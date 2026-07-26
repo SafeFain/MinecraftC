@@ -131,9 +131,11 @@ typedef void          (APIENTRY *PFNGLDELETEPROGRAMPROC)(GLuint);
 
 typedef GLint         (APIENTRY *PFNGLGETUNIFORMLOCATIONPROC)(GLuint, const GLchar*);
 typedef void          (APIENTRY *PFNGLUNIFORMMATRIX4FVPROC)(GLint, GLsizei, GLboolean, const GLfloat*);
+typedef void          (APIENTRY *PFNGLUNIFORM1FPROC)(GLint, GLfloat);
 typedef void          (APIENTRY *PFNGLUNIFORM3FPROC)(GLint, GLfloat, GLfloat, GLfloat);
 typedef void          (APIENTRY *PFNGLUNIFORM1IPROC)(GLint, GLint);
 typedef void          (APIENTRY *PFNGLBLENDFUNCPROC)(GLenum, GLenum);
+typedef void          (APIENTRY *PFNGLDEPTHMASKPROC)(GLboolean);
 typedef void          (APIENTRY *PFNGLGETBOOLEANVPROC)(GLenum, GLboolean*);
 typedef void          (APIENTRY *PFNGLUNIFORM4FPROC)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
 
@@ -163,7 +165,9 @@ typedef void          (APIENTRY *PFNGLGENERATEMIPMAPPROC)(GLenum);
 #define GL_TEXTURE_MAG_FILTER       0x2800
 #define GL_NEAREST                  0x2600
 #define GL_NEAREST_MIPMAP_NEAREST   0x2700
+#define GL_NEAREST_MIPMAP_LINEAR    0x2702
 #define GL_RGBA                     0x1908
+#define GL_SRGB8_ALPHA8             0x8C43
 #define GL_UNSIGNED_BYTE            0x1401
 #endif
 
@@ -179,6 +183,10 @@ typedef void          (APIENTRY *PFNGLGENERATEMIPMAPPROC)(GLenum);
 #define GL_CLAMP_TO_EDGE            0x812F
 #define GL_TEXTURE_WRAP_S           0x2802
 #define GL_TEXTURE_WRAP_T           0x2803
+#define GL_TEXTURE_MAX_LEVEL        0x813D
+#define GL_MULTISAMPLE              0x809D
+#define GL_SAMPLES                  0x80A9
+#define GL_FRAMEBUFFER_SRGB         0x8DB9
 #define GL_ACTIVE_TEXTURE           0x84E0
 #endif
 
@@ -217,9 +225,11 @@ extern PFNGLDELETEPROGRAMPROC          glad_glDeleteProgram;
 
 extern PFNGLGETUNIFORMLOCATIONPROC     glad_glGetUniformLocation;
 extern PFNGLUNIFORMMATRIX4FVPROC       glad_glUniformMatrix4fv;
+extern PFNGLUNIFORM1FPROC              glad_glUniform1f;
 extern PFNGLUNIFORM3FPROC              glad_glUniform3f;
 extern PFNGLUNIFORM1IPROC              glad_glUniform1i;
 extern PFNGLBLENDFUNCPROC              glad_glBlendFunc;
+extern PFNGLDEPTHMASKPROC              glad_glDepthMask;
 extern PFNGLGETBOOLEANVPROC            glad_glGetBooleanv;
 extern PFNGLUNIFORM4FPROC              glad_glUniform4f;
 
@@ -284,9 +294,11 @@ int gladLoadGL(void* (*getProcAddress)(const char*));
 
 #define glGetUniformLocation    glad_glGetUniformLocation
 #define glUniformMatrix4fv      glad_glUniformMatrix4fv
+#define glUniform1f             glad_glUniform1f
 #define glUniform3f             glad_glUniform3f
 #define glUniform1i             glad_glUniform1i
 #define glBlendFunc             glad_glBlendFunc
+#define glDepthMask             glad_glDepthMask
 #define glGetBooleanv           glad_glGetBooleanv
 #define glUniform4f             glad_glUniform4f
 

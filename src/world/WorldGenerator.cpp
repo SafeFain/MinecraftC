@@ -1,5 +1,6 @@
 #include "world/WorldGenerator.h"
 #include "Config.h"
+#include "world/SurfaceRules.h"
 #include <cmath>
 #include <algorithm>
 
@@ -51,6 +52,8 @@ void WorldGenerator::generate(Chunk& chunk,
             int   height = heightMap[x][z];
             Biome biome  = biomeMap[x][z];
             const BiomeProperties& bprops = getBiomeProps(biome);
+            SurfaceProfile surface = SurfaceRules::profile(
+                m_seed, wxBase + x, wzBase + z, biome);
 
             // Bedrock (y = 0 .. BEDROCK_LEVEL)
             for (int y = 0; y <= Config::BEDROCK_LEVEL; ++y) {
@@ -58,7 +61,7 @@ void WorldGenerator::generate(Chunk& chunk,
             }
 
             // Stone (bedrock+1 .. height-4)
-            int subsoilTop = height - 3;
+            int subsoilTop = height - surface.depth;
             int stoneStart = Config::BEDROCK_LEVEL + 1;
             int stoneEnd   = std::max(stoneStart, subsoilTop);
 
@@ -71,38 +74,13 @@ void WorldGenerator::generate(Chunk& chunk,
                 chunk.setBlock(x, y, z, BlockId::DEEPSLATE);
             }
 
-            // Ore generation: replace stone/deepslate with ore veins
-            float wx = static_cast<float>(wxBase + x) + 0.5f;
-            float wz = static_cast<float>(wxBase + z) + 0.5f;
-            for (int y = stoneStart; y < stoneEnd; ++y) {
-                BlockId existing = chunk.getBlock(x, y, z);
-                BlockId ore = m_oreGenerator.getOre(wx, static_cast<float>(y) + 0.5f, wz, existing);
-                if (ore != BlockId::AIR) {
-                    chunk.setBlock(x, y, z, ore);
-                }
-            }
-
-            // Lava pools at depth
-            for (int y = Config::LAVA_POOL_MIN_Y; y <= Config::LAVA_POOL_MAX_Y && y < stoneEnd; ++y) {
-                BlockId existing = chunk.getBlock(x, y, z);
-                if (existing == BlockId::STONE || existing == BlockId::DEEPSLATE) {
-                    uint64_t ph = static_cast<uint64_t>(x) * 6364136223846793005ULL
-                                + static_cast<uint64_t>(y) * 1442695040888963407ULL
-                                + static_cast<uint64_t>(z) * 3487395720957301753ULL + m_seed;
-                    if (static_cast<float>(ph & 0xFFFF) / 65536.0f < Config::LAVA_POOL_CHANCE) {
-                        chunk.setBlock(x, y, z, BlockId::LAVA);
-                    }
-                }
-            }
-
             // Subsoil (height-3 .. height-1)
             for (int y = stoneEnd; y < height; ++y) {
-                chunk.setBlock(x, y, z, bprops.subsoilBlock);
+                chunk.setBlock(x, y, z, surface.under);
             }
 
             // Surface block (y = height)
-            BlockId surface = bprops.surfaceBlock;
-            chunk.setBlock(x, height, z, surface);
+            chunk.setBlock(x, height, z, surface.top);
 
             // Snow cover: if height >= biome snowLine, override surface
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
@@ -126,88 +104,48 @@ void WorldGenerator::generate(Chunk& chunk,
         }
     }
 
-    // ── Phase 3: Cave carving ───────────────────────────────────────────
-    // Precompute worm tunnel segments for this chunk + padding
-    int caveYMin = Config::CAVE_MIN_Y;
-    int caveYMax = Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN;
-    constexpr int kTunnelPad = 16;  // safety margin beyond cell expansion
-    int tunMinX = wxBase - kTunnelPad;
-    int tunMaxX = wxBase + Config::CHUNK_SIZE_X + kTunnelPad;
-    int tunMinZ = wzBase - kTunnelPad;
-    int tunMaxZ = wzBase + Config::CHUNK_SIZE_Z + kTunnelPad;
-    auto tunnels = m_caveGenerator.generateTunnels(
-        tunMinX, caveYMin, tunMinZ, tunMaxX, caveYMax, tunMaxZ);
-
-    CaveSpatialIndex caveIndex;
-    caveIndex.build(tunnels,
-        static_cast<float>(tunMinX), static_cast<float>(caveYMin), static_cast<float>(tunMinZ),
-        static_cast<float>(tunMaxX), static_cast<float>(caveYMax), static_cast<float>(tunMaxZ));
-
-    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            int height = heightMap[x][z];
-            int caveMinY = Config::CAVE_MIN_Y;
-            int caveMaxY = std::min(height - Config::CAVE_CEILING_MARGIN,
-                                    Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN);
-            if (caveMaxY <= caveMinY) continue;
-
-            float wx = static_cast<float>(wxBase + x) + 0.5f;
-            float wz = static_cast<float>(wxBase + z) + 0.5f;
-            int carvedInColumn = 0;
-            int maxCarveInColumn = (caveMaxY - caveMinY) * Config::CAVE_MAX_CARVE_RATIO / 100;
-            for (int y = caveMinY; y < caveMaxY; ++y) {
-                float wy = static_cast<float>(y) + 0.5f;
-                if (m_caveGenerator.isInTunnel(wx, wy, wz, caveIndex, tunnels) ||
-                    m_caveGenerator.isInRoom(wx, wy, wz, height)) {
-                    BlockId existing = chunk.getBlock(x, y, z);
-                    // Carve through stone, deepslate, and subsoil (dirt/sand)
-                    if (existing == BlockId::STONE ||
-                        existing == BlockId::DIRT  ||
-                        existing == BlockId::SAND  ||
-                        existing == BlockId::DEEPSLATE) {
-                        // Limit per-column carving to prevent hollow columns
-                        if (carvedInColumn < maxCarveInColumn) {
-                            chunk.setBlock(x, y, z, BlockId::AIR);
-                            ++carvedInColumn;
-                        }
-                    }
-                }
-            }
+    // ── Phase 3: Hybrid caves, liquids, then ores ───────────────────────
+    std::vector<CaveColumnInfo> caveColumns(
+        static_cast<size_t>(Config::CHUNK_SIZE_X) * Config::CHUNK_SIZE_Z);
+    for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+            const auto& props = getBiomeProps(biomeMap[x][z]);
+            caveColumns[static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x] = {
+                heightMap[x][z], props.waterLevel,
+                riverMap[x][z] || heightMap[x][z] < props.waterLevel
+            };
         }
     }
-    // ── Phase 3b: Cave connectivity ─────────────────────────────────────
-    // Remove thin stone walls between adjacent cave air pockets.
-    // Iterate twice to propagate connectivity through 2-block-thick walls.
-    constexpr int kConnectPasses = 2;
-    constexpr int kMinAirNeighbors = 3;  // carve if ≥ this many air neighbors
-
-    for (int pass = 0; pass < kConnectPasses; ++pass) {
-        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-                int height = heightMap[x][z];
-                int caveMinY = Config::CAVE_MIN_Y;
-                int caveMaxY = std::min(height - Config::CAVE_CEILING_MARGIN,
-                                        Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN);
-                for (int y = caveMinY; y < caveMaxY; ++y) {
-                    BlockId cur = chunk.getBlock(x, y, z);
-                    if (cur != BlockId::STONE && cur != BlockId::DIRT &&
-                        cur != BlockId::SAND && cur != BlockId::DEEPSLATE) {
-                        continue;
-                    }
-
-                    // Count air neighbors on 6 faces
-                    int airCount = 0;
-                    if (x > 0                    && chunk.getBlock(x-1, y, z) == BlockId::AIR) ++airCount;
-                    if (x < Config::CHUNK_SIZE_X-1 && chunk.getBlock(x+1, y, z) == BlockId::AIR) ++airCount;
-                    if (y > 0                    && chunk.getBlock(x, y-1, z) == BlockId::AIR) ++airCount;
-                    if (y < Config::CHUNK_SIZE_Y-1 && chunk.getBlock(x, y+1, z) == BlockId::AIR) ++airCount;
-                    if (z > 0                    && chunk.getBlock(x, y, z-1) == BlockId::AIR) ++airCount;
-                    if (z < Config::CHUNK_SIZE_Z-1 && chunk.getBlock(x, y, z+1) == BlockId::AIR) ++airCount;
-
-                    if (airCount >= kMinAirNeighbors) {
-                        chunk.setBlock(x, y, z, BlockId::AIR);
-                    }
-                }
+    CaveVolume caveVolume = m_caveGenerator.generateVolume(
+        wxBase, wzBase, Config::CHUNK_SIZE_X, Config::CHUNK_SIZE_Z, caveColumns);
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            int wx = wxBase + x, wz = wzBase + z;
+            for (int y = Config::CAVE_MIN_Y; y < Config::CHUNK_SIZE_Y; ++y) {
+                CaveCell cell = caveVolume.get(wx, y, wz);
+                if (cell == CaveCell::Solid) continue;
+                BlockId current = chunk.getBlock(x, y, z);
+                bool carveable = current == BlockId::STONE || current == BlockId::DEEPSLATE ||
+                                 current == BlockId::DIRT || current == BlockId::SAND ||
+                                 current == BlockId::GRASS || current == BlockId::SNOW;
+                if (!carveable) continue;
+                chunk.setBlock(x, y, z, cell == CaveCell::Water ? BlockId::WATER :
+                    cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR);
+            }
+            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::CHUNK_SIZE_Y; ++y) {
+                BlockId current = chunk.getBlock(x, y, z);
+                if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
+                BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
+                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f, current);
+                if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
+            }
+            if (heightMap[x][z] + 1 < Config::CHUNK_SIZE_Y &&
+                chunk.getBlock(x, heightMap[x][z], z) != BlockId::AIR &&
+                chunk.getBlock(x, heightMap[x][z] + 1, z) == BlockId::AIR) {
+                BlockId decoration = SurfaceRules::decoration(
+                    m_seed, wx, wz, heightMap[x][z], biomeMap[x][z], riverMap[x][z]);
+                if (decoration != BlockId::AIR)
+                    chunk.setBlock(x, heightMap[x][z] + 1, z, decoration);
             }
         }
     }
@@ -247,13 +185,18 @@ void WorldGenerator::generate(Chunk& chunk,
 // ═══════════════════════════════════════════════════════════════════════════
 
 void WorldGenerator::placeTrunk(Chunk& chunk, int x, int baseY, int z,
-                                 int trunkHeight) {
+                                 int trunkHeight, TreeType type) {
+    BlockId wood = BlockId::WOOD;
+    if (type == TreeType::BIRCH) wood = BlockId::BIRCH_WOOD;
+    else if (type == TreeType::SPRUCE) wood = BlockId::SPRUCE_WOOD;
+    else if (type == TreeType::JUNGLE) wood = BlockId::JUNGLE_WOOD;
+    else if (type == TreeType::ACACIA) wood = BlockId::ACACIA_WOOD;
     for (int y = baseY; y < baseY + trunkHeight; ++y) {
         if (x >= 0 && x < 16 && z >= 0 && z < 16 &&
             y >= 0 && y < Config::CHUNK_SIZE_Y) {
             BlockId cur = chunk.getBlock(x, y, z);
             if (cur != BlockId::WATER) {
-                chunk.setBlock(x, y, z, BlockId::WOOD);
+                chunk.setBlock(x, y, z, wood);
             }
         }
     }
@@ -268,11 +211,19 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
                                const BlockSetter& blockSetter,
                                int chunkWorldX, int chunkWorldZ) {
     auto setLeaf = [&](int lx, int ly, int lz, BlockId id) {
+        if (id == BlockId::LEAVES) {
+            if (type == TreeType::BIRCH) id = BlockId::BIRCH_LEAVES;
+            else if (type == TreeType::SPRUCE) id = BlockId::SPRUCE_LEAVES;
+            else if (type == TreeType::JUNGLE) id = BlockId::JUNGLE_LEAVES;
+            else if (type == TreeType::ACACIA) id = BlockId::ACACIA_LEAVES;
+        }
         if (ly < 0 || ly >= Config::CHUNK_SIZE_Y) return;
         if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) {
             BlockId cur = chunk.getBlock(lx, ly, lz);
-            if (cur == BlockId::AIR || cur == BlockId::LEAVES ||
-                cur == BlockId::SNOW) {
+            bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
+                        cur == BlockId::SPRUCE_LEAVES || cur == BlockId::JUNGLE_LEAVES ||
+                        cur == BlockId::ACACIA_LEAVES;
+            if (cur == BlockId::AIR || leaf || cur == BlockId::SNOW) {
                 chunk.setBlock(lx, ly, lz, id);
             }
         } else if (blockSetter) {
@@ -289,7 +240,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
     switch (type) {
         case TreeType::OAK: {
             // Classic oak: trunk + spherical leaf canopy
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             int leafBase = baseY + trunkHeight - 2;
             for (int ly = leafBase; ly < leafBase + 4; ++ly) {
                 int radius = (ly < leafBase + 2) ? 2 : 1;
@@ -306,7 +257,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
         case TreeType::BIRCH: {
             // Taller thin trunk, smaller leaf cap
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             int leafBase = baseY + trunkHeight - 2;
             for (int ly = leafBase; ly < leafBase + 3; ++ly) {
                 int radius = 1;
@@ -323,7 +274,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
         case TreeType::SPRUCE: {
             // Tall conical spruce
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             // Conical leaf layers: wider at bottom, narrow at top
             int leafBase = baseY + trunkHeight - 4;
             for (int ly = leafBase; ly < leafBase + 5; ++ly) {
@@ -342,7 +293,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
         case TreeType::JUNGLE: {
             // Thick trunk, wide canopy
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             int leafBase = baseY + trunkHeight - 3;
             for (int ly = leafBase; ly < leafBase + 5; ++ly) {
                 int radius = (ly < leafBase + 2) ? 3 : 2;
@@ -361,7 +312,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
         case TreeType::ACACIA: {
             // Slanted trunk effect simplified: straight trunk + flat top
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             // Flat canopy at top
             int leafY = baseY + trunkHeight - 1;
             for (int dx = -2; dx <= 2; ++dx) {
@@ -376,7 +327,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
         case TreeType::SWAMP_OAK: {
             // Short trunk with wide low canopy, often in water
-            placeTrunk(chunk, x, baseY, z, trunkHeight);
+            placeTrunk(chunk, x, baseY, z, trunkHeight, type);
             int leafBase = baseY + trunkHeight - 1;
             for (int ly = leafBase; ly < leafBase + 3; ++ly) {
                 int radius = 2;

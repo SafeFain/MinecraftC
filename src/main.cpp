@@ -2,6 +2,7 @@
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
+#include "renderer/RenderEnvironment.h"
 #include "Config.h"
 #include "world/World.h"
 #include "player/Player.h"
@@ -11,13 +12,24 @@
 #include "ui/SettingsMenu.h"
 #include "ui/Hotbar.h"
 #include "ui/Inventory.h"
+#include "ui/SurvivalInventory.h"
+#include "ui/ContainerScreen.h"
 #include "debug/Log.h"
 #include "debug/CrashHandler.h"
+#include "game/SaveStore.h"
+#include "game/WorldCatalog.h"
+#include "game/Command.h"
+#include "world/WorldGenContext.h"
+#include "entity/EntityManager.h"
 #include <glad/glad.h>
 
 #include <stdexcept>
 #include <chrono>
 #include <cmath>
+#include <algorithm>
+#include <filesystem>
+#include <vector>
+#include <random>
 
 class Application {
 public:
@@ -44,6 +56,7 @@ private:
     ThreadPool  m_threadPool;
     World       m_world;
     Player      m_player{m_world};
+    EntityManager m_entities{m_world};
     bool        m_running = true;
 
     // ── UI / State ────────────────────────────────────────────────────
@@ -52,15 +65,31 @@ private:
     std::unique_ptr<Menu> m_activeMenu;
     MenuCallbacks         m_menuCallbacks;
     bool                  m_terrainGenerated = false;
+    std::unique_ptr<SaveStore> m_saveStore;
+    WorldCatalog          m_worldCatalog;
+    WorldMetadata         m_worldMetadata;
+    float                 m_autosaveSeconds = 0.0f;
+    bool                  m_playerDead = false;
+    uint64_t              m_survivalTicks = 0;
+    float                 m_survivalWorldTickRemainder = 0.0f;
 
     Hotbar                m_hotbar;
     CreativeInventory     m_inventory;
+    SurvivalInventoryScreen m_survivalInventory{m_player.inventory()};
+    ContainerScreen         m_containerScreen{m_player.inventory()};
+    bool                    m_containerOpen = false;
     bool                  m_inventoryOpen = false;
     double                m_mouseScreenX = 0.0;
     double                m_mouseScreenY = 0.0;
+    bool                  m_commandOpen = false;
+    bool                  m_suppressCommandChar = false;
+    std::string           m_commandInput;
+    std::string           m_commandMessage;
+    float                 m_commandMessageSeconds = 0.0f;
 
     using Clock = std::chrono::high_resolution_clock;
     Clock::time_point m_lastFrame;
+    DayNightCycle m_dayNightCycle;
 
     // Key state tracking
     bool m_keys[512] = {};
@@ -78,26 +107,67 @@ private:
         // Set initial viewport (framebuffer size already queried in Window constructor)
         glViewport(0, 0, m_window.width(), m_window.height());
 
-        m_renderer.initialize();
-        m_uiRenderer.initialize();
+        m_renderer.initialize(m_window.isSrgbCapable());
+        m_uiRenderer.initialize(
+            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb());
 
         // Start with cursor visible (main menu)
         m_window.setCursorLocked(false);
 
         // Set up thread pool for async mesh building
         m_world.setThreadPool(&m_threadPool);
+        m_player.setEntityManager(&m_entities);
+        m_player.setBedCallback([this](const glm::ivec3& bed) {
+            if (!m_entities.hasHostileNear(glm::vec3(bed), 8.0f)) {
+                m_worldMetadata.bedSpawn = bed;
+                m_dayNightCycle.resetMorning();
+            }
+        });
 
         // ── Menu callbacks ────────────────────────────────────────────
-        m_menuCallbacks.onStartGame = [this]() { startGame(); };
+        m_menuCallbacks.onOpenWorld = [this](const std::string& id) {
+            startGame(id, false);
+        };
+        m_menuCallbacks.onCreateWorld =
+            [this](const std::string& name, const std::string& seedText,
+                   GameMode mode, bool cheatsEnabled) {
+                uint64_t seed = 0;
+                if (seedText.empty() || seedText == "-") {
+                    std::random_device device;
+                    std::mt19937_64 generator(device());
+                    seed = generator();
+                } else {
+                    std::size_t consumed = 0;
+                    try {
+                        if (seedText.front() == '-') {
+                            const int64_t signedSeed = std::stoll(seedText, &consumed, 10);
+                            seed = static_cast<uint64_t>(signedSeed);
+                        } else {
+                            seed = std::stoull(seedText, &consumed, 10);
+                        }
+                    } catch (const std::exception&) {
+                        LOG_WARN("Invalid seed '" << seedText << "'; using a random seed");
+                        std::random_device device;
+                        std::mt19937_64 generator(device());
+                        seed = generator();
+                    }
+                    if (consumed != seedText.size())
+                        LOG_WARN("Seed contained unused characters: " << seedText);
+                }
+                const std::string id = m_worldCatalog.create(
+                    name, seed, mode, Difficulty::Normal, cheatsEnabled);
+                startGame(id, true);
+            };
         m_menuCallbacks.onResume = [this]() {
             m_gameState = GameState::Playing;
             m_window.setCursorLocked(true);
             m_activeMenu.reset();
         };
         m_menuCallbacks.onBackToMenu = [this]() {
+            saveCurrentWorld();
             m_gameState = GameState::MainMenu;
             m_window.setCursorLocked(false);
-            m_activeMenu = std::make_unique<MainMenu>(m_menuCallbacks);
+            showMainMenu();
         };
         m_menuCallbacks.onQuit = [this]() { m_running = false; };
 
@@ -110,7 +180,7 @@ private:
                 if (prevState == GameState::Paused) {
                     m_activeMenu = std::make_unique<PauseMenu>(prevCallbacks);
                 } else {
-                    m_activeMenu = std::make_unique<MainMenu>(prevCallbacks);
+                    showMainMenu();
                 }
             });
         };
@@ -124,9 +194,34 @@ private:
                 if (key < 512) m_keys[key] = false;
             }
 
+            if (m_commandOpen) {
+                if (action == GLFW_PRESS) {
+                    if (key == GLFW_KEY_ESCAPE) {
+                        closeCommandInput();
+                    } else if (key == GLFW_KEY_ENTER) {
+                        executeCommand();
+                    } else if (key == GLFW_KEY_BACKSPACE &&
+                               !m_commandInput.empty()) {
+                        m_commandInput.pop_back();
+                    }
+                }
+                return;
+            }
+
+            if (key == GLFW_KEY_T && action == GLFW_PRESS &&
+                m_gameState == GameState::Playing && !m_activeMenu &&
+                !m_inventoryOpen && !m_playerDead) {
+                m_commandOpen = true;
+                m_commandInput.clear();
+                m_suppressCommandChar = true;
+                m_window.setCursorLocked(false);
+                return;
+            }
+
             // E key — toggle creative inventory (Playing only, no menu active)
             if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-                if (m_gameState == GameState::Playing && !m_activeMenu) {
+                if (m_gameState == GameState::Playing && !m_activeMenu &&
+                    !m_player.isSpectator()) {
                     if (m_inventoryOpen) {
                         closeInventory();
                     } else {
@@ -140,6 +235,7 @@ private:
             if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
                 if (m_gameState == GameState::Playing) {
                     m_hotbar.onKeyPress(key);
+                    m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
                     m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
                 }
             }
@@ -166,26 +262,82 @@ private:
                 return;
             }
 
+            if (m_playerDead && action == GLFW_PRESS &&
+                (key == GLFW_KEY_ENTER || key == GLFW_KEY_SPACE)) {
+                respawnPlayer();
+                return;
+            }
+
             // Route to active menu for key presses
             if (action == GLFW_PRESS && m_activeMenu) {
                 m_activeMenu->onKeyPress(key);
             }
         });
+        m_window.setCharCallback([this](unsigned int codepoint) {
+            if (m_commandOpen) {
+                if (m_suppressCommandChar) {
+                    m_suppressCommandChar = false;
+                    return;
+                }
+                if (codepoint >= 32 && codepoint <= 126 &&
+                    m_commandInput.size() < 80) {
+                    m_commandInput.push_back(static_cast<char>(codepoint));
+                }
+            } else if (m_activeMenu) {
+                m_activeMenu->onChar(codepoint);
+            }
+        });
 
         m_window.setMouseButtonCallback([this](int button, int action, int /*mods*/) {
+            updateMouseScreenPosition();
+            if (m_inventoryOpen && (m_player.isSurvival() || m_containerOpen) &&
+                (action == GLFW_PRESS || action == GLFW_RELEASE)) {
+                if (m_containerOpen) m_containerScreen.onMouseButton(
+                    button, action, static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                else m_survivalInventory.onMouseButton(button, action,
+                    static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                return;
+            }
+            if (!m_inventoryOpen && !m_commandOpen &&
+                m_gameState == GameState::Playing &&
+                (action == GLFW_PRESS || action == GLFW_RELEASE)) {
+                if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_RIGHT &&
+                    !m_player.isSpectator()) {
+                    auto hit = m_world.raycast(
+                        m_player.getEyePosition(), m_player.getForward(),
+                        Config::REACH_DISTANCE);
+                    if (hit) {
+                        const BlockId target = m_world.getBlock(
+                            hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+                        if (target == BlockId::CRAFTING_TABLE && m_player.isSurvival()) {
+                            openInventory();
+                            m_survivalInventory.setCraftingTable(true);
+                            return;
+                        }
+                        if (target == BlockId::CHEST || target == BlockId::FURNACE) {
+                            if (m_containerScreen.open(m_world, hit->blockPos)) {
+                                m_containerOpen = true;
+                                m_inventoryOpen = true;
+                                m_window.setCursorLocked(false);
+                                return;
+                            }
+                        }
+                    }
+                }
+                m_player.handleMouseButton(button, action);
+                return;
+            }
             if (action == GLFW_PRESS) {
                 if (m_inventoryOpen) {
-                    // Click in inventory grid
-                    m_inventory.onMouseClick(button,
-                        static_cast<int>(m_mouseScreenX),
-                        static_cast<int>(m_mouseScreenY),
-                        [this](BlockId id) {
-                            // Select block: update hotbar slot + player
-                            m_hotbar.setSlotBlock(m_hotbar.getSelectedSlot(), id);
-                            m_player.setSelectedBlock(id);
-                        });
-                } else if (m_gameState == GameState::Playing) {
-                    m_player.handleMouseButton(button);
+                    if (!m_player.isSurvival()) {
+                        m_inventory.onMouseClick(button,
+                            static_cast<int>(m_mouseScreenX),
+                            static_cast<int>(m_mouseScreenY),
+                            [this](BlockId id) {
+                                m_hotbar.setSlotBlock(m_hotbar.getSelectedSlot(), id);
+                                m_player.setSelectedBlock(id);
+                            });
+                    }
                 } else if (m_activeMenu) {
                     m_activeMenu->onMouseClick(button);
                 }
@@ -193,14 +345,16 @@ private:
         });
 
         m_window.setScrollCallback([this](double /*xoffset*/, double yoffset) {
-            if (m_gameState == GameState::Playing && !m_activeMenu && !m_inventoryOpen) {
+            if (m_gameState == GameState::Playing && !m_activeMenu &&
+                !m_inventoryOpen && !m_commandOpen) {
                 m_hotbar.onScroll(yoffset);
+                m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
                 m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
             }
         });
 
         // ── Show main menu ────────────────────────────────────────────
-        m_activeMenu = std::make_unique<MainMenu>(m_menuCallbacks);
+        showMainMenu();
 
         m_lastFrame = Clock::now();
 
@@ -209,17 +363,37 @@ private:
         LOG_INFO("Renderer: " << glGetString(GL_RENDERER));
     }
 
-    void startGame() {
+    void showMainMenu() {
+        m_activeMenu = std::make_unique<MainMenu>(
+            m_menuCallbacks, m_worldCatalog.list());
+    }
+
+    void startGame(const std::string& worldId, bool newWorld) {
+        saveCurrentWorld();
+        m_saveStore = std::make_unique<SaveStore>(m_worldCatalog.open(worldId));
+        m_worldMetadata = m_saveStore->loadMetadata();
+        const GameMode mode = m_worldMetadata.gameMode;
+
         m_gameState = GameState::Playing;
+        m_player.configureRules(mode, m_worldMetadata.difficulty);
+        m_hotbar.setSurvivalInventory(
+            mode == GameMode::Survival ? &m_player.inventory() : nullptr);
+        m_player.inventory() = m_worldMetadata.inventory;
+        m_player.survivalStats().set(
+            m_worldMetadata.health, m_worldMetadata.hunger,
+            m_worldMetadata.saturation, m_worldMetadata.exhaustion);
+        if (!newWorld) m_player.setPosition(m_worldMetadata.playerPosition);
+        m_dayNightCycle.resetMorning();
         m_window.setCursorLocked(true);
         m_activeMenu.reset();
 
-        // If returning from menu, regenerate world with current seed
-        if (m_terrainGenerated) {
-            LOG_INFO("Regenerating world with seed " << Config::WORLD_SEED);
-            m_world.resetForNewSeed(Config::WORLD_SEED);
-            m_terrainGenerated = false;
-        }
+        m_world.setSaveStore(m_saveStore.get());
+        m_entities.setSaveStore(m_saveStore.get());
+        LOG_INFO("Loading world with seed " << m_worldMetadata.seed);
+        m_world.resetForNewSeed(m_worldMetadata.seed);
+        m_entities.clear();
+        if (!newWorld) m_entities.loadEntities(m_worldMetadata.entities);
+        m_terrainGenerated = false;
 
         if (!m_terrainGenerated) {
             // Terrain generation — first batch: create chunks, generate async, wait briefly
@@ -231,14 +405,27 @@ private:
             m_world.buildMeshesSync(&m_renderer, 16);
             auto t1 = Clock::now();
             float genTime = std::chrono::duration<float>(t1 - t0).count();
-            LOG_INFO("Seed: " << Config::WORLD_SEED);
+            LOG_INFO("Seed: " << m_worldMetadata.seed);
             LOG_INFO("Chunks: " << m_world.getActiveChunks().size());
             LOG_INFO("Terrain generated in " << genTime << "s");
             LOG_INFO("Thread pool: " << m_threadPool.threadCount() << " workers");
 
-            safeSpawn();
+            if (newWorld) {
+                safeSpawn();
+                const auto position = m_player.getPosition();
+                m_worldMetadata.worldSpawn = glm::ivec3(
+                    static_cast<int>(std::floor(position.x)),
+                    static_cast<int>(std::floor(position.y)),
+                    static_cast<int>(std::floor(position.z)));
+            }
             m_terrainGenerated = true;
         }
+        m_autosaveSeconds = 0.0f;
+        m_playerDead = false;
+        m_commandOpen = false;
+        m_commandInput.clear();
+        m_survivalTicks = m_worldMetadata.worldTicks;
+        m_survivalWorldTickRemainder = 0.0f;
 
         LOG_INFO("WASD=move | Mouse=look | Space=jump | Ctrl=sprint");
         LOG_INFO("Left-click=break | Right-click=place | ESC=pause");
@@ -280,6 +467,9 @@ private:
             float dt = std::chrono::duration<float>(now - m_lastFrame).count();
             m_lastFrame = now;
             dt = std::min(dt, 0.1f);
+            if (m_commandMessageSeconds > 0.0f)
+                m_commandMessageSeconds =
+                    std::max(0.0f, m_commandMessageSeconds - dt);
 
             m_window.pollEvents();
 
@@ -289,21 +479,17 @@ private:
             }
 
             // ── Handle input ──────────────────────────────────────────
-            if (m_gameState == GameState::Playing && !m_inventoryOpen) {
+            if (m_gameState == GameState::Playing && !m_inventoryOpen &&
+                !m_commandOpen) {
                 double dx, dy;
                 m_window.getCursorDelta(dx, dy);
                 m_player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy));
-                m_player.handleMovement(m_keys, dt);
+                if (!m_playerDead) m_player.handleMovement(m_keys, dt);
             }
 
             // Track mouse position (always, for inventory/menu hover)
             {
-                double mx, my;
-                m_window.getCursorPos(mx, my);
-                int fbWidth, fbHeight;
-                glfwGetFramebufferSize(m_window.native(), &fbWidth, &fbHeight);
-                m_mouseScreenX = mx;
-                m_mouseScreenY = static_cast<double>(fbHeight) - my;
+                updateMouseScreenPosition();
 
                 // Route to inventory hover if open
                 if (m_inventoryOpen) {
@@ -319,21 +505,51 @@ private:
             }
 
             // ── Update ────────────────────────────────────────────────
+            m_dayNightCycle.update(
+                dt, Config::DAY_CYCLE_MINUTES, m_gameState == GameState::Playing);
             if (m_gameState == GameState::Playing) {
-                m_player.update(dt);
+                if (m_containerOpen && (!m_containerScreen.valid())) closeInventory();
+                if (!m_playerDead) m_player.update(dt);
+                if (m_player.isSurvival()) {
+                    const RenderEnvironment current = m_dayNightCycle.evaluate();
+                    const bool peaceful = m_player.difficulty() == Difficulty::Peaceful;
+                    m_entities.update(m_player, dt,
+                        current.starIntensity > 0.25f && !peaceful, peaceful);
+                    if (!m_playerDead && m_player.survivalStats().dead())
+                        beginPlayerDeath();
+                    m_survivalWorldTickRemainder += dt * 20.0f;
+                    while (m_survivalWorldTickRemainder >= 1.0f) {
+                        ++m_survivalTicks;
+                        m_survivalWorldTickRemainder -= 1.0f;
+                        m_world.tickBlockEntities();
+                        if ((m_survivalTicks % 20) == 0)
+                            m_world.tickSurvival(
+                                m_player.getPosition(), m_survivalTicks);
+                    }
+                }
                 m_world.update(m_player.getPosition());
 
                 // Async generation pipeline: terrain gen → mesh build → GPU upload
                 m_world.enqueueGeneration();
                 m_world.processCompletedGenerations();
+                m_entities.syncChunks();
 
                 // Async mesh building
                 m_world.enqueueMeshBuilds();
                 m_world.processCompletedMeshes(&m_renderer, Config::MESH_UPLOADS_PER_FRAME);
 
-                // Sync camera to player
-                m_camera.setPosition(m_player.getEyePosition());
+                // Camera-relative rendering keeps all GPU coordinates near
+                // zero even when the logical world position is millions of
+                // blocks from spawn.
+                const glm::dvec3 eye = m_player.getEyePosition();
+                m_camera.setPosition(glm::vec3(
+                    0.0f, static_cast<float>(eye.y), 0.0f));
                 m_camera.updateVectors(m_player.getYaw(), m_player.getPitch());
+                m_autosaveSeconds += dt;
+                if (m_autosaveSeconds >= 30.0f) {
+                    saveCurrentWorld();
+                    m_autosaveSeconds = 0.0f;
+                }
             }
 
             // ── 3D Rendering ──────────────────────────────────────────
@@ -345,22 +561,38 @@ private:
 
                 Frustum frustum;
                 frustum.extractFromVP(vp);
+                const RenderEnvironment environment = m_dayNightCycle.evaluate();
 
                 m_renderer.beginFrame();
+                m_renderer.renderSky(
+                    environment, glm::inverse(vp), m_camera.m_position);
+                m_renderer.setEnvironment(environment, m_camera.m_position);
                 m_renderer.setViewProjection(vp);
                 m_renderer.setFrustum(frustum);
 
                 // Bind block shader once for all chunks (saves ~N glUseProgram calls)
                 m_renderer.bindBlockShader();
 
+                struct VisibleChunk {
+                    const Chunk* chunk;
+                    glm::mat4 model;
+                    float distance2;
+                };
+                std::vector<VisibleChunk> visibleChunks;
                 int rendered = 0;
+                const glm::dvec3 playerPosition = m_player.getPosition();
+                const glm::dvec3 renderOrigin(
+                    playerPosition.x, 0.0, playerPosition.z);
                 for (const auto* chunk : m_world.getActiveChunks()) {
                     const ChunkMesh& mesh = chunk->getMesh();
                     if (!mesh.gpuReady || mesh.indexCount == 0) continue;
 
                     // Tighter AABB: use actual max block height instead of full chunk height
                     int chunkMaxY = chunk->getGlobalMaxY();
-                    glm::vec3 aabbMin(chunk->worldX(), 0.0f, chunk->worldZ());
+                    glm::vec3 aabbMin(
+                        static_cast<float>(chunk->worldX() - renderOrigin.x),
+                        0.0f,
+                        static_cast<float>(chunk->worldZ() - renderOrigin.z));
                     glm::vec3 aabbMax(aabbMin.x + Config::CHUNK_SIZE_X,
                                       static_cast<float>(chunkMaxY + 1),
                                       aabbMin.z + Config::CHUNK_SIZE_Z);
@@ -368,14 +600,36 @@ private:
                     if (!frustum.intersectsAABB(aabbMin, aabbMax)) continue;
 
                     glm::mat4 model = glm::translate(glm::mat4(1.0f), aabbMin);
-                    m_renderer.renderChunk(mesh, model, vp);
+                    glm::vec3 center = aabbMin + glm::vec3(
+                        Config::CHUNK_SIZE_X * 0.5f,
+                        chunkMaxY * 0.5f,
+                        Config::CHUNK_SIZE_Z * 0.5f);
+                    glm::vec3 delta = center - m_camera.m_position;
+                    visibleChunks.push_back({chunk, model, glm::dot(delta, delta)});
+                    m_renderer.renderChunk(mesh, model, vp, false);
                     ++rendered;
                 }
+
+                std::sort(visibleChunks.begin(), visibleChunks.end(),
+                    [](const VisibleChunk& a, const VisibleChunk& b) {
+                        return a.distance2 > b.distance2;
+                    });
+                m_renderer.beginTranslucent();
+                for (const auto& visible : visibleChunks) {
+                    m_renderer.renderChunk(
+                        visible.chunk->getMesh(), visible.model, vp, true);
+                }
+                m_renderer.endTranslucent();
+
+                m_entities.render(m_renderer, vp, renderOrigin);
 
                 // Wireframe highlight
                 auto highlighted = m_player.getHighlightedBlock();
                 if (highlighted) {
-                    glm::vec3 pos(highlighted->x, highlighted->y, highlighted->z);
+                    glm::vec3 pos(
+                        static_cast<float>(highlighted->x - renderOrigin.x),
+                        static_cast<float>(highlighted->y),
+                        static_cast<float>(highlighted->z - renderOrigin.z));
                     m_renderer.renderWireframe(pos, vp);
                 }
 
@@ -406,16 +660,44 @@ private:
             // Phase 1: Inventory overlay (on top of 3D world)
             if (m_inventoryOpen) {
                 m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
-                m_inventory.render(m_uiRenderer, fbWidth, fbHeight,
-                                   static_cast<int>(m_mouseScreenX),
-                                   static_cast<int>(m_mouseScreenY));
+                if (m_containerOpen) {
+                    m_containerScreen.render(
+                        m_uiRenderer, fbWidth, fbHeight, static_cast<int>(m_mouseScreenX),
+                        static_cast<int>(m_mouseScreenY));
+                } else if (m_player.isSurvival()) {
+                    m_survivalInventory.render(m_uiRenderer, fbWidth, fbHeight,
+                        static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                } else {
+                    m_inventory.render(m_uiRenderer, fbWidth, fbHeight,
+                                       static_cast<int>(m_mouseScreenX),
+                                       static_cast<int>(m_mouseScreenY));
+                }
                 m_uiRenderer.endUIFrame();
             }
 
             // Phase 2: Hotbar HUD (Playing, no inventory, no menu)
             if (m_gameState == GameState::Playing && !m_inventoryOpen && !m_activeMenu) {
                 m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
-                m_hotbar.render(m_uiRenderer, fbWidth, fbHeight);
+                if (!m_player.isSpectator()) {
+                    m_hotbar.render(m_uiRenderer, fbWidth, fbHeight);
+                    if (m_player.isSurvival()) renderSurvivalHud(fbWidth);
+                    renderCrosshairAndMiningProgress(fbWidth, fbHeight);
+                }
+                m_uiRenderer.endUIFrame();
+            }
+
+            if (m_commandOpen || m_commandMessageSeconds > 0.0f) {
+                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
+                const std::string text = m_commandOpen
+                    ? "> " + m_commandInput + "_"
+                    : m_commandMessage;
+                m_uiRenderer.drawRect(
+                    12.0f, 18.0f, static_cast<float>(fbWidth - 24), 36.0f,
+                    glm::vec4(0.02f, 0.02f, 0.03f, 0.82f));
+                m_uiRenderer.renderText(
+                    text, 20.0f, 27.0f, 1.25f,
+                    m_commandOpen ? glm::vec3(1.0f)
+                                  : glm::vec3(1.0f, 0.82f, 0.35f));
                 m_uiRenderer.endUIFrame();
             }
 
@@ -423,6 +705,23 @@ private:
             if (m_activeMenu) {
                 m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
                 m_activeMenu->render(m_uiRenderer, fbWidth, fbHeight);
+                m_uiRenderer.endUIFrame();
+            }
+
+            if (m_playerDead) {
+                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
+                m_uiRenderer.drawRect(0, 0, static_cast<float>(fbWidth),
+                                      static_cast<float>(fbHeight),
+                                      glm::vec4(0.28f, 0.0f, 0.0f, 0.62f));
+                const char* title = "YOU DIED";
+                auto titleSize = m_uiRenderer.measureText(title, 4.0f);
+                m_uiRenderer.renderText(title, (fbWidth - titleSize.x) * 0.5f,
+                                        fbHeight * 0.58f, 4.0f,
+                                        glm::vec3(1.0f, 0.82f, 0.82f));
+                const char* prompt = "Press Enter to respawn";
+                auto promptSize = m_uiRenderer.measureText(prompt, 1.5f);
+                m_uiRenderer.renderText(prompt, (fbWidth - promptSize.x) * 0.5f,
+                                        fbHeight * 0.46f, 1.5f, glm::vec3(1.0f));
                 m_uiRenderer.endUIFrame();
             }
 
@@ -439,18 +738,206 @@ private:
     }
 
     void openInventory() {
+        if (m_player.isSpectator()) return;
+        if (m_player.isSurvival() && !m_inventoryOpen)
+            m_survivalInventory.setCraftingTable(false);
+        m_containerOpen = false;
         m_inventoryOpen = true;
         m_window.setCursorLocked(false);
     }
 
+    void closeCommandInput() {
+        m_commandOpen = false;
+        m_commandInput.clear();
+        m_suppressCommandChar = false;
+        if (m_gameState == GameState::Playing) m_window.setCursorLocked(true);
+    }
+
+    void showCommandMessage(const std::string& message) {
+        m_commandMessage = message;
+        m_commandMessageSeconds = 4.0f;
+    }
+
+    void executeCommand() {
+        const std::string submitted = m_commandInput;
+        closeCommandInput();
+        if (!m_worldMetadata.cheatsEnabled) {
+            showCommandMessage("Cheats are disabled for this world");
+            return;
+        }
+        const auto mode = parseGamemodeCommand(submitted);
+        if (mode) {
+            m_player.configureRules(*mode, m_worldMetadata.difficulty);
+            m_worldMetadata.gameMode = *mode;
+            m_hotbar.setSurvivalInventory(
+                *mode == GameMode::Survival ? &m_player.inventory() : nullptr);
+            const char* name = *mode == GameMode::Survival ? "Survival" :
+                               *mode == GameMode::Creative ? "Creative" :
+                               "Spectator";
+            showCommandMessage(std::string("Game mode changed to ") + name);
+            return;
+        }
+        const auto target = parseTeleportCommand(submitted);
+        if (target) {
+            m_player.teleport({target->x, target->y, target->z});
+            m_world.update(m_player.getPosition());
+            m_world.enqueueGeneration();
+            showCommandMessage(
+                "Teleported to " + std::to_string(target->x) + " " +
+                std::to_string(target->y) + " " +
+                std::to_string(target->z));
+            return;
+        }
+        showCommandMessage("Usage: /gamemode 0|1|3 or /tp x y z");
+    }
+
+    void updateMouseScreenPosition() {
+        double windowX = 0.0;
+        double windowY = 0.0;
+        m_window.getCursorPos(windowX, windowY);
+
+        int windowWidth = 0;
+        int windowHeight = 0;
+        int framebufferWidth = 0;
+        int framebufferHeight = 0;
+        glfwGetWindowSize(m_window.native(), &windowWidth, &windowHeight);
+        glfwGetFramebufferSize(
+            m_window.native(), &framebufferWidth, &framebufferHeight);
+
+        const double scaleX = windowWidth > 0
+            ? static_cast<double>(framebufferWidth) / windowWidth : 1.0;
+        const double scaleY = windowHeight > 0
+            ? static_cast<double>(framebufferHeight) / windowHeight : 1.0;
+        m_mouseScreenX = windowX * scaleX;
+        m_mouseScreenY =
+            static_cast<double>(framebufferHeight) - windowY * scaleY;
+    }
+
+    void renderSurvivalHud(int screenWidth) {
+        const auto& stats = m_player.survivalStats();
+        constexpr float unitW = 12.0f;
+        constexpr float unitH = 10.0f;
+        constexpr float gap = 2.0f;
+        constexpr float y = 76.0f;
+        const float groupW = 10.0f * unitW + 9.0f * gap;
+        const float leftX = screenWidth * 0.5f - groupW - 10.0f;
+        const float rightX = screenWidth * 0.5f + 10.0f;
+        for (int i = 0; i < 10; ++i) {
+            const float healthFill = std::clamp(stats.health() - i * 2.0f, 0.0f, 2.0f) * 0.5f;
+            const float hungerFill = std::clamp(
+                static_cast<float>(stats.hunger()) - i * 2.0f, 0.0f, 2.0f) * 0.5f;
+            const float hx = leftX + i * (unitW + gap);
+            const float fx = rightX + (9 - i) * (unitW + gap);
+            m_uiRenderer.drawRect(hx, y, unitW, unitH, glm::vec4(0.18f, 0.04f, 0.04f, 0.9f));
+            m_uiRenderer.drawRect(hx, y, unitW * healthFill, unitH,
+                                  glm::vec4(0.85f, 0.08f, 0.10f, 1.0f));
+            m_uiRenderer.drawRect(fx, y, unitW, unitH, glm::vec4(0.16f, 0.08f, 0.02f, 0.9f));
+            m_uiRenderer.drawRect(fx + unitW * (1.0f - hungerFill), y,
+                                  unitW * hungerFill, unitH,
+                                  glm::vec4(0.88f, 0.48f, 0.08f, 1.0f));
+        }
+    }
+
+    void renderCrosshairAndMiningProgress(int screenWidth, int screenHeight) {
+        const float centerX = static_cast<float>(screenWidth) * 0.5f;
+        const float centerY = static_cast<float>(screenHeight) * 0.5f;
+        constexpr float armLength = 8.0f;
+        constexpr float thickness = 2.0f;
+        constexpr float centerGap = 3.0f;
+
+        const glm::vec4 shadow(0.0f, 0.0f, 0.0f, 0.85f);
+        const glm::vec4 foreground(1.0f, 1.0f, 1.0f, 0.95f);
+        auto drawCrossPart = [&](float x, float y, float width, float height) {
+            m_uiRenderer.drawRect(x - 1.0f, y - 1.0f,
+                                  width + 2.0f, height + 2.0f, shadow);
+            m_uiRenderer.drawRect(x, y, width, height, foreground);
+        };
+        drawCrossPart(centerX - centerGap - armLength, centerY - thickness * 0.5f,
+                      armLength, thickness);
+        drawCrossPart(centerX + centerGap, centerY - thickness * 0.5f,
+                      armLength, thickness);
+        drawCrossPart(centerX - thickness * 0.5f, centerY + centerGap,
+                      thickness, armLength);
+        drawCrossPart(centerX - thickness * 0.5f,
+                      centerY - centerGap - armLength, thickness, armLength);
+
+        const float progress = m_player.getMiningProgress();
+        if (progress <= 0.0f) return;
+        constexpr float barWidth = 112.0f;
+        constexpr float barHeight = 8.0f;
+        const float barX = centerX - barWidth * 0.5f;
+        const float barY = centerY - 42.0f;
+        m_uiRenderer.drawRect(barX - 2.0f, barY - 2.0f,
+                              barWidth + 4.0f, barHeight + 4.0f,
+                              glm::vec4(0.0f, 0.0f, 0.0f, 0.82f));
+        m_uiRenderer.drawRect(barX, barY, barWidth, barHeight,
+                              glm::vec4(0.18f, 0.18f, 0.20f, 0.92f));
+        m_uiRenderer.drawRect(barX, barY, barWidth * progress, barHeight,
+                              glm::vec4(0.92f, 0.74f, 0.25f, 1.0f));
+    }
+
+    void beginPlayerDeath() {
+        m_playerDead = true;
+        const glm::vec3 deathPosition = glm::vec3(
+            m_player.getPosition() + glm::dvec3(0.0, 0.5, 0.0));
+        for (const auto& stack : m_player.inventory().storage())
+            if (!stack.empty()) m_entities.spawnItem(deathPosition, stack);
+        for (const auto& stack : m_player.inventory().armor())
+            if (!stack.empty()) m_entities.spawnItem(deathPosition, stack);
+        if (!m_player.inventory().offhand().empty())
+            m_entities.spawnItem(deathPosition, m_player.inventory().offhand());
+        m_player.inventory().clear();
+        m_window.setCursorLocked(false);
+    }
+
+    void respawnPlayer() {
+        glm::ivec3 spawn = m_worldMetadata.worldSpawn;
+        if (m_worldMetadata.bedSpawn &&
+            m_world.getBlock(m_worldMetadata.bedSpawn->x,
+                             m_worldMetadata.bedSpawn->y,
+                             m_worldMetadata.bedSpawn->z) == BlockId::WHITE_BED) {
+            spawn = *m_worldMetadata.bedSpawn;
+        }
+        m_player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, 1.01f, 0.5f));
+        m_player.survivalStats().resetAfterRespawn();
+        m_world.update(m_player.getPosition());
+        m_world.enqueueGeneration();
+        m_world.waitForInitialGeneration(150);
+        m_world.processCompletedGenerations();
+        m_playerDead = false;
+        m_window.setCursorLocked(true);
+    }
+
     void closeInventory() {
+        if (m_containerOpen) {
+            m_containerScreen.close([this](ItemStack stack) {
+                m_entities.spawnItem(m_player.getPosition() + glm::dvec3(0.0, 0.5, 0.0), stack);
+            });
+        } else if (m_player.isSurvival()) m_survivalInventory.onClose();
+        m_containerOpen = false;
         m_inventoryOpen = false;
         m_window.setCursorLocked(true);
     }
 
     void cleanup() {
+        saveCurrentWorld();
         Debug::Log::shutdown();
         // Resources cleaned up by destructors
+    }
+
+    void saveCurrentWorld() {
+        if (!m_saveStore || !m_terrainGenerated) return;
+        m_worldMetadata.playerPosition = m_player.getPosition();
+        m_worldMetadata.inventory = m_player.inventory();
+        m_worldMetadata.health = m_player.survivalStats().health();
+        m_worldMetadata.hunger = m_player.survivalStats().hunger();
+        m_worldMetadata.saturation = m_player.survivalStats().saturation();
+        m_worldMetadata.exhaustion = m_player.survivalStats().exhaustion();
+        m_worldMetadata.worldTicks = m_survivalTicks;
+        m_entities.flushChunkEntities();
+        m_worldMetadata.entities.clear();
+        m_world.flushModifiedChunks();
+        m_saveStore->saveMetadata(m_worldMetadata);
     }
 };
 

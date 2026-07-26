@@ -17,6 +17,12 @@ enum class Biome : uint8_t {
     SNOW_TUNDRA,
     JUNGLE,
     SAVANNA,
+    DEEP_OCEAN,
+    RIVER,
+    STONY_SHORE,
+    MEADOW,
+    BIRCH_FOREST,
+    BADLANDS,
     COUNT
 };
 

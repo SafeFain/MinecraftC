@@ -18,8 +18,10 @@ private:
     std::function<void()> m_onBack;
 
     void cycleRenderDistance();
-    void randomizeSeed();
+    void cycleDayCycle();
+    void toggleAutoJump();
     std::string labelForRenderDist() const;
-    std::string labelForSeed() const;
+    std::string labelForDayCycle() const;
+    std::string labelForAutoJump() const;
     void refreshButtons();
 };

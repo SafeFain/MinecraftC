@@ -83,11 +83,11 @@ void CreativeInventory::render(UIRenderer& ui, int screenWidth, int screenHeight
             : glm::vec4(props.color * 0.35f, 0.9f);
         ui.drawRect(slot.x, slot.y, slotSize, slotSize, bgColor);
 
-        // Inner colored square
+        // Material thumbnail from the world block atlas.
         float innerMargin = 4.0f;
-        ui.drawRect(slot.x + innerMargin, slot.y + innerMargin,
-                    slotSize - innerMargin * 2.0f, slotSize - innerMargin * 2.0f,
-                    glm::vec4(props.color, 0.85f));
+        ui.drawBlockIcon(slot.x + innerMargin, slot.y + innerMargin,
+                         slotSize - innerMargin * 2.0f,
+                         slotSize - innerMargin * 2.0f, slot.id);
 
         // Hover border
         if (slot.hovered) {

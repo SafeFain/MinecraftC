@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/survival_stats_tests.dir/link.d CMakeFiles/survival_stats_tests.dir/tests/SurvivalStatsTests.cpp.o CMakeFiles/survival_stats_tests.dir/src/game/SurvivalStats.cpp.o CMakeFiles/survival_stats_tests.dir/src/game/Item.cpp.o CMakeFiles/survival_stats_tests.dir/src/world/Block.cpp.o -o survival_stats_tests

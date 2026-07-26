@@ -12,11 +12,11 @@ class OreGenerator;
 
 // ── Region Generator ─────────────────────────────────────────────────────
 // Generates an N×N chunk region as an atomic unit. Within the region, all
-// cross-chunk operations (biome smoothing, river flow, cave connectivity,
+// cross-chunk operations (biome smoothing, river flow, cave generation,
 // tree spacing) are perfectly continuous — no more chunk-boundary seams.
 //
-// Pipeline: precomputeColumns → placeTrees → populateChunks →
-//            caveConnectivity → finalizeChunks
+// Pipeline: precomputeColumns → precomputeCaves → placeTrees →
+//            populateChunks → finalizeChunks
 //
 class RegionGenerator {
 public:
@@ -49,9 +49,8 @@ private:
 
     // ── Pipeline phases ─────────────────────────────────────────────────
     void precomputeColumns();
-    void precomputeCaves();   // generate worm tunnels for this region
+    void precomputeCaves();
     void placeTreesRegion();
     void populateChunk(Chunk& chunk, int localCX, int localCZ);
-    void caveConnectivityPass(const std::vector<Chunk*>& chunks);
     void finalizeChunks(std::vector<Chunk*>& chunks);
 };

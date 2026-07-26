@@ -5,6 +5,7 @@
 #include <glad/glad.h>
 
 #include "ui/FontRenderer.h"
+#include "world/Block.h"
 
 class Shader;
 
@@ -16,12 +17,13 @@ public:
     UIRenderer(const UIRenderer&) = delete;
     UIRenderer& operator=(const UIRenderer&) = delete;
 
-    void initialize();
+    void initialize(GLuint blockAtlasTexture, bool framebufferSrgb);
 
     void beginUIFrame(int screenWidth, int screenHeight);
     void endUIFrame();
 
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
+    void drawBlockIcon(float x, float y, float w, float h, BlockId block);
 
     void renderText(const std::string& text, float x, float y,
                     float scale, const glm::vec3& color);
@@ -38,6 +40,8 @@ private:
     GLuint m_quadVAO = 0;
     GLuint m_quadVBO = 0;
     GLuint m_quadEBO = 0;
+    GLuint m_blockAtlasTexture = 0; // shared, owned by Renderer
+    bool m_manualGamma = false;
 
     // Saved GL state
     GLboolean m_prevDepthTest = GL_TRUE;

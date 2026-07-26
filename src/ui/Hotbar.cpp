@@ -70,17 +70,30 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
         float sy = barY + padY;
 
         BlockId id = m_slots[i];
+        const ItemStack* survivalStack = m_survivalInventory
+            ? &m_survivalInventory->slot(static_cast<size_t>(i)) : nullptr;
+        const ItemProperties* itemProps = survivalStack && !survivalStack->empty()
+            ? &getItemProps(survivalStack->id) : nullptr;
+        if (itemProps && itemProps->placedBlock) id = *itemProps->placedBlock;
         const BlockProperties& props = getBlockProps(id);
 
         // Slot background (darker)
         ui.drawRect(sx, sy, slotSize, slotSize,
                     glm::vec4(props.color * 0.35f, 0.9f));
 
-        // Inner colored square
+        // Material thumbnail from the same atlas used by world rendering.
         float innerMargin = 4.0f;
-        ui.drawRect(sx + innerMargin, sy + innerMargin,
-                    slotSize - innerMargin * 2.0f, slotSize - innerMargin * 2.0f,
-                    glm::vec4(props.color, 0.85f));
+        if (!survivalStack || !survivalStack->empty()) {
+            if (!itemProps || itemProps->placedBlock) {
+                ui.drawBlockIcon(sx + innerMargin, sy + innerMargin,
+                                 slotSize - innerMargin * 2.0f,
+                                 slotSize - innerMargin * 2.0f, id);
+            } else {
+                const std::string initial(1, itemProps->name.empty() ? '?' : itemProps->name[0]);
+                ui.renderText(initial, sx + slotSize * 0.38f, sy + slotSize * 0.32f,
+                              1.6f, glm::vec3(0.95f));
+            }
+        }
 
         // Selection highlight
         if (i == m_selectedSlot) {
@@ -101,5 +114,12 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                       sy - labelSize.y - 1.0f,
                       labelScale,
                       glm::vec3(0.7f, 0.7f, 0.7f));
+
+        if (survivalStack && survivalStack->count > 1) {
+            const std::string countLabel = std::to_string(survivalStack->count);
+            auto countSize = ui.measureText(countLabel, 1.0f);
+            ui.renderText(countLabel, sx + slotSize - countSize.x - 3.0f,
+                          sy + 3.0f, 1.0f, glm::vec3(1.0f));
+        }
     }
 }

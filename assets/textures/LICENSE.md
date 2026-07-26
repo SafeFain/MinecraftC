@@ -1,0 +1,30 @@
+# Block texture sources
+
+Selected 16×16 source textures in `source/` are adapted from
+“Assorted Minecraft style textures” by JoeEnderman:
+
+https://opengameart.org/content/assorted-minecraft-style-textures
+
+The source work is dedicated to the public domain under CC0 1.0. Attribution
+is not required; it is recorded here for provenance. Textures not represented
+by the source pack are generated into the runtime atlas by MinecraftC.
+
+PNG loading uses `stb_image`, distributed under its license in
+`external/stb/LICENSE`.
+
+`oak_log.png`, `spruce_log.png`, and `jungle_log.png` are adapted from the
+same JoeEnderman CC0 pack. They replace plank-derived procedural log sides so
+logs and sawn planks remain visually distinct.
+
+`entity_atlas.png` is original AI-generated pixel art produced for MinecraftC
+with OpenAI image generation on 2026-07-25. It was prompted as a generic,
+non-branded voxel-creature portrait sheet and does not copy Mojang assets.
+
+Additional CC0 visual references reviewed for entity and crop readability:
+
+- “Pixel Animals 16x16” by GrumpyDiamond:
+  https://opengameart.org/content/pixel-animals-16x16
+- “8x8 Critter Pack” by patvanmackelberg:
+  https://lpc.opengameart.org/content/8x8-critter-pack
+- “Farming crops 16x16” by josehzz:
+  https://opengameart.org/content/farming-crops-16x16

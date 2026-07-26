@@ -30,9 +30,11 @@ PFNGLDELETEPROGRAMPROC          glad_glDeleteProgram;
 
 PFNGLGETUNIFORMLOCATIONPROC     glad_glGetUniformLocation;
 PFNGLUNIFORMMATRIX4FVPROC       glad_glUniformMatrix4fv;
+PFNGLUNIFORM1FPROC              glad_glUniform1f;
 PFNGLUNIFORM3FPROC              glad_glUniform3f;
 PFNGLUNIFORM1IPROC              glad_glUniform1i;
 PFNGLBLENDFUNCPROC              glad_glBlendFunc;
+PFNGLDEPTHMASKPROC              glad_glDepthMask;
 PFNGLGETBOOLEANVPROC            glad_glGetBooleanv;
 PFNGLUNIFORM4FPROC              glad_glUniform4f;
 
@@ -96,9 +98,11 @@ extern "C" int gladLoadGL(void* (*getProcAddress)(const char*)) {
 
     LOAD(glGetUniformLocation);
     LOAD(glUniformMatrix4fv);
+    LOAD(glUniform1f);
     LOAD(glUniform3f);
     LOAD(glUniform1i);
     LOAD(glBlendFunc);
+    LOAD(glDepthMask);
     LOAD(glGetBooleanv);
     LOAD(glUniform4f);
 

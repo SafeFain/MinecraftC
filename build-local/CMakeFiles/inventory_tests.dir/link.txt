@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/inventory_tests.dir/link.d CMakeFiles/inventory_tests.dir/tests/InventoryTests.cpp.o CMakeFiles/inventory_tests.dir/src/game/Item.cpp.o CMakeFiles/inventory_tests.dir/src/game/InventoryModel.cpp.o CMakeFiles/inventory_tests.dir/src/world/Block.cpp.o -o inventory_tests

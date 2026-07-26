@@ -2,14 +2,14 @@
 
 #include "world/BiomeMap.h"
 #include "world/Block.h"
-#include "world/CaveGenerator.h"  // for TunnelSegment
+#include "world/CaveGenerator.h"
 #include <vector>
 #include <cstdint>
 
 // ── Region Generation Data ────────────────────────────────────────────────
 // Shared pre-computed column data for a generation region (N×N chunks).
 // All height/biome/river/cave operations use this padded grid so cross-chunk
-// smoothing and connectivity are perfectly continuous within the region.
+// smoothing and cave fields are continuous within the region.
 //
 // Coordinate system:
 //   worldOriginX = regionOriginCX * 16
@@ -34,6 +34,7 @@ struct RegionGenerationData {
     // ── Per-column data ──────────────────────────────────────────────────
     struct ColumnInfo {
         int   height  = 0;     // final surface Y (after river carving, biome modulation, smoothing)
+        int   waterLevel = 40;
         Biome biome   = Biome::OCEAN;
         bool  isRiver = false;
     };
@@ -60,11 +61,8 @@ struct RegionGenerationData {
     };
     std::vector<TreePlacement> trees;
 
-    // ── Worm tunnel segments (precomputed for this region) ─────────────
-    std::vector<TunnelSegment> tunnels;
-
-    // ── Spatial index for fast tunnel lookup (built after tunnels) ──────
-    CaveSpatialIndex caveIndex;
+    // ── Hybrid cave classification for the region core ─────────────────
+    CaveVolume caves;
 
     // ── Pending blocks (tree leaves that fall outside this region) ───────
     struct PendingBlock {

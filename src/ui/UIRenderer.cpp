@@ -16,7 +16,9 @@ UIRenderer::~UIRenderer() {
 
 // ── Initialization ────────────────────────────────────────────────────────
 
-void UIRenderer::initialize() {
+void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
+    m_blockAtlasTexture = blockAtlasTexture;
+    m_manualGamma = !framebufferSrgb;
     // Compile UI rectangle shader
     m_uiShader = std::make_unique<Shader>(
         "assets/shaders/ui.vert",
@@ -25,10 +27,10 @@ void UIRenderer::initialize() {
 
     // Create unit-square VAO for rectangles with index buffer
     const float quadVerts[] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        1.0f, 1.0f,
-        0.0f, 1.0f
+        0.0f, 0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 1.0f, 0.0f,
+        1.0f, 1.0f, 1.0f, 1.0f,
+        0.0f, 1.0f, 0.0f, 1.0f
     };
     const unsigned int quadIndices[] = { 0, 1, 2, 0, 2, 3 };
 
@@ -38,8 +40,11 @@ void UIRenderer::initialize() {
     GL_CHECK(glGenBuffers(1, &m_quadVBO));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO));
     GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW));
-    GL_CHECK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr));
+    GL_CHECK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr));
     GL_CHECK(glEnableVertexAttribArray(0));
+    GL_CHECK(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                                  reinterpret_cast<void*>(2 * sizeof(float))));
+    GL_CHECK(glEnableVertexAttribArray(1));
 
     GL_CHECK(glGenBuffers(1, &m_quadEBO));
     GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_quadEBO));
@@ -48,7 +53,7 @@ void UIRenderer::initialize() {
     GL_CHECK(glBindVertexArray(0));
 
     // Initialize font renderer
-    m_fontRenderer.initialize();
+    m_fontRenderer.initialize(m_manualGamma);
 }
 
 // ── Frame management ──────────────────────────────────────────────────────
@@ -79,6 +84,7 @@ void UIRenderer::endUIFrame() {
     if (m_prevCullFace)  GL_CHECK(glEnable(GL_CULL_FACE));  else GL_CHECK(glDisable(GL_CULL_FACE));
     if (m_prevBlend)     GL_CHECK(glEnable(GL_BLEND));       else GL_CHECK(glDisable(GL_BLEND));
     GL_CHECK(glBlendFunc(m_prevBlendSrc, m_prevBlendDst));
+    GL_CHECK(glActiveTexture(m_prevActiveTexture));
 }
 
 // ── Rectangle drawing ─────────────────────────────────────────────────────
@@ -90,15 +96,17 @@ void UIRenderer::drawRect(float x, float y, float w, float h,
 
     // Set 4-component color uniform
     m_uiShader->setVec4("uColor", color);
+    m_uiShader->setInt("uUseTexture", 0);
+    m_uiShader->setInt("uManualGamma", m_manualGamma ? 1 : 0);
 
     // Build 4 screen-space vertices using unit square + translation/scale
     // Since our shader takes screen-space positions directly and we use
     // orthographic projection, we need to upload dynamic vertices.
     float verts[] = {
-        x,   y,
-        x+w, y,
-        x+w, y+h,
-        x,   y+h
+        x,   y,   0.0f, 0.0f,
+        x+w, y,   1.0f, 0.0f,
+        x+w, y+h, 1.0f, 1.0f,
+        x,   y+h, 0.0f, 1.0f
     };
 
     GL_CHECK(glBindVertexArray(m_quadVAO));
@@ -109,6 +117,46 @@ void UIRenderer::drawRect(float x, float y, float w, float h,
     GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_quadEBO));
     GL_CHECK(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
 
+    GL_CHECK(glBindVertexArray(0));
+}
+
+void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block) {
+    if (!m_blockAtlasTexture || block == BlockId::AIR) return;
+
+    FaceDir iconFace = FaceDir::TOP;
+    if (block == BlockId::WOOD || block == BlockId::BIRCH_WOOD ||
+        block == BlockId::SPRUCE_WOOD || block == BlockId::JUNGLE_WOOD ||
+        block == BlockId::ACACIA_WOOD || getBlockProps(block).shape == RenderShape::Cross) {
+        iconFace = FaceDir::FRONT;
+    }
+    const int tile = static_cast<int>(getFaceTexture(block, iconFace));
+    constexpr float atlasTiles = 8.0f;
+    constexpr float inset = 0.5f / (16.0f * atlasTiles);
+    float u0 = static_cast<float>(tile % 8) / atlasTiles + inset;
+    float v0 = static_cast<float>(tile / 8) / atlasTiles + inset;
+    float u1 = static_cast<float>(tile % 8 + 1) / atlasTiles - inset;
+    float v1 = static_cast<float>(tile / 8 + 1) / atlasTiles - inset;
+
+    float verts[] = {
+        x,   y,   u0, v0,
+        x+w, y,   u1, v0,
+        x+w, y+h, u1, v1,
+        x,   y+h, u0, v1
+    };
+
+    m_uiShader->bind();
+    m_uiShader->setMat4("uProjection", m_projection);
+    m_uiShader->setVec4("uColor", glm::vec4(1.0f));
+    m_uiShader->setInt("uUseTexture", 1);
+    m_uiShader->setInt("uTexture", 0);
+    m_uiShader->setInt("uManualGamma", m_manualGamma ? 1 : 0);
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_blockAtlasTexture));
+    GL_CHECK(glBindVertexArray(m_quadVAO));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_DYNAMIC_DRAW));
+    GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_quadEBO));
+    GL_CHECK(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
     GL_CHECK(glBindVertexArray(0));
 }
 

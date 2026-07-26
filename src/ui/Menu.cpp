@@ -73,14 +73,90 @@ void Menu::activateSelected(std::vector<Button>& buttons, int selectedIdx) {
 
 // ── Main Menu ─────────────────────────────────────────────────────────────
 
-MainMenu::MainMenu(const MenuCallbacks& callbacks) {
-    m_buttons.emplace_back("Start Game", callbacks.onStartGame);
-    m_buttons.emplace_back("Settings",    callbacks.onOpenSettings);
-    m_buttons.emplace_back("Quit",        callbacks.onQuit);
+MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds)
+    : m_callbacks(callbacks), m_worlds(std::move(worlds)) {
+    showHome();
+}
 
-    if (!m_buttons.empty()) {
-        m_buttons[0].setSelected(true);
+void MainMenu::showHome() {
+    m_page = Page::Home;
+    rebuildButtons();
+}
+
+void MainMenu::showWorlds() {
+    m_page = Page::Worlds;
+    rebuildButtons();
+}
+
+void MainMenu::showCreate() {
+    m_page = Page::Create;
+    m_worldName = "New World";
+    m_seedText.clear();
+    m_createMode = GameMode::Survival;
+    m_createCheats = false;
+    m_field = Field::Name;
+    rebuildButtons();
+}
+
+std::string MainMenu::fieldLabel(const char* name, const std::string& value) const {
+    const bool active = (name == std::string("World Name") && m_field == Field::Name) ||
+                        (name == std::string("Seed") && m_field == Field::Seed);
+    return std::string(active ? "> " : "") + name + ": " +
+           (value.empty() ? (name == std::string("Seed") ? "<random>" : "") : value);
+}
+
+void MainMenu::rebuildButtons() {
+    m_buttons.clear();
+    if (m_page == Page::Home) {
+        m_buttons.emplace_back("Singleplayer", [this]() { showWorlds(); });
+        m_buttons.emplace_back("Settings", m_callbacks.onOpenSettings);
+        m_buttons.emplace_back("Quit", m_callbacks.onQuit);
+    } else if (m_page == Page::Worlds) {
+        for (const auto& world : m_worlds) {
+            const std::string id = world.id;
+            const std::string mode =
+                world.mode == GameMode::Survival ? "Survival" :
+                world.mode == GameMode::Creative ? "Creative" : "Spectator";
+            m_buttons.emplace_back(world.displayName + " [" + mode + "]",
+                                   [this, id]() { m_callbacks.onOpenWorld(id); });
+        }
+        m_buttons.emplace_back("Create New World", [this]() { showCreate(); });
+        m_buttons.emplace_back("Back", [this]() { showHome(); });
+    } else {
+        m_buttons.emplace_back(fieldLabel("World Name", m_worldName),
+                               [this]() { selectField(Field::Name); });
+        m_buttons.emplace_back(
+            std::string("Game Mode: ") +
+                (m_createMode == GameMode::Survival ? "Survival" : "Creative"),
+            [this]() {
+                m_createMode = m_createMode == GameMode::Survival
+                    ? GameMode::Creative : GameMode::Survival;
+                rebuildButtons();
+            });
+        m_buttons.emplace_back(fieldLabel("Seed", m_seedText),
+                               [this]() { selectField(Field::Seed); });
+        m_buttons.emplace_back(
+            std::string("Allow Cheats: ") + (m_createCheats ? "ON" : "OFF"),
+            [this]() {
+                m_createCheats = !m_createCheats;
+                rebuildButtons();
+            });
+        m_buttons.emplace_back("Create World", [this]() {
+            m_callbacks.onCreateWorld(
+                m_worldName, m_seedText, m_createMode, m_createCheats);
+        });
+        m_buttons.emplace_back("Cancel", [this]() { showWorlds(); });
     }
+    m_selectedIdx = 0;
+    if (!m_buttons.empty()) m_buttons[0].setSelected(true);
+}
+
+void MainMenu::selectField(Field field) {
+    m_field = field;
+    rebuildButtons();
+    m_selectedIdx = field == Field::Name ? 0 : 2;
+    m_buttons[0].setSelected(false);
+    m_buttons[m_selectedIdx].setSelected(true);
 }
 
 void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
@@ -89,8 +165,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                 static_cast<float>(screenHeight),
                 glm::vec4(0.08f, 0.08f, 0.12f, 1.0f));
 
-    // Title: "MINECRAFTC"
-    const char* title = "MINECRAFTC";
+    const char* title = m_page == Page::Home ? "MINECRAFTC" :
+                        m_page == Page::Worlds ? "SELECT WORLD" : "CREATE NEW WORLD";
     float titleScale = 4.5f;
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;
@@ -98,8 +174,9 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.renderText(title, titleX, titleY, titleScale,
                   glm::vec3(1.0f, 0.85f, 0.3f));  // gold
 
-    // Subtitle
-    const char* subtitle = "A C++ Voxel Engine";
+    const char* subtitle = m_page == Page::Create
+        ? "Choose a mode and enter an optional numeric seed"
+        : (m_page == Page::Worlds ? "Select a saved world" : "A C++ Voxel Engine");
     float subScale = 1.5f;
     auto subSize = ui.measureText(subtitle, subScale);
     float subX = (screenWidth - subSize.x) * 0.5f;
@@ -120,6 +197,28 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
 }
 
 void MainMenu::onKeyPress(int key) {
+    if (m_page == Page::Create && key == GLFW_KEY_TAB) {
+        selectField(m_field == Field::Name ? Field::Seed : Field::Name);
+        return;
+    }
+    if (m_page == Page::Create && key == GLFW_KEY_BACKSPACE) {
+        std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
+        if (!value.empty()) value.pop_back();
+        rebuildButtons();
+        selectField(m_field);
+        return;
+    }
+    // Printable keys remain text input on the create screen. Arrow keys and
+    // Enter provide unambiguous keyboard navigation while a field is focused.
+    if (m_page == Page::Create &&
+        (key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_SPACE)) {
+        return;
+    }
+    if (key == GLFW_KEY_ESCAPE) {
+        if (m_page == Page::Create) showWorlds();
+        else if (m_page == Page::Worlds) showHome();
+        return;
+    }
     switch (key) {
         case GLFW_KEY_UP:
         case GLFW_KEY_W:
@@ -136,6 +235,21 @@ void MainMenu::onKeyPress(int key) {
         default:
             break;
     }
+}
+
+void MainMenu::onChar(unsigned int codepoint) {
+    if (m_page != Page::Create || codepoint < 32 || codepoint > 126) return;
+    char character = static_cast<char>(codepoint);
+    std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
+    if (m_field == Field::Seed) {
+        if (character == '-' && value.empty()) value.push_back(character);
+        else if (character >= '0' && character <= '9' && value.size() < 20)
+            value.push_back(character);
+    } else if (value.size() < 32) {
+        value.push_back(character);
+    }
+    rebuildButtons();
+    selectField(m_field);
 }
 
 void MainMenu::onMouseMove(double x, double y) {

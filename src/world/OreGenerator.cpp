@@ -1,74 +1,68 @@
 #include "world/OreGenerator.h"
 #include "world/Noise.h"
-#include "Config.h"
 
-#include <random>
+#include <algorithm>
 #include <cmath>
 
-OreGenerator::OreGenerator(const Noise& noise, uint64_t seed)
-    : m_noise(noise)
-{
-    std::mt19937_64 rng(seed);
-    auto randOff = [&rng]() -> float {
-        return static_cast<float>(rng() % 10000) * 0.1f;
-    };
-
-    m_coalOffX    = randOff(); m_coalOffY    = randOff(); m_coalOffZ    = randOff();
-    m_ironOffX    = randOff(); m_ironOffY    = randOff(); m_ironOffZ    = randOff();
-    m_goldOffX    = randOff(); m_goldOffY    = randOff(); m_goldOffZ    = randOff();
-    m_diamondOffX = randOff(); m_diamondOffY = randOff(); m_diamondOffZ = randOff();
+namespace {
+constexpr uint64_t COAL_DOMAIN = 0x4F52455F434F414CULL;
+constexpr uint64_t IRON_DOMAIN = 0x4F52455F49524F4EULL;
+constexpr uint64_t GOLD_DOMAIN = 0x4F52455F474F4C44ULL;
+constexpr uint64_t DIAM_DOMAIN = 0x4F52455F4449414DULL;
+constexpr uint64_t VEIN_DOMAIN = 0x4F52455F5645494EULL;
 }
 
-BlockId OreGenerator::getOre(float wx, float wy, float wz,
-                              BlockId existing) const {
-    // Only replace stone-like blocks
-    if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE) {
+void OreGenerator::configure(FastNoiseLite& noise, int seed, float frequency) {
+    noise.SetSeed(seed);
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+    noise.SetFrequency(frequency);
+    noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
+    noise.SetFractalOctaves(2);
+    noise.SetFractalLacunarity(2.0f);
+    noise.SetFractalGain(0.55f);
+}
+
+OreGenerator::OreGenerator(const Noise&, uint64_t seed)
+    : m_context(seed)
+{
+    configure(m_coal, m_context.noiseSeed(COAL_DOMAIN), 0.045f);
+    configure(m_iron, m_context.noiseSeed(IRON_DOMAIN), 0.052f);
+    configure(m_gold, m_context.noiseSeed(GOLD_DOMAIN), 0.060f);
+    configure(m_diamond, m_context.noiseSeed(DIAM_DOMAIN), 0.070f);
+    configure(m_vein, m_context.noiseSeed(VEIN_DOMAIN), 0.012f);
+}
+
+float OreGenerator::triangle(float y, float minY, float peakY, float maxY) {
+    if (y <= minY || y >= maxY) return 0.0f;
+    if (y <= peakY) return (y - minY) / (peakY - minY);
+    return (maxY - y) / (maxY - peakY);
+}
+
+BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing) const {
+    if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE)
         return BlockId::AIR;
-    }
 
-    // Coal: common, wide Y range, high threshold = large veins
-    if (wy >= static_cast<float>(Config::ORE_COAL_MIN_Y) &&
-        wy <= static_cast<float>(Config::ORE_COAL_MAX_Y)) {
-        float n = std::abs(m_noise.octave3D(
-            wx * Config::ORE_COAL_SCALE + m_coalOffX,
-            wy * Config::ORE_COAL_SCALE + m_coalOffY,
-            wz * Config::ORE_COAL_SCALE + m_coalOffZ,
-            2, Config::NOISE_PERSISTENCE, Config::NOISE_LACUNARITY));
-        if (n > Config::ORE_COAL_THRESHOLD) return BlockId::COAL_ORE;
-    }
+    float vein = 0.5f + 0.5f * m_vein.GetNoise(x, y * 0.75f, z);
+    auto score = [vein, x, y, z](const FastNoiseLite& noise) {
+        float n = 0.5f + 0.5f * noise.GetNoise(x, y, z);
+        return n * 0.72f + vein * 0.28f;
+    };
 
-    // Iron: medium frequency, mid Y range
-    if (wy >= static_cast<float>(Config::ORE_IRON_MIN_Y) &&
-        wy <= static_cast<float>(Config::ORE_IRON_MAX_Y)) {
-        float n = std::abs(m_noise.octave3D(
-            wx * Config::ORE_IRON_SCALE + m_ironOffX,
-            wy * Config::ORE_IRON_SCALE + m_ironOffY,
-            wz * Config::ORE_IRON_SCALE + m_ironOffZ,
-            2, Config::NOISE_PERSISTENCE, Config::NOISE_LACUNARITY));
-        if (n > Config::ORE_IRON_THRESHOLD) return BlockId::IRON_ORE;
-    }
+    float diamondY = triangle(y, 4.0f, 10.0f, 24.0f);
+    if (diamondY > 0.0f && score(m_diamond) > 0.97f - diamondY * 0.01f)
+        return BlockId::DIAMOND_ORE;
 
-    // Gold: lower Y, rarer
-    if (wy >= static_cast<float>(Config::ORE_GOLD_MIN_Y) &&
-        wy <= static_cast<float>(Config::ORE_GOLD_MAX_Y)) {
-        float n = std::abs(m_noise.octave3D(
-            wx * Config::ORE_GOLD_SCALE + m_goldOffX,
-            wy * Config::ORE_GOLD_SCALE + m_goldOffY,
-            wz * Config::ORE_GOLD_SCALE + m_goldOffZ,
-            2, Config::NOISE_PERSISTENCE, Config::NOISE_LACUNARITY));
-        if (n > Config::ORE_GOLD_THRESHOLD) return BlockId::GOLD_ORE;
-    }
+    float goldY = triangle(y, 4.0f, 19.0f, 42.0f);
+    if (goldY > 0.0f && score(m_gold) > 0.96f - goldY * 0.015f)
+        return BlockId::GOLD_ORE;
 
-    // Diamond: deepest, rarest
-    if (wy >= static_cast<float>(Config::ORE_DIAMOND_MIN_Y) &&
-        wy <= static_cast<float>(Config::ORE_DIAMOND_MAX_Y)) {
-        float n = std::abs(m_noise.octave3D(
-            wx * Config::ORE_DIAMOND_SCALE + m_diamondOffX,
-            wy * Config::ORE_DIAMOND_SCALE + m_diamondOffY,
-            wz * Config::ORE_DIAMOND_SCALE + m_diamondOffZ,
-            2, Config::NOISE_PERSISTENCE, Config::NOISE_LACUNARITY));
-        if (n > Config::ORE_DIAMOND_THRESHOLD) return BlockId::DIAMOND_ORE;
-    }
+    float ironY = triangle(y, 4.0f, 38.0f, 88.0f);
+    if (ironY > 0.0f && score(m_iron) > 0.95f - ironY * 0.02f)
+        return BlockId::IRON_ORE;
+
+    float coalY = triangle(y, 8.0f, 62.0f, 122.0f);
+    if (coalY > 0.0f && score(m_coal) > 0.94f - coalY * 0.02f)
+        return BlockId::COAL_ORE;
 
     return BlockId::AIR;
 }

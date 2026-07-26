@@ -3,14 +3,14 @@
 #include "Config.h"
 
 #include <GLFW/glfw3.h>
-#include <random>
 #include <sstream>
 
 SettingsMenu::SettingsMenu(std::function<void()> onBack)
     : m_onBack(std::move(onBack))
 {
     m_buttons.emplace_back(labelForRenderDist(), [this]() { cycleRenderDistance(); });
-    m_buttons.emplace_back(labelForSeed(),       [this]() { randomizeSeed(); });
+    m_buttons.emplace_back(labelForDayCycle(),    [this]() { cycleDayCycle(); });
+    m_buttons.emplace_back(labelForAutoJump(),    [this]() { toggleAutoJump(); });
     m_buttons.emplace_back("Back", m_onBack);
 
     if (!m_buttons.empty()) {
@@ -22,8 +22,13 @@ std::string SettingsMenu::labelForRenderDist() const {
     return "Render Distance: " + std::to_string(Config::RENDER_DISTANCE);
 }
 
-std::string SettingsMenu::labelForSeed() const {
-    return "World Seed: " + std::to_string(Config::WORLD_SEED);
+std::string SettingsMenu::labelForDayCycle() const {
+    if (Config::DAY_CYCLE_MINUTES == 0) return "Day Cycle: Static Day";
+    return "Day Cycle: " + std::to_string(Config::DAY_CYCLE_MINUTES) + " Minutes";
+}
+
+std::string SettingsMenu::labelForAutoJump() const {
+    return std::string("Auto Jump: ") + (Config::AUTO_JUMP ? "ON" : "OFF");
 }
 
 void SettingsMenu::cycleRenderDistance() {
@@ -38,10 +43,20 @@ void SettingsMenu::cycleRenderDistance() {
     refreshButtons();
 }
 
-void SettingsMenu::randomizeSeed() {
-    std::random_device rd;
-    std::mt19937_64 rng(rd());
-    Config::WORLD_SEED = rng();
+void SettingsMenu::cycleDayCycle() {
+    int idx = 0;
+    for (int i = 0; i < Config::DAY_CYCLE_OPTION_COUNT; ++i) {
+        if (Config::DAY_CYCLE_OPTIONS[i] == Config::DAY_CYCLE_MINUTES) {
+            idx = (i + 1) % Config::DAY_CYCLE_OPTION_COUNT;
+            break;
+        }
+    }
+    Config::DAY_CYCLE_MINUTES = Config::DAY_CYCLE_OPTIONS[idx];
+    refreshButtons();
+}
+
+void SettingsMenu::toggleAutoJump() {
+    Config::AUTO_JUMP = !Config::AUTO_JUMP;
     refreshButtons();
 }
 
@@ -50,7 +65,8 @@ void SettingsMenu::refreshButtons() {
     int oldIdx = m_selectedIdx;
     m_buttons.clear();
     m_buttons.emplace_back(labelForRenderDist(), [this]() { cycleRenderDistance(); });
-    m_buttons.emplace_back(labelForSeed(),       [this]() { randomizeSeed(); });
+    m_buttons.emplace_back(labelForDayCycle(),    [this]() { cycleDayCycle(); });
+    m_buttons.emplace_back(labelForAutoJump(),    [this]() { toggleAutoJump(); });
     m_buttons.emplace_back("Back", m_onBack);
 
     if (oldIdx >= 0 && oldIdx < static_cast<int>(m_buttons.size())) {

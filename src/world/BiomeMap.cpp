@@ -10,7 +10,7 @@ const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
         BlockId::SAND, BlockId::SAND,
         1.0f, -5.0f,
         0.0f, TreeType::NONE, TreeType::NONE,
-        45, 999           // higher water level for deep ocean
+        40, 999
     },
     // BEACH — flat sandy coastal strip (heights preserved as-is)
     {
@@ -88,6 +88,48 @@ const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
         BlockId::GRASS, BlockId::DIRT,
         1.0f, 1.0f,
         0.03f, TreeType::ACACIA, TreeType::NONE,
+        40, 999
+    },
+    // DEEP_OCEAN
+    {
+        BlockId::GRAVEL, BlockId::STONE,
+        1.0f, 0.0f,
+        0.0f, TreeType::NONE, TreeType::NONE,
+        43, 999
+    },
+    // RIVER
+    {
+        BlockId::GRAVEL, BlockId::CLAY,
+        1.0f, 0.0f,
+        0.0f, TreeType::NONE, TreeType::NONE,
+        40, 999
+    },
+    // STONY_SHORE
+    {
+        BlockId::STONE, BlockId::GRAVEL,
+        1.0f, 0.0f,
+        0.0f, TreeType::NONE, TreeType::NONE,
+        40, 999
+    },
+    // MEADOW
+    {
+        BlockId::GRASS, BlockId::DIRT,
+        1.0f, 0.0f,
+        0.015f, TreeType::OAK, TreeType::NONE,
+        40, 82
+    },
+    // BIRCH_FOREST
+    {
+        BlockId::GRASS, BlockId::DIRT,
+        1.0f, 0.0f,
+        0.16f, TreeType::BIRCH, TreeType::OAK,
+        40, 999
+    },
+    // BADLANDS
+    {
+        BlockId::RED_SAND, BlockId::TERRACOTTA,
+        1.0f, 0.0f,
+        0.005f, TreeType::CACTUS, TreeType::NONE,
         40, 999
     },
 };

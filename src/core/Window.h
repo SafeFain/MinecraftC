@@ -35,6 +35,9 @@ public:
     using KeyCallback = std::function<void(int key, int scancode, int action, int mods)>;
     void setKeyCallback(KeyCallback cb) { m_keyCallback = std::move(cb); }
 
+    using CharCallback = std::function<void(unsigned int codepoint)>;
+    void setCharCallback(CharCallback cb) { m_charCallback = std::move(cb); }
+
     using MouseButtonCallback = std::function<void(int button, int action, int mods)>;
     void setMouseButtonCallback(MouseButtonCallback cb) { m_mouseButtonCallback = std::move(cb); }
 
@@ -44,6 +47,7 @@ public:
     GLFWwindow* native() const { return m_window; }
 
     bool isMinimized() const { return m_minimized; }
+    bool isSrgbCapable() const;
 
 private:
     GLFWwindow* m_window = nullptr;
@@ -57,12 +61,14 @@ private:
     double m_cursorDeltaY = 0.0;
 
     KeyCallback m_keyCallback;
+    CharCallback m_charCallback;
     MouseButtonCallback m_mouseButtonCallback;
     ScrollCallback m_scrollCallback;
 
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void cursorPosCallback(GLFWwindow* window, double x, double y);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void charCallback(GLFWwindow* window, unsigned int codepoint);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
     static void iconifyCallback(GLFWwindow* window, int iconified);

@@ -1,5 +1,6 @@
 #include "core/Window.h"
 #include "debug/Log.h"
+#include "Config.h"
 #include <glad/glad.h>
 #include <stdexcept>
 
@@ -26,6 +27,11 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
     if (self && self->m_keyCallback) {
         self->m_keyCallback(key, scancode, action, mods);
     }
+}
+
+void Window::charCallback(GLFWwindow* window, unsigned int codepoint) {
+    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+    if (self && self->m_charCallback) self->m_charCallback(codepoint);
 }
 
 void Window::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
@@ -63,6 +69,8 @@ Window::Window(int width, int height, const std::string& title)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_SAMPLES, Config::MSAA_SAMPLES);
 
     m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
     if (!m_window) {
@@ -78,6 +86,7 @@ Window::Window(int width, int height, const std::string& title)
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
     glfwSetCursorPosCallback(m_window, cursorPosCallback);
     glfwSetKeyCallback(m_window, keyCallback);
+    glfwSetCharCallback(m_window, charCallback);
     glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
     glfwSetScrollCallback(m_window, scrollCallback);
     glfwSetWindowIconifyCallback(m_window, iconifyCallback);
@@ -132,6 +141,10 @@ bool Window::isKeyPressed(int key) const {
 
 bool Window::isMouseButtonPressed(int button) const {
     return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
+}
+
+bool Window::isSrgbCapable() const {
+    return glfwGetWindowAttrib(m_window, GLFW_SRGB_CAPABLE) == GLFW_TRUE;
 }
 
 void Window::getCursorDelta(double& dx, double& dy) {

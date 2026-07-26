@@ -1,0 +1,85 @@
+#pragma once
+
+#include <cstdint>
+#include <vector>
+#include <set>
+
+#include <glm/glm.hpp>
+
+#include "game/Item.h"
+#include "game/SaveStore.h"
+
+class Player;
+class Renderer;
+class World;
+
+enum class EntityType : uint8_t {
+    Item,
+    Cow,
+    Pig,
+    Sheep,
+    Chicken,
+    Zombie,
+    Skeleton,
+    Spider,
+    Blastling
+    ,Arrow
+};
+
+struct Entity {
+    uint64_t id = 0;
+    EntityType type = EntityType::Item;
+    glm::dvec3 position{0.0};
+    glm::vec3 velocity{0.0f};
+    float health = 1.0f;
+    float ageSeconds = 0.0f;
+    float actionCooldown = 0.0f;
+    ItemStack item;
+    uint32_t behaviorSeed = 0;
+    bool inGround = false;
+    bool playerOwned = false;
+    float projectileDamage = 0.0f;
+    float stuckSeconds = 0.0f;
+};
+
+class EntityManager {
+public:
+    explicit EntityManager(World& world) : m_world(world) {}
+
+    void clear();
+    void spawnItem(const glm::dvec3& position, ItemStack stack,
+                   const glm::vec3& velocity = glm::vec3(0.0f));
+    void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
+                    float damage, bool playerOwned);
+    void update(Player& player, float dt, bool hostileSpawning, bool peaceful = false);
+    bool attackRay(const glm::dvec3& origin, const glm::vec3& direction,
+                   float reach, float damage);
+    void render(Renderer& renderer, const glm::mat4& viewProjection,
+                const glm::dvec3& renderOrigin) const;
+    const std::vector<Entity>& entities() const { return m_entities; }
+    std::vector<WorldMetadata::PersistedEntity> saveEntities() const;
+    void loadEntities(const std::vector<WorldMetadata::PersistedEntity>& entities);
+    bool hasHostileNear(const glm::dvec3& position, float radius) const;
+    void setSaveStore(SaveStore* store) { m_saveStore = store; }
+    void syncChunks();
+    void flushChunkEntities();
+
+private:
+    World& m_world;
+    std::vector<Entity> m_entities;
+    uint64_t m_nextId = 1;
+    float m_spawnTimer = 0.0f;
+    uint32_t m_spawnSequence = 0;
+    SaveStore* m_saveStore = nullptr;
+    std::set<std::pair<int,int>> m_loadedChunks;
+
+    void spawnMob(EntityType type, const glm::dvec3& position);
+    void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
+    void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
+    bool collides(const Entity& entity, const glm::dvec3& position) const;
+    void updateArrow(Entity& entity, Player& player, float dt);
+    void dropMobLoot(const Entity& entity);
+    static bool hostile(EntityType type);
+    static glm::vec3 renderColor(EntityType type);
+    static glm::vec3 renderSize(EntityType type);
+};

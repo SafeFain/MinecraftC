@@ -1,0 +1,168 @@
+#include "game/Item.h"
+
+#include <array>
+#include <stdexcept>
+
+namespace {
+
+constexpr size_t itemCount = static_cast<size_t>(ItemId::COUNT);
+
+std::array<ItemProperties, itemCount> buildRegistry() {
+    std::array<ItemProperties, itemCount> items{};
+    items[0] = {"Empty", ItemKind::Material, 0};
+
+    const std::array<const char*, 35> blockNames = {{
+        "Grass Block", "Dirt", "Stone", "Oak Log", "Oak Leaves", "Sand",
+        "Bedrock", "Water", "Snow", "Oak Planks", "Deepslate", "Cactus",
+        "Coal Ore", "Iron Ore", "Gold Ore", "Diamond Ore", "Lava", "Ice",
+        "Gravel", "Clay", "Red Sand", "Terracotta", "Podzol", "Moss",
+        "Tall Grass", "Flower", "Reeds", "Birch Log", "Birch Leaves",
+        "Spruce Log", "Spruce Leaves", "Jungle Log", "Jungle Leaves",
+        "Acacia Log", "Acacia Leaves"
+    }};
+    for (size_t i = 0; i < blockNames.size(); ++i) {
+        items[i + 1] = {blockNames[i], ItemKind::Block, 64, 0,
+                        ToolKind::None, ToolTier::None, 0.0f, 0.0f, 0, 0.0f,
+                        static_cast<BlockId>(i + 1)};
+    }
+
+    auto set = [&](ItemId id, ItemProperties props) {
+        items[static_cast<size_t>(id)] = props;
+    };
+    set(ItemId::COBBLESTONE, {"Cobblestone", ItemKind::Block, 64, 0,
+                              ToolKind::None, ToolTier::None, 0, 0, 0, 0,
+                              BlockId::COBBLESTONE});
+    set(ItemId::STICK, {"Stick"});
+    set(ItemId::COAL, {"Coal"});
+    set(ItemId::RAW_IRON, {"Raw Iron"});
+    set(ItemId::IRON_INGOT, {"Iron Ingot"});
+    set(ItemId::RAW_GOLD, {"Raw Gold"});
+    set(ItemId::GOLD_INGOT, {"Gold Ingot"});
+    set(ItemId::DIAMOND, {"Diamond"});
+    set(ItemId::STRING, {"String"});
+    set(ItemId::FEATHER, {"Feather"});
+    set(ItemId::LEATHER, {"Leather"});
+    set(ItemId::BONE, {"Bone"});
+    set(ItemId::ARROW, {"Arrow"});
+    set(ItemId::WHEAT_SEEDS, {"Wheat Seeds"});
+    set(ItemId::WHEAT, {"Wheat"});
+    set(ItemId::BREAD, {"Bread", ItemKind::Food, 64, 0, ToolKind::None,
+                        ToolTier::None, 0, 0, 5, 6.0f});
+    set(ItemId::RAW_BEEF, {"Raw Beef", ItemKind::Food, 64, 0, ToolKind::None,
+                           ToolTier::None, 0, 0, 3, 1.8f});
+    set(ItemId::STEAK, {"Steak", ItemKind::Food, 64, 0, ToolKind::None,
+                        ToolTier::None, 0, 0, 8, 12.8f});
+    set(ItemId::RAW_PORKCHOP, {"Raw Porkchop", ItemKind::Food, 64, 0,
+                               ToolKind::None, ToolTier::None, 0, 0, 3, 1.8f});
+    set(ItemId::COOKED_PORKCHOP, {"Cooked Porkchop", ItemKind::Food, 64, 0,
+                                  ToolKind::None, ToolTier::None, 0, 0, 8, 12.8f});
+    set(ItemId::RAW_CHICKEN, {"Raw Chicken", ItemKind::Food, 64, 0,
+                              ToolKind::None, ToolTier::None, 0, 0, 2, 1.2f});
+    set(ItemId::COOKED_CHICKEN, {"Cooked Chicken", ItemKind::Food, 64, 0,
+                                 ToolKind::None, ToolTier::None, 0, 0, 6, 7.2f});
+    set(ItemId::MUTTON, {"Raw Mutton", ItemKind::Food, 64, 0, ToolKind::None,
+                         ToolTier::None, 0, 0, 2, 1.2f});
+    set(ItemId::COOKED_MUTTON, {"Cooked Mutton", ItemKind::Food, 64, 0,
+                                ToolKind::None, ToolTier::None, 0, 0, 6, 9.6f});
+    set(ItemId::ROTTEN_FLESH, {"Rotten Flesh", ItemKind::Food, 64, 0,
+                               ToolKind::None, ToolTier::None, 0, 0, 4, 0.8f});
+    set(ItemId::WHITE_WOOL, {"White Wool"});
+
+    set(ItemId::CRAFTING_TABLE, {"Crafting Table", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CRAFTING_TABLE});
+    set(ItemId::FURNACE, {"Furnace", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::FURNACE});
+    set(ItemId::CHEST, {"Chest", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CHEST});
+    set(ItemId::TORCH, {"Torch", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::TORCH});
+    set(ItemId::WHITE_BED, {"White Bed", ItemKind::Block, 1, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::WHITE_BED});
+    set(ItemId::FARMLAND, {"Farmland", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::FARMLAND});
+
+    struct TierData { ToolTier tier; uint16_t durability; };
+    const std::array<TierData, 5> tiers = {{
+        {ToolTier::Wood, 59}, {ToolTier::Stone, 131}, {ToolTier::Iron, 250},
+        {ToolTier::Gold, 32}, {ToolTier::Diamond, 1561}
+    }};
+    const ItemId firstTools[] = {
+        ItemId::WOODEN_PICKAXE, ItemId::STONE_PICKAXE, ItemId::IRON_PICKAXE,
+        ItemId::GOLDEN_PICKAXE, ItemId::DIAMOND_PICKAXE
+    };
+    const char* tierNames[] = {"Wooden", "Stone", "Iron", "Golden", "Diamond"};
+    for (size_t tierIndex = 0; tierIndex < tiers.size(); ++tierIndex) {
+        const uint16_t base = static_cast<uint16_t>(firstTools[tierIndex]);
+        const ToolKind kinds[] = {ToolKind::Pickaxe, ToolKind::Axe, ToolKind::Shovel,
+                                  ToolKind::Hoe, ToolKind::Sword};
+        const char* names[] = {" Pickaxe", " Axe", " Shovel", " Hoe", " Sword"};
+        for (uint16_t offset = 0; offset < 5; ++offset) {
+            ItemProperties props;
+            props.name = names[offset];
+            props.kind = offset == 4 ? ItemKind::Weapon : ItemKind::Tool;
+            props.maxStack = 1;
+            props.maxDurability = tiers[tierIndex].durability;
+            props.tool = kinds[offset];
+            props.tier = tiers[tierIndex].tier;
+            props.attackDamage = offset == 4 ? 4.0f + static_cast<float>(tierIndex) : 1.0f;
+            props.name = std::string(tierNames[tierIndex]) + names[offset];
+            set(static_cast<ItemId>(base + offset), props);
+        }
+    }
+
+    set(ItemId::BOW, {"Bow", ItemKind::Weapon, 1, 384, ToolKind::Bow});
+    set(ItemId::SHIELD, {"Shield", ItemKind::Weapon, 1, 336, ToolKind::Shield});
+
+    const ItemId armorStart[] = {
+        ItemId::LEATHER_HELMET, ItemId::IRON_HELMET,
+        ItemId::GOLDEN_HELMET, ItemId::DIAMOND_HELMET
+    };
+    const uint16_t armorDurability[][4] = {
+        {55, 80, 75, 65}, {165, 240, 225, 195},
+        {77, 112, 105, 91}, {363, 528, 495, 429}
+    };
+    const char* armorNames[][4] = {
+        {"Leather Helmet", "Leather Chestplate", "Leather Leggings", "Leather Boots"},
+        {"Iron Helmet", "Iron Chestplate", "Iron Leggings", "Iron Boots"},
+        {"Golden Helmet", "Golden Chestplate", "Golden Leggings", "Golden Boots"},
+        {"Diamond Helmet", "Diamond Chestplate", "Diamond Leggings", "Diamond Boots"}
+    };
+    for (size_t tier = 0; tier < 4; ++tier) {
+        for (uint16_t slot = 0; slot < 4; ++slot) {
+            set(static_cast<ItemId>(static_cast<uint16_t>(armorStart[tier]) + slot),
+                {armorNames[tier][slot], ItemKind::Armor, 1, armorDurability[tier][slot]});
+        }
+    }
+    set(ItemId::FLINT, {"Flint"});
+
+    return items;
+}
+
+const auto REGISTRY = buildRegistry();
+
+} // namespace
+
+bool isValidItemId(ItemId id) {
+    return static_cast<size_t>(id) < itemCount;
+}
+
+const ItemProperties& getItemProps(ItemId id) {
+    if (!isValidItemId(id)) throw std::out_of_range("Invalid serialized item id");
+    return REGISTRY[static_cast<size_t>(id)];
+}
+
+ItemId itemForBlock(BlockId id) {
+    const auto raw = static_cast<uint16_t>(id);
+    if (raw > 0 && raw <= 35) return static_cast<ItemId>(raw);
+    switch (raw) {
+        case static_cast<uint16_t>(BlockId::COBBLESTONE): return ItemId::COBBLESTONE;
+        case static_cast<uint16_t>(BlockId::CRAFTING_TABLE): return ItemId::CRAFTING_TABLE;
+        case static_cast<uint16_t>(BlockId::FURNACE): return ItemId::FURNACE;
+        case static_cast<uint16_t>(BlockId::CHEST): return ItemId::CHEST;
+        case static_cast<uint16_t>(BlockId::TORCH): return ItemId::TORCH;
+        case static_cast<uint16_t>(BlockId::WHITE_WOOL): return ItemId::WHITE_WOOL;
+        case static_cast<uint16_t>(BlockId::WHITE_BED): return ItemId::WHITE_BED;
+        case static_cast<uint16_t>(BlockId::FARMLAND): return ItemId::DIRT;
+        default: return ItemId::EMPTY;
+    }
+}

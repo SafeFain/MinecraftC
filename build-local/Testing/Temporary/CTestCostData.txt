@@ -1,0 +1,13 @@
+cavegen_determinism_and_boundaries 42 0.00635223
+worldgen_determinism_boundaries_and_distribution 40 0.030405
+rendering_day_cycle_and_environment 34 6.23379e-05
+player_ledge_and_auto_jump_logic 32 5.34333e-05
+survival_item_registry_and_inventory 30 5.3133e-05
+survival_save_roundtrip_and_corruption 29 7.00983e-05
+survival_mining_crafting_and_smelting 26 5.98963e-05
+survival_health_hunger_and_starvation 25 6.13448e-05
+survival_multiple_world_catalog 19 9.08349e-05
+cheat_gamemode_command_parsing 6 0.000279728
+survival_entity_spawning_despawn_and_sweep 2 0.00108684
+rendering_cross_chunk_block_light 1 0.00174174
+---

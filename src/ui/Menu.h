@@ -6,6 +6,8 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "Config.h"
+#include "game/SaveStore.h"
+#include "game/WorldCatalog.h"
 
 class UIRenderer;
 
@@ -20,7 +22,8 @@ enum class GameState {
 // ── Menu callbacks ────────────────────────────────────────────────────────
 
 struct MenuCallbacks {
-    std::function<void()> onStartGame;
+    std::function<void(const std::string&)> onOpenWorld;
+    std::function<void(const std::string&, const std::string&, GameMode, bool)> onCreateWorld;
     std::function<void()> onResume;
     std::function<void()> onBackToMenu;
     std::function<void()> onQuit;
@@ -78,6 +81,7 @@ public:
     virtual void onKeyPress(int key) = 0;
     virtual void onMouseMove(double x, double y) = 0;
     virtual void onMouseClick(int button) = 0;
+    virtual void onChar(unsigned int) {}
 
 protected:
     void navigateUp(std::vector<Button>& buttons, int& selectedIdx);
@@ -89,16 +93,35 @@ protected:
 
 class MainMenu : public Menu {
 public:
-    explicit MainMenu(const MenuCallbacks& callbacks);
+    MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
     void onMouseClick(int button) override;
+    void onChar(unsigned int codepoint) override;
 
 private:
+    enum class Page { Home, Worlds, Create };
+    enum class Field { Name, Seed };
+
+    MenuCallbacks m_callbacks;
+    std::vector<WorldSummary> m_worlds;
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
+    Page m_page = Page::Home;
+    Field m_field = Field::Name;
+    std::string m_worldName = "New World";
+    std::string m_seedText;
+    GameMode m_createMode = GameMode::Survival;
+    bool m_createCheats = false;
+
+    void showHome();
+    void showWorlds();
+    void showCreate();
+    void rebuildButtons();
+    void selectField(Field field);
+    std::string fieldLabel(const char* name, const std::string& value) const;
 };
 
 // ── Pause Menu ────────────────────────────────────────────────────────────

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/command_tests.dir/link.d CMakeFiles/command_tests.dir/tests/CommandTests.cpp.o -o command_tests

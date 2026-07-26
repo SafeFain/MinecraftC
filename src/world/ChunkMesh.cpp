@@ -13,15 +13,15 @@ void ChunkMesh::upload() {
     }
 
     // Verify MeshVertex layout at compile time
-    static_assert(sizeof(MeshVertex) == 24, "MeshVertex must be 6 tightly-packed floats");
+    static_assert(sizeof(MeshVertex) == 44, "MeshVertex must be 11 tightly-packed floats");
     static_assert(offsetof(MeshVertex, px) == 0,  "px at offset 0");
-    static_assert(offsetof(MeshVertex, cr) == 12, "cr at offset 12");
+    static_assert(offsetof(MeshVertex, ao) == 12, "ao at offset 12");
 
     GLuint vbo, ebo;
     GL_CHECK(glGenVertexArrays(1, &vao));
     GL_CHECK(glBindVertexArray(vao));
 
-    // Single interleaved VBO: MeshVertex is {px,py,pz, cr,cg,cb}
+    // Single interleaved VBO with lighting and material attributes.
     GL_CHECK(glGenBuffers(1, &vbo));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vbo));
     GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
@@ -33,10 +33,19 @@ void ChunkMesh::upload() {
                           reinterpret_cast<void*>(0)));
     GL_CHECK(glEnableVertexAttribArray(0));
 
-    // Color: location=1, 3 floats, stride=sizeof(MeshVertex), offset=12
-    GL_CHECK(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+    // AO, sky light, reserved, alpha.
+    GL_CHECK(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
                           reinterpret_cast<void*>(12)));
     GL_CHECK(glEnableVertexAttribArray(1));
+
+    // Repeating tile UV and atlas tile index.
+    GL_CHECK(glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+                          reinterpret_cast<void*>(28)));
+    GL_CHECK(glEnableVertexAttribArray(2));
+
+    GL_CHECK(glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+                          reinterpret_cast<void*>(40)));
+    GL_CHECK(glEnableVertexAttribArray(3));
 
     // Element buffer
     GL_CHECK(glGenBuffers(1, &ebo));

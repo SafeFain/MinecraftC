@@ -27,7 +27,40 @@ enum class BlockId : uint8_t {
     DIAMOND_ORE  = 16,
     LAVA         = 17,
     ICE          = 18,
-    COUNT        = 19
+    GRAVEL       = 19,
+    CLAY         = 20,
+    RED_SAND     = 21,
+    TERRACOTTA   = 22,
+    PODZOL       = 23,
+    MOSS         = 24,
+    TALL_GRASS   = 25,
+    FLOWER       = 26,
+    REEDS        = 27,
+    BIRCH_WOOD   = 28,
+    BIRCH_LEAVES = 29,
+    SPRUCE_WOOD  = 30,
+    SPRUCE_LEAVES= 31,
+    JUNGLE_WOOD  = 32,
+    JUNGLE_LEAVES= 33,
+    ACACIA_WOOD  = 34,
+    ACACIA_LEAVES= 35,
+    COBBLESTONE  = 36,
+    CRAFTING_TABLE = 37,
+    FURNACE      = 38,
+    CHEST        = 39,
+    TORCH        = 40,
+    WHITE_WOOL   = 41,
+    WHITE_BED    = 42,
+    FARMLAND     = 43,
+    WHEAT_0      = 44,
+    WHEAT_1      = 45,
+    WHEAT_2      = 46,
+    WHEAT_3      = 47,
+    WHEAT_4      = 48,
+    WHEAT_5      = 49,
+    WHEAT_6      = 50,
+    WHEAT_7      = 51,
+    COUNT        = 52
 };
 
 // ── Face direction ────────────────────────────────────────────────────
@@ -45,16 +78,43 @@ constexpr int FACE_COUNT = 6;
 
 // ── Block properties ──────────────────────────────────────────────────
 
+enum class RenderShape : uint8_t {
+    Cube,
+    Cross
+};
+
+enum class RenderLayer : uint8_t {
+    Opaque,
+    Cutout,
+    Translucent
+};
+
 struct BlockProperties {
     BlockId   id;
     std::string name;
     glm::vec3 color;       // base RGB (0..1)
     bool      solid;
     bool      transparent;
+    RenderShape shape = RenderShape::Cube;
+    RenderLayer layer = RenderLayer::Opaque;
+    float alpha = 1.0f;
+};
+
+// Material tiles in the shared 8x8 block atlas.
+enum class BlockTexture : uint8_t {
+    Dirt, GrassTop, GrassSide, Stone, OakLog, LogTop, Leaves, Sand,
+    Bedrock, Water, Snow, Planks, Deepslate, CactusSide, CactusTop,
+    CoalOre, IronOre, GoldOre, DiamondOre, Lava, Ice, Gravel, Clay,
+    RedSand, Terracotta, PodzolTop, Moss, TallGrass, Flower, Reeds,
+    BirchLog, BirchLeaves, SpruceLog, SpruceLeaves, JungleLog,
+    JungleLeaves, AcaciaLog, AcaciaLeaves,
+    Cobblestone, CraftingTable, Furnace, Chest, Torch, WhiteWool,
+    WhiteBed, Farmland, WheatYoung, WheatMiddle, WheatMature,
+    Count
 };
 
 // Global registry (defined in Block.cpp)
-extern const std::array<BlockProperties, 19> BLOCK_TABLE;
+extern const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE;
 
 // Quick lookup
 inline const BlockProperties& getBlockProps(BlockId id) {
@@ -65,19 +125,7 @@ inline bool isSolid(BlockId id) {
     return getBlockProps(id).solid;
 }
 
-// ── Face brightness (fake lighting) ───────────────────────────────────
-
-extern const std::array<float, 6> FACE_BRIGHTNESS; // indexed by FaceDir
-
-// ── Grass special colors ──────────────────────────────────────────────
-
-extern const glm::vec3 GRASS_TOP_COLOR;   // (0.42, 0.76, 0.30)
-extern const glm::vec3 GRASS_SIDE_COLOR;  // (0.45, 0.55, 0.25)
-extern const glm::vec3 DIRT_COLOR;        // (0.56, 0.37, 0.18) — for grass bottom
-
-// ── Get rendered face color ───────────────────────────────────────────
-
-glm::vec3 getFaceColor(BlockId id, FaceDir face);
+BlockTexture getFaceTexture(BlockId id, FaceDir face);
 
 // ── Face direction offset vectors ─────────────────────────────────────
 

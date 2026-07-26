@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/rendering_logic_tests.dir/link.d CMakeFiles/rendering_logic_tests.dir/tests/RenderingLogicTests.cpp.o -o rendering_logic_tests

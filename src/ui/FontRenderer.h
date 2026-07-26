@@ -15,7 +15,7 @@ public:
     FontRenderer(const FontRenderer&) = delete;
     FontRenderer& operator=(const FontRenderer&) = delete;
 
-    void initialize();
+    void initialize(bool manualGamma);
 
     void begin(const glm::mat4& projection);
     void end();
@@ -38,4 +38,5 @@ private:
     GLuint m_vao = 0;
     GLuint m_vboPos = 0;
     GLuint m_vboUV = 0;
+    bool m_manualGamma = false;
 };

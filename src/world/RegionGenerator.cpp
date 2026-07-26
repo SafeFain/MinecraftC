@@ -4,6 +4,7 @@
 #include "world/TreeGenerator.h"
 #include "world/OreGenerator.h"
 #include "world/BiomeMap.h"
+#include "world/SurfaceRules.h"
 #include "Config.h"
 
 #include <cmath>
@@ -50,7 +51,7 @@ void RegionGenerator::generateRegion(
     // Phase 1: Pre-compute height, biome, river for padded grid
     precomputeColumns();
 
-    // Phase 1b: Pre-compute worm tunnel segments for region + padding
+    // Phase 1b: Pre-compute deterministic hybrid cave volume
     precomputeCaves();
 
     // Phase 2: Region-wide tree placement
@@ -85,13 +86,24 @@ void RegionGenerator::generateRegion(
             // setLeaf: handles in-region and out-of-region placement
             auto setLeaf = [&](int lx, int ly, int lz, BlockId id) {
                 if (ly < 0 || ly >= Config::CHUNK_SIZE_Y) return;
+                if (id == BlockId::LEAVES) {
+                    if (tp.type == TreeType::BIRCH) id = BlockId::BIRCH_LEAVES;
+                    else if (tp.type == TreeType::SPRUCE) id = BlockId::SPRUCE_LEAVES;
+                    else if (tp.type == TreeType::JUNGLE) id = BlockId::JUNGLE_LEAVES;
+                    else if (tp.type == TreeType::ACACIA) id = BlockId::ACACIA_LEAVES;
+                }
 
                 int worldX = chunkWorldX + lx;
                 int worldZ = chunkWorldZ + lz;
 
                 // Compute which region-local chunk this leaf is in
-                int leafCX = (worldX - m_regionData.worldOriginX) / Config::CHUNK_SIZE_X;
-                int leafCZ = (worldZ - m_regionData.worldOriginZ) / Config::CHUNK_SIZE_Z;
+                auto floorChunk = [](int value) {
+                    return value >= 0 ? value / Config::CHUNK_SIZE_X
+                                      : -((-value + Config::CHUNK_SIZE_X - 1) /
+                                          Config::CHUNK_SIZE_X);
+                };
+                int leafCX = floorChunk(worldX - m_regionData.worldOriginX);
+                int leafCZ = floorChunk(worldZ - m_regionData.worldOriginZ);
 
                 if (leafCX >= 0 && leafCX < regionSizeChunks &&
                     leafCZ >= 0 && leafCZ < regionSizeChunks) {
@@ -102,8 +114,10 @@ void RegionGenerator::generateRegion(
                     int llz = worldZ - leafChunk.worldZ();
                     if (llx >= 0 && llx < 16 && llz >= 0 && llz < 16) {
                         BlockId cur = leafChunk.getBlock(llx, ly, llz);
-                        if (cur == BlockId::AIR || cur == BlockId::LEAVES ||
-                            cur == BlockId::SNOW) {
+                        bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
+                                    cur == BlockId::SPRUCE_LEAVES || cur == BlockId::JUNGLE_LEAVES ||
+                                    cur == BlockId::ACACIA_LEAVES;
+                        if (cur == BlockId::AIR || leaf || cur == BlockId::SNOW) {
                             leafChunk.setBlock(llx, ly, llz, id);
                         }
                     }
@@ -114,12 +128,17 @@ void RegionGenerator::generateRegion(
             };
 
             // Place trunk (only within the owning chunk)
+            BlockId trunkBlock = BlockId::WOOD;
+            if (tp.type == TreeType::BIRCH) trunkBlock = BlockId::BIRCH_WOOD;
+            else if (tp.type == TreeType::SPRUCE) trunkBlock = BlockId::SPRUCE_WOOD;
+            else if (tp.type == TreeType::JUNGLE) trunkBlock = BlockId::JUNGLE_WOOD;
+            else if (tp.type == TreeType::ACACIA) trunkBlock = BlockId::ACACIA_WOOD;
             for (int y = baseY; y < baseY + tp.trunkHeight; ++y) {
                 if (trunkLX >= 0 && trunkLX < 16 && trunkLZ >= 0 && trunkLZ < 16 &&
                     y >= 0 && y < Config::CHUNK_SIZE_Y) {
                     BlockId cur = chunk.getBlock(trunkLX, y, trunkLZ);
                     if (cur != BlockId::WATER) {
-                        chunk.setBlock(trunkLX, y, trunkLZ, BlockId::WOOD);
+                        chunk.setBlock(trunkLX, y, trunkLZ, trunkBlock);
                     }
                 }
             }
@@ -224,10 +243,7 @@ void RegionGenerator::generateRegion(
         }
     }
 
-    // Phase 4: Region-wide cave connectivity pass
-    caveConnectivityPass(chunks);
-
-    // Phase 5: Finalize all chunks
+    // Phase 4: Finalize all chunks
     finalizeChunks(chunks);
 }
 
@@ -244,31 +260,24 @@ void RegionGenerator::precomputeColumns() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Phase 1b: Pre-compute worm tunnel segments for this region
+// Phase 1b: Pre-compute hybrid cave volume for this region
 // ═══════════════════════════════════════════════════════════════════════════
 
 void RegionGenerator::precomputeCaves() {
+    int size = m_regionData.regionSizeBlocks;
     int pad = m_regionData.padding;
-
-    // Compute cave Y band from the region's column data
-    int caveMinY = Config::CAVE_MIN_Y;
-    int caveMaxY = Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN;
-
-    // Generate tunnels covering the padded region's world-coordinate extent
-    int worldMinX = m_regionData.worldOriginX - pad;
-    int worldMinZ = m_regionData.worldOriginZ - pad;
-    int worldMaxX = m_regionData.worldOriginX + m_regionData.regionSizeBlocks + pad - 1;
-    int worldMaxZ = m_regionData.worldOriginZ + m_regionData.regionSizeBlocks + pad - 1;
-
-    m_regionData.tunnels = m_caveGenerator.generateTunnels(
-        worldMinX, caveMinY, worldMinZ,
-        worldMaxX, caveMaxY, worldMaxZ);
-
-    // Build spatial index for O(1) tunnel segment lookup per block
-    m_regionData.caveIndex.build(
-        m_regionData.tunnels,
-        static_cast<float>(worldMinX), static_cast<float>(caveMinY), static_cast<float>(worldMinZ),
-        static_cast<float>(worldMaxX), static_cast<float>(caveMaxY), static_cast<float>(worldMaxZ));
+    std::vector<CaveColumnInfo> columns(static_cast<size_t>(size) * size);
+    for (int z = 0; z < size; ++z) {
+        for (int x = 0; x < size; ++x) {
+            const auto& col = m_regionData.col(pad + x, pad + z);
+            columns[static_cast<size_t>(z) * size + x] = {
+                col.height, col.waterLevel,
+                col.isRiver || col.height < col.waterLevel
+            };
+        }
+    }
+    m_regionData.caves = m_caveGenerator.generateVolume(
+        m_regionData.worldOriginX, m_regionData.worldOriginZ, size, size, columns);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -323,6 +332,8 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             int   height = col.height;
             Biome biome  = col.biome;
             const BiomeProperties& bprops = getBiomeProps(biome);
+            SurfaceProfile surface = SurfaceRules::profile(
+                m_seed, wxBase + x, wzBase + z, biome);
 
             // Bedrock layer
             for (int y = 0; y <= Config::BEDROCK_LEVEL; ++y) {
@@ -330,7 +341,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             }
 
             // Stone fill
-            int subsoilTop = height - 3;
+            int subsoilTop = height - surface.depth;
             int stoneStart = Config::BEDROCK_LEVEL + 1;
             int stoneEnd   = std::max(stoneStart, subsoilTop);
             for (int y = stoneStart; y < stoneEnd; ++y) {
@@ -342,37 +353,13 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 chunk.setBlock(x, y, z, BlockId::DEEPSLATE);
             }
 
-            // Ore generation
-            float wx = static_cast<float>(wxBase + x) + 0.5f;
-            float wz = static_cast<float>(wzBase + z) + 0.5f;
-            for (int y = stoneStart; y < stoneEnd; ++y) {
-                BlockId existing = chunk.getBlock(x, y, z);
-                BlockId ore = m_oreGenerator.getOre(wx, static_cast<float>(y) + 0.5f, wz, existing);
-                if (ore != BlockId::AIR) {
-                    chunk.setBlock(x, y, z, ore);
-                }
-            }
-
-            // Lava pools at depth
-            for (int y = Config::LAVA_POOL_MIN_Y; y <= Config::LAVA_POOL_MAX_Y && y < stoneEnd; ++y) {
-                BlockId existing = chunk.getBlock(x, y, z);
-                if (existing == BlockId::STONE || existing == BlockId::DEEPSLATE) {
-                    uint64_t ph = static_cast<uint64_t>(x) * 6364136223846793005ULL
-                                + static_cast<uint64_t>(y) * 1442695040888963407ULL
-                                + static_cast<uint64_t>(z) * 3487395720957301753ULL + m_seed;
-                    if (static_cast<float>(ph & 0xFFFF) / 65536.0f < Config::LAVA_POOL_CHANCE) {
-                        chunk.setBlock(x, y, z, BlockId::LAVA);
-                    }
-                }
-            }
-
             // Subsoil
             for (int y = stoneEnd; y < height; ++y) {
-                chunk.setBlock(x, y, z, bprops.subsoilBlock);
+                chunk.setBlock(x, y, z, surface.under);
             }
 
             // Surface block
-            chunk.setBlock(x, height, z, bprops.surfaceBlock);
+            chunk.setBlock(x, height, z, surface.top);
 
             // Snow cover
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
@@ -380,7 +367,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             }
 
             // Water fill
-            int waterTop = bprops.waterLevel;
+            int waterTop = col.waterLevel;
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
                     if (y < Config::CHUNK_SIZE_Y) {
@@ -396,134 +383,49 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
         }
     }
 
-    // Cave carving (per-column, deterministic from world coords)
+    // Apply the precomputed cave classification after terrain fill.
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            int regionLX = pad + localCX * Config::CHUNK_SIZE_X + x;
-            int regionLZ = pad + localCZ * Config::CHUNK_SIZE_Z + z;
-            int height = m_regionData.col(regionLX, regionLZ).height;
+            int wx = wxBase + x, wz = wzBase + z;
+            for (int y = Config::CAVE_MIN_Y; y < Config::CHUNK_SIZE_Y; ++y) {
+                CaveCell cell = m_regionData.caves.get(wx, y, wz);
+                if (cell == CaveCell::Solid) continue;
+                BlockId existing = chunk.getBlock(x, y, z);
+                bool carveable = existing == BlockId::STONE || existing == BlockId::DEEPSLATE ||
+                                 existing == BlockId::DIRT || existing == BlockId::SAND ||
+                                 existing == BlockId::GRASS || existing == BlockId::SNOW;
+                if (!carveable) continue;
+                BlockId replacement = cell == CaveCell::Water ? BlockId::WATER :
+                                      cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR;
+                chunk.setBlock(x, y, z, replacement);
+            }
 
-            int caveMinY = Config::CAVE_MIN_Y;
-            int caveMaxY = std::min(height - Config::CAVE_CEILING_MARGIN,
-                                    Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN);
-            if (caveMaxY <= caveMinY) continue;
+            // Ores only replace rock that remains after carving.
+            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::CHUNK_SIZE_Y; ++y) {
+                BlockId existing = chunk.getBlock(x, y, z);
+                if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE) continue;
+                BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
+                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f, existing);
+                if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
+            }
 
-            float wx = static_cast<float>(wxBase + x) + 0.5f;
-            float wz = static_cast<float>(wzBase + z) + 0.5f;
-            int carvedInColumn = 0;
-            int maxCarveInColumn = (caveMaxY - caveMinY) * Config::CAVE_MAX_CARVE_RATIO / 100;
-
-            for (int y = caveMinY; y < caveMaxY; ++y) {
-                float wy = static_cast<float>(y) + 0.5f;
-                if (m_caveGenerator.isInTunnel(wx, wy, wz, m_regionData.caveIndex, m_regionData.tunnels) ||
-                    m_caveGenerator.isInRoom(wx, wy, wz, height)) {
-                    BlockId existing = chunk.getBlock(x, y, z);
-                    if (existing == BlockId::STONE ||
-                        existing == BlockId::DIRT  ||
-                        existing == BlockId::SAND  ||
-                        existing == BlockId::DEEPSLATE) {
-                        if (carvedInColumn < maxCarveInColumn) {
-                            chunk.setBlock(x, y, z, BlockId::AIR);
-                            ++carvedInColumn;
-                        }
-                    }
-                }
+            const auto& decoCol = m_regionData.col(
+                pad + localCX * Config::CHUNK_SIZE_X + x,
+                pad + localCZ * Config::CHUNK_SIZE_Z + z);
+            if (decoCol.height + 1 < Config::CHUNK_SIZE_Y &&
+                chunk.getBlock(x, decoCol.height, z) != BlockId::AIR &&
+                chunk.getBlock(x, decoCol.height + 1, z) == BlockId::AIR) {
+                BlockId decoration = SurfaceRules::decoration(
+                    m_seed, wx, wz, decoCol.height, decoCol.biome, decoCol.isRiver);
+                if (decoration != BlockId::AIR)
+                    chunk.setBlock(x, decoCol.height + 1, z, decoration);
             }
         }
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Phase 4: Region-wide cave connectivity pass
-// ═══════════════════════════════════════════════════════════════════════════
-
-void RegionGenerator::caveConnectivityPass(const std::vector<Chunk*>& chunks) {
-    constexpr int kConnectPasses = 2;
-    constexpr int kMinAirNeighbors = 3;
-    int nChunks = m_regionSizeChunks;
-    int pad = m_regionData.padding;
-
-    // Region world-coordinate bounds for neighbor guards
-    int regionMinX = m_regionData.worldOriginX;
-    int regionMaxX = m_regionData.worldOriginX + m_regionData.regionSizeBlocks;
-    int regionMinZ = m_regionData.worldOriginZ;
-    int regionMaxZ = m_regionData.worldOriginZ + m_regionData.regionSizeBlocks;
-
-    // Helper: get block at world coords within the region
-    // Returns AIR if outside all region chunks
-    auto getRegionBlock = [&](int worldX, int worldY, int worldZ) -> BlockId {
-        if (worldY < 0 || worldY >= Config::CHUNK_SIZE_Y) return BlockId::AIR;
-
-        // Determine which region-local chunk
-        int lcx = (worldX - m_regionData.worldOriginX) / Config::CHUNK_SIZE_X;
-        int lcz = (worldZ - m_regionData.worldOriginZ) / Config::CHUNK_SIZE_Z;
-        if (lcx < 0 || lcx >= nChunks || lcz < 0 || lcz >= nChunks) return BlockId::AIR;
-
-        size_t chunkIdx = static_cast<size_t>(lcz) * static_cast<size_t>(nChunks) + static_cast<size_t>(lcx);
-        Chunk& c = *chunks[chunkIdx];
-        int lx = worldX - c.worldX();
-        int lz = worldZ - c.worldZ();
-        if (lx < 0 || lx >= 16 || lz < 0 || lz >= 16) return BlockId::AIR;
-        return c.getBlock(lx, worldY, lz);
-    };
-
-    for (int pass = 0; pass < kConnectPasses; ++pass) {
-        for (int lcz = 0; lcz < nChunks; ++lcz) {
-            for (int lcx = 0; lcx < nChunks; ++lcx) {
-                size_t idx = static_cast<size_t>(lcz) * static_cast<size_t>(nChunks) + static_cast<size_t>(lcx);
-                Chunk& chunk = *chunks[idx];
-                int wxBase = chunk.worldX();
-                int wzBase = chunk.worldZ();
-
-                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-                    for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-                        int regionLX = pad + lcx * Config::CHUNK_SIZE_X + x;
-                        int regionLZ = pad + lcz * Config::CHUNK_SIZE_Z + z;
-                        int height = m_regionData.col(regionLX, regionLZ).height;
-
-                        int caveMinY = Config::CAVE_MIN_Y;
-                        int caveMaxY = std::min(height - Config::CAVE_CEILING_MARGIN,
-                                                Config::CHUNK_SIZE_Y - Config::CAVE_TOP_MARGIN);
-                        if (caveMaxY <= caveMinY) continue;
-
-                        int carvedInColumn = 0;
-                        int maxCarveInColumn = (caveMaxY - caveMinY) * Config::CAVE_CONNECT_CARVE_RATIO / 100;
-
-                        for (int y = caveMinY; y < caveMaxY; ++y) {
-                            BlockId cur = chunk.getBlock(x, y, z);
-                            if (cur != BlockId::STONE && cur != BlockId::DIRT &&
-                                cur != BlockId::SAND && cur != BlockId::DEEPSLATE) {
-                                continue;
-                            }
-
-                            // Count air neighbors on all 6 faces
-                            // Horizontal neighbors: skip if outside region bounds (matches legacy path)
-                            int airCount = 0;
-                            int nxWorld = wxBase + x - 1;
-                            if (nxWorld >= regionMinX && getRegionBlock(nxWorld, y, wzBase + z) == BlockId::AIR) ++airCount;
-                            nxWorld = wxBase + x + 1;
-                            if (nxWorld < regionMaxX && getRegionBlock(nxWorld, y, wzBase + z) == BlockId::AIR) ++airCount;
-                            if (y > 0                    && chunk.getBlock(x, y - 1, z) == BlockId::AIR) ++airCount;
-                            if (y < Config::CHUNK_SIZE_Y-1 && chunk.getBlock(x, y + 1, z) == BlockId::AIR) ++airCount;
-                            int nzWorld = wzBase + z - 1;
-                            if (nzWorld >= regionMinZ && getRegionBlock(wxBase + x, y, nzWorld) == BlockId::AIR) ++airCount;
-                            nzWorld = wzBase + z + 1;
-                            if (nzWorld < regionMaxZ && getRegionBlock(wxBase + x, y, nzWorld) == BlockId::AIR) ++airCount;
-
-                            if (airCount >= kMinAirNeighbors && carvedInColumn < maxCarveInColumn) {
-                                chunk.setBlock(x, y, z, BlockId::AIR);
-                                ++carvedInColumn;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Phase 5: Finalize chunks (recompute maxY, set flags, mark dirty)
+// Phase 4: Finalize chunks (recompute maxY, set flags, mark dirty)
 // ═══════════════════════════════════════════════════════════════════════════
 
 void RegionGenerator::finalizeChunks(std::vector<Chunk*>& chunks) {

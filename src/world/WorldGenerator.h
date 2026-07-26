@@ -61,5 +61,6 @@ private:
                    int chunkWorldX = 0, int chunkWorldZ = 0);
 
     // Place a simple trunk column (used by all tree types)
-    static void placeTrunk(Chunk& chunk, int x, int baseY, int z, int trunkHeight);
+    static void placeTrunk(Chunk& chunk, int x, int baseY, int z,
+                           int trunkHeight, TreeType type);
 };

@@ -6,15 +6,18 @@
 #include <shared_mutex>
 #include <optional>
 #include <functional>
+#include <unordered_set>
 
 #include <glm/glm.hpp>
 
 #include "world/Chunk.h"
 #include "world/WorldGenerator.h"
 #include "world/RegionGenerationData.h"
+#include "world/BlockEntity.h"
 
 class Renderer;
 class ThreadPool;
+class SaveStore;
 
 class World {
 public:
@@ -26,9 +29,17 @@ public:
 
     // ── Thread pool ──────────────────────────────────────────────────
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
+    void setSaveStore(SaveStore* store) { m_saveStore = store; }
+    void flushModifiedChunks();
+    void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick);
+    void tickBlockEntities();
+    BlockEntity* getBlockEntity(const glm::ivec3& position);
+    const BlockEntity* getBlockEntity(const glm::ivec3& position) const;
+    std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position);
 
     // ── Block queries ────────────────────────────────────────────────
     BlockId getBlock(int worldX, int worldY, int worldZ) const;
+    uint8_t getBlockLight(int worldX, int worldY, int worldZ) const;
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
@@ -41,7 +52,7 @@ public:
     void resetForNewSeed(uint64_t newSeed);
 
     // Update chunk loading/unloading around player position
-    void update(const glm::vec3& playerPosition);
+    void update(const glm::dvec3& playerPosition);
 
     // ── Async generation pipeline ──────────────────────────────────────
     // Enqueue terrain generation. Groups ungenerated chunks into N×N regions
@@ -70,7 +81,7 @@ public:
         glm::ivec3 blockPos;
         glm::ivec3 faceNormal;
     };
-    std::optional<RaycastHit> raycast(const glm::vec3& origin,
+    std::optional<RaycastHit> raycast(const glm::dvec3& origin,
                                       const glm::vec3& direction,
                                       float maxDistance) const;
 
@@ -78,10 +89,10 @@ public:
     const std::vector<Chunk*>& getActiveChunks() const { return m_activeChunks; }
 
     // ── Chunk coordinate helpers ─────────────────────────────────────
-    static inline int worldToChunkX(float wx) {
+    static inline int worldToChunkX(double wx) {
         return static_cast<int>(std::floor(wx / Config::CHUNK_SIZE_X));
     }
-    static inline int worldToChunkZ(float wz) {
+    static inline int worldToChunkZ(double wz) {
         return static_cast<int>(std::floor(wz / Config::CHUNK_SIZE_Z));
     }
 
@@ -101,6 +112,7 @@ private:
 
     WorldGenerator m_generator;
     ThreadPool* m_threadPool = nullptr;
+    SaveStore* m_saveStore = nullptr;
 
     int m_chunksPerFrame = 16;  // First frame loads more
     bool m_firstUpdate = true;
@@ -110,9 +122,23 @@ private:
     // chunk finishes generation. Keyed by target chunk coordinates.
     using PendingBlockVec = std::vector<RegionGenerationData::PendingBlock>;
     std::unordered_map<std::pair<int,int>, PendingBlockVec, PairHash> m_pendingBlocks;
+    using OverrideMap = std::unordered_map<uint16_t, BlockId>;
+    std::unordered_map<std::pair<int,int>, OverrideMap, PairHash> m_blockOverrides;
+    std::unordered_set<std::pair<int,int>, PairHash> m_dirtyOverrideChunks;
+    std::unordered_set<std::pair<int,int>, PairHash> m_overridesApplied;
+    using BlockEntityMap = std::unordered_map<uint16_t, BlockEntity>;
+    std::unordered_map<std::pair<int,int>, BlockEntityMap, PairHash> m_blockEntities;
+    std::unordered_set<std::pair<int,int>, PairHash> m_dirtyBlockEntityChunks;
+    std::unordered_set<std::pair<int,int>, PairHash> m_blockEntitiesApplied;
+    bool m_lightDirty = true;
 
     // Apply queued pending blocks to a newly-generated chunk
     void applyPendingBlocks(int cx, int cz);
+    void applySavedOverrides(int cx, int cz);
+    void saveOverrides(int cx, int cz);
+    void loadBlockEntities(int cx, int cz);
+    void saveBlockEntities(int cx, int cz);
+    void rebuildBlockLight();
 
     void markDirty(int cx, int cz);
 };

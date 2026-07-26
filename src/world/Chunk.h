@@ -44,6 +44,12 @@ public:
     // Raw block array access (for WorldGenerator)
     uint8_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }
     const uint8_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
+    uint8_t getBlockLight(int x, int y, int z) const {
+        return x < 0 || x >= Config::CHUNK_SIZE_X || y < 0 || y >= Config::CHUNK_SIZE_Y ||
+               z < 0 || z >= Config::CHUNK_SIZE_Z ? 0 : m_blockLight[index(x,y,z)];
+    }
+    void setBlockLight(int x, int y, int z, uint8_t value) { m_blockLight[index(x,y,z)] = value; }
+    void clearBlockLight() { m_blockLight.fill(0); }
 
     // Column max write access (for WorldGenerator)
     void setColumnMaxY(int x, int z, int val) { m_columnMaxY[x][z] = val; }
@@ -65,6 +71,7 @@ public:
 private:
     // Flat array: blocks[x + z*16 + y*16*16]
     std::array<uint8_t, Config::CHUNK_VOLUME> m_blocks{};
+    std::array<uint8_t, Config::CHUNK_VOLUME> m_blockLight{};
     int m_columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
 
     bool m_dirty = true;

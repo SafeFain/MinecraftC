@@ -2,7 +2,7 @@
 
 // ── Block properties table ────────────────────────────────────────────
 
-const std::array<BlockProperties, 19> BLOCK_TABLE = {{
+const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE = {{
     { BlockId::AIR,          "Air",          glm::vec3(0.0f, 0.0f, 0.0f), false, false },
     { BlockId::GRASS,        "Grass",        glm::vec3(0.34f, 0.68f, 0.24f), true, false },
     { BlockId::DIRT,         "Dirt",         glm::vec3(0.56f, 0.37f, 0.18f), true, false },
@@ -11,7 +11,8 @@ const std::array<BlockProperties, 19> BLOCK_TABLE = {{
     { BlockId::LEAVES,       "Leaves",       glm::vec3(0.15f, 0.55f, 0.15f), true, false },
     { BlockId::SAND,         "Sand",         glm::vec3(0.90f, 0.84f, 0.60f), true, false },
     { BlockId::BEDROCK,      "Bedrock",      glm::vec3(0.20f, 0.20f, 0.20f), true, false },
-    { BlockId::WATER,        "Water",        glm::vec3(0.20f, 0.40f, 0.90f), false, true },
+    { BlockId::WATER,        "Water",        glm::vec3(0.20f, 0.40f, 0.90f), false, true,
+      RenderShape::Cube, RenderLayer::Translucent, 0.62f },
     { BlockId::SNOW,         "Snow",         glm::vec3(0.95f, 0.95f, 0.95f), true, false },
     { BlockId::PLANKS,       "Planks",       glm::vec3(0.70f, 0.55f, 0.30f), true, false },
     { BlockId::DEEPSLATE,    "Deepslate",    glm::vec3(0.25f, 0.25f, 0.27f), true, false },
@@ -20,44 +21,120 @@ const std::array<BlockProperties, 19> BLOCK_TABLE = {{
     { BlockId::IRON_ORE,     "Iron Ore",     glm::vec3(0.65f, 0.55f, 0.45f), true, false },
     { BlockId::GOLD_ORE,     "Gold Ore",     glm::vec3(0.85f, 0.75f, 0.25f), true, false },
     { BlockId::DIAMOND_ORE,  "Diamond Ore",  glm::vec3(0.40f, 0.80f, 0.85f), true, false },
-    { BlockId::LAVA,         "Lava",         glm::vec3(0.95f, 0.50f, 0.10f), false, true },
-    { BlockId::ICE,          "Ice",          glm::vec3(0.70f, 0.85f, 0.95f), true, false },
+    { BlockId::LAVA,         "Lava",         glm::vec3(0.95f, 0.50f, 0.10f), false, true,
+      RenderShape::Cube, RenderLayer::Translucent, 0.86f },
+    { BlockId::ICE,          "Ice",          glm::vec3(0.70f, 0.85f, 0.95f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.72f },
+    { BlockId::GRAVEL,       "Gravel",        glm::vec3(0.43f, 0.42f, 0.40f), true, false },
+    { BlockId::CLAY,         "Clay",          glm::vec3(0.55f, 0.60f, 0.63f), true, false },
+    { BlockId::RED_SAND,     "Red Sand",      glm::vec3(0.73f, 0.33f, 0.13f), true, false },
+    { BlockId::TERRACOTTA,   "Terracotta",    glm::vec3(0.60f, 0.30f, 0.20f), true, false },
+    { BlockId::PODZOL,       "Podzol",        glm::vec3(0.35f, 0.22f, 0.10f), true, false },
+    { BlockId::MOSS,         "Moss",          glm::vec3(0.25f, 0.50f, 0.16f), true, false },
+    { BlockId::TALL_GRASS,   "Tall Grass",    glm::vec3(0.30f, 0.68f, 0.20f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::FLOWER,       "Flower",        glm::vec3(0.92f, 0.35f, 0.48f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::REEDS,        "Reeds",         glm::vec3(0.50f, 0.72f, 0.24f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::BIRCH_WOOD,   "Birch Wood",    glm::vec3(0.82f, 0.78f, 0.62f), true, false },
+    { BlockId::BIRCH_LEAVES, "Birch Leaves",  glm::vec3(0.38f, 0.66f, 0.22f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.86f },
+    { BlockId::SPRUCE_WOOD,  "Spruce Wood",   glm::vec3(0.32f, 0.22f, 0.12f), true, false },
+    { BlockId::SPRUCE_LEAVES,"Spruce Leaves", glm::vec3(0.12f, 0.40f, 0.22f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.88f },
+    { BlockId::JUNGLE_WOOD,  "Jungle Wood",   glm::vec3(0.46f, 0.30f, 0.14f), true, false },
+    { BlockId::JUNGLE_LEAVES,"Jungle Leaves", glm::vec3(0.10f, 0.58f, 0.15f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.84f },
+    { BlockId::ACACIA_WOOD,  "Acacia Wood",   glm::vec3(0.62f, 0.30f, 0.14f), true, false },
+    { BlockId::ACACIA_LEAVES,"Acacia Leaves", glm::vec3(0.34f, 0.55f, 0.17f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.86f },
+    { BlockId::COBBLESTONE,   "Cobblestone",   glm::vec3(0.43f), true, false },
+    { BlockId::CRAFTING_TABLE,"Crafting Table",glm::vec3(0.55f, 0.36f, 0.18f), true, false },
+    { BlockId::FURNACE,       "Furnace",       glm::vec3(0.38f), true, false },
+    { BlockId::CHEST,         "Chest",         glm::vec3(0.58f, 0.36f, 0.12f), true, false },
+    { BlockId::TORCH,         "Torch",         glm::vec3(0.95f, 0.72f, 0.25f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHITE_WOOL,    "White Wool",    glm::vec3(0.92f), true, false },
+    { BlockId::WHITE_BED,     "White Bed",     glm::vec3(0.88f), true, false },
+    { BlockId::FARMLAND,      "Farmland",      glm::vec3(0.35f, 0.20f, 0.08f), true, false },
+    { BlockId::WHEAT_0,       "Wheat",         glm::vec3(0.38f, 0.52f, 0.14f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_1,       "Wheat",         glm::vec3(0.42f, 0.56f, 0.14f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_2,       "Wheat",         glm::vec3(0.48f, 0.60f, 0.14f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_3,       "Wheat",         glm::vec3(0.55f, 0.64f, 0.14f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_4,       "Wheat",         glm::vec3(0.62f, 0.67f, 0.16f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_5,       "Wheat",         glm::vec3(0.72f, 0.69f, 0.18f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_6,       "Wheat",         glm::vec3(0.80f, 0.70f, 0.20f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::WHEAT_7,       "Wheat",         glm::vec3(0.88f, 0.72f, 0.22f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
 }};
 
-// ── Face brightness ───────────────────────────────────────────────────
-
-const std::array<float, 6> FACE_BRIGHTNESS = {
-    1.0f,   // top — brightest
-    0.35f,  // bottom — darkest
-    0.6f,   // front
-    0.6f,   // back
-    0.5f,   // right
-    0.5f    // left
-};
-
-// ── Grass special colors ──────────────────────────────────────────────
-
-const glm::vec3 GRASS_TOP_COLOR(0.42f, 0.76f, 0.30f);
-const glm::vec3 GRASS_SIDE_COLOR(0.45f, 0.55f, 0.25f);
-const glm::vec3 DIRT_COLOR(0.56f, 0.37f, 0.18f);
-
-// ── getFaceColor ──────────────────────────────────────────────────────
-
-glm::vec3 getFaceColor(BlockId id, FaceDir face) {
-    glm::vec3 base;
-
-    if (id == BlockId::GRASS) {
-        switch (face) {
-            case FaceDir::TOP:    base = GRASS_TOP_COLOR;  break;
-            case FaceDir::BOTTOM: base = DIRT_COLOR;       break;
-            default:              base = GRASS_SIDE_COLOR; break;
-        }
-    } else {
-        base = getBlockProps(id).color;
+BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    const bool top = face == FaceDir::TOP;
+    const bool bottom = face == FaceDir::BOTTOM;
+    switch (id) {
+        case BlockId::GRASS:
+            return top ? BlockTexture::GrassTop :
+                   bottom ? BlockTexture::Dirt : BlockTexture::GrassSide;
+        case BlockId::DIRT:          return BlockTexture::Dirt;
+        case BlockId::STONE:         return BlockTexture::Stone;
+        case BlockId::WOOD:          return top || bottom ? BlockTexture::LogTop : BlockTexture::OakLog;
+        case BlockId::LEAVES:        return BlockTexture::Leaves;
+        case BlockId::SAND:          return BlockTexture::Sand;
+        case BlockId::BEDROCK:       return BlockTexture::Bedrock;
+        case BlockId::WATER:         return BlockTexture::Water;
+        case BlockId::SNOW:          return BlockTexture::Snow;
+        case BlockId::PLANKS:        return BlockTexture::Planks;
+        case BlockId::DEEPSLATE:     return BlockTexture::Deepslate;
+        case BlockId::CACTUS_BLOCK:  return top || bottom ? BlockTexture::CactusTop : BlockTexture::CactusSide;
+        case BlockId::COAL_ORE:      return BlockTexture::CoalOre;
+        case BlockId::IRON_ORE:      return BlockTexture::IronOre;
+        case BlockId::GOLD_ORE:      return BlockTexture::GoldOre;
+        case BlockId::DIAMOND_ORE:   return BlockTexture::DiamondOre;
+        case BlockId::LAVA:          return BlockTexture::Lava;
+        case BlockId::ICE:           return BlockTexture::Ice;
+        case BlockId::GRAVEL:        return BlockTexture::Gravel;
+        case BlockId::CLAY:          return BlockTexture::Clay;
+        case BlockId::RED_SAND:      return BlockTexture::RedSand;
+        case BlockId::TERRACOTTA:    return BlockTexture::Terracotta;
+        case BlockId::PODZOL:        return top ? BlockTexture::PodzolTop : BlockTexture::Dirt;
+        case BlockId::MOSS:          return BlockTexture::Moss;
+        case BlockId::TALL_GRASS:    return BlockTexture::TallGrass;
+        case BlockId::FLOWER:        return BlockTexture::Flower;
+        case BlockId::REEDS:         return BlockTexture::Reeds;
+        case BlockId::BIRCH_WOOD:    return top || bottom ? BlockTexture::LogTop : BlockTexture::BirchLog;
+        case BlockId::BIRCH_LEAVES:  return BlockTexture::BirchLeaves;
+        case BlockId::SPRUCE_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::SpruceLog;
+        case BlockId::SPRUCE_LEAVES: return BlockTexture::SpruceLeaves;
+        case BlockId::JUNGLE_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::JungleLog;
+        case BlockId::JUNGLE_LEAVES: return BlockTexture::JungleLeaves;
+        case BlockId::ACACIA_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::AcaciaLog;
+        case BlockId::ACACIA_LEAVES: return BlockTexture::AcaciaLeaves;
+        case BlockId::COBBLESTONE:   return BlockTexture::Cobblestone;
+        case BlockId::CRAFTING_TABLE:return BlockTexture::CraftingTable;
+        case BlockId::FURNACE:       return BlockTexture::Furnace;
+        case BlockId::CHEST:         return BlockTexture::Chest;
+        case BlockId::TORCH:         return BlockTexture::Torch;
+        case BlockId::WHITE_WOOL:    return BlockTexture::WhiteWool;
+        case BlockId::WHITE_BED:     return BlockTexture::WhiteBed;
+        case BlockId::FARMLAND:      return BlockTexture::Farmland;
+        case BlockId::WHEAT_0:
+        case BlockId::WHEAT_1:
+        case BlockId::WHEAT_2:       return BlockTexture::WheatYoung;
+        case BlockId::WHEAT_3:
+        case BlockId::WHEAT_4:
+        case BlockId::WHEAT_5:       return BlockTexture::WheatMiddle;
+        case BlockId::WHEAT_6:
+        case BlockId::WHEAT_7:       return BlockTexture::WheatMature;
+        default:                     return BlockTexture::Dirt;
     }
-
-    float brightness = FACE_BRIGHTNESS[static_cast<int>(face)];
-    return base * brightness;
 }
 
 // ── Face direction offsets ────────────────────────────────────────────

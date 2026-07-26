@@ -1,9 +1,11 @@
 #include "renderer/Renderer.h"
 #include "world/ChunkMesh.h"
 #include "debug/OpenGL.h"
+#include "debug/Log.h"
 
 #include <vector>
 #include <cmath>
+#include <stb_image.h>
 #include "Config.h"
 
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
@@ -21,11 +23,16 @@ static const std::vector<float> WIRE_CUBE = {
 
 Renderer::~Renderer() {
     if (m_wireVAO) deleteVAO(m_wireVAO);
+    if (m_skyVAO) GL_CHECK(glDeleteVertexArrays(1, &m_skyVAO));
+    if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
+    if (m_entityVAO) GL_CHECK(glDeleteVertexArrays(1, &m_entityVAO));
+    if (m_entityTexture) GL_CHECK(glDeleteTextures(1, &m_entityTexture));
 }
 
 // ── Initialization ────────────────────────────────────────────────────
 
-void Renderer::initialize() {
+void Renderer::initialize(bool framebufferSrgb) {
+    m_framebufferSrgb = framebufferSrgb;
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
         "assets/shaders/block.vert",
@@ -35,16 +42,93 @@ void Renderer::initialize() {
         "assets/shaders/wireframe.vert",
         "assets/shaders/wireframe.frag"
     );
+    m_skyShader = std::make_unique<Shader>(
+        "assets/shaders/sky.vert",
+        "assets/shaders/sky.frag"
+    );
+    m_entityShader = std::make_unique<Shader>(
+        "assets/shaders/entity.vert",
+        "assets/shaders/entity.frag"
+    );
+    m_blockAtlas.initialize();
 
     // Global GL state
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glEnable(GL_MULTISAMPLE));
+    if (m_framebufferSrgb) GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
+    GLint samples = 0;
+    GL_CHECK(glGetIntegerv(GL_SAMPLES, &samples));
+    LOG_INFO("Visual pipeline: " << samples << "x MSAA, "
+             << (m_framebufferSrgb ? "hardware sRGB" : "shader gamma fallback"));
     GL_CHECK(glCullFace(GL_BACK));
     GL_CHECK(glClearColor(Config::SKY_COLOR.r, Config::SKY_COLOR.g,
                  Config::SKY_COLOR.b, Config::SKY_COLOR.a));
 
     // Create shared wireframe cube VAO
     m_wireVAO = createLineVAO(WIRE_CUBE, m_wireVertexCount);
+    GL_CHECK(glGenVertexArrays(1, &m_skyVAO));
+    const float cubePositions[] = {
+        0,0,0, 1,0,0, 1,1,0, 0,0,0, 1,1,0, 0,1,0,
+        1,0,1, 0,0,1, 0,1,1, 1,0,1, 0,1,1, 1,1,1,
+        0,0,1, 0,0,0, 0,1,0, 0,0,1, 0,1,0, 0,1,1,
+        1,0,0, 1,0,1, 1,1,1, 1,0,0, 1,1,1, 1,1,0,
+        0,1,0, 1,1,0, 1,1,1, 0,1,0, 1,1,1, 0,1,1,
+        0,0,1, 1,0,1, 1,0,0, 0,0,1, 1,0,0, 0,0,0
+    };
+    constexpr float faceUvs[] = {
+        0,0, 1,0, 1,1, 0,0, 1,1, 0,1
+    };
+    std::vector<float> entityVertices;
+    entityVertices.reserve(36 * 5);
+    for (int vertex = 0; vertex < 36; ++vertex) {
+        entityVertices.insert(
+            entityVertices.end(), cubePositions + vertex * 3,
+            cubePositions + vertex * 3 + 3);
+        const int faceVertex = vertex % 6;
+        entityVertices.push_back(faceUvs[faceVertex * 2]);
+        entityVertices.push_back(faceUvs[faceVertex * 2 + 1]);
+    }
+    GL_CHECK(glGenVertexArrays(1, &m_entityVAO));
+    GL_CHECK(glGenBuffers(1, &m_entityVBO));
+    GL_CHECK(glBindVertexArray(m_entityVAO));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_entityVBO));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+                         entityVertices.size() * sizeof(float),
+                         entityVertices.data(), GL_STATIC_DRAW));
+    GL_CHECK(glVertexAttribPointer(
+        0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr));
+    GL_CHECK(glEnableVertexAttribArray(0));
+    GL_CHECK(glVertexAttribPointer(
+        1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+        reinterpret_cast<void*>(3 * sizeof(float))));
+    GL_CHECK(glEnableVertexAttribArray(1));
+    GL_CHECK(glBindVertexArray(0));
+
+    int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
+    stbi_set_flip_vertically_on_load(1);
+    stbi_uc* atlas = stbi_load(
+        "assets/textures/entity_atlas.png",
+        &atlasWidth, &atlasHeight, &atlasChannels, 4);
+    if (atlas && atlasWidth == atlasHeight && atlasWidth % 3 == 0) {
+        GL_CHECK(glGenTextures(1, &m_entityTexture));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_entityTexture));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8,
+                             atlasWidth, atlasHeight, 0, GL_RGBA,
+                             GL_UNSIGNED_BYTE, atlas));
+        GL_CHECK(glTexParameteri(
+            GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+        GL_CHECK(glTexParameteri(
+            GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+        GL_CHECK(glTexParameteri(
+            GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        GL_CHECK(glTexParameteri(
+            GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
+    } else {
+        LOG_WARN("Entity texture atlas unavailable or not a square 3x3 atlas");
+    }
+    stbi_image_free(atlas);
 }
 
 // ── Frame management ──────────────────────────────────────────────────
@@ -57,24 +141,85 @@ void Renderer::endFrame() {
     // Currently a no-op; swap happens in main loop
 }
 
+void Renderer::setEnvironment(const RenderEnvironment& environment,
+                              const glm::vec3& cameraPosition) {
+    m_environment = environment;
+    m_cameraPosition = cameraPosition;
+}
+
+void Renderer::renderSky(const RenderEnvironment& environment,
+                         const glm::mat4& inverseViewProjection,
+                         const glm::vec3& cameraPosition) {
+    GL_CHECK(glDisable(GL_DEPTH_TEST));
+    GL_CHECK(glDisable(GL_CULL_FACE));
+    GL_CHECK(glDepthMask(GL_FALSE));
+
+    m_skyShader->bind();
+    m_skyShader->setMat4("uInverseViewProjection", inverseViewProjection);
+    m_skyShader->setVec3("uCameraPosition", cameraPosition);
+    m_skyShader->setVec3("uSunDirection", environment.sunDirection);
+    m_skyShader->setVec3("uMoonDirection", environment.moonDirection);
+    m_skyShader->setVec3("uZenithColor", environment.zenithColor);
+    m_skyShader->setVec3("uHorizonColor", environment.horizonColor);
+    m_skyShader->setFloat("uStarIntensity", environment.starIntensity);
+    m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    GL_CHECK(glBindVertexArray(m_skyVAO));
+    GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
+    GL_CHECK(glBindVertexArray(0));
+
+    GL_CHECK(glDepthMask(GL_TRUE));
+    GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
+}
+
 // ── Chunk rendering ───────────────────────────────────────────────────
 
 void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
-                           const glm::mat4& viewProjection) {
+                           const glm::mat4& viewProjection, bool translucent) {
     if (!mesh.gpuReady || mesh.indexCount == 0) return;
+    size_t count = translucent ? mesh.translucentIndexCount : mesh.opaqueIndexCount;
+    size_t offset = translucent ? mesh.translucentIndexOffset : 0;
+    if (count == 0) return;
 
     glm::mat4 mvp = viewProjection * modelMatrix;
 
     // Shader is expected to already be bound (caller binds once per frame)
     m_blockShader->setMat4("uMVP", mvp);
+    m_blockShader->setVec3("uChunkOrigin", glm::vec3(modelMatrix[3]));
     GL_CHECK(glBindVertexArray(mesh.vao));
-    GL_CHECK(glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh.indexCount),
-                   GL_UNSIGNED_INT, nullptr));
+    GL_CHECK(glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count),
+                   GL_UNSIGNED_INT,
+                   reinterpret_cast<void*>(offset * sizeof(unsigned int))));
     // VAO stays bound — next draw will bind its own
+}
+
+void Renderer::beginTranslucent() {
+    GL_CHECK(glEnable(GL_BLEND));
+    GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    GL_CHECK(glDepthMask(GL_FALSE));
+}
+
+void Renderer::endTranslucent() {
+    GL_CHECK(glDepthMask(GL_TRUE));
+    GL_CHECK(glDisable(GL_BLEND));
 }
 
 void Renderer::bindBlockShader() const {
     m_blockShader->bind();
+    m_blockAtlas.bind();
+    m_blockShader->setInt("uBlockAtlas", 0);
+    m_blockShader->setVec3("uCameraPosition", m_cameraPosition);
+    m_blockShader->setVec3("uLightDirection", m_environment.lightDirection);
+    m_blockShader->setVec3("uDirectColor", m_environment.directColor);
+    m_blockShader->setVec3("uAmbientColor", m_environment.ambientColor);
+    m_blockShader->setVec3("uFogColor", m_environment.fogColor);
+    m_blockShader->setFloat("uDirectIntensity", m_environment.directIntensity);
+    m_blockShader->setFloat("uAmbientIntensity", m_environment.ambientIntensity);
+    m_blockShader->setFloat(
+        "uFogEnd", (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
+                   Config::CHUNK_SIZE_X);
+    m_blockShader->setFloat("uFogStartFraction", Config::FOG_START_FRACTION);
+    m_blockShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
 }
 
 void Renderer::unbindBlockShader() const {
@@ -103,6 +248,25 @@ void Renderer::renderWireframe(const glm::vec3& blockPos,
     GL_CHECK(glBindVertexArray(0));
 
     GL_CHECK(glDisable(GL_POLYGON_OFFSET_LINE));
+}
+
+void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
+                            const glm::vec3& color, int textureIndex,
+                            const glm::mat4& viewProjection) {
+    const glm::mat4 model = glm::translate(glm::mat4(1.0f), position) *
+                            glm::scale(glm::mat4(1.0f), size);
+    m_entityShader->bind();
+    m_entityShader->setMat4("uMVP", viewProjection * model);
+    m_entityShader->setVec3("uColor", color);
+    m_entityShader->setInt("uTextureIndex", textureIndex);
+    m_entityShader->setInt("uEntityAtlas", 0);
+    m_entityShader->setInt("uUseTexture", m_entityTexture ? 1 : 0);
+    m_entityShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_entityTexture));
+    GL_CHECK(glBindVertexArray(m_entityVAO));
+    GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 36));
+    GL_CHECK(glBindVertexArray(0));
 }
 
 // ── VAO helpers ───────────────────────────────────────────────────────

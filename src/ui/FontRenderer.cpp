@@ -251,7 +251,8 @@ FontRenderer::~FontRenderer() {
 
 // ── Initialization ────────────────────────────────────────────────────────
 
-void FontRenderer::initialize() {
+void FontRenderer::initialize(bool manualGamma) {
+    m_manualGamma = manualGamma;
     // Compile text shader
     m_shader = std::make_unique<Shader>(
         "assets/shaders/text.vert",
@@ -298,6 +299,7 @@ void FontRenderer::begin(const glm::mat4& projection) {
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_atlasTexture));
     m_shader->setInt("uFontAtlas", 0);
+    m_shader->setInt("uManualGamma", m_manualGamma ? 1 : 0);
 }
 
 void FontRenderer::end() {

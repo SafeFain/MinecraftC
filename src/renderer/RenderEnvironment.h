@@ -1,0 +1,99 @@
+#pragma once
+
+#include <algorithm>
+#include <cmath>
+
+#include <glm/glm.hpp>
+
+#include "Config.h"
+
+struct RenderEnvironment {
+    float dayPhase = 0.0f;
+    float daylight = 1.0f;
+    float starIntensity = 0.0f;
+    float ambientIntensity = 1.0f;
+    float directIntensity = 1.0f;
+    glm::vec3 sunDirection{0.0f, 1.0f, 0.0f};
+    glm::vec3 moonDirection{0.0f, -1.0f, 0.0f};
+    glm::vec3 lightDirection{0.0f, 1.0f, 0.0f};
+    glm::vec3 directColor{1.0f};
+    glm::vec3 ambientColor{1.0f};
+    glm::vec3 zenithColor{0.25f, 0.55f, 0.90f};
+    glm::vec3 horizonColor{0.62f, 0.78f, 0.92f};
+    glm::vec3 fogColor{0.62f, 0.78f, 0.92f};
+};
+
+class DayNightCycle {
+public:
+    static constexpr float MORNING_PHASE = 0.04f;
+    static constexpr float STATIC_DAY_PHASE = 0.25f;
+
+    void resetMorning() {
+        m_phase = Config::DAY_CYCLE_MINUTES == 0
+            ? STATIC_DAY_PHASE : MORNING_PHASE;
+    }
+
+    void update(float deltaSeconds, int cycleMinutes, bool advancing) {
+        if (cycleMinutes == 0) {
+            m_phase = STATIC_DAY_PHASE;
+        } else if (advancing && deltaSeconds > 0.0f) {
+            const float seconds = static_cast<float>(cycleMinutes) * 60.0f;
+            m_phase += std::min(deltaSeconds, 0.1f) / seconds;
+            m_phase -= std::floor(m_phase);
+        }
+    }
+
+    float phase() const { return m_phase; }
+
+    RenderEnvironment evaluate() const {
+        constexpr float PI = 3.14159265358979323846f;
+        const float angle = m_phase * 2.0f * PI;
+        const glm::vec3 sun = glm::normalize(glm::vec3(
+            std::cos(angle), std::sin(angle), 0.32f));
+        const glm::vec3 moon = -sun;
+        const float daylight = smoothstep(-0.12f, 0.18f, sun.y);
+        const float moonlight = smoothstep(-0.08f, 0.20f, moon.y);
+        const float twilight = std::clamp(
+            1.0f - std::abs(sun.y) / 0.32f, 0.0f, 1.0f);
+
+        RenderEnvironment env;
+        env.dayPhase = m_phase;
+        env.daylight = daylight;
+        env.starIntensity = smoothstep(0.18f, 0.72f, 1.0f - daylight);
+        env.sunDirection = sun;
+        env.moonDirection = moon;
+        env.lightDirection = daylight >= 0.12f ? sun : moon;
+        env.directIntensity = daylight * 0.82f + moonlight * 0.16f;
+        env.ambientIntensity = Config::NIGHT_AMBIENT_MIN +
+            daylight * (0.76f - Config::NIGHT_AMBIENT_MIN);
+
+        const glm::vec3 warmSun(1.00f, 0.91f, 0.72f);
+        const glm::vec3 noonSun(1.00f, 0.98f, 0.91f);
+        const glm::vec3 moonColor(0.42f, 0.53f, 0.78f);
+        env.directColor = glm::mix(
+            moonColor, glm::mix(noonSun, warmSun, twilight * 0.72f), daylight);
+        env.ambientColor = glm::mix(
+            glm::vec3(0.16f, 0.20f, 0.31f),
+            glm::vec3(0.72f, 0.82f, 0.92f), daylight);
+
+        env.zenithColor = glm::mix(
+            glm::vec3(0.008f, 0.014f, 0.045f),
+            glm::vec3(0.18f, 0.48f, 0.88f), daylight);
+        env.horizonColor = glm::mix(
+            glm::vec3(0.025f, 0.035f, 0.075f),
+            glm::vec3(0.62f, 0.79f, 0.94f), daylight);
+        env.horizonColor = glm::mix(
+            env.horizonColor, glm::vec3(0.98f, 0.37f, 0.16f),
+            twilight * (0.25f + 0.75f * daylight));
+        env.fogColor = glm::mix(env.horizonColor, env.zenithColor, 0.18f);
+        return env;
+    }
+
+private:
+    float m_phase = MORNING_PHASE;
+
+    static float smoothstep(float edge0, float edge1, float value) {
+        float t = std::clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    }
+};
