@@ -27,7 +27,9 @@ struct ClimateSample {
 
 struct SurfaceColumn {
     int height = 0;
+    int nominalHeight = 0;
     int waterLevel = 0;
+    float mountainFactor = 0.0f;
     Biome biome = Biome::OCEAN;
     bool river = false;
     ClimateSample climate;
@@ -43,6 +45,8 @@ public:
     HeightPipeline(const Noise& legacyNoise, uint64_t seed);
 
     SurfaceColumn sampleColumn(int worldX, int worldZ) const;
+    bool isTerrainSolid(int worldX, int worldY, int worldZ,
+                        const SurfaceColumn& column) const;
 
     void computePaddedRegion(int worldOriginX, int worldOriginZ,
                              int regionSizeX, int regionSizeZ, int padding,
@@ -72,11 +76,16 @@ private:
     FastNoiseLite m_temperature;
     FastNoiseLite m_humidity;
     FastNoiseLite m_detail;
+    FastNoiseLite m_ridges;
+    FastNoiseLite m_river;
+    FastNoiseLite m_surfaceWarp;
+    FastNoiseLite m_surfaceDensity;
 
     static float clamp01(float value);
     static float smoothstep(float edge0, float edge1, float value);
     static float peaksAndValleys(float weirdness);
     static float spline(float value, const float* xs, const float* ys, int count);
+    SurfaceColumn sampleBaseColumn(int worldX, int worldZ) const;
     Biome selectBiome(const ClimateSample& climate, int height,
                       bool river, bool coast, bool deepOcean) const;
 };

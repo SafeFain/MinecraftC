@@ -7,6 +7,7 @@
 #include <optional>
 #include <functional>
 #include <unordered_set>
+#include <atomic>
 
 #include <glm/glm.hpp>
 
@@ -61,10 +62,14 @@ public:
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.
-    void processCompletedGenerations();
+    void processCompletedGenerations(bool rebuildLighting = true);
 
     // Spin-wait for initial chunk generation (called once on first startGame)
     void waitForInitialGeneration(int maxWaitMs = 150);
+
+    struct GenerationProgress { size_t completed = 0; size_t total = 0; };
+    GenerationProgress generationProgress() const;
+    void persistGeneratedChunks();
 
     // Enqueue mesh builds for dirty chunks (async via thread pool)
     void enqueueMeshBuilds();
@@ -116,21 +121,25 @@ private:
 
     int m_chunksPerFrame = 16;  // First frame loads more
     bool m_firstUpdate = true;
+    int m_centerChunkX = 0;
+    int m_centerChunkZ = 0;
+    std::atomic<int> m_generationTasksInFlight{0};
 
     // ── Pending block queue ───────────────────────────────────────────
     // Cross-region tree leaves that need to be applied when the target
     // chunk finishes generation. Keyed by target chunk coordinates.
     using PendingBlockVec = std::vector<RegionGenerationData::PendingBlock>;
     std::unordered_map<std::pair<int,int>, PendingBlockVec, PairHash> m_pendingBlocks;
-    using OverrideMap = std::unordered_map<uint16_t, BlockId>;
+    using OverrideMap = std::unordered_map<uint32_t, BlockId>;
     std::unordered_map<std::pair<int,int>, OverrideMap, PairHash> m_blockOverrides;
     std::unordered_set<std::pair<int,int>, PairHash> m_dirtyOverrideChunks;
     std::unordered_set<std::pair<int,int>, PairHash> m_overridesApplied;
-    using BlockEntityMap = std::unordered_map<uint16_t, BlockEntity>;
+    using BlockEntityMap = std::unordered_map<uint32_t, BlockEntity>;
     std::unordered_map<std::pair<int,int>, BlockEntityMap, PairHash> m_blockEntities;
     std::unordered_set<std::pair<int,int>, PairHash> m_dirtyBlockEntityChunks;
     std::unordered_set<std::pair<int,int>, PairHash> m_blockEntitiesApplied;
     bool m_lightDirty = true;
+    bool m_lightHasSources = false;
 
     // Apply queued pending blocks to a newly-generated chunk
     void applyPendingBlocks(int cx, int cz);

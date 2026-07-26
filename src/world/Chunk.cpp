@@ -1,14 +1,26 @@
 #include "world/Chunk.h"
 #include <algorithm>
+#include <stdexcept>
 
 Chunk::Chunk(int cx, int cz) : cx(cx), cz(cz) {
     // blocks already zero-initialized (AIR)
-    // column_max_y already zero-initialized
+    for (auto& column : m_columnMaxY)
+        std::fill(std::begin(column), std::end(column), Config::WORLD_MIN_Y - 1);
+}
+
+void Chunk::loadRawBlocks(const std::vector<uint8_t>& blocks) {
+    if (blocks.size() != m_blocks.size())
+        throw std::runtime_error("Generated chunk cache has the wrong size");
+    std::copy(blocks.begin(), blocks.end(), m_blocks.begin());
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
+            recalcColumnMax(x, z);
+    m_dirty = true;
 }
 
 BlockId Chunk::getBlock(int x, int y, int z) const {
     if (x < 0 || x >= Config::CHUNK_SIZE_X ||
-        y < 0 || y >= Config::CHUNK_SIZE_Y ||
+        !Config::isValidWorldY(y) ||
         z < 0 || z >= Config::CHUNK_SIZE_Z) {
         return BlockId::AIR;
     }
@@ -17,7 +29,7 @@ BlockId Chunk::getBlock(int x, int y, int z) const {
 
 void Chunk::setBlock(int x, int y, int z, BlockId id) {
     if (x < 0 || x >= Config::CHUNK_SIZE_X ||
-        y < 0 || y >= Config::CHUNK_SIZE_Y ||
+        !Config::isValidWorldY(y) ||
         z < 0 || z >= Config::CHUNK_SIZE_Z) {
         return;
     }
@@ -38,11 +50,11 @@ void Chunk::setBlock(int x, int y, int z, BlockId id) {
 }
 
 void Chunk::recalcColumnMax(int x, int z) {
-    for (int y = Config::CHUNK_SIZE_Y - 1; y >= 0; --y) {
+    for (int y = Config::WORLD_MAX_Y - 1; y >= Config::WORLD_MIN_Y; --y) {
         if (m_blocks[index(x, y, z)] != 0) {
             m_columnMaxY[x][z] = y;
             return;
         }
     }
-    m_columnMaxY[x][z] = 0;
+    m_columnMaxY[x][z] = Config::WORLD_MIN_Y - 1;
 }

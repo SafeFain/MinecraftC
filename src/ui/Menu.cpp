@@ -121,13 +121,15 @@ void MainMenu::rebuildButtons() {
                 world.mode == GameMode::Survival ? "Survival" :
                 world.mode == GameMode::Creative ? "Creative" : "Spectator";
             m_buttons.emplace_back((index == m_selectedWorld ? "> " : "") +
-                world.displayName + " [" + mode + "]", [this, index]() {
+                world.displayName + " [" + (world.compatible ? mode : "Incompatible v" +
+                    std::to_string(world.generationVersion)) + "]", [this, index]() {
                     m_selectedWorld = index;
                     rebuildButtons();
                 });
         }
         m_buttons.emplace_back("Play Selected World", [this]() {
-            if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()))
+            if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()) &&
+                m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
                 m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         });
         m_buttons.emplace_back("Create New World", [this]() { showCreate(); });
@@ -205,8 +207,10 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
         m_selectedWorld < static_cast<int>(m_worlds.size())) {
         const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
-        const std::string details = "Seed " + std::to_string(world.seed) +
-            "  |  Played " + std::to_string(world.worldTicks / 1200) + " min";
+        const std::string details = world.compatible
+            ? "Seed " + std::to_string(world.seed) + "  |  Played " +
+                std::to_string(world.worldTicks / 1200) + " min"
+            : "This generation version is not supported";
         const auto size = ui.measureText(details, 1.0f);
         ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,
                       1.0f, glm::vec3(0.78f));
@@ -253,7 +257,8 @@ void MainMenu::onKeyPress(int key) {
     }
     if (m_page == Page::Worlds && key == GLFW_KEY_ENTER && m_selectedWorld >= 0 &&
         m_selectedIdx == m_selectedWorld - m_worldOffset) {
-        m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
+        if (m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
+            m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         return;
     }
     switch (key) {

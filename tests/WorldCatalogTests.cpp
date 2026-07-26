@@ -1,4 +1,5 @@
 #include "game/WorldCatalog.h"
+#include "world/WorldGenContext.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -24,10 +25,28 @@ int main() {
             "My Survival World", 42, GameMode::Survival, Difficulty::Normal, true);
         const std::string second = catalog.create(
             "My Survival World", 99, GameMode::Creative, Difficulty::Peaceful);
+        WorldMetadata legacy;
+        legacy.displayName = "Legacy v2";
+        legacy.seed = 7;
+        legacy.generationVersion = 2;
+        SaveStore(root / "legacy-v2").saveMetadata(legacy);
         require(first == "my-survival-world", "display name creates a safe id");
         require(second == "my-survival-world-2", "duplicate names get unique ids");
         const auto worlds = catalog.list();
-        require(worlds.size() == 2, "catalog lists multiple saves");
+        require(worlds.size() == 3, "catalog lists compatible and legacy saves");
+        bool sawLegacy = false;
+        for (const auto& world : worlds) {
+            require(world.generationVersion == 2 ||
+                    world.generationVersion == WorldGenContext::GENERATION_VERSION,
+                    "catalog lost generation version");
+            if (world.generationVersion == 2) {
+                sawLegacy = true;
+                require(!world.compatible, "legacy generation was marked compatible");
+            } else {
+                require(world.compatible, "current generation was marked incompatible");
+            }
+        }
+        require(sawLegacy, "legacy world was hidden instead of marked incompatible");
         require(catalog.open(first).loadMetadata().seed == 42,
                 "catalog opens the selected world");
         require(catalog.open(first).loadMetadata().cheatsEnabled,

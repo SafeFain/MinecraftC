@@ -49,38 +49,36 @@ void WorldGenerator::generate(Chunk& chunk,
     // ── Phase 2: Fill blocks ────────────────────────────────────────────
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            int   height = heightMap[x][z];
-            Biome biome  = biomeMap[x][z];
+            const int worldX = wxBase + x, worldZ = wzBase + z;
+            SurfaceColumn terrainColumn = m_heightPipeline.sampleColumn(worldX, worldZ);
+            int   height = terrainColumn.height;
+            Biome biome  = terrainColumn.biome;
+            heightMap[x][z] = height;
+            biomeMap[x][z] = biome;
+            riverMap[x][z] = terrainColumn.river;
             const BiomeProperties& bprops = getBiomeProps(biome);
             SurfaceProfile surface = SurfaceRules::profile(
                 m_seed, wxBase + x, wzBase + z, biome);
 
-            // Bedrock (y = 0 .. BEDROCK_LEVEL)
-            for (int y = 0; y <= Config::BEDROCK_LEVEL; ++y) {
+            const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
+                WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
+            for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
                 chunk.setBlock(x, y, z, BlockId::BEDROCK);
             }
 
-            // Stone (bedrock+1 .. height-4)
-            int subsoilTop = height - surface.depth;
-            int stoneStart = Config::BEDROCK_LEVEL + 1;
-            int stoneEnd   = std::max(stoneStart, subsoilTop);
-
-            for (int y = stoneStart; y < stoneEnd; ++y) {
-                chunk.setBlock(x, y, z, BlockId::STONE);
+            for (int y = bedrockTop + 1; y <= height; ++y) {
+                if (!m_heightPipeline.isTerrainSolid(worldX, y, worldZ, terrainColumn)) continue;
+                const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
+                    WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
+                        Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
+                chunk.setBlock(x, y, z, deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
-
-            // Deepslate: below DEEPSLATE_DEPTH, stone becomes deepslate
-            for (int y = stoneStart; y <= Config::DEEPSLATE_DEPTH && y < stoneEnd; ++y) {
-                chunk.setBlock(x, y, z, BlockId::DEEPSLATE);
+            for (int depth = 0; depth <= surface.depth; ++depth) {
+                const int y = height - depth;
+                const BlockId current = chunk.getBlock(x, y, z);
+                if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
+                chunk.setBlock(x, y, z, depth == 0 ? surface.top : surface.under);
             }
-
-            // Subsoil (height-3 .. height-1)
-            for (int y = stoneEnd; y < height; ++y) {
-                chunk.setBlock(x, y, z, surface.under);
-            }
-
-            // Surface block (y = height)
-            chunk.setBlock(x, height, z, surface.top);
 
             // Snow cover: if height >= biome snowLine, override surface
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
@@ -91,7 +89,7 @@ void WorldGenerator::generate(Chunk& chunk,
             int waterTop = bprops.waterLevel;
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
-                    if (y < Config::CHUNK_SIZE_Y) {
+                    if (y < Config::WORLD_MAX_Y) {
                         chunk.setBlock(x, y, z, BlockId::WATER);
                     }
                 }
@@ -121,7 +119,8 @@ void WorldGenerator::generate(Chunk& chunk,
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             int wx = wxBase + x, wz = wzBase + z;
-            for (int y = Config::CAVE_MIN_Y; y < Config::CHUNK_SIZE_Y; ++y) {
+            for (int y = Config::CAVE_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                if (y > heightMap[x][z] - Config::CAVE_DRY_ROOF) continue;
                 CaveCell cell = caveVolume.get(wx, y, wz);
                 if (cell == CaveCell::Solid) continue;
                 BlockId current = chunk.getBlock(x, y, z);
@@ -132,14 +131,14 @@ void WorldGenerator::generate(Chunk& chunk,
                 chunk.setBlock(x, y, z, cell == CaveCell::Water ? BlockId::WATER :
                     cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR);
             }
-            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::CHUNK_SIZE_Y; ++y) {
+            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId current = chunk.getBlock(x, y, z);
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
                     static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f, current);
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
-            if (heightMap[x][z] + 1 < Config::CHUNK_SIZE_Y &&
+            if (heightMap[x][z] + 1 < Config::WORLD_MAX_Y &&
                 chunk.getBlock(x, heightMap[x][z], z) != BlockId::AIR &&
                 chunk.getBlock(x, heightMap[x][z] + 1, z) == BlockId::AIR) {
                 BlockId decoration = SurfaceRules::decoration(
@@ -166,8 +165,8 @@ void WorldGenerator::generate(Chunk& chunk,
     // ── Phase 5: Recompute column max Y ─────────────────────────────────
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            int maxY = 0;
-            for (int y = Config::CHUNK_SIZE_Y - 1; y >= 0; --y) {
+            int maxY = Config::WORLD_MIN_Y - 1;
+            for (int y = Config::WORLD_MAX_Y - 1; y >= Config::WORLD_MIN_Y; --y) {
                 if (chunk.blockAt(x, y, z) != 0) {
                     maxY = y;
                     break;
@@ -193,7 +192,7 @@ void WorldGenerator::placeTrunk(Chunk& chunk, int x, int baseY, int z,
     else if (type == TreeType::ACACIA) wood = BlockId::ACACIA_WOOD;
     for (int y = baseY; y < baseY + trunkHeight; ++y) {
         if (x >= 0 && x < 16 && z >= 0 && z < 16 &&
-            y >= 0 && y < Config::CHUNK_SIZE_Y) {
+            Config::isValidWorldY(y)) {
             BlockId cur = chunk.getBlock(x, y, z);
             if (cur != BlockId::WATER) {
                 chunk.setBlock(x, y, z, wood);
@@ -217,7 +216,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
             else if (type == TreeType::JUNGLE) id = BlockId::JUNGLE_LEAVES;
             else if (type == TreeType::ACACIA) id = BlockId::ACACIA_LEAVES;
         }
-        if (ly < 0 || ly >= Config::CHUNK_SIZE_Y) return;
+        if (!Config::isValidWorldY(ly)) return;
         if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) {
             BlockId cur = chunk.getBlock(lx, ly, lz);
             bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
@@ -346,7 +345,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
             // Green cactus column (using LEAVES as stand-in for cactus block)
             for (int y = baseY; y < baseY + trunkHeight; ++y) {
                 if (x >= 0 && x < 16 && z >= 0 && z < 16 &&
-                    y >= 0 && y < Config::CHUNK_SIZE_Y) {
+                    Config::isValidWorldY(y)) {
                     chunk.setBlock(x, y, z, BlockId::CACTUS_BLOCK);
                 }
             }

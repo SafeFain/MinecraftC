@@ -414,13 +414,13 @@ void Player::applyPhysics(float dt) {
     if (verticalBlocked) m_velocity.y = 0.0f;
 
     // Clamp Y
-    if (m_position.y < 0.0f) {
-        m_position.y = 0.01f;
+    if (m_position.y < static_cast<double>(Config::WORLD_MIN_Y)) {
+        m_position.y = static_cast<double>(Config::WORLD_MIN_Y) + 0.01;
         m_velocity.y = 0.0f;
         m_onGround = true;
     }
-    if (m_position.y > Config::CHUNK_SIZE_Y - Config::PLAYER_HEIGHT) {
-        m_position.y = Config::CHUNK_SIZE_Y - Config::PLAYER_HEIGHT;
+    if (m_position.y > Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT) {
+        m_position.y = Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT;
     }
 }
 

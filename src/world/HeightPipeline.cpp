@@ -13,6 +13,10 @@ constexpr uint64_t DOMAIN_WEIRD   = 0x57454952444E4553ULL;
 constexpr uint64_t DOMAIN_TEMP    = 0x54454D5045524154ULL;
 constexpr uint64_t DOMAIN_HUMID   = 0x48554D4944495459ULL;
 constexpr uint64_t DOMAIN_DETAIL  = 0x44455441494C3031ULL;
+constexpr uint64_t DOMAIN_RIDGES  = 0x5249444745533031ULL;
+constexpr uint64_t DOMAIN_RIVER   = 0x5249564552533031ULL;
+constexpr uint64_t DOMAIN_SURFACE_WARP = 0x5355524657415250ULL;
+constexpr uint64_t DOMAIN_SURFACE_DENSITY = 0x5355524644454E53ULL;
 
 void configureFbm(FastNoiseLite& noise, int seed, float frequency, int octaves) {
     noise.SetSeed(seed);
@@ -47,6 +51,18 @@ HeightPipeline::HeightPipeline(const Noise&, uint64_t seed)
     m_detail.SetFractalType(FastNoiseLite::FractalType_Ridged);
     m_detail.SetFractalOctaves(3);
     m_detail.SetFractalGain(0.5f);
+
+    configureFbm(m_ridges, m_context.noiseSeed(DOMAIN_RIDGES), 0.0028f, 4);
+    m_ridges.SetFractalType(FastNoiseLite::FractalType_Ridged);
+    configureFbm(m_river, m_context.noiseSeed(DOMAIN_RIVER), 0.0009f, 3);
+
+    m_surfaceWarp.SetSeed(m_context.noiseSeed(DOMAIN_SURFACE_WARP));
+    m_surfaceWarp.SetDomainWarpType(FastNoiseLite::DomainWarpType_OpenSimplex2Reduced);
+    m_surfaceWarp.SetDomainWarpAmp(12.0f);
+    m_surfaceWarp.SetFrequency(0.012f);
+    m_surfaceWarp.SetFractalType(FastNoiseLite::FractalType_DomainWarpProgressive);
+    m_surfaceWarp.SetFractalOctaves(2);
+    configureFbm(m_surfaceDensity, m_context.noiseSeed(DOMAIN_SURFACE_DENSITY), 0.021f, 3);
 }
 
 float HeightPipeline::clamp01(float value) {
@@ -75,7 +91,7 @@ float HeightPipeline::spline(float value, const float* xs, const float* ys, int 
     return ys[lower] + (ys[upper] - ys[lower]) * t;
 }
 
-SurfaceColumn HeightPipeline::sampleColumn(int worldX, int worldZ) const {
+SurfaceColumn HeightPipeline::sampleBaseColumn(int worldX, int worldZ) const {
     float x = static_cast<float>(worldX);
     float z = static_cast<float>(worldZ);
     m_warp.DomainWarp(x, z);
@@ -89,42 +105,83 @@ SurfaceColumn HeightPipeline::sampleColumn(int worldX, int worldZ) const {
     climate.humidity = m_humidity.GetNoise(x - 29000.0f, z - 13000.0f);
 
     static constexpr float CONT_X[] = {-1.0f, -0.55f, -0.30f, -0.16f, -0.08f, 0.20f, 0.55f, 1.0f};
-    static constexpr float CONT_Y[] = {15.0f, 20.0f, 29.0f, 37.0f, 41.0f, 48.0f, 57.0f, 64.0f};
+    static constexpr float CONT_Y[] = {12.0f, 24.0f, 42.0f, 57.0f, 64.0f, 76.0f, 94.0f, 112.0f};
     float base = spline(climate.continentalness, CONT_X, CONT_Y, 8);
 
     float inland = smoothstep(-0.12f, 0.32f, climate.continentalness);
     float lowErosion = 1.0f - smoothstep(-0.45f, 0.65f, climate.erosion);
     float peakBand = smoothstep(0.05f, 0.78f, climate.peaksValleys);
     float mountain = inland * lowErosion * peakBand;
-    float rolling = inland * (climate.peaksValleys * 5.0f +
-                              (0.25f - climate.erosion) * 4.0f);
-    float detail = (m_detail.GetNoise(x, z) * 2.0f - 0.5f) * (1.5f + inland * 1.5f);
+    float ridge = std::max(0.0f, m_ridges.GetNoise(x, z));
+    mountain = clamp01(mountain * 0.72f + inland * lowErosion * ridge * 0.55f);
+    float rolling = inland * (climate.peaksValleys * 12.0f +
+                              (0.20f - climate.erosion) * 9.0f);
+    float detail = m_detail.GetNoise(x, z) * (2.5f + inland * 4.0f);
 
-    float height = base + rolling + mountain * 42.0f + detail;
+    float height = base + rolling + mountain * (82.0f + ridge * 62.0f) + detail;
 
     // Valleys in inland terrain become continuous rivers. Smooth carving is a
     // point function, so it cannot form region/chunk seams.
-    float valley = smoothstep(-0.58f, -0.88f, climate.peaksValleys);
+    float riverLine = std::abs(m_river.GetNoise(x + 5700.0f, z - 9300.0f));
+    float valley = 1.0f - smoothstep(0.018f, 0.095f, riverLine);
     float riverClimate = 1.0f - smoothstep(0.50f, 0.82f, climate.erosion);
     float riverWeight = valley * inland * riverClimate;
-    bool river = riverWeight > 0.56f && climate.continentalness > -0.13f;
+    bool river = riverWeight > 0.58f && climate.continentalness > -0.13f;
     if (riverWeight > 0.0f) {
         float riverFloor = static_cast<float>(Config::SEA_LEVEL - 2);
         height = height + (riverFloor - height) * smoothstep(0.35f, 0.92f, riverWeight);
     }
 
     int finalHeight = static_cast<int>(std::round(std::max(
-        1.0f, std::min(static_cast<float>(Config::TERRAIN_MAX_HEIGHT), height))));
+        static_cast<float>(Config::TERRAIN_MIN_HEIGHT),
+        std::min(static_cast<float>(Config::TERRAIN_MAX_HEIGHT), height))));
     bool deepOcean = climate.continentalness < -0.46f;
     bool coast = !river && climate.continentalness >= -0.20f &&
                  climate.continentalness < -0.07f;
 
     SurfaceColumn result;
     result.height = finalHeight;
+    result.nominalHeight = finalHeight;
     result.waterLevel = deepOcean ? Config::SEA_LEVEL + 3 : Config::SEA_LEVEL;
+    result.mountainFactor = mountain;
     result.river = river;
     result.climate = climate;
     result.biome = selectBiome(climate, finalHeight, river, coast, deepOcean);
+    return result;
+}
+
+bool HeightPipeline::isTerrainSolid(int worldX, int worldY, int worldZ,
+                                    const SurfaceColumn& column) const {
+    if (worldY <= column.nominalHeight - 28) return true;
+    if (worldY > column.nominalHeight + 32) return false;
+    const float overhangMask = smoothstep(0.42f, 0.78f, column.mountainFactor);
+    if (overhangMask <= 0.0f) return worldY <= column.nominalHeight;
+    float x = static_cast<float>(worldX);
+    float y = static_cast<float>(worldY);
+    float z = static_cast<float>(worldZ);
+    m_surfaceWarp.DomainWarp(x, y, z);
+    const float noise = m_surfaceDensity.GetNoise(x, y * 0.82f, z);
+    const float vertical = static_cast<float>(column.nominalHeight - worldY);
+    return vertical + noise * (6.0f + 13.0f * overhangMask) > 0.0f;
+}
+
+SurfaceColumn HeightPipeline::sampleColumn(int worldX, int worldZ) const {
+    SurfaceColumn result = sampleBaseColumn(worldX, worldZ);
+    const int scanTop = std::min(Config::TERRAIN_MAX_HEIGHT,
+                                 result.nominalHeight + 32);
+    const int scanBottom = std::max(Config::WORLD_MIN_Y,
+                                    result.nominalHeight - 28);
+    result.height = result.nominalHeight;
+    for (int y = scanTop; y >= scanBottom; --y) {
+        if (isTerrainSolid(worldX, y, worldZ, result)) {
+            result.height = y;
+            break;
+        }
+    }
+    result.biome = selectBiome(result.climate, result.height, result.river,
+        result.climate.continentalness >= -0.20f &&
+        result.climate.continentalness < -0.07f,
+        result.climate.continentalness < -0.46f);
     return result;
 }
 
@@ -138,9 +195,9 @@ Biome HeightPipeline::selectBiome(const ClimateSample& c, int height,
             ? Biome::STONY_SHORE : Biome::BEACH;
     }
 
-    if (height >= 88 || (height >= 73 && c.erosion < -0.30f))
+    if (height >= 145 || (height >= 115 && c.erosion < -0.30f))
         return Biome::MOUNTAINS;
-    if (height >= 64 && c.peaksValleys > 0.20f)
+    if (height >= 90 && c.peaksValleys > 0.20f)
         return c.humidity > 0.35f ? Biome::MEADOW : Biome::HILLS;
 
     if (c.temperature > 0.45f && c.humidity < -0.28f) {
@@ -173,6 +230,8 @@ void HeightPipeline::computePaddedRegion(
                 worldOriginX + lx - padding, worldOriginZ + lz - padding);
             auto& out = columnsOut[static_cast<size_t>(lz) * width + lx];
             out.height = sample.height;
+            out.nominalHeight = sample.nominalHeight;
+            out.mountainFactor = sample.mountainFactor;
             out.biome = sample.biome;
             out.isRiver = sample.river;
             out.waterLevel = sample.waterLevel;

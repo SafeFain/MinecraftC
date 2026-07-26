@@ -69,6 +69,7 @@ private:
     std::unique_ptr<Menu> m_activeMenu;
     MenuCallbacks         m_menuCallbacks;
     bool                  m_terrainGenerated = false;
+    std::chrono::high_resolution_clock::time_point m_pregenerationStarted;
     std::unique_ptr<SaveStore> m_saveStore;
     WorldCatalog          m_worldCatalog;
     WorldMetadata         m_worldMetadata;
@@ -455,9 +456,11 @@ private:
         saveCurrentWorld();
         m_saveStore = std::make_unique<SaveStore>(m_worldCatalog.open(worldId));
         m_worldMetadata = m_saveStore->loadMetadata();
+        if (m_worldMetadata.generationVersion != WorldGenContext::GENERATION_VERSION)
+            throw std::runtime_error("World generation version is incompatible");
         const GameMode mode = m_worldMetadata.gameMode;
 
-        m_gameState = GameState::Playing;
+        m_gameState = newWorld ? GameState::LoadingWorld : GameState::Playing;
         m_player.configureRules(mode, m_worldMetadata.difficulty);
         m_hotbar.setSurvivalInventory(
             mode == GameMode::Survival ? &m_player.inventory() : nullptr);
@@ -465,9 +468,9 @@ private:
         m_player.survivalStats().set(
             m_worldMetadata.health, m_worldMetadata.hunger,
             m_worldMetadata.saturation, m_worldMetadata.exhaustion);
-        if (!newWorld) m_player.setPosition(m_worldMetadata.playerPosition);
+        m_player.setPosition(m_worldMetadata.playerPosition);
         m_dayNightCycle.resetMorning();
-        m_window.setCursorLocked(true);
+        m_window.setCursorLocked(!newWorld);
         m_activeMenu.reset();
 
         m_world.setSaveStore(m_saveStore.get());
@@ -477,6 +480,22 @@ private:
         m_entities.clear();
         if (!newWorld) m_entities.loadEntities(m_worldMetadata.entities);
         m_terrainGenerated = false;
+
+        m_autosaveSeconds = 0.0f;
+        m_playerDead = false;
+        m_commandOpen = false;
+        m_commandInput.clear();
+        m_survivalTicks = m_worldMetadata.worldTicks;
+        m_survivalWorldTickRemainder = 0.0f;
+
+        if (newWorld) {
+            m_world.update(m_player.getPosition());
+            m_world.enqueueGeneration();
+            m_pregenerationStarted = Clock::now();
+            LOG_INFO("Pregenerating " << m_world.getActiveChunks().size()
+                     << " spawn chunks");
+            return;
+        }
 
         if (!m_terrainGenerated) {
             // Terrain generation — first batch: create chunks, generate async, wait briefly
@@ -493,22 +512,8 @@ private:
             LOG_INFO("Terrain generated in " << genTime << "s");
             LOG_INFO("Thread pool: " << m_threadPool.threadCount() << " workers");
 
-            if (newWorld) {
-                safeSpawn();
-                const auto position = m_player.getPosition();
-                m_worldMetadata.worldSpawn = glm::ivec3(
-                    static_cast<int>(std::floor(position.x)),
-                    static_cast<int>(std::floor(position.y)),
-                    static_cast<int>(std::floor(position.z)));
-            }
             m_terrainGenerated = true;
         }
-        m_autosaveSeconds = 0.0f;
-        m_playerDead = false;
-        m_commandOpen = false;
-        m_commandInput.clear();
-        m_survivalTicks = m_worldMetadata.worldTicks;
-        m_survivalWorldTickRemainder = 0.0f;
 
         LOG_INFO("WASD=move | Mouse=look | Space=jump | Ctrl=sprint");
         LOG_INFO("Left-click=break | Right-click=place | ESC=pause");
@@ -519,7 +524,7 @@ private:
         int px = static_cast<int>(std::floor(m_player.getPosition().x));
         int pz = static_cast<int>(std::floor(m_player.getPosition().z));
 
-        for (int wy = Config::CHUNK_SIZE_Y - 1; wy >= 0; --wy) {
+        for (int wy = Config::WORLD_MAX_Y - 1; wy >= Config::WORLD_MIN_Y; --wy) {
             BlockId id = m_world.getBlock(px, wy, pz);
             const BlockProperties& props = getBlockProps(id);
             if (props.solid) {
@@ -535,12 +540,12 @@ private:
 
         // No ground found — create a platform
         LOG_INFO("No ground found at spawn, creating platform");
-        for (int y = 30; y <= 33; ++y) {
+        for (int y = Config::SEA_LEVEL - 4; y <= Config::SEA_LEVEL - 1; ++y) {
             m_world.setBlock(px, y, pz, BlockId::STONE);
         }
-        m_world.setBlock(px, 34, pz, BlockId::GRASS);
+        m_world.setBlock(px, Config::SEA_LEVEL, pz, BlockId::GRASS);
         auto pos = m_player.getPosition();
-        pos.y = 34.01f;
+        pos.y = Config::SEA_LEVEL + 1.01f;
         m_player.setPosition(pos);
     }
 
@@ -646,6 +651,31 @@ private:
                     saveCurrentWorld();
                     m_autosaveSeconds = 0.0f;
                 }
+            } else if (m_gameState == GameState::LoadingWorld) {
+                m_world.enqueueGeneration();
+                m_world.processCompletedGenerations(false);
+                const auto progress = m_world.generationProgress();
+                if (progress.total > 0 && progress.completed == progress.total &&
+                    m_threadPool.idle()) {
+                    m_world.processCompletedGenerations();
+                    m_world.persistGeneratedChunks();
+                    safeSpawn();
+                    const auto position = m_player.getPosition();
+                    m_worldMetadata.playerPosition = position;
+                    m_worldMetadata.worldSpawn = glm::ivec3(
+                        static_cast<int>(std::floor(position.x)),
+                        static_cast<int>(std::floor(position.y)),
+                        static_cast<int>(std::floor(position.z)));
+                    m_saveStore->saveMetadata(m_worldMetadata);
+                    m_world.buildMeshesSync(&m_renderer, 16);
+                    m_terrainGenerated = true;
+                    m_gameState = GameState::Playing;
+                    m_window.setCursorLocked(true);
+                    const float seconds = std::chrono::duration<float>(
+                        Clock::now() - m_pregenerationStarted).count();
+                    LOG_INFO("Spawn chunk pregeneration completed in "
+                             << seconds << "s");
+                }
             }
 
             // ── 3D Rendering ──────────────────────────────────────────
@@ -687,7 +717,7 @@ private:
                     int chunkMaxY = chunk->getGlobalMaxY();
                     glm::vec3 aabbMin(
                         static_cast<float>(chunk->worldX() - renderOrigin.x),
-                        0.0f,
+                        static_cast<float>(Config::WORLD_MIN_Y),
                         static_cast<float>(chunk->worldZ() - renderOrigin.z));
                     glm::vec3 aabbMax(aabbMin.x + Config::CHUNK_SIZE_X,
                                       static_cast<float>(chunkMaxY + 1),
@@ -695,11 +725,12 @@ private:
 
                     if (!frustum.intersectsAABB(aabbMin, aabbMax)) continue;
 
-                    glm::mat4 model = glm::translate(glm::mat4(1.0f), aabbMin);
-                    glm::vec3 center = aabbMin + glm::vec3(
-                        Config::CHUNK_SIZE_X * 0.5f,
-                        chunkMaxY * 0.5f,
-                        Config::CHUNK_SIZE_Z * 0.5f);
+                    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
+                        aabbMin.x, 0.0f, aabbMin.z));
+                    glm::vec3 center(
+                        aabbMin.x + Config::CHUNK_SIZE_X * 0.5f,
+                        (Config::WORLD_MIN_Y + chunkMaxY + 1) * 0.5f,
+                        aabbMin.z + Config::CHUNK_SIZE_Z * 0.5f);
                     glm::vec3 delta = center - m_camera.m_position;
                     visibleChunks.push_back({chunk, model, glm::dot(delta, delta)});
                     m_renderer.renderChunk(mesh, model, vp, false);
@@ -805,6 +836,37 @@ private:
             if (m_activeMenu) {
                 m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 m_activeMenu->render(m_uiRenderer, uiWidth, uiHeight);
+                m_uiRenderer.endUIFrame();
+            }
+
+            if (m_gameState == GameState::LoadingWorld) {
+                const auto progress = m_world.generationProgress();
+                const float fraction = progress.total == 0 ? 0.0f :
+                    static_cast<float>(progress.completed) /
+                    static_cast<float>(progress.total);
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
+                m_uiRenderer.drawRect(0, 0, static_cast<float>(uiWidth),
+                                      static_cast<float>(uiHeight),
+                                      glm::vec4(.055f, .065f, .08f, 1.0f));
+                const char* title = "PREGENERATING WORLD";
+                const auto titleSize = m_uiRenderer.measureText(title, 3.0f);
+                m_uiRenderer.renderText(title, (uiWidth - titleSize.x) * 0.5f,
+                                        uiHeight * 0.58f, 3.0f,
+                                        glm::vec3(1.0f, .85f, .3f));
+                const float barWidth = std::min(420.0f, uiWidth - 48.0f);
+                const float barX = (uiWidth - barWidth) * 0.5f;
+                const float barY = uiHeight * 0.46f;
+                m_uiRenderer.drawRect(barX - 2, barY - 2, barWidth + 4, 18,
+                                      glm::vec4(.02f, .02f, .025f, 1.0f));
+                m_uiRenderer.drawRect(barX, barY, barWidth, 14,
+                                      glm::vec4(.18f, .18f, .2f, 1.0f));
+                m_uiRenderer.drawRect(barX, barY, barWidth * fraction, 14,
+                                      glm::vec4(.36f, .72f, .3f, 1.0f));
+                const std::string status = std::to_string(progress.completed) + " / " +
+                    std::to_string(progress.total) + " chunks";
+                const auto statusSize = m_uiRenderer.measureText(status, 1.25f);
+                m_uiRenderer.renderText(status, (uiWidth - statusSize.x) * 0.5f,
+                                        barY - 28.0f, 1.25f, glm::vec3(.82f));
                 m_uiRenderer.endUIFrame();
             }
 

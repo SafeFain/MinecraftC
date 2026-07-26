@@ -6,7 +6,7 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 2;
+    static constexpr uint32_t GENERATION_VERSION = 3;
 
     explicit WorldGenContext(uint64_t seed) : m_seed(seed) {}
 

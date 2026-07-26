@@ -19,7 +19,7 @@ public:
     int worldX() const { return cx * Config::CHUNK_SIZE_X; }
     int worldZ() const { return cz * Config::CHUNK_SIZE_Z; }
 
-    // Voxel access (local coordinates: 0..15, 0..127, 0..15)
+    // X/Z are local coordinates; Y is an absolute world coordinate.
     BlockId getBlock(int x, int y, int z) const;
     void setBlock(int x, int y, int z, BlockId id);
 
@@ -29,7 +29,7 @@ public:
 
     // Global max Y across all columns (for tighter frustum culling AABB)
     int getGlobalMaxY() const {
-        int maxY = 0;
+        int maxY = Config::WORLD_MIN_Y - 1;
         for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
             for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
                 if (m_columnMaxY[x][z] > maxY) maxY = m_columnMaxY[x][z];
@@ -44,8 +44,10 @@ public:
     // Raw block array access (for WorldGenerator)
     uint8_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }
     const uint8_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
+    const uint8_t* rawBlocks() const { return m_blocks.data(); }
+    void loadRawBlocks(const std::vector<uint8_t>& blocks);
     uint8_t getBlockLight(int x, int y, int z) const {
-        return x < 0 || x >= Config::CHUNK_SIZE_X || y < 0 || y >= Config::CHUNK_SIZE_Y ||
+        return x < 0 || x >= Config::CHUNK_SIZE_X || !Config::isValidWorldY(y) ||
                z < 0 || z >= Config::CHUNK_SIZE_Z ? 0 : m_blockLight[index(x,y,z)];
     }
     void setBlockLight(int x, int y, int z, uint8_t value) { m_blockLight[index(x,y,z)] = value; }
@@ -81,7 +83,7 @@ private:
 
     static inline int index(int x, int y, int z) {
         return x + z * Config::CHUNK_SIZE_X
-                 + y * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+                 + Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
     }
 
     void recalcColumnMax(int x, int z);

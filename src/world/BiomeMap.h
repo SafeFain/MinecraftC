@@ -54,7 +54,7 @@ struct BiomeProperties {
     float     treeDensity   = 0.05f;   // 0=no trees, higher=denser
     TreeType  treeType1     = TreeType::OAK;
     TreeType  treeType2     = TreeType::NONE;
-    int       waterLevel    = 40;      // sea-level override per biome (for swamps etc.)
+    int       waterLevel    = 63;      // sea-level override per biome (for swamps etc.)
     int       snowLine       = 999;    // height above which surface becomes SNOW (999=never)
 };
 

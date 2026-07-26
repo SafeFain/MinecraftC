@@ -23,13 +23,13 @@ float findSupportHeight(float px, float bottomY, float pz,
     const int minZ = static_cast<int>(std::floor(pz - halfWidth + margin));
     const int maxZ = static_cast<int>(std::floor(pz + halfWidth - margin));
     const int scanTop = std::min(
-        Config::CHUNK_SIZE_Y - 1,
+        Config::WORLD_MAX_Y - 1,
         static_cast<int>(std::floor(bottomY + margin)));
 
-    float support = 0.0f;
+    float support = static_cast<float>(Config::WORLD_MIN_Y);
     for (int bx = minX; bx <= maxX; ++bx) {
         for (int bz = minZ; bz <= maxZ; ++bz) {
-            for (int by = scanTop; by >= 0; --by) {
+            for (int by = scanTop; by >= Config::WORLD_MIN_Y; --by) {
                 const BlockId id = getBlock(bx, by, bz);
                 if (!getBlockProps(id).solid) continue;
                 const float top = static_cast<float>(by + 1);

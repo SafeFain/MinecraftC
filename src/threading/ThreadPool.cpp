@@ -22,6 +22,7 @@ ThreadPool::ThreadPool(size_t numThreads) {
 
                     task = std::move(m_tasks.top());
                     m_tasks.pop();
+                    ++m_activeTasks;
                 }
 
                 try {
@@ -31,6 +32,7 @@ ThreadPool::ThreadPool(size_t numThreads) {
                 } catch (...) {
                     LOG_ERROR("ThreadPool worker task threw unknown exception");
                 }
+                --m_activeTasks;
             }
         });
     }

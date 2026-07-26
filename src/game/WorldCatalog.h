@@ -14,6 +14,8 @@ struct WorldSummary {
     Difficulty difficulty = Difficulty::Normal;
     uint64_t seed = 0;
     uint64_t worldTicks = 0;
+    uint32_t generationVersion = 0;
+    bool compatible = false;
 };
 
 class WorldCatalog {

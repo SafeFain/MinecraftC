@@ -85,7 +85,7 @@ void RegionGenerator::generateRegion(
 
             // setLeaf: handles in-region and out-of-region placement
             auto setLeaf = [&](int lx, int ly, int lz, BlockId id) {
-                if (ly < 0 || ly >= Config::CHUNK_SIZE_Y) return;
+                if (!Config::isValidWorldY(ly)) return;
                 if (id == BlockId::LEAVES) {
                     if (tp.type == TreeType::BIRCH) id = BlockId::BIRCH_LEAVES;
                     else if (tp.type == TreeType::SPRUCE) id = BlockId::SPRUCE_LEAVES;
@@ -135,7 +135,7 @@ void RegionGenerator::generateRegion(
             else if (tp.type == TreeType::ACACIA) trunkBlock = BlockId::ACACIA_WOOD;
             for (int y = baseY; y < baseY + tp.trunkHeight; ++y) {
                 if (trunkLX >= 0 && trunkLX < 16 && trunkLZ >= 0 && trunkLZ < 16 &&
-                    y >= 0 && y < Config::CHUNK_SIZE_Y) {
+                    Config::isValidWorldY(y)) {
                     BlockId cur = chunk.getBlock(trunkLX, y, trunkLZ);
                     if (cur != BlockId::WATER) {
                         chunk.setBlock(trunkLX, y, trunkLZ, trunkBlock);
@@ -144,7 +144,7 @@ void RegionGenerator::generateRegion(
             }
 
             // Place canopy via setLeaf (handles cross-chunk within region)
-            int hash = (tp.localX * 7919 + tp.localZ * 6287 + tp.baseY * 3313) & 0x7FFFFFFF;
+            int hash = (trunkLX * 7919 + trunkLZ * 6287 + baseY * 3313) & 0x7FFFFFFF;
 
             switch (tp.type) {
                 case TreeType::OAK: {
@@ -230,7 +230,7 @@ void RegionGenerator::generateRegion(
                 case TreeType::CACTUS: {
                     for (int y = baseY; y < baseY + tp.trunkHeight; ++y) {
                         if (trunkLX >= 0 && trunkLX < 16 && trunkLZ >= 0 && trunkLZ < 16 &&
-                            y >= 0 && y < Config::CHUNK_SIZE_Y) {
+                            Config::isValidWorldY(y)) {
                             chunk.setBlock(trunkLX, y, trunkLZ, BlockId::CACTUS_BLOCK);
                         }
                     }
@@ -335,31 +335,30 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             SurfaceProfile surface = SurfaceRules::profile(
                 m_seed, wxBase + x, wzBase + z, biome);
 
-            // Bedrock layer
-            for (int y = 0; y <= Config::BEDROCK_LEVEL; ++y) {
+            const int worldX = wxBase + x, worldZ = wzBase + z;
+            SurfaceColumn terrainColumn;
+            terrainColumn.height = col.height;
+            terrainColumn.nominalHeight = col.nominalHeight;
+            terrainColumn.mountainFactor = col.mountainFactor;
+            const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
+                WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
+            for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
                 chunk.setBlock(x, y, z, BlockId::BEDROCK);
             }
 
-            // Stone fill
-            int subsoilTop = height - surface.depth;
-            int stoneStart = Config::BEDROCK_LEVEL + 1;
-            int stoneEnd   = std::max(stoneStart, subsoilTop);
-            for (int y = stoneStart; y < stoneEnd; ++y) {
-                chunk.setBlock(x, y, z, BlockId::STONE);
+            for (int y = bedrockTop + 1; y <= height; ++y) {
+                if (!m_heightPipeline.isTerrainSolid(worldX, y, worldZ, terrainColumn)) continue;
+                const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
+                    WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
+                        Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
+                chunk.setBlock(x, y, z, deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
-
-            // Deepslate replacement
-            for (int y = stoneStart; y <= Config::DEEPSLATE_DEPTH && y < stoneEnd; ++y) {
-                chunk.setBlock(x, y, z, BlockId::DEEPSLATE);
+            for (int depth = 0; depth <= surface.depth; ++depth) {
+                const int y = height - depth;
+                const BlockId current = chunk.getBlock(x, y, z);
+                if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
+                chunk.setBlock(x, y, z, depth == 0 ? surface.top : surface.under);
             }
-
-            // Subsoil
-            for (int y = stoneEnd; y < height; ++y) {
-                chunk.setBlock(x, y, z, surface.under);
-            }
-
-            // Surface block
-            chunk.setBlock(x, height, z, surface.top);
 
             // Snow cover
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
@@ -370,7 +369,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             int waterTop = col.waterLevel;
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
-                    if (y < Config::CHUNK_SIZE_Y) {
+                    if (y < Config::WORLD_MAX_Y) {
                         chunk.setBlock(x, y, z, BlockId::WATER);
                     }
                 }
@@ -387,7 +386,11 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             int wx = wxBase + x, wz = wzBase + z;
-            for (int y = Config::CAVE_MIN_Y; y < Config::CHUNK_SIZE_Y; ++y) {
+            for (int y = Config::CAVE_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                const auto& surfaceColumn = m_regionData.col(
+                    pad + localCX * Config::CHUNK_SIZE_X + x,
+                    pad + localCZ * Config::CHUNK_SIZE_Z + z);
+                if (y > surfaceColumn.height - Config::CAVE_DRY_ROOF) continue;
                 CaveCell cell = m_regionData.caves.get(wx, y, wz);
                 if (cell == CaveCell::Solid) continue;
                 BlockId existing = chunk.getBlock(x, y, z);
@@ -401,7 +404,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             }
 
             // Ores only replace rock that remains after carving.
-            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::CHUNK_SIZE_Y; ++y) {
+            for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId existing = chunk.getBlock(x, y, z);
                 if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
@@ -412,7 +415,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             const auto& decoCol = m_regionData.col(
                 pad + localCX * Config::CHUNK_SIZE_X + x,
                 pad + localCZ * Config::CHUNK_SIZE_Z + z);
-            if (decoCol.height + 1 < Config::CHUNK_SIZE_Y &&
+            if (decoCol.height + 1 < Config::WORLD_MAX_Y &&
                 chunk.getBlock(x, decoCol.height, z) != BlockId::AIR &&
                 chunk.getBlock(x, decoCol.height + 1, z) == BlockId::AIR) {
                 BlockId decoration = SurfaceRules::decoration(

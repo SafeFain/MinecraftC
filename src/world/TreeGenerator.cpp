@@ -85,7 +85,7 @@ bool TreeGenerator::accepts(Biome biome, int height, bool river,
                             int worldX, int worldZ) const {
     float chance = chanceFor(biome);
     if (chance <= 0.0f || river || height <= Config::SEA_LEVEL ||
-        height >= Config::CHUNK_SIZE_Y - 14) {
+        height >= Config::WORLD_MAX_Y - 14) {
         return false;
     }
     uint64_t h = WorldGenContext::hashPosition(

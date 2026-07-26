@@ -1,4 +1,5 @@
 #include "game/SaveStore.h"
+#include "Config.h"
 
 #include <array>
 #include <cstring>
@@ -192,10 +193,10 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
     }
 }
 
-PersistedBlockEntity readBlockEntity(Reader& reader) {
+PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     PersistedBlockEntity entity;
-    entity.localIndex = reader.read<uint16_t>();
-    if (entity.localIndex >= 16 * 128 * 16)
+    entity.localIndex = version >= 6 ? reader.read<uint32_t>() : reader.read<uint16_t>();
+    if (entity.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid block entity position");
     const uint8_t type = reader.read<uint8_t>();
     if (type > static_cast<uint8_t>(BlockEntityType::Furnace))
@@ -294,6 +295,11 @@ std::filesystem::path SaveStore::chunkPath(int chunkX, int chunkZ) const {
         ("c." + std::to_string(chunkX) + "." + std::to_string(chunkZ) + ".bin");
 }
 
+std::filesystem::path SaveStore::generatedChunkPath(int chunkX, int chunkZ) const {
+    return m_worldDirectory / "generated" /
+        ("g." + std::to_string(chunkX) + "." + std::to_string(chunkZ) + ".bin");
+}
+
 std::filesystem::path SaveStore::blockEntityPath(int chunkX, int chunkZ) const {
     return m_worldDirectory / "block_entities" /
         ("b." + std::to_string(chunkX) + "." + std::to_string(chunkZ) + ".bin");
@@ -311,7 +317,7 @@ void SaveStore::saveChunkOverrides(
     append(payload, chunkZ);
     append(payload, static_cast<uint32_t>(overrides.size()));
     for (const auto& entry : overrides) {
-        if (entry.localIndex >= 16 * 128 * 16 ||
+        if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
             static_cast<uint8_t>(entry.block) >= static_cast<uint8_t>(BlockId::COUNT))
             throw std::runtime_error("Invalid block override");
         append(payload, entry.localIndex);
@@ -328,20 +334,66 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
     if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ)
         throw std::runtime_error("Chunk save coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
-    if (count > 16 * 128 * 16) throw std::runtime_error("Too many block overrides");
+    if (count > static_cast<uint32_t>(Config::CHUNK_VOLUME))
+        throw std::runtime_error("Too many block overrides");
     std::vector<BlockOverride> overrides;
     overrides.reserve(count);
     for (uint32_t i = 0; i < count; ++i) {
         BlockOverride entry;
-        entry.localIndex = reader.read<uint16_t>();
+        entry.localIndex = checked.version >= 6
+            ? reader.read<uint32_t>() : reader.read<uint16_t>();
         entry.block = static_cast<BlockId>(reader.read<uint8_t>());
-        if (entry.localIndex >= 16 * 128 * 16 ||
+        const uint32_t legacyLimit = 16u * 128u * 16u;
+        const uint32_t limit = checked.version >= 6
+            ? static_cast<uint32_t>(Config::CHUNK_VOLUME) : legacyLimit;
+        if (entry.localIndex >= limit ||
             static_cast<uint8_t>(entry.block) >= static_cast<uint8_t>(BlockId::COUNT))
             throw std::runtime_error("Invalid block override");
         overrides.push_back(entry);
     }
     if (!reader.finished()) throw std::runtime_error("Unexpected trailing chunk data");
     return overrides;
+}
+
+void SaveStore::saveGeneratedChunk(
+    int chunkX, int chunkZ, const std::vector<uint8_t>& blocks,
+    uint32_t generationVersion) const {
+    if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME))
+        throw std::runtime_error("Invalid generated chunk size");
+    Bytes payload;
+    payload.reserve(sizeof(int) * 2 + sizeof(uint32_t) * 2 + blocks.size());
+    append(payload, chunkX);
+    append(payload, chunkZ);
+    append(payload, generationVersion);
+    append(payload, static_cast<uint32_t>(blocks.size()));
+    payload.insert(payload.end(), blocks.begin(), blocks.end());
+    writeAtomic(generatedChunkPath(chunkX, chunkZ), payload);
+}
+
+std::optional<std::vector<uint8_t>> SaveStore::loadGeneratedChunk(
+    int chunkX, int chunkZ, uint32_t generationVersion) const {
+    const auto path = generatedChunkPath(chunkX, chunkZ);
+    if (!std::filesystem::exists(path)) return std::nullopt;
+    try {
+        CheckedBytes checked = readChecked(path);
+        Reader reader(std::move(checked.payload));
+        if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ ||
+            reader.read<uint32_t>() != generationVersion)
+            return std::nullopt;
+        const uint32_t size = reader.read<uint32_t>();
+        if (size != static_cast<uint32_t>(Config::CHUNK_VOLUME)) return std::nullopt;
+        std::vector<uint8_t> blocks;
+        blocks.reserve(size);
+        for (uint32_t i = 0; i < size; ++i) {
+            const uint8_t block = reader.read<uint8_t>();
+            if (block >= static_cast<uint8_t>(BlockId::COUNT)) return std::nullopt;
+            blocks.push_back(block);
+        }
+        if (!reader.finished()) return std::nullopt;
+        return blocks;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
 }
 
 void SaveStore::saveBlockEntities(
@@ -366,7 +418,8 @@ std::vector<PersistedBlockEntity> SaveStore::loadBlockEntities(
     if (count > 4096) throw std::runtime_error("Too many block entities");
     std::vector<PersistedBlockEntity> result;
     result.reserve(count);
-    for (uint32_t i = 0; i < count; ++i) result.push_back(readBlockEntity(reader));
+    for (uint32_t i = 0; i < count; ++i)
+        result.push_back(readBlockEntity(reader, checked.version));
     if (!reader.finished()) throw std::runtime_error("Unexpected block entity data");
     return result;
 }

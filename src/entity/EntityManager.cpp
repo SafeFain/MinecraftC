@@ -175,13 +175,13 @@ void EntityManager::spawnAroundPlayer(
     const int x = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
     const int z = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
     int surface = -1;
-    for (int y = 127; y >= 0; --y) {
+    for (int y = Config::WORLD_MAX_Y - 1; y >= Config::WORLD_MIN_Y; --y) {
         if (isSolid(m_world.getBlock(x, y, z))) {
             surface = y + 1;
             break;
         }
     }
-    if (surface < 1 || surface >= 126 ||
+    if (!Config::isValidWorldY(surface) || surface + 1 >= Config::WORLD_MAX_Y ||
         m_world.getBlock(x, surface, z) != BlockId::AIR ||
         m_world.getBlock(x, surface + 1, z) != BlockId::AIR) return;
     if (spawnHostile && !hostileSpawnLightValid(m_world.getBlockLight(x, surface, z))) return;

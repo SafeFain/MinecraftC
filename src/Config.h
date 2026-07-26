@@ -14,15 +14,21 @@ constexpr float FAR_PLANE       = 500.0f;
 
 // ── World ─────────────────────────────────────────────────────────────
 constexpr int   CHUNK_SIZE_X    = 16;
-constexpr int   CHUNK_SIZE_Y    = 128;
 constexpr int   CHUNK_SIZE_Z    = 16;
+constexpr int   WORLD_MIN_Y     = -64;
+constexpr int   WORLD_MAX_Y     = 320; // exclusive
+constexpr int   WORLD_HEIGHT    = WORLD_MAX_Y - WORLD_MIN_Y;
+constexpr int   CHUNK_SIZE_Y    = WORLD_HEIGHT;
 constexpr int   CHUNK_VOLUME    = CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z;
 inline int     RENDER_DISTANCE = 6;    // runtime-mutable (changed via Settings menu)
-constexpr int   WORLD_HEIGHT    = CHUNK_SIZE_Y;
+constexpr bool isValidWorldY(int y) { return y >= WORLD_MIN_Y && y < WORLD_MAX_Y; }
+constexpr int worldYToStorageY(int y) { return y - WORLD_MIN_Y; }
+constexpr int storageYToWorldY(int y) { return y + WORLD_MIN_Y; }
 
 // ── Async generation ──────────────────────────────────────────────────
 constexpr int   MESH_UPLOADS_PER_FRAME = 4;   // max GL uploads per frame (avoids GPU stalls)
-constexpr int   CHUNK_GEN_PER_FRAME    = 8;   // max chunks to enqueue for generation per frame
+constexpr int   CHUNK_GEN_TASKS_IN_FLIGHT = 2; // bounds expensive terrain workers
+constexpr int   CHUNK_MESH_TASKS_IN_FLIGHT = 2; // prevents mesh queue buildup
 
 constexpr int   RENDER_DISTANCE_OPTIONS[] = {2, 4, 6, 8, 10, 12, 16};
 constexpr int   RENDER_DISTANCE_OPTION_COUNT = 7;
@@ -51,8 +57,9 @@ constexpr int   REGION_PADDED_SIZE   = REGION_SIZE_BLOCKS + 2 * REGION_PADDING; 
 inline uint64_t WORLD_SEED = 1234567890ULL;
 
 // ── Terrain Generation ────────────────────────────────────────────────
-constexpr int   SEA_LEVEL         = 40;
-constexpr int   TERRAIN_MAX_HEIGHT = CHUNK_SIZE_Y - 5;  // max Y for terrain columns (123)
+constexpr int   SEA_LEVEL          = 63;
+constexpr int   TERRAIN_MIN_HEIGHT = 4;
+constexpr int   TERRAIN_MAX_HEIGHT = 303;
 
 // Terrain/climate/router constants are versioned with WorldGenContext and
 // intentionally live beside the algorithm in HeightPipeline.cpp. Changing
@@ -60,7 +67,7 @@ constexpr int   TERRAIN_MAX_HEIGHT = CHUNK_SIZE_Y - 5;  // max Y for terrain col
 
 // ── Caves ─────────────────────────────────────────────────────────────
 // Hybrid cave density fields, branching carvers, and aquifers.
-constexpr int   BEDROCK_LEVEL              = 3;
+constexpr int   BEDROCK_LEVEL              = -60;
 constexpr int   CAVE_MIN_Y                 = BEDROCK_LEVEL + 2;
 constexpr int   CAVE_TOP_MARGIN            = 10;
 constexpr int   CAVE_DRY_ROOF              = 6;
@@ -78,40 +85,40 @@ constexpr float CAVE_NOODLE_THICKNESS      = 0.052f;
 constexpr int   CAVE_CARVER_CELL_SIZE      = 64;
 constexpr int   CAVE_CARVER_MAX_REACH      = 128;
 constexpr float CAVE_CARVER_CHANCE         = 0.28f;
-constexpr int   CAVE_LAVA_LEVEL            = 8;
-constexpr int   CAVE_AQUIFER_LEVEL_BASE    = 28;
+constexpr int   CAVE_LAVA_LEVEL            = -54;
+constexpr int   CAVE_AQUIFER_LEVEL_BASE    = 30;
 constexpr float CAVE_AQUIFER_THRESHOLD     = 0.02f;
 
 // ── Snow ──────────────────────────────────────────────────────────────
-constexpr int   SNOW_LINE_BASE           = 75;
+constexpr int   SNOW_LINE_BASE           = 140;
 constexpr float SNOW_TEMP_FACTOR         = 0.15f;
 constexpr int   SNOW_LINE_DISABLED       = 999;
 
 // ── Deepslate ─────────────────────────────────────────────────────────
-constexpr int   DEEPSLATE_DEPTH          = 8;     // y below which stone becomes deepslate
+constexpr int   DEEPSLATE_DEPTH          = 8;     // transition begins below this world Y
 
 // ── Ore Generation ────────────────────────────────────────────────────
 constexpr int   ORE_MAX_PER_CHUNK        = 50;
 
 constexpr float ORE_COAL_SCALE           = 0.05f;
 constexpr float ORE_COAL_THRESHOLD       = 0.55f;
-constexpr int   ORE_COAL_MIN_Y           = 1;
-constexpr int   ORE_COAL_MAX_Y           = 120;
+constexpr int   ORE_COAL_MIN_Y           = 0;
+constexpr int   ORE_COAL_MAX_Y           = 256;
 
 constexpr float ORE_IRON_SCALE           = 0.04f;
 constexpr float ORE_IRON_THRESHOLD       = 0.65f;
-constexpr int   ORE_IRON_MIN_Y           = 1;
-constexpr int   ORE_IRON_MAX_Y           = 60;
+constexpr int   ORE_IRON_MIN_Y           = -64;
+constexpr int   ORE_IRON_MAX_Y           = 256;
 
 constexpr float ORE_GOLD_SCALE           = 0.03f;
 constexpr float ORE_GOLD_THRESHOLD       = 0.70f;
-constexpr int   ORE_GOLD_MIN_Y           = 1;
-constexpr int   ORE_GOLD_MAX_Y           = 30;
+constexpr int   ORE_GOLD_MIN_Y           = -64;
+constexpr int   ORE_GOLD_MAX_Y           = 32;
 
 constexpr float ORE_DIAMOND_SCALE        = 0.025f;
 constexpr float ORE_DIAMOND_THRESHOLD    = 0.75f;
-constexpr int   ORE_DIAMOND_MIN_Y        = 1;
-constexpr int   ORE_DIAMOND_MAX_Y        = 15;
+constexpr int   ORE_DIAMOND_MIN_Y        = -64;
+constexpr int   ORE_DIAMOND_MAX_Y        = 16;
 
 // ── Trees ─────────────────────────────────────────────────────────────
 constexpr int   TREE_MAX_CANDIDATES      = 30;
@@ -119,7 +126,7 @@ constexpr int   TREE_MAX_PLACEMENTS      = 50;
 constexpr float TREE_SLOPE_MAX           = 2.0f;
 
 // ── Ice ───────────────────────────────────────────────────────────────
-constexpr int   ICE_FREEZE_MAX_Y         = 50;
+constexpr int   ICE_FREEZE_MAX_Y         = 80;
 
 // ── Biome ─────────────────────────────────────────────────────────────
 // ── Player ────────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@ public:
 
     // Number of pending tasks
     size_t pendingCount() const;
+    bool idle() const { return pendingCount() == 0 && m_activeTasks.load() == 0; }
 
     // Number of worker threads
     size_t threadCount() const { return m_workers.size(); }
@@ -45,6 +46,7 @@ private:
     mutable std::mutex m_queueMutex;
     std::condition_variable m_condition;
     std::atomic<bool> m_stop{false};
+    std::atomic<size_t> m_activeTasks{0};
 };
 
 // Template must be in header

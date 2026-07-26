@@ -40,6 +40,13 @@ int main() {
     require(std::abs(lowerSupport - 10.0f) < 0.001f,
             "support did not transition after clearing the ledge");
 
+    blocks.clear();
+    blocks[{0, -40, 0}] = BlockId::STONE;
+    float negativeSupport =
+        PlayerPhysics::findSupportHeight(0.5f, -38.999f, 0.5f, getter);
+    require(std::abs(negativeSupport + 39.0f) < 0.001f,
+            "support scan stopped at the old zero-height boundary");
+
     require(PlayerPhysics::shouldAutoJump(true, true, true, true, true),
             "clear grounded obstacle did not permit auto jump");
     require(!PlayerPhysics::shouldAutoJump(false, true, true, true, true),

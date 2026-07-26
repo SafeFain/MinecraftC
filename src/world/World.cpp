@@ -10,6 +10,7 @@
 #include "game/SurvivalBlockLogic.h"
 #include "world/BlockEntityLogic.h"
 #include "world/BlockLightLogic.h"
+#include "world/WorldGenContext.h"
 
 #include <cmath>
 #include <algorithm>
@@ -34,6 +35,7 @@ void World::resetForNewSeed(uint64_t newSeed) {
     m_dirtyBlockEntityChunks.clear();
     m_blockEntitiesApplied.clear();
     m_lightDirty = true;
+    m_lightHasSources = false;
     m_firstUpdate = true;
     m_chunksPerFrame = 16;
     // Placement-new: WorldGenerator contains reference members (Noise&),
@@ -53,7 +55,7 @@ World::~World() {
 // ── Block queries ─────────────────────────────────────────────────────
 
 BlockId World::getBlock(int worldX, int worldY, int worldZ) const {
-    if (worldY < 0 || worldY >= Config::CHUNK_SIZE_Y) {
+    if (!Config::isValidWorldY(worldY)) {
         return BlockId::AIR;
     }
 
@@ -75,7 +77,7 @@ BlockId World::getBlock(int worldX, int worldY, int worldZ) const {
 }
 
 uint8_t World::getBlockLight(int worldX, int worldY, int worldZ) const {
-    if (worldY < 0 || worldY >= Config::CHUNK_SIZE_Y) return 0;
+    if (!Config::isValidWorldY(worldY)) return 0;
     const int cx = worldToChunkX(worldX), cz = worldToChunkZ(worldZ);
     const int lx = worldX - cx * Config::CHUNK_SIZE_X;
     const int lz = worldZ - cz * Config::CHUNK_SIZE_Z;
@@ -85,7 +87,7 @@ uint8_t World::getBlockLight(int worldX, int worldY, int worldZ) const {
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
-    if (worldY < 0 || worldY >= Config::CHUNK_SIZE_Y) return;
+    if (!Config::isValidWorldY(worldY)) return;
 
     int cx = worldToChunkX(static_cast<double>(worldX));
     int cz = worldToChunkZ(static_cast<double>(worldZ));
@@ -97,9 +99,10 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
 
     Chunk* chunk = getChunk(cx, cz);
     chunk->setBlock(lx, worldY, lz, id);
-    const uint16_t localIndex = static_cast<uint16_t>(
+    const uint32_t localIndex = static_cast<uint32_t>(
         lx + lz * Config::CHUNK_SIZE_X +
-        worldY * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+        Config::worldYToStorageY(worldY) *
+            Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
     {
         std::unique_lock lock(m_chunkMutex);
         m_blockOverrides[{cx, cz}][localIndex] = id;
@@ -154,6 +157,13 @@ Chunk* World::getChunk(int cx, int cz) {
     }
 
     auto chunk = std::make_unique<Chunk>(cx, cz);
+    if (m_saveStore) {
+        if (auto cached = m_saveStore->loadGeneratedChunk(
+                cx, cz, WorldGenContext::GENERATION_VERSION)) {
+            chunk->loadRawBlocks(*cached);
+            chunk->generated = true;
+        }
+    }
     // Generation is deferred to enqueueGeneration() — the chunk
     // starts as all-AIR and will be populated by a worker thread.
     Chunk* ptr = chunk.get();
@@ -161,11 +171,36 @@ Chunk* World::getChunk(int cx, int cz) {
     return ptr;
 }
 
+World::GenerationProgress World::generationProgress() const {
+    std::shared_lock lock(m_chunkMutex);
+    GenerationProgress progress;
+    progress.total = m_chunks.size();
+    for (const auto& [key, chunk] : m_chunks) {
+        (void)key;
+        if (chunk->generated.load()) ++progress.completed;
+    }
+    return progress;
+}
+
+void World::persistGeneratedChunks() {
+    if (!m_saveStore) return;
+    std::shared_lock lock(m_chunkMutex);
+    for (const auto& [key, chunk] : m_chunks) {
+        if (!chunk->generated.load()) continue;
+        std::vector<uint8_t> blocks(
+            chunk->rawBlocks(), chunk->rawBlocks() + Config::CHUNK_VOLUME);
+        m_saveStore->saveGeneratedChunk(
+            key.first, key.second, blocks, WorldGenContext::GENERATION_VERSION);
+    }
+}
+
 // ── Update (chunk loading/unloading) ──────────────────────────────────
 
 void World::update(const glm::dvec3& playerPos) {
     int pcx = worldToChunkX(playerPos.x);
     int pcz = worldToChunkZ(playerPos.z);
+    m_centerChunkX = pcx;
+    m_centerChunkZ = pcz;
 
     // First frame: load more chunks
     if (m_firstUpdate) {
@@ -208,6 +243,7 @@ void World::update(const glm::dvec3& playerPos) {
         for (auto& key : toRemove) {
             auto it = m_chunks.find(key);
             if (it != m_chunks.end()) {
+                if (it->second->generated.load()) m_lightDirty = true;
                 saveOverrides(key.first, key.second);
                 saveBlockEntities(key.first, key.second);
                 it->second->getMesh().destroy();
@@ -247,6 +283,10 @@ void World::update(const glm::dvec3& playerPos) {
 void World::enqueueGeneration() {
     if (!m_threadPool) return;
 
+    const int taskSlots = Config::CHUNK_GEN_TASKS_IN_FLIGHT -
+        m_generationTasksInFlight.load();
+    if (taskSlots <= 0) return;
+
     std::shared_lock lock(m_chunkMutex);
 
     // Collect all ungenerated, not-in-progress chunk coords
@@ -257,6 +297,13 @@ void World::enqueueGeneration() {
         }
     }
     if (ungenerated.empty()) return;
+    std::sort(ungenerated.begin(), ungenerated.end(), [this](const auto& a, const auto& b) {
+        const int64_t adx = static_cast<int64_t>(a.first) - m_centerChunkX;
+        const int64_t adz = static_cast<int64_t>(a.second) - m_centerChunkZ;
+        const int64_t bdx = static_cast<int64_t>(b.first) - m_centerChunkX;
+        const int64_t bdz = static_cast<int64_t>(b.second) - m_centerChunkZ;
+        return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+    });
 
     // Build a set for fast lookup
     std::unordered_set<int64_t> available;
@@ -276,6 +323,7 @@ void World::enqueueGeneration() {
     std::vector<RegionTask> regions;
 
     for (auto& [cx, cz] : ungenerated) {
+        if (static_cast<int>(regions.size()) >= taskSlots) break;
         int64_t key = (static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz);
         if (visited.count(key)) continue;
 
@@ -318,7 +366,12 @@ void World::enqueueGeneration() {
         World* worldPtr = this;
         WorldGenerator* genPtr = &m_generator;
 
+        ++m_generationTasksInFlight;
         m_threadPool->enqueuePriority([worldPtr, genPtr, reg = std::move(reg), R, PADDING]() {
+            struct Completion {
+                std::atomic<int>& count;
+                ~Completion() { --count; }
+            } completion{worldPtr->m_generationTasksInFlight};
             // Build RegionGenerator from WorldGenerator's sub-generators
             RegionGenerator regionGen(
                 genPtr->getHeightPipeline(),
@@ -349,7 +402,9 @@ void World::enqueueGeneration() {
     }
 
     // Remaining ungenerated chunks (not part of any region) — legacy singleton path
+    int scheduledTasks = static_cast<int>(regions.size());
     for (auto& [cx, cz] : ungenerated) {
+        if (scheduledTasks >= taskSlots) break;
         int64_t key = (static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz);
         if (visited.count(key)) continue;
 
@@ -378,7 +433,7 @@ void World::enqueueGeneration() {
         };
 
         auto blockSetter = [this](int wx, int wy, int wz, BlockId id) {
-            if (wy < 0 || wy >= Config::CHUNK_SIZE_Y) return;
+            if (!Config::isValidWorldY(wy)) return;
             int bsx = World::worldToChunkX(static_cast<double>(wx));
             int bsz = World::worldToChunkZ(static_cast<double>(wz));
             int lx = wx - bsx * Config::CHUNK_SIZE_X;
@@ -394,7 +449,14 @@ void World::enqueueGeneration() {
             }
         };
 
-        m_threadPool->enqueuePriority([chunkPtr, genPtr, neighborQuery, blockSetter]() {
+        World* worldPtr = this;
+        ++m_generationTasksInFlight;
+        ++scheduledTasks;
+        m_threadPool->enqueuePriority([worldPtr, chunkPtr, genPtr, neighborQuery, blockSetter]() {
+            struct Completion {
+                std::atomic<int>& count;
+                ~Completion() { --count; }
+            } completion{worldPtr->m_generationTasksInFlight};
             genPtr->generate(*chunkPtr, neighborQuery, blockSetter);
             chunkPtr->generated = true;
             chunkPtr->generationInProgress = false;
@@ -402,7 +464,7 @@ void World::enqueueGeneration() {
     }
 }
 
-void World::processCompletedGenerations() {
+void World::processCompletedGenerations(bool rebuildLighting) {
     // Apply pending tree leaves for chunks that have finished generating
     std::unique_lock lock(m_chunkMutex);
     for (auto& [key, chunk] : m_chunks) {
@@ -415,26 +477,46 @@ void World::processCompletedGenerations() {
         }
     }
     lock.unlock();
-    if (m_lightDirty) rebuildBlockLight();
+    if (rebuildLighting && m_lightDirty) rebuildBlockLight();
 }
 
 void World::rebuildBlockLight() {
     std::queue<BlockLightNode> queue;
     std::unique_lock lock(m_chunkMutex);
     if (!m_lightDirty) return;
+    // Terrain generation never creates torches. Player-placed torches are
+    // sparse overrides, so collect those directly instead of scanning every
+    // cell in every 384-layer chunk after each streaming update.
+    struct TorchSource { Chunk* chunk; int x; int y; int z; };
+    std::vector<TorchSource> sources;
+    for (const auto& [key, overrides] : m_blockOverrides) {
+        auto chunkIt = m_chunks.find(key);
+        if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
+        Chunk* chunk = chunkIt->second.get();
+        for (const auto& [index, block] : overrides) {
+            if (block != BlockId::TORCH) continue;
+            const int x = index % Config::CHUNK_SIZE_X;
+            const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
+            const int y = Config::storageYToWorldY(
+                index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+            sources.push_back({chunk, x, y, z});
+        }
+    }
+    if (sources.empty() && !m_lightHasSources) {
+        m_lightDirty = false;
+        return;
+    }
     for (auto& [key, chunk] : m_chunks) {
-        if (!chunk->generated.load()) continue;
-        chunk->clearBlockLight();
-        for (int y=0;y<Config::CHUNK_SIZE_Y;++y)
-            for (int z=0;z<Config::CHUNK_SIZE_Z;++z)
-                for (int x=0;x<Config::CHUNK_SIZE_X;++x)
-                    if (chunk->getBlock(x,y,z)==BlockId::TORCH) {
-                        chunk->setBlockLight(x,y,z,14);
-                        queue.push({chunk->worldX()+x,y,chunk->worldZ()+z,14});
-                    }
+        (void)key;
+        if (chunk->generated.load()) chunk->clearBlockLight();
+    }
+    for (const auto& source : sources) {
+        source.chunk->setBlockLight(source.x, source.y, source.z, 14);
+        queue.push({source.chunk->worldX() + source.x, source.y,
+                    source.chunk->worldZ() + source.z, 14});
     }
     auto findCell=[&](int wx,int y,int wz) -> std::pair<Chunk*,glm::ivec3> {
-        if(y<0||y>=Config::CHUNK_SIZE_Y) return {nullptr,glm::ivec3(0)};
+        if(!Config::isValidWorldY(y)) return {nullptr,glm::ivec3(0)};
         const int cx=worldToChunkX(wx),cz=worldToChunkZ(wz);
         auto it=m_chunks.find({cx,cz});
         if(it==m_chunks.end()||!it->second->generated.load()) return {nullptr,glm::ivec3(0)};
@@ -449,6 +531,7 @@ void World::rebuildBlockLight() {
         [&](int x,int y,int z,uint8_t value){ auto [chunk,p]=findCell(x,y,z);
             if(chunk)chunk->setBlockLight(p.x,p.y,p.z,value); });
     for (auto& [key,chunk]:m_chunks) if (chunk->generated.load()) chunk->markDirty();
+    m_lightHasSources = !sources.empty();
     m_lightDirty=false;
 }
 
@@ -468,7 +551,8 @@ void World::applySavedOverrides(int cx, int cz) {
     for (const auto& [index, block] : cached) {
         const int x = index % Config::CHUNK_SIZE_X;
         const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
-        const int y = index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+            const int y = Config::storageYToWorldY(
+                index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
         chunk->setBlock(x, y, z, block);
     }
     m_overridesApplied.insert(key);
@@ -504,16 +588,17 @@ void World::flushModifiedChunks() {
 }
 
 namespace {
-uint16_t localIndexFor(const glm::ivec3& position, int cx, int cz) {
+uint32_t localIndexFor(const glm::ivec3& position, int cx, int cz) {
     const int lx = position.x - cx * Config::CHUNK_SIZE_X;
     const int lz = position.z - cz * Config::CHUNK_SIZE_Z;
-    return static_cast<uint16_t>(lx + lz * Config::CHUNK_SIZE_X +
-        position.y * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+    return static_cast<uint32_t>(lx + lz * Config::CHUNK_SIZE_X +
+        Config::worldYToStorageY(position.y) *
+            Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
 }
 }
 
 BlockEntity* World::getBlockEntity(const glm::ivec3& position) {
-    if (position.y < 0 || position.y >= Config::CHUNK_SIZE_Y) return nullptr;
+    if (!Config::isValidWorldY(position.y)) return nullptr;
     const int cx = worldToChunkX(position.x);
     const int cz = worldToChunkZ(position.z);
     std::unique_lock lock(m_chunkMutex);
@@ -526,7 +611,7 @@ BlockEntity* World::getBlockEntity(const glm::ivec3& position) {
 }
 
 const BlockEntity* World::getBlockEntity(const glm::ivec3& position) const {
-    if (position.y < 0 || position.y >= Config::CHUNK_SIZE_Y) return nullptr;
+    if (!Config::isValidWorldY(position.y)) return nullptr;
     const int cx = worldToChunkX(position.x);
     const int cz = worldToChunkZ(position.z);
     std::shared_lock lock(m_chunkMutex);
@@ -677,7 +762,7 @@ bool World::growSapling(const glm::ivec3& p, BlockId sapling) {
     }
     for (const auto& placement : placements) {
         const auto& q = placement.position;
-        if (q.y < 0 || q.y >= Config::CHUNK_SIZE_Y) return false;
+        if (!Config::isValidWorldY(q.y)) return false;
         const int cx = worldToChunkX(q.x), cz = worldToChunkZ(q.z);
         {
             std::shared_lock lock(m_chunkMutex);
@@ -721,7 +806,7 @@ void World::applyPendingBlocks(int cx, int cz) {
         int lx = pb.worldX - chunk->worldX();
         int lz = pb.worldZ - chunk->worldZ();
         if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16 &&
-            pb.worldY >= 0 && pb.worldY < Config::CHUNK_SIZE_Y) {
+            Config::isValidWorldY(pb.worldY)) {
             BlockId cur = chunk->getBlock(lx, pb.worldY, lz);
             bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
                         cur == BlockId::SPRUCE_LEAVES || cur == BlockId::JUNGLE_LEAVES ||
@@ -775,8 +860,16 @@ void World::enqueueMeshBuilds() {
     int enqueued = 0;
     std::shared_lock lock(m_chunkMutex);
 
+    int inFlight = 0;
+    for (const auto& [key, chunk] : m_chunks) {
+        (void)key;
+        if (chunk->meshInProgress.load()) ++inFlight;
+    }
+    const int availableSlots = Config::CHUNK_MESH_TASKS_IN_FLIGHT - inFlight;
+    if (availableSlots <= 0) return;
+
     for (auto& [key, chunk] : m_chunks) {
-        if (enqueued >= m_chunksPerFrame) break;
+        if (enqueued >= std::min(m_chunksPerFrame, availableSlots)) break;
         if (!chunk->isDirty()) continue;
         if (chunk->meshInProgress.load()) continue;
         if (!chunk->generated.load()) continue;  // not generated yet
@@ -800,7 +893,7 @@ void World::enqueueMeshBuilds() {
 
             chunkPtr->m_pendingMesh.build(
                 chunkPtr->worldX(), chunkPtr->worldZ(),
-                &chunkPtr->blockAt(0, 0, 0),
+                chunkPtr->rawBlocks(),
                 chunkPtr->getColumnMaxYData(),
                 neighborFunc, lightFunc
             );
@@ -861,7 +954,7 @@ void World::buildMeshesSync(Renderer* renderer, int maxCount) {
             ChunkMesh& mesh = chunk->getMesh();
             mesh.build(
                 chunk->worldX(), chunk->worldZ(),
-                &chunk->blockAt(0, 0, 0),
+                chunk->rawBlocks(),
                 chunk->getColumnMaxYData(),
                 neighborFunc, lightFunc
             );
@@ -935,7 +1028,7 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
             tMax.z += tDelta.z;
         }
 
-        if (blockPos.y < 0 || blockPos.y >= Config::CHUNK_SIZE_Y) {
+        if (!Config::isValidWorldY(blockPos.y)) {
             break;
         }
     }

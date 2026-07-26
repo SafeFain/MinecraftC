@@ -45,7 +45,7 @@ struct WorldMetadata {
 };
 
 struct BlockOverride {
-    uint16_t localIndex = 0;
+    uint32_t localIndex = 0;
     BlockId block = BlockId::AIR;
 };
 
@@ -60,6 +60,11 @@ public:
     void saveChunkOverrides(int chunkX, int chunkZ,
                             const std::vector<BlockOverride>& overrides) const;
     std::vector<BlockOverride> loadChunkOverrides(int chunkX, int chunkZ) const;
+    void saveGeneratedChunk(int chunkX, int chunkZ,
+                            const std::vector<uint8_t>& blocks,
+                            uint32_t generationVersion) const;
+    std::optional<std::vector<uint8_t>> loadGeneratedChunk(
+        int chunkX, int chunkZ, uint32_t generationVersion) const;
     void saveBlockEntities(int chunkX, int chunkZ,
                            const std::vector<PersistedBlockEntity>& entities) const;
     std::vector<PersistedBlockEntity> loadBlockEntities(int chunkX, int chunkZ) const;
@@ -71,6 +76,7 @@ private:
     std::filesystem::path m_worldDirectory;
 
     std::filesystem::path chunkPath(int chunkX, int chunkZ) const;
+    std::filesystem::path generatedChunkPath(int chunkX, int chunkZ) const;
     std::filesystem::path blockEntityPath(int chunkX, int chunkZ) const;
     std::filesystem::path entityPath(int chunkX, int chunkZ) const;
 };

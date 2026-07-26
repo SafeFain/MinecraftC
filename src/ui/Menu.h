@@ -16,6 +16,7 @@ class UIRenderer;
 
 enum class GameState {
     MainMenu,
+    LoadingWorld,
     Playing,
     Paused
 };

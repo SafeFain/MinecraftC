@@ -34,7 +34,9 @@ struct RegionGenerationData {
     // ── Per-column data ──────────────────────────────────────────────────
     struct ColumnInfo {
         int   height  = 0;     // final surface Y (after river carving, biome modulation, smoothing)
-        int   waterLevel = 40;
+        int   nominalHeight = 0;
+        float mountainFactor = 0.0f;
+        int   waterLevel = 63;
         Biome biome   = Biome::OCEAN;
         bool  isRiver = false;
     };

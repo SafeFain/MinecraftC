@@ -42,15 +42,28 @@ int main() {
     bool seedDiffers = false;
     std::set<Biome> observedBiomes;
     int riverColumns = 0;
+    int maxTerrainHeight = Config::WORLD_MIN_Y;
+    int overhangColumns = 0;
     for (int z = -2048; z <= 2048; z += 8) {
         for (int x = -2048; x <= 2048; x += 8) {
             SurfaceColumn a = terrain.sampleColumn(x, z);
             SurfaceColumn b = terrain.sampleColumn(x, z);
             require(a.height == b.height && a.biome == b.biome &&
                     a.river == b.river, "same seed point sample changed");
-            require(a.height >= 1 && a.height <= Config::TERRAIN_MAX_HEIGHT,
+            require(a.height >= Config::TERRAIN_MIN_HEIGHT &&
+                    a.height <= Config::TERRAIN_MAX_HEIGHT,
                     "terrain height outside world");
             observedBiomes.insert(a.biome);
+            maxTerrainHeight = std::max(maxTerrainHeight, a.height);
+            if (a.mountainFactor > 0.55f) {
+                for (int y = a.nominalHeight - 20; y <= a.height; ++y) {
+                    if (terrain.isTerrainSolid(x, y, z, a) &&
+                        !terrain.isTerrainSolid(x, y - 1, z, a)) {
+                        ++overhangColumns;
+                        break;
+                    }
+                }
+            }
             if (a.river) ++riverColumns;
             SurfaceColumn changed = other.sampleColumn(x, z);
             if (a.height != changed.height || a.biome != changed.biome ||
@@ -60,6 +73,8 @@ int main() {
     require(seedDiffers, "different seeds produced identical surface");
     require(observedBiomes.size() >= 6, "surface lacks biome diversity");
     require(riverColumns > 0, "surface router produced no rivers");
+    require(maxTerrainHeight >= 160, "terrain router produced no tall mountains");
+    require(overhangColumns > 0, "mountain density produced no overhangs");
 
     // Padded-region output and direct point queries are byte-for-byte equal,
     // including negative world coordinates.
@@ -145,6 +160,23 @@ int main() {
     // Full generation equivalence: terrain, caves, ores, decorations and trees
     // must not depend on region-vs-singleton execution.
     WorldGenerator regionWorld(seed);
+    {
+        std::vector<CaveColumnInfo> smallColumns(16 * 16);
+        std::vector<CaveColumnInfo> largeColumns(48 * 48);
+        for (int z = 0; z < 48; ++z) for (int x = 0; x < 48; ++x) {
+            const auto column = regionWorld.getHeightPipeline().sampleColumn(x, z);
+            const CaveColumnInfo info{column.height, column.waterLevel,
+                column.river || column.height < column.waterLevel};
+            largeColumns[static_cast<size_t>(z) * 48 + x] = info;
+            if (x < 16 && z < 16) smallColumns[static_cast<size_t>(z) * 16 + x] = info;
+        }
+        const auto smallCaves = regionWorld.getCaveGenerator().generateVolume(0,0,16,16,smallColumns);
+        const auto largeCaves = regionWorld.getCaveGenerator().generateVolume(0,0,48,48,largeColumns);
+        for (int z=0;z<16;++z) for(int x=0;x<16;++x)
+            for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+                require(smallCaves.get(x,y,z)==largeCaves.get(x,y,z),
+                        "cave request size changes overlapping output");
+    }
     RegionGenerator regionGenerator(
         regionWorld.getHeightPipeline(), regionWorld.getCaveGenerator(),
         regionWorld.getTreeGenerator(), regionWorld.getOreGenerator(), seed);
@@ -189,12 +221,20 @@ int main() {
             chunk.setBlock(lx, block.worldY, lz, block.id);
     }
     for (size_t i = 0; i < regionChunks.size(); ++i) {
-        for (int y = 0; y < Config::CHUNK_SIZE_Y; ++y) {
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
             for (int z = 0; z < 16; ++z) {
                 for (int x = 0; x < 16; ++x) {
-                    require(regionChunks[i]->getBlock(x, y, z) ==
-                            singletonOwned[i]->getBlock(x, y, z),
-                            "region and singleton full block output differ");
+                    if (regionChunks[i]->getBlock(x, y, z) !=
+                        singletonOwned[i]->getBlock(x, y, z)) {
+                        std::cerr << "mismatch chunk=" << i << " x=" << x
+                                  << " y=" << y << " z=" << z
+                                  << " region=" << static_cast<int>(regionChunks[i]->getBlock(x,y,z))
+                                  << " singleton=" << static_cast<int>(singletonOwned[i]->getBlock(x,y,z))
+                                  << " regionMax=" << regionChunks[i]->getColumnMaxY(x,z)
+                                  << " singletonMax=" << singletonOwned[i]->getColumnMaxY(x,z)
+                                  << '\n';
+                        require(false, "region and singleton full block output differ");
+                    }
                 }
             }
         }
@@ -240,7 +280,7 @@ int main() {
     // water and leaves occupy the translucent draw range.
     std::vector<uint8_t> meshBlocks(Config::CHUNK_VOLUME, 0);
     auto meshIndex = [](int x, int y, int z) {
-        return x + z * 16 + y * 16 * 16;
+        return x + z * 16 + Config::worldYToStorageY(y) * 16 * 16;
     };
     meshBlocks[meshIndex(1, 42, 1)] = static_cast<uint8_t>(BlockId::TALL_GRASS);
     meshBlocks[meshIndex(2, 40, 2)] = static_cast<uint8_t>(BlockId::WATER);
@@ -269,7 +309,7 @@ int main() {
     ChunkMesh aoMesh;
     aoMesh.build(0, 0, aoBlocks.data(), aoMaxY,
         [&](int wx, int wy, int wz) {
-            if (wx < 0 || wx >= 16 || wy < 0 || wy >= Config::CHUNK_SIZE_Y ||
+            if (wx < 0 || wx >= 16 || !Config::isValidWorldY(wy) ||
                 wz < 0 || wz >= 16) return BlockId::AIR;
             return static_cast<BlockId>(aoBlocks[meshIndex(wx, wy, wz)]);
         }, [](int, int, int) -> uint8_t { return 0; });

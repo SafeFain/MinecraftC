@@ -20,6 +20,6 @@ struct BlockEntity {
 };
 
 struct PersistedBlockEntity {
-    uint16_t localIndex = 0;
+    uint32_t localIndex = 0;
     BlockEntity value;
 };

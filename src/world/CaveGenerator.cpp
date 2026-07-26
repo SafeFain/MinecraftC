@@ -12,18 +12,18 @@ constexpr float PI = 3.14159265358979323846f;
 
 CaveVolume::CaveVolume(int minX, int minZ, int width, int depth)
     : m_minX(minX), m_minZ(minZ), m_width(width), m_depth(depth),
-      m_cells(static_cast<size_t>(width) * Config::CHUNK_SIZE_Y * depth,
+      m_cells(static_cast<size_t>(width) * Config::WORLD_HEIGHT * depth,
               CaveCell::Solid) {}
 
 size_t CaveVolume::index(int wx, int y, int wz) const {
-    return (static_cast<size_t>(wz - m_minZ) * Config::CHUNK_SIZE_Y +
-            static_cast<size_t>(y)) * static_cast<size_t>(m_width) +
+    return (static_cast<size_t>(wz - m_minZ) * Config::WORLD_HEIGHT +
+            static_cast<size_t>(Config::worldYToStorageY(y))) * static_cast<size_t>(m_width) +
            static_cast<size_t>(wx - m_minX);
 }
 
 bool CaveVolume::contains(int wx, int y, int wz) const {
     return wx >= m_minX && wx < m_minX + m_width && wz >= m_minZ &&
-           wz < m_minZ + m_depth && y >= 0 && y < Config::CHUNK_SIZE_Y;
+           wz < m_minZ + m_depth && Config::isValidWorldY(y);
 }
 
 CaveCell CaveVolume::get(int wx, int y, int wz) const {
@@ -83,7 +83,7 @@ CaveCell CaveGenerator::liquidFor(int wx, int y, int wz) const {
     float levelNoise = m_noise.octave2D(wx * 0.006f + 317.0f,
                                         wz * 0.006f - 911.0f, 2);
     int waterTable = std::clamp(Config::CAVE_AQUIFER_LEVEL_BASE +
-        static_cast<int>(std::round(levelNoise * 6.0f)), 12, 34);
+        static_cast<int>(std::round(levelNoise * 24.0f)), -32, 54);
     float selector = m_noise.octave3D(wx * 0.012f - 503.0f, y * 0.016f + 127.0f,
                                       wz * 0.012f + 719.0f, 2);
     return (y <= waterTable && selector > Config::CAVE_AQUIFER_THRESHOLD) ?
@@ -103,7 +103,7 @@ void CaveGenerator::appendTunnel(float x, float y, float z, float yaw, float pit
         float ny = y + std::sin(pitch) * 2.0f;
         float nz = z + std::sin(yaw) * std::cos(pitch) * 2.0f;
         out.push_back({x, y, z, nx, ny, nz, r, 0.72f});
-        x = nx; y = std::clamp(ny, 6.0f, 112.0f); z = nz;
+        x = nx; y = std::clamp(ny, static_cast<float>(Config::CAVE_MIN_Y), 240.0f); z = nz;
         yaw += randomRange(state, -0.16f, 0.16f);
         pitch = pitch * 0.72f + randomRange(state, -0.09f, 0.09f);
         if (branchDepth == 0 && i == branchAt && random01(state) < 0.72f) {
@@ -124,7 +124,7 @@ void CaveGenerator::generateCarverCell(int cellX, int cellZ,
     if (random01(state) >= Config::CAVE_CARVER_CHANCE) return;
     float x = cellX * Config::CAVE_CARVER_CELL_SIZE + randomRange(state, 0.0f, static_cast<float>(Config::CAVE_CARVER_CELL_SIZE));
     float z = cellZ * Config::CAVE_CARVER_CELL_SIZE + randomRange(state, 0.0f, static_cast<float>(Config::CAVE_CARVER_CELL_SIZE));
-    float y = 7.0f + std::min(random01(state), random01(state)) * 66.0f;
+    float y = -52.0f + std::min(random01(state), random01(state)) * 180.0f;
     bool hasRoom = random01(state) < 0.25f;
     int trunks = hasRoom ? 1 + static_cast<int>(next64(state) % 4) : 1;
     float baseRadius = randomRange(state, 1.8f, 4.2f);
@@ -146,11 +146,11 @@ void CaveGenerator::rasterizeSegment(const Segment& s, CaveVolume& volume,
     int minZ = std::max(volume.minZ(), static_cast<int>(std::floor(std::min(s.az, s.bz) - s.radius)));
     int maxZ = std::min(volume.minZ() + volume.depth() - 1, static_cast<int>(std::ceil(std::max(s.az, s.bz) + s.radius)));
     int minY = std::max(Config::CAVE_MIN_Y, static_cast<int>(std::floor(std::min(s.ay, s.by) - vr)));
-    int maxY = std::min(Config::CHUNK_SIZE_Y - 1, static_cast<int>(std::ceil(std::max(s.ay, s.by) + vr)));
+    int maxY = std::min(Config::WORLD_MAX_Y - 1, static_cast<int>(std::ceil(std::max(s.ay, s.by) + vr)));
     float dx=s.bx-s.ax, dy=(s.by-s.ay)/s.verticalScale, dz=s.bz-s.az;
     float len2=dx*dx+dy*dy+dz*dz;
     for (int z=minZ; z<=maxZ; ++z) for (int y=minY; y<=maxY; ++y) for (int x=minX; x<=maxX; ++x) {
-        if (!canCarve(x,y,z,true,volume,columns)) continue;
+        if (!canCarve(x,y,z,false,volume,columns)) continue;
         float px=x+0.5f-s.ax, py=(y+0.5f-s.ay)/s.verticalScale, pz=z+0.5f-s.az;
         float t=len2>0 ? std::clamp((px*dx+py*dy+pz*dz)/len2,0.0f,1.0f) : 0.0f;
         float qx=px-t*dx, qy=py-t*dy, qz=pz-t*dz;
@@ -165,9 +165,9 @@ void CaveGenerator::rasterizeRoom(const Room& r, CaveVolume& volume,
     int minZ=std::max(volume.minZ(),static_cast<int>(std::floor(r.z-r.radius)));
     int maxZ=std::min(volume.minZ()+volume.depth()-1,static_cast<int>(std::ceil(r.z+r.radius)));
     int minY=std::max(Config::CAVE_MIN_Y,static_cast<int>(std::floor(r.y-r.radius*r.verticalScale)));
-    int maxY=std::min(Config::CHUNK_SIZE_Y-1,static_cast<int>(std::ceil(r.y+r.radius*r.verticalScale)));
+    int maxY=std::min(Config::WORLD_MAX_Y-1,static_cast<int>(std::ceil(r.y+r.radius*r.verticalScale)));
     for(int z=minZ;z<=maxZ;++z) for(int y=minY;y<=maxY;++y) for(int x=minX;x<=maxX;++x){
-        if(!canCarve(x,y,z,true,volume,columns)) continue;
+        if(!canCarve(x,y,z,false,volume,columns)) continue;
         float dx=(x+0.5f-r.x)/r.radius, dy=(y+0.5f-r.y)/(r.radius*r.verticalScale), dz=(z+0.5f-r.z)/r.radius;
         if(dx*dx+dy*dy+dz*dz<1.0f) volume.set(x,y,z,liquidFor(x,y,z));
     }
@@ -180,9 +180,9 @@ CaveVolume CaveGenerator::generateVolume(int minX, int minZ, int width, int dept
     CaveVolume volume(minX,minZ,width,depth);
     for(int z=minZ;z<minZ+depth;++z) for(int x=minX;x<minX+width;++x){
         const auto& col=columns[static_cast<size_t>(z-minZ)*width+(x-minX)];
-        int maxY=std::min(col.surfaceY-Config::CAVE_DRY_ROOF,Config::CHUNK_SIZE_Y-Config::CAVE_TOP_MARGIN);
+        int maxY=std::min(col.surfaceY-Config::CAVE_DRY_ROOF,Config::WORLD_MAX_Y-Config::CAVE_TOP_MARGIN);
         for(int y=Config::CAVE_MIN_Y;y<=maxY;++y){
-            float depthFactor=std::clamp((col.surfaceY-y-Config::CAVE_DRY_ROOF)/48.0f,0.0f,1.0f);
+            float depthFactor=std::clamp((col.surfaceY-y-Config::CAVE_DRY_ROOF)/96.0f,0.0f,1.0f);
             float cheese=m_noise.octave3D(x*Config::CAVE_CHEESE_SCALE_XZ+41.0f,y*Config::CAVE_CHEESE_SCALE_Y-73.0f,z*Config::CAVE_CHEESE_SCALE_XZ+109.0f,3);
             bool cavern=cheese > (Config::CAVE_CHEESE_THRESHOLD-Config::CAVE_CHEESE_DEPTH_BONUS*depthFactor);
             float s1=m_noise.noise3D(x*Config::CAVE_SPAGHETTI_SCALE_XZ+211.0f,y*Config::CAVE_SPAGHETTI_SCALE_Y+37.0f,z*Config::CAVE_SPAGHETTI_SCALE_XZ-419.0f);

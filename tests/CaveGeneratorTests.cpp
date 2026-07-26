@@ -37,10 +37,12 @@ int main() {
                 if (a != CaveCell::Solid) ++carved;
                 if (a == CaveCell::Water) ++water;
                 if (a == CaveCell::Lava) ++lava;
-                require(y > 8 || a != CaveCell::Water, "water generated in lava band");
-                require(y <= 8 || a != CaveCell::Lava, "lava generated above lava band");
+                require(y > Config::CAVE_LAVA_LEVEL || a != CaveCell::Water,
+                        "water generated in lava band");
+                require(y <= Config::CAVE_LAVA_LEVEL || a != CaveCell::Lava,
+                        "lava generated above lava band");
             }
-            for (int y = 0; y < Config::CAVE_MIN_Y; ++y)
+            for (int y = Config::WORLD_MIN_Y; y < Config::CAVE_MIN_Y; ++y)
                 require(large.get(x, y, z) == CaveCell::Solid, "bedrock band was carved");
         }
     }
@@ -52,13 +54,13 @@ int main() {
 
     auto chunk = caves.generateVolume(-16, -16, 16, 16, columns(16, 16));
     for (int z = -16; z < 0; ++z) for (int x = -16; x < 0; ++x)
-        for (int y = 0; y < Config::CHUNK_SIZE_Y; ++y)
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
             require(chunk.get(x, y, z) == large.get(x, y, z),
                     "overlapping requests disagree at a boundary");
 
-    auto wet = caves.generateVolume(0, 0, 16, 16, columns(16, 16, 38, true));
+    auto wet = caves.generateVolume(0, 0, 16, 16, columns(16, 16, 62, true));
     for (int z = 0; z < 16; ++z) for (int x = 0; x < 16; ++x)
-        for (int y = 34; y < Config::CHUNK_SIZE_Y; ++y)
+        for (int y = 58; y < Config::WORLD_MAX_Y; ++y)
             require(wet.get(x, y, z) == CaveCell::Solid, "submerged roof was breached");
 
     Noise otherNoise(987654321ULL);

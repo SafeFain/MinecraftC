@@ -1,4 +1,5 @@
 #include "game/SaveStore.h"
+#include "Config.h"
 #include "world/WorldGenContext.h"
 
 #include <cstdlib>
@@ -72,7 +73,8 @@ int main() {
 
         const std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},
-            {static_cast<uint16_t>(15 + 15 * 16 + 127 * 256), BlockId::DIAMOND_ORE},
+            {static_cast<uint32_t>(15 + 15 * 16 +
+                Config::worldYToStorageY(319) * 256), BlockId::DIAMOND_ORE},
             {513, BlockId::FARMLAND_7},
             {514, BlockId::ACACIA_SAPLING}
         };
@@ -88,6 +90,31 @@ int main() {
                 "new farming block ids round trip in save format 5");
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
+
+        std::vector<uint8_t> generated(Config::CHUNK_VOLUME,
+                                       static_cast<uint8_t>(BlockId::STONE));
+        generated.front() = static_cast<uint8_t>(BlockId::BEDROCK);
+        generated.back() = static_cast<uint8_t>(BlockId::AIR);
+        store.saveGeneratedChunk(-2, -7, generated,
+                                 WorldGenContext::GENERATION_VERSION);
+        const auto loadedGenerated = store.loadGeneratedChunk(
+            -2, -7, WorldGenContext::GENERATION_VERSION);
+        require(loadedGenerated && *loadedGenerated == generated,
+                "pregenerated chunk cache round trips");
+        require(!store.loadGeneratedChunk(
+                    -2, -7, WorldGenContext::GENERATION_VERSION + 1),
+                "pregenerated chunk cache rejects a different generation version");
+        {
+            std::fstream file(root / "negative-coordinates" / "generated" /
+                                  "g.-2.-7.bin",
+                              std::ios::binary | std::ios::in | std::ios::out);
+            file.seekp(-1, std::ios::end);
+            const char corrupt = '\x7f';
+            file.write(&corrupt, 1);
+        }
+        require(!store.loadGeneratedChunk(
+                    -2, -7, WorldGenContext::GENERATION_VERSION),
+                "corrupt pregenerated chunk cache falls back to generation");
 
         PersistedBlockEntity chest;
         chest.localIndex = 513;

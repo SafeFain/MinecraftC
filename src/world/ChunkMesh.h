@@ -76,9 +76,10 @@ struct ChunkMesh {
         clear();
         std::vector<unsigned int> opaqueIndices;
         std::vector<unsigned int> translucentIndices;
-        auto localIdx = [](int x, int y, int z) -> int {
+        auto localIdx = [](int x, int worldY, int z) -> int {
             return x + z * Config::CHUNK_SIZE_X
-                     + y * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+                     + Config::worldYToStorageY(worldY) *
+                           Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
         };
         auto blockLight = [&](int x, int y, int z) {
             return static_cast<float>(getLight(chunkWorldX+x,y,chunkWorldZ+z))/15.0f;
@@ -180,13 +181,12 @@ struct ChunkMesh {
                     for (int v = 0; v < size2; ++v) {
                         int x, y, z;
                         if (face == FaceDir::TOP || face == FaceDir::BOTTOM) {
-                            x = u; y = d; z = v;
+                            x = u; y = Config::storageYToWorldY(d); z = v;
                         } else if (face == FaceDir::FRONT || face == FaceDir::BACK) {
-                            x = u; y = v; z = d;
+                            x = u; y = Config::storageYToWorldY(v); z = d;
                         } else { // RIGHT or LEFT
-                            x = d; y = v; z = u;
+                            x = d; y = Config::storageYToWorldY(v); z = u;
                         }
-                        if (y >= Config::CHUNK_SIZE_Y) continue;
                         BlockId visible = faceVisible(x, y, z, face);
                         if (visible == BlockId::AIR) continue;
                         MaskCell& cell = mask[u + v * size1];
@@ -252,11 +252,15 @@ struct ChunkMesh {
                         float u1 = static_cast<float>(maxU + 1);
                         float v0 = static_cast<float>(v);
                         float v1 = static_cast<float>(maxV + 1);
+                        if (face != FaceDir::TOP && face != FaceDir::BOTTOM) {
+                            v0 += static_cast<float>(Config::WORLD_MIN_Y);
+                            v1 += static_cast<float>(Config::WORLD_MIN_Y);
+                        }
 
                         // Position of the face plane (just outside the block)
                         float depthPos;
-                        if (face == FaceDir::TOP)      depthPos = static_cast<float>(d + 1);
-                        else if (face == FaceDir::BOTTOM) depthPos = static_cast<float>(d);
+                        if (face == FaceDir::TOP)      depthPos = static_cast<float>(Config::storageYToWorldY(d) + 1);
+                        else if (face == FaceDir::BOTTOM) depthPos = static_cast<float>(Config::storageYToWorldY(d));
                         else if (face == FaceDir::FRONT)  depthPos = static_cast<float>(d);
                         else if (face == FaceDir::BACK)   depthPos = static_cast<float>(d + 1);
                         else if (face == FaceDir::RIGHT)  depthPos = static_cast<float>(d + 1);
@@ -384,7 +388,7 @@ struct ChunkMesh {
             for (unsigned int value : order) opaqueIndices.push_back(base + value);
         };
 
-        for (int y = 0; y < Config::CHUNK_SIZE_Y; ++y) {
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
             for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                     BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
