@@ -1,6 +1,8 @@
 #include "game/SurvivalRules.h"
+#include "game/InventoryModel.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <iostream>
 
 namespace {
@@ -38,6 +40,29 @@ int main() {
     require(miningSeconds(BlockId::STONE, ironPick, true, false) >
             miningSeconds(BlockId::STONE, ironPick, false, false),
             "underwater mining penalty is represented");
+    require(static_cast<uint8_t>(BlockId::WHEAT_7) == 51 &&
+            static_cast<uint16_t>(ItemId::FLINT) < static_cast<uint16_t>(ItemId::OAK_SAPLING),
+            "new serialized ids append after existing values");
+    for (uint8_t moisture = 0; moisture <= 7; ++moisture) {
+        const BlockId farmland = farmlandForMoisture(moisture);
+        require(isFarmland(farmland) && farmlandMoisture(farmland) == moisture,
+                "farmland moisture state did not round trip");
+    }
+    require(itemForBlock(BlockId::BIRCH_SAPLING) == ItemId::BIRCH_SAPLING,
+            "birch sapling block maps to its stable item");
+    require(getBlockDrops(BlockId::SPRUCE_LEAVES, hand, 0)[0].id ==
+                ItemId::SPRUCE_SAPLING &&
+            getBlockDrops(BlockId::SPRUCE_LEAVES, hand, 1).empty(),
+            "leaves use the five-percent matching sapling drop");
+
+    InventoryModel armorInventory;
+    armorInventory.armor()[0] = {ItemId::DIAMOND_HELMET, 1, 0};
+    armorInventory.armor()[1] = {ItemId::DIAMOND_CHESTPLATE, 1, 0};
+    require(totalArmorPoints(armorInventory) == 11,
+            "shared armor points match combat values");
+    require(std::abs(durabilityRemaining({ItemId::WOODEN_PICKAXE, 1, 0}) - 1.0f) < 0.001f &&
+            durabilityRemaining({ItemId::WOODEN_PICKAXE, 1, 59}) == 0.0f,
+            "durability bar fraction handles full and exhausted tools");
 
     std::array<ItemId, 9> grid{};
     grid.fill(ItemId::EMPTY);
@@ -65,4 +90,3 @@ int main() {
     std::cout << "Survival rules tests passed\n";
     return 0;
 }
-

@@ -7,6 +7,8 @@
 
 #include "game/Item.h"
 
+class InventoryModel;
+
 struct BlockSurvivalProperties {
     float hardness = 1.0f;
     ToolKind preferredTool = ToolKind::None;
@@ -40,3 +42,6 @@ const CraftingRecipe* findCraftingRecipe(const std::array<ItemId, 9>& grid,
 const SmeltingRecipe* findSmeltingRecipe(ItemId input);
 uint16_t fuelTicks(ItemId fuel);
 
+int armorPointsForItem(ItemId item);
+int totalArmorPoints(const InventoryModel& inventory);
+float durabilityRemaining(const ItemStack& stack);

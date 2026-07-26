@@ -96,11 +96,22 @@ Current status: in progress.
   Arrows handle gravity, block/entity collision, damage and knockback, persist
   across chunk unloads, expire after 60 simulated seconds, and player-fired
   arrows can be recovered after embedding.
+- Added persistent 0-7 farmland moisture, four-block water hydration, gradual
+  drying, hydrated crop growth bonuses, and dry unused farmland reversion.
+- Added placeable oak, birch, spruce, jungle, and acacia saplings with matching
+  leaf drops, deterministic growth timing, obstruction checks, and persistent
+  cross-chunk tree placement.
+- Beds now always set the respawn point but only skip time at night when no
+  hostile entity is nearby, with an on-screen result message.
+- Added simplified water movement with reduced horizontal speed, gentle
+  sinking, Space ascent, Shift descent, bounded collision, and fall reset.
+- Added a shared 0-20 armor calculation and Survival armor HUD plus red-to-green
+  durability bars in the hotbar, inventory, armor/offhand, chest, furnace, and
+  cursor stacks.
 
 ## Remaining
 
-- Add crop hydration/saplings, bed nighttime validation, water movement, armor
-  HUD, durability bars, and remaining interaction polish.
+- Add remaining interaction polish.
 - Add broader integration tests for chunk override application, death recovery,
   crop growth, live entity/container interaction, and the complete progression
   path.

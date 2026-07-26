@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 
+#include "game/InventoryModel.h"
+
 namespace {
 
 int tierLevel(ToolTier tier) {
@@ -49,7 +51,11 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::ICE, 0.5f, ToolKind::Pickaxe);
     set(BlockId::GRAVEL, 0.6f, ToolKind::Shovel);
-    for (BlockId id : {BlockId::CLAY, BlockId::RED_SAND, BlockId::FARMLAND})
+    for (BlockId id : {BlockId::CLAY, BlockId::RED_SAND, BlockId::FARMLAND,
+                       BlockId::FARMLAND_1, BlockId::FARMLAND_2,
+                       BlockId::FARMLAND_3, BlockId::FARMLAND_4,
+                       BlockId::FARMLAND_5, BlockId::FARMLAND_6,
+                       BlockId::FARMLAND_7})
         set(id, 0.6f, ToolKind::Shovel);
     for (BlockId id : {BlockId::TERRACOTTA, BlockId::COBBLESTONE,
                        BlockId::FURNACE})
@@ -59,6 +65,10 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
                        BlockId::TORCH, BlockId::WHEAT_0, BlockId::WHEAT_1,
                        BlockId::WHEAT_2, BlockId::WHEAT_3, BlockId::WHEAT_4,
                        BlockId::WHEAT_5, BlockId::WHEAT_6, BlockId::WHEAT_7})
+        set(id, 0.0f);
+    for (BlockId id : {BlockId::OAK_SAPLING, BlockId::BIRCH_SAPLING,
+                       BlockId::SPRUCE_SAPLING, BlockId::JUNGLE_SAPLING,
+                       BlockId::ACACIA_SAPLING})
         set(id, 0.0f);
     for (BlockId id : {BlockId::BIRCH_WOOD, BlockId::SPRUCE_WOOD,
                        BlockId::JUNGLE_WOOD, BlockId::ACACIA_WOOD,
@@ -227,6 +237,18 @@ std::vector<ItemStack> getBlockDrops(
             return randomValue % 8 == 0
                 ? std::vector<ItemStack>{{ItemId::WHEAT_SEEDS, 1, 0}}
                 : std::vector<ItemStack>{};
+        case BlockId::LEAVES:
+        case BlockId::BIRCH_LEAVES:
+        case BlockId::SPRUCE_LEAVES:
+        case BlockId::JUNGLE_LEAVES:
+        case BlockId::ACACIA_LEAVES: {
+            if (randomValue % 20 != 0) return {};
+            const uint16_t offset = block == BlockId::LEAVES ? 0 :
+                block == BlockId::BIRCH_LEAVES ? 1 :
+                block == BlockId::SPRUCE_LEAVES ? 2 :
+                block == BlockId::JUNGLE_LEAVES ? 3 : 4;
+            return {{static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_SAPLING) + offset), 1, 0}};
+        }
         case BlockId::GRAVEL:
             return randomValue % 10 == 0
                 ? std::vector<ItemStack>{{ItemId::FLINT, 1, 0}}
@@ -304,4 +326,28 @@ uint16_t fuelTicks(ItemId fuel) {
     const auto& props = getItemProps(fuel);
     if (props.tool != ToolKind::None && props.tier == ToolTier::Wood) return 200;
     return 0;
+}
+
+int armorPointsForItem(ItemId item) {
+    static constexpr int armorPoints[4][4] = {
+        {1, 3, 2, 1}, {2, 6, 5, 2}, {2, 5, 3, 1}, {3, 8, 6, 3}
+    };
+    const uint16_t relative = static_cast<uint16_t>(item) -
+                              static_cast<uint16_t>(ItemId::LEATHER_HELMET);
+    if (relative >= 16) return 0;
+    return armorPoints[relative / 4][relative % 4];
+}
+
+int totalArmorPoints(const InventoryModel& inventory) {
+    int total = 0;
+    for (const auto& stack : inventory.armor())
+        if (!stack.empty()) total += armorPointsForItem(stack.id);
+    return std::min(total, 20);
+}
+
+float durabilityRemaining(const ItemStack& stack) {
+    if (stack.empty()) return 0.0f;
+    const uint16_t maximum = getItemProps(stack.id).maxDurability;
+    if (maximum == 0) return 0.0f;
+    return std::clamp(1.0f - static_cast<float>(stack.damage) / maximum, 0.0f, 1.0f);
 }

@@ -139,6 +139,8 @@ private:
     void loadBlockEntities(int cx, int cz);
     void saveBlockEntities(int cx, int cz);
     void rebuildBlockLight();
+    bool growSapling(const glm::ivec3& position, BlockId sapling);
+    bool hasWaterForFarmland(const glm::ivec3& position) const;
 
     void markDirty(int cx, int cz);
 };

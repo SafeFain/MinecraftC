@@ -575,6 +575,7 @@ void World::saveBlockEntities(int cx, int cz) {
 }
 
 void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
+    (void)playerPosition;
     auto hash = [](uint64_t value) {
         value ^= value >> 30;
         value *= 0xbf58476d1ce4e5b9ULL;
@@ -582,20 +583,128 @@ void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
         value *= 0x94d049bb133111ebULL;
         return value ^ (value >> 31);
     };
-    for (uint64_t sample = 0; sample < 32; ++sample) {
-        const uint64_t random = hash(tick * 37 + sample);
-        const int x = static_cast<int>(std::floor(playerPosition.x)) +
-                      static_cast<int>(random % 33) - 16;
-        const int z = static_cast<int>(std::floor(playerPosition.z)) +
-                      static_cast<int>((random >> 16) % 33) - 16;
-        const int y = static_cast<int>((random >> 32) % Config::CHUNK_SIZE_Y);
-        const BlockId block = getBlock(x, y, z);
-        if (block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7 &&
-            getBlock(x, y - 1, z) == BlockId::FARMLAND) {
-            setBlock(x, y, z, static_cast<BlockId>(
-                static_cast<uint8_t>(block) + 1));
+    struct Candidate { glm::ivec3 position; BlockId block; };
+    std::vector<Candidate> candidates;
+    {
+        std::shared_lock lock(m_chunkMutex);
+        for (const auto& [key, overrides] : m_blockOverrides) {
+            auto chunkIt = m_chunks.find(key);
+            if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
+            for (const auto& [index, block] : overrides) {
+                if (!isFarmland(block) && !isSapling(block) &&
+                    !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)) continue;
+                const int y = index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+                const int rem = index % (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+                const int z = rem / Config::CHUNK_SIZE_X;
+                const int x = rem % Config::CHUNK_SIZE_X;
+                candidates.push_back({{key.first * Config::CHUNK_SIZE_X + x, y,
+                                       key.second * Config::CHUNK_SIZE_Z + z}, block});
+            }
         }
     }
+    for (const auto& candidate : candidates) {
+        const glm::ivec3 p = candidate.position;
+        if (getBlock(p.x, p.y, p.z) != candidate.block) continue;
+        uint64_t random = static_cast<uint64_t>(static_cast<uint32_t>(p.x));
+        random = hash(random ^ (static_cast<uint64_t>(static_cast<uint32_t>(p.z)) << 32) ^
+                      static_cast<uint64_t>(p.y * 131 + tick * 37));
+        if (isFarmland(candidate.block) && random % 20 == 0) {
+            const uint8_t moisture = farmlandMoisture(candidate.block);
+            if (hasWaterForFarmland(p)) {
+                if (moisture != 7) setBlock(p.x, p.y, p.z, farmlandForMoisture(7));
+            } else if (moisture > 0) {
+                setBlock(p.x, p.y, p.z, farmlandForMoisture(moisture - 1));
+            } else {
+                const BlockId above = getBlock(p.x, p.y + 1, p.z);
+                if (above < BlockId::WHEAT_0 || above > BlockId::WHEAT_7)
+                    setBlock(p.x, p.y, p.z, BlockId::DIRT);
+            }
+        } else if (candidate.block >= BlockId::WHEAT_0 &&
+                   candidate.block < BlockId::WHEAT_7) {
+            const BlockId soil = getBlock(p.x, p.y - 1, p.z);
+            if (!isFarmland(soil)) continue;
+            const uint64_t interval = farmlandMoisture(soil) > 0 ? 30 : 120;
+            if (random % interval == 0)
+                setBlock(p.x, p.y, p.z, static_cast<BlockId>(
+                    static_cast<uint8_t>(candidate.block) + 1));
+        } else if (isSapling(candidate.block) && random % 300 == 0) {
+            growSapling(p, candidate.block);
+        }
+    }
+}
+
+bool World::hasWaterForFarmland(const glm::ivec3& position) const {
+    for (int y = position.y; y <= position.y + 1; ++y)
+        for (int x = position.x - 4; x <= position.x + 4; ++x)
+            for (int z = position.z - 4; z <= position.z + 4; ++z)
+                if (getBlock(x, y, z) == BlockId::WATER) return true;
+    return false;
+}
+
+bool World::growSapling(const glm::ivec3& p, BlockId sapling) {
+    const int type = static_cast<int>(sapling) - static_cast<int>(BlockId::OAK_SAPLING);
+    const BlockId woods[] = {BlockId::WOOD, BlockId::BIRCH_WOOD, BlockId::SPRUCE_WOOD,
+                             BlockId::JUNGLE_WOOD, BlockId::ACACIA_WOOD};
+    const BlockId leaves[] = {BlockId::LEAVES, BlockId::BIRCH_LEAVES, BlockId::SPRUCE_LEAVES,
+                              BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES};
+    uint64_t h = WorldGenContext::hashPosition(Config::WORLD_SEED, p.x, p.y, p.z);
+    const int heights[] = {4 + static_cast<int>(h % 3), 5 + static_cast<int>(h % 3),
+                           6 + static_cast<int>(h % 5), 8 + static_cast<int>(h % 5),
+                           5 + static_cast<int>(h % 3)};
+    const int height = heights[type];
+    struct Placement { glm::ivec3 position; BlockId block; bool trunk; };
+    std::vector<Placement> placements;
+    for (int y = 0; y < height; ++y) placements.push_back({p + glm::ivec3(0,y,0), woods[type], true});
+    auto leaf = [&](int dx, int y, int dz) {
+        placements.push_back({p + glm::ivec3(dx,y,dz), leaves[type], false});
+    };
+    if (type == 0 || type == 1) {
+        const int base = height - 2, layers = type == 0 ? 4 : 3;
+        for (int y = 0; y < layers; ++y) {
+            const int radius = type == 0 && y < 2 ? 2 : 1;
+            for (int dx=-radius; dx<=radius; ++dx) for (int dz=-radius; dz<=radius; ++dz)
+                if (!(type == 0 && std::abs(dx)==radius && std::abs(dz)==radius &&
+                      (static_cast<int>(h) + dx*7 + dz*13)%3==0)) leaf(dx,base+y,dz);
+        }
+        if (type == 1) leaf(0, base + 3, 0);
+    } else if (type == 2) {
+        const int base = height - 4;
+        for (int y=0;y<5;++y) { const int r=y<2?2:y<4?1:0;
+            for(int dx=-r;dx<=r;++dx)for(int dz=-r;dz<=r;++dz)leaf(dx,base+y,dz); }
+        leaf(0,base+5,0);
+    } else if (type == 3) {
+        const int base=height-3;
+        for(int y=0;y<5;++y){const int r=y<2?3:2;
+            for(int dx=-r;dx<=r;++dx)for(int dz=-r;dz<=r;++dz)
+                if(dx*dx+dz*dz<=r*r)leaf(dx,base+y,dz);}
+    } else {
+        const int y=height-1;
+        for(int dx=-2;dx<=2;++dx)for(int dz=-2;dz<=2;++dz)
+            if(!(std::abs(dx)==2&&std::abs(dz)==2))leaf(dx,y,dz);
+        leaf(0,y+1,0);
+    }
+    for (const auto& placement : placements) {
+        const auto& q = placement.position;
+        if (q.y < 0 || q.y >= Config::CHUNK_SIZE_Y) return false;
+        const int cx = worldToChunkX(q.x), cz = worldToChunkZ(q.z);
+        {
+            std::shared_lock lock(m_chunkMutex);
+            auto it = m_chunks.find({cx,cz});
+            if (it == m_chunks.end() || !it->second->generated.load()) return false;
+        }
+        const BlockId current = getBlock(q.x,q.y,q.z);
+        const bool replaceable = current == BlockId::AIR || isSapling(current) ||
+            current == BlockId::LEAVES || current == BlockId::BIRCH_LEAVES ||
+            current == BlockId::SPRUCE_LEAVES || current == BlockId::JUNGLE_LEAVES ||
+            current == BlockId::ACACIA_LEAVES;
+        if (!replaceable && !(q == p)) return false;
+    }
+    for (const auto& placement : placements) {
+        const BlockId current = getBlock(placement.position.x, placement.position.y, placement.position.z);
+        if (placement.trunk || current == BlockId::AIR || isSapling(current))
+            setBlock(placement.position.x, placement.position.y, placement.position.z, placement.block);
+    }
+    return true;
 }
 
 void World::tickBlockEntities() {

@@ -62,6 +62,12 @@ loading, bounded voxel movement, deterministic local obstacle steering, and
 recoverable ballistic arrows. Save format 5 keeps v2-v4 metadata readable and
 stores block entities and simulated entities in per-chunk sidecar files.
 
+The current survival-polish pass adds eight persistent farmland moisture
+states, five growable saplings, daytime respawn-point setting and night-only
+sleep, simplified water swimming, an armor HUD, and durability bars throughout
+the inventory/container UI. These additions remain save-format 5 and world
+generation version 2 compatible.
+
 ## Completion Criteria
 
 - A new player can gather wood, craft a table and tools, mine and smelt iron,

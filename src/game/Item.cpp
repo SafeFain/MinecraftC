@@ -134,6 +134,16 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         }
     }
     set(ItemId::FLINT, {"Flint"});
+    set(ItemId::OAK_SAPLING, {"Oak Sapling", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::OAK_SAPLING});
+    set(ItemId::BIRCH_SAPLING, {"Birch Sapling", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BIRCH_SAPLING});
+    set(ItemId::SPRUCE_SAPLING, {"Spruce Sapling", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SPRUCE_SAPLING});
+    set(ItemId::JUNGLE_SAPLING, {"Jungle Sapling", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::JUNGLE_SAPLING});
+    set(ItemId::ACACIA_SAPLING, {"Acacia Sapling", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ACACIA_SAPLING});
 
     return items;
 }
@@ -163,6 +173,18 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::WHITE_WOOL): return ItemId::WHITE_WOOL;
         case static_cast<uint16_t>(BlockId::WHITE_BED): return ItemId::WHITE_BED;
         case static_cast<uint16_t>(BlockId::FARMLAND): return ItemId::DIRT;
+        case static_cast<uint16_t>(BlockId::FARMLAND_1):
+        case static_cast<uint16_t>(BlockId::FARMLAND_2):
+        case static_cast<uint16_t>(BlockId::FARMLAND_3):
+        case static_cast<uint16_t>(BlockId::FARMLAND_4):
+        case static_cast<uint16_t>(BlockId::FARMLAND_5):
+        case static_cast<uint16_t>(BlockId::FARMLAND_6):
+        case static_cast<uint16_t>(BlockId::FARMLAND_7): return ItemId::DIRT;
+        case static_cast<uint16_t>(BlockId::OAK_SAPLING): return ItemId::OAK_SAPLING;
+        case static_cast<uint16_t>(BlockId::BIRCH_SAPLING): return ItemId::BIRCH_SAPLING;
+        case static_cast<uint16_t>(BlockId::SPRUCE_SAPLING): return ItemId::SPRUCE_SAPLING;
+        case static_cast<uint16_t>(BlockId::JUNGLE_SAPLING): return ItemId::JUNGLE_SAPLING;
+        case static_cast<uint16_t>(BlockId::ACACIA_SAPLING): return ItemId::ACACIA_SAPLING;
         default: return ItemId::EMPTY;
     }
 }

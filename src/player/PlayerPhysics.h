@@ -49,4 +49,11 @@ inline bool shouldAutoJump(bool enabled, bool onGround, bool movementBlocked,
            currentHeadroomClear && targetHeadroomClear;
 }
 
+inline float waterVerticalVelocity(float current, bool rise, bool dive, float dt) {
+    if (rise != dive)
+        return rise ? Config::WATER_RISE_SPEED : -Config::WATER_DIVE_SPEED;
+    return current + (-Config::WATER_SINK_SPEED - current) *
+                     std::clamp(dt * 3.0f, 0.0f, 1.0f);
+}
+
 } // namespace PlayerPhysics

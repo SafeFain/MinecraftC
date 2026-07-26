@@ -1,6 +1,7 @@
 #include "ui/UIRenderer.h"
 #include "renderer/Shader.h"
 #include "debug/OpenGL.h"
+#include "game/SurvivalRules.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
@@ -158,6 +159,15 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
     GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_quadEBO));
     GL_CHECK(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
     GL_CHECK(glBindVertexArray(0));
+}
+
+void UIRenderer::drawDurability(float x, float y, float w, const ItemStack& stack) {
+    const auto& props = stack.empty() ? getItemProps(ItemId::EMPTY) : getItemProps(stack.id);
+    if (props.maxDurability == 0 || stack.damage == 0) return;
+    const float remaining = durabilityRemaining(stack);
+    const glm::vec4 color(1.0f - remaining, remaining, 0.08f, 1.0f);
+    drawRect(x, y, w, 4.0f, glm::vec4(0.02f, 0.02f, 0.02f, 0.95f));
+    drawRect(x + 1.0f, y + 1.0f, (w - 2.0f) * remaining, 2.0f, color);
 }
 
 // ── Text rendering (delegated to FontRenderer) ────────────────────────────

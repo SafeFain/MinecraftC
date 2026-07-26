@@ -17,12 +17,17 @@ int main() {
     DayNightCycle cycle;
     cycle.resetMorning();
     const float morning = cycle.phase();
+    require(!cycle.isNight(), "morning was classified as night");
 
     cycle.update(1.0f, 20, false);
     require(cycle.phase() == morning, "paused cycle advanced");
 
     cycle.update(0.1f, 20, true);
     require(cycle.phase() > morning, "active cycle did not advance");
+
+    DayNightCycle nightCycle;
+    for (int i = 0; i < 900; ++i) nightCycle.update(0.1f, 1, true);
+    require(nightCycle.isNight(), "night phase was not recognized");
 
     cycle.update(0.1f, 0, false);
     require(std::abs(cycle.phase() - DayNightCycle::STATIC_DAY_PHASE) < 0.0001f,

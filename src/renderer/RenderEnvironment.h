@@ -44,6 +44,7 @@ public:
     }
 
     float phase() const { return m_phase; }
+    bool isNight() const { return evaluate().starIntensity > 0.25f; }
 
     RenderEnvironment evaluate() const {
         constexpr float PI = 3.14159265358979323846f;

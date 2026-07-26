@@ -1,5 +1,7 @@
 #include "world/Block.h"
 
+#include <algorithm>
+
 // ── Block properties table ────────────────────────────────────────────
 
 const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE = {{
@@ -74,6 +76,23 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
     { BlockId::WHEAT_7,       "Wheat",         glm::vec3(0.88f, 0.72f, 0.22f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::FARMLAND_1,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_2,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_3,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_4,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_5,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_6,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::FARMLAND_7,    "Wet Farmland",  glm::vec3(0.27f, 0.13f, 0.05f), true, false },
+    { BlockId::OAK_SAPLING,   "Oak Sapling",   glm::vec3(0.25f, 0.62f, 0.18f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::BIRCH_SAPLING, "Birch Sapling", glm::vec3(0.46f, 0.70f, 0.22f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::SPRUCE_SAPLING,"Spruce Sapling",glm::vec3(0.18f, 0.46f, 0.25f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::JUNGLE_SAPLING,"Jungle Sapling",glm::vec3(0.20f, 0.68f, 0.16f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::ACACIA_SAPLING,"Acacia Sapling",glm::vec3(0.42f, 0.60f, 0.16f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -125,6 +144,10 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::WHITE_WOOL:    return BlockTexture::WhiteWool;
         case BlockId::WHITE_BED:     return BlockTexture::WhiteBed;
         case BlockId::FARMLAND:      return BlockTexture::Farmland;
+        case BlockId::FARMLAND_1: case BlockId::FARMLAND_2:
+        case BlockId::FARMLAND_3: case BlockId::FARMLAND_4:
+        case BlockId::FARMLAND_5: case BlockId::FARMLAND_6:
+        case BlockId::FARMLAND_7:    return BlockTexture::WetFarmland;
         case BlockId::WHEAT_0:
         case BlockId::WHEAT_1:
         case BlockId::WHEAT_2:       return BlockTexture::WheatYoung;
@@ -133,8 +156,35 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::WHEAT_5:       return BlockTexture::WheatMiddle;
         case BlockId::WHEAT_6:
         case BlockId::WHEAT_7:       return BlockTexture::WheatMature;
+        case BlockId::OAK_SAPLING:   return BlockTexture::OakSapling;
+        case BlockId::BIRCH_SAPLING: return BlockTexture::BirchSapling;
+        case BlockId::SPRUCE_SAPLING:return BlockTexture::SpruceSapling;
+        case BlockId::JUNGLE_SAPLING:return BlockTexture::JungleSapling;
+        case BlockId::ACACIA_SAPLING:return BlockTexture::AcaciaSapling;
         default:                     return BlockTexture::Dirt;
     }
+}
+
+bool isFarmland(BlockId id) {
+    return id == BlockId::FARMLAND ||
+           (id >= BlockId::FARMLAND_1 && id <= BlockId::FARMLAND_7);
+}
+
+uint8_t farmlandMoisture(BlockId id) {
+    if (id == BlockId::FARMLAND) return 0;
+    if (id >= BlockId::FARMLAND_1 && id <= BlockId::FARMLAND_7)
+        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FARMLAND_1) + 1;
+    return 0;
+}
+
+BlockId farmlandForMoisture(uint8_t moisture) {
+    if (moisture == 0) return BlockId::FARMLAND;
+    moisture = std::min<uint8_t>(moisture, 7);
+    return static_cast<BlockId>(static_cast<uint8_t>(BlockId::FARMLAND_1) + moisture - 1);
+}
+
+bool isSapling(BlockId id) {
+    return id >= BlockId::OAK_SAPLING && id <= BlockId::ACACIA_SAPLING;
 }
 
 // ── Face direction offsets ────────────────────────────────────────────

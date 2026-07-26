@@ -115,6 +115,8 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                       labelScale,
                       glm::vec3(0.7f, 0.7f, 0.7f));
 
+        if (survivalStack) ui.drawDurability(sx + 4.0f, sy + 3.0f,
+                                              slotSize - 8.0f, *survivalStack);
         if (survivalStack && survivalStack->count > 1) {
             const std::string countLabel = std::to_string(survivalStack->count);
             auto countSize = ui.measureText(countLabel, 1.0f);

@@ -56,6 +56,7 @@ void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
     if (props.placedBlock) ui.drawBlockIcon(r.x+4, r.y+4, r.w-8, r.h-8, *props.placedBlock);
     else ui.renderText(props.name.empty() ? "?" : props.name.substr(0,1),
                        r.x+15, r.y+13, 1.5f, glm::vec3(.95f));
+    ui.drawDurability(r.x+3,r.y+2,r.w-6,stack);
     if (stack.count > 1) ui.renderText(std::to_string(stack.count), r.x+r.w-16, r.y+2,
                                       .9f, glm::vec3(1));
 }

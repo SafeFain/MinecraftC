@@ -6,6 +6,7 @@
 
 #include "ui/FontRenderer.h"
 #include "world/Block.h"
+#include "game/Item.h"
 
 class Shader;
 
@@ -24,6 +25,7 @@ public:
 
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawBlockIcon(float x, float y, float w, float h, BlockId block);
+    void drawDurability(float x, float y, float w, const ItemStack& stack);
 
     void renderText(const std::string& text, float x, float y,
                     float scale, const glm::vec3& color);

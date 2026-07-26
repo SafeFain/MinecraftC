@@ -117,6 +117,7 @@ private:
     void moveFlyingAndCollide(const glm::vec3& delta);
     bool checkCollision(double px, double py, double pz) const;
     float findGround() const;
+    bool isInWater() const;
     void applyPhysics(float dt);
     void updateHighlight();
     void updateMining(float dt);

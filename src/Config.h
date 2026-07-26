@@ -135,6 +135,11 @@ constexpr float PLAYER_WIDTH      = 0.6f;
 constexpr float EYE_HEIGHT        = 1.6f;
 constexpr float MOUSE_SENSITIVITY = 0.15f;
 constexpr float REACH_DISTANCE    = 6.0f;
+constexpr float WATER_HORIZONTAL_FACTOR = 0.45f;
+constexpr float WATER_RISE_SPEED = 4.0f;
+constexpr float WATER_DIVE_SPEED = 3.0f;
+constexpr float WATER_SINK_SPEED = 0.6f;
+constexpr float WATER_ENTRY_MAX_FALL_SPEED = 3.0f;
 inline bool     AUTO_JUMP         = true;
 
 // ── UI ──────────────────────────────────────────────────────────────────

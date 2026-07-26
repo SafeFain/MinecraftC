@@ -72,15 +72,20 @@ int main() {
 
         const std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},
-            {static_cast<uint16_t>(15 + 15 * 16 + 127 * 256), BlockId::DIAMOND_ORE}
+            {static_cast<uint16_t>(15 + 15 * 16 + 127 * 256), BlockId::DIAMOND_ORE},
+            {513, BlockId::FARMLAND_7},
+            {514, BlockId::ACACIA_SAPLING}
         };
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 2, "chunk overrides round trip");
+        require(loadedOverrides.size() == 4, "chunk overrides round trip");
         require(loadedOverrides[0].block == BlockId::AIR,
                 "explicit AIR override is preserved");
         require(loadedOverrides[1].localIndex == overrides[1].localIndex,
                 "highest local block index is valid");
+        require(loadedOverrides[2].block == BlockId::FARMLAND_7 &&
+                loadedOverrides[3].block == BlockId::ACACIA_SAPLING,
+                "new farming block ids round trip in save format 5");
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
 

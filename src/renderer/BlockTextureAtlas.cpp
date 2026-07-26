@@ -253,9 +253,15 @@ bool BlockTextureAtlas::initialize() {
     tiles[static_cast<size_t>(BlockTexture::WhiteWool)] = material(222, 222, 216, 12, 35);
     tiles[static_cast<size_t>(BlockTexture::WhiteBed)] = material(228, 225, 218, 10, 36);
     tiles[static_cast<size_t>(BlockTexture::Farmland)] = material(87, 52, 24, 18, 37);
+    tiles[static_cast<size_t>(BlockTexture::WetFarmland)] = material(58, 31, 18, 14, 38);
     tiles[static_cast<size_t>(BlockTexture::WheatYoung)] = wheat(0);
     tiles[static_cast<size_t>(BlockTexture::WheatMiddle)] = wheat(1);
     tiles[static_cast<size_t>(BlockTexture::WheatMature)] = wheat(2);
+    tiles[static_cast<size_t>(BlockTexture::OakSapling)] = plant(64, 151, 49, false);
+    tiles[static_cast<size_t>(BlockTexture::BirchSapling)] = plant(104, 168, 58, false);
+    tiles[static_cast<size_t>(BlockTexture::SpruceSapling)] = plant(43, 105, 65, false);
+    tiles[static_cast<size_t>(BlockTexture::JungleSapling)] = plant(48, 166, 41, false);
+    tiles[static_cast<size_t>(BlockTexture::AcaciaSapling)] = plant(104, 146, 44, false);
 
     GL_CHECK(glGenTextures(1, &m_texture));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture));

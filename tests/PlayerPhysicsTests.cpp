@@ -59,6 +59,15 @@ int main() {
             "movement larger than the collision bound was not split");
     require(PlayerPhysics::movementSubsteps(-0.61f) == 4,
             "falling movement did not use absolute distance");
+    require(PlayerPhysics::waterVerticalVelocity(0.0f, true, false, 0.1f) ==
+                Config::WATER_RISE_SPEED,
+            "water rise input did not select swim speed");
+    require(PlayerPhysics::waterVerticalVelocity(0.0f, false, true, 0.1f) ==
+                -Config::WATER_DIVE_SPEED,
+            "water dive input did not select dive speed");
+    const float sinking = PlayerPhysics::waterVerticalVelocity(0.0f, false, false, 0.1f);
+    require(sinking < 0.0f && sinking > -Config::WATER_SINK_SPEED,
+            "neutral water movement did not approach gentle sinking");
 
     std::cout << "player physics logic passed\n";
 }

@@ -128,6 +128,12 @@ enum class ItemId : uint16_t {
 
     FLINT,
 
+    OAK_SAPLING,
+    BIRCH_SAPLING,
+    SPRUCE_SAPLING,
+    JUNGLE_SAPLING,
+    ACACIA_SAPLING,
+
     COUNT
 };
 

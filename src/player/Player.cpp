@@ -45,9 +45,6 @@ void Player::takeDamage(float amount, bool bypassArmor) {
         if (++shield.damage >= getItemProps(shield.id).maxDurability) shield.clear();
     }
     if (!bypassArmor) {
-        static constexpr int armorPoints[4][4] = {
-            {1, 3, 2, 1}, {2, 6, 5, 2}, {2, 5, 3, 1}, {3, 8, 6, 3}
-        };
         int points = 0;
         for (size_t slot = 0; slot < InventoryModel::ARMOR_SIZE; ++slot) {
             auto& armor = m_inventory.armor()[slot];
@@ -55,7 +52,7 @@ void Player::takeDamage(float amount, bool bypassArmor) {
             const uint16_t relative = static_cast<uint16_t>(armor.id) -
                                       static_cast<uint16_t>(ItemId::LEATHER_HELMET);
             if (relative < 16 && relative % 4 == slot) {
-                points += armorPoints[relative / 4][slot];
+                points += armorPointsForItem(armor.id);
                 if (++armor.damage >= getItemProps(armor.id).maxDurability)
                     armor.clear();
             }
@@ -104,6 +101,8 @@ void Player::handleMovement(const bool keys[256], float dt) {
     if (m_gameMode == GameMode::Survival && !m_survivalStats.canSprint())
         m_isSprinting = false;
     float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
+    const bool inWater = m_gameMode == GameMode::Survival && isInWater();
+    if (inWater) speed *= Config::WATER_HORIZONTAL_FACTOR;
 
     glm::vec3 moveDir(0.0f);
     glm::vec3 planarForward(m_forward.x, 0.0f, m_forward.z);
@@ -151,7 +150,13 @@ void Player::handleMovement(const bool keys[256], float dt) {
         }
 
         // Jump
-        if (keys[GLFW_KEY_SPACE] && m_onGround) {
+        if (inWater) {
+            m_velocity.y = PlayerPhysics::waterVerticalVelocity(
+                m_velocity.y, keys[GLFW_KEY_SPACE],
+                keys[GLFW_KEY_LEFT_SHIFT] || keys[GLFW_KEY_RIGHT_SHIFT], dt);
+            m_onGround = false;
+            m_fallDistance = 0.0f;
+        } else if (keys[GLFW_KEY_SPACE] && m_onGround) {
             m_velocity.y = Config::JUMP_SPEED;
             m_onGround = false;
             if (m_gameMode == GameMode::Survival)
@@ -353,11 +358,32 @@ float Player::findGround() const {
         [this](int x, int y, int z) { return m_world.getBlock(x, y, z); });
 }
 
+bool Player::isInWater() const {
+    const glm::dvec3 eye = getEyePosition();
+    const double half = Config::PLAYER_WIDTH * 0.5 - 0.001;
+    const int minX = static_cast<int>(std::floor(m_position.x - half));
+    const int maxX = static_cast<int>(std::floor(m_position.x + half));
+    const int minZ = static_cast<int>(std::floor(m_position.z - half));
+    const int maxZ = static_cast<int>(std::floor(m_position.z + half));
+    const int feetY = static_cast<int>(std::floor(m_position.y + 0.1));
+    const int eyeY = static_cast<int>(std::floor(eye.y));
+    for (int x = minX; x <= maxX; ++x)
+        for (int z = minZ; z <= maxZ; ++z)
+            if (m_world.getBlock(x, feetY, z) == BlockId::WATER ||
+                m_world.getBlock(x, eyeY, z) == BlockId::WATER) return true;
+    return false;
+}
+
 void Player::applyPhysics(float dt) {
     if (m_flying) return; // no physics in flight mode
 
-    // Gravity
-    m_velocity.y -= Config::GRAVITY * dt;
+    const bool inWater = m_gameMode == GameMode::Survival && isInWater();
+    if (inWater) {
+        m_fallDistance = 0.0f;
+        m_velocity.y = std::max(m_velocity.y, -Config::WATER_ENTRY_MAX_FALL_SPEED);
+    } else {
+        m_velocity.y -= Config::GRAVITY * dt;
+    }
 
     // Vertical movement is swept in bounded steps. In particular, a ceiling
     // hit retains the last non-colliding position; deriving a ceiling from the
@@ -501,7 +527,8 @@ void Player::updateMining(float dt) {
     const BlockId block = m_world.getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
     const float required = miningSeconds(
-        block, m_inventory.slot(static_cast<size_t>(m_selectedSlot)));
+        block, m_inventory.slot(static_cast<size_t>(m_selectedSlot)),
+        isInWater(), !m_onGround);
     m_miningRequired = required;
     if (required < 0.0f) {
         m_miningProgress = 0.0f;
@@ -560,7 +587,7 @@ void Player::placeBlock() {
             if (++stack.damage >= props.maxDurability) stack.clear();
             return;
         }
-        if (stack.id == ItemId::WHEAT_SEEDS && hitBlock == BlockId::FARMLAND &&
+        if (stack.id == ItemId::WHEAT_SEEDS && isFarmland(hitBlock) &&
             hit->faceNormal.y > 0 && m_world.getBlock(
                 placePos.x, placePos.y, placePos.z) == BlockId::AIR) {
             m_world.setBlock(placePos.x, placePos.y, placePos.z, BlockId::WHEAT_0);
@@ -569,6 +596,13 @@ void Player::placeBlock() {
         }
         if (!props.placedBlock) return;
         placed = *props.placedBlock;
+        if (isSapling(placed)) {
+            if (hit->faceNormal.y <= 0 ||
+                (hitBlock != BlockId::GRASS && hitBlock != BlockId::DIRT &&
+                 hitBlock != BlockId::PODZOL) ||
+                m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR)
+                return;
+        }
     }
 
     if (!collidesWithPlayer(placePos)) {

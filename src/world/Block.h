@@ -60,7 +60,19 @@ enum class BlockId : uint8_t {
     WHEAT_5      = 49,
     WHEAT_6      = 50,
     WHEAT_7      = 51,
-    COUNT        = 52
+    FARMLAND_1   = 52,
+    FARMLAND_2   = 53,
+    FARMLAND_3   = 54,
+    FARMLAND_4   = 55,
+    FARMLAND_5   = 56,
+    FARMLAND_6   = 57,
+    FARMLAND_7   = 58,
+    OAK_SAPLING  = 59,
+    BIRCH_SAPLING = 60,
+    SPRUCE_SAPLING = 61,
+    JUNGLE_SAPLING = 62,
+    ACACIA_SAPLING = 63,
+    COUNT        = 64
 };
 
 // ── Face direction ────────────────────────────────────────────────────
@@ -109,7 +121,8 @@ enum class BlockTexture : uint8_t {
     BirchLog, BirchLeaves, SpruceLog, SpruceLeaves, JungleLog,
     JungleLeaves, AcaciaLog, AcaciaLeaves,
     Cobblestone, CraftingTable, Furnace, Chest, Torch, WhiteWool,
-    WhiteBed, Farmland, WheatYoung, WheatMiddle, WheatMature,
+    WhiteBed, Farmland, WetFarmland, WheatYoung, WheatMiddle, WheatMature,
+    OakSapling, BirchSapling, SpruceSapling, JungleSapling, AcaciaSapling,
     Count
 };
 
@@ -126,6 +139,11 @@ inline bool isSolid(BlockId id) {
 }
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face);
+
+bool isFarmland(BlockId id);
+uint8_t farmlandMoisture(BlockId id);
+BlockId farmlandForMoisture(uint8_t moisture);
+bool isSapling(BlockId id);
 
 // ── Face direction offset vectors ─────────────────────────────────────
 

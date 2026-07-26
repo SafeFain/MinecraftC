@@ -19,6 +19,7 @@
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "game/Command.h"
+#include "game/SurvivalRules.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include <glad/glad.h>
@@ -118,9 +119,14 @@ private:
         m_world.setThreadPool(&m_threadPool);
         m_player.setEntityManager(&m_entities);
         m_player.setBedCallback([this](const glm::ivec3& bed) {
-            if (!m_entities.hasHostileNear(glm::vec3(bed), 8.0f)) {
-                m_worldMetadata.bedSpawn = bed;
+            m_worldMetadata.bedSpawn = bed;
+            if (!m_dayNightCycle.isNight()) {
+                showCommandMessage("Respawn point set");
+            } else if (m_entities.hasHostileNear(glm::vec3(bed), 8.0f)) {
+                showCommandMessage("Respawn point set; monsters are nearby");
+            } else {
                 m_dayNightCycle.resetMorning();
+                showCommandMessage("Respawn point set; slept until morning");
             }
         });
 
@@ -835,6 +841,18 @@ private:
             m_uiRenderer.drawRect(fx + unitW * (1.0f - hungerFill), y,
                                   unitW * hungerFill, unitH,
                                   glm::vec4(0.88f, 0.48f, 0.08f, 1.0f));
+        }
+        const int armor = totalArmorPoints(m_player.inventory());
+        if (armor > 0) {
+            constexpr float armorY = y + 14.0f;
+            for (int i = 0; i < 10; ++i) {
+                const float fill = std::clamp((armor - i * 2) * 0.5f, 0.0f, 1.0f);
+                const float x = leftX + i * (unitW + gap);
+                m_uiRenderer.drawRect(x, armorY, unitW, unitH,
+                                      glm::vec4(0.08f, 0.10f, 0.13f, 0.9f));
+                m_uiRenderer.drawRect(x, armorY, unitW * fill, unitH,
+                                      glm::vec4(0.62f, 0.72f, 0.82f, 1.0f));
+            }
         }
     }
 

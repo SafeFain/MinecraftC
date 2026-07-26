@@ -61,6 +61,7 @@ void SurvivalInventoryScreen::drawStack(
         ui.renderText(initial, rect.x + 15.0f, rect.y + 13.0f, 1.5f,
                       glm::vec3(0.95f));
     }
+    ui.drawDurability(rect.x + 3.0f, rect.y + 2.0f, rect.w - 6.0f, stack);
     if (stack.count > 1) {
         const std::string text = std::to_string(stack.count);
         const auto size = ui.measureText(text, 0.9f);
