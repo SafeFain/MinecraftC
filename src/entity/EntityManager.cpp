@@ -295,12 +295,14 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 }
 
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
-                           bool playerTargetable, bool playerCanPickup) {
+                           bool playerTargetable, bool playerCanPickup,
+                           bool thunderstorm, bool raining) {
     struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
     std::vector<PendingArrow> pendingArrows;
     m_spawnTimer += dt;
     if (m_spawnTimer >= 4.0f) {
-        spawnAroundPlayer(player.getPosition(), !isDay && !peaceful);
+        spawnAroundPlayer(
+            player.getPosition(), (!isDay || thunderstorm) && !peaceful);
         m_spawnTimer = 0.0f;
     }
 
@@ -335,18 +337,32 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
 
         integrateVelocity(entity, dt);
 
-        if (entity.type == EntityType::Zombie || entity.type == EntityType::Skeleton) {
+        {
             const bool inWater = touchesWater(entity);
-            const bool sunlit = isDay && exposedToSky(entity);
-            const float activeBurnTime = inWater ? 0.0f :
-                (sunlit ? dt : std::min(dt, entity.burningSeconds));
+            const int x = static_cast<int>(std::floor(entity.position.x));
+            const int y = static_cast<int>(std::floor(entity.position.y));
+            const int z = static_cast<int>(std::floor(entity.position.z));
+            const bool exposed = exposedToSky(entity);
+            const bool wetByRain = raining && exposed &&
+                m_world.precipitationAt(x, y, z) == PrecipitationType::Rain;
+            const bool fireContact = m_world.getBlock(x, y, z) == BlockId::FIRE ||
+                m_world.getBlock(x, static_cast<int>(std::floor(
+                    entity.position.y + renderSize(entity.type).y * 0.5)), z) ==
+                    BlockId::FIRE;
+            const bool undead = entity.type == EntityType::Zombie ||
+                                entity.type == EntityType::Skeleton;
+            const bool ignited = fireContact ||
+                (undead && isDay && !thunderstorm && exposed);
+            const bool extinguished = inWater || wetByRain;
+            const float activeBurnTime = extinguished ? 0.0f :
+                (ignited ? dt : std::min(dt, entity.burningSeconds));
             entity.burningSeconds = updateBurning(
-                entity.burningSeconds, sunlit, inWater, dt);
+                entity.burningSeconds, ignited, extinguished, dt);
             const int burnTicks = accumulateBurnDamage(
                 entity.burnDamageSeconds, activeBurnTime);
             for (int tick = 0; tick < burnTicks; ++tick)
                 damageEntity(entity, 4.0f, glm::vec3(0.0f), false);
-            if (inWater)
+            if (extinguished)
                 entity.burnDamageSeconds = 0.0f;
             if (entity.health <= 0.0f) continue;
         }
@@ -362,7 +378,8 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             continue;
         }
         const bool behaviorTargetsPlayer = entity.type == EntityType::Spider
-            ? spiderTargetsPlayer(isDay, entity.spiderProvoked, distance)
+            ? spiderTargetsPlayer(isDay && !thunderstorm,
+                                  entity.spiderProvoked, distance)
             : hostile(entity.type) && distance < 18.0f;
         const bool targetsPlayer = mobTargetsPlayer(
             playerTargetable, behaviorTargetsPlayer);
@@ -428,6 +445,22 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                    (entity.type == EntityType::Arrow && entity.ageSeconds >= 60.0f);
         }), m_entities.end());
     for (const auto& entity : deadMobs) dropMobLoot(entity);
+}
+
+void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) {
+    const glm::dvec3 center = glm::dvec3(position) + glm::dvec3(0.5, 0.0, 0.5);
+    for (auto& entity : m_entities) {
+        if (entity.type == EntityType::Item || entity.type == EntityType::Arrow ||
+            entity.health <= 0.0f) continue;
+        if (glm::distance(entity.position, center) <= 3.0) {
+            damageEntity(entity, 5.0f, glm::vec3(0.0f, 0.25f, 0.0f), false);
+            entity.burningSeconds = std::max(entity.burningSeconds, 8.0f);
+        }
+    }
+    if (player.isSurvival() && glm::distance(player.getPosition(), center) <= 3.0) {
+        player.takeDamage(5.0f);
+        player.ignite(8.0f);
+    }
 }
 
 void EntityManager::dropMobLoot(const Entity& entity) {

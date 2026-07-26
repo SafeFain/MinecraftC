@@ -33,6 +33,7 @@ target_include_directories(minecraftc PRIVATE
     external/glad/include
     external/FastNoiseLite
     external/stb
+    external/miniaudio
 )
 # Prevent GLFW from including GL/gl.h — we use our own GL loader
 target_compile_definitions(minecraftc PRIVATE GLFW_INCLUDE_NONE)
@@ -49,7 +50,13 @@ target_link_libraries(minecraftc PRIVATE
     glm::glm
     OpenGL::GL
     glad
+    ${CMAKE_DL_LIBS}
 )
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
+        COMPILE_OPTIONS "-w")
+endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
@@ -209,6 +216,17 @@ if(BUILD_TESTING)
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests)
+
+    add_executable(weather_logic_tests
+        tests/WeatherTests.cpp
+        src/game/Weather.cpp
+        src/world/BiomeMap.cpp)
+    target_include_directories(weather_logic_tests PRIVATE src)
+    target_link_libraries(weather_logic_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(weather_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME weather_cycle_precipitation_and_commands COMMAND weather_logic_tests)
 
     add_executable(entity_logic_tests tests/EntityLogicTests.cpp)
     target_include_directories(entity_logic_tests PRIVATE src)

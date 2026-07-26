@@ -236,6 +236,11 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload, static_cast<uint8_t>(metadata.difficulty));
     append(payload, static_cast<uint8_t>(metadata.cheatsEnabled));
     append(payload, metadata.worldTicks);
+    append(payload, static_cast<uint8_t>(metadata.weather.raining));
+    append(payload, static_cast<uint8_t>(metadata.weather.thundering));
+    append(payload, metadata.weather.rainTicks);
+    append(payload, metadata.weather.thunderTicks);
+    append(payload, metadata.weather.sequence);
     append(payload, metadata.playerPosition);
     append(payload, metadata.worldSpawn);
     append(payload, static_cast<uint8_t>(metadata.bedSpawn.has_value()));
@@ -264,6 +269,13 @@ WorldMetadata SaveStore::loadMetadata() const {
     metadata.difficulty = static_cast<Difficulty>(reader.read<uint8_t>());
     if (checked.version >= 3) metadata.cheatsEnabled = reader.read<uint8_t>() != 0;
     metadata.worldTicks = reader.read<uint64_t>();
+    if (checked.version >= 7) {
+        metadata.weather.raining = reader.read<uint8_t>() != 0;
+        metadata.weather.thundering = reader.read<uint8_t>() != 0;
+        metadata.weather.rainTicks = reader.read<uint32_t>();
+        metadata.weather.thunderTicks = reader.read<uint32_t>();
+        metadata.weather.sequence = reader.read<uint64_t>();
+    }
     metadata.playerPosition = checked.version >= 4
         ? reader.read<glm::dvec3>()
         : glm::dvec3(reader.read<glm::vec3>());

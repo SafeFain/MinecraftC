@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <stb_image.h>
+#include <GLFW/glfw3.h>
 #include "Config.h"
 
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
@@ -27,6 +28,9 @@ Renderer::~Renderer() {
     if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
     if (m_entityVAO) GL_CHECK(glDeleteVertexArrays(1, &m_entityVAO));
     if (m_entityTexture) GL_CHECK(glDeleteTextures(1, &m_entityTexture));
+    if (m_weatherInstanceVBO) GL_CHECK(glDeleteBuffers(1, &m_weatherInstanceVBO));
+    if (m_weatherQuadVBO) GL_CHECK(glDeleteBuffers(1, &m_weatherQuadVBO));
+    if (m_weatherVAO) GL_CHECK(glDeleteVertexArrays(1, &m_weatherVAO));
 }
 
 // ── Initialization ────────────────────────────────────────────────────
@@ -50,6 +54,8 @@ void Renderer::initialize(bool framebufferSrgb) {
         "assets/shaders/entity.vert",
         "assets/shaders/entity.frag"
     );
+    m_weatherShader = std::make_unique<Shader>(
+        "assets/shaders/weather.vert", "assets/shaders/weather.frag");
     m_blockAtlas.initialize();
 
     // Global GL state
@@ -104,6 +110,39 @@ void Renderer::initialize(bool framebufferSrgb) {
         reinterpret_cast<void*>(3 * sizeof(float))));
     GL_CHECK(glEnableVertexAttribArray(1));
     GL_CHECK(glBindVertexArray(0));
+
+    m_drawArraysInstanced = reinterpret_cast<DrawArraysInstancedFn>(
+        glfwGetProcAddress("glDrawArraysInstanced"));
+    m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
+        glfwGetProcAddress("glVertexAttribDivisor"));
+    if (m_drawArraysInstanced && m_vertexAttribDivisor) {
+        constexpr float quad[] = {
+            -0.5f, 0.0f,  0.5f, 0.0f,  0.5f, 1.0f,
+            -0.5f, 0.0f,  0.5f, 1.0f, -0.5f, 1.0f
+        };
+        GL_CHECK(glGenVertexArrays(1, &m_weatherVAO));
+        GL_CHECK(glGenBuffers(1, &m_weatherQuadVBO));
+        GL_CHECK(glGenBuffers(1, &m_weatherInstanceVBO));
+        GL_CHECK(glBindVertexArray(m_weatherVAO));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherQuadVBO));
+        GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW));
+        GL_CHECK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                                      2 * sizeof(float), nullptr));
+        GL_CHECK(glEnableVertexAttribArray(0));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherInstanceVBO));
+        GL_CHECK(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
+                                      sizeof(WeatherParticle), nullptr));
+        GL_CHECK(glEnableVertexAttribArray(1));
+        GL_CHECK(glVertexAttribPointer(
+            2, 1, GL_FLOAT, GL_FALSE, sizeof(WeatherParticle),
+            reinterpret_cast<void*>(4 * sizeof(float))));
+        GL_CHECK(glEnableVertexAttribArray(2));
+        m_vertexAttribDivisor(1, 1);
+        m_vertexAttribDivisor(2, 1);
+        GL_CHECK(glBindVertexArray(0));
+    } else {
+        LOG_WARN("OpenGL instanced weather rendering is unavailable");
+    }
 
     int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
     stbi_set_flip_vertically_on_load(1);
@@ -162,6 +201,9 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setVec3("uZenithColor", environment.zenithColor);
     m_skyShader->setVec3("uHorizonColor", environment.horizonColor);
     m_skyShader->setFloat("uStarIntensity", environment.starIntensity);
+    m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
+    m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
+    m_skyShader->setFloat("uWeatherTime", static_cast<float>(glfwGetTime()));
     m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_skyVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
@@ -267,6 +309,33 @@ void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
     GL_CHECK(glBindVertexArray(m_entityVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 36));
     GL_CHECK(glBindVertexArray(0));
+}
+
+void Renderer::renderWeather(const std::vector<WeatherParticle>& particles,
+                             const glm::mat4& viewProjection,
+                             const glm::vec3& cameraRight, float intensity) {
+    if (particles.empty() || !m_weatherVAO || !m_drawArraysInstanced) return;
+    m_weatherShader->bind();
+    m_weatherShader->setMat4("uViewProjection", viewProjection);
+    m_weatherShader->setVec3("uCameraRight", cameraRight);
+    m_weatherShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
+    m_weatherShader->setFloat("uIntensity", intensity);
+    m_weatherShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    GL_CHECK(glEnable(GL_BLEND));
+    GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    GL_CHECK(glDepthMask(GL_FALSE));
+    GL_CHECK(glDisable(GL_CULL_FACE));
+    GL_CHECK(glBindVertexArray(m_weatherVAO));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherInstanceVBO));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+                         particles.size() * sizeof(WeatherParticle),
+                         particles.data(), GL_DYNAMIC_DRAW));
+    m_drawArraysInstanced(
+        GL_TRIANGLES, 0, 6, static_cast<GLsizei>(particles.size()));
+    GL_CHECK(glBindVertexArray(0));
+    GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glDepthMask(GL_TRUE));
+    GL_CHECK(glDisable(GL_BLEND));
 }
 
 // ── VAO helpers ───────────────────────────────────────────────────────

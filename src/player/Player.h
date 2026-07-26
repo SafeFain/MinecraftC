@@ -62,6 +62,9 @@ public:
     SurvivalStats& survivalStats() { return m_survivalStats; }
     const SurvivalStats& survivalStats() const { return m_survivalStats; }
     void takeDamage(float amount, bool bypassArmor = false);
+    void ignite(float seconds) { m_burningSeconds = std::max(m_burningSeconds, seconds); }
+    void extinguish() { m_burningSeconds = 0.0f; m_burnDamageTicks = 0; }
+    void setRainExposure(bool exposed) { m_rainExposed = exposed; }
     void resetDamageImmunity() { m_hurtImmunity = {}; }
     void setSelectedSlot(int slot) { if (slot >= 0 && slot < 9) m_selectedSlot = slot; }
     int selectedSlot() const { return m_selectedSlot; }
@@ -116,6 +119,9 @@ private:
     float m_fallDistance = 0.0f;
     int m_airTicks = 300;
     uint32_t m_environmentDamageTicks = 0;
+    float m_burningSeconds = 0.0f;
+    uint32_t m_burnDamageTicks = 0;
+    bool m_rainExposed = false;
     bool m_blocking = false;
     PlayerPhysics::HurtImmunity m_hurtImmunity;
 

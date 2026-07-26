@@ -33,6 +33,14 @@ int main() {
             !parseTimeSetCommand("/time set noon") &&
             !parseTimeSetCommand("/time set day extra"),
             "invalid time command was accepted");
+    require(parseWeatherCommand("/weather clear") == WeatherType::Clear &&
+            parseWeatherCommand("/weather rain") == WeatherType::Rain &&
+            parseWeatherCommand("/weather thunder") == WeatherType::Thunder,
+            "weather command was not parsed");
+    require(!parseWeatherCommand("/weather snow") &&
+            !parseWeatherCommand("/weather rain 600") &&
+            !parseWeatherCommand("/weather"),
+            "invalid weather command was accepted");
     const auto teleport = parseTeleportCommand("/tp -12.5 80 44.25");
     require(teleport && teleport->x == -12.5 && teleport->y == 80.0 &&
             teleport->z == 44.25,

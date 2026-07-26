@@ -72,7 +72,9 @@ enum class BlockId : uint8_t {
     SPRUCE_SAPLING = 61,
     JUNGLE_SAPLING = 62,
     ACACIA_SAPLING = 63,
-    COUNT        = 64
+    SNOW_LAYER   = 64,
+    FIRE         = 65,
+    COUNT        = 66
 };
 
 // ── Face direction ────────────────────────────────────────────────────
@@ -92,7 +94,8 @@ constexpr int FACE_COUNT = 6;
 
 enum class RenderShape : uint8_t {
     Cube,
-    Cross
+    Cross,
+    SnowLayer
 };
 
 enum class RenderLayer : uint8_t {
@@ -123,6 +126,7 @@ enum class BlockTexture : uint8_t {
     Cobblestone, CraftingTable, Furnace, Chest, Torch, WhiteWool,
     WhiteBed, Farmland, WetFarmland, WheatYoung, WheatMiddle, WheatMature,
     OakSapling, BirchSapling, SpruceSapling, JungleSapling, AcaciaSapling,
+    SnowLayer, Fire,
     Count
 };
 
@@ -144,6 +148,9 @@ bool isFarmland(BlockId id);
 uint8_t farmlandMoisture(BlockId id);
 BlockId farmlandForMoisture(uint8_t moisture);
 bool isSapling(BlockId id);
+uint8_t fireEncouragement(BlockId id);
+uint8_t burnOdds(BlockId id);
+inline bool isFlammable(BlockId id) { return fireEncouragement(id) > 0; }
 bool shouldRenderCubeFace(BlockId current, BlockId neighbor);
 
 // ── Face direction offset vectors ─────────────────────────────────────

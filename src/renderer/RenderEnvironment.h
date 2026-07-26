@@ -21,7 +21,45 @@ struct RenderEnvironment {
     glm::vec3 zenithColor{0.25f, 0.55f, 0.90f};
     glm::vec3 horizonColor{0.62f, 0.78f, 0.92f};
     glm::vec3 fogColor{0.62f, 0.78f, 0.92f};
+    float rainIntensity = 0.0f;
+    float thunderIntensity = 0.0f;
+    float lightningFlash = 0.0f;
 };
+
+inline RenderEnvironment applyWeather(RenderEnvironment env, float rain,
+                                      float thunder, float lightningFlash) {
+    rain = std::clamp(rain, 0.0f, 1.0f);
+    thunder = std::clamp(thunder, 0.0f, rain);
+    lightningFlash = std::clamp(lightningFlash, 0.0f, 1.0f);
+    env.rainIntensity = rain;
+    env.thunderIntensity = thunder;
+    env.lightningFlash = lightningFlash;
+    env.starIntensity *= 1.0f - rain;
+    env.directIntensity *= 1.0f - 0.42f * rain - 0.46f * thunder;
+    env.ambientIntensity *= 1.0f - 0.16f * rain - 0.26f * thunder;
+    const glm::vec3 rainSky(0.22f, 0.28f, 0.34f);
+    const glm::vec3 stormSky(0.075f, 0.09f, 0.12f);
+    env.zenithColor = glm::mix(env.zenithColor, rainSky, rain * 0.72f);
+    env.zenithColor = glm::mix(env.zenithColor, stormSky, thunder * 0.82f);
+    env.horizonColor = glm::mix(
+        env.horizonColor, glm::vec3(0.34f, 0.38f, 0.42f), rain * 0.70f);
+    env.horizonColor = glm::mix(
+        env.horizonColor, glm::vec3(0.10f, 0.12f, 0.15f), thunder * 0.78f);
+    env.fogColor = glm::mix(env.horizonColor, env.zenithColor, 0.28f);
+    env.directColor = glm::mix(
+        env.directColor, glm::vec3(0.62f, 0.69f, 0.78f), rain * 0.55f);
+    env.ambientColor = glm::mix(
+        env.ambientColor, glm::vec3(0.38f, 0.43f, 0.50f), rain * 0.58f);
+    if (lightningFlash > 0.0f) {
+        const glm::vec3 flash(0.72f, 0.80f, 1.0f);
+        env.zenithColor += flash * lightningFlash * 0.65f;
+        env.horizonColor += flash * lightningFlash * 0.48f;
+        env.fogColor += flash * lightningFlash * 0.38f;
+        env.ambientIntensity = std::max(
+            env.ambientIntensity, 0.8f * lightningFlash);
+    }
+    return env;
+}
 
 class DayNightCycle {
 public:

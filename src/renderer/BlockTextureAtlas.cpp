@@ -157,6 +157,24 @@ Tile wheat(int stage) {
     return tile;
 }
 
+Tile fireTile() {
+    Tile tile{};
+    for (int y = 0; y < 16; ++y) {
+        const int halfWidth = std::max(1, 6 - y / 3);
+        const int center = 7 + static_cast<int>(pixelHash(y, 5, 91) % 3) - 1;
+        for (int x = center - halfWidth; x <= center + halfWidth; ++x) {
+            if (x < 0 || x >= 16 || pixelHash(x, y, 92) % 7 == 0) continue;
+            const size_t i = static_cast<size_t>(y * 16 + x) * 4;
+            const float height = static_cast<float>(y) / 15.0f;
+            tile[i] = 255;
+            tile[i + 1] = static_cast<uint8_t>(190 - height * 125.0f);
+            tile[i + 2] = static_cast<uint8_t>(35 - height * 25.0f);
+            tile[i + 3] = 235;
+        }
+    }
+    return tile;
+}
+
 Tile logTop() {
     Tile tile = material(145, 104, 55, 10, 81);
     for (int y = 1; y < 15; ++y) {
@@ -262,6 +280,9 @@ bool BlockTextureAtlas::initialize() {
     tiles[static_cast<size_t>(BlockTexture::SpruceSapling)] = plant(43, 105, 65, false);
     tiles[static_cast<size_t>(BlockTexture::JungleSapling)] = plant(48, 166, 41, false);
     tiles[static_cast<size_t>(BlockTexture::AcaciaSapling)] = plant(104, 146, 44, false);
+    tiles[static_cast<size_t>(BlockTexture::SnowLayer)] =
+        tiles[static_cast<size_t>(BlockTexture::Snow)];
+    tiles[static_cast<size_t>(BlockTexture::Fire)] = fireTile();
 
     GL_CHECK(glGenTextures(1, &m_texture));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture));

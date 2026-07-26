@@ -6,6 +6,7 @@
 #include <string>
 
 #include "game/GameRules.h"
+#include "game/Weather.h"
 
 inline std::optional<GameMode> parseGamemodeCommand(const std::string& input) {
     std::istringstream stream(input);
@@ -41,6 +42,21 @@ inline std::optional<TimePreset> parseTimeSetCommand(const std::string& input) {
     }
     if (value == "day") return TimePreset::Day;
     if (value == "night") return TimePreset::Night;
+    return std::nullopt;
+}
+
+inline std::optional<WeatherType> parseWeatherCommand(const std::string& input) {
+    std::istringstream stream(input);
+    std::string command;
+    std::string value;
+    std::string trailing;
+    if (!(stream >> command >> value) || command != "/weather" ||
+        (stream >> trailing)) {
+        return std::nullopt;
+    }
+    if (value == "clear") return WeatherType::Clear;
+    if (value == "rain") return WeatherType::Rain;
+    if (value == "thunder") return WeatherType::Thunder;
     return std::nullopt;
 }
 

@@ -94,6 +94,10 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
     { BlockId::ACACIA_SAPLING,"Acacia Sapling",glm::vec3(0.42f, 0.60f, 0.16f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::SNOW_LAYER,     "Snow Layer",     glm::vec3(0.95f), false, true,
+      RenderShape::SnowLayer, RenderLayer::Opaque, 1.0f },
+    { BlockId::FIRE,           "Fire",           glm::vec3(1.0f, 0.38f, 0.06f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -162,6 +166,8 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::SPRUCE_SAPLING:return BlockTexture::SpruceSapling;
         case BlockId::JUNGLE_SAPLING:return BlockTexture::JungleSapling;
         case BlockId::ACACIA_SAPLING:return BlockTexture::AcaciaSapling;
+        case BlockId::SNOW_LAYER:    return BlockTexture::SnowLayer;
+        case BlockId::FIRE:          return BlockTexture::Fire;
         default:                     return BlockTexture::Dirt;
     }
 }
@@ -186,6 +192,43 @@ BlockId farmlandForMoisture(uint8_t moisture) {
 
 bool isSapling(BlockId id) {
     return id >= BlockId::OAK_SAPLING && id <= BlockId::ACACIA_SAPLING;
+}
+
+uint8_t fireEncouragement(BlockId id) {
+    switch (id) {
+        case BlockId::WOOD: case BlockId::BIRCH_WOOD:
+        case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
+        case BlockId::ACACIA_WOOD: return 5;
+        case BlockId::PLANKS: case BlockId::CRAFTING_TABLE:
+        case BlockId::CHEST: return 5;
+        case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
+        case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
+        case BlockId::ACACIA_LEAVES: case BlockId::WHITE_WOOL:
+        case BlockId::WHITE_BED: return 30;
+        case BlockId::OAK_SAPLING: case BlockId::BIRCH_SAPLING:
+        case BlockId::SPRUCE_SAPLING: case BlockId::JUNGLE_SAPLING:
+        case BlockId::ACACIA_SAPLING: case BlockId::TALL_GRASS:
+        case BlockId::FLOWER: case BlockId::WHEAT_0:
+        case BlockId::WHEAT_1: case BlockId::WHEAT_2:
+        case BlockId::WHEAT_3: case BlockId::WHEAT_4:
+        case BlockId::WHEAT_5: case BlockId::WHEAT_6:
+        case BlockId::WHEAT_7: return 60;
+        default: return 0;
+    }
+}
+
+uint8_t burnOdds(BlockId id) {
+    const uint8_t encouragement = fireEncouragement(id);
+    if (encouragement == 0) return 0;
+    if (encouragement == 5) {
+        switch (id) {
+            case BlockId::WOOD: case BlockId::BIRCH_WOOD:
+            case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
+            case BlockId::ACACIA_WOOD: return 5;
+            default: return 20;
+        }
+    }
+    return encouragement == 30 ? 60 : 100;
 }
 
 bool shouldRenderCubeFace(BlockId current, BlockId neighbor) {

@@ -10,6 +10,7 @@
 
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
+#include "game/Weather.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
 
@@ -22,6 +23,7 @@ struct WorldMetadata {
     Difficulty difficulty = Difficulty::Normal;
     bool cheatsEnabled = false;
     uint64_t worldTicks = 0;
+    WeatherSaveState weather;
     glm::dvec3 playerPosition{0.0, 50.0, 0.0};
     glm::ivec3 worldSpawn{0, 50, 0};
     std::optional<glm::ivec3> bedSpawn;

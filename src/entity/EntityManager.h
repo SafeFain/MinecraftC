@@ -56,7 +56,9 @@ public:
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned);
     void update(Player& player, float dt, bool isDay, bool peaceful,
-                bool playerTargetable, bool playerCanPickup);
+                bool playerTargetable, bool playerCanPickup,
+                bool thunderstorm = false, bool raining = false);
+    void strikeLightning(Player& player, const glm::ivec3& position);
     bool attackRay(const glm::dvec3& origin, const glm::vec3& direction,
                    float reach, float damage);
     void render(Renderer& renderer, const glm::mat4& viewProjection,

@@ -28,6 +28,7 @@ void World::resetForNewSeed(uint64_t newSeed) {
     }
     m_chunks.clear();
     m_activeChunks.clear();
+    m_fireAges.clear();
     m_pendingBlocks.clear();
     m_blockOverrides.clear();
     m_dirtyOverrideChunks.clear();
@@ -85,6 +86,27 @@ uint8_t World::getBlockLight(int worldX, int worldY, int worldZ) const {
     std::shared_lock lock(m_chunkMutex);
     auto it = m_chunks.find({cx,cz});
     return it == m_chunks.end() ? 0 : it->second->getBlockLight(lx,worldY,lz);
+}
+
+int World::getSurfaceY(int worldX, int worldZ) const {
+    const int cx = worldToChunkX(worldX), cz = worldToChunkZ(worldZ);
+    const int lx = worldX - cx * Config::CHUNK_SIZE_X;
+    const int lz = worldZ - cz * Config::CHUNK_SIZE_Z;
+    std::shared_lock lock(m_chunkMutex);
+    auto it = m_chunks.find({cx, cz});
+    if (it == m_chunks.end() || !it->second->generated.load())
+        return Config::WORLD_MAX_Y;
+    return it->second->getColumnMaxY(lx, lz);
+}
+
+bool World::hasSkyAccess(int worldX, int worldY, int worldZ) const {
+    return worldY >= getSurfaceY(worldX, worldZ);
+}
+
+PrecipitationType World::precipitationAt(
+    int worldX, int worldY, int worldZ) const {
+    const HeightBiome sample = m_generator.queryHeightBiome(worldX, worldZ);
+    return precipitationFor(sample.biome, worldY);
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
@@ -505,19 +527,20 @@ void World::rebuildBlockLight() {
     // Terrain generation never creates torches. Player-placed torches are
     // sparse overrides, so collect those directly instead of scanning every
     // cell in every 384-layer chunk after each streaming update.
-    struct TorchSource { Chunk* chunk; int x; int y; int z; };
-    std::vector<TorchSource> sources;
+    struct LightSource { Chunk* chunk; int x; int y; int z; uint8_t level; };
+    std::vector<LightSource> sources;
     for (const auto& [key, overrides] : m_blockOverrides) {
         auto chunkIt = m_chunks.find(key);
         if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
         Chunk* chunk = chunkIt->second.get();
         for (const auto& [index, block] : overrides) {
-            if (block != BlockId::TORCH) continue;
+            if (block != BlockId::TORCH && block != BlockId::FIRE) continue;
             const int x = index % Config::CHUNK_SIZE_X;
             const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
             const int y = Config::storageYToWorldY(
                 index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
-            sources.push_back({chunk, x, y, z});
+            sources.push_back({chunk, x, y, z,
+                               block == BlockId::FIRE ? uint8_t{15} : uint8_t{14}});
         }
     }
     if (sources.empty() && !m_lightHasSources) {
@@ -529,9 +552,10 @@ void World::rebuildBlockLight() {
         if (chunk->generated.load()) chunk->clearBlockLight();
     }
     for (const auto& source : sources) {
-        source.chunk->setBlockLight(source.x, source.y, source.z, 14);
+        source.chunk->setBlockLight(
+            source.x, source.y, source.z, source.level);
         queue.push({source.chunk->worldX() + source.x, source.y,
-                    source.chunk->worldZ() + source.z, 14});
+                    source.chunk->worldZ() + source.z, source.level});
     }
     auto findCell=[&](int wx,int y,int wz) -> std::pair<Chunk*,glm::ivec3> {
         if(!Config::isValidWorldY(y)) return {nullptr,glm::ivec3(0)};
@@ -679,7 +703,8 @@ void World::saveBlockEntities(int cx, int cz) {
     m_dirtyBlockEntityChunks.erase({cx, cz});
 }
 
-void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
+void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
+                         bool raining) {
     (void)playerPosition;
     auto hash = [](uint64_t value) {
         value ^= value >> 30;
@@ -715,7 +740,7 @@ void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
                       static_cast<uint64_t>(p.y * 131 + tick * 37));
         if (isFarmland(candidate.block) && random % 20 == 0) {
             const BlockId next=nextFarmlandState(candidate.block,getBlock(p.x,p.y+1,p.z),
-                                                  hasWaterForFarmland(p),random);
+                                                  hasWaterForFarmland(p, raining),random);
             if(next!=candidate.block)setBlock(p.x,p.y,p.z,next);
         } else if (candidate.block >= BlockId::WHEAT_0 &&
                    candidate.block < BlockId::WHEAT_7) {
@@ -728,7 +753,135 @@ void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
     }
 }
 
-bool World::hasWaterForFarmland(const glm::ivec3& position) const {
+void World::tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick) {
+    auto hash = [](uint64_t value) {
+        value ^= value >> 30;
+        value *= 0xbf58476d1ce4e5b9ULL;
+        value ^= value >> 27;
+        value *= 0x94d049bb133111ebULL;
+        return value ^ (value >> 31);
+    };
+    auto positionRandom = [&](const glm::ivec3& p, uint64_t salt) {
+        uint64_t value = static_cast<uint32_t>(p.x);
+        value ^= static_cast<uint64_t>(static_cast<uint32_t>(p.z)) << 32;
+        value ^= static_cast<uint64_t>(static_cast<uint32_t>(p.y)) *
+                 0x9e3779b97f4a7c15ULL;
+        return hash(value ^ Config::WORLD_SEED ^ tick * 37ULL ^ salt);
+    };
+
+    // One deterministic precipitation candidate per active chunk per second.
+    // This keeps accumulation bounded independently of render distance.
+    for (const Chunk* chunk : m_activeChunks) {
+        if (!chunk->generated.load()) continue;
+        const uint64_t random = hash(
+            Config::WORLD_SEED ^ tick * 131ULL ^
+            static_cast<uint64_t>(static_cast<uint32_t>(chunk->cx)) ^
+            (static_cast<uint64_t>(static_cast<uint32_t>(chunk->cz)) << 32));
+        const int x = chunk->worldX() + static_cast<int>(random % 16);
+        const int z = chunk->worldZ() + static_cast<int>((random >> 8) % 16);
+        const int surface = getSurfaceY(x, z);
+        if (!Config::isValidWorldY(surface)) continue;
+        const BlockId top = getBlock(x, surface, z);
+        if (weather.raining() &&
+            precipitationAt(x, surface + 1, z) == PrecipitationType::Snow) {
+            const int layerY = surface + 1;
+            if (Config::isValidWorldY(layerY) && isSolid(top) &&
+                !isFarmland(top) && top != BlockId::ICE &&
+                getBlock(x, layerY, z) == BlockId::AIR &&
+                getBlockLight(x, layerY, z) <= 9) {
+                setBlock(x, layerY, z, BlockId::SNOW_LAYER);
+            }
+        } else if (weather.type() == WeatherType::Clear && daytime &&
+                   top == BlockId::SNOW_LAYER && random % 2 == 0) {
+            setBlock(x, surface, z, BlockId::AIR);
+        }
+    }
+
+    struct FireCell { glm::ivec3 position; };
+    std::vector<FireCell> fires;
+    fires.reserve(256);
+    {
+        std::shared_lock lock(m_chunkMutex);
+        for (const auto& [key, overrides] : m_blockOverrides) {
+            auto chunkIt = m_chunks.find(key);
+            if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
+            for (const auto& [index, block] : overrides) {
+                if (block != BlockId::FIRE || fires.size() >= 256) continue;
+                const int x = index % Config::CHUNK_SIZE_X;
+                const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
+                const int y = Config::storageYToWorldY(
+                    index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+                fires.push_back({{key.first * Config::CHUNK_SIZE_X + x, y,
+                                  key.second * Config::CHUNK_SIZE_Z + z}});
+            }
+        }
+    }
+
+    for (const FireCell& cell : fires) {
+        const glm::ivec3 p = cell.position;
+        if (getBlock(p.x, p.y, p.z) != BlockId::FIRE) {
+            m_fireAges.erase(p);
+            continue;
+        }
+        uint8_t& age = m_fireAges[p];
+        const uint64_t random = positionRandom(p, age);
+        age = static_cast<uint8_t>(std::min<int>(15, age + random % 3));
+        const bool exposedRain = weather.raining() &&
+            precipitationAt(p.x, p.y, p.z) == PrecipitationType::Rain &&
+            hasSkyAccess(p.x, p.y + 1, p.z);
+        if ((exposedRain && random % 100 <
+                static_cast<uint64_t>(20 + age * 3)) ||
+            (age == 15 && (random >> 9) % 4 == 0)) {
+            setBlock(p.x, p.y, p.z, BlockId::AIR);
+            m_fireAges.erase(p);
+            continue;
+        }
+
+        bool hasFuel = false;
+        for (size_t direction = 0; direction < FACE_OFFSETS.size(); ++direction) {
+            const glm::ivec3 q = p + FACE_OFFSETS[direction];
+            const BlockId block = getBlock(q.x, q.y, q.z);
+            if (!isFlammable(block)) continue;
+            hasFuel = true;
+            const uint64_t roll = positionRandom(q, direction + age * 17ULL);
+            if (roll % 300 < burnOdds(block)) {
+                setBlock(q.x, q.y, q.z,
+                         (roll >> 10) % 2 == 0 ? BlockId::FIRE : BlockId::AIR);
+            }
+        }
+
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            const uint64_t roll = hash(random + static_cast<uint64_t>(attempt) *
+                                       0x9e3779b97f4a7c15ULL);
+            glm::ivec3 q = p + glm::ivec3(
+                static_cast<int>(roll % 3) - 1,
+                static_cast<int>((roll >> 8) % 6) - 1,
+                static_cast<int>((roll >> 16) % 3) - 1);
+            if (!Config::isValidWorldY(q.y) ||
+                getBlock(q.x, q.y, q.z) != BlockId::AIR) continue;
+            uint8_t encouragement = 0;
+            for (const glm::ivec3& offset : FACE_OFFSETS) {
+                encouragement = std::max(
+                    encouragement, fireEncouragement(getBlock(
+                        q.x + offset.x, q.y + offset.y, q.z + offset.z)));
+            }
+            if (encouragement > 0 &&
+                (roll >> 24) % (300 + 20 * age) < encouragement)
+                setBlock(q.x, q.y, q.z, BlockId::FIRE);
+        }
+
+        const bool supported = isSolid(getBlock(p.x, p.y - 1, p.z));
+        if (age > 3 && !supported && !hasFuel) {
+            setBlock(p.x, p.y, p.z, BlockId::AIR);
+            m_fireAges.erase(p);
+        }
+    }
+}
+
+bool World::hasWaterForFarmland(const glm::ivec3& position, bool raining) const {
+    if (raining && precipitationAt(position.x, position.y + 1, position.z) ==
+                       PrecipitationType::Rain &&
+        hasSkyAccess(position.x, position.y + 1, position.z)) return true;
     for (int y = position.y; y <= position.y + 1; ++y)
         for (int x = position.x - 4; x <= position.x + 4; ++x)
             for (int z = position.z - 4; z <= position.z + 4; ++z)

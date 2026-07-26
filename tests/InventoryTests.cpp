@@ -20,6 +20,17 @@ int main() {
             "legacy block item ids remain aligned");
     require(itemForBlock(BlockId::DIAMOND_ORE) == ItemId::DIAMOND_ORE,
             "block maps to its inventory item");
+    require(static_cast<uint8_t>(BlockId::ACACIA_SAPLING) == 63 &&
+            static_cast<uint8_t>(BlockId::SNOW_LAYER) == 64 &&
+            static_cast<uint8_t>(BlockId::FIRE) == 65,
+            "weather blocks did not append after stable serialized ids");
+    require(getBlockProps(BlockId::SNOW_LAYER).shape == RenderShape::SnowLayer &&
+            !isSolid(BlockId::SNOW_LAYER) && !isSolid(BlockId::FIRE),
+            "weather block geometry or collision properties are invalid");
+    require(fireEncouragement(BlockId::LEAVES) == 30 &&
+            burnOdds(BlockId::LEAVES) == 60 &&
+            !isFlammable(BlockId::STONE),
+            "fire flammability registry does not match the weather rules");
     require(getItemProps(ItemId::IRON_PICKAXE).maxStack == 1,
             "tools are non-stackable");
     require(getItemProps(ItemId::IRON_PICKAXE).maxDurability == 250,

@@ -374,7 +374,8 @@ struct ChunkMesh {
             unsigned int base = static_cast<unsigned int>(vertices.size());
             float tile = static_cast<float>(getFaceTexture(props.id, FaceDir::FRONT));
             constexpr float CROSS_FACE = 6.0f;
-            const float light = props.id == BlockId::TORCH ? 1.0f
+            const float light = (props.id == BlockId::TORCH ||
+                                 props.id == BlockId::FIRE) ? 1.0f
                 : blockLight(static_cast<int>(x0), static_cast<int>(y),
                              static_cast<int>(z0));
             vertices.push_back({x0, y,       z0, 1, sky, light, props.alpha, 0, 0, tile, CROSS_FACE});
@@ -402,6 +403,36 @@ struct ChunkMesh {
                                    fx + 0.88f, fz + 0.88f, fy, sky, props);
                     emitCrossPlane(fx + 0.88f, fz + 0.12f,
                                    fx + 0.12f, fz + 0.88f, fy, sky, props);
+                }
+            }
+        }
+
+        // A weather-created snow layer is a thin box rather than a full cube.
+        // It is intentionally not greedy-merged so it cannot merge with the
+        // serialized full snow block used by terrain generation.
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                    if (static_cast<BlockId>(blocks[localIdx(x, y, z)]) !=
+                        BlockId::SNOW_LAYER) continue;
+                    const float tile = static_cast<float>(BlockTexture::SnowLayer);
+                    const float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
+                    const float light = blockLight(x, y, z);
+                    for (int f : {0, 2, 3, 4, 5}) {
+                        const unsigned int base =
+                            static_cast<unsigned int>(vertices.size());
+                        for (int cornerIndex : FACE_INDICES[static_cast<size_t>(f)]) {
+                            glm::vec3 p = CUBE_CORNERS[static_cast<size_t>(cornerIndex)];
+                            p.y *= 0.125f;
+                            const float u = (f <= 1 || f >= 4) ? p.z : p.x;
+                            const float v = f <= 1 ? p.x : p.y * 8.0f;
+                            vertices.push_back({
+                                p.x + x, p.y + y, p.z + z, 1.0f, sky, light,
+                                1.0f, u, v, tile, static_cast<float>(f)});
+                            opaqueIndices.push_back(base +
+                                static_cast<unsigned int>(vertices.size() - base - 1));
+                        }
+                    }
                 }
             }
         }

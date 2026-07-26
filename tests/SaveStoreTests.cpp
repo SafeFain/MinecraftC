@@ -34,6 +34,7 @@ int main() {
         source.difficulty = Difficulty::Hard;
         source.cheatsEnabled = true;
         source.worldTicks = 123456;
+        source.weather = {true, true, 18000, 7200, 42};
         source.playerPosition = {-1000000.125, 63.0, 1000000.375};
         source.worldSpawn = {-3, 70, 9};
         source.bedSpawn = glm::ivec3{-33, 66, -18};
@@ -59,6 +60,11 @@ int main() {
                 loaded.difficulty == Difficulty::Hard,
                 "game rules round trip");
         require(loaded.cheatsEnabled, "cheat option round trips");
+        require(loaded.weather.raining && loaded.weather.thundering &&
+                loaded.weather.rainTicks == 18000 &&
+                loaded.weather.thunderTicks == 7200 &&
+                loaded.weather.sequence == 42,
+                "weather state round trips");
         require(loaded.playerPosition == source.playerPosition,
                 "negative player position round trips");
         require(loaded.bedSpawn == source.bedSpawn, "bed spawn round trips");

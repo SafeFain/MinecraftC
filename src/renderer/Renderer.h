@@ -14,6 +14,12 @@
 // Forward declaration
 class ChunkMesh;
 
+struct WeatherParticle {
+    glm::vec3 position{0.0f};
+    float kind = 0.0f;
+    float phase = 0.0f;
+};
+
 class Renderer {
 public:
     Renderer() = default;
@@ -48,6 +54,9 @@ public:
     void renderEntity(const glm::vec3& position, const glm::vec3& size,
                       const glm::vec3& color, int textureIndex,
                       const glm::mat4& viewProjection);
+    void renderWeather(const std::vector<WeatherParticle>& particles,
+                       const glm::mat4& viewProjection,
+                       const glm::vec3& cameraRight, float intensity);
 
     // VAO creation helpers
     static GLuint createVAO(const std::vector<float>& vertices,
@@ -72,6 +81,7 @@ private:
     std::unique_ptr<Shader> m_wireShader;
     std::unique_ptr<Shader> m_skyShader;
     std::unique_ptr<Shader> m_entityShader;
+    std::unique_ptr<Shader> m_weatherShader;
     BlockTextureAtlas m_blockAtlas;
 
     // Shared wireframe cube GPU resources
@@ -81,6 +91,14 @@ private:
     GLuint m_entityVAO = 0;
     GLuint m_entityVBO = 0;
     GLuint m_entityTexture = 0;
+    GLuint m_weatherVAO = 0;
+    GLuint m_weatherQuadVBO = 0;
+    GLuint m_weatherInstanceVBO = 0;
+
+    using DrawArraysInstancedFn = void (*)(GLenum, GLint, GLsizei, GLsizei);
+    using VertexAttribDivisorFn = void (*)(GLuint, GLuint);
+    DrawArraysInstancedFn m_drawArraysInstanced = nullptr;
+    VertexAttribDivisorFn m_vertexAttribDivisor = nullptr;
 
     glm::mat4 m_viewProjection{1.0f};
     Frustum m_frustum;

@@ -15,6 +15,7 @@
 #include "world/WorldGenerator.h"
 #include "world/RegionGenerationData.h"
 #include "world/BlockEntity.h"
+#include "game/Weather.h"
 
 class Renderer;
 class ThreadPool;
@@ -32,7 +33,9 @@ public:
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
     void flushModifiedChunks();
-    void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick);
+    void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
+                      bool raining = false);
+    void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick);
     void tickBlockEntities();
     BlockEntity* getBlockEntity(const glm::ivec3& position);
     const BlockEntity* getBlockEntity(const glm::ivec3& position) const;
@@ -41,6 +44,9 @@ public:
     // ── Block queries ────────────────────────────────────────────────
     BlockId getBlock(int worldX, int worldY, int worldZ) const;
     uint8_t getBlockLight(int worldX, int worldY, int worldZ) const;
+    int getSurfaceY(int worldX, int worldZ) const;
+    bool hasSkyAccess(int worldX, int worldY, int worldZ) const;
+    PrecipitationType precipitationAt(int worldX, int worldY, int worldZ) const;
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
@@ -110,7 +116,16 @@ private:
     };
 
     using ChunkMap = std::unordered_map<std::pair<int,int>, std::unique_ptr<Chunk>, PairHash>;
+    struct BlockPosHash {
+        size_t operator()(const glm::ivec3& p) const {
+            size_t h = std::hash<int>{}(p.x);
+            h ^= std::hash<int>{}(p.y) + 0x9e3779b9u + (h << 6) + (h >> 2);
+            h ^= std::hash<int>{}(p.z) + 0x9e3779b9u + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
     ChunkMap m_chunks;
+    std::unordered_map<glm::ivec3, uint8_t, BlockPosHash> m_fireAges;
     std::vector<Chunk*> m_activeChunks;
 
     mutable std::shared_mutex m_chunkMutex;
@@ -149,7 +164,7 @@ private:
     void saveBlockEntities(int cx, int cz);
     void rebuildBlockLight();
     bool growSapling(const glm::ivec3& position, BlockId sapling);
-    bool hasWaterForFarmland(const glm::ivec3& position) const;
+    bool hasWaterForFarmland(const glm::ivec3& position, bool raining = false) const;
 
     void markDirty(int cx, int cz);
 };

@@ -55,6 +55,16 @@ int main() {
     require(noon.ambientIntensity >= Config::NIGHT_AMBIENT_MIN &&
             noon.ambientIntensity <= 1.0f,
             "noon ambient is outside expected range");
+    const RenderEnvironment rain = applyWeather(noon, 1.0f, 0.0f, 0.0f);
+    const RenderEnvironment thunder = applyWeather(noon, 1.0f, 1.0f, 0.0f);
+    const RenderEnvironment flash = applyWeather(noon, 1.0f, 1.0f, 1.0f);
+    require(rain.directIntensity < noon.directIntensity &&
+            thunder.directIntensity < rain.directIntensity,
+            "weather did not progressively darken direct light");
+    require(rain.starIntensity == 0.0f,
+            "overcast weather did not hide stars");
+    require(flash.ambientIntensity > thunder.ambientIntensity,
+            "lightning flash did not brighten the environment");
 
     // Switching back to an automatic cycle resumes from noon. Advance half a
     // cycle in bounded frame-sized steps to reach midnight.

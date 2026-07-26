@@ -441,6 +441,19 @@ void Player::updateEnvironment(uint32_t ticks) {
         static_cast<int>(std::floor(m_position.z)));
     const BlockId eyeBlock = m_world.getBlock(eye.x, eye.y, eye.z);
     const BlockId feetBlock = m_world.getBlock(feet.x, feet.y, feet.z);
+    if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE)
+        ignite(4.0f);
+    if (feetBlock == BlockId::WATER || eyeBlock == BlockId::WATER || m_rainExposed) {
+        m_burningSeconds = 0.0f;
+        m_burnDamageTicks = 0;
+    } else if (m_burningSeconds > 0.0f) {
+        m_burningSeconds = std::max(0.0f, m_burningSeconds - ticks / 20.0f);
+        m_burnDamageTicks += ticks;
+        while (m_burnDamageTicks >= 20) {
+            takeDamage(4.0f);
+            m_burnDamageTicks -= 20;
+        }
+    }
     if (eyeBlock == BlockId::WATER) {
         m_airTicks -= static_cast<int>(ticks);
         if (m_airTicks <= 0) {
