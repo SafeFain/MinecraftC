@@ -31,12 +31,18 @@ public:
     void resetMorning() {
         m_phase = Config::DAY_CYCLE_MINUTES == 0
             ? STATIC_DAY_PHASE : MORNING_PHASE;
+        m_manualTimeSet = false;
     }
+
+    void setDay() { m_phase = 0.0f; m_manualTimeSet = true; }
+    void setNight() { m_phase = 0.5f; m_manualTimeSet = true; }
 
     void update(float deltaSeconds, int cycleMinutes, bool advancing) {
         if (cycleMinutes == 0) {
-            m_phase = STATIC_DAY_PHASE;
-        } else if (advancing && deltaSeconds > 0.0f) {
+            if (!m_manualTimeSet) m_phase = STATIC_DAY_PHASE;
+            return;
+        }
+        if (advancing && deltaSeconds > 0.0f) {
             const float seconds = static_cast<float>(cycleMinutes) * 60.0f;
             m_phase += std::min(deltaSeconds, 0.1f) / seconds;
             m_phase -= std::floor(m_phase);
@@ -44,7 +50,9 @@ public:
     }
 
     float phase() const { return m_phase; }
-    bool isNight() const { return evaluate().starIntensity > 0.25f; }
+    static bool isDayPhase(float phase) { return phase >= 0.0f && phase < 0.5f; }
+    bool isDay() const { return isDayPhase(m_phase); }
+    bool isNight() const { return !isDay(); }
 
     RenderEnvironment evaluate() const {
         constexpr float PI = 3.14159265358979323846f;
@@ -92,6 +100,7 @@ public:
 
 private:
     float m_phase = MORNING_PHASE;
+    bool m_manualTimeSet = false;
 
     static float smoothstep(float edge0, float edge1, float value) {
         float t = std::clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);

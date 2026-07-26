@@ -15,6 +15,23 @@ void require(bool condition, const char* message) {
 
 int main() {
     DayNightCycle cycle;
+    require(DayNightCycle::isDayPhase(0.0f), "sunrise was not day");
+    require(DayNightCycle::isDayPhase(0.25f), "noon was not day");
+    require(DayNightCycle::isDayPhase(0.5f - 0.000001f),
+            "the phase immediately before sunset was not day");
+    require(!DayNightCycle::isDayPhase(0.5f),
+            "sunset did not enter night immediately");
+    require(!DayNightCycle::isDayPhase(0.999999f),
+            "the phase immediately before sunrise was not night");
+    cycle.setDay();
+    require(cycle.phase() == 0.0f && cycle.isDay(),
+            "set day did not select sunrise");
+    cycle.setNight();
+    require(cycle.phase() == 0.5f && cycle.isNight(),
+            "set night did not select sunset");
+    cycle.update(0.1f, 0, true);
+    require(cycle.phase() == 0.5f,
+            "a manually selected time was lost in static-cycle mode");
     cycle.resetMorning();
     const float morning = cycle.phase();
     require(!cycle.isNight(), "morning was classified as night");

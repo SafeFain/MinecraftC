@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "world/Block.h"
 
@@ -209,3 +210,4 @@ struct ItemStack {
 const ItemProperties& getItemProps(ItemId id);
 bool isValidItemId(ItemId id);
 ItemId itemForBlock(BlockId id);
+std::vector<ItemId> creativeInventoryItems();

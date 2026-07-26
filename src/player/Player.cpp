@@ -27,6 +27,7 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
     m_mining = false;
     m_miningTarget.reset();
     m_miningProgress = 0.0f;
+    resetDamageImmunity();
     if (mode == GameMode::Spectator) {
         m_flying = true;
         m_onGround = false;
@@ -39,6 +40,9 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
 
 void Player::takeDamage(float amount, bool bypassArmor) {
     if (m_gameMode != GameMode::Survival || amount <= 0.0f) return;
+    amount = PlayerPhysics::damageAfterImmunity(
+        m_hurtImmunity, amount, Config::PLAYER_HURT_IMMUNITY_SECONDS);
+    if (amount <= 0.0f) return;
     if (!bypassArmor && m_blocking && m_inventory.offhand().id == ItemId::SHIELD) {
         amount *= 0.33f;
         auto& shield = m_inventory.offhand();
@@ -185,7 +189,8 @@ void Player::handleMouseButton(int button, int action) {
             if (m_gameMode == GameMode::Survival) {
                 const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
                 if (!stack.empty()) damage = std::max(1.0f, getItemProps(stack.id).attackDamage);
-            }
+            } else if (m_gameMode == GameMode::Creative)
+                damage = std::max(1.0f, getItemProps(m_selectedCreativeItem).attackDamage);
             if (m_entities && m_entities->attackRay(
                     getEyePosition(), m_forward,
                     m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
@@ -207,6 +212,7 @@ void Player::handleMouseButton(int button, int action) {
 // ── Update ────────────────────────────────────────────────────────────
 
 void Player::update(float dt) {
+    PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
     if (m_actionCooldown > 0.0f) {
         m_actionCooldown -= dt;
     }
@@ -544,6 +550,12 @@ void Player::updateMining(float dt) {
 }
 
 void Player::placeBlock() {
+    if (m_gameMode == GameMode::Creative && m_selectedCreativeItem == ItemId::BOW) {
+        if (m_entities)
+            m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
+                                   m_forward * 24.0f, 6.0f, true);
+        return;
+    }
     if (m_gameMode == GameMode::Survival) {
         auto& selected = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (!selected.empty() && getItemProps(selected.id).kind == ItemKind::Food) {
@@ -574,6 +586,7 @@ void Player::placeBlock() {
     }
 
     BlockId placed = m_selectedBlock;
+    if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return;
     if (m_gameMode == GameMode::Survival) {
         auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (stack.empty()) return;

@@ -26,6 +26,12 @@ int main() {
             "iron tool durability follows the frozen ruleset");
     require(getItemProps(ItemId::STEAK).food == 8,
             "food values are represented in the registry");
+    const auto creativeItems = creativeInventoryItems();
+    require(creativeItems.size() == static_cast<size_t>(ItemId::COUNT) - 1,
+            "creative inventory does not expose every registered item");
+    require(creativeItems.front() == ItemId::GRASS_BLOCK &&
+            creativeItems.back() == ItemId::ACACIA_SAPLING,
+            "creative inventory ordering does not follow stable item ids");
 
     InventoryModel inventory;
     require(inventory.add({ItemId::COAL, 64, 0}) == 0,
@@ -52,4 +58,3 @@ int main() {
     std::cout << "Inventory and item registry tests passed\n";
     return 0;
 }
-

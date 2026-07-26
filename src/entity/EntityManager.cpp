@@ -220,6 +220,66 @@ void EntityManager::moveWithTerrain(
     entity.stuckSeconds = moved ? 0.0f : entity.stuckSeconds + dt;
 }
 
+void EntityManager::integrateVelocity(Entity& entity, float dt) {
+    entity.velocity.y -= 20.0f * dt;
+    const glm::dvec3 total = glm::dvec3(entity.velocity) * static_cast<double>(dt);
+    const int steps = sweptCollisionSteps(glm::length(total), 0.15);
+    const glm::dvec3 step = total / static_cast<double>(steps);
+    for (int i = 0; i < steps; ++i) {
+        glm::dvec3 candidate = entity.position;
+        candidate.x += step.x;
+        if (!collides(entity, candidate)) entity.position.x = candidate.x;
+        else entity.velocity.x = 0.0f;
+        candidate = entity.position;
+        candidate.y += step.y;
+        if (!collides(entity, candidate)) entity.position.y = candidate.y;
+        else entity.velocity.y = 0.0f;
+        candidate = entity.position;
+        candidate.z += step.z;
+        if (!collides(entity, candidate)) entity.position.z = candidate.z;
+        else entity.velocity.z = 0.0f;
+    }
+    const float drag = std::pow(0.12f, dt);
+    entity.velocity.x *= drag;
+    entity.velocity.z *= drag;
+}
+
+bool EntityManager::exposedToSky(const Entity& entity) const {
+    const int worldX = static_cast<int>(std::floor(entity.position.x));
+    const int worldZ = static_cast<int>(std::floor(entity.position.z));
+    const int headTop = static_cast<int>(std::floor(
+        entity.position.y + renderSize(entity.type).y - 1e-6));
+    const int cx = World::worldToChunkX(static_cast<double>(worldX));
+    const int cz = World::worldToChunkZ(static_cast<double>(worldZ));
+    const int lx = worldX - cx * Config::CHUNK_SIZE_X;
+    const int lz = worldZ - cz * Config::CHUNK_SIZE_Z;
+    for (const Chunk* chunk : m_world.getActiveChunks()) {
+        if (chunk->cx == cx && chunk->cz == cz && chunk->generated.load())
+            return chunk->getColumnMaxY(lx, lz) <= headTop;
+    }
+    return false;
+}
+
+bool EntityManager::touchesWater(const Entity& entity) const {
+    const glm::vec3 size = renderSize(entity.type);
+    const int x = static_cast<int>(std::floor(entity.position.x));
+    const int z = static_cast<int>(std::floor(entity.position.z));
+    const int feet = static_cast<int>(std::floor(entity.position.y + 0.05));
+    const int head = static_cast<int>(std::floor(entity.position.y + size.y - 0.05));
+    return m_world.getBlock(x, feet, z) == BlockId::WATER ||
+           m_world.getBlock(x, head, z) == BlockId::WATER;
+}
+
+void EntityManager::damageEntity(Entity& entity, float damage,
+                                 const glm::vec3& knockback, bool playerAttack) {
+    if (damage <= 0.0f || entity.health <= 0.0f) return;
+    entity.health -= damage;
+    entity.hurtFlashSeconds = 0.2f;
+    entity.velocity += knockback;
+    if (playerAttack && entity.type == EntityType::Spider)
+        entity.spiderProvoked = true;
+}
+
 bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) const {
     const glm::vec3 size=renderSize(entity.type);
     const double halfX=size.x*0.5,halfZ=size.z*0.5;
@@ -234,12 +294,13 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
     return false;
 }
 
-void EntityManager::update(Player& player, float dt, bool hostileSpawning, bool peaceful) {
+void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
+                           bool playerTargetable, bool playerCanPickup) {
     struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
     std::vector<PendingArrow> pendingArrows;
     m_spawnTimer += dt;
     if (m_spawnTimer >= 4.0f) {
-        spawnAroundPlayer(player.getPosition(), hostileSpawning);
+        spawnAroundPlayer(player.getPosition(), !isDay && !peaceful);
         m_spawnTimer = 0.0f;
     }
 
@@ -247,6 +308,7 @@ void EntityManager::update(Player& player, float dt, bool hostileSpawning, bool 
         if (peaceful && hostile(entity.type)) { entity.health=0.0f; continue; }
         entity.ageSeconds += dt;
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
+        entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         if (entity.type == EntityType::Arrow) {
             updateArrow(entity, player, dt);
             continue;
@@ -264,21 +326,47 @@ void EntityManager::update(Player& player, float dt, bool hostileSpawning, bool 
             } else {
                 entity.position = next;
             }
-            if (glm::distance(entity.position, player.getPosition()) < 1.6) {
+            if (playerCanPickup &&
+                glm::distance(entity.position, player.getPosition()) < 1.6) {
                 if (pickupItemStack(player.inventory(), entity.item)) entity.health = 0.0f;
             }
             continue;
         }
 
+        integrateVelocity(entity, dt);
+
+        if (entity.type == EntityType::Zombie || entity.type == EntityType::Skeleton) {
+            const bool inWater = touchesWater(entity);
+            const bool sunlit = isDay && exposedToSky(entity);
+            const float activeBurnTime = inWater ? 0.0f :
+                (sunlit ? dt : std::min(dt, entity.burningSeconds));
+            entity.burningSeconds = updateBurning(
+                entity.burningSeconds, sunlit, inWater, dt);
+            const int burnTicks = accumulateBurnDamage(
+                entity.burnDamageSeconds, activeBurnTime);
+            for (int tick = 0; tick < burnTicks; ++tick)
+                damageEntity(entity, 4.0f, glm::vec3(0.0f), false);
+            if (inWater)
+                entity.burnDamageSeconds = 0.0f;
+            if (entity.health <= 0.0f) continue;
+        }
+
         const glm::vec3 delta = glm::vec3(player.getPosition() - entity.position);
         glm::vec3 horizontal(delta.x, 0.0f, delta.z);
         const float distance = glm::length(horizontal);
+        if (entity.type == EntityType::Spider && distance >= 18.0f)
+            entity.spiderProvoked = false;
         if (hostile(entity.type) && shouldHostileDespawn(distance,entity.ageSeconds,
             hash32(entity.behaviorSeed + static_cast<uint32_t>(entity.ageSeconds)))) {
             entity.health = 0.0f;
             continue;
         }
-        if (hostile(entity.type) && distance < 18.0f && distance > 0.01f) {
+        const bool behaviorTargetsPlayer = entity.type == EntityType::Spider
+            ? spiderTargetsPlayer(isDay, entity.spiderProvoked, distance)
+            : hostile(entity.type) && distance < 18.0f;
+        const bool targetsPlayer = mobTargetsPlayer(
+            playerTargetable, behaviorTargetsPlayer);
+        if (targetsPlayer && distance > 0.01f) {
             horizontal /= distance;
             const glm::dvec3 attackOrigin=entity.position+glm::dvec3(0,1.2,0);
             const glm::vec3 sightDirection=glm::normalize(glm::vec3(player.getEyePosition()-attackOrigin));
@@ -380,8 +468,10 @@ bool EntityManager::attackRay(
         }
     }
     if (!best) return false;
-    best->health -= damage;
-    best->velocity += direction * 4.0f;
+    glm::vec3 knockback(direction.x, 0.0f, direction.z);
+    if (glm::length(knockback) > 0.001f) knockback = glm::normalize(knockback) * 4.0f;
+    knockback.y = 2.0f;
+    damageEntity(*best, damage, knockback, true);
     return true;
 }
 
@@ -419,8 +509,12 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
             const glm::dvec3 min=target.position+glm::dvec3(-size.x*.5,0,-size.z*.5);
             const glm::dvec3 max=target.position+glm::dvec3(size.x*.5,size.y,size.z*.5);
             if(next.x>=min.x&&next.x<=max.x&&next.y>=min.y&&next.y<=max.y&&next.z>=min.z&&next.z<=max.z) {
-                target.health-=arrow.projectileDamage;
-                target.velocity+=glm::normalize(arrow.velocity)*3.0f;
+                glm::vec3 knockback(arrow.velocity.x, 0.0f, arrow.velocity.z);
+                if (glm::length(knockback) > 0.001f)
+                    knockback = glm::normalize(knockback) * 3.0f;
+                knockback.y = 1.5f;
+                damageEntity(target, arrow.projectileDamage, knockback,
+                             arrow.playerOwned);
                 arrow.health=0;return;
             }
         }
@@ -474,10 +568,17 @@ void EntityManager::render(
             case EntityType::Item: textureIndex = 8; break;
             case EntityType::Arrow: textureIndex = 8; break;
         }
+        glm::vec3 color = renderColor(entity.type);
+        if (entity.hurtFlashSeconds > 0.0f) {
+            color = {1.0f, 0.16f, 0.16f};
+        } else if (entity.burningSeconds > 0.0f) {
+            const float pulse = 0.08f * std::sin(entity.ageSeconds * 18.0f);
+            color = {1.0f, 0.32f + pulse, 0.08f};
+        }
         renderer.renderEntity(
                               glm::vec3(glm::dvec3(entity.position) - renderOrigin),
                               renderSize(entity.type),
-                              renderColor(entity.type), textureIndex,
+                              color, textureIndex,
                               viewProjection);
     }
 }

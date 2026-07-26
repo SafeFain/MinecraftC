@@ -147,6 +147,7 @@ constexpr float WATER_RISE_SPEED = 4.0f;
 constexpr float WATER_DIVE_SPEED = 3.0f;
 constexpr float WATER_SINK_SPEED = 0.6f;
 constexpr float WATER_ENTRY_MAX_FALL_SPEED = 3.0f;
+constexpr float PLAYER_HURT_IMMUNITY_SECONDS = 0.5f; // 10 ticks
 inline bool     AUTO_JUMP         = true;
 
 // ── UI ──────────────────────────────────────────────────────────────────

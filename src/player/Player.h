@@ -11,6 +11,7 @@
 #include "game/InventoryModel.h"
 #include "game/SurvivalStats.h"
 #include "core/Input.h"
+#include "player/PlayerPhysics.h"
 
 class World;
 class EntityManager;
@@ -61,6 +62,7 @@ public:
     SurvivalStats& survivalStats() { return m_survivalStats; }
     const SurvivalStats& survivalStats() const { return m_survivalStats; }
     void takeDamage(float amount, bool bypassArmor = false);
+    void resetDamageImmunity() { m_hurtImmunity = {}; }
     void setSelectedSlot(int slot) { if (slot >= 0 && slot < 9) m_selectedSlot = slot; }
     int selectedSlot() const { return m_selectedSlot; }
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
@@ -68,6 +70,7 @@ public:
 
     // ── Selected block for placement ───────────────────────────────────
     void setSelectedBlock(BlockId id) { m_selectedBlock = id; }
+    void setSelectedCreativeItem(ItemId id) { m_selectedCreativeItem = id; }
     BlockId getSelectedBlock() const { return m_selectedBlock; }
 
 private:
@@ -97,6 +100,7 @@ private:
     std::optional<glm::ivec3> m_highlightedBlock;
     float m_actionCooldown = 0.0f;
     BlockId m_selectedBlock = BlockId::GRASS;
+    ItemId m_selectedCreativeItem = ItemId::GRASS_BLOCK;
     GameMode m_gameMode = GameMode::Creative;
     Difficulty m_difficulty = Difficulty::Normal;
     InventoryModel m_inventory;
@@ -113,6 +117,7 @@ private:
     int m_airTicks = 300;
     uint32_t m_environmentDamageTicks = 0;
     bool m_blocking = false;
+    PlayerPhysics::HurtImmunity m_hurtImmunity;
 
     // ── Internal methods ─────────────────────────────────────────────
     void updateDirectionVectors();

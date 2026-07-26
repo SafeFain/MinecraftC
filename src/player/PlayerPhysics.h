@@ -8,6 +8,29 @@
 
 namespace PlayerPhysics {
 
+struct HurtImmunity {
+    float remaining = 0.0f;
+    float lastDamage = 0.0f;
+};
+
+inline void tickHurtImmunity(HurtImmunity& immunity, float dt) {
+    immunity.remaining = std::max(0.0f, immunity.remaining - std::max(dt, 0.0f));
+    if (immunity.remaining == 0.0f) immunity.lastDamage = 0.0f;
+}
+
+inline float damageAfterImmunity(HurtImmunity& immunity, float damage,
+                                 float immunitySeconds) {
+    if (damage <= 0.0f) return 0.0f;
+    float accepted = damage;
+    if (immunity.remaining > 0.0f) {
+        if (damage <= immunity.lastDamage) return 0.0f;
+        accepted = damage - immunity.lastDamage;
+    }
+    immunity.remaining = std::max(immunitySeconds, 0.0f);
+    immunity.lastDamage = damage;
+    return accepted;
+}
+
 inline int movementSubsteps(float distance, float maximumStep = 0.20f) {
     return std::max(
         1, static_cast<int>(std::ceil(std::abs(distance) / maximumStep)));

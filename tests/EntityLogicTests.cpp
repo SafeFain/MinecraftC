@@ -23,5 +23,29 @@ int main() {
             "eligible distant hostiles honor deterministic roll");
     require(sweptCollisionSteps(0.0) == 1 && sweptCollisionSteps(0.31) == 3,
             "projectile sweep bounds each collision step");
+    require(!spiderTargetsPlayer(true, false, 4.0f),
+            "an unprovoked daytime spider targeted the player");
+    require(spiderTargetsPlayer(true, true, 17.9f),
+            "a provoked daytime spider did not retaliate");
+    require(!spiderTargetsPlayer(true, true, 18.0f),
+            "a daytime spider retained anger outside perception range");
+    require(spiderTargetsPlayer(false, false, 4.0f),
+            "a nighttime spider did not target the player");
+    require(mobTargetsPlayer(true, true),
+            "a hostile behavior did not target a vulnerable player");
+    require(!mobTargetsPlayer(false, true),
+            "a hostile behavior targeted an invulnerable game-mode player");
+    require(updateBurning(0.0f, true, false, 0.1f) == 5.0f,
+            "sunlight did not refresh burning duration");
+    require(updateBurning(5.0f, false, false, 1.0f) == 4.0f,
+            "shade did not count down residual burning");
+    require(updateBurning(5.0f, true, true, 0.1f) == 0.0f,
+            "water did not extinguish burning immediately");
+    float burnAccumulator = 0.0f;
+    int burnTicks = 0;
+    for (int i = 0; i < 50; ++i)
+        burnTicks += accumulateBurnDamage(burnAccumulator, 0.1f);
+    require(burnTicks == 5 && std::abs(burnAccumulator) < 0.0001f,
+            "five burning seconds did not produce five damage ticks");
     std::cout << "Entity logic tests passed\n";
 }

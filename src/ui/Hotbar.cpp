@@ -10,15 +10,15 @@ Hotbar::Hotbar() {
 }
 
 void Hotbar::initDefaultSlots() {
-    m_slots[0] = BlockId::GRASS;
-    m_slots[1] = BlockId::DIRT;
-    m_slots[2] = BlockId::STONE;
-    m_slots[3] = BlockId::WOOD;
-    m_slots[4] = BlockId::PLANKS;
-    m_slots[5] = BlockId::LEAVES;
-    m_slots[6] = BlockId::SAND;
-    m_slots[7] = BlockId::SNOW;
-    m_slots[8] = BlockId::WATER;
+    const BlockId defaults[] = {BlockId::GRASS, BlockId::DIRT, BlockId::STONE,
+        BlockId::WOOD, BlockId::PLANKS, BlockId::LEAVES, BlockId::SAND,
+        BlockId::SNOW, BlockId::WATER};
+    for (size_t i=0;i<m_slots.size();++i) m_slots[i]={itemForBlock(defaults[i]),1,0};
+}
+
+BlockId Hotbar::getSelectedBlock() const {
+    const auto& props=getItemProps(getSelectedItem());
+    return props.placedBlock.value_or(BlockId::AIR);
 }
 
 void Hotbar::selectSlot(int index) {
@@ -27,9 +27,9 @@ void Hotbar::selectSlot(int index) {
     }
 }
 
-void Hotbar::setSlotBlock(int index, BlockId id) {
+void Hotbar::setSlotItem(int index, ItemId id) {
     if (index >= 0 && index < static_cast<int>(m_slots.size())) {
-        m_slots[index] = id;
+        m_slots[index] = {id,1,0};
     }
 }
 
@@ -69,17 +69,20 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
         float sx = barX + padX + static_cast<float>(i) * (slotSize + gap);
         float sy = barY + padY;
 
-        BlockId id = m_slots[i];
+        ItemStack creativeStack = m_slots[i];
+        BlockId id = BlockId::AIR;
         const ItemStack* survivalStack = m_survivalInventory
             ? &m_survivalInventory->slot(static_cast<size_t>(i)) : nullptr;
-        const ItemProperties* itemProps = survivalStack && !survivalStack->empty()
-            ? &getItemProps(survivalStack->id) : nullptr;
+        const ItemStack* shownStack = survivalStack ? survivalStack : &creativeStack;
+        const ItemProperties* itemProps = shownStack && !shownStack->empty()
+            ? &getItemProps(shownStack->id) : nullptr;
         if (itemProps && itemProps->placedBlock) id = *itemProps->placedBlock;
-        const BlockProperties& props = getBlockProps(id);
+        const glm::vec3 slotColor = id == BlockId::AIR
+            ? glm::vec3(.12f) : getBlockProps(id).color * .35f;
 
         // Slot background (darker)
         ui.drawRect(sx, sy, slotSize, slotSize,
-                    glm::vec4(props.color * 0.35f, 0.9f));
+                    glm::vec4(slotColor, 0.9f));
 
         // Material thumbnail from the same atlas used by world rendering.
         float innerMargin = 4.0f;
@@ -90,7 +93,7 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                                  slotSize - innerMargin * 2.0f, id);
             } else ui.drawItemIcon(sx + innerMargin, sy + innerMargin,
                                    slotSize - innerMargin * 2.0f,
-                                   slotSize - innerMargin * 2.0f, *survivalStack);
+                                   slotSize - innerMargin * 2.0f, *shownStack);
         }
 
         // Selection highlight

@@ -264,6 +264,7 @@ private:
                 if (m_gameState == GameState::Playing) {
                     m_hotbar.selectSlot(slot);
                     m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
+                    m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
                     m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
                 }
                 break;
@@ -341,7 +342,9 @@ private:
                 }
                 for(int slot=0;slot<9;++slot)if(mouseBound(static_cast<InputAction>(
                     static_cast<int>(InputAction::Hotbar1)+slot))){m_hotbar.selectSlot(slot);
-                    m_player.setSelectedSlot(slot);m_player.setSelectedBlock(m_hotbar.getSelectedBlock());}
+                    m_player.setSelectedSlot(slot);
+                    m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
+                    m_player.setSelectedBlock(m_hotbar.getSelectedBlock());}
             }
             if (m_inventoryOpen && (m_player.isSurvival() || m_containerOpen) &&
                 (action == GLFW_PRESS || action == GLFW_RELEASE)) {
@@ -363,9 +366,10 @@ private:
                         m_inventory.onMouseClick(button,
                             static_cast<int>(m_mouseScreenX),
                             static_cast<int>(m_mouseScreenY),
-                            [this](BlockId id) {
-                                m_hotbar.setSlotBlock(m_hotbar.getSelectedSlot(), id);
-                                m_player.setSelectedBlock(id);
+                            [this](ItemId id) {
+                                m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(), id);
+                                m_player.setSelectedCreativeItem(id);
+                                m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
                             });
                     }
                 } else if (m_activeMenu) {
@@ -397,6 +401,7 @@ private:
                 if (m_input.pressed(InputAction::PreviousSlot)) m_hotbar.onScroll(1.0);
                 if (m_input.pressed(InputAction::NextSlot)) m_hotbar.onScroll(-1.0);
                 m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
+                m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
                 m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
             }
         });
@@ -611,11 +616,12 @@ private:
             if (m_gameState == GameState::Playing) {
                 if (m_containerOpen && (!m_containerScreen.valid())) closeInventory();
                 if (!m_playerDead) m_player.update(dt);
+                const bool peaceful =
+                    m_player.difficulty() == Difficulty::Peaceful;
+                m_entities.update(
+                    m_player, dt, m_dayNightCycle.isDay(), peaceful,
+                    m_player.isSurvival(), !m_player.isSpectator());
                 if (m_player.isSurvival()) {
-                    const RenderEnvironment current = m_dayNightCycle.evaluate();
-                    const bool peaceful = m_player.difficulty() == Difficulty::Peaceful;
-                    m_entities.update(m_player, dt,
-                        current.starIntensity > 0.25f && !peaceful, peaceful);
                     if (!m_playerDead && m_player.survivalStats().dead())
                         beginPlayerDeath();
                     m_survivalWorldTickRemainder += dt * 20.0f;
@@ -950,7 +956,19 @@ private:
                 std::to_string(target->z));
             return;
         }
-        showCommandMessage("Usage: /gamemode 0|1|3 or /tp x y z");
+        const auto time = parseTimeSetCommand(submitted);
+        if (time) {
+            if (*time == TimePreset::Day) {
+                m_dayNightCycle.setDay();
+                showCommandMessage("Set time to day");
+            } else {
+                m_dayNightCycle.setNight();
+                showCommandMessage("Set time to night");
+            }
+            return;
+        }
+        showCommandMessage(
+            "Usage: /gamemode 0|1|3, /tp x y z, or /time set day|night");
     }
 
     void updateMouseScreenPosition() {
@@ -1038,7 +1056,7 @@ private:
             const auto& stack = m_player.inventory().slot(
                 static_cast<size_t>(m_hotbar.getSelectedSlot()));
             if (!stack.empty()) name = getItemProps(stack.id).name;
-        } else name = getBlockProps(m_hotbar.getSelectedBlock()).name;
+        } else name = getItemProps(m_hotbar.getSelectedItem()).name;
         if (name.empty()) return;
         const auto size = m_uiRenderer.measureText(name, 1.0f);
         const float x = (screenWidth - size.x) * .5f;
@@ -1101,6 +1119,7 @@ private:
             m_worldMetadata.worldSpawn, m_worldMetadata.bedSpawn, bedValid);
         m_player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, 1.01f, 0.5f));
         m_player.survivalStats().resetAfterRespawn();
+        m_player.resetDamageImmunity();
         m_world.update(m_player.getPosition());
         m_world.enqueueGeneration();
         m_world.waitForInitialGeneration(150);

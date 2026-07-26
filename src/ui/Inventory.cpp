@@ -8,8 +8,8 @@
 #include <cmath>
 
 CreativeInventory::CreativeInventory() {
-    for (uint8_t i=1;i<static_cast<uint8_t>(BlockId::COUNT);++i)
-        m_slots.push_back({static_cast<BlockId>(i),0,0,false,false});
+    for (const ItemId id : creativeInventoryItems())
+        m_slots.push_back({id,0,0,false,false});
 }
 
 void CreativeInventory::layoutSlots(int width,int height) {
@@ -57,11 +57,14 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
     const Slot* hovered=nullptr;
     for(const auto& item:m_slots){
         if(!item.visible) continue;
-        const auto& props=getBlockProps(item.id);
+        const auto& props=getItemProps(item.id);
         ui.drawRect(item.x,item.y,slot,slot,item.hovered?glm::vec4(.34f,.34f,.38f,1)
                                                        :glm::vec4(.17f,.17f,.20f,.98f));
-        ui.drawRect(item.x+2,item.y+2,slot-4,slot-4,{props.color*.28f,1});
-        ui.drawBlockIcon(item.x+4,item.y+4,slot-8,slot-8,item.id);
+        const glm::vec3 background = props.placedBlock
+            ? getBlockProps(*props.placedBlock).color * .28f
+            : glm::vec3(.08f,.08f,.10f);
+        ui.drawRect(item.x+2,item.y+2,slot-4,slot-4,{background,1});
+        ui.drawItemIcon(item.x+4,item.y+4,slot-8,slot-8,{item.id,1,0});
         if(item.id==m_selected||item.hovered){
             const glm::vec4 color=item.id==m_selected?glm::vec4(1,.82f,.22f,1):glm::vec4(1,1,1,.95f);
             ui.drawRect(item.x,item.y,slot,2,color);ui.drawRect(item.x,item.y+slot-2,slot,2,color);
@@ -79,8 +82,7 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
         ui.drawRect(trackX,trackY,4,trackH,{.04f,.04f,.05f,1});
         ui.drawRect(trackX,trackY+(trackH-thumbH)*(1.0f-fraction),4,thumbH,{.70f,.70f,.74f,1});
     }
-    if(hovered){ItemStack stack{itemForBlock(hovered->id),1,0};
-        if(!stack.empty())ui.drawTooltip(mouseX+12.0f,mouseY+12.0f,stack);}
+    if(hovered)ui.drawTooltip(mouseX+12.0f,mouseY+12.0f,{hovered->id,1,0});
 }
 
 void CreativeInventory::onMouseMove(int x,int y){
@@ -88,7 +90,7 @@ void CreativeInventory::onMouseMove(int x,int y){
     for(auto& item:m_slots)item.hovered=item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot;
 }
 
-void CreativeInventory::onMouseClick(int button,int x,int y,std::function<void(BlockId)> select){
+void CreativeInventory::onMouseClick(int button,int x,int y,std::function<void(ItemId)> select){
     if(button!=GLFW_MOUSE_BUTTON_LEFT) return;
     constexpr float slot=44.0f;
     for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){

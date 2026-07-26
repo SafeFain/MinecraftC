@@ -17,6 +17,7 @@
 #include <thread>
 #include <chrono>
 #include <unordered_set>
+#include <limits>
 
 World::World() : m_generator(Config::WORLD_SEED) {}
 
@@ -275,6 +276,14 @@ void World::update(const glm::dvec3& playerPos) {
         for (auto& [key, chunk] : m_chunks) {
             m_activeChunks.push_back(chunk.get());
         }
+        std::sort(m_activeChunks.begin(), m_activeChunks.end(), [pcx, pcz](
+                      const Chunk* a, const Chunk* b) {
+            const int64_t adx = static_cast<int64_t>(a->cx) - pcx;
+            const int64_t adz = static_cast<int64_t>(a->cz) - pcz;
+            const int64_t bdx = static_cast<int64_t>(b->cx) - pcx;
+            const int64_t bdz = static_cast<int64_t>(b->cz) - pcz;
+            return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+        });
     }
 }
 
@@ -365,6 +374,12 @@ void World::enqueueGeneration() {
     for (auto& reg : regions) {
         World* worldPtr = this;
         WorldGenerator* genPtr = &m_generator;
+        int regionDistance2 = std::numeric_limits<int>::max();
+        for (const Chunk* chunk : reg.chunks) {
+            const int dx = chunk->cx - m_centerChunkX;
+            const int dz = chunk->cz - m_centerChunkZ;
+            regionDistance2 = std::min(regionDistance2, dx * dx + dz * dz);
+        }
 
         ++m_generationTasksInFlight;
         m_threadPool->enqueuePriority([worldPtr, genPtr, reg = std::move(reg), R, PADDING]() {
@@ -398,7 +413,7 @@ void World::enqueueGeneration() {
                     worldPtr->m_pendingBlocks[{tcx, tcz}].push_back(pb);
                 }
             }
-        }, 1);
+        }, 1000000 - regionDistance2);
     }
 
     // Remaining ungenerated chunks (not part of any region) — legacy singleton path
@@ -452,6 +467,9 @@ void World::enqueueGeneration() {
         World* worldPtr = this;
         ++m_generationTasksInFlight;
         ++scheduledTasks;
+        const int dx = cx - m_centerChunkX;
+        const int dz = cz - m_centerChunkZ;
+        const int distance2 = dx * dx + dz * dz;
         m_threadPool->enqueuePriority([worldPtr, chunkPtr, genPtr, neighborQuery, blockSetter]() {
             struct Completion {
                 std::atomic<int>& count;
@@ -460,7 +478,7 @@ void World::enqueueGeneration() {
             genPtr->generate(*chunkPtr, neighborQuery, blockSetter);
             chunkPtr->generated = true;
             chunkPtr->generationInProgress = false;
-        }, 1);
+        }, 1000000 - distance2);
     }
 }
 
@@ -857,7 +875,6 @@ void World::waitForInitialGeneration(int maxWaitMs) {
 void World::enqueueMeshBuilds() {
     if (!m_threadPool) return;
 
-    int enqueued = 0;
     std::shared_lock lock(m_chunkMutex);
 
     int inFlight = 0;
@@ -868,19 +885,37 @@ void World::enqueueMeshBuilds() {
     const int availableSlots = Config::CHUNK_MESH_TASKS_IN_FLIGHT - inFlight;
     if (availableSlots <= 0) return;
 
+    std::vector<Chunk*> candidates;
+    candidates.reserve(m_chunks.size());
     for (auto& [key, chunk] : m_chunks) {
-        if (enqueued >= std::min(m_chunksPerFrame, availableSlots)) break;
+        (void)key;
         if (!chunk->isDirty()) continue;
         if (chunk->meshInProgress.load()) continue;
         if (!chunk->generated.load()) continue;  // not generated yet
+        candidates.push_back(chunk.get());
+    }
+    std::sort(candidates.begin(), candidates.end(), [this](const Chunk* a, const Chunk* b) {
+        const int64_t adx = static_cast<int64_t>(a->cx) - m_centerChunkX;
+        const int64_t adz = static_cast<int64_t>(a->cz) - m_centerChunkZ;
+        const int64_t bdx = static_cast<int64_t>(b->cx) - m_centerChunkX;
+        const int64_t bdz = static_cast<int64_t>(b->cz) - m_centerChunkZ;
+        return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+    });
 
-        chunk->meshInProgress = true;
-        chunk->markClean();  // Mark clean NOW so we don't re-enqueue
+    const int enqueueCount = std::min({m_chunksPerFrame, availableSlots,
+                                       static_cast<int>(candidates.size())});
+    for (int i = 0; i < enqueueCount; ++i) {
+        Chunk* chunkPtr = candidates[static_cast<size_t>(i)];
+
+        chunkPtr->meshInProgress = true;
+        chunkPtr->markClean();  // Mark clean NOW so we don't re-enqueue
 
         // Capture a raw pointer — the chunk is owned by m_chunks and
         // won't be destroyed while meshInProgress is true
-        Chunk* chunkPtr = chunk.get();
         World* worldPtr = this;
+        const int dx = chunkPtr->cx - m_centerChunkX;
+        const int dz = chunkPtr->cz - m_centerChunkZ;
+        const int distance2 = dx * dx + dz * dz;
 
         m_threadPool->enqueuePriority([chunkPtr, worldPtr]() {
             // Build mesh into pending buffer
@@ -900,20 +935,29 @@ void World::enqueueMeshBuilds() {
 
             // Signal completion
             chunkPtr->meshReady = true;
-        }, 0);
-
-        ++enqueued;
+        }, 500000 - distance2);
     }
 }
 
 void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
     if (!renderer) return;
 
-    int uploaded = 0;
     std::shared_lock lock(m_chunkMutex);
+    std::vector<Chunk*> ready;
     for (auto& [key, chunk] : m_chunks) {
-        if (uploaded >= maxUploads) break;
-        if (!chunk->meshReady.load()) continue;
+        (void)key;
+        if (chunk->meshReady.load()) ready.push_back(chunk.get());
+    }
+    std::sort(ready.begin(), ready.end(), [this](const Chunk* a, const Chunk* b) {
+        const int64_t adx = static_cast<int64_t>(a->cx) - m_centerChunkX;
+        const int64_t adz = static_cast<int64_t>(a->cz) - m_centerChunkZ;
+        const int64_t bdx = static_cast<int64_t>(b->cx) - m_centerChunkX;
+        const int64_t bdz = static_cast<int64_t>(b->cz) - m_centerChunkZ;
+        return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+    });
+    const int uploadCount = std::min(maxUploads, static_cast<int>(ready.size()));
+    for (int i = 0; i < uploadCount; ++i) {
+        Chunk* chunk = ready[static_cast<size_t>(i)];
 
         // Swap pending mesh into active
         {
@@ -926,7 +970,6 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
 
         chunk->meshReady = false;
         chunk->meshInProgress = false;
-        ++uploaded;
     }
 }
 

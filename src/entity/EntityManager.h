@@ -40,6 +40,10 @@ struct Entity {
     bool playerOwned = false;
     float projectileDamage = 0.0f;
     float stuckSeconds = 0.0f;
+    float hurtFlashSeconds = 0.0f;
+    float burningSeconds = 0.0f;
+    float burnDamageSeconds = 0.0f;
+    bool spiderProvoked = false;
 };
 
 class EntityManager {
@@ -51,7 +55,8 @@ public:
                    const glm::vec3& velocity = glm::vec3(0.0f));
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned);
-    void update(Player& player, float dt, bool hostileSpawning, bool peaceful = false);
+    void update(Player& player, float dt, bool isDay, bool peaceful,
+                bool playerTargetable, bool playerCanPickup);
     bool attackRay(const glm::dvec3& origin, const glm::vec3& direction,
                    float reach, float damage);
     void render(Renderer& renderer, const glm::mat4& viewProjection,
@@ -76,7 +81,12 @@ private:
     void spawnMob(EntityType type, const glm::dvec3& position);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
+    void integrateVelocity(Entity& entity, float dt);
     bool collides(const Entity& entity, const glm::dvec3& position) const;
+    bool exposedToSky(const Entity& entity) const;
+    bool touchesWater(const Entity& entity) const;
+    void damageEntity(Entity& entity, float damage, const glm::vec3& knockback,
+                      bool playerAttack);
     void updateArrow(Entity& entity, Player& player, float dt);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);

@@ -188,3 +188,14 @@ ItemId itemForBlock(BlockId id) {
         default: return ItemId::EMPTY;
     }
 }
+
+std::vector<ItemId> creativeInventoryItems() {
+    std::vector<ItemId> items;
+    items.reserve(itemCount - 1);
+    for (size_t raw = 1; raw < itemCount; ++raw) {
+        const ItemId id = static_cast<ItemId>(raw);
+        const auto& props = getItemProps(id);
+        if (!props.name.empty() && props.maxStack > 0) items.push_back(id);
+    }
+    return items;
+}

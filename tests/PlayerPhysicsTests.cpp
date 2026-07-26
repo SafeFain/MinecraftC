@@ -16,6 +16,16 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    PlayerPhysics::HurtImmunity immunity;
+    require(PlayerPhysics::damageAfterImmunity(immunity, 3.0f, 0.5f) == 3.0f,
+            "first hit bypasses an inactive hurt cooldown");
+    require(PlayerPhysics::damageAfterImmunity(immunity, 3.0f, 0.5f) == 0.0f,
+            "equal damage is ignored during hurt immunity");
+    require(PlayerPhysics::damageAfterImmunity(immunity, 6.0f, 0.5f) == 3.0f,
+            "stronger damage applies only its excess during hurt immunity");
+    PlayerPhysics::tickHurtImmunity(immunity, 0.5f);
+    require(PlayerPhysics::damageAfterImmunity(immunity, 3.0f, 0.5f) == 3.0f,
+            "damage applies normally after hurt immunity expires");
     using Key = std::tuple<int, int, int>;
     std::map<Key, BlockId> blocks;
     blocks[{0, 10, 0}] = BlockId::STONE; // high ledge, top y=11
