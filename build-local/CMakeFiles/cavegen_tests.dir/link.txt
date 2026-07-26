@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/cavegen_tests.dir/link.d CMakeFiles/cavegen_tests.dir/tests/CaveGeneratorTests.cpp.o CMakeFiles/cavegen_tests.dir/src/world/CaveGenerator.cpp.o CMakeFiles/cavegen_tests.dir/src/world/Noise.cpp.o -o cavegen_tests

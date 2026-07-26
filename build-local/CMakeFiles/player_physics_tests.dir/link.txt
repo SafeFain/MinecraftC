@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/player_physics_tests.dir/link.d CMakeFiles/player_physics_tests.dir/tests/PlayerPhysicsTests.cpp.o CMakeFiles/player_physics_tests.dir/src/world/Block.cpp.o -o player_physics_tests
