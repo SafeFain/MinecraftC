@@ -21,7 +21,9 @@ from collections import Counter, deque
 from pathlib import Path
 
 SIZE = 16
-DEFAULT_SEED = 0x4D435458
+# Selected from the deterministic contact-sheet candidates. CMake's asset
+# target relies on this default, so keep it aligned with committed atlas.json.
+DEFAULT_SEED = 213785369
 NAMES = [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
     "leaves", "sand", "bedrock", "water", "snow", "oak_planks",
@@ -245,6 +247,28 @@ def break_axis_runs(indices,limit=8):
                 run_start=moving
     return out
 
+def break_flat_rectangles(indices):
+    """Notch large near-solid boxes so clods retain an organic silhouette."""
+    out=list(indices)
+    for color in range(6):
+        pending={(x,y) for y in range(SIZE) for x in range(SIZE)
+                 if out[y*SIZE+x]==color}
+        while pending:
+            start=pending.pop(); component={start}; queue=[start]
+            while queue:
+                for neighbor in neighbors4(*queue.pop()):
+                    if neighbor in pending:
+                        pending.remove(neighbor); component.add(neighbor); queue.append(neighbor)
+            if len(component)<12: continue
+            xs=[p[0] for p in component]; ys=[p[1] for p in component]
+            width=max(xs)-min(xs)+1; height=max(ys)-min(ys)+1
+            if len(component)/(width*height)<=.96: continue
+            # A single corner notch is a meso-shape correction, not a random
+            # pixel layer. Prefer the lower-right corner to preserve upper-left light.
+            corner=(max(xs),max(ys)); index=corner[1]*SIZE+corner[0]
+            out[index]=color-1 if color>0 else 1
+    return out
+
 def generate_wood_side(name,seed):
     values=[]
     phase=(sample(seed,name,1,1)%628)/100.0
@@ -378,7 +402,8 @@ def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
     indices=generate_generic(name,local)
     indices=generate_special(name,local,indices)
-    if name in NATURAL: indices=break_axis_runs(indices)
+    if name in NATURAL:
+        indices=break_flat_rectangles(break_axis_runs(indices))
     palette=PALETTES[name]
     return [palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
 

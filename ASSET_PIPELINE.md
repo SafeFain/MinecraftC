@@ -22,7 +22,7 @@ From the repository root:
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
-  --seed 1296258136 --output assets/textures/generated
+  --seed 213785369 --output assets/textures/generated
 
 # Equivalent default-seed CMake target
 cmake --build build-local --target texture_generator
@@ -58,7 +58,7 @@ For visual review, generate eight deterministic candidates per material:
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
-  --seed 1296258136 --candidate-count 8 --contact-sheet \
+  --seed 213785369 --candidate-count 8 --contact-sheet \
   --output assets/textures/generated
 ```
 

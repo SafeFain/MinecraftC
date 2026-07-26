@@ -1,7 +1,7 @@
 {
   "filter": "nearest",
   "grid_size": 15,
-  "seed": 1296258136,
+  "seed": 213785369,
   "textures": {
     "acacia_leaves": {
       "generated": true,
