@@ -314,13 +314,14 @@ CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: \
  /usr/include/c++/14/bits/memory_resource.h \
  /usr/include/c++/14/bits/uses_allocator_args.h \
  /home/evan/Coding/MinecraftC/src/world/Block.h /usr/include/c++/14/array \
- /usr/include/c++/14/compare \
+ /usr/include/c++/14/compare /home/evan/Coding/MinecraftC/src/game/Item.h \
+ /usr/include/c++/14/optional \
+ /usr/include/c++/14/bits/enable_special_members.h \
  /home/evan/Coding/MinecraftC/src/renderer/Shader.h \
  /usr/include/c++/14/unordered_map \
  /usr/include/c++/14/bits/unordered_map.h \
  /usr/include/c++/14/bits/hashtable.h \
  /usr/include/c++/14/bits/hashtable_policy.h \
- /usr/include/c++/14/bits/enable_special_members.h \
  /usr/include/c++/14/bits/node_handle.h \
  /usr/include/c++/14/bits/erase_if.h \
  /home/evan/Coding/MinecraftC/src/debug/OpenGL.h \
@@ -357,6 +358,10 @@ CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: \
  /usr/include/libintl.h /usr/include/c++/14/bits/locale_facets_nonio.tcc \
  /usr/include/c++/14/bits/locale_conv.h \
  /usr/include/c++/14/bits/quoted_string.h \
+ /home/evan/Coding/MinecraftC/src/game/SurvivalRules.h \
+ /usr/include/c++/14/vector /usr/include/c++/14/bits/stl_vector.h \
+ /usr/include/c++/14/bits/stl_bvector.h \
+ /usr/include/c++/14/bits/vector.tcc \
  /usr/include/glm/gtc/matrix_transform.hpp \
  /usr/include/glm/ext/matrix_projection.hpp \
  /usr/include/glm/gtc/constants.hpp \
@@ -368,7 +373,9 @@ CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: \
  /usr/include/glm/ext/matrix_clip_space.inl \
  /usr/include/glm/ext/matrix_transform.hpp \
  /usr/include/glm/ext/matrix_transform.inl \
- /usr/include/glm/gtc/matrix_transform.inl /usr/include/c++/14/vector \
- /usr/include/c++/14/bits/stl_vector.h \
- /usr/include/c++/14/bits/stl_bvector.h \
- /usr/include/c++/14/bits/vector.tcc
+ /usr/include/glm/gtc/matrix_transform.inl /usr/include/c++/14/algorithm \
+ /usr/include/c++/14/bits/stl_algo.h \
+ /usr/include/c++/14/bits/algorithmfwd.h \
+ /usr/include/c++/14/bits/stl_heap.h \
+ /usr/include/c++/14/bits/uniform_int_dist.h \
+ /usr/include/c++/14/pstl/glue_algorithm_defs.h

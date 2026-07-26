@@ -16,7 +16,8 @@ bool Button::containsPoint(float px, float py) const {
 
 void Button::render(UIRenderer& ui) const {
     // Choose color based on state
-    glm::vec4 bgColor = m_selected ? m_colors.selected
+    glm::vec4 bgColor = m_pressed ? glm::vec4(0.16f, 0.16f, 0.20f, 0.98f)
+                      : m_selected ? m_colors.selected
                       : m_hovered  ? m_colors.hover
                       :              m_colors.normal;
 
@@ -112,14 +113,23 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back("Settings", m_callbacks.onOpenSettings);
         m_buttons.emplace_back("Quit", m_callbacks.onQuit);
     } else if (m_page == Page::Worlds) {
-        for (const auto& world : m_worlds) {
-            const std::string id = world.id;
+        const int visible = 6;
+        const int end = std::min(static_cast<int>(m_worlds.size()), m_worldOffset + visible);
+        for (int index = m_worldOffset; index < end; ++index) {
+            const auto& world = m_worlds[static_cast<size_t>(index)];
             const std::string mode =
                 world.mode == GameMode::Survival ? "Survival" :
                 world.mode == GameMode::Creative ? "Creative" : "Spectator";
-            m_buttons.emplace_back(world.displayName + " [" + mode + "]",
-                                   [this, id]() { m_callbacks.onOpenWorld(id); });
+            m_buttons.emplace_back((index == m_selectedWorld ? "> " : "") +
+                world.displayName + " [" + mode + "]", [this, index]() {
+                    m_selectedWorld = index;
+                    rebuildButtons();
+                });
         }
+        m_buttons.emplace_back("Play Selected World", [this]() {
+            if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()))
+                m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
+        });
         m_buttons.emplace_back("Create New World", [this]() { showCreate(); });
         m_buttons.emplace_back("Back", [this]() { showHome(); });
     } else {
@@ -160,10 +170,18 @@ void MainMenu::selectField(Field field) {
 }
 
 void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    // Full-screen dark background
     ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
-                static_cast<float>(screenHeight),
-                glm::vec4(0.08f, 0.08f, 0.12f, 1.0f));
+                static_cast<float>(screenHeight), glm::vec4(.08f,.11f,.15f,1));
+    constexpr float tile = 32.0f;
+    for (float y=0;y<screenHeight;y+=tile) for (float x=0;x<screenWidth;x+=tile) {
+        const bool alternate = (static_cast<int>(x/tile)+static_cast<int>(y/tile))%2;
+        ui.drawRect(x,y,tile,tile,alternate ? glm::vec4(.15f,.12f,.09f,1)
+                                            : glm::vec4(.18f,.14f,.10f,1));
+        ui.drawRect(x+2,y+2,tile-4,tile-4,{.20f,.16f,.11f,1});
+    }
+    const float panelW = std::min(520.0f, screenWidth - 24.0f);
+    ui.drawPanel((screenWidth-panelW)*.5f, 18.0f, panelW, screenHeight-36.0f,
+                 {.07f,.075f,.09f,.94f});
 
     const char* title = m_page == Page::Home ? "MINECRAFTC" :
                         m_page == Page::Worlds ? "SELECT WORLD" : "CREATE NEW WORLD";
@@ -184,14 +202,28 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.renderText(subtitle, subX, subY, subScale,
                   glm::vec3(0.6f, 0.6f, 0.7f));
 
+    if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
+        m_selectedWorld < static_cast<int>(m_worlds.size())) {
+        const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
+        const std::string details = "Seed " + std::to_string(world.seed) +
+            "  |  Played " + std::to_string(world.worldTicks / 1200) + " min";
+        const auto size = ui.measureText(details, 1.0f);
+        ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,
+                      1.0f, glm::vec3(0.78f));
+    }
+
     // Buttons
-    float buttonStartY = subY - subSize.y - 50.0f;
+    float buttonStartY = subY - subSize.y - 38.0f;
     float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
+    const float buttonHeight = std::clamp(
+        (buttonStartY - 16.0f) / std::max<size_t>(1, m_buttons.size()) - 5.0f,
+        22.0f, Config::UI_BUTTON_HEIGHT);
+    const float spacing = std::min(Config::UI_BUTTON_SPACING, 7.0f);
 
     for (size_t i = 0; i < m_buttons.size(); ++i) {
-        float by = buttonStartY - static_cast<float>(i) * (Config::UI_BUTTON_HEIGHT + Config::UI_BUTTON_SPACING);
+        float by = buttonStartY - static_cast<float>(i) * (buttonHeight + spacing);
         m_buttons[i].setPosition(buttonX, by);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, Config::UI_BUTTON_HEIGHT);
+        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, buttonHeight);
         m_buttons[i].render(ui);
     }
 }
@@ -217,6 +249,11 @@ void MainMenu::onKeyPress(int key) {
     if (key == GLFW_KEY_ESCAPE) {
         if (m_page == Page::Create) showWorlds();
         else if (m_page == Page::Worlds) showHome();
+        return;
+    }
+    if (m_page == Page::Worlds && key == GLFW_KEY_ENTER && m_selectedWorld >= 0 &&
+        m_selectedIdx == m_selectedWorld - m_worldOffset) {
+        m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         return;
     }
     switch (key) {
@@ -259,14 +296,45 @@ void MainMenu::onMouseMove(double x, double y) {
     }
 }
 
-void MainMenu::onMouseClick(int button) {
+void MainMenu::onMouseButton(int button, int action, double x, double y) {
     if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    for (auto& btn : m_buttons) {
-        if (btn.isHovered()) {
-            btn.activate();
-            return;
+    if (action == GLFW_PRESS) {
+        m_pressedButton = -1;
+        for (size_t i = 0; i < m_buttons.size(); ++i) {
+            if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
+                m_pressedButton = static_cast<int>(i);
+                m_buttons[i].setPressed(true);
+                return;
+            }
+        }
+    } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
+        const int captured = m_pressedButton;
+        m_pressedButton = -1;
+        m_buttons[static_cast<size_t>(captured)].setPressed(false);
+        if (m_buttons[static_cast<size_t>(captured)].containsPoint(
+                static_cast<float>(x), static_cast<float>(y))) {
+            const int visibleWorlds = std::min(6, static_cast<int>(m_worlds.size()) - m_worldOffset);
+            if (m_page == Page::Worlds && captured < visibleWorlds) {
+                const int worldIndex = m_worldOffset + captured;
+                const double now = glfwGetTime();
+                if (m_lastWorldIndex == worldIndex && m_lastWorldClick >= 0.0 &&
+                    now - m_lastWorldClick <= 0.35) {
+                    m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
+                    return;
+                }
+                m_lastWorldIndex = worldIndex;
+                m_lastWorldClick = now;
+            }
+            m_buttons[static_cast<size_t>(captured)].activate();
         }
     }
+}
+
+void MainMenu::onScroll(double yOffset) {
+    if (m_page != Page::Worlds || m_worlds.size() <= 6) return;
+    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - 6);
+    m_worldOffset = std::clamp(m_worldOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
+    rebuildButtons();
 }
 
 // ── Pause Menu ────────────────────────────────────────────────────────────
@@ -341,12 +409,23 @@ void PauseMenu::onMouseMove(double x, double y) {
     }
 }
 
-void PauseMenu::onMouseClick(int button) {
+void PauseMenu::onMouseButton(int button, int action, double x, double y) {
     if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    for (auto& btn : m_buttons) {
-        if (btn.isHovered()) {
-            btn.activate();
-            return;
+    if (action == GLFW_PRESS) {
+        m_pressedButton = -1;
+        for (size_t i = 0; i < m_buttons.size(); ++i) {
+            if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
+                m_pressedButton = static_cast<int>(i);
+                m_buttons[i].setPressed(true);
+                return;
+            }
         }
+    } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
+        const int captured = m_pressedButton;
+        m_pressedButton = -1;
+        m_buttons[static_cast<size_t>(captured)].setPressed(false);
+        if (m_buttons[static_cast<size_t>(captured)].containsPoint(
+                static_cast<float>(x), static_cast<float>(y)))
+            m_buttons[static_cast<size_t>(captured)].activate();
     }
 }

@@ -77,6 +77,8 @@ all: CMakeFiles/world_catalog_tests.dir/all
 all: CMakeFiles/command_tests.dir/all
 all: CMakeFiles/entity_logic_tests.dir/all
 all: CMakeFiles/lighting_logic_tests.dir/all
+all: CMakeFiles/client_input_tests.dir/all
+all: CMakeFiles/survival_integration_tests.dir/all
 .PHONY : all
 
 # The main recursive "codegen" target.
@@ -94,6 +96,8 @@ codegen: CMakeFiles/world_catalog_tests.dir/codegen
 codegen: CMakeFiles/command_tests.dir/codegen
 codegen: CMakeFiles/entity_logic_tests.dir/codegen
 codegen: CMakeFiles/lighting_logic_tests.dir/codegen
+codegen: CMakeFiles/client_input_tests.dir/codegen
+codegen: CMakeFiles/survival_integration_tests.dir/codegen
 .PHONY : codegen
 
 # The main recursive "preinstall" target.
@@ -143,6 +147,8 @@ clean: CMakeFiles/world_catalog_tests.dir/clean
 clean: CMakeFiles/command_tests.dir/clean
 clean: CMakeFiles/entity_logic_tests.dir/clean
 clean: CMakeFiles/lighting_logic_tests.dir/clean
+clean: CMakeFiles/client_input_tests.dir/clean
+clean: CMakeFiles/survival_integration_tests.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -152,7 +158,7 @@ clean: CMakeFiles/lighting_logic_tests.dir/clean
 CMakeFiles/glad.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/glad.dir/build.make CMakeFiles/glad.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/glad.dir/build.make CMakeFiles/glad.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=9,10 "Built target glad"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=13,14 "Built target glad"
 .PHONY : CMakeFiles/glad.dir/all
 
 # Build rule for subdir invocation for target.
@@ -169,7 +175,7 @@ glad: CMakeFiles/glad.dir/rule
 # codegen rule for target.
 CMakeFiles/glad.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/glad.dir/build.make CMakeFiles/glad.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=9,10 "Finished codegen for target glad"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=13,14 "Finished codegen for target glad"
 .PHONY : CMakeFiles/glad.dir/codegen
 
 # clean rule for target.
@@ -184,12 +190,12 @@ CMakeFiles/glad.dir/clean:
 CMakeFiles/minecraftc.dir/all: CMakeFiles/glad.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56 "Built target minecraftc"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57 "Built target minecraftc"
 .PHONY : CMakeFiles/minecraftc.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/minecraftc.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 41
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 39
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/minecraftc.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/minecraftc.dir/rule
@@ -201,7 +207,7 @@ minecraftc: CMakeFiles/minecraftc.dir/rule
 # codegen rule for target.
 CMakeFiles/minecraftc.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56 "Finished codegen for target minecraftc"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57 "Finished codegen for target minecraftc"
 .PHONY : CMakeFiles/minecraftc.dir/codegen
 
 # clean rule for target.
@@ -1112,12 +1118,12 @@ CMakeFiles/ContinuousSubmit.dir/clean:
 CMakeFiles/cavegen_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cavegen_tests.dir/build.make CMakeFiles/cavegen_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cavegen_tests.dir/build.make CMakeFiles/cavegen_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=1,2,3,4 "Built target cavegen_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=1,2,3 "Built target cavegen_tests"
 .PHONY : CMakeFiles/cavegen_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/cavegen_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 4
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/cavegen_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/cavegen_tests.dir/rule
@@ -1129,7 +1135,7 @@ cavegen_tests: CMakeFiles/cavegen_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/cavegen_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cavegen_tests.dir/build.make CMakeFiles/cavegen_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=1,2,3,4 "Finished codegen for target cavegen_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=1,2,3 "Finished codegen for target cavegen_tests"
 .PHONY : CMakeFiles/cavegen_tests.dir/codegen
 
 # clean rule for target.
@@ -1144,12 +1150,12 @@ CMakeFiles/cavegen_tests.dir/clean:
 CMakeFiles/worldgen_tests.dir/all: CMakeFiles/glad.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/worldgen_tests.dir/build.make CMakeFiles/worldgen_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/worldgen_tests.dir/build.make CMakeFiles/worldgen_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=85,86,87,88,89,90,91,92,93,94,95,96 "Built target worldgen_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=90,91,92,93,94,95,96,97,98,99,100 "Built target worldgen_tests"
 .PHONY : CMakeFiles/worldgen_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/worldgen_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 13
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/worldgen_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/worldgen_tests.dir/rule
@@ -1161,7 +1167,7 @@ worldgen_tests: CMakeFiles/worldgen_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/worldgen_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/worldgen_tests.dir/build.make CMakeFiles/worldgen_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=85,86,87,88,89,90,91,92,93,94,95,96 "Finished codegen for target worldgen_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=90,91,92,93,94,95,96,97,98,99,100 "Finished codegen for target worldgen_tests"
 .PHONY : CMakeFiles/worldgen_tests.dir/codegen
 
 # clean rule for target.
@@ -1176,7 +1182,7 @@ CMakeFiles/worldgen_tests.dir/clean:
 CMakeFiles/rendering_logic_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rendering_logic_tests.dir/build.make CMakeFiles/rendering_logic_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rendering_logic_tests.dir/build.make CMakeFiles/rendering_logic_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=60,61 "Built target rendering_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=61,62 "Built target rendering_logic_tests"
 .PHONY : CMakeFiles/rendering_logic_tests.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1193,7 +1199,7 @@ rendering_logic_tests: CMakeFiles/rendering_logic_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/rendering_logic_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rendering_logic_tests.dir/build.make CMakeFiles/rendering_logic_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=60,61 "Finished codegen for target rendering_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=61,62 "Finished codegen for target rendering_logic_tests"
 .PHONY : CMakeFiles/rendering_logic_tests.dir/codegen
 
 # clean rule for target.
@@ -1208,7 +1214,7 @@ CMakeFiles/rendering_logic_tests.dir/clean:
 CMakeFiles/player_physics_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/player_physics_tests.dir/build.make CMakeFiles/player_physics_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/player_physics_tests.dir/build.make CMakeFiles/player_physics_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=57,58,59 "Built target player_physics_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=58,59,60 "Built target player_physics_tests"
 .PHONY : CMakeFiles/player_physics_tests.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1225,7 +1231,7 @@ player_physics_tests: CMakeFiles/player_physics_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/player_physics_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/player_physics_tests.dir/build.make CMakeFiles/player_physics_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=57,58,59 "Finished codegen for target player_physics_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=58,59,60 "Finished codegen for target player_physics_tests"
 .PHONY : CMakeFiles/player_physics_tests.dir/codegen
 
 # clean rule for target.
@@ -1240,12 +1246,12 @@ CMakeFiles/player_physics_tests.dir/clean:
 CMakeFiles/inventory_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=11,12,13,14,15 "Built target inventory_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=15,16,17,18 "Built target inventory_tests"
 .PHONY : CMakeFiles/inventory_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/inventory_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 5
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 4
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/inventory_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/inventory_tests.dir/rule
@@ -1257,7 +1263,7 @@ inventory_tests: CMakeFiles/inventory_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/inventory_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=11,12,13,14,15 "Finished codegen for target inventory_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=15,16,17,18 "Finished codegen for target inventory_tests"
 .PHONY : CMakeFiles/inventory_tests.dir/codegen
 
 # clean rule for target.
@@ -1272,12 +1278,12 @@ CMakeFiles/inventory_tests.dir/clean:
 CMakeFiles/save_store_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=62,63,64,65,66,67 "Built target save_store_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=63,64,65,66,67 "Built target save_store_tests"
 .PHONY : CMakeFiles/save_store_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/save_store_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 5
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/save_store_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/save_store_tests.dir/rule
@@ -1289,7 +1295,7 @@ save_store_tests: CMakeFiles/save_store_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/save_store_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=62,63,64,65,66,67 "Finished codegen for target save_store_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=63,64,65,66,67 "Finished codegen for target save_store_tests"
 .PHONY : CMakeFiles/save_store_tests.dir/codegen
 
 # clean rule for target.
@@ -1304,12 +1310,12 @@ CMakeFiles/save_store_tests.dir/clean:
 CMakeFiles/survival_rules_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=68,69,70,71,72 "Built target survival_rules_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=76,77,78,79 "Built target survival_rules_tests"
 .PHONY : CMakeFiles/survival_rules_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/survival_rules_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 5
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 4
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/survival_rules_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/survival_rules_tests.dir/rule
@@ -1321,7 +1327,7 @@ survival_rules_tests: CMakeFiles/survival_rules_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/survival_rules_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=68,69,70,71,72 "Finished codegen for target survival_rules_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=76,77,78,79 "Finished codegen for target survival_rules_tests"
 .PHONY : CMakeFiles/survival_rules_tests.dir/codegen
 
 # clean rule for target.
@@ -1336,7 +1342,7 @@ CMakeFiles/survival_rules_tests.dir/clean:
 CMakeFiles/survival_stats_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=73,74,75,76,77 "Built target survival_stats_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=80,81,82,83,84 "Built target survival_stats_tests"
 .PHONY : CMakeFiles/survival_stats_tests.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1353,7 +1359,7 @@ survival_stats_tests: CMakeFiles/survival_stats_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/survival_stats_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=73,74,75,76,77 "Finished codegen for target survival_stats_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=80,81,82,83,84 "Finished codegen for target survival_stats_tests"
 .PHONY : CMakeFiles/survival_stats_tests.dir/codegen
 
 # clean rule for target.
@@ -1368,12 +1374,12 @@ CMakeFiles/survival_stats_tests.dir/clean:
 CMakeFiles/world_catalog_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=78,79,80,81,82,83,84 "Built target world_catalog_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=85,86,87,88,89 "Built target world_catalog_tests"
 .PHONY : CMakeFiles/world_catalog_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/world_catalog_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 5
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/world_catalog_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/world_catalog_tests.dir/rule
@@ -1385,7 +1391,7 @@ world_catalog_tests: CMakeFiles/world_catalog_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/world_catalog_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=78,79,80,81,82,83,84 "Finished codegen for target world_catalog_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=85,86,87,88,89 "Finished codegen for target world_catalog_tests"
 .PHONY : CMakeFiles/world_catalog_tests.dir/codegen
 
 # clean rule for target.
@@ -1400,12 +1406,12 @@ CMakeFiles/world_catalog_tests.dir/clean:
 CMakeFiles/command_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/command_tests.dir/build.make CMakeFiles/command_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/command_tests.dir/build.make CMakeFiles/command_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=5,6 "Built target command_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=10 "Built target command_tests"
 .PHONY : CMakeFiles/command_tests.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/command_tests.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 1
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/command_tests.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
 .PHONY : CMakeFiles/command_tests.dir/rule
@@ -1417,7 +1423,7 @@ command_tests: CMakeFiles/command_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/command_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/command_tests.dir/build.make CMakeFiles/command_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=5,6 "Finished codegen for target command_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=10 "Finished codegen for target command_tests"
 .PHONY : CMakeFiles/command_tests.dir/codegen
 
 # clean rule for target.
@@ -1432,7 +1438,7 @@ CMakeFiles/command_tests.dir/clean:
 CMakeFiles/entity_logic_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/entity_logic_tests.dir/build.make CMakeFiles/entity_logic_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/entity_logic_tests.dir/build.make CMakeFiles/entity_logic_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=7,8 "Built target entity_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=11,12 "Built target entity_logic_tests"
 .PHONY : CMakeFiles/entity_logic_tests.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1449,7 +1455,7 @@ entity_logic_tests: CMakeFiles/entity_logic_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/entity_logic_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/entity_logic_tests.dir/build.make CMakeFiles/entity_logic_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=7,8 "Finished codegen for target entity_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=11,12 "Finished codegen for target entity_logic_tests"
 .PHONY : CMakeFiles/entity_logic_tests.dir/codegen
 
 # clean rule for target.
@@ -1464,7 +1470,7 @@ CMakeFiles/entity_logic_tests.dir/clean:
 CMakeFiles/lighting_logic_tests.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lighting_logic_tests.dir/build.make CMakeFiles/lighting_logic_tests.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lighting_logic_tests.dir/build.make CMakeFiles/lighting_logic_tests.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=16,17 "Built target lighting_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=19,20 "Built target lighting_logic_tests"
 .PHONY : CMakeFiles/lighting_logic_tests.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1481,13 +1487,77 @@ lighting_logic_tests: CMakeFiles/lighting_logic_tests.dir/rule
 # codegen rule for target.
 CMakeFiles/lighting_logic_tests.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lighting_logic_tests.dir/build.make CMakeFiles/lighting_logic_tests.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=16,17 "Finished codegen for target lighting_logic_tests"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=19,20 "Finished codegen for target lighting_logic_tests"
 .PHONY : CMakeFiles/lighting_logic_tests.dir/codegen
 
 # clean rule for target.
 CMakeFiles/lighting_logic_tests.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lighting_logic_tests.dir/build.make CMakeFiles/lighting_logic_tests.dir/clean
 .PHONY : CMakeFiles/lighting_logic_tests.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/client_input_tests.dir
+
+# All Build rule for target.
+CMakeFiles/client_input_tests.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=4,5,6,7,8,9 "Built target client_input_tests"
+.PHONY : CMakeFiles/client_input_tests.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/client_input_tests.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 6
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/client_input_tests.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
+.PHONY : CMakeFiles/client_input_tests.dir/rule
+
+# Convenience name for target.
+client_input_tests: CMakeFiles/client_input_tests.dir/rule
+.PHONY : client_input_tests
+
+# codegen rule for target.
+CMakeFiles/client_input_tests.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=4,5,6,7,8,9 "Finished codegen for target client_input_tests"
+.PHONY : CMakeFiles/client_input_tests.dir/codegen
+
+# clean rule for target.
+CMakeFiles/client_input_tests.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/clean
+.PHONY : CMakeFiles/client_input_tests.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/survival_integration_tests.dir
+
+# All Build rule for target.
+CMakeFiles/survival_integration_tests.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=68,69,70,71,72,73,74,75 "Built target survival_integration_tests"
+.PHONY : CMakeFiles/survival_integration_tests.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/survival_integration_tests.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 8
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/survival_integration_tests.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/evan/Coding/MinecraftC/build-local/CMakeFiles 0
+.PHONY : CMakeFiles/survival_integration_tests.dir/rule
+
+# Convenience name for target.
+survival_integration_tests: CMakeFiles/survival_integration_tests.dir/rule
+.PHONY : survival_integration_tests
+
+# codegen rule for target.
+CMakeFiles/survival_integration_tests.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=68,69,70,71,72,73,74,75 "Finished codegen for target survival_integration_tests"
+.PHONY : CMakeFiles/survival_integration_tests.dir/codegen
+
+# clean rule for target.
+CMakeFiles/survival_integration_tests.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/clean
+.PHONY : CMakeFiles/survival_integration_tests.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

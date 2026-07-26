@@ -64,19 +64,19 @@ void Player::takeDamage(float amount, bool bypassArmor) {
 
 // ── Input ─────────────────────────────────────────────────────────────
 
-void Player::handleMouseDelta(float dx, float dy) {
+void Player::handleMouseDelta(float dx, float dy, float sensitivity, bool invertY) {
     if (!m_mouseLocked) return;
 
-    m_yaw   -= dx * Config::MOUSE_SENSITIVITY;
-    m_pitch -= dy * Config::MOUSE_SENSITIVITY;
+    m_yaw   -= dx * sensitivity;
+    m_pitch += dy * sensitivity * (invertY ? 1.0f : -1.0f);
     m_pitch = std::max(-89.9f, std::min(89.9f, m_pitch));
 }
 
-void Player::handleMovement(const bool keys[256], float dt) {
+void Player::handleMovement(const InputState& input, float dt) {
     if (!m_mouseLocked) return;
 
     // ── Double-tap SPACE to toggle flight ──────────────────────────
-    bool spaceDown = keys[GLFW_KEY_SPACE];
+    bool spaceDown = input.held(InputAction::Jump);
 
     if (spaceDown && !m_spaceWasDown) {
         // Space just pressed — check for double-tap
@@ -97,7 +97,7 @@ void Player::handleMovement(const bool keys[256], float dt) {
 
     m_spaceWasDown = spaceDown;
 
-    m_isSprinting = keys[GLFW_KEY_LEFT_CONTROL] || keys[GLFW_KEY_RIGHT_CONTROL];
+    m_isSprinting = input.held(InputAction::Sprint);
     if (m_gameMode == GameMode::Survival && !m_survivalStats.canSprint())
         m_isSprinting = false;
     float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
@@ -108,10 +108,10 @@ void Player::handleMovement(const bool keys[256], float dt) {
     glm::vec3 planarForward(m_forward.x, 0.0f, m_forward.z);
     if (glm::length(planarForward) > 0.0f)
         planarForward = glm::normalize(planarForward);
-    if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])    moveDir += planarForward;
-    if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])  moveDir -= planarForward;
-    if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])  moveDir += m_right;
-    if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) moveDir -= m_right;
+    if (input.held(InputAction::MoveForward))  moveDir += planarForward;
+    if (input.held(InputAction::MoveBackward)) moveDir -= planarForward;
+    if (input.held(InputAction::MoveLeft))     moveDir += m_right;
+    if (input.held(InputAction::MoveRight))    moveDir -= m_right;
 
     if (m_flying) {
         // Creative flight uses camera yaw for horizontal travel. Vertical
@@ -124,8 +124,8 @@ void Player::handleMovement(const bool keys[256], float dt) {
             ? Config::CREATIVE_FLY_SPRINT_SPEED
             : Config::CREATIVE_FLY_SPEED;
         float vertical = 0.0f;
-        if (keys[GLFW_KEY_SPACE]) vertical += 1.0f;
-        if (keys[GLFW_KEY_LEFT_SHIFT] || keys[GLFW_KEY_RIGHT_SHIFT])
+        if (input.held(InputAction::Jump)) vertical += 1.0f;
+        if (input.held(InputAction::Sneak))
             vertical -= 1.0f;
         const glm::vec3 flightDelta =
             horizontal * flySpeed * dt +
@@ -152,11 +152,11 @@ void Player::handleMovement(const bool keys[256], float dt) {
         // Jump
         if (inWater) {
             m_velocity.y = PlayerPhysics::waterVerticalVelocity(
-                m_velocity.y, keys[GLFW_KEY_SPACE],
-                keys[GLFW_KEY_LEFT_SHIFT] || keys[GLFW_KEY_RIGHT_SHIFT], dt);
+                m_velocity.y, input.held(InputAction::Jump),
+                input.held(InputAction::Sneak), dt);
             m_onGround = false;
             m_fallDistance = 0.0f;
-        } else if (keys[GLFW_KEY_SPACE] && m_onGround) {
+        } else if (input.held(InputAction::Jump) && m_onGround) {
             m_velocity.y = Config::JUMP_SPEED;
             m_onGround = false;
             if (m_gameMode == GameMode::Survival)

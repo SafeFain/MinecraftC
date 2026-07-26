@@ -223,4 +223,35 @@ if(BUILD_TESTING)
         target_compile_options(lighting_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME rendering_cross_chunk_block_light COMMAND lighting_logic_tests)
+
+    add_executable(client_input_tests
+        tests/ClientInputTests.cpp
+        src/core/Input.cpp
+        src/game/ClientSettings.cpp
+        src/game/InventoryInteraction.cpp
+        src/game/Item.cpp
+        src/world/Block.cpp)
+    target_include_directories(client_input_tests PRIVATE src)
+    target_link_libraries(client_input_tests PRIVATE glm::glm glfw)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
+
+    add_executable(survival_integration_tests
+        tests/SurvivalIntegrationTests.cpp
+        src/game/SurvivalRules.cpp
+        src/game/SurvivalSession.cpp
+        src/game/SurvivalBlockLogic.cpp
+        src/game/SaveStore.cpp
+        src/game/InventoryModel.cpp
+        src/game/Item.cpp
+        src/world/Block.cpp
+        src/world/BlockEntityLogic.cpp)
+    target_include_directories(survival_integration_tests PRIVATE src external/FastNoiseLite)
+    target_link_libraries(survival_integration_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(survival_integration_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME survival_progression_persistence_and_recovery COMMAND survival_integration_tests)
 endif()

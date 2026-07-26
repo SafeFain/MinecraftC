@@ -10,6 +10,7 @@
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
 #include "game/SurvivalStats.h"
+#include "core/Input.h"
 
 class World;
 class EntityManager;
@@ -19,8 +20,8 @@ public:
     Player(World& world);
 
     // ── Input ───────────────────────────────────────────────────────
-    void handleMouseDelta(float dx, float dy);
-    void handleMovement(const bool* keys, float dt);  // GLFW key states (at least 512 entries)
+    void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
+    void handleMovement(const InputState& input, float dt);
     void handleMouseButton(int button, int action);
 
     // ── Update ──────────────────────────────────────────────────────
@@ -62,6 +63,8 @@ public:
     void takeDamage(float amount, bool bypassArmor = false);
     void setSelectedSlot(int slot) { if (slot >= 0 && slot < 9) m_selectedSlot = slot; }
     int selectedSlot() const { return m_selectedSlot; }
+    float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
+    bool underwater() const { return m_airTicks < 300; }
 
     // ── Selected block for placement ───────────────────────────────────
     void setSelectedBlock(BlockId id) { m_selectedBlock = id; }

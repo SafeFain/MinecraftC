@@ -135,6 +135,8 @@ CMakeFiles/minecraftc.dir/src/main.cpp.o: \
  /usr/lib/gcc/x86_64-linux-gnu/14/include/stdint.h /usr/include/stdint.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
+ /home/evan/Coding/MinecraftC/src/core/Input.h \
+ /usr/include/c++/14/cstdint \
  /home/evan/Coding/MinecraftC/src/renderer/Renderer.h \
  /usr/include/c++/14/memory /usr/include/c++/14/bits/stl_tempbuf.h \
  /usr/include/c++/14/bits/stl_raw_storage_iter.h \
@@ -202,7 +204,7 @@ CMakeFiles/minecraftc.dir/src/main.cpp.o: \
  /usr/include/c++/14/tr1/riemann_zeta.tcc \
  /usr/include/glm/detail/setup.hpp /usr/include/c++/14/cassert \
  /usr/include/assert.h /usr/include/glm/simd/platform.h \
- /usr/include/c++/14/cstdint /usr/include/c++/14/climits \
+ /usr/include/c++/14/climits \
  /usr/lib/gcc/x86_64-linux-gnu/14/include/limits.h \
  /usr/lib/gcc/x86_64-linux-gnu/14/include/syslimits.h \
  /usr/include/limits.h /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
@@ -416,6 +418,7 @@ CMakeFiles/minecraftc.dir/src/main.cpp.o: \
  /usr/include/c++/14/bits/sstream.tcc /usr/include/c++/14/codecvt \
  /usr/include/c++/14/bits/fs_dir.h /usr/include/c++/14/bits/fs_ops.h \
  /home/evan/Coding/MinecraftC/src/game/WorldCatalog.h \
+ /home/evan/Coding/MinecraftC/src/game/ClientSettings.h \
  /home/evan/Coding/MinecraftC/src/ui/SettingsMenu.h \
  /home/evan/Coding/MinecraftC/src/ui/Hotbar.h \
  /home/evan/Coding/MinecraftC/src/ui/Inventory.h \
@@ -427,6 +430,8 @@ CMakeFiles/minecraftc.dir/src/main.cpp.o: \
  /usr/include/c++/14/bits/fstream.tcc /usr/include/c++/14/chrono \
  /home/evan/Coding/MinecraftC/src/debug/CrashHandler.h \
  /home/evan/Coding/MinecraftC/src/game/Command.h \
+ /home/evan/Coding/MinecraftC/src/game/SurvivalRules.h \
+ /home/evan/Coding/MinecraftC/src/game/SurvivalSession.h \
  /home/evan/Coding/MinecraftC/src/entity/EntityManager.h \
  /usr/include/c++/14/set /usr/include/c++/14/bits/stl_tree.h \
  /usr/include/c++/14/bits/stl_set.h \

@@ -1,6 +1,7 @@
 #include "ui/SurvivalInventory.h"
 
 #include "game/SurvivalRules.h"
+#include "game/InventoryInteraction.h"
 #include "ui/UIRenderer.h"
 
 #include <GLFW/glfw3.h>
@@ -56,11 +57,8 @@ void SurvivalInventoryScreen::drawStack(
     if (props.placedBlock) {
         ui.drawBlockIcon(rect.x + 4.0f, rect.y + 4.0f, rect.w - 8.0f,
                          rect.h - 8.0f, *props.placedBlock);
-    } else {
-        const std::string initial(1, props.name.empty() ? '?' : props.name[0]);
-        ui.renderText(initial, rect.x + 15.0f, rect.y + 13.0f, 1.5f,
-                      glm::vec3(0.95f));
-    }
+    } else ui.drawItemIcon(rect.x + 4.0f, rect.y + 4.0f,
+                           rect.w - 8.0f, rect.h - 8.0f, stack);
     ui.drawDurability(rect.x + 3.0f, rect.y + 2.0f, rect.w - 6.0f, stack);
     if (stack.count > 1) {
         const std::string text = std::to_string(stack.count);
@@ -91,9 +89,12 @@ void SurvivalInventoryScreen::render(
     ui.renderText("CRAFTING", screenWidth * 0.5f - 118.0f,
                   m_craftingRects[0].y + 54.0f, 1.1f, glm::vec3(0.85f));
 
-    for (size_t i = 0; i < m_inventoryRects.size(); ++i)
+    const ItemStack* tooltip = nullptr;
+    for (size_t i = 0; i < m_inventoryRects.size(); ++i) {
         drawStack(ui, m_inventoryRects[i], m_inventory.slot(i),
                   contains(m_inventoryRects[i], mouseX, mouseY));
+        if (contains(m_inventoryRects[i], mouseX, mouseY)) tooltip = &m_inventory.slot(i);
+    }
     const size_t craftSlots = m_craftingTable ? 9 : 4;
     for (size_t i = 0; i < craftSlots; ++i)
         drawStack(ui, m_craftingRects[i], m_crafting[i],
@@ -106,6 +107,8 @@ void SurvivalInventoryScreen::render(
     drawStack(ui, m_offhandRect, m_inventory.offhand(),
               contains(m_offhandRect, mouseX, mouseY));
 
+    if (tooltip && !tooltip->empty()) ui.drawTooltip(mouseX + 12.0f, mouseY + 12.0f, *tooltip);
+
     if (!m_cursor.empty()) {
         Rect cursor{static_cast<float>(mouseX + 8), static_cast<float>(mouseY + 8), 38, 38};
         drawStack(ui, cursor, m_cursor, true);
@@ -113,36 +116,25 @@ void SurvivalInventoryScreen::render(
 }
 
 void SurvivalInventoryScreen::clickStack(ItemStack& stack, bool rightClick) {
-    if (m_cursor.empty()) {
-        if (stack.empty()) return;
-        if (rightClick && stack.count > 1) {
-            const uint8_t taken = static_cast<uint8_t>((stack.count + 1) / 2);
-            m_cursor = {stack.id, taken, stack.damage};
-            stack.count -= taken;
-        } else {
-            std::swap(m_cursor, stack);
-        }
-        return;
+    InventoryInteraction::click(m_cursor, stack, rightClick);
+}
+
+void SurvivalInventoryScreen::quickMove(int x, int y) {
+    for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){
+        auto& source=m_inventory.slot(i);if(source.empty())return;
+        if(getItemProps(source.id).kind==ItemKind::Armor)for(size_t a=0;a<InventoryModel::ARMOR_SIZE;++a)
+            if(m_inventory.armor()[a].empty()&&acceptsArmor(a,source.id)){m_inventory.armor()[a]=source;source.clear();return;}
+        std::vector<ItemStack*> targets;const size_t begin=i<9?9:0,end=i<9?36:9;
+        for(size_t slot=begin;slot<end;++slot)targets.push_back(&m_inventory.slot(slot));
+        InventoryInteraction::transfer(source,targets);return;
     }
-    if (stack.empty()) {
-        if (rightClick) {
-            stack = {m_cursor.id, 1, m_cursor.damage};
-            if (--m_cursor.count == 0) m_cursor.clear();
-        } else {
-            std::swap(m_cursor, stack);
-        }
-        return;
+    for(size_t i=0;i<m_armorRects.size();++i)if(contains(m_armorRects[i],x,y)){
+        std::vector<ItemStack*> targets;for(size_t slot=0;slot<36;++slot)targets.push_back(&m_inventory.slot(slot));
+        InventoryInteraction::transfer(m_inventory.armor()[i],targets);return;
     }
-    if (stack.id == m_cursor.id && stack.damage == m_cursor.damage) {
-        const uint8_t maximum = getItemProps(stack.id).maxStack;
-        const uint8_t requested = rightClick ? 1 : m_cursor.count;
-        const uint8_t moved = static_cast<uint8_t>(
-            std::min<int>(requested, maximum - stack.count));
-        stack.count += moved;
-        m_cursor.count -= moved;
-        if (m_cursor.count == 0) m_cursor.clear();
-    } else if (!rightClick) {
-        std::swap(m_cursor, stack);
+    if(contains(m_outputRect,x,y))while(!craftingOutput().empty()){
+        ItemStack output=craftingOutput();if(m_inventory.add(output)!=0)break;
+        for(auto& ingredient:m_crafting)if(!ingredient.empty()&&!--ingredient.count)ingredient.clear();
     }
 }
 
@@ -193,22 +185,38 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 }
 
 void SurvivalInventoryScreen::onMouseButton(
-    int button, int action, int mouseX, int mouseY) {
+    int button, int action, int mouseX, int mouseY, int mods) {
     if (button != GLFW_MOUSE_BUTTON_LEFT && button != GLFW_MOUSE_BUTTON_RIGHT) return;
     if (action == GLFW_PRESS) {
         m_pointerPressed = true;
         m_pressedButton = button;
         m_pressX = mouseX;
         m_pressY = mouseY;
+        m_pressMods = mods;
+        m_cursorHeldAtPress = !m_cursor.empty();
+        m_dragTargets.clear();
         return;
     }
     if (action != GLFW_RELEASE || !m_pointerPressed || button != m_pressedButton)
         return;
 
+    if ((m_pressMods & GLFW_MOD_SHIFT) && button == GLFW_MOUSE_BUTTON_LEFT) {
+        quickMove(mouseX,mouseY);m_pointerPressed=false;m_pressedButton=-1;return;
+    }
     const int deltaX = mouseX - m_pressX;
     const int deltaY = mouseY - m_pressY;
     const bool dragged = deltaX * deltaX + deltaY * deltaY >= 16;
-    if (dragged) {
+    const double now=glfwGetTime();
+    if(dragged && m_cursorHeldAtPress && !m_dragTargets.empty()) {
+        InventoryInteraction::distribute(m_cursor,m_dragTargets,
+                                         button==GLFW_MOUSE_BUTTON_RIGHT);
+    } else if(!dragged && button==GLFW_MOUSE_BUTTON_LEFT && !m_cursor.empty() &&
+       m_lastClickSeconds>=0.0 && now-m_lastClickSeconds<=0.30) {
+        std::vector<ItemStack*> sources;
+        for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
+        for(auto& stack:m_crafting)sources.push_back(&stack);
+        InventoryInteraction::gather(m_cursor,sources);
+    } else if (dragged) {
         // Pick up from the press position, then place at the release position.
         performClick(button, m_pressX, m_pressY);
         performClick(button, mouseX, mouseY);
@@ -216,8 +224,17 @@ void SurvivalInventoryScreen::onMouseButton(
         // A normal click changes the cursor stack exactly once.
         performClick(button, mouseX, mouseY);
     }
+    m_lastClickSeconds=now;
     m_pointerPressed = false;
     m_pressedButton = -1;
+}
+
+void SurvivalInventoryScreen::onMouseMove(int x,int y){
+    if(!m_pointerPressed||!m_cursorHeldAtPress) return;
+    ItemStack* target=nullptr;
+    for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
+    if(!target){const size_t count=m_craftingTable?9:4;for(size_t i=0;i<count;++i)if(contains(m_craftingRects[i],x,y)){target=&m_crafting[i];break;}}
+    if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);
 }
 
 bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {

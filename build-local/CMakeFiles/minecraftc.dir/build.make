@@ -72,10 +72,24 @@ include CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/codegen:
 .PHONY : CMakeFiles/minecraftc.dir/codegen
 
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.o: /home/evan/Coding/MinecraftC/src/core/Input.cpp
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/minecraftc.dir/src/core/Input.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/core/Input.cpp.o -MF CMakeFiles/minecraftc.dir/src/core/Input.cpp.o.d -o CMakeFiles/minecraftc.dir/src/core/Input.cpp.o -c /home/evan/Coding/MinecraftC/src/core/Input.cpp
+
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/core/Input.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/core/Input.cpp > CMakeFiles/minecraftc.dir/src/core/Input.cpp.i
+
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/core/Input.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/core/Input.cpp -o CMakeFiles/minecraftc.dir/src/core/Input.cpp.s
+
 CMakeFiles/minecraftc.dir/src/core/Window.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/core/Window.cpp.o: /home/evan/Coding/MinecraftC/src/core/Window.cpp
 CMakeFiles/minecraftc.dir/src/core/Window.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/minecraftc.dir/src/core/Window.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/minecraftc.dir/src/core/Window.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/core/Window.cpp.o -MF CMakeFiles/minecraftc.dir/src/core/Window.cpp.o.d -o CMakeFiles/minecraftc.dir/src/core/Window.cpp.o -c /home/evan/Coding/MinecraftC/src/core/Window.cpp
 
 CMakeFiles/minecraftc.dir/src/core/Window.cpp.i: cmake_force
@@ -89,7 +103,7 @@ CMakeFiles/minecraftc.dir/src/core/Window.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o: /home/evan/Coding/MinecraftC/src/debug/CrashHandler.cpp
 CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o -MF CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o.d -o CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o -c /home/evan/Coding/MinecraftC/src/debug/CrashHandler.cpp
 
 CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.i: cmake_force
@@ -103,7 +117,7 @@ CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o: /home/evan/Coding/MinecraftC/src/debug/Log.cpp
 CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o -MF CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o.d -o CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o -c /home/evan/Coding/MinecraftC/src/debug/Log.cpp
 
 CMakeFiles/minecraftc.dir/src/debug/Log.cpp.i: cmake_force
@@ -117,7 +131,7 @@ CMakeFiles/minecraftc.dir/src/debug/Log.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o: /home/evan/Coding/MinecraftC/src/entity/EntityManager.cpp
 CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o -MF CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o.d -o CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o -c /home/evan/Coding/MinecraftC/src/entity/EntityManager.cpp
 
 CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.i: cmake_force
@@ -128,10 +142,38 @@ CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/entity/EntityManager.cpp -o CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.s
 
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o: /home/evan/Coding/MinecraftC/src/game/ClientSettings.cpp
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o -c /home/evan/Coding/MinecraftC/src/game/ClientSettings.cpp
+
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/game/ClientSettings.cpp > CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.i
+
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/ClientSettings.cpp -o CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.s
+
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o: /home/evan/Coding/MinecraftC/src/game/InventoryInteraction.cpp
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o -c /home/evan/Coding/MinecraftC/src/game/InventoryInteraction.cpp
+
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/game/InventoryInteraction.cpp > CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.i
+
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/InventoryInteraction.cpp -o CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.s
+
 CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o: /home/evan/Coding/MinecraftC/src/game/InventoryModel.cpp
 CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o -c /home/evan/Coding/MinecraftC/src/game/InventoryModel.cpp
 
 CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.i: cmake_force
@@ -145,7 +187,7 @@ CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/game/Item.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/Item.cpp.o: /home/evan/Coding/MinecraftC/src/game/Item.cpp
 CMakeFiles/minecraftc.dir/src/game/Item.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/minecraftc.dir/src/game/Item.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/minecraftc.dir/src/game/Item.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/Item.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/Item.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/Item.cpp.o -c /home/evan/Coding/MinecraftC/src/game/Item.cpp
 
 CMakeFiles/minecraftc.dir/src/game/Item.cpp.i: cmake_force
@@ -159,7 +201,7 @@ CMakeFiles/minecraftc.dir/src/game/Item.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o: /home/evan/Coding/MinecraftC/src/game/SaveStore.cpp
 CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o -c /home/evan/Coding/MinecraftC/src/game/SaveStore.cpp
 
 CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.i: cmake_force
@@ -170,10 +212,24 @@ CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/SaveStore.cpp -o CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.s
 
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o: /home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.cpp
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o -c /home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.cpp
+
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.cpp > CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.i
+
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.cpp -o CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.s
+
 CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o: /home/evan/Coding/MinecraftC/src/game/SurvivalRules.cpp
 CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o -c /home/evan/Coding/MinecraftC/src/game/SurvivalRules.cpp
 
 CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.i: cmake_force
@@ -184,10 +240,24 @@ CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/SurvivalRules.cpp -o CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.s
 
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o: /home/evan/Coding/MinecraftC/src/game/SurvivalSession.cpp
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o -c /home/evan/Coding/MinecraftC/src/game/SurvivalSession.cpp
+
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/game/SurvivalSession.cpp > CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.i
+
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/game/SurvivalSession.cpp -o CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.s
+
 CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o: /home/evan/Coding/MinecraftC/src/game/SurvivalStats.cpp
 CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o -c /home/evan/Coding/MinecraftC/src/game/SurvivalStats.cpp
 
 CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.i: cmake_force
@@ -201,7 +271,7 @@ CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o: /home/evan/Coding/MinecraftC/src/game/WorldCatalog.cpp
 CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o -MF CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o.d -o CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o -c /home/evan/Coding/MinecraftC/src/game/WorldCatalog.cpp
 
 CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.i: cmake_force
@@ -215,7 +285,7 @@ CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/main.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/main.cpp.o: /home/evan/Coding/MinecraftC/src/main.cpp
 CMakeFiles/minecraftc.dir/src/main.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/minecraftc.dir/src/main.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/minecraftc.dir/src/main.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/main.cpp.o -MF CMakeFiles/minecraftc.dir/src/main.cpp.o.d -o CMakeFiles/minecraftc.dir/src/main.cpp.o -c /home/evan/Coding/MinecraftC/src/main.cpp
 
 CMakeFiles/minecraftc.dir/src/main.cpp.i: cmake_force
@@ -229,7 +299,7 @@ CMakeFiles/minecraftc.dir/src/main.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/player/Player.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/player/Player.cpp.o: /home/evan/Coding/MinecraftC/src/player/Player.cpp
 CMakeFiles/minecraftc.dir/src/player/Player.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/minecraftc.dir/src/player/Player.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/minecraftc.dir/src/player/Player.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/player/Player.cpp.o -MF CMakeFiles/minecraftc.dir/src/player/Player.cpp.o.d -o CMakeFiles/minecraftc.dir/src/player/Player.cpp.o -c /home/evan/Coding/MinecraftC/src/player/Player.cpp
 
 CMakeFiles/minecraftc.dir/src/player/Player.cpp.i: cmake_force
@@ -243,7 +313,7 @@ CMakeFiles/minecraftc.dir/src/player/Player.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o: /home/evan/Coding/MinecraftC/src/renderer/BlockTextureAtlas.cpp
 CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o -MF CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o.d -o CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.o -c /home/evan/Coding/MinecraftC/src/renderer/BlockTextureAtlas.cpp
 
 CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.i: cmake_force
@@ -257,7 +327,7 @@ CMakeFiles/minecraftc.dir/src/renderer/BlockTextureAtlas.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o: /home/evan/Coding/MinecraftC/src/renderer/Camera.cpp
 CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o -MF CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o.d -o CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.o -c /home/evan/Coding/MinecraftC/src/renderer/Camera.cpp
 
 CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.i: cmake_force
@@ -271,7 +341,7 @@ CMakeFiles/minecraftc.dir/src/renderer/Camera.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o: /home/evan/Coding/MinecraftC/src/renderer/Frustum.cpp
 CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o -MF CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o.d -o CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.o -c /home/evan/Coding/MinecraftC/src/renderer/Frustum.cpp
 
 CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.i: cmake_force
@@ -285,7 +355,7 @@ CMakeFiles/minecraftc.dir/src/renderer/Frustum.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o: /home/evan/Coding/MinecraftC/src/renderer/Renderer.cpp
 CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o -MF CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o.d -o CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.o -c /home/evan/Coding/MinecraftC/src/renderer/Renderer.cpp
 
 CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.i: cmake_force
@@ -299,7 +369,7 @@ CMakeFiles/minecraftc.dir/src/renderer/Renderer.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o: /home/evan/Coding/MinecraftC/src/renderer/Shader.cpp
 CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CXX object CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o -MF CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o.d -o CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.o -c /home/evan/Coding/MinecraftC/src/renderer/Shader.cpp
 
 CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.i: cmake_force
@@ -313,7 +383,7 @@ CMakeFiles/minecraftc.dir/src/renderer/Shader.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o: /home/evan/Coding/MinecraftC/src/threading/ThreadPool.cpp
 CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CXX object CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o -MF CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o.d -o CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.o -c /home/evan/Coding/MinecraftC/src/threading/ThreadPool.cpp
 
 CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.i: cmake_force
@@ -327,7 +397,7 @@ CMakeFiles/minecraftc.dir/src/threading/ThreadPool.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o: /home/evan/Coding/MinecraftC/src/ui/ContainerScreen.cpp
 CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/ContainerScreen.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.i: cmake_force
@@ -341,7 +411,7 @@ CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o: /home/evan/Coding/MinecraftC/src/ui/FontRenderer.cpp
 CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/FontRenderer.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.i: cmake_force
@@ -355,7 +425,7 @@ CMakeFiles/minecraftc.dir/src/ui/FontRenderer.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o: /home/evan/Coding/MinecraftC/src/ui/Hotbar.cpp
 CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/Hotbar.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.i: cmake_force
@@ -369,7 +439,7 @@ CMakeFiles/minecraftc.dir/src/ui/Hotbar.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o: /home/evan/Coding/MinecraftC/src/ui/Inventory.cpp
 CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/Inventory.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.i: cmake_force
@@ -383,7 +453,7 @@ CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o: /home/evan/Coding/MinecraftC/src/ui/Menu.cpp
 CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/Menu.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.i: cmake_force
@@ -397,7 +467,7 @@ CMakeFiles/minecraftc.dir/src/ui/Menu.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o: /home/evan/Coding/MinecraftC/src/ui/SettingsMenu.cpp
 CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/SettingsMenu.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.i: cmake_force
@@ -411,7 +481,7 @@ CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o: /home/evan/Coding/MinecraftC/src/ui/SurvivalInventory.cpp
 CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/SurvivalInventory.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.i: cmake_force
@@ -425,7 +495,7 @@ CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: /home/evan/Coding/MinecraftC/src/ui/UIRenderer.cpp
 CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o -MF CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o.d -o CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o -c /home/evan/Coding/MinecraftC/src/ui/UIRenderer.cpp
 
 CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.i: cmake_force
@@ -439,7 +509,7 @@ CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o: /home/evan/Coding/MinecraftC/src/world/BiomeMap.cpp
 CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building CXX object CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o -c /home/evan/Coding/MinecraftC/src/world/BiomeMap.cpp
 
 CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.i: cmake_force
@@ -453,7 +523,7 @@ CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/Block.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/Block.cpp.o: /home/evan/Coding/MinecraftC/src/world/Block.cpp
 CMakeFiles/minecraftc.dir/src/world/Block.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Block.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Block.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/Block.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/Block.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/Block.cpp.o -c /home/evan/Coding/MinecraftC/src/world/Block.cpp
 
 CMakeFiles/minecraftc.dir/src/world/Block.cpp.i: cmake_force
@@ -464,10 +534,24 @@ CMakeFiles/minecraftc.dir/src/world/Block.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/world/Block.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/world/Block.cpp -o CMakeFiles/minecraftc.dir/src/world/Block.cpp.s
 
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o: CMakeFiles/minecraftc.dir/flags.make
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o: /home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.cpp
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o -c /home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.cpp
+
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.cpp > CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.i
+
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.cpp -o CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.s
+
 CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o: /home/evan/Coding/MinecraftC/src/world/CaveGenerator.cpp
 CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building CXX object CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o -c /home/evan/Coding/MinecraftC/src/world/CaveGenerator.cpp
 
 CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.i: cmake_force
@@ -481,7 +565,7 @@ CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o: /home/evan/Coding/MinecraftC/src/world/Chunk.cpp
 CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o -c /home/evan/Coding/MinecraftC/src/world/Chunk.cpp
 
 CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.i: cmake_force
@@ -495,7 +579,7 @@ CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o: /home/evan/Coding/MinecraftC/src/world/ChunkMesh.cpp
 CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o -c /home/evan/Coding/MinecraftC/src/world/ChunkMesh.cpp
 
 CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.i: cmake_force
@@ -509,7 +593,7 @@ CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o: /home/evan/Coding/MinecraftC/src/world/HeightPipeline.cpp
 CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.o -c /home/evan/Coding/MinecraftC/src/world/HeightPipeline.cpp
 
 CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.i: cmake_force
@@ -523,7 +607,7 @@ CMakeFiles/minecraftc.dir/src/world/HeightPipeline.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o: /home/evan/Coding/MinecraftC/src/world/Noise.cpp
 CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building CXX object CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/Noise.cpp.o -c /home/evan/Coding/MinecraftC/src/world/Noise.cpp
 
 CMakeFiles/minecraftc.dir/src/world/Noise.cpp.i: cmake_force
@@ -537,7 +621,7 @@ CMakeFiles/minecraftc.dir/src/world/Noise.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o: /home/evan/Coding/MinecraftC/src/world/OreGenerator.cpp
 CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building CXX object CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.o -c /home/evan/Coding/MinecraftC/src/world/OreGenerator.cpp
 
 CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.i: cmake_force
@@ -551,7 +635,7 @@ CMakeFiles/minecraftc.dir/src/world/OreGenerator.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o: /home/evan/Coding/MinecraftC/src/world/RegionGenerator.cpp
 CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building CXX object CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.o -c /home/evan/Coding/MinecraftC/src/world/RegionGenerator.cpp
 
 CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.i: cmake_force
@@ -565,7 +649,7 @@ CMakeFiles/minecraftc.dir/src/world/RegionGenerator.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o: /home/evan/Coding/MinecraftC/src/world/TreeGenerator.cpp
 CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Building CXX object CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.o -c /home/evan/Coding/MinecraftC/src/world/TreeGenerator.cpp
 
 CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.i: cmake_force
@@ -579,7 +663,7 @@ CMakeFiles/minecraftc.dir/src/world/TreeGenerator.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/World.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/World.cpp.o: /home/evan/Coding/MinecraftC/src/world/World.cpp
 CMakeFiles/minecraftc.dir/src/world/World.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/minecraftc.dir/src/world/World.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_43) "Building CXX object CMakeFiles/minecraftc.dir/src/world/World.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/World.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/World.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/World.cpp.o -c /home/evan/Coding/MinecraftC/src/world/World.cpp
 
 CMakeFiles/minecraftc.dir/src/world/World.cpp.i: cmake_force
@@ -593,7 +677,7 @@ CMakeFiles/minecraftc.dir/src/world/World.cpp.s: cmake_force
 CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o: CMakeFiles/minecraftc.dir/flags.make
 CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o: /home/evan/Coding/MinecraftC/src/world/WorldGenerator.cpp
 CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o: CMakeFiles/minecraftc.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_44) "Building CXX object CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o -MF CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o.d -o CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.o -c /home/evan/Coding/MinecraftC/src/world/WorldGenerator.cpp
 
 CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.i: cmake_force
@@ -606,14 +690,19 @@ CMakeFiles/minecraftc.dir/src/world/WorldGenerator.cpp.s: cmake_force
 
 # Object files for target minecraftc
 minecraftc_OBJECTS = \
+"CMakeFiles/minecraftc.dir/src/core/Input.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/core/Window.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o" \
+"CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o" \
+"CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/Item.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o" \
+"CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o" \
+"CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/main.cpp.o" \
@@ -634,6 +723,7 @@ minecraftc_OBJECTS = \
 "CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/world/Block.cpp.o" \
+"CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o" \
 "CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o" \
@@ -648,14 +738,19 @@ minecraftc_OBJECTS = \
 # External object files for target minecraftc
 minecraftc_EXTERNAL_OBJECTS =
 
+minecraftc: CMakeFiles/minecraftc.dir/src/core/Input.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/core/Window.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o
+minecraftc: CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o
+minecraftc: CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/Item.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o
+minecraftc: CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o
+minecraftc: CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/main.cpp.o
@@ -676,6 +771,7 @@ minecraftc: CMakeFiles/minecraftc.dir/src/ui/SurvivalInventory.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/world/Block.cpp.o
+minecraftc: CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o
 minecraftc: CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o
@@ -693,7 +789,7 @@ minecraftc: libglad.a
 minecraftc: /usr/lib/x86_64-linux-gnu/libGLX.so
 minecraftc: /usr/lib/x86_64-linux-gnu/libOpenGL.so
 minecraftc: CMakeFiles/minecraftc.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Linking CXX executable minecraftc"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/evan/Coding/MinecraftC/build-local/CMakeFiles --progress-num=$(CMAKE_PROGRESS_45) "Linking CXX executable minecraftc"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/minecraftc.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

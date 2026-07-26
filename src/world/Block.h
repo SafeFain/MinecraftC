@@ -144,6 +144,7 @@ bool isFarmland(BlockId id);
 uint8_t farmlandMoisture(BlockId id);
 BlockId farmlandForMoisture(uint8_t moisture);
 bool isSapling(BlockId id);
+bool shouldRenderCubeFace(BlockId current, BlockId neighbor);
 
 // ── Face direction offset vectors ─────────────────────────────────────
 

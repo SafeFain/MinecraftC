@@ -1,4 +1,5 @@
 #include "core/Window.h"
+#include "core/Input.h"
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
@@ -20,6 +21,8 @@
 #include "game/WorldCatalog.h"
 #include "game/Command.h"
 #include "game/SurvivalRules.h"
+#include "game/ClientSettings.h"
+#include "game/SurvivalSession.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include <glad/glad.h>
@@ -91,6 +94,11 @@ private:
     using Clock = std::chrono::high_resolution_clock;
     Clock::time_point m_lastFrame;
     DayNightCycle m_dayNightCycle;
+    ClientSettings m_clientSettings;
+    InputState m_input;
+    int m_guiScale = 1;
+    int m_lastHudSlot = -1;
+    float m_itemNameSeconds = 0.0f;
 
     // Key state tracking
     bool m_keys[512] = {};
@@ -100,6 +108,9 @@ private:
         Debug::Log::init(Debug::LogLevel::Trace, Config::LogConfig::FILE_OUTPUT,
                          Config::LogConfig::LOG_PATH);
         Debug::installCrashHandlers();
+
+        m_clientSettings = ClientSettings::load("saves/options.txt");
+        applyClientSettings(false);
 
         if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress))) {
             throw std::runtime_error("Failed to load OpenGL functions");
@@ -181,7 +192,9 @@ private:
             // Save current state to restore the correct menu on back
             GameState prevState = m_gameState;
             MenuCallbacks prevCallbacks = m_menuCallbacks;
-            m_activeMenu = std::make_unique<SettingsMenu>([this, prevState, prevCallbacks]() {
+            m_activeMenu = std::make_unique<SettingsMenu>(m_clientSettings,
+                [this]() { applyClientSettings(); },
+                [this, prevState, prevCallbacks]() {
                 m_gameState = prevState;
                 if (prevState == GameState::Paused) {
                     m_activeMenu = std::make_unique<PauseMenu>(prevCallbacks);
@@ -193,7 +206,13 @@ private:
 
         // ── Input callbacks ───────────────────────────────────────────
         m_window.setKeyCallback([this](int key, int /*scancode*/, int action, int /*mods*/) {
-            // Track key state for polling
+            m_input.keyEvent(key, action);
+            m_input.update(m_clientSettings.bindings);
+            auto keyBound = [this, key](InputAction inputAction) {
+                const auto& binding = m_clientSettings.bindings[static_cast<size_t>(inputAction)];
+                return binding.device == InputDevice::Keyboard && binding.code == key;
+            };
+            // Track key state for legacy window/system shortcuts.
             if (action == GLFW_PRESS || action == GLFW_REPEAT) {
                 if (key < 512) m_keys[key] = true;
             } else if (action == GLFW_RELEASE) {
@@ -214,7 +233,7 @@ private:
                 return;
             }
 
-            if (key == GLFW_KEY_T && action == GLFW_PRESS &&
+            if (action == GLFW_PRESS && keyBound(InputAction::Command) &&
                 m_gameState == GameState::Playing && !m_activeMenu &&
                 !m_inventoryOpen && !m_playerDead) {
                 m_commandOpen = true;
@@ -225,7 +244,7 @@ private:
             }
 
             // E key — toggle creative inventory (Playing only, no menu active)
-            if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+            if (action == GLFW_PRESS && keyBound(InputAction::Inventory)) {
                 if (m_gameState == GameState::Playing && !m_activeMenu &&
                     !m_player.isSpectator()) {
                     if (m_inventoryOpen) {
@@ -238,12 +257,22 @@ private:
             }
 
             // Number keys 1-9 — hotbar selection (Playing only)
-            if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
+            for (int slot = 0; slot < 9 && action == GLFW_PRESS; ++slot) {
+                if (!keyBound(static_cast<InputAction>(
+                        static_cast<int>(InputAction::Hotbar1) + slot))) continue;
                 if (m_gameState == GameState::Playing) {
-                    m_hotbar.onKeyPress(key);
+                    m_hotbar.selectSlot(slot);
                     m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
                     m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
                 }
+                break;
+            }
+
+            if ((keyBound(InputAction::Attack) || keyBound(InputAction::Use)) &&
+                m_gameState == GameState::Playing && !m_inventoryOpen && !m_commandOpen) {
+                if (keyBound(InputAction::Attack)) handleGameplayAction(false, action);
+                if (keyBound(InputAction::Use) && !m_inventoryOpen) handleGameplayAction(true, action);
+                return;
             }
 
             // ESC handling
@@ -294,48 +323,42 @@ private:
             }
         });
 
-        m_window.setMouseButtonCallback([this](int button, int action, int /*mods*/) {
+        m_window.setMouseButtonCallback([this](int button, int action, int mods) {
+            m_input.mouseEvent(button, action);
+            m_input.update(m_clientSettings.bindings);
+            auto mouseBound = [this, button](InputAction inputAction) {
+                const auto& binding = m_clientSettings.bindings[static_cast<size_t>(inputAction)];
+                return binding.device == InputDevice::Mouse && binding.code == button;
+            };
             updateMouseScreenPosition();
+            if (action == GLFW_PRESS && m_gameState == GameState::Playing && !m_activeMenu) {
+                if (mouseBound(InputAction::Command) && !m_inventoryOpen && !m_playerDead) {
+                    m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;
+                }
+                if (mouseBound(InputAction::Inventory) && !m_commandOpen && !m_player.isSpectator()) {
+                    if(m_inventoryOpen)closeInventory();else openInventory();return;
+                }
+                for(int slot=0;slot<9;++slot)if(mouseBound(static_cast<InputAction>(
+                    static_cast<int>(InputAction::Hotbar1)+slot))){m_hotbar.selectSlot(slot);
+                    m_player.setSelectedSlot(slot);m_player.setSelectedBlock(m_hotbar.getSelectedBlock());}
+            }
             if (m_inventoryOpen && (m_player.isSurvival() || m_containerOpen) &&
                 (action == GLFW_PRESS || action == GLFW_RELEASE)) {
                 if (m_containerOpen) m_containerScreen.onMouseButton(
-                    button, action, static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                    button, action, static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY), mods);
                 else m_survivalInventory.onMouseButton(button, action,
-                    static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                    static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY), mods);
                 return;
             }
-            if (!m_inventoryOpen && !m_commandOpen &&
-                m_gameState == GameState::Playing &&
-                (action == GLFW_PRESS || action == GLFW_RELEASE)) {
-                if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_RIGHT &&
-                    !m_player.isSpectator()) {
-                    auto hit = m_world.raycast(
-                        m_player.getEyePosition(), m_player.getForward(),
-                        Config::REACH_DISTANCE);
-                    if (hit) {
-                        const BlockId target = m_world.getBlock(
-                            hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
-                        if (target == BlockId::CRAFTING_TABLE && m_player.isSurvival()) {
-                            openInventory();
-                            m_survivalInventory.setCraftingTable(true);
-                            return;
-                        }
-                        if (target == BlockId::CHEST || target == BlockId::FURNACE) {
-                            if (m_containerScreen.open(m_world, hit->blockPos)) {
-                                m_containerOpen = true;
-                                m_inventoryOpen = true;
-                                m_window.setCursorLocked(false);
-                                return;
-                            }
-                        }
-                    }
-                }
-                m_player.handleMouseButton(button, action);
+            if (!m_inventoryOpen && !m_commandOpen && m_gameState == GameState::Playing &&
+                (mouseBound(InputAction::Attack) || mouseBound(InputAction::Use))) {
+                if (mouseBound(InputAction::Attack)) handleGameplayAction(false, action);
+                if (mouseBound(InputAction::Use) && !m_inventoryOpen) handleGameplayAction(true, action);
                 return;
             }
-            if (action == GLFW_PRESS) {
+            if (action == GLFW_PRESS || action == GLFW_RELEASE) {
                 if (m_inventoryOpen) {
-                    if (!m_player.isSurvival()) {
+                    if (!m_player.isSurvival() && action == GLFW_PRESS) {
                         m_inventory.onMouseClick(button,
                             static_cast<int>(m_mouseScreenX),
                             static_cast<int>(m_mouseScreenY),
@@ -345,15 +368,33 @@ private:
                             });
                     }
                 } else if (m_activeMenu) {
-                    m_activeMenu->onMouseClick(button);
+                    m_activeMenu->onMouseButton(button, action,
+                                                m_mouseScreenX, m_mouseScreenY);
                 }
             }
         });
 
         m_window.setScrollCallback([this](double /*xoffset*/, double yoffset) {
+            m_input.scrollEvent(yoffset);
+            m_input.update(m_clientSettings.bindings);
+            if (m_activeMenu) { m_activeMenu->onScroll(yoffset); return; }
+            if (m_inventoryOpen && !m_player.isSurvival() && !m_containerOpen) {
+                m_inventory.onScroll(yoffset);
+                return;
+            }
+            auto wheelBound=[this,yoffset](InputAction action){const auto& binding=m_clientSettings.bindings[static_cast<size_t>(action)];
+                return binding.device==InputDevice::Wheel&&binding.code==(yoffset>0?1:-1);};
+            if(m_gameState==GameState::Playing&&!m_commandOpen){
+                if(wheelBound(InputAction::Inventory)&&!m_player.isSpectator()){if(m_inventoryOpen)closeInventory();else openInventory();return;}
+                if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;}
+                for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_hotbar.selectSlot(slot);
+                if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,GLFW_PRESS);handleGameplayAction(false,GLFW_RELEASE);}
+                    if(wheelBound(InputAction::Use)){handleGameplayAction(true,GLFW_PRESS);if(!m_inventoryOpen)handleGameplayAction(true,GLFW_RELEASE);}}
+            }
             if (m_gameState == GameState::Playing && !m_activeMenu &&
                 !m_inventoryOpen && !m_commandOpen) {
-                m_hotbar.onScroll(yoffset);
+                if (m_input.pressed(InputAction::PreviousSlot)) m_hotbar.onScroll(1.0);
+                if (m_input.pressed(InputAction::NextSlot)) m_hotbar.onScroll(-1.0);
                 m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
                 m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
             }
@@ -372,6 +413,42 @@ private:
     void showMainMenu() {
         m_activeMenu = std::make_unique<MainMenu>(
             m_menuCallbacks, m_worldCatalog.list());
+    }
+
+    void applyClientSettings(bool persist = true) {
+        m_clientSettings.validate();
+        Config::RENDER_DISTANCE = m_clientSettings.renderDistance;
+        Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
+        Config::AUTO_JUMP = m_clientSettings.autoJump;
+        m_window.setRawMouseInput(m_clientSettings.rawMouseInput);
+        if (persist && !m_clientSettings.save("saves/options.txt"))
+            LOG_WARN("Could not save client settings");
+    }
+
+    void handleGameplayAction(bool use, int action) {
+        const int logicalButton = use ? GLFW_MOUSE_BUTTON_RIGHT : GLFW_MOUSE_BUTTON_LEFT;
+        if (action == GLFW_PRESS && use && !m_player.isSpectator()) {
+            auto hit = m_world.raycast(m_player.getEyePosition(), m_player.getForward(),
+                                       Config::REACH_DISTANCE);
+            if (hit) {
+                const BlockId target = m_world.getBlock(
+                    hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+                if (target == BlockId::CRAFTING_TABLE && m_player.isSurvival()) {
+                    openInventory();
+                    m_survivalInventory.setCraftingTable(true);
+                    return;
+                }
+                if (target == BlockId::CHEST || target == BlockId::FURNACE) {
+                    if (m_containerScreen.open(m_world, hit->blockPos)) {
+                        m_containerOpen = true;
+                        m_inventoryOpen = true;
+                        m_window.setCursorLocked(false);
+                        return;
+                    }
+                }
+            }
+        }
+        m_player.handleMouseButton(logicalButton, action);
     }
 
     void startGame(const std::string& worldId, bool newWorld) {
@@ -476,8 +553,16 @@ private:
             if (m_commandMessageSeconds > 0.0f)
                 m_commandMessageSeconds =
                     std::max(0.0f, m_commandMessageSeconds - dt);
+            if (m_itemNameSeconds > 0.0f)
+                m_itemNameSeconds = std::max(0.0f, m_itemNameSeconds - dt);
+            if (m_hotbar.getSelectedSlot() != m_lastHudSlot) {
+                m_lastHudSlot = m_hotbar.getSelectedSlot();
+                m_itemNameSeconds = 2.0f;
+            }
 
+            m_input.beginFrame();
             m_window.pollEvents();
+            m_input.update(m_clientSettings.bindings);
 
             // Skip rendering when minimized to save resources
             if (m_window.isMinimized()) {
@@ -489,8 +574,9 @@ private:
                 !m_commandOpen) {
                 double dx, dy;
                 m_window.getCursorDelta(dx, dy);
-                m_player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy));
-                if (!m_playerDead) m_player.handleMovement(m_keys, dt);
+                m_player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy),
+                    m_clientSettings.mouseSensitivity, m_clientSettings.invertMouseY);
+                if (!m_playerDead) m_player.handleMovement(m_input, dt);
             }
 
             // Track mouse position (always, for inventory/menu hover)
@@ -502,6 +588,10 @@ private:
                     m_inventory.onMouseMove(
                         static_cast<int>(m_mouseScreenX),
                         static_cast<int>(m_mouseScreenY));
+                    if (m_containerOpen) m_containerScreen.onMouseMove(
+                        static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
+                    else if (m_player.isSurvival()) m_survivalInventory.onMouseMove(
+                        static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
                 }
 
                 // Route to menu hover
@@ -662,19 +752,22 @@ private:
             // ── UI Rendering ──────────────────────────────────────────
             int fbWidth, fbHeight;
             glfwGetFramebufferSize(m_window.native(), &fbWidth, &fbHeight);
+            m_guiScale = effectiveGuiScale(fbWidth, fbHeight, m_clientSettings.guiScale);
+            const int uiWidth = std::max(1, fbWidth / m_guiScale);
+            const int uiHeight = std::max(1, fbHeight / m_guiScale);
 
             // Phase 1: Inventory overlay (on top of 3D world)
             if (m_inventoryOpen) {
-                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 if (m_containerOpen) {
                     m_containerScreen.render(
-                        m_uiRenderer, fbWidth, fbHeight, static_cast<int>(m_mouseScreenX),
+                        m_uiRenderer, uiWidth, uiHeight, static_cast<int>(m_mouseScreenX),
                         static_cast<int>(m_mouseScreenY));
                 } else if (m_player.isSurvival()) {
-                    m_survivalInventory.render(m_uiRenderer, fbWidth, fbHeight,
+                    m_survivalInventory.render(m_uiRenderer, uiWidth, uiHeight,
                         static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
                 } else {
-                    m_inventory.render(m_uiRenderer, fbWidth, fbHeight,
+                    m_inventory.render(m_uiRenderer, uiWidth, uiHeight,
                                        static_cast<int>(m_mouseScreenX),
                                        static_cast<int>(m_mouseScreenY));
                 }
@@ -683,22 +776,23 @@ private:
 
             // Phase 2: Hotbar HUD (Playing, no inventory, no menu)
             if (m_gameState == GameState::Playing && !m_inventoryOpen && !m_activeMenu) {
-                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 if (!m_player.isSpectator()) {
-                    m_hotbar.render(m_uiRenderer, fbWidth, fbHeight);
-                    if (m_player.isSurvival()) renderSurvivalHud(fbWidth);
-                    renderCrosshairAndMiningProgress(fbWidth, fbHeight);
+                    m_hotbar.render(m_uiRenderer, uiWidth, uiHeight);
+                    if (m_player.isSurvival()) renderSurvivalHud(uiWidth);
+                    renderCrosshairAndMiningProgress(uiWidth, uiHeight);
+                    if (m_itemNameSeconds > 0.0f) renderSelectedItemName(uiWidth);
                 }
                 m_uiRenderer.endUIFrame();
             }
 
             if (m_commandOpen || m_commandMessageSeconds > 0.0f) {
-                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 const std::string text = m_commandOpen
                     ? "> " + m_commandInput + "_"
                     : m_commandMessage;
                 m_uiRenderer.drawRect(
-                    12.0f, 18.0f, static_cast<float>(fbWidth - 24), 36.0f,
+                    12.0f, 18.0f, static_cast<float>(uiWidth - 24), 36.0f,
                     glm::vec4(0.02f, 0.02f, 0.03f, 0.82f));
                 m_uiRenderer.renderText(
                     text, 20.0f, 27.0f, 1.25f,
@@ -709,25 +803,25 @@ private:
 
             // Phase 3: Active menu (overlays everything)
             if (m_activeMenu) {
-                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
-                m_activeMenu->render(m_uiRenderer, fbWidth, fbHeight);
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
+                m_activeMenu->render(m_uiRenderer, uiWidth, uiHeight);
                 m_uiRenderer.endUIFrame();
             }
 
             if (m_playerDead) {
-                m_uiRenderer.beginUIFrame(fbWidth, fbHeight);
-                m_uiRenderer.drawRect(0, 0, static_cast<float>(fbWidth),
-                                      static_cast<float>(fbHeight),
+                m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
+                m_uiRenderer.drawRect(0, 0, static_cast<float>(uiWidth),
+                                      static_cast<float>(uiHeight),
                                       glm::vec4(0.28f, 0.0f, 0.0f, 0.62f));
                 const char* title = "YOU DIED";
                 auto titleSize = m_uiRenderer.measureText(title, 4.0f);
-                m_uiRenderer.renderText(title, (fbWidth - titleSize.x) * 0.5f,
-                                        fbHeight * 0.58f, 4.0f,
+                m_uiRenderer.renderText(title, (uiWidth - titleSize.x) * 0.5f,
+                                        uiHeight * 0.58f, 4.0f,
                                         glm::vec3(1.0f, 0.82f, 0.82f));
                 const char* prompt = "Press Enter to respawn";
                 auto promptSize = m_uiRenderer.measureText(prompt, 1.5f);
-                m_uiRenderer.renderText(prompt, (fbWidth - promptSize.x) * 0.5f,
-                                        fbHeight * 0.46f, 1.5f, glm::vec3(1.0f));
+                m_uiRenderer.renderText(prompt, (uiWidth - promptSize.x) * 0.5f,
+                                        uiHeight * 0.46f, 1.5f, glm::vec3(1.0f));
                 m_uiRenderer.endUIFrame();
             }
 
@@ -814,9 +908,10 @@ private:
             ? static_cast<double>(framebufferWidth) / windowWidth : 1.0;
         const double scaleY = windowHeight > 0
             ? static_cast<double>(framebufferHeight) / windowHeight : 1.0;
-        m_mouseScreenX = windowX * scaleX;
+        const double uiScale = std::max(1, m_guiScale);
+        m_mouseScreenX = windowX * scaleX / uiScale;
         m_mouseScreenY =
-            static_cast<double>(framebufferHeight) - windowY * scaleY;
+            (static_cast<double>(framebufferHeight) - windowY * scaleY) / uiScale;
     }
 
     void renderSurvivalHud(int screenWidth) {
@@ -834,13 +929,23 @@ private:
                 static_cast<float>(stats.hunger()) - i * 2.0f, 0.0f, 2.0f) * 0.5f;
             const float hx = leftX + i * (unitW + gap);
             const float fx = rightX + (9 - i) * (unitW + gap);
-            m_uiRenderer.drawRect(hx, y, unitW, unitH, glm::vec4(0.18f, 0.04f, 0.04f, 0.9f));
-            m_uiRenderer.drawRect(hx, y, unitW * healthFill, unitH,
-                                  glm::vec4(0.85f, 0.08f, 0.10f, 1.0f));
-            m_uiRenderer.drawRect(fx, y, unitW, unitH, glm::vec4(0.16f, 0.08f, 0.02f, 0.9f));
-            m_uiRenderer.drawRect(fx + unitW * (1.0f - hungerFill), y,
-                                  unitW * hungerFill, unitH,
-                                  glm::vec4(0.88f, 0.48f, 0.08f, 1.0f));
+            auto heart = [&](float x, float fill) {
+                m_uiRenderer.drawRect(x+2,y+2,8,7,{.20f,.03f,.04f,.95f});
+                m_uiRenderer.drawRect(x+1,y+5,10,4,{.20f,.03f,.04f,.95f});
+                if (fill > 0) {
+                    const float width = fill < 1 ? 5.0f : 10.0f;
+                    m_uiRenderer.drawRect(x+1,y+5,width,4,{.90f,.07f,.10f,1});
+                    m_uiRenderer.drawRect(x+2,y+2,std::max(0.0f,width-2),3,{.90f,.07f,.10f,1});
+                }
+            };
+            auto food = [&](float x, float fill) {
+                m_uiRenderer.drawRect(x+3,y+1,7,8,{.18f,.08f,.02f,.95f});
+                m_uiRenderer.drawRect(x+1,y+3,4,5,{.18f,.08f,.02f,.95f});
+                if (fill > 0) m_uiRenderer.drawRect(x+(fill<1?6:2),y+3,
+                    fill<1?4:8,5,{.90f,.46f,.06f,1});
+            };
+            heart(hx, healthFill);
+            food(fx, hungerFill);
         }
         const int armor = totalArmorPoints(m_player.inventory());
         if (armor > 0) {
@@ -854,6 +959,29 @@ private:
                                       glm::vec4(0.62f, 0.72f, 0.82f, 1.0f));
             }
         }
+        if (m_player.underwater()) {
+            const int bubbles = static_cast<int>(std::ceil(m_player.airFraction() * 10.0f));
+            for (int i=0;i<10;++i) {
+                const float x = rightX + (9-i)*(unitW+gap);
+                m_uiRenderer.drawRect(x+2,y+15,8,8,{.06f,.18f,.25f,.9f});
+                m_uiRenderer.drawRect(x+4,y+17,4,4,
+                    i < bubbles ? glm::vec4(.45f,.82f,1,1) : glm::vec4(.08f,.12f,.16f,1));
+            }
+        }
+    }
+
+    void renderSelectedItemName(int screenWidth) {
+        std::string name;
+        if (m_player.isSurvival()) {
+            const auto& stack = m_player.inventory().slot(
+                static_cast<size_t>(m_hotbar.getSelectedSlot()));
+            if (!stack.empty()) name = getItemProps(stack.id).name;
+        } else name = getBlockProps(m_hotbar.getSelectedBlock()).name;
+        if (name.empty()) return;
+        const auto size = m_uiRenderer.measureText(name, 1.0f);
+        const float x = (screenWidth - size.x) * .5f;
+        m_uiRenderer.renderText(name, x+1, 66, 1.0f, {.05f,.05f,.05f});
+        m_uiRenderer.renderText(name, x, 67, 1.0f, {.95f,.95f,.95f});
     }
 
     void renderCrosshairAndMiningProgress(int screenWidth, int screenHeight) {
@@ -898,24 +1026,17 @@ private:
         m_playerDead = true;
         const glm::vec3 deathPosition = glm::vec3(
             m_player.getPosition() + glm::dvec3(0.0, 0.5, 0.0));
-        for (const auto& stack : m_player.inventory().storage())
-            if (!stack.empty()) m_entities.spawnItem(deathPosition, stack);
-        for (const auto& stack : m_player.inventory().armor())
-            if (!stack.empty()) m_entities.spawnItem(deathPosition, stack);
-        if (!m_player.inventory().offhand().empty())
-            m_entities.spawnItem(deathPosition, m_player.inventory().offhand());
-        m_player.inventory().clear();
+        for (const auto& stack : takeDeathDrops(m_player.inventory()))
+            m_entities.spawnItem(deathPosition, stack);
         m_window.setCursorLocked(false);
     }
 
     void respawnPlayer() {
-        glm::ivec3 spawn = m_worldMetadata.worldSpawn;
-        if (m_worldMetadata.bedSpawn &&
-            m_world.getBlock(m_worldMetadata.bedSpawn->x,
-                             m_worldMetadata.bedSpawn->y,
-                             m_worldMetadata.bedSpawn->z) == BlockId::WHITE_BED) {
-            spawn = *m_worldMetadata.bedSpawn;
-        }
+        const bool bedValid = m_worldMetadata.bedSpawn &&
+            m_world.getBlock(m_worldMetadata.bedSpawn->x, m_worldMetadata.bedSpawn->y,
+                             m_worldMetadata.bedSpawn->z) == BlockId::WHITE_BED;
+        const glm::ivec3 spawn = chooseRespawnPosition(
+            m_worldMetadata.worldSpawn, m_worldMetadata.bedSpawn, bedValid);
         m_player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, 1.01f, 0.5f));
         m_player.survivalStats().resetAfterRespawn();
         m_world.update(m_player.getPosition());

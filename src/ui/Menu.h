@@ -8,6 +8,7 @@
 #include "Config.h"
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
+#include "game/ClientSettings.h"
 
 class UIRenderer;
 
@@ -50,6 +51,7 @@ public:
     bool containsPoint(float px, float py) const;
     void setHovered(bool h) { m_hovered = h; }
     void setSelected(bool s) { m_selected = s; }
+    void setPressed(bool p) { m_pressed = p; }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
 
@@ -69,6 +71,7 @@ private:
     ButtonColors m_colors;
     bool m_hovered = false;
     bool m_selected = false;
+    bool m_pressed = false;
 };
 
 // ── Menu base class ───────────────────────────────────────────────────────
@@ -80,7 +83,8 @@ public:
     virtual void render(UIRenderer& ui, int screenWidth, int screenHeight) = 0;
     virtual void onKeyPress(int key) = 0;
     virtual void onMouseMove(double x, double y) = 0;
-    virtual void onMouseClick(int button) = 0;
+    virtual void onMouseButton(int button, int action, double x, double y) = 0;
+    virtual void onScroll(double) {}
     virtual void onChar(unsigned int) {}
 
 protected:
@@ -98,7 +102,8 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
-    void onMouseClick(int button) override;
+    void onMouseButton(int button, int action, double x, double y) override;
+    void onScroll(double yOffset) override;
     void onChar(unsigned int codepoint) override;
 
 private:
@@ -115,6 +120,11 @@ private:
     std::string m_seedText;
     GameMode m_createMode = GameMode::Survival;
     bool m_createCheats = false;
+    int m_worldOffset = 0;
+    int m_selectedWorld = -1;
+    int m_pressedButton = -1;
+    double m_lastWorldClick = -1.0;
+    int m_lastWorldIndex = -1;
 
     void showHome();
     void showWorlds();
@@ -133,9 +143,10 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
-    void onMouseClick(int button) override;
+    void onMouseButton(int button, int action, double x, double y) override;
 
 private:
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
+    int m_pressedButton = -1;
 };

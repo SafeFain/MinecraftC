@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 #include "game/InventoryModel.h"
 
@@ -13,7 +14,8 @@ public:
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight,
                 int mouseX, int mouseY);
-    void onMouseButton(int button, int action, int mouseX, int mouseY);
+    void onMouseButton(int button, int action, int mouseX, int mouseY, int mods = 0);
+    void onMouseMove(int mouseX, int mouseY);
     void onClose();
     void setCraftingTable(bool enabled) { m_craftingTable = enabled; }
 
@@ -33,12 +35,17 @@ private:
     int m_pressedButton = -1;
     int m_pressX = 0;
     int m_pressY = 0;
+    int m_pressMods = 0;
+    double m_lastClickSeconds = -1.0;
+    std::vector<ItemStack*> m_dragTargets;
+    bool m_cursorHeldAtPress = false;
 
     void layout(int screenWidth, int screenHeight);
     ItemStack craftingOutput() const;
     void takeCraftingOutput();
     void clickStack(ItemStack& stack, bool rightClick);
     void performClick(int button, int mouseX, int mouseY);
+    void quickMove(int mouseX, int mouseY);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,
                           const ItemStack& stack, bool hovered);

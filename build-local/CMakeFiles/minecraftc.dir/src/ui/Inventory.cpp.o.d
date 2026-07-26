@@ -328,4 +328,11 @@ CMakeFiles/minecraftc.dir/src/ui/Inventory.cpp.o: \
  /usr/include/c++/14/pstl/execution_defs.h \
  /home/evan/Coding/MinecraftC/external/glad/include/glad/glad.h \
  /home/evan/Coding/MinecraftC/src/ui/FontRenderer.h \
- /home/evan/Coding/MinecraftC/src/Config.h /usr/include/GLFW/glfw3.h
+ /home/evan/Coding/MinecraftC/src/game/Item.h \
+ /usr/include/c++/14/optional /home/evan/Coding/MinecraftC/src/Config.h \
+ /usr/include/GLFW/glfw3.h /usr/include/c++/14/algorithm \
+ /usr/include/c++/14/bits/stl_algo.h \
+ /usr/include/c++/14/bits/algorithmfwd.h \
+ /usr/include/c++/14/bits/stl_heap.h \
+ /usr/include/c++/14/bits/uniform_int_dist.h \
+ /usr/include/c++/14/pstl/glue_algorithm_defs.h

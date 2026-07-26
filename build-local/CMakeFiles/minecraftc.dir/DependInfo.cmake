@@ -8,14 +8,19 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/evan/Coding/MinecraftC/src/core/Input.cpp" "CMakeFiles/minecraftc.dir/src/core/Input.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/core/Input.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/core/Window.cpp" "CMakeFiles/minecraftc.dir/src/core/Window.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/core/Window.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/debug/CrashHandler.cpp" "CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/debug/Log.cpp" "CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/entity/EntityManager.cpp" "CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o.d"
+  "/home/evan/Coding/MinecraftC/src/game/ClientSettings.cpp" "CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o.d"
+  "/home/evan/Coding/MinecraftC/src/game/InventoryInteraction.cpp" "CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/InventoryModel.cpp" "CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/Item.cpp" "CMakeFiles/minecraftc.dir/src/game/Item.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/Item.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/SaveStore.cpp" "CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o.d"
+  "/home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.cpp" "CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/SurvivalRules.cpp" "CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o.d"
+  "/home/evan/Coding/MinecraftC/src/game/SurvivalSession.cpp" "CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/SurvivalStats.cpp" "CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/game/WorldCatalog.cpp" "CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/main.cpp" "CMakeFiles/minecraftc.dir/src/main.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/main.cpp.o.d"
@@ -36,6 +41,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/evan/Coding/MinecraftC/src/ui/UIRenderer.cpp" "CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/world/BiomeMap.cpp" "CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/world/Block.cpp" "CMakeFiles/minecraftc.dir/src/world/Block.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/Block.cpp.o.d"
+  "/home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.cpp" "CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/world/CaveGenerator.cpp" "CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/world/Chunk.cpp" "CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o.d"
   "/home/evan/Coding/MinecraftC/src/world/ChunkMesh.cpp" "CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o" "gcc" "CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o.d"

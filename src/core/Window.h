@@ -29,6 +29,7 @@ public:
 
     // Mouse lock (cursor grab)
     void setCursorLocked(bool locked);
+    void setRawMouseInput(bool enabled);
     bool isCursorLocked() const { return m_cursorLocked; }
 
     // Callbacks
@@ -53,6 +54,7 @@ private:
     GLFWwindow* m_window = nullptr;
     int m_width, m_height;
     bool m_cursorLocked = false;
+    bool m_rawMouseInput = false;
     bool m_minimized = false;
 
     double m_lastCursorX = 0.0;

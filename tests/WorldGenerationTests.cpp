@@ -26,6 +26,12 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 }
 
 int main() {
+    require(shouldRenderCubeFace(BlockId::STONE, BlockId::ICE) &&
+            shouldRenderCubeFace(BlockId::DIRT, BlockId::LEAVES),
+            "opaque terrain faces remain behind translucent solid blocks");
+    require(!shouldRenderCubeFace(BlockId::ICE, BlockId::STONE) &&
+            !shouldRenderCubeFace(BlockId::LEAVES, BlockId::LEAVES),
+            "translucent interfaces avoid duplicate and internal faces");
     constexpr uint64_t seed = 1234567890ULL;
     Noise legacy(seed);
     HeightPipeline terrain(legacy, seed);

@@ -40,6 +40,8 @@
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/command_tests.dir
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/entity_logic_tests.dir
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/lighting_logic_tests.dir
+/home/evan/Coding/MinecraftC/build-local/CMakeFiles/client_input_tests.dir
+/home/evan/Coding/MinecraftC/build-local/CMakeFiles/survival_integration_tests.dir
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/test.dir
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/edit_cache.dir
 /home/evan/Coding/MinecraftC/build-local/CMakeFiles/rebuild_cache.dir

@@ -88,11 +88,9 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                 ui.drawBlockIcon(sx + innerMargin, sy + innerMargin,
                                  slotSize - innerMargin * 2.0f,
                                  slotSize - innerMargin * 2.0f, id);
-            } else {
-                const std::string initial(1, itemProps->name.empty() ? '?' : itemProps->name[0]);
-                ui.renderText(initial, sx + slotSize * 0.38f, sy + slotSize * 0.32f,
-                              1.6f, glm::vec3(0.95f));
-            }
+            } else ui.drawItemIcon(sx + innerMargin, sy + innerMargin,
+                                   slotSize - innerMargin * 2.0f,
+                                   slotSize - innerMargin * 2.0f, *survivalStack);
         }
 
         // Selection highlight

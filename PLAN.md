@@ -68,6 +68,13 @@ sleep, simplified water swimming, an armor HUD, and durability bars throughout
 the inventory/container UI. These additions remain save-format 5 and world
 generation version 2 compatible.
 
+The current interaction-polish pass adds an integer-scaled procedural pixel UI,
+a scrollable select-then-play world list, persistent global client options,
+configurable keyboard/mouse/wheel gameplay bindings, pixel survival indicators,
+unified item tooltips, and inventory quick-transfer, collection, and drag
+distribution. Client options live in `saves/options.txt`, independently of
+world saves.
+
 ## Completion Criteria
 
 - A new player can gather wood, craft a table and tools, mine and smelt iron,

@@ -99,17 +99,7 @@ struct ChunkMesh {
 
             BlockId nid = getNeighbor(nx, ny, nz);
 
-            if (props.solid) {
-                // Solid block: face visible if neighbor is air or transparent
-                if (nid == BlockId::AIR) return id;
-                if (!getBlockProps(nid).solid) return id;
-                return BlockId::AIR;
-            } else if (props.transparent) {
-                // Transparent block (e.g. water): face visible only toward AIR
-                if (nid == BlockId::AIR) return id;
-                return BlockId::AIR;
-            }
-            return BlockId::AIR;
+            return shouldRenderCubeFace(id, nid) ? id : BlockId::AIR;
         };
 
         struct MaskCell {

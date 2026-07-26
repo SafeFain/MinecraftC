@@ -116,4 +116,6 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/command_tests.dir/DependInfo.cmake"
   "CMakeFiles/entity_logic_tests.dir/DependInfo.cmake"
   "CMakeFiles/lighting_logic_tests.dir/DependInfo.cmake"
+  "CMakeFiles/client_input_tests.dir/DependInfo.cmake"
+  "CMakeFiles/survival_integration_tests.dir/DependInfo.cmake"
   )

@@ -6,6 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <cstdio>
+#include <algorithm>
 
 // ── Constructor / Destructor ──────────────────────────────────────────────
 
@@ -159,6 +160,68 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
     GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_quadEBO));
     GL_CHECK(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
     GL_CHECK(glBindVertexArray(0));
+}
+
+void UIRenderer::drawPanel(float x, float y, float w, float h, const glm::vec4& fill) {
+    drawRect(x, y, w, h, glm::vec4(0.02f, 0.02f, 0.025f, fill.a));
+    drawRect(x + 2, y + 2, w - 4, h - 4, glm::vec4(0.48f, 0.48f, 0.52f, fill.a));
+    drawRect(x + 4, y + 4, w - 8, h - 8, fill);
+}
+
+void UIRenderer::drawItemIcon(float x, float y, float w, float h, const ItemStack& stack) {
+    if (stack.empty()) return;
+    const auto& props = getItemProps(stack.id);
+    if (props.placedBlock) { drawBlockIcon(x, y, w, h, *props.placedBlock); return; }
+    glm::vec4 material(.72f, .72f, .72f, 1.0f);
+    if (props.tier == ToolTier::Wood) material = {.48f,.30f,.14f,1};
+    else if (props.tier == ToolTier::Stone) material = {.48f,.50f,.52f,1};
+    else if (props.tier == ToolTier::Iron) material = {.82f,.84f,.82f,1};
+    else if (props.tier == ToolTier::Gold) material = {.95f,.72f,.12f,1};
+    else if (props.tier == ToolTier::Diamond) material = {.18f,.82f,.78f,1};
+    const float p = std::max(2.0f, std::floor(std::min(w,h) / 12.0f));
+    if (props.kind == ItemKind::Tool || props.kind == ItemKind::Weapon) {
+        drawRect(x+w*.45f, y+h*.12f, p*2, h*.62f, {.42f,.24f,.10f,1});
+        if (props.tool == ToolKind::Pickaxe)
+            drawRect(x+w*.18f, y+h*.67f, w*.68f, p*2, material);
+        else if (props.tool == ToolKind::Axe) {
+            drawRect(x+w*.50f, y+h*.58f, w*.32f, h*.26f, material);
+            drawRect(x+w*.33f, y+h*.64f, w*.24f, p*2, material);
+        } else if (props.tool == ToolKind::Bow) {
+            drawRect(x+w*.25f,y+h*.18f,p,h*.64f,material);
+            drawRect(x+w*.68f,y+h*.18f,p,h*.64f,{.9f,.9f,.75f,1});
+        } else if (props.tool == ToolKind::Shield) {
+            drawRect(x+w*.20f,y+h*.18f,w*.60f,h*.66f,{.46f,.28f,.12f,1});
+            drawRect(x+w*.30f,y+h*.31f,w*.40f,h*.42f,material);
+        } else drawRect(x+w*.35f, y+h*.64f, w*.42f, p*2, material);
+    } else if (props.kind == ItemKind::Armor) {
+        drawRect(x+w*.22f,y+h*.20f,w*.56f,h*.58f,material);
+        drawRect(x+w*.36f,y+h*.10f,w*.28f,h*.22f,{.10f,.10f,.12f,1});
+    } else if (props.kind == ItemKind::Food) {
+        drawRect(x+w*.22f,y+h*.22f,w*.56f,h*.52f,{.72f,.25f,.12f,1});
+        drawRect(x+w*.54f,y+h*.70f,p*2,p*2,{.25f,.68f,.18f,1});
+    } else {
+        drawRect(x+w*.24f,y+h*.24f,w*.52f,h*.52f,material);
+        drawRect(x+w*.34f,y+h*.34f,w*.32f,h*.32f,{material.r*.65f,material.g*.65f,material.b*.65f,1});
+    }
+}
+
+void UIRenderer::drawTooltip(float x, float y, const ItemStack& stack) {
+    if (stack.empty()) return;
+    const auto& props = getItemProps(stack.id);
+    std::string detail = props.name;
+    if (stack.count > 1) detail += " x" + std::to_string(stack.count);
+    if (props.maxDurability)
+        detail += "  " + std::to_string(props.maxDurability - std::min(props.maxDurability, stack.damage)) +
+                  "/" + std::to_string(props.maxDurability);
+    else if (props.kind == ItemKind::Armor)
+        detail += "  Armor";
+    else if (props.attackDamage > 0.0f)
+        detail += "  Damage " + std::to_string(static_cast<int>(props.attackDamage));
+    else if (props.food > 0)
+        detail += "  Food +" + std::to_string(props.food);
+    const auto size = measureText(detail, .9f);
+    drawPanel(x, y, size.x + 14.0f, size.y + 12.0f, {.08f,.05f,.12f,.97f});
+    renderText(detail, x + 7.0f, y + 6.0f, .9f, {.95f,.90f,1.0f});
 }
 
 void UIRenderer::drawDurability(float x, float y, float w, const ItemStack& stack) {

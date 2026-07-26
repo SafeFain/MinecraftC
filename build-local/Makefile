@@ -717,6 +717,32 @@ lighting_logic_tests/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/lighting_logic_tests.dir/build.make CMakeFiles/lighting_logic_tests.dir/build
 .PHONY : lighting_logic_tests/fast
 
+#=============================================================================
+# Target rules for targets named client_input_tests
+
+# Build rule for target.
+client_input_tests: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 client_input_tests
+.PHONY : client_input_tests
+
+# fast build rule for target.
+client_input_tests/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/build
+.PHONY : client_input_tests/fast
+
+#=============================================================================
+# Target rules for targets named survival_integration_tests
+
+# Build rule for target.
+survival_integration_tests: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 survival_integration_tests
+.PHONY : survival_integration_tests
+
+# fast build rule for target.
+survival_integration_tests/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/build
+.PHONY : survival_integration_tests/fast
+
 external/glad/src/glad.o: external/glad/src/glad.c.o
 .PHONY : external/glad/src/glad.o
 
@@ -740,6 +766,33 @@ external/glad/src/glad.s: external/glad/src/glad.c.s
 external/glad/src/glad.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/glad.dir/build.make CMakeFiles/glad.dir/external/glad/src/glad.c.s
 .PHONY : external/glad/src/glad.c.s
+
+src/core/Input.o: src/core/Input.cpp.o
+.PHONY : src/core/Input.o
+
+# target to build an object file
+src/core/Input.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/core/Input.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/core/Input.cpp.o
+.PHONY : src/core/Input.cpp.o
+
+src/core/Input.i: src/core/Input.cpp.i
+.PHONY : src/core/Input.i
+
+# target to preprocess a source file
+src/core/Input.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/core/Input.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/core/Input.cpp.i
+.PHONY : src/core/Input.cpp.i
+
+src/core/Input.s: src/core/Input.cpp.s
+.PHONY : src/core/Input.s
+
+# target to generate assembly for a file
+src/core/Input.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/core/Input.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/core/Input.cpp.s
+.PHONY : src/core/Input.cpp.s
 
 src/core/Window.o: src/core/Window.cpp.o
 .PHONY : src/core/Window.o
@@ -837,6 +890,60 @@ src/entity/EntityManager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.s
 .PHONY : src/entity/EntityManager.cpp.s
 
+src/game/ClientSettings.o: src/game/ClientSettings.cpp.o
+.PHONY : src/game/ClientSettings.o
+
+# target to build an object file
+src/game/ClientSettings.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/ClientSettings.cpp.o
+.PHONY : src/game/ClientSettings.cpp.o
+
+src/game/ClientSettings.i: src/game/ClientSettings.cpp.i
+.PHONY : src/game/ClientSettings.i
+
+# target to preprocess a source file
+src/game/ClientSettings.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/ClientSettings.cpp.i
+.PHONY : src/game/ClientSettings.cpp.i
+
+src/game/ClientSettings.s: src/game/ClientSettings.cpp.s
+.PHONY : src/game/ClientSettings.s
+
+# target to generate assembly for a file
+src/game/ClientSettings.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/ClientSettings.cpp.s
+.PHONY : src/game/ClientSettings.cpp.s
+
+src/game/InventoryInteraction.o: src/game/InventoryInteraction.cpp.o
+.PHONY : src/game/InventoryInteraction.o
+
+# target to build an object file
+src/game/InventoryInteraction.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/InventoryInteraction.cpp.o
+.PHONY : src/game/InventoryInteraction.cpp.o
+
+src/game/InventoryInteraction.i: src/game/InventoryInteraction.cpp.i
+.PHONY : src/game/InventoryInteraction.i
+
+# target to preprocess a source file
+src/game/InventoryInteraction.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/InventoryInteraction.cpp.i
+.PHONY : src/game/InventoryInteraction.cpp.i
+
+src/game/InventoryInteraction.s: src/game/InventoryInteraction.cpp.s
+.PHONY : src/game/InventoryInteraction.s
+
+# target to generate assembly for a file
+src/game/InventoryInteraction.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/InventoryInteraction.cpp.s
+.PHONY : src/game/InventoryInteraction.cpp.s
+
 src/game/InventoryModel.o: src/game/InventoryModel.cpp.o
 .PHONY : src/game/InventoryModel.o
 
@@ -846,6 +953,7 @@ src/game/InventoryModel.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/src/game/InventoryModel.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/InventoryModel.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/InventoryModel.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/InventoryModel.cpp.o
 .PHONY : src/game/InventoryModel.cpp.o
 
 src/game/InventoryModel.i: src/game/InventoryModel.cpp.i
@@ -857,6 +965,7 @@ src/game/InventoryModel.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/src/game/InventoryModel.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/InventoryModel.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/InventoryModel.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/InventoryModel.cpp.i
 .PHONY : src/game/InventoryModel.cpp.i
 
 src/game/InventoryModel.s: src/game/InventoryModel.cpp.s
@@ -868,6 +977,7 @@ src/game/InventoryModel.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/inventory_tests.dir/build.make CMakeFiles/inventory_tests.dir/src/game/InventoryModel.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/InventoryModel.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/InventoryModel.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/InventoryModel.cpp.s
 .PHONY : src/game/InventoryModel.cpp.s
 
 src/game/Item.o: src/game/Item.cpp.o
@@ -881,6 +991,8 @@ src/game/Item.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/Item.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/game/Item.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/Item.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/Item.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/Item.cpp.o
 .PHONY : src/game/Item.cpp.o
 
 src/game/Item.i: src/game/Item.cpp.i
@@ -894,6 +1006,8 @@ src/game/Item.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/Item.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/game/Item.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/Item.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/Item.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/Item.cpp.i
 .PHONY : src/game/Item.cpp.i
 
 src/game/Item.s: src/game/Item.cpp.s
@@ -907,6 +1021,8 @@ src/game/Item.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/Item.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/game/Item.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/Item.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/game/Item.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/Item.cpp.s
 .PHONY : src/game/Item.cpp.s
 
 src/game/SaveStore.o: src/game/SaveStore.cpp.o
@@ -917,6 +1033,7 @@ src/game/SaveStore.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/SaveStore.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/SaveStore.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SaveStore.cpp.o
 .PHONY : src/game/SaveStore.cpp.o
 
 src/game/SaveStore.i: src/game/SaveStore.cpp.i
@@ -927,6 +1044,7 @@ src/game/SaveStore.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/SaveStore.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/SaveStore.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SaveStore.cpp.i
 .PHONY : src/game/SaveStore.cpp.i
 
 src/game/SaveStore.s: src/game/SaveStore.cpp.s
@@ -937,7 +1055,35 @@ src/game/SaveStore.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/src/game/SaveStore.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/game/SaveStore.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SaveStore.cpp.s
 .PHONY : src/game/SaveStore.cpp.s
+
+src/game/SurvivalBlockLogic.o: src/game/SurvivalBlockLogic.cpp.o
+.PHONY : src/game/SurvivalBlockLogic.o
+
+# target to build an object file
+src/game/SurvivalBlockLogic.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalBlockLogic.cpp.o
+.PHONY : src/game/SurvivalBlockLogic.cpp.o
+
+src/game/SurvivalBlockLogic.i: src/game/SurvivalBlockLogic.cpp.i
+.PHONY : src/game/SurvivalBlockLogic.i
+
+# target to preprocess a source file
+src/game/SurvivalBlockLogic.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalBlockLogic.cpp.i
+.PHONY : src/game/SurvivalBlockLogic.cpp.i
+
+src/game/SurvivalBlockLogic.s: src/game/SurvivalBlockLogic.cpp.s
+.PHONY : src/game/SurvivalBlockLogic.s
+
+# target to generate assembly for a file
+src/game/SurvivalBlockLogic.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalBlockLogic.cpp.s
+.PHONY : src/game/SurvivalBlockLogic.cpp.s
 
 src/game/SurvivalRules.o: src/game/SurvivalRules.cpp.o
 .PHONY : src/game/SurvivalRules.o
@@ -946,6 +1092,7 @@ src/game/SurvivalRules.o: src/game/SurvivalRules.cpp.o
 src/game/SurvivalRules.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/SurvivalRules.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalRules.cpp.o
 .PHONY : src/game/SurvivalRules.cpp.o
 
 src/game/SurvivalRules.i: src/game/SurvivalRules.cpp.i
@@ -955,6 +1102,7 @@ src/game/SurvivalRules.i: src/game/SurvivalRules.cpp.i
 src/game/SurvivalRules.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/SurvivalRules.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalRules.cpp.i
 .PHONY : src/game/SurvivalRules.cpp.i
 
 src/game/SurvivalRules.s: src/game/SurvivalRules.cpp.s
@@ -964,7 +1112,35 @@ src/game/SurvivalRules.s: src/game/SurvivalRules.cpp.s
 src/game/SurvivalRules.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/game/SurvivalRules.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalRules.cpp.s
 .PHONY : src/game/SurvivalRules.cpp.s
+
+src/game/SurvivalSession.o: src/game/SurvivalSession.cpp.o
+.PHONY : src/game/SurvivalSession.o
+
+# target to build an object file
+src/game/SurvivalSession.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalSession.cpp.o
+.PHONY : src/game/SurvivalSession.cpp.o
+
+src/game/SurvivalSession.i: src/game/SurvivalSession.cpp.i
+.PHONY : src/game/SurvivalSession.i
+
+# target to preprocess a source file
+src/game/SurvivalSession.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalSession.cpp.i
+.PHONY : src/game/SurvivalSession.cpp.i
+
+src/game/SurvivalSession.s: src/game/SurvivalSession.cpp.s
+.PHONY : src/game/SurvivalSession.s
+
+# target to generate assembly for a file
+src/game/SurvivalSession.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/game/SurvivalSession.cpp.s
+.PHONY : src/game/SurvivalSession.cpp.s
 
 src/game/SurvivalStats.o: src/game/SurvivalStats.cpp.o
 .PHONY : src/game/SurvivalStats.o
@@ -1444,6 +1620,8 @@ src/world/Block.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/world/Block.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/world/Block.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/world/Block.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/world/Block.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/Block.cpp.o
 .PHONY : src/world/Block.cpp.o
 
 src/world/Block.i: src/world/Block.cpp.i
@@ -1459,6 +1637,8 @@ src/world/Block.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/world/Block.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/world/Block.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/world/Block.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/world/Block.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/Block.cpp.i
 .PHONY : src/world/Block.cpp.i
 
 src/world/Block.s: src/world/Block.cpp.s
@@ -1474,7 +1654,36 @@ src/world/Block.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_rules_tests.dir/build.make CMakeFiles/survival_rules_tests.dir/src/world/Block.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_stats_tests.dir/build.make CMakeFiles/survival_stats_tests.dir/src/world/Block.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/world_catalog_tests.dir/build.make CMakeFiles/world_catalog_tests.dir/src/world/Block.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/src/world/Block.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/Block.cpp.s
 .PHONY : src/world/Block.cpp.s
+
+src/world/BlockEntityLogic.o: src/world/BlockEntityLogic.cpp.o
+.PHONY : src/world/BlockEntityLogic.o
+
+# target to build an object file
+src/world/BlockEntityLogic.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/BlockEntityLogic.cpp.o
+.PHONY : src/world/BlockEntityLogic.cpp.o
+
+src/world/BlockEntityLogic.i: src/world/BlockEntityLogic.cpp.i
+.PHONY : src/world/BlockEntityLogic.i
+
+# target to preprocess a source file
+src/world/BlockEntityLogic.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/BlockEntityLogic.cpp.i
+.PHONY : src/world/BlockEntityLogic.cpp.i
+
+src/world/BlockEntityLogic.s: src/world/BlockEntityLogic.cpp.s
+.PHONY : src/world/BlockEntityLogic.s
+
+# target to generate assembly for a file
+src/world/BlockEntityLogic.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/minecraftc.dir/build.make CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/src/world/BlockEntityLogic.cpp.s
+.PHONY : src/world/BlockEntityLogic.cpp.s
 
 src/world/CaveGenerator.o: src/world/CaveGenerator.cpp.o
 .PHONY : src/world/CaveGenerator.o
@@ -1770,6 +1979,30 @@ tests/CaveGeneratorTests.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cavegen_tests.dir/build.make CMakeFiles/cavegen_tests.dir/tests/CaveGeneratorTests.cpp.s
 .PHONY : tests/CaveGeneratorTests.cpp.s
 
+tests/ClientInputTests.o: tests/ClientInputTests.cpp.o
+.PHONY : tests/ClientInputTests.o
+
+# target to build an object file
+tests/ClientInputTests.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/tests/ClientInputTests.cpp.o
+.PHONY : tests/ClientInputTests.cpp.o
+
+tests/ClientInputTests.i: tests/ClientInputTests.cpp.i
+.PHONY : tests/ClientInputTests.i
+
+# target to preprocess a source file
+tests/ClientInputTests.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/tests/ClientInputTests.cpp.i
+.PHONY : tests/ClientInputTests.cpp.i
+
+tests/ClientInputTests.s: tests/ClientInputTests.cpp.s
+.PHONY : tests/ClientInputTests.s
+
+# target to generate assembly for a file
+tests/ClientInputTests.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/client_input_tests.dir/build.make CMakeFiles/client_input_tests.dir/tests/ClientInputTests.cpp.s
+.PHONY : tests/ClientInputTests.cpp.s
+
 tests/CommandTests.o: tests/CommandTests.cpp.o
 .PHONY : tests/CommandTests.o
 
@@ -1938,6 +2171,30 @@ tests/SaveStoreTests.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/save_store_tests.dir/build.make CMakeFiles/save_store_tests.dir/tests/SaveStoreTests.cpp.s
 .PHONY : tests/SaveStoreTests.cpp.s
 
+tests/SurvivalIntegrationTests.o: tests/SurvivalIntegrationTests.cpp.o
+.PHONY : tests/SurvivalIntegrationTests.o
+
+# target to build an object file
+tests/SurvivalIntegrationTests.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/tests/SurvivalIntegrationTests.cpp.o
+.PHONY : tests/SurvivalIntegrationTests.cpp.o
+
+tests/SurvivalIntegrationTests.i: tests/SurvivalIntegrationTests.cpp.i
+.PHONY : tests/SurvivalIntegrationTests.i
+
+# target to preprocess a source file
+tests/SurvivalIntegrationTests.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/tests/SurvivalIntegrationTests.cpp.i
+.PHONY : tests/SurvivalIntegrationTests.cpp.i
+
+tests/SurvivalIntegrationTests.s: tests/SurvivalIntegrationTests.cpp.s
+.PHONY : tests/SurvivalIntegrationTests.s
+
+# target to generate assembly for a file
+tests/SurvivalIntegrationTests.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/survival_integration_tests.dir/build.make CMakeFiles/survival_integration_tests.dir/tests/SurvivalIntegrationTests.cpp.s
+.PHONY : tests/SurvivalIntegrationTests.cpp.s
+
 tests/SurvivalRulesTests.o: tests/SurvivalRulesTests.cpp.o
 .PHONY : tests/SurvivalRulesTests.o
 
@@ -2076,6 +2333,7 @@ help:
 	@echo "... NightlyTest"
 	@echo "... NightlyUpdate"
 	@echo "... cavegen_tests"
+	@echo "... client_input_tests"
 	@echo "... command_tests"
 	@echo "... entity_logic_tests"
 	@echo "... glad"
@@ -2085,6 +2343,7 @@ help:
 	@echo "... player_physics_tests"
 	@echo "... rendering_logic_tests"
 	@echo "... save_store_tests"
+	@echo "... survival_integration_tests"
 	@echo "... survival_rules_tests"
 	@echo "... survival_stats_tests"
 	@echo "... world_catalog_tests"
@@ -2092,6 +2351,9 @@ help:
 	@echo "... external/glad/src/glad.o"
 	@echo "... external/glad/src/glad.i"
 	@echo "... external/glad/src/glad.s"
+	@echo "... src/core/Input.o"
+	@echo "... src/core/Input.i"
+	@echo "... src/core/Input.s"
 	@echo "... src/core/Window.o"
 	@echo "... src/core/Window.i"
 	@echo "... src/core/Window.s"
@@ -2104,6 +2366,12 @@ help:
 	@echo "... src/entity/EntityManager.o"
 	@echo "... src/entity/EntityManager.i"
 	@echo "... src/entity/EntityManager.s"
+	@echo "... src/game/ClientSettings.o"
+	@echo "... src/game/ClientSettings.i"
+	@echo "... src/game/ClientSettings.s"
+	@echo "... src/game/InventoryInteraction.o"
+	@echo "... src/game/InventoryInteraction.i"
+	@echo "... src/game/InventoryInteraction.s"
 	@echo "... src/game/InventoryModel.o"
 	@echo "... src/game/InventoryModel.i"
 	@echo "... src/game/InventoryModel.s"
@@ -2113,9 +2381,15 @@ help:
 	@echo "... src/game/SaveStore.o"
 	@echo "... src/game/SaveStore.i"
 	@echo "... src/game/SaveStore.s"
+	@echo "... src/game/SurvivalBlockLogic.o"
+	@echo "... src/game/SurvivalBlockLogic.i"
+	@echo "... src/game/SurvivalBlockLogic.s"
 	@echo "... src/game/SurvivalRules.o"
 	@echo "... src/game/SurvivalRules.i"
 	@echo "... src/game/SurvivalRules.s"
+	@echo "... src/game/SurvivalSession.o"
+	@echo "... src/game/SurvivalSession.i"
+	@echo "... src/game/SurvivalSession.s"
 	@echo "... src/game/SurvivalStats.o"
 	@echo "... src/game/SurvivalStats.i"
 	@echo "... src/game/SurvivalStats.s"
@@ -2176,6 +2450,9 @@ help:
 	@echo "... src/world/Block.o"
 	@echo "... src/world/Block.i"
 	@echo "... src/world/Block.s"
+	@echo "... src/world/BlockEntityLogic.o"
+	@echo "... src/world/BlockEntityLogic.i"
+	@echo "... src/world/BlockEntityLogic.s"
 	@echo "... src/world/CaveGenerator.o"
 	@echo "... src/world/CaveGenerator.i"
 	@echo "... src/world/CaveGenerator.s"
@@ -2209,6 +2486,9 @@ help:
 	@echo "... tests/CaveGeneratorTests.o"
 	@echo "... tests/CaveGeneratorTests.i"
 	@echo "... tests/CaveGeneratorTests.s"
+	@echo "... tests/ClientInputTests.o"
+	@echo "... tests/ClientInputTests.i"
+	@echo "... tests/ClientInputTests.s"
 	@echo "... tests/CommandTests.o"
 	@echo "... tests/CommandTests.i"
 	@echo "... tests/CommandTests.s"
@@ -2230,6 +2510,9 @@ help:
 	@echo "... tests/SaveStoreTests.o"
 	@echo "... tests/SaveStoreTests.i"
 	@echo "... tests/SaveStoreTests.s"
+	@echo "... tests/SurvivalIntegrationTests.o"
+	@echo "... tests/SurvivalIntegrationTests.i"
+	@echo "... tests/SurvivalIntegrationTests.s"
 	@echo "... tests/SurvivalRulesTests.o"
 	@echo "... tests/SurvivalRulesTests.i"
 	@echo "... tests/SurvivalRulesTests.s"

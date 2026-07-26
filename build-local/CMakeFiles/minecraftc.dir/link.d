@@ -2,14 +2,19 @@ minecraftc: \
   /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/Scrt1.o \
   /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/crti.o \
   /usr/lib/gcc/x86_64-linux-gnu/14/crtbeginS.o \
+  CMakeFiles/minecraftc.dir/src/core/Input.cpp.o \
   CMakeFiles/minecraftc.dir/src/core/Window.cpp.o \
   CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o \
   CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o \
   CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o \
+  CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o \
+  CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/Item.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o \
+  CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o \
+  CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o \
   CMakeFiles/minecraftc.dir/src/game/WorldCatalog.cpp.o \
   CMakeFiles/minecraftc.dir/src/main.cpp.o \
@@ -30,6 +35,7 @@ minecraftc: \
   CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o \
   CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o \
   CMakeFiles/minecraftc.dir/src/world/Block.cpp.o \
+  CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o \
   CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o \
   CMakeFiles/minecraftc.dir/src/world/Chunk.cpp.o \
   CMakeFiles/minecraftc.dir/src/world/ChunkMesh.cpp.o \
@@ -78,6 +84,8 @@ minecraftc: \
 
 /usr/lib/gcc/x86_64-linux-gnu/14/crtbeginS.o:
 
+CMakeFiles/minecraftc.dir/src/core/Input.cpp.o:
+
 CMakeFiles/minecraftc.dir/src/core/Window.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/debug/CrashHandler.cpp.o:
@@ -86,13 +94,21 @@ CMakeFiles/minecraftc.dir/src/debug/Log.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o:
 
+CMakeFiles/minecraftc.dir/src/game/ClientSettings.cpp.o:
+
+CMakeFiles/minecraftc.dir/src/game/InventoryInteraction.cpp.o:
+
 CMakeFiles/minecraftc.dir/src/game/InventoryModel.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/game/Item.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/game/SaveStore.cpp.o:
 
+CMakeFiles/minecraftc.dir/src/game/SurvivalBlockLogic.cpp.o:
+
 CMakeFiles/minecraftc.dir/src/game/SurvivalRules.cpp.o:
+
+CMakeFiles/minecraftc.dir/src/game/SurvivalSession.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/game/SurvivalStats.cpp.o:
 
@@ -133,6 +149,8 @@ CMakeFiles/minecraftc.dir/src/ui/UIRenderer.cpp.o:
 CMakeFiles/minecraftc.dir/src/world/BiomeMap.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/world/Block.cpp.o:
+
+CMakeFiles/minecraftc.dir/src/world/BlockEntityLogic.cpp.o:
 
 CMakeFiles/minecraftc.dir/src/world/CaveGenerator.cpp.o:
 

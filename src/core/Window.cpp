@@ -158,9 +158,22 @@ void Window::getCursorPos(double& x, double& y) const {
 
 void Window::setCursorLocked(bool locked) {
     m_cursorLocked = locked;
+    m_cursorDeltaX = 0.0;
+    m_cursorDeltaY = 0.0;
+    glfwGetCursorPos(m_window, &m_lastCursorX, &m_lastCursorY);
     if (locked) {
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     } else {
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION,
+                         locked && m_rawMouseInput ? GLFW_TRUE : GLFW_FALSE);
+}
+
+void Window::setRawMouseInput(bool enabled) {
+    m_rawMouseInput = enabled;
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION,
+                         m_cursorLocked && enabled ? GLFW_TRUE : GLFW_FALSE);
 }

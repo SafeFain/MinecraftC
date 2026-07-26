@@ -1,10 +1,10 @@
-Start testing: Jul 26 08:56 CST
+Start testing: Jul 26 10:59 CST
 ----------------------------------------------------------
-1/12 Testing: cavegen_determinism_and_boundaries
-1/12 Test: cavegen_determinism_and_boundaries
+1/14 Testing: cavegen_determinism_and_boundaries
+1/14 Test: cavegen_determinism_and_boundaries
 Command: "/home/evan/Coding/MinecraftC/build-local/cavegen_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"cavegen_determinism_and_boundaries" start time: Jul 26 08:56 CST
+"cavegen_determinism_and_boundaries" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 cave density=0.0835751 carved=53916 water=1132 lava=2970
@@ -12,32 +12,32 @@ cave density=0.0835751 carved=53916 water=1132 lava=2970
 Test time =   0.27 sec
 ----------------------------------------------------------
 Test Passed.
-"cavegen_determinism_and_boundaries" end time: Jul 26 08:56 CST
+"cavegen_determinism_and_boundaries" end time: Jul 26 10:59 CST
 "cavegen_determinism_and_boundaries" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-2/12 Testing: worldgen_determinism_boundaries_and_distribution
-2/12 Test: worldgen_determinism_boundaries_and_distribution
+2/14 Testing: worldgen_determinism_boundaries_and_distribution
+2/14 Test: worldgen_determinism_boundaries_and_distribution
 Command: "/home/evan/Coding/MinecraftC/build-local/worldgen_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"worldgen_determinism_boundaries_and_distribution" start time: Jul 26 08:56 CST
+"worldgen_determinism_boundaries_and_distribution" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 ore sample coal=6378 iron=2916 gold=422 diamond=67 total=9783/1933312
 biomes=18 rivers=18325 trees=0 ores=9783/1933312
 <end of output>
-Test time =   1.22 sec
+Test time =   1.30 sec
 ----------------------------------------------------------
 Test Passed.
-"worldgen_determinism_boundaries_and_distribution" end time: Jul 26 08:56 CST
+"worldgen_determinism_boundaries_and_distribution" end time: Jul 26 10:59 CST
 "worldgen_determinism_boundaries_and_distribution" time elapsed: 00:00:01
 ----------------------------------------------------------
 
-3/12 Testing: rendering_day_cycle_and_environment
-3/12 Test: rendering_day_cycle_and_environment
+3/14 Testing: rendering_day_cycle_and_environment
+3/14 Test: rendering_day_cycle_and_environment
 Command: "/home/evan/Coding/MinecraftC/build-local/rendering_logic_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"rendering_day_cycle_and_environment" start time: Jul 26 08:56 CST
+"rendering_day_cycle_and_environment" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 render environment logic passed
@@ -45,15 +45,15 @@ render environment logic passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"rendering_day_cycle_and_environment" end time: Jul 26 08:56 CST
+"rendering_day_cycle_and_environment" end time: Jul 26 10:59 CST
 "rendering_day_cycle_and_environment" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-4/12 Testing: player_ledge_and_auto_jump_logic
-4/12 Test: player_ledge_and_auto_jump_logic
+4/14 Testing: player_ledge_and_auto_jump_logic
+4/14 Test: player_ledge_and_auto_jump_logic
 Command: "/home/evan/Coding/MinecraftC/build-local/player_physics_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"player_ledge_and_auto_jump_logic" start time: Jul 26 08:56 CST
+"player_ledge_and_auto_jump_logic" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 player physics logic passed
@@ -61,15 +61,15 @@ player physics logic passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"player_ledge_and_auto_jump_logic" end time: Jul 26 08:56 CST
+"player_ledge_and_auto_jump_logic" end time: Jul 26 10:59 CST
 "player_ledge_and_auto_jump_logic" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/12 Testing: survival_item_registry_and_inventory
-5/12 Test: survival_item_registry_and_inventory
+5/14 Testing: survival_item_registry_and_inventory
+5/14 Test: survival_item_registry_and_inventory
 Command: "/home/evan/Coding/MinecraftC/build-local/inventory_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_item_registry_and_inventory" start time: Jul 26 08:56 CST
+"survival_item_registry_and_inventory" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Inventory and item registry tests passed
@@ -77,15 +77,15 @@ Inventory and item registry tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_item_registry_and_inventory" end time: Jul 26 08:56 CST
+"survival_item_registry_and_inventory" end time: Jul 26 10:59 CST
 "survival_item_registry_and_inventory" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-6/12 Testing: survival_save_roundtrip_and_corruption
-6/12 Test: survival_save_roundtrip_and_corruption
+6/14 Testing: survival_save_roundtrip_and_corruption
+6/14 Test: survival_save_roundtrip_and_corruption
 Command: "/home/evan/Coding/MinecraftC/build-local/save_store_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_save_roundtrip_and_corruption" start time: Jul 26 08:56 CST
+"survival_save_roundtrip_and_corruption" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Save store tests passed
@@ -93,15 +93,15 @@ Save store tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_save_roundtrip_and_corruption" end time: Jul 26 08:56 CST
+"survival_save_roundtrip_and_corruption" end time: Jul 26 10:59 CST
 "survival_save_roundtrip_and_corruption" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-7/12 Testing: survival_mining_crafting_and_smelting
-7/12 Test: survival_mining_crafting_and_smelting
+7/14 Testing: survival_mining_crafting_and_smelting
+7/14 Test: survival_mining_crafting_and_smelting
 Command: "/home/evan/Coding/MinecraftC/build-local/survival_rules_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_mining_crafting_and_smelting" start time: Jul 26 08:56 CST
+"survival_mining_crafting_and_smelting" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Survival rules tests passed
@@ -109,15 +109,15 @@ Survival rules tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_mining_crafting_and_smelting" end time: Jul 26 08:56 CST
+"survival_mining_crafting_and_smelting" end time: Jul 26 10:59 CST
 "survival_mining_crafting_and_smelting" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-8/12 Testing: survival_health_hunger_and_starvation
-8/12 Test: survival_health_hunger_and_starvation
+8/14 Testing: survival_health_hunger_and_starvation
+8/14 Test: survival_health_hunger_and_starvation
 Command: "/home/evan/Coding/MinecraftC/build-local/survival_stats_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_health_hunger_and_starvation" start time: Jul 26 08:56 CST
+"survival_health_hunger_and_starvation" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Survival stats tests passed
@@ -125,15 +125,15 @@ Survival stats tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_health_hunger_and_starvation" end time: Jul 26 08:56 CST
+"survival_health_hunger_and_starvation" end time: Jul 26 10:59 CST
 "survival_health_hunger_and_starvation" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-9/12 Testing: survival_multiple_world_catalog
-9/12 Test: survival_multiple_world_catalog
+9/14 Testing: survival_multiple_world_catalog
+9/14 Test: survival_multiple_world_catalog
 Command: "/home/evan/Coding/MinecraftC/build-local/world_catalog_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_multiple_world_catalog" start time: Jul 26 08:56 CST
+"survival_multiple_world_catalog" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 World catalog tests passed
@@ -141,15 +141,15 @@ World catalog tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_multiple_world_catalog" end time: Jul 26 08:56 CST
+"survival_multiple_world_catalog" end time: Jul 26 10:59 CST
 "survival_multiple_world_catalog" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-10/12 Testing: cheat_gamemode_command_parsing
-10/12 Test: cheat_gamemode_command_parsing
+10/14 Testing: cheat_gamemode_command_parsing
+10/14 Test: cheat_gamemode_command_parsing
 Command: "/home/evan/Coding/MinecraftC/build-local/command_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"cheat_gamemode_command_parsing" start time: Jul 26 08:56 CST
+"cheat_gamemode_command_parsing" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Command parsing tests passed
@@ -157,15 +157,15 @@ Command parsing tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"cheat_gamemode_command_parsing" end time: Jul 26 08:56 CST
+"cheat_gamemode_command_parsing" end time: Jul 26 10:59 CST
 "cheat_gamemode_command_parsing" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-11/12 Testing: survival_entity_spawning_despawn_and_sweep
-11/12 Test: survival_entity_spawning_despawn_and_sweep
+11/14 Testing: survival_entity_spawning_despawn_and_sweep
+11/14 Test: survival_entity_spawning_despawn_and_sweep
 Command: "/home/evan/Coding/MinecraftC/build-local/entity_logic_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"survival_entity_spawning_despawn_and_sweep" start time: Jul 26 08:56 CST
+"survival_entity_spawning_despawn_and_sweep" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Entity logic tests passed
@@ -173,15 +173,15 @@ Entity logic tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"survival_entity_spawning_despawn_and_sweep" end time: Jul 26 08:56 CST
+"survival_entity_spawning_despawn_and_sweep" end time: Jul 26 10:59 CST
 "survival_entity_spawning_despawn_and_sweep" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-12/12 Testing: rendering_cross_chunk_block_light
-12/12 Test: rendering_cross_chunk_block_light
+12/14 Testing: rendering_cross_chunk_block_light
+12/14 Test: rendering_cross_chunk_block_light
 Command: "/home/evan/Coding/MinecraftC/build-local/lighting_logic_tests"
 Directory: /home/evan/Coding/MinecraftC/build-local
-"rendering_cross_chunk_block_light" start time: Jul 26 08:56 CST
+"rendering_cross_chunk_block_light" start time: Jul 26 10:59 CST
 Output:
 ----------------------------------------------------------
 Lighting logic tests passed
@@ -189,8 +189,40 @@ Lighting logic tests passed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"rendering_cross_chunk_block_light" end time: Jul 26 08:56 CST
+"rendering_cross_chunk_block_light" end time: Jul 26 10:59 CST
 "rendering_cross_chunk_block_light" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Jul 26 08:56 CST
+13/14 Testing: client_settings_bindings_and_inventory_gestures
+13/14 Test: client_settings_bindings_and_inventory_gestures
+Command: "/home/evan/Coding/MinecraftC/build-local/client_input_tests"
+Directory: /home/evan/Coding/MinecraftC/build-local
+"client_settings_bindings_and_inventory_gestures" start time: Jul 26 10:59 CST
+Output:
+----------------------------------------------------------
+Client input and inventory interaction tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"client_settings_bindings_and_inventory_gestures" end time: Jul 26 10:59 CST
+"client_settings_bindings_and_inventory_gestures" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/14 Testing: survival_progression_persistence_and_recovery
+14/14 Test: survival_progression_persistence_and_recovery
+Command: "/home/evan/Coding/MinecraftC/build-local/survival_integration_tests"
+Directory: /home/evan/Coding/MinecraftC/build-local
+"survival_progression_persistence_and_recovery" start time: Jul 26 10:59 CST
+Output:
+----------------------------------------------------------
+Survival progression integration tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"survival_progression_persistence_and_recovery" end time: Jul 26 10:59 CST
+"survival_progression_persistence_and_recovery" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jul 26 10:59 CST

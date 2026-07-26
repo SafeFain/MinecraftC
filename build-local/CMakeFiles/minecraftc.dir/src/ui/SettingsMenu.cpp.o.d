@@ -366,7 +366,14 @@ CMakeFiles/minecraftc.dir/src/ui/SettingsMenu.cpp.o: \
  /home/evan/Coding/MinecraftC/src/world/BlockEntity.h \
  /home/evan/Coding/MinecraftC/src/game/WorldCatalog.h \
  /usr/include/c++/14/utility /usr/include/c++/14/bits/stl_relops.h \
+ /home/evan/Coding/MinecraftC/src/game/ClientSettings.h \
+ /home/evan/Coding/MinecraftC/src/core/Input.h \
  /home/evan/Coding/MinecraftC/src/ui/UIRenderer.h \
  /home/evan/Coding/MinecraftC/external/glad/include/glad/glad.h \
  /home/evan/Coding/MinecraftC/src/ui/FontRenderer.h \
- /usr/include/GLFW/glfw3.h
+ /usr/include/GLFW/glfw3.h /usr/include/c++/14/algorithm \
+ /usr/include/c++/14/bits/stl_algo.h \
+ /usr/include/c++/14/bits/algorithmfwd.h \
+ /usr/include/c++/14/bits/stl_heap.h \
+ /usr/include/c++/14/bits/uniform_int_dist.h \
+ /usr/include/c++/14/pstl/glue_algorithm_defs.h

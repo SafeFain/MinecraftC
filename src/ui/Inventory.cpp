@@ -1,135 +1,101 @@
 #include "ui/Inventory.h"
 #include "ui/UIRenderer.h"
 #include "Config.h"
+#include "game/Item.h"
 
 #include <GLFW/glfw3.h>
+#include <algorithm>
+#include <cmath>
 
 CreativeInventory::CreativeInventory() {
-    // Populate slots with all non-AIR blocks (in BLOCK_TABLE order)
-    for (uint8_t i = 1; i < static_cast<uint8_t>(BlockId::COUNT); ++i) {
-        BlockId id = static_cast<BlockId>(i);
-        m_slots.push_back({id, 0.0f, 0.0f, false});
+    for (uint8_t i=1;i<static_cast<uint8_t>(BlockId::COUNT);++i)
+        m_slots.push_back({static_cast<BlockId>(i),0,0,false,false});
+}
+
+void CreativeInventory::layoutSlots(int width,int height) {
+    constexpr float slot=44.0f,gap=5.0f,padding=14.0f,header=52.0f,footer=34.0f;
+    m_columns=std::clamp(static_cast<int>((width-80.0f)/(slot+gap)),5,10);
+    m_totalRows=(static_cast<int>(m_slots.size())+m_columns-1)/m_columns;
+    m_visibleRows=std::clamp(static_cast<int>((height-150.0f)/(slot+gap)),2,7);
+    m_visibleRows=std::min(m_visibleRows,m_totalRows);
+    m_scrollRow=std::clamp(m_scrollRow,0,std::max(0,m_totalRows-m_visibleRows));
+    const float gridW=m_columns*slot+(m_columns-1)*gap;
+    const float gridH=m_visibleRows*slot+(m_visibleRows-1)*gap;
+    m_panelW=gridW+padding*2+12.0f;
+    m_panelH=header+gridH+footer;
+    m_panelX=(width-m_panelW)*.5f;
+    m_panelY=(height-m_panelH)*.5f;
+    const float originX=m_panelX+padding;
+    const float gridTop=m_panelY+footer+gridH;
+    for(size_t i=0;i<m_slots.size();++i){
+        auto& item=m_slots[i];const int row=static_cast<int>(i)/m_columns;
+        const int visibleRow=row-m_scrollRow;item.visible=visibleRow>=0&&visibleRow<m_visibleRows;
+        item.hovered=item.hovered&&item.visible;
+        if(!item.visible)continue;
+        const int column=static_cast<int>(i)%m_columns;
+        item.x=originX+column*(slot+gap);
+        item.y=gridTop-slot-visibleRow*(slot+gap);
     }
 }
 
-void CreativeInventory::layoutSlots(int screenWidth, int screenHeight) {
-    const float slotSize   = Config::INV_SLOT_SIZE;
-    const float padding    = Config::INV_PADDING;
-    const float labelH     = Config::INV_LABEL_HEIGHT;
-    const int   cols       = Config::INV_COLS;
-    const int   numSlots   = static_cast<int>(m_slots.size());
-    const int   rows       = (numSlots + cols - 1) / cols;
+void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,int mouseY) {
+    layoutSlots(width,height);
+    constexpr float slot=44.0f,footer=34.0f;
+    ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),{0,0,0,.58f});
+    ui.drawPanel(m_panelX,m_panelY,m_panelW,m_panelH,{.10f,.105f,.12f,.97f});
+    const std::string title="CREATIVE INVENTORY";
+    const auto titleSize=ui.measureText(title,1.8f);
+    ui.renderText(title,m_panelX+(m_panelW-titleSize.x)*.5f,m_panelY+m_panelH-34.0f,
+                  1.8f,Config::UIColors::TEXT_TITLE);
+    const std::string page=std::to_string(m_scrollRow+1)+" / "+
+        std::to_string(std::max(1,m_totalRows-m_visibleRows+1));
+    const auto pageSize=ui.measureText(page,.8f);
+    ui.renderText(page,m_panelX+m_panelW-pageSize.x-18.0f,m_panelY+14.0f,.8f,{.68f,.68f,.72f});
+    ui.renderText("Scroll to browse  |  Click to place in selected hotbar slot  |  E to close",
+                  m_panelX+16.0f,m_panelY+14.0f,.72f,{.65f,.65f,.70f});
 
-    const float gridW = cols * slotSize + (cols - 1) * padding;
-    const float gridH = rows * (slotSize + labelH + padding) - padding;  // no gap after last row
-
-    const float originX = (static_cast<float>(screenWidth) - gridW) * 0.5f;
-    const float originY = (static_cast<float>(screenHeight) - gridH) * 0.5f;
-
-    for (int i = 0; i < numSlots; ++i) {
-        int col = i % cols;
-        int row = i / cols;
-
-        // Rows top-to-bottom: row 0 = top row
-        m_slots[i].x = originX + col * (slotSize + padding);
-        m_slots[i].y = originY + (rows - 1 - row) * (slotSize + labelH + padding);
-    }
-}
-
-void CreativeInventory::render(UIRenderer& ui, int screenWidth, int screenHeight,
-                               int /*mouseX*/, int /*mouseY*/) {
-    // Recompute layout each frame
-    layoutSlots(screenWidth, screenHeight);
-
-    const float slotSize = Config::INV_SLOT_SIZE;
-
-    // Full-screen semi-transparent overlay
-    ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
-                static_cast<float>(screenHeight),
-                glm::vec4(0.0f, 0.0f, 0.0f, 0.55f));
-
-    // Title
-    const char* title = "CREATIVE INVENTORY";
-    float titleScale = Config::INV_TITLE_SCALE;
-    auto titleSize = ui.measureText(title, titleScale);
-    float titleX = (screenWidth - titleSize.x) * 0.5f;
-
-    // Find top of grid for title placement
-    float gridTop = 0.0f;
-    for (const auto& slot : m_slots) {
-        float top = slot.y + slotSize;
-        if (top > gridTop) gridTop = top;
-    }
-    float titleY = gridTop + Config::INV_LABEL_HEIGHT;
-    ui.renderText(title, titleX, titleY, titleScale,
-                  glm::vec3(1.0f, 0.85f, 0.3f));
-
-    // Instruction text at bottom
-    const char* instr = "Click to select  |  E to close";
-    float instrScale = Config::INV_INSTR_SCALE;
-    auto instrSize = ui.measureText(instr, instrScale);
-    float instrX = (screenWidth - instrSize.x) * 0.5f;
-    float instrY = 20.0f;
-    ui.renderText(instr, instrX, instrY, instrScale,
-                  glm::vec3(0.6f, 0.6f, 0.7f));
-
-    // Draw each slot
-    for (const auto& slot : m_slots) {
-        const BlockProperties& props = getBlockProps(slot.id);
-
-        // Slot background
-        glm::vec4 bgColor = slot.hovered
-            ? glm::vec4(props.color * 0.6f, 1.0f)
-            : glm::vec4(props.color * 0.35f, 0.9f);
-        ui.drawRect(slot.x, slot.y, slotSize, slotSize, bgColor);
-
-        // Material thumbnail from the world block atlas.
-        float innerMargin = 4.0f;
-        ui.drawBlockIcon(slot.x + innerMargin, slot.y + innerMargin,
-                         slotSize - innerMargin * 2.0f,
-                         slotSize - innerMargin * 2.0f, slot.id);
-
-        // Hover border
-        if (slot.hovered) {
-            float bw = 2.5f;
-            glm::vec4 borderCol(1.0f, 1.0f, 1.0f, 0.9f);
-            ui.drawRect(slot.x, slot.y, slotSize, bw, borderCol);
-            ui.drawRect(slot.x, slot.y + slotSize - bw, slotSize, bw, borderCol);
-            ui.drawRect(slot.x, slot.y, bw, slotSize, borderCol);
-            ui.drawRect(slot.x + slotSize - bw, slot.y, bw, slotSize, borderCol);
+    const Slot* hovered=nullptr;
+    for(const auto& item:m_slots){
+        if(!item.visible) continue;
+        const auto& props=getBlockProps(item.id);
+        ui.drawRect(item.x,item.y,slot,slot,item.hovered?glm::vec4(.34f,.34f,.38f,1)
+                                                       :glm::vec4(.17f,.17f,.20f,.98f));
+        ui.drawRect(item.x+2,item.y+2,slot-4,slot-4,{props.color*.28f,1});
+        ui.drawBlockIcon(item.x+4,item.y+4,slot-8,slot-8,item.id);
+        if(item.id==m_selected||item.hovered){
+            const glm::vec4 color=item.id==m_selected?glm::vec4(1,.82f,.22f,1):glm::vec4(1,1,1,.95f);
+            ui.drawRect(item.x,item.y,slot,2,color);ui.drawRect(item.x,item.y+slot-2,slot,2,color);
+            ui.drawRect(item.x,item.y,2,slot,color);ui.drawRect(item.x+slot-2,item.y,2,slot,color);
         }
-
-        // Block name label below slot
-        float labelScale = 1.0f;
-        auto labelSize = ui.measureText(props.name, labelScale);
-        ui.renderText(props.name,
-                      slot.x + (slotSize - labelSize.x) * 0.5f,
-                      slot.y - labelSize.y - 2.0f,
-                      labelScale,
-                      glm::vec3(0.9f, 0.9f, 0.9f));
+        if(item.hovered)hovered=&item;
     }
+
+    if(m_totalRows>m_visibleRows){
+        const float trackX=m_panelX+m_panelW-12.0f;
+        const float trackY=m_panelY+footer;
+        const float trackH=m_visibleRows*slot+(m_visibleRows-1)*5.0f;
+        const float thumbH=std::max(18.0f,trackH*m_visibleRows/m_totalRows);
+        const float fraction=static_cast<float>(m_scrollRow)/std::max(1,m_totalRows-m_visibleRows);
+        ui.drawRect(trackX,trackY,4,trackH,{.04f,.04f,.05f,1});
+        ui.drawRect(trackX,trackY+(trackH-thumbH)*(1.0f-fraction),4,thumbH,{.70f,.70f,.74f,1});
+    }
+    if(hovered){ItemStack stack{itemForBlock(hovered->id),1,0};
+        if(!stack.empty())ui.drawTooltip(mouseX+12.0f,mouseY+12.0f,stack);}
 }
 
-void CreativeInventory::onMouseMove(int mouseX, int mouseY) {
-    const float slotSize = Config::INV_SLOT_SIZE;
-    for (auto& slot : m_slots) {
-        slot.hovered = (mouseX >= slot.x && mouseX <= slot.x + slotSize &&
-                        mouseY >= slot.y && mouseY <= slot.y + slotSize);
-    }
+void CreativeInventory::onMouseMove(int x,int y){
+    constexpr float slot=44.0f;
+    for(auto& item:m_slots)item.hovered=item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot;
 }
 
-void CreativeInventory::onMouseClick(int button, int mouseX, int mouseY,
-                                     std::function<void(BlockId)> onSelectBlock) {
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+void CreativeInventory::onMouseClick(int button,int x,int y,std::function<void(BlockId)> select){
+    if(button!=GLFW_MOUSE_BUTTON_LEFT) return;
+    constexpr float slot=44.0f;
+    for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
+        m_selected=item.id;if(select)select(item.id);return;}
+}
 
-    const float slotSize = Config::INV_SLOT_SIZE;
-    for (const auto& slot : m_slots) {
-        if (mouseX >= slot.x && mouseX <= slot.x + slotSize &&
-            mouseY >= slot.y && mouseY <= slot.y + slotSize) {
-            if (onSelectBlock) {
-                onSelectBlock(slot.id);
-            }
-            return;
-        }
-    }
+void CreativeInventory::onScroll(double yOffset){
+    const int maximum=std::max(0,m_totalRows-m_visibleRows);
+    m_scrollRow=std::clamp(m_scrollRow+(yOffset<0?1:-1),0,maximum);
 }

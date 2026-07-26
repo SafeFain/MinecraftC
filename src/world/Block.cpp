@@ -10,7 +10,8 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::DIRT,         "Dirt",         glm::vec3(0.56f, 0.37f, 0.18f), true, false },
     { BlockId::STONE,        "Stone",        glm::vec3(0.50f, 0.50f, 0.50f), true, false },
     { BlockId::WOOD,         "Wood",         glm::vec3(0.55f, 0.40f, 0.20f), true, false },
-    { BlockId::LEAVES,       "Leaves",       glm::vec3(0.15f, 0.55f, 0.15f), true, false },
+    { BlockId::LEAVES,       "Leaves",       glm::vec3(0.15f, 0.55f, 0.15f), true, false,
+      RenderShape::Cube, RenderLayer::Translucent, 0.86f },
     { BlockId::SAND,         "Sand",         glm::vec3(0.90f, 0.84f, 0.60f), true, false },
     { BlockId::BEDROCK,      "Bedrock",      glm::vec3(0.20f, 0.20f, 0.20f), true, false },
     { BlockId::WATER,        "Water",        glm::vec3(0.20f, 0.40f, 0.90f), false, true,
@@ -185,6 +186,24 @@ BlockId farmlandForMoisture(uint8_t moisture) {
 
 bool isSapling(BlockId id) {
     return id >= BlockId::OAK_SAPLING && id <= BlockId::ACACIA_SAPLING;
+}
+
+bool shouldRenderCubeFace(BlockId current, BlockId neighbor) {
+    if (current == BlockId::AIR) return false;
+    const auto& currentProps = getBlockProps(current);
+    if (currentProps.shape != RenderShape::Cube) return false;
+    if (neighbor == BlockId::AIR) return true;
+
+    const auto& neighborProps = getBlockProps(neighbor);
+    if (!currentProps.solid)
+        return !neighborProps.solid && neighbor != current;
+    if (!neighborProps.solid) return true;
+
+    // Preserve the opaque surface behind ice/leaves. Without this interface
+    // face, gaps or alpha in the translucent material reveal missing terrain
+    // geometry and look like an x-ray into caves below.
+    return currentProps.layer == RenderLayer::Opaque &&
+           neighborProps.layer == RenderLayer::Translucent;
 }
 
 // ── Face direction offsets ────────────────────────────────────────────

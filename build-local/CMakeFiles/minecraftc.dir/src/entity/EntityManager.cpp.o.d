@@ -365,6 +365,7 @@ CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o: \
  /usr/include/c++/14/bits/hashtable_policy.h /usr/include/c++/14/utility \
  /usr/include/c++/14/bits/stl_relops.h \
  /home/evan/Coding/MinecraftC/src/game/SurvivalStats.h \
+ /home/evan/Coding/MinecraftC/src/core/Input.h \
  /home/evan/Coding/MinecraftC/src/renderer/Renderer.h \
  /usr/include/c++/14/memory \
  /usr/include/c++/14/bits/stl_raw_storage_iter.h \
@@ -409,4 +410,5 @@ CMakeFiles/minecraftc.dir/src/entity/EntityManager.cpp.o: \
  /home/evan/Coding/MinecraftC/src/world/WorldGenContext.h \
  /home/evan/Coding/MinecraftC/external/FastNoiseLite/FastNoiseLite.h \
  /home/evan/Coding/MinecraftC/src/world/TreeGenerator.h \
- /home/evan/Coding/MinecraftC/src/world/OreGenerator.h
+ /home/evan/Coding/MinecraftC/src/world/OreGenerator.h \
+ /home/evan/Coding/MinecraftC/src/game/SurvivalSession.h

@@ -298,6 +298,7 @@ CMakeFiles/minecraftc.dir/src/player/Player.cpp.o: \
  /home/evan/Coding/MinecraftC/src/game/InventoryModel.h \
  /home/evan/Coding/MinecraftC/src/game/Item.h \
  /home/evan/Coding/MinecraftC/src/game/SurvivalStats.h \
+ /home/evan/Coding/MinecraftC/src/core/Input.h \
  /home/evan/Coding/MinecraftC/src/world/World.h \
  /usr/include/c++/14/memory \
  /usr/include/c++/14/bits/stl_raw_storage_iter.h \

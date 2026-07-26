@@ -108,18 +108,37 @@ Current status: in progress.
 - Added a shared 0-20 armor calculation and Survival armor HUD plus red-to-green
   durability bars in the hotbar, inventory, armor/offhand, chest, furnace, and
   cursor stacks.
+- Reworked the main, pause, and settings screens around an original procedural
+  pixel theme with integer Auto/1x-4x scaling. World selection now scrolls,
+  displays metadata, and launches through Enter, double-click, or Play.
+- Added versioned global client options for mouse behavior, GUI scale, existing
+  runtime settings, and keyboard/mouse/wheel bindings for every gameplay action.
+- Added procedural non-block item icons, attribute/durability tooltips, pixel
+  health/hunger/armor/air HUD indicators, and selected-item labels.
+- Replaced the overflowing fixed five-column Creative inventory with a centered
+  responsive 5-10 column grid, bounded visible rows, mouse-wheel browsing,
+  scrollbar/page feedback, persistent selection highlighting, and hover
+  tooltips. Per-slot labels moved into tooltips to keep the grid readable.
+- Fixed ice/leaf x-ray seams by retaining opaque terrain faces at translucent
+  solid interfaces while continuing to cull duplicate translucent/internal
+  faces. Oak leaves now use the same translucent material layer as other leaf
+  variants, and mesh visibility has regression coverage.
+- Added Shift quick transfer, armor/furnace routing, batch crafting, double-click
+  collection, and left/right drag distribution to inventory/container screens.
+- Added headless client-input and survival-progression integration suites for
+  configuration, gestures, farming, furnace ticks, death/respawn, item pickup,
+  negative-chunk persistence, and progression through diamonds.
 
 ## Remaining
 
-- Add remaining interaction polish.
-- Add broader integration tests for chunk override application, death recovery,
-  crop growth, live entity/container interaction, and the complete progression
-  path.
+- No remaining items in the scoped interaction-polish and integration-test pass.
+- Window-driven screenshot automation remains out of scope; rendering is
+  covered by the OpenGL startup smoke test.
 
 ## Validation
 
 - Release configure/build: passed.
-- CTest: passed, 12/12.
+- CTest: passed, 14/14.
 - `git diff --check`: passed.
 - OpenGL startup under Xvfb: passed on Mesa OpenGL 4.6 with 4× MSAA and shader
   gamma fallback.

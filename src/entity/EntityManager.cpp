@@ -4,6 +4,7 @@
 #include "player/Player.h"
 #include "renderer/Renderer.h"
 #include "world/World.h"
+#include "game/SurvivalSession.h"
 
 #include <algorithm>
 #include <cmath>
@@ -264,9 +265,7 @@ void EntityManager::update(Player& player, float dt, bool hostileSpawning, bool 
                 entity.position = next;
             }
             if (glm::distance(entity.position, player.getPosition()) < 1.6) {
-                const uint32_t remaining = player.inventory().add(entity.item);
-                entity.item.count = static_cast<uint8_t>(remaining);
-                if (remaining == 0) entity.health = 0.0f;
+                if (pickupItemStack(player.inventory(), entity.item)) entity.health = 0.0f;
             }
             continue;
         }

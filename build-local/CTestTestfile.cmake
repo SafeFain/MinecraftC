@@ -28,3 +28,7 @@ add_test(survival_entity_spawning_despawn_and_sweep "/home/evan/Coding/Minecraft
 set_tests_properties(survival_entity_spawning_despawn_and_sweep PROPERTIES  _BACKTRACE_TRIPLES "/home/evan/Coding/MinecraftC/CMakeLists.txt;218;add_test;/home/evan/Coding/MinecraftC/CMakeLists.txt;0;")
 add_test(rendering_cross_chunk_block_light "/home/evan/Coding/MinecraftC/build-local/lighting_logic_tests")
 set_tests_properties(rendering_cross_chunk_block_light PROPERTIES  _BACKTRACE_TRIPLES "/home/evan/Coding/MinecraftC/CMakeLists.txt;225;add_test;/home/evan/Coding/MinecraftC/CMakeLists.txt;0;")
+add_test(client_settings_bindings_and_inventory_gestures "/home/evan/Coding/MinecraftC/build-local/client_input_tests")
+set_tests_properties(client_settings_bindings_and_inventory_gestures PROPERTIES  _BACKTRACE_TRIPLES "/home/evan/Coding/MinecraftC/CMakeLists.txt;239;add_test;/home/evan/Coding/MinecraftC/CMakeLists.txt;0;")
+add_test(survival_progression_persistence_and_recovery "/home/evan/Coding/MinecraftC/build-local/survival_integration_tests")
+set_tests_properties(survival_progression_persistence_and_recovery PROPERTIES  _BACKTRACE_TRIPLES "/home/evan/Coding/MinecraftC/CMakeLists.txt;256;add_test;/home/evan/Coding/MinecraftC/CMakeLists.txt;0;")

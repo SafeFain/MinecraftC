@@ -415,4 +415,6 @@ CMakeFiles/minecraftc.dir/src/world/World.cpp.o: \
  /usr/include/c++/14/bits/fs_dir.h /usr/include/c++/14/bits/fs_ops.h \
  /home/evan/Coding/MinecraftC/src/game/GameRules.h \
  /home/evan/Coding/MinecraftC/src/game/SurvivalRules.h \
+ /home/evan/Coding/MinecraftC/src/game/SurvivalBlockLogic.h \
+ /home/evan/Coding/MinecraftC/src/world/BlockEntityLogic.h \
  /home/evan/Coding/MinecraftC/src/world/BlockLightLogic.h

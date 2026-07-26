@@ -25,7 +25,11 @@ public:
 
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawBlockIcon(float x, float y, float w, float h, BlockId block);
+    void drawItemIcon(float x, float y, float w, float h, const ItemStack& stack);
     void drawDurability(float x, float y, float w, const ItemStack& stack);
+    void drawPanel(float x, float y, float w, float h,
+                   const glm::vec4& fill = glm::vec4(0.10f, 0.10f, 0.12f, 0.94f));
+    void drawTooltip(float x, float y, const ItemStack& stack);
 
     void renderText(const std::string& text, float x, float y,
                     float scale, const glm::vec3& color);

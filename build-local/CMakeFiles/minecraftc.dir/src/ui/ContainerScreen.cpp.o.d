@@ -331,6 +331,7 @@ CMakeFiles/minecraftc.dir/src/ui/ContainerScreen.cpp.o: \
  /usr/include/c++/14/pstl/execution_defs.h \
  /home/evan/Coding/MinecraftC/external/glad/include/glad/glad.h \
  /home/evan/Coding/MinecraftC/src/ui/FontRenderer.h \
+ /home/evan/Coding/MinecraftC/src/game/InventoryInteraction.h \
  /home/evan/Coding/MinecraftC/src/world/World.h \
  /usr/include/c++/14/shared_mutex /usr/include/c++/14/bits/chrono.h \
  /usr/include/c++/14/ratio /usr/include/c++/14/ctime \

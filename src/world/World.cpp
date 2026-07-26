@@ -7,6 +7,8 @@
 #include "Config.h"
 #include "game/SaveStore.h"
 #include "game/SurvivalRules.h"
+#include "game/SurvivalBlockLogic.h"
+#include "world/BlockEntityLogic.h"
 #include "world/BlockLightLogic.h"
 
 #include <cmath>
@@ -609,24 +611,14 @@ void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick) {
         random = hash(random ^ (static_cast<uint64_t>(static_cast<uint32_t>(p.z)) << 32) ^
                       static_cast<uint64_t>(p.y * 131 + tick * 37));
         if (isFarmland(candidate.block) && random % 20 == 0) {
-            const uint8_t moisture = farmlandMoisture(candidate.block);
-            if (hasWaterForFarmland(p)) {
-                if (moisture != 7) setBlock(p.x, p.y, p.z, farmlandForMoisture(7));
-            } else if (moisture > 0) {
-                setBlock(p.x, p.y, p.z, farmlandForMoisture(moisture - 1));
-            } else {
-                const BlockId above = getBlock(p.x, p.y + 1, p.z);
-                if (above < BlockId::WHEAT_0 || above > BlockId::WHEAT_7)
-                    setBlock(p.x, p.y, p.z, BlockId::DIRT);
-            }
+            const BlockId next=nextFarmlandState(candidate.block,getBlock(p.x,p.y+1,p.z),
+                                                  hasWaterForFarmland(p),random);
+            if(next!=candidate.block)setBlock(p.x,p.y,p.z,next);
         } else if (candidate.block >= BlockId::WHEAT_0 &&
                    candidate.block < BlockId::WHEAT_7) {
             const BlockId soil = getBlock(p.x, p.y - 1, p.z);
-            if (!isFarmland(soil)) continue;
-            const uint64_t interval = farmlandMoisture(soil) > 0 ? 30 : 120;
-            if (random % interval == 0)
-                setBlock(p.x, p.y, p.z, static_cast<BlockId>(
-                    static_cast<uint8_t>(candidate.block) + 1));
+            const BlockId next=nextCropState(candidate.block,soil,random);
+            if(next!=candidate.block)setBlock(p.x,p.y,p.z,next);
         } else if (isSapling(candidate.block) && random % 300 == 0) {
             growSapling(p, candidate.block);
         }
@@ -712,35 +704,7 @@ void World::tickBlockEntities() {
     for (auto& [key, entities] : m_blockEntities) {
         bool changed = false;
         for (auto& [index, entity] : entities) {
-            if (entity.type != BlockEntityType::Furnace) continue;
-            const SmeltingRecipe* recipe = entity.input.empty()
-                ? nullptr : findSmeltingRecipe(entity.input.id);
-            const bool outputFits = recipe && (entity.output.empty() ||
-                (entity.output.id == recipe->output.id &&
-                 entity.output.count + recipe->output.count <=
-                     getItemProps(entity.output.id).maxStack));
-            if (entity.burnRemaining == 0 && outputFits && !entity.fuel.empty()) {
-                const uint16_t burn = fuelTicks(entity.fuel.id);
-                if (burn != 0) {
-                    entity.burnRemaining = entity.burnTotal = burn;
-                    if (--entity.fuel.count == 0) entity.fuel.clear();
-                    changed = true;
-                }
-            }
-            if (entity.burnRemaining > 0) { --entity.burnRemaining; changed = true; }
-            if (entity.burnRemaining > 0 && outputFits) {
-                entity.cookTotal = recipe->cookTicks;
-                if (++entity.cookProgress >= entity.cookTotal) {
-                    entity.cookProgress = 0;
-                    if (--entity.input.count == 0) entity.input.clear();
-                    if (entity.output.empty()) entity.output = recipe->output;
-                    else entity.output.count += recipe->output.count;
-                }
-                changed = true;
-            } else if (entity.cookProgress != 0) {
-                entity.cookProgress = 0;
-                changed = true;
-            }
+            changed = tickFurnace(entity) || changed;
         }
         if (changed) m_dirtyBlockEntityChunks.insert(key);
     }
