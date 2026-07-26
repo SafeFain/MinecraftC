@@ -64,6 +64,7 @@ void Player::takeDamage(float amount, bool bypassArmor) {
         amount *= 1.0f - std::min(points, 20) * 0.04f;
     }
     m_survivalStats.damage(amount);
+    if (m_damageCallback) m_damageCallback(amount);
 }
 
 // ── Input ─────────────────────────────────────────────────────────────
@@ -526,6 +527,7 @@ void Player::breakBlock() {
             m_survivalStats.addExhaustion(0.005f);
         }
         m_world.setBlock(hit->blockPos.x, hit->blockPos.y, hit->blockPos.z, BlockId::AIR);
+        if (m_blockBreakCallback) m_blockBreakCallback(hit->blockPos, block);
     }
 }
 

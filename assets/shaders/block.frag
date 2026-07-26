@@ -20,6 +20,9 @@ uniform float uAmbientIntensity;
 uniform float uFogEnd;
 uniform float uFogStartFraction;
 uniform int uManualGamma;
+uniform float uAtlasTiles;
+uniform float uLavaTile;
+uniform float uWaterTile;
 
 out vec4 outColor;
 
@@ -34,7 +37,7 @@ vec3 faceNormal(float face) {
 }
 
 void main() {
-    const float atlasTiles = 8.0;
+    float atlasTiles = uAtlasTiles;
     float tile = floor(vTile + 0.5);
     vec2 tileOrigin = vec2(mod(tile, atlasTiles), floor(tile / atlasTiles));
     vec2 local = mix(vec2(0.5 / 16.0), vec2(15.5 / 16.0), fract(vTileUV));
@@ -57,11 +60,11 @@ void main() {
     lighting = max(lighting, vec3(1.0, 0.72, 0.38) * vBlockLight * 1.15);
 
     // Atlas tile 19 is lava: keep it readable and warm independent of the sky.
-    if (abs(tile - 19.0) < 0.25)
+    if (abs(tile - uLavaTile) < 0.25)
         lighting = max(lighting, vec3(1.15, 0.52, 0.16));
 
     // Atlas tile 9 is water: add a restrained celestial highlight.
-    if (abs(tile - 9.0) < 0.25 && vFace < 0.5) {
+    if (abs(tile - uWaterTile) < 0.25 && vFace < 0.5) {
         vec3 viewDir = normalize(uCameraPosition - vWorldPosition);
         vec3 halfDir = normalize(viewDir + normalize(uLightDirection));
         float sparkle = pow(max(dot(normal, halfDir), 0.0), 48.0);

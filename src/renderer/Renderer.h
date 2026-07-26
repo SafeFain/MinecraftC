@@ -10,15 +10,10 @@
 #include "renderer/Frustum.h"
 #include "renderer/BlockTextureAtlas.h"
 #include "renderer/RenderEnvironment.h"
+#include "renderer/ParticleSystem.h"
 
 // Forward declaration
 class ChunkMesh;
-
-struct WeatherParticle {
-    glm::vec3 position{0.0f};
-    float kind = 0.0f;
-    float phase = 0.0f;
-};
 
 class Renderer {
 public:
@@ -54,9 +49,10 @@ public:
     void renderEntity(const glm::vec3& position, const glm::vec3& size,
                       const glm::vec3& color, int textureIndex,
                       const glm::mat4& viewProjection);
-    void renderWeather(const std::vector<WeatherParticle>& particles,
-                       const glm::mat4& viewProjection,
-                       const glm::vec3& cameraRight, float intensity);
+    void renderParticles(const std::vector<ParticleRenderData>& particles,
+                         const glm::mat4& viewProjection,
+                         const glm::vec3& cameraRight,
+                         const glm::vec3& cameraUp, float intensity);
 
     // VAO creation helpers
     static GLuint createVAO(const std::vector<float>& vertices,
@@ -81,7 +77,7 @@ private:
     std::unique_ptr<Shader> m_wireShader;
     std::unique_ptr<Shader> m_skyShader;
     std::unique_ptr<Shader> m_entityShader;
-    std::unique_ptr<Shader> m_weatherShader;
+    std::unique_ptr<Shader> m_particleShader;
     BlockTextureAtlas m_blockAtlas;
 
     // Shared wireframe cube GPU resources
@@ -91,9 +87,9 @@ private:
     GLuint m_entityVAO = 0;
     GLuint m_entityVBO = 0;
     GLuint m_entityTexture = 0;
-    GLuint m_weatherVAO = 0;
-    GLuint m_weatherQuadVBO = 0;
-    GLuint m_weatherInstanceVBO = 0;
+    GLuint m_particleVAO = 0;
+    GLuint m_particleQuadVBO = 0;
+    GLuint m_particleInstanceVBO = 0;
 
     using DrawArraysInstancedFn = void (*)(GLenum, GLint, GLsizei, GLsizei);
     using VertexAttribDivisorFn = void (*)(GLuint, GLuint);

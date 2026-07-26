@@ -4,6 +4,8 @@
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
 #include "renderer/RenderEnvironment.h"
+#include "renderer/ParticleSystem.h"
+#include "renderer/CameraEffects.h"
 #include "Config.h"
 #include "world/World.h"
 #include "player/Player.h"
@@ -59,6 +61,7 @@ private:
     Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"};
     Renderer    m_renderer;
     Camera      m_camera;
+    CameraEffects m_cameraEffects;
     ThreadPool  m_threadPool;
     World       m_world;
     Player      m_player{m_world};
@@ -98,6 +101,7 @@ private:
     Clock::time_point m_lastFrame;
     DayNightCycle m_dayNightCycle;
     WeatherSystem m_weather;
+    ParticleSystem m_particles;
     AudioSystem m_audio;
     struct LightningEvent {
         glm::dvec3 position{0.0};
@@ -140,6 +144,12 @@ private:
         // Set up thread pool for async mesh building
         m_world.setThreadPool(&m_threadPool);
         m_player.setEntityManager(&m_entities);
+        m_player.setBlockBreakCallback(
+            [this](const glm::ivec3& position, BlockId block) {
+                m_particles.emitBlockBreak(position, block);
+            });
+        m_player.setDamageCallback(
+            [this](float amount) { m_cameraEffects.onDamage(amount); });
         m_player.setBedCallback([this](const glm::ivec3& bed) {
             m_worldMetadata.bedSpawn = bed;
             if (!m_dayNightCycle.isNight()) {
@@ -488,6 +498,8 @@ private:
         m_dayNightCycle.resetMorning();
         m_weather.reset(m_worldMetadata.seed, m_worldMetadata.weather);
         m_lightningEvents.clear();
+        m_particles.clear();
+        m_cameraEffects.reset(m_player.getPosition());
         m_window.setCursorLocked(!newWorld);
         m_activeMenu.reset();
 
@@ -641,6 +653,11 @@ private:
                 m_audio.setRainVolume(m_weather.rainGradient() *
                                       (rainExposure ? 0.72f : 0.06f));
                 if (!m_playerDead) m_player.update(dt);
+                m_cameraEffects.update(m_player.getPosition(), m_player.onGround(),
+                                       m_player.isFlying(), dt);
+                m_particles.update(m_world, m_player.getPosition(), dt,
+                                   m_weather.rainGradient(),
+                                   m_worldMetadata.seed ^ m_survivalTicks);
                 const bool peaceful =
                     m_player.difficulty() == Difficulty::Peaceful;
                 m_entities.update(
@@ -725,7 +742,8 @@ private:
             // ── 3D Rendering ──────────────────────────────────────────
             if (m_gameState == GameState::Playing ||
                 m_gameState == GameState::Paused) {
-                glm::mat4 view       = m_camera.getViewMatrix();
+                glm::mat4 view       = m_cameraEffects.viewTransform() *
+                                       m_camera.getViewMatrix();
                 glm::mat4 projection = m_camera.getProjectionMatrix(m_window.aspectRatio());
                 glm::mat4 vp         = projection * view;
 
@@ -799,8 +817,10 @@ private:
                 m_renderer.endTranslucent();
 
                 m_entities.render(m_renderer, vp, renderOrigin);
-                m_renderer.renderWeather(
-                    buildWeatherParticles(renderOrigin), vp, m_camera.right,
+                m_renderer.renderParticles(
+                    m_particles.buildRenderData(renderOrigin), vp,
+                    m_camera.right,
+                    glm::normalize(glm::cross(m_camera.forward, m_camera.right)),
                     m_weather.rainGradient());
 
                 // Wireframe highlight
@@ -987,71 +1007,8 @@ private:
                 m_world.getBlock(x, strikeY, z) == BlockId::SNOW_LAYER)
                 m_world.setBlock(x, strikeY, z, BlockId::FIRE);
             m_lightningEvents.push_back({glm::dvec3(strike), 0.5f});
+            m_particles.appendLightning(glm::dvec3(strike));
         }
-    }
-
-    std::vector<WeatherParticle> buildWeatherParticles(
-        const glm::dvec3& renderOrigin) const {
-        std::vector<WeatherParticle> particles;
-        particles.reserve(700);
-        auto hash = [](uint64_t value) {
-            value ^= value >> 30;
-            value *= 0xbf58476d1ce4e5b9ULL;
-            value ^= value >> 27;
-            value *= 0x94d049bb133111ebULL;
-            return value ^ (value >> 31);
-        };
-        if (m_weather.rainGradient() > 0.01f) {
-            const glm::dvec3 player = m_player.getPosition();
-            const int centerX = static_cast<int>(std::floor(player.x));
-            const int centerZ = static_cast<int>(std::floor(player.z));
-            const double time = glfwGetTime();
-            for (int dz = -12; dz <= 12; ++dz) {
-                for (int dx = -12; dx <= 12; ++dx) {
-                    const int x = centerX + dx;
-                    const int z = centerZ + dz;
-                    const int surface = m_world.getSurfaceY(x, z);
-                    if (!Config::isValidWorldY(surface)) continue;
-                    const PrecipitationType type =
-                        m_world.precipitationAt(x, surface + 1, z);
-                    if (type == PrecipitationType::None) continue;
-                    uint64_t random = hash(
-                        m_worldMetadata.seed ^ static_cast<uint32_t>(x) ^
-                        (static_cast<uint64_t>(static_cast<uint32_t>(z)) << 32));
-                    const double low = std::max<double>(surface + 0.15, player.y - 8.0);
-                    const double high = std::min<double>(
-                        Config::WORLD_MAX_Y - 0.5, player.y + 18.0);
-                    if (low >= high) continue;
-                    const double phase = (random & 0xffffu) / 65535.0;
-                    const double speed = type == PrecipitationType::Rain ? 1.25 : 0.18;
-                    double fall = std::fmod(phase - time * speed, 1.0);
-                    if (fall < 0.0) fall += 1.0;
-                    const double y = low + fall * (high - low);
-                    particles.push_back({
-                        glm::vec3(
-                            static_cast<float>(x + 0.5 - renderOrigin.x),
-                            static_cast<float>(y),
-                            static_cast<float>(z + 0.5 - renderOrigin.z)),
-                        type == PrecipitationType::Rain ? 0.0f : 1.0f,
-                        static_cast<float>((random >> 16) & 0xffffu) / 65535.0f});
-                }
-            }
-        }
-        for (const auto& event : m_lightningEvents) {
-            const int segments = 16;
-            for (int segment = 0; segment < segments; ++segment) {
-                const double y = event.position.y + segment * 4.0;
-                if (y >= Config::WORLD_MAX_Y) break;
-                particles.push_back({
-                    glm::vec3(
-                        static_cast<float>(event.position.x + 0.5 - renderOrigin.x),
-                        static_cast<float>(y),
-                        static_cast<float>(event.position.z + 0.5 - renderOrigin.z)),
-                    2.0f,
-                    static_cast<float>(segment) / static_cast<float>(segments)});
-            }
-        }
-        return particles;
     }
 
     void openInventory() {
@@ -1279,6 +1236,7 @@ private:
         m_player.survivalStats().resetAfterRespawn();
         m_player.extinguish();
         m_player.resetDamageImmunity();
+        m_cameraEffects.reset(m_player.getPosition());
         m_world.update(m_player.getPosition());
         m_world.enqueueGeneration();
         m_world.waitForInitialGeneration(150);

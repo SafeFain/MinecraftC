@@ -6,7 +6,10 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 3;
+    static constexpr uint32_t GENERATION_VERSION = 4;
+    // v4 changes ore thresholds only. Keep all established seed domains on
+    // their v3 layout so terrain, caves, biomes and decoration do not reroll.
+    static constexpr uint32_t SEED_LAYOUT_VERSION = 3;
 
     explicit WorldGenContext(uint64_t seed) : m_seed(seed) {}
 
@@ -14,7 +17,7 @@ public:
 
     uint64_t derive(uint64_t domain) const {
         uint64_t value = m_seed ^ domain ^
-            (static_cast<uint64_t>(GENERATION_VERSION) << 32);
+            (static_cast<uint64_t>(SEED_LAYOUT_VERSION) << 32);
         return mix(value);
     }
 

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "items": {
+    "grass_block": {"texture": "grass_top"}, "dirt": {"texture": "dirt"},
+    "stone": {"texture": "stone"}, "oak_log": {"texture": "oak_log"},
+    "oak_leaves": {"texture": "leaves"}, "sand": {"texture": "sand"},
+    "bedrock": {"texture": "bedrock"}, "water": {"texture": "water"},
+    "snow": {"texture": "snow"}, "oak_planks": {"texture": "oak_planks"},
+    "deepslate": {"texture": "deepslate"}, "cactus": {"texture": "cactus_side"},
+    "coal_ore": {"texture": "coal_ore"}, "iron_ore": {"texture": "iron_ore"},
+    "gold_ore": {"texture": "gold_ore"}, "diamond_ore": {"texture": "diamond_ore"},
+    "lava": {"texture": "lava"}, "ice": {"texture": "ice"},
+    "gravel": {"texture": "gravel"}, "clay": {"texture": "clay"},
+    "red_sand": {"texture": "red_sand"}, "terracotta": {"texture": "terracotta"},
+    "podzol": {"texture": "podzol_top"}, "moss": {"texture": "moss"},
+    "tall_grass": {"texture": "tall_grass"}, "flower": {"texture": "flower"},
+    "reeds": {"texture": "reeds"}, "birch_log": {"texture": "birch_log"},
+    "birch_leaves": {"texture": "birch_leaves"}, "spruce_log": {"texture": "spruce_log"},
+    "spruce_leaves": {"texture": "spruce_leaves"}, "jungle_log": {"texture": "jungle_log"},
+    "jungle_leaves": {"texture": "jungle_leaves"}, "acacia_log": {"texture": "acacia_log"},
+    "acacia_leaves": {"texture": "acacia_leaves"}, "cobblestone": {"texture": "cobblestone"},
+    "crafting_table": {"texture": "crafting_table"}, "furnace": {"texture": "furnace"},
+    "chest": {"texture": "chest"}, "torch": {"texture": "torch"},
+    "white_wool": {"texture": "white_wool"}, "white_bed": {"texture": "white_bed"},
+    "farmland": {"texture": "farmland"}, "oak_sapling": {"texture": "oak_sapling"},
+    "birch_sapling": {"texture": "birch_sapling"}, "spruce_sapling": {"texture": "spruce_sapling"},
+    "jungle_sapling": {"texture": "jungle_sapling"}, "acacia_sapling": {"texture": "acacia_sapling"},
+    "copper_ore": {"texture": "copper_ore", "future": true}
+  }
+}

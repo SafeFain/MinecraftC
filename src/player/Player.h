@@ -55,6 +55,13 @@ public:
     void setBedCallback(std::function<void(const glm::ivec3&)> callback) {
         m_bedCallback = std::move(callback);
     }
+    void setBlockBreakCallback(
+        std::function<void(const glm::ivec3&, BlockId)> callback) {
+        m_blockBreakCallback = std::move(callback);
+    }
+    void setDamageCallback(std::function<void(float)> callback) {
+        m_damageCallback = std::move(callback);
+    }
     GameMode gameMode() const { return m_gameMode; }
     Difficulty difficulty() const { return m_difficulty; }
     InventoryModel& inventory() { return m_inventory; }
@@ -70,6 +77,7 @@ public:
     int selectedSlot() const { return m_selectedSlot; }
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
     bool underwater() const { return m_airTicks < 300; }
+    bool onGround() const { return m_onGround; }
 
     // ── Selected block for placement ───────────────────────────────────
     void setSelectedBlock(BlockId id) { m_selectedBlock = id; }
@@ -78,6 +86,8 @@ public:
 
 private:
     World& m_world;
+    std::function<void(const glm::ivec3&, BlockId)> m_blockBreakCallback;
+    std::function<void(float)> m_damageCallback;
 
     // Position & velocity
     glm::dvec3 m_position{0.0, 50.0, 0.0};

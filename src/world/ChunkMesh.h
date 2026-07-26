@@ -275,7 +275,7 @@ struct ChunkMesh {
                         for (int i = 0; i < 4; ++i)
                             vtx[i] = {0,0,0, 1.0f, static_cast<float>(cell.sky),
                                       static_cast<float>(cell.light) / 15.0f, alpha, 0, 0,
-                                      static_cast<float>(getFaceTexture(bid, face)),
+                                      static_cast<float>(getFaceTextureIndex(bid, face)),
                                       static_cast<float>(f)};
 
                         auto setPos = [&](int vi, float px, float py, float pz) {
@@ -372,7 +372,7 @@ struct ChunkMesh {
         auto emitCrossPlane = [&](float x0, float z0, float x1, float z1,
                                   float y, float sky, const BlockProperties& props) {
             unsigned int base = static_cast<unsigned int>(vertices.size());
-            float tile = static_cast<float>(getFaceTexture(props.id, FaceDir::FRONT));
+            float tile = static_cast<float>(getFaceTextureIndex(props.id, FaceDir::FRONT));
             constexpr float CROSS_FACE = 6.0f;
             const float light = (props.id == BlockId::TORCH ||
                                  props.id == BlockId::FIRE) ? 1.0f
@@ -415,7 +415,8 @@ struct ChunkMesh {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                     if (static_cast<BlockId>(blocks[localIdx(x, y, z)]) !=
                         BlockId::SNOW_LAYER) continue;
-                    const float tile = static_cast<float>(BlockTexture::SnowLayer);
+                    const float tile = static_cast<float>(
+                        getAtlasTextureIndex(BlockTexture::SnowLayer));
                     const float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
                     const float light = blockLight(x, y, z);
                     for (int f : {0, 2, 3, 4, 5}) {

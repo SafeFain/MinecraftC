@@ -143,6 +143,13 @@ inline bool isSolid(BlockId id) {
 }
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face);
+uint8_t getAtlasTextureIndex(BlockTexture texture);
+uint8_t getFaceTextureIndex(BlockId id, FaceDir face);
+const char* getBlockTextureAssetName(BlockTexture texture);
+bool loadTextureAssetDefinitions(
+    const std::string& atlasMetadataPath,
+    const std::string& blockDefinitionsPath,
+    const std::string& itemDefinitionsPath);
 
 bool isFarmland(BlockId id);
 uint8_t farmlandMoisture(BlockId id);

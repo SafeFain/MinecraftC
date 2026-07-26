@@ -131,7 +131,7 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
         block == BlockId::ACACIA_WOOD || getBlockProps(block).shape == RenderShape::Cross) {
         iconFace = FaceDir::FRONT;
     }
-    const int tile = static_cast<int>(getFaceTexture(block, iconFace));
+    const int tile = static_cast<int>(getFaceTextureIndex(block, iconFace));
     constexpr float atlasTiles = 8.0f;
     constexpr float inset = 0.5f / (16.0f * atlasTiles);
     float u0 = static_cast<float>(tile % 8) / atlasTiles + inset;

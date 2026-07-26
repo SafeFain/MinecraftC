@@ -49,21 +49,21 @@ BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing) const 
     };
 
     const float diamondY = std::clamp((16.0f - y) / 76.0f, 0.0f, 1.0f);
-    if (diamondY > 0.0f && score(m_diamond) > 0.975f - diamondY * 0.020f)
+    if (diamondY > 0.0f && score(m_diamond) > 0.973f - diamondY * 0.020f)
         return BlockId::DIAMOND_ORE;
 
     const float goldY = triangle(y, -64.0f, -16.0f, 33.0f);
-    if (goldY > 0.0f && score(m_gold) > 0.968f - goldY * 0.018f)
+    if (goldY > 0.0f && score(m_gold) > 0.966f - goldY * 0.018f)
         return BlockId::GOLD_ORE;
 
     const float lowIron = triangle(y, -64.0f, 16.0f, 73.0f);
     const float highIron = std::clamp((y - 80.0f) / 176.0f, 0.0f, 1.0f);
     const float ironY = std::max(lowIron, highIron);
-    if (ironY > 0.0f && score(m_iron) > 0.962f - ironY * 0.022f)
+    if (ironY > 0.0f && score(m_iron) > 0.960f - ironY * 0.022f)
         return BlockId::IRON_ORE;
 
     const float coalY = triangle(y, -1.0f, 96.0f, 257.0f);
-    if (coalY > 0.0f && score(m_coal) > 0.958f - coalY * 0.024f)
+    if (coalY > 0.0f && score(m_coal) > 0.956f - coalY * 0.024f)
         return BlockId::COAL_ORE;
 
     return BlockId::AIR;

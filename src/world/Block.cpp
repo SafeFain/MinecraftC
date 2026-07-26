@@ -1,6 +1,90 @@
 #include "world/Block.h"
 
 #include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <regex>
+#include <sstream>
+#include <unordered_map>
+
+namespace {
+constexpr size_t TEXTURE_COUNT = static_cast<size_t>(BlockTexture::Count);
+std::array<uint8_t, TEXTURE_COUNT> g_atlasIndices = [] {
+    std::array<uint8_t, TEXTURE_COUNT> result{};
+    for (size_t i = 0; i < result.size(); ++i) result[i] = static_cast<uint8_t>(i);
+    return result;
+}();
+std::array<std::array<BlockTexture, FACE_COUNT>, static_cast<size_t>(BlockId::COUNT)>
+    g_definitionFaces{};
+bool g_definitionFacesReady = false;
+
+constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
+    "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
+    "leaves", "sand", "bedrock", "water", "snow", "oak_planks",
+    "deepslate", "cactus_side", "cactus_top", "coal_ore", "iron_ore",
+    "gold_ore", "diamond_ore", "lava", "ice", "gravel", "clay",
+    "red_sand", "terracotta", "podzol_top", "moss", "tall_grass",
+    "flower", "reeds", "birch_log", "birch_leaves", "spruce_log",
+    "spruce_leaves", "jungle_log", "jungle_leaves", "acacia_log",
+    "acacia_leaves", "cobblestone", "crafting_table", "furnace", "chest",
+    "torch", "white_wool", "white_bed", "farmland", "wet_farmland",
+    "wheat_young", "wheat_middle", "wheat_mature", "oak_sapling",
+    "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
+    "snow_layer", "fire"
+}};
+
+const std::unordered_map<std::string, BlockTexture>& textureNames() {
+    static const std::unordered_map<std::string, BlockTexture> names = [] {
+        std::unordered_map<std::string, BlockTexture> result;
+        for (size_t i = 0; i < TEXTURE_ASSET_NAMES.size(); ++i)
+            result.emplace(TEXTURE_ASSET_NAMES[i], static_cast<BlockTexture>(i));
+        return result;
+    }();
+    return names;
+}
+
+const std::unordered_map<std::string, BlockId>& blockNames() {
+    static const std::unordered_map<std::string, BlockId> names = [] {
+        std::unordered_map<std::string, BlockId> result;
+        for (size_t i = 1; i < static_cast<size_t>(BlockId::COUNT); ++i) {
+            std::string key;
+            for (unsigned char character : BLOCK_TABLE[i].name) {
+                if (std::isalnum(character))
+                    key.push_back(static_cast<char>(std::tolower(character)));
+                else if (!key.empty() && key.back() != '_') key.push_back('_');
+            }
+            result.emplace(key, static_cast<BlockId>(i));
+        }
+        result["wood"] = BlockId::WOOD;
+        result["planks"] = BlockId::PLANKS;
+        result["cactus_block"] = BlockId::CACTUS_BLOCK;
+        result["podzol"] = BlockId::PODZOL;
+        result["wet_farmland"] = BlockId::FARMLAND_7;
+        result["wheat_young"] = BlockId::WHEAT_0;
+        result["wheat_middle"] = BlockId::WHEAT_4;
+        result["wheat_mature"] = BlockId::WHEAT_7;
+        return result;
+    }();
+    return names;
+}
+
+std::string readTextFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file) return {};
+    std::ostringstream stream;
+    stream << file.rdbuf();
+    return stream.str();
+}
+
+bool quotedField(const std::string& object, const char* field, std::string& value) {
+    const std::regex expression(std::string("\\\"") + field +
+                                "\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+    std::smatch match;
+    if (!std::regex_search(object, match, expression)) return false;
+    value = match[1].str();
+    return true;
+}
+}
 
 // ── Block properties table ────────────────────────────────────────────
 
@@ -101,6 +185,11 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    if (g_definitionFacesReady) {
+        const BlockTexture defined = g_definitionFaces[static_cast<size_t>(id)]
+                                                       [static_cast<size_t>(face)];
+        if (defined != BlockTexture::Count) return defined;
+    }
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
     switch (id) {
@@ -170,6 +259,85 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::FIRE:          return BlockTexture::Fire;
         default:                     return BlockTexture::Dirt;
     }
+}
+
+uint8_t getAtlasTextureIndex(BlockTexture texture) {
+    const size_t index = static_cast<size_t>(texture);
+    return index < g_atlasIndices.size() ? g_atlasIndices[index] : 0;
+}
+
+const char* getBlockTextureAssetName(BlockTexture texture) {
+    const size_t index = static_cast<size_t>(texture);
+    return index < TEXTURE_ASSET_NAMES.size() ? TEXTURE_ASSET_NAMES[index] : "dirt";
+}
+
+uint8_t getFaceTextureIndex(BlockId id, FaceDir face) {
+    return getAtlasTextureIndex(getFaceTexture(id, face));
+}
+
+bool loadTextureAssetDefinitions(const std::string& atlasMetadataPath,
+                                 const std::string& blockDefinitionsPath,
+                                 const std::string& itemDefinitionsPath) {
+    const std::string atlas = readTextFile(atlasMetadataPath);
+    const std::string blocks = readTextFile(blockDefinitionsPath);
+    const std::string items = readTextFile(itemDefinitionsPath);
+    if (atlas.empty() || blocks.empty() || items.empty()) return false;
+
+    std::array<int, TEXTURE_COUNT> requested{};
+    requested.fill(-1);
+    const std::regex atlasEntry(
+        "\\\"([^\\\"]+)\\\"\\s*:\\s*\\{[^{}]*\\\"index\\\"\\s*:\\s*([0-9]+)[^{}]*\\}");
+    for (std::sregex_iterator it(atlas.begin(), atlas.end(), atlasEntry), end;
+         it != end; ++it) {
+        const auto texture = textureNames().find((*it)[1].str());
+        if (texture == textureNames().end()) continue;
+        const int index = std::stoi((*it)[2].str());
+        if (index >= 0 && index < static_cast<int>(TEXTURE_COUNT))
+            requested[static_cast<size_t>(texture->second)] = index;
+    }
+    std::array<bool, TEXTURE_COUNT> used{};
+    for (size_t texture = 0; texture < TEXTURE_COUNT; ++texture) {
+        if (requested[texture] >= 0 && !used[requested[texture]]) {
+            g_atlasIndices[texture] = static_cast<uint8_t>(requested[texture]);
+            used[requested[texture]] = true;
+        }
+    }
+    size_t next = 0;
+    for (size_t texture = 0; texture < TEXTURE_COUNT; ++texture) {
+        if (requested[texture] >= 0) continue;
+        while (next < used.size() && used[next]) ++next;
+        if (next < used.size()) {
+            g_atlasIndices[texture] = static_cast<uint8_t>(next);
+            used[next] = true;
+        }
+    }
+
+    for (auto& faces : g_definitionFaces) faces.fill(BlockTexture::Count);
+    const std::regex blockEntry("\\\"([a-z0-9_]+)\\\"\\s*:\\s*\\{([^{}]*)\\}");
+    for (std::sregex_iterator it(blocks.begin(), blocks.end(), blockEntry), end;
+         it != end; ++it) {
+        const auto block = blockNames().find((*it)[1].str());
+        if (block == blockNames().end()) continue;
+        auto& faces = g_definitionFaces[static_cast<size_t>(block->second)];
+        const std::string object = (*it)[2].str();
+        std::string value;
+        if (quotedField(object, "all", value)) {
+            const auto texture = textureNames().find(value);
+            if (texture != textureNames().end()) faces.fill(texture->second);
+        }
+        auto apply = [&](const char* field, std::initializer_list<FaceDir> targets) {
+            std::string name;
+            if (!quotedField(object, field, name)) return;
+            const auto texture = textureNames().find(name);
+            if (texture == textureNames().end()) return;
+            for (FaceDir face : targets) faces[static_cast<size_t>(face)] = texture->second;
+        };
+        apply("top", {FaceDir::TOP});
+        apply("bottom", {FaceDir::BOTTOM});
+        apply("side", {FaceDir::FRONT, FaceDir::BACK, FaceDir::RIGHT, FaceDir::LEFT});
+    }
+    g_definitionFacesReady = true;
+    return true;
 }
 
 bool isFarmland(BlockId id) {

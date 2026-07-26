@@ -28,9 +28,9 @@ Renderer::~Renderer() {
     if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
     if (m_entityVAO) GL_CHECK(glDeleteVertexArrays(1, &m_entityVAO));
     if (m_entityTexture) GL_CHECK(glDeleteTextures(1, &m_entityTexture));
-    if (m_weatherInstanceVBO) GL_CHECK(glDeleteBuffers(1, &m_weatherInstanceVBO));
-    if (m_weatherQuadVBO) GL_CHECK(glDeleteBuffers(1, &m_weatherQuadVBO));
-    if (m_weatherVAO) GL_CHECK(glDeleteVertexArrays(1, &m_weatherVAO));
+    if (m_particleInstanceVBO) GL_CHECK(glDeleteBuffers(1, &m_particleInstanceVBO));
+    if (m_particleQuadVBO) GL_CHECK(glDeleteBuffers(1, &m_particleQuadVBO));
+    if (m_particleVAO) GL_CHECK(glDeleteVertexArrays(1, &m_particleVAO));
 }
 
 // ── Initialization ────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ void Renderer::initialize(bool framebufferSrgb) {
         "assets/shaders/entity.vert",
         "assets/shaders/entity.frag"
     );
-    m_weatherShader = std::make_unique<Shader>(
+    m_particleShader = std::make_unique<Shader>(
         "assets/shaders/weather.vert", "assets/shaders/weather.frag");
     m_blockAtlas.initialize();
 
@@ -120,28 +120,28 @@ void Renderer::initialize(bool framebufferSrgb) {
             -0.5f, 0.0f,  0.5f, 0.0f,  0.5f, 1.0f,
             -0.5f, 0.0f,  0.5f, 1.0f, -0.5f, 1.0f
         };
-        GL_CHECK(glGenVertexArrays(1, &m_weatherVAO));
-        GL_CHECK(glGenBuffers(1, &m_weatherQuadVBO));
-        GL_CHECK(glGenBuffers(1, &m_weatherInstanceVBO));
-        GL_CHECK(glBindVertexArray(m_weatherVAO));
-        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherQuadVBO));
+        GL_CHECK(glGenVertexArrays(1, &m_particleVAO));
+        GL_CHECK(glGenBuffers(1, &m_particleQuadVBO));
+        GL_CHECK(glGenBuffers(1, &m_particleInstanceVBO));
+        GL_CHECK(glBindVertexArray(m_particleVAO));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_particleQuadVBO));
         GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW));
         GL_CHECK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
                                       2 * sizeof(float), nullptr));
         GL_CHECK(glEnableVertexAttribArray(0));
-        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherInstanceVBO));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_particleInstanceVBO));
         GL_CHECK(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
-                                      sizeof(WeatherParticle), nullptr));
+                                      sizeof(ParticleRenderData), nullptr));
         GL_CHECK(glEnableVertexAttribArray(1));
         GL_CHECK(glVertexAttribPointer(
-            2, 1, GL_FLOAT, GL_FALSE, sizeof(WeatherParticle),
+            2, 4, GL_FLOAT, GL_FALSE, sizeof(ParticleRenderData),
             reinterpret_cast<void*>(4 * sizeof(float))));
         GL_CHECK(glEnableVertexAttribArray(2));
         m_vertexAttribDivisor(1, 1);
         m_vertexAttribDivisor(2, 1);
         GL_CHECK(glBindVertexArray(0));
     } else {
-        LOG_WARN("OpenGL instanced weather rendering is unavailable");
+        LOG_WARN("OpenGL instanced particle rendering is unavailable");
     }
 
     int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
@@ -250,6 +250,11 @@ void Renderer::bindBlockShader() const {
     m_blockShader->bind();
     m_blockAtlas.bind();
     m_blockShader->setInt("uBlockAtlas", 0);
+    m_blockShader->setFloat("uAtlasTiles", 8.0f);
+    m_blockShader->setFloat(
+        "uLavaTile", static_cast<float>(getAtlasTextureIndex(BlockTexture::Lava)));
+    m_blockShader->setFloat(
+        "uWaterTile", static_cast<float>(getAtlasTextureIndex(BlockTexture::Water)));
     m_blockShader->setVec3("uCameraPosition", m_cameraPosition);
     m_blockShader->setVec3("uLightDirection", m_environment.lightDirection);
     m_blockShader->setVec3("uDirectColor", m_environment.directColor);
@@ -311,24 +316,29 @@ void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
     GL_CHECK(glBindVertexArray(0));
 }
 
-void Renderer::renderWeather(const std::vector<WeatherParticle>& particles,
-                             const glm::mat4& viewProjection,
-                             const glm::vec3& cameraRight, float intensity) {
-    if (particles.empty() || !m_weatherVAO || !m_drawArraysInstanced) return;
-    m_weatherShader->bind();
-    m_weatherShader->setMat4("uViewProjection", viewProjection);
-    m_weatherShader->setVec3("uCameraRight", cameraRight);
-    m_weatherShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
-    m_weatherShader->setFloat("uIntensity", intensity);
-    m_weatherShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
+                               const glm::mat4& viewProjection,
+                               const glm::vec3& cameraRight,
+                               const glm::vec3& cameraUp, float intensity) {
+    if (particles.empty() || !m_particleVAO || !m_drawArraysInstanced) return;
+    m_particleShader->bind();
+    m_particleShader->setMat4("uViewProjection", viewProjection);
+    m_particleShader->setVec3("uCameraRight", cameraRight);
+    m_particleShader->setVec3("uCameraUp", cameraUp);
+    m_particleShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
+    m_particleShader->setFloat("uIntensity", intensity);
+    m_particleShader->setInt("uBlockAtlas", 0);
+    m_particleShader->setFloat("uAtlasTiles", 8.0f);
+    m_particleShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_blockAtlas.bind();
     GL_CHECK(glEnable(GL_BLEND));
     GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
     GL_CHECK(glDepthMask(GL_FALSE));
     GL_CHECK(glDisable(GL_CULL_FACE));
-    GL_CHECK(glBindVertexArray(m_weatherVAO));
-    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_weatherInstanceVBO));
+    GL_CHECK(glBindVertexArray(m_particleVAO));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_particleInstanceVBO));
     GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
-                         particles.size() * sizeof(WeatherParticle),
+                         particles.size() * sizeof(ParticleRenderData),
                          particles.data(), GL_DYNAMIC_DRAW));
     m_drawArraysInstanced(
         GL_TRIANGLES, 0, 6, static_cast<GLsizei>(particles.size()));

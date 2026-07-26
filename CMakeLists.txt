@@ -88,6 +88,24 @@ install(TARGETS minecraftc DESTINATION bin)
 # ── Deterministic world-generation tests ───────────────────────────────────
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME texture_generator_determinism_tiling_and_atlas
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
+
+    add_executable(asset_definition_tests
+        tests/AssetDefinitionTests.cpp
+        src/world/Block.cpp)
+    target_include_directories(asset_definition_tests PRIVATE src)
+    target_link_libraries(asset_definition_tests PRIVATE glm::glm)
+    target_compile_definitions(asset_definition_tests PRIVATE
+        MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(asset_definition_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME asset_json_block_item_and_atlas_mapping
+             COMMAND asset_definition_tests)
+
     add_executable(cavegen_tests
         tests/CaveGeneratorTests.cpp
         src/world/CaveGenerator.cpp
@@ -123,6 +141,7 @@ if(BUILD_TESTING)
 
     add_executable(rendering_logic_tests
         tests/RenderingLogicTests.cpp
+        src/renderer/CameraEffects.cpp
     )
     target_include_directories(rendering_logic_tests PRIVATE src)
     target_link_libraries(rendering_logic_tests PRIVATE glm::glm)
@@ -272,4 +291,14 @@ if(BUILD_TESTING)
         target_compile_options(survival_integration_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME survival_progression_persistence_and_recovery COMMAND survival_integration_tests)
+endif()
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(texture_generator
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
+                --generate --validate --build-atlas
+                --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Generating and validating deterministic voxel textures")
 endif()

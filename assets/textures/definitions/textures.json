@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "generated": [
+    "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
+    "leaves", "sand", "bedrock", "water", "snow", "oak_planks",
+    "deepslate", "cactus_side", "cactus_top", "coal_ore", "iron_ore",
+    "gold_ore", "diamond_ore", "lava", "ice", "gravel", "clay",
+    "red_sand", "terracotta", "podzol_top", "moss", "tall_grass",
+    "flower", "reeds", "birch_log", "birch_leaves", "spruce_log",
+    "spruce_leaves", "jungle_log", "jungle_leaves", "acacia_log",
+    "acacia_leaves", "cobblestone", "crafting_table", "furnace", "chest",
+    "torch", "white_wool", "white_bed", "farmland", "wet_farmland",
+    "wheat_young", "wheat_middle", "wheat_mature", "oak_sapling",
+    "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
+    "snow_layer", "fire", "copper_ore"
+  ]
+}

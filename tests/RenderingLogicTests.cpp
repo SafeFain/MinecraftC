@@ -1,4 +1,5 @@
 #include "renderer/RenderEnvironment.h"
+#include "renderer/CameraEffects.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -14,6 +15,27 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    CameraEffects cameraEffects;
+    cameraEffects.reset({0.0, 64.0, 0.0});
+    cameraEffects.update({0.0, 64.0, 0.0}, true, false, 1.0f / 60.0f);
+    require(cameraEffects.movementBlend() == 0.0f,
+            "stationary player produced view bobbing");
+    for (int i = 1; i <= 30; ++i)
+        cameraEffects.update({i * 0.08, 64.0, 0.0}, true, false, 1.0f / 60.0f);
+    require(cameraEffects.movementBlend() > 0.5f &&
+            glm::length(cameraEffects.translation()) > 0.001f,
+            "ground movement did not produce view bobbing");
+    cameraEffects.onDamage(6.0f);
+    require(cameraEffects.trauma() > 0.6f,
+            "damage did not produce camera trauma");
+    cameraEffects.update({2.4, 64.0, 0.0}, true, false, 0.05f);
+    require(glm::length(cameraEffects.rotationDegrees()) > 0.1f,
+            "damage trauma did not produce rotational shake");
+    for (int i = 0; i < 20; ++i)
+        cameraEffects.update({2.4, 64.0, 0.0}, true, false, 0.05f);
+    require(cameraEffects.trauma() == 0.0f,
+            "damage trauma did not decay to zero");
+
     DayNightCycle cycle;
     require(DayNightCycle::isDayPhase(0.0f), "sunrise was not day");
     require(DayNightCycle::isDayPhase(0.25f), "noon was not day");

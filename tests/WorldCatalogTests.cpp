@@ -30,16 +30,19 @@ int main() {
         legacy.seed = 7;
         legacy.generationVersion = 2;
         SaveStore(root / "legacy-v2").saveMetadata(legacy);
+        legacy.displayName = "Legacy v3";
+        legacy.generationVersion = 3;
+        SaveStore(root / "legacy-v3").saveMetadata(legacy);
         require(first == "my-survival-world", "display name creates a safe id");
         require(second == "my-survival-world-2", "duplicate names get unique ids");
         const auto worlds = catalog.list();
-        require(worlds.size() == 3, "catalog lists compatible and legacy saves");
+        require(worlds.size() == 4, "catalog lists compatible and legacy saves");
         bool sawLegacy = false;
         for (const auto& world : worlds) {
-            require(world.generationVersion == 2 ||
+            require(world.generationVersion == 2 || world.generationVersion == 3 ||
                     world.generationVersion == WorldGenContext::GENERATION_VERSION,
                     "catalog lost generation version");
-            if (world.generationVersion == 2) {
+            if (world.generationVersion < WorldGenContext::GENERATION_VERSION) {
                 sawLegacy = true;
                 require(!world.compatible, "legacy generation was marked compatible");
             } else {

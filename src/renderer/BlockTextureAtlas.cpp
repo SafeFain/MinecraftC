@@ -197,6 +197,13 @@ BlockTextureAtlas::~BlockTextureAtlas() {
 bool BlockTextureAtlas::initialize() {
     stbi_set_flip_vertically_on_load(1);
     const std::string root = "assets/textures/source/";
+    const std::string generatedRoot = "assets/textures/generated/";
+    const bool definitionsLoaded = loadTextureAssetDefinitions(
+        generatedRoot + "atlas.json",
+        "assets/textures/definitions/blocks.json",
+        "assets/textures/definitions/items.json");
+    if (!definitionsLoaded)
+        LOG_WARN("Texture JSON definitions unavailable; using legacy atlas mapping");
     std::array<Tile, static_cast<size_t>(BlockTexture::Count)> tiles;
 
     tiles[static_cast<size_t>(BlockTexture::Dirt)] = material(121, 82, 49, 18, 1);
@@ -284,12 +291,21 @@ bool BlockTextureAtlas::initialize() {
         tiles[static_cast<size_t>(BlockTexture::Snow)];
     tiles[static_cast<size_t>(BlockTexture::Fire)] = fireTile();
 
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        const auto texture = static_cast<BlockTexture>(i);
+        auto& tile = tiles[i];
+        tile = loadTile(generatedRoot + getBlockTextureAssetName(texture) + ".png",
+                        tile);
+    }
+
     GL_CHECK(glGenTextures(1, &m_texture));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture));
 
     std::array<std::vector<uint8_t>, static_cast<size_t>(BlockTexture::Count)> levelTiles;
-    for (size_t i = 0; i < tiles.size(); ++i)
-        levelTiles[i].assign(tiles[i].begin(), tiles[i].end());
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        const size_t atlasIndex = getAtlasTextureIndex(static_cast<BlockTexture>(i));
+        levelTiles[atlasIndex].assign(tiles[i].begin(), tiles[i].end());
+    }
 
     int tileSize = TILE_SIZE;
     for (int level = 0; level <= 4; ++level) {

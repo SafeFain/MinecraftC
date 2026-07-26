@@ -272,6 +272,8 @@ int main() {
               << " total=" << totalOres << '/' << sampledHostBlocks << '\n';
     require(totalOres * 100 < sampledHostBlocks,
             "ore replaced at least one percent of sampled host rock");
+    require(totalOres > 5781,
+            "generation-v4 ore density did not exceed the v3 baseline");
     require(oreCounts[0] > 0 && oreCounts[1] > 0 &&
             oreCounts[2] > 0 && oreCounts[3] > 0,
             "sparse ore tuning removed an ore type from the sample");

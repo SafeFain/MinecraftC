@@ -1,5 +1,10 @@
 # Block texture sources
 
+The directory layout and generation workflow are documented in
+`ASSET_PIPELINE.md`. New generated-asset provenance is recorded in the root
+`ASSET_SOURCES.md`; imported asset licenses are recorded in
+`THIRD_PARTY_LICENSES.md`.
+
 Selected 16×16 source textures in `source/` are adapted from
 “Assorted Minecraft style textures” by JoeEnderman:
 
