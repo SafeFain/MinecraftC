@@ -11,6 +11,62 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def item_definitions(self):
+        root = Path(__file__).resolve().parents[1]
+        return (root / "assets/textures/definitions/item_icons.json",
+                root / "assets/textures/definitions/blocks.json")
+
+    def test_item_templates_palettes_alpha_and_bounds(self):
+        item_defs, _ = self.item_definitions()
+        definitions = tg.load_item_icon_definitions(item_defs)
+        self.assertEqual(set(tg.GENERATOR_CATEGORIES),
+                         {"block_texture", "item_sprite", "block_item_icon"})
+        for material in ("wood", "stone", "copper", "iron", "gold"):
+            self.assertGreaterEqual(len(definitions["materials"][material]), 4)
+        for material in definitions["materials"]:
+            for template in definitions["templates"]:
+                pixels = tg.generate_item_sprite(template, material, definitions)
+                self.assertEqual(len(pixels), 256)
+                self.assertTrue(all(pixel[3] in (0, 255) for pixel in pixels))
+                self.assertTrue(any(pixel[3] == 0 for pixel in pixels))
+                self.assertFalse(tg.validate_item_sprite(pixels, template))
+                opaque = [(x, y) for y in range(16) for x in range(16)
+                          if pixels[y * 16 + x][3]]
+                self.assertTrue(all(0 <= x < 16 and 0 <= y < 16 for x, y in opaque))
+
+    def test_items_atlas_is_deterministic_complete_and_honors_overrides(self):
+        item_defs, block_defs = self.item_definitions()
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second, tempfile.TemporaryDirectory() as overrides, tempfile.TemporaryDirectory() as legacy:
+            a, b = Path(first), Path(second)
+            for output in (a, b):
+                tg.generate(output, 99)
+                tg.build_items_atlas(output, 99, item_defs, block_defs,
+                                     Path(overrides), Path(legacy))
+            self.assertEqual((a / "items_atlas.png").read_bytes(),
+                             (b / "items_atlas.png").read_bytes())
+            metadata = json.loads((a / "items_atlas.json").read_text())
+            definitions = tg.load_item_icon_definitions(item_defs)
+            self.assertEqual(set(metadata["items"]), set(definitions["items"]))
+            self.assertEqual(metadata["filter"], "nearest")
+            self.assertEqual(metadata["priority"],
+                             ["override", "generated", "legacy", "missing"])
+            self.assertEqual(sorted(v["index"] for v in metadata["items"].values()),
+                             list(range(len(definitions["items"]))))
+
+            override_pixels = [(0, 0, 0, 0)] * 256
+            override_pixels[0] = (17, 31, 47, 255)
+            tg.write_png(Path(overrides) / "stick.png", 16, 16, override_pixels)
+            tg.write_png(Path(legacy) / "stick.png", 16, 16,
+                         [(91, 92, 93, 255)] * 256)
+            tg.build_items_atlas(a, 99, item_defs, block_defs,
+                                 Path(overrides), Path(legacy))
+            metadata = json.loads((a / "items_atlas.json").read_text())
+            self.assertEqual(metadata["items"]["stick"]["source_kind"], "override")
+            width, _, atlas_pixels = tg.read_generated_png(a / "items_atlas.png")
+            index = metadata["items"]["stick"]["index"]
+            self.assertEqual(atlas_pixels[(index // 8 * 16) * width +
+                                          (index % 8 * 16)], (17, 31, 47, 255))
+
     def test_generation_is_deterministic_and_tileable(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             a, b = Path(first), Path(second)

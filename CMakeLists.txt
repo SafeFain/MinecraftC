@@ -95,7 +95,8 @@ if(BUILD_TESTING)
 
     add_executable(asset_definition_tests
         tests/AssetDefinitionTests.cpp
-        src/world/Block.cpp)
+        src/world/Block.cpp
+        src/game/Item.cpp)
     target_include_directories(asset_definition_tests PRIVATE src)
     target_link_libraries(asset_definition_tests PRIVATE glm::glm)
     target_compile_definitions(asset_definition_tests PRIVATE
@@ -297,7 +298,7 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_custom_target(texture_generator
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
-                --generate --validate --build-atlas
+                --generate --validate --build-atlas --build-items-atlas
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Generating and validating deterministic voxel textures")

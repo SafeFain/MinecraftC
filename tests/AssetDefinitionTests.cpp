@@ -1,6 +1,9 @@
 #include "world/Block.h"
+#include "game/Item.h"
 
+#include <cctype>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -35,6 +38,19 @@ int main() {
     require(!loadTextureAssetDefinitions("missing-atlas.json", "missing-blocks.json",
                                          "missing-items.json"),
             "missing definitions did not activate compatibility fallback");
+    std::ifstream itemsAtlas(root + "/assets/textures/generated/items_atlas.json");
+    const std::string itemMetadata((std::istreambuf_iterator<char>(itemsAtlas)),
+                                   std::istreambuf_iterator<char>());
+    require(!itemMetadata.empty(), "items atlas metadata did not load");
+    for (ItemId item : creativeInventoryItems()) {
+        std::string logicalName = getItemProps(item).name;
+        for (char& c : logicalName) {
+            const auto value = static_cast<unsigned char>(c);
+            c = std::isalnum(value) ? static_cast<char>(std::tolower(value)) : '_';
+        }
+        require(itemMetadata.find("\"" + logicalName + "\"") != std::string::npos,
+                ("items atlas missing registered item: " + logicalName).c_str());
+    }
     std::cout << "Asset definition tests passed\n";
     return 0;
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 
@@ -47,7 +49,13 @@ private:
     GLuint m_quadVBO = 0;
     GLuint m_quadEBO = 0;
     GLuint m_blockAtlasTexture = 0; // shared, owned by Renderer
+    GLuint m_itemAtlasTexture = 0;  // owned by UIRenderer
+    int m_itemAtlasColumns = 0;
+    int m_itemAtlasRows = 0;
+    std::unordered_map<std::string, int> m_itemAtlasIndices;
     bool m_manualGamma = false;
+
+    bool drawGeneratedItemIcon(float x, float y, float w, float h, ItemId item);
 
     // Saved GL state
     GLboolean m_prevDepthTest = GL_TRUE;

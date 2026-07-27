@@ -7,10 +7,16 @@
 #include <vector>
 #include <cstdio>
 #include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <regex>
+#include <sstream>
+#include <stb_image.h>
 
 // ── Constructor / Destructor ──────────────────────────────────────────────
 
 UIRenderer::~UIRenderer() {
+    if (m_itemAtlasTexture) GL_CHECK(glDeleteTextures(1, &m_itemAtlasTexture));
     if (m_quadEBO) GL_CHECK(glDeleteBuffers(1, &m_quadEBO));
     if (m_quadVBO) GL_CHECK(glDeleteBuffers(1, &m_quadVBO));
     if (m_quadVAO) GL_CHECK(glDeleteVertexArrays(1, &m_quadVAO));
@@ -21,6 +27,32 @@ UIRenderer::~UIRenderer() {
 void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
     m_blockAtlasTexture = blockAtlasTexture;
     m_manualGamma = !framebufferSrgb;
+    std::ifstream metadataFile("assets/textures/generated/items_atlas.json");
+    std::stringstream metadataBuffer;
+    if (metadataFile) metadataBuffer << metadataFile.rdbuf();
+    const std::string metadata = metadataBuffer.str();
+    std::smatch match;
+    if (std::regex_search(metadata, match, std::regex(R"("columns"\s*:\s*(\d+))")))
+        m_itemAtlasColumns = std::stoi(match[1]);
+    if (std::regex_search(metadata, match, std::regex(R"("rows"\s*:\s*(\d+))")))
+        m_itemAtlasRows = std::stoi(match[1]);
+    const std::regex entry(R"REGEX("([^"]+)"\s*:\s*\{[^{}]*"index"\s*:\s*(\d+))REGEX");
+    for (std::sregex_iterator it(metadata.begin(), metadata.end(), entry), end; it != end; ++it)
+        m_itemAtlasIndices[(*it)[1].str()] = std::stoi((*it)[2]);
+    int atlasWidth=0,atlasHeight=0,channels=0;
+    stbi_uc* itemPixels=stbi_load("assets/textures/generated/items_atlas.png",&atlasWidth,&atlasHeight,&channels,4);
+    if (itemPixels && m_itemAtlasColumns>0 && m_itemAtlasRows>0 &&
+        atlasWidth==m_itemAtlasColumns*16 && atlasHeight==m_itemAtlasRows*16) {
+        GL_CHECK(glGenTextures(1,&m_itemAtlasTexture));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D,m_itemAtlasTexture));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D,0,GL_SRGB8_ALPHA8,atlasWidth,atlasHeight,0,GL_RGBA,GL_UNSIGNED_BYTE,itemPixels));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D,0));
+    }
+    stbi_image_free(itemPixels);
     // Compile UI rectangle shader
     m_uiShader = std::make_unique<Shader>(
         "assets/shaders/ui.vert",
@@ -170,6 +202,7 @@ void UIRenderer::drawPanel(float x, float y, float w, float h, const glm::vec4& 
 
 void UIRenderer::drawItemIcon(float x, float y, float w, float h, const ItemStack& stack) {
     if (stack.empty()) return;
+    if (drawGeneratedItemIcon(x,y,w,h,stack.id)) return;
     const auto& props = getItemProps(stack.id);
     if (props.placedBlock) { drawBlockIcon(x, y, w, h, *props.placedBlock); return; }
     glm::vec4 material(.72f, .72f, .72f, 1.0f);
@@ -203,6 +236,32 @@ void UIRenderer::drawItemIcon(float x, float y, float w, float h, const ItemStac
         drawRect(x+w*.24f,y+h*.24f,w*.52f,h*.52f,material);
         drawRect(x+w*.34f,y+h*.34f,w*.32f,h*.32f,{material.r*.65f,material.g*.65f,material.b*.65f,1});
     }
+}
+
+bool UIRenderer::drawGeneratedItemIcon(float x,float y,float w,float h,ItemId item) {
+    if (!m_itemAtlasTexture) return false;
+    std::string name=getItemProps(item).name;
+    for (char& c:name) c=std::isalnum(static_cast<unsigned char>(c)) ?
+        static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '_';
+    const auto found=m_itemAtlasIndices.find(name);
+    if (found==m_itemAtlasIndices.end()) return false;
+    const int tile=found->second;
+    // stb_image flips the complete atlas for OpenGL, including its tile rows.
+    const int textureRow=m_itemAtlasRows-1-tile/m_itemAtlasColumns;
+    const float u0=static_cast<float>(tile%m_itemAtlasColumns)/m_itemAtlasColumns;
+    const float v0=static_cast<float>(textureRow)/m_itemAtlasRows;
+    const float u1=static_cast<float>(tile%m_itemAtlasColumns+1)/m_itemAtlasColumns;
+    const float v1=static_cast<float>(textureRow+1)/m_itemAtlasRows;
+    const float verts[]={x,y,u0,v0,x+w,y,u1,v0,x+w,y+h,u1,v1,x,y+h,u0,v1};
+    m_uiShader->bind(); m_uiShader->setMat4("uProjection",m_projection);
+    m_uiShader->setVec4("uColor",glm::vec4(1)); m_uiShader->setInt("uUseTexture",1);
+    m_uiShader->setInt("uTexture",0); m_uiShader->setInt("uManualGamma",m_manualGamma?1:0);
+    GL_CHECK(glActiveTexture(GL_TEXTURE0)); GL_CHECK(glBindTexture(GL_TEXTURE_2D,m_itemAtlasTexture));
+    GL_CHECK(glBindVertexArray(m_quadVAO)); GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER,m_quadVBO));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,sizeof(verts),verts,GL_DYNAMIC_DRAW));
+    GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m_quadEBO));
+    GL_CHECK(glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,nullptr)); GL_CHECK(glBindVertexArray(0));
+    return true;
 }
 
 void UIRenderer::drawTooltip(float x, float y, const ItemStack& stack) {

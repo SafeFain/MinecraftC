@@ -3,8 +3,9 @@
 MinecraftC separates authored, generated, imported, and declarative assets:
 
 - `assets/textures/source/` contains project-authored or adapted source PNGs.
-- `assets/textures/generated/` contains reproducible generator output and the
-  packed `atlas.png`/`atlas.json` pair.
+- `assets/textures/generated/` contains reproducible output, the unchanged
+  block `atlas.png`/`atlas.json` pair, and the separate
+  `items_atlas.png`/`items_atlas.json` pair.
 - `assets/textures/third_party/` contains imported packs with their licenses.
 - `assets/textures/definitions/` contains JSON block, item, and texture names.
 
@@ -22,13 +23,15 @@ From the repository root:
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
+  --build-items-atlas \
   --seed 213785369 --output assets/textures/generated
 
 # Equivalent default-seed CMake target
 cmake --build build-local --target texture_generator
 ```
 
-Available switches are `--generate`, `--validate`, `--build-atlas`, `--seed`,
+Available switches are `--generate`, `--validate`, `--build-atlas`,
+`--build-items-atlas`, `--seed`,
 `--output`, `--candidate-count`, `--contact-sheet`, and repeatable
 `--local-seed MATERIAL=SEED`. Operations may be combined. A local seed selects
 one material candidate without perturbing any other material and is recorded
@@ -66,6 +69,34 @@ python3 tools/texture_generator.py --generate --validate --build-atlas \
 each cell contains the original tile and an 8x8 repeat. Its companion JSON
 lists candidate and selected local seeds. These two development files are not
 part of `atlas.png` or `atlas.json`.
+
+## Item icons
+
+`definitions/item_icons.json` declares `block_texture`, `item_sprite`, and
+`block_item_icon`, plus logical names, templates, and palettes. Concrete C++
+`ItemId` values are not embedded in Python. Initial templates are sword,
+pickaxe, axe, shovel, hoe, stick, ingot, gem, coal, and torch; shared materials
+are wood, stone, copper, iron, and gold.
+
+The definition covers every registered non-empty item. Additional silhouettes
+handle fibers, feathers, bones, arrows, crops, food, bows, shields, armor, and
+flint. A C++ regression test derives logical names from the live item registry
+and rejects any registered item missing from `items_atlas.json`.
+
+Item sprites have transparent backgrounds and, unlike block textures, are not
+validated for seamless repetition. Tool sprites use discrete outline, handle,
+working-part, and top-left highlight layers. Every icon is 16x16 RGBA, uses
+only alpha 0 or 255, has no antialiasing, avoids broad pure-black outlines, and
+is packed without resampling. Metadata and runtime use nearest filtering.
+
+`block_item_icon` samples logical top and side materials from `blocks.json` and
+composes an isometric inventory cube without changing block tiles, seamless
+validation, or the existing block atlas format.
+
+Selection order is an authored PNG in `source/items/`, the automatic icon, a
+PNG in `legacy/items/`, then the missing-resource/existing runtime icon.
+`items_atlas.json` records source kind, generator category, tile index, grid
+dimensions, and this priority. Items absent from the atlas retain the old path.
 
 ## Add a block and material
 

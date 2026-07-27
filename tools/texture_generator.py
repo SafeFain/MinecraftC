@@ -24,6 +24,7 @@ SIZE = 16
 # Selected from the deterministic contact-sheet candidates. CMake's asset
 # target relies on this default, so keep it aligned with committed atlas.json.
 DEFAULT_SEED = 213785369
+GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
 NAMES = [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
     "leaves", "sand", "bedrock", "water", "snow", "oak_planks",
@@ -420,6 +421,185 @@ def png_bytes(width,height,pixels):
 def write_png(path,width,height,pixels):
     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(png_bytes(width,height,pixels))
 
+def load_item_icon_definitions(path):
+    data=json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("version") != 1: raise ValueError("item icon definitions require version 1")
+    for category in data.get("generator_categories",[]):
+        if category not in GENERATOR_CATEGORIES: raise ValueError(f"unknown generator category '{category}'")
+    required={"sword","pickaxe","axe","shovel","hoe","stick","ingot","gem","coal","torch"}
+    missing=required-set(data.get("templates",{}))
+    if missing: raise ValueError("missing item templates: "+", ".join(sorted(missing)))
+    for name in ("wood","stone","copper","iron","gold"):
+        shades=data.get("materials",{}).get(name)
+        if not isinstance(shades,list) or len(shades)<4:
+            raise ValueError(f"material '{name}' requires at least four colors")
+        for color in shades:
+            if len(color)!=3 or any(not isinstance(c,int) or c<0 or c>255 for c in color):
+                raise ValueError(f"invalid RGB color in material '{name}'")
+    return data
+
+def _rgba(rgb): return tuple(rgb)+(255,)
+def _put(canvas,x,y,color):
+    if 0<=x<SIZE and 0<=y<SIZE: canvas[y*SIZE+x]=color
+def _line(canvas,x0,y0,x1,y1,color,width=1):
+    dx=abs(x1-x0); sx=1 if x0<x1 else -1; dy=-abs(y1-y0); sy=1 if y0<y1 else -1; err=dx+dy
+    while True:
+        for oy in range(-(width//2),width-width//2):
+            for ox in range(-(width//2),width-width//2): _put(canvas,x0+ox,y0+oy,color)
+        if x0==x1 and y0==y1: break
+        twice=2*err
+        if twice>=dy: err+=dy; x0+=sx
+        if twice<=dx: err+=dx; y0+=sy
+
+def generate_item_sprite(template,material,definitions):
+    """Generate crisp binary-alpha sprites; coordinates use PNG top-left origin."""
+    if template not in definitions["templates"]: raise ValueError(f"unknown item template '{template}'")
+    if material not in definitions["materials"]: raise ValueError(f"unknown item material '{material}'")
+    shades=[_rgba(c) for c in definitions["materials"][material]]
+    outline=(max(16,shades[0][0]//2),max(14,shades[0][1]//2),max(12,shades[0][2]//2),255)
+    handle=[_rgba(c) for c in definitions["handle_palette"]]
+    image=[(0,0,0,0)]*(SIZE*SIZE)
+    # Each tool is assembled in layer order: outline, handle, working part, highlight.
+    if template in {"sword","pickaxe","axe","shovel","hoe"}:
+        _line(image,4,13,11,6,outline,3); _line(image,4,13,11,6,handle[1],1)
+        _line(image,3,14,6,11,outline,2); _line(image,3,14,5,12,handle[2],1)
+        if template=="sword":
+            _line(image,10,7,14,1,outline,4); _line(image,10,7,14,1,shades[2],2); _line(image,12,4,14,1,shades[3],1)
+            _line(image,7,9,11,9,outline,3); _line(image,8,8,11,8,shades[1],1)
+        elif template=="pickaxe":
+            _line(image,7,5,14,2,outline,3); _line(image,7,5,14,2,shades[2],1); _line(image,8,4,13,2,shades[3],1)
+        elif template=="axe":
+            for y in range(2,7):
+                for x in range(9+(y>4),14-(y==6)): _put(image,x,y,outline)
+            for y in range(3,6):
+                for x in range(10,13): _put(image,x,y,shades[2 if x<12 else 1])
+            _line(image,10,3,12,3,shades[3],1)
+        elif template=="shovel":
+            for x,y in ((12,2),(13,2),(11,3),(12,3),(13,3),(11,4),(12,4)): _put(image,x,y,outline)
+            for x,y in ((12,2),(12,3),(11,3)): _put(image,x,y,shades[2])
+            _put(image,12,2,shades[3])
+        else:
+            _line(image,10,5,14,3,outline,3); _line(image,10,5,14,3,shades[2],1); _put(image,13,3,shades[3])
+    elif template=="stick":
+        _line(image,4,13,12,3,outline,3); _line(image,4,13,12,3,handle[1],1); _line(image,9,6,12,3,handle[2],1)
+    elif template=="ingot":
+        for y,left,right in ((5,6,10),(6,4,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9)):
+            for x in range(left,right+1): _put(image,x,y,outline)
+        for y,left,right in ((6,6,10),(7,5,11),(8,4,10),(9,5,9)):
+            for x in range(left,right+1): _put(image,x,y,shades[2 if x+y<15 else 1])
+        _line(image,6,6,10,6,shades[3],1)
+    elif template=="gem":
+        rows=((3,7,8),(4,5,10),(5,4,11),(6,3,12),(7,3,12),(8,4,11),(9,5,10),(10,7,8))
+        for y,left,right in rows:
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[2 if x+y<15 else 1])
+        _line(image,6,5,9,4,shades[3],1)
+    elif template=="coal":
+        rows=((4,6,9),(5,4,11),(6,3,12),(7,3,12),(8,4,12),(9,5,11),(10,6,9))
+        for y,left,right in rows:
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x+y)%2])
+        _put(image,6,5,shades[3]); _put(image,5,6,shades[2])
+    elif template=="torch":
+        _line(image,6,13,9,5,outline,4); _line(image,6,13,9,5,handle[1],2)
+        for x,y,c in ((8,5,shades[1]),(9,5,shades[2]),(8,4,shades[2]),(9,4,shades[3]),(10,4,shades[2]),(9,3,shades[3])): _put(image,x,y,c)
+    elif template in {"string","bow"}:
+        for y in range(2,14):
+            x=4+abs(7-y)//2
+            _put(image,x,y,shades[2]); _put(image,11,y,shades[3])
+        if template=="bow": _line(image,5,2,11,8,handle[1],2); _line(image,11,8,5,13,handle[1],2)
+    elif template in {"feather","bone","arrow"}:
+        _line(image,3,13,12,3,outline,3); _line(image,3,13,12,3,shades[2],1)
+        if template=="feather":
+            for x,y in ((5,11),(4,10),(7,9),(6,8),(9,7),(8,6)): _put(image,x,y,shades[3])
+        elif template=="bone":
+            for x,y in ((2,12),(3,14),(11,2),(13,3)): _put(image,x,y,shades[3])
+        else:
+            _line(image,10,5,13,2,shades[3],2); _line(image,3,13,3,10,handle[2],1)
+    elif template in {"seeds","wheat"}:
+        _line(image,7,13,8,4,shades[1],1)
+        for x,y in ((6,11),(9,10),(6,8),(9,7),(7,5)):
+            _put(image,x,y,shades[2]); _put(image,x+(1 if x<8 else -1),y-1,shades[3])
+        if template=="wheat": _line(image,8,8,11,5,shades[2],1)
+    elif template in {"food","leather"}:
+        rows=((4,6,9),(5,4,11),(6,3,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9),(11,6,8))
+        for y,left,right in rows:
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x+y)%2])
+        _line(image,5,5,9,4,shades[3],1)
+    elif template=="shield":
+        for y,left,right in ((2,5,10),(3,4,11),(4,4,11),(5,4,11),(6,4,11),(7,5,10),(8,5,10),(9,6,9),(10,7,8)):
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x>7)])
+        _line(image,5,3,9,3,shades[3],1)
+    elif template in {"helmet","chestplate","leggings","boots"}:
+        if template=="helmet": rows=((4,5,10),(5,4,11),(6,4,11),(7,4,11),(8,4,6),(8,9,11))
+        elif template=="chestplate": rows=((3,3,6),(3,9,12),(4,3,12),(5,4,11),(6,4,11),(7,4,11),(8,4,11),(9,5,10),(10,5,10),(11,5,10))
+        elif template=="leggings": rows=((3,4,11),(4,4,11),(5,5,10),(6,5,10),(7,5,7),(7,9,11),(8,5,7),(8,9,11),(9,5,7),(9,9,11),(10,5,7),(10,9,11),(11,5,7),(11,9,11))
+        else: rows=((7,4,6),(7,9,11),(8,4,6),(8,9,11),(9,4,7),(9,8,11),(10,4,7),(10,8,11),(11,4,7),(11,8,11))
+        for y,left,right in rows:
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[2])
+        _line(image,5,4,9,4,shades[3],1)
+    elif template=="flint":
+        for x,y in ((8,3),(7,4),(8,4),(6,5),(7,5),(8,5),(5,6),(6,6),(7,6),(5,7),(6,7),(5,8),(4,9)):
+            _put(image,x,y,shades[3] if x+y<12 else shades[1])
+    return image
+
+def generate_block_item_icon(top_pixels,side_pixels):
+    """Compose a small nearest-neighbor isometric cube from top and side tiles."""
+    image=[(0,0,0,0)]*(SIZE*SIZE)
+    for y in range(4):
+        for x in range(8):
+            color=top_pixels[min(15,y*4)*SIZE+min(15,x*2)]
+            _put(image,4+x-y,2+x//2+y,color)
+            _put(image,5+x-y,2+x//2+y,color)
+    for y in range(8):
+        for x in range(6):
+            color=side_pixels[min(15,y*2)*SIZE+min(15,x*3)]
+            _put(image,2+x,6+y+x//3,color)
+            shade=(max(1,color[0]*3//4),max(1,color[1]*3//4),max(1,color[2]*3//4),color[3])
+            _put(image,8+x,6+y-x//3,shade)
+    return image
+
+def validate_item_sprite(pixels,name="item"):
+    errors=[]
+    if len(pixels)!=SIZE*SIZE: errors.append(f"{name}: dimensions must be 16x16")
+    if any(p[3] not in (0,255) for p in pixels): errors.append(f"{name}: alpha values must be 0 or 255")
+    opaque=[p for p in pixels if p[3]]
+    if not opaque: errors.append(f"{name}: icon is empty")
+    if sum(p[:3]==(0,0,0) for p in opaque)>max(2,len(opaque)//12): errors.append(f"{name}: excessive pure-black outline")
+    return errors
+
+def build_items_atlas(output,seed,definitions_path,block_definitions_path,override_dir=None,legacy_dir=None):
+    definitions=load_item_icon_definitions(definitions_path)
+    blocks=json.loads(Path(block_definitions_path).read_text(encoding="utf-8"))["blocks"]
+    item_dir=output/"items"; item_dir.mkdir(parents=True,exist_ok=True)
+    resolved=[]
+    for name,spec in definitions["items"].items():
+        override=Path(override_dir)/f"{name}.png" if override_dir else None
+        legacy=Path(legacy_dir)/f"{name}.png" if legacy_dir else None
+        source_kind="generated"; source_path=item_dir/f"{name}.png"
+        pixels=None
+        if override and override.exists(): source_kind="override"; source_path=override; _,_,pixels=read_generated_png(override)
+        if pixels is None:
+            category=spec["generator"]
+            if category=="item_sprite": pixels=generate_item_sprite(spec["template"],spec["material"],definitions)
+            elif category=="block_item_icon":
+                block=blocks[spec["block"]]; top=block.get("top",block.get("all")); side=block.get("side",block.get("all",top))
+                _,_,top_pixels=read_generated_png(output/f"{top}.png"); _,_,side_pixels=read_generated_png(output/f"{side}.png")
+                pixels=generate_block_item_icon(top_pixels,side_pixels)
+            else: raise ValueError(f"item '{name}' has invalid generator '{category}'")
+            errors=validate_item_sprite(pixels,name)
+            if errors: raise ValueError("\n".join(errors))
+            write_png(source_path,SIZE,SIZE,pixels)
+        if pixels is None and legacy and legacy.exists(): source_kind="legacy"; source_path=legacy; _,_,pixels=read_generated_png(legacy)
+        if pixels is None: source_kind="missing"; pixels=generate_item_sprite("coal","stone",definitions)
+        resolved.append((name,spec,source_kind,source_path,pixels))
+    columns=8; rows=max(1,math.ceil(len(resolved)/columns)); atlas=[(0,0,0,0)]*(columns*SIZE*rows*SIZE)
+    metadata={"version":1,"tile_size":SIZE,"columns":columns,"rows":rows,"filter":"nearest","seed":seed,"priority":["override","generated","legacy","missing"],"items":{}}
+    for index,(name,spec,kind,path,pixels) in enumerate(resolved):
+        tx,ty=index%columns,index//columns
+        for y in range(SIZE): atlas[(ty*SIZE+y)*columns*SIZE+tx*SIZE:(ty*SIZE+y)*columns*SIZE+(tx+1)*SIZE]=pixels[y*SIZE:(y+1)*SIZE]
+        metadata["items"][name]={"index":index,"x":tx,"y":ty,"generator":spec["generator"],"source_kind":kind,"source":str(path)}
+    write_png(output/"items_atlas.png",columns*SIZE,rows*SIZE,atlas)
+    (output/"items_atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+
 def read_generated_png(path):
     data=path.read_bytes()
     if not data.startswith(b"\x89PNG\r\n\x1a\n"): raise ValueError(f"not a PNG: {path}")
@@ -617,17 +797,23 @@ def parse_args(argv=None):
     parser.add_argument("--seed",type=int,default=DEFAULT_SEED); parser.add_argument("--output",type=Path,default=Path("assets/textures/generated"))
     parser.add_argument("--candidate-count",type=int,default=1); parser.add_argument("--contact-sheet",action="store_true")
     parser.add_argument("--local-seed",action="append",default=[],metavar="MATERIAL=SEED")
+    parser.add_argument("--build-items-atlas",action="store_true")
+    parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
+    parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
+    parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
+    parser.add_argument("--legacy-items",type=Path,default=Path("assets/textures/legacy/items"))
     return parser.parse_args(argv)
 
 def main(argv=None):
     args=parse_args(argv)
-    if not (args.generate or args.validate or args.build_atlas or args.contact_sheet): raise SystemExit("select --generate, --validate, --build-atlas, or --contact-sheet")
+    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
         local_seeds=parse_local_seeds(args.local_seed)
         if args.generate: generate(args.output,args.seed,local_seeds)
         if args.validate: validate(args.output)
         if args.build_atlas: build_atlas(args.output,args.seed,local_seeds)
+        if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0
