@@ -11,7 +11,7 @@ MinecraftC 是一个使用 C++17 与 OpenGL 3.3 编写的体素沙盒游戏。�
 - 生存、创造和旁观模式，以及可持久化的多世界选择、游戏规则和客户端设置。
 - 晴天、下雨和雷暴循环；雪原中降水表现为雪，雷暴可产生闪电。
 - 生物战斗、碰撞击退、受击反馈、日照燃烧及昼夜相关敌对行为。
-- JSON 驱动的方块/物品材质映射，以及确定性程序化 16×16 像素纹理资产管线。
+- JSON 驱动的方块材质与全部 116 个注册物品图标，以及确定性程序化 16×16 像素资产管线。
 
 ## 构建要求
 
@@ -72,22 +72,26 @@ cmake --build build-local --clean-first -j2
 
 ## 纹理资产管线
 
-方块和物品通过 `assets/textures/definitions/` 下的 JSON 文件引用逻辑材质名，C++ 与着色器不硬编码具体 atlas 坐标。正式生成纹理位于 `assets/textures/generated/`；运行时仍保留旧资源和程序化 atlas 作为兼容回退。
+方块和物品通过 `assets/textures/definitions/` 下的 JSON 文件引用逻辑材质名，C++ 与着色器不硬编码具体 atlas 坐标。`block_texture`、`item_sprite` 和 `block_item_icon` 三种生成器分别负责可平铺方块纹理、透明背景物品精灵，以及使用方块顶面和侧面自动合成的立体背包图标。具体物品 ID 不硬编码在 Python 中。
+
+方块继续使用原有 `atlas.png` / `atlas.json`；全部 116 个当前注册的非空物品使用独立的 `items_atlas.png` / `items_atlas.json`。物品 atlas 采用最近邻采样，图标保持 16×16、二值 alpha、清晰像素轮廓和左上方受光。资源选择顺序为人工覆盖、自动生成、旧图标、缺失资源图标。运行时仍保留旧资源和程序化绘制作为兼容回退。
 
 当前正式纹理种子为 `213785369`。从项目根目录重新生成、校验并打包：
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
+  --build-items-atlas \
   --seed 213785369 --output assets/textures/generated
 
 # 使用当前默认种子的等价 CMake 目标
 cmake --build build-local --target texture_generator
 ```
 
-生成器采用有限调色板、二值透明度、最近邻像素输出和环面坐标结构生成，并检测长直线、中心十字、大型矩形色块、周期性、频率分布及矿簇连通性。生成8组开发候选总览：
+方块生成器采用有限调色板、二值透明度、最近邻像素输出和环面坐标结构，并检测长直线、中心十字、大型矩形色块、周期性、频率分布及矿簇连通性。物品图标不做无缝平铺校验；工具由轮廓、手柄、工作部件和高光层构成，其他模板覆盖材料、食物、弓盾、护甲、箭矢、作物和树苗等全部现有物品。生成 8 组方块纹理开发候选总览：
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
+  --build-items-atlas \
   --seed 213785369 --candidate-count 8 --contact-sheet \
   --output assets/textures/generated
 ```
@@ -100,7 +104,7 @@ python3 tools/texture_generator.py --generate --validate --build-atlas \
 ctest --test-dir build-local --output-on-failure
 ```
 
-测试覆盖世界生成确定性、区块边界、渲染逻辑、玩家移动、生存规则、存档、实体、光照、客户端输入和完整生存进程。
+测试覆盖世界生成确定性、区块边界、渲染逻辑、玩家移动、生存规则、存档、实体、光照、客户端输入和完整生存进程；资产测试还检查图标确定性、二值透明度、调色板、模板边界、atlas 完整性、人工覆盖优先级，以及实时物品注册表的全覆盖。
 
 ## 项目说明
 
