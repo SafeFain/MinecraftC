@@ -1,6 +1,11 @@
 /build-local/
 /saves/
-CLAUDE.md
-PLAN.md
-PROGRESS.md
-AGENTS.md
+
+# Local agent context and task state; never publish with project sources.
+/AGENTS.md
+/CLAUDE.md
+/PLAN.md
+/PROGRESS.md
+/TASKS.md
+/docs/context-migration.md
+/docs/tasks/
