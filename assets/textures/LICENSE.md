@@ -34,6 +34,10 @@ logs and sawn planks remain visually distinct.
 `entity_atlas.png` is original AI-generated pixel art produced for MinecraftC
 with OpenAI image generation on 2026-07-25. It was prompted as a generic,
 non-branded voxel-creature portrait sheet and does not copy Mojang assets.
+It remains as a compatibility fallback. Runtime models normally use the
+deterministic original material swatches in `generated/entity_atlas.png`;
+their source record and reproduction command are documented in
+`ASSET_SOURCES.md` and `ASSET_PIPELINE.md`.
 
 Additional CC0 visual references reviewed for entity and crop readability:
 

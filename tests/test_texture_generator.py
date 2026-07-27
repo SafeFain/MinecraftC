@@ -16,6 +16,24 @@ class TextureGeneratorTests(unittest.TestCase):
         return (root / "assets/textures/definitions/item_icons.json",
                 root / "assets/textures/definitions/blocks.json")
 
+    def test_entity_atlas_is_deterministic_and_complete(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            a, b = Path(first), Path(second)
+            tg.build_entity_atlas(a, 314159)
+            tg.build_entity_atlas(b, 314159)
+            self.assertEqual((a / "entity_atlas.png").read_bytes(),
+                             (b / "entity_atlas.png").read_bytes())
+            metadata = json.loads((a / "entity_atlas.json").read_text())
+            self.assertEqual(tuple(metadata["entities"]), tuple(sorted(tg.ENTITY_NAMES)))
+            self.assertEqual({entry["index"] for entry in metadata["entities"].values()},
+                             set(range(9)))
+            width, height, pixels = tg.read_generated_png(a / "entity_atlas.png")
+            self.assertEqual((width, height), (48, 48))
+            self.assertTrue(all(pixel[3] == 255 for pixel in pixels))
+            for name in tg.ENTITY_NAMES:
+                _, _, tile = tg.read_generated_png(a / "entities" / f"{name}.png")
+                self.assertGreaterEqual(len(set(tile)), 4, name)
+
     def test_item_templates_palettes_alpha_and_bounds(self):
         item_defs, _ = self.item_definitions()
         definitions = tg.load_item_icon_definitions(item_defs)

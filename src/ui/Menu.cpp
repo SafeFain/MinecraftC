@@ -230,6 +230,9 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
         m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, buttonHeight);
         m_buttons[i].render(ui);
     }
+
+    ui.renderText(Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
+                  glm::vec3(0.62f, 0.62f, 0.66f));
 }
 
 void MainMenu::onKeyPress(int key) {

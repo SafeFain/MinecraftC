@@ -1,0 +1,64 @@
+{
+  "columns": 3,
+  "entities": {
+    "blastling": {
+      "index": 7,
+      "source": "entities/blastling.png",
+      "x": 1,
+      "y": 2
+    },
+    "chicken": {
+      "index": 3,
+      "source": "entities/chicken.png",
+      "x": 0,
+      "y": 1
+    },
+    "cow": {
+      "index": 0,
+      "source": "entities/cow.png",
+      "x": 0,
+      "y": 0
+    },
+    "item": {
+      "index": 8,
+      "source": "entities/item.png",
+      "x": 2,
+      "y": 2
+    },
+    "pig": {
+      "index": 1,
+      "source": "entities/pig.png",
+      "x": 1,
+      "y": 0
+    },
+    "sheep": {
+      "index": 2,
+      "source": "entities/sheep.png",
+      "x": 2,
+      "y": 0
+    },
+    "skeleton": {
+      "index": 5,
+      "source": "entities/skeleton.png",
+      "x": 2,
+      "y": 1
+    },
+    "spider": {
+      "index": 6,
+      "source": "entities/spider.png",
+      "x": 0,
+      "y": 2
+    },
+    "zombie": {
+      "index": 4,
+      "source": "entities/zombie.png",
+      "x": 1,
+      "y": 1
+    }
+  },
+  "filter": "nearest",
+  "rows": 3,
+  "seed": 213785369,
+  "tile_size": 16,
+  "version": 1
+}

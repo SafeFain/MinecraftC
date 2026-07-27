@@ -25,6 +25,28 @@ SIZE = 16
 # target relies on this default, so keep it aligned with committed atlas.json.
 DEFAULT_SEED = 213785369
 GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
+ENTITY_NAMES = ("cow", "pig", "sheep", "chicken", "zombie", "skeleton",
+                "spider", "blastling", "item")
+ENTITY_PALETTES = {
+    "cow": ((61,39,25,255),(82,49,29,255),(111,67,38,255),
+            (151,105,68,255),(213,199,171,255),(238,229,207,255)),
+    "pig": ((147,67,78,255),(180,89,101,255),(207,112,124,255),
+            (226,139,149,255),(239,166,174,255),(248,192,198,255)),
+    "sheep": ((133,126,112,255),(160,153,139,255),(185,181,168,255),
+              (207,204,193,255),(226,224,215,255),(241,240,232,255)),
+    "chicken": ((157,47,38,255),(211,66,43,255),(209,139,31,255),
+                (232,184,64,255),(218,216,199,255),(245,244,229,255)),
+    "zombie": ((32,67,44,255),(46,88,54,255),(64,108,66,255),
+               (55,94,96,255),(65,116,123,255),(91,137,130,255)),
+    "skeleton": ((92,84,69,255),(126,116,95,255),(159,149,124,255),
+                 (190,181,154,255),(218,209,181,255),(239,233,207,255)),
+    "spider": ((32,22,20,255),(48,30,26,255),(68,40,33,255),
+               (92,52,39,255),(137,25,24,255),(213,42,31,255)),
+    "blastling": ((29,69,30,255),(39,94,37,255),(53,119,43,255),
+                  (70,146,48,255),(97,174,58,255),(132,204,76,255)),
+    "item": ((91,55,21,255),(122,76,25,255),(158,104,31,255),
+             (192,137,39,255),(223,174,58,255),(244,207,91,255)),
+}
 NAMES = [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
     "leaves", "sand", "bedrock", "water", "snow", "oak_planks",
@@ -408,6 +430,48 @@ def generate_texture(name,seed,local_seeds=None):
     palette=PALETTES[name]
     return [palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
 
+def generate_entity_texture(name,seed):
+    """Generate a wrapping material swatch, not a face portrait."""
+    if name not in ENTITY_PALETTES: raise ValueError(f"unknown entity material '{name}'")
+    values=[v*.55 for v in macro_field(seed,name,6)]
+    for i in range(7):
+        h=sample(seed,name,i,131)
+        blob=grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),3+(h>>16)%8,i)
+        tone=(-.55,.38,.66)[i%3]
+        for x,y in blob: values[y*SIZE+x]+=tone
+    indices=quantize(values)
+    if name=="cow":
+        for i in range(3):
+            h=sample(seed,name,i,137)
+            for x,y in grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),10+(h>>16)%10,20+i):
+                indices[y*SIZE+x]=4+(x+y+i)%2
+    elif name=="sheep":
+        indices=[3+((x+y+indices[y*SIZE+x])%3) for y in range(SIZE) for x in range(SIZE)]
+        for i in range(9):
+            h=sample(seed,name,i,141)
+            indices[((h>>8)%SIZE)*SIZE+h%SIZE]=2
+    elif name=="chicken":
+        indices=[4+(indices[y*SIZE+x]&1) for y in range(SIZE) for x in range(SIZE)]
+        for i in range(8):
+            h=sample(seed,name,i,139); x=h%SIZE; y=(h>>8)%SIZE
+            indices[y*SIZE+x]=i%4
+    elif name=="zombie":
+        for y in range(6,10):
+            for x in range(SIZE):
+                if (x+y)%5: indices[y*SIZE+x]=3+(indices[y*SIZE+x]&1)
+    elif name=="skeleton":
+        for i in range(6):
+            h=sample(seed,name,i,149); x=h%SIZE; y=(h>>8)%SIZE
+            for step in range(2+(h>>16)%3):
+                indices[wrap(y+step)*SIZE+wrap(x+step//2)]=step%2
+    elif name=="spider":
+        indices=[min(3,i) for i in indices]
+        for i in range(5):
+            h=sample(seed,name,i,151)
+            indices[((h>>8)%SIZE)*SIZE+h%SIZE]=4+i%2
+    palette=ENTITY_PALETTES[name]
+    return [palette[max(0,min(5,index))] for index in indices]
+
 def png_bytes(width,height,pixels):
     raw=bytearray()
     for y in range(height):
@@ -735,6 +799,24 @@ def build_atlas(output,seed,local_seeds=None):
     write_png(output/"atlas.png",grid*SIZE,grid*SIZE,atlas)
     (output/"atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
+def build_entity_atlas(output,seed):
+    columns=3; rows=3; atlas=[(0,0,0,0)]*(columns*SIZE*rows*SIZE)
+    metadata={"version":1,"tile_size":SIZE,"columns":columns,"rows":rows,
+              "filter":"nearest","seed":seed,"entities":{}}
+    entity_dir=output/"entities"; entity_dir.mkdir(parents=True,exist_ok=True)
+    for index,name in enumerate(ENTITY_NAMES):
+        pixels=generate_entity_texture(name,seed)
+        write_png(entity_dir/f"{name}.png",SIZE,SIZE,pixels)
+        tx,ty=index%columns,index//columns
+        for y in range(SIZE):
+            begin=(ty*SIZE+y)*columns*SIZE+tx*SIZE
+            atlas[begin:begin+SIZE]=pixels[y*SIZE:(y+1)*SIZE]
+        metadata["entities"][name]={"index":index,"x":tx,"y":ty,
+                                    "source":f"entities/{name}.png"}
+    write_png(output/"entity_atlas.png",columns*SIZE,rows*SIZE,atlas)
+    (output/"entity_atlas.json").write_text(
+        json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+
 # Compact 3x5 bitmap glyphs keep contact sheets dependency-free.
 FONT={c:bits for c,bits in {
 "0":"111101101101111","1":"010110010010111","2":"111001111100111","3":"111001111001111",
@@ -798,6 +880,7 @@ def parse_args(argv=None):
     parser.add_argument("--candidate-count",type=int,default=1); parser.add_argument("--contact-sheet",action="store_true")
     parser.add_argument("--local-seed",action="append",default=[],metavar="MATERIAL=SEED")
     parser.add_argument("--build-items-atlas",action="store_true")
+    parser.add_argument("--build-entity-atlas",action="store_true")
     parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
     parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
     parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
@@ -806,7 +889,7 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args=parse_args(argv)
-    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
+    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
         local_seeds=parse_local_seeds(args.local_seed)
@@ -814,6 +897,7 @@ def main(argv=None):
         if args.validate: validate(args.output)
         if args.build_atlas: build_atlas(args.output,args.seed,local_seeds)
         if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
+        if args.build_entity_atlas: build_entity_atlas(args.output,args.seed)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0

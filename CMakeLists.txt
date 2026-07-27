@@ -299,6 +299,7 @@ if(Python3_Interpreter_FOUND)
     add_custom_target(texture_generator
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
                 --generate --validate --build-atlas --build-items-atlas
+                --build-entity-atlas
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Generating and validating deterministic voxel textures")

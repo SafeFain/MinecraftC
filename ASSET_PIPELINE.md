@@ -23,7 +23,7 @@ From the repository root:
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
-  --build-items-atlas \
+  --build-items-atlas --build-entity-atlas \
   --seed 213785369 --output assets/textures/generated
 
 # Equivalent default-seed CMake target
@@ -31,7 +31,7 @@ cmake --build build-local --target texture_generator
 ```
 
 Available switches are `--generate`, `--validate`, `--build-atlas`,
-`--build-items-atlas`, `--seed`,
+`--build-items-atlas`, `--build-entity-atlas`, `--seed`,
 `--output`, `--candidate-count`, `--contact-sheet`, and repeatable
 `--local-seed MATERIAL=SEED`. Operations may be combined. A local seed selects
 one material candidate without perturbing any other material and is recorded
@@ -97,6 +97,15 @@ Selection order is an authored PNG in `source/items/`, the automatic icon, a
 PNG in `legacy/items/`, then the missing-resource/existing runtime icon.
 `items_atlas.json` records source kind, generator category, tile index, grid
 dimensions, and this priority. Items absent from the atlas retain the old path.
+
+## Entity materials
+
+`--build-entity-atlas` deterministically creates nine 16x16 wrapping material
+swatches for the passive animals, hostile mobs, and item fallback. Unlike the
+legacy portrait sheet, these tiles contain hide, fleece, feather, bone, skin,
+or carapace patterns that remain coherent on every cuboid model part. The 3x3
+atlas and its metadata are written to `generated/entity_atlas.png` and
+`generated/entity_atlas.json` with nearest filtering.
 
 ## Add a block and material
 

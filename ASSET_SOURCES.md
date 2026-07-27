@@ -21,3 +21,12 @@ Use one section per original or generated asset family.
 - Creator/tool: `tools/texture_generator.py`
 - Seed and generator version: atlas metadata records both; format version 1
 - License: original project-generated assets
+
+## Procedural entity materials
+
+- Logical names: cow, pig, sheep, chicken, zombie, skeleton, spider, blastling, item
+- Local paths: `assets/textures/generated/entities/`, `assets/textures/generated/entity_atlas.png`
+- Creator/tool: `tools/texture_generator.py --build-entity-atlas`
+- Creation date: 2026-07-27
+- Seed and generator version: atlas metadata records seed; format version 1
+- License: original project-generated assets

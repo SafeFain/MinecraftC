@@ -147,8 +147,13 @@ void Renderer::initialize(bool framebufferSrgb) {
     int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
     stbi_set_flip_vertically_on_load(1);
     stbi_uc* atlas = stbi_load(
-        "assets/textures/entity_atlas.png",
+        "assets/textures/generated/entity_atlas.png",
         &atlasWidth, &atlasHeight, &atlasChannels, 4);
+    if (!atlas) {
+        atlas = stbi_load("assets/textures/entity_atlas.png",
+                          &atlasWidth, &atlasHeight, &atlasChannels, 4);
+        if (atlas) LOG_WARN("Using legacy entity portrait atlas fallback");
+    }
     if (atlas && atlasWidth == atlasHeight && atlasWidth % 3 == 0) {
         GL_CHECK(glGenTextures(1, &m_entityTexture));
         GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_entityTexture));
@@ -300,7 +305,18 @@ void Renderer::renderWireframe(const glm::vec3& blockPos,
 void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
                             const glm::vec3& color, int textureIndex,
                             const glm::mat4& viewProjection) {
+    renderEntityPart(position, glm::vec3(0.0f), size, 0.0f, color,
+                     textureIndex, viewProjection);
+}
+
+void Renderer::renderEntityPart(
+    const glm::vec3& position, const glm::vec3& offset,
+    const glm::vec3& size, float yaw, const glm::vec3& color,
+    int textureIndex, const glm::mat4& viewProjection) {
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), position) *
+                            glm::rotate(glm::mat4(1.0f), yaw,
+                                        glm::vec3(0.0f, 1.0f, 0.0f)) *
+                            glm::translate(glm::mat4(1.0f), offset) *
                             glm::scale(glm::mat4(1.0f), size);
     m_entityShader->bind();
     m_entityShader->setMat4("uMVP", viewProjection * model);

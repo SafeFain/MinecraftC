@@ -49,6 +49,10 @@ public:
     void renderEntity(const glm::vec3& position, const glm::vec3& size,
                       const glm::vec3& color, int textureIndex,
                       const glm::mat4& viewProjection);
+    void renderEntityPart(const glm::vec3& position, const glm::vec3& offset,
+                          const glm::vec3& size, float yaw,
+                          const glm::vec3& color, int textureIndex,
+                          const glm::mat4& viewProjection);
     void renderParticles(const std::vector<ParticleRenderData>& particles,
                          const glm::mat4& viewProjection,
                          const glm::vec3& cameraRight,
