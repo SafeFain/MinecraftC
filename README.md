@@ -104,11 +104,16 @@ GitHub Actions 会在 Linux、Windows 和 macOS（arm64/x86-64 通用版）上�
 - `T`：打开命令输入
 - `Esc`：暂停、关闭界面或返回
 
-键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。新安装默认把
-设置和世界存档写入平台用户数据目录：Windows 的 Roaming AppData、macOS 的
-Application Support，以及 Linux 的 `$XDG_DATA_HOME`（未设置时为
-`~/.local/share`）。如果启动目录已经存在 `saves/`，程序会继续原地使用该
-目录，不自动移动旧数据。新存档使用固定 little-endian 的格式 v8，并兼容读取
+键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。存档默认位于：
+
+- Windows：`%APPDATA%\MinecraftC\saves`
+- macOS：`~/Library/Application Support/MinecraftC/saves`
+- Linux：`$XDG_DATA_HOME/minecraftc/saves`，未设置时为
+  `~/.local/share/minecraftc/saves`
+
+如果启动目录已经存在 `saves/`，程序会优先使用该目录。`options.txt` 位于存档
+目录，`minecraftc.log` 位于其上一级数据目录。新存档使用固定 little-endian 的
+格式 v8，并兼容读取
 现有桌面平台生成的 v2–v7 存档；新建世界使用世界生成版本 v5。默认世界渲染
 距离为 8 区块；云渲染距离可在设置中选择 64–512 方块，默认为 192 方块。
 旧版 v5 基础区块缓存会按缓存修订号失效并重生成，玩家方块覆盖仍会保留。
