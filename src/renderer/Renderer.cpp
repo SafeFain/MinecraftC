@@ -35,28 +35,30 @@ Renderer::~Renderer() {
 
 // ── Initialization ────────────────────────────────────────────────────
 
-void Renderer::initialize(bool framebufferSrgb) {
+void Renderer::initialize(bool framebufferSrgb,
+                          const std::filesystem::path& assetRoot) {
     m_framebufferSrgb = framebufferSrgb;
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
-        "assets/shaders/block.vert",
-        "assets/shaders/block.frag"
+        assetRoot / "shaders" / "block.vert",
+        assetRoot / "shaders" / "block.frag"
     );
     m_wireShader = std::make_unique<Shader>(
-        "assets/shaders/wireframe.vert",
-        "assets/shaders/wireframe.frag"
+        assetRoot / "shaders" / "wireframe.vert",
+        assetRoot / "shaders" / "wireframe.frag"
     );
     m_skyShader = std::make_unique<Shader>(
-        "assets/shaders/sky.vert",
-        "assets/shaders/sky.frag"
+        assetRoot / "shaders" / "sky.vert",
+        assetRoot / "shaders" / "sky.frag"
     );
     m_entityShader = std::make_unique<Shader>(
-        "assets/shaders/entity.vert",
-        "assets/shaders/entity.frag"
+        assetRoot / "shaders" / "entity.vert",
+        assetRoot / "shaders" / "entity.frag"
     );
     m_particleShader = std::make_unique<Shader>(
-        "assets/shaders/weather.vert", "assets/shaders/weather.frag");
-    m_blockAtlas.initialize();
+        assetRoot / "shaders" / "weather.vert",
+        assetRoot / "shaders" / "weather.frag");
+    m_blockAtlas.initialize(assetRoot);
 
     // Global GL state
     GL_CHECK(glEnable(GL_DEPTH_TEST));
@@ -146,11 +148,15 @@ void Renderer::initialize(bool framebufferSrgb) {
 
     int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
     stbi_set_flip_vertically_on_load(1);
+    const auto generatedEntityAtlas =
+        (assetRoot / "textures" / "generated" / "entity_atlas.png").u8string();
     stbi_uc* atlas = stbi_load(
-        "assets/textures/generated/entity_atlas.png",
+        generatedEntityAtlas.c_str(),
         &atlasWidth, &atlasHeight, &atlasChannels, 4);
     if (!atlas) {
-        atlas = stbi_load("assets/textures/entity_atlas.png",
+        const auto legacyEntityAtlas =
+            (assetRoot / "textures" / "entity_atlas.png").u8string();
+        atlas = stbi_load(legacyEntityAtlas.c_str(),
                           &atlasWidth, &atlasHeight, &atlasChannels, 4);
         if (atlas) LOG_WARN("Using legacy entity portrait atlas fallback");
     }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <glad/glad.h>
 
 class BlockTextureAtlas {
@@ -10,7 +11,7 @@ public:
     BlockTextureAtlas(const BlockTextureAtlas&) = delete;
     BlockTextureAtlas& operator=(const BlockTextureAtlas&) = delete;
 
-    bool initialize();
+    bool initialize(const std::filesystem::path& assetRoot);
     void bind() const;
     GLuint textureId() const { return m_texture; }
 

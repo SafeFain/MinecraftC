@@ -1,0 +1,69 @@
+name: Cross-platform build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenGL and virtual-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
+      - name: Configure
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+      - name: Build
+        run: cmake --build build-ci -j2
+      - name: Test
+        run: ctest --test-dir build-ci --output-on-failure
+      - name: Install
+        run: cmake --install build-ci --prefix "$RUNNER_TEMP/minecraftc-stage"
+      - name: Verify installed OpenGL startup
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          set +e
+          timeout 8s xvfb-run -a "$RUNNER_TEMP/minecraftc-stage/bin/minecraftc" > minecraftc-smoke.log 2>&1
+          status=$?
+          set -e
+          cat minecraftc-smoke.log
+          grep -q "MinecraftC initialized" minecraftc-smoke.log
+          test "$status" -eq 124
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+      - name: Build
+        run: cmake --build build-ci --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build-ci -C Release --output-on-failure
+      - name: Install and verify layout
+        shell: pwsh
+        run: |
+          cmake --install build-ci --config Release --prefix "$env:RUNNER_TEMP/minecraftc-stage"
+          if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/bin/minecraftc.exe")) { throw "Executable was not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/shaders/block.vert")) { throw "Assets were not installed" }
+
+  macos-universal:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure universal build
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+      - name: Build
+        run: cmake --build build-ci -j2
+      - name: Test native slice
+        run: ctest --test-dir build-ci --output-on-failure
+      - name: Install and verify universal executable
+        run: |
+          cmake --install build-ci --prefix "$RUNNER_TEMP/minecraftc-stage"
+          lipo -verify_arch arm64 x86_64 "$RUNNER_TEMP/minecraftc-stage/bin/minecraftc"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/shaders/block.vert"

@@ -13,23 +13,36 @@ MinecraftC 是一个使用 C++17 与 OpenGL 3.3 编写的体素沙盒游戏。�
 - 生物战斗、碰撞击退、受击反馈、日照燃烧及昼夜相关敌对行为。
 - JSON 驱动的方块材质与全部 116 个注册物品图标，以及确定性程序化 16×16 像素资产管线。
 
-## 构建要求
+## 安装与构建
 
-- 支持 C++17 的编译器
-- CMake 3.16 或更高版本
-- GLFW 3
-- OpenGL 3.3 或更高版本
-- GLM
+需要支持 C++17 的编译器、CMake 3.16+ 和 OpenGL 3.3+。以下命令均在项目
+根目录执行。
 
-Debian/Ubuntu 可安装以下依赖：
+### Linux 发行版
+
+安装依赖：
 
 ```bash
+# Debian / Ubuntu
 sudo apt install build-essential cmake libglfw3-dev libglm-dev libgl1-mesa-dev
+
+# Fedora
+sudo dnf install gcc-c++ cmake glfw-devel glm-devel mesa-libGL-devel
+
+# Arch Linux
+sudo pacman -S --needed base-devel cmake glfw-x11 glm mesa
 ```
 
-## 构建与运行
+构建、安装并运行：
 
-在项目根目录执行：
+```bash
+cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
+cmake --build build-local -j2
+cmake --install build-local --prefix ./install-local
+./install-local/bin/minecraftc
+```
+
+若正在开发程序，亦可：
 
 ```bash
 cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
@@ -37,13 +50,38 @@ cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
-如果更新源码后遇到旧构建产物导致的链接或 ODR 错误，可执行干净重建：
+### macOS
+
+先安装 Xcode Command Line Tools 与 Homebrew 依赖：
 
 ```bash
-cmake --build build-local --clean-first -j2
+xcode-select --install
+brew install cmake glfw glm
 ```
 
-程序需要从项目根目录启动，因为着色器和纹理使用相对路径。
+构建当前 Mac 的原生版本：
+
+```bash
+cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
+cmake --build build-local -j2
+cmake --install build-local --prefix ./install-local
+./install-local/bin/minecraftc
+```
+
+构建 Intel 与 Apple Silicon 通用版本时，改用源码依赖并添加
+`-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`。
+
+### Windows
+
+安装 Visual Studio 2022 或更高版本并勾选“使用 C++ 的桌面开发”，同时安装
+CMake 和 Git。然后在 PowerShell 中使用项目自带的固定版本源码依赖：
+
+```powershell
+cmake -S . -B build-local -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+cmake --build build-local --config Release --parallel 2
+cmake --install build-local --config Release --prefix install-local
+.\install-local\bin\minecraftc.exe
+```
 
 ## 默认操作
 
@@ -59,7 +97,12 @@ cmake --build build-local --clean-first -j2
 - `T`：打开命令输入
 - `Esc`：暂停、关闭界面或返回
 
-键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。客户端设置保存在 `saves/options.txt`，世界存档位于 `saves/`。
+键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。新安装默认把
+设置和世界存档写入平台用户数据目录：Windows 的 Roaming AppData、macOS 的
+Application Support，以及 Linux 的 `$XDG_DATA_HOME`（未设置时为
+`~/.local/share`）。如果启动目录已经存在 `saves/`，程序会继续原地使用该
+目录，不自动移动旧数据。新存档使用固定 little-endian 的格式 v8，并兼容读取
+现有桌面平台生成的 v2–v7 存档。
 
 允许作弊的世界支持以下命令：
 

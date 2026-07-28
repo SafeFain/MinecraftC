@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
@@ -8,7 +9,8 @@
 
 class Shader {
 public:
-    Shader(const std::string& vertexPath, const std::string& fragmentPath);
+    Shader(const std::filesystem::path& vertexPath,
+           const std::filesystem::path& fragmentPath);
     ~Shader();
 
     Shader(const Shader&) = delete;
@@ -35,5 +37,5 @@ private:
     GLint getUniformLocation(const std::string& name) const;
 
     static GLuint compileShader(GLenum type, const std::string& source);
-    static std::string readFile(const std::string& path);
+    static std::string readFile(const std::filesystem::path& path);
 };

@@ -68,7 +68,7 @@ const std::unordered_map<std::string, BlockId>& blockNames() {
     return names;
 }
 
-std::string readTextFile(const std::string& path) {
+std::string readTextFile(const std::filesystem::path& path) {
     std::ifstream file(path);
     if (!file) return {};
     std::ostringstream stream;
@@ -275,9 +275,9 @@ uint8_t getFaceTextureIndex(BlockId id, FaceDir face) {
     return getAtlasTextureIndex(getFaceTexture(id, face));
 }
 
-bool loadTextureAssetDefinitions(const std::string& atlasMetadataPath,
-                                 const std::string& blockDefinitionsPath,
-                                 const std::string& itemDefinitionsPath) {
+bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
+                                 const std::filesystem::path& blockDefinitionsPath,
+                                 const std::filesystem::path& itemDefinitionsPath) {
     const std::string atlas = readTextFile(atlasMetadataPath);
     const std::string blocks = readTextFile(blockDefinitionsPath);
     const std::string items = readTextFile(itemDefinitionsPath);

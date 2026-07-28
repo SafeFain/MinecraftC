@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -20,7 +21,8 @@ public:
     UIRenderer(const UIRenderer&) = delete;
     UIRenderer& operator=(const UIRenderer&) = delete;
 
-    void initialize(GLuint blockAtlasTexture, bool framebufferSrgb);
+    void initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+                    const std::filesystem::path& assetRoot);
 
     void beginUIFrame(int screenWidth, int screenHeight);
     void endUIFrame();

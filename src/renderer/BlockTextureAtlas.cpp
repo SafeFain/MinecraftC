@@ -5,6 +5,9 @@
 #include "world/Block.h"
 
 #define STB_IMAGE_IMPLEMENTATION
+#if defined(_WIN32)
+#  define STBI_WINDOWS_UTF8
+#endif
 #include <stb_image.h>
 
 #include <algorithm>
@@ -194,14 +197,14 @@ BlockTextureAtlas::~BlockTextureAtlas() {
     if (m_texture) GL_CHECK(glDeleteTextures(1, &m_texture));
 }
 
-bool BlockTextureAtlas::initialize() {
+bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
     stbi_set_flip_vertically_on_load(1);
-    const std::string root = "assets/textures/source/";
-    const std::string generatedRoot = "assets/textures/generated/";
+    const std::filesystem::path root = assetRoot / "textures" / "source";
+    const std::filesystem::path generatedRoot = assetRoot / "textures" / "generated";
     const bool definitionsLoaded = loadTextureAssetDefinitions(
-        generatedRoot + "atlas.json",
-        "assets/textures/definitions/blocks.json",
-        "assets/textures/definitions/items.json");
+        generatedRoot / "atlas.json",
+        assetRoot / "textures" / "definitions" / "blocks.json",
+        assetRoot / "textures" / "definitions" / "items.json");
     if (!definitionsLoaded)
         LOG_WARN("Texture JSON definitions unavailable; using legacy atlas mapping");
     std::array<Tile, static_cast<size_t>(BlockTexture::Count)> tiles;
@@ -209,21 +212,21 @@ bool BlockTextureAtlas::initialize() {
     tiles[static_cast<size_t>(BlockTexture::Dirt)] = material(121, 82, 49, 18, 1);
     tiles[static_cast<size_t>(BlockTexture::Stone)] = material(126, 128, 126, 22, 2);
     tiles[static_cast<size_t>(BlockTexture::GrassTop)] =
-        loadTile(root + "grass_top.png", material(82, 150, 55, 18, 3));
+        loadTile((root / "grass_top.png").u8string(), material(82, 150, 55, 18, 3));
     Tile grassSide = tiles[static_cast<size_t>(BlockTexture::Dirt)];
-    overlay(grassSide, loadTile(root + "grass_side.png", Tile{}));
+    overlay(grassSide, loadTile((root / "grass_side.png").u8string(), Tile{}));
     tiles[static_cast<size_t>(BlockTexture::GrassSide)] = grassSide;
     tiles[static_cast<size_t>(BlockTexture::OakLog)] =
-        loadTile(root + "oak_log.png", material(91, 65, 38, 18, 4));
+        loadTile((root / "oak_log.png").u8string(), material(91, 65, 38, 18, 4));
     tiles[static_cast<size_t>(BlockTexture::LogTop)] = logTop();
     tiles[static_cast<size_t>(BlockTexture::Leaves)] = leaves(55, 130, 43, 5);
     tiles[static_cast<size_t>(BlockTexture::Sand)] =
-        loadTile(root + "sand.png", material(218, 203, 146, 10, 6));
+        loadTile((root / "sand.png").u8string(), material(218, 203, 146, 10, 6));
     tiles[static_cast<size_t>(BlockTexture::Bedrock)] = material(54, 54, 58, 35, 7);
     tiles[static_cast<size_t>(BlockTexture::Water)] = material(47, 103, 205, 10, 8);
     tiles[static_cast<size_t>(BlockTexture::Snow)] = material(235, 242, 246, 7, 9);
     tiles[static_cast<size_t>(BlockTexture::Planks)] =
-        loadTile(root + "oak_planks.png", material(169, 127, 68, 13, 10));
+        loadTile((root / "oak_planks.png").u8string(), material(169, 127, 68, 13, 10));
     tiles[static_cast<size_t>(BlockTexture::Deepslate)] = material(54, 57, 63, 15, 11);
     tiles[static_cast<size_t>(BlockTexture::CactusSide)] = material(53, 128, 55, 13, 12);
     tiles[static_cast<size_t>(BlockTexture::CactusTop)] = material(88, 153, 64, 11, 13);
@@ -231,7 +234,7 @@ bool BlockTextureAtlas::initialize() {
     const Tile stone = tiles[static_cast<size_t>(BlockTexture::Stone)];
     auto ore = [&](BlockTexture id, const char* file) {
         Tile value = stone;
-        overlay(value, loadTile(root + file, Tile{}));
+        overlay(value, loadTile((root / file).u8string(), Tile{}));
         tiles[static_cast<size_t>(id)] = value;
     };
     ore(BlockTexture::CoalOre, "coal_overlay.png");
@@ -244,28 +247,28 @@ bool BlockTextureAtlas::initialize() {
     tiles[static_cast<size_t>(BlockTexture::Gravel)] = material(105, 101, 96, 30, 16);
     tiles[static_cast<size_t>(BlockTexture::Clay)] = material(145, 159, 169, 12, 17);
     tiles[static_cast<size_t>(BlockTexture::RedSand)] =
-        loadTile(root + "red_sand.png", material(181, 82, 35, 14, 18));
+        loadTile((root / "red_sand.png").u8string(), material(181, 82, 35, 14, 18));
     tiles[static_cast<size_t>(BlockTexture::Terracotta)] = material(151, 74, 47, 12, 19);
     tiles[static_cast<size_t>(BlockTexture::PodzolTop)] = material(91, 59, 30, 22, 20);
     tiles[static_cast<size_t>(BlockTexture::Moss)] = material(71, 127, 45, 20, 21);
     tiles[static_cast<size_t>(BlockTexture::TallGrass)] = plant(54, 151, 46, false);
     Tile fallbackFlower = plant(55, 139, 43, true);
     tiles[static_cast<size_t>(BlockTexture::Flower)] =
-        loadTile(root + "flower.png", fallbackFlower);
+        loadTile((root / "flower.png").u8string(), fallbackFlower);
     tiles[static_cast<size_t>(BlockTexture::Reeds)] = plant(126, 173, 58, false);
 
     Tile oak = tiles[static_cast<size_t>(BlockTexture::OakLog)];
     tiles[static_cast<size_t>(BlockTexture::BirchLog)] =
-        loadTile(root + "birch_log.png", tint(oak, 1.55f, 1.50f, 1.30f));
+        loadTile((root / "birch_log.png").u8string(), tint(oak, 1.55f, 1.50f, 1.30f));
     tiles[static_cast<size_t>(BlockTexture::BirchLeaves)] = leaves(93, 157, 54, 22);
     tiles[static_cast<size_t>(BlockTexture::SpruceLog)] =
-        loadTile(root + "spruce_log.png", tint(oak, 0.62f, 0.58f, 0.52f));
+        loadTile((root / "spruce_log.png").u8string(), tint(oak, 0.62f, 0.58f, 0.52f));
     tiles[static_cast<size_t>(BlockTexture::SpruceLeaves)] = leaves(35, 91, 61, 23);
     tiles[static_cast<size_t>(BlockTexture::JungleLog)] =
-        loadTile(root + "jungle_log.png", tint(oak, 0.80f, 0.72f, 0.62f));
+        loadTile((root / "jungle_log.png").u8string(), tint(oak, 0.80f, 0.72f, 0.62f));
     tiles[static_cast<size_t>(BlockTexture::JungleLeaves)] = leaves(39, 142, 42, 24);
     tiles[static_cast<size_t>(BlockTexture::AcaciaLog)] =
-        loadTile(root + "acacia_log.png", tint(oak, 1.18f, 0.72f, 0.52f));
+        loadTile((root / "acacia_log.png").u8string(), tint(oak, 1.18f, 0.72f, 0.52f));
     tiles[static_cast<size_t>(BlockTexture::AcaciaLeaves)] = leaves(84, 133, 45, 25);
     tiles[static_cast<size_t>(BlockTexture::Cobblestone)] = material(112, 112, 108, 34, 31);
     tiles[static_cast<size_t>(BlockTexture::CraftingTable)] =
@@ -294,7 +297,8 @@ bool BlockTextureAtlas::initialize() {
     for (size_t i = 0; i < tiles.size(); ++i) {
         const auto texture = static_cast<BlockTexture>(i);
         auto& tile = tiles[i];
-        tile = loadTile(generatedRoot + getBlockTextureAssetName(texture) + ".png",
+        tile = loadTile((generatedRoot /
+                         (std::string(getBlockTextureAssetName(texture)) + ".png")).u8string(),
                         tile);
     }
 

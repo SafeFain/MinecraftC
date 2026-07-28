@@ -4,14 +4,21 @@
 #include <csignal>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 
-// glibc backtrace (Linux)
-#ifdef __GLIBC__
+// POSIX backtrace support is available on glibc and macOS.
+#if defined(__GLIBC__) || defined(__APPLE__)
 #  include <execinfo.h>
-#  include <unistd.h>
 #  define HAS_BACKTRACE 1
 #else
 #  define HAS_BACKTRACE 0
+#endif
+
+#if defined(_WIN32)
+#  define NOMINMAX
+#  include <windows.h>
+#else
+#  include <unistd.h>
 #endif
 
 namespace Debug {
@@ -19,6 +26,7 @@ namespace Debug {
 // ── Internal signal handler ────────────────────────────────────────────
 
 // Async-signal-safe: only calls functions safe to use in signal handlers.
+#if !defined(_WIN32)
 static void crashSignalHandler(int sig) {
     // Build a minimal crash message (no heap allocation, no iostream)
     const char* sigName = "UNKNOWN";
@@ -53,10 +61,30 @@ static void crashSignalHandler(int sig) {
     std::signal(sig, SIG_DFL);
     std::raise(sig);
 }
+#else
+static LONG WINAPI unhandledExceptionFilter(EXCEPTION_POINTERS* exception) {
+    char message[128]{};
+    const unsigned long code = exception && exception->ExceptionRecord
+        ? exception->ExceptionRecord->ExceptionCode : 0;
+    const int length = std::snprintf(
+        message, sizeof(message),
+        "\n[CRASH] MinecraftC caught Windows exception 0x%08lX\n", code);
+    const HANDLE stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
+    if (stderrHandle != INVALID_HANDLE_VALUE && length > 0) {
+        DWORD written = 0;
+        WriteFile(stderrHandle, message, static_cast<DWORD>(length), &written, nullptr);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
 
 // ── Public API ─────────────────────────────────────────────────────────
 
 bool installCrashHandlers() {
+#if defined(_WIN32)
+    SetUnhandledExceptionFilter(unhandledExceptionFilter);
+    LOG_DEBUG("Windows unhandled-exception diagnostics installed");
+#else
 #if HAS_BACKTRACE
     LOG_DEBUG("Crash handlers installed (backtrace available)");
 #else
@@ -67,12 +95,21 @@ bool installCrashHandlers() {
     std::signal(SIGABRT, crashSignalHandler);
     std::signal(SIGFPE,  crashSignalHandler);
     std::signal(SIGILL,  crashSignalHandler);
+#endif
 
     return true;
 }
 
 void printStackTrace(int maxFrames) {
-#if HAS_BACKTRACE
+#if defined(_WIN32)
+    if (maxFrames < 0) maxFrames = 0;
+    if (maxFrames > 64) maxFrames = 64;
+    void* frames[64]{};
+    const USHORT frameCount = CaptureStackBackTrace(
+        0, static_cast<DWORD>(maxFrames), frames, nullptr);
+    for (USHORT i = 0; i < frameCount; ++i)
+        LOG_TRACE("[STACK] #" << i << " " << frames[i]);
+#elif HAS_BACKTRACE
     void* frames[64];
     if (maxFrames > 64) maxFrames = 64;
 

@@ -1,4 +1,5 @@
 #include "game/ClientSettings.h"
+#include "core/Platform.h"
 
 #include <GLFW/glfw3.h>
 #include <algorithm>
@@ -81,7 +82,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
 bool ClientSettings::save(const std::filesystem::path& path) const {
     std::error_code error;
     std::filesystem::create_directories(path.parent_path(), error);
-    const auto temporary = path.string() + ".tmp";
+    auto temporary = path;
+    temporary += ".tmp";
     std::ofstream output(temporary, std::ios::trunc);
     if (!output) return false;
     output << "version=" << FORMAT_VERSION << '\n'
@@ -97,12 +99,9 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
                << ',' << bindings[i].code << '\n';
     output.close();
     if (!output) return false;
-    std::filesystem::rename(temporary, path, error);
-    if (!error) return true;
-    std::filesystem::remove(path, error);
-    error.clear();
-    std::filesystem::rename(temporary, path, error);
-    return !error;
+    if (Platform::replaceFileAtomically(temporary, path, error)) return true;
+    std::filesystem::remove(temporary, error);
+    return false;
 }
 
 int effectiveGuiScale(int width, int height, int configuredScale) {

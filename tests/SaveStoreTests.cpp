@@ -2,6 +2,8 @@
 #include "Config.h"
 #include "world/WorldGenContext.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -76,6 +78,41 @@ int main() {
         require(loaded.entities.size() == 1 &&
                 loaded.entities[0].position == source.entities[0].position,
                 "persistent entities round trip");
+
+        WorldMetadata replacement = source;
+        replacement.worldTicks += 1;
+        store.saveMetadata(replacement);
+        require(store.loadMetadata().worldTicks == replacement.worldTicks,
+                "saving again atomically replaces an existing metadata file");
+
+        const auto metadataPath = root / "negative-coordinates" / "level.bin";
+        std::array<uint8_t, 47> prefix{};
+        {
+            std::ifstream file(metadataPath, std::ios::binary);
+            file.read(reinterpret_cast<char*>(prefix.data()), prefix.size());
+            require(file.gcount() == static_cast<std::streamsize>(prefix.size()),
+                    "save prefix is readable");
+        }
+        require(prefix[8] == SAVE_FORMAT_VERSION && prefix[9] == 0 &&
+                prefix[10] == 0 && prefix[11] == 0,
+                "save version is encoded as little-endian uint32");
+        constexpr std::array<uint8_t, 8> expectedSeed =
+            {0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe};
+        require(std::equal(expectedSeed.begin(), expectedSeed.end(), prefix.begin() + 39),
+                "64-bit seed is encoded in canonical little-endian order");
+
+        const auto legacyDirectory = root / "legacy-v7";
+        std::filesystem::create_directories(legacyDirectory);
+        const auto legacyPath = legacyDirectory / "level.bin";
+        std::filesystem::copy_file(metadataPath, legacyPath);
+        {
+            std::fstream file(legacyPath, std::ios::binary | std::ios::in | std::ios::out);
+            const char legacyVersion = 7;
+            file.seekp(8);
+            file.write(&legacyVersion, 1);
+        }
+        require(SaveStore(legacyDirectory).loadMetadata().seed == source.seed,
+                "existing little-endian v7 metadata remains readable");
 
         const std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
@@ -23,7 +24,7 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void initialize(bool framebufferSrgb);
+    void initialize(bool framebufferSrgb, const std::filesystem::path& assetRoot);
     void beginFrame();
     void endFrame();
     void setEnvironment(const RenderEnvironment& environment,

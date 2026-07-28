@@ -1,7 +1,7 @@
 #include "debug/Log.h"
+#include "core/Platform.h"
 
 #include <iostream>
-#include <unistd.h>
 
 namespace Debug {
 
@@ -13,17 +13,19 @@ bool         Log::s_colorOutput = false;
 
 // ── Initialization ─────────────────────────────────────────────────────
 
-void Log::init(LogLevel minLevel, bool fileOutput, const std::string& logPath) {
+void Log::init(LogLevel minLevel, bool fileOutput,
+               const std::filesystem::path& logPath) {
     s_minLevel  = minLevel;
     s_fileOutput = fileOutput;
 
     // Auto-detect whether stdout is a terminal (for ANSI color codes)
-    s_colorOutput = isatty(fileno(stdout));
+    s_colorOutput = Platform::stdoutSupportsColor();
 
     if (s_fileOutput) {
         s_file.open(logPath, std::ios::out | std::ios::app);
         if (!s_file.is_open()) {
-            std::cerr << "[Log] Warning: failed to open log file: " << logPath << std::endl;
+            std::cerr << "[Log] Warning: failed to open log file: "
+                      << logPath.u8string() << std::endl;
             s_fileOutput = false;
         }
     }
@@ -106,8 +108,8 @@ std::string Log::timestamp() {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         now.time_since_epoch()) % 1000;
 
-    std::tm tm;
-    localtime_r(&time, &tm);
+    std::tm tm{};
+    if (!Platform::localTime(time, tm)) return "0000-00-00 00:00:00.000";
 
     std::ostringstream oss;
     oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")

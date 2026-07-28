@@ -3,12 +3,37 @@ project(MinecraftC LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+include(GNUInstallDirs)
+option(MINECRAFTC_FETCH_DEPENDENCIES
+       "Use pinned source builds of GLFW and GLM instead of system packages" OFF)
+option(MINECRAFTC_ENABLE_SANITIZERS
+       "Enable AddressSanitizer and UndefinedBehaviorSanitizer in Debug builds" OFF)
 
 # ── Dependencies ───────────────────────────────────────────────────────
 
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)
+if(MINECRAFTC_FETCH_DEPENDENCIES)
+    include(FetchContent)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG 3.4
+        GIT_SHALLOW TRUE)
+    FetchContent_Declare(glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 1.0.1
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(glfw glm)
+else()
+    find_package(glfw3 REQUIRED)
+    find_package(glm REQUIRED)
+endif()
 find_package(OpenGL REQUIRED)
 
 # ── GLAD (minimal OpenGL loader) ───────────────────────────────────────
@@ -26,6 +51,20 @@ file(GLOB_RECURSE SOURCES
     src/*.cpp
     src/*.h
 )
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/Platform.cpp")
+
+add_library(minecraftc_platform STATIC src/core/Platform.cpp)
+target_include_directories(minecraftc_platform PUBLIC src)
+target_compile_definitions(minecraftc_platform PRIVATE
+    MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
+if(WIN32)
+    target_link_libraries(minecraftc_platform PUBLIC shell32 ole32)
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(minecraftc_platform PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+    target_compile_options(minecraftc_platform PRIVATE /W4 /permissive- /utf-8)
+endif()
 
 add_executable(minecraftc ${SOURCES})
 target_include_directories(minecraftc PRIVATE
@@ -42,48 +81,54 @@ target_compile_definitions(minecraftc PRIVATE GLFW_INCLUDE_NONE)
 # LOG_COMPILE_LEVEL strips log macros below the given level:
 #   0=Trace  1=Debug  2=Info  3=Warn  4=Error  5=Fatal
 target_compile_definitions(minecraftc PRIVATE
-    $<$<CONFIG:Debug>:-DLOG_COMPILE_LEVEL=0>
-    $<$<CONFIG:Release>:-DLOG_COMPILE_LEVEL=2>
+    $<$<CONFIG:Debug>:LOG_COMPILE_LEVEL=0>
+    $<$<CONFIG:Release>:LOG_COMPILE_LEVEL=2>
 )
 target_link_libraries(minecraftc PRIVATE
     glfw
     glm::glm
     OpenGL::GL
     glad
+    minecraftc_platform
     ${CMAKE_DL_LIBS}
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
         COMPILE_OPTIONS "-w")
+elseif(MSVC)
+    set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
+        COMPILE_OPTIONS "/w")
 endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(minecraftc PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+    target_compile_options(minecraftc PRIVATE /W4 /permissive- /utf-8)
+endif()
 
-    # Release build: optimization flags
-    target_compile_options(minecraftc PRIVATE
-        $<$<CONFIG:Release>:-O2 -march=native -DNDEBUG>
-        $<$<CONFIG:Release>:-flto>
-    )
-    target_link_options(minecraftc PRIVATE
-        $<$<CONFIG:Release>:-flto>
-    )
+include(CheckIPOSupported)
+check_ipo_supported(RESULT MINECRAFTC_IPO_SUPPORTED OUTPUT MINECRAFTC_IPO_ERROR)
+if(MINECRAFTC_IPO_SUPPORTED)
+    set_property(TARGET minecraftc PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+endif()
 
-    # Debug build: sanitizers for catching UB and memory errors
+if(MINECRAFTC_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(minecraftc PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined -g -O0>
-    )
+        $<$<CONFIG:Debug>:-fsanitize=address,undefined -g -O0>)
     target_link_options(minecraftc PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined -rdynamic>
-    )
+        $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
+    if(UNIX AND NOT APPLE)
+        target_link_options(minecraftc PRIVATE $<$<CONFIG:Debug>:-rdynamic>)
+    endif()
 endif()
 
 # ── Install ────────────────────────────────────────────────────────────
 
-install(TARGETS minecraftc DESTINATION bin)
+install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
 
 # ── Deterministic world-generation tests ───────────────────────────────────
 include(CTest)
@@ -92,6 +137,16 @@ if(BUILD_TESTING)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
+
+    add_executable(platform_tests tests/PlatformTests.cpp)
+    target_include_directories(platform_tests PRIVATE src)
+    target_link_libraries(platform_tests PRIVATE minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(platform_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(platform_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME platform_paths_and_atomic_replace COMMAND platform_tests)
 
     add_executable(asset_definition_tests
         tests/AssetDefinitionTests.cpp
@@ -183,7 +238,7 @@ if(BUILD_TESTING)
         src/world/Block.cpp
     )
     target_include_directories(save_store_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(save_store_tests PRIVATE glm::glm)
+    target_link_libraries(save_store_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(save_store_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -224,7 +279,7 @@ if(BUILD_TESTING)
         src/world/Block.cpp
     )
     target_include_directories(world_catalog_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(world_catalog_tests PRIVATE glm::glm)
+    target_link_libraries(world_catalog_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(world_catalog_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -270,7 +325,7 @@ if(BUILD_TESTING)
         src/game/Item.cpp
         src/world/Block.cpp)
     target_include_directories(client_input_tests PRIVATE src)
-    target_link_libraries(client_input_tests PRIVATE glm::glm glfw)
+    target_link_libraries(client_input_tests PRIVATE glm::glm glfw minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -287,7 +342,7 @@ if(BUILD_TESTING)
         src/world/Block.cpp
         src/world/BlockEntityLogic.cpp)
     target_include_directories(survival_integration_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(survival_integration_tests PRIVATE glm::glm)
+    target_link_libraries(survival_integration_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_integration_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

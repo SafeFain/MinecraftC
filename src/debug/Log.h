@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <mutex>
 #include <fstream>
@@ -41,7 +42,7 @@ public:
     // If fileOutput is true, messages are also appended to logPath.
     static void init(LogLevel minLevel = LogLevel::Info,
                      bool fileOutput = false,
-                     const std::string& logPath = "minecraftc.log");
+                     const std::filesystem::path& logPath = "minecraftc.log");
 
     // Write a message. Thread-safe — multiple threads can call concurrently
     // and each log line will be written atomically.

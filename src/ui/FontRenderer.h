@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <memory>
 #include <glm/glm.hpp>
@@ -15,7 +16,7 @@ public:
     FontRenderer(const FontRenderer&) = delete;
     FontRenderer& operator=(const FontRenderer&) = delete;
 
-    void initialize(bool manualGamma);
+    void initialize(bool manualGamma, const std::filesystem::path& assetRoot);
 
     void begin(const glm::mat4& projection);
     void end();

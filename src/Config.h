@@ -192,9 +192,7 @@ constexpr glm::vec4 SKY_COLOR(0.53f, 0.81f, 0.92f, 1.0f);
 
 // ── Debug / Logging ─────────────────────────────────────────────────────
 namespace LogConfig {
-    constexpr bool FILE_OUTPUT   = false;          // also write log to file
-    constexpr bool COLOR_OUTPUT  = true;           // ANSI color codes in terminal
-    constexpr const char* LOG_PATH = "minecraftc.log";
+    constexpr bool FILE_OUTPUT = false; // also write log to the platform data directory
 }
 
 // ── Profiler ──────────────────────────────────────────────────────────

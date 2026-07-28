@@ -1,5 +1,6 @@
 #include "game/SaveStore.h"
 #include "Config.h"
+#include "core/Platform.h"
 
 #include <array>
 #include <cstring>
@@ -17,10 +18,50 @@ constexpr std::array<char, 8> MAGIC = {'M', 'C', 'C', 'S', 'A', 'V', 'E', '\0'};
 constexpr uint32_t MAX_PAYLOAD = 16 * 1024 * 1024;
 
 template<typename T>
+struct AlwaysFalse : std::false_type {};
+
+template<typename UInt>
+void appendUnsigned(Bytes& bytes, UInt value) {
+    static_assert(std::is_unsigned_v<UInt>);
+    for (size_t byte = 0; byte < sizeof(UInt); ++byte) {
+        bytes.push_back(static_cast<uint8_t>(value & static_cast<UInt>(0xff)));
+        value >>= 8;
+    }
+}
+
+template<typename T>
 void append(Bytes& bytes, const T& value) {
-    static_assert(std::is_trivially_copyable_v<T>);
-    const auto* raw = reinterpret_cast<const uint8_t*>(&value);
-    bytes.insert(bytes.end(), raw, raw + sizeof(T));
+    if constexpr (std::is_same_v<T, uint8_t>) {
+        bytes.push_back(value);
+    } else if constexpr (std::is_same_v<T, uint16_t> ||
+                         std::is_same_v<T, uint32_t> ||
+                         std::is_same_v<T, uint64_t>) {
+        appendUnsigned(bytes, value);
+    } else if constexpr (std::is_same_v<T, int32_t>) {
+        uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        appendUnsigned(bytes, bits);
+    } else if constexpr (std::is_same_v<T, float>) {
+        static_assert(sizeof(float) == sizeof(uint32_t));
+        static_assert(std::numeric_limits<float>::is_iec559);
+        uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        appendUnsigned(bytes, bits);
+    } else if constexpr (std::is_same_v<T, double>) {
+        static_assert(sizeof(double) == sizeof(uint64_t));
+        static_assert(std::numeric_limits<double>::is_iec559);
+        uint64_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        appendUnsigned(bytes, bits);
+    } else if constexpr (std::is_same_v<T, glm::vec3> ||
+                         std::is_same_v<T, glm::dvec3> ||
+                         std::is_same_v<T, glm::ivec3>) {
+        append(bytes, value.x);
+        append(bytes, value.y);
+        append(bytes, value.z);
+    } else {
+        static_assert(AlwaysFalse<T>::value, "Unsupported save field type");
+    }
 }
 
 void appendString(Bytes& bytes, const std::string& value) {
@@ -37,13 +78,36 @@ public:
 
     template<typename T>
     T read() {
-        static_assert(std::is_trivially_copyable_v<T>);
-        if (m_offset + sizeof(T) > m_bytes.size())
-            throw std::runtime_error("Truncated save payload");
-        T value;
-        std::memcpy(&value, m_bytes.data() + m_offset, sizeof(T));
-        m_offset += sizeof(T);
-        return value;
+        if constexpr (std::is_same_v<T, uint8_t>) {
+            return readUnsigned<uint8_t>();
+        } else if constexpr (std::is_same_v<T, uint16_t> ||
+                             std::is_same_v<T, uint32_t> ||
+                             std::is_same_v<T, uint64_t>) {
+            return readUnsigned<T>();
+        } else if constexpr (std::is_same_v<T, int32_t>) {
+            const uint32_t bits = readUnsigned<uint32_t>();
+            int32_t value = 0;
+            std::memcpy(&value, &bits, sizeof(value));
+            return value;
+        } else if constexpr (std::is_same_v<T, float>) {
+            const uint32_t bits = readUnsigned<uint32_t>();
+            float value = 0.0f;
+            std::memcpy(&value, &bits, sizeof(value));
+            return value;
+        } else if constexpr (std::is_same_v<T, double>) {
+            const uint64_t bits = readUnsigned<uint64_t>();
+            double value = 0.0;
+            std::memcpy(&value, &bits, sizeof(value));
+            return value;
+        } else if constexpr (std::is_same_v<T, glm::vec3>) {
+            return {read<float>(), read<float>(), read<float>()};
+        } else if constexpr (std::is_same_v<T, glm::dvec3>) {
+            return {read<double>(), read<double>(), read<double>()};
+        } else if constexpr (std::is_same_v<T, glm::ivec3>) {
+            return {read<int32_t>(), read<int32_t>(), read<int32_t>()};
+        } else {
+            static_assert(AlwaysFalse<T>::value, "Unsupported save field type");
+        }
     }
 
     std::string readString() {
@@ -58,6 +122,18 @@ public:
     bool finished() const { return m_offset == m_bytes.size(); }
 
 private:
+    template<typename UInt>
+    UInt readUnsigned() {
+        static_assert(std::is_unsigned_v<UInt>);
+        if (m_offset + sizeof(UInt) > m_bytes.size())
+            throw std::runtime_error("Truncated save payload");
+        UInt value = 0;
+        for (size_t byte = 0; byte < sizeof(UInt); ++byte) {
+            value |= static_cast<UInt>(m_bytes[m_offset++]) << (byte * 8);
+        }
+        return value;
+    }
+
     Bytes m_bytes;
     size_t m_offset = 0;
 };
@@ -73,25 +149,28 @@ uint64_t checksum(const Bytes& bytes) {
 
 void writeAtomic(const std::filesystem::path& path, const Bytes& payload) {
     std::filesystem::create_directories(path.parent_path());
-    const auto temporary = path.string() + ".tmp";
+    auto temporary = path;
+    temporary += ".tmp";
     {
         std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
         if (!output) throw std::runtime_error("Cannot open temporary save file");
-        output.write(MAGIC.data(), MAGIC.size());
+        Bytes header;
+        header.insert(header.end(), MAGIC.begin(), MAGIC.end());
         const uint32_t version = SAVE_FORMAT_VERSION;
         const uint32_t size = static_cast<uint32_t>(payload.size());
         const uint64_t hash = checksum(payload);
-        output.write(reinterpret_cast<const char*>(&version), sizeof(version));
-        output.write(reinterpret_cast<const char*>(&size), sizeof(size));
-        output.write(reinterpret_cast<const char*>(&hash), sizeof(hash));
+        append(header, version);
+        append(header, size);
+        append(header, hash);
+        output.write(reinterpret_cast<const char*>(header.data()),
+                     static_cast<std::streamsize>(header.size()));
         output.write(reinterpret_cast<const char*>(payload.data()),
                      static_cast<std::streamsize>(payload.size()));
         output.flush();
         if (!output) throw std::runtime_error("Failed while writing save file");
     }
     std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error) {
+    if (!Platform::replaceFileAtomically(temporary, path, error)) {
         std::filesystem::remove(temporary);
         throw std::runtime_error("Cannot atomically replace save file: " + error.message());
     }
@@ -106,14 +185,15 @@ CheckedBytes readChecked(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     if (!input) throw std::runtime_error("Cannot open save file: " + path.string());
     std::array<char, 8> magic{};
-    uint32_t version = 0;
-    uint32_t size = 0;
-    uint64_t expectedHash = 0;
     input.read(magic.data(), magic.size());
-    input.read(reinterpret_cast<char*>(&version), sizeof(version));
-    input.read(reinterpret_cast<char*>(&size), sizeof(size));
-    input.read(reinterpret_cast<char*>(&expectedHash), sizeof(expectedHash));
+    Bytes encodedHeader(sizeof(uint32_t) * 2 + sizeof(uint64_t));
+    input.read(reinterpret_cast<char*>(encodedHeader.data()),
+               static_cast<std::streamsize>(encodedHeader.size()));
     if (!input || magic != MAGIC) throw std::runtime_error("Invalid save header");
+    Reader header(std::move(encodedHeader));
+    const uint32_t version = header.read<uint32_t>();
+    const uint32_t size = header.read<uint32_t>();
+    const uint64_t expectedHash = header.read<uint64_t>();
     if (version > SAVE_FORMAT_VERSION) throw std::runtime_error("Save was made by a newer version");
     if (version < 2) throw std::runtime_error("Unsupported save version");
     if (size > MAX_PAYLOAD) throw std::runtime_error("Save payload exceeds safety limit");
@@ -325,8 +405,8 @@ std::filesystem::path SaveStore::entityPath(int chunkX, int chunkZ) const {
 void SaveStore::saveChunkOverrides(
     int chunkX, int chunkZ, const std::vector<BlockOverride>& overrides) const {
     Bytes payload;
-    append(payload, chunkX);
-    append(payload, chunkZ);
+    append(payload, static_cast<int32_t>(chunkX));
+    append(payload, static_cast<int32_t>(chunkZ));
     append(payload, static_cast<uint32_t>(overrides.size()));
     for (const auto& entry : overrides) {
         if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
@@ -343,7 +423,7 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
     Reader reader(std::move(checked.payload));
-    if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ)
+    if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Chunk save coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
     if (count > static_cast<uint32_t>(Config::CHUNK_VOLUME))
@@ -373,9 +453,9 @@ void SaveStore::saveGeneratedChunk(
     if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid generated chunk size");
     Bytes payload;
-    payload.reserve(sizeof(int) * 2 + sizeof(uint32_t) * 2 + blocks.size());
-    append(payload, chunkX);
-    append(payload, chunkZ);
+    payload.reserve(sizeof(int32_t) * 2 + sizeof(uint32_t) * 2 + blocks.size());
+    append(payload, static_cast<int32_t>(chunkX));
+    append(payload, static_cast<int32_t>(chunkZ));
     append(payload, generationVersion);
     append(payload, static_cast<uint32_t>(blocks.size()));
     payload.insert(payload.end(), blocks.begin(), blocks.end());
@@ -389,7 +469,7 @@ std::optional<std::vector<uint8_t>> SaveStore::loadGeneratedChunk(
     try {
         CheckedBytes checked = readChecked(path);
         Reader reader(std::move(checked.payload));
-        if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ ||
+        if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ ||
             reader.read<uint32_t>() != generationVersion)
             return std::nullopt;
         const uint32_t size = reader.read<uint32_t>();
@@ -411,8 +491,8 @@ std::optional<std::vector<uint8_t>> SaveStore::loadGeneratedChunk(
 void SaveStore::saveBlockEntities(
     int chunkX, int chunkZ, const std::vector<PersistedBlockEntity>& entities) const {
     Bytes payload;
-    append(payload, chunkX);
-    append(payload, chunkZ);
+    append(payload, static_cast<int32_t>(chunkX));
+    append(payload, static_cast<int32_t>(chunkZ));
     append(payload, static_cast<uint32_t>(entities.size()));
     for (const auto& entity : entities) appendBlockEntity(payload, entity);
     writeAtomic(blockEntityPath(chunkX, chunkZ), payload);
@@ -424,7 +504,7 @@ std::vector<PersistedBlockEntity> SaveStore::loadBlockEntities(
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
     Reader reader(std::move(checked.payload));
-    if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ)
+    if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Block entity coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
     if (count > 4096) throw std::runtime_error("Too many block entities");
@@ -440,8 +520,8 @@ void SaveStore::saveChunkEntities(
     int chunkX, int chunkZ,
     const std::vector<WorldMetadata::PersistedEntity>& entities) const {
     Bytes payload;
-    append(payload, chunkX);
-    append(payload, chunkZ);
+    append(payload, static_cast<int32_t>(chunkX));
+    append(payload, static_cast<int32_t>(chunkZ));
     append(payload, static_cast<uint32_t>(entities.size()));
     for (const auto& entity : entities) appendEntity(payload, entity);
     writeAtomic(entityPath(chunkX, chunkZ), payload);
@@ -453,7 +533,7 @@ std::vector<WorldMetadata::PersistedEntity> SaveStore::loadChunkEntities(
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
     Reader reader(std::move(checked.payload));
-    if (reader.read<int>() != chunkX || reader.read<int>() != chunkZ)
+    if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Entity chunk coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
     if (count > 4096) throw std::runtime_error("Too many chunk entities");

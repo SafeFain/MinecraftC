@@ -1,5 +1,6 @@
 #include "core/Window.h"
 #include "core/Input.h"
+#include "core/Platform.h"
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
@@ -38,11 +39,14 @@
 #include <filesystem>
 #include <vector>
 #include <random>
+#include <iostream>
 
 class Application {
 public:
-    Application()
-        : m_camera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE)
+    explicit Application(RuntimePaths paths)
+        : m_paths(std::move(paths)),
+          m_camera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE),
+          m_worldCatalog(m_paths.savesDirectory())
     {}
 
     int run() {
@@ -58,6 +62,7 @@ public:
     }
 
 private:
+    RuntimePaths m_paths;
     Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"};
     Renderer    m_renderer;
     Camera      m_camera;
@@ -119,11 +124,16 @@ private:
 
     void initialize() {
         // ── Debug infrastructure ────────────────────────────────────────
+        std::error_code directoryError;
+        std::filesystem::create_directories(m_paths.dataRoot, directoryError);
+        if (directoryError)
+            throw std::runtime_error("Cannot create user data directory: " +
+                                     directoryError.message());
         Debug::Log::init(Debug::LogLevel::Trace, Config::LogConfig::FILE_OUTPUT,
-                         Config::LogConfig::LOG_PATH);
+                         m_paths.logFile());
         Debug::installCrashHandlers();
 
-        m_clientSettings = ClientSettings::load("saves/options.txt");
+        m_clientSettings = ClientSettings::load(m_paths.settingsFile());
         applyClientSettings(false);
 
         if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress))) {
@@ -133,10 +143,11 @@ private:
         // Set initial viewport (framebuffer size already queried in Window constructor)
         glViewport(0, 0, m_window.width(), m_window.height());
 
-        m_renderer.initialize(m_window.isSrgbCapable());
+        m_renderer.initialize(m_window.isSrgbCapable(), m_paths.assetRoot);
         m_audio.initialize();
         m_uiRenderer.initialize(
-            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb());
+            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
+            m_paths.assetRoot);
 
         // Start with cursor visible (main menu)
         m_window.setCursorLocked(false);
@@ -448,7 +459,7 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
         m_window.setRawMouseInput(m_clientSettings.rawMouseInput);
-        if (persist && !m_clientSettings.save("saves/options.txt"))
+        if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");
     }
 
@@ -1279,7 +1290,13 @@ private:
     }
 };
 
-int main() {
-    Application app;
-    return app.run();
+int main(int argc, char** argv) {
+    try {
+        RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
+        Application app(std::move(paths));
+        return app.run();
+    } catch (const std::exception& error) {
+        std::cerr << "MinecraftC startup failed: " << error.what() << '\n';
+        return 1;
+    }
 }

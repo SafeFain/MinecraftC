@@ -24,10 +24,12 @@ UIRenderer::~UIRenderer() {
 
 // ── Initialization ────────────────────────────────────────────────────────
 
-void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
+void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+                            const std::filesystem::path& assetRoot) {
     m_blockAtlasTexture = blockAtlasTexture;
     m_manualGamma = !framebufferSrgb;
-    std::ifstream metadataFile("assets/textures/generated/items_atlas.json");
+    std::ifstream metadataFile(
+        assetRoot / "textures" / "generated" / "items_atlas.json");
     std::stringstream metadataBuffer;
     if (metadataFile) metadataBuffer << metadataFile.rdbuf();
     const std::string metadata = metadataBuffer.str();
@@ -40,7 +42,9 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
     for (std::sregex_iterator it(metadata.begin(), metadata.end(), entry), end; it != end; ++it)
         m_itemAtlasIndices[(*it)[1].str()] = std::stoi((*it)[2]);
     int atlasWidth=0,atlasHeight=0,channels=0;
-    stbi_uc* itemPixels=stbi_load("assets/textures/generated/items_atlas.png",&atlasWidth,&atlasHeight,&channels,4);
+    const auto itemAtlasPath =
+        (assetRoot / "textures" / "generated" / "items_atlas.png").u8string();
+    stbi_uc* itemPixels=stbi_load(itemAtlasPath.c_str(),&atlasWidth,&atlasHeight,&channels,4);
     if (itemPixels && m_itemAtlasColumns>0 && m_itemAtlasRows>0 &&
         atlasWidth==m_itemAtlasColumns*16 && atlasHeight==m_itemAtlasRows*16) {
         GL_CHECK(glGenTextures(1,&m_itemAtlasTexture));
@@ -55,8 +59,8 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
     stbi_image_free(itemPixels);
     // Compile UI rectangle shader
     m_uiShader = std::make_unique<Shader>(
-        "assets/shaders/ui.vert",
-        "assets/shaders/ui.frag"
+        assetRoot / "shaders" / "ui.vert",
+        assetRoot / "shaders" / "ui.frag"
     );
 
     // Create unit-square VAO for rectangles with index buffer
@@ -87,7 +91,7 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb) {
     GL_CHECK(glBindVertexArray(0));
 
     // Initialize font renderer
-    m_fontRenderer.initialize(m_manualGamma);
+    m_fontRenderer.initialize(m_manualGamma, assetRoot);
 }
 
 // ── Frame management ──────────────────────────────────────────────────────

@@ -8,10 +8,10 @@
 
 // ── File reading ──────────────────────────────────────────────────────
 
-std::string Shader::readFile(const std::string& path) {
+std::string Shader::readFile(const std::filesystem::path& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
-        throw std::runtime_error("Failed to open shader file: " + path);
+        throw std::runtime_error("Failed to open shader file: " + path.u8string());
     }
     std::stringstream buffer;
     buffer << file.rdbuf();
@@ -41,7 +41,8 @@ GLuint Shader::compileShader(GLenum type, const std::string& source) {
 
 // ── Constructor / Destructor ──────────────────────────────────────────
 
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
+Shader::Shader(const std::filesystem::path& vertexPath,
+               const std::filesystem::path& fragmentPath) {
     std::string vertexSrc   = readFile(vertexPath);
     std::string fragmentSrc = readFile(fragmentPath);
 

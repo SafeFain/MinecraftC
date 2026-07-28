@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <filesystem>
 #include <glm/glm.hpp>
 
 // ── Block ID enum ─────────────────────────────────────────────────────
@@ -147,9 +148,9 @@ uint8_t getAtlasTextureIndex(BlockTexture texture);
 uint8_t getFaceTextureIndex(BlockId id, FaceDir face);
 const char* getBlockTextureAssetName(BlockTexture texture);
 bool loadTextureAssetDefinitions(
-    const std::string& atlasMetadataPath,
-    const std::string& blockDefinitionsPath,
-    const std::string& itemDefinitionsPath);
+    const std::filesystem::path& atlasMetadataPath,
+    const std::filesystem::path& blockDefinitionsPath,
+    const std::filesystem::path& itemDefinitionsPath);
 
 bool isFarmland(BlockId id);
 uint8_t farmlandMoisture(BlockId id);
