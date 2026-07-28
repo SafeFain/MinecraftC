@@ -12,11 +12,11 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install OpenGL and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test
@@ -38,9 +38,9 @@ jobs:
   windows:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
-        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci --config Release --parallel 2
       - name: Test
@@ -55,9 +55,9 @@ jobs:
   macos-universal:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure universal build
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_INSTALL_MESSAGE=NEVER '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test native slice
@@ -65,5 +65,5 @@ jobs:
       - name: Install and verify universal executable
         run: |
           cmake --install build-ci --prefix "$RUNNER_TEMP/minecraftc-stage"
-          lipo -verify_arch arm64 x86_64 "$RUNNER_TEMP/minecraftc-stage/bin/minecraftc"
+          lipo "$RUNNER_TEMP/minecraftc-stage/bin/minecraftc" -verify_arch arm64 x86_64
           test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/shaders/block.vert"

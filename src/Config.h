@@ -5,7 +5,7 @@
 
 namespace Config {
 
-constexpr const char* GAME_VERSION = "Pre-release 0.4.1";
+constexpr const char* GAME_VERSION = "Beta 1.0";
 
 // ── Window ────────────────────────────────────────────────────────────
 constexpr int   WINDOW_WIDTH    = 1280;
