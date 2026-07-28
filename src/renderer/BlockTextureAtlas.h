@@ -14,6 +14,7 @@ public:
     bool initialize(const std::filesystem::path& assetRoot);
     void bind() const;
     GLuint textureId() const { return m_texture; }
+    static int tilesPerSide();
 
 private:
     GLuint m_texture = 0;

@@ -8,7 +8,8 @@
 struct ClientSettings {
     static constexpr int FORMAT_VERSION = 1;
 
-    int renderDistance = 6;
+    int renderDistance = 8;
+    int cloudRenderDistance = 192;
     int dayCycleMinutes = 20;
     bool autoJump = true;
     float mouseSensitivity = 0.15f;

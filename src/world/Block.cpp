@@ -30,7 +30,9 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "torch", "white_wool", "white_bed", "farmland", "wet_farmland",
     "wheat_young", "wheat_middle", "wheat_mature", "oak_sapling",
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
-    "snow_layer", "fire"
+    "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
+    "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
+    "sunflower_top", "cloud"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -63,6 +65,11 @@ const std::unordered_map<std::string, BlockId>& blockNames() {
         result["wheat_young"] = BlockId::WHEAT_0;
         result["wheat_middle"] = BlockId::WHEAT_4;
         result["wheat_mature"] = BlockId::WHEAT_7;
+        result["poppy"] = BlockId::FLOWER;
+        for (uint8_t level = 1; level <= 7; ++level) {
+            result["flowing_water_" + std::to_string(level)] = fluidBlock(false, level);
+            result["flowing_lava_" + std::to_string(level)] = fluidBlock(true, level);
+        }
         return result;
     }();
     return names;
@@ -99,7 +106,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::SAND,         "Sand",         glm::vec3(0.90f, 0.84f, 0.60f), true, false },
     { BlockId::BEDROCK,      "Bedrock",      glm::vec3(0.20f, 0.20f, 0.20f), true, false },
     { BlockId::WATER,        "Water",        glm::vec3(0.20f, 0.40f, 0.90f), false, true,
-      RenderShape::Cube, RenderLayer::Translucent, 0.62f },
+      RenderShape::Fluid, RenderLayer::Translucent, 0.62f },
     { BlockId::SNOW,         "Snow",         glm::vec3(0.95f, 0.95f, 0.95f), true, false },
     { BlockId::PLANKS,       "Planks",       glm::vec3(0.70f, 0.55f, 0.30f), true, false },
     { BlockId::DEEPSLATE,    "Deepslate",    glm::vec3(0.25f, 0.25f, 0.27f), true, false },
@@ -109,7 +116,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::GOLD_ORE,     "Gold Ore",     glm::vec3(0.85f, 0.75f, 0.25f), true, false },
     { BlockId::DIAMOND_ORE,  "Diamond Ore",  glm::vec3(0.40f, 0.80f, 0.85f), true, false },
     { BlockId::LAVA,         "Lava",         glm::vec3(0.95f, 0.50f, 0.10f), false, true,
-      RenderShape::Cube, RenderLayer::Translucent, 0.86f },
+      RenderShape::Fluid, RenderLayer::Translucent, 0.86f },
     { BlockId::ICE,          "Ice",          glm::vec3(0.70f, 0.85f, 0.95f), true, false,
       RenderShape::Cube, RenderLayer::Translucent, 0.72f },
     { BlockId::GRAVEL,       "Gravel",        glm::vec3(0.43f, 0.42f, 0.40f), true, false },
@@ -182,6 +189,40 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::SnowLayer, RenderLayer::Opaque, 1.0f },
     { BlockId::FIRE,           "Fire",           glm::vec3(1.0f, 0.38f, 0.06f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::GLASS,          "Glass",          glm::vec3(0.82f, 0.92f, 0.96f), true, true,
+      RenderShape::Cube, RenderLayer::Translucent, 0.45f },
+    { BlockId::TNT,            "TNT",            glm::vec3(0.78f, 0.18f, 0.12f), true, false },
+    { BlockId::OBSIDIAN,       "Obsidian",       glm::vec3(0.12f, 0.08f, 0.18f), true, false },
+    { BlockId::DANDELION,      "Dandelion",      glm::vec3(0.95f, 0.80f, 0.12f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::BLUE_ORCHID,    "Blue Orchid",    glm::vec3(0.25f, 0.65f, 0.88f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::ALLIUM,         "Allium",         glm::vec3(0.68f, 0.36f, 0.78f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::OXEYE_DAISY,    "Oxeye Daisy",    glm::vec3(0.92f, 0.92f, 0.82f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::SUNFLOWER_BOTTOM,"Sunflower",     glm::vec3(0.45f, 0.65f, 0.18f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::SUNFLOWER_TOP,  "Sunflower Top",  glm::vec3(0.95f, 0.72f, 0.12f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+#define FLUID_ENTRY(id, label, r, g, b, a) \
+    { id, label, glm::vec3(r, g, b), false, true, RenderShape::Fluid, \
+      RenderLayer::Translucent, a }
+    FLUID_ENTRY(BlockId::FLOWING_WATER_1, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_2, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_3, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_4, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_5, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_6, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_WATER_7, "Flowing Water", .20f, .40f, .90f, .62f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_1, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_2, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_3, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_4, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_5, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_6, "Flowing Lava", .95f, .50f, .10f, .86f),
+    FLUID_ENTRY(BlockId::FLOWING_LAVA_7, "Flowing Lava", .95f, .50f, .10f, .86f),
+#undef FLUID_ENTRY
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -257,6 +298,23 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::ACACIA_SAPLING:return BlockTexture::AcaciaSapling;
         case BlockId::SNOW_LAYER:    return BlockTexture::SnowLayer;
         case BlockId::FIRE:          return BlockTexture::Fire;
+        case BlockId::GLASS:         return BlockTexture::Glass;
+        case BlockId::TNT:           return BlockTexture::Tnt;
+        case BlockId::OBSIDIAN:      return BlockTexture::Obsidian;
+        case BlockId::DANDELION:     return BlockTexture::Dandelion;
+        case BlockId::BLUE_ORCHID:   return BlockTexture::BlueOrchid;
+        case BlockId::ALLIUM:        return BlockTexture::Allium;
+        case BlockId::OXEYE_DAISY:   return BlockTexture::OxeyeDaisy;
+        case BlockId::SUNFLOWER_BOTTOM: return BlockTexture::SunflowerBottom;
+        case BlockId::SUNFLOWER_TOP: return BlockTexture::SunflowerTop;
+        case BlockId::FLOWING_WATER_1: case BlockId::FLOWING_WATER_2:
+        case BlockId::FLOWING_WATER_3: case BlockId::FLOWING_WATER_4:
+        case BlockId::FLOWING_WATER_5: case BlockId::FLOWING_WATER_6:
+        case BlockId::FLOWING_WATER_7: return BlockTexture::Water;
+        case BlockId::FLOWING_LAVA_1: case BlockId::FLOWING_LAVA_2:
+        case BlockId::FLOWING_LAVA_3: case BlockId::FLOWING_LAVA_4:
+        case BlockId::FLOWING_LAVA_5: case BlockId::FLOWING_LAVA_6:
+        case BlockId::FLOWING_LAVA_7: return BlockTexture::Lava;
         default:                     return BlockTexture::Dirt;
     }
 }
@@ -362,6 +420,54 @@ bool isSapling(BlockId id) {
     return id >= BlockId::OAK_SAPLING && id <= BlockId::ACACIA_SAPLING;
 }
 
+bool isWater(BlockId id) {
+    return id == BlockId::WATER ||
+           (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7);
+}
+
+bool isLava(BlockId id) {
+    return id == BlockId::LAVA ||
+           (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7);
+}
+
+uint8_t fluidLevel(BlockId id) {
+    if (id == BlockId::WATER || id == BlockId::LAVA) return 0;
+    if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)
+        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_WATER_1) + 1;
+    if (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7)
+        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_LAVA_1) + 1;
+    return 0;
+}
+
+BlockId fluidBlock(bool lava, uint8_t level) {
+    if (level == 0) return lava ? BlockId::LAVA : BlockId::WATER;
+    level = std::min<uint8_t>(level, 7);
+    const uint8_t first = static_cast<uint8_t>(
+        lava ? BlockId::FLOWING_LAVA_1 : BlockId::FLOWING_WATER_1);
+    return static_cast<BlockId>(first + level - 1);
+}
+
+float fluidSurfaceHeight(BlockId id) {
+    return isFluid(id) ? (fluidLevel(id) == 0 ? .875f : (8.0f - fluidLevel(id)) / 8.0f)
+                       : 0.0f;
+}
+
+bool isSunflower(BlockId id) {
+    return id == BlockId::SUNFLOWER_BOTTOM || id == BlockId::SUNFLOWER_TOP;
+}
+
+bool isFlower(BlockId id) {
+    return id == BlockId::FLOWER || id == BlockId::DANDELION ||
+           id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
+           id == BlockId::OXEYE_DAISY || isSunflower(id);
+}
+
+bool isReplaceableByFluid(BlockId id) {
+    return id == BlockId::AIR || id == BlockId::FIRE || id == BlockId::SNOW_LAYER ||
+           id == BlockId::TALL_GRASS || id == BlockId::REEDS || isFlower(id) ||
+           isSapling(id);
+}
+
 uint8_t fireEncouragement(BlockId id) {
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
@@ -380,7 +486,11 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::WHEAT_1: case BlockId::WHEAT_2:
         case BlockId::WHEAT_3: case BlockId::WHEAT_4:
         case BlockId::WHEAT_5: case BlockId::WHEAT_6:
-        case BlockId::WHEAT_7: return 60;
+        case BlockId::WHEAT_7: case BlockId::DANDELION:
+        case BlockId::BLUE_ORCHID: case BlockId::ALLIUM:
+        case BlockId::OXEYE_DAISY: case BlockId::SUNFLOWER_BOTTOM:
+        case BlockId::SUNFLOWER_TOP: return 60;
+        case BlockId::TNT: return 100;
         default: return 0;
     }
 }

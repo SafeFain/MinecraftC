@@ -8,6 +8,7 @@
 #include <functional>
 #include <unordered_set>
 #include <atomic>
+#include <queue>
 
 #include <glm/glm.hpp>
 
@@ -37,6 +38,8 @@ public:
                       bool raining = false);
     void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick);
     void tickBlockEntities();
+    void tickFluids(uint64_t tick);
+    std::vector<glm::ivec3> takeTntIgnitions();
     BlockEntity* getBlockEntity(const glm::ivec3& position);
     const BlockEntity* getBlockEntity(const glm::ivec3& position) const;
     std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position);
@@ -124,8 +127,26 @@ private:
             return h;
         }
     };
+    struct ScheduledFluidTick {
+        uint64_t due = 0;
+        glm::ivec3 position{0};
+    };
+    struct ScheduledFluidLater {
+        bool operator()(const ScheduledFluidTick& a,
+                        const ScheduledFluidTick& b) const {
+            if (a.due != b.due) return a.due > b.due;
+            if (a.position.y != b.position.y) return a.position.y > b.position.y;
+            if (a.position.z != b.position.z) return a.position.z > b.position.z;
+            return a.position.x > b.position.x;
+        }
+    };
     ChunkMap m_chunks;
     std::unordered_map<glm::ivec3, uint8_t, BlockPosHash> m_fireAges;
+    std::priority_queue<ScheduledFluidTick, std::vector<ScheduledFluidTick>,
+                        ScheduledFluidLater> m_fluidTicks;
+    std::unordered_map<glm::ivec3, uint64_t, BlockPosHash> m_scheduledFluidDue;
+    std::vector<glm::ivec3> m_tntIgnitions;
+    uint64_t m_currentWorldTick = 0;
     std::vector<Chunk*> m_activeChunks;
 
     mutable std::shared_mutex m_chunkMutex;
@@ -165,6 +186,9 @@ private:
     void rebuildBlockLight();
     bool growSapling(const glm::ivec3& position, BlockId sapling);
     bool hasWaterForFarmland(const glm::ivec3& position, bool raining = false) const;
+    void scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDelay = 1);
+    bool generatedAt(int worldX, int worldZ) const;
+    void updateFluidCell(const glm::ivec3& position, uint64_t tick);
 
     void markDirty(int cx, int cz);
 };

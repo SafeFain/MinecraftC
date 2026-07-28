@@ -22,8 +22,9 @@ enum class EntityType : uint8_t {
     Zombie,
     Skeleton,
     Spider,
-    Blastling
-    ,Arrow
+    Blastling,
+    Arrow,
+    PrimedTnt
 };
 
 struct Entity {
@@ -55,6 +56,9 @@ public:
                    const glm::vec3& velocity = glm::vec3(0.0f));
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned);
+    void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
+                  bool removeBlock = true);
+    std::vector<glm::dvec3> takeExplosionEvents();
     void update(Player& player, float dt, bool isDay, bool peaceful,
                 bool playerTargetable, bool playerCanPickup,
                 bool thunderstorm = false, bool raining = false);
@@ -79,6 +83,7 @@ private:
     uint32_t m_spawnSequence = 0;
     SaveStore* m_saveStore = nullptr;
     std::set<std::pair<int,int>> m_loadedChunks;
+    std::vector<glm::dvec3> m_explosionEvents;
 
     void spawnMob(EntityType type, const glm::dvec3& position);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
@@ -90,6 +95,8 @@ private:
     void damageEntity(Entity& entity, float damage, const glm::vec3& knockback,
                       bool playerAttack);
     void updateArrow(Entity& entity, Player& player, float dt);
+    void explode(Player& player, const glm::dvec3& center, float power,
+                 uint32_t eventSeed);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);
     static glm::vec3 renderColor(EntityType type);

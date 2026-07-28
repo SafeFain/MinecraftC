@@ -5,6 +5,7 @@
 #include "renderer/Renderer.h"
 #include "world/World.h"
 #include "game/SurvivalSession.h"
+#include "game/SurvivalRules.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,6 +29,7 @@ void EntityManager::clear() {
     m_spawnTimer = 0.0f;
     m_spawnSequence = 0;
     m_loadedChunks.clear();
+    m_explosionEvents.clear();
 }
 
 std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const {
@@ -126,6 +128,32 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
     m_entities.push_back(entity);
 }
 
+void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
+                             bool removeBlock) {
+    if (removeBlock) {
+        if (m_world.getBlock(position.x, position.y, position.z) != BlockId::TNT)
+            return;
+        m_world.setBlock(position.x, position.y, position.z, BlockId::AIR);
+    }
+    Entity entity;
+    entity.id = m_nextId++;
+    entity.type = EntityType::PrimedTnt;
+    entity.position = glm::dvec3(position) + glm::dvec3(0.5, 0.0, 0.5);
+    entity.velocity = {0.0f, 0.2f, 0.0f};
+    entity.health = 1.0f;
+    entity.projectileDamage = std::max(0.05f, fuseSeconds);
+    entity.behaviorSeed = hash32(static_cast<uint32_t>(entity.id) ^
+        static_cast<uint32_t>(position.x * 73428767) ^
+        static_cast<uint32_t>(position.z * 912931));
+    m_entities.push_back(entity);
+}
+
+std::vector<glm::dvec3> EntityManager::takeExplosionEvents() {
+    std::vector<glm::dvec3> result;
+    result.swap(m_explosionEvents);
+    return result;
+}
+
 void EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
     Entity entity;
     entity.id = m_nextId++;
@@ -142,6 +170,7 @@ void EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
         case EntityType::Blastling: entity.health = 20.0f; break;
         case EntityType::Spider: entity.health = 16.0f; break;
         case EntityType::Arrow: return;
+        case EntityType::PrimedTnt: return;
         case EntityType::Item: return;
     }
     m_entities.push_back(entity);
@@ -266,8 +295,8 @@ bool EntityManager::touchesWater(const Entity& entity) const {
     const int z = static_cast<int>(std::floor(entity.position.z));
     const int feet = static_cast<int>(std::floor(entity.position.y + 0.05));
     const int head = static_cast<int>(std::floor(entity.position.y + size.y - 0.05));
-    return m_world.getBlock(x, feet, z) == BlockId::WATER ||
-           m_world.getBlock(x, head, z) == BlockId::WATER;
+    return isWater(m_world.getBlock(x, feet, z)) ||
+           isWater(m_world.getBlock(x, head, z));
 }
 
 void EntityManager::damageEntity(Entity& entity, float damage,
@@ -299,6 +328,12 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool thunderstorm, bool raining) {
     struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
     std::vector<PendingArrow> pendingArrows;
+    struct PendingExplosion {
+        glm::dvec3 position;
+        uint32_t seed;
+        float power;
+    };
+    std::vector<PendingExplosion> pendingExplosions;
     m_spawnTimer += dt;
     if (m_spawnTimer >= 4.0f) {
         spawnAroundPlayer(
@@ -313,6 +348,12 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         if (entity.type == EntityType::Arrow) {
             updateArrow(entity, player, dt);
+            continue;
+        }
+        if (entity.type == EntityType::PrimedTnt) {
+            integrateVelocity(entity, dt);
+            if (entity.ageSeconds >= std::max(0.05f, entity.projectileDamage))
+                entity.health = 0.0f;
             continue;
         }
         if (entity.type == EntityType::Item) {
@@ -403,23 +444,12 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             }
             if (entity.type != EntityType::Skeleton &&
                 distance < 1.5f && clearSight && entity.actionCooldown <= 0.0f) {
-                player.takeDamage(entity.type == EntityType::Blastling ? 6.0f : 3.0f);
                 entity.actionCooldown = 1.0f;
                 if (entity.type == EntityType::Blastling) {
-                    const glm::ivec3 center(glm::floor(entity.position));
-                    for (int dz = -2; dz <= 2; ++dz)
-                        for (int dy = -2; dy <= 2; ++dy)
-                            for (int dx = -2; dx <= 2; ++dx) {
-                                if (dx * dx + dy * dy + dz * dz > 4) continue;
-                                const glm::ivec3 position = center + glm::ivec3(dx, dy, dz);
-                                const BlockId block = m_world.getBlock(
-                                    position.x, position.y, position.z);
-                                if (block != BlockId::AIR && block != BlockId::BEDROCK)
-                                    m_world.setBlock(position.x, position.y, position.z,
-                                                     BlockId::AIR);
-                            }
+                    pendingExplosions.push_back(
+                        {entity.position, entity.behaviorSeed, 2.5f});
                     entity.health = 0.0f;
-                }
+                } else player.takeDamage(3.0f);
             }
         } else {
             const float angle = static_cast<float>(
@@ -434,9 +464,17 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
     for (const auto& arrow : pendingArrows)
         spawnArrow(arrow.position, arrow.velocity, arrow.damage, false);
 
+    for (const auto& entity : m_entities)
+        if (entity.type == EntityType::PrimedTnt && entity.health <= 0.0f)
+            pendingExplosions.push_back(
+                {entity.position, entity.behaviorSeed, 4.0f});
+    for (const auto& explosion : pendingExplosions)
+        explode(player, explosion.position, explosion.power, explosion.seed);
+
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
-        if (entity.health <= 0.0f && entity.type != EntityType::Item)
+        if (entity.health <= 0.0f && entity.type != EntityType::Item &&
+            entity.type != EntityType::PrimedTnt)
             deadMobs.push_back(entity);
     m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
         [](const Entity& entity) {
@@ -477,9 +515,10 @@ void EntityManager::dropMobLoot(const Entity& entity) {
         case EntityType::Skeleton:
             loot = {{ItemId::BONE, 1, 0}, {ItemId::ARROW, 1, 0}}; break;
         case EntityType::Spider: loot = {{ItemId::STRING, 1, 0}}; break;
-        case EntityType::Blastling:
+        case EntityType::Blastling: loot = {{ItemId::GUNPOWDER, 1, 0}}; break;
         case EntityType::Arrow:
         case EntityType::Item: break;
+        case EntityType::PrimedTnt: break;
     }
     for (const auto& stack : loot) spawnItem(entity.position, stack);
 }
@@ -555,6 +594,96 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
     }
 }
 
+void EntityManager::explode(Player& player, const glm::dvec3& center,
+                            float power, uint32_t eventSeed) {
+    const float effectRadius = power * 2.0f;
+    auto impactAt = [&](const glm::dvec3& target) {
+        const glm::dvec3 delta = target - center;
+        const double distance = glm::length(delta);
+        if (distance >= effectRadius) return 0.0f;
+        float exposure = 1.0f;
+        if (distance > 0.01) {
+            const auto blocked = m_world.raycast(
+                center, glm::normalize(glm::vec3(delta)), static_cast<float>(distance));
+            if (blocked) exposure = 0.35f;
+        }
+        return std::max(0.0f, 1.0f - static_cast<float>(distance) / effectRadius) * exposure;
+    };
+
+    for (auto& entity : m_entities) {
+        if (entity.health <= 0.0f || entity.type == EntityType::PrimedTnt) continue;
+        const float impact = impactAt(entity.position + glm::dvec3(0.0, .5, 0.0));
+        if (impact <= 0.0f) continue;
+        glm::vec3 direction = glm::vec3(entity.position - center);
+        if (glm::length(direction) > .001f) direction = glm::normalize(direction);
+        direction.y = std::max(direction.y, .25f);
+        if (entity.type == EntityType::Item) {
+            entity.velocity += direction * impact * 4.0f;
+        } else {
+            const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);
+            damageEntity(entity, damage, direction * impact * 3.5f, false);
+        }
+    }
+    if (player.isSurvival()) {
+        const float impact = impactAt(player.getPosition() + glm::dvec3(0.0, 1.0, 0.0));
+        if (impact > 0.0f) {
+            const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);
+            player.takeDamage(damage);
+            glm::vec3 direction = glm::vec3(player.getPosition() - center);
+            if (glm::length(direction) > .001f) direction = glm::normalize(direction);
+            direction.y = std::max(direction.y, .3f);
+            player.applyImpulse(direction * impact * 3.5f);
+        }
+    }
+
+    std::vector<glm::ivec3> chain;
+    size_t spawnedDrops = 0;
+    const int radius = static_cast<int>(std::ceil(power));
+    const ItemStack diamondPick{ItemId::DIAMOND_PICKAXE, 1, 0};
+    const glm::ivec3 blockCenter(glm::floor(center));
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const glm::ivec3 p = blockCenter + glm::ivec3(dx, dy, dz);
+                if (!Config::isValidWorldY(p.y)) continue;
+                const float distance = glm::length(glm::vec3(dx, dy, dz));
+                if (distance > power) continue;
+                const BlockId block = m_world.getBlock(p.x, p.y, p.z);
+                if (block == BlockId::AIR || block == BlockId::BEDROCK ||
+                    block == BlockId::OBSIDIAN || isFluid(block)) continue;
+                uint32_t random = hash32(eventSeed ^ static_cast<uint32_t>(p.x * 73428767) ^
+                    static_cast<uint32_t>(p.y * 912931) ^
+                    static_cast<uint32_t>(p.z * 438289));
+                const float resistance = std::max(0.0f, getBlockSurvivalProps(block).hardness);
+                const float strength = power * (0.75f + (random & 255u) / 512.0f);
+                if (distance + resistance * .18f > strength) continue;
+                if (block == BlockId::TNT) {
+                    chain.push_back(p);
+                } else if (spawnedDrops < 32 && random % 3 == 0) {
+                    for (const ItemStack& drop : getBlockDrops(block, diamondPick, random)) {
+                        if (spawnedDrops >= 32) break;
+                        const glm::vec3 velocity(
+                            (static_cast<int>((random >> 8) & 15) - 7) * .05f,
+                            .6f + ((random >> 16) & 7) * .04f,
+                            (static_cast<int>((random >> 20) & 15) - 7) * .05f);
+                        spawnItem(glm::dvec3(p) + glm::dvec3(.5), drop, velocity);
+                        ++spawnedDrops;
+                    }
+                }
+                m_world.setBlock(p.x, p.y, p.z, BlockId::AIR);
+            }
+        }
+    }
+    for (const glm::ivec3& p : chain) {
+        if (m_world.getBlock(p.x, p.y, p.z) != BlockId::TNT) continue;
+        m_world.setBlock(p.x, p.y, p.z, BlockId::AIR);
+        const uint32_t random = hash32(eventSeed ^ static_cast<uint32_t>(p.x) ^
+                                       (static_cast<uint32_t>(p.z) << 16));
+        primeTnt(p, .5f + static_cast<float>(random % 1001) / 1000.0f, false);
+    }
+    m_explosionEvents.push_back(center);
+}
+
 glm::vec3 EntityManager::renderColor(EntityType type) {
     switch (type) {
         case EntityType::Item: return {0.95f, 0.78f, 0.22f};
@@ -567,6 +696,7 @@ glm::vec3 EntityManager::renderColor(EntityType type) {
         case EntityType::Spider: return {0.16f, 0.08f, 0.07f};
         case EntityType::Blastling: return {0.35f, 0.72f, 0.30f};
         case EntityType::Arrow: return {0.58f,0.42f,0.20f};
+        case EntityType::PrimedTnt: return {0.86f,0.18f,0.12f};
     }
     return {1.0f, 0.0f, 1.0f};
 }
@@ -575,6 +705,7 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
     switch (type) {
         case EntityType::Item: return {0.25f, 0.25f, 0.25f};
         case EntityType::Arrow: return {0.08f,0.08f,0.75f};
+        case EntityType::PrimedTnt: return {0.98f,0.98f,0.98f};
         case EntityType::Chicken: return {0.45f, 0.65f, 0.45f};
         case EntityType::Spider: return {1.2f, 0.55f, 1.2f};
         case EntityType::Cow:
@@ -600,9 +731,13 @@ void EntityManager::render(
             case EntityType::Blastling: textureIndex = 7; break;
             case EntityType::Item: textureIndex = 8; break;
             case EntityType::Arrow: textureIndex = 8; break;
+            case EntityType::PrimedTnt: textureIndex = 8; break;
         }
         glm::vec3 color = renderColor(entity.type);
-        if (entity.hurtFlashSeconds > 0.0f) {
+        if (entity.type == EntityType::PrimedTnt) {
+            const float flash = std::fmod(entity.ageSeconds, 0.25f) < 0.10f ? 1.0f : 0.0f;
+            color = glm::mix(glm::vec3(0.86f, 0.18f, 0.12f), glm::vec3(1.0f), flash);
+        } else if (entity.hurtFlashSeconds > 0.0f) {
             color = {1.0f, 0.16f, 0.16f};
         } else if (entity.burningSeconds > 0.0f) {
             const float pulse = 0.08f * std::sin(entity.ageSeconds * 18.0f);

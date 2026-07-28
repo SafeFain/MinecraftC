@@ -13,6 +13,7 @@ public:
     bool initialize();
     void setRainVolume(float volume);
     void playThunder(float pan, float volume);
+    void playExplosion(float pan, float volume);
     bool available() const;
 
 private:

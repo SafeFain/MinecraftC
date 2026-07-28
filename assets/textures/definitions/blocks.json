@@ -36,6 +36,12 @@
     "spruce_sapling": {"all": "spruce_sapling"}, "jungle_sapling": {"all": "jungle_sapling"},
     "acacia_sapling": {"all": "acacia_sapling"},
     "snow_layer": {"all": "snow_layer"}, "fire": {"all": "fire"},
+    "glass": {"all": "glass"}, "tnt": {"all": "tnt"},
+    "obsidian": {"all": "obsidian"}, "dandelion": {"all": "dandelion"},
+    "blue_orchid": {"all": "blue_orchid"}, "allium": {"all": "allium"},
+    "oxeye_daisy": {"all": "oxeye_daisy"},
+    "sunflower": {"all": "sunflower_bottom"},
+    "sunflower_top": {"all": "sunflower_top"},
     "copper_ore": {"all": "copper_ore", "future": true}
   }
 }

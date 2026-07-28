@@ -261,7 +261,8 @@ void Renderer::bindBlockShader() const {
     m_blockShader->bind();
     m_blockAtlas.bind();
     m_blockShader->setInt("uBlockAtlas", 0);
-    m_blockShader->setFloat("uAtlasTiles", 8.0f);
+    m_blockShader->setFloat("uAtlasTiles",
+                            static_cast<float>(BlockTextureAtlas::tilesPerSide()));
     m_blockShader->setFloat(
         "uLavaTile", static_cast<float>(getAtlasTextureIndex(BlockTexture::Lava)));
     m_blockShader->setFloat(
@@ -329,13 +330,49 @@ void Renderer::renderEntityPart(
     m_entityShader->setVec3("uColor", color);
     m_entityShader->setInt("uTextureIndex", textureIndex);
     m_entityShader->setInt("uEntityAtlas", 0);
-    m_entityShader->setInt("uUseTexture", m_entityTexture ? 1 : 0);
+    m_entityShader->setInt("uUseTexture",
+                           m_entityTexture && textureIndex >= 0 ? 1 : 0);
     m_entityShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_entityTexture));
     GL_CHECK(glBindVertexArray(m_entityVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 36));
     GL_CHECK(glBindVertexArray(0));
+}
+
+void Renderer::renderClouds(const glm::dvec3& playerPosition,
+                            const glm::mat4& viewProjection,
+                            uint64_t worldSeed, float timeSeconds,
+                            int renderDistanceBlocks) {
+    // Sparse, deterministic voxel clusters drift east without entering the
+    // collision/world data structures. Large cells keep the draw budget small.
+    constexpr int cellSize = 16;
+    const int radius = std::max(1, (renderDistanceBlocks + cellSize - 1) / cellSize);
+    const double drift = static_cast<double>(timeSeconds) * 0.8;
+    const int centerX = static_cast<int>(std::floor((playerPosition.x - drift) / cellSize));
+    const int centerZ = static_cast<int>(std::floor(playerPosition.z / cellSize));
+    for (int dz = -radius; dz <= radius; ++dz) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            const int cx = centerX + dx;
+            const int cz = centerZ + dz;
+            uint64_t h = worldSeed ^ (static_cast<uint64_t>(static_cast<int64_t>(cx)) *
+                                      0x9E3779B97F4A7C15ULL);
+            h ^= static_cast<uint64_t>(static_cast<int64_t>(cz)) *
+                 0xD1B54A32D192ED03ULL;
+            h ^= h >> 30; h *= 0xBF58476D1CE4E5B9ULL;
+            h ^= h >> 27; h *= 0x94D049BB133111EBULL; h ^= h >> 31;
+            if ((h & 15ULL) > 5ULL) continue;
+            const float width = 8.0f + static_cast<float>((h >> 8) & 7ULL);
+            const float depth = 7.0f + static_cast<float>((h >> 12) & 7ULL);
+            const float height = 2.0f + static_cast<float>((h >> 16) % 3ULL);
+            glm::vec3 position(
+                static_cast<float>(cx * cellSize + drift - playerPosition.x),
+                192.0f + static_cast<float>((h >> 20) % 3ULL),
+                static_cast<float>(cz * cellSize - playerPosition.z));
+            renderEntity(position, glm::vec3(width, height, depth),
+                         glm::vec3(0.92f, 0.94f, 0.96f), -1, viewProjection);
+        }
+    }
 }
 
 void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
@@ -350,7 +387,8 @@ void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
     m_particleShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
     m_particleShader->setFloat("uIntensity", intensity);
     m_particleShader->setInt("uBlockAtlas", 0);
-    m_particleShader->setFloat("uAtlasTiles", 8.0f);
+    m_particleShader->setFloat("uAtlasTiles",
+                               static_cast<float>(BlockTextureAtlas::tilesPerSide()));
     m_particleShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     m_blockAtlas.bind();
     GL_CHECK(glEnable(GL_BLEND));

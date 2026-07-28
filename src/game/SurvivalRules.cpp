@@ -79,6 +79,15 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
         set(id, 0.2f);
     set(BlockId::WHITE_WOOL, 0.8f);
     set(BlockId::WHITE_BED, 0.2f);
+    set(BlockId::GLASS, 0.3f);
+    set(BlockId::TNT, 0.0f);
+    set(BlockId::OBSIDIAN, 50.0f, ToolKind::Pickaxe, ToolTier::Diamond);
+    for (BlockId id : {BlockId::DANDELION, BlockId::BLUE_ORCHID, BlockId::ALLIUM,
+                       BlockId::OXEYE_DAISY, BlockId::SUNFLOWER_BOTTOM,
+                       BlockId::SUNFLOWER_TOP}) set(id, 0.0f);
+    for (uint8_t raw = static_cast<uint8_t>(BlockId::FLOWING_WATER_1);
+         raw <= static_cast<uint8_t>(BlockId::FLOWING_LAVA_7); ++raw)
+        set(static_cast<BlockId>(raw), -1.0f, ToolKind::None, ToolTier::None, true);
     return values;
 }
 
@@ -171,6 +180,13 @@ std::vector<CraftingRecipe> buildRecipes() {
                                     ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
                                     E, ItemId::OAK_PLANKS, E},
                              {ItemId::SHIELD, 1, 0}, false));
+    recipes.push_back(shaped(2, 1, {ItemId::FLINT, ItemId::IRON_INGOT},
+                             {ItemId::FLINT_AND_STEEL, 1, 0}));
+    recipes.push_back(shaped(3, 3, {
+        ItemId::GUNPOWDER, ItemId::SAND, ItemId::GUNPOWDER,
+        ItemId::SAND, ItemId::GUNPOWDER, ItemId::SAND,
+        ItemId::GUNPOWDER, ItemId::SAND, ItemId::GUNPOWDER},
+        {ItemId::TNT, 1, 0}, false));
     addToolSet(recipes, ItemId::OAK_PLANKS, ItemId::WOODEN_PICKAXE);
     addToolSet(recipes, ItemId::COBBLESTONE, ItemId::STONE_PICKAXE);
     addToolSet(recipes, ItemId::IRON_INGOT, ItemId::IRON_PICKAXE);
@@ -204,7 +220,7 @@ bool recipeMatches(const CraftingRecipe& recipe, const std::array<ItemId, 9>& gr
 
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
-const std::array<SmeltingRecipe, 8> SMELTING = {{
+const std::array<SmeltingRecipe, 10> SMELTING = {{
     {ItemId::RAW_IRON, {ItemId::IRON_INGOT, 1, 0}, 200},
     {ItemId::IRON_ORE, {ItemId::IRON_INGOT, 1, 0}, 200},
     {ItemId::RAW_GOLD, {ItemId::GOLD_INGOT, 1, 0}, 200},
@@ -212,7 +228,9 @@ const std::array<SmeltingRecipe, 8> SMELTING = {{
     {ItemId::RAW_BEEF, {ItemId::STEAK, 1, 0}, 200},
     {ItemId::RAW_CHICKEN, {ItemId::COOKED_CHICKEN, 1, 0}, 200},
     {ItemId::RAW_PORKCHOP, {ItemId::COOKED_PORKCHOP, 1, 0}, 200},
-    {ItemId::MUTTON, {ItemId::COOKED_MUTTON, 1, 0}, 200}
+    {ItemId::MUTTON, {ItemId::COOKED_MUTTON, 1, 0}, 200},
+    {ItemId::SAND, {ItemId::GLASS, 1, 0}, 200},
+    {ItemId::RED_SAND, {ItemId::GLASS, 1, 0}, 200}
 }};
 
 } // namespace
@@ -233,6 +251,8 @@ std::vector<ItemStack> getBlockDrops(
         case BlockId::IRON_ORE: return {{ItemId::RAW_IRON, 1, 0}};
         case BlockId::GOLD_ORE: return {{ItemId::RAW_GOLD, 1, 0}};
         case BlockId::DIAMOND_ORE: return {{ItemId::DIAMOND, 1, 0}};
+        case BlockId::GLASS:
+        case BlockId::SUNFLOWER_TOP: return {};
         case BlockId::TALL_GRASS:
             return randomValue % 8 == 0
                 ? std::vector<ItemStack>{{ItemId::WHEAT_SEEDS, 1, 0}}

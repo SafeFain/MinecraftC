@@ -144,6 +144,26 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::JUNGLE_SAPLING});
     set(ItemId::ACACIA_SAPLING, {"Acacia Sapling", ItemKind::Block, 64, 0,
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ACACIA_SAPLING});
+    set(ItemId::GLASS, {"Glass", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GLASS});
+    set(ItemId::TNT, {"TNT", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::TNT});
+    set(ItemId::OBSIDIAN, {"Obsidian", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::OBSIDIAN});
+    set(ItemId::DANDELION, {"Dandelion", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DANDELION});
+    set(ItemId::BLUE_ORCHID, {"Blue Orchid", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BLUE_ORCHID});
+    set(ItemId::ALLIUM, {"Allium", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ALLIUM});
+    set(ItemId::OXEYE_DAISY, {"Oxeye Daisy", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::OXEYE_DAISY});
+    set(ItemId::SUNFLOWER, {"Sunflower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SUNFLOWER_BOTTOM});
+    set(ItemId::FLINT_AND_STEEL, {"Flint and Steel", ItemKind::Tool, 1, 64});
+    set(ItemId::GUNPOWDER, {"Gunpowder"});
+
+    items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
 }
@@ -185,6 +205,29 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::SPRUCE_SAPLING): return ItemId::SPRUCE_SAPLING;
         case static_cast<uint16_t>(BlockId::JUNGLE_SAPLING): return ItemId::JUNGLE_SAPLING;
         case static_cast<uint16_t>(BlockId::ACACIA_SAPLING): return ItemId::ACACIA_SAPLING;
+        case static_cast<uint16_t>(BlockId::GLASS): return ItemId::GLASS;
+        case static_cast<uint16_t>(BlockId::TNT): return ItemId::TNT;
+        case static_cast<uint16_t>(BlockId::OBSIDIAN): return ItemId::OBSIDIAN;
+        case static_cast<uint16_t>(BlockId::DANDELION): return ItemId::DANDELION;
+        case static_cast<uint16_t>(BlockId::BLUE_ORCHID): return ItemId::BLUE_ORCHID;
+        case static_cast<uint16_t>(BlockId::ALLIUM): return ItemId::ALLIUM;
+        case static_cast<uint16_t>(BlockId::OXEYE_DAISY): return ItemId::OXEYE_DAISY;
+        case static_cast<uint16_t>(BlockId::SUNFLOWER_BOTTOM): return ItemId::SUNFLOWER;
+        case static_cast<uint16_t>(BlockId::SUNFLOWER_TOP): return ItemId::EMPTY;
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_1):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_2):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_3):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_4):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_5):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_6):
+        case static_cast<uint16_t>(BlockId::FLOWING_WATER_7): return ItemId::WATER;
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_1):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_2):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_3):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_4):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_5):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_6):
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_7): return ItemId::LAVA;
         default: return ItemId::EMPTY;
     }
 }

@@ -29,6 +29,10 @@ void World::resetForNewSeed(uint64_t newSeed) {
     m_chunks.clear();
     m_activeChunks.clear();
     m_fireAges.clear();
+    m_fluidTicks = {};
+    m_scheduledFluidDue.clear();
+    m_tntIgnitions.clear();
+    m_currentWorldTick = 0;
     m_pendingBlocks.clear();
     m_blockOverrides.clear();
     m_dirtyOverrideChunks.clear();
@@ -111,6 +115,8 @@ PrecipitationType World::precipitationAt(
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
     if (!Config::isValidWorldY(worldY)) return;
+    const BlockId previous = getBlock(worldX, worldY, worldZ);
+    if (previous == id) return;
 
     int cx = worldToChunkX(static_cast<double>(worldX));
     int cz = worldToChunkZ(static_cast<double>(worldZ));
@@ -150,6 +156,163 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
     if (lx == Config::CHUNK_SIZE_X - 1) markDirty(cx + 1, cz);
     if (lz == 0)                   markDirty(cx, cz - 1);
     if (lz == Config::CHUNK_SIZE_Z - 1) markDirty(cx, cz + 1);
+    scheduleFluidAround({worldX, worldY, worldZ});
+    if (id == BlockId::AIR && previous == BlockId::SUNFLOWER_BOTTOM &&
+        worldY + 1 < Config::WORLD_MAX_Y &&
+        getBlock(worldX, worldY + 1, worldZ) == BlockId::SUNFLOWER_TOP)
+        setBlock(worldX, worldY + 1, worldZ, BlockId::AIR);
+    if (id == BlockId::AIR && previous == BlockId::SUNFLOWER_TOP &&
+        worldY > Config::WORLD_MIN_Y &&
+        getBlock(worldX, worldY - 1, worldZ) == BlockId::SUNFLOWER_BOTTOM)
+        setBlock(worldX, worldY - 1, worldZ, BlockId::AIR);
+}
+
+bool World::generatedAt(int worldX, int worldZ) const {
+    const int cx = worldToChunkX(worldX);
+    const int cz = worldToChunkZ(worldZ);
+    std::shared_lock lock(m_chunkMutex);
+    const auto it = m_chunks.find({cx, cz});
+    return it != m_chunks.end() && it->second->generated.load();
+}
+
+void World::scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDelay) {
+    auto schedule = [&](const glm::ivec3& p) {
+        if (!Config::isValidWorldY(p.y) || !generatedAt(p.x, p.z)) return;
+        const BlockId block = getBlock(p.x, p.y, p.z);
+        if (!isFluid(block)) return;
+        const uint64_t delay = std::max<uint64_t>(
+            minimumDelay, isLava(block) ? 30u : 5u);
+        const uint64_t due = m_currentWorldTick + delay;
+        const auto existing = m_scheduledFluidDue.find(p);
+        if (existing != m_scheduledFluidDue.end() && existing->second <= due) return;
+        m_scheduledFluidDue[p] = due;
+        m_fluidTicks.push({due, p});
+    };
+    schedule(position);
+    for (const glm::ivec3& offset : FACE_OFFSETS) schedule(position + offset);
+}
+
+std::vector<glm::ivec3> World::takeTntIgnitions() {
+    std::vector<glm::ivec3> result;
+    result.swap(m_tntIgnitions);
+    return result;
+}
+
+void World::updateFluidCell(const glm::ivec3& p, uint64_t tick) {
+    BlockId current = getBlock(p.x, p.y, p.z);
+    if (!isFluid(current)) return;
+    const bool lava = isLava(current);
+    auto same = [&](BlockId block) { return lava ? isLava(block) : isWater(block); };
+    auto opposite = [&](BlockId block) { return lava ? isWater(block) : isLava(block); };
+
+    // Contact solidification happens before spreading so update order cannot
+    // allow one fluid to overwrite the other.
+    if (lava) {
+        for (const glm::ivec3& offset : FACE_OFFSETS) {
+            if (!isWater(getBlock(p.x + offset.x, p.y + offset.y, p.z + offset.z)))
+                continue;
+            const BlockId product = offset.y > 0 ? BlockId::STONE :
+                (fluidLevel(current) == 0 ? BlockId::OBSIDIAN : BlockId::COBBLESTONE);
+            setBlock(p.x, p.y, p.z, product);
+            return;
+        }
+    }
+
+    if (fluidLevel(current) != 0) {
+        uint8_t desired = 8;
+        const BlockId above = getBlock(p.x, p.y + 1, p.z);
+        if (same(above)) {
+            desired = 1;
+        } else {
+            int sourceNeighbors = 0;
+            for (const glm::ivec3& offset : {glm::ivec3{1,0,0}, {-1,0,0},
+                                             {0,0,1}, {0,0,-1}}) {
+                const BlockId neighbor = getBlock(
+                    p.x + offset.x, p.y, p.z + offset.z);
+                if (!same(neighbor)) continue;
+                if (fluidLevel(neighbor) == 0) ++sourceNeighbors;
+                desired = std::min<uint8_t>(desired,
+                    static_cast<uint8_t>(fluidLevel(neighbor) + 1));
+            }
+            if (!lava && sourceNeighbors >= 2 && isSolid(getBlock(p.x, p.y - 1, p.z)))
+                desired = 0;
+        }
+        if (desired > 7) {
+            setBlock(p.x, p.y, p.z, BlockId::AIR);
+            return;
+        }
+        const BlockId recomputed = fluidBlock(lava, desired);
+        if (recomputed != current) {
+            setBlock(p.x, p.y, p.z, recomputed);
+            current = recomputed;
+        }
+    }
+
+    for (const glm::ivec3& offset : FACE_OFFSETS) {
+        const glm::ivec3 q = p + offset;
+        if (getBlock(q.x, q.y, q.z) != BlockId::TNT) continue;
+        if (lava) {
+            setBlock(q.x, q.y, q.z, BlockId::AIR);
+            m_tntIgnitions.push_back(q);
+        }
+    }
+
+    const glm::ivec3 below = p + glm::ivec3(0, -1, 0);
+    if (Config::isValidWorldY(below.y) && generatedAt(below.x, below.z)) {
+        const BlockId target = getBlock(below.x, below.y, below.z);
+        if (opposite(target)) {
+            setBlock(below.x, below.y, below.z, BlockId::STONE);
+            return;
+        }
+        if (isReplaceableByFluid(target) ||
+            (same(target) && fluidLevel(target) > 1)) {
+            setBlock(below.x, below.y, below.z, fluidBlock(lava, 1));
+            scheduleFluidAround(below);
+            return;
+        }
+    }
+
+    const uint8_t nextLevel = fluidLevel(current) == 0 ? 1
+        : static_cast<uint8_t>(fluidLevel(current) + 1);
+    if (nextLevel > 7) return;
+    for (const glm::ivec3& offset : {glm::ivec3{1,0,0}, {-1,0,0},
+                                     {0,0,1}, {0,0,-1}}) {
+        const glm::ivec3 q = p + offset;
+        if (!generatedAt(q.x, q.z)) continue;
+        const BlockId target = getBlock(q.x, q.y, q.z);
+        if (opposite(target)) {
+            if (lava) setBlock(p.x, p.y, p.z,
+                fluidLevel(current) == 0 ? BlockId::OBSIDIAN : BlockId::COBBLESTONE);
+            continue;
+        }
+        if (isReplaceableByFluid(target) ||
+            (same(target) && fluidLevel(target) > nextLevel)) {
+            setBlock(q.x, q.y, q.z, fluidBlock(lava, nextLevel));
+            scheduleFluidAround(q);
+        }
+    }
+    (void)tick;
+}
+
+void World::tickFluids(uint64_t tick) {
+    m_currentWorldTick = tick;
+    constexpr size_t MAX_UPDATES = 512;
+    size_t processed = 0;
+    while (!m_fluidTicks.empty() && m_fluidTicks.top().due <= tick &&
+           processed < MAX_UPDATES) {
+        const ScheduledFluidTick scheduled = m_fluidTicks.top();
+        m_fluidTicks.pop();
+        const auto current = m_scheduledFluidDue.find(scheduled.position);
+        if (current == m_scheduledFluidDue.end() || current->second != scheduled.due)
+            continue;
+        m_scheduledFluidDue.erase(current);
+        if (!generatedAt(scheduled.position.x, scheduled.position.z)) {
+            scheduleFluidAround(scheduled.position, 20);
+            continue;
+        }
+        updateFluidCell(scheduled.position, tick);
+        ++processed;
+    }
 }
 
 void World::markDirty(int cx, int cz) {
@@ -182,7 +345,7 @@ Chunk* World::getChunk(int cx, int cz) {
     auto chunk = std::make_unique<Chunk>(cx, cz);
     if (m_saveStore) {
         if (auto cached = m_saveStore->loadGeneratedChunk(
-                cx, cz, WorldGenContext::GENERATION_VERSION)) {
+                cx, cz, WorldGenContext::CHUNK_CACHE_VERSION)) {
             chunk->loadRawBlocks(*cached);
             chunk->generated = true;
         }
@@ -213,7 +376,7 @@ void World::persistGeneratedChunks() {
         std::vector<uint8_t> blocks(
             chunk->rawBlocks(), chunk->rawBlocks() + Config::CHUNK_VOLUME);
         m_saveStore->saveGeneratedChunk(
-            key.first, key.second, blocks, WorldGenContext::GENERATION_VERSION);
+            key.first, key.second, blocks, WorldGenContext::CHUNK_CACHE_VERSION);
     }
 }
 
@@ -506,6 +669,7 @@ void World::enqueueGeneration() {
 
 void World::processCompletedGenerations(bool rebuildLighting) {
     // Apply pending tree leaves for chunks that have finished generating
+    std::vector<glm::ivec3> fluidSeeds;
     std::unique_lock lock(m_chunkMutex);
     for (auto& [key, chunk] : m_chunks) {
         if (chunk->generated.load()) {
@@ -513,10 +677,26 @@ void World::processCompletedGenerations(bool rebuildLighting) {
             applyPendingBlocks(key.first, key.second);
             applySavedOverrides(key.first, key.second);
             loadBlockEntities(key.first, key.second);
-            if (firstApply) m_lightDirty = true;
+            if (firstApply) {
+                m_lightDirty = true;
+                const auto overrides = m_blockOverrides.find(key);
+                if (overrides != m_blockOverrides.end()) {
+                    for (const auto& [index, block] : overrides->second) {
+                        (void)block;
+                        const int x = index % Config::CHUNK_SIZE_X;
+                        const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
+                        const int y = Config::storageYToWorldY(index /
+                            (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+                        fluidSeeds.push_back({key.first * Config::CHUNK_SIZE_X + x,
+                                              y,
+                                              key.second * Config::CHUNK_SIZE_Z + z});
+                    }
+                }
+            }
         }
     }
     lock.unlock();
+    for (const glm::ivec3& position : fluidSeeds) scheduleFluidAround(position);
     if (rebuildLighting && m_lightDirty) rebuildBlockLight();
 }
 
@@ -534,13 +714,15 @@ void World::rebuildBlockLight() {
         if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
         Chunk* chunk = chunkIt->second.get();
         for (const auto& [index, block] : overrides) {
-            if (block != BlockId::TORCH && block != BlockId::FIRE) continue;
+            if (block != BlockId::TORCH && block != BlockId::FIRE && !isLava(block))
+                continue;
             const int x = index % Config::CHUNK_SIZE_X;
             const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
             const int y = Config::storageYToWorldY(
                 index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
             sources.push_back({chunk, x, y, z,
-                               block == BlockId::FIRE ? uint8_t{15} : uint8_t{14}});
+                               (block == BlockId::FIRE || isLava(block))
+                                   ? uint8_t{15} : uint8_t{14}});
         }
     }
     if (sources.empty() && !m_lightHasSources) {
@@ -841,6 +1023,12 @@ void World::tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tic
         for (size_t direction = 0; direction < FACE_OFFSETS.size(); ++direction) {
             const glm::ivec3 q = p + FACE_OFFSETS[direction];
             const BlockId block = getBlock(q.x, q.y, q.z);
+            if (block == BlockId::TNT) {
+                setBlock(q.x, q.y, q.z, BlockId::AIR);
+                m_tntIgnitions.push_back(q);
+                hasFuel = true;
+                continue;
+            }
             if (!isFlammable(block)) continue;
             hasFuel = true;
             const uint64_t roll = positionRandom(q, direction + age * 17ULL);
@@ -885,7 +1073,7 @@ bool World::hasWaterForFarmland(const glm::ivec3& position, bool raining) const 
     for (int y = position.y; y <= position.y + 1; ++y)
         for (int x = position.x - 4; x <= position.x + 4; ++x)
             for (int z = position.z - 4; z <= position.z + 4; ++z)
-                if (getBlock(x, y, z) == BlockId::WATER) return true;
+                if (isWater(getBlock(x, y, z))) return true;
     return false;
 }
 

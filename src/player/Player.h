@@ -78,6 +78,7 @@ public:
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
     bool underwater() const { return m_airTicks < 300; }
     bool onGround() const { return m_onGround; }
+    void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
 
     // ── Selected block for placement ───────────────────────────────────
     void setSelectedBlock(BlockId id) { m_selectedBlock = id; }

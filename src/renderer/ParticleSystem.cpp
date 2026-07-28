@@ -131,6 +131,31 @@ void ParticleSystem::emitBlockBreak(const glm::ivec3& position, BlockId block) {
     }
 }
 
+void ParticleSystem::emitExplosion(const glm::dvec3& position) {
+    const float texture = static_cast<float>(
+        getAtlasTextureIndex(BlockTexture::Tnt));
+    for (int i = 0; i < 80 && m_particles.size() < MAX_PARTICLES; ++i) {
+        Particle particle;
+        particle.kind = ParticleKind::BlockDebris;
+        particle.position = position + glm::dvec3(
+            (randomFloat() - .5f) * .8f, randomFloat() * .8f,
+            (randomFloat() - .5f) * .8f);
+        glm::vec3 direction(randomFloat() * 2.0f - 1.0f,
+                            randomFloat() * 1.4f - .2f,
+                            randomFloat() * 2.0f - 1.0f);
+        if (glm::length(direction) < .01f) direction = {0,1,0};
+        direction = glm::normalize(direction);
+        particle.velocity = direction * (3.0f + randomFloat() * 8.0f);
+        particle.lifetime = .55f + randomFloat() * .9f;
+        particle.phase = randomFloat();
+        particle.texture = texture;
+        particle.size = .14f + randomFloat() * .22f;
+        particle.rotation = randomFloat() * 6.2831853f;
+        particle.angularVelocity = (randomFloat() - .5f) * 14.0f;
+        m_particles.push_back(particle);
+    }
+}
+
 void ParticleSystem::appendLightning(const glm::dvec3& position) {
     for (int segment = 0; segment < 16 && m_particles.size() < MAX_PARTICLES;
          ++segment) {

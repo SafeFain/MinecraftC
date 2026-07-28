@@ -41,7 +41,7 @@ int main() {
     require(creativeItems.size() == static_cast<size_t>(ItemId::COUNT) - 1,
             "creative inventory does not expose every registered item");
     require(creativeItems.front() == ItemId::GRASS_BLOCK &&
-            creativeItems.back() == ItemId::ACACIA_SAPLING,
+            creativeItems.back() == ItemId::GUNPOWDER,
             "creative inventory ordering does not follow stable item ids");
 
     InventoryModel inventory;

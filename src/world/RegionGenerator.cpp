@@ -420,8 +420,13 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 chunk.getBlock(x, decoCol.height + 1, z) == BlockId::AIR) {
                 BlockId decoration = SurfaceRules::decoration(
                     m_seed, wx, wz, decoCol.height, decoCol.biome, decoCol.isRiver);
-                if (decoration != BlockId::AIR)
+                if (decoration != BlockId::AIR) {
                     chunk.setBlock(x, decoCol.height + 1, z, decoration);
+                    if (decoration == BlockId::SUNFLOWER_BOTTOM &&
+                        decoCol.height + 2 < Config::WORLD_MAX_Y)
+                        chunk.setBlock(x, decoCol.height + 2, z,
+                                       BlockId::SUNFLOWER_TOP);
+                }
             }
         }
     }

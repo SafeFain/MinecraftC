@@ -135,7 +135,19 @@ enum class ItemId : uint16_t {
     JUNGLE_SAPLING,
     ACACIA_SAPLING,
 
-    COUNT
+    GLASS,
+    TNT,
+    OBSIDIAN,
+    DANDELION,
+    BLUE_ORCHID,
+    ALLIUM,
+    OXEYE_DAISY,
+    SUNFLOWER,
+    FLINT_AND_STEEL,
+    GUNPOWDER,
+
+    COUNT,
+    POPPY = FLOWER
 };
 
 enum class ItemKind : uint8_t {

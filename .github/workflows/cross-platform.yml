@@ -12,7 +12,7 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - name: Install OpenGL and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
@@ -23,6 +23,11 @@ jobs:
         run: ctest --test-dir build-ci --output-on-failure
       - name: Install
         run: cmake --install build-ci --prefix "$RUNNER_TEMP/minecraftc-stage"
+      - name: Verify installed assets
+        run: |
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/atlas.json"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/items_atlas.png"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/cloud.png"
       - name: Verify installed OpenGL startup
         shell: bash
         run: |
@@ -48,7 +53,7 @@ jobs:
   windows:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - name: Configure
         run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
@@ -61,6 +66,9 @@ jobs:
           cmake --install build-ci --config Release --prefix "$env:RUNNER_TEMP/minecraftc-stage"
           if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/bin/minecraftc.exe")) { throw "Executable was not installed" }
           if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/shaders/block.vert")) { throw "Assets were not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/items_atlas.png")) { throw "Item atlas was not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/cloud.png")) { throw "Cloud material was not installed" }
       - name: Package Windows release
         shell: pwsh
         run: Compress-Archive -Path "$env:RUNNER_TEMP/minecraftc-stage/*" -DestinationPath "$env:RUNNER_TEMP/minecraftc-windows-x86_64.zip"
@@ -76,7 +84,7 @@ jobs:
   macos-universal:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - name: Configure universal build
         run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_INSTALL_MESSAGE=NEVER '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
       - name: Build
@@ -88,6 +96,9 @@ jobs:
           cmake --install build-ci --prefix "$RUNNER_TEMP/minecraftc-stage"
           lipo "$RUNNER_TEMP/minecraftc-stage/bin/minecraftc" -verify_arch arm64 x86_64
           test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/shaders/block.vert"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/atlas.json"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/items_atlas.png"
+          test -f "$RUNNER_TEMP/minecraftc-stage/share/minecraftc/assets/textures/generated/cloud.png"
       - name: Package macOS release
         run: tar -C "$RUNNER_TEMP/minecraftc-stage" -czf "$RUNNER_TEMP/minecraftc-macos-universal.tar.gz" .
       - name: Upload macOS package

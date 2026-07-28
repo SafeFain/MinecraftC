@@ -132,4 +132,18 @@ const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
         0.005f, TreeType::CACTUS, TreeType::NONE,
         63, 999
     },
+    // FLOWER_FOREST
+    {
+        BlockId::GRASS, BlockId::DIRT,
+        1.0f, 3.0f,
+        0.13f, TreeType::OAK, TreeType::BIRCH,
+        63, 999
+    },
+    // SUNFLOWER_PLAINS
+    {
+        BlockId::GRASS, BlockId::DIRT,
+        1.0f, 2.0f,
+        0.015f, TreeType::OAK, TreeType::NONE,
+        63, 999
+    },
 };

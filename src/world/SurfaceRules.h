@@ -53,6 +53,7 @@ public:
                 result.depth = 5;
                 break;
             case Biome::FOREST:
+            case Biome::FLOWER_FOREST:
             case Biome::BIRCH_FOREST:
             case Biome::TAIGA:
                 if (h % 5 == 0) result.top = BlockId::PODZOL;
@@ -83,6 +84,8 @@ public:
         int density = 0;
         switch (biome) {
             case Biome::MEADOW:       density = 45; break;
+            case Biome::FLOWER_FOREST:density = 29; break;
+            case Biome::SUNFLOWER_PLAINS: density = 22; break;
             case Biome::PLAINS:       density = 18; break;
             case Biome::FOREST:
             case Biome::BIRCH_FOREST: density = 14; break;
@@ -92,7 +95,20 @@ public:
             default:                  density = 0; break;
         }
         if (static_cast<int>(h % 100) >= density) return BlockId::AIR;
-        return (biome == Biome::MEADOW && (h >> 8) % 3 == 0)
-            ? BlockId::FLOWER : BlockId::TALL_GRASS;
+        const uint64_t choice = (h >> 8) % 12;
+        if (biome == Biome::SUNFLOWER_PLAINS && choice < 7)
+            return BlockId::SUNFLOWER_BOTTOM;
+        if (biome == Biome::FLOWER_FOREST || biome == Biome::MEADOW ||
+            biome == Biome::SUNFLOWER_PLAINS) {
+            switch (choice % 6) {
+                case 0: return BlockId::FLOWER;
+                case 1: return BlockId::DANDELION;
+                case 2: return BlockId::BLUE_ORCHID;
+                case 3: return BlockId::ALLIUM;
+                case 4: return BlockId::OXEYE_DAISY;
+                default: return BlockId::TALL_GRASS;
+            }
+        }
+        return BlockId::TALL_GRASS;
     }
 };

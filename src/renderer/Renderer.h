@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -58,6 +59,9 @@ public:
                          const glm::mat4& viewProjection,
                          const glm::vec3& cameraRight,
                          const glm::vec3& cameraUp, float intensity);
+    void renderClouds(const glm::dvec3& playerPosition,
+                      const glm::mat4& viewProjection, uint64_t worldSeed,
+                      float timeSeconds, int renderDistanceBlocks);
 
     // VAO creation helpers
     static GLuint createVAO(const std::vector<float>& vertices,

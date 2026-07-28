@@ -23,6 +23,8 @@ enum class Biome : uint8_t {
     MEADOW,
     BIRCH_FOREST,
     BADLANDS,
+    FLOWER_FOREST,
+    SUNFLOWER_PLAINS,
     COUNT
 };
 

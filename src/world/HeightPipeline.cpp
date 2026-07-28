@@ -213,8 +213,13 @@ Biome HeightPipeline::selectBiome(const ClimateSample& c, int height,
         return Biome::TAIGA;
     if (height <= Config::SEA_LEVEL + 2 && c.humidity > 0.35f)
         return Biome::SWAMP;
-    if (c.humidity > 0.32f)
+    if (c.humidity > 0.32f) {
+        if (c.weirdness < -0.28f) return Biome::FLOWER_FOREST;
         return c.weirdness > 0.18f ? Biome::BIRCH_FOREST : Biome::FOREST;
+    }
+    if (c.temperature > -0.15f && c.temperature < 0.38f &&
+        c.humidity > -0.24f && c.weirdness > 0.26f)
+        return Biome::SUNFLOWER_PLAINS;
     return Biome::PLAINS;
 }
 

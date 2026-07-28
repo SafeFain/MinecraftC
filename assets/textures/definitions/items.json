@@ -13,7 +13,7 @@
     "gravel": {"texture": "gravel"}, "clay": {"texture": "clay"},
     "red_sand": {"texture": "red_sand"}, "terracotta": {"texture": "terracotta"},
     "podzol": {"texture": "podzol_top"}, "moss": {"texture": "moss"},
-    "tall_grass": {"texture": "tall_grass"}, "flower": {"texture": "flower"},
+    "tall_grass": {"texture": "tall_grass"}, "poppy": {"texture": "flower"},
     "reeds": {"texture": "reeds"}, "birch_log": {"texture": "birch_log"},
     "birch_leaves": {"texture": "birch_leaves"}, "spruce_log": {"texture": "spruce_log"},
     "spruce_leaves": {"texture": "spruce_leaves"}, "jungle_log": {"texture": "jungle_log"},
@@ -25,6 +25,10 @@
     "farmland": {"texture": "farmland"}, "oak_sapling": {"texture": "oak_sapling"},
     "birch_sapling": {"texture": "birch_sapling"}, "spruce_sapling": {"texture": "spruce_sapling"},
     "jungle_sapling": {"texture": "jungle_sapling"}, "acacia_sapling": {"texture": "acacia_sapling"},
+    "glass": {"texture": "glass"}, "tnt": {"texture": "tnt"},
+    "obsidian": {"texture": "obsidian"}, "dandelion": {"texture": "dandelion"},
+    "blue_orchid": {"texture": "blue_orchid"}, "allium": {"texture": "allium"},
+    "oxeye_daisy": {"texture": "oxeye_daisy"}, "sunflower": {"texture": "sunflower_bottom"},
     "copper_ore": {"texture": "copper_ore", "future": true}
   }
 }

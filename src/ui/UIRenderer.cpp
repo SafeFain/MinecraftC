@@ -1,5 +1,6 @@
 #include "ui/UIRenderer.h"
 #include "renderer/Shader.h"
+#include "renderer/BlockTextureAtlas.h"
 #include "debug/OpenGL.h"
 #include "game/SurvivalRules.h"
 
@@ -168,12 +169,13 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
         iconFace = FaceDir::FRONT;
     }
     const int tile = static_cast<int>(getFaceTextureIndex(block, iconFace));
-    constexpr float atlasTiles = 8.0f;
-    constexpr float inset = 0.5f / (16.0f * atlasTiles);
-    float u0 = static_cast<float>(tile % 8) / atlasTiles + inset;
-    float v0 = static_cast<float>(tile / 8) / atlasTiles + inset;
-    float u1 = static_cast<float>(tile % 8 + 1) / atlasTiles - inset;
-    float v1 = static_cast<float>(tile / 8 + 1) / atlasTiles - inset;
+    const int atlasSide = BlockTextureAtlas::tilesPerSide();
+    const float atlasTiles = static_cast<float>(atlasSide);
+    const float inset = 0.5f / (16.0f * atlasTiles);
+    float u0 = static_cast<float>(tile % atlasSide) / atlasTiles + inset;
+    float v0 = static_cast<float>(tile / atlasSide) / atlasTiles + inset;
+    float u1 = static_cast<float>(tile % atlasSide + 1) / atlasTiles - inset;
+    float v1 = static_cast<float>(tile / atlasSide + 1) / atlasTiles - inset;
 
     float verts[] = {
         x,   y,   u0, v0,

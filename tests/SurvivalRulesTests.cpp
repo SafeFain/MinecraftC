@@ -84,6 +84,23 @@ int main() {
 
     require(findSmeltingRecipe(ItemId::RAW_IRON)->output.id == ItemId::IRON_INGOT,
             "raw iron smelts to an ingot");
+    require(findSmeltingRecipe(ItemId::SAND)->output.id == ItemId::GLASS,
+            "sand smelts into generated glass");
+    grid.fill(ItemId::EMPTY);
+    for (size_t i = 0; i < grid.size(); ++i)
+        grid[i] = (i % 2 == 0) ? ItemId::GUNPOWDER : ItemId::SAND;
+    const auto* tnt = findCraftingRecipe(grid, 3, 3);
+    require(tnt && tnt->output.id == ItemId::TNT,
+            "alternating gunpowder and sand crafts TNT");
+    grid.fill(ItemId::EMPTY);
+    grid[0] = ItemId::FLINT;
+    grid[1] = ItemId::IRON_INGOT;
+    const auto* igniter = findCraftingRecipe(grid, 2, 1);
+    require(igniter && igniter->output.id == ItemId::FLINT_AND_STEEL,
+            "flint and iron craft flint and steel");
+    require(isWater(BlockId::FLOWING_WATER_7) && fluidLevel(BlockId::WATER) == 0 &&
+            fluidLevel(BlockId::FLOWING_LAVA_4) == 4,
+            "serialized fluid states retain material and level semantics");
     require(fuelTicks(ItemId::COAL) == 1600, "coal smelts eight items");
     require(fuelTicks(ItemId::DIAMOND) == 0, "non-fuels are rejected");
 

@@ -675,6 +675,14 @@ private:
                     m_player, dt, m_dayNightCycle.isDay(), peaceful,
                     m_player.isSurvival(), !m_player.isSpectator(),
                     m_weather.thundering(), m_weather.raining());
+                for (const glm::dvec3& explosion : m_entities.takeExplosionEvents()) {
+                    m_particles.emitExplosion(explosion);
+                    const glm::dvec3 delta = explosion - m_player.getPosition();
+                    const float distance = static_cast<float>(glm::length(delta));
+                    m_audio.playExplosion(
+                        std::clamp(static_cast<float>(delta.x) / 24.0f, -1.0f, 1.0f),
+                        std::clamp(1.0f - distance / 96.0f, .16f, 1.0f));
+                }
                 if (m_player.isSurvival() && !m_playerDead &&
                     m_player.survivalStats().dead()) beginPlayerDeath();
                 m_survivalWorldTickRemainder += dt * 20.0f;
@@ -684,6 +692,7 @@ private:
                     m_weather.tick();
                     tickLightning();
                     m_world.tickBlockEntities();
+                    m_world.tickFluids(m_survivalTicks);
                     if ((m_survivalTicks % 20) == 0) {
                         m_world.tickSurvival(
                             m_player.getPosition(), m_survivalTicks,
@@ -691,6 +700,8 @@ private:
                         m_world.tickWeather(
                             m_weather, m_dayNightCycle.isDay(), m_survivalTicks);
                     }
+                    for (const glm::ivec3& position : m_world.takeTntIgnitions())
+                        m_entities.primeTnt(position, 4.0f, false);
                 }
                 for (auto& lightning : m_lightningEvents)
                     lightning.seconds -= dt;
@@ -775,6 +786,14 @@ private:
                 m_renderer.setViewProjection(vp);
                 m_renderer.setFrustum(frustum);
 
+                const glm::dvec3 playerPosition = m_player.getPosition();
+                const glm::dvec3 renderOrigin(
+                    playerPosition.x, 0.0, playerPosition.z);
+                m_renderer.renderClouds(
+                    playerPosition, vp, m_worldMetadata.seed,
+                    static_cast<float>(glfwGetTime()),
+                    m_clientSettings.cloudRenderDistance);
+
                 // Bind block shader once for all chunks (saves ~N glUseProgram calls)
                 m_renderer.bindBlockShader();
 
@@ -785,9 +804,6 @@ private:
                 };
                 std::vector<VisibleChunk> visibleChunks;
                 int rendered = 0;
-                const glm::dvec3 playerPosition = m_player.getPosition();
-                const glm::dvec3 renderOrigin(
-                    playerPosition.x, 0.0, playerPosition.z);
                 for (const auto* chunk : m_world.getActiveChunks()) {
                     const ChunkMesh& mesh = chunk->getMesh();
                     if (!mesh.gpuReady || mesh.indexCount == 0) continue;

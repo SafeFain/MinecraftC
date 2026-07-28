@@ -367,6 +367,99 @@ struct ChunkMesh {
             }
         }
 
+        // Fluid cells use independent quads because their level-dependent top
+        // surfaces cannot participate in cube greedy merging.
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                    const BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
+                    if (!isFluid(id)) continue;
+                    const bool lava = isLava(id);
+                    auto same = [&](int wx, int wy, int wz) {
+                        const BlockId other = getNeighbor(wx, wy, wz);
+                        return lava ? isLava(other) : isWater(other);
+                    };
+                    auto cornerHeight = [&](int cornerX, int cornerZ) {
+                        float sum = 0.0f;
+                        int count = 0;
+                        for (int dz = -1; dz <= 0; ++dz) {
+                            for (int dx = -1; dx <= 0; ++dx) {
+                                const int wx = chunkWorldX + cornerX + dx;
+                                const int wz = chunkWorldZ + cornerZ + dz;
+                                const BlockId sample = getNeighbor(wx, y, wz);
+                                if ((lava && isLava(sample)) || (!lava && isWater(sample))) {
+                                    if (same(wx, y + 1, wz)) return 1.0f;
+                                    sum += fluidSurfaceHeight(sample);
+                                    ++count;
+                                }
+                            }
+                        }
+                        return count ? sum / static_cast<float>(count)
+                                     : fluidSurfaceHeight(id);
+                    };
+                    const float h00 = cornerHeight(x, z);
+                    const float h10 = cornerHeight(x + 1, z);
+                    const float h01 = cornerHeight(x, z + 1);
+                    const float h11 = cornerHeight(x + 1, z + 1);
+                    const float tile = static_cast<float>(getFaceTextureIndex(id, FaceDir::TOP));
+                    const float alpha = getBlockProps(id).alpha;
+                    const float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
+                    const float light = lava ? 1.0f : blockLight(x, y, z);
+                    auto emit = [&](FaceDir face, const glm::vec3 (&positions)[4]) {
+                        const unsigned int base = static_cast<unsigned int>(vertices.size());
+                        const glm::vec2 uv[4] = {{1,1},{1,0},{0,0},{0,1}};
+                        for (int i = 0; i < 4; ++i) {
+                            vertices.push_back({positions[i].x, positions[i].y,
+                                positions[i].z, 1.0f, sky, light, alpha,
+                                uv[i].x, uv[i].y, tile, static_cast<float>(face)});
+                        }
+                        for (unsigned int index : {0u,1u,2u,0u,2u,3u})
+                            translucentIndices.push_back(base + index);
+                    };
+                    const float x0 = static_cast<float>(x), x1 = x0 + 1.0f;
+                    const float z0 = static_cast<float>(z), z1 = z0 + 1.0f;
+                    const float y0 = static_cast<float>(y);
+                    if (!same(chunkWorldX + x, y + 1, chunkWorldZ + z)) {
+                        const glm::vec3 p[4] = {{x1,y0+h11,z1},{x1,y0+h10,z0},
+                                                {x0,y0+h00,z0},{x0,y0+h01,z1}};
+                        emit(FaceDir::TOP, p);
+                    }
+                    auto visibleSide = [&](int wx, int wy, int wz) {
+                        const BlockId neighbor = getNeighbor(wx, wy, wz);
+                        if ((lava && isLava(neighbor)) || (!lava && isWater(neighbor)))
+                            return false;
+                        return !isSolid(neighbor);
+                    };
+                    if (visibleSide(chunkWorldX+x, y, chunkWorldZ+z-1)) {
+                        const glm::vec3 p[4] = {{x1,y0+h10,z0},{x1,y0,z0},
+                                                {x0,y0,z0},{x0,y0+h00,z0}};
+                        emit(FaceDir::FRONT, p);
+                    }
+                    if (visibleSide(chunkWorldX+x, y, chunkWorldZ+z+1)) {
+                        const glm::vec3 p[4] = {{x0,y0+h01,z1},{x0,y0,z1},
+                                                {x1,y0,z1},{x1,y0+h11,z1}};
+                        emit(FaceDir::BACK, p);
+                    }
+                    if (visibleSide(chunkWorldX+x+1, y, chunkWorldZ+z)) {
+                        const glm::vec3 p[4] = {{x1,y0+h11,z1},{x1,y0,z1},
+                                                {x1,y0,z0},{x1,y0+h10,z0}};
+                        emit(FaceDir::RIGHT, p);
+                    }
+                    if (visibleSide(chunkWorldX+x-1, y, chunkWorldZ+z)) {
+                        const glm::vec3 p[4] = {{x0,y0+h00,z0},{x0,y0,z0},
+                                                {x0,y0,z1},{x0,y0+h01,z1}};
+                        emit(FaceDir::LEFT, p);
+                    }
+                    const BlockId below = getNeighbor(chunkWorldX+x, y-1, chunkWorldZ+z);
+                    if (!isSolid(below) && !same(chunkWorldX+x, y-1, chunkWorldZ+z)) {
+                        const glm::vec3 p[4] = {{x0,y0,z1},{x0,y0,z0},
+                                                {x1,y0,z0},{x1,y0,z1}};
+                        emit(FaceDir::BOTTOM, p);
+                    }
+                }
+            }
+        }
+
         // Cross-shaped plants are never greedy-merged. Each diagonal plane is
         // emitted double-sided so the normal culling state can stay enabled.
         auto emitCrossPlane = [&](float x0, float z0, float x1, float z1,

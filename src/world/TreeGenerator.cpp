@@ -34,6 +34,7 @@ float TreeGenerator::radiusFor(Biome biome) {
     switch (biome) {
         case Biome::JUNGLE:       return 3.0f;
         case Biome::FOREST:
+        case Biome::FLOWER_FOREST:
         case Biome::BIRCH_FOREST:
         case Biome::TAIGA:        return 4.0f;
         case Biome::SWAMP:        return 4.5f;
@@ -47,12 +48,14 @@ float TreeGenerator::chanceFor(Biome biome) {
     switch (biome) {
         case Biome::JUNGLE:       return 0.95f;
         case Biome::FOREST:       return 0.78f;
+        case Biome::FLOWER_FOREST:return 0.66f;
         case Biome::BIRCH_FOREST: return 0.82f;
         case Biome::TAIGA:        return 0.68f;
         case Biome::SWAMP:        return 0.52f;
         case Biome::HILLS:        return 0.24f;
         case Biome::MEADOW:       return 0.12f;
         case Biome::PLAINS:       return 0.10f;
+        case Biome::SUNFLOWER_PLAINS: return 0.06f;
         case Biome::SAVANNA:      return 0.18f;
         case Biome::MOUNTAINS:    return 0.08f;
         case Biome::DESERT:

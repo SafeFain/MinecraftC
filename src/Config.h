@@ -12,7 +12,7 @@ constexpr int   WINDOW_WIDTH    = 1280;
 constexpr int   WINDOW_HEIGHT   = 720;
 constexpr float FOV             = 70.0f;
 constexpr float NEAR_PLANE      = 0.1f;
-constexpr float FAR_PLANE       = 500.0f;
+constexpr float FAR_PLANE       = 640.0f;
 
 // ── World ─────────────────────────────────────────────────────────────
 constexpr int   CHUNK_SIZE_X    = 16;
@@ -22,7 +22,7 @@ constexpr int   WORLD_MAX_Y     = 320; // exclusive
 constexpr int   WORLD_HEIGHT    = WORLD_MAX_Y - WORLD_MIN_Y;
 constexpr int   CHUNK_SIZE_Y    = WORLD_HEIGHT;
 constexpr int   CHUNK_VOLUME    = CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z;
-inline int     RENDER_DISTANCE = 6;    // runtime-mutable (changed via Settings menu)
+inline int     RENDER_DISTANCE = 8;    // runtime-mutable (changed via Settings menu)
 constexpr bool isValidWorldY(int y) { return y >= WORLD_MIN_Y && y < WORLD_MAX_Y; }
 constexpr int worldYToStorageY(int y) { return y - WORLD_MIN_Y; }
 constexpr int storageYToWorldY(int y) { return y + WORLD_MIN_Y; }

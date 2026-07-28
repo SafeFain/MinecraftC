@@ -12,6 +12,8 @@
     "torch", "white_wool", "white_bed", "farmland", "wet_farmland",
     "wheat_young", "wheat_middle", "wheat_mature", "oak_sapling",
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
-    "snow_layer", "fire", "copper_ore"
+    "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
+    "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
+    "sunflower_top", "cloud", "copper_ore"
   ]
 }

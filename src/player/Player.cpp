@@ -376,8 +376,8 @@ bool Player::isInWater() const {
     const int eyeY = static_cast<int>(std::floor(eye.y));
     for (int x = minX; x <= maxX; ++x)
         for (int z = minZ; z <= maxZ; ++z)
-            if (m_world.getBlock(x, feetY, z) == BlockId::WATER ||
-                m_world.getBlock(x, eyeY, z) == BlockId::WATER) return true;
+            if (isWater(m_world.getBlock(x, feetY, z)) ||
+                isWater(m_world.getBlock(x, eyeY, z))) return true;
     return false;
 }
 
@@ -444,7 +444,7 @@ void Player::updateEnvironment(uint32_t ticks) {
     const BlockId feetBlock = m_world.getBlock(feet.x, feet.y, feet.z);
     if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE)
         ignite(4.0f);
-    if (feetBlock == BlockId::WATER || eyeBlock == BlockId::WATER || m_rainExposed) {
+    if (isWater(feetBlock) || isWater(eyeBlock) || m_rainExposed) {
         m_burningSeconds = 0.0f;
         m_burnDamageTicks = 0;
     } else if (m_burningSeconds > 0.0f) {
@@ -455,7 +455,7 @@ void Player::updateEnvironment(uint32_t ticks) {
             m_burnDamageTicks -= 20;
         }
     }
-    if (eyeBlock == BlockId::WATER) {
+    if (isWater(eyeBlock)) {
         m_airTicks -= static_cast<int>(ticks);
         if (m_airTicks <= 0) {
             m_environmentDamageTicks += ticks;
@@ -467,7 +467,7 @@ void Player::updateEnvironment(uint32_t ticks) {
     } else {
         m_airTicks = std::min(300, m_airTicks + static_cast<int>(ticks) * 4);
     }
-    if (feetBlock == BlockId::LAVA || eyeBlock == BlockId::LAVA) {
+    if (isLava(feetBlock) || isLava(eyeBlock)) {
         m_environmentDamageTicks += ticks;
         if (m_environmentDamageTicks >= 10) {
             takeDamage(4.0f);
@@ -500,8 +500,15 @@ void Player::updateHighlight() {
 void Player::breakBlock() {
     auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (hit) {
-        const BlockId block = m_world.getBlock(
+        glm::ivec3 breakPos = hit->blockPos;
+        BlockId block = m_world.getBlock(
             hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+        if (block == BlockId::SUNFLOWER_TOP &&
+            m_world.getBlock(breakPos.x, breakPos.y - 1, breakPos.z) ==
+                BlockId::SUNFLOWER_BOTTOM) {
+            --breakPos.y;
+            block = BlockId::SUNFLOWER_BOTTOM;
+        }
         if (m_gameMode == GameMode::Survival) {
             if (m_entities) {
                 for (const auto& content : m_world.takeBlockEntityContents(hit->blockPos))
@@ -526,8 +533,8 @@ void Player::breakBlock() {
             }
             m_survivalStats.addExhaustion(0.005f);
         }
-        m_world.setBlock(hit->blockPos.x, hit->blockPos.y, hit->blockPos.z, BlockId::AIR);
-        if (m_blockBreakCallback) m_blockBreakCallback(hit->blockPos, block);
+        m_world.setBlock(breakPos.x, breakPos.y, breakPos.z, BlockId::AIR);
+        if (m_blockBreakCallback) m_blockBreakCallback(breakPos, block);
     }
 }
 
@@ -600,6 +607,26 @@ void Player::placeBlock() {
         return;
     }
 
+    const ItemId activeItem = m_gameMode == GameMode::Survival
+        ? m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id
+        : m_selectedCreativeItem;
+    if (activeItem == ItemId::FLINT_AND_STEEL) {
+        bool used = false;
+        if (targetedBlock == BlockId::TNT && m_entities) {
+            m_entities->primeTnt(hit->blockPos);
+            used = true;
+        } else if (m_world.getBlock(placePos.x, placePos.y, placePos.z) == BlockId::AIR &&
+                   (isSolid(targetedBlock) || isFlammable(targetedBlock))) {
+            m_world.setBlock(placePos.x, placePos.y, placePos.z, BlockId::FIRE);
+            used = true;
+        }
+        if (used && m_gameMode == GameMode::Survival) {
+            auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+            if (++stack.damage >= getItemProps(stack.id).maxDurability) stack.clear();
+        }
+        return;
+    }
+
     BlockId placed = m_selectedBlock;
     if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return;
     if (m_gameMode == GameMode::Survival) {
@@ -634,6 +661,20 @@ void Player::placeBlock() {
     }
 
     if (!collidesWithPlayer(placePos)) {
+        if (placed == BlockId::SUNFLOWER_BOTTOM) {
+            const BlockId soil = m_world.getBlock(
+                placePos.x, placePos.y - 1, placePos.z);
+            if (hit->faceNormal.y <= 0 ||
+                (soil != BlockId::GRASS && soil != BlockId::DIRT &&
+                 soil != BlockId::PODZOL) ||
+                placePos.y + 1 >= Config::WORLD_MAX_Y ||
+                m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
+                m_world.getBlock(placePos.x, placePos.y + 1, placePos.z) != BlockId::AIR ||
+                collidesWithPlayer(placePos + glm::ivec3(0, 1, 0)))
+                return;
+            m_world.setBlock(placePos.x, placePos.y + 1, placePos.z,
+                             BlockId::SUNFLOWER_TOP);
+        }
         m_world.setBlock(placePos.x, placePos.y, placePos.z, placed);
         if (m_gameMode == GameMode::Survival) {
             auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));

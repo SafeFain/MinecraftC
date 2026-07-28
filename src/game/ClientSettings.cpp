@@ -27,7 +27,11 @@ void ClientSettings::resetBindings() {
 void ClientSettings::validate() {
     constexpr int distances[] = {2,4,6,8,10,12,16};
     if (std::find(std::begin(distances), std::end(distances), renderDistance) == std::end(distances))
-        renderDistance = 6;
+        renderDistance = 8;
+    constexpr int cloudDistances[] = {64,96,128,192,256,512};
+    if (std::find(std::begin(cloudDistances), std::end(cloudDistances),
+                  cloudRenderDistance) == std::end(cloudDistances))
+        cloudRenderDistance = 192;
     constexpr int cycles[] = {0,10,20,40};
     if (std::find(std::begin(cycles), std::end(cycles), dayCycleMinutes) == std::end(cycles))
         dayCycleMinutes = 20;
@@ -58,6 +62,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         const std::string value = line.substr(equals + 1);
         try {
             if (name == "render_distance") settings.renderDistance = std::stoi(value);
+            else if (name == "cloud_render_distance")
+                settings.cloudRenderDistance = std::stoi(value);
             else if (name == "day_cycle") settings.dayCycleMinutes = std::stoi(value);
             else if (name == "auto_jump") settings.autoJump = std::stoi(value) != 0;
             else if (name == "mouse_sensitivity") settings.mouseSensitivity = std::stof(value);
@@ -88,6 +94,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
     if (!output) return false;
     output << "version=" << FORMAT_VERSION << '\n'
            << "render_distance=" << renderDistance << '\n'
+           << "cloud_render_distance=" << cloudRenderDistance << '\n'
            << "day_cycle=" << dayCycleMinutes << '\n'
            << "auto_jump=" << autoJump << '\n'
            << "mouse_sensitivity=" << mouseSensitivity << '\n'

@@ -14,10 +14,12 @@ int main(){
     std::filesystem::remove_all(root);
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
+    settings.renderDistance=8;settings.cloudRenderDistance=512;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
     require(settings.save(root/"options.txt"),"settings save succeeds");
     const auto loaded=ClientSettings::load(root/"options.txt");
-    require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&loaded.invertMouseY,
+    require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&loaded.invertMouseY&&
+            loaded.renderDistance==8&&loaded.cloudRenderDistance==512,
             "client settings round trip");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");

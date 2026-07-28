@@ -18,7 +18,6 @@
 
 namespace {
 constexpr int TILE_SIZE = 16;
-constexpr int ATLAS_TILES = 8;
 using Tile = std::array<uint8_t, TILE_SIZE * TILE_SIZE * 4>;
 
 uint32_t pixelHash(int x, int y, uint32_t salt) {
@@ -193,6 +192,13 @@ Tile logTop() {
 }
 }
 
+int BlockTextureAtlas::tilesPerSide() {
+    int side = 1;
+    const int count = static_cast<int>(BlockTexture::Count);
+    while (side * side < count) ++side;
+    return side;
+}
+
 BlockTextureAtlas::~BlockTextureAtlas() {
     if (m_texture) GL_CHECK(glDeleteTextures(1, &m_texture));
 }
@@ -293,6 +299,16 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
     tiles[static_cast<size_t>(BlockTexture::SnowLayer)] =
         tiles[static_cast<size_t>(BlockTexture::Snow)];
     tiles[static_cast<size_t>(BlockTexture::Fire)] = fireTile();
+    tiles[static_cast<size_t>(BlockTexture::Glass)] = material(184, 214, 225, 8, 93);
+    tiles[static_cast<size_t>(BlockTexture::Tnt)] = material(184, 45, 36, 16, 94);
+    tiles[static_cast<size_t>(BlockTexture::Obsidian)] = material(39, 27, 55, 12, 95);
+    tiles[static_cast<size_t>(BlockTexture::Dandelion)] = plant(225, 184, 34, true);
+    tiles[static_cast<size_t>(BlockTexture::BlueOrchid)] = plant(58, 151, 196, true);
+    tiles[static_cast<size_t>(BlockTexture::Allium)] = plant(151, 86, 180, true);
+    tiles[static_cast<size_t>(BlockTexture::OxeyeDaisy)] = plant(221, 220, 195, true);
+    tiles[static_cast<size_t>(BlockTexture::SunflowerBottom)] = plant(82, 133, 46, false);
+    tiles[static_cast<size_t>(BlockTexture::SunflowerTop)] = plant(224, 169, 28, true);
+    tiles[static_cast<size_t>(BlockTexture::Cloud)] = material(220, 225, 229, 7, 96);
 
     for (size_t i = 0; i < tiles.size(); ++i) {
         const auto texture = static_cast<BlockTexture>(i);
@@ -313,12 +329,13 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
 
     int tileSize = TILE_SIZE;
     for (int level = 0; level <= 4; ++level) {
-        const int atlasSize = tileSize * ATLAS_TILES;
+        const int atlasTiles = tilesPerSide();
+        const int atlasSize = tileSize * atlasTiles;
         std::vector<uint8_t> atlas(
             static_cast<size_t>(atlasSize * atlasSize * 4), 0);
         for (size_t tileIndex = 0; tileIndex < levelTiles.size(); ++tileIndex) {
-            const int tileX = static_cast<int>(tileIndex % ATLAS_TILES);
-            const int tileY = static_cast<int>(tileIndex / ATLAS_TILES);
+            const int tileX = static_cast<int>(tileIndex % atlasTiles);
+            const int tileY = static_cast<int>(tileIndex / atlasTiles);
             for (int y = 0; y < tileSize; ++y) {
                 for (int x = 0; x < tileSize; ++x) {
                     const size_t src = static_cast<size_t>(y * tileSize + x) * 4;

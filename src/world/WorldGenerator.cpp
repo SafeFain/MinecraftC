@@ -143,8 +143,13 @@ void WorldGenerator::generate(Chunk& chunk,
                 chunk.getBlock(x, heightMap[x][z] + 1, z) == BlockId::AIR) {
                 BlockId decoration = SurfaceRules::decoration(
                     m_seed, wx, wz, heightMap[x][z], biomeMap[x][z], riverMap[x][z]);
-                if (decoration != BlockId::AIR)
+                if (decoration != BlockId::AIR) {
                     chunk.setBlock(x, heightMap[x][z] + 1, z, decoration);
+                    if (decoration == BlockId::SUNFLOWER_BOTTOM &&
+                        heightMap[x][z] + 2 < Config::WORLD_MAX_Y)
+                        chunk.setBlock(x, heightMap[x][z] + 2, z,
+                                       BlockId::SUNFLOWER_TOP);
+                }
             }
         }
     }

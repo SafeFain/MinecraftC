@@ -59,7 +59,9 @@ NAMES = [
     "torch", "white_wool", "white_bed", "farmland", "wet_farmland",
     "wheat_young", "wheat_middle", "wheat_mature", "oak_sapling",
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
-    "snow_layer", "fire", "copper_ore",
+    "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
+    "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
+    "sunflower_top", "cloud", "copper_ore",
 ]
 
 PALETTES = {
@@ -93,10 +95,17 @@ EXTRA_BASES = {
     "oak_sapling":(58,120,50), "birch_sapling":(79,133,61), "spruce_sapling":(45,88,63),
     "jungle_sapling":(48,127,47), "acacia_sapling":(82,119,54),
     "snow_layer":(218,226,231), "fire":(221,91,24),
+    "glass":(180,214,224), "tnt":(184,45,36), "obsidian":(39,27,55),
+    "dandelion":(225,184,34), "blue_orchid":(58,151,196),
+    "allium":(151,86,180), "oxeye_daisy":(221,220,195),
+    "sunflower_bottom":(82,133,46), "sunflower_top":(224,169,28),
+    "cloud":(220,225,229),
 }
 TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle",
                "wheat_mature","oak_sapling","birch_sapling","spruce_sapling",
-               "jungle_sapling","acacia_sapling","fire"}
+               "jungle_sapling","acacia_sapling","fire","glass","dandelion",
+               "blue_orchid","allium","oxeye_daisy","sunflower_bottom",
+               "sunflower_top"}
 
 def muted_palette(base, transparent=False):
     colors = [tuple(max(1, min(245, c+d)) for c in base)+(255,)
@@ -113,7 +122,8 @@ for _name, _ore in {"gold_ore":((125,91,31),(191,143,43),(235,190,67)),
 
 HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_ore","fire"}
 NATURAL = {"dirt","grass_top","stone","sand","bedrock","deepslate","gravel","clay",
-           "red_sand","terracotta","podzol_top","moss","snow","snow_layer","cobblestone"}
+           "red_sand","terracotta","podzol_top","moss","snow","snow_layer","cobblestone",
+           "cloud"}
 DIRECTIONAL = {"oak_planks","oak_log","birch_log","spruce_log","jungle_log","acacia_log",
                "farmland","wet_farmland","cactus_side","reeds"}
 LEAF_NAMES = {"leaves","birch_leaves","spruce_leaves","jungle_leaves","acacia_leaves"}
@@ -378,7 +388,8 @@ def generate_generic(name,seed):
     return field
 
 PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","wheat_mature",
-        "oak_sapling","birch_sapling","spruce_sapling","jungle_sapling","acacia_sapling"}
+        "oak_sapling","birch_sapling","spruce_sapling","jungle_sapling","acacia_sapling",
+        "dandelion","blue_orchid","allium","oxeye_daisy","sunflower_bottom","sunflower_top"}
 
 def generate_special(name,seed,indices):
     if name=="grass_side":
@@ -394,8 +405,13 @@ def generate_special(name,seed,indices):
             indices[y*SIZE+x]=2+y%5
             if y in (4,7,10,13):
                 for dx in (-2,-1,1,2): indices[y*SIZE+wrap(x+dx)]=1+(y+dx)%6
-        if name=="flower":
-            for dx,dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)): indices[wrap(13+dy)*SIZE+wrap(center+dx)]=6
+        if name in {"flower","dandelion","blue_orchid","allium","oxeye_daisy","sunflower_top"}:
+            flower_y=12 if name=="sunflower_top" else 13
+            for dx,dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)):
+                indices[wrap(flower_y+dy)*SIZE+wrap(center+dx)]=6
+        if name=="sunflower_bottom":
+            for y in range(15):
+                for dx in (-1,0,1): indices[y*SIZE+wrap(center+dx)]=2+(y+dx)%4
     elif name=="fire":
         indices=[0]*256
         for y in range(15):
@@ -416,6 +432,20 @@ def generate_special(name,seed,indices):
                 border=(x in (1,14) and 1<=y<=14) or (y in (1,14) and 1<=x<=14)
                 panel=x in (5,10) and 4<=y<=11
                 indices.append(0 if border else 1 if panel else 2+sample(seed,name,x//2,y//2)%4)
+    elif name=="glass":
+        indices=[]
+        for y in range(SIZE):
+            for x in range(SIZE):
+                border=x in (0,15) or y in (0,15)
+                glint=(x-y) in (-1,0,1) and 3<=x<=7
+                indices.append(3+(x+y)%3 if border else 2 if glint else 0)
+    elif name=="tnt":
+        indices=[]
+        for y in range(SIZE):
+            for x in range(SIZE):
+                band=6<=y<=9
+                fuse=(x in (7,8) and y<3)
+                indices.append(5 if fuse else 1 if band else 2+(x+y)%4)
     return indices
 
 def resolve_seed(seed,name,local_seeds=None):
@@ -603,6 +633,14 @@ def generate_item_sprite(template,material,definitions):
     elif template=="flint":
         for x,y in ((8,3),(7,4),(8,4),(6,5),(7,5),(8,5),(5,6),(6,6),(7,6),(5,7),(6,7),(5,8),(4,9)):
             _put(image,x,y,shades[3] if x+y<12 else shades[1])
+    elif template=="flint_and_steel":
+        _line(image,4,12,10,5,outline,4); _line(image,4,12,10,5,shades[1],2)
+        _line(image,9,5,13,8,shades[3],2); _line(image,13,8,10,11,shades[2],2)
+        _put(image,5,11,handle[2]); _put(image,6,10,handle[3])
+    elif template=="gunpowder":
+        for x,y in ((5,6),(7,5),(9,6),(6,8),(8,8),(10,9),(5,10),(8,11)):
+            _put(image,x,y,shades[1+(x+y)%3])
+            if (x+y)%2: _put(image,x+1,y,shades[2])
     return image
 
 def generate_block_item_icon(top_pixels,side_pixels):

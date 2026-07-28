@@ -16,6 +16,10 @@ SettingsMenu::SettingsMenu(ClientSettings& settings,
 std::string SettingsMenu::labelForRenderDist() const {
     return "Render Distance: " + std::to_string(m_settings.renderDistance);
 }
+std::string SettingsMenu::labelForCloudRenderDist() const {
+    return "Cloud Distance: " + std::to_string(m_settings.cloudRenderDistance) +
+           " Blocks";
+}
 std::string SettingsMenu::labelForDayCycle() const {
     return m_settings.dayCycleMinutes == 0 ? "Day Cycle: Static Day" :
         "Day Cycle: " + std::to_string(m_settings.dayCycleMinutes) + " Minutes";
@@ -29,6 +33,14 @@ void SettingsMenu::cycleRenderDistance() {
     auto it = std::find(std::begin(options), std::end(options), m_settings.renderDistance);
     m_settings.renderDistance = options[(it == std::end(options) ? 0 :
         (static_cast<int>(it - std::begin(options)) + 1) % 7)];
+    m_onChanged(); refreshButtons();
+}
+void SettingsMenu::cycleCloudRenderDistance() {
+    constexpr int options[] = {64,96,128,192,256,512};
+    auto it = std::find(std::begin(options), std::end(options),
+                        m_settings.cloudRenderDistance);
+    m_settings.cloudRenderDistance = options[(it == std::end(options) ? 0 :
+        (static_cast<int>(it - std::begin(options)) + 1) % 6)];
     m_onChanged(); refreshButtons();
 }
 void SettingsMenu::cycleDayCycle() {
@@ -46,6 +58,8 @@ void SettingsMenu::refreshButtons() {
     m_buttons.clear();
     if (!m_controls) {
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
+        m_buttons.emplace_back(labelForCloudRenderDist(),
+                               [this]{ cycleCloudRenderDistance(); });
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
         std::ostringstream sensitivity;

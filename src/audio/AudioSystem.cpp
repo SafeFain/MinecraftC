@@ -16,11 +16,16 @@ struct AudioSystem::Impl {
     std::atomic<float> thunderPan{0.0f};
     std::atomic<float> thunderVolume{0.0f};
     std::atomic<unsigned> thunderTriggers{0};
+    std::atomic<float> explosionPan{0.0f};
+    std::atomic<float> explosionVolume{0.0f};
+    std::atomic<unsigned> explosionTriggers{0};
     float rainVolume = 0.0f;
     float rainLowPass = 0.0f;
     float thunderEnvelope = 0.0f;
     float thunderFilter = 0.0f;
     float thunderPhase = 0.0f;
+    float explosionEnvelope = 0.0f;
+    float explosionFilter = 0.0f;
     uint32_t noiseState = 0x91e10da5u;
 
     float noise() {
@@ -34,9 +39,14 @@ struct AudioSystem::Impl {
         auto* samples = static_cast<float*>(output);
         if (self->thunderTriggers.exchange(0) > 0)
             self->thunderEnvelope = self->thunderVolume.load();
+        if (self->explosionTriggers.exchange(0) > 0)
+            self->explosionEnvelope = self->explosionVolume.load();
         const float pan = std::clamp(self->thunderPan.load(), -1.0f, 1.0f);
         const float leftPan = std::sqrt(0.5f * (1.0f - pan));
         const float rightPan = std::sqrt(0.5f * (1.0f + pan));
+        const float explosionPan = std::clamp(self->explosionPan.load(), -1.0f, 1.0f);
+        const float explosionLeft = std::sqrt(0.5f * (1.0f - explosionPan));
+        const float explosionRight = std::sqrt(0.5f * (1.0f + explosionPan));
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             self->rainVolume +=
                 (self->rainTarget.load() - self->rainVolume) * 0.0008f;
@@ -55,9 +65,17 @@ struct AudioSystem::Impl {
                 std::sin(self->thunderPhase) * 0.28f) * self->thunderEnvelope;
             self->thunderEnvelope *= 0.99986f;
             if (self->thunderEnvelope < 0.0001f) self->thunderEnvelope = 0.0f;
-            samples[frame * 2] = std::clamp(rain + thunder * leftPan, -1.0f, 1.0f);
+            const float explosionNoise = self->noise();
+            self->explosionFilter += (explosionNoise - self->explosionFilter) * .045f;
+            const float explosion = (explosionNoise * .42f + self->explosionFilter * .78f) *
+                                    self->explosionEnvelope;
+            self->explosionEnvelope *= .9989f;
+            if (self->explosionEnvelope < .0001f) self->explosionEnvelope = 0.0f;
+            samples[frame * 2] = std::clamp(
+                rain + thunder * leftPan + explosion * explosionLeft, -1.0f, 1.0f);
             samples[frame * 2 + 1] =
-                std::clamp(rain + thunder * rightPan, -1.0f, 1.0f);
+                std::clamp(rain + thunder * rightPan + explosion * explosionRight,
+                           -1.0f, 1.0f);
         }
     }
 };
@@ -95,6 +113,13 @@ void AudioSystem::playThunder(float pan, float volume) {
     m_impl->thunderPan = std::clamp(pan, -1.0f, 1.0f);
     m_impl->thunderVolume = std::clamp(volume, 0.0f, 1.0f);
     ++m_impl->thunderTriggers;
+}
+
+void AudioSystem::playExplosion(float pan, float volume) {
+    if (!m_impl->initialized) return;
+    m_impl->explosionPan = std::clamp(pan, -1.0f, 1.0f);
+    m_impl->explosionVolume = std::clamp(volume, 0.0f, 1.0f);
+    ++m_impl->explosionTriggers;
 }
 
 bool AudioSystem::available() const { return m_impl->initialized; }

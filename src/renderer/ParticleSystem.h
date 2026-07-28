@@ -28,6 +28,7 @@ public:
     void update(World& world, const glm::dvec3& viewer, float dt,
                 float rainIntensity, uint64_t seed);
     void emitBlockBreak(const glm::ivec3& position, BlockId block);
+    void emitExplosion(const glm::dvec3& position);
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(
         const glm::dvec3& renderOrigin) const;

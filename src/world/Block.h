@@ -75,7 +75,31 @@ enum class BlockId : uint8_t {
     ACACIA_SAPLING = 63,
     SNOW_LAYER   = 64,
     FIRE         = 65,
-    COUNT        = 66
+    GLASS        = 66,
+    TNT          = 67,
+    OBSIDIAN     = 68,
+    DANDELION    = 69,
+    BLUE_ORCHID  = 70,
+    ALLIUM       = 71,
+    OXEYE_DAISY  = 72,
+    SUNFLOWER_BOTTOM = 73,
+    SUNFLOWER_TOP = 74,
+    FLOWING_WATER_1 = 75,
+    FLOWING_WATER_2 = 76,
+    FLOWING_WATER_3 = 77,
+    FLOWING_WATER_4 = 78,
+    FLOWING_WATER_5 = 79,
+    FLOWING_WATER_6 = 80,
+    FLOWING_WATER_7 = 81,
+    FLOWING_LAVA_1 = 82,
+    FLOWING_LAVA_2 = 83,
+    FLOWING_LAVA_3 = 84,
+    FLOWING_LAVA_4 = 85,
+    FLOWING_LAVA_5 = 86,
+    FLOWING_LAVA_6 = 87,
+    FLOWING_LAVA_7 = 88,
+    COUNT        = 89,
+    POPPY        = FLOWER
 };
 
 // ── Face direction ────────────────────────────────────────────────────
@@ -96,7 +120,8 @@ constexpr int FACE_COUNT = 6;
 enum class RenderShape : uint8_t {
     Cube,
     Cross,
-    SnowLayer
+    SnowLayer,
+    Fluid
 };
 
 enum class RenderLayer : uint8_t {
@@ -116,7 +141,7 @@ struct BlockProperties {
     float alpha = 1.0f;
 };
 
-// Material tiles in the shared 8x8 block atlas.
+// Material tiles in the dynamically sized shared block atlas.
 enum class BlockTexture : uint8_t {
     Dirt, GrassTop, GrassSide, Stone, OakLog, LogTop, Leaves, Sand,
     Bedrock, Water, Snow, Planks, Deepslate, CactusSide, CactusTop,
@@ -127,7 +152,8 @@ enum class BlockTexture : uint8_t {
     Cobblestone, CraftingTable, Furnace, Chest, Torch, WhiteWool,
     WhiteBed, Farmland, WetFarmland, WheatYoung, WheatMiddle, WheatMature,
     OakSapling, BirchSapling, SpruceSapling, JungleSapling, AcaciaSapling,
-    SnowLayer, Fire,
+    SnowLayer, Fire, Glass, Tnt, Obsidian, Dandelion, BlueOrchid, Allium,
+    OxeyeDaisy, SunflowerBottom, SunflowerTop, Cloud,
     Count
 };
 
@@ -156,6 +182,15 @@ bool isFarmland(BlockId id);
 uint8_t farmlandMoisture(BlockId id);
 BlockId farmlandForMoisture(uint8_t moisture);
 bool isSapling(BlockId id);
+bool isWater(BlockId id);
+bool isLava(BlockId id);
+inline bool isFluid(BlockId id) { return isWater(id) || isLava(id); }
+uint8_t fluidLevel(BlockId id);
+BlockId fluidBlock(bool lava, uint8_t level);
+float fluidSurfaceHeight(BlockId id);
+bool isReplaceableByFluid(BlockId id);
+bool isFlower(BlockId id);
+bool isSunflower(BlockId id);
 uint8_t fireEncouragement(BlockId id);
 uint8_t burnOdds(BlockId id);
 inline bool isFlammable(BlockId id) { return fireEncouragement(id) > 0; }

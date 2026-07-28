@@ -26,6 +26,14 @@
       "x": 3,
       "y": 14
     },
+    "allium": {
+      "generator": "block_item_icon",
+      "index": 121,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/allium.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 15
+    },
     "arrow": {
       "generator": "item_sprite",
       "index": 71,
@@ -65,6 +73,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 14
+    },
+    "blue_orchid": {
+      "generator": "block_item_icon",
+      "index": 120,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/blue_orchid.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 15
     },
     "bone": {
       "generator": "item_sprite",
@@ -169,6 +185,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 0
+    },
+    "dandelion": {
+      "generator": "block_item_icon",
+      "index": 119,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/dandelion.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 14
     },
     "deepslate": {
       "generator": "block_item_icon",
@@ -298,13 +322,13 @@
       "x": 6,
       "y": 13
     },
-    "flower": {
-      "generator": "block_item_icon",
-      "index": 55,
-      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/flower.png",
+    "flint_and_steel": {
+      "generator": "item_sprite",
+      "index": 124,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/flint_and_steel.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 6
+      "x": 4,
+      "y": 15
     },
     "furnace": {
       "generator": "block_item_icon",
@@ -313,6 +337,14 @@
       "source_kind": "generated",
       "x": 7,
       "y": 0
+    },
+    "glass": {
+      "generator": "block_item_icon",
+      "index": 116,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/glass.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 14
     },
     "gold_ingot": {
       "generator": "item_sprite",
@@ -417,6 +449,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 6
+    },
+    "gunpowder": {
+      "generator": "item_sprite",
+      "index": 125,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/gunpowder.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 15
     },
     "ice": {
       "generator": "block_item_icon",
@@ -626,12 +666,36 @@
       "x": 7,
       "y": 13
     },
+    "obsidian": {
+      "generator": "block_item_icon",
+      "index": 118,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/obsidian.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 14
+    },
+    "oxeye_daisy": {
+      "generator": "block_item_icon",
+      "index": 122,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oxeye_daisy.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 15
+    },
     "podzol": {
       "generator": "block_item_icon",
       "index": 52,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/podzol.png",
       "source_kind": "generated",
       "x": 4,
+      "y": 6
+    },
+    "poppy": {
+      "generator": "block_item_icon",
+      "index": 55,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/poppy.png",
+      "source_kind": "generated",
+      "x": 7,
       "y": 6
     },
     "raw_beef": {
@@ -826,6 +890,14 @@
       "x": 3,
       "y": 8
     },
+    "sunflower": {
+      "generator": "block_item_icon",
+      "index": 123,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sunflower.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 15
+    },
     "tall_grass": {
       "generator": "block_item_icon",
       "index": 54,
@@ -841,6 +913,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 6
+    },
+    "tnt": {
+      "generator": "block_item_icon",
+      "index": 117,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/tnt.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 14
     },
     "torch": {
       "generator": "item_sprite",
@@ -937,7 +1017,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 15,
+  "rows": 16,
   "seed": 213785369,
   "tile_size": 16,
   "version": 1
