@@ -83,6 +83,17 @@ cmake --install build-local --config Release --prefix install-local
 .\install-local\bin\minecraftc.exe
 ```
 
+### 自动构建与发行
+
+每次 push 后，GitHub Actions 会构建并测试三个平台，并提供 Linux x86-64、
+Windows x86-64 和 macOS 通用版下载产物。推送 `v*` 标签会自动创建 GitHub
+Release 并附加这三个压缩包：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ## 默认操作
 
 - `WASD`：移动
