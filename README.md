@@ -173,3 +173,5 @@ hierarchical animation and GPU skinning. Dropped items, arrows, and primed TNT
 retain the lightweight compatibility renderer. The original deterministic
 assets and regeneration instructions are documented in
 `assets/models/entities/README.md`.
+The implementation history and validation record are in
+`docs/gltf-entity-model-engine.md`.
