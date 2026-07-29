@@ -173,6 +173,14 @@ void ParticleSystem::appendLightning(const glm::dvec3& position) {
 std::vector<ParticleRenderData> ParticleSystem::buildRenderData(
     const glm::dvec3& renderOrigin) const {
     std::vector<ParticleRenderData> result;
+    buildRenderData(renderOrigin, result);
+    return result;
+}
+
+void ParticleSystem::buildRenderData(
+    const glm::dvec3& renderOrigin,
+    std::vector<ParticleRenderData>& result) const {
+    result.clear();
     result.reserve(m_particles.size());
     for (const auto& particle : m_particles) {
         const glm::dvec3 relative = particle.position - renderOrigin;
@@ -180,5 +188,4 @@ std::vector<ParticleRenderData> ParticleSystem::buildRenderData(
                           particle.phase, particle.texture, particle.size,
                           particle.rotation});
     }
-    return result;
 }

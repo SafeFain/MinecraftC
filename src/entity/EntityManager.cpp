@@ -30,6 +30,9 @@ void EntityManager::clear() {
     m_spawnTimer = 0.0f;
     m_spawnSequence = 0;
     m_loadedChunks.clear();
+    m_dirtyEntityChunks.clear();
+    m_pendingEntitySaves.clear();
+    m_lastStreamingRevision = std::numeric_limits<uint64_t>::max();
     m_explosionEvents.clear();
     m_modelRegistry.clearInstances();
 }
@@ -69,6 +72,8 @@ void EntityManager::loadEntities(
 
 void EntityManager::syncChunks() {
     if (!m_saveStore) return;
+    const uint64_t revision = m_world.streamingRevision();
+    if (revision == m_lastStreamingRevision) return;
     std::set<std::pair<int,int>> active;
     for (const Chunk* chunk : m_world.getActiveChunks())
         if (chunk->generated.load()) active.insert({chunk->cx,chunk->cz});
@@ -81,6 +86,8 @@ void EntityManager::syncChunks() {
                 entity.projectileDamage});
         }
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
+        m_dirtyEntityChunks.erase(key);
+        m_pendingEntitySaves.erase(key);
     }
     m_entities.erase(std::remove_if(m_entities.begin(),m_entities.end(),[&](const Entity& entity){
         const auto key=entityChunk(entity.position);
@@ -89,11 +96,24 @@ void EntityManager::syncChunks() {
     for (const auto& key : active) if (!m_loadedChunks.count(key))
         loadEntities(m_saveStore->loadChunkEntities(key.first,key.second));
     m_loadedChunks=std::move(active);
+    m_lastStreamingRevision = revision;
 }
 
-void EntityManager::flushChunkEntities() {
-    if (!m_saveStore) return;
-    for (const auto& key:m_loadedChunks) {
+void EntityManager::beginChunkEntityAutosave() {
+    m_pendingEntitySaves.insert(m_dirtyEntityChunks.begin(),
+                                m_dirtyEntityChunks.end());
+    m_dirtyEntityChunks.clear();
+}
+
+bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
+    if (!m_saveStore) return true;
+    if (includeAllLoaded) {
+        m_pendingEntitySaves.insert(m_loadedChunks.begin(), m_loadedChunks.end());
+        m_dirtyEntityChunks.clear();
+    }
+    size_t savedFiles = 0;
+    while (!m_pendingEntitySaves.empty() && savedFiles < maxFiles) {
+        const auto key = *m_pendingEntitySaves.begin();
         std::vector<WorldMetadata::PersistedEntity> saved;
         for(const auto& entity:m_entities) if(entityChunk(entity.position)==key)
             saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
@@ -101,7 +121,10 @@ void EntityManager::flushChunkEntities() {
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
                 entity.projectileDamage});
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
+        m_pendingEntitySaves.erase(key);
+        ++savedFiles;
     }
+    return m_pendingEntitySaves.empty();
 }
 
 void EntityManager::spawnItem(
@@ -115,6 +138,7 @@ void EntityManager::spawnItem(
     entity.item = stack;
     entity.behaviorSeed = hash32(static_cast<uint32_t>(entity.id));
     m_entities.push_back(entity);
+    m_dirtyEntityChunks.insert(entityChunk(entity.position));
 }
 
 void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
@@ -128,6 +152,7 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
     entity.playerOwned = playerOwned;
     entity.health = 1.0f;
     m_entities.push_back(entity);
+    m_dirtyEntityChunks.insert(entityChunk(entity.position));
 }
 
 void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
@@ -340,6 +365,8 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
                            bool thunderstorm, bool raining) {
+    for (const auto& entity : m_entities)
+        m_dirtyEntityChunks.insert(entityChunk(entity.position));
     for (auto& dead : m_deadEntityRenders) {
         dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
         m_modelRegistry.advance(dead.type, dead.id, dt);
@@ -549,6 +576,8 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                    (entity.type == EntityType::Arrow && entity.ageSeconds >= 60.0f);
         }), m_entities.end());
     for (const auto& entity : deadMobs) dropMobLoot(entity);
+    for (const auto& entity : m_entities)
+        m_dirtyEntityChunks.insert(entityChunk(entity.position));
 }
 
 void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) {

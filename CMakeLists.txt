@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MinecraftC LANGUAGES CXX C)
+project(MinecraftC VERSION 1.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +12,13 @@ option(MINECRAFTC_FETCH_DEPENDENCIES
        "Use pinned source builds of GLFW and GLM instead of system packages" OFF)
 option(MINECRAFTC_ENABLE_SANITIZERS
        "Enable AddressSanitizer and UndefinedBehaviorSanitizer in Debug builds" OFF)
+option(MINECRAFTC_PORTABLE_LAYOUT
+       "Install a self-contained release layout rooted at the install prefix" OFF)
+option(MINECRAFTC_STATIC_MSVC_RUNTIME
+       "Use the static MSVC runtime for portable Windows packages" OFF)
+if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 # ── Dependencies ───────────────────────────────────────────────────────
 
@@ -77,7 +84,9 @@ target_include_directories(minecraftc PRIVATE
     external
 )
 # Prevent GLFW from including GL/gl.h — we use our own GL loader
-target_compile_definitions(minecraftc PRIVATE GLFW_INCLUDE_NONE)
+target_compile_definitions(minecraftc PRIVATE
+    GLFW_INCLUDE_NONE
+    MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
 
 # ── Debug / logging compile-time gating ─────────────────────────────────
 # LOG_COMPILE_LEVEL strips log macros below the given level:
@@ -129,13 +138,28 @@ endif()
 
 # ── Install ────────────────────────────────────────────────────────────
 
-install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
+if(MINECRAFTC_PORTABLE_LAYOUT)
+    install(TARGETS minecraftc RUNTIME DESTINATION .)
+    install(DIRECTORY assets/ DESTINATION assets)
+    install(FILES README.md THIRD_PARTY_LICENSES.md packaging/README-release.md
+            DESTINATION .)
+    if(WIN32)
+        install(FILES packaging/run-minecraftc.cmd DESTINATION .)
+    else()
+        install(PROGRAMS packaging/run-minecraftc.sh DESTINATION .)
+    endif()
+else()
+    install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
+endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────
 include(CTest)
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME release_version_cli COMMAND minecraftc --version)
+    set_tests_properties(release_version_cli PROPERTIES
+        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.0")
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)

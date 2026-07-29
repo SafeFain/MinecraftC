@@ -36,14 +36,24 @@ void World::resetForNewSeed(uint64_t newSeed) {
     m_pendingBlocks.clear();
     m_blockOverrides.clear();
     m_dirtyOverrideChunks.clear();
+    m_pendingOverrideSaves.clear();
     m_overridesApplied.clear();
     m_blockEntities.clear();
     m_dirtyBlockEntityChunks.clear();
+    m_pendingBlockEntitySaves.clear();
     m_blockEntitiesApplied.clear();
     m_lightDirty = true;
     m_lightHasSources = false;
     m_firstUpdate = true;
     m_chunksPerFrame = 16;
+    m_streamCenterChunkX = std::numeric_limits<int>::max();
+    m_streamCenterChunkZ = std::numeric_limits<int>::max();
+    m_streamRenderDistance = -1;
+    m_desiredChunks.clear();
+    m_desiredChunkSet.clear();
+    m_streamCursor = 0;
+    m_streamCleanupPending = false;
+    ++m_streamingRevision;
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
@@ -412,43 +422,49 @@ void World::update(const glm::dvec3& playerPos) {
     m_centerChunkX = pcx;
     m_centerChunkZ = pcz;
 
-    // First frame: load more chunks
-    if (m_firstUpdate) {
-        m_chunksPerFrame = 16;
-        m_firstUpdate = false;
-    } else {
-        m_chunksPerFrame = 4;
-    }
-
-    // Compute needed chunks
-    std::vector<std::pair<int,int>> needed;
-    int r2 = Config::RENDER_DISTANCE * Config::RENDER_DISTANCE;
-    for (int dx = -Config::RENDER_DISTANCE; dx <= Config::RENDER_DISTANCE; ++dx) {
-        for (int dz = -Config::RENDER_DISTANCE; dz <= Config::RENDER_DISTANCE; ++dz) {
-            if (dx * dx + dz * dz <= r2) {
-                needed.emplace_back(pcx + dx, pcz + dz);
+    const bool targetChanged = pcx != m_streamCenterChunkX ||
+        pcz != m_streamCenterChunkZ ||
+        Config::RENDER_DISTANCE != m_streamRenderDistance;
+    if (targetChanged) {
+        m_streamCenterChunkX = pcx;
+        m_streamCenterChunkZ = pcz;
+        m_streamRenderDistance = Config::RENDER_DISTANCE;
+        m_desiredChunks.clear();
+        m_desiredChunkSet.clear();
+        const int r2 = Config::RENDER_DISTANCE * Config::RENDER_DISTANCE;
+        for (int dx = -Config::RENDER_DISTANCE; dx <= Config::RENDER_DISTANCE; ++dx) {
+            for (int dz = -Config::RENDER_DISTANCE; dz <= Config::RENDER_DISTANCE; ++dz) {
+                if (dx * dx + dz * dz > r2) continue;
+                const int cx = pcx + dx;
+                const int cz = pcz + dz;
+                m_desiredChunks.emplace_back(cx, cz);
+                m_desiredChunkSet.insert(packedChunkKey(cx, cz));
             }
         }
+        std::sort(m_desiredChunks.begin(), m_desiredChunks.end(),
+            [pcx, pcz](const auto& a, const auto& b) {
+                const int64_t adx = static_cast<int64_t>(a.first) - pcx;
+                const int64_t adz = static_cast<int64_t>(a.second) - pcz;
+                const int64_t bdx = static_cast<int64_t>(b.first) - pcx;
+                const int64_t bdz = static_cast<int64_t>(b.second) - pcz;
+                return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+            });
+        m_streamCursor = 0;
+        m_streamCleanupPending = true;
     }
 
-    // Remove out-of-range chunks — O(1) lookup via hash set
-    {
+    bool activeChanged = false;
+    if (m_streamCleanupPending) {
         std::unique_lock lock(m_chunkMutex);
-
-        // Build lookup set from needed coords for O(1) membership test
-        std::unordered_set<int64_t> neededSet;
-        neededSet.reserve(needed.size());
-        for (auto& [cx, cz] : needed) {
-            neededSet.insert((static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz));
-        }
-
         std::vector<std::pair<int,int>> toRemove;
+        bool blockedRemoval = false;
         for (auto& [key, chunk] : m_chunks) {
-            int64_t k64 = (static_cast<int64_t>(key.first) << 32) | static_cast<uint32_t>(key.second);
-            if (neededSet.find(k64) == neededSet.end() && !chunk->meshInProgress.load()
-                && !chunk->generationInProgress.load()) {
+            if (m_desiredChunkSet.count(packedChunkKey(key.first, key.second)) != 0)
+                continue;
+            if (chunk->meshInProgress.load() || chunk->generationInProgress.load())
+                blockedRemoval = true;
+            else
                 toRemove.push_back(key);
-            }
         }
         for (auto& key : toRemove) {
             auto it = m_chunks.find(key);
@@ -470,12 +486,19 @@ void World::update(const glm::dvec3& playerPos) {
                 m_overridesApplied.erase(key);
                 m_blockEntities.erase(key);
                 m_blockEntitiesApplied.erase(key);
+                activeChanged = true;
             }
         }
+        m_streamCleanupPending = blockedRemoval;
     }
 
-    // Load/generate new chunks
-    for (auto& key : needed) {
+    const int loadBudget = m_firstUpdate
+        ? Config::INITIAL_CHUNK_LOADS_PER_FRAME : Config::CHUNK_LOADS_PER_FRAME;
+    m_firstUpdate = false;
+    m_chunksPerFrame = Config::CHUNK_LOADS_PER_FRAME;
+    int loaded = 0;
+    while (m_streamCursor < m_desiredChunks.size() && loaded < loadBudget) {
+        const auto key = m_desiredChunks[m_streamCursor++];
         bool exists = false;
         {
             std::shared_lock lock(m_chunkMutex);
@@ -483,11 +506,12 @@ void World::update(const glm::dvec3& playerPos) {
         }
         if (!exists) {
             getChunk(key.first, key.second);
+            ++loaded;
+            activeChanged = true;
         }
     }
 
-    // Rebuild active list
-    {
+    if (activeChanged) {
         std::shared_lock lock(m_chunkMutex);
         m_activeChunks.clear();
         m_activeChunks.reserve(m_chunks.size());
@@ -502,6 +526,7 @@ void World::update(const glm::dvec3& playerPos) {
             const int64_t bdz = static_cast<int64_t>(b->cz) - pcz;
             return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
         });
+        ++m_streamingRevision;
     }
 }
 
@@ -703,6 +728,7 @@ void World::enqueueGeneration() {
 void World::processCompletedGenerations(bool rebuildLightingNow) {
     // Apply pending tree leaves for chunks that have finished generating
     std::vector<glm::ivec3> fluidSeeds;
+    bool generationStateChanged = false;
     std::unique_lock lock(m_chunkMutex);
     for (auto& [key, chunk] : m_chunks) {
         if (chunk->generated.load()) {
@@ -711,6 +737,7 @@ void World::processCompletedGenerations(bool rebuildLightingNow) {
             applySavedOverrides(key.first, key.second);
             loadBlockEntities(key.first, key.second);
             if (firstApply) {
+                generationStateChanged = true;
                 m_lightDirty = true;
                 const auto overrides = m_blockOverrides.find(key);
                 if (overrides != m_blockOverrides.end()) {
@@ -728,6 +755,7 @@ void World::processCompletedGenerations(bool rebuildLightingNow) {
             }
         }
     }
+    if (generationStateChanged) ++m_streamingRevision;
     lock.unlock();
     for (const glm::ivec3& position : fluidSeeds) scheduleFluidAround(position);
     if (rebuildLightingNow && m_lightDirty) rebuildLighting();
@@ -959,7 +987,8 @@ void World::applySavedOverrides(int cx, int cz) {
 void World::saveOverrides(int cx, int cz) {
     if (!m_saveStore) return;
     const std::pair<int, int> key{cx, cz};
-    if (m_dirtyOverrideChunks.count(key) == 0) return;
+    if (m_dirtyOverrideChunks.count(key) == 0 &&
+        m_pendingOverrideSaves.count(key) == 0) return;
     const auto it = m_blockOverrides.find(key);
     if (it == m_blockOverrides.end()) return;
     std::vector<BlockOverride> serialized;
@@ -973,16 +1002,37 @@ void World::saveOverrides(int cx, int cz) {
               });
     m_saveStore->saveChunkOverrides(cx, cz, serialized);
     m_dirtyOverrideChunks.erase(key);
+    m_pendingOverrideSaves.erase(key);
 }
 
-void World::flushModifiedChunks() {
+void World::beginModifiedChunkAutosave() {
     std::unique_lock lock(m_chunkMutex);
+    m_pendingOverrideSaves.insert(m_dirtyOverrideChunks.begin(),
+                                  m_dirtyOverrideChunks.end());
+    m_pendingBlockEntitySaves.insert(m_dirtyBlockEntityChunks.begin(),
+                                     m_dirtyBlockEntityChunks.end());
+    m_dirtyOverrideChunks.clear();
+    m_dirtyBlockEntityChunks.clear();
+}
+
+bool World::flushModifiedChunks(size_t maxFiles) {
+    std::unique_lock lock(m_chunkMutex);
+    size_t saved = 0;
     std::vector<std::pair<int, int>> dirty(
-        m_dirtyOverrideChunks.begin(), m_dirtyOverrideChunks.end());
-    for (const auto& [cx, cz] : dirty) saveOverrides(cx, cz);
+        m_pendingOverrideSaves.begin(), m_pendingOverrideSaves.end());
+    for (const auto& [cx, cz] : dirty) {
+        if (saved >= maxFiles) break;
+        saveOverrides(cx, cz);
+        ++saved;
+    }
     std::vector<std::pair<int, int>> dirtyEntities(
-        m_dirtyBlockEntityChunks.begin(), m_dirtyBlockEntityChunks.end());
-    for (const auto& [cx, cz] : dirtyEntities) saveBlockEntities(cx, cz);
+        m_pendingBlockEntitySaves.begin(), m_pendingBlockEntitySaves.end());
+    for (const auto& [cx, cz] : dirtyEntities) {
+        if (saved >= maxFiles) break;
+        saveBlockEntities(cx, cz);
+        ++saved;
+    }
+    return m_pendingOverrideSaves.empty() && m_pendingBlockEntitySaves.empty();
 }
 
 namespace {
@@ -1044,7 +1094,9 @@ void World::loadBlockEntities(int cx, int cz) {
 }
 
 void World::saveBlockEntities(int cx, int cz) {
-    if (!m_saveStore || m_dirtyBlockEntityChunks.count({cx, cz}) == 0) return;
+    const std::pair<int,int> key{cx,cz};
+    if (!m_saveStore || (m_dirtyBlockEntityChunks.count(key) == 0 &&
+                         m_pendingBlockEntitySaves.count(key) == 0)) return;
     std::vector<PersistedBlockEntity> persisted;
     auto it = m_blockEntities.find({cx, cz});
     if (it != m_blockEntities.end()) {
@@ -1057,6 +1109,7 @@ void World::saveBlockEntities(int cx, int cz) {
     }
     m_saveStore->saveBlockEntities(cx, cz, persisted);
     m_dirtyBlockEntityChunks.erase({cx, cz});
+    m_pendingBlockEntitySaves.erase({cx, cz});
 }
 
 void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
@@ -1456,7 +1509,8 @@ void World::enqueueMeshBuilds() {
     }
 }
 
-void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
+void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
+                                   size_t maxUploadBytes) {
     if (!renderer) return;
 
     std::shared_lock lock(m_chunkMutex);
@@ -1473,6 +1527,7 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
         return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
     });
     const int uploadCount = std::min(maxUploads, static_cast<int>(ready.size()));
+    size_t uploadedBytes = 0;
     for (int i = 0; i < uploadCount; ++i) {
         Chunk* chunk = ready[static_cast<size_t>(i)];
 
@@ -1483,6 +1538,9 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
             continue;
         }
 
+        const size_t bytes = chunk->m_pendingMesh.uploadBytes();
+        if (uploadedBytes > 0 && uploadedBytes + bytes > maxUploadBytes) break;
+
         // Swap pending mesh into active
         {
             std::lock_guard meshLock(chunk->getMeshMutex());
@@ -1491,6 +1549,7 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
 
         // Upload on main thread (GL context)
         chunk->getMesh().upload();
+        uploadedBytes += bytes;
 
         chunk->meshReady = false;
         chunk->meshInProgress = false;

@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <atomic>
 #include <queue>
+#include <limits>
 
 #include <glm/glm.hpp>
 
@@ -34,7 +35,16 @@ public:
     // ── Thread pool ──────────────────────────────────────────────────
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
-    void flushModifiedChunks();
+    bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max());
+    void beginModifiedChunkAutosave();
+    bool hasModifiedChunks() const {
+        return !m_dirtyOverrideChunks.empty() || !m_dirtyBlockEntityChunks.empty() ||
+               !m_pendingOverrideSaves.empty() || !m_pendingBlockEntitySaves.empty();
+    }
+    bool hasPendingModifiedChunkSaves() const {
+        return !m_pendingOverrideSaves.empty() ||
+               !m_pendingBlockEntitySaves.empty();
+    }
     void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
                       bool raining = false);
     void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick);
@@ -89,7 +99,9 @@ public:
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps GL uploads per frame to avoid pipeline stalls.
-    void processCompletedMeshes(Renderer* renderer, int maxUploads = 4);
+    void processCompletedMeshes(Renderer* renderer, int maxUploads = 4,
+                                size_t maxUploadBytes =
+                                    Config::MESH_UPLOAD_BYTES_PER_FRAME);
 
     // Synchronous build (for first frame or when thread pool unavailable)
     void buildMeshesSync(Renderer* renderer, int maxCount = 16);
@@ -105,6 +117,11 @@ public:
 
     // ── Rendering ────────────────────────────────────────────────────
     const std::vector<Chunk*>& getActiveChunks() const { return m_activeChunks; }
+    uint64_t streamingRevision() const { return m_streamingRevision; }
+    bool streamingTargetReady() const {
+        return m_streamCursor >= m_desiredChunks.size() &&
+               !m_streamCleanupPending;
+    }
 
     // ── Chunk coordinate helpers ─────────────────────────────────────
     static inline int worldToChunkX(double wx) {
@@ -163,6 +180,14 @@ private:
     bool m_firstUpdate = true;
     int m_centerChunkX = 0;
     int m_centerChunkZ = 0;
+    int m_streamCenterChunkX = std::numeric_limits<int>::max();
+    int m_streamCenterChunkZ = std::numeric_limits<int>::max();
+    int m_streamRenderDistance = -1;
+    std::vector<std::pair<int,int>> m_desiredChunks;
+    std::unordered_set<uint64_t> m_desiredChunkSet;
+    size_t m_streamCursor = 0;
+    bool m_streamCleanupPending = false;
+    uint64_t m_streamingRevision = 0;
     std::atomic<int> m_generationTasksInFlight{0};
 
     // ── Pending block queue ───────────────────────────────────────────
@@ -173,10 +198,12 @@ private:
     using OverrideMap = std::unordered_map<uint32_t, BlockId>;
     std::unordered_map<std::pair<int,int>, OverrideMap, PairHash> m_blockOverrides;
     std::unordered_set<std::pair<int,int>, PairHash> m_dirtyOverrideChunks;
+    std::unordered_set<std::pair<int,int>, PairHash> m_pendingOverrideSaves;
     std::unordered_set<std::pair<int,int>, PairHash> m_overridesApplied;
     using BlockEntityMap = std::unordered_map<uint32_t, BlockEntity>;
     std::unordered_map<std::pair<int,int>, BlockEntityMap, PairHash> m_blockEntities;
     std::unordered_set<std::pair<int,int>, PairHash> m_dirtyBlockEntityChunks;
+    std::unordered_set<std::pair<int,int>, PairHash> m_pendingBlockEntitySaves;
     std::unordered_set<std::pair<int,int>, PairHash> m_blockEntitiesApplied;
     bool m_lightDirty = true;
     bool m_lightHasSources = false;
@@ -196,4 +223,8 @@ private:
     void updateFluidCell(const glm::ivec3& position, uint64_t tick);
 
     void markDirty(int cx, int cz);
+    static uint64_t packedChunkKey(int cx, int cz) {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(cx)) << 32) |
+               static_cast<uint32_t>(cz);
+    }
 };

@@ -135,6 +135,12 @@ void Window::pollEvents() {
     glfwPollEvents();
 }
 
+void Window::waitEvents(double timeoutSeconds) {
+    m_cursorDeltaX = 0.0;
+    m_cursorDeltaY = 0.0;
+    glfwWaitEventsTimeout(timeoutSeconds);
+}
+
 void Window::setTitle(const std::string& title) {
     glfwSetWindowTitle(m_window, title.c_str());
 }

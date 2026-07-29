@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <cfloat>
+#include <array>
 
 namespace Debug {
 
@@ -84,8 +85,10 @@ class FrameTimer {
 public:
     using Clock = std::chrono::high_resolution_clock;
 
-    explicit FrameTimer(int logIntervalFrames = 300)
-        : m_logIntervalFrames(logIntervalFrames)
+    static constexpr size_t MAX_SAMPLES = 600;
+    explicit FrameTimer(int logIntervalFrames = 600)
+        : m_logIntervalFrames(std::clamp(logIntervalFrames, 1,
+                                         static_cast<int>(MAX_SAMPLES)))
     {}
 
     void beginFrame() {
@@ -96,6 +99,7 @@ public:
         float ms = std::chrono::duration<float, std::milli>(
             Clock::now() - m_frameStart).count();
 
+        m_samples[m_frameCount] = ms;
         ++m_frameCount;
         m_totalMs += ms;
         m_minMs = std::min(m_minMs, ms);
@@ -103,7 +107,17 @@ public:
 
         if (m_frameCount % m_logIntervalFrames == 0) {
             float avg = m_totalMs / static_cast<float>(m_frameCount);
+            auto sorted = m_samples;
+            std::sort(sorted.begin(), sorted.begin() + m_frameCount);
+            const auto percentile = [&](float fraction) {
+                const size_t index = std::min(
+                    m_frameCount - 1,
+                    static_cast<size_t>(fraction * static_cast<float>(m_frameCount - 1)));
+                return sorted[index];
+            };
             LOG_INFO("[FRAME] avg=" << avg << " ms  "
+                     "p95=" << percentile(0.95f) << " ms  "
+                     "p99=" << percentile(0.99f) << " ms  "
                      "min=" << m_minMs << " ms  "
                      "max=" << m_maxMs << " ms  "
                      "over " << m_frameCount << " frames  "
@@ -133,6 +147,7 @@ private:
     float m_maxMs   = 0.0f;
     size_t m_frameCount = 0;
     int m_logIntervalFrames;
+    std::array<float, MAX_SAMPLES> m_samples{};
 };
 
 } // namespace Debug

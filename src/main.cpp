@@ -20,6 +20,7 @@
 #include "ui/ContainerScreen.h"
 #include "debug/Log.h"
 #include "debug/CrashHandler.h"
+#include "debug/Profiler.h"
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "game/Command.h"
@@ -40,6 +41,7 @@
 #include <vector>
 #include <random>
 #include <iostream>
+#include <limits>
 
 class Application {
 public:
@@ -84,6 +86,10 @@ private:
     WorldCatalog          m_worldCatalog;
     WorldMetadata         m_worldMetadata;
     float                 m_autosaveSeconds = 0.0f;
+    bool                  m_autosavePending = false;
+    bool                  m_autosaveEntityTurn = true;
+    float                 m_titleUpdateSeconds = 0.0f;
+    Debug::FrameTimer     m_frameTimer{600};
     bool                  m_playerDead = false;
     uint64_t              m_survivalTicks = 0;
     float                 m_survivalWorldTickRemainder = 0.0f;
@@ -107,6 +113,7 @@ private:
     DayNightCycle m_dayNightCycle;
     WeatherSystem m_weather;
     ParticleSystem m_particles;
+    std::vector<ParticleRenderData> m_particleRenderData;
     AudioSystem m_audio;
     struct LightningEvent {
         glm::dvec3 position{0.0};
@@ -525,6 +532,7 @@ private:
         m_terrainGenerated = false;
 
         m_autosaveSeconds = 0.0f;
+        m_autosavePending = false;
         m_playerDead = false;
         m_commandOpen = false;
         m_commandInput.clear();
@@ -593,7 +601,14 @@ private:
     }
 
     void mainLoop() {
+        struct VisibleChunk {
+            const Chunk* chunk;
+            glm::mat4 model;
+            float distance2;
+        };
+        std::vector<VisibleChunk> visibleChunks;
         while (!m_window.shouldClose() && m_running) {
+            m_frameTimer.beginFrame();
             auto now = Clock::now();
             float dt = std::chrono::duration<float>(now - m_lastFrame).count();
             m_lastFrame = now;
@@ -614,6 +629,7 @@ private:
 
             // Skip rendering when minimized to save resources
             if (m_window.isMinimized()) {
+                m_window.waitEvents(0.1);
                 continue;
             }
 
@@ -731,14 +747,17 @@ private:
                 m_camera.updateVectors(m_player.getYaw(), m_player.getPitch());
                 m_autosaveSeconds += dt;
                 if (m_autosaveSeconds >= 30.0f) {
-                    saveCurrentWorld();
+                    beginAutosave();
                     m_autosaveSeconds = 0.0f;
                 }
+                processAutosave();
             } else if (m_gameState == GameState::LoadingWorld) {
+                m_world.update(m_player.getPosition());
                 m_world.enqueueGeneration();
                 m_world.processCompletedGenerations(false);
                 const auto progress = m_world.generationProgress();
-                if (progress.total > 0 && progress.completed == progress.total &&
+                if (m_world.streamingTargetReady() && progress.total > 0 &&
+                    progress.completed == progress.total &&
                     m_threadPool.idle()) {
                     m_world.processCompletedGenerations();
                     m_world.persistGeneratedChunks();
@@ -799,12 +818,9 @@ private:
                 // Bind block shader once for all chunks (saves ~N glUseProgram calls)
                 m_renderer.bindBlockShader();
 
-                struct VisibleChunk {
-                    const Chunk* chunk;
-                    glm::mat4 model;
-                    float distance2;
-                };
-                std::vector<VisibleChunk> visibleChunks;
+                visibleChunks.clear();
+                if (visibleChunks.capacity() < m_world.getActiveChunks().size())
+                    visibleChunks.reserve(m_world.getActiveChunks().size());
                 int rendered = 0;
                 for (const auto* chunk : m_world.getActiveChunks()) {
                     const ChunkMesh& mesh = chunk->getMesh();
@@ -846,8 +862,9 @@ private:
                 m_renderer.endTranslucent();
 
                 m_entities.render(m_renderer, vp, renderOrigin);
+                m_particles.buildRenderData(renderOrigin, m_particleRenderData);
                 m_renderer.renderParticles(
-                    m_particles.buildRenderData(renderOrigin), vp,
+                    m_particleRenderData, vp,
                     m_camera.right,
                     glm::normalize(glm::cross(m_camera.forward, m_camera.right)),
                     m_weather.rainGradient());
@@ -864,16 +881,20 @@ private:
 
                 // Title bar info
                 if (m_gameState == GameState::Playing) {
-                    int fps = dt > 0.0f ? static_cast<int>(1.0f / dt) : 999;
-                    m_window.setTitle(
-                        "MinecraftC" + std::string(m_player.isFlying() ? " [FLY]" : "") +
-                        " | FPS: " + std::to_string(fps) +
-                        " | XYZ: " + std::to_string(static_cast<int>(std::floor(m_player.getPosition().x))) +
-                        "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().y))) +
-                        "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().z))) +
-                        " | Chunks: " + std::to_string(rendered) +
-                        "/" + std::to_string(m_world.getActiveChunks().size())
-                    );
+                    m_titleUpdateSeconds += dt;
+                    if (m_titleUpdateSeconds >= 0.25f) {
+                        m_titleUpdateSeconds = 0.0f;
+                        int fps = dt > 0.0f ? static_cast<int>(1.0f / dt) : 999;
+                        m_window.setTitle(
+                            "MinecraftC" + std::string(m_player.isFlying() ? " [FLY]" : "") +
+                            " | FPS: " + std::to_string(fps) +
+                            " | XYZ: " + std::to_string(static_cast<int>(std::floor(m_player.getPosition().x))) +
+                            "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().y))) +
+                            "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().z))) +
+                            " | Chunks: " + std::to_string(rendered) +
+                            "/" + std::to_string(m_world.getActiveChunks().size())
+                        );
+                    }
                 } else {
                     m_window.setTitle("MinecraftC [PAUSED]");
                 }
@@ -992,6 +1013,7 @@ private:
             // ── Finish frame ──────────────────────────────────────────
             m_renderer.endFrame();
             m_window.swapBuffers();
+            m_frameTimer.endFrame();
 
             // Alt+F4 to quit
             if (m_window.isKeyPressed(GLFW_KEY_F4) &&
@@ -1291,8 +1313,7 @@ private:
         // Resources cleaned up by destructors
     }
 
-    void saveCurrentWorld() {
-        if (!m_saveStore || !m_terrainGenerated) return;
+    void updateSaveMetadata() {
         m_worldMetadata.playerPosition = m_player.getPosition();
         m_worldMetadata.inventory = m_player.inventory();
         m_worldMetadata.health = m_player.survivalStats().health();
@@ -1301,15 +1322,79 @@ private:
         m_worldMetadata.exhaustion = m_player.survivalStats().exhaustion();
         m_worldMetadata.worldTicks = m_survivalTicks;
         m_worldMetadata.weather = m_weather.saveState();
-        m_entities.flushChunkEntities();
         m_worldMetadata.entities.clear();
-        m_world.flushModifiedChunks();
-        m_saveStore->saveMetadata(m_worldMetadata);
+    }
+
+    void beginAutosave() {
+        if (!m_saveStore || !m_terrainGenerated || m_autosavePending) return;
+        try {
+            updateSaveMetadata();
+            m_saveStore->saveMetadata(m_worldMetadata);
+            m_entities.beginChunkEntityAutosave();
+            m_world.beginModifiedChunkAutosave();
+            m_autosavePending = m_world.hasPendingModifiedChunkSaves() ||
+                                m_entities.hasPendingChunkEntitySaves();
+            m_autosaveEntityTurn = true;
+        } catch (const std::exception& error) {
+            LOG_ERROR("Autosave metadata failed: " << error.what());
+            showCommandMessage("Autosave failed; see minecraftc.log");
+        }
+    }
+
+    void processAutosave() {
+        if (!m_autosavePending) return;
+        try {
+            if (m_autosaveEntityTurn &&
+                m_entities.hasPendingChunkEntitySaves()) {
+                m_entities.flushChunkEntities(1);
+            } else if (m_world.hasPendingModifiedChunkSaves()) {
+                m_world.flushModifiedChunks(1);
+            } else if (m_entities.hasPendingChunkEntitySaves()) {
+                m_entities.flushChunkEntities(1);
+            }
+            m_autosaveEntityTurn = !m_autosaveEntityTurn;
+            m_autosavePending = m_world.hasPendingModifiedChunkSaves() ||
+                                m_entities.hasPendingChunkEntitySaves();
+        } catch (const std::exception& error) {
+            m_autosavePending = false;
+            LOG_ERROR("Autosave chunk flush failed: " << error.what());
+            showCommandMessage("Autosave failed; changes will be retried");
+        }
+    }
+
+    void saveCurrentWorld() {
+        if (!m_saveStore || !m_terrainGenerated) return;
+        try {
+            updateSaveMetadata();
+            m_entities.beginChunkEntityAutosave();
+            m_world.beginModifiedChunkAutosave();
+            m_entities.flushChunkEntities(
+                std::numeric_limits<size_t>::max(), true);
+            m_world.flushModifiedChunks();
+            m_saveStore->saveMetadata(m_worldMetadata);
+            m_autosavePending = false;
+        } catch (const std::exception& error) {
+            LOG_ERROR("Could not save world: " << error.what());
+            showCommandMessage("World save failed; see minecraftc.log");
+        }
     }
 };
 
 int main(int argc, char** argv) {
     try {
+        if (argc > 1) {
+            const std::string argument(argv[1]);
+            if (argument == "--version") {
+                std::cout << "MinecraftC " << Config::GAME_VERSION << '\n';
+                return 0;
+            }
+            if (argument == "--help" || argument == "-h") {
+                std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
+                          << "Usage: minecraftc [--help] [--version]\n"
+                          << "Worlds and settings are stored in the platform user-data directory.\n";
+                return 0;
+            }
+        }
         RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
         Application app(std::move(paths));
         return app.run();

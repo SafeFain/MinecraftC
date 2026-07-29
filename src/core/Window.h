@@ -15,11 +15,14 @@ public:
     bool shouldClose() const;
     void swapBuffers();
     void pollEvents();
+    void waitEvents(double timeoutSeconds);
     void setTitle(const std::string& title);
 
     int width() const  { return m_width; }
     int height() const { return m_height; }
-    float aspectRatio() const { return static_cast<float>(m_width) / m_height; }
+    float aspectRatio() const {
+        return static_cast<float>(m_width) / static_cast<float>(m_height > 0 ? m_height : 1);
+    }
 
     // Input queries
     bool isKeyPressed(int key) const;
@@ -47,7 +50,7 @@ public:
 
     GLFWwindow* native() const { return m_window; }
 
-    bool isMinimized() const { return m_minimized; }
+    bool isMinimized() const { return m_minimized || m_width <= 0 || m_height <= 0; }
     bool isSrgbCapable() const;
 
 private:

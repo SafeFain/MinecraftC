@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <vector>
 #include <set>
+#include <limits>
 
 #include <glm/glm.hpp>
 
@@ -80,7 +81,15 @@ public:
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
     void syncChunks();
-    void flushChunkEntities();
+    bool flushChunkEntities(size_t maxFiles = std::numeric_limits<size_t>::max(),
+                            bool includeAllLoaded = false);
+    void beginChunkEntityAutosave();
+    bool hasDirtyChunkEntities() const {
+        return !m_dirtyEntityChunks.empty() || !m_pendingEntitySaves.empty();
+    }
+    bool hasPendingChunkEntitySaves() const {
+        return !m_pendingEntitySaves.empty();
+    }
 
 private:
     World& m_world;
@@ -92,6 +101,9 @@ private:
     uint32_t m_spawnSequence = 0;
     SaveStore* m_saveStore = nullptr;
     std::set<std::pair<int,int>> m_loadedChunks;
+    std::set<std::pair<int,int>> m_dirtyEntityChunks;
+    std::set<std::pair<int,int>> m_pendingEntitySaves;
+    uint64_t m_lastStreamingRevision = std::numeric_limits<uint64_t>::max();
     std::vector<glm::dvec3> m_explosionEvents;
 
     void spawnMob(EntityType type, const glm::dvec3& position);

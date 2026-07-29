@@ -32,6 +32,8 @@ public:
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(
         const glm::dvec3& renderOrigin) const;
+    void buildRenderData(const glm::dvec3& renderOrigin,
+                         std::vector<ParticleRenderData>& output) const;
 
     size_t size() const { return m_particles.size(); }
 

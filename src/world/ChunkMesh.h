@@ -27,6 +27,8 @@ struct ChunkMesh {
     std::vector<unsigned int> indices;
 
     GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint ebo = 0;
     size_t indexCount = 0;
     size_t opaqueIndexCount = 0;
     size_t translucentIndexOffset = 0;
@@ -45,6 +47,11 @@ struct ChunkMesh {
 
     bool empty() const {
         return vertices.empty() || indices.empty();
+    }
+
+    size_t uploadBytes() const {
+        return vertices.size() * sizeof(MeshVertex) +
+               indices.size() * sizeof(unsigned int);
     }
 
     // Replace only the CPU-side geometry with a completed worker mesh.
@@ -182,12 +189,15 @@ struct ChunkMesh {
                     static_cast<uint8_t>((block+count/2)/count)};
         };
 
+        std::vector<MaskCell> mask;
+        std::vector<uint8_t> visited;
+
         // Process each face direction
         for (int f = 0; f < FACE_COUNT; ++f) {
             FaceDir face = static_cast<FaceDir>(f);
 
             // Determine plane dimensions for this face
-            int size1, size2, depthMax;
+            int size1 = 0, size2 = 0, depthMax = 0;
 
             switch (face) {
                 case FaceDir::TOP: case FaceDir::BOTTOM:
@@ -203,10 +213,15 @@ struct ChunkMesh {
                     depthMax = Config::CHUNK_SIZE_X;
                     break;
             }
+            if (size1 == 0 || size2 == 0 || depthMax == 0) continue;
+
+            const size_t planeSize = static_cast<size_t>(size1 * size2);
+            mask.resize(planeSize);
+            visited.resize(planeSize);
 
             // For each depth layer, build and merge a visibility mask
             for (int d = 0; d < depthMax; ++d) {
-                std::vector<MaskCell> mask(static_cast<size_t>(size1 * size2));
+                std::fill(mask.begin(), mask.end(), MaskCell{});
 
                 // Fill mask
                 for (int u = 0; u < size1; ++u) {
@@ -237,7 +252,7 @@ struct ChunkMesh {
                 }
 
                 // Greedy merge
-                std::vector<bool> visited(size1 * size2, false);
+                std::fill(visited.begin(), visited.end(), uint8_t{0});
 
                 for (int v = 0; v < size2; ++v) {
                     for (int u = 0; u < size1; ++u) {
