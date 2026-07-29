@@ -10,6 +10,25 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    require(selectEntityPlayback(0.0f, false, false) == EntityPlayback::Idle,
+            "idle playback selection failed");
+    require(selectEntityPlayback(0.2f, false, false) == EntityPlayback::Walk,
+            "walk playback selection failed");
+    require(selectEntityPlayback(0.2f, true, false) == EntityPlayback::Hurt,
+            "hurt playback did not override locomotion");
+    require(selectEntityPlayback(0.2f, true, true) == EntityPlayback::Death,
+            "death playback did not have highest priority");
+    require(walkPlaybackRate(0.0f) == 0.5f &&
+            walkPlaybackRate(100.0f) == 2.0f,
+            "walk playback rate was not bounded");
+    require(deathPresentationVisible(0.0f) &&
+            deathPresentationVisible(0.999f) &&
+            !deathPresentationVisible(ENTITY_DEATH_PRESENTATION_SECONDS),
+            "death presentation did not use the exact one-second interval");
+    require(advanceDeathPresentation(0.75f, 0.25f) ==
+                ENTITY_DEATH_PRESENTATION_SECONDS &&
+            advanceDeathPresentation(0.75f, -1.0f) == 0.75f,
+            "death presentation timer did not advance monotonically");
     require(hostileSpawnLightValid(0), "darkness permits hostile spawning");
     require(!hostileSpawnLightValid(1) && !hostileSpawnLightValid(14),
             "any block light prevents hostile spawning");

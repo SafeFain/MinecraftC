@@ -1,5 +1,6 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/CameraEffects.h"
+#include "model/ModelRenderLogic.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -15,6 +16,19 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(model::modelPass(model::AlphaMode::Opaque) ==
+                model::ModelPass::Opaque &&
+            model::modelPass(model::AlphaMode::Mask) ==
+                model::ModelPass::Opaque,
+            "opaque and masked model materials were split incorrectly");
+    require(model::modelPass(model::AlphaMode::Blend) ==
+                model::ModelPass::Blend,
+            "blended model material used the opaque pass");
+    std::vector<model::BlendSortEntry> blended{{2.0f}, {9.0f}, {4.0f}};
+    model::sortBlended(blended);
+    require(blended[0].distanceSquared == 9.0f &&
+            blended[2].distanceSquared == 2.0f,
+            "blended model draws were not sorted far-to-near");
     CameraEffects cameraEffects;
     cameraEffects.reset({0.0, 64.0, 0.0});
     cameraEffects.update({0.0, 64.0, 0.0}, true, false, 1.0f / 60.0f);
@@ -87,6 +101,13 @@ int main() {
             "overcast weather did not hide stars");
     require(flash.ambientIntensity > thunder.ambientIntensity,
             "lightning flash did not brighten the environment");
+    const glm::vec3 noonCloud = cloudColorForEnvironment(noon);
+    const glm::vec3 rainCloud = cloudColorForEnvironment(rain);
+    const glm::vec3 thunderCloud = cloudColorForEnvironment(thunder);
+    require(glm::length(rainCloud) < glm::length(noonCloud),
+            "rain clouds should be darker than clear-day clouds");
+    require(glm::length(thunderCloud) < glm::length(rainCloud),
+            "thunder clouds should be darker than rain clouds");
 
     // Switching back to an automatic cycle resumes from noon. Advance half a
     // cycle in bounded frame-sized steps to reach midnight.
@@ -96,6 +117,9 @@ int main() {
     require(midnight.starIntensity > 0.9f, "night sky has no stars");
     require(midnight.ambientIntensity >= Config::NIGHT_AMBIENT_MIN,
             "night ambient fell below playable minimum");
+    require(glm::length(cloudColorForEnvironment(midnight)) <
+                glm::length(noonCloud),
+            "night clouds should be darker than daytime clouds");
 
     // One complete 10-minute cycle must wrap back to its starting phase.
     cycle.update(0.1f, 0, false);

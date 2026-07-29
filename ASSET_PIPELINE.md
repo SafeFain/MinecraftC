@@ -125,3 +125,9 @@ atlas and its metadata are written to `generated/entity_atlas.png` and
 For third-party art, place files under `third_party/<pack>/`, retain the
 upstream license, and fill in `THIRD_PARTY_LICENSES.md`. Never copy assets from
 Minecraft or another game without a compatible license.
+# Entity model generation
+
+Run `python3 tools/generate_entity_models.py --output assets/models/entities`
+to reproduce all eight runtime GLBs. `python3 tests/test_entity_models.py`
+performs byte-for-byte regeneration plus the skin, animation, vertex semantic,
+embedded PNG, and nearest-sampler contract checks.

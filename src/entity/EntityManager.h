@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <vector>
 #include <set>
 
@@ -8,24 +9,12 @@
 
 #include "game/Item.h"
 #include "game/SaveStore.h"
+#include "entity/EntityLogic.h"
+#include "entity/EntityModelRegistry.h"
 
 class Player;
 class Renderer;
 class World;
-
-enum class EntityType : uint8_t {
-    Item,
-    Cow,
-    Pig,
-    Sheep,
-    Chicken,
-    Zombie,
-    Skeleton,
-    Spider,
-    Blastling,
-    Arrow,
-    PrimedTnt
-};
 
 struct Entity {
     uint64_t id = 0;
@@ -45,6 +34,15 @@ struct Entity {
     float burningSeconds = 0.0f;
     float burnDamageSeconds = 0.0f;
     bool spiderProvoked = false;
+};
+
+struct DeadEntityRender {
+    uint64_t id = 0;
+    EntityType type = EntityType::Cow;
+    glm::dvec3 position{0.0};
+    glm::vec3 velocity{0.0f};
+    uint32_t behaviorSeed = 0;
+    float elapsed = 0.0f;
 };
 
 class EntityManager {
@@ -67,7 +65,12 @@ public:
                    float reach, float damage);
     void render(Renderer& renderer, const glm::mat4& viewProjection,
                 const glm::dvec3& renderOrigin) const;
+    void initializeModels(const std::filesystem::path& assetRoot,
+                          Renderer& renderer);
     const std::vector<Entity>& entities() const { return m_entities; }
+    const std::vector<DeadEntityRender>& deadEntityRenders() const {
+        return m_deadEntityRenders;
+    }
     std::vector<WorldMetadata::PersistedEntity> saveEntities() const;
     void loadEntities(const std::vector<WorldMetadata::PersistedEntity>& entities);
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
@@ -78,6 +81,8 @@ public:
 private:
     World& m_world;
     std::vector<Entity> m_entities;
+    std::vector<DeadEntityRender> m_deadEntityRenders;
+    mutable EntityModelRegistry m_modelRegistry;
     uint64_t m_nextId = 1;
     float m_spawnTimer = 0.0f;
     uint32_t m_spawnSequence = 0;

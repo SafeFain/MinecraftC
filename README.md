@@ -166,3 +166,10 @@ ctest --test-dir build-local --output-on-failure
 ## 项目说明
 
 项目中的 GLAD、FastNoiseLite 与 stb_image 位于 `external/`。资产来源记录在 [`ASSET_SOURCES.md`](ASSET_SOURCES.md)，纹理许可说明位于 [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md)，第三方资产许可模板位于 [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)。
+# glTF entity models
+
+MinecraftC renders its eight mobs from reusable glTF 2.0 GLB assets with
+hierarchical animation and GPU skinning. Dropped items, arrows, and primed TNT
+retain the lightweight compatibility renderer. The original deterministic
+assets and regeneration instructions are documented in
+`assets/models/entities/README.md`.

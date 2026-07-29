@@ -61,6 +61,16 @@ inline RenderEnvironment applyWeather(RenderEnvironment env, float rain,
     return env;
 }
 
+inline glm::vec3 cloudColorForEnvironment(const RenderEnvironment& env) {
+    constexpr glm::vec3 clearDayColor(0.92f, 0.94f, 0.96f);
+    const float daylightShade = 0.30f + 0.70f *
+        std::clamp(env.daylight, 0.0f, 1.0f);
+    const float weatherShade = 1.0f -
+        0.25f * std::clamp(env.rainIntensity, 0.0f, 1.0f) -
+        0.30f * std::clamp(env.thunderIntensity, 0.0f, 1.0f);
+    return clearDayColor * daylightShade * weatherShade;
+}
+
 class DayNightCycle {
 public:
     static constexpr float MORNING_PHASE = 0.04f;

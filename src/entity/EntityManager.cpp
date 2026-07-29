@@ -26,6 +26,7 @@ std::pair<int,int> entityChunk(const glm::dvec3& position) {
 
 void EntityManager::clear() {
     m_entities.clear();
+    m_deadEntityRenders.clear();
     m_spawnTimer = 0.0f;
     m_spawnSequence = 0;
     m_loadedChunks.clear();
@@ -326,6 +327,14 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
                            bool thunderstorm, bool raining) {
+    for (auto& dead : m_deadEntityRenders)
+        dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
+    m_deadEntityRenders.erase(std::remove_if(
+        m_deadEntityRenders.begin(), m_deadEntityRenders.end(),
+        [](const DeadEntityRender& dead) {
+            return !deathPresentationVisible(dead.elapsed);
+        }), m_deadEntityRenders.end());
+
     struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
     std::vector<PendingArrow> pendingArrows;
     struct PendingExplosion {
@@ -476,6 +485,12 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         if (entity.health <= 0.0f && entity.type != EntityType::Item &&
             entity.type != EntityType::PrimedTnt)
             deadMobs.push_back(entity);
+    for (const auto& entity : deadMobs) {
+        if (entity.type != EntityType::Arrow) {
+            m_deadEntityRenders.push_back({entity.id, entity.type,
+                entity.position, entity.velocity, entity.behaviorSeed, 0.0f});
+        }
+    }
     m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
         [](const Entity& entity) {
             return entity.health <= 0.0f ||
@@ -718,6 +733,7 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
 void EntityManager::render(
     Renderer& renderer, const glm::mat4& viewProjection,
     const glm::dvec3& renderOrigin) const {
+    m_modelRegistry.beginFrame();
     for (const auto& entity : m_entities) {
         int textureIndex = 8;
         switch (entity.type) {
@@ -753,87 +769,32 @@ void EntityManager::render(
                                 entity.type == EntityType::Skeleton ||
                                 entity.type == EntityType::Spider ||
                                 entity.type == EntityType::Blastling;
+        if (passive || hostileMob) {
+            m_modelRegistry.queue(entity.type, entity.id, entity.position,
+                entity.velocity, entity.behaviorSeed,
+                entity.hurtFlashSeconds > 0.0f, false, entity.ageSeconds,
+                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer());
+            continue;
+        }
         if (!passive && !hostileMob) {
-            renderer.renderEntity(position, renderSize(entity.type), color,
-                                  textureIndex, viewProjection);
+            renderer.renderCompatibilityEntityCube(
+                position, renderSize(entity.type), color, textureIndex,
+                viewProjection);
             continue;
         }
 
-        const float horizontalSpeed = std::hypot(entity.velocity.x,
-                                                  entity.velocity.z);
-        const float yaw = horizontalSpeed > 0.05f
-            ? std::atan2(-entity.velocity.x, -entity.velocity.z)
-            : static_cast<float>(entity.behaviorSeed % 628u) * 0.01f;
-        const auto part = [&](const glm::vec3& offset, const glm::vec3& size) {
-            renderer.renderEntityPart(position, offset, size, yaw, color,
-                                      textureIndex, viewProjection);
-        };
-
-        if (entity.type == EntityType::Zombie) {
-            part({-.26f,1.36f,-.26f}, {.52f,.39f,.52f});
-            part({-.30f,.68f,-.19f}, {.60f,.70f,.38f});
-            part({-.29f,0.0f,-.16f}, {.23f,.72f,.27f});
-            part({ .06f,0.0f,-.16f}, {.23f,.72f,.27f});
-            part({-.47f,.68f,-.14f}, {.18f,.73f,.24f});
-            part({ .29f,.68f,-.14f}, {.18f,.73f,.24f});
-        } else if (entity.type == EntityType::Skeleton) {
-            part({-.25f,1.38f,-.25f}, {.50f,.37f,.50f});
-            part({-.20f,.73f,-.11f}, {.40f,.67f,.22f});
-            part({-.22f,0.0f,-.09f}, {.14f,.76f,.16f});
-            part({ .08f,0.0f,-.09f}, {.14f,.76f,.16f});
-            part({-.35f,.70f,-.08f}, {.13f,.71f,.14f});
-            part({ .22f,.70f,-.08f}, {.13f,.71f,.14f});
-            part({-.27f,1.02f,-.16f}, {.54f,.10f,.32f});
-        } else if (entity.type == EntityType::Spider) {
-            part({-.40f,.18f,-.30f}, {.80f,.32f,.72f});
-            part({-.29f,.16f,-.61f}, {.58f,.30f,.34f});
-            part({-.60f,.12f,-.48f}, {.34f,.10f,.12f});
-            part({ .26f,.12f,-.48f}, {.34f,.10f,.12f});
-            part({-.64f,.10f,-.20f}, {.40f,.10f,.12f});
-            part({ .24f,.10f,-.20f}, {.40f,.10f,.12f});
-            part({-.64f,.08f, .08f}, {.40f,.10f,.12f});
-            part({ .24f,.08f, .08f}, {.40f,.10f,.12f});
-            part({-.58f,.06f, .34f}, {.34f,.10f,.12f});
-            part({ .24f,.06f, .34f}, {.34f,.10f,.12f});
-        } else if (entity.type == EntityType::Blastling) {
-            part({-.32f,.88f,-.31f}, {.64f,.70f,.62f});
-            part({-.25f,.49f,-.23f}, {.50f,.42f,.48f});
-            part({-.29f,0.0f,-.23f}, {.19f,.54f,.19f});
-            part({ .10f,0.0f,-.23f}, {.19f,.54f,.19f});
-            part({-.29f,0.0f, .08f}, {.19f,.54f,.19f});
-            part({ .10f,0.0f, .08f}, {.19f,.54f,.19f});
-        } else if (entity.type == EntityType::Cow) {
-            part({-.45f,.43f,-.50f}, {.90f,.62f,1.05f});
-            part({-.34f,.68f,-.82f}, {.68f,.58f,.42f});
-            part({-.42f,1.16f,-.75f}, {.16f,.13f,.16f});
-            part({ .26f,1.16f,-.75f}, {.16f,.13f,.16f});
-            part({-.36f,0.0f,-.41f}, {.18f,.52f,.18f});
-            part({ .18f,0.0f,-.41f}, {.18f,.52f,.18f});
-            part({-.36f,0.0f, .32f}, {.18f,.52f,.18f});
-            part({ .18f,0.0f, .32f}, {.18f,.52f,.18f});
-        } else if (entity.type == EntityType::Pig) {
-            part({-.43f,.34f,-.50f}, {.86f,.58f,1.05f});
-            part({-.33f,.45f,-.83f}, {.66f,.55f,.43f});
-            part({-.20f,.56f,-.94f}, {.40f,.22f,.14f});
-            part({-.35f,0.0f,-.39f}, {.17f,.42f,.17f});
-            part({ .18f,0.0f,-.39f}, {.17f,.42f,.17f});
-            part({-.35f,0.0f, .31f}, {.17f,.42f,.17f});
-            part({ .18f,0.0f, .31f}, {.17f,.42f,.17f});
-        } else if (entity.type == EntityType::Sheep) {
-            part({-.48f,.38f,-.52f}, {.96f,.72f,1.12f});
-            part({-.29f,.61f,-.84f}, {.58f,.59f,.43f});
-            part({-.36f,0.0f,-.40f}, {.17f,.48f,.17f});
-            part({ .19f,0.0f,-.40f}, {.17f,.48f,.17f});
-            part({-.36f,0.0f, .35f}, {.17f,.48f,.17f});
-            part({ .19f,0.0f, .35f}, {.17f,.48f,.17f});
-        } else {
-            part({-.23f,.20f,-.20f}, {.46f,.38f,.46f});
-            part({-.17f,.50f,-.30f}, {.34f,.34f,.34f});
-            part({-.16f,.57f,-.39f}, {.32f,.13f,.12f});
-            part({-.31f,.26f,-.13f}, {.10f,.28f,.32f});
-            part({ .21f,.26f,-.13f}, {.10f,.28f,.32f});
-            part({-.14f,0.0f,-.08f}, {.08f,.24f,.08f});
-            part({ .06f,0.0f,-.08f}, {.08f,.24f,.08f});
-        }
     }
+    for (const auto& dead : m_deadEntityRenders) {
+        m_modelRegistry.queue(dead.type, dead.id, dead.position, dead.velocity,
+            dead.behaviorSeed, false, true, dead.elapsed, renderOrigin,
+            glm::vec3(0.0f), renderer.modelRenderer());
+    }
+    m_modelRegistry.endFrame();
+    renderer.flushModels(viewProjection);
+}
+
+void EntityManager::initializeModels(const std::filesystem::path& assetRoot,
+                                     Renderer& renderer) {
+    m_modelRegistry.loadAll(assetRoot);
+    m_modelRegistry.uploadAll(renderer.modelRenderer());
 }
