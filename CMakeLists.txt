@@ -71,6 +71,7 @@ target_include_directories(minecraftc PRIVATE
     src
     external/glad/include
     external/FastNoiseLite
+    external/cgltf
     external/stb
     external/miniaudio
 )
@@ -137,6 +138,41 @@ if(BUILD_TESTING)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
+
+    add_executable(model_asset_tests
+        tests/ModelAssetTests.cpp
+        src/model/ModelAnimation.cpp)
+    target_include_directories(model_asset_tests PRIVATE src)
+    target_link_libraries(model_asset_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(model_asset_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME model_asset_layout_and_weights COMMAND model_asset_tests)
+
+    add_executable(model_animation_tests
+        tests/ModelAnimationTests.cpp
+        src/model/ModelAnimation.cpp)
+    target_include_directories(model_animation_tests PRIVATE src)
+    target_link_libraries(model_animation_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(model_animation_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME model_animation_sampling_and_pose_math COMMAND model_animation_tests)
+
+    add_executable(gltf_loader_tests
+        tests/GltfLoaderTests.cpp
+        src/model/GltfLoader.cpp
+        src/renderer/StbImageImpl.cpp)
+    target_include_directories(gltf_loader_tests PRIVATE src external/cgltf external/stb)
+    target_compile_definitions(gltf_loader_tests PRIVATE
+        MINECRAFTC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(gltf_loader_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(gltf_loader_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(gltf_loader_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME gltf_loader_validation_and_conversion COMMAND gltf_loader_tests)
 
     add_executable(platform_tests tests/PlatformTests.cpp)
     target_include_directories(platform_tests PRIVATE src)
@@ -309,6 +345,36 @@ if(BUILD_TESTING)
         target_compile_options(entity_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME survival_entity_spawning_despawn_and_sweep COMMAND entity_logic_tests)
+
+    add_executable(entity_model_registry_tests
+        tests/EntityModelRegistryTests.cpp
+        src/entity/EntityModelRegistry.cpp
+        src/model/ModelAnimation.cpp
+        src/model/GltfLoader.cpp
+        src/model/ModelRenderer.cpp
+        src/debug/Log.cpp
+        src/renderer/Shader.cpp
+        src/renderer/StbImageImpl.cpp)
+    target_include_directories(entity_model_registry_tests PRIVATE
+        src external/cgltf external/stb external/glad/include)
+    target_compile_definitions(entity_model_registry_tests PRIVATE GLFW_INCLUDE_NONE)
+    target_link_libraries(entity_model_registry_tests PRIVATE
+        glm::glm glad glfw OpenGL::GL minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(entity_model_registry_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(entity_model_registry_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME entity_model_registry_sharing_and_fallback
+             COMMAND entity_model_registry_tests)
+
+    add_custom_target(entity_model_assets
+        COMMAND ${CMAKE_COMMAND} -E env
+                python3 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME entity_model_asset_contract
+        COMMAND ${CMAKE_COMMAND} -E env
+                python3 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py)
 
     add_executable(lighting_logic_tests tests/LightingLogicTests.cpp)
     target_include_directories(lighting_logic_tests PRIVATE src)

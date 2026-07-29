@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Deterministically generate MinecraftC's original block-style entity GLBs."""
+import argparse, json, pathlib, struct, zlib
+
+VERSION = 1
+SEED = 0x4D43474C
+MODELS = {
+    "cow": ((0.90,1.20,1.30),(112,72,48,255)),
+    "pig": ((0.86,0.95,1.15),(225,132,151,255)),
+    "sheep": ((0.96,1.20,1.25),(224,222,207,255)),
+    "chicken": ((0.46,0.70,0.48),(236,229,190,255)),
+    "zombie": ((0.62,1.78,0.42),(78,139,104,255)),
+    "skeleton": ((0.48,1.78,0.34),(196,192,174,255)),
+    "spider": ((1.25,0.58,1.20),(64,48,55,255)),
+    "blastling": ((0.72,1.35,0.72),(105,170,102,255)),
+}
+
+def png(color, accent):
+    width=height=16; raw=bytearray()
+    for y in range(height):
+        raw.append(0)
+        for x in range(width):
+            raw.extend(accent if ((x//4+y//4)&1) else color)
+    def chunk(kind,data):
+        return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
+    return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",width,height,8,6,0,0,0))+chunk(b"IDAT",zlib.compress(bytes(raw),9))+chunk(b"IEND",b"")
+
+class Buffer:
+    def __init__(self): self.data=bytearray(); self.views=[]; self.accessors=[]
+    def add(self,data,target=None):
+        while len(self.data)%4:self.data.append(0)
+        offset=len(self.data);self.data.extend(data)
+        view={"buffer":0,"byteOffset":offset,"byteLength":len(data)}
+        if target:view["target"]=target
+        self.views.append(view);return len(self.views)-1
+    def accessor(self,view,component,count,kind,offset=0,minimum=None,maximum=None,normalized=False):
+        a={"bufferView":view,"byteOffset":offset,"componentType":component,"count":count,"type":kind}
+        if minimum is not None:a["min"]=minimum
+        if maximum is not None:a["max"]=maximum
+        if normalized:a["normalized"]=True
+        self.accessors.append(a);return len(self.accessors)-1
+
+def build(name,size,color):
+    sx,sy,sz=size; x=sx/2; z=sz/2
+    faces=[((0,0,-1),[(-x,0,-z),(x,0,-z),(x,sy,-z),(-x,sy,-z)]),
+           ((0,0,1),[(x,0,z),(-x,0,z),(-x,sy,z),(x,sy,z)]),
+           ((-1,0,0),[(-x,0,z),(-x,0,-z),(-x,sy,-z),(-x,sy,z)]),
+           ((1,0,0),[(x,0,-z),(x,0,z),(x,sy,z),(x,sy,-z)]),
+           ((0,1,0),[(-x,sy,-z),(x,sy,-z),(x,sy,z),(-x,sy,z)]),
+           ((0,-1,0),[(-x,0,z),(x,0,z),(x,0,-z),(-x,0,-z)])]
+    vertices=bytearray();indices=[];uv=((0,0),(1,0),(1,1),(0,1))
+    for normal,points in faces:
+        base=len(indices)//6*4
+        for point,tex in zip(points,uv):
+            vertices.extend(struct.pack("<3f3f2f4H4f",*point,*normal,*tex,0,0,0,0,1,0,0,0))
+        indices += [base,base+1,base+2,base,base+2,base+3]
+    buf=Buffer(); vv=buf.add(vertices,34962);iv=buf.add(struct.pack("<36H",*indices),34963)
+    pos=buf.accessor(vv,5126,24,"VEC3",0,[-x,0,-z],[x,sy,z]); normal=buf.accessor(vv,5126,24,"VEC3",12)
+    tex=buf.accessor(vv,5126,24,"VEC2",24); joints=buf.accessor(vv,5123,24,"VEC4",32)
+    weights=buf.accessor(vv,5126,24,"VEC4",40); inds=buf.accessor(iv,5123,36,"SCALAR")
+    # Interleaved vertex attributes share one 64-byte-stride view.
+    buf.views[vv]["byteStride"]=64
+    inverse=buf.add(struct.pack("<16f",1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)); iba=buf.accessor(inverse,5126,1,"MAT4")
+    times=buf.add(struct.pack("<2f",0,1)); time_a=buf.accessor(times,5126,2,"SCALAR",0,[0],[1])
+    animations=[]
+    values={"idle":((0,0,0),(0,.025,0)),"walk":((-.04,0,0),(.04,.035,0)),
+            "hurt":((0,0,0),(0,.12,.10)),"death":((0,0,0),(0,-sy*.55,.25))}
+    for clip,(a,b) in values.items():
+        view=buf.add(struct.pack("<6f",*a,*b)); output=buf.accessor(view,5126,2,"VEC3")
+        animations.append({"name":clip,"samplers":[{"input":time_a,"output":output,"interpolation":"LINEAR"}],
+                           "channels":[{"sampler":0,"target":{"node":0,"path":"translation"}}]})
+    accent=tuple(max(0,min(255,c+(22 if i<3 else 0))) for i,c in enumerate(color))
+    image=png(color,accent); image_view=buf.add(image)
+    doc={"asset":{"version":"2.0","generator":f"MinecraftC entity generator v{VERSION} seed {SEED}"},
+         "scene":0,"scenes":[{"nodes":[0,1]}],
+         "nodes":[{"name":"root_bone"},{"name":name,"mesh":0,"skin":0}],
+         "skins":[{"name":name+"_skin","joints":[0],"skeleton":0,"inverseBindMatrices":iba}],
+         "meshes":[{"name":name+"_block","primitives":[{"attributes":{"POSITION":pos,"NORMAL":normal,"TEXCOORD_0":tex,"JOINTS_0":joints,"WEIGHTS_0":weights},"indices":inds,"material":0}]}],
+         "materials":[{"name":name+"_pixels","pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
+         "textures":[{"sampler":0,"source":0}],"samplers":[{"magFilter":9728,"minFilter":9728,"wrapS":33071,"wrapT":33071}],
+         "images":[{"name":name+"_texture","mimeType":"image/png","bufferView":image_view}],
+         "animations":animations,"accessors":buf.accessors,"bufferViews":buf.views,"buffers":[{"byteLength":len(buf.data)}]}
+    encoded=json.dumps(doc,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
+    encoded+=b" "*((-len(encoded))%4); binary=bytes(buf.data)+b"\0"*((-len(buf.data))%4)
+    total=12+8+len(encoded)+8+len(binary)
+    return struct.pack("<4sII",b"glTF",2,total)+struct.pack("<II",len(encoded),0x4E4F534A)+encoded+struct.pack("<II",len(binary),0x004E4942)+binary
+
+def parts_for(name):
+    if name in {"cow","pig","sheep"}:
+        return [("body",(0,.78,.10),(.9,.62,1.05)),("head",(0,.92,-.62),(.62,.55,.42)),
+                ("leg_fl",(-.28,.26,-.30),(.18,.52,.18)),("leg_fr",(.28,.26,-.30),(.18,.52,.18)),
+                ("leg_bl",(-.28,.26,.40),(.18,.52,.18)),("leg_br",(.28,.26,.40),(.18,.52,.18))]
+    if name=="chicken":
+        return [("body",(0,.38,0),(.46,.38,.46)),("head",(0,.68,-.18),(.34,.34,.34)),
+                ("wing_l",(-.28,.40,0),(.10,.28,.32)),("wing_r",(.28,.40,0),(.10,.28,.32)),
+                ("leg_l",(-.10,.12,0),(.08,.24,.08)),("leg_r",(.10,.12,0),(.08,.24,.08))]
+    if name in {"zombie","skeleton"}:
+        thin=.14 if name=="skeleton" else .22
+        return [("body",(0,1.03,0),(.52,.68,.34)),("head",(0,1.55,0),(.50,.40,.50)),
+                ("arm_l",(-.36,1.03,0),(thin,.72,thin)),("arm_r",(.36,1.03,0),(thin,.72,thin)),
+                ("leg_l",(-.15,.38,0),(thin,.76,thin)),("leg_r",(.15,.38,0),(thin,.76,thin))]
+    if name=="spider":
+        result=[("body",(0,.34,.15),(.80,.32,.72)),("head",(0,.32,-.40),(.58,.30,.34))]
+        for i,z in enumerate((-.38,-.12,.14,.40)):
+            result += [(f"leg_l{i}",(-.55,.05,z),(.46,.10,.12)),(f"leg_r{i}",(.55,.05,z),(.46,.10,.12))]
+        return result
+    return [("body",(0,.80,0),(.64,.70,.62)),("head",(0,1.28,0),(.58,.42,.56)),
+            ("leg_fl",(-.22,.27,-.20),(.18,.54,.18)),("leg_fr",(.22,.27,-.20),(.18,.54,.18)),
+            ("leg_bl",(-.22,.27,.20),(.18,.54,.18)),("leg_br",(.22,.27,.20),(.18,.54,.18))]
+
+def build_v2(name,size,color):
+    del size
+    parts=parts_for(name);buf=Buffer();vertices=bytearray();indices=[]
+    uv=((0,0),(1,0),(1,1),(0,1)); normals=((0,0,-1),(0,0,1),(-1,0,0),(1,0,0),(0,1,0),(0,-1,0))
+    for joint,(_,center,dims) in enumerate(parts,1):
+        cx,cy,cz=center;dx,dy,dz=(v/2 for v in dims)
+        corners=[(cx-dx,cy-dy,cz-dz),(cx+dx,cy-dy,cz-dz),(cx+dx,cy+dy,cz-dz),(cx-dx,cy+dy,cz-dz),
+                 (cx-dx,cy-dy,cz+dz),(cx+dx,cy-dy,cz+dz),(cx+dx,cy+dy,cz+dz),(cx-dx,cy+dy,cz+dz)]
+        faces=((0,1,2,3),(5,4,7,6),(4,0,3,7),(1,5,6,2),(3,2,6,7),(4,5,1,0))
+        for normal,face in zip(normals,faces):
+            base=len(vertices)//64
+            for corner,tex in zip(face,uv):vertices.extend(struct.pack("<3f3f2f4H8x4f",*corners[corner],*normal,*tex,joint,0,0,0,1,0,0,0))
+            indices += [base,base+1,base+2,base,base+2,base+3]
+    vv=buf.add(vertices,34962);buf.views[vv]["byteStride"]=64
+    iv=buf.add(struct.pack("<%dH"%len(indices),*indices),34963);count=len(vertices)//64
+    all_points=[(c[0]+sx*d[0]/2,c[1]+sy*d[1]/2,c[2]+sz*d[2]/2) for _,c,d in parts for sx in (-1,1) for sy in (-1,1) for sz in (-1,1)]
+    minimum=[min(p[i] for p in all_points) for i in range(3)];maximum=[max(p[i] for p in all_points) for i in range(3)]
+    attrs={"POSITION":buf.accessor(vv,5126,count,"VEC3",0,minimum,maximum),"NORMAL":buf.accessor(vv,5126,count,"VEC3",12),
+           "TEXCOORD_0":buf.accessor(vv,5126,count,"VEC2",24),"JOINTS_0":buf.accessor(vv,5123,count,"VEC4",32),"WEIGHTS_0":buf.accessor(vv,5126,count,"VEC4",48)}
+    inds=buf.accessor(iv,5123,len(indices),"SCALAR")
+    matrices=[]
+    for _,center,_ in [("root",(0,0,0),(0,0,0))]+parts:
+        x,y,z=center;matrices += [1,0,0,0,0,1,0,0,0,0,1,0,-x,-y,-z,1]
+    ibv=buf.add(struct.pack("<%df"%len(matrices),*matrices));iba=buf.accessor(ibv,5126,len(parts)+1,"MAT4")
+    tv=buf.add(struct.pack("<2f",0,1));ta=buf.accessor(tv,5126,2,"SCALAR",0,[0],[1])
+    nodes=[{"name":"root","children":list(range(1,len(parts)+1))}]
+    nodes += [{"name":part,"translation":list(center)} for part,center,_ in parts]
+    mesh_node=len(nodes);nodes.append({"name":name,"mesh":0,"skin":0})
+    animations=[]
+    def animation(clip,channels):
+        samplers=[];outputs=[]
+        for node,path,values in channels:
+            view=buf.add(struct.pack("<%df"%sum(len(v) for v in values),*(x for v in values for x in v)))
+            output=buf.accessor(view,5126,2,"VEC4" if path=="rotation" else "VEC3")
+            samplers.append({"input":ta,"output":output,"interpolation":"LINEAR"});outputs.append({"sampler":len(samplers)-1,"target":{"node":node,"path":path}})
+        animations.append({"name":clip,"samplers":samplers,"channels":outputs})
+    animation("idle",[(0,"translation",((0,0,0),(0,.025,0)))])
+    walk=[]
+    for index,(part,_,_) in enumerate(parts,1):
+        if "leg" in part or "arm" in part:
+            sign=-1 if index%2 else 1; angle=.30*sign
+            walk.append((index,"rotation",((0,0,-angle,1),(0,0,angle,1))))
+    animation("walk",walk or [(0,"translation",((-.03,0,0),(.03,.02,0)))])
+    animation("hurt",[(0,"translation",((0,0,0),(0,.12,.10)))])
+    animation("death",[(0,"rotation",((0,0,0,1),(0,0,.7071068,.7071068)))])
+    accent=tuple(max(0,min(255,c+(22 if i<3 else 0))) for i,c in enumerate(color));image_view=buf.add(png(color,accent))
+    doc={"asset":{"version":"2.0","generator":f"MinecraftC entity generator v{VERSION} seed {SEED}"},"scene":0,"scenes":[{"nodes":[0,mesh_node]}],"nodes":nodes,
+         "skins":[{"name":name+"_skin","joints":list(range(len(parts)+1)),"skeleton":0,"inverseBindMatrices":iba}],
+         "meshes":[{"name":name+"_blocks","primitives":[{"attributes":attrs,"indices":inds,"material":0}]}],
+         "materials":[{"name":name+"_pixels","pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
+         "textures":[{"sampler":0,"source":0}],"samplers":[{"magFilter":9728,"minFilter":9728,"wrapS":33071,"wrapT":33071}],"images":[{"mimeType":"image/png","bufferView":image_view}],
+         "animations":animations,"accessors":buf.accessors,"bufferViews":buf.views,"buffers":[{"byteLength":len(buf.data)}]}
+    encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode();encoded+=b" "*((-len(encoded))%4);binary=bytes(buf.data)+b"\0"*((-len(buf.data))%4);total=28+len(encoded)+len(binary)
+    return struct.pack("<4sII",b"glTF",2,total)+struct.pack("<II",len(encoded),0x4E4F534A)+encoded+struct.pack("<II",len(binary),0x004E4942)+binary
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument("--output",type=pathlib.Path,required=True);parser.add_argument("--fixtures",type=pathlib.Path)
+    args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+    for name,(size,color) in MODELS.items():(args.output/(name+".glb")).write_bytes(build_v2(name,size,color))
+
+if __name__=="__main__":main()

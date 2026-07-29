@@ -1,4 +1,5 @@
 #include "renderer/Renderer.h"
+#include "model/ModelRenderer.h"
 #include "world/ChunkMesh.h"
 #include "debug/OpenGL.h"
 #include "debug/Log.h"
@@ -22,6 +23,8 @@ static const std::vector<float> WIRE_CUBE = {
 
 // ── Constructor / Destructor ──────────────────────────────────────────
 
+Renderer::Renderer() = default;
+
 Renderer::~Renderer() {
     if (m_wireVAO) deleteVAO(m_wireVAO);
     if (m_skyVAO) GL_CHECK(glDeleteVertexArrays(1, &m_skyVAO));
@@ -41,6 +44,8 @@ Renderer::~Renderer() {
 void Renderer::initialize(bool framebufferSrgb,
                           const std::filesystem::path& assetRoot) {
     m_framebufferSrgb = framebufferSrgb;
+    m_modelRenderer = std::make_unique<model::ModelRenderer>();
+    m_modelRenderer->initialize(assetRoot, framebufferSrgb);
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "block.vert",
@@ -342,6 +347,27 @@ void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
                             const glm::mat4& viewProjection) {
     renderEntityPart(position, glm::vec3(0.0f), size, 0.0f, color,
                      textureIndex, viewProjection);
+}
+
+void Renderer::renderCompatibilityEntityCube(
+    const glm::vec3& position, const glm::vec3& size,
+    const glm::vec3& color, int textureIndex,
+    const glm::mat4& viewProjection) {
+    renderEntity(position, size, color, textureIndex, viewProjection);
+}
+
+model::ModelRenderer& Renderer::modelRenderer() {
+    return *m_modelRenderer;
+}
+
+void Renderer::flushModels(const glm::mat4& viewProjection) {
+    const float fogEnd = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
+                         Config::CHUNK_SIZE_X;
+    const glm::vec3 renderSpaceCamera(0.0f);
+    m_modelRenderer->flushOpaque(viewProjection, m_environment,
+        renderSpaceCamera, fogEnd * Config::FOG_START_FRACTION, fogEnd);
+    m_modelRenderer->flushBlend(viewProjection, m_environment,
+        renderSpaceCamera, fogEnd * Config::FOG_START_FRACTION, fogEnd);
 }
 
 void Renderer::renderEntityPart(

@@ -144,6 +144,7 @@ private:
         glViewport(0, 0, m_window.width(), m_window.height());
 
         m_renderer.initialize(m_window.isSrgbCapable(), m_paths.assetRoot);
+        m_entities.initializeModels(m_paths.assetRoot, m_renderer);
         m_audio.initialize();
         m_uiRenderer.initialize(
             m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),

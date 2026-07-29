@@ -30,3 +30,9 @@ Use one section per original or generated asset family.
 - Creation date: 2026-07-27
 - Seed and generator version: atlas metadata records seed; format version 1
 - License: original project-generated assets
+# Entity GLBs
+
+The files under `assets/models/entities/` are original, deterministic
+MinecraftC assets. Generator version, seed, coordinate contract, and CC0-1.0
+license are documented in that directory's README. They contain no copied
+Minecraft/Mojang model or texture data.

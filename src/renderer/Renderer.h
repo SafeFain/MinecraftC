@@ -16,10 +16,11 @@
 
 // Forward declaration
 class ChunkMesh;
+namespace model { class ModelRenderer; }
 
 class Renderer {
 public:
-    Renderer() = default;
+    Renderer();
     ~Renderer();
 
     Renderer(const Renderer&) = delete;
@@ -51,6 +52,12 @@ public:
     void renderEntity(const glm::vec3& position, const glm::vec3& size,
                       const glm::vec3& color, int textureIndex,
                       const glm::mat4& viewProjection);
+    void renderCompatibilityEntityCube(
+        const glm::vec3& position, const glm::vec3& size,
+        const glm::vec3& color, int textureIndex,
+        const glm::mat4& viewProjection);
+    model::ModelRenderer& modelRenderer();
+    void flushModels(const glm::mat4& viewProjection);
     void renderEntityPart(const glm::vec3& position, const glm::vec3& offset,
                           const glm::vec3& size, float yaw,
                           const glm::vec3& color, int textureIndex,
@@ -88,6 +95,7 @@ private:
     std::unique_ptr<Shader> m_entityShader;
     std::unique_ptr<Shader> m_cloudShader;
     std::unique_ptr<Shader> m_particleShader;
+    std::unique_ptr<model::ModelRenderer> m_modelRenderer;
     BlockTextureAtlas m_blockAtlas;
 
     // Shared wireframe cube GPU resources

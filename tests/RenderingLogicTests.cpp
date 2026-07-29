@@ -1,5 +1,6 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/CameraEffects.h"
+#include "model/ModelRenderLogic.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -15,6 +16,19 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(model::modelPass(model::AlphaMode::Opaque) ==
+                model::ModelPass::Opaque &&
+            model::modelPass(model::AlphaMode::Mask) ==
+                model::ModelPass::Opaque,
+            "opaque and masked model materials were split incorrectly");
+    require(model::modelPass(model::AlphaMode::Blend) ==
+                model::ModelPass::Blend,
+            "blended model material used the opaque pass");
+    std::vector<model::BlendSortEntry> blended{{2.0f}, {9.0f}, {4.0f}};
+    model::sortBlended(blended);
+    require(blended[0].distanceSquared == 9.0f &&
+            blended[2].distanceSquared == 2.0f,
+            "blended model draws were not sorted far-to-near");
     CameraEffects cameraEffects;
     cameraEffects.reset({0.0, 64.0, 0.0});
     cameraEffects.update({0.0, 64.0, 0.0}, true, false, 1.0f / 60.0f);
