@@ -28,6 +28,9 @@ Renderer::~Renderer() {
     if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
     if (m_entityVAO) GL_CHECK(glDeleteVertexArrays(1, &m_entityVAO));
     if (m_entityTexture) GL_CHECK(glDeleteTextures(1, &m_entityTexture));
+    if (m_cloudInstanceVBO)
+        GL_CHECK(glDeleteBuffers(1, &m_cloudInstanceVBO));
+    if (m_cloudVAO) GL_CHECK(glDeleteVertexArrays(1, &m_cloudVAO));
     if (m_particleInstanceVBO) GL_CHECK(glDeleteBuffers(1, &m_particleInstanceVBO));
     if (m_particleQuadVBO) GL_CHECK(glDeleteBuffers(1, &m_particleQuadVBO));
     if (m_particleVAO) GL_CHECK(glDeleteVertexArrays(1, &m_particleVAO));
@@ -54,6 +57,10 @@ void Renderer::initialize(bool framebufferSrgb,
     m_entityShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "entity.vert",
         assetRoot / "shaders" / "entity.frag"
+    );
+    m_cloudShader = std::make_unique<Shader>(
+        assetRoot / "shaders" / "cloud.vert",
+        assetRoot / "shaders" / "cloud.frag"
     );
     m_particleShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "weather.vert",
@@ -118,6 +125,27 @@ void Renderer::initialize(bool framebufferSrgb,
     m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
         glfwGetProcAddress("glVertexAttribDivisor"));
     if (m_drawArraysInstanced && m_vertexAttribDivisor) {
+        // Clouds share the static entity cube but provide position and size
+        // per instance, reducing the entire layer to one draw call.
+        GL_CHECK(glGenVertexArrays(1, &m_cloudVAO));
+        GL_CHECK(glGenBuffers(1, &m_cloudInstanceVBO));
+        GL_CHECK(glBindVertexArray(m_cloudVAO));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_entityVBO));
+        GL_CHECK(glVertexAttribPointer(
+            0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr));
+        GL_CHECK(glEnableVertexAttribArray(0));
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
+        GL_CHECK(glVertexAttribPointer(
+            2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
+        GL_CHECK(glEnableVertexAttribArray(2));
+        GL_CHECK(glVertexAttribPointer(
+            3, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+            reinterpret_cast<void*>(4 * sizeof(float))));
+        GL_CHECK(glEnableVertexAttribArray(3));
+        m_vertexAttribDivisor(2, 1);
+        m_vertexAttribDivisor(3, 1);
+        GL_CHECK(glBindVertexArray(0));
+
         constexpr float quad[] = {
             -0.5f, 0.0f,  0.5f, 0.0f,  0.5f, 1.0f,
             -0.5f, 0.0f,  0.5f, 1.0f, -0.5f, 1.0f
@@ -351,6 +379,13 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
     const double drift = static_cast<double>(timeSeconds) * 0.8;
     const int centerX = static_cast<int>(std::floor((playerPosition.x - drift) / cellSize));
     const int centerZ = static_cast<int>(std::floor(playerPosition.z / cellSize));
+    struct CloudInstance {
+        float x, y, z;
+        float width, depth, height;
+    };
+    std::vector<CloudInstance> instances;
+    instances.reserve(static_cast<size_t>((radius * 2 + 1) *
+                                          (radius * 2 + 1) * 3 / 8));
     for (int dz = -radius; dz <= radius; ++dz) {
         for (int dx = -radius; dx <= radius; ++dx) {
             const int cx = centerX + dx;
@@ -365,14 +400,40 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
             const float width = 8.0f + static_cast<float>((h >> 8) & 7ULL);
             const float depth = 7.0f + static_cast<float>((h >> 12) & 7ULL);
             const float height = 2.0f + static_cast<float>((h >> 16) % 3ULL);
-            glm::vec3 position(
+            instances.push_back({
                 static_cast<float>(cx * cellSize + drift - playerPosition.x),
                 192.0f + static_cast<float>((h >> 20) % 3ULL),
-                static_cast<float>(cz * cellSize - playerPosition.z));
-            renderEntity(position, glm::vec3(width, height, depth),
-                         glm::vec3(0.92f, 0.94f, 0.96f), -1, viewProjection);
+                static_cast<float>(cz * cellSize - playerPosition.z),
+                width, depth, height});
         }
     }
+    if (instances.empty()) return;
+    const glm::vec3 cloudColor = cloudColorForEnvironment(m_environment);
+
+    if (!m_cloudVAO || !m_drawArraysInstanced) {
+        for (const CloudInstance& instance : instances) {
+            renderEntity(glm::vec3(instance.x, instance.y, instance.z),
+                         glm::vec3(instance.width, instance.height,
+                                   instance.depth),
+                         cloudColor, -1, viewProjection);
+        }
+        return;
+    }
+
+    m_cloudShader->bind();
+    m_cloudShader->setMat4("uViewProjection", viewProjection);
+    m_cloudShader->setVec3("uColor", cloudColor);
+    m_cloudShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    GL_CHECK(glBindVertexArray(m_cloudVAO));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
+    // GL_STREAM_DRAW lets the driver replace storage rather than waiting for
+    // a prior frame that is still consuming the instance buffer.
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+                         instances.size() * sizeof(CloudInstance),
+                         instances.data(), GL_STREAM_DRAW));
+    m_drawArraysInstanced(GL_TRIANGLES, 0, 36,
+                          static_cast<GLsizei>(instances.size()));
+    GL_CHECK(glBindVertexArray(0));
 }
 
 void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,

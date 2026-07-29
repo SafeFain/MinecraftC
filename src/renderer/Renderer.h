@@ -86,6 +86,7 @@ private:
     std::unique_ptr<Shader> m_wireShader;
     std::unique_ptr<Shader> m_skyShader;
     std::unique_ptr<Shader> m_entityShader;
+    std::unique_ptr<Shader> m_cloudShader;
     std::unique_ptr<Shader> m_particleShader;
     BlockTextureAtlas m_blockAtlas;
 
@@ -96,6 +97,8 @@ private:
     GLuint m_entityVAO = 0;
     GLuint m_entityVBO = 0;
     GLuint m_entityTexture = 0;
+    GLuint m_cloudVAO = 0;
+    GLuint m_cloudInstanceVBO = 0;
     GLuint m_particleVAO = 0;
     GLuint m_particleQuadVBO = 0;
     GLuint m_particleInstanceVBO = 0;

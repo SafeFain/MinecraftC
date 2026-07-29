@@ -87,6 +87,13 @@ int main() {
             "overcast weather did not hide stars");
     require(flash.ambientIntensity > thunder.ambientIntensity,
             "lightning flash did not brighten the environment");
+    const glm::vec3 noonCloud = cloudColorForEnvironment(noon);
+    const glm::vec3 rainCloud = cloudColorForEnvironment(rain);
+    const glm::vec3 thunderCloud = cloudColorForEnvironment(thunder);
+    require(glm::length(rainCloud) < glm::length(noonCloud),
+            "rain clouds should be darker than clear-day clouds");
+    require(glm::length(thunderCloud) < glm::length(rainCloud),
+            "thunder clouds should be darker than rain clouds");
 
     // Switching back to an automatic cycle resumes from noon. Advance half a
     // cycle in bounded frame-sized steps to reach midnight.
@@ -96,6 +103,9 @@ int main() {
     require(midnight.starIntensity > 0.9f, "night sky has no stars");
     require(midnight.ambientIntensity >= Config::NIGHT_AMBIENT_MIN,
             "night ambient fell below playable minimum");
+    require(glm::length(cloudColorForEnvironment(midnight)) <
+                glm::length(noonCloud),
+            "night clouds should be darker than daytime clouds");
 
     // One complete 10-minute cycle must wrap back to its starting phase.
     cycle.update(0.1f, 0, false);
