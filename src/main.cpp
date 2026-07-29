@@ -458,6 +458,7 @@ private:
         m_clientSettings.validate();
         Config::RENDER_DISTANCE = m_clientSettings.renderDistance;
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
+        Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
         m_window.setRawMouseInput(m_clientSettings.rawMouseInput);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))

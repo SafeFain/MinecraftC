@@ -20,6 +20,7 @@ uniform float uAmbientIntensity;
 uniform float uFogEnd;
 uniform float uFogStartFraction;
 uniform int uManualGamma;
+uniform int uSmoothLighting;
 uniform float uAtlasTiles;
 uniform float uLavaTile;
 uniform float uWaterTile;
@@ -39,6 +40,9 @@ vec3 faceNormal(float face) {
 void main() {
     float atlasTiles = uAtlasTiles;
     float tile = floor(vTile + 0.5);
+    float packedLight = floor(fract(vTile) * 512.0 + 0.5);
+    float flatSkyLight = floor(packedLight / 16.0) / 15.0;
+    float flatBlockLight = mod(packedLight, 16.0) / 15.0;
     vec2 tileOrigin = vec2(mod(tile, atlasTiles), floor(tile / atlasTiles));
     vec2 local = mix(vec2(0.5 / 16.0), vec2(15.5 / 16.0), fract(vTileUV));
     vec2 atlasUV = (tileOrigin + local) / atlasTiles;
@@ -52,12 +56,16 @@ void main() {
     float diffuse = vFace > 5.5
         ? 0.32
         : max(dot(normal, normalize(uLightDirection)), 0.0);
-    float ao = mix(0.55, 1.0, clamp(vAO, 0.0, 1.0));
-    float caveAmbient = mix(0.72, 1.0, vSkyLight);
-    vec3 lighting = uAmbientColor * uAmbientIntensity * caveAmbient;
-    lighting += uDirectColor * uDirectIntensity * diffuse * vSkyLight * 0.58;
-    lighting *= ao;
-    lighting = max(lighting, vec3(1.0, 0.72, 0.38) * vBlockLight * 1.15);
+    float smoothWeight = uSmoothLighting != 0 ? 1.0 : 0.0;
+    float ao = mix(1.0, mix(0.42, 1.0, clamp(vAO, 0.0, 1.0)), smoothWeight);
+    float sampledSky = mix(flatSkyLight, vSkyLight, smoothWeight);
+    float sampledBlock = mix(flatBlockLight, vBlockLight, smoothWeight);
+    float skyLight = pow(clamp(sampledSky, 0.0, 1.0), 1.35);
+    float blockLight = pow(clamp(sampledBlock, 0.0, 1.0), 1.35);
+    vec3 lighting = uAmbientColor * uAmbientIntensity * skyLight * 0.68;
+    lighting += uDirectColor * uDirectIntensity * diffuse * skyLight * 0.46;
+    lighting = max(lighting, vec3(1.0, 0.72, 0.38) * blockLight * 1.15);
+    lighting = max(lighting * ao, vec3(0.025));
 
     // Atlas tile 19 is lava: keep it readable and warm independent of the sky.
     if (abs(tile - uLavaTile) < 0.25)
@@ -76,7 +84,7 @@ void main() {
     float fog = smoothstep(uFogEnd * uFogStartFraction, uFogEnd,
                            distanceToCamera);
     vec3 localFog = mix(uAmbientColor * uAmbientIntensity * 0.34,
-                        uFogColor, vSkyLight);
+                        uFogColor, skyLight);
     color = mix(color, localFog, fog);
 
     if (uManualGamma != 0)

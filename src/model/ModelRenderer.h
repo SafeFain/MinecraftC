@@ -2,6 +2,7 @@
 
 #include "model/ModelAnimation.h"
 #include "renderer/RenderEnvironment.h"
+#include "world/BlockLightLogic.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -22,6 +23,7 @@ struct ModelDraw {
     const ModelInstance* instance = nullptr;
     glm::vec4 tint{1.0f};
     float distanceSquared = 0.0f;
+    SmoothLightSample light;
 };
 
 class ModelRenderer {
@@ -63,8 +65,13 @@ private:
     std::vector<GpuModel> m_models;
     std::vector<ModelDraw> m_draws;
     bool m_framebufferSrgb = false;
+#if defined(_WIN32)
+    using VertexAttribIPointerFn = void (__stdcall *)(GLuint, GLint, GLenum,
+                                                      GLsizei, const void*);
+#else
     using VertexAttribIPointerFn = void (*)(GLuint, GLint, GLenum, GLsizei,
                                             const void*);
+#endif
     VertexAttribIPointerFn m_vertexAttribIPointer = nullptr;
 
     void flush(bool blended, const glm::mat4& viewProjection,

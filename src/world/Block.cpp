@@ -430,6 +430,22 @@ bool isLava(BlockId id) {
            (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7);
 }
 
+uint8_t getLightEmission(BlockId id) {
+    if (id == BlockId::TORCH) return 14;
+    return id == BlockId::FIRE || isLava(id) ? 15 : 0;
+}
+
+uint8_t getLightDampening(BlockId id) {
+    if (id == BlockId::AIR || id == BlockId::GLASS ||
+        getBlockProps(id).shape == RenderShape::Cross) return 0;
+    if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
+        id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
+        id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
+        isLava(id)) return 1;
+    if (isWater(id) || id == BlockId::ICE) return 2;
+    return getBlockProps(id).transparent ? 0 : 15;
+}
+
 uint8_t fluidLevel(BlockId id) {
     if (id == BlockId::WATER || id == BlockId::LAVA) return 0;
     if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)

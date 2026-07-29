@@ -13,6 +13,7 @@
 #include "renderer/BlockTextureAtlas.h"
 #include "renderer/RenderEnvironment.h"
 #include "renderer/ParticleSystem.h"
+#include "world/BlockLightLogic.h"
 
 // Forward declaration
 class ChunkMesh;
@@ -55,13 +56,14 @@ public:
     void renderCompatibilityEntityCube(
         const glm::vec3& position, const glm::vec3& size,
         const glm::vec3& color, int textureIndex,
-        const glm::mat4& viewProjection);
+        const glm::mat4& viewProjection, SmoothLightSample light = {});
     model::ModelRenderer& modelRenderer();
     void flushModels(const glm::mat4& viewProjection);
     void renderEntityPart(const glm::vec3& position, const glm::vec3& offset,
                           const glm::vec3& size, float yaw,
                           const glm::vec3& color, int textureIndex,
-                          const glm::mat4& viewProjection);
+                          const glm::mat4& viewProjection,
+                          SmoothLightSample light = {1.0f, 0.0f});
     void renderParticles(const std::vector<ParticleRenderData>& particles,
                          const glm::mat4& viewProjection,
                          const glm::vec3& cameraRight,
@@ -89,6 +91,12 @@ public:
     bool usesFramebufferSrgb() const { return m_framebufferSrgb; }
 
 private:
+    struct CloudInstance {
+        float x, y, z;
+        float width, depth, height;
+    };
+    static constexpr size_t MAX_CLOUD_INSTANCES = 65u * 65u;
+
     std::unique_ptr<Shader> m_blockShader;
     std::unique_ptr<Shader> m_wireShader;
     std::unique_ptr<Shader> m_skyShader;
@@ -111,10 +119,25 @@ private:
     GLuint m_particleQuadVBO = 0;
     GLuint m_particleInstanceVBO = 0;
 
+#if defined(_WIN32)
+    using DrawArraysInstancedFn = void (__stdcall *)(GLenum, GLint, GLsizei,
+                                                     GLsizei);
+    using VertexAttribDivisorFn = void (__stdcall *)(GLuint, GLuint);
+    using BufferSubDataFn = void (__stdcall *)(GLenum, GLintptr, GLsizeiptr,
+                                               const void*);
+#else
     using DrawArraysInstancedFn = void (*)(GLenum, GLint, GLsizei, GLsizei);
     using VertexAttribDivisorFn = void (*)(GLuint, GLuint);
+    using BufferSubDataFn = void (*)(GLenum, GLintptr, GLsizeiptr, const void*);
+#endif
     DrawArraysInstancedFn m_drawArraysInstanced = nullptr;
     VertexAttribDivisorFn m_vertexAttribDivisor = nullptr;
+    BufferSubDataFn m_bufferSubData = nullptr;
+    std::vector<CloudInstance> m_cloudInstances;
+    uint64_t m_cloudCacheSeed = 0;
+    int m_cloudCacheCenterX = 0;
+    int m_cloudCacheCenterZ = 0;
+    int m_cloudCacheRadius = -1;
 
     glm::mat4 m_viewProjection{1.0f};
     Frustum m_frustum;

@@ -69,6 +69,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "mouse_sensitivity") settings.mouseSensitivity = std::stof(value);
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
             else if (name == "raw_mouse_input") settings.rawMouseInput = std::stoi(value) != 0;
+            else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name.rfind("binding.", 0) == 0) {
                 const size_t index = static_cast<size_t>(std::stoul(name.substr(8)));
@@ -100,6 +101,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "raw_mouse_input=" << rawMouseInput << '\n'
+           << "smooth_lighting=" << smoothLighting << '\n'
            << "gui_scale=" << guiScale << '\n';
     for (size_t i = 0; i < bindings.size(); ++i)
         output << "binding." << i << '=' << static_cast<int>(bindings[i].device)

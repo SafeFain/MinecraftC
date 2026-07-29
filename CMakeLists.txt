@@ -388,14 +388,17 @@ if(BUILD_TESTING)
 
     add_custom_target(entity_model_assets
         COMMAND ${CMAKE_COMMAND} -E env
-                python3 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py
+                ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME entity_model_asset_contract
         COMMAND ${CMAKE_COMMAND} -E env
-                python3 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py)
+                ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py)
 
-    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp)
+    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp src/world/Block.cpp)
     target_include_directories(lighting_logic_tests PRIVATE src)
+    target_link_libraries(lighting_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(lighting_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

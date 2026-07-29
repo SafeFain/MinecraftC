@@ -812,6 +812,9 @@ void EntityManager::render(
         }
         const glm::vec3 position(
             glm::dvec3(entity.position) - renderOrigin);
+        const glm::vec3 size=renderSize(entity.type);
+        const SmoothLightSample light=m_world.sampleLight(
+            entity.position+glm::dvec3(0.0,size.y*0.5,0.0));
         const bool passive = entity.type == EntityType::Cow ||
                              entity.type == EntityType::Pig ||
                              entity.type == EntityType::Sheep ||
@@ -823,13 +826,12 @@ void EntityManager::render(
         if (passive || hostileMob) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
-                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer());
+                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(), light);
             continue;
         }
         if (!passive && !hostileMob) {
             renderer.renderCompatibilityEntityCube(
-                position, renderSize(entity.type), color, textureIndex,
-                viewProjection);
+                position, size, color, textureIndex, viewProjection, light);
             continue;
         }
 
@@ -837,7 +839,8 @@ void EntityManager::render(
     for (const auto& dead : m_deadEntityRenders) {
         m_modelRegistry.queue(dead.type, dead.id, dead.position,
             dead.facing, dead.behaviorSeed, renderOrigin,
-            glm::vec3(0.0f), renderer.modelRenderer());
+            glm::vec3(0.0f), renderer.modelRenderer(),
+            m_world.sampleLight(dead.position+glm::dvec3(0.0,0.8,0.0)));
     }
     m_modelRegistry.endFrame();
     renderer.flushModels(viewProjection);

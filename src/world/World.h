@@ -16,6 +16,7 @@
 #include "world/WorldGenerator.h"
 #include "world/RegionGenerationData.h"
 #include "world/BlockEntity.h"
+#include "world/BlockLightLogic.h"
 #include "game/Weather.h"
 
 class Renderer;
@@ -46,7 +47,10 @@ public:
 
     // ── Block queries ────────────────────────────────────────────────
     BlockId getBlock(int worldX, int worldY, int worldZ) const;
+    LightSample getLight(int worldX, int worldY, int worldZ) const;
+    SmoothLightSample sampleLight(const glm::dvec3& position) const;
     uint8_t getBlockLight(int worldX, int worldY, int worldZ) const;
+    uint8_t getSkyLight(int worldX, int worldY, int worldZ) const;
     int getSurfaceY(int worldX, int worldZ) const;
     bool hasSkyAccess(int worldX, int worldY, int worldZ) const;
     PrecipitationType precipitationAt(int worldX, int worldY, int worldZ) const;
@@ -71,7 +75,7 @@ public:
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.
-    void processCompletedGenerations(bool rebuildLighting = true);
+    void processCompletedGenerations(bool rebuildLightingNow = true);
 
     // Spin-wait for initial chunk generation (called once on first startGame)
     void waitForInitialGeneration(int maxWaitMs = 150);
@@ -183,7 +187,8 @@ private:
     void saveOverrides(int cx, int cz);
     void loadBlockEntities(int cx, int cz);
     void saveBlockEntities(int cx, int cz);
-    void rebuildBlockLight();
+    void rebuildLighting();
+    void updateLightingAt(const glm::ivec3& position);
     bool growSapling(const glm::ivec3& position, BlockId sapling);
     bool hasWaterForFarmland(const glm::ivec3& position, bool raining = false) const;
     void scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDelay = 1);

@@ -12,10 +12,11 @@
 
 #include "Config.h"
 #include "world/Block.h"
+#include "world/BlockLightLogic.h"
 
 struct MeshVertex {
     float px, py, pz;
-    float ao, skyLight, unused, alpha;
+    float ao, skyLight, blockLight, alpha;
     float u, v;
     float tile;
     float face;
@@ -81,8 +82,19 @@ struct ChunkMesh {
                      + Config::worldYToStorageY(worldY) *
                            Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
         };
-        auto blockLight = [&](int x, int y, int z) {
-            return static_cast<float>(getLight(chunkWorldX+x,y,chunkWorldZ+z))/15.0f;
+        (void)columnMaxY;
+        auto voxelLight = [&](int x, int y, int z) {
+            return getLight(chunkWorldX+x,y,chunkWorldZ+z);
+        };
+        auto normalizedLight = [&](int x,int y,int z) {
+            const LightSample value=voxelLight(x,y,z);
+            return glm::vec2(static_cast<float>(value.sky)/15.0f,
+                             static_cast<float>(value.block)/15.0f);
+        };
+        auto encodeFlatLight = [](float tile,uint8_t sky,uint8_t block) {
+            const int packed=std::clamp<int>(sky,0,15)*16+
+                             std::clamp<int>(block,0,15);
+            return tile+static_cast<float>(packed)/512.0f;
         };
 
         // Determine if a face is visible and returns its BlockId (or AIR if not)
@@ -106,11 +118,13 @@ struct ChunkMesh {
         struct MaskCell {
             uint8_t block = 0;
             uint8_t ao[4] = {3, 3, 3, 3};
-            uint8_t sky = 0;
-            uint8_t light = 0;
+            uint8_t sky[4] = {};
+            uint8_t light[4] = {};
 
             bool operator==(const MaskCell& other) const {
-                return block == other.block && sky == other.sky && light == other.light &&
+                return block == other.block &&
+                       std::equal(std::begin(sky),std::end(sky),std::begin(other.sky)) &&
+                       std::equal(std::begin(light),std::end(light),std::begin(other.light)) &&
                        ao[0] == other.ao[0] && ao[1] == other.ao[1] &&
                        ao[2] == other.ao[2] && ao[3] == other.ao[3];
             }
@@ -148,6 +162,24 @@ struct ChunkMesh {
             if (a && b) return 0;
             return static_cast<uint8_t>(3 - static_cast<int>(a) -
                                         static_cast<int>(b) - static_cast<int>(c));
+        };
+
+        auto cornerLight = [&](int x,int y,int z,FaceDir face,
+                               int uSign,int vSign) -> LightSample {
+            glm::ivec3 uAxis,vAxis;faceAxes(face,uAxis,vAxis);
+            const glm::ivec3 n=FACE_OFFSETS[static_cast<int>(face)];
+            const glm::ivec3 base(chunkWorldX+x,y,chunkWorldZ+z);
+            const glm::ivec3 samples[4]={base+n,base+n+uAxis*uSign,
+                base+n+vAxis*vSign,base+n+uAxis*uSign+vAxis*vSign};
+            int sky=0,block=0,count=0;
+            for(const auto& p:samples) {
+                if(getLightDampening(getNeighbor(p.x,p.y,p.z))>=15)continue;
+                const LightSample value=getLight(p.x,p.y,p.z);
+                sky+=value.sky;block+=value.block;++count;
+            }
+            if(count==0)return {};
+            return {static_cast<uint8_t>((sky+count/2)/count),
+                    static_cast<uint8_t>((block+count/2)/count)};
         };
 
         // Process each face direction
@@ -195,11 +227,12 @@ struct ChunkMesh {
                         cell.ao[1] = cornerAO(x, y, z, face,  1, -1);
                         cell.ao[2] = cornerAO(x, y, z, face,  1,  1);
                         cell.ao[3] = cornerAO(x, y, z, face, -1,  1);
-                        cell.sky = y >= columnMaxY[x][z] ? 1 : 0;
-                        const glm::ivec3 lightOffset = FACE_OFFSETS[static_cast<int>(face)];
-                        cell.light = static_cast<uint8_t>(
-                            std::round(blockLight(x + lightOffset.x, y + lightOffset.y,
-                                                  z + lightOffset.z) * 15.0f));
+                        const int signs[4][2]={{-1,-1},{1,-1},{1,1},{-1,1}};
+                        for(int corner=0;corner<4;++corner) {
+                            const LightSample value=cornerLight(x,y,z,face,
+                                signs[corner][0],signs[corner][1]);
+                            cell.sky[corner]=value.sky;cell.light[corner]=value.block;
+                        }
                     }
                 }
 
@@ -272,10 +305,15 @@ struct ChunkMesh {
 
                         MeshVertex vtx[4];
                         float alpha = getBlockProps(bid).alpha;
+                        int flatSky=0,flatBlock=0;
+                        for(int i=0;i<4;++i){flatSky+=cell.sky[i];flatBlock+=cell.light[i];}
+                        const float encodedTile=encodeFlatLight(
+                            static_cast<float>(getFaceTextureIndex(bid,face)),
+                            static_cast<uint8_t>((flatSky+2)/4),
+                            static_cast<uint8_t>((flatBlock+2)/4));
                         for (int i = 0; i < 4; ++i)
-                            vtx[i] = {0,0,0, 1.0f, static_cast<float>(cell.sky),
-                                      static_cast<float>(cell.light) / 15.0f, alpha, 0, 0,
-                                      static_cast<float>(getFaceTextureIndex(bid, face)),
+                            vtx[i] = {0,0,0, 1.0f, 0.0f, 0.0f, alpha, 0, 0,
+                                      encodedTile,
                                       static_cast<float>(f)};
 
                         auto setPos = [&](int vi, float px, float py, float pz) {
@@ -348,6 +386,10 @@ struct ChunkMesh {
                         const int* aoMap = patternA ? aoMapA : aoMapB;
                         for (int i = 0; i < 4; ++i)
                             vtx[i].ao = static_cast<float>(cell.ao[aoMap[i]]) / 3.0f;
+                        for (int i = 0; i < 4; ++i) {
+                            vtx[i].skyLight=static_cast<float>(cell.sky[aoMap[i]])/15.0f;
+                            vtx[i].blockLight=static_cast<float>(cell.light[aoMap[i]])/15.0f;
+                        }
 
                         // Push vertices and indices (2 triangles = 6 indices)
                         for (int i = 0; i < 4; ++i) vertices.push_back(vtx[i]);
@@ -401,10 +443,14 @@ struct ChunkMesh {
                     const float h10 = cornerHeight(x + 1, z);
                     const float h01 = cornerHeight(x, z + 1);
                     const float h11 = cornerHeight(x + 1, z + 1);
-                    const float tile = static_cast<float>(getFaceTextureIndex(id, FaceDir::TOP));
+                    const float baseTile = static_cast<float>(getFaceTextureIndex(id, FaceDir::TOP));
                     const float alpha = getBlockProps(id).alpha;
-                    const float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
-                    const float light = lava ? 1.0f : blockLight(x, y, z);
+                    const glm::vec2 sampled=normalizedLight(x,y,z);
+                    const float sky=sampled.x;
+                    const float light = lava ? 1.0f : sampled.y;
+                    const float tile=encodeFlatLight(baseTile,
+                        static_cast<uint8_t>(std::round(sky*15.0f)),
+                        static_cast<uint8_t>(std::round(light*15.0f)));
                     auto emit = [&](FaceDir face, const glm::vec3 (&positions)[4]) {
                         const unsigned int base = static_cast<unsigned int>(vertices.size());
                         const glm::vec2 uv[4] = {{1,1},{1,0},{0,0},{0,1}};
@@ -465,12 +511,14 @@ struct ChunkMesh {
         auto emitCrossPlane = [&](float x0, float z0, float x1, float z1,
                                   float y, float sky, const BlockProperties& props) {
             unsigned int base = static_cast<unsigned int>(vertices.size());
-            float tile = static_cast<float>(getFaceTextureIndex(props.id, FaceDir::FRONT));
+            const float baseTile = static_cast<float>(getFaceTextureIndex(props.id, FaceDir::FRONT));
             constexpr float CROSS_FACE = 6.0f;
-            const float light = (props.id == BlockId::TORCH ||
-                                 props.id == BlockId::FIRE) ? 1.0f
-                : blockLight(static_cast<int>(x0), static_cast<int>(y),
-                             static_cast<int>(z0));
+            const glm::vec2 sampled=normalizedLight(static_cast<int>(x0),
+                static_cast<int>(y),static_cast<int>(z0));
+            const float light = getLightEmission(props.id)>0 ? 1.0f : sampled.y;
+            const float tile=encodeFlatLight(baseTile,
+                static_cast<uint8_t>(std::round(sky*15.0f)),
+                static_cast<uint8_t>(std::round(light*15.0f)));
             vertices.push_back({x0, y,       z0, 1, sky, light, props.alpha, 0, 0, tile, CROSS_FACE});
             vertices.push_back({x1, y,       z1, 1, sky, light, props.alpha, 1, 0, tile, CROSS_FACE});
             vertices.push_back({x1, y + 1.0f,z1, 1, sky, light, props.alpha, 1, 1, tile, CROSS_FACE});
@@ -491,7 +539,7 @@ struct ChunkMesh {
                     float fx = static_cast<float>(x);
                     float fy = static_cast<float>(y);
                     float fz = static_cast<float>(z);
-                    float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
+                    float sky = normalizedLight(x,y,z).x;
                     emitCrossPlane(fx + 0.12f, fz + 0.12f,
                                    fx + 0.88f, fz + 0.88f, fy, sky, props);
                     emitCrossPlane(fx + 0.88f, fz + 0.12f,
@@ -508,10 +556,14 @@ struct ChunkMesh {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                     if (static_cast<BlockId>(blocks[localIdx(x, y, z)]) !=
                         BlockId::SNOW_LAYER) continue;
-                    const float tile = static_cast<float>(
+                    const float baseTile = static_cast<float>(
                         getAtlasTextureIndex(BlockTexture::SnowLayer));
-                    const float sky = y >= columnMaxY[x][z] ? 1.0f : 0.0f;
-                    const float light = blockLight(x, y, z);
+                    const glm::vec2 sampled=normalizedLight(x,y,z);
+                    const float sky=sampled.x;
+                    const float light=sampled.y;
+                    const float tile=encodeFlatLight(baseTile,
+                        static_cast<uint8_t>(std::round(sky*15.0f)),
+                        static_cast<uint8_t>(std::round(light*15.0f)));
                     for (int f : {0, 2, 3, 4, 5}) {
                         const unsigned int base =
                             static_cast<unsigned int>(vertices.size());

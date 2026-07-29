@@ -141,6 +141,11 @@ struct BlockProperties {
     float alpha = 1.0f;
 };
 
+// Lighting is deliberately independent from render transparency.  For
+// example, leaves and water transmit light but attenuate it.
+uint8_t getLightEmission(BlockId id);
+uint8_t getLightDampening(BlockId id);
+
 // Material tiles in the dynamically sized shared block atlas.
 enum class BlockTexture : uint8_t {
     Dirt, GrassTop, GrassSide, Stone, OakLog, LogTop, Leaves, Sand,

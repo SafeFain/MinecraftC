@@ -12,6 +12,7 @@ void Chunk::loadRawBlocks(const std::vector<uint8_t>& blocks) {
     if (blocks.size() != m_blocks.size())
         throw std::runtime_error("Generated chunk cache has the wrong size");
     std::copy(blocks.begin(), blocks.end(), m_blocks.begin());
+    ++m_dataRevision;
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
             recalcColumnMax(x, z);
@@ -35,6 +36,7 @@ void Chunk::setBlock(int x, int y, int z, BlockId id) {
     }
 
     m_blocks[index(x, y, z)] = static_cast<uint8_t>(id);
+    ++m_dataRevision;
     m_dirty = true;
 
     // Update column max height

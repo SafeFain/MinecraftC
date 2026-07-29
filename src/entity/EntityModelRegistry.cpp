@@ -4,6 +4,7 @@
 #include "debug/Log.h"
 
 #include <cmath>
+#include <algorithm>
 #include <stdexcept>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -229,7 +230,8 @@ void EntityModelRegistry::queue(
     EntityType type, uint64_t id, const glm::dvec3& position,
     const glm::vec3& facing, uint32_t behaviorSeed,
     const glm::dvec3& renderOrigin,
-    const glm::vec3& cameraPosition, model::ModelRenderer& renderer) {
+    const glm::vec3& cameraPosition, model::ModelRenderer& renderer,
+    SmoothLightSample light) {
     m_seen.insert(id);
     const auto& definition = this->definition(type);
     InstanceEntry& entry = ensure(type, id);
@@ -246,8 +248,13 @@ void EntityModelRegistry::queue(
     const glm::mat4 transform = glm::translate(glm::mat4(1), localPosition) *
         glm::rotate(glm::mat4(1), yaw, glm::vec3(0,1,0));
     const glm::vec3 delta = localPosition - cameraPosition;
+    const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.35f);
+    const float block=std::pow(std::clamp(light.block,0.0f,1.0f),1.35f);
+    const glm::vec3 illumination=glm::max(glm::vec3(sky),
+        glm::vec3(1.0f,0.72f,0.38f)*block);
     renderer.queue({definition.handle, transform, &entry.instance,
-                    glm::vec4(1), glm::dot(delta, delta)});
+                    glm::vec4(glm::max(illumination,glm::vec3(0.025f)),1.0f),
+                    glm::dot(delta, delta), light});
 }
 
 void EntityModelRegistry::endFrame() {

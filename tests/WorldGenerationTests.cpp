@@ -291,7 +291,7 @@ int main() {
     ChunkMesh mesh;
     mesh.build(0, 0, meshBlocks.data(), maxY,
                [](int, int, int) { return BlockId::AIR; },
-               [](int, int, int) -> uint8_t { return 0; });
+               [](int, int, int) -> LightSample { return {}; });
     require(mesh.opaqueIndexCount >= 24,
             "cross-shaped vegetation was not emitted double-sided");
     require(mesh.translucentIndexCount > 0,
@@ -314,7 +314,7 @@ int main() {
             if (wx < 0 || wx >= 16 || !Config::isValidWorldY(wy) ||
                 wz < 0 || wz >= 16) return BlockId::AIR;
             return static_cast<BlockId>(aoBlocks[meshIndex(wx, wy, wz)]);
-        }, [](int, int, int) -> uint8_t { return 0; });
+        }, [](int, int, int) -> LightSample { return {}; });
     bool foundDarkCorner = false;
     bool foundCoveredSurface = false;
     for (const auto& vertex : aoMesh.vertices) {
@@ -328,6 +328,28 @@ int main() {
     }
     require(foundDarkCorner, "voxel corner AO was not generated");
     require(foundCoveredSurface, "covered surface incorrectly received sky light");
+
+    std::vector<uint8_t> litBlocks(Config::CHUNK_VOLUME,0);
+    litBlocks[meshIndex(8,40,8)]=static_cast<uint8_t>(BlockId::STONE);
+    ChunkMesh litMesh;
+    litMesh.build(0,0,litBlocks.data(),maxY,
+        [&](int wx,int wy,int wz){
+            if(wx<0||wx>=16||wz<0||wz>=16||!Config::isValidWorldY(wy))
+                return BlockId::AIR;
+            return static_cast<BlockId>(litBlocks[meshIndex(wx,wy,wz)]);
+        },[](int wx,int,int)->LightSample{
+            return {static_cast<uint8_t>(wx<9?15:7),
+                    static_cast<uint8_t>(wx<9?2:14)};
+        });
+    float minSky=1.0f,maxSky=0.0f,minBlock=1.0f,maxBlock=0.0f;
+    for(const auto& vertex:litMesh.vertices){
+        if(vertex.face!=static_cast<float>(FaceDir::TOP)||
+           std::abs(vertex.py-41.0f)>0.01f)continue;
+        minSky=std::min(minSky,vertex.skyLight);maxSky=std::max(maxSky,vertex.skyLight);
+        minBlock=std::min(minBlock,vertex.blockLight);maxBlock=std::max(maxBlock,vertex.blockLight);
+    }
+    require(maxSky-minSky>0.1f&&maxBlock-minBlock>0.1f,
+            "smooth mesh vertices did not preserve dual-channel gradients");
 
     // The async worker-to-render-thread handoff must carry all layer metadata,
     // not just the vertex/index arrays. Missing counts make otherwise valid

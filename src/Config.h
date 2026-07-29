@@ -5,7 +5,7 @@
 
 namespace Config {
 
-constexpr const char* GAME_VERSION = "Beta 1.0";
+constexpr const char* GAME_VERSION = "Beta-1.1.0";
 
 // ── Window ────────────────────────────────────────────────────────────
 constexpr int   WINDOW_WIDTH    = 1280;
@@ -38,6 +38,7 @@ constexpr int   RENDER_DISTANCE_OPTION_COUNT = 7;
 // ── Visual environment ──────────────────────────────────────────────────
 constexpr int   MSAA_SAMPLES = 4;
 inline int      DAY_CYCLE_MINUTES = 20;
+inline bool     SMOOTH_LIGHTING = true;
 constexpr int   DAY_CYCLE_OPTIONS[] = {0, 10, 20, 40}; // 0 = static noon
 constexpr int   DAY_CYCLE_OPTION_COUNT = 4;
 constexpr float NIGHT_AMBIENT_MIN = 0.20f;

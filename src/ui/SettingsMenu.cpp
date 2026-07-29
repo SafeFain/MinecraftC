@@ -56,10 +56,7 @@ void SettingsMenu::toggleAutoJump() {
 
 void SettingsMenu::refreshButtons() {
     m_buttons.clear();
-    if (!m_controls) {
-        m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
-        m_buttons.emplace_back(labelForCloudRenderDist(),
-                               [this]{ cycleCloudRenderDistance(); });
+    if (m_page == Page::General) {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
         std::ostringstream sensitivity;
@@ -78,12 +75,31 @@ void SettingsMenu::refreshButtons() {
             (m_settings.rawMouseInput ? "ON" : "OFF"), [this]{
                 m_settings.rawMouseInput = !m_settings.rawMouseInput; m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back("GUI Scale: " + std::string(m_settings.guiScale == 0 ? "Auto" :
-            std::to_string(m_settings.guiScale) + "x"), [this]{
-                m_settings.guiScale = (m_settings.guiScale + 1) % 5; m_onChanged(); refreshButtons();
-            });
-        m_buttons.emplace_back("Controls...", [this]{ m_controls = true; refreshButtons(); });
+        m_buttons.emplace_back("Video Settings...", [this]{
+            m_page = Page::Video; m_selectedIdx = 0; refreshButtons();
+        });
+        m_buttons.emplace_back("Controls...", [this]{
+            m_page = Page::Controls; m_selectedIdx = 0; refreshButtons();
+        });
         m_buttons.emplace_back("Back", m_onBack);
+    } else if (m_page == Page::Video) {
+        m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
+        m_buttons.emplace_back(labelForCloudRenderDist(),
+                               [this]{ cycleCloudRenderDistance(); });
+        m_buttons.emplace_back(std::string("Smooth Lighting: ") +
+            (m_settings.smoothLighting ? "ON" : "OFF"), [this]{
+                m_settings.smoothLighting = !m_settings.smoothLighting;
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back("GUI Scale: " + std::string(
+            m_settings.guiScale == 0 ? "Auto" :
+            std::to_string(m_settings.guiScale) + "x"), [this]{
+                m_settings.guiScale = (m_settings.guiScale + 1) % 5;
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back("Back to Settings", [this]{
+            m_page = Page::General; m_selectedIdx = 0; refreshButtons();
+        });
     } else {
         constexpr int visible = 8;
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
@@ -97,8 +113,9 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back("Reset Controls", [this]{
             m_settings.resetBindings(); m_onChanged(); refreshButtons();
         });
-        m_buttons.emplace_back("Back to General", [this]{
-            m_captureAction = -1; m_controls = false; refreshButtons();
+        m_buttons.emplace_back("Back to Settings", [this]{
+            m_captureAction = -1; m_page = Page::General;
+            m_selectedIdx = 0; refreshButtons();
         });
     }
     m_selectedIdx = std::clamp(m_selectedIdx, 0, std::max(0, static_cast<int>(m_buttons.size()) - 1));
@@ -117,12 +134,13 @@ void SettingsMenu::assignBinding(InputBinding binding) {
 void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
                 Config::UIColors::BACKGROUND);
-    const char* title = m_controls ? "CONTROLS" : "SETTINGS";
+    const char* title = m_page == Page::Controls ? "CONTROLS" :
+                        m_page == Page::Video ? "VIDEO SETTINGS" : "SETTINGS";
     const auto titleSize = ui.measureText(title, 3.0f);
     const float titleY = height * 0.78f;
     ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,
                   Config::UIColors::TEXT_TITLE);
-    if (m_controls)
+    if (m_page == Page::Controls)
         ui.renderText("Click a row, then press a key / mouse button / wheel",
                       width * .5f - 210.0f, titleY - 34.0f, 1.0f, glm::vec3(.72f));
     const float startY = titleY - 58.0f;
@@ -152,7 +170,12 @@ void SettingsMenu::onKeyPress(int key) {
         case GLFW_KEY_DOWN: case GLFW_KEY_S: navigateDown(m_buttons, m_selectedIdx); break;
         case GLFW_KEY_ENTER: case GLFW_KEY_SPACE: activateSelected(m_buttons, m_selectedIdx); break;
         case GLFW_KEY_ESCAPE:
-            if (m_controls) { m_controls = false; refreshButtons(); } else m_onBack();
+            if (m_page != Page::General) {
+                m_captureAction = -1;
+                m_page = Page::General;
+                m_selectedIdx = 0;
+                refreshButtons();
+            } else m_onBack();
             break;
         default: break;
     }
@@ -186,7 +209,7 @@ void SettingsMenu::onMouseButton(int button, int action, double x, double y) {
 
 void SettingsMenu::onScroll(double yOffset) {
     if (m_captureAction >= 0) { assignBinding({InputDevice::Wheel, yOffset > 0 ? 1 : -1}); return; }
-    if (!m_controls) return;
+    if (m_page != Page::Controls) return;
     const int maximum = std::max(0, static_cast<int>(INPUT_ACTION_COUNT) - 8);
     m_controlOffset = std::clamp(m_controlOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
     refreshButtons();

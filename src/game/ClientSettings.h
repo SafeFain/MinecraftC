@@ -6,7 +6,7 @@
 #include "core/Input.h"
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 1;
+    static constexpr int FORMAT_VERSION = 2;
 
     int renderDistance = 8;
     int cloudRenderDistance = 192;
@@ -15,6 +15,7 @@ struct ClientSettings {
     float mouseSensitivity = 0.15f;
     bool invertMouseY = false;
     bool rawMouseInput = true;
+    bool smoothLighting = true;
     int guiScale = 0; // 0 = Auto
     std::array<InputBinding, INPUT_ACTION_COUNT> bindings{};
 

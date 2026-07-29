@@ -129,6 +129,9 @@ void Renderer::initialize(bool framebufferSrgb,
         glfwGetProcAddress("glDrawArraysInstanced"));
     m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
         glfwGetProcAddress("glVertexAttribDivisor"));
+    m_bufferSubData = reinterpret_cast<BufferSubDataFn>(
+        glfwGetProcAddress("glBufferSubData"));
+    m_cloudInstances.reserve(MAX_CLOUD_INSTANCES);
     if (m_drawArraysInstanced && m_vertexAttribDivisor) {
         // Clouds share the static entity cube but provide position and size
         // per instance, reducing the entire layer to one draw call.
@@ -140,6 +143,9 @@ void Renderer::initialize(bool framebufferSrgb,
             0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr));
         GL_CHECK(glEnableVertexAttribArray(0));
         GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
+        GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+            MAX_CLOUD_INSTANCES * sizeof(CloudInstance), nullptr,
+            GL_STREAM_DRAW));
         GL_CHECK(glVertexAttribPointer(
             2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
         GL_CHECK(glEnableVertexAttribArray(2));
@@ -150,7 +156,6 @@ void Renderer::initialize(bool framebufferSrgb,
         m_vertexAttribDivisor(2, 1);
         m_vertexAttribDivisor(3, 1);
         GL_CHECK(glBindVertexArray(0));
-
         constexpr float quad[] = {
             -0.5f, 0.0f,  0.5f, 0.0f,  0.5f, 1.0f,
             -0.5f, 0.0f,  0.5f, 1.0f, -0.5f, 1.0f
@@ -312,6 +317,7 @@ void Renderer::bindBlockShader() const {
                    Config::CHUNK_SIZE_X);
     m_blockShader->setFloat("uFogStartFraction", Config::FOG_START_FRACTION);
     m_blockShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_blockShader->setInt("uSmoothLighting", Config::SMOOTH_LIGHTING ? 1 : 0);
 }
 
 void Renderer::unbindBlockShader() const {
@@ -352,8 +358,9 @@ void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
 void Renderer::renderCompatibilityEntityCube(
     const glm::vec3& position, const glm::vec3& size,
     const glm::vec3& color, int textureIndex,
-    const glm::mat4& viewProjection) {
-    renderEntity(position, size, color, textureIndex, viewProjection);
+    const glm::mat4& viewProjection, SmoothLightSample light) {
+    renderEntityPart(position, glm::vec3(0.0f), size, 0.0f, color,
+                     textureIndex, viewProjection, light);
 }
 
 model::ModelRenderer& Renderer::modelRenderer() {
@@ -373,7 +380,7 @@ void Renderer::flushModels(const glm::mat4& viewProjection) {
 void Renderer::renderEntityPart(
     const glm::vec3& position, const glm::vec3& offset,
     const glm::vec3& size, float yaw, const glm::vec3& color,
-    int textureIndex, const glm::mat4& viewProjection) {
+    int textureIndex, const glm::mat4& viewProjection, SmoothLightSample light) {
     const glm::mat4 model = glm::translate(glm::mat4(1.0f), position) *
                             glm::rotate(glm::mat4(1.0f), yaw,
                                         glm::vec3(0.0f, 1.0f, 0.0f)) *
@@ -387,6 +394,8 @@ void Renderer::renderEntityPart(
     m_entityShader->setInt("uUseTexture",
                            m_entityTexture && textureIndex >= 0 ? 1 : 0);
     m_entityShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_entityShader->setFloat("uSkyLight", light.sky);
+    m_entityShader->setFloat("uBlockLight", light.block);
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_entityTexture));
     GL_CHECK(glBindVertexArray(m_entityVAO));
@@ -405,40 +414,51 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
     const double drift = static_cast<double>(timeSeconds) * 0.8;
     const int centerX = static_cast<int>(std::floor((playerPosition.x - drift) / cellSize));
     const int centerZ = static_cast<int>(std::floor(playerPosition.z / cellSize));
-    struct CloudInstance {
-        float x, y, z;
-        float width, depth, height;
-    };
-    std::vector<CloudInstance> instances;
-    instances.reserve(static_cast<size_t>((radius * 2 + 1) *
-                                          (radius * 2 + 1) * 3 / 8));
-    for (int dz = -radius; dz <= radius; ++dz) {
-        for (int dx = -radius; dx <= radius; ++dx) {
-            const int cx = centerX + dx;
-            const int cz = centerZ + dz;
-            uint64_t h = worldSeed ^ (static_cast<uint64_t>(static_cast<int64_t>(cx)) *
-                                      0x9E3779B97F4A7C15ULL);
-            h ^= static_cast<uint64_t>(static_cast<int64_t>(cz)) *
-                 0xD1B54A32D192ED03ULL;
-            h ^= h >> 30; h *= 0xBF58476D1CE4E5B9ULL;
-            h ^= h >> 27; h *= 0x94D049BB133111EBULL; h ^= h >> 31;
-            if ((h & 15ULL) > 5ULL) continue;
-            const float width = 8.0f + static_cast<float>((h >> 8) & 7ULL);
-            const float depth = 7.0f + static_cast<float>((h >> 12) & 7ULL);
-            const float height = 2.0f + static_cast<float>((h >> 16) % 3ULL);
-            instances.push_back({
-                static_cast<float>(cx * cellSize + drift - playerPosition.x),
-                192.0f + static_cast<float>((h >> 20) % 3ULL),
-                static_cast<float>(cz * cellSize - playerPosition.z),
-                width, depth, height});
+    const bool rebuild = m_cloudCacheRadius != radius ||
+        m_cloudCacheCenterX != centerX || m_cloudCacheCenterZ != centerZ ||
+        m_cloudCacheSeed != worldSeed;
+    if (rebuild) {
+        m_cloudInstances.clear();
+        for (int dz = -radius; dz <= radius; ++dz) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const int cx = centerX + dx;
+                const int cz = centerZ + dz;
+                uint64_t h = worldSeed ^
+                    (static_cast<uint64_t>(static_cast<int64_t>(cx)) *
+                     0x9E3779B97F4A7C15ULL);
+                h ^= static_cast<uint64_t>(static_cast<int64_t>(cz)) *
+                     0xD1B54A32D192ED03ULL;
+                h ^= h >> 30; h *= 0xBF58476D1CE4E5B9ULL;
+                h ^= h >> 27; h *= 0x94D049BB133111EBULL; h ^= h >> 31;
+                if ((h & 15ULL) > 5ULL) continue;
+                const float width = 8.0f + static_cast<float>((h >> 8) & 7ULL);
+                const float depth = 7.0f + static_cast<float>((h >> 12) & 7ULL);
+                const float height = 2.0f +
+                                     static_cast<float>((h >> 16) % 3ULL);
+                m_cloudInstances.push_back({
+                    static_cast<float>(dx * cellSize),
+                    192.0f + static_cast<float>((h >> 20) % 3ULL),
+                    static_cast<float>(dz * cellSize),
+                    width, depth, height});
+            }
         }
+        m_cloudCacheRadius = radius;
+        m_cloudCacheCenterX = centerX;
+        m_cloudCacheCenterZ = centerZ;
+        m_cloudCacheSeed = worldSeed;
     }
-    if (instances.empty()) return;
+    if (m_cloudInstances.empty()) return;
+    const glm::vec3 cloudOrigin(
+        static_cast<float>(static_cast<double>(centerX) * cellSize + drift -
+                           playerPosition.x),
+        0.0f,
+        static_cast<float>(static_cast<double>(centerZ) * cellSize -
+                           playerPosition.z));
     const glm::vec3 cloudColor = cloudColorForEnvironment(m_environment);
 
     if (!m_cloudVAO || !m_drawArraysInstanced) {
-        for (const CloudInstance& instance : instances) {
-            renderEntity(glm::vec3(instance.x, instance.y, instance.z),
+        for (const CloudInstance& instance : m_cloudInstances) {
+            renderEntity(cloudOrigin + glm::vec3(instance.x, instance.y, instance.z),
                          glm::vec3(instance.width, instance.height,
                                    instance.depth),
                          cloudColor, -1, viewProjection);
@@ -448,17 +468,23 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
 
     m_cloudShader->bind();
     m_cloudShader->setMat4("uViewProjection", viewProjection);
+    m_cloudShader->setVec3("uCloudOrigin", cloudOrigin);
     m_cloudShader->setVec3("uColor", cloudColor);
     m_cloudShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_cloudVAO));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
-    // GL_STREAM_DRAW lets the driver replace storage rather than waiting for
-    // a prior frame that is still consuming the instance buffer.
-    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
-                         instances.size() * sizeof(CloudInstance),
-                         instances.data(), GL_STREAM_DRAW));
+    if (rebuild) {
+        const GLsizeiptr bytes = static_cast<GLsizeiptr>(
+            m_cloudInstances.size() * sizeof(CloudInstance));
+        if (m_bufferSubData)
+            GL_CHECK(m_bufferSubData(
+                GL_ARRAY_BUFFER, 0, bytes, m_cloudInstances.data()));
+        else
+            GL_CHECK(glBufferData(GL_ARRAY_BUFFER, bytes, m_cloudInstances.data(),
+                                  GL_STREAM_DRAW));
+    }
     m_drawArraysInstanced(GL_TRIANGLES, 0, 36,
-                          static_cast<GLsizei>(instances.size()));
+                          static_cast<GLsizei>(m_cloudInstances.size()));
     GL_CHECK(glBindVertexArray(0));
 }
 

@@ -3,6 +3,7 @@
 #include "entity/EntityLogic.h"
 #include "model/GltfLoader.h"
 #include "model/AnimationMixer.h"
+#include "world/BlockLightLogic.h"
 
 #include <array>
 #include <filesystem>
@@ -42,7 +43,7 @@ public:
     void queue(EntityType type, uint64_t id, const glm::dvec3& position,
                const glm::vec3& facing, uint32_t behaviorSeed,
                const glm::dvec3& renderOrigin, const glm::vec3& cameraPosition,
-               model::ModelRenderer& renderer);
+               model::ModelRenderer& renderer, SmoothLightSample light = {});
     void endFrame();
 
 private:

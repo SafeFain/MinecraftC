@@ -15,12 +15,14 @@ public:
     void onScroll(double yOffset) override;
 
 private:
+    enum class Page { General, Video, Controls };
+
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
     std::function<void()> m_onBack;
     std::function<void()> m_onChanged;
     ClientSettings& m_settings;
-    bool m_controls = false;
+    Page m_page = Page::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;
     int m_pressedButton = -1;

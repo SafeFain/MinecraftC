@@ -83,13 +83,37 @@ BlockId World::getBlock(int worldX, int worldY, int worldZ) const {
 }
 
 uint8_t World::getBlockLight(int worldX, int worldY, int worldZ) const {
-    if (!Config::isValidWorldY(worldY)) return 0;
+    return getLight(worldX, worldY, worldZ).block;
+}
+
+uint8_t World::getSkyLight(int worldX, int worldY, int worldZ) const {
+    return getLight(worldX, worldY, worldZ).sky;
+}
+
+LightSample World::getLight(int worldX, int worldY, int worldZ) const {
+    if (!Config::isValidWorldY(worldY)) return {};
     const int cx = worldToChunkX(worldX), cz = worldToChunkZ(worldZ);
     const int lx = worldX - cx * Config::CHUNK_SIZE_X;
     const int lz = worldZ - cz * Config::CHUNK_SIZE_Z;
     std::shared_lock lock(m_chunkMutex);
     auto it = m_chunks.find({cx,cz});
-    return it == m_chunks.end() ? 0 : it->second->getBlockLight(lx,worldY,lz);
+    return it == m_chunks.end() ? LightSample{} :
+        unpackLight(it->second->getPackedLight(lx,worldY,lz));
+}
+
+SmoothLightSample World::sampleLight(const glm::dvec3& position) const {
+    const int x0=static_cast<int>(std::floor(position.x));
+    const int y0=static_cast<int>(std::floor(position.y));
+    const int z0=static_cast<int>(std::floor(position.z));
+    const glm::dvec3 fraction=position-glm::dvec3(x0,y0,z0);
+    double sky=0.0,block=0.0;
+    for(int dz=0;dz<=1;++dz)for(int dy=0;dy<=1;++dy)for(int dx=0;dx<=1;++dx){
+        const double weight=(dx?fraction.x:1.0-fraction.x)*
+            (dy?fraction.y:1.0-fraction.y)*(dz?fraction.z:1.0-fraction.z);
+        const LightSample light=getLight(x0+dx,y0+dy,z0+dz);
+        sky+=weight*light.sky;block+=weight*light.block;
+    }
+    return {static_cast<float>(sky/15.0),static_cast<float>(block/15.0)};
 }
 
 int World::getSurfaceY(int worldX, int worldZ) const {
@@ -150,7 +174,7 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
             m_dirtyBlockEntityChunks.insert({cx, cz});
         }
     }
-    m_lightDirty = true;
+    updateLightingAt({worldX,worldY,worldZ});
 
     if (lx == 0)                   markDirty(cx - 1, cz);
     if (lx == Config::CHUNK_SIZE_X - 1) markDirty(cx + 1, cz);
@@ -429,7 +453,16 @@ void World::update(const glm::dvec3& playerPos) {
         for (auto& key : toRemove) {
             auto it = m_chunks.find(key);
             if (it != m_chunks.end()) {
-                if (it->second->generated.load()) m_lightDirty = true;
+                if (it->second->generated.load()) {
+                    m_lightDirty = true;
+                    constexpr int adjacent[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+                    for(const auto& direction:adjacent){
+                        auto neighbor=m_chunks.find({key.first+direction[0],
+                                                     key.second+direction[1]});
+                        if(neighbor!=m_chunks.end())
+                            neighbor->second->lightingInitialized=false;
+                    }
+                }
                 saveOverrides(key.first, key.second);
                 saveBlockEntities(key.first, key.second);
                 it->second->getMesh().destroy();
@@ -667,7 +700,7 @@ void World::enqueueGeneration() {
     }
 }
 
-void World::processCompletedGenerations(bool rebuildLighting) {
+void World::processCompletedGenerations(bool rebuildLightingNow) {
     // Apply pending tree leaves for chunks that have finished generating
     std::vector<glm::ivec3> fluidSeeds;
     std::unique_lock lock(m_chunkMutex);
@@ -697,48 +730,14 @@ void World::processCompletedGenerations(bool rebuildLighting) {
     }
     lock.unlock();
     for (const glm::ivec3& position : fluidSeeds) scheduleFluidAround(position);
-    if (rebuildLighting && m_lightDirty) rebuildBlockLight();
+    if (rebuildLightingNow && m_lightDirty) rebuildLighting();
 }
 
-void World::rebuildBlockLight() {
-    std::queue<BlockLightNode> queue;
+void World::rebuildLighting() {
+    std::queue<BlockLightNode> blockQueue;
+    std::queue<BlockLightNode> skyQueue;
     std::unique_lock lock(m_chunkMutex);
     if (!m_lightDirty) return;
-    // Terrain generation never creates torches. Player-placed torches are
-    // sparse overrides, so collect those directly instead of scanning every
-    // cell in every 384-layer chunk after each streaming update.
-    struct LightSource { Chunk* chunk; int x; int y; int z; uint8_t level; };
-    std::vector<LightSource> sources;
-    for (const auto& [key, overrides] : m_blockOverrides) {
-        auto chunkIt = m_chunks.find(key);
-        if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
-        Chunk* chunk = chunkIt->second.get();
-        for (const auto& [index, block] : overrides) {
-            if (block != BlockId::TORCH && block != BlockId::FIRE && !isLava(block))
-                continue;
-            const int x = index % Config::CHUNK_SIZE_X;
-            const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
-            const int y = Config::storageYToWorldY(
-                index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
-            sources.push_back({chunk, x, y, z,
-                               (block == BlockId::FIRE || isLava(block))
-                                   ? uint8_t{15} : uint8_t{14}});
-        }
-    }
-    if (sources.empty() && !m_lightHasSources) {
-        m_lightDirty = false;
-        return;
-    }
-    for (auto& [key, chunk] : m_chunks) {
-        (void)key;
-        if (chunk->generated.load()) chunk->clearBlockLight();
-    }
-    for (const auto& source : sources) {
-        source.chunk->setBlockLight(
-            source.x, source.y, source.z, source.level);
-        queue.push({source.chunk->worldX() + source.x, source.y,
-                    source.chunk->worldZ() + source.z, source.level});
-    }
     auto findCell=[&](int wx,int y,int wz) -> std::pair<Chunk*,glm::ivec3> {
         if(!Config::isValidWorldY(y)) return {nullptr,glm::ivec3(0)};
         const int cx=worldToChunkX(wx),cz=worldToChunkZ(wz);
@@ -746,17 +745,192 @@ void World::rebuildBlockLight() {
         if(it==m_chunks.end()||!it->second->generated.load()) return {nullptr,glm::ivec3(0)};
         return {it->second.get(),{wx-cx*Config::CHUNK_SIZE_X,y,wz-cz*Config::CHUNK_SIZE_Z}};
     };
-    propagateBlockLight(queue,
-        [&](int x,int y,int z){ auto [chunk,p]=findCell(x,y,z);if(!chunk)return false;
-            const BlockId block=chunk->getBlock(p.x,p.y,p.z);
-            return block==BlockId::AIR||getBlockProps(block).transparent; },
-        [&](int x,int y,int z){ auto [chunk,p]=findCell(x,y,z);
-            return chunk?chunk->getBlockLight(p.x,p.y,p.z):uint8_t{0}; },
-        [&](int x,int y,int z,uint8_t value){ auto [chunk,p]=findCell(x,y,z);
-            if(chunk)chunk->setBlockLight(p.x,p.y,p.z,value); });
-    for (auto& [key,chunk]:m_chunks) if (chunk->generated.load()) chunk->markDirty();
-    m_lightHasSources = !sources.empty();
+
+    bool hasSources = false;
+    std::vector<Chunk*> initialized;
+    std::unordered_set<Chunk*> lightChanged;
+    for (auto& [key, chunk] : m_chunks) {
+        (void)key;
+        if (!chunk->generated.load()||chunk->lightingInitialized.load()) continue;
+        chunk->clearLight();
+        initialized.push_back(chunk.get());
+        lightChanged.insert(chunk.get());
+        for (int z=0;z<Config::CHUNK_SIZE_Z;++z) for(int x=0;x<Config::CHUNK_SIZE_X;++x) {
+            uint8_t vertical=15;
+            for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y) {
+                const BlockId block=chunk->getBlock(x,y,z);
+                const uint8_t damping=getLightDampening(block);
+                if(damping>=15) vertical=0;
+                else if(vertical>0 && damping>0)
+                    vertical=static_cast<uint8_t>(vertical>damping?vertical-damping:0);
+                if(vertical>0) {
+                    chunk->setSkyLight(x,y,z,vertical);
+                }
+                const uint8_t emission=getLightEmission(block);
+                if(emission>0) {
+                    chunk->setBlockLight(x,y,z,emission);
+                    blockQueue.push({chunk->worldX()+x,y,chunk->worldZ()+z,emission});
+                    hasSources=true;
+                }
+            }
+        }
+        chunk->lightingInitialized=true;
+    }
+
+    // Direct columns are already complete.  Seed flood fill only along an
+    // exposed horizontal frontier instead of queueing every open-sky voxel.
+    constexpr int horizontal[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+    for(Chunk* chunk:initialized){
+        for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+            for(int z=0;z<Config::CHUNK_SIZE_Z;++z)
+                for(int x=0;x<Config::CHUNK_SIZE_X;++x){
+                    const uint8_t value=chunk->getSkyLight(x,y,z);if(value==0)continue;
+                    const int wx=chunk->worldX()+x,wz=chunk->worldZ()+z;
+                    bool frontier=false;
+                    for(const auto& d:horizontal){auto [neighbor,p]=findCell(wx+d[0],y,wz+d[1]);
+                        if(neighbor&&neighbor->getSkyLight(p.x,p.y,p.z)<value){frontier=true;break;}}
+                    if(frontier)skyQueue.push({wx,y,wz,value});
+                }
+    }
+    // Existing neighbor borders are also sources for a newly initialized
+    // chunk, and vice versa.
+    for(Chunk* chunk:initialized)for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+        for(int edge=0;edge<4;++edge)for(int i=0;i<Config::CHUNK_SIZE_X;++i){
+            const int x=edge==0?0:edge==1?Config::CHUNK_SIZE_X-1:i;
+            const int z=edge==2?0:edge==3?Config::CHUNK_SIZE_Z-1:i;
+            const int wx=chunk->worldX()+x,wz=chunk->worldZ()+z;
+            const int nx=wx+(edge==0?-1:edge==1?1:0);
+            const int nz=wz+(edge==2?-1:edge==3?1:0);
+            auto [neighbor,p]=findCell(nx,y,nz);if(!neighbor)continue;
+            for(const auto& seed:std::array<std::pair<int,int>,2>{{{wx,wz},{nx,nz}}}){
+                auto [source,sp]=findCell(seed.first,y,seed.second);if(!source)continue;
+                const uint8_t sky=source->getSkyLight(sp.x,sp.y,sp.z);
+                const uint8_t block=source->getBlockLight(sp.x,sp.y,sp.z);
+                if(sky)skyQueue.push({seed.first,y,seed.second,sky});
+                if(block)blockQueue.push({seed.first,y,seed.second,block});
+            }
+        }
+
+    constexpr int directions[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    auto spread=[&](std::queue<BlockLightNode>& queue,bool sky) {
+        while(!queue.empty()) {
+            const auto node=queue.front();queue.pop();
+            auto [origin,op]=findCell(node.x,node.y,node.z);
+            if(!origin)continue;
+            const uint8_t current=sky?origin->getSkyLight(op.x,op.y,op.z):
+                                      origin->getBlockLight(op.x,op.y,op.z);
+            if(current!=node.light||current==0)continue;
+            for(const auto& d:directions) {
+                const int nx=node.x+d[0],ny=node.y+d[1],nz=node.z+d[2];
+                auto [target,p]=findCell(nx,ny,nz);if(!target)continue;
+                const uint8_t damping=getLightDampening(target->getBlock(p.x,p.y,p.z));
+                if(damping>=15)continue;
+                uint8_t loss=static_cast<uint8_t>(std::max<int>(1,damping));
+                if(sky&&d[1]==-1&&current==15&&damping==0)loss=0;
+                const uint8_t next=current>loss?static_cast<uint8_t>(current-loss):0;
+                uint8_t old=sky?target->getSkyLight(p.x,p.y,p.z):target->getBlockLight(p.x,p.y,p.z);
+                if(next<=old)continue;
+                if(sky)target->setSkyLight(p.x,p.y,p.z,next);
+                else target->setBlockLight(p.x,p.y,p.z,next);
+                lightChanged.insert(target);
+                queue.push({nx,ny,nz,next});
+            }
+        }
+    };
+    spread(skyQueue,true);
+    spread(blockQueue,false);
+    for(Chunk* chunk:lightChanged)chunk->markDirty();
+    m_lightHasSources = hasSources;
     m_lightDirty=false;
+}
+
+void World::updateLightingAt(const glm::ivec3& position) {
+    struct RemovalNode { int x=0,y=0,z=0;uint8_t light=0; };
+    std::unique_lock lock(m_chunkMutex);
+    if(m_lightDirty)return;
+    auto findCell=[&](int wx,int y,int wz)->std::pair<Chunk*,glm::ivec3>{
+        if(!Config::isValidWorldY(y))return {nullptr,glm::ivec3(0)};
+        const int cx=worldToChunkX(wx),cz=worldToChunkZ(wz);
+        auto it=m_chunks.find({cx,cz});
+        if(it==m_chunks.end()||!it->second->generated.load())
+            return {nullptr,glm::ivec3(0)};
+        return {it->second.get(),{wx-cx*Config::CHUNK_SIZE_X,y,
+                                  wz-cz*Config::CHUNK_SIZE_Z}};
+    };
+    std::unordered_set<Chunk*> changed;
+    auto get=[&](int x,int y,int z,bool sky){auto [c,p]=findCell(x,y,z);
+        return c?(sky?c->getSkyLight(p.x,p.y,p.z):c->getBlockLight(p.x,p.y,p.z)):uint8_t{0};};
+    auto set=[&](int x,int y,int z,bool sky,uint8_t value){auto [c,p]=findCell(x,y,z);
+        if(!c)return;
+        const uint8_t old=sky?c->getSkyLight(p.x,p.y,p.z):c->getBlockLight(p.x,p.y,p.z);
+        if(old==value)return;
+        if(sky)c->setSkyLight(p.x,p.y,p.z,value);else c->setBlockLight(p.x,p.y,p.z,value);
+        changed.insert(c);};
+    constexpr int dirs[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    auto updateChannel=[&](bool sky,std::queue<RemovalNode>& removal,
+                           std::queue<BlockLightNode>& addition){
+        while(!removal.empty()){
+            const auto node=removal.front();removal.pop();
+            for(const auto& d:dirs){const int x=node.x+d[0],y=node.y+d[1],z=node.z+d[2];
+                const uint8_t neighbor=get(x,y,z,sky);if(neighbor==0)continue;
+                const bool descendingFullSky=sky&&d[1]==-1&&node.light==15&&neighbor==15;
+                if(neighbor<node.light||descendingFullSky){set(x,y,z,sky,0);removal.push({x,y,z,neighbor});}
+                else addition.push({x,y,z,neighbor});
+            }
+        }
+        while(!addition.empty()){
+            const auto node=addition.front();addition.pop();
+            const uint8_t current=get(node.x,node.y,node.z,sky);
+            if(current!=node.light||current==0)continue;
+            for(const auto& d:dirs){const int x=node.x+d[0],y=node.y+d[1],z=node.z+d[2];
+                auto [target,p]=findCell(x,y,z);if(!target)continue;
+                const uint8_t damping=getLightDampening(target->getBlock(p.x,p.y,p.z));
+                if(damping>=15)continue;
+                uint8_t loss=static_cast<uint8_t>(std::max<int>(1,damping));
+                if(sky&&d[1]==-1&&current==15&&damping==0)loss=0;
+                const uint8_t next=current>loss?static_cast<uint8_t>(current-loss):0;
+                if(next<=get(x,y,z,sky))continue;
+                set(x,y,z,sky,next);addition.push({x,y,z,next});
+            }
+        }
+    };
+
+    std::queue<RemovalNode> blockRemoval,skyRemoval;
+    std::queue<BlockLightNode> blockAddition,skyAddition;
+    const uint8_t oldBlock=get(position.x,position.y,position.z,false);
+    const auto [cell,local]=findCell(position.x,position.y,position.z);
+    if(!cell)return;
+    const uint8_t emission=getLightEmission(cell->getBlock(local.x,local.y,local.z));
+    if(oldBlock>emission){set(position.x,position.y,position.z,false,emission);
+        blockRemoval.push({position.x,position.y,position.z,oldBlock});}
+    else if(emission>oldBlock)set(position.x,position.y,position.z,false,emission);
+    if(emission>0)blockAddition.push({position.x,position.y,position.z,emission});
+    for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
+        const uint8_t value=get(x,y,z,false);if(value)blockAddition.push({x,y,z,value});}
+    updateChannel(false,blockRemoval,blockAddition);
+
+    uint8_t vertical=15;
+    for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y){
+        auto [column,p]=findCell(position.x,y,position.z);if(!column)continue;
+        const uint8_t damping=getLightDampening(column->getBlock(p.x,p.y,p.z));
+        if(damping>=15)vertical=0;else if(vertical>0&&damping>0)
+            vertical=static_cast<uint8_t>(vertical>damping?vertical-damping:0);
+        const uint8_t old=get(position.x,y,position.z,true);
+        if(old>vertical){set(position.x,y,position.z,true,vertical);
+            skyRemoval.push({position.x,y,position.z,old});}
+        else if(vertical>old)set(position.x,y,position.z,true,vertical);
+        if(vertical>0)skyAddition.push({position.x,y,position.z,vertical});
+    }
+    for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
+        const uint8_t value=get(x,y,z,true);if(value)skyAddition.push({x,y,z,value});}
+    updateChannel(true,skyRemoval,skyAddition);
+    for(Chunk* chunk:changed){chunk->markDirty();
+        if(chunk->cx!=worldToChunkX(position.x)||chunk->cz!=worldToChunkZ(position.z))continue;
+        if(local.x==0){auto it=m_chunks.find({chunk->cx-1,chunk->cz});if(it!=m_chunks.end())it->second->markDirty();}
+        if(local.x==Config::CHUNK_SIZE_X-1){auto it=m_chunks.find({chunk->cx+1,chunk->cz});if(it!=m_chunks.end())it->second->markDirty();}
+        if(local.z==0){auto it=m_chunks.find({chunk->cx,chunk->cz-1});if(it!=m_chunks.end())it->second->markDirty();}
+        if(local.z==Config::CHUNK_SIZE_Z-1){auto it=m_chunks.find({chunk->cx,chunk->cz+1});if(it!=m_chunks.end())it->second->markDirty();}
+    }
 }
 
 void World::applySavedOverrides(int cx, int cz) {
@@ -1250,6 +1424,7 @@ void World::enqueueMeshBuilds() {
 
         chunkPtr->meshInProgress = true;
         chunkPtr->markClean();  // Mark clean NOW so we don't re-enqueue
+        const uint64_t revision=chunkPtr->dataRevision();
 
         // Capture a raw pointer — the chunk is owned by m_chunks and
         // won't be destroyed while meshInProgress is true
@@ -1258,13 +1433,13 @@ void World::enqueueMeshBuilds() {
         const int dz = chunkPtr->cz - m_centerChunkZ;
         const int distance2 = dx * dx + dz * dz;
 
-        m_threadPool->enqueuePriority([chunkPtr, worldPtr]() {
+        m_threadPool->enqueuePriority([chunkPtr, worldPtr, revision]() {
             // Build mesh into pending buffer
             auto neighborFunc = [worldPtr](int wx, int wy, int wz) -> BlockId {
                 return worldPtr->getBlock(wx, wy, wz);
             };
-            auto lightFunc = [worldPtr](int wx,int wy,int wz) -> uint8_t {
-                return worldPtr->getBlockLight(wx,wy,wz);
+            auto lightFunc = [worldPtr](int wx,int wy,int wz) -> LightSample {
+                return worldPtr->getLight(wx,wy,wz);
             };
 
             chunkPtr->m_pendingMesh.build(
@@ -1273,6 +1448,7 @@ void World::enqueueMeshBuilds() {
                 chunkPtr->getColumnMaxYData(),
                 neighborFunc, lightFunc
             );
+            chunkPtr->pendingMeshRevision=revision;
 
             // Signal completion
             chunkPtr->meshReady = true;
@@ -1299,6 +1475,13 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads) {
     const int uploadCount = std::min(maxUploads, static_cast<int>(ready.size()));
     for (int i = 0; i < uploadCount; ++i) {
         Chunk* chunk = ready[static_cast<size_t>(i)];
+
+        if(chunk->pendingMeshRevision.load()!=chunk->dataRevision()) {
+            chunk->meshReady=false;
+            chunk->meshInProgress=false;
+            chunk->markDirty();
+            continue;
+        }
 
         // Swap pending mesh into active
         {
@@ -1329,8 +1512,8 @@ void World::buildMeshesSync(Renderer* renderer, int maxCount) {
         auto neighborFunc = [this](int wx, int wy, int wz) -> BlockId {
             return this->getBlock(wx, wy, wz);
         };
-        auto lightFunc = [this](int wx,int wy,int wz) -> uint8_t {
-            return this->getBlockLight(wx,wy,wz);
+        auto lightFunc = [this](int wx,int wy,int wz) -> LightSample {
+            return this->getLight(wx,wy,wz);
         };
 
         {
