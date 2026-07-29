@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <glm/glm.hpp>
 
 enum class EntityType : uint8_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
@@ -24,6 +25,16 @@ inline EntityPlayback selectEntityPlayback(float horizontalSpeed, bool hurt,
 
 inline float walkPlaybackRate(float horizontalSpeed) {
     return std::clamp(horizontalSpeed, 0.5f, 2.0f);
+}
+inline glm::vec3 autonomousHorizontalVelocity(const glm::dvec3& before,
+                                               const glm::dvec3& after,
+                                               float dt) {
+    if (dt <= 0.0f) return glm::vec3(0.0f);
+    return {static_cast<float>((after.x - before.x) / dt), 0.0f,
+            static_cast<float>((after.z - before.z) / dt)};
+}
+inline bool attackImpactValid(float distance, float reach, bool clearSight) {
+    return distance >= 0.0f && distance < reach && clearSight;
 }
 
 inline bool deathPresentationVisible(float elapsed) {

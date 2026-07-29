@@ -34,6 +34,9 @@ struct Entity {
     float burningSeconds = 0.0f;
     float burnDamageSeconds = 0.0f;
     bool spiderProvoked = false;
+    glm::vec3 locomotionVelocity{0.0f};
+    glm::vec3 facing{0.0f, 0.0f, -1.0f};
+    bool attackPending = false;
 };
 
 struct DeadEntityRender {
@@ -41,6 +44,7 @@ struct DeadEntityRender {
     EntityType type = EntityType::Cow;
     glm::dvec3 position{0.0};
     glm::vec3 velocity{0.0f};
+    glm::vec3 facing{0.0f, 0.0f, -1.0f};
     uint32_t behaviorSeed = 0;
     float elapsed = 0.0f;
 };

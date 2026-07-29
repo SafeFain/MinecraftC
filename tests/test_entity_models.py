@@ -10,21 +10,101 @@ def document(path):
     assert data[:4] == b"glTF" and struct.unpack_from("<I", data, 4)[0] == 2
     json_length, chunk_type = struct.unpack_from("<II", data, 12)
     assert chunk_type == 0x4E4F534A
-    return json.loads(data[20:20 + json_length].decode("utf-8"))
+    doc = json.loads(data[20:20 + json_length].decode("utf-8"))
+    binary_offset = 20 + json_length + 8
+    return doc, data[binary_offset:]
+
+def float_accessor(doc, binary, index):
+    accessor = doc["accessors"][index]
+    view = doc["bufferViews"][accessor["bufferView"]]
+    width = {"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}[accessor["type"]]
+    offset = view.get("byteOffset",0) + accessor.get("byteOffset",0)
+    return struct.unpack_from("<%df" % (accessor["count"]*width), binary, offset)
+
+def vec2_accessor(doc,binary,index):
+    accessor=doc["accessors"][index];view=doc["bufferViews"][accessor["bufferView"]]
+    offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    stride=view.get("byteStride",8)
+    return tuple(struct.unpack_from("<2f",binary,offset+i*stride)
+                 for i in range(accessor["count"]))
+
+def vec3_accessor(doc,binary,index):
+    accessor=doc["accessors"][index];view=doc["bufferViews"][accessor["bufferView"]]
+    offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    stride=view.get("byteStride",12)
+    return tuple(struct.unpack_from("<3f",binary,offset+i*stride)
+                 for i in range(accessor["count"]))
+
+def index_accessor(doc,binary,index):
+    accessor=doc["accessors"][index];view=doc["bufferViews"][accessor["bufferView"]]
+    offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    fmt={5121:"B",5123:"H",5125:"I"}[accessor["componentType"]]
+    return struct.unpack_from("<%d%s"%(accessor["count"],fmt),binary,offset)
+
+def png_dimensions(data):
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    return struct.unpack_from(">II",data,16)
 
 def main():
     files = list(MODEL_DIR.glob("*.glb"))
     assert {path.stem for path in files} == NAMES, "expected exactly eight entity GLBs"
+    graphs = list(MODEL_DIR.glob("*.anim.json"))
+    assert {path.name[:-len(".anim.json")] for path in graphs} == NAMES, \
+        "expected exactly eight entity action graphs"
     for path in files:
-        doc = document(path)
+        doc, binary = document(path)
         assert {a["name"] for a in doc["animations"]} >= {"idle", "walk", "hurt", "death"}
+        animations = {a["name"]:a for a in doc["animations"]}
+        walk = animations["walk"]
+        assert len(walk["channels"]) >= 2, f"{path.name} walk has no articulated gait"
+        for sampler in walk["samplers"]:
+            times = float_accessor(doc,binary,sampler["input"])
+            values = float_accessor(doc,binary,sampler["output"])
+            width = len(values)//len(times)
+            assert len(times) >= 3 and values[:width] == values[-width:], \
+                f"{path.name} walk does not close its loop"
         assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"]) <= 64
         attributes = doc["meshes"][0]["primitives"][0]["attributes"]
         assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"} <= set(attributes)
         assert doc["images"][0].get("mimeType") == "image/png" and "bufferView" in doc["images"][0]
+        image_view=doc["bufferViews"][doc["images"][0]["bufferView"]]
+        image=binary[image_view.get("byteOffset",0):image_view.get("byteOffset",0)+image_view["byteLength"]]
+        assert png_dimensions(image)==(64,64), f"{path.name} does not embed a 64x64 entity skin"
+        skin_path=ROOT/"assets"/"textures"/"generated"/"entity_skins"/(path.stem+".png")
+        assert image==skin_path.read_bytes(), f"{path.name} embedded skin differs from texture generator output"
         sampler = doc["samplers"][0]
         assert sampler["magFilter"] == 9728 and sampler["minFilter"] == 9728
         assert doc["accessors"][attributes["POSITION"]]["min"][1] == 0.0
+        positions=vec3_accessor(doc,binary,attributes["POSITION"])
+        normals=vec3_accessor(doc,binary,attributes["NORMAL"])
+        mesh_indices=index_accessor(doc,binary,doc["meshes"][0]["primitives"][0]["indices"])
+        for offset in range(0,len(mesh_indices),3):
+            ia,ib,ic=mesh_indices[offset:offset+3]
+            a,b,c=positions[ia],positions[ib],positions[ic]
+            ab=tuple(b[i]-a[i] for i in range(3));ac=tuple(c[i]-a[i] for i in range(3))
+            winding=(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])
+            assert sum(winding[i]*normals[ia][i] for i in range(3))>0, \
+                f"{path.name} triangle winding faces inward and will be culled"
+        all_uvs=vec2_accessor(doc,binary,attributes["TEXCOORD_0"])
+        uv_pairs=set(all_uvs)
+        assert len(uv_pairs)>16, f"{path.name} does not use face-specific atlas regions"
+        assert min(v for pair in uv_pairs for v in pair)>0 and \
+               max(v for pair in uv_pairs for v in pair)<1, \
+               f"{path.name} UVs lack atlas inset"
+        # Parts are emitted body then head; each cuboid contributes 24 vertices.
+        def expected_tile(index):
+            tx,ty=index%4,index//4
+            u0,u1=(tx*16+.5)/64,(tx*16+15.5)/64
+            v0,v1=(ty*16+.5)/64,(ty*16+15.5)/64
+            return ((u0,v1),(u1,v1),(u1,v0),(u0,v0))
+        assert all(abs(a-b)<1e-6 for pair,want in zip(all_uvs[:4],expected_tile(6))
+                   for a,b in zip(pair,want)), f"{path.name} body front UV is incorrect"
+        assert all(abs(a-b)<1e-6 for pair,want in zip(all_uvs[24:28],expected_tile(0))
+                   for a,b in zip(pair,want)), f"{path.name} head front UV is incorrect or vertically flipped"
+        graph = json.loads((MODEL_DIR/(path.stem+".anim.json")).read_text())
+        assert graph["version"] == 1 and {"idle","walk","hurt","death"} <= set(graph["actions"])
+        if path.stem in {"zombie","skeleton","spider","blastling"}:
+            assert "attack" in animations and graph["actions"]["attack"]["events"]
     with tempfile.TemporaryDirectory() as directory:
         generated = pathlib.Path(directory)
         subprocess.run([sys.executable, str(ROOT / "tools/generate_entity_models.py"),
@@ -32,6 +112,9 @@ def main():
         for path in files:
             assert path.read_bytes() == (generated / path.name).read_bytes(), \
                 f"{path.name} was not reproduced byte-for-byte"
+            graph_name = path.stem+".anim.json"
+            assert (MODEL_DIR/graph_name).read_bytes() == (generated/graph_name).read_bytes(), \
+                f"{graph_name} was not reproduced byte-for-byte"
     print("entity model asset contract passed")
 
 if __name__ == "__main__":

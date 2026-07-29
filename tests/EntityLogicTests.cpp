@@ -21,6 +21,16 @@ int main() {
     require(walkPlaybackRate(0.0f) == 0.5f &&
             walkPlaybackRate(100.0f) == 2.0f,
             "walk playback rate was not bounded");
+    const glm::vec3 locomotion = autonomousHorizontalVelocity(
+        {10.0, 4.0, -2.0}, {10.5, 7.0, -2.25}, 0.5f);
+    require(std::abs(locomotion.x - 1.0f) < 0.0001f && locomotion.y == 0.0f &&
+            std::abs(locomotion.z + 0.5f) < 0.0001f &&
+            autonomousHorizontalVelocity({0,0,0},{1,0,1},0.0f) == glm::vec3(0),
+            "autonomous locomotion did not use actual horizontal displacement");
+    require(attackImpactValid(1.49f, 1.5f, true) &&
+            !attackImpactValid(1.5f, 1.5f, true) &&
+            !attackImpactValid(1.0f, 1.5f, false),
+            "attack impact range or sight revalidation failed");
     require(deathPresentationVisible(0.0f) &&
             deathPresentationVisible(0.999f) &&
             !deathPresentationVisible(ENTITY_DEATH_PRESENTATION_SECONDS),

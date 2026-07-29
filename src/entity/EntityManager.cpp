@@ -31,6 +31,7 @@ void EntityManager::clear() {
     m_spawnSequence = 0;
     m_loadedChunks.clear();
     m_explosionEvents.clear();
+    m_modelRegistry.clearInstances();
 }
 
 std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const {
@@ -229,6 +230,7 @@ void EntityManager::spawnAroundPlayer(
 
 void EntityManager::moveWithTerrain(
     Entity& entity, const glm::vec3& horizontal, float dt) {
+    const glm::dvec3 start = entity.position;
     const double distance = glm::length(horizontal) * dt;
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / 0.2)));
     const glm::dvec3 delta = glm::dvec3(horizontal) *
@@ -248,6 +250,15 @@ void EntityManager::moveWithTerrain(
         if (!collides(entity,candidate)) entity.position.y-=0.25;
     }
     entity.stuckSeconds = moved ? 0.0f : entity.stuckSeconds + dt;
+    if (dt > 0.0f) {
+        const glm::vec3 displacement(
+            static_cast<float>(entity.position.x - start.x), 0.0f,
+            static_cast<float>(entity.position.z - start.z));
+        entity.locomotionVelocity = autonomousHorizontalVelocity(
+            start, entity.position, dt);
+        if (glm::length(displacement) > 0.00001f)
+            entity.facing = glm::normalize(displacement);
+    }
 }
 
 void EntityManager::integrateVelocity(Entity& entity, float dt) {
@@ -305,6 +316,8 @@ void EntityManager::damageEntity(Entity& entity, float damage,
     if (damage <= 0.0f || entity.health <= 0.0f) return;
     entity.health -= damage;
     entity.hurtFlashSeconds = 0.2f;
+    if (entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling)
+        m_modelRegistry.playAction(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
     if (playerAttack && entity.type == EntityType::Spider)
         entity.spiderProvoked = true;
@@ -327,8 +340,10 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
                            bool thunderstorm, bool raining) {
-    for (auto& dead : m_deadEntityRenders)
+    for (auto& dead : m_deadEntityRenders) {
         dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
+        m_modelRegistry.advance(dead.type, dead.id, dt);
+    }
     m_deadEntityRenders.erase(std::remove_if(
         m_deadEntityRenders.begin(), m_deadEntityRenders.end(),
         [](const DeadEntityRender& dead) {
@@ -385,6 +400,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             continue;
         }
 
+        entity.locomotionVelocity = glm::vec3(0.0f);
         integrateVelocity(entity, dt);
 
         {
@@ -420,6 +436,42 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         const glm::vec3 delta = glm::vec3(player.getPosition() - entity.position);
         glm::vec3 horizontal(delta.x, 0.0f, delta.z);
         const float distance = glm::length(horizontal);
+        const glm::dvec3 attackOrigin = entity.position + glm::dvec3(0,1.2,0);
+        const glm::vec3 sightDirection = distance > 0.001f
+            ? glm::normalize(glm::vec3(player.getEyePosition() - attackOrigin))
+            : glm::vec3(0.0f, 0.0f, -1.0f);
+        const bool clearSight = distance <= 0.001f ||
+            !m_world.raycast(attackOrigin, sightDirection, distance).has_value();
+        const auto animationEvents = m_modelRegistry.advance(
+            entity.type, entity.id, dt);
+        for (const auto& event : animationEvents) {
+            if (!entity.attackPending) continue;
+            if (event.name == "melee") {
+                if (attackImpactValid(distance, 1.5f, clearSight))
+                    player.takeDamage(3.0f);
+                entity.attackPending = false;
+            } else if (event.name == "shoot") {
+                if (attackImpactValid(distance, 14.0f, clearSight)) {
+                    const glm::vec3 aim = glm::normalize(glm::vec3(
+                        player.getEyePosition() -
+                        (entity.position + glm::dvec3(0,1.45,0))));
+                    pendingArrows.push_back({entity.position + glm::dvec3(0,1.45,0) +
+                        glm::dvec3(aim) * 0.75, aim * 22.0f, 2.0f});
+                }
+                entity.attackPending = false;
+            } else if (event.name == "explode") {
+                if (attackImpactValid(distance, 1.5f, clearSight)) {
+                    pendingExplosions.push_back(
+                        {entity.position, entity.behaviorSeed, 2.5f});
+                    entity.health = 0.0f;
+                }
+                entity.attackPending = false;
+            }
+        }
+        if (entity.attackPending &&
+            !m_modelRegistry.playing(entity.type, entity.id, "attack"))
+            entity.attackPending = false;
+        if (entity.health <= 0.0f) continue;
         if (entity.type == EntityType::Spider && distance >= 18.0f)
             entity.spiderProvoked = false;
         if (hostile(entity.type) && shouldHostileDespawn(distance,entity.ageSeconds,
@@ -433,20 +485,17 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             : hostile(entity.type) && distance < 18.0f;
         const bool targetsPlayer = mobTargetsPlayer(
             playerTargetable, behaviorTargetsPlayer);
-        if (targetsPlayer && distance > 0.01f) {
+        if (entity.attackPending) {
+            if (distance > 0.01f) entity.facing = glm::normalize(horizontal);
+        } else if (targetsPlayer && distance > 0.01f) {
             horizontal /= distance;
-            const glm::dvec3 attackOrigin=entity.position+glm::dvec3(0,1.2,0);
-            const glm::vec3 sightDirection=glm::normalize(glm::vec3(player.getEyePosition()-attackOrigin));
-            const bool clearSight=!m_world.raycast(attackOrigin,sightDirection,distance).has_value();
             const float speed = entity.type == EntityType::Spider ? 3.0f : 2.0f;
             if (entity.type == EntityType::Skeleton) {
                 if (distance > 7.0f) moveWithTerrain(entity, horizontal * speed, dt);
                 if (distance < 14.0f && clearSight && entity.actionCooldown <= 0.0f) {
-                    glm::vec3 aim=glm::normalize(glm::vec3(player.getEyePosition()-
-                        (entity.position+glm::dvec3(0,1.45,0))));
-                    pendingArrows.push_back({entity.position+glm::dvec3(0,1.45,0)+
-                        glm::dvec3(aim)*0.75,aim*22.0f,2.0f});
                     entity.actionCooldown = 2.0f;
+                    entity.attackPending = m_modelRegistry.playAction(
+                        entity.type, entity.id, "attack");
                 }
             } else {
                 moveWithTerrain(entity, horizontal * speed, dt);
@@ -454,11 +503,8 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             if (entity.type != EntityType::Skeleton &&
                 distance < 1.5f && clearSight && entity.actionCooldown <= 0.0f) {
                 entity.actionCooldown = 1.0f;
-                if (entity.type == EntityType::Blastling) {
-                    pendingExplosions.push_back(
-                        {entity.position, entity.behaviorSeed, 2.5f});
-                    entity.health = 0.0f;
-                } else player.takeDamage(3.0f);
+                entity.attackPending = m_modelRegistry.playAction(
+                    entity.type, entity.id, "attack");
             }
         } else {
             const float angle = static_cast<float>(
@@ -468,6 +514,9 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             moveWithTerrain(entity, {std::cos(angle+offset) * 0.65f, 0.0f,
                                      std::sin(angle+offset) * 0.65f}, dt);
         }
+        m_modelRegistry.setLocomotion(
+            entity.type, entity.id,
+            std::hypot(entity.locomotionVelocity.x, entity.locomotionVelocity.z));
     }
 
     for (const auto& arrow : pendingArrows)
@@ -487,8 +536,10 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             deadMobs.push_back(entity);
     for (const auto& entity : deadMobs) {
         if (entity.type != EntityType::Arrow) {
+            m_modelRegistry.playAction(entity.type, entity.id, "death");
             m_deadEntityRenders.push_back({entity.id, entity.type,
-                entity.position, entity.velocity, entity.behaviorSeed, 0.0f});
+                entity.position, entity.velocity, entity.facing,
+                entity.behaviorSeed, 0.0f});
         }
     }
     m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
@@ -771,8 +822,7 @@ void EntityManager::render(
                                 entity.type == EntityType::Blastling;
         if (passive || hostileMob) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
-                entity.velocity, entity.behaviorSeed,
-                entity.hurtFlashSeconds > 0.0f, false, entity.ageSeconds,
+                entity.facing, entity.behaviorSeed,
                 renderOrigin, glm::vec3(0.0f), renderer.modelRenderer());
             continue;
         }
@@ -785,8 +835,8 @@ void EntityManager::render(
 
     }
     for (const auto& dead : m_deadEntityRenders) {
-        m_modelRegistry.queue(dead.type, dead.id, dead.position, dead.velocity,
-            dead.behaviorSeed, false, true, dead.elapsed, renderOrigin,
+        m_modelRegistry.queue(dead.type, dead.id, dead.position,
+            dead.facing, dead.behaviorSeed, renderOrigin,
             glm::vec3(0.0f), renderer.modelRenderer());
     }
     m_modelRegistry.endFrame();

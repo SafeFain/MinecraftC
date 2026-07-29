@@ -34,6 +34,47 @@ class TextureGeneratorTests(unittest.TestCase):
                 _, _, tile = tg.read_generated_png(a / "entities" / f"{name}.png")
                 self.assertGreaterEqual(len(set(tile)), 4, name)
 
+    def test_entity_skins_are_deterministic_semantic_and_face_specific(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            a, b = Path(first), Path(second)
+            tg.build_entity_skins(a, 314159)
+            tg.build_entity_skins(b, 314159)
+            metadata = json.loads((a / "entity_skins.json").read_text())
+            self.assertEqual(metadata["layout"], tg.ENTITY_SKIN_LAYOUT)
+            self.assertEqual(set(metadata["entities"]), set(tg.ENTITY_SKIN_NAMES))
+            self.assertEqual(metadata["filter"], "nearest")
+            for name in tg.ENTITY_SKIN_NAMES:
+                path=a / "entity_skins" / f"{name}.png"
+                self.assertEqual(path.read_bytes(),
+                                 (b / "entity_skins" / f"{name}.png").read_bytes())
+                width, height, pixels=tg.read_generated_png(path)
+                self.assertEqual((width,height),(64,64))
+                self.assertTrue(all(pixel[3]==255 for pixel in pixels))
+                tiles=[]
+                for index in range(16):
+                    tx,ty=index%4,index//4
+                    tiles.append(tuple(pixels[(ty*16+y)*64+tx*16+x]
+                                       for y in range(16) for x in range(16)))
+                self.assertGreater(len(set(tiles)),10,name)
+                self.assertNotEqual(tiles[tg.ENTITY_SKIN_LAYOUT["head_front"]],
+                                    tiles[tg.ENTITY_SKIN_LAYOUT["head_back"]],name)
+                front=tiles[tg.ENTITY_SKIN_LAYOUT["head_front"]]
+                self.assertGreater(max(tg.luminance(p) for p in front)-
+                                   min(tg.luminance(p) for p in front),35,name)
+                for semantic in ("head_back","body_back"):
+                    tile=tiles[tg.ENTITY_SKIN_LAYOUT[semantic]]
+                    jumps=[]
+                    for y in range(16):
+                        for x in range(15):
+                            jumps.append(abs(tg.luminance(tile[y*16+x])-
+                                             tg.luminance(tile[y*16+x+1])))
+                    for x in range(16):
+                        for y in range(15):
+                            jumps.append(abs(tg.luminance(tile[y*16+x])-
+                                             tg.luminance(tile[(y+1)*16+x])))
+                    self.assertLess(sum(jump>55 for jump in jumps)/len(jumps),.08,
+                                    f"{name} {semantic} has abrupt base transitions")
+
     def test_item_templates_palettes_alpha_and_bounds(self):
         item_defs, _ = self.item_definitions()
         definitions = tg.load_item_icon_definitions(item_defs)

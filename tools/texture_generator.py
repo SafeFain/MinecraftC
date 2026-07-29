@@ -27,6 +27,16 @@ DEFAULT_SEED = 213785369
 GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
 ENTITY_NAMES = ("cow", "pig", "sheep", "chicken", "zombie", "skeleton",
                 "spider", "blastling", "item")
+ENTITY_SKIN_NAMES = ENTITY_NAMES[:-1]
+ENTITY_SKIN_SIZE = 64
+ENTITY_SKIN_LAYOUT = {
+    "head_front": 0, "head_back": 1, "head_left": 2, "head_right": 3,
+    "head_top": 4, "head_bottom": 5,
+    "body_front": 6, "body_back": 7, "body_left": 8, "body_right": 9,
+    "body_top": 10, "body_bottom": 11,
+    "limb_primary": 12, "limb_secondary": 13, "detail": 14,
+    "fallback": 15,
+}
 ENTITY_PALETTES = {
     "cow": ((61,39,25,255),(82,49,29,255),(111,67,38,255),
             (151,105,68,255),(213,199,171,255),(238,229,207,255)),
@@ -502,6 +512,136 @@ def generate_entity_texture(name,seed):
     palette=ENTITY_PALETTES[name]
     return [palette[max(0,min(5,index))] for index in indices]
 
+def _entity_part_palette(name, part):
+    base=ENTITY_PALETTES[name]
+    overrides={
+        ("cow","head"): ((47,31,23,255),(68,43,29,255),(92,57,35,255),
+                          (126,82,52,255),(190,154,112,255),(232,211,178,255)),
+        ("sheep","head"): ((62,55,48,255),(84,76,65,255),(111,101,86,255),
+                            (143,132,113,255),(181,172,151,255),(218,211,190,255)),
+        ("zombie","body"): ((25,67,70,255),(31,82,85,255),(38,98,99,255),
+                             (47,116,113,255),(61,135,126,255),(79,153,140,255)),
+        ("zombie","secondary"): ((42,32,63,255),(55,41,82,255),(68,51,101,255),
+                                  (82,63,119,255),(99,78,138,255),(119,97,157,255)),
+        ("chicken","primary"): ((111,70,17,255),(145,91,20,255),(180,114,24,255),
+                                 (211,143,31,255),(235,174,48,255),(247,202,78,255)),
+        ("chicken","head"): ((169,166,151,255),(187,185,170,255),(205,203,188,255),
+                              (220,218,204,255),(235,233,220,255),(248,247,237,255)),
+        ("chicken","body"): ((166,164,150,255),(184,182,168,255),(202,200,186,255),
+                              (218,216,202,255),(234,232,219,255),(247,246,236,255)),
+        ("chicken","secondary"): ((158,157,145,255),(178,177,164,255),(198,197,184,255),
+                                   (216,215,202,255),(233,232,220,255),(247,246,237,255)),
+    }
+    return overrides.get((name,part),base)
+
+def _cube_coordinate(face,x,y):
+    a=2*x-15; b=15-2*y
+    return {
+        "front":(a,b,-15), "back":(-a,b,15),
+        "left":(-15,b,-a), "right":(15,b,a),
+        "top":(a,15,-b), "bottom":(a,-15,b),
+    }[face]
+
+def _entity_surface_indices(name,part,face,seed):
+    """Sample a continuous cube-space field so adjacent cuboid faces agree."""
+    salt=sample(seed,name,len(part),sum(ord(c) for c in part))
+    p0=(salt&255)/19.0; p1=((salt>>8)&255)/23.0; p2=((salt>>16)&255)/29.0
+    result=[]
+    for y in range(SIZE):
+        for x in range(SIZE):
+            cx,cy,cz=_cube_coordinate(face,x,y)
+            value=(math.sin((cx+p0)/8.2)+math.sin((cy+p1)/9.7)+
+                   math.sin((cz+p2)/7.6)+.55*math.sin((cx+cy-cz+p0)/12.4))
+            result.append(max(0,min(5,int(round(2.5+value*.78)))))
+    return result
+
+def _entity_wrapping_indices(name,part,seed):
+    values=macro_field(seed,name+"_"+part,7)
+    # Quantize a smoothed field; this avoids the old checkerboard transitions.
+    indices=quantize(values)
+    return [max(0,min(5,index)) for index in indices]
+
+def _paint_rect(tile,x0,y0,x1,y1,color):
+    for y in range(max(0,y0),min(SIZE,y1)):
+        for x in range(max(0,x0),min(SIZE,x1)): tile[y*SIZE+x]=color
+
+def _paint_entity_face(name,tile):
+    dark=(20,18,18,255); blackish=(14,16,14,255)
+    if name=="cow":
+        _paint_rect(tile,3,4,5,6,dark); _paint_rect(tile,11,4,13,6,dark)
+        _paint_rect(tile,4,8,12,14,(216,181,139,255))
+        _paint_rect(tile,5,10,7,12,(66,43,34,255)); _paint_rect(tile,9,10,11,12,(66,43,34,255))
+    elif name=="pig":
+        _paint_rect(tile,3,4,5,6,dark); _paint_rect(tile,11,4,13,6,dark)
+        _paint_rect(tile,4,8,12,14,(239,166,174,255))
+        _paint_rect(tile,5,10,7,12,(116,54,67,255)); _paint_rect(tile,9,10,11,12,(116,54,67,255))
+    elif name=="sheep":
+        _paint_rect(tile,3,5,5,7,dark); _paint_rect(tile,11,5,13,7,dark)
+        _paint_rect(tile,6,10,10,12,(66,57,49,255))
+    elif name=="chicken":
+        _paint_rect(tile,3,4,5,6,dark); _paint_rect(tile,11,4,13,6,dark)
+        _paint_rect(tile,5,7,11,10,(232,166,47,255)); _paint_rect(tile,6,10,10,13,(190,50,38,255))
+    elif name=="zombie":
+        _paint_rect(tile,3,4,6,7,(26,40,29,255)); _paint_rect(tile,10,4,13,7,(26,40,29,255))
+        _paint_rect(tile,5,10,11,12,(31,55,38,255)); _paint_rect(tile,7,9,9,10,(43,73,48,255))
+    elif name=="skeleton":
+        _paint_rect(tile,2,3,6,8,blackish); _paint_rect(tile,10,3,14,8,blackish)
+        _paint_rect(tile,7,7,9,10,(48,44,37,255)); _paint_rect(tile,5,12,11,13,(72,65,54,255))
+    elif name=="spider":
+        red=(202,38,31,255); bright=(239,65,49,255)
+        for x,y in ((3,5),(6,4),(10,4),(13,5),(5,8),(11,8)):
+            _paint_rect(tile,x-1,y-1,x+1,y+1,red)
+            tile[(y-1)*SIZE+x-1]=bright
+    elif name=="blastling":
+        _paint_rect(tile,3,3,6,8,blackish); _paint_rect(tile,10,3,13,8,blackish)
+        _paint_rect(tile,6,8,10,11,blackish); _paint_rect(tile,4,10,7,14,blackish)
+        _paint_rect(tile,9,10,12,14,blackish); _paint_rect(tile,7,12,9,15,blackish)
+
+def _paint_entity_body(name,tile):
+    if name=="skeleton":
+        bone=(205,197,171,255); shadow=(82,75,62,255)
+        _paint_rect(tile,7,2,9,14,bone)
+        for y in (4,7,10):
+            _paint_rect(tile,3,y,7,y+1,shadow); _paint_rect(tile,9,y,13,y+1,shadow)
+    elif name=="zombie":
+        _paint_rect(tile,6,1,10,3,(28,70,72,255))
+
+def generate_entity_skin(name,seed):
+    """Generate one original 64x64 semantic skin atlas for a runtime mob."""
+    if name not in ENTITY_SKIN_NAMES: raise ValueError(f"unknown entity skin '{name}'")
+    atlas=[(0,0,0,255)]*(ENTITY_SKIN_SIZE*ENTITY_SKIN_SIZE)
+    for semantic,index in ENTITY_SKIN_LAYOUT.items():
+        part,_,face=semantic.partition("_")
+        if semantic.startswith("limb_primary"):
+            part="primary"; indices=_entity_wrapping_indices(name,part,seed)
+        elif semantic.startswith("limb_secondary"):
+            part="secondary"; indices=_entity_wrapping_indices(name,part,seed)
+        elif semantic in {"detail","fallback"}:
+            part=semantic; indices=_entity_wrapping_indices(name,part,seed)
+        else:
+            indices=_entity_surface_indices(name,part,face,seed)
+        palette=_entity_part_palette(name,part)
+        tile=[palette[i] for i in indices]
+        if semantic=="head_front": _paint_entity_face(name,tile)
+        elif semantic=="body_front": _paint_entity_body(name,tile)
+        tx,ty=index%4,index//4
+        for y in range(SIZE):
+            start=(ty*SIZE+y)*ENTITY_SKIN_SIZE+tx*SIZE
+            atlas[start:start+SIZE]=tile[y*SIZE:(y+1)*SIZE]
+    return atlas
+
+def build_entity_skins(output,seed):
+    skin_dir=output/"entity_skins"; skin_dir.mkdir(parents=True,exist_ok=True)
+    metadata={"version":1,"width":ENTITY_SKIN_SIZE,"height":ENTITY_SKIN_SIZE,
+              "tile_size":SIZE,"columns":4,"rows":4,"filter":"nearest",
+              "seed":seed,"layout":ENTITY_SKIN_LAYOUT,"entities":{}}
+    for name in ENTITY_SKIN_NAMES:
+        pixels=generate_entity_skin(name,seed)
+        path=skin_dir/f"{name}.png"; write_png(path,ENTITY_SKIN_SIZE,ENTITY_SKIN_SIZE,pixels)
+        metadata["entities"][name]={"source":f"entity_skins/{name}.png"}
+    (output/"entity_skins.json").write_text(
+        json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+
 def png_bytes(width,height,pixels):
     raw=bytearray()
     for y in range(height):
@@ -919,6 +1059,7 @@ def parse_args(argv=None):
     parser.add_argument("--local-seed",action="append",default=[],metavar="MATERIAL=SEED")
     parser.add_argument("--build-items-atlas",action="store_true")
     parser.add_argument("--build-entity-atlas",action="store_true")
+    parser.add_argument("--build-entity-skins",action="store_true")
     parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
     parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
     parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
@@ -927,7 +1068,7 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args=parse_args(argv)
-    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
+    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
         local_seeds=parse_local_seeds(args.local_seed)
@@ -936,6 +1077,7 @@ def main(argv=None):
         if args.build_atlas: build_atlas(args.output,args.seed,local_seeds)
         if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
         if args.build_entity_atlas: build_entity_atlas(args.output,args.seed)
+        if args.build_entity_skins: build_entity_skins(args.output,args.seed)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0

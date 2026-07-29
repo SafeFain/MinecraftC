@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Deterministically generate MinecraftC's original block-style entity GLBs."""
-import argparse, json, pathlib, struct, zlib
+import argparse, json, math, pathlib, struct, zlib
+import texture_generator
 
-VERSION = 1
+VERSION = 3
 SEED = 0x4D43474C
 MODELS = {
     "cow": ((0.90,1.20,1.30),(112,72,48,255)),
@@ -111,16 +112,31 @@ def parts_for(name):
 def build_v2(name,size,color):
     del size
     parts=parts_for(name);buf=Buffer();vertices=bytearray();indices=[]
-    uv=((0,0),(1,0),(1,1),(0,1)); normals=((0,0,-1),(0,0,1),(-1,0,0),(1,0,0),(0,1,0),(0,-1,0))
-    for joint,(_,center,dims) in enumerate(parts,1):
+    normals=((0,0,-1),(0,0,1),(-1,0,0),(1,0,0),(0,1,0),(0,-1,0))
+    face_names=("front","back","left","right","top","bottom")
+    def semantic(part,face):
+        if part=="head": return "head_"+face
+        if part=="body": return "body_"+face
+        if part.startswith("wing_"): return "limb_secondary"
+        if name in {"zombie","skeleton"} and part.startswith("leg_"): return "limb_secondary"
+        return "limb_primary"
+    def tile_uv(slot):
+        index=texture_generator.ENTITY_SKIN_LAYOUT[slot];tx,ty=index%4,index//4
+        u0=(tx*16+.5)/64;u1=(tx*16+15.5)/64
+        v0=(ty*16+.5)/64;v1=(ty*16+15.5)/64
+        # PNG row zero is the visual top; bottom vertices therefore use v1.
+        return ((u0,v1),(u1,v1),(u1,v0),(u0,v0))
+    for joint,(part,center,dims) in enumerate(parts,1):
         cx,cy,cz=center;dx,dy,dz=(v/2 for v in dims)
         corners=[(cx-dx,cy-dy,cz-dz),(cx+dx,cy-dy,cz-dz),(cx+dx,cy+dy,cz-dz),(cx-dx,cy+dy,cz-dz),
                  (cx-dx,cy-dy,cz+dz),(cx+dx,cy-dy,cz+dz),(cx+dx,cy+dy,cz+dz),(cx-dx,cy+dy,cz+dz)]
         faces=((0,1,2,3),(5,4,7,6),(4,0,3,7),(1,5,6,2),(3,2,6,7),(4,5,1,0))
-        for normal,face in zip(normals,faces):
+        for normal,face,face_name in zip(normals,faces,face_names):
             base=len(vertices)//64
-            for corner,tex in zip(face,uv):vertices.extend(struct.pack("<3f3f2f4H8x4f",*corners[corner],*normal,*tex,joint,0,0,0,1,0,0,0))
-            indices += [base,base+1,base+2,base,base+2,base+3]
+            for corner,tex in zip(face,tile_uv(semantic(part,face_name))):vertices.extend(struct.pack("<3f3f2f4H8x4f",*corners[corner],*normal,*tex,joint,0,0,0,1,0,0,0))
+            # glTF/OpenGL use counter-clockwise front faces. The cuboid corner
+            # lists above are clockwise when viewed from the outward normal.
+            indices += [base,base+2,base+1,base,base+3,base+2]
     vv=buf.add(vertices,34962);buf.views[vv]["byteStride"]=64
     iv=buf.add(struct.pack("<%dH"%len(indices),*indices),34963);count=len(vertices)//64
     all_points=[(c[0]+sx*d[0]/2,c[1]+sy*d[1]/2,c[2]+sz*d[2]/2) for _,c,d in parts for sx in (-1,1) for sy in (-1,1) for sz in (-1,1)]
@@ -132,28 +148,66 @@ def build_v2(name,size,color):
     for _,center,_ in [("root",(0,0,0),(0,0,0))]+parts:
         x,y,z=center;matrices += [1,0,0,0,0,1,0,0,0,0,1,0,-x,-y,-z,1]
     ibv=buf.add(struct.pack("<%df"%len(matrices),*matrices));iba=buf.accessor(ibv,5126,len(parts)+1,"MAT4")
-    tv=buf.add(struct.pack("<2f",0,1));ta=buf.accessor(tv,5126,2,"SCALAR",0,[0],[1])
     nodes=[{"name":"root","children":list(range(1,len(parts)+1))}]
     nodes += [{"name":part,"translation":list(center)} for part,center,_ in parts]
     mesh_node=len(nodes);nodes.append({"name":name,"mesh":0,"skin":0})
     animations=[]
-    def animation(clip,channels):
+    def animation(clip,duration,channels):
+        frame_count=len(channels[0][2]); times=[duration*i/(frame_count-1) for i in range(frame_count)]
+        tv=buf.add(struct.pack("<%df"%frame_count,*times));ta=buf.accessor(tv,5126,frame_count,"SCALAR",0,[0],[duration])
         samplers=[];outputs=[]
         for node,path,values in channels:
+            assert len(values)==frame_count
             view=buf.add(struct.pack("<%df"%sum(len(v) for v in values),*(x for v in values for x in v)))
-            output=buf.accessor(view,5126,2,"VEC4" if path=="rotation" else "VEC3")
+            output=buf.accessor(view,5126,frame_count,"VEC4" if path=="rotation" else "VEC3")
             samplers.append({"input":ta,"output":output,"interpolation":"LINEAR"});outputs.append({"sampler":len(samplers)-1,"target":{"node":node,"path":path}})
         animations.append({"name":clip,"samplers":samplers,"channels":outputs})
-    animation("idle",[(0,"translation",((0,0,0),(0,.025,0)))])
+    def qx(angle):return (math.sin(angle/2),0,0,math.cos(angle/2))
+    def qy(angle):return (0,math.sin(angle/2),0,math.cos(angle/2))
+    def qz(angle):return (0,0,math.sin(angle/2),math.cos(angle/2))
+    node={part:index for index,(part,_,_) in enumerate(parts,1)}
+    animation("idle",1.6,[(0,"translation",((0,0,0),(0,.025,0),(0,0,0)))])
     walk=[]
-    for index,(part,_,_) in enumerate(parts,1):
-        if "leg" in part or "arm" in part:
-            sign=-1 if index%2 else 1; angle=.30*sign
-            walk.append((index,"rotation",((0,0,-angle,1),(0,0,angle,1))))
-    animation("walk",walk or [(0,"translation",((-.03,0,0),(.03,.02,0)))])
-    animation("hurt",[(0,"translation",((0,0,0),(0,.12,.10)))])
-    animation("death",[(0,"rotation",((0,0,0,1),(0,0,.7071068,.7071068)))])
-    accent=tuple(max(0,min(255,c+(22 if i<3 else 0))) for i,c in enumerate(color));image_view=buf.add(png(color,accent))
+    if name in {"cow","pig","sheep","blastling"}:
+        for part in ("leg_fl","leg_br"):
+            walk.append((node[part],"rotation",(qx(.38),qx(-.38),qx(.38))))
+        for part in ("leg_fr","leg_bl"):
+            walk.append((node[part],"rotation",(qx(-.38),qx(.38),qx(-.38))))
+        walk.append((0,"translation",((0,0,0),(0,.035,0),(0,0,0))))
+    elif name in {"zombie","skeleton"}:
+        for part,phase in (("leg_l",1),("leg_r",-1),("arm_l",-1),("arm_r",1)):
+            walk.append((node[part],"rotation",(qx(.48*phase),qx(-.48*phase),qx(.48*phase))))
+    elif name=="chicken":
+        walk += [(node["leg_l"],"rotation",(qx(.42),qx(-.42),qx(.42))),
+                 (node["leg_r"],"rotation",(qx(-.42),qx(.42),qx(-.42))),
+                 (node["wing_l"],"rotation",(qz(-.10),qz(-.28),qz(-.10))),
+                 (node["wing_r"],"rotation",(qz(.10),qz(.28),qz(.10))),
+                 (0,"translation",((0,0,0),(0,.045,0),(0,0,0)))]
+    else:
+        for i in range(4):
+            phase=1 if i%2==0 else -1
+            walk += [(node[f"leg_l{i}"],"rotation",(qy(.30*phase),qy(-.30*phase),qy(.30*phase))),
+                     (node[f"leg_r{i}"],"rotation",(qy(-.30*phase),qy(.30*phase),qy(-.30*phase)))]
+        walk.append((0,"translation",((0,0,0),(0,.025,0),(0,0,0))))
+    animation("walk",1.0,walk)
+    animation("hurt",.35,[(0,"translation",((0,0,0),(0,.12,.10),(0,0,0)))])
+    animation("death",1.0,[(0,"rotation",(qz(0),qz(math.pi*.5),qz(math.pi*.5)))])
+    if name=="zombie":
+        animation("attack",.55,[(node["arm_l"],"rotation",(qx(-.2),qx(-1.15),qx(.35))),
+                                 (node["arm_r"],"rotation",(qx(-.2),qx(-1.15),qx(.35)))])
+    elif name=="skeleton":
+        animation("attack",.75,[(node["arm_l"],"rotation",(qx(-.25),qx(-1.05),qx(-.15))),
+                                 (node["arm_r"],"rotation",(qy(-.20),qy(.55),qy(0)))])
+    elif name=="spider":
+        animation("attack",.50,[(0,"translation",((0,0,0),(0,.12,-.28),(0,0,0))),
+                                 (node["leg_l0"],"rotation",(qy(0),qy(.55),qy(0))),
+                                 (node["leg_r0"],"rotation",(qy(0),qy(-.55),qy(0)))])
+    elif name=="blastling":
+        animation("attack",1.20,[(0,"scale",((1,1,1),(1.18,1.18,1.18),(1,1,1))),
+                                  (0,"translation",((0,0,0),(0,.08,0),(0,0,0)))])
+    del color
+    skin=texture_generator.generate_entity_skin(name,texture_generator.DEFAULT_SEED)
+    image_view=buf.add(texture_generator.png_bytes(64,64,skin))
     doc={"asset":{"version":"2.0","generator":f"MinecraftC entity generator v{VERSION} seed {SEED}"},"scene":0,"scenes":[{"nodes":[0,mesh_node]}],"nodes":nodes,
          "skins":[{"name":name+"_skin","joints":list(range(len(parts)+1)),"skeleton":0,"inverseBindMatrices":iba}],
          "meshes":[{"name":name+"_blocks","primitives":[{"attributes":attrs,"indices":inds,"material":0}]}],
@@ -163,9 +217,40 @@ def build_v2(name,size,color):
     encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode();encoded+=b" "*((-len(encoded))%4);binary=bytes(buf.data)+b"\0"*((-len(buf.data))%4);total=28+len(encoded)+len(binary)
     return struct.pack("<4sII",b"glTF",2,total)+struct.pack("<II",len(encoded),0x4E4F534A)+encoded+struct.pack("<II",len(binary),0x004E4942)+binary
 
+def write_action_graph(path,name):
+    action_nodes={
+        "zombie":{"body":1,"head":1,"arm_l":1,"arm_r":1},
+        "skeleton":{"body":1,"head":1,"arm_l":1,"arm_r":1},
+    }
+    layers=[{"name":"base","order":0,"blend":"override"},
+            {"name":"action","order":100,"blend":"override"},
+            {"name":"reaction","order":200,"blend":"additive"},
+            {"name":"death","order":300,"blend":"override"}]
+    if name in action_nodes:
+        layers[1]["mask"]={"nodes":action_nodes[name],"include_descendants":True}
+    actions={
+        "idle":{"clip":"idle","layer":"base","loop":True,"fade_in":.15,"fade_out":.15},
+        "walk":{"clip":"walk","layer":"base","loop":True,"fade_in":.15,"fade_out":.15},
+        "hurt":{"clip":"hurt","layer":"reaction","loop":False,"priority":200,"fade_in":.04,"fade_out":.10},
+        "death":{"clip":"death","layer":"death","loop":False,"priority":300,"fade_in":.08,"fade_out":0},
+    }
+    attack={
+        "zombie":(.55,.30,"melee"),"spider":(.50,.30,"melee"),
+        "skeleton":(.75,.45,"shoot"),"blastling":(1.20,1.00,"explode")}
+    if name in attack:
+        duration,event_time,event=attack[name]
+        actions["attack"]={"clip":"attack","layer":"action","loop":False,
+                           "duration":duration,"priority":100,"fade_in":.08,
+                           "fade_out":.12,"events":[{"name":event,"time":event_time}]}
+    graph={"version":1,"bindings":{key:key for key in actions},
+           "layers":layers,"actions":actions}
+    path.write_text(json.dumps(graph,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("--output",type=pathlib.Path,required=True);parser.add_argument("--fixtures",type=pathlib.Path)
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
-    for name,(size,color) in MODELS.items():(args.output/(name+".glb")).write_bytes(build_v2(name,size,color))
+    for name,(size,color) in MODELS.items():
+        (args.output/(name+".glb")).write_bytes(build_v2(name,size,color))
+        write_action_graph(args.output/(name+".anim.json"),name)
 
 if __name__=="__main__":main()

@@ -514,6 +514,10 @@ LoadResult loadGltf(const std::filesystem::path& path) {
     }
 
     asset->nodes.resize(data->nodes_count);
+    constexpr int UNBOUND_PRIMITIVE = -3;
+    constexpr int CONFLICTING_PRIMITIVE = -2;
+    std::vector<int> primitiveSkinBindings(
+        asset->primitives.size(), UNBOUND_PRIMITIVE);
     for (cgltf_size index = 0; index < data->nodes_count; ++index) {
         const cgltf_node& source = data->nodes[index];
         Node& node = asset->nodes[index];
@@ -530,6 +534,10 @@ LoadResult loadGltf(const std::filesystem::path& path) {
             node.primitives = meshPrimitives[meshIndex];
             for (int primitiveIndex : node.primitives) {
                 Primitive& primitive = asset->primitives[primitiveIndex];
+                int& binding = primitiveSkinBindings[
+                    static_cast<std::size_t>(primitiveIndex)];
+                if (binding == UNBOUND_PRIMITIVE) binding = node.skin;
+                else if (binding != node.skin) binding = CONFLICTING_PRIMITIVE;
                 if (node.skin >= 0) {
                     const std::size_t jointCount = asset->skins[static_cast<std::size_t>(node.skin)].joints.size();
                     for (const Vertex& vertex : primitive.vertices) {
@@ -548,6 +556,10 @@ LoadResult loadGltf(const std::filesystem::path& path) {
             node.children.push_back(child);
             asset->nodes[child].parent = static_cast<int>(index);
         }
+    }
+    for (std::size_t index = 0; index < asset->primitives.size(); ++index) {
+        const int binding = primitiveSkinBindings[index];
+        asset->primitives[index].skin = binding >= 0 ? binding : -1;
     }
     if (data->scene) {
         for (cgltf_size index = 0; index < data->scene->nodes_count; ++index) {

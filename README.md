@@ -137,7 +137,7 @@ GitHub Actions 会在 Linux、Windows 和 macOS（arm64/x86-64 通用版）上�
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
-  --build-items-atlas \
+  --build-items-atlas --build-entity-atlas --build-entity-skins \
   --seed 213785369 --output assets/textures/generated
 
 # 使用当前默认种子的等价 CMake 目标
@@ -169,9 +169,15 @@ ctest --test-dir build-local --output-on-failure
 # glTF entity models
 
 MinecraftC renders its eight mobs from reusable glTF 2.0 GLB assets with
-hierarchical animation and GPU skinning. Dropped items, arrows, and primed TNT
+hierarchical animation and GPU skinning. Versioned JSON action graphs provide
+arbitrary override/additive layers, masks, queues, transitions, and gameplay
+events. Every mob has a species-specific seamless walk cycle, while hostile
+attacks use visible windups and event-timed impact checks. Each mob embeds an
+original 64x64 semantic skin with independent head and body faces, continuous
+pixel shading, and a dedicated recognizable face. Dropped items,
+arrows, and primed TNT
 retain the lightweight compatibility renderer. The original deterministic
 assets and regeneration instructions are documented in
 `assets/models/entities/README.md`.
 The implementation history and validation record are in
-`docs/gltf-entity-model-engine.md`.
+`docs/gltf-entity-model-engine.md` and `docs/entity-animation-engine.md`.

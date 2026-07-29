@@ -13,14 +13,7 @@ struct Pose {
     std::vector<glm::mat4> global;
 };
 
-enum class PlaybackState { Idle, Walk, Hurt, Death, Attack };
-
 struct ModelInstance {
-    PlaybackState state = PlaybackState::Idle;
-    PlaybackState previousState = PlaybackState::Idle;
-    float stateTime = 0;
-    float previousTime = 0;
-    float transition = 1;
     Pose pose;
     std::vector<std::vector<glm::mat4>> jointPalettes;
 };

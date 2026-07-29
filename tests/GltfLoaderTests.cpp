@@ -209,6 +209,8 @@ int main() {
     require(valid && valid.asset->skins[0].joints.size() == 2, "valid skin failed");
     require(valid.asset->primitives.size() == 1 && valid.asset->primitives[0].indices.size() == 3,
             "indexed triangle was not converted");
+    require(valid.asset->primitives[0].skin == 0,
+            "node skin was not handed off to its unique mesh primitive");
     require(valid.asset->images.size() == 1 && valid.asset->images[0].width == 1,
             "embedded PNG was not decoded");
     require(valid.asset->nodes[0].translation.x == 2.0f && valid.asset->nodes[2].usesMatrix,
@@ -274,6 +276,9 @@ int main() {
         if (!loaded) std::cerr << name << ": " << loaded.error << '\n';
         require(static_cast<bool>(loaded),
                 "generated runtime entity model failed loader validation");
+        require(loaded.asset->primitives.size() == 1 &&
+                    loaded.asset->primitives[0].skin == 0,
+                "generated entity primitive lost its GPU skin binding");
     }
 
     std::cout << "gltf loader tests passed\n";

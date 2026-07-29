@@ -74,6 +74,7 @@ target_include_directories(minecraftc PRIVATE
     external/cgltf
     external/stb
     external/miniaudio
+    external
 )
 # Prevent GLFW from including GL/gl.h — we use our own GL loader
 target_compile_definitions(minecraftc PRIVATE GLFW_INCLUDE_NONE)
@@ -158,6 +159,21 @@ if(BUILD_TESTING)
         target_compile_options(model_animation_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME model_animation_sampling_and_pose_math COMMAND model_animation_tests)
+
+    add_executable(animation_graph_tests
+        tests/AnimationGraphTests.cpp
+        src/model/AnimationGraph.cpp
+        src/model/AnimationMixer.cpp
+        src/model/ModelAnimation.cpp)
+    target_include_directories(animation_graph_tests PRIVATE src external)
+    target_link_libraries(animation_graph_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(animation_graph_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(animation_graph_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME animation_graph_layers_queues_masks_and_events
+        COMMAND animation_graph_tests)
 
     add_executable(gltf_loader_tests
         tests/GltfLoaderTests.cpp
@@ -349,6 +365,8 @@ if(BUILD_TESTING)
     add_executable(entity_model_registry_tests
         tests/EntityModelRegistryTests.cpp
         src/entity/EntityModelRegistry.cpp
+        src/model/AnimationGraph.cpp
+        src/model/AnimationMixer.cpp
         src/model/ModelAnimation.cpp
         src/model/GltfLoader.cpp
         src/model/ModelRenderer.cpp
@@ -356,7 +374,7 @@ if(BUILD_TESTING)
         src/renderer/Shader.cpp
         src/renderer/StbImageImpl.cpp)
     target_include_directories(entity_model_registry_tests PRIVATE
-        src external/cgltf external/stb external/glad/include)
+        src external external/cgltf external/stb external/glad/include)
     target_compile_definitions(entity_model_registry_tests PRIVATE GLFW_INCLUDE_NONE)
     target_link_libraries(entity_model_registry_tests PRIVATE
         glm::glm glad glfw OpenGL::GL minecraftc_platform)
@@ -420,7 +438,7 @@ if(Python3_Interpreter_FOUND)
     add_custom_target(texture_generator
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
                 --generate --validate --build-atlas --build-items-atlas
-                --build-entity-atlas
+                --build-entity-atlas --build-entity-skins
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Generating and validating deterministic voxel textures")

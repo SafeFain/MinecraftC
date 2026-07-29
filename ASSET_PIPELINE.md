@@ -107,6 +107,23 @@ or carapace patterns that remain coherent on every cuboid model part. The 3x3
 atlas and its metadata are written to `generated/entity_atlas.png` and
 `generated/entity_atlas.json` with nearest filtering.
 
+`--build-entity-skins` creates eight original 64x64 runtime skins under
+`generated/entity_skins/` plus `generated/entity_skins.json`. Each 4x4 skin
+contains named 16x16 regions for all six head faces, all six body faces,
+primary and secondary limbs, detail, and fallback material. Head and body
+backgrounds come from continuous cube-space fields so adjacent faces remain
+coherent; eyes, mouths, muzzles, beaks, and other identifying features are
+drawn as explicit overlays. Output remains nearest-filtered pixel art.
+
+## Entity models and actions
+
+`tools/generate_entity_models.py` deterministically emits the eight runtime
+GLBs and their versioned `.anim.json` action graphs. GLBs hold geometry,
+skins, embedded copies of the generated 64x64 entity skins, per-face UVs, and
+keyframes; action graphs hold runtime layers,
+masks, transitions, priorities, queues, and gameplay event times. Regenerate
+and verify them with `python3 tests/test_entity_models.py`.
+
 ## Add a block and material
 
 1. Append the serialized `BlockId` before `COUNT`; never reorder existing IDs.
