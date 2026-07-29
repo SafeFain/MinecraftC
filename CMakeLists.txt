@@ -357,6 +357,7 @@ if(BUILD_TESTING)
 
     add_executable(entity_logic_tests tests/EntityLogicTests.cpp)
     target_include_directories(entity_logic_tests PRIVATE src)
+    target_link_libraries(entity_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(entity_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

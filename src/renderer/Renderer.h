@@ -16,7 +16,7 @@
 #include "world/BlockLightLogic.h"
 
 // Forward declaration
-class ChunkMesh;
+struct ChunkMesh;
 namespace model { class ModelRenderer; }
 
 class Renderer {
