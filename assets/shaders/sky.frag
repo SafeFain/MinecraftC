@@ -12,6 +12,7 @@ uniform float uStarIntensity;
 uniform float uRainIntensity;
 uniform float uThunderIntensity;
 uniform float uWeatherTime;
+uniform int uRenderClouds;
 uniform int uManualGamma;
 
 out vec4 outColor;
@@ -55,7 +56,7 @@ void main() {
     float stars = step(0.9965, starSeed) * smoothstep(0.0, 0.18, ray.y);
     color += vec3(0.68, 0.76, 1.0) * stars * uStarIntensity;
 
-    if (ray.y > 0.025) {
+    if (uRenderClouds != 0 && ray.y > 0.025) {
         vec2 cloudUv = ray.xz / max(ray.y, 0.06) * 0.42;
         cloudUv += vec2(uWeatherTime * 0.012, uWeatherTime * 0.004);
         float noise = cloudNoise(cloudUv) * 0.65 +

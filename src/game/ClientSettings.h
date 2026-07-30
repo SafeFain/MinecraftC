@@ -6,9 +6,10 @@
 #include "core/Input.h"
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 2;
+    static constexpr int FORMAT_VERSION = 3;
 
     int renderDistance = 8;
+    bool renderClouds = true;
     int cloudRenderDistance = 192;
     int dayCycleMinutes = 20;
     bool autoJump = true;

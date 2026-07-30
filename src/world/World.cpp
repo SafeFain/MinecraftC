@@ -457,28 +457,26 @@ void World::update(const glm::dvec3& playerPos) {
     if (m_streamCleanupPending) {
         std::unique_lock lock(m_chunkMutex);
         std::vector<std::pair<int,int>> toRemove;
-        bool blockedRemoval = false;
+        toRemove.reserve(Config::CHUNK_UNLOADS_PER_FRAME);
+        bool cleanupRemaining = false;
         for (auto& [key, chunk] : m_chunks) {
             if (m_desiredChunkSet.count(packedChunkKey(key.first, key.second)) != 0)
                 continue;
             if (chunk->meshInProgress.load() || chunk->generationInProgress.load())
-                blockedRemoval = true;
-            else
+                cleanupRemaining = true;
+            else if (static_cast<int>(toRemove.size()) <
+                     Config::CHUNK_UNLOADS_PER_FRAME)
                 toRemove.push_back(key);
+            else
+                cleanupRemaining = true;
         }
         for (auto& key : toRemove) {
             auto it = m_chunks.find(key);
             if (it != m_chunks.end()) {
-                if (it->second->generated.load()) {
-                    m_lightDirty = true;
-                    constexpr int adjacent[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
-                    for(const auto& direction:adjacent){
-                        auto neighbor=m_chunks.find({key.first+direction[0],
-                                                     key.second+direction[1]});
-                        if(neighbor!=m_chunks.end())
-                            neighbor->second->lightingInitialized=false;
-                    }
-                }
+                // Retained chunks keep their derived light. Unloading an
+                // out-of-range neighbor does not change world blocks, and
+                // invalidating the boundary strip here caused a synchronous
+                // relight whenever the player crossed a 16-block boundary.
                 saveOverrides(key.first, key.second);
                 saveBlockEntities(key.first, key.second);
                 it->second->getMesh().destroy();
@@ -489,7 +487,7 @@ void World::update(const glm::dvec3& playerPos) {
                 activeChanged = true;
             }
         }
-        m_streamCleanupPending = blockedRemoval;
+        m_streamCleanupPending = cleanupRemaining;
     }
 
     const int loadBudget = m_firstUpdate

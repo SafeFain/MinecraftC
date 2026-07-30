@@ -35,6 +35,10 @@ void SettingsMenu::cycleRenderDistance() {
         (static_cast<int>(it - std::begin(options)) + 1) % 7)];
     m_onChanged(); refreshButtons();
 }
+void SettingsMenu::toggleCloudRendering() {
+    m_settings.renderClouds = !m_settings.renderClouds;
+    m_onChanged(); refreshButtons();
+}
 void SettingsMenu::cycleCloudRenderDistance() {
     constexpr int options[] = {64,96,128,192,256,512};
     auto it = std::find(std::begin(options), std::end(options),
@@ -84,6 +88,9 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back("Back", m_onBack);
     } else if (m_page == Page::Video) {
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
+        m_buttons.emplace_back(std::string("Clouds: ") +
+            (m_settings.renderClouds ? "ON" : "OFF"),
+            [this]{ toggleCloudRendering(); });
         m_buttons.emplace_back(labelForCloudRenderDist(),
                                [this]{ cycleCloudRenderDistance(); });
         m_buttons.emplace_back(std::string("Smooth Lighting: ") +

@@ -34,7 +34,7 @@ public:
                         const glm::vec3& cameraPosition);
     void renderSky(const RenderEnvironment& environment,
                    const glm::mat4& inverseViewProjection,
-                   const glm::vec3& cameraPosition);
+                   const glm::vec3& cameraPosition, bool renderClouds);
 
     // Chunk rendering
     void renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
@@ -96,6 +96,7 @@ private:
         float width, depth, height;
     };
     static constexpr size_t MAX_CLOUD_INSTANCES = 65u * 65u;
+    static constexpr size_t CLOUD_INSTANCE_BUFFER_COUNT = 3;
 
     std::unique_ptr<Shader> m_blockShader;
     std::unique_ptr<Shader> m_wireShader;
@@ -114,7 +115,8 @@ private:
     GLuint m_entityVBO = 0;
     GLuint m_entityTexture = 0;
     GLuint m_cloudVAO = 0;
-    GLuint m_cloudInstanceVBO = 0;
+    GLuint m_cloudInstanceVBOs[CLOUD_INSTANCE_BUFFER_COUNT]{};
+    size_t m_cloudInstanceBufferIndex = 0;
     GLuint m_particleVAO = 0;
     GLuint m_particleQuadVBO = 0;
     GLuint m_particleInstanceVBO = 0;

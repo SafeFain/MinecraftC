@@ -62,6 +62,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         const std::string value = line.substr(equals + 1);
         try {
             if (name == "render_distance") settings.renderDistance = std::stoi(value);
+            else if (name == "render_clouds")
+                settings.renderClouds = std::stoi(value) != 0;
             else if (name == "cloud_render_distance")
                 settings.cloudRenderDistance = std::stoi(value);
             else if (name == "day_cycle") settings.dayCycleMinutes = std::stoi(value);
@@ -95,6 +97,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
     if (!output) return false;
     output << "version=" << FORMAT_VERSION << '\n'
            << "render_distance=" << renderDistance << '\n'
+           << "render_clouds=" << renderClouds << '\n'
            << "cloud_render_distance=" << cloudRenderDistance << '\n'
            << "day_cycle=" << dayCycleMinutes << '\n'
            << "auto_jump=" << autoJump << '\n'

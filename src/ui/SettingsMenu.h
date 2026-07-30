@@ -28,6 +28,7 @@ private:
     int m_pressedButton = -1;
 
     void cycleRenderDistance();
+    void toggleCloudRendering();
     void cycleCloudRenderDistance();
     void cycleDayCycle();
     void toggleAutoJump();

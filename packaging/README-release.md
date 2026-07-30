@@ -1,4 +1,4 @@
-# MinecraftC Release 1.1.0
+# MinecraftC Release 1.1.1
 
 This is a portable MinecraftC build. Keep the executable and `assets` directory
 together.

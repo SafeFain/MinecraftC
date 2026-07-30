@@ -802,7 +802,8 @@ private:
 
                 m_renderer.beginFrame();
                 m_renderer.renderSky(
-                    environment, glm::inverse(vp), m_camera.m_position);
+                    environment, glm::inverse(vp), m_camera.m_position,
+                    m_clientSettings.renderClouds);
                 m_renderer.setEnvironment(environment, m_camera.m_position);
                 m_renderer.setViewProjection(vp);
                 m_renderer.setFrustum(frustum);
@@ -810,10 +811,12 @@ private:
                 const glm::dvec3 playerPosition = m_player.getPosition();
                 const glm::dvec3 renderOrigin(
                     playerPosition.x, 0.0, playerPosition.z);
-                m_renderer.renderClouds(
-                    playerPosition, vp, m_worldMetadata.seed,
-                    static_cast<float>(glfwGetTime()),
-                    m_clientSettings.cloudRenderDistance);
+                if (m_clientSettings.renderClouds) {
+                    m_renderer.renderClouds(
+                        playerPosition, vp, m_worldMetadata.seed,
+                        static_cast<float>(glfwGetTime()),
+                        m_clientSettings.cloudRenderDistance);
+                }
 
                 // Bind block shader once for all chunks (saves ~N glUseProgram calls)
                 m_renderer.bindBlockShader();

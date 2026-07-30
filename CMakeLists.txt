@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MinecraftC VERSION 1.1.0 LANGUAGES CXX C)
+project(MinecraftC VERSION 1.1.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -159,7 +159,7 @@ if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
-        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.0")
+        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.1")
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)

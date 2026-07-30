@@ -7,7 +7,7 @@
 namespace Config {
 
 #ifndef MINECRAFTC_VERSION_STRING
-#  define MINECRAFTC_VERSION_STRING "1.1.0"
+#  define MINECRAFTC_VERSION_STRING "1.1.1"
 #endif
 constexpr const char* GAME_VERSION = "Release-" MINECRAFTC_VERSION_STRING;
 
@@ -35,6 +35,7 @@ constexpr int storageYToWorldY(int y) { return y + WORLD_MIN_Y; }
 constexpr int   MESH_UPLOADS_PER_FRAME = 4;   // max GL uploads per frame (avoids GPU stalls)
 constexpr size_t MESH_UPLOAD_BYTES_PER_FRAME = 8u * 1024u * 1024u;
 constexpr int   CHUNK_LOADS_PER_FRAME = 4;
+constexpr int   CHUNK_UNLOADS_PER_FRAME = 2;
 constexpr int   INITIAL_CHUNK_LOADS_PER_FRAME = 16;
 constexpr int   CHUNK_GEN_TASKS_IN_FLIGHT = 2; // bounds expensive terrain workers
 constexpr int   CHUNK_MESH_TASKS_IN_FLIGHT = 2; // prevents mesh queue buildup

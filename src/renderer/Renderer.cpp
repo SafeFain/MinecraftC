@@ -31,8 +31,9 @@ Renderer::~Renderer() {
     if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
     if (m_entityVAO) GL_CHECK(glDeleteVertexArrays(1, &m_entityVAO));
     if (m_entityTexture) GL_CHECK(glDeleteTextures(1, &m_entityTexture));
-    if (m_cloudInstanceVBO)
-        GL_CHECK(glDeleteBuffers(1, &m_cloudInstanceVBO));
+    GL_CHECK(glDeleteBuffers(
+        static_cast<GLsizei>(CLOUD_INSTANCE_BUFFER_COUNT),
+        m_cloudInstanceVBOs));
     if (m_cloudVAO) GL_CHECK(glDeleteVertexArrays(1, &m_cloudVAO));
     if (m_particleInstanceVBO) GL_CHECK(glDeleteBuffers(1, &m_particleInstanceVBO));
     if (m_particleQuadVBO) GL_CHECK(glDeleteBuffers(1, &m_particleQuadVBO));
@@ -136,16 +137,23 @@ void Renderer::initialize(bool framebufferSrgb,
         // Clouds share the static entity cube but provide position and size
         // per instance, reducing the entire layer to one draw call.
         GL_CHECK(glGenVertexArrays(1, &m_cloudVAO));
-        GL_CHECK(glGenBuffers(1, &m_cloudInstanceVBO));
+        GL_CHECK(glGenBuffers(
+            static_cast<GLsizei>(CLOUD_INSTANCE_BUFFER_COUNT),
+            m_cloudInstanceVBOs));
         GL_CHECK(glBindVertexArray(m_cloudVAO));
         GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_entityVBO));
         GL_CHECK(glVertexAttribPointer(
             0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr));
         GL_CHECK(glEnableVertexAttribArray(0));
-        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
-        GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
-            MAX_CLOUD_INSTANCES * sizeof(CloudInstance), nullptr,
-            GL_STREAM_DRAW));
+        for (GLuint buffer : m_cloudInstanceVBOs) {
+            GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, buffer));
+            GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+                MAX_CLOUD_INSTANCES * sizeof(CloudInstance), nullptr,
+                GL_STREAM_DRAW));
+        }
+        GL_CHECK(glBindBuffer(
+            GL_ARRAY_BUFFER,
+            m_cloudInstanceVBOs[m_cloudInstanceBufferIndex]));
         GL_CHECK(glVertexAttribPointer(
             2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
         GL_CHECK(glEnableVertexAttribArray(2));
@@ -237,7 +245,7 @@ void Renderer::setEnvironment(const RenderEnvironment& environment,
 
 void Renderer::renderSky(const RenderEnvironment& environment,
                          const glm::mat4& inverseViewProjection,
-                         const glm::vec3& cameraPosition) {
+                         const glm::vec3& cameraPosition, bool renderClouds) {
     GL_CHECK(glDisable(GL_DEPTH_TEST));
     GL_CHECK(glDisable(GL_CULL_FACE));
     GL_CHECK(glDepthMask(GL_FALSE));
@@ -253,6 +261,7 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
     m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
     m_skyShader->setFloat("uWeatherTime", static_cast<float>(glfwGetTime()));
+    m_skyShader->setInt("uRenderClouds", renderClouds ? 1 : 0);
     m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_skyVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
@@ -472,8 +481,19 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
     m_cloudShader->setVec3("uColor", cloudColor);
     m_cloudShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_cloudVAO));
-    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_cloudInstanceVBO));
     if (rebuild) {
+        // Rotate allocations so a grid transition never overwrites instance
+        // data that an earlier frame may still be consuming on the GPU.
+        m_cloudInstanceBufferIndex =
+            (m_cloudInstanceBufferIndex + 1) % CLOUD_INSTANCE_BUFFER_COUNT;
+        GL_CHECK(glBindBuffer(
+            GL_ARRAY_BUFFER,
+            m_cloudInstanceVBOs[m_cloudInstanceBufferIndex]));
+        GL_CHECK(glVertexAttribPointer(
+            2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
+        GL_CHECK(glVertexAttribPointer(
+            3, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+            reinterpret_cast<void*>(4 * sizeof(float))));
         const GLsizeiptr bytes = static_cast<GLsizeiptr>(
             m_cloudInstances.size() * sizeof(CloudInstance));
         if (m_bufferSubData)
