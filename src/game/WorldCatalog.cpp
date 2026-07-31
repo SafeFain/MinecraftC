@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
+#include <system_error>
 
 std::string WorldCatalog::slug(const std::string& displayName) {
     std::string result;
@@ -81,4 +82,21 @@ SaveStore WorldCatalog::open(const std::string& id) const {
     SaveStore store(m_savesDirectory / id);
     if (!store.exists()) throw std::runtime_error("World does not exist");
     return store;
+}
+
+bool WorldCatalog::deleteWorld(const std::string& id) const {
+    if (!validId(id)) throw std::runtime_error("Invalid world id");
+    const std::filesystem::path target = m_savesDirectory / id;
+    std::error_code error;
+    const auto status = std::filesystem::symlink_status(target, error);
+    if (error || !std::filesystem::exists(status)) return false;
+    if (std::filesystem::is_symlink(status) ||
+        !std::filesystem::is_directory(status)) {
+        throw std::runtime_error("World path is not a direct save directory");
+    }
+    if (!SaveStore(target).exists())
+        throw std::runtime_error("World metadata does not exist");
+    const auto removed = std::filesystem::remove_all(target, error);
+    if (error) throw std::runtime_error("Could not delete world: " + error.message());
+    return removed > 0;
 }

@@ -83,7 +83,9 @@ private:
     std::unique_ptr<Menu> m_activeMenu;
     MenuCallbacks         m_menuCallbacks;
     bool                  m_terrainGenerated = false;
-    std::chrono::high_resolution_clock::time_point m_pregenerationStarted;
+    bool                  m_loadingNewWorld = false;
+    bool                  m_loadingGenerationComplete = false;
+    std::chrono::high_resolution_clock::time_point m_worldLoadingStarted;
     std::unique_ptr<SaveStore> m_saveStore;
     WorldCatalog          m_worldCatalog;
     WorldMetadata         m_worldMetadata;
@@ -191,6 +193,18 @@ private:
         m_menuCallbacks.onOpenWorld = [this](const std::string& id) {
             startGame(id, false);
         };
+        m_menuCallbacks.onRefreshWorlds = [this]() {
+            return m_worldCatalog.list();
+        };
+        m_menuCallbacks.onDeleteWorld = [this](const std::string& id) {
+            try {
+                return m_worldCatalog.deleteWorld(id);
+            } catch (const std::exception& error) {
+                LOG_ERROR("Could not delete world '" << id << "': "
+                          << error.what());
+                return false;
+            }
+        };
         m_menuCallbacks.onCreateWorld =
             [this](const std::string& name, const std::string& seedText,
                    GameMode mode, bool cheatsEnabled) {
@@ -229,6 +243,11 @@ private:
         };
         m_menuCallbacks.onBackToMenu = [this]() {
             saveCurrentWorld();
+            m_world.setSaveStore(nullptr);
+            m_entities.setSaveStore(nullptr);
+            m_saveStore.reset();
+            m_terrainGenerated = false;
+            m_audio.stopRain();
             m_gameState = GameState::MainMenu;
             m_window.setCursorLocked(false);
             showMainMenu();
@@ -515,7 +534,9 @@ private:
             throw std::runtime_error("World generation version is incompatible");
         const GameMode mode = m_worldMetadata.gameMode;
 
-        m_gameState = newWorld ? GameState::LoadingWorld : GameState::Playing;
+        m_gameState = GameState::LoadingWorld;
+        m_loadingNewWorld = newWorld;
+        m_loadingGenerationComplete = false;
         m_player.configureRules(mode, m_worldMetadata.difficulty);
         m_hotbar.setSurvivalInventory(
             mode == GameMode::Survival ? &m_player.inventory() : nullptr);
@@ -526,10 +547,11 @@ private:
         m_player.setPosition(m_worldMetadata.playerPosition);
         m_dayNightCycle.resetMorning();
         m_weather.reset(m_worldMetadata.seed, m_worldMetadata.weather);
+        m_audio.stopRain();
         m_lightningEvents.clear();
         m_particles.clear();
         m_cameraEffects.reset(m_player.getPosition());
-        m_window.setCursorLocked(!newWorld);
+        m_window.setCursorLocked(false);
         m_activeMenu.reset();
 
         m_world.setSaveStore(m_saveStore.get());
@@ -548,35 +570,12 @@ private:
         m_survivalTicks = m_worldMetadata.worldTicks;
         m_survivalWorldTickRemainder = 0.0f;
 
-        if (newWorld) {
-            m_world.update(m_player.getPosition());
-            m_world.enqueueGeneration();
-            m_pregenerationStarted = Clock::now();
-            LOG_INFO("Pregenerating " << m_world.getActiveChunks().size()
-                     << " spawn chunks");
-            return;
-        }
-
-        if (!m_terrainGenerated) {
-            // Terrain generation — first batch: create chunks, generate async, wait briefly
-            auto t0 = Clock::now();
-            m_world.update(m_player.getPosition());
-            m_world.enqueueGeneration();
-            m_world.waitForInitialGeneration(150);  // wait up to 150ms for first gen wave
-            m_world.processCompletedGenerations();
-            m_world.buildMeshesSync(&m_renderer, 16);
-            auto t1 = Clock::now();
-            float genTime = std::chrono::duration<float>(t1 - t0).count();
-            LOG_INFO("Seed: " << m_worldMetadata.seed);
-            LOG_INFO("Chunks: " << m_world.getActiveChunks().size());
-            LOG_INFO("Terrain generated in " << genTime << "s");
-            LOG_INFO("Thread pool: " << m_threadPool.threadCount() << " workers");
-
-            m_terrainGenerated = true;
-        }
-
-        LOG_INFO("WASD=move | Mouse=look | Space=jump | Ctrl=sprint");
-        LOG_INFO("Left-click=break | Right-click=place | ESC=pause");
+        m_world.update(m_player.getPosition());
+        m_world.enqueueGeneration();
+        m_worldLoadingStarted = Clock::now();
+        LOG_INFO((newWorld ? "Pregenerating new world around spawn"
+                           : "Loading existing world around saved position")
+                 << " at render distance " << Config::RENDER_DISTANCE);
     }
 
     void safeSpawn() {
@@ -761,33 +760,54 @@ private:
                 }
                 processAutosave();
             } else if (m_gameState == GameState::LoadingWorld) {
-                m_world.update(m_player.getPosition());
-                m_world.enqueueGeneration();
-                m_world.processCompletedGenerations(false);
-                const auto progress = m_world.generationProgress();
-                if (m_world.streamingTargetReady() && progress.total > 0 &&
+                m_world.update(
+                    m_player.getPosition(),
+                    Config::LOADING_CHUNK_LOADS_PER_FRAME);
+                if (!m_loadingGenerationComplete) {
+                    m_world.enqueueGeneration();
+                    m_world.processCompletedGenerations(false);
+                    const auto generation = m_world.generationProgress();
+                    if (m_world.streamingTargetReady() && generation.total > 0 &&
+                        generation.completed == generation.total &&
+                        m_threadPool.idle()) {
+                        m_world.processCompletedGenerations();
+                        if (m_loadingNewWorld) {
+                            m_world.persistGeneratedChunks();
+                            safeSpawn();
+                            const auto position = m_player.getPosition();
+                            m_worldMetadata.playerPosition = position;
+                            m_worldMetadata.worldSpawn = glm::ivec3(
+                                static_cast<int>(std::floor(position.x)),
+                                static_cast<int>(std::floor(position.y)),
+                                static_cast<int>(std::floor(position.z)));
+                            m_worldMetadata.worldTicks = m_survivalTicks;
+                            m_worldMetadata.weather = m_weather.saveState();
+                            m_saveStore->saveMetadata(m_worldMetadata);
+                        }
+                        m_loadingGenerationComplete = true;
+                    }
+                }
+                if (m_loadingGenerationComplete) {
+                    m_world.enqueueMeshBuilds(
+                        Config::LOADING_MESH_TASKS_IN_FLIGHT);
+                    m_world.processCompletedMeshes(
+                        &m_renderer, Config::LOADING_MESH_UPLOADS_PER_FRAME,
+                        Config::LOADING_MESH_UPLOAD_BYTES_PER_FRAME);
+                }
+                const auto progress = m_world.loadingProgress();
+                if (m_loadingGenerationComplete &&
+                    m_world.streamingTargetReady() && progress.total > 0 &&
                     progress.completed == progress.total &&
                     m_threadPool.idle()) {
-                    m_world.processCompletedGenerations();
-                    m_world.persistGeneratedChunks();
-                    safeSpawn();
-                    const auto position = m_player.getPosition();
-                    m_worldMetadata.playerPosition = position;
-                    m_worldMetadata.worldSpawn = glm::ivec3(
-                        static_cast<int>(std::floor(position.x)),
-                        static_cast<int>(std::floor(position.y)),
-                        static_cast<int>(std::floor(position.z)));
-                    m_worldMetadata.worldTicks = m_survivalTicks;
-                    m_worldMetadata.weather = m_weather.saveState();
-                    m_saveStore->saveMetadata(m_worldMetadata);
-                    m_world.buildMeshesSync(&m_renderer, 16);
                     m_terrainGenerated = true;
                     m_gameState = GameState::Playing;
                     m_window.setCursorLocked(true);
                     const float seconds = std::chrono::duration<float>(
-                        Clock::now() - m_pregenerationStarted).count();
-                    LOG_INFO("Spawn chunk pregeneration completed in "
-                             << seconds << "s");
+                        Clock::now() - m_worldLoadingStarted).count();
+                    LOG_INFO("World render target loaded in " << seconds
+                             << "s (" << progress.total << " chunks)");
+                    LOG_INFO("WASD=move | Mouse=look | Space=jump | Ctrl=sprint");
+                    LOG_INFO("Left-click=break | Right-click=place | ESC=pause");
                 }
             }
 
@@ -978,10 +998,13 @@ private:
             }
 
             if (m_gameState == GameState::LoadingWorld) {
-                const auto progress = m_world.generationProgress();
-                const float fraction = progress.total == 0 ? 0.0f :
+                const auto progress = m_loadingGenerationComplete
+                    ? m_world.loadingProgress() : m_world.generationProgress();
+                const float phaseFraction = progress.total == 0 ? 0.0f :
                     static_cast<float>(progress.completed) /
                     static_cast<float>(progress.total);
+                const float fraction = m_loadingGenerationComplete
+                    ? 0.75f + phaseFraction * 0.25f : phaseFraction * 0.75f;
                 m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 m_uiRenderer.drawRect(0, 0, static_cast<float>(uiWidth),
                                       static_cast<float>(uiHeight),
@@ -1000,7 +1023,10 @@ private:
                                       glm::vec4(.18f, .18f, .2f, 1.0f));
                 m_uiRenderer.drawRect(barX, barY, barWidth * fraction, 14,
                                       glm::vec4(.36f, .72f, .3f, 1.0f));
-                const std::string status = m_localization.format("loading.chunks", {
+                const std::string status = m_localization.format(
+                    m_loadingGenerationComplete ? "loading.preparing" :
+                    (m_loadingNewWorld ? "loading.generating"
+                                       : "loading.cached"), {
                     std::to_string(progress.completed), std::to_string(progress.total)});
                 const auto statusSize = m_uiRenderer.measureText(status, 1.25f);
                 m_uiRenderer.renderText(status, (uiWidth - statusSize.x) * 0.5f,

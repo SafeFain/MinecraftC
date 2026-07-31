@@ -13,6 +13,7 @@ struct AudioSystem::Impl {
     ma_device device{};
     bool initialized = false;
     std::atomic<float> rainTarget{0.0f};
+    std::atomic<bool> rainReset{false};
     std::atomic<float> thunderPan{0.0f};
     std::atomic<float> thunderVolume{0.0f};
     std::atomic<unsigned> thunderTriggers{0};
@@ -37,6 +38,10 @@ struct AudioSystem::Impl {
                          const void*, ma_uint32 frameCount) {
         auto* self = static_cast<Impl*>(device->pUserData);
         auto* samples = static_cast<float*>(output);
+        if (self->rainReset.exchange(false)) {
+            self->rainVolume = 0.0f;
+            self->rainLowPass = 0.0f;
+        }
         if (self->thunderTriggers.exchange(0) > 0)
             self->thunderEnvelope = self->thunderVolume.load();
         if (self->explosionTriggers.exchange(0) > 0)
@@ -106,6 +111,11 @@ bool AudioSystem::initialize() {
 
 void AudioSystem::setRainVolume(float volume) {
     m_impl->rainTarget = std::clamp(volume, 0.0f, 1.0f);
+}
+
+void AudioSystem::stopRain() {
+    m_impl->rainTarget = 0.0f;
+    m_impl->rainReset = true;
 }
 
 void AudioSystem::playThunder(float pan, float volume) {

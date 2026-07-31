@@ -54,6 +54,13 @@ int main() {
                 "catalog opens the selected world");
         require(catalog.open(first).loadMetadata().cheatsEnabled,
                 "catalog persists the create-world cheat option");
+        require(catalog.deleteWorld(first), "catalog deletes the selected world");
+        require(!std::filesystem::exists(root / first),
+                "catalog left deleted world files on disk");
+        require(catalog.open(second).loadMetadata().seed == 99,
+                "deleting one world damaged another save");
+        require(!catalog.deleteWorld(first),
+                "deleting an already missing world should report no change");
         bool rejected = false;
         try {
             (void)catalog.open("../escape");
@@ -61,6 +68,13 @@ int main() {
             rejected = true;
         }
         require(rejected, "catalog rejects path traversal ids");
+        rejected = false;
+        try {
+            (void)catalog.deleteWorld("../escape");
+        } catch (const std::runtime_error&) {
+            rejected = true;
+        }
+        require(rejected, "catalog deletion rejects path traversal ids");
     } catch (...) {
         std::filesystem::remove_all(root);
         throw;

@@ -27,6 +27,8 @@ enum class GameState {
 struct MenuCallbacks {
     std::function<void(const std::string&)> onOpenWorld;
     std::function<void(const std::string&, const std::string&, GameMode, bool)> onCreateWorld;
+    std::function<std::vector<WorldSummary>()> onRefreshWorlds;
+    std::function<bool(const std::string&)> onDeleteWorld;
     std::function<void()> onResume;
     std::function<void()> onBackToMenu;
     std::function<void()> onQuit;
@@ -119,6 +121,7 @@ private:
     Localization& m_localization;
     std::vector<WorldSummary> m_worlds;
     std::vector<Button> m_buttons;
+    std::vector<Button> m_deleteButtons;
     int m_selectedIdx = 0;
     Page m_page = Page::Home;
     Field m_field = Field::Name;
@@ -129,12 +132,15 @@ private:
     int m_worldOffset = 0;
     int m_selectedWorld = -1;
     int m_pressedButton = -1;
+    int m_pressedDeleteButton = -1;
     double m_lastWorldClick = -1.0;
     int m_lastWorldIndex = -1;
+    std::string m_pendingDeleteWorldId;
 
     void showHome();
     void showWorlds();
     void showCreate();
+    void refreshWorlds();
     void rebuildButtons();
     void selectField(Field field);
     std::string fieldLabel(Field field, const std::string& value) const;

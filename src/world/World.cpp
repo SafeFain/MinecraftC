@@ -394,10 +394,27 @@ Chunk* World::getChunk(int cx, int cz) {
 World::GenerationProgress World::generationProgress() const {
     std::shared_lock lock(m_chunkMutex);
     GenerationProgress progress;
-    progress.total = m_chunks.size();
-    for (const auto& [key, chunk] : m_chunks) {
-        (void)key;
-        if (chunk->generated.load()) ++progress.completed;
+    progress.total = m_desiredChunks.size();
+    for (const auto& key : m_desiredChunks) {
+        const auto it = m_chunks.find(key);
+        if (it != m_chunks.end() && it->second->generated.load())
+            ++progress.completed;
+    }
+    return progress;
+}
+
+World::GenerationProgress World::loadingProgress() const {
+    std::shared_lock lock(m_chunkMutex);
+    GenerationProgress progress;
+    progress.total = m_desiredChunks.size();
+    for (const auto& key : m_desiredChunks) {
+        const auto it = m_chunks.find(key);
+        if (it == m_chunks.end()) continue;
+        const Chunk& chunk = *it->second;
+        if (chunk.generated.load() && !chunk.isDirty() &&
+            !chunk.meshInProgress.load() && !chunk.meshReady.load()) {
+            ++progress.completed;
+        }
     }
     return progress;
 }
@@ -416,7 +433,7 @@ void World::persistGeneratedChunks() {
 
 // ── Update (chunk loading/unloading) ──────────────────────────────────
 
-void World::update(const glm::dvec3& playerPos) {
+void World::update(const glm::dvec3& playerPos, int loadBudgetOverride) {
     int pcx = worldToChunkX(playerPos.x);
     int pcz = worldToChunkZ(playerPos.z);
     m_centerChunkX = pcx;
@@ -490,8 +507,9 @@ void World::update(const glm::dvec3& playerPos) {
         m_streamCleanupPending = cleanupRemaining;
     }
 
-    const int loadBudget = m_firstUpdate
-        ? Config::INITIAL_CHUNK_LOADS_PER_FRAME : Config::CHUNK_LOADS_PER_FRAME;
+    const int loadBudget = loadBudgetOverride > 0 ? loadBudgetOverride :
+        (m_firstUpdate ? Config::INITIAL_CHUNK_LOADS_PER_FRAME
+                       : Config::CHUNK_LOADS_PER_FRAME);
     m_firstUpdate = false;
     m_chunksPerFrame = Config::CHUNK_LOADS_PER_FRAME;
     int loaded = 0;
@@ -1438,7 +1456,7 @@ void World::waitForInitialGeneration(int maxWaitMs) {
 
 // ── Async mesh building ───────────────────────────────────────────────
 
-void World::enqueueMeshBuilds() {
+void World::enqueueMeshBuilds(int maxInFlight) {
     if (!m_threadPool) return;
 
     std::shared_lock lock(m_chunkMutex);
@@ -1448,7 +1466,7 @@ void World::enqueueMeshBuilds() {
         (void)key;
         if (chunk->meshInProgress.load()) ++inFlight;
     }
-    const int availableSlots = Config::CHUNK_MESH_TASKS_IN_FLIGHT - inFlight;
+    const int availableSlots = std::max(1, maxInFlight) - inFlight;
     if (availableSlots <= 0) return;
 
     std::vector<Chunk*> candidates;

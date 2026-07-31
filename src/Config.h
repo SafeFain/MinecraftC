@@ -37,8 +37,12 @@ constexpr size_t MESH_UPLOAD_BYTES_PER_FRAME = 8u * 1024u * 1024u;
 constexpr int   CHUNK_LOADS_PER_FRAME = 4;
 constexpr int   CHUNK_UNLOADS_PER_FRAME = 2;
 constexpr int   INITIAL_CHUNK_LOADS_PER_FRAME = 16;
+constexpr int   LOADING_CHUNK_LOADS_PER_FRAME = 32;
 constexpr int   CHUNK_GEN_TASKS_IN_FLIGHT = 2; // bounds expensive terrain workers
 constexpr int   CHUNK_MESH_TASKS_IN_FLIGHT = 2; // prevents mesh queue buildup
+constexpr int   LOADING_MESH_TASKS_IN_FLIGHT = 4;
+constexpr int   LOADING_MESH_UPLOADS_PER_FRAME = 8;
+constexpr size_t LOADING_MESH_UPLOAD_BYTES_PER_FRAME = 16u * 1024u * 1024u;
 
 constexpr int   RENDER_DISTANCE_OPTIONS[] = {2, 4, 6, 8, 10, 12, 16};
 constexpr int   RENDER_DISTANCE_OPTION_COUNT = 7;

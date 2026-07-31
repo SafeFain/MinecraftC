@@ -76,7 +76,7 @@ public:
     void resetForNewSeed(uint64_t newSeed);
 
     // Update chunk loading/unloading around player position
-    void update(const glm::dvec3& playerPosition);
+    void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0);
 
     // ── Async generation pipeline ──────────────────────────────────────
     // Enqueue terrain generation. Groups ungenerated chunks into N×N regions
@@ -92,10 +92,12 @@ public:
 
     struct GenerationProgress { size_t completed = 0; size_t total = 0; };
     GenerationProgress generationProgress() const;
+    GenerationProgress loadingProgress() const;
     void persistGeneratedChunks();
 
     // Enqueue mesh builds for dirty chunks (async via thread pool)
-    void enqueueMeshBuilds();
+    void enqueueMeshBuilds(
+        int maxInFlight = Config::CHUNK_MESH_TASKS_IN_FLIGHT);
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps GL uploads per frame to avoid pipeline stalls.

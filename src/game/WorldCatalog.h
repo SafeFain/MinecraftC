@@ -28,6 +28,7 @@ public:
                        GameMode mode, Difficulty difficulty,
                        bool cheatsEnabled = false) const;
     SaveStore open(const std::string& id) const;
+    bool deleteWorld(const std::string& id) const;
 
 private:
     std::filesystem::path m_savesDirectory;

@@ -102,6 +102,36 @@ void MainMenu::showCreate() {
     rebuildButtons();
 }
 
+void MainMenu::refreshWorlds() {
+    std::string selectedId;
+    if (m_selectedWorld >= 0 &&
+        m_selectedWorld < static_cast<int>(m_worlds.size())) {
+        selectedId = m_worlds[static_cast<size_t>(m_selectedWorld)].id;
+    }
+    if (m_callbacks.onRefreshWorlds)
+        m_worlds = m_callbacks.onRefreshWorlds();
+    m_selectedWorld = -1;
+    if (!selectedId.empty()) {
+        const auto selected = std::find_if(
+            m_worlds.begin(), m_worlds.end(), [&selectedId](const WorldSummary& world) {
+                return world.id == selectedId;
+            });
+        if (selected != m_worlds.end())
+            m_selectedWorld = static_cast<int>(selected - m_worlds.begin());
+    }
+    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - 6);
+    m_worldOffset = std::clamp(m_worldOffset, 0, maximum);
+    if (m_selectedWorld >= 0) {
+        if (m_selectedWorld < m_worldOffset) m_worldOffset = m_selectedWorld;
+        if (m_selectedWorld >= m_worldOffset + 6)
+            m_worldOffset = m_selectedWorld - 5;
+    }
+    m_pendingDeleteWorldId.clear();
+    m_lastWorldClick = -1.0;
+    m_lastWorldIndex = -1;
+    rebuildButtons();
+}
+
 std::string MainMenu::fieldLabel(Field field, const std::string& value) const {
     const bool active = field == m_field;
     const std::string name = m_localization.text(
@@ -113,6 +143,7 @@ std::string MainMenu::fieldLabel(Field field, const std::string& value) const {
 
 void MainMenu::rebuildButtons() {
     m_buttons.clear();
+    m_deleteButtons.clear();
     if (m_page == Page::Home) {
         m_buttons.emplace_back(m_localization.text("menu.home.singleplayer"),
                                [this]() { showWorlds(); });
@@ -141,7 +172,23 @@ void MainMenu::rebuildButtons() {
                     m_selectedWorld = index;
                     rebuildButtons();
                 });
+            const std::string worldId = world.id;
+            m_deleteButtons.emplace_back(
+                m_localization.text(m_pendingDeleteWorldId == worldId
+                    ? "menu.worlds.confirm_delete" : "menu.worlds.delete"),
+                [this, worldId]() {
+                    if (m_pendingDeleteWorldId != worldId) {
+                        m_pendingDeleteWorldId = worldId;
+                        rebuildButtons();
+                        return;
+                    }
+                    if (m_callbacks.onDeleteWorld)
+                        (void)m_callbacks.onDeleteWorld(worldId);
+                    refreshWorlds();
+                });
         }
+        m_buttons.emplace_back(m_localization.text("menu.worlds.refresh"),
+                               [this]() { refreshWorlds(); });
         m_buttons.emplace_back(m_localization.text("menu.worlds.play"), [this]() {
             if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()) &&
                 m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
@@ -223,6 +270,7 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.renderText(subtitle, subX, subY, subScale,
                   glm::vec3(0.6f, 0.6f, 0.7f));
 
+    float detailsReserve = 0.0f;
     if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
         m_selectedWorld < static_cast<int>(m_worlds.size())) {
         const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
@@ -234,10 +282,11 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
         const auto size = ui.measureText(details, 1.0f);
         ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,
                       1.0f, glm::vec3(0.78f));
+        detailsReserve = size.y + 14.0f;
     }
 
     // Buttons
-    float buttonStartY = subY - subSize.y - 38.0f;
+    float buttonStartY = subY - subSize.y - 38.0f - detailsReserve;
     float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
     const float buttonHeight = std::clamp(
         (buttonStartY - 16.0f) / std::max<size_t>(1, m_buttons.size()) - 5.0f,
@@ -246,9 +295,21 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
 
     for (size_t i = 0; i < m_buttons.size(); ++i) {
         float by = buttonStartY - static_cast<float>(i) * (buttonHeight + spacing);
-        m_buttons[i].setPosition(buttonX, by);
+        const bool worldRow =
+            m_page == Page::Worlds && i < m_deleteButtons.size();
+        constexpr float deleteWidth = 84.0f;
+        constexpr float deleteGap = 8.0f;
+        const float rowX = (screenWidth -
+            (Config::UI_BUTTON_WIDTH + deleteGap + deleteWidth)) * 0.5f;
+        m_buttons[i].setPosition(worldRow ? rowX : buttonX, by);
         m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, buttonHeight);
         m_buttons[i].render(ui);
+        if (worldRow) {
+            m_deleteButtons[i].setPosition(
+                rowX + Config::UI_BUTTON_WIDTH + deleteGap, by);
+            m_deleteButtons[i].setSize(deleteWidth, buttonHeight);
+            m_deleteButtons[i].render(ui);
+        }
     }
 
     ui.renderText(Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
@@ -322,18 +383,39 @@ void MainMenu::onMouseMove(double x, double y) {
         btn.setHovered(btn.containsPoint(static_cast<float>(x),
                                           static_cast<float>(y)));
     }
+    for (auto& btn : m_deleteButtons) {
+        btn.setHovered(btn.containsPoint(static_cast<float>(x),
+                                         static_cast<float>(y)));
+    }
 }
 
 void MainMenu::onMouseButton(int button, int action, double x, double y) {
     if (button != GLFW_MOUSE_BUTTON_LEFT) return;
     if (action == GLFW_PRESS) {
         m_pressedButton = -1;
+        m_pressedDeleteButton = -1;
+        for (size_t i = 0; i < m_deleteButtons.size(); ++i) {
+            if (m_deleteButtons[i].containsPoint(
+                    static_cast<float>(x), static_cast<float>(y))) {
+                m_pressedDeleteButton = static_cast<int>(i);
+                m_deleteButtons[i].setPressed(true);
+                return;
+            }
+        }
         for (size_t i = 0; i < m_buttons.size(); ++i) {
             if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
                 m_pressedButton = static_cast<int>(i);
                 m_buttons[i].setPressed(true);
                 return;
             }
+        }
+    } else if (action == GLFW_RELEASE && m_pressedDeleteButton >= 0) {
+        const int captured = m_pressedDeleteButton;
+        m_pressedDeleteButton = -1;
+        m_deleteButtons[static_cast<size_t>(captured)].setPressed(false);
+        if (m_deleteButtons[static_cast<size_t>(captured)].containsPoint(
+                static_cast<float>(x), static_cast<float>(y))) {
+            m_deleteButtons[static_cast<size_t>(captured)].activate();
         }
     } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
         const int captured = m_pressedButton;
