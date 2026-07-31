@@ -15,14 +15,29 @@ int main(){
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
-    settings.cloudRenderDistance=512;settings.smoothLighting=false;
+    settings.cloudRenderDistance=1024;settings.smoothLighting=false;
+    settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
     require(settings.save(root/"options.txt"),"settings save succeeds");
     const auto loaded=ClientSettings::load(root/"options.txt");
     require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&loaded.invertMouseY&&
             loaded.renderDistance==8&&!loaded.renderClouds&&
-            loaded.cloudRenderDistance==512&&!loaded.smoothLighting,
+            loaded.cloudRenderDistance==1024&&!loaded.smoothLighting,
             "client settings round trip");
+    require(loaded.language==Language::SimplifiedChinese,
+            "client language round trips");
+    {
+        std::ofstream legacy(root/"legacy-options.txt");
+        legacy<<"version=3\nrender_distance=8\n";
+    }
+    require(ClientSettings::load(root/"legacy-options.txt").language==Language::English,
+            "legacy settings default to English");
+    {
+        std::ofstream invalid(root/"invalid-options.txt");
+        invalid<<"version=4\nlanguage=unsupported\n";
+    }
+    require(ClientSettings::load(root/"invalid-options.txt").language==Language::English,
+            "unsupported language falls back to English");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");
     require(effectiveGuiScale(1920,1080,0)==3&&effectiveGuiScale(800,450,0)==1,

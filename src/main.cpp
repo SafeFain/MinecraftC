@@ -27,6 +27,7 @@
 #include "game/Weather.h"
 #include "game/SurvivalRules.h"
 #include "game/ClientSettings.h"
+#include "game/Localization.h"
 #include "game/SurvivalSession.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
@@ -78,6 +79,7 @@ private:
     // ── UI / State ────────────────────────────────────────────────────
     GameState             m_gameState = GameState::MainMenu;
     UIRenderer            m_uiRenderer;
+    Localization          m_localization;
     std::unique_ptr<Menu> m_activeMenu;
     MenuCallbacks         m_menuCallbacks;
     bool                  m_terrainGenerated = false;
@@ -141,6 +143,8 @@ private:
         Debug::installCrashHandlers();
 
         m_clientSettings = ClientSettings::load(m_paths.settingsFile());
+        m_localization.load(m_paths.assetRoot);
+        m_localization.setLanguage(m_clientSettings.language);
         applyClientSettings(false);
 
         if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress))) {
@@ -156,6 +160,7 @@ private:
         m_uiRenderer.initialize(
             m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
             m_paths.assetRoot);
+        m_uiRenderer.setLocalization(m_localization);
 
         // Start with cursor visible (main menu)
         m_window.setCursorLocked(false);
@@ -172,13 +177,13 @@ private:
         m_player.setBedCallback([this](const glm::ivec3& bed) {
             m_worldMetadata.bedSpawn = bed;
             if (!m_dayNightCycle.isNight()) {
-                showCommandMessage("Respawn point set");
+                showCommandMessage(m_localization.text("message.respawn_set"));
             } else if (m_entities.hasHostileNear(glm::vec3(bed), 8.0f)) {
-                showCommandMessage("Respawn point set; monsters are nearby");
+                showCommandMessage(m_localization.text("message.monsters_nearby"));
             } else {
                 m_dayNightCycle.resetMorning();
                 m_weather.setWeather(WeatherType::Clear);
-                showCommandMessage("Respawn point set; slept until morning");
+                showCommandMessage(m_localization.text("message.slept"));
             }
         });
 
@@ -213,7 +218,8 @@ private:
                         LOG_WARN("Seed contained unused characters: " << seedText);
                 }
                 const std::string id = m_worldCatalog.create(
-                    name, seed, mode, Difficulty::Normal, cheatsEnabled);
+                    name.empty() ? m_localization.text("menu.create.default_name") : name,
+                    seed, mode, Difficulty::Normal, cheatsEnabled);
                 startGame(id, true);
             };
         m_menuCallbacks.onResume = [this]() {
@@ -228,6 +234,7 @@ private:
             showMainMenu();
         };
         m_menuCallbacks.onQuit = [this]() { m_running = false; };
+        m_menuCallbacks.onSettingsChanged = [this]() { applyClientSettings(); };
 
         m_menuCallbacks.onOpenSettings = [this]() {
             // Save current state to restore the correct menu on back
@@ -238,11 +245,12 @@ private:
                 [this, prevState, prevCallbacks]() {
                 m_gameState = prevState;
                 if (prevState == GameState::Paused) {
-                    m_activeMenu = std::make_unique<PauseMenu>(prevCallbacks);
+                    m_activeMenu = std::make_unique<PauseMenu>(
+                        prevCallbacks, m_localization);
                 } else {
                     showMainMenu();
                 }
-            });
+            }, m_localization);
         };
 
         // ── Input callbacks ───────────────────────────────────────────
@@ -329,7 +337,8 @@ private:
                     // Pause the game
                     m_gameState = GameState::Paused;
                     m_window.setCursorLocked(false);
-                    m_activeMenu = std::make_unique<PauseMenu>(m_menuCallbacks);
+                    m_activeMenu = std::make_unique<PauseMenu>(
+                        m_menuCallbacks, m_localization);
                 } else if (m_gameState == GameState::Paused) {
                     // Resume (ESC in pause menu handled by menu itself)
                     // But just in case the menu hasn't handled it:
@@ -458,7 +467,7 @@ private:
 
     void showMainMenu() {
         m_activeMenu = std::make_unique<MainMenu>(
-            m_menuCallbacks, m_worldCatalog.list());
+            m_menuCallbacks, m_worldCatalog.list(), m_clientSettings, m_localization);
     }
 
     void applyClientSettings(bool persist = true) {
@@ -889,17 +898,20 @@ private:
                         m_titleUpdateSeconds = 0.0f;
                         int fps = dt > 0.0f ? static_cast<int>(1.0f / dt) : 999;
                         m_window.setTitle(
-                            "MinecraftC" + std::string(m_player.isFlying() ? " [FLY]" : "") +
+                            "MinecraftC" + (m_player.isFlying()
+                                ? " [" + m_localization.text("window.fly") + "]" : "") +
                             " | FPS: " + std::to_string(fps) +
                             " | XYZ: " + std::to_string(static_cast<int>(std::floor(m_player.getPosition().x))) +
                             "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().y))) +
                             "," + std::to_string(static_cast<int>(std::floor(m_player.getPosition().z))) +
-                            " | Chunks: " + std::to_string(rendered) +
+                            " | " + m_localization.text("window.chunks") + ": " +
+                            std::to_string(rendered) +
                             "/" + std::to_string(m_world.getActiveChunks().size())
                         );
                     }
                 } else {
-                    m_window.setTitle("MinecraftC [PAUSED]");
+                    m_window.setTitle(
+                        "MinecraftC [" + m_localization.text("window.paused") + "]");
                 }
             } else {
                 // MainMenu: just clear the screen
@@ -974,7 +986,7 @@ private:
                 m_uiRenderer.drawRect(0, 0, static_cast<float>(uiWidth),
                                       static_cast<float>(uiHeight),
                                       glm::vec4(.055f, .065f, .08f, 1.0f));
-                const char* title = "PREGENERATING WORLD";
+                const std::string title = m_localization.text("loading.title");
                 const auto titleSize = m_uiRenderer.measureText(title, 3.0f);
                 m_uiRenderer.renderText(title, (uiWidth - titleSize.x) * 0.5f,
                                         uiHeight * 0.58f, 3.0f,
@@ -988,8 +1000,8 @@ private:
                                       glm::vec4(.18f, .18f, .2f, 1.0f));
                 m_uiRenderer.drawRect(barX, barY, barWidth * fraction, 14,
                                       glm::vec4(.36f, .72f, .3f, 1.0f));
-                const std::string status = std::to_string(progress.completed) + " / " +
-                    std::to_string(progress.total) + " chunks";
+                const std::string status = m_localization.format("loading.chunks", {
+                    std::to_string(progress.completed), std::to_string(progress.total)});
                 const auto statusSize = m_uiRenderer.measureText(status, 1.25f);
                 m_uiRenderer.renderText(status, (uiWidth - statusSize.x) * 0.5f,
                                         barY - 28.0f, 1.25f, glm::vec3(.82f));
@@ -1001,12 +1013,12 @@ private:
                 m_uiRenderer.drawRect(0, 0, static_cast<float>(uiWidth),
                                       static_cast<float>(uiHeight),
                                       glm::vec4(0.28f, 0.0f, 0.0f, 0.62f));
-                const char* title = "YOU DIED";
+                const std::string title = m_localization.text("death.title");
                 auto titleSize = m_uiRenderer.measureText(title, 4.0f);
                 m_uiRenderer.renderText(title, (uiWidth - titleSize.x) * 0.5f,
                                         uiHeight * 0.58f, 4.0f,
                                         glm::vec3(1.0f, 0.82f, 0.82f));
-                const char* prompt = "Press Enter to respawn";
+                const std::string prompt = m_localization.text("death.respawn");
                 auto promptSize = m_uiRenderer.measureText(prompt, 1.5f);
                 m_uiRenderer.renderText(prompt, (uiWidth - promptSize.x) * 0.5f,
                                         uiHeight * 0.46f, 1.5f, glm::vec3(1.0f));
@@ -1090,7 +1102,7 @@ private:
         const std::string submitted = m_commandInput;
         closeCommandInput();
         if (!m_worldMetadata.cheatsEnabled) {
-            showCommandMessage("Cheats are disabled for this world");
+            showCommandMessage(m_localization.text("message.cheats_disabled"));
             return;
         }
         const auto mode = parseGamemodeCommand(submitted);
@@ -1099,10 +1111,10 @@ private:
             m_worldMetadata.gameMode = *mode;
             m_hotbar.setSurvivalInventory(
                 *mode == GameMode::Survival ? &m_player.inventory() : nullptr);
-            const char* name = *mode == GameMode::Survival ? "Survival" :
-                               *mode == GameMode::Creative ? "Creative" :
-                               "Spectator";
-            showCommandMessage(std::string("Game mode changed to ") + name);
+            const std::string name = m_localization.text(
+                *mode == GameMode::Survival ? "common.survival" :
+                *mode == GameMode::Creative ? "common.creative" : "common.spectator");
+            showCommandMessage(m_localization.format("message.mode_changed", {name}));
             return;
         }
         const auto target = parseTeleportCommand(submitted);
@@ -1110,34 +1122,32 @@ private:
             m_player.teleport({target->x, target->y, target->z});
             m_world.update(m_player.getPosition());
             m_world.enqueueGeneration();
-            showCommandMessage(
-                "Teleported to " + std::to_string(target->x) + " " +
-                std::to_string(target->y) + " " +
-                std::to_string(target->z));
+            showCommandMessage(m_localization.format("message.teleported", {
+                std::to_string(target->x), std::to_string(target->y),
+                std::to_string(target->z)}));
             return;
         }
         const auto time = parseTimeSetCommand(submitted);
         if (time) {
             if (*time == TimePreset::Day) {
                 m_dayNightCycle.setDay();
-                showCommandMessage("Set time to day");
+                showCommandMessage(m_localization.text("message.time_day"));
             } else {
                 m_dayNightCycle.setNight();
-                showCommandMessage("Set time to night");
+                showCommandMessage(m_localization.text("message.time_night"));
             }
             return;
         }
         const auto weather = parseWeatherCommand(submitted);
         if (weather) {
             m_weather.setWeather(*weather);
-            showCommandMessage(*weather == WeatherType::Clear
-                ? "Set weather to clear"
-                : *weather == WeatherType::Rain
-                    ? "Set weather to rain" : "Set weather to thunder");
+            showCommandMessage(m_localization.text(
+                *weather == WeatherType::Clear ? "message.weather_clear" :
+                *weather == WeatherType::Rain ? "message.weather_rain" :
+                "message.weather_thunder"));
             return;
         }
-        showCommandMessage(
-            "Usage: /gamemode 0|1|3, /tp x y z, /time set day|night, or /weather clear|rain|thunder");
+        showCommandMessage(m_localization.text("message.command_usage"));
     }
 
     void updateMouseScreenPosition() {
@@ -1224,8 +1234,8 @@ private:
         if (m_player.isSurvival()) {
             const auto& stack = m_player.inventory().slot(
                 static_cast<size_t>(m_hotbar.getSelectedSlot()));
-            if (!stack.empty()) name = getItemProps(stack.id).name;
-        } else name = getItemProps(m_hotbar.getSelectedItem()).name;
+            if (!stack.empty()) name = m_localization.itemName(stack.id);
+        } else name = m_localization.itemName(m_hotbar.getSelectedItem());
         if (name.empty()) return;
         const auto size = m_uiRenderer.measureText(name, 1.0f);
         const float x = (screenWidth - size.x) * .5f;
@@ -1340,7 +1350,7 @@ private:
             m_autosaveEntityTurn = true;
         } catch (const std::exception& error) {
             LOG_ERROR("Autosave metadata failed: " << error.what());
-            showCommandMessage("Autosave failed; see minecraftc.log");
+            showCommandMessage(m_localization.text("message.autosave_log"));
         }
     }
 
@@ -1361,7 +1371,7 @@ private:
         } catch (const std::exception& error) {
             m_autosavePending = false;
             LOG_ERROR("Autosave chunk flush failed: " << error.what());
-            showCommandMessage("Autosave failed; changes will be retried");
+            showCommandMessage(m_localization.text("message.autosave_retry"));
         }
     }
 
@@ -1378,7 +1388,7 @@ private:
             m_autosavePending = false;
         } catch (const std::exception& error) {
             LOG_ERROR("Could not save world: " << error.what());
-            showCommandMessage("World save failed; see minecraftc.log");
+            showCommandMessage(m_localization.text("message.save_log"));
         }
     }
 };

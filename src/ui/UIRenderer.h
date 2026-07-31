@@ -10,6 +10,7 @@
 #include "ui/FontRenderer.h"
 #include "world/Block.h"
 #include "game/Item.h"
+#include "game/Localization.h"
 
 class Shader;
 
@@ -23,6 +24,10 @@ public:
 
     void initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
                     const std::filesystem::path& assetRoot);
+    void setLocalization(const Localization& localization) {
+        m_localization = &localization;
+    }
+    const Localization& localization() const { return *m_localization; }
 
     void beginUIFrame(int screenWidth, int screenHeight);
     void endUIFrame();
@@ -56,6 +61,7 @@ private:
     int m_itemAtlasRows = 0;
     std::unordered_map<std::string, int> m_itemAtlasIndices;
     bool m_manualGamma = false;
+    const Localization* m_localization = nullptr;
 
     bool drawGeneratedItemIcon(float x, float y, float w, float h, ItemId item);
 

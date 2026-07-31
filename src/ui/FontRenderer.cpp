@@ -1,10 +1,15 @@
 #include "ui/FontRenderer.h"
 #include "renderer/Shader.h"
 #include "debug/OpenGL.h"
+#include "debug/Log.h"
+#include "game/Utf8.h"
 
+#include <stb_truetype.h>
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <fstream>
+#include <unordered_map>
 
 // ── 8×14 Bitmap Font Data ───────────────────────────────────────────────
 //
@@ -238,9 +243,35 @@ static std::vector<uint8_t> buildFontAtlasRGBA() {
     return rgba;
 }
 
+struct FontRenderer::Impl {
+    struct Glyph {
+        int atlasX = 0, atlasY = 0, width = 0, height = 0;
+        float xOffset = 0.0f, bottomOffset = 0.0f, advance = 0.0f;
+    };
+    std::vector<unsigned char> fontData;
+    stbtt_fontinfo font{};
+    std::unordered_map<uint32_t, Glyph> glyphs;
+    int shelfX = 1;
+    int shelfY = FontRenderer::GLYPH_H + 2;
+    int shelfHeight = 0;
+    bool available = false;
+    float fontScale = 0.0f;
+    float renderScale = 1.0f;
+};
+
+namespace {
+float asciiAdvance(char c) {
+    if (c == ' ' || c == 'i' || c == 'l' || c == 'I' || c == '|' || c == ':')
+        return FontRenderer::GLYPH_W * 0.5f;
+    if (c == 't' || c == 'f' || c == 'j' || c == 'r' || c == '[' || c == ']')
+        return FontRenderer::GLYPH_W * 0.7f;
+    return FontRenderer::GLYPH_W * 0.85f;
+}
+}
+
 // ── Constructor / Destructor ──────────────────────────────────────────────
 
-FontRenderer::FontRenderer() = default;
+FontRenderer::FontRenderer() : m_impl(std::make_unique<Impl>()) {}
 
 FontRenderer::~FontRenderer() {
     if (m_vboUV) GL_CHECK(glDeleteBuffers(1, &m_vboUV));
@@ -262,6 +293,29 @@ void FontRenderer::initialize(bool manualGamma,
 
     // Create font atlas texture as RGBA (since GL_R8 may not be available)
     auto atlasData = buildFontAtlasRGBA();
+
+    const auto fontPath = assetRoot / "fonts" / "noto" / "NotoSansCJKsc-Regular.otf";
+    std::ifstream fontInput(fontPath, std::ios::binary);
+    if (fontInput) {
+        fontInput.seekg(0, std::ios::end);
+        const auto size = fontInput.tellg();
+        fontInput.seekg(0, std::ios::beg);
+        if (size > 0) {
+            m_impl->fontData.resize(static_cast<size_t>(size));
+            fontInput.read(
+                reinterpret_cast<char*>(m_impl->fontData.data()),
+                static_cast<std::streamsize>(size));
+            m_impl->available = fontInput.good() &&
+                stbtt_InitFont(&m_impl->font, m_impl->fontData.data(), 0) != 0;
+        }
+    }
+    if (m_impl->available) {
+        constexpr float rasterHeight = 28.0f;
+        m_impl->fontScale = stbtt_ScaleForPixelHeight(&m_impl->font, rasterHeight);
+        m_impl->renderScale = static_cast<float>(GLYPH_H) / rasterHeight;
+    } else {
+        LOG_WARN("Could not load CJK font: " << fontPath.u8string());
+    }
 
     GL_CHECK(glGenTextures(1, &m_atlasTexture));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_atlasTexture));
@@ -314,17 +368,20 @@ glm::vec2 FontRenderer::measureText(const std::string& text, float scale) const 
     float lineWidth = 0.0f;
     int lines = 1;
 
-    for (char c : text) {
-        if (c == '\n') {
+    for (uint32_t codepoint : decodeUtf8(text)) {
+        if (codepoint == '\n') {
             maxWidth = std::max(maxWidth, lineWidth);
             lineWidth = 0.0f;
             ++lines;
             continue;
         }
-        if (c == ' ' || c == 'i' || c == 'l' || c == 'I' || c == '|' || c == ':') {
-            lineWidth += GLYPH_W * scale * 0.5f;
-        } else if (c == 't' || c == 'f' || c == 'j' || c == 'r' || c == '[' || c == ']') {
-            lineWidth += GLYPH_W * scale * 0.7f;
+        if (codepoint < 128) {
+            lineWidth += asciiAdvance(static_cast<char>(codepoint)) * scale;
+        } else if (m_impl->available) {
+            int advance = 0;
+            stbtt_GetCodepointHMetrics(
+                &m_impl->font, static_cast<int>(codepoint), &advance, nullptr);
+            lineWidth += advance * m_impl->fontScale * m_impl->renderScale * scale;
         } else {
             lineWidth += GLYPH_W * scale * 0.85f;
         }
@@ -344,36 +401,113 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
     // 6 vertices per character (2 triangles, no index buffer)
     std::vector<float> positions;
     std::vector<float> uvs;
-    positions.reserve(text.size() * 12);  // 6 verts × 2 floats
-    uvs.reserve(text.size() * 12);
+    const auto codepoints = decodeUtf8(text);
+    positions.reserve(codepoints.size() * 12);
+    uvs.reserve(codepoints.size() * 12);
 
     float cursorX = x;
     float cursorY = y;
 
-    for (char c : text) {
-        if (c == '\n') {
+    auto ensureGlyph = [this](uint32_t codepoint) -> const Impl::Glyph* {
+        if (!m_impl->available ||
+            stbtt_FindGlyphIndex(&m_impl->font, static_cast<int>(codepoint)) == 0)
+            return nullptr;
+        if (const auto found = m_impl->glyphs.find(codepoint);
+            found != m_impl->glyphs.end()) return &found->second;
+
+        int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+        stbtt_GetCodepointBitmapBox(
+            &m_impl->font, static_cast<int>(codepoint), m_impl->fontScale,
+            m_impl->fontScale, &x0, &y0, &x1, &y1);
+        const int width = std::max(1, x1 - x0);
+        const int height = std::max(1, y1 - y0);
+        if (m_impl->shelfX + width + 1 >= ATLAS_W) {
+            m_impl->shelfX = 1;
+            m_impl->shelfY += m_impl->shelfHeight + 1;
+            m_impl->shelfHeight = 0;
+        }
+        if (m_impl->shelfY + height + 1 >= ATLAS_H) {
+            std::vector<uint8_t> cleared(
+                static_cast<size_t>(ATLAS_W) * (ATLAS_H - GLYPH_H) * 4, 0);
+            GL_CHECK(glTexSubImage2D(
+                GL_TEXTURE_2D, 0, 0, GLYPH_H, ATLAS_W, ATLAS_H - GLYPH_H,
+                GL_RGBA, GL_UNSIGNED_BYTE, cleared.data()));
+            m_impl->glyphs.clear();
+            m_impl->shelfX = 1;
+            m_impl->shelfY = GLYPH_H + 2;
+            m_impl->shelfHeight = 0;
+        }
+
+        std::vector<unsigned char> bitmap(static_cast<size_t>(width * height));
+        stbtt_MakeCodepointBitmap(
+            &m_impl->font, bitmap.data(), width, height, width,
+            m_impl->fontScale, m_impl->fontScale, static_cast<int>(codepoint));
+        std::vector<uint8_t> rgba(static_cast<size_t>(width * height * 4), 255);
+        for (size_t pixel = 0; pixel < bitmap.size(); ++pixel)
+            rgba[pixel * 4 + 3] = bitmap[pixel];
+        const int atlasX = m_impl->shelfX;
+        const int atlasY = m_impl->shelfY;
+        GL_CHECK(glTexSubImage2D(
+            GL_TEXTURE_2D, 0, atlasX, atlasY, width, height,
+            GL_RGBA, GL_UNSIGNED_BYTE, rgba.data()));
+
+        int advance = 0;
+        stbtt_GetCodepointHMetrics(
+            &m_impl->font, static_cast<int>(codepoint), &advance, nullptr);
+        Impl::Glyph glyph;
+        glyph.atlasX = atlasX;
+        glyph.atlasY = atlasY;
+        glyph.width = width;
+        glyph.height = height;
+        glyph.xOffset = x0 * m_impl->renderScale;
+        // UI text coordinates use the bottom of a fixed 14-pixel line box,
+        // unlike stb_truetype's baseline-relative bitmap coordinates.
+        glyph.bottomOffset =
+            (GLYPH_H - height * m_impl->renderScale) * 0.5f;
+        glyph.advance = advance * m_impl->fontScale * m_impl->renderScale;
+        m_impl->shelfX += width + 1;
+        m_impl->shelfHeight = std::max(m_impl->shelfHeight, height);
+        return &m_impl->glyphs.emplace(codepoint, glyph).first->second;
+    };
+
+    for (uint32_t codepoint : codepoints) {
+        if (codepoint == '\n') {
             cursorX = x;
             cursorY -= GLYPH_H * scale;
             continue;
         }
 
-        int charCode = static_cast<unsigned char>(c);
-        if (charCode < FIRST_GLYPH || charCode >= FIRST_GLYPH + GLYPH_COUNT) {
-            cursorX += GLYPH_W * scale * 0.5f;
-            continue;
+        float u0 = 0.0f, u1 = 0.0f, v0 = 0.0f, v1 = 0.0f;
+        float x0 = cursorX, x1 = cursorX, y0 = cursorY, y1 = cursorY;
+        float advance = 0.0f;
+        if (codepoint >= FIRST_GLYPH &&
+            codepoint < FIRST_GLYPH + GLYPH_COUNT) {
+            const int charIndex = static_cast<int>(codepoint) - FIRST_GLYPH;
+            u0 = static_cast<float>(charIndex * GLYPH_W) / ATLAS_W;
+            u1 = static_cast<float>((charIndex + 1) * GLYPH_W) / ATLAS_W;
+            v1 = static_cast<float>(GLYPH_H) / ATLAS_H;
+            x1 = cursorX + GLYPH_W * scale;
+            y1 = cursorY + GLYPH_H * scale;
+            advance = asciiAdvance(static_cast<char>(codepoint)) * scale;
+        } else if (const Impl::Glyph* glyph = ensureGlyph(codepoint)) {
+            u0 = static_cast<float>(glyph->atlasX) / ATLAS_W;
+            u1 = static_cast<float>(glyph->atlasX + glyph->width) / ATLAS_W;
+            v0 = static_cast<float>(glyph->atlasY) / ATLAS_H;
+            v1 = static_cast<float>(glyph->atlasY + glyph->height) / ATLAS_H;
+            x0 = cursorX + glyph->xOffset * scale;
+            x1 = x0 + glyph->width * m_impl->renderScale * scale;
+            y0 = cursorY + glyph->bottomOffset * scale;
+            y1 = y0 + glyph->height * m_impl->renderScale * scale;
+            advance = glyph->advance * scale;
+        } else {
+            const int charIndex = '?' - FIRST_GLYPH;
+            u0 = static_cast<float>(charIndex * GLYPH_W) / ATLAS_W;
+            u1 = static_cast<float>((charIndex + 1) * GLYPH_W) / ATLAS_W;
+            v1 = static_cast<float>(GLYPH_H) / ATLAS_H;
+            x1 = cursorX + GLYPH_W * scale;
+            y1 = cursorY + GLYPH_H * scale;
+            advance = asciiAdvance('?') * scale;
         }
-
-        int charIndex = charCode - FIRST_GLYPH;
-
-        float u0 = static_cast<float>(charIndex * GLYPH_W) / ATLAS_W;
-        float u1 = static_cast<float>((charIndex + 1) * GLYPH_W) / ATLAS_W;
-        float v0 = 0.0f;  // bottom of glyph in texture atlas
-        float v1 = 1.0f;  // top of glyph in texture atlas
-
-        float x0 = cursorX;
-        float x1 = cursorX + GLYPH_W * scale;
-        float y0 = cursorY;
-        float y1 = cursorY + GLYPH_H * scale;
 
         // 2 triangles = 6 vertices (CCW winding)
         // Triangle 1: bottom-left, bottom-right, top-right
@@ -390,14 +524,7 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
         positions.insert(positions.end(), std::begin(quadPos), std::end(quadPos));
         uvs.insert(uvs.end(), std::begin(quadUV), std::end(quadUV));
 
-        // Advance cursor (proportional spacing)
-        if (c == ' ' || c == 'i' || c == 'l' || c == 'I' || c == '|' || c == ':') {
-            cursorX += GLYPH_W * scale * 0.5f;
-        } else if (c == 't' || c == 'f' || c == 'j' || c == 'r' || c == '[' || c == ']') {
-            cursorX += GLYPH_W * scale * 0.7f;
-        } else {
-            cursorX += GLYPH_W * scale * 0.85f;
-        }
+        cursorX += advance;
     }
 
     if (positions.empty()) return;

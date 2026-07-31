@@ -9,6 +9,7 @@
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "game/ClientSettings.h"
+#include "game/Localization.h"
 
 class UIRenderer;
 
@@ -30,6 +31,7 @@ struct MenuCallbacks {
     std::function<void()> onBackToMenu;
     std::function<void()> onQuit;
     std::function<void()> onOpenSettings;
+    std::function<void()> onSettingsChanged;
 };
 
 // ── Button ────────────────────────────────────────────────────────────────
@@ -98,7 +100,8 @@ protected:
 
 class MainMenu : public Menu {
 public:
-    MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds);
+    MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
+             ClientSettings& settings, Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
@@ -112,12 +115,14 @@ private:
     enum class Field { Name, Seed };
 
     MenuCallbacks m_callbacks;
+    ClientSettings& m_settings;
+    Localization& m_localization;
     std::vector<WorldSummary> m_worlds;
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
     Page m_page = Page::Home;
     Field m_field = Field::Name;
-    std::string m_worldName = "New World";
+    std::string m_worldName;
     std::string m_seedText;
     GameMode m_createMode = GameMode::Survival;
     bool m_createCheats = false;
@@ -132,14 +137,14 @@ private:
     void showCreate();
     void rebuildButtons();
     void selectField(Field field);
-    std::string fieldLabel(const char* name, const std::string& value) const;
+    std::string fieldLabel(Field field, const std::string& value) const;
 };
 
 // ── Pause Menu ────────────────────────────────────────────────────────────
 
 class PauseMenu : public Menu {
 public:
-    explicit PauseMenu(const MenuCallbacks& callbacks);
+    PauseMenu(const MenuCallbacks& callbacks, const Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;

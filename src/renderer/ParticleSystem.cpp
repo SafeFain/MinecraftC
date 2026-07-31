@@ -42,13 +42,19 @@ void ParticleSystem::emitWeatherParticle(World& world,
     particle.position = {x, std::min<double>(viewer.y + 16.0,
                                              Config::WORLD_MAX_Y - 0.25), z};
     particle.velocity = particle.kind == ParticleKind::Rain
-        ? glm::vec3((randomFloat() - 0.5f) * 0.25f, -20.0f,
-                    (randomFloat() - 0.5f) * 0.25f)
+        ? glm::vec3((randomFloat() - 0.5f) * 0.35f, -15.0f,
+                    (randomFloat() - 0.5f) * 0.35f)
         : glm::vec3((randomFloat() - 0.5f) * 0.8f, -2.2f,
                     (randomFloat() - 0.5f) * 0.8f);
     particle.lifetime = particle.kind == ParticleKind::Rain ? 1.6f : 7.0f;
     particle.phase = randomFloat();
-    particle.size = 1.0f;
+    if (particle.kind == ParticleKind::Rain) {
+        particle.texture = static_cast<float>(
+            getAtlasTextureIndex(BlockTexture::Water));
+        particle.size = 0.10f + randomFloat() * 0.09f;
+        particle.rotation = randomFloat() * 6.2831853f;
+        particle.angularVelocity = (randomFloat() - 0.5f) * 7.0f;
+    }
     m_particles.push_back(particle);
 }
 
@@ -72,6 +78,8 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         if (particle.kind == ParticleKind::BlockDebris) {
             particle.velocity.y -= 18.0f * dt;
             particle.velocity *= std::pow(0.18f, dt);
+            particle.rotation += particle.angularVelocity * dt;
+        } else if (particle.kind == ParticleKind::Rain) {
             particle.rotation += particle.angularVelocity * dt;
         } else if (particle.kind == ParticleKind::Snow) {
             const float sway = std::sin(particle.age * 2.4f + particle.phase * 6.283f);

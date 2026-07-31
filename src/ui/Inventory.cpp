@@ -43,15 +43,16 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
     constexpr float slot=44.0f,footer=34.0f;
     ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),{0,0,0,.58f});
     ui.drawPanel(m_panelX,m_panelY,m_panelW,m_panelH,{.10f,.105f,.12f,.97f});
-    const std::string title="CREATIVE INVENTORY";
+    const std::string title = ui.localization().text("inventory.creative");
     const auto titleSize=ui.measureText(title,1.8f);
     ui.renderText(title,m_panelX+(m_panelW-titleSize.x)*.5f,m_panelY+m_panelH-34.0f,
                   1.8f,Config::UIColors::TEXT_TITLE);
-    const std::string page=std::to_string(m_scrollRow+1)+" / "+
-        std::to_string(std::max(1,m_totalRows-m_visibleRows+1));
+    const std::string page = ui.localization().format("inventory.page", {
+        std::to_string(m_scrollRow + 1),
+        std::to_string(std::max(1, m_totalRows - m_visibleRows + 1))});
     const auto pageSize=ui.measureText(page,.8f);
     ui.renderText(page,m_panelX+m_panelW-pageSize.x-18.0f,m_panelY+14.0f,.8f,{.68f,.68f,.72f});
-    ui.renderText("Scroll to browse  |  Click to place in selected hotbar slot  |  E to close",
+    ui.renderText(ui.localization().text("inventory.help"),
                   m_panelX+16.0f,m_panelY+14.0f,.72f,{.65f,.65f,.70f});
 
     const Slot* hovered=nullptr;

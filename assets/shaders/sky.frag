@@ -34,6 +34,57 @@ float cloudNoise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+vec2 cubeSkyUv(vec3 direction, out float face) {
+    vec3 magnitude = abs(direction);
+    if (magnitude.x >= magnitude.y && magnitude.x >= magnitude.z) {
+        face = direction.x >= 0.0 ? 0.0 : 1.0;
+        return vec2(direction.z, direction.y) / magnitude.x;
+    }
+    if (magnitude.y >= magnitude.z) {
+        face = direction.y >= 0.0 ? 2.0 : 3.0;
+        return vec2(direction.x, direction.z) / magnitude.y;
+    }
+    face = direction.z >= 0.0 ? 4.0 : 5.0;
+    return vec2(direction.x, direction.y) / magnitude.z;
+}
+
+vec3 starTemperature(float seed) {
+    vec3 warm = vec3(1.00, 0.76, 0.58);
+    vec3 neutral = vec3(0.92, 0.95, 1.00);
+    vec3 blue = vec3(0.60, 0.73, 1.00);
+    return seed < 0.48
+        ? mix(warm, neutral, smoothstep(0.08, 0.48, seed))
+        : mix(neutral, blue, smoothstep(0.58, 0.96, seed));
+}
+
+vec3 starLayer(vec2 skyUv, float face, float density, float threshold,
+               float radiusScale, float time) {
+    vec2 coordinate = (skyUv * 0.5 + 0.5) * density;
+    vec2 cell = floor(coordinate);
+    vec2 local = fract(coordinate);
+    vec3 identity = vec3(cell, face * 137.0 + density);
+    float existence = hash31(identity);
+    float visible = step(threshold, existence);
+
+    vec2 offset = vec2(
+        hash31(identity + vec3(19.1, 7.7, 3.4)),
+        hash31(identity + vec3(3.8, 29.3, 11.2)));
+    offset = 0.16 + offset * 0.68;
+    float character = hash31(identity + vec3(41.7, 13.5, 23.9));
+    float distanceToStar = length(local - offset);
+    float radius = mix(0.045, 0.095, character * character) * radiusScale;
+    float antialias = max(fwidth(distanceToStar), 0.006);
+    float disc = 1.0 - smoothstep(radius - antialias,
+                                  radius + antialias, distanceToStar);
+    float core = 1.0 - smoothstep(0.0, radius * 0.34, distanceToStar);
+    float brightness = mix(0.42, 1.18, character);
+    float twinklePhase = hash31(identity + vec3(61.2, 5.4, 37.8));
+    float twinkle = 0.91 + 0.09 * sin(
+        time * mix(0.45, 0.82, twinklePhase) + twinklePhase * 6.2831853);
+    return starTemperature(hash31(identity + vec3(5.2, 71.4, 17.6))) *
+           (disc + core * 0.42) * brightness * twinkle * visible;
+}
+
 void main() {
     vec4 farPoint = uInverseViewProjection * vec4(vNdc, 1.0, 1.0);
     vec3 world = farPoint.xyz / farPoint.w;
@@ -49,12 +100,34 @@ void main() {
     color = mix(color, vec3(1.0, 0.94, 0.74), sun);
 
     float moon = smoothstep(0.99945, 0.99978, dot(ray, uMoonDirection)) * celestial;
+    float moonHalo = pow(max(dot(ray, uMoonDirection), 0.0), 180.0) *
+                     celestial * uStarIntensity;
+    color += vec3(0.30, 0.40, 0.72) * moonHalo * 0.14;
     color = mix(color, vec3(0.72, 0.80, 1.0), moon * uStarIntensity);
 
-    vec3 starCell = floor(ray * 620.0);
-    float starSeed = hash31(starCell);
-    float stars = step(0.9965, starSeed) * smoothstep(0.0, 0.18, ray.y);
-    color += vec3(0.68, 0.76, 1.0) * stars * uStarIntensity;
+    float starFace = 0.0;
+    vec2 starUv = cubeSkyUv(ray, starFace);
+    float horizonFade = smoothstep(-0.015, 0.20, ray.y);
+    float clearNight = uStarIntensity * pow(max(celestial, 0.0), 1.7);
+    float moonOcclusion = 1.0 - smoothstep(
+        0.9965, 0.99955, dot(ray, uMoonDirection));
+
+    vec3 milkyNormal = normalize(vec3(0.28, 0.91, -0.30));
+    float milkyLatitude = abs(dot(ray, milkyNormal));
+    float milkyBand = exp(-milkyLatitude * milkyLatitude * 76.0);
+    float milkyTexture = cloudNoise(
+        starUv * 7.5 + vec2(starFace * 17.3, starFace * 9.1));
+    milkyTexture *= 0.55 + 0.45 * cloudNoise(
+        starUv * 18.0 + vec2(starFace * 4.7, 31.0));
+    color += mix(vec3(0.075, 0.095, 0.18), vec3(0.16, 0.12, 0.23),
+                 smoothstep(0.25, 0.85, milkyTexture)) *
+             milkyBand * (0.035 + milkyTexture * 0.055) *
+             clearNight * horizonFade;
+
+    vec3 stars = starLayer(starUv, starFace, 185.0, 0.988, 0.78, uWeatherTime);
+    stars += starLayer(starUv, starFace, 96.0, 0.966, 1.00, uWeatherTime);
+    stars += starLayer(starUv, starFace, 52.0, 0.975, 1.34, uWeatherTime) * 1.18;
+    color += stars * clearNight * horizonFade * moonOcclusion;
 
     if (uRenderClouds != 0 && ray.y > 0.025) {
         vec2 cloudUv = ray.xz / max(ray.y, 0.06) * 0.42;

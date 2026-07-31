@@ -17,15 +17,15 @@ out float vPhase;
 void main() {
     float kind = aPositionKind.w;
     float phase = aParticleParams.x;
-    float width = kind < 0.5 ? 0.045 : (kind < 1.5 ? 0.18 : (kind < 2.5 ? 0.16 : aParticleParams.z));
-    float height = kind < 0.5 ? 1.65 : (kind < 1.5 ? 0.22 : (kind < 2.5 ? 4.2 : aParticleParams.z));
+    float width = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.18 : (kind < 2.5 ? 0.16 : aParticleParams.z));
+    float height = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.22 : (kind < 2.5 ? 4.2 : aParticleParams.z));
     vec3 position = aPositionKind.xyz;
     if (kind > 0.5 && kind < 1.5)
         position += uCameraRight * sin(uTime * 1.7 + phase * 6.283) * 0.13;
     if (kind > 1.5 && kind < 2.5)
         position += uCameraRight * (fract(sin(phase * 91.7) * 43758.5) - 0.5) * 0.7;
     vec2 corner = vec2(aCorner.x, aCorner.y - 0.5);
-    if (kind > 2.5) {
+    if (kind < 0.5 || kind > 2.5) {
         float c = cos(aParticleParams.w), s = sin(aParticleParams.w);
         corner = mat2(c, -s, s, c) * corner;
     }

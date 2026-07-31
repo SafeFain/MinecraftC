@@ -273,17 +273,24 @@ bool UIRenderer::drawGeneratedItemIcon(float x,float y,float w,float h,ItemId it
 void UIRenderer::drawTooltip(float x, float y, const ItemStack& stack) {
     if (stack.empty()) return;
     const auto& props = getItemProps(stack.id);
-    std::string detail = props.name;
+    std::string detail = m_localization
+        ? m_localization->itemName(stack.id) : props.name;
     if (stack.count > 1) detail += " x" + std::to_string(stack.count);
     if (props.maxDurability)
         detail += "  " + std::to_string(props.maxDurability - std::min(props.maxDurability, stack.damage)) +
                   "/" + std::to_string(props.maxDurability);
     else if (props.kind == ItemKind::Armor)
-        detail += "  Armor";
+        detail += "  " + (m_localization
+            ? m_localization->text("tooltip.armor") : "Armor");
     else if (props.attackDamage > 0.0f)
-        detail += "  Damage " + std::to_string(static_cast<int>(props.attackDamage));
+        detail += "  " + (m_localization
+            ? m_localization->format("tooltip.damage", {
+                std::to_string(static_cast<int>(props.attackDamage))})
+            : "Damage " + std::to_string(static_cast<int>(props.attackDamage)));
     else if (props.food > 0)
-        detail += "  Food +" + std::to_string(props.food);
+        detail += "  " + (m_localization
+            ? m_localization->format("tooltip.food", {std::to_string(props.food)})
+            : "Food +" + std::to_string(props.food));
     const auto size = measureText(detail, .9f);
     drawPanel(x, y, size.x + 14.0f, size.y + 12.0f, {.08f,.05f,.12f,.97f});
     renderText(detail, x + 7.0f, y + 6.0f, .9f, {.95f,.90f,1.0f});

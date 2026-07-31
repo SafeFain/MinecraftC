@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MinecraftC VERSION 1.1.1 LANGUAGES CXX C)
+project(MinecraftC VERSION 1.1.2 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -159,7 +159,7 @@ if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
-        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.1")
+        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.2")
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
@@ -433,6 +433,7 @@ if(BUILD_TESTING)
         tests/ClientInputTests.cpp
         src/core/Input.cpp
         src/game/ClientSettings.cpp
+        src/game/Language.cpp
         src/game/InventoryInteraction.cpp
         src/game/Item.cpp
         src/world/Block.cpp)
@@ -442,6 +443,28 @@ if(BUILD_TESTING)
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
+
+    add_executable(localization_tests
+        tests/LocalizationTests.cpp
+        src/core/Input.cpp
+        src/game/Item.cpp
+        src/game/Language.cpp
+        src/game/Localization.cpp
+        src/game/Utf8.cpp
+        src/ui/StbTruetypeImpl.cpp
+        src/world/Block.cpp)
+    target_include_directories(localization_tests PRIVATE
+        src external external/stb)
+    target_compile_definitions(localization_tests PRIVATE
+        MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    target_link_libraries(localization_tests PRIVATE glm::glm glfw)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(localization_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(localization_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME localization_resources_utf8_and_cjk_font
+             COMMAND localization_tests)
 
     add_executable(survival_integration_tests
         tests/SurvivalIntegrationTests.cpp

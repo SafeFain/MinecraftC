@@ -95,7 +95,7 @@ private:
         float x, y, z;
         float width, depth, height;
     };
-    static constexpr size_t MAX_CLOUD_INSTANCES = 65u * 65u;
+    static constexpr size_t MAX_CLOUD_INSTANCES = 2u * 129u * 129u;
     static constexpr size_t CLOUD_INSTANCE_BUFFER_COUNT = 3;
 
     std::unique_ptr<Shader> m_blockShader;

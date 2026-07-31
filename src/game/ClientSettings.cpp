@@ -28,7 +28,7 @@ void ClientSettings::validate() {
     constexpr int distances[] = {2,4,6,8,10,12,16};
     if (std::find(std::begin(distances), std::end(distances), renderDistance) == std::end(distances))
         renderDistance = 8;
-    constexpr int cloudDistances[] = {64,96,128,192,256,512};
+    constexpr int cloudDistances[] = {64,96,128,192,256,512,1024};
     if (std::find(std::begin(cloudDistances), std::end(cloudDistances),
                   cloudRenderDistance) == std::end(cloudDistances))
         cloudRenderDistance = 192;
@@ -73,6 +73,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "raw_mouse_input") settings.rawMouseInput = std::stoi(value) != 0;
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
+            else if (name == "language") settings.language = parseLanguage(value);
             else if (name.rfind("binding.", 0) == 0) {
                 const size_t index = static_cast<size_t>(std::stoul(name.substr(8)));
                 if (index >= settings.bindings.size()) continue;
@@ -105,7 +106,8 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "raw_mouse_input=" << rawMouseInput << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'
-           << "gui_scale=" << guiScale << '\n';
+           << "gui_scale=" << guiScale << '\n'
+           << "language=" << languageCode(language) << '\n';
     for (size_t i = 0; i < bindings.size(); ++i)
         output << "binding." << i << '=' << static_cast<int>(bindings[i].device)
                << ',' << bindings[i].code << '\n';

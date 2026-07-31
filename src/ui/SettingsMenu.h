@@ -6,7 +6,7 @@
 class SettingsMenu : public Menu {
 public:
     SettingsMenu(ClientSettings& settings, std::function<void()> onChanged,
-                 std::function<void()> onBack);
+                 std::function<void()> onBack, const Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
@@ -22,6 +22,7 @@ private:
     std::function<void()> m_onBack;
     std::function<void()> m_onChanged;
     ClientSettings& m_settings;
+    const Localization& m_localization;
     Page m_page = Page::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;

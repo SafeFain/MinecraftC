@@ -59,6 +59,7 @@ PFNGLGENERATEMIPMAPPROC         glad_glGenerateMipmap;
 PFNGLGENTEXTURESPROC            glad_glGenTextures;
 PFNGLBINDTEXTUREPROC            glad_glBindTexture;
 PFNGLTEXIMAGE2DPROC             glad_glTexImage2D;
+PFNGLTEXSUBIMAGE2DPROC          glad_glTexSubImage2D;
 PFNGLTEXPARAMETERIPROC          glad_glTexParameteri;
 PFNGLDELETETEXTURESPROC         glad_glDeleteTextures;
 
@@ -127,6 +128,7 @@ extern "C" int gladLoadGL(void* (*getProcAddress)(const char*)) {
     LOAD(glGenTextures);
     LOAD(glBindTexture);
     LOAD(glTexImage2D);
+    LOAD(glTexSubImage2D);
     LOAD(glTexParameteri);
     LOAD(glDeleteTextures);
 

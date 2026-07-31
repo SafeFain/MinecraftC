@@ -3,6 +3,7 @@
 
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include "game/Utf8.h"
 
 // ── Button ────────────────────────────────────────────────────────────────
 
@@ -74,8 +75,10 @@ void Menu::activateSelected(std::vector<Button>& buttons, int selectedIdx) {
 
 // ── Main Menu ─────────────────────────────────────────────────────────────
 
-MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds)
-    : m_callbacks(callbacks), m_worlds(std::move(worlds)) {
+MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
+                   ClientSettings& settings, Localization& localization)
+    : m_callbacks(callbacks), m_settings(settings), m_localization(localization),
+      m_worlds(std::move(worlds)) {
     showHome();
 }
 
@@ -91,7 +94,7 @@ void MainMenu::showWorlds() {
 
 void MainMenu::showCreate() {
     m_page = Page::Create;
-    m_worldName = "New World";
+    m_worldName = m_localization.text("menu.create.default_name");
     m_seedText.clear();
     m_createMode = GameMode::Survival;
     m_createCheats = false;
@@ -99,65 +102,80 @@ void MainMenu::showCreate() {
     rebuildButtons();
 }
 
-std::string MainMenu::fieldLabel(const char* name, const std::string& value) const {
-    const bool active = (name == std::string("World Name") && m_field == Field::Name) ||
-                        (name == std::string("Seed") && m_field == Field::Seed);
+std::string MainMenu::fieldLabel(Field field, const std::string& value) const {
+    const bool active = field == m_field;
+    const std::string name = m_localization.text(
+        field == Field::Name ? "menu.create.world_name" : "menu.create.seed");
     return std::string(active ? "> " : "") + name + ": " +
-           (value.empty() ? (name == std::string("Seed") ? "<random>" : "") : value);
+           (value.empty() && field == Field::Seed
+                ? m_localization.text("menu.create.random") : value);
 }
 
 void MainMenu::rebuildButtons() {
     m_buttons.clear();
     if (m_page == Page::Home) {
-        m_buttons.emplace_back("Singleplayer", [this]() { showWorlds(); });
-        m_buttons.emplace_back("Settings", m_callbacks.onOpenSettings);
-        m_buttons.emplace_back("Quit", m_callbacks.onQuit);
+        m_buttons.emplace_back(m_localization.text("menu.home.singleplayer"),
+                               [this]() { showWorlds(); });
+        m_buttons.emplace_back(m_localization.text("menu.home.settings"),
+                               m_callbacks.onOpenSettings);
+        m_buttons.emplace_back(m_localization.text("menu.home.language"), [this]() {
+            m_settings.language = m_settings.language == Language::English
+                ? Language::SimplifiedChinese : Language::English;
+            m_localization.setLanguage(m_settings.language);
+            if (m_callbacks.onSettingsChanged) m_callbacks.onSettingsChanged();
+            rebuildButtons();
+        });
+        m_buttons.emplace_back(m_localization.text("menu.home.quit"), m_callbacks.onQuit);
     } else if (m_page == Page::Worlds) {
         const int visible = 6;
         const int end = std::min(static_cast<int>(m_worlds.size()), m_worldOffset + visible);
         for (int index = m_worldOffset; index < end; ++index) {
             const auto& world = m_worlds[static_cast<size_t>(index)];
-            const std::string mode =
-                world.mode == GameMode::Survival ? "Survival" :
-                world.mode == GameMode::Creative ? "Creative" : "Spectator";
+            const std::string mode = m_localization.text(
+                world.mode == GameMode::Survival ? "common.survival" :
+                world.mode == GameMode::Creative ? "common.creative" : "common.spectator");
             m_buttons.emplace_back((index == m_selectedWorld ? "> " : "") +
-                world.displayName + " [" + (world.compatible ? mode : "Incompatible v" +
-                    std::to_string(world.generationVersion)) + "]", [this, index]() {
+                world.displayName + " [" + (world.compatible ? mode :
+                    m_localization.format("menu.worlds.incompatible", {
+                        std::to_string(world.generationVersion)})) + "]", [this, index]() {
                     m_selectedWorld = index;
                     rebuildButtons();
                 });
         }
-        m_buttons.emplace_back("Play Selected World", [this]() {
+        m_buttons.emplace_back(m_localization.text("menu.worlds.play"), [this]() {
             if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()) &&
                 m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
                 m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         });
-        m_buttons.emplace_back("Create New World", [this]() { showCreate(); });
-        m_buttons.emplace_back("Back", [this]() { showHome(); });
+        m_buttons.emplace_back(m_localization.text("menu.worlds.create"),
+                               [this]() { showCreate(); });
+        m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
     } else {
-        m_buttons.emplace_back(fieldLabel("World Name", m_worldName),
+        m_buttons.emplace_back(fieldLabel(Field::Name, m_worldName),
                                [this]() { selectField(Field::Name); });
         m_buttons.emplace_back(
-            std::string("Game Mode: ") +
-                (m_createMode == GameMode::Survival ? "Survival" : "Creative"),
+            m_localization.format("menu.create.game_mode", {m_localization.text(
+                m_createMode == GameMode::Survival
+                    ? "common.survival" : "common.creative")}),
             [this]() {
                 m_createMode = m_createMode == GameMode::Survival
                     ? GameMode::Creative : GameMode::Survival;
                 rebuildButtons();
             });
-        m_buttons.emplace_back(fieldLabel("Seed", m_seedText),
+        m_buttons.emplace_back(fieldLabel(Field::Seed, m_seedText),
                                [this]() { selectField(Field::Seed); });
         m_buttons.emplace_back(
-            std::string("Allow Cheats: ") + (m_createCheats ? "ON" : "OFF"),
+            m_localization.format("menu.create.cheats", {m_localization.text(
+                m_createCheats ? "common.on" : "common.off")}),
             [this]() {
                 m_createCheats = !m_createCheats;
                 rebuildButtons();
             });
-        m_buttons.emplace_back("Create World", [this]() {
+        m_buttons.emplace_back(m_localization.text("menu.create.confirm"), [this]() {
             m_callbacks.onCreateWorld(
                 m_worldName, m_seedText, m_createMode, m_createCheats);
         });
-        m_buttons.emplace_back("Cancel", [this]() { showWorlds(); });
+        m_buttons.emplace_back(m_localization.text("common.cancel"), [this]() { showWorlds(); });
     }
     m_selectedIdx = 0;
     if (!m_buttons.empty()) m_buttons[0].setSelected(true);
@@ -185,8 +203,9 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.drawPanel((screenWidth-panelW)*.5f, 18.0f, panelW, screenHeight-36.0f,
                  {.07f,.075f,.09f,.94f});
 
-    const char* title = m_page == Page::Home ? "MINECRAFTC" :
-                        m_page == Page::Worlds ? "SELECT WORLD" : "CREATE NEW WORLD";
+    const std::string title = m_page == Page::Home ? "MINECRAFTC" :
+        m_localization.text(m_page == Page::Worlds
+            ? "menu.worlds.title" : "menu.create.title");
     float titleScale = 4.5f;
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;
@@ -194,9 +213,9 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.renderText(title, titleX, titleY, titleScale,
                   glm::vec3(1.0f, 0.85f, 0.3f));  // gold
 
-    const char* subtitle = m_page == Page::Create
-        ? "Choose a mode and enter an optional numeric seed"
-        : (m_page == Page::Worlds ? "Select a saved world" : "A C++ Voxel Engine");
+    const std::string subtitle = m_localization.text(
+        m_page == Page::Create ? "menu.create.subtitle" :
+        m_page == Page::Worlds ? "menu.worlds.subtitle" : "menu.home.subtitle");
     float subScale = 1.5f;
     auto subSize = ui.measureText(subtitle, subScale);
     float subX = (screenWidth - subSize.x) * 0.5f;
@@ -208,9 +227,10 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
         m_selectedWorld < static_cast<int>(m_worlds.size())) {
         const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
         const std::string details = world.compatible
-            ? "Seed " + std::to_string(world.seed) + "  |  Played " +
-                std::to_string(world.worldTicks / 1200) + " min"
-            : "This generation version is not supported";
+            ? m_localization.format("menu.worlds.details", {
+                std::to_string(world.seed),
+                std::to_string(world.worldTicks / 1200)})
+            : m_localization.text("menu.worlds.unsupported");
         const auto size = ui.measureText(details, 1.0f);
         ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,
                       1.0f, glm::vec3(0.78f));
@@ -242,7 +262,7 @@ void MainMenu::onKeyPress(int key) {
     }
     if (m_page == Page::Create && key == GLFW_KEY_BACKSPACE) {
         std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
-        if (!value.empty()) value.pop_back();
+        eraseLastUtf8Codepoint(value);
         rebuildButtons();
         selectField(m_field);
         return;
@@ -283,15 +303,15 @@ void MainMenu::onKeyPress(int key) {
 }
 
 void MainMenu::onChar(unsigned int codepoint) {
-    if (m_page != Page::Create || codepoint < 32 || codepoint > 126) return;
-    char character = static_cast<char>(codepoint);
+    if (m_page != Page::Create || codepoint < 32) return;
     std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
     if (m_field == Field::Seed) {
+        const char character = static_cast<char>(codepoint);
         if (character == '-' && value.empty()) value.push_back(character);
         else if (character >= '0' && character <= '9' && value.size() < 20)
             value.push_back(character);
-    } else if (value.size() < 32) {
-        value.push_back(character);
+    } else if (utf8CodepointCount(value) < 32) {
+        appendUtf8(value, codepoint);
     }
     rebuildButtons();
     selectField(m_field);
@@ -347,11 +367,12 @@ void MainMenu::onScroll(double yOffset) {
 
 // ── Pause Menu ────────────────────────────────────────────────────────────
 
-PauseMenu::PauseMenu(const MenuCallbacks& callbacks) {
-    m_buttons.emplace_back("Resume",        callbacks.onResume);
-    m_buttons.emplace_back("Settings",      callbacks.onOpenSettings);
-    m_buttons.emplace_back("Back to Menu",  callbacks.onBackToMenu);
-    m_buttons.emplace_back("Quit",          callbacks.onQuit);
+PauseMenu::PauseMenu(
+    const MenuCallbacks& callbacks, const Localization& localization) {
+    m_buttons.emplace_back(localization.text("menu.pause.resume"), callbacks.onResume);
+    m_buttons.emplace_back(localization.text("menu.home.settings"), callbacks.onOpenSettings);
+    m_buttons.emplace_back(localization.text("menu.pause.back"), callbacks.onBackToMenu);
+    m_buttons.emplace_back(localization.text("menu.home.quit"), callbacks.onQuit);
 
     if (!m_buttons.empty()) {
         m_buttons[0].setSelected(true);
@@ -365,7 +386,7 @@ void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                 glm::vec4(0.0f, 0.0f, 0.0f, 0.55f));
 
     // "PAUSED" title
-    const char* title = "PAUSED";
+    const std::string title = ui.localization().text("menu.pause.title");
     float titleScale = 3.0f;
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;

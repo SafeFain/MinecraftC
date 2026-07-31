@@ -88,8 +88,12 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
-    ui.renderText(entity->type == BlockEntityType::Chest ? "CHEST" : "FURNACE",
-                  width*.5f-60, height*.78f, 2, {1,.85f,.3f});
+    const std::string title = ui.localization().text(
+        entity->type == BlockEntityType::Chest
+            ? "container.chest" : "container.furnace");
+    const auto titleSize = ui.measureText(title, 2.0f);
+    ui.renderText(title, (width - titleSize.x) * .5f,
+                  height*.78f, 2, {1,.85f,.3f});
     for (size_t i=0;i<m_inventoryRects.size();++i)
         drawStack(ui,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
     if (entity->type == BlockEntityType::Chest) {

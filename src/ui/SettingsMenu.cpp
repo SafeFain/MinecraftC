@@ -9,23 +9,28 @@
 
 SettingsMenu::SettingsMenu(ClientSettings& settings,
                            std::function<void()> onChanged,
-                           std::function<void()> onBack)
+                           std::function<void()> onBack,
+                           const Localization& localization)
     : m_onBack(std::move(onBack)), m_onChanged(std::move(onChanged)),
-      m_settings(settings) { refreshButtons(); }
+      m_settings(settings), m_localization(localization) { refreshButtons(); }
 
 std::string SettingsMenu::labelForRenderDist() const {
-    return "Render Distance: " + std::to_string(m_settings.renderDistance);
+    return m_localization.format(
+        "settings.render_distance", {std::to_string(m_settings.renderDistance)});
 }
 std::string SettingsMenu::labelForCloudRenderDist() const {
-    return "Cloud Distance: " + std::to_string(m_settings.cloudRenderDistance) +
-           " Blocks";
+    return m_localization.format(
+        "settings.cloud_distance", {std::to_string(m_settings.cloudRenderDistance)});
 }
 std::string SettingsMenu::labelForDayCycle() const {
-    return m_settings.dayCycleMinutes == 0 ? "Day Cycle: Static Day" :
-        "Day Cycle: " + std::to_string(m_settings.dayCycleMinutes) + " Minutes";
+    return m_settings.dayCycleMinutes == 0
+        ? m_localization.text("settings.day_static")
+        : m_localization.format(
+            "settings.day_minutes", {std::to_string(m_settings.dayCycleMinutes)});
 }
 std::string SettingsMenu::labelForAutoJump() const {
-    return std::string("Auto Jump: ") + (m_settings.autoJump ? "ON" : "OFF");
+    return m_localization.format("settings.auto_jump", {m_localization.text(
+        m_settings.autoJump ? "common.on" : "common.off")});
 }
 
 void SettingsMenu::cycleRenderDistance() {
@@ -40,11 +45,11 @@ void SettingsMenu::toggleCloudRendering() {
     m_onChanged(); refreshButtons();
 }
 void SettingsMenu::cycleCloudRenderDistance() {
-    constexpr int options[] = {64,96,128,192,256,512};
+    constexpr int options[] = {64,96,128,192,256,512,1024};
     auto it = std::find(std::begin(options), std::end(options),
                         m_settings.cloudRenderDistance);
     m_settings.cloudRenderDistance = options[(it == std::end(options) ? 0 :
-        (static_cast<int>(it - std::begin(options)) + 1) % 6)];
+        (static_cast<int>(it - std::begin(options)) + 1) % 7)];
     m_onChanged(); refreshButtons();
 }
 void SettingsMenu::cycleDayCycle() {
@@ -64,47 +69,47 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
         std::ostringstream sensitivity;
-        sensitivity << "Mouse Sensitivity: " << std::fixed << std::setprecision(2)
-                    << m_settings.mouseSensitivity;
-        m_buttons.emplace_back(sensitivity.str(), [this]{
+        sensitivity << std::fixed << std::setprecision(2) << m_settings.mouseSensitivity;
+        m_buttons.emplace_back(m_localization.format(
+            "settings.sensitivity", {sensitivity.str()}), [this]{
             m_settings.mouseSensitivity += 0.05f;
             if (m_settings.mouseSensitivity > 0.50f) m_settings.mouseSensitivity = 0.05f;
             m_onChanged(); refreshButtons();
         });
-        m_buttons.emplace_back(std::string("Invert Mouse Y: ") +
-            (m_settings.invertMouseY ? "ON" : "OFF"), [this]{
+        m_buttons.emplace_back(m_localization.format("settings.invert_y", {
+            m_localization.text(m_settings.invertMouseY ? "common.on" : "common.off")}), [this]{
                 m_settings.invertMouseY = !m_settings.invertMouseY; m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back(std::string("Raw Mouse Input: ") +
-            (m_settings.rawMouseInput ? "ON" : "OFF"), [this]{
+        m_buttons.emplace_back(m_localization.format("settings.raw_mouse", {
+            m_localization.text(m_settings.rawMouseInput ? "common.on" : "common.off")}), [this]{
                 m_settings.rawMouseInput = !m_settings.rawMouseInput; m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back("Video Settings...", [this]{
+        m_buttons.emplace_back(m_localization.text("settings.video"), [this]{
             m_page = Page::Video; m_selectedIdx = 0; refreshButtons();
         });
-        m_buttons.emplace_back("Controls...", [this]{
+        m_buttons.emplace_back(m_localization.text("settings.controls"), [this]{
             m_page = Page::Controls; m_selectedIdx = 0; refreshButtons();
         });
-        m_buttons.emplace_back("Back", m_onBack);
+        m_buttons.emplace_back(m_localization.text("common.back"), m_onBack);
     } else if (m_page == Page::Video) {
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
-        m_buttons.emplace_back(std::string("Clouds: ") +
-            (m_settings.renderClouds ? "ON" : "OFF"),
+        m_buttons.emplace_back(m_localization.format("settings.clouds", {
+            m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),
             [this]{ toggleCloudRendering(); });
         m_buttons.emplace_back(labelForCloudRenderDist(),
                                [this]{ cycleCloudRenderDistance(); });
-        m_buttons.emplace_back(std::string("Smooth Lighting: ") +
-            (m_settings.smoothLighting ? "ON" : "OFF"), [this]{
+        m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
+            m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
                 m_settings.smoothLighting = !m_settings.smoothLighting;
                 m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back("GUI Scale: " + std::string(
-            m_settings.guiScale == 0 ? "Auto" :
-            std::to_string(m_settings.guiScale) + "x"), [this]{
+        m_buttons.emplace_back(m_localization.format("settings.gui_scale", {
+            m_settings.guiScale == 0 ? m_localization.text("common.auto") :
+            std::to_string(m_settings.guiScale) + "x"}), [this]{
                 m_settings.guiScale = (m_settings.guiScale + 1) % 5;
                 m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back("Back to Settings", [this]{
+        m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             m_page = Page::General; m_selectedIdx = 0; refreshButtons();
         });
     } else {
@@ -112,15 +117,15 @@ void SettingsMenu::refreshButtons() {
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
         for (int i = m_controlOffset; i < end; ++i) {
             const InputAction action = static_cast<InputAction>(i);
-            const std::string label = std::string(inputActionName(action)) + ": " +
-                (m_captureAction == i ? "> Press a key <" :
-                 inputBindingName(m_settings.bindings[static_cast<size_t>(i)]));
+            const std::string label = m_localization.actionName(action) + ": " +
+                (m_captureAction == i ? m_localization.text("settings.capture") :
+                 m_localization.bindingName(m_settings.bindings[static_cast<size_t>(i)]));
             m_buttons.emplace_back(label, [this, i]{ m_captureAction = i; refreshButtons(); });
         }
-        m_buttons.emplace_back("Reset Controls", [this]{
+        m_buttons.emplace_back(m_localization.text("settings.reset"), [this]{
             m_settings.resetBindings(); m_onChanged(); refreshButtons();
         });
-        m_buttons.emplace_back("Back to Settings", [this]{
+        m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             m_captureAction = -1; m_page = Page::General;
             m_selectedIdx = 0; refreshButtons();
         });
@@ -141,15 +146,20 @@ void SettingsMenu::assignBinding(InputBinding binding) {
 void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
                 Config::UIColors::BACKGROUND);
-    const char* title = m_page == Page::Controls ? "CONTROLS" :
-                        m_page == Page::Video ? "VIDEO SETTINGS" : "SETTINGS";
+    const std::string title = m_localization.text(
+        m_page == Page::Controls ? "settings.controls_title" :
+        m_page == Page::Video ? "settings.video_title" : "settings.title");
     const auto titleSize = ui.measureText(title, 3.0f);
     const float titleY = height * 0.78f;
     ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,
                   Config::UIColors::TEXT_TITLE);
     if (m_page == Page::Controls)
-        ui.renderText("Click a row, then press a key / mouse button / wheel",
-                      width * .5f - 210.0f, titleY - 34.0f, 1.0f, glm::vec3(.72f));
+        {
+            const std::string help = m_localization.text("settings.controls_help");
+            const auto helpSize = ui.measureText(help, 1.0f);
+            ui.renderText(help, (width - helpSize.x) * .5f,
+                          titleY - 34.0f, 1.0f, glm::vec3(.72f));
+        }
     const float startY = titleY - 58.0f;
     const float x = (width - Config::UI_BUTTON_WIDTH) * .5f;
     const float buttonHeight = std::clamp(

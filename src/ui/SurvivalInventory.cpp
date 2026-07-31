@@ -84,9 +84,12 @@ void SurvivalInventoryScreen::render(
     layout(screenWidth, screenHeight);
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
-    ui.renderText("SURVIVAL INVENTORY", screenWidth * 0.5f - 126.0f,
+    const std::string title = ui.localization().text("inventory.survival");
+    const auto titleSize = ui.measureText(title, 2.0f);
+    ui.renderText(title, (screenWidth - titleSize.x) * 0.5f,
                   screenHeight * 0.78f, 2.0f, glm::vec3(1.0f, 0.85f, 0.3f));
-    ui.renderText("CRAFTING", screenWidth * 0.5f - 118.0f,
+    ui.renderText(ui.localization().text("inventory.crafting"),
+                  screenWidth * 0.5f - 118.0f,
                   m_craftingRects[0].y + 54.0f, 1.1f, glm::vec3(0.85f));
 
     const ItemStack* tooltip = nullptr;

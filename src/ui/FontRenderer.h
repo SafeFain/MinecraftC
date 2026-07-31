@@ -30,11 +30,13 @@ public:
     static constexpr int GLYPH_H      = 14;
     static constexpr int FIRST_GLYPH  = 32;
     static constexpr int GLYPH_COUNT  = 95;   // 126 - 32 + 1
-    static constexpr int ATLAS_W      = GLYPH_W * GLYPH_COUNT;  // 760
-    static constexpr int ATLAS_H      = GLYPH_H;                // 14
+    static constexpr int ATLAS_W      = 2048;
+    static constexpr int ATLAS_H      = 2048;
 
 private:
+    struct Impl;
     std::unique_ptr<Shader> m_shader;
+    std::unique_ptr<Impl> m_impl;
     GLuint m_atlasTexture = 0;
     GLuint m_vao = 0;
     GLuint m_vboPos = 0;

@@ -193,6 +193,7 @@ typedef void          (APIENTRY *PFNGLGENERATEMIPMAPPROC)(GLenum);
 typedef void          (APIENTRY *PFNGLGENTEXTURESPROC)(GLsizei, GLuint*);
 typedef void          (APIENTRY *PFNGLBINDTEXTUREPROC)(GLenum, GLuint);
 typedef void          (APIENTRY *PFNGLTEXIMAGE2DPROC)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+typedef void          (APIENTRY *PFNGLTEXSUBIMAGE2DPROC)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void*);
 typedef void          (APIENTRY *PFNGLTEXPARAMETERIPROC)(GLenum, GLenum, GLint);
 typedef void          (APIENTRY *PFNGLDELETETEXTURESPROC)(GLsizei, const GLuint*);
 
@@ -254,6 +255,7 @@ extern PFNGLGENERATEMIPMAPPROC         glad_glGenerateMipmap;
 extern PFNGLGENTEXTURESPROC            glad_glGenTextures;
 extern PFNGLBINDTEXTUREPROC            glad_glBindTexture;
 extern PFNGLTEXIMAGE2DPROC             glad_glTexImage2D;
+extern PFNGLTEXSUBIMAGE2DPROC          glad_glTexSubImage2D;
 extern PFNGLTEXPARAMETERIPROC          glad_glTexParameteri;
 extern PFNGLDELETETEXTURESPROC         glad_glDeleteTextures;
 
@@ -323,6 +325,7 @@ int gladLoadGL(void* (*getProcAddress)(const char*));
 #define glGenTextures           glad_glGenTextures
 #define glBindTexture           glad_glBindTexture
 #define glTexImage2D            glad_glTexImage2D
+#define glTexSubImage2D         glad_glTexSubImage2D
 #define glTexParameteri         glad_glTexParameteri
 #define glDeleteTextures        glad_glDeleteTextures
 

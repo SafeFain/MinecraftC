@@ -4,6 +4,7 @@
 #include "debug/OpenGL.h"
 #include "debug/Log.h"
 
+#include <algorithm>
 #include <vector>
 #include <cmath>
 #include <stb_image.h>
@@ -20,6 +21,56 @@ static const std::vector<float> WIRE_CUBE = {
     // Vertical edges
     0,0,0, 0,1,0,   1,0,0, 1,1,0,   1,0,1, 1,1,1,   0,0,1, 0,1,1,
 };
+
+namespace {
+
+uint64_t cloudHash(uint64_t seed, int x, int z) {
+    uint64_t value = seed ^
+        static_cast<uint64_t>(static_cast<int64_t>(x)) *
+            0x9E3779B97F4A7C15ULL;
+    value ^= static_cast<uint64_t>(static_cast<int64_t>(z)) *
+             0xD1B54A32D192ED03ULL;
+    value ^= value >> 30;
+    value *= 0xBF58476D1CE4E5B9ULL;
+    value ^= value >> 27;
+    value *= 0x94D049BB133111EBULL;
+    return value ^ (value >> 31);
+}
+
+int floorDiv(int value, int divisor) {
+    int quotient = value / divisor;
+    if (value % divisor < 0) --quotient;
+    return quotient;
+}
+
+float cloudRandom(uint64_t seed, int x, int z) {
+    return static_cast<float>(cloudHash(seed, x, z) & 0xFFFFFFULL) /
+           static_cast<float>(0xFFFFFFULL);
+}
+
+float cloudValueNoise(uint64_t seed, int x, int z, int scale) {
+    const int x0 = floorDiv(x, scale);
+    const int z0 = floorDiv(z, scale);
+    float tx = static_cast<float>(x - x0 * scale) / static_cast<float>(scale);
+    float tz = static_cast<float>(z - z0 * scale) / static_cast<float>(scale);
+    tx = tx * tx * (3.0f - 2.0f * tx);
+    tz = tz * tz * (3.0f - 2.0f * tz);
+    const float a = cloudRandom(seed, x0, z0);
+    const float b = cloudRandom(seed, x0 + 1, z0);
+    const float c = cloudRandom(seed, x0, z0 + 1);
+    const float d = cloudRandom(seed, x0 + 1, z0 + 1);
+    return (a + (b - a) * tx) * (1.0f - tz) +
+           (c + (d - c) * tx) * tz;
+}
+
+float cloudDensity(uint64_t seed, int x, int z) {
+    const float broad = cloudValueNoise(seed, x, z, 8);
+    const float detail = cloudValueNoise(
+        seed ^ 0xA0761D6478BD642FULL, x + 37, z - 53, 4);
+    return broad * 0.70f + detail * 0.30f;
+}
+
+} // namespace
 
 // ── Constructor / Destructor ──────────────────────────────────────────
 
@@ -416,10 +467,12 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
                             const glm::mat4& viewProjection,
                             uint64_t worldSeed, float timeSeconds,
                             int renderDistanceBlocks) {
-    // Sparse, deterministic voxel clusters drift east without entering the
-    // collision/world data structures. Large cells keep the draw budget small.
+    // A coherent density field creates broad voxel cloud masses. Adjacent cells
+    // are merged before upload so extended distances retain a small draw budget.
     constexpr int cellSize = 16;
-    const int radius = std::max(1, (renderDistanceBlocks + cellSize - 1) / cellSize);
+    constexpr int maxRadius = 1024 / cellSize;
+    const int radius = std::clamp(
+        (renderDistanceBlocks + cellSize - 1) / cellSize, 1, maxRadius);
     const double drift = static_cast<double>(timeSeconds) * 0.8;
     const int centerX = static_cast<int>(std::floor((playerPosition.x - drift) / cellSize));
     const int centerZ = static_cast<int>(std::floor(playerPosition.z / cellSize));
@@ -428,29 +481,58 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
         m_cloudCacheSeed != worldSeed;
     if (rebuild) {
         m_cloudInstances.clear();
-        for (int dz = -radius; dz <= radius; ++dz) {
-            for (int dx = -radius; dx <= radius; ++dx) {
-                const int cx = centerX + dx;
-                const int cz = centerZ + dz;
-                uint64_t h = worldSeed ^
-                    (static_cast<uint64_t>(static_cast<int64_t>(cx)) *
-                     0x9E3779B97F4A7C15ULL);
-                h ^= static_cast<uint64_t>(static_cast<int64_t>(cz)) *
-                     0xD1B54A32D192ED03ULL;
-                h ^= h >> 30; h *= 0xBF58476D1CE4E5B9ULL;
-                h ^= h >> 27; h *= 0x94D049BB133111EBULL; h ^= h >> 31;
-                if ((h & 15ULL) > 5ULL) continue;
-                const float width = 8.0f + static_cast<float>((h >> 8) & 7ULL);
-                const float depth = 7.0f + static_cast<float>((h >> 12) & 7ULL);
-                const float height = 2.0f +
-                                     static_cast<float>((h >> 16) % 3ULL);
-                m_cloudInstances.push_back({
-                    static_cast<float>(dx * cellSize),
-                    192.0f + static_cast<float>((h >> 20) % 3ULL),
-                    static_cast<float>(dz * cellSize),
-                    width, depth, height});
+        const int diameter = radius * 2 + 1;
+        std::vector<float> density(static_cast<size_t>(diameter * diameter));
+        for (int z = 0; z < diameter; ++z) {
+            for (int x = 0; x < diameter; ++x) {
+                density[static_cast<size_t>(x + z * diameter)] = cloudDensity(
+                    worldSeed, centerX + x - radius, centerZ + z - radius);
             }
         }
+
+        const auto appendLayer = [&](float threshold, float y, float height) {
+            constexpr int maxMergeCells = 3;
+            std::vector<bool> consumed(
+                static_cast<size_t>(diameter * diameter), false);
+            const auto occupied = [&](int x, int z) {
+                const size_t index = static_cast<size_t>(x + z * diameter);
+                return !consumed[index] && density[index] >= threshold;
+            };
+            for (int z = 0; z < diameter; ++z) {
+                for (int x = 0; x < diameter; ++x) {
+                    if (!occupied(x, z)) continue;
+                    int width = 1;
+                    while (width < maxMergeCells && x + width < diameter &&
+                           occupied(x + width, z))
+                        ++width;
+                    int depth = 1;
+                    bool canExtend = true;
+                    while (depth < maxMergeCells && z + depth < diameter &&
+                           canExtend) {
+                        for (int offset = 0; offset < width; ++offset) {
+                            if (!occupied(x + offset, z + depth)) {
+                                canExtend = false;
+                                break;
+                            }
+                        }
+                        if (canExtend) ++depth;
+                    }
+                    for (int dz = 0; dz < depth; ++dz) {
+                        for (int dx = 0; dx < width; ++dx) {
+                            consumed[static_cast<size_t>(
+                                x + dx + (z + dz) * diameter)] = true;
+                        }
+                    }
+                    m_cloudInstances.push_back({
+                        static_cast<float>((x - radius) * cellSize), y,
+                        static_cast<float>((z - radius) * cellSize),
+                        static_cast<float>(width * cellSize),
+                        static_cast<float>(depth * cellSize), height});
+                }
+            }
+        };
+        appendLayer(0.53f, 192.0f, 3.0f);
+        appendLayer(0.68f, 195.0f, 2.0f);
         m_cloudCacheRadius = radius;
         m_cloudCacheCenterX = centerX;
         m_cloudCacheCenterZ = centerZ;

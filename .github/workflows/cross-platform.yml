@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  RELEASE_DIR: MinecraftC-1.1.1
+  RELEASE_DIR: MinecraftC-1.1.2
 
 jobs:
   linux:
@@ -31,7 +31,7 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/atlas.json"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.1"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.2"
       - name: Verify installed OpenGL startup
         shell: bash
         run: |
@@ -44,12 +44,12 @@ jobs:
           grep -q "MinecraftC initialized" minecraftc-smoke.log
           test "$status" -eq 124
       - name: Package Linux release
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.1-linux-x86_64.tar.gz" "$RELEASE_DIR"
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.2-linux-x86_64.tar.gz" "$RELEASE_DIR"
       - name: Upload Linux package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-linux-x86_64
-          path: ${{ runner.temp }}/MinecraftC-1.1.1-linux-x86_64.tar.gz
+          path: ${{ runner.temp }}/MinecraftC-1.1.2-linux-x86_64.tar.gz
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -73,15 +73,15 @@ jobs:
           if (!(Test-Path "$stage/assets/shaders/block.vert")) { throw "Assets were not installed" }
           if (!(Test-Path "$stage/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
           $version = & "$stage/minecraftc.exe" --version
-          if ($version -ne "MinecraftC Release-1.1.1") { throw "Version check failed: $version" }
+          if ($version -ne "MinecraftC Release-1.1.2") { throw "Version check failed: $version" }
       - name: Package Windows release
         shell: pwsh
-        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-1.1.1-windows-x86_64.zip"
+        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-1.1.2-windows-x86_64.zip"
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-windows-x86_64
-          path: ${{ runner.temp }}/MinecraftC-1.1.1-windows-x86_64.zip
+          path: ${{ runner.temp }}/MinecraftC-1.1.2-windows-x86_64.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -101,14 +101,14 @@ jobs:
           cmake --install build-ci --prefix "$RUNNER_TEMP/$RELEASE_DIR"
           lipo "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" -verify_arch arm64 x86_64
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/block.vert"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.1"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.2"
       - name: Package macOS release
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.1-macos-universal.tar.gz" "$RELEASE_DIR"
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.2-macos-universal.tar.gz" "$RELEASE_DIR"
       - name: Upload macOS package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-macos-universal
-          path: ${{ runner.temp }}/MinecraftC-1.1.1-macos-universal.tar.gz
+          path: ${{ runner.temp }}/MinecraftC-1.1.2-macos-universal.tar.gz
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

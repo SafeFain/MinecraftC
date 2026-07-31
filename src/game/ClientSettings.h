@@ -4,9 +4,10 @@
 #include <filesystem>
 
 #include "core/Input.h"
+#include "game/Language.h"
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 3;
+    static constexpr int FORMAT_VERSION = 4;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -18,6 +19,7 @@ struct ClientSettings {
     bool rawMouseInput = true;
     bool smoothLighting = true;
     int guiScale = 0; // 0 = Auto
+    Language language = Language::English;
     std::array<InputBinding, INPUT_ACTION_COUNT> bindings{};
 
     ClientSettings();

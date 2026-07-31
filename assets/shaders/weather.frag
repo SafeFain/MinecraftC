@@ -15,9 +15,15 @@ out vec4 outColor;
 void main() {
     vec4 color;
     if (vKind < 0.5) {
-        float edge = smoothstep(0.0, 0.22, vUv.x) *
-                     (1.0 - smoothstep(0.78, 1.0, vUv.x));
-        color = vec4(0.56, 0.70, 0.86, edge * 0.72 * uIntensity);
+        float tile = floor(vTexture + 0.5);
+        vec2 tileOrigin = vec2(mod(tile, uAtlasTiles),
+                               floor(tile / uAtlasTiles)) / uAtlasTiles;
+        vec2 fragmentOffset =
+            vec2(fract(vPhase * 7.13), fract(vPhase * 13.71)) * 0.55;
+        vec2 localUv = fragmentOffset + vUv * 0.42;
+        color = texture(uBlockAtlas, tileOrigin + localUv / uAtlasTiles);
+        color.rgb = mix(color.rgb, vec3(0.58, 0.72, 0.90), 0.32);
+        color.a *= 0.86 * uIntensity;
     } else if (vKind < 1.5) {
         vec2 centered = vUv - vec2(0.5);
         float flake = 1.0 - smoothstep(0.30, 0.52, length(centered));
