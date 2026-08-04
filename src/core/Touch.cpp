@@ -4,6 +4,7 @@
 
 #include <GLFW/glfw3.h>
 #include <cstring>
+#include <unordered_set>
 #include <utility>
 
 #if defined(__linux__)
@@ -11,6 +12,13 @@
 #include <GLFW/glfw3native.h>
 #include <wayland-client.h>
 #include <algorithm>
+#elif defined(_WIN32)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0602
+#endif
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <windows.h>
 #endif
 
 struct TouchSource::Impl {
@@ -123,6 +131,115 @@ struct TouchSource::Impl {
     ~Impl() {
         destroySeat();
         if (registry) wl_registry_destroy(registry);
+    }
+#elif defined(_WIN32)
+    HWND window = nullptr;
+    WNDPROC previousWindowProc = nullptr;
+    std::unordered_set<int32_t> activeTouches;
+
+    static constexpr const wchar_t* propertyName = L"MinecraftC.TouchSource";
+
+    static Impl* fromWindow(HWND hwnd) {
+        return static_cast<Impl*>(GetPropW(hwnd, propertyName));
+    }
+
+    static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam,
+                                       LPARAM lParam) {
+        auto* self = fromWindow(hwnd);
+        if (!self) return DefWindowProcW(hwnd, message, wParam, lParam);
+        self->handlePointerMessage(message, wParam);
+        return CallWindowProcW(self->previousWindowProc, hwnd, message, wParam, lParam);
+    }
+
+    void emit(const TouchEvent& event) { if (callback) callback(event); }
+
+    bool pointerPosition(uint32_t id, TouchEvent& event) const {
+        POINTER_INFO info{};
+        POINTER_INPUT_TYPE type = PT_POINTER;
+        if (!GetPointerType(id, &type) || type != PT_TOUCH ||
+            !GetPointerInfo(id, &info)) return false;
+        POINT position = info.ptPixelLocation;
+        if (!ScreenToClient(window, &position)) return false;
+        event.id = static_cast<int32_t>(id);
+        event.x = static_cast<double>(position.x);
+        event.y = static_cast<double>(position.y);
+        if ((info.pointerFlags & POINTER_FLAG_CANCELED) != 0) {
+            event.phase = TouchPhase::Cancel;
+        }
+        return true;
+    }
+
+    void cancelAll() {
+        if (activeTouches.empty()) return;
+        activeTouches.clear();
+        emit({-1, TouchPhase::Cancel, 0.0, 0.0});
+    }
+
+    void handlePointerMessage(UINT message, WPARAM wParam) {
+        if (message == WM_POINTERCAPTURECHANGED || message == WM_CANCELMODE) {
+            cancelAll();
+            return;
+        }
+        if (message != WM_POINTERDOWN && message != WM_POINTERUPDATE &&
+            message != WM_POINTERUP) return;
+
+        const uint32_t id = GET_POINTERID_WPARAM(wParam);
+        TouchEvent event;
+        if (!pointerPosition(id, event)) return;
+        if (event.phase == TouchPhase::Cancel) {
+            cancelAll();
+            return;
+        }
+
+        if (message == WM_POINTERDOWN) {
+            activeTouches.insert(static_cast<int32_t>(id));
+            isAvailable = true;
+            event.phase = TouchPhase::Begin;
+        } else {
+            if (activeTouches.count(static_cast<int32_t>(id)) == 0) return;
+            event.phase = message == WM_POINTERUP ? TouchPhase::End : TouchPhase::Move;
+        }
+        emit(event);
+        if (message == WM_POINTERUP) activeTouches.erase(static_cast<int32_t>(id));
+    }
+
+    explicit Impl(GLFWwindow* glfwWindow) {
+        window = glfwGetWin32Window(glfwWindow);
+        if (!window) return;
+        previousWindowProc = reinterpret_cast<WNDPROC>(
+            GetWindowLongPtrW(window, GWLP_WNDPROC));
+        if (!previousWindowProc || !SetPropW(window, propertyName, this)) {
+            previousWindowProc = nullptr;
+            window = nullptr;
+            LOG_WARN("Could not initialize Windows touch input");
+            return;
+        }
+        SetLastError(ERROR_SUCCESS);
+        const LONG_PTR result = SetWindowLongPtrW(
+            window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&windowProc));
+        if (result == 0 && GetLastError() != ERROR_SUCCESS) {
+            RemovePropW(window, propertyName);
+            previousWindowProc = nullptr;
+            window = nullptr;
+            LOG_WARN("Could not install Windows touch input handler");
+            return;
+        }
+        const int digitizer = GetSystemMetrics(SM_DIGITIZER);
+        isAvailable = (digitizer & NID_READY) != 0 &&
+            (digitizer & (NID_INTEGRATED_TOUCH | NID_EXTERNAL_TOUCH)) != 0;
+        if (isAvailable) LOG_INFO("Windows touchscreen input available");
+    }
+
+    ~Impl() {
+        cancelAll();
+        if (!window) return;
+        const auto current = reinterpret_cast<WNDPROC>(
+            GetWindowLongPtrW(window, GWLP_WNDPROC));
+        if (current == &windowProc && previousWindowProc) {
+            SetWindowLongPtrW(window, GWLP_WNDPROC,
+                              reinterpret_cast<LONG_PTR>(previousWindowProc));
+        }
+        RemovePropW(window, propertyName);
     }
 #else
     explicit Impl(GLFWwindow*) {}

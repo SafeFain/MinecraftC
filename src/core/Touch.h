@@ -12,7 +12,8 @@ struct TouchEvent {
     int32_t id = -1;
     TouchPhase phase = TouchPhase::Cancel;
     double x = 0.0;
-    double y = 0.0; // Wayland surface coordinates: top-left origin.
+    // Native window client/surface coordinates with a top-left origin.
+    double y = 0.0;
 };
 
 class TouchSource {
