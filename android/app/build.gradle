@@ -9,9 +9,8 @@ def versionMinor = versionMatch.group(2).toInteger()
 def versionPatch = versionMatch.group(3).toInteger()
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
 
-tasks.register("prepareLegalAssets", Copy) {
+tasks.register("prepareLegalAssets", Sync) {
     from new File(repositoryRoot, "LICENSE")
-    from new File(repositoryRoot, "THIRD_PARTY_LICENSES.md")
     into generatedLegalAssetsDir
 }
 

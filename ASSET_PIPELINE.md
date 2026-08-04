@@ -140,7 +140,7 @@ and verify them with `python3 tests/test_entity_models.py`.
    test.
 
 For third-party art, place files under `third_party/<pack>/`, retain the
-upstream license, and fill in `THIRD_PARTY_LICENSES.md`. Never copy assets from
+upstream license, and add it to the third-party table in `README.md`. Never copy assets from
 Minecraft or another game without a compatible license.
 # Entity model generation
 

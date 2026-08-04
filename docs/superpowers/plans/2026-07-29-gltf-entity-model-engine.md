@@ -155,7 +155,7 @@ git diff --check
 - Create: `tests/GltfLoaderTests.cpp`
 - Create: `tests/fixtures/models/README.md`
 - Modify: `CMakeLists.txt`
-- Modify: `THIRD_PARTY_LICENSES.md`
+- Modify: `README.md` third-party license table
 
 **Interfaces:**
 - Consumes: Task 1 types and project stb_image.
@@ -163,7 +163,7 @@ git diff --check
 
 - [ ] **Step 1: Vendor cgltf 1.15 with upstream URL, tag, retrieval date, SHA-256, and unmodified license**
 
-Use `https://github.com/jkuhlmann/cgltf/tree/v1.15`; add `external/cgltf` include paths. Record provenance in both `UPSTREAM.md` and `THIRD_PARTY_LICENSES.md`.
+Use `https://github.com/jkuhlmann/cgltf/tree/v1.15`; add `external/cgltf` include paths. Record provenance in both `UPSTREAM.md` and the root README third-party table.
 
 - [ ] **Step 2: Write failing loader tests**
 

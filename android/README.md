@@ -13,11 +13,12 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 The release APK is intentionally unsigned. Sign it outside the repository with
 the publisher's keystore before distribution.
 
-The APK includes `LICENSE` and `THIRD_PARTY_LICENSES.md` in its assets. MinecraftC
-is distributed under GPL-3.0-only except for third-party components and assets
-that identify a different license.
+The APK includes `LICENSE` in its assets. MinecraftC is distributed under
+GPL-3.0-only except for third-party components and assets that identify a
+different license; their notices remain beside the corresponding source or
+asset and are summarized in the root `README.md`.
 
 GitHub Actions builds the same unsigned arm64 release APK on every workflow run.
 Pushed `v*` tags publish it as
-`MinecraftC-1.1.4-android-arm64-unsigned.apk` alongside the Linux, Windows, and
+`MinecraftC-1.1.5-android-arm64-unsigned.apk` alongside the Linux, Windows, and
 macOS packages.

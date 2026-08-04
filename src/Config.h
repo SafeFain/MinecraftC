@@ -7,7 +7,7 @@
 namespace Config {
 
 #ifndef MINECRAFTC_VERSION_STRING
-#  define MINECRAFTC_VERSION_STRING "1.1.4"
+#  define MINECRAFTC_VERSION_STRING "1.1.5"
 #endif
 constexpr const char* GAME_VERSION = "Release-" MINECRAFTC_VERSION_STRING;
 
