@@ -15,5 +15,5 @@ the publisher's keystore before distribution.
 
 GitHub Actions builds the same unsigned arm64 release APK on every workflow run.
 Pushed `v*` tags publish it as
-`MinecraftC-1.1.3-android-arm64-unsigned.apk` alongside the Linux, Windows, and
+`MinecraftC-1.1.4-android-arm64-unsigned.apk` alongside the Linux, Windows, and
 macOS packages.

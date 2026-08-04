@@ -1,4 +1,7 @@
+/build/
 /build-local/
+/cmake-build-*/
+/install-local/
 /android/.deps/
 /android/.gradle/
 /android/app/.cxx/
@@ -6,6 +9,9 @@
 /saves/
 
 # Local agent context and task state; never publish with project sources.
+/.agents/
+/.codex/
+/.claude/
 /AGENTS.md
 /CLAUDE.md
 /PLAN.md

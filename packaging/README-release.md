@@ -1,11 +1,11 @@
-# MinecraftC Release 1.1.3
+# MinecraftC Release 1.1.4
 
 This is a portable MinecraftC build. Keep the executable and `assets` directory
 together.
 
 - Windows: run `minecraftc.exe` or `run-minecraftc.cmd`.
 - Linux/macOS: run `./run-minecraftc.sh` from a terminal.
-- Android: install `MinecraftC-1.1.3-android-arm64-unsigned.apk` after signing it
+- Android: install `MinecraftC-1.1.4-android-arm64-unsigned.apk` after signing it
   with a trusted publisher or local developer key. It requires Android 10,
   arm64, and OpenGL ES 3.0.
 - Print build information without opening a window with `--version`.
