@@ -1,7 +1,7 @@
 #pragma once
 
 #include "debug/Log.h"
-#include <chrono>
+#include "core/RuntimeClock.h"
 #include <string>
 #include <algorithm>
 #include <cfloat>
@@ -20,15 +20,13 @@ namespace Debug {
 
 class ScopedTimer {
 public:
-    using Clock = std::chrono::high_resolution_clock;
-
     explicit ScopedTimer(const char* name,
                          LogLevel level = LogLevel::Trace,
                          float warnThresholdMs = 1000.0f)
         : m_name(name)
         , m_level(level)
         , m_warnThresholdMs(warnThresholdMs)
-        , m_start(Clock::now())
+        , m_start(m_clock.now())
     {}
 
     ~ScopedTimer() {
@@ -53,8 +51,8 @@ public:
     }
 
     float elapsedMs() const {
-        auto now = Clock::now();
-        return std::chrono::duration<float, std::milli>(now - m_start).count();
+        return static_cast<float>(RuntimeClock::seconds(
+            RuntimeClock::elapsed(m_start,m_clock.now()))*1000.0);
     }
 
     ScopedTimer(const ScopedTimer&) = delete;
@@ -66,7 +64,8 @@ private:
     const char*           m_name;
     LogLevel              m_level;
     float                 m_warnThresholdMs;
-    Clock::time_point     m_start;
+    RuntimeClock          m_clock;
+    RuntimeClock::Tick    m_start;
     bool                  m_stopped = false;
 };
 
@@ -83,8 +82,6 @@ private:
 
 class FrameTimer {
 public:
-    using Clock = std::chrono::high_resolution_clock;
-
     static constexpr size_t MAX_SAMPLES = 600;
     explicit FrameTimer(int logIntervalFrames = 600)
         : m_logIntervalFrames(std::clamp(logIntervalFrames, 1,
@@ -92,12 +89,12 @@ public:
     {}
 
     void beginFrame() {
-        m_frameStart = Clock::now();
+        m_frameStart = m_clock.now();
     }
 
     void endFrame() {
-        float ms = std::chrono::duration<float, std::milli>(
-            Clock::now() - m_frameStart).count();
+        float ms=static_cast<float>(RuntimeClock::seconds(
+            RuntimeClock::elapsed(m_frameStart,m_clock.now()))*1000.0);
 
         m_samples[m_frameCount] = ms;
         ++m_frameCount;
@@ -141,7 +138,8 @@ public:
     }
 
 private:
-    Clock::time_point m_frameStart;
+    RuntimeClock m_clock;
+    RuntimeClock::Tick m_frameStart=0;
     float m_totalMs = 0.0f;
     float m_minMs   = FLT_MAX;
     float m_maxMs   = 0.0f;

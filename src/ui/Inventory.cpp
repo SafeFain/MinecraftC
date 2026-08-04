@@ -101,3 +101,20 @@ void CreativeInventory::onScroll(double yOffset){
     const int maximum=std::max(0,m_totalRows-m_visibleRows);
     m_scrollRow=std::clamp(m_scrollRow+(yOffset<0?1:-1),0,maximum);
 }
+
+void CreativeInventory::onGamepadNavigate(int dx,int dy) {
+    if(m_slots.empty())return;
+    const int row=m_focus/m_columns,col=m_focus%m_columns;
+    const int nextRow=std::clamp(row+dy,0,std::max(0,m_totalRows-1));
+    const int nextCol=std::clamp(col+dx,0,m_columns-1);
+    m_focus=std::min(static_cast<int>(m_slots.size())-1,nextRow*m_columns+nextCol);
+    if(nextRow<m_scrollRow)m_scrollRow=nextRow;
+    if(nextRow>=m_scrollRow+m_visibleRows)m_scrollRow=nextRow-m_visibleRows+1;
+    for(size_t i=0;i<m_slots.size();++i)m_slots[i].hovered=static_cast<int>(i)==m_focus;
+}
+
+void CreativeInventory::onGamepadAction(bool select,std::function<void(ItemId)> callback) {
+    if(!select||m_focus<0||m_focus>=static_cast<int>(m_slots.size()))return;
+    m_selected=m_slots[static_cast<size_t>(m_focus)].id;
+    if(callback)callback(m_selected);
+}

@@ -1,6 +1,7 @@
 #include "core/Input.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 constexpr const char* ACTION_NAMES[] = {
@@ -10,6 +11,21 @@ constexpr const char* ACTION_NAMES[] = {
     "Hotbar 6", "Hotbar 7", "Hotbar 8", "Hotbar 9",
     "Previous Slot", "Next Slot"
 };
+}
+
+std::string gamepadBindingName(const GamepadBinding& binding) {
+    if (binding.type == GamepadBindingType::None) return "Unbound";
+    if (binding.type == GamepadBindingType::Button)
+        return "Button " + std::to_string(binding.code);
+    return "Axis " + std::to_string(binding.code) +
+        (binding.type == GamepadBindingType::AxisPositive ? " +" : " -");
+}
+
+float normalizeGamepadAxis(float value, float deadzone) {
+    deadzone = std::clamp(deadzone, 0.0f, 0.95f);
+    const float magnitude = std::abs(value);
+    if (magnitude <= deadzone) return 0.0f;
+    return std::copysign(std::min(1.0f, (magnitude - deadzone) / (1.0f - deadzone)), value);
 }
 
 const char* inputActionName(InputAction action) {
@@ -92,11 +108,32 @@ void InputState::update(const std::array<InputBinding, INPUT_ACTION_COUNT>& bind
             now = m_mouse[static_cast<size_t>(binding.code)];
         else if (binding.device == InputDevice::Wheel)
             now = m_wheelDirection == binding.code;
-        m_values[i] = std::max(now ? 1.0f : 0.0f, m_virtual[i]);
+        m_values[i] = std::max({now ? 1.0f : 0.0f, m_virtual[i], m_gamepad[i]});
         const bool combined = m_values[i] > 0.001f;
         m_pressed[i] = m_pressed[i] || (combined && !m_held[i]);
         m_released[i] = m_released[i] || (!combined && m_held[i]);
         m_held[i] = combined;
+    }
+}
+
+void InputState::updateGamepad(
+        const std::array<GamepadBinding, INPUT_ACTION_COUNT>& bindings,
+        const std::array<bool, 32>& buttons, const std::array<float, 16>& axes,
+        float deadzone) {
+    for (size_t i = 0; i < bindings.size(); ++i) {
+        const auto& binding = bindings[i];
+        float value = 0.0f;
+        if (binding.type == GamepadBindingType::Button && binding.code >= 0 &&
+            binding.code < static_cast<int>(buttons.size())) {
+            value = buttons[static_cast<size_t>(binding.code)] ? 1.0f : 0.0f;
+        } else if ((binding.type == GamepadBindingType::AxisPositive ||
+                    binding.type == GamepadBindingType::AxisNegative) &&
+                   binding.code >= 0 && binding.code < static_cast<int>(axes.size())) {
+            float axis = normalizeGamepadAxis(axes[static_cast<size_t>(binding.code)], deadzone);
+            if (binding.type == GamepadBindingType::AxisNegative) axis = -axis;
+            value = std::max(0.0f, axis);
+        }
+        m_gamepad[i] = value;
     }
 }
 

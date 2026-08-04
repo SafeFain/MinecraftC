@@ -2,15 +2,21 @@
 
 #include "debug/Log.h"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
 
-#include <miniaudio.h>
-
 struct AudioSystem::Impl {
-    ma_device device{};
+    static constexpr int CHANNELS = 2;
+    static constexpr int SAMPLE_RATE = 48000;
+    static constexpr size_t CALLBACK_FRAMES = 4096;
+
+    SDL_AudioStream* stream = nullptr;
+    bool subsystemInitialized = false;
     bool initialized = false;
     std::atomic<float> rainTarget{0.0f};
     std::atomic<bool> rainReset{false};
@@ -34,48 +40,44 @@ struct AudioSystem::Impl {
         return static_cast<float>((noiseState >> 8) & 0xffffu) / 32767.5f - 1.0f;
     }
 
-    static void callback(ma_device* device, void* output,
-                         const void*, ma_uint32 frameCount) {
-        auto* self = static_cast<Impl*>(device->pUserData);
-        auto* samples = static_cast<float*>(output);
-        if (self->rainReset.exchange(false)) {
-            self->rainVolume = 0.0f;
-            self->rainLowPass = 0.0f;
+    void render(float* samples, size_t frameCount) {
+        if (rainReset.exchange(false)) {
+            rainVolume = 0.0f;
+            rainLowPass = 0.0f;
         }
-        if (self->thunderTriggers.exchange(0) > 0)
-            self->thunderEnvelope = self->thunderVolume.load();
-        if (self->explosionTriggers.exchange(0) > 0)
-            self->explosionEnvelope = self->explosionVolume.load();
-        const float pan = std::clamp(self->thunderPan.load(), -1.0f, 1.0f);
+        if (thunderTriggers.exchange(0) > 0)
+            thunderEnvelope = thunderVolume.load();
+        if (explosionTriggers.exchange(0) > 0)
+            explosionEnvelope = explosionVolume.load();
+        const float pan = std::clamp(thunderPan.load(), -1.0f, 1.0f);
         const float leftPan = std::sqrt(0.5f * (1.0f - pan));
         const float rightPan = std::sqrt(0.5f * (1.0f + pan));
-        const float explosionPan = std::clamp(self->explosionPan.load(), -1.0f, 1.0f);
-        const float explosionLeft = std::sqrt(0.5f * (1.0f - explosionPan));
-        const float explosionRight = std::sqrt(0.5f * (1.0f + explosionPan));
-        for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
-            self->rainVolume +=
-                (self->rainTarget.load() - self->rainVolume) * 0.0008f;
-            const float white = self->noise();
-            self->rainLowPass += (white - self->rainLowPass) * 0.055f;
-            const float rain = ((white - self->rainLowPass) * 0.13f +
-                                self->rainLowPass * 0.025f) * self->rainVolume;
+        const float explosionPanValue = std::clamp(explosionPan.load(), -1.0f, 1.0f);
+        const float explosionLeft = std::sqrt(0.5f * (1.0f - explosionPanValue));
+        const float explosionRight = std::sqrt(0.5f * (1.0f + explosionPanValue));
+        for (size_t frame = 0; frame < frameCount; ++frame) {
+            rainVolume += (rainTarget.load() - rainVolume) * 0.0008f;
+            const float white = noise();
+            rainLowPass += (white - rainLowPass) * 0.055f;
+            const float rain = ((white - rainLowPass) * 0.13f +
+                                rainLowPass * 0.025f) * rainVolume;
 
-            const float thunderNoise = self->noise();
-            self->thunderFilter +=
-                (thunderNoise - self->thunderFilter) * 0.012f;
-            self->thunderPhase += 6.283185307f * 48.0f / 48000.0f;
-            if (self->thunderPhase > 6.283185307f)
-                self->thunderPhase -= 6.283185307f;
-            const float thunder = (self->thunderFilter * 0.72f +
-                std::sin(self->thunderPhase) * 0.28f) * self->thunderEnvelope;
-            self->thunderEnvelope *= 0.99986f;
-            if (self->thunderEnvelope < 0.0001f) self->thunderEnvelope = 0.0f;
-            const float explosionNoise = self->noise();
-            self->explosionFilter += (explosionNoise - self->explosionFilter) * .045f;
-            const float explosion = (explosionNoise * .42f + self->explosionFilter * .78f) *
-                                    self->explosionEnvelope;
-            self->explosionEnvelope *= .9989f;
-            if (self->explosionEnvelope < .0001f) self->explosionEnvelope = 0.0f;
+            const float thunderNoise = noise();
+            thunderFilter += (thunderNoise - thunderFilter) * 0.012f;
+            thunderPhase += 6.283185307f * 48.0f /
+                            static_cast<float>(SAMPLE_RATE);
+            if (thunderPhase > 6.283185307f)
+                thunderPhase -= 6.283185307f;
+            const float thunder = (thunderFilter * 0.72f +
+                std::sin(thunderPhase) * 0.28f) * thunderEnvelope;
+            thunderEnvelope *= 0.99986f;
+            if (thunderEnvelope < 0.0001f) thunderEnvelope = 0.0f;
+            const float explosionNoise = noise();
+            explosionFilter += (explosionNoise - explosionFilter) * .045f;
+            const float explosion = (explosionNoise * .42f + explosionFilter * .78f) *
+                                    explosionEnvelope;
+            explosionEnvelope *= .9989f;
+            if (explosionEnvelope < .0001f) explosionEnvelope = 0.0f;
             samples[frame * 2] = std::clamp(
                 rain + thunder * leftPan + explosion * explosionLeft, -1.0f, 1.0f);
             samples[frame * 2 + 1] =
@@ -83,29 +85,53 @@ struct AudioSystem::Impl {
                            -1.0f, 1.0f);
         }
     }
+
+    static void SDLCALL callback(void* userdata, SDL_AudioStream* stream,
+                                 int additionalAmount, int) {
+        auto* self = static_cast<Impl*>(userdata);
+        std::array<float, CALLBACK_FRAMES * CHANNELS> samples{};
+        int framesRemaining = std::max(0, additionalAmount) /
+                              static_cast<int>(sizeof(float) * CHANNELS);
+        while (framesRemaining > 0) {
+            const size_t frames = std::min(
+                static_cast<size_t>(framesRemaining), CALLBACK_FRAMES);
+            self->render(samples.data(), frames);
+            const int bytes = static_cast<int>(frames * CHANNELS * sizeof(float));
+            if (!SDL_PutAudioStreamData(stream, samples.data(), bytes)) return;
+            framesRemaining -= static_cast<int>(frames);
+        }
+    }
 };
 
 AudioSystem::AudioSystem() : m_impl(std::make_unique<Impl>()) {}
 
 AudioSystem::~AudioSystem() {
-    if (m_impl->initialized) ma_device_uninit(&m_impl->device);
+    if (m_impl->stream) SDL_DestroyAudioStream(m_impl->stream);
+    if (m_impl->subsystemInitialized) SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
 bool AudioSystem::initialize() {
-    ma_device_config config = ma_device_config_init(ma_device_type_playback);
-    config.playback.format = ma_format_f32;
-    config.playback.channels = 2;
-    config.sampleRate = 48000;
-    config.dataCallback = Impl::callback;
-    config.pUserData = m_impl.get();
-    const ma_result result = ma_device_init(nullptr, &config, &m_impl->device);
-    if (result != MA_SUCCESS || ma_device_start(&m_impl->device) != MA_SUCCESS) {
-        if (result == MA_SUCCESS) ma_device_uninit(&m_impl->device);
-        LOG_WARN("Audio device unavailable; weather audio disabled");
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+        LOG_WARN("SDL audio unavailable; weather audio disabled: " << SDL_GetError());
+        return false;
+    }
+    m_impl->subsystemInitialized = true;
+    const SDL_AudioSpec spec{SDL_AUDIO_F32, Impl::CHANNELS, Impl::SAMPLE_RATE};
+    m_impl->stream = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, Impl::callback, m_impl.get());
+    if (!m_impl->stream || !SDL_ResumeAudioStreamDevice(m_impl->stream)) {
+        LOG_WARN("SDL audio device unavailable; weather audio disabled: " <<
+                 SDL_GetError());
+        if (m_impl->stream) {
+            SDL_DestroyAudioStream(m_impl->stream);
+            m_impl->stream = nullptr;
+        }
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        m_impl->subsystemInitialized = false;
         return false;
     }
     m_impl->initialized = true;
-    LOG_INFO("Weather audio initialized at 48 kHz stereo");
+    LOG_INFO("SDL weather audio initialized at 48 kHz stereo");
     return true;
 }
 

@@ -1,15 +1,15 @@
 #include "game/Localization.h"
+#include "core/AssetStore.h"
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
+#include <sstream>
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
 
 Localization::Strings Localization::loadFile(const std::filesystem::path& path) {
-    std::ifstream input(path);
-    if (!input) throw std::runtime_error("Failed to open language file: " + path.u8string());
+    std::istringstream input(AssetStore::readTextPath(path));
     nlohmann::json root;
     input >> root;
     if (!root.is_object())

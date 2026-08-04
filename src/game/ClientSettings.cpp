@@ -11,9 +11,13 @@ namespace {
 InputBinding key(int code) { return {InputDevice::Keyboard, code}; }
 InputBinding mouse(int code) { return {InputDevice::Mouse, code}; }
 InputBinding wheel(int direction) { return {InputDevice::Wheel, direction}; }
+GamepadBinding button(int code) { return {GamepadBindingType::Button, code}; }
+GamepadBinding axis(int code, bool positive) {
+    return {positive ? GamepadBindingType::AxisPositive : GamepadBindingType::AxisNegative, code};
+}
 }
 
-ClientSettings::ClientSettings() { resetBindings(); }
+ClientSettings::ClientSettings() { resetBindings(); resetGamepadBindings(); }
 
 void ClientSettings::resetBindings() {
     bindings = {key(Key::W), key(Key::S), key(Key::A), key(Key::D),
@@ -22,6 +26,23 @@ void ClientSettings::resetBindings() {
         mouse(MouseButton::Right), key(Key::Num1), key(Key::Num2),
         key(Key::Num3), key(Key::Num4), key(Key::Num5), key(Key::Num6),
         key(Key::Num7), key(Key::Num8), key(Key::Num9), wheel(1), wheel(-1)};
+}
+
+void ClientSettings::resetGamepadBindings() {
+    gamepadBindings.fill({});
+    gamepadBindings[static_cast<size_t>(InputAction::MoveForward)] = axis(1, false);
+    gamepadBindings[static_cast<size_t>(InputAction::MoveBackward)] = axis(1, true);
+    gamepadBindings[static_cast<size_t>(InputAction::MoveLeft)] = axis(0, false);
+    gamepadBindings[static_cast<size_t>(InputAction::MoveRight)] = axis(0, true);
+    gamepadBindings[static_cast<size_t>(InputAction::Jump)] = button(0); // South/A
+    gamepadBindings[static_cast<size_t>(InputAction::Sneak)] = button(1); // East/B
+    gamepadBindings[static_cast<size_t>(InputAction::Sprint)] = button(7); // L3
+    gamepadBindings[static_cast<size_t>(InputAction::Inventory)] = button(3); // North/Y
+    gamepadBindings[static_cast<size_t>(InputAction::Command)] = button(11); // D-pad up
+    gamepadBindings[static_cast<size_t>(InputAction::Attack)] = axis(5, true); // RT
+    gamepadBindings[static_cast<size_t>(InputAction::Use)] = axis(4, true); // LT
+    gamepadBindings[static_cast<size_t>(InputAction::PreviousSlot)] = button(9); // LB
+    gamepadBindings[static_cast<size_t>(InputAction::NextSlot)] = button(10); // RB
 }
 
 void ClientSettings::validate() {
@@ -40,6 +61,9 @@ void ClientSettings::validate() {
         static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
         controlMode = ControlMode::Auto;
     touchSensitivity = std::clamp(touchSensitivity, 0.5f, 2.0f);
+    gamepadDeadzone = std::clamp(gamepadDeadzone, 0.05f, 0.50f);
+    gamepadLookSensitivity = std::clamp(gamepadLookSensitivity, 0.25f, 3.0f);
+    gamepadRumble = std::clamp(gamepadRumble, 0.0f, 1.0f);
     constexpr float sizes[] = {.75f,1.0f,1.25f,1.5f};
     if (std::none_of(std::begin(sizes),std::end(sizes),[this](float v){return std::abs(v-touchControlSize)<.001f;}))
         touchControlSize=1.0f;
@@ -58,11 +82,22 @@ void ClientSettings::validate() {
                        binding.device == InputDevice::None))
             binding = defaults.bindings[i];
     }
+    for (size_t i = 0; i < gamepadBindings.size(); ++i) {
+        auto& binding = gamepadBindings[i];
+        const bool valid = binding.type == GamepadBindingType::None ||
+            (binding.type == GamepadBindingType::Button && binding.code >= 0 && binding.code < 32) ||
+            ((binding.type == GamepadBindingType::AxisPositive || binding.type == GamepadBindingType::AxisNegative) &&
+             binding.code >= 0 && binding.code < 16);
+        if (!valid || (!inputActionCanUnbind(static_cast<InputAction>(i)) &&
+                       binding.type == GamepadBindingType::None))
+            binding = defaults.gamepadBindings[i];
+    }
 }
 
 ClientSettings ClientSettings::load(const std::filesystem::path& path) {
     ClientSettings settings;
     std::array<bool, INPUT_ACTION_COUNT> bindingRead{};
+    std::array<bool, INPUT_ACTION_COUNT> gamepadBindingRead{};
     std::ifstream input(path);
     if (!input) return settings;
     std::string line;
@@ -92,6 +127,20 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "touch_size") settings.touchControlSize = std::stof(value);
             else if (name == "touch_opacity") settings.touchControlOpacity = std::stof(value);
             else if (name == "touch_left_handed") settings.touchLeftHanded = std::stoi(value) != 0;
+            else if (name == "gamepad_deadzone") settings.gamepadDeadzone = std::stof(value);
+            else if (name == "gamepad_look_sensitivity") settings.gamepadLookSensitivity = std::stof(value);
+            else if (name == "invert_gamepad_y") settings.invertGamepadY = std::stoi(value) != 0;
+            else if (name == "gamepad_rumble") settings.gamepadRumble = std::stof(value);
+            else if (name.rfind("gamepad_binding.", 0) == 0) {
+                const size_t index = static_cast<size_t>(std::stoul(name.substr(16)));
+                if (index >= settings.gamepadBindings.size()) continue;
+                std::istringstream stream(value);
+                int type = 0, code = 0; char comma = 0;
+                if (stream >> type >> comma >> code && comma == ',') {
+                    settings.gamepadBindings[index] = {static_cast<GamepadBindingType>(type), code};
+                    gamepadBindingRead[index] = true;
+                }
+            }
             else if (name.rfind("binding.", 0) == 0) {
                 const size_t index = static_cast<size_t>(std::stoul(name.substr(8)));
                 if (index >= settings.bindings.size()) continue;
@@ -105,8 +154,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             }
         } catch (const std::exception&) {}
     }
-    if (formatVersion < FORMAT_VERSION) {
-        ClientSettings defaults;
+    ClientSettings defaults;
+    if (formatVersion < 6) {
         for (size_t i = 0; i < settings.bindings.size(); ++i) {
             auto& binding = settings.bindings[i];
             if (!bindingRead[i] || binding.device != InputDevice::Keyboard) continue;
@@ -116,6 +165,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 ? InputBinding{} : defaults.bindings[i];
         }
     }
+    if(formatVersion<FORMAT_VERSION)for(size_t i=0;i<settings.gamepadBindings.size();++i)
+        if(!gamepadBindingRead[i])settings.gamepadBindings[i]=defaults.gamepadBindings[i];
     settings.validate();
     return settings;
 }
@@ -143,9 +194,16 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "touch_size=" << touchControlSize << '\n'
            << "touch_opacity=" << touchControlOpacity << '\n'
            << "touch_left_handed=" << touchLeftHanded << '\n';
+    output << "gamepad_deadzone=" << gamepadDeadzone << '\n'
+           << "gamepad_look_sensitivity=" << gamepadLookSensitivity << '\n'
+           << "invert_gamepad_y=" << invertGamepadY << '\n'
+           << "gamepad_rumble=" << gamepadRumble << '\n';
     for (size_t i = 0; i < bindings.size(); ++i)
         output << "binding." << i << '=' << static_cast<int>(bindings[i].device)
                << ',' << bindings[i].code << '\n';
+    for (size_t i = 0; i < gamepadBindings.size(); ++i)
+        output << "gamepad_binding." << i << '=' << static_cast<int>(gamepadBindings[i].type)
+               << ',' << gamepadBindings[i].code << '\n';
     output.close();
     if (!output) return false;
     if (Platform::replaceFileAtomically(temporary, path, error)) return true;

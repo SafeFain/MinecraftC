@@ -1,4 +1,5 @@
 #include "world/Block.h"
+#include "core/AssetStore.h"
 
 #include <algorithm>
 #include <cctype>
@@ -76,11 +77,7 @@ const std::unordered_map<std::string, BlockId>& blockNames() {
 }
 
 std::string readTextFile(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    if (!file) return {};
-    std::ostringstream stream;
-    stream << file.rdbuf();
-    return stream.str();
+    try{return AssetStore::readTextPath(path);}catch(const std::exception&){return {};}
 }
 
 bool quotedField(const std::string& object, const char* field, std::string& value) {

@@ -10,6 +10,8 @@
 #include <stb_image.h>
 #include "core/Window.h"
 #include "Config.h"
+#include "core/AssetStore.h"
+#include "core/RuntimeClock.h"
 
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
 
@@ -245,16 +247,14 @@ void Renderer::initialize(bool framebufferSrgb,
 
     int atlasWidth = 0, atlasHeight = 0, atlasChannels = 0;
     stbi_set_flip_vertically_on_load(1);
-    const auto generatedEntityAtlas =
-        (assetRoot / "textures" / "generated" / "entity_atlas.png").u8string();
-    stbi_uc* atlas = stbi_load(
-        generatedEntityAtlas.c_str(),
-        &atlasWidth, &atlasHeight, &atlasChannels, 4);
+    stbi_uc* atlas=nullptr;
+    try { const auto encoded=AssetStore::readPath(assetRoot/"textures"/"generated"/"entity_atlas.png");
+        atlas=stbi_load_from_memory(encoded.data(),static_cast<int>(encoded.size()),&atlasWidth,&atlasHeight,&atlasChannels,4);
+    } catch(const std::exception&) {}
     if (!atlas) {
-        const auto legacyEntityAtlas =
-            (assetRoot / "textures" / "entity_atlas.png").u8string();
-        atlas = stbi_load(legacyEntityAtlas.c_str(),
-                          &atlasWidth, &atlasHeight, &atlasChannels, 4);
+        try { const auto encoded=AssetStore::readPath(assetRoot/"textures"/"entity_atlas.png");
+            atlas=stbi_load_from_memory(encoded.data(),static_cast<int>(encoded.size()),&atlasWidth,&atlasHeight,&atlasChannels,4);
+        } catch(const std::exception&) {}
         if (atlas) LOG_WARN("Using legacy entity portrait atlas fallback");
     }
     if (atlas && atlasWidth == atlasHeight && atlasWidth % 3 == 0) {
@@ -311,7 +311,7 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setFloat("uStarIntensity", environment.starIntensity);
     m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
     m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
-    m_skyShader->setFloat("uWeatherTime", static_cast<float>(Window::timeSeconds()));
+    m_skyShader->setFloat("uWeatherTime", static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())));
     m_skyShader->setInt("uRenderClouds", renderClouds ? 1 : 0);
     m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_skyVAO));
@@ -599,7 +599,7 @@ void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
     m_particleShader->setMat4("uViewProjection", viewProjection);
     m_particleShader->setVec3("uCameraRight", cameraRight);
     m_particleShader->setVec3("uCameraUp", cameraUp);
-    m_particleShader->setFloat("uTime", static_cast<float>(Window::timeSeconds()));
+    m_particleShader->setFloat("uTime", static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())));
     m_particleShader->setFloat("uIntensity", intensity);
     m_particleShader->setInt("uBlockAtlas", 0);
     m_particleShader->setFloat("uAtlasTiles",

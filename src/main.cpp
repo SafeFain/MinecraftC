@@ -1,6 +1,9 @@
 #include "core/Window.h"
 #include "core/Input.h"
 #include "core/Platform.h"
+#include "core/RuntimeClock.h"
+#include "core/TextEditBuffer.h"
+#include "core/AssetStore.h"
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
@@ -35,7 +38,10 @@
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
 #include <glad/glad.h>
+#define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_messagebox.h>
 
 #include <stdexcept>
 #include <chrono>
@@ -52,24 +58,19 @@ class Application {
 public:
     explicit Application(RuntimePaths paths)
         : m_paths(std::move(paths)),
+          m_assets(m_paths.assetRoot),
           m_camera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE),
           m_worldCatalog(m_paths.savesDirectory())
     {}
 
-    int run() {
-        try {
-            initialize();
-            mainLoop();
-            cleanup();
-            return 0;
-        } catch (const std::exception& e) {
-            LOG_FATAL("Fatal error: " << e.what());
-            return 1;
-        }
-    }
+    void start() { initialize(); }
+    bool iterate() { return runFrame(); }
+    void event(const SDL_Event& event) { m_window.handleEvent(&event); }
+    void shutdown() { if(!m_cleaned){m_cleaned=true;cleanup();} }
 
 private:
     RuntimePaths m_paths;
+    AssetStore m_assets;
     Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"};
     Renderer    m_renderer;
     Camera      m_camera;
@@ -79,6 +80,9 @@ private:
     Player      m_player{m_world};
     EntityManager m_entities{m_world};
     bool        m_running = true;
+    bool        m_cleaned = false;
+    struct VisibleChunk { const Chunk* chunk; glm::mat4 model; float distance2; };
+    std::vector<VisibleChunk> m_visibleChunks;
 
     // ── UI / State ────────────────────────────────────────────────────
     GameState             m_gameState = GameState::MainMenu;
@@ -89,7 +93,7 @@ private:
     bool                  m_terrainGenerated = false;
     bool                  m_loadingNewWorld = false;
     bool                  m_loadingGenerationComplete = false;
-    std::chrono::high_resolution_clock::time_point m_worldLoadingStarted;
+    RuntimeClock::Tick m_worldLoadingStarted=0;
     std::unique_ptr<SaveStore> m_saveStore;
     WorldCatalog          m_worldCatalog;
     WorldMetadata         m_worldMetadata;
@@ -111,12 +115,12 @@ private:
     double                m_mouseScreenX = 0.0;
     double                m_mouseScreenY = 0.0;
     bool                  m_commandOpen = false;
-    std::string           m_commandInput;
+    TextEditBuffer        m_commandInput{{}, 80};
     std::string           m_commandMessage;
     float                 m_commandMessageSeconds = 0.0f;
 
-    using Clock = std::chrono::high_resolution_clock;
-    Clock::time_point m_lastFrame;
+    RuntimeClock m_runtimeClock;
+    RuntimeClock::Tick m_lastFrameTick = 0;
     DayNightCycle m_dayNightCycle;
     WeatherSystem m_weather;
     ParticleSystem m_particles;
@@ -129,6 +133,12 @@ private:
     std::vector<LightningEvent> m_lightningEvents;
     ClientSettings m_clientSettings;
     InputState m_input;
+    std::array<bool,32> m_gamepadButtons{};
+    std::array<float,16> m_gamepadAxes{};
+    std::array<bool,32> m_previousGamepadButtons{};
+    int m_gamepadNavX=0,m_gamepadNavY=0;
+    RuntimeClock::Tick m_gamepadRepeatTick=0;
+    bool m_gamepadCaptureArmed=false;
     TouchControls m_touchControls;
     bool m_touchHudVisible = false;
     std::unordered_map<TouchContactId, bool, TouchContactHash> m_touchGameplay;
@@ -136,7 +146,7 @@ private:
         TouchContactId id;
         glm::vec2 position{0.0f};
         glm::vec2 origin{0.0f};
-        Clock::time_point started{};
+        RuntimeClock::Tick started=0;
         bool active = false;
         bool buttonDown = false;
         bool rightButton = false;
@@ -189,9 +199,14 @@ private:
         m_player.setBlockBreakCallback(
             [this](const glm::ivec3& position, BlockId block) {
                 m_particles.emitBlockBreak(position, block);
+                m_window.gamepads().rumble(.18f, 70, m_clientSettings.gamepadRumble);
             });
         m_player.setDamageCallback(
-            [this](float amount) { m_cameraEffects.onDamage(amount); });
+            [this](float amount) {
+                m_cameraEffects.onDamage(amount);
+                m_window.gamepads().rumble(std::min(1.0f, .2f + amount * .08f),
+                                           140, m_clientSettings.gamepadRumble);
+            });
         m_player.setBedCallback([this](const glm::ivec3& bed) {
             m_worldMetadata.bedSpawn = bed;
             if (!m_dayNightCycle.isNight()) {
@@ -289,7 +304,7 @@ private:
         };
 
         // ── Input callbacks ───────────────────────────────────────────
-        m_window.setKeyCallback([this](int key, int /*scancode*/, ButtonAction action, int /*mods*/) {
+        m_window.setKeyCallback([this](int key, int /*scancode*/, ButtonAction action, int mods) {
             if (action == ButtonAction::Press && m_clientSettings.controlMode == ControlMode::Auto)
                 m_touchHudVisible = false;
             m_input.keyEvent(key, action);
@@ -311,10 +326,16 @@ private:
                         closeCommandInput();
                     } else if (key == Key::Enter) {
                         executeCommand();
-                    } else if (key == Key::Backspace &&
-                               !m_commandInput.empty()) {
-                        m_commandInput.pop_back();
-                    }
+                    } else if (key == Key::Backspace) m_commandInput.backspace();
+                    else if (key == Key::Delete) m_commandInput.eraseForward();
+                    else if (key == Key::Left) m_commandInput.moveLeft((mods & KeyModifier::Shift) != 0);
+                    else if (key == Key::Right) m_commandInput.moveRight((mods & KeyModifier::Shift) != 0);
+                    else if (key == Key::Home) m_commandInput.moveHome((mods & KeyModifier::Shift) != 0);
+                    else if (key == Key::End) m_commandInput.moveEnd((mods & KeyModifier::Shift) != 0);
+                    else if ((mods & KeyModifier::Control) != 0 && key == Key::A) m_commandInput.selectAll();
+                    else if ((mods & KeyModifier::Control) != 0 && key == Key::C) m_commandInput.copySelection();
+                    else if ((mods & KeyModifier::Control) != 0 && key == Key::X) m_commandInput.cutSelection();
+                    else if ((mods & KeyModifier::Control) != 0 && key == Key::V) m_commandInput.pasteClipboard();
                 }
                 return;
             }
@@ -323,7 +344,7 @@ private:
                 m_gameState == GameState::Playing && !m_activeMenu &&
                 !m_inventoryOpen && !m_playerDead) {
                 m_commandOpen = true;
-                m_commandInput.clear();
+                m_commandInput.setText({});
                 m_window.setCursorLocked(false);
                 return;
             }
@@ -392,16 +413,14 @@ private:
 
             // Route to active menu for key presses
             if (action == ButtonAction::Press && m_activeMenu) {
-                m_activeMenu->onKeyPress(key);
+                m_activeMenu->onKeyPress(key, mods);
             }
         });
         m_window.setCharCallback([this](std::string_view text) {
             for (const uint32_t codepoint : decodeUtf8(text)) {
                 if (m_commandOpen) {
-                    if (codepoint >= 32 && codepoint <= 126 &&
-                        m_commandInput.size() < 80) {
-                        m_commandInput.push_back(static_cast<char>(codepoint));
-                    }
+                    std::string encoded; appendUtf8(encoded, codepoint);
+                    m_commandInput.insert(encoded);
                 } else if (m_activeMenu) {
                     m_activeMenu->onChar(codepoint);
                 }
@@ -421,7 +440,7 @@ private:
             updateMouseScreenPosition();
             if (action == ButtonAction::Press && m_gameState == GameState::Playing && !m_activeMenu) {
                 if (mouseBound(InputAction::Command) && !m_inventoryOpen && !m_playerDead) {
-                    m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;
+                    m_commandOpen=true;m_commandInput.setText({});m_window.setCursorLocked(false);return;
                 }
                 if (mouseBound(InputAction::Inventory) && !m_commandOpen && !m_player.isSpectator()) {
                     if(m_inventoryOpen)closeInventory();else openInventory();return;
@@ -477,7 +496,7 @@ private:
                 return binding.device==InputDevice::Wheel&&binding.code==(yoffset>0?1:-1);};
             if(m_gameState==GameState::Playing&&!m_commandOpen){
                 if(wheelBound(InputAction::Inventory)&&!m_player.isSpectator()){if(m_inventoryOpen)closeInventory();else openInventory();return;}
-                if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;}
+                if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.setText({});m_window.setCursorLocked(false);return;}
                 for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_hotbar.selectSlot(slot);
                 if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,ButtonAction::Press);handleGameplayAction(false,ButtonAction::Release);}
                     if(wheelBound(InputAction::Use)){handleGameplayAction(true,ButtonAction::Press);if(!m_inventoryOpen)handleGameplayAction(true,ButtonAction::Release);}}
@@ -503,7 +522,7 @@ private:
         // ── Show main menu ────────────────────────────────────────────
         showMainMenu();
 
-        m_lastFrame = Clock::now();
+        m_lastFrameTick = m_runtimeClock.now();
 
         LOG_INFO("MinecraftC initialized");
         LOG_INFO("OpenGL: " << glGetString(GL_VERSION));
@@ -600,7 +619,7 @@ private:
     void handleUiTouch(const TouchEvent& event,const glm::vec2& position) {
         if(event.phase==TouchPhase::Begin){
             if(m_uiTouch.active)return;
-            m_uiTouch={event.id,position,position,Clock::now(),true,false,false,false};
+            m_uiTouch={event.id,position,position,m_runtimeClock.now(),true,false,false,false};
             dispatchUiTouchMove(position);return;
         }
         if(!m_uiTouch.active||event.id!=m_uiTouch.id)return;
@@ -633,7 +652,7 @@ private:
     void updateLongPress() {
         if(!m_uiTouch.active||m_uiTouch.buttonDown||m_uiTouch.scrolling||
            !m_inventoryOpen||(!m_player.isSurvival()&&!m_containerOpen))return;
-        if(std::chrono::duration<float>(Clock::now()-m_uiTouch.started).count()<.45f)return;
+        if(RuntimeClock::seconds(RuntimeClock::elapsed(m_uiTouch.started,m_runtimeClock.now()))<.45)return;
         dispatchUiTouchButton(MouseButton::Right,ButtonAction::Press,m_uiTouch.position);
         m_uiTouch.buttonDown=true;m_uiTouch.rightButton=true;
     }
@@ -738,13 +757,13 @@ private:
         m_autosavePending = false;
         m_playerDead = false;
         m_commandOpen = false;
-        m_commandInput.clear();
+        m_commandInput.setText({});
         m_survivalTicks = m_worldMetadata.worldTicks;
         m_survivalWorldTickRemainder = 0.0f;
 
         m_world.update(m_player.getPosition());
         m_world.enqueueGeneration();
-        m_worldLoadingStarted = Clock::now();
+        m_worldLoadingStarted = m_runtimeClock.now();
         LOG_INFO((newWorld ? "Pregenerating new world around spawn"
                            : "Loading existing world around saved position")
                  << " at render distance " << Config::RENDER_DISTANCE);
@@ -780,18 +799,14 @@ private:
         m_player.setPosition(pos);
     }
 
-    void mainLoop() {
-        struct VisibleChunk {
-            const Chunk* chunk;
-            glm::mat4 model;
-            float distance2;
-        };
-        std::vector<VisibleChunk> visibleChunks;
-        while (!m_window.shouldClose() && m_running) {
+    bool runFrame() {
+        if(m_window.shouldClose()||!m_running)return false;
+        auto& visibleChunks=m_visibleChunks;
             m_frameTimer.beginFrame();
-            auto now = Clock::now();
-            float dt = std::chrono::duration<float>(now - m_lastFrame).count();
-            m_lastFrame = now;
+            const RuntimeClock::Tick now = m_runtimeClock.now();
+            float dt = static_cast<float>(RuntimeClock::seconds(
+                RuntimeClock::elapsed(m_lastFrameTick, now)));
+            m_lastFrameTick = now;
             dt = std::min(dt, 0.1f);
             if (m_commandMessageSeconds > 0.0f)
                 m_commandMessageSeconds =
@@ -807,19 +822,23 @@ private:
             m_input.clearVirtual();
             m_window.setTextInputEnabled(
                 m_commandOpen || (m_activeMenu && m_activeMenu->wantsTextInput()));
-            m_window.pollEvents();
             updateLongPress();
             const int touchWidth = std::max(1, m_window.width() / std::max(1,m_guiScale));
             const int touchHeight = std::max(1, m_window.height() / std::max(1,m_guiScale));
             m_touchControls.configure(touchWidth,touchHeight,touchConfig());
             if (m_clientSettings.controlMode != ControlMode::KeyboardMouse)
                 m_touchControls.applyTo(m_input);
+            m_window.gamepads().sample(m_gamepadButtons, m_gamepadAxes);
+            m_input.updateGamepad(m_clientSettings.gamepadBindings, m_gamepadButtons,
+                                  m_gamepadAxes, m_clientSettings.gamepadDeadzone);
             m_input.update(m_clientSettings.bindings);
+            updateGamepadUi(now);
 
             // Skip rendering when minimized to save resources
             if (m_window.isMinimized()) {
-                m_window.waitEvents(0.1);
-                continue;
+                SDL_Delay(100);
+                m_window.finishEventFrame();
+                return !m_window.shouldClose()&&m_running;
             }
 
             // ── Handle input ──────────────────────────────────────────
@@ -829,6 +848,11 @@ private:
                 m_window.getCursorDelta(dx, dy);
                 m_player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy),
                     m_clientSettings.mouseSensitivity, m_clientSettings.invertMouseY);
+                const float padLookX = normalizeGamepadAxis(m_gamepadAxes[2], m_clientSettings.gamepadDeadzone);
+                float padLookY = normalizeGamepadAxis(m_gamepadAxes[3], m_clientSettings.gamepadDeadzone);
+                if (m_clientSettings.invertGamepadY) padLookY = -padLookY;
+                m_player.handleMouseDelta(padLookX, padLookY,
+                    4.0f * m_clientSettings.gamepadLookSensitivity * dt * 60.0f, false);
                 const glm::vec2 touchLook=m_touchControls.consumeLookDelta();
                 m_player.handleMouseDelta(touchLook.x,-touchLook.y,.15f,false);
                 if (!m_playerDead) m_player.handleMovement(m_input, dt);
@@ -836,6 +860,8 @@ private:
 
             // Track mouse position (always, for inventory/menu hover)
             {
+                double pointerDx=0,pointerDy=0;m_window.getCursorDelta(pointerDx,pointerDy);
+                const bool pointerMoved=m_uiTouch.active||pointerDx!=0.0||pointerDy!=0.0;
                 if (!m_uiTouch.active) updateMouseScreenPosition();
                 else {
                     m_mouseScreenX=m_uiTouch.position.x;
@@ -843,7 +869,7 @@ private:
                 }
 
                 // Route to inventory hover if open
-                if (m_inventoryOpen) {
+                if (m_inventoryOpen && pointerMoved) {
                     m_inventory.onMouseMove(
                         static_cast<int>(m_mouseScreenX),
                         static_cast<int>(m_mouseScreenY));
@@ -854,7 +880,7 @@ private:
                 }
 
                 // Route to menu hover
-                if (m_activeMenu) {
+                if (m_activeMenu && pointerMoved) {
                     m_activeMenu->onMouseMove(m_mouseScreenX, m_mouseScreenY);
                 }
             }
@@ -895,6 +921,9 @@ private:
                     m_audio.playExplosion(
                         std::clamp(static_cast<float>(delta.x) / 24.0f, -1.0f, 1.0f),
                         std::clamp(1.0f - distance / 96.0f, .16f, 1.0f));
+                    m_window.gamepads().rumble(
+                        std::clamp(1.0f - distance / 20.0f, .15f, 1.0f),
+                        260, m_clientSettings.gamepadRumble);
                 }
                 if (m_player.isSurvival() && !m_playerDead &&
                     m_player.survivalStats().dead()) beginPlayerDeath();
@@ -989,8 +1018,8 @@ private:
                     m_terrainGenerated = true;
                     m_gameState = GameState::Playing;
                     m_window.setCursorLocked(true);
-                    const float seconds = std::chrono::duration<float>(
-                        Clock::now() - m_worldLoadingStarted).count();
+                    const float seconds=static_cast<float>(RuntimeClock::seconds(
+                        RuntimeClock::elapsed(m_worldLoadingStarted,now)));
                     LOG_INFO("World render target loaded in " << seconds
                              << "s (" << progress.total << " chunks)");
                     LOG_INFO("WASD=move | Mouse=look | Space=jump | Ctrl=sprint");
@@ -1030,7 +1059,7 @@ private:
                 if (m_clientSettings.renderClouds) {
                     m_renderer.renderClouds(
                         playerPosition, vp, m_worldMetadata.seed,
-                        static_cast<float>(Window::timeSeconds()),
+                        static_cast<float>(RuntimeClock::seconds(now)),
                         m_clientSettings.cloudRenderDistance);
                 }
 
@@ -1167,7 +1196,7 @@ private:
             if (m_commandOpen || m_commandMessageSeconds > 0.0f) {
                 m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
                 const std::string text = m_commandOpen
-                    ? "> " + m_commandInput + "_"
+                    ? "> " + m_commandInput.text() + "_"
                     : m_commandMessage;
                 m_uiRenderer.drawRect(
                     12.0f, 18.0f, static_cast<float>(uiWidth - 24), 36.0f,
@@ -1250,7 +1279,49 @@ private:
                 (m_keys[Key::LeftAlt] || m_keys[Key::RightAlt])) {
                 m_running = false;
             }
+        m_window.finishEventFrame();
+        return !m_window.shouldClose()&&m_running;
+    }
+
+    void updateGamepadUi(RuntimeClock::Tick now) {
+        auto* settings=dynamic_cast<SettingsMenu*>(m_activeMenu.get());
+        if(settings&&settings->capturingGamepad()){
+            bool centered=true;for(float axis:m_gamepadAxes)if(std::abs(axis)>.25f)centered=false;
+            if(centered)m_gamepadCaptureArmed=true;
+            for(size_t i=0;i<m_gamepadButtons.size();++i)if(m_gamepadButtons[i]&&!m_previousGamepadButtons[i]){
+                if(i==4)settings->onKeyPress(Key::Escape);
+                else settings->onGamepadBinding({GamepadBindingType::Button,static_cast<int>(i)});
+                m_gamepadCaptureArmed=false;break;
+            }
+            if(m_gamepadCaptureArmed&&settings->capturingGamepad())for(size_t i=0;i<m_gamepadAxes.size();++i){
+                if(std::abs(m_gamepadAxes[i])>.65f){settings->onGamepadBinding({m_gamepadAxes[i]>0?GamepadBindingType::AxisPositive:GamepadBindingType::AxisNegative,static_cast<int>(i)});m_gamepadCaptureArmed=false;break;}}
+            m_previousGamepadButtons=m_gamepadButtons;return;
         }
+        m_gamepadCaptureArmed=false;
+        const bool pressA=m_gamepadButtons[0]&&!m_previousGamepadButtons[0];
+        const bool pressB=m_gamepadButtons[1]&&!m_previousGamepadButtons[1];
+        const bool pressX=m_gamepadButtons[2]&&!m_previousGamepadButtons[2];
+        const bool pressY=m_gamepadButtons[3]&&!m_previousGamepadButtons[3];
+        int navX=(m_gamepadButtons[14]||m_gamepadAxes[0]>.65f)?1:
+                 (m_gamepadButtons[13]||m_gamepadAxes[0]<-.65f)?-1:0;
+        int navY=(m_gamepadButtons[12]||m_gamepadAxes[1]>.65f)?1:
+                 (m_gamepadButtons[11]||m_gamepadAxes[1]<-.65f)?-1:0;
+        bool navigate=navX!=m_gamepadNavX||navY!=m_gamepadNavY;
+        if((navX||navY)&&now>=m_gamepadRepeatTick){navigate=true;m_gamepadRepeatTick=now+RuntimeClock::fromSeconds(.12);}
+        if((navX!=m_gamepadNavX||navY!=m_gamepadNavY)&&(navX||navY))m_gamepadRepeatTick=now+RuntimeClock::fromSeconds(.35);
+        m_gamepadNavX=navX;m_gamepadNavY=navY;
+        if(m_inventoryOpen){
+            if(navigate){if(m_containerOpen)m_containerScreen.onGamepadNavigate(navX,-navY);else if(m_player.isSurvival())m_survivalInventory.onGamepadNavigate(navX,-navY);else m_inventory.onGamepadNavigate(navX,navY);}
+            if(m_containerOpen){if(pressA)m_containerScreen.onGamepadAction(0);if(pressX)m_containerScreen.onGamepadAction(1);if(pressY)m_containerScreen.onGamepadAction(2);}
+            else if(m_player.isSurvival()){if(pressA)m_survivalInventory.onGamepadAction(0);if(pressX)m_survivalInventory.onGamepadAction(1);if(pressY)m_survivalInventory.onGamepadAction(2);}
+            else if(pressA)m_inventory.onGamepadAction(true,[this](ItemId id){m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(),id);m_player.setSelectedCreativeItem(id);});
+            if(pressB)closeInventory();
+        }else if(m_activeMenu){
+            if(navigate){if(navY<0)m_activeMenu->onKeyPress(Key::Up);else if(navY>0)m_activeMenu->onKeyPress(Key::Down);else if(navX<0)m_activeMenu->onKeyPress(Key::Left);else if(navX>0)m_activeMenu->onKeyPress(Key::Right);}
+            if(pressA)m_activeMenu->onKeyPress(Key::Enter);
+            if(pressB)m_activeMenu->onKeyPress(Key::Escape);
+        }
+        m_previousGamepadButtons=m_gamepadButtons;
     }
 
     void tickLightning() {
@@ -1284,6 +1355,9 @@ private:
             m_audio.playThunder(
                 std::clamp(static_cast<float>(delta.x) / 32.0f, -1.0f, 1.0f),
                 std::clamp(1.0f - distance / 160.0f, 0.18f, 1.0f));
+            m_window.gamepads().rumble(
+                std::clamp(1.0f - distance / 48.0f, .12f, .8f),
+                220, m_clientSettings.gamepadRumble);
             if (m_world.getBlock(x, strikeY, z) == BlockId::AIR ||
                 m_world.getBlock(x, strikeY, z) == BlockId::SNOW_LAYER)
                 m_world.setBlock(x, strikeY, z, BlockId::FIRE);
@@ -1303,7 +1377,7 @@ private:
 
     void closeCommandInput() {
         m_commandOpen = false;
-        m_commandInput.clear();
+        m_commandInput.setText({});
         if (m_gameState == GameState::Playing) m_window.setCursorLocked(true);
     }
 
@@ -1313,7 +1387,7 @@ private:
     }
 
     void executeCommand() {
-        const std::string submitted = m_commandInput;
+        const std::string submitted = m_commandInput.text();
         closeCommandInput();
         if (!m_worldMetadata.cheatsEnabled) {
             showCommandMessage(m_localization.text("message.cheats_disabled"));
@@ -1606,26 +1680,56 @@ private:
     }
 };
 
-int main(int argc, char** argv) {
+namespace {
+void reportFatal(const char* context,const std::exception& error) {
+    const std::string message=std::string("MinecraftC ")+context+" failed:\n"+error.what();
+    std::cerr<<message<<'\n';
+    LOG_FATAL(message);
+    if(!SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"MinecraftC",message.c_str(),nullptr))
+        std::cerr<<"Could not show SDL error message: "<<SDL_GetError()<<'\n';
+}
+}
+
+SDL_AppResult SDL_AppInit(void** appstate,int argc,char** argv) {
     try {
         if (argc > 1) {
             const std::string argument(argv[1]);
             if (argument == "--version") {
                 std::cout << "MinecraftC " << Config::GAME_VERSION << '\n';
-                return 0;
+                return SDL_APP_SUCCESS;
             }
             if (argument == "--help" || argument == "-h") {
                 std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
                           << "Usage: minecraftc [--help] [--version]\n"
                           << "Worlds and settings are stored in the platform user-data directory.\n";
-                return 0;
+                return SDL_APP_SUCCESS;
             }
         }
         RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
-        Application app(std::move(paths));
-        return app.run();
+        auto app=std::make_unique<Application>(std::move(paths));
+        app->start();
+        *appstate=app.release();
+        return SDL_APP_CONTINUE;
     } catch (const std::exception& error) {
-        std::cerr << "MinecraftC startup failed: " << error.what() << '\n';
-        return 1;
+        reportFatal("startup",error);
+        return SDL_APP_FAILURE;
     }
+}
+
+SDL_AppResult SDL_AppEvent(void* appstate,SDL_Event* event) {
+    if(!appstate)return SDL_APP_SUCCESS;
+    try { static_cast<Application*>(appstate)->event(*event); return SDL_APP_CONTINUE; }
+    catch(const std::exception& error){reportFatal("event handling",error);return SDL_APP_FAILURE;}
+}
+
+SDL_AppResult SDL_AppIterate(void* appstate) {
+    if(!appstate)return SDL_APP_SUCCESS;
+    try{return static_cast<Application*>(appstate)->iterate()?SDL_APP_CONTINUE:SDL_APP_SUCCESS;}
+    catch(const std::exception& error){reportFatal("runtime",error);return SDL_APP_FAILURE;}
+}
+
+void SDL_AppQuit(void* appstate,SDL_AppResult) {
+    if(!appstate)return;
+    try { auto app=std::unique_ptr<Application>(static_cast<Application*>(appstate));app->shutdown(); }
+    catch(const std::exception& error){reportFatal("shutdown",error);}
 }

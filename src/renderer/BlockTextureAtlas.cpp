@@ -3,6 +3,7 @@
 #include "debug/Log.h"
 #include "debug/OpenGL.h"
 #include "world/Block.h"
+#include "core/AssetStore.h"
 
 #include <stb_image.h>
 
@@ -42,7 +43,10 @@ Tile material(uint8_t r, uint8_t g, uint8_t b, int variation, uint32_t salt) {
 
 Tile loadTile(const std::string& path, const Tile& fallback) {
     int width = 0, height = 0, channels = 0;
-    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+    stbi_uc* pixels=nullptr;
+    try { const auto encoded=AssetStore::readPath(std::filesystem::u8path(path));
+        pixels=stbi_load_from_memory(encoded.data(),static_cast<int>(encoded.size()),&width,&height,&channels,4);
+    } catch(const std::exception&) {}
     if (!pixels || width != TILE_SIZE || height != TILE_SIZE) {
         LOG_WARN("Block texture unavailable or not 16x16: " + path);
         stbi_image_free(pixels);

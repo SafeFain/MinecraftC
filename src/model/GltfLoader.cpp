@@ -1,4 +1,5 @@
 #include "model/GltfLoader.h"
+#include "core/AssetStore.h"
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
@@ -11,6 +12,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -20,6 +23,22 @@ namespace model {
 namespace {
 
 using DataHandle = std::unique_ptr<cgltf_data, decltype(&cgltf_free)>;
+
+cgltf_result assetRead(const cgltf_memory_options* memory,
+                       const cgltf_file_options*,const char* path,
+                       cgltf_size* size,void** data) {
+    try { const auto bytes=AssetStore::readPath(std::filesystem::u8path(path));
+        const cgltf_size requested=*size;
+        if(requested&&bytes.size()<requested)return cgltf_result_data_too_short;
+        void* result=memory->alloc_func?memory->alloc_func(memory->user_data,bytes.size()):std::malloc(bytes.size());
+        if(!result&& !bytes.empty())return cgltf_result_out_of_memory;
+        if(!bytes.empty())std::memcpy(result,bytes.data(),bytes.size());
+        *size=bytes.size();*data=result;return cgltf_result_success;
+    } catch(const std::exception&){return cgltf_result_file_not_found;}
+}
+void assetRelease(const cgltf_memory_options* memory,const cgltf_file_options*,void* data){
+    if(memory->free_func)memory->free_func(memory->user_data,data);else std::free(data);
+}
 
 LoadResult failure(std::string error) {
     LoadResult result;
@@ -442,6 +461,7 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
 
 LoadResult loadGltf(const std::filesystem::path& path) {
     cgltf_options options{};
+    options.file.read=&assetRead;options.file.release=&assetRelease;
     cgltf_data* parsed = nullptr;
     const std::string nativePath = path.string();
     cgltf_result result = cgltf_parse_file(&options, nativePath.c_str(), &parsed);

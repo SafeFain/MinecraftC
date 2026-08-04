@@ -3,12 +3,12 @@
 #include "debug/OpenGL.h"
 #include "debug/Log.h"
 #include "game/Utf8.h"
+#include "core/AssetStore.h"
 
 #include <stb_truetype.h>
 #include <vector>
 #include <array>
 #include <algorithm>
-#include <fstream>
 #include <unordered_map>
 
 // ── 8×14 Bitmap Font Data ───────────────────────────────────────────────
@@ -295,20 +295,10 @@ void FontRenderer::initialize(bool manualGamma,
     auto atlasData = buildFontAtlasRGBA();
 
     const auto fontPath = assetRoot / "fonts" / "noto" / "NotoSansCJKsc-Regular.otf";
-    std::ifstream fontInput(fontPath, std::ios::binary);
-    if (fontInput) {
-        fontInput.seekg(0, std::ios::end);
-        const auto size = fontInput.tellg();
-        fontInput.seekg(0, std::ios::beg);
-        if (size > 0) {
-            m_impl->fontData.resize(static_cast<size_t>(size));
-            fontInput.read(
-                reinterpret_cast<char*>(m_impl->fontData.data()),
-                static_cast<std::streamsize>(size));
-            m_impl->available = fontInput.good() &&
-                stbtt_InitFont(&m_impl->font, m_impl->fontData.data(), 0) != 0;
-        }
-    }
+    try { m_impl->fontData=AssetStore::readPath(fontPath);
+        m_impl->available=!m_impl->fontData.empty()&&
+            stbtt_InitFont(&m_impl->font,m_impl->fontData.data(),0)!=0;
+    } catch(const std::exception&) { m_impl->available=false; }
     if (m_impl->available) {
         constexpr float rasterHeight = 28.0f;
         m_impl->fontScale = stbtt_ScaleForPixelHeight(&m_impl->font, rasterHeight);

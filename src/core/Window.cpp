@@ -40,6 +40,7 @@ Window::Window(int width, int height, const std::string& title) {
         LOG_FATAL("Failed to initialize SDL: " << SDL_GetError());
         throw std::runtime_error("Failed to initialize SDL");
     }
+    m_gamepads = std::make_unique<GamepadManager>();
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -90,6 +91,7 @@ Window::~Window() {
     if (m_textInputEnabled && m_window) SDL_StopTextInput(m_window);
     if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
     if (m_window) SDL_DestroyWindow(m_window);
+    m_gamepads.reset();
     SDL_Quit();
 }
 
@@ -107,6 +109,7 @@ void Window::resetEventFrame() {
 
 void Window::processEvent(const void* opaqueEvent) {
     const auto& event = *static_cast<const SDL_Event*>(opaqueEvent);
+    if (m_gamepads) m_gamepads->processEvent(event);
     switch (event.type) {
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -204,22 +207,6 @@ void Window::processEvent(const void* opaqueEvent) {
     }
 }
 
-void Window::pollEvents() {
-    resetEventFrame();
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) processEvent(&event);
-}
-
-void Window::waitEvents(double timeoutSeconds) {
-    resetEventFrame();
-    SDL_Event event;
-    const int timeout = std::max(0, static_cast<int>(std::lround(timeoutSeconds * 1000.0)));
-    if (SDL_WaitEventTimeout(&event, timeout)) {
-        processEvent(&event);
-        while (SDL_PollEvent(&event)) processEvent(&event);
-    }
-}
-
 void Window::swapBuffers() { SDL_GL_SwapWindow(m_window); }
 void Window::setTitle(const std::string& title) { SDL_SetWindowTitle(m_window, title.c_str()); }
 
@@ -263,8 +250,4 @@ void Window::setTextInputEnabled(bool enabled) {
 
 void* Window::glProcAddress(const char* name) {
     return reinterpret_cast<void*>(SDL_GL_GetProcAddress(name));
-}
-
-double Window::timeSeconds() {
-    return static_cast<double>(SDL_GetTicksNS()) / 1000000000.0;
 }

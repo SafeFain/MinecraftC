@@ -4,7 +4,7 @@ Record every imported asset pack here before committing it.
 
 | Dependency | Author | Source URL | License | Local path | Changes |
 | --- | --- | --- | --- | --- | --- |
-| SDL 3.4.10 | SDL contributors | https://github.com/libsdl-org/SDL/tree/release-3.4.10 | Zlib | CMake FetchContent build tree | Unmodified pinned source build with unused subsystems disabled. |
+| SDL 3.4.10 | SDL contributors | https://github.com/libsdl-org/SDL/tree/release-3.4.10 | Zlib | CMake FetchContent build tree | Unmodified pinned source build; provides window, input, touch, timing, and audio. |
 | cgltf 1.15 | jkuhlmann | https://github.com/jkuhlmann/cgltf/tree/v1.15 | MIT | `external/cgltf/` | Unmodified pinned header; SHA-256 recorded in `UPSTREAM.md`. |
 | nlohmann/json 3.12.0 | Niels Lohmann | https://github.com/nlohmann/json/releases/tag/v3.12.0 | MIT | `external/nlohmann/` | Unmodified release header; SHA-256 recorded in `UPSTREAM.md`. |
 | stb_truetype 1.26 | Sean Barrett and contributors | https://github.com/nothings/stb/blob/master/stb_truetype.h | MIT | `external/stb/stb_truetype.h` | Unmodified header; SHA-256 recorded in `UPSTREAM-truetype.md`. |

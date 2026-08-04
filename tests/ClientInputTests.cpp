@@ -4,6 +4,11 @@
 #include "ui/UIRenderer.h"
 
 #include "core/InputCodes.h"
+#include "core/RuntimeClock.h"
+#include "core/AssetStore.h"
+#include "core/GamepadManager.h"
+#include <SDL3/SDL.h>
+#include "core/TextEditBuffer.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -20,8 +25,41 @@ glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
 int main(){
+    require(SDL_InitSubSystem(SDL_INIT_JOYSTICK|SDL_INIT_GAMEPAD),
+            "SDL gamepad test subsystem initializes");
+    SDL_VirtualJoystickDesc virtualDesc{};SDL_INIT_INTERFACE(&virtualDesc);
+    virtualDesc.type=SDL_JOYSTICK_TYPE_GAMEPAD;virtualDesc.naxes=6;virtualDesc.nbuttons=15;
+    virtualDesc.axis_mask=(1u<<SDL_GAMEPAD_AXIS_LEFTX)|(1u<<SDL_GAMEPAD_AXIS_LEFTY);
+    virtualDesc.button_mask=1u<<SDL_GAMEPAD_BUTTON_SOUTH;virtualDesc.name="MinecraftC Test Gamepad";
+    const SDL_JoystickID virtualId=SDL_AttachVirtualJoystick(&virtualDesc);
+    require(virtualId!=0,"virtual SDL gamepad attaches");
+    {GamepadManager manager;require(manager.available(),"gamepad manager opens an existing virtual gamepad");
+        SDL_Joystick* joystick=SDL_OpenJoystick(virtualId);require(joystick!=nullptr,"virtual joystick opens");
+        require(SDL_SetJoystickVirtualAxis(joystick,SDL_GAMEPAD_AXIS_LEFTY,-32768),"virtual axis update succeeds");
+        SDL_UpdateJoysticks();std::array<bool,32> buttons{};std::array<float,16> axes{};manager.sample(buttons,axes);
+        require(axes[SDL_GAMEPAD_AXIS_LEFTY]<-.99f,"active gamepad sampling exposes virtual axis state");
+        SDL_CloseJoystick(joystick);}
+    require(SDL_DetachVirtualJoystick(virtualId),"virtual SDL gamepad detaches");
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK|SDL_INIT_GAMEPAD|SDL_INIT_HAPTIC);
+    require(normalizeGamepadAxis(.1f,.18f)==0.0f&&
+            normalizeGamepadAxis(1.0f,.18f)==1.0f&&
+            normalizeGamepadAxis(-1.0f,.18f)==-1.0f,
+            "gamepad deadzone normalization is signed and bounded");
+    require(AssetStore::validPath("textures/generated/a.png")&&
+            !AssetStore::validPath("../secret")&&!AssetStore::validPath("/absolute")&&
+            !AssetStore::validPath("a/./b")&&!AssetStore::validPath("a\\b"),
+            "asset paths remain title-root-relative and normalized");
     const auto root=std::filesystem::temp_directory_path()/"minecraftc-client-input-test";
     std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root/"assets");
+    {std::ofstream text(root/"assets"/"sample.txt",std::ios::binary);text<<"hello";}
+    {std::ofstream empty(root/"assets"/"empty.bin",std::ios::binary);}
+    {AssetStore assets(root/"assets");
+        require(assets.readText("sample.txt")=="hello"&&assets.readBinary("empty.bin").empty(),
+                "title storage reads text and empty binary assets");
+        auto stream=assets.openMemory("empty.bin");require(static_cast<bool>(stream),"empty assets expose a valid IOStream");
+        bool missing=false;try{assets.readBinary("missing.bin");}catch(const std::exception&){missing=true;}
+        require(missing,"missing title assets report failure");}
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
@@ -29,6 +67,8 @@ int main(){
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
     settings.controlMode=ControlMode::Touch;settings.touchSensitivity=1.75f;
+    settings.gamepadDeadzone=.22f;settings.gamepadLookSensitivity=1.5f;
+    settings.invertGamepadY=true;settings.gamepadRumble=.6f;
     settings.touchControlSize=1.25f;settings.touchControlOpacity=.8f;settings.touchLeftHanded=true;
     require(settings.save(root/"options.txt"),"settings save succeeds");
     const auto loaded=ClientSettings::load(root/"options.txt");
@@ -39,6 +79,9 @@ int main(){
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");
+    require(loaded.gamepadDeadzone==.22f&&loaded.gamepadLookSensitivity==1.5f&&
+            loaded.invertGamepadY&&loaded.gamepadRumble==.6f,
+            "gamepad settings round trip");
     require(loaded.language==Language::SimplifiedChinese,
             "client language round trips");
     {
@@ -65,6 +108,9 @@ int main(){
     require(migrated.bindings[8]==InputBinding{}&&
             migrated.bindings[4]==ClientSettings{}.bindings[4],
             "unknown legacy bindings unbind optional actions and restore required defaults");
+    {std::ofstream v6(root/"v6-bindings.txt");v6<<"version=6\nbinding.0=1,"<<Key::W<<"\n";}
+    require(ClientSettings::load(root/"v6-bindings.txt").bindings[0]==InputBinding{InputDevice::Keyboard,Key::W},
+            "v6 physical bindings are preserved while gamepad defaults are added");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");
     require(effectiveGuiScale(1920,1080,0)==3&&effectiveGuiScale(800,450,0)==1,
@@ -86,6 +132,27 @@ int main(){
             "virtual analog actions merge into input state");
     require(!inputActionCanUnbind(InputAction::Jump)&&inputActionCanUnbind(InputAction::Command),
             "core bindings are protected");
+    std::array<bool,32> gamepadButtons{};std::array<float,16> gamepadAxes{};
+    gamepadAxes[1]=-1.0f;
+    input.beginFrame();input.clearVirtual();input.updateGamepad(
+        loaded.gamepadBindings,gamepadButtons,gamepadAxes,loaded.gamepadDeadzone);
+    input.update(loaded.bindings);
+    require(input.value(InputAction::MoveForward)==1.0f,
+            "independent negative-axis gamepad binding drives movement");
+    gamepadAxes.fill(0.0f);
+    input.updateGamepad(loaded.gamepadBindings,gamepadButtons,gamepadAxes,
+                        loaded.gamepadDeadzone);
+
+    TextEditBuffer edit("A\xE4\xB8\xAD",8);
+    edit.moveLeft();edit.backspace();
+    require(edit.text()=="\xE4\xB8\xAD","UTF-8 cursor backspace removes one codepoint");
+    edit.moveHome();edit.insert("B\nC");edit.selectAll();
+    require(edit.selectedText()=="BC\xE4\xB8\xAD","text insertion strips line breaks and selection is byte-safe");
+    edit.moveEnd();edit.moveLeft(true);edit.eraseForward();
+    require(edit.text()=="BC","forward deletion erases the selected multibyte codepoint");
+    require(RuntimeClock::elapsed(20,10)==0&&RuntimeClock::milliseconds(2'500'000)==2&&
+            RuntimeClock::fromSeconds(.5)==500'000'000,
+            "runtime clock conversions saturate backwards elapsed time");
 
     TouchControls touch;TouchControlConfig config;touch.configure(1000,600,config);
     auto commands=touch.onTouch({{0,1},TouchPhase::Begin,76,176});

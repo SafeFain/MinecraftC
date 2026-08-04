@@ -6,6 +6,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "Config.h"
+#include "core/TextEditBuffer.h"
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "game/ClientSettings.h"
@@ -86,7 +87,7 @@ public:
     virtual ~Menu() = default;
 
     virtual void render(UIRenderer& ui, int screenWidth, int screenHeight) = 0;
-    virtual void onKeyPress(int key) = 0;
+    virtual void onKeyPress(int key, int mods = 0) = 0;
     virtual void onMouseMove(double x, double y) = 0;
     virtual void onMouseButton(int button, ButtonAction action, double x, double y) = 0;
     virtual void onScroll(double) {}
@@ -107,7 +108,7 @@ public:
              ClientSettings& settings, Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
-    void onKeyPress(int key) override;
+    void onKeyPress(int key, int mods = 0) override;
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
@@ -127,8 +128,8 @@ private:
     int m_selectedIdx = 0;
     Page m_page = Page::Home;
     Field m_field = Field::Name;
-    std::string m_worldName;
-    std::string m_seedText;
+    TextEditBuffer m_worldName{{}, 32};
+    TextEditBuffer m_seedText{{}, 20};
     GameMode m_createMode = GameMode::Survival;
     bool m_createCheats = false;
     int m_worldOffset = 0;
@@ -155,7 +156,7 @@ public:
     PauseMenu(const MenuCallbacks& callbacks, const Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
-    void onKeyPress(int key) override;
+    void onKeyPress(int key, int mods = 0) override;
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
 

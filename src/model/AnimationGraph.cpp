@@ -1,10 +1,10 @@
 #include "model/AnimationGraph.h"
+#include "core/AssetStore.h"
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <set>
 #include <sstream>
 
@@ -50,8 +50,7 @@ std::string AnimationGraphAsset::actionFor(const std::string& semantic) const {
 AnimationGraphLoadResult loadAnimationGraph(const std::filesystem::path& path,
                                              const ModelAsset& model) {
     try {
-        std::ifstream input(path);
-        if (!input) return {{}, context(path, "could not open action graph")};
+        std::istringstream input(AssetStore::readTextPath(path));
         Json root;
         input >> root;
         if (!root.is_object() || root.value("version", 0) != 1)

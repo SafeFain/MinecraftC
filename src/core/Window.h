@@ -2,9 +2,11 @@
 
 #include "core/InputCodes.h"
 #include "core/Touch.h"
+#include "core/GamepadManager.h"
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -20,8 +22,8 @@ public:
 
     bool shouldClose() const { return m_shouldClose; }
     void swapBuffers();
-    void pollEvents();
-    void waitEvents(double timeoutSeconds);
+    void handleEvent(const void* event) { processEvent(event); }
+    void finishEventFrame() { resetEventFrame(); }
     void setTitle(const std::string& title);
 
     int width() const { return m_pixelWidth; }
@@ -46,6 +48,7 @@ public:
         return m_minimized || m_pixelWidth <= 0 || m_pixelHeight <= 0;
     }
     bool isSrgbCapable() const { return m_srgbCapable; }
+    GamepadManager& gamepads() { return *m_gamepads; }
 
     using KeyCallback =
         std::function<void(int key, int scancode, ButtonAction action, int mods)>;
@@ -65,7 +68,6 @@ public:
     void setFocusCallback(FocusCallback callback) { m_focusCallback = std::move(callback); }
 
     static void* glProcAddress(const char* name);
-    static double timeSeconds();
 
 private:
     SDL_Window* m_window = nullptr;
@@ -80,6 +82,7 @@ private:
     bool m_srgbCapable = false;
     bool m_touchAvailable = false;
     bool m_textInputEnabled = false;
+    std::unique_ptr<GamepadManager> m_gamepads;
     std::array<bool, Key::Count> m_keys{};
     std::array<bool, MouseButton::Count> m_mouse{};
     double m_cursorX = 0.0;

@@ -8,11 +8,14 @@
 namespace Key {
 constexpr int Unknown = 0;
 constexpr int A = 4;
+constexpr int C = 6;
 constexpr int D = 7;
 constexpr int E = 8;
 constexpr int S = 22;
 constexpr int T = 23;
+constexpr int V = 25;
 constexpr int W = 26;
+constexpr int X = 27;
 constexpr int Num1 = 30;
 constexpr int Num2 = 31;
 constexpr int Num3 = 32;
@@ -28,6 +31,9 @@ constexpr int Backspace = 42;
 constexpr int Tab = 43;
 constexpr int Space = 44;
 constexpr int F4 = 61;
+constexpr int Home = 74;
+constexpr int Delete = 76;
+constexpr int End = 77;
 constexpr int Right = 79;
 constexpr int Left = 80;
 constexpr int Down = 81;

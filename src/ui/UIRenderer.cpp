@@ -3,13 +3,13 @@
 #include "renderer/BlockTextureAtlas.h"
 #include "debug/OpenGL.h"
 #include "game/SurvivalRules.h"
+#include "core/AssetStore.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <cstdio>
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 #include <regex>
 #include <sstream>
 #include <stb_image.h>
@@ -29,11 +29,8 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
                             const std::filesystem::path& assetRoot) {
     m_blockAtlasTexture = blockAtlasTexture;
     m_manualGamma = !framebufferSrgb;
-    std::ifstream metadataFile(
-        assetRoot / "textures" / "generated" / "items_atlas.json");
-    std::stringstream metadataBuffer;
-    if (metadataFile) metadataBuffer << metadataFile.rdbuf();
-    const std::string metadata = metadataBuffer.str();
+    const std::string metadata=AssetStore::readTextPath(
+        assetRoot/"textures"/"generated"/"items_atlas.json");
     std::smatch match;
     if (std::regex_search(metadata, match, std::regex(R"("columns"\s*:\s*(\d+))")))
         m_itemAtlasColumns = std::stoi(match[1]);
@@ -43,9 +40,9 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
     for (std::sregex_iterator it(metadata.begin(), metadata.end(), entry), end; it != end; ++it)
         m_itemAtlasIndices[(*it)[1].str()] = std::stoi((*it)[2]);
     int atlasWidth=0,atlasHeight=0,channels=0;
-    const auto itemAtlasPath =
-        (assetRoot / "textures" / "generated" / "items_atlas.png").u8string();
-    stbi_uc* itemPixels=stbi_load(itemAtlasPath.c_str(),&atlasWidth,&atlasHeight,&channels,4);
+    const auto itemAtlas=AssetStore::readPath(
+        assetRoot/"textures"/"generated"/"items_atlas.png");
+    stbi_uc* itemPixels=stbi_load_from_memory(itemAtlas.data(),static_cast<int>(itemAtlas.size()),&atlasWidth,&atlasHeight,&channels,4);
     if (itemPixels && m_itemAtlasColumns>0 && m_itemAtlasRows>0 &&
         atlasWidth==m_itemAtlasColumns*16 && atlasHeight==m_itemAtlasRows*16) {
         GL_CHECK(glGenTextures(1,&m_itemAtlasTexture));

@@ -16,6 +16,8 @@ public:
                       std::function<void(ItemId)> onSelectItem);
     void onMouseMove(int mouseX, int mouseY);
     void onScroll(double yOffset);
+    void onGamepadNavigate(int dx, int dy);
+    void onGamepadAction(bool select, std::function<void(ItemId)> onSelectItem);
 
 private:
     struct Slot {
@@ -31,6 +33,7 @@ private:
     int m_scrollRow = 0;
     int m_totalRows = 0;
     ItemId m_selected = ItemId::EMPTY;
+    int m_focus = 0;
     float m_panelX = 0.0f, m_panelY = 0.0f, m_panelW = 0.0f, m_panelH = 0.0f;
 
     void layoutSlots(int screenWidth, int screenHeight);

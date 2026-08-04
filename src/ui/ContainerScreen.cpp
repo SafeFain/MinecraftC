@@ -6,6 +6,7 @@
 #include "world/World.h"
 
 #include "core/Window.h"
+#include "core/RuntimeClock.h"
 #include <algorithm>
 
 bool ContainerScreen::open(World& world, const glm::ivec3& position) {
@@ -85,6 +86,7 @@ void ContainerScreen::quickMove(int x,int y) {
 
 void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int my) {
     layout(width, height);
+    if(m_focusX||m_focusY){mx=m_focusX;my=m_focusY;}
     const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
@@ -141,13 +143,14 @@ void ContainerScreen::click(int button, int x, int y) {
 }
 
 void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,int mods) {
+    if(action==ButtonAction::Press){m_focusX=x;m_focusY=y;}
     if (button!=MouseButton::Left && button!=MouseButton::Right) return;
     if (action==ButtonAction::Press) { m_pressed=true;m_button=button;m_pressX=x;m_pressY=y;m_pressMods=mods;
         m_cursorHeldAtPress=!m_cursor.empty();m_dragTargets.clear();return; }
     if (action!=ButtonAction::Release || !m_pressed || m_button!=button) return;
     if((m_pressMods&KeyModifier::Shift)&&button==MouseButton::Left){quickMove(x,y);m_pressed=false;m_button=-1;return;}
     const int dx=x-m_pressX,dy=y-m_pressY;const bool dragged=dx*dx+dy*dy>=16;
-    const double now=Window::timeSeconds();
+    const double now=RuntimeClock::seconds(RuntimeClock{}.now());
     if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty())InventoryInteraction::distribute(m_cursor,m_dragTargets,button==MouseButton::Right);
     else if(!dragged&&button==MouseButton::Left&&!m_cursor.empty()&&m_lastClickSeconds>=0&&now-m_lastClickSeconds<=.30){
         std::vector<ItemStack*> sources;for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
@@ -164,6 +167,26 @@ void ContainerScreen::onMouseMove(int x,int y){if(!m_pressed||!m_cursorHeldAtPre
     BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(!target&&entity&&entity->type==BlockEntityType::Chest)
         for(int i=0;i<27;++i)if(contains(m_containerRects[i],x,y)){target=&entity->chest[i];break;}
     if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);}
+
+void ContainerScreen::onGamepadNavigate(int dx,int dy) {
+    std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
+    const BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    const int count=entity?(entity->type==BlockEntityType::Chest?27:3):0;
+    for(int i=0;i<count;++i)rects.push_back(m_containerRects[static_cast<size_t>(i)]);
+    if(rects.empty())return;
+    if(!m_focusX&&!m_focusY){m_focusX=static_cast<int>(rects[0].x+22);m_focusY=static_cast<int>(rects[0].y+22);}
+    float best=1e30f;const Rect* chosen=nullptr;
+    for(const Rect& r:rects){const float cx=r.x+22,cy=r.y+22,vx=cx-m_focusX,vy=cy-m_focusY;
+        if((dx&&vx*dx<=1)||(dy&&vy*dy<=1))continue;
+        const float primary=dx?std::abs(vx):std::abs(vy),secondary=dx?std::abs(vy):std::abs(vx);
+        const float score=primary+secondary*2.0f;if(score<best){best=score;chosen=&r;}}
+    if(chosen){m_focusX=static_cast<int>(chosen->x+22);m_focusY=static_cast<int>(chosen->y+22);}
+}
+
+void ContainerScreen::onGamepadAction(int action) {
+    if(action==2)quickMove(m_focusX,m_focusY);
+    else click(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
+}
 
 void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
     if (!m_cursor.empty()) {

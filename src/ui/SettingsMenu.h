@@ -9,13 +9,15 @@ public:
                  std::function<void()> onBack, const Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
-    void onKeyPress(int key) override;
+    void onKeyPress(int key, int mods = 0) override;
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
+    bool capturingGamepad() const { return m_page == Page::Gamepad && m_captureAction >= 0; }
+    void onGamepadBinding(GamepadBinding binding);
 
 private:
-    enum class Page { General, Video, Controls, Touch };
+    enum class Page { General, Video, Controls, Gamepad, Touch };
 
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
@@ -39,4 +41,5 @@ private:
     std::string labelForAutoJump() const;
     void refreshButtons();
     void assignBinding(InputBinding binding);
+    void assignGamepadBinding(GamepadBinding binding);
 };

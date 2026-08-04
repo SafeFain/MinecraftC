@@ -1,4 +1,5 @@
 #include "world/World.h"
+#include "core/RuntimeClock.h"
 #include "world/ChunkMesh.h"
 #include "world/RegionGenerator.h"
 #include "renderer/Renderer.h"
@@ -1422,8 +1423,7 @@ void World::applyPendingBlocks(int cx, int cz) {
 }
 
 void World::waitForInitialGeneration(int maxWaitMs) {
-    using namespace std::chrono;
-    auto start = high_resolution_clock::now();
+    RuntimeClock clock;const auto start=clock.now();
 
     while (true) {
         // Check if all chunks are generated
@@ -1446,8 +1446,9 @@ void World::waitForInitialGeneration(int maxWaitMs) {
 
         if (allGenerated) break;
 
-        auto elapsed = duration_cast<milliseconds>(high_resolution_clock::now() - start).count();
-        if (elapsed >= maxWaitMs) break;
+        const auto elapsed=RuntimeClock::milliseconds(
+            RuntimeClock::elapsed(start,clock.now()));
+        if (elapsed >= static_cast<uint64_t>(std::max(0,maxWaitMs))) break;
 
         // Yield to let worker threads run
         std::this_thread::sleep_for(std::chrono::microseconds(500));

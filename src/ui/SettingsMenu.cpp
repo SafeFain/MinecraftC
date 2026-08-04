@@ -85,6 +85,9 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.controls"), [this]{
             m_page = Page::Controls; m_selectedIdx = 0; refreshButtons();
         });
+        m_buttons.emplace_back("Gamepad", [this]{
+            m_page = Page::Gamepad; m_selectedIdx = 0; refreshButtons();
+        });
         m_buttons.emplace_back(m_localization.text("settings.touch"), [this]{
             m_page = Page::Touch; m_selectedIdx = 0; refreshButtons();
         });
@@ -127,6 +130,23 @@ void SettingsMenu::refreshButtons() {
             m_captureAction = -1; m_page = Page::General;
             m_selectedIdx = 0; refreshButtons();
         });
+    } else if (m_page == Page::Gamepad) {
+        constexpr int visible=7;
+        const int end=std::min<int>(INPUT_ACTION_COUNT,m_controlOffset+visible);
+        for(int i=m_controlOffset;i<end;++i){
+            const InputAction action=static_cast<InputAction>(i);
+            m_buttons.emplace_back(m_localization.actionName(action)+": "+
+                (m_captureAction==i?"Move an axis or press a button":
+                 gamepadBindingName(m_settings.gamepadBindings[static_cast<size_t>(i)])),
+                [this,i]{m_captureAction=i;refreshButtons();});
+        }
+        auto decimal=[](float value){std::ostringstream out;out<<std::fixed<<std::setprecision(2)<<value;return out.str();};
+        m_buttons.emplace_back("Deadzone: "+decimal(m_settings.gamepadDeadzone),[this]{m_settings.gamepadDeadzone+=.02f;if(m_settings.gamepadDeadzone>.5001f)m_settings.gamepadDeadzone=.10f;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back("Look sensitivity: "+decimal(m_settings.gamepadLookSensitivity),[this]{m_settings.gamepadLookSensitivity+=.25f;if(m_settings.gamepadLookSensitivity>3.001f)m_settings.gamepadLookSensitivity=.25f;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(std::string("Invert gamepad Y: ")+(m_settings.invertGamepadY?"On":"Off"),[this]{m_settings.invertGamepadY=!m_settings.invertGamepadY;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back("Rumble: "+decimal(m_settings.gamepadRumble),[this]{m_settings.gamepadRumble+=.25f;if(m_settings.gamepadRumble>1.001f)m_settings.gamepadRumble=0;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.text("settings.reset"),[this]{m_settings.resetGamepadBindings();m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.text("settings.back"),[this]{m_captureAction=-1;m_page=Page::General;m_selectedIdx=0;refreshButtons();});
     } else {
         const char* modeKey = m_settings.controlMode == ControlMode::Auto ? "settings.touch_mode_auto" :
             m_settings.controlMode == ControlMode::KeyboardMouse ? "settings.touch_mode_keyboard" : "settings.touch_mode_touch";
@@ -158,18 +178,29 @@ void SettingsMenu::assignBinding(InputBinding binding) {
     refreshButtons();
 }
 
+void SettingsMenu::assignGamepadBinding(GamepadBinding binding) {
+    if(m_captureAction<0)return;
+    m_settings.gamepadBindings[static_cast<size_t>(m_captureAction)]=binding;
+    m_captureAction=-1;m_settings.validate();m_onChanged();refreshButtons();
+}
+
+void SettingsMenu::onGamepadBinding(GamepadBinding binding) {
+    assignGamepadBinding(binding);
+}
+
 void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
                 Config::UIColors::BACKGROUND);
     const std::string title = m_localization.text(
         m_page == Page::Controls ? "settings.controls_title" :
+        m_page == Page::Gamepad ? "Gamepad Settings" :
         m_page == Page::Video ? "settings.video_title" :
         m_page == Page::Touch ? "settings.touch_title" : "settings.title");
     const auto titleSize = ui.measureText(title, 3.0f);
     const float titleY = height * 0.78f;
     ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,
                   Config::UIColors::TEXT_TITLE);
-    if (m_page == Page::Controls)
+    if (m_page == Page::Controls || m_page == Page::Gamepad)
         {
             const std::string help = m_localization.text("settings.controls_help");
             const auto helpSize = ui.measureText(help, 1.0f);
@@ -189,13 +220,13 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     }
 }
 
-void SettingsMenu::onKeyPress(int key) {
+void SettingsMenu::onKeyPress(int key, int) {
     if (m_captureAction >= 0) {
         if (key == Key::Escape) { m_captureAction = -1; refreshButtons(); }
         else if (key == Key::Backspace &&
                  inputActionCanUnbind(static_cast<InputAction>(m_captureAction)))
             assignBinding({});
-        else assignBinding({InputDevice::Keyboard, key});
+        else if (m_page != Page::Gamepad) assignBinding({InputDevice::Keyboard, key});
         return;
     }
     switch (key) {
@@ -242,7 +273,7 @@ void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, doub
 
 void SettingsMenu::onScroll(double yOffset) {
     if (m_captureAction >= 0) { assignBinding({InputDevice::Wheel, yOffset > 0 ? 1 : -1}); return; }
-    if (m_page != Page::Controls) return;
+    if (m_page != Page::Controls && m_page != Page::Gamepad) return;
     const int maximum = std::max(0, static_cast<int>(INPUT_ACTION_COUNT) - 8);
     m_controlOffset = std::clamp(m_controlOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
     refreshButtons();

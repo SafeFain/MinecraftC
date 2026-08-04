@@ -46,13 +46,13 @@ else()
     set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
     set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
-    set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
+    set(SDL_AUDIO ON CACHE BOOL "" FORCE)
     set(SDL_CAMERA OFF CACHE BOOL "" FORCE)
     set(SDL_DIALOG OFF CACHE BOOL "" FORCE)
     set(SDL_GPU OFF CACHE BOOL "" FORCE)
-    set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
-    set(SDL_HIDAPI OFF CACHE BOOL "" FORCE)
-    set(SDL_JOYSTICK OFF CACHE BOOL "" FORCE)
+    set(SDL_HAPTIC ON CACHE BOOL "" FORCE)
+    set(SDL_HIDAPI ON CACHE BOOL "" FORCE)
+    set(SDL_JOYSTICK ON CACHE BOOL "" FORCE)
     set(SDL_POWER OFF CACHE BOOL "" FORCE)
     set(SDL_RENDER OFF CACHE BOOL "" FORCE)
     set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
@@ -65,6 +65,11 @@ else()
     set(MINECRAFTC_SDL_TARGET SDL3::SDL3-static)
 endif()
 find_package(OpenGL REQUIRED)
+
+add_library(minecraftc_assets STATIC src/core/AssetStore.cpp)
+target_include_directories(minecraftc_assets PUBLIC src)
+target_link_libraries(minecraftc_assets PUBLIC ${MINECRAFTC_SDL_TARGET})
+link_libraries(minecraftc_assets)
 
 # ── GLAD (minimal OpenGL loader) ───────────────────────────────────────
 
@@ -82,6 +87,7 @@ file(GLOB_RECURSE SOURCES
     src/*.h
 )
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/Platform.cpp")
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/AssetStore.cpp")
 
 add_library(minecraftc_platform STATIC src/core/Platform.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
@@ -103,7 +109,6 @@ target_include_directories(minecraftc PRIVATE
     external/FastNoiseLite
     external/cgltf
     external/stb
-    external/miniaudio
     external
 )
 target_compile_definitions(minecraftc PRIVATE
@@ -124,14 +129,6 @@ target_link_libraries(minecraftc PRIVATE
     minecraftc_platform
     ${CMAKE_DL_LIBS}
 )
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
-        COMPILE_OPTIONS "-w")
-elseif(MSVC)
-    set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
-        COMPILE_OPTIONS "/w")
-endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
@@ -416,6 +413,7 @@ if(BUILD_TESTING)
         src/model/ModelAnimation.cpp
         src/model/GltfLoader.cpp
         src/model/ModelRenderer.cpp
+        src/core/GamepadManager.cpp
         src/core/Window.cpp
         src/debug/Log.cpp
         src/renderer/Shader.cpp
@@ -455,9 +453,13 @@ if(BUILD_TESTING)
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
         src/core/Input.cpp
+        src/core/GamepadManager.cpp
         src/core/InputCodes.cpp
+        src/core/TextEditBuffer.cpp
+        src/debug/Log.cpp
         src/ui/TouchControls.cpp
         src/game/ClientSettings.cpp
+        src/game/Utf8.cpp
         src/game/Language.cpp
         src/game/InventoryInteraction.cpp
         src/game/Item.cpp

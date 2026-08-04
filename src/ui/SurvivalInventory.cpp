@@ -5,6 +5,7 @@
 #include "ui/UIRenderer.h"
 
 #include "core/Window.h"
+#include "core/RuntimeClock.h"
 #include <algorithm>
 #include <string>
 
@@ -82,6 +83,7 @@ ItemStack SurvivalInventoryScreen::craftingOutput() const {
 void SurvivalInventoryScreen::render(
     UIRenderer& ui, int screenWidth, int screenHeight, int mouseX, int mouseY) {
     layout(screenWidth, screenHeight);
+    if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
     const std::string title = ui.localization().text("inventory.survival");
@@ -189,6 +191,7 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 
 void SurvivalInventoryScreen::onMouseButton(
     int button, ButtonAction action, int mouseX, int mouseY, int mods) {
+    if(action==ButtonAction::Press){m_focusX=mouseX;m_focusY=mouseY;}
     if (button != MouseButton::Left && button != MouseButton::Right) return;
     if (action == ButtonAction::Press) {
         m_pointerPressed = true;
@@ -209,7 +212,7 @@ void SurvivalInventoryScreen::onMouseButton(
     const int deltaX = mouseX - m_pressX;
     const int deltaY = mouseY - m_pressY;
     const bool dragged = deltaX * deltaX + deltaY * deltaY >= 16;
-    const double now=Window::timeSeconds();
+    const double now=RuntimeClock::seconds(RuntimeClock{}.now());
     if(dragged && m_cursorHeldAtPress && !m_dragTargets.empty()) {
         InventoryInteraction::distribute(m_cursor,m_dragTargets,
                                          button==MouseButton::Right);
@@ -238,6 +241,27 @@ void SurvivalInventoryScreen::onMouseMove(int x,int y){
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
     if(!target){const size_t count=m_craftingTable?9:4;for(size_t i=0;i<count;++i)if(contains(m_craftingRects[i],x,y)){target=&m_crafting[i];break;}}
     if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);
+}
+
+void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
+    std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
+    const size_t craftingCount=m_craftingTable?9:4;
+    for(size_t i=0;i<craftingCount;++i)rects.push_back(m_craftingRects[i]);
+    rects.insert(rects.end(),m_armorRects.begin(),m_armorRects.end());
+    rects.push_back(m_offhandRect);rects.push_back(m_outputRect);
+    if(rects.empty())return;
+    if(!m_focusX&&!m_focusY){m_focusX=static_cast<int>(rects[0].x+22);m_focusY=static_cast<int>(rects[0].y+22);}
+    float best=1e30f;const Rect* chosen=nullptr;
+    for(const Rect& r:rects){const float cx=r.x+22,cy=r.y+22,vx=cx-m_focusX,vy=cy-m_focusY;
+        if((dx&&vx*dx<=1)||(dy&&vy*dy<=1))continue;
+        const float primary=dx?std::abs(vx):std::abs(vy),secondary=dx?std::abs(vy):std::abs(vx);
+        const float score=primary+secondary*2.0f;if(score<best){best=score;chosen=&r;}}
+    if(chosen){m_focusX=static_cast<int>(chosen->x+22);m_focusY=static_cast<int>(chosen->y+22);}
+}
+
+void SurvivalInventoryScreen::onGamepadAction(int action) {
+    if(action==2)quickMove(m_focusX,m_focusY);
+    else performClick(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
 }
 
 bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {

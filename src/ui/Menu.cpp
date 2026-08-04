@@ -2,6 +2,7 @@
 #include "ui/UIRenderer.h"
 
 #include "core/Window.h"
+#include "core/RuntimeClock.h"
 #include <algorithm>
 #include "game/Utf8.h"
 
@@ -79,6 +80,9 @@ MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> wor
                    ClientSettings& settings, Localization& localization)
     : m_callbacks(callbacks), m_settings(settings), m_localization(localization),
       m_worlds(std::move(worlds)) {
+    m_seedText.setFilter([](uint32_t codepoint,const std::string& current){
+        return (codepoint>='0'&&codepoint<='9')||(codepoint=='-'&&current.empty());
+    });
     showHome();
 }
 
@@ -94,8 +98,8 @@ void MainMenu::showWorlds() {
 
 void MainMenu::showCreate() {
     m_page = Page::Create;
-    m_worldName = m_localization.text("menu.create.default_name");
-    m_seedText.clear();
+    m_worldName.setText(m_localization.text("menu.create.default_name"));
+    m_seedText.setText({});
     m_createMode = GameMode::Survival;
     m_createCheats = false;
     m_field = Field::Name;
@@ -198,7 +202,7 @@ void MainMenu::rebuildButtons() {
                                [this]() { showCreate(); });
         m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
     } else {
-        m_buttons.emplace_back(fieldLabel(Field::Name, m_worldName),
+        m_buttons.emplace_back(fieldLabel(Field::Name, m_worldName.text()),
                                [this]() { selectField(Field::Name); });
         m_buttons.emplace_back(
             m_localization.format("menu.create.game_mode", {m_localization.text(
@@ -209,7 +213,7 @@ void MainMenu::rebuildButtons() {
                     ? GameMode::Creative : GameMode::Survival;
                 rebuildButtons();
             });
-        m_buttons.emplace_back(fieldLabel(Field::Seed, m_seedText),
+        m_buttons.emplace_back(fieldLabel(Field::Seed, m_seedText.text()),
                                [this]() { selectField(Field::Seed); });
         m_buttons.emplace_back(
             m_localization.format("menu.create.cheats", {m_localization.text(
@@ -220,7 +224,7 @@ void MainMenu::rebuildButtons() {
             });
         m_buttons.emplace_back(m_localization.text("menu.create.confirm"), [this]() {
             m_callbacks.onCreateWorld(
-                m_worldName, m_seedText, m_createMode, m_createCheats);
+                m_worldName.text(), m_seedText.text(), m_createMode, m_createCheats);
         });
         m_buttons.emplace_back(m_localization.text("common.cancel"), [this]() { showWorlds(); });
     }
@@ -316,17 +320,34 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                   glm::vec3(0.62f, 0.62f, 0.66f));
 }
 
-void MainMenu::onKeyPress(int key) {
+void MainMenu::onKeyPress(int key, int mods) {
     if (m_page == Page::Create && key == Key::Tab) {
         selectField(m_field == Field::Name ? Field::Seed : Field::Name);
         return;
     }
     if (m_page == Page::Create && key == Key::Backspace) {
-        std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
-        eraseLastUtf8Codepoint(value);
+        TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
+        value.backspace();
         rebuildButtons();
         selectField(m_field);
         return;
+    }
+    if (m_page == Page::Create) {
+        TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
+        const bool selecting = (mods & KeyModifier::Shift) != 0;
+        const bool control = (mods & KeyModifier::Control) != 0;
+        bool edited = true;
+        if (key == Key::Delete) value.eraseForward();
+        else if (key == Key::Left) value.moveLeft(selecting);
+        else if (key == Key::Right) value.moveRight(selecting);
+        else if (key == Key::Home) value.moveHome(selecting);
+        else if (key == Key::End) value.moveEnd(selecting);
+        else if (control && key == Key::A) value.selectAll();
+        else if (control && key == Key::C) value.copySelection();
+        else if (control && key == Key::X) value.cutSelection();
+        else if (control && key == Key::V) value.pasteClipboard();
+        else edited = false;
+        if (edited) { rebuildButtons(); selectField(m_field); return; }
     }
     // Printable keys remain text input on the create screen. Arrow keys and
     // Enter provide unambiguous keyboard navigation while a field is focused.
@@ -365,14 +386,15 @@ void MainMenu::onKeyPress(int key) {
 
 void MainMenu::onChar(unsigned int codepoint) {
     if (m_page != Page::Create || codepoint < 32) return;
-    std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
+    TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
     if (m_field == Field::Seed) {
         const char character = static_cast<char>(codepoint);
-        if (character == '-' && value.empty()) value.push_back(character);
-        else if (character >= '0' && character <= '9' && value.size() < 20)
-            value.push_back(character);
-    } else if (utf8CodepointCount(value) < 32) {
-        appendUtf8(value, codepoint);
+        if ((character == '-' && value.text().empty()) ||
+            (character >= '0' && character <= '9')) {
+            std::string encoded(1, character); value.insert(encoded);
+        }
+    } else {
+        std::string encoded; appendUtf8(encoded, codepoint); value.insert(encoded);
     }
     rebuildButtons();
     selectField(m_field);
@@ -426,7 +448,7 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
             const int visibleWorlds = std::min(6, static_cast<int>(m_worlds.size()) - m_worldOffset);
             if (m_page == Page::Worlds && captured < visibleWorlds) {
                 const int worldIndex = m_worldOffset + captured;
-                const double now = Window::timeSeconds();
+                const double now = RuntimeClock::seconds(RuntimeClock{}.now());
                 if (m_lastWorldIndex == worldIndex && m_lastWorldClick >= 0.0 &&
                     now - m_lastWorldClick <= 0.35) {
                     m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
@@ -488,7 +510,7 @@ void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     }
 }
 
-void PauseMenu::onKeyPress(int key) {
+void PauseMenu::onKeyPress(int key, int) {
     switch (key) {
         case Key::Up:
         case Key::W:

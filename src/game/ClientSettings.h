@@ -9,7 +9,7 @@
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 6;
+    static constexpr int FORMAT_VERSION = 7;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -26,12 +26,18 @@ struct ClientSettings {
     float touchControlSize = 1.0f;
     float touchControlOpacity = 0.65f;
     bool touchLeftHanded = false;
+    float gamepadDeadzone = 0.18f;
+    float gamepadLookSensitivity = 1.0f;
+    bool invertGamepadY = false;
+    float gamepadRumble = 1.0f;
     std::array<InputBinding, INPUT_ACTION_COUNT> bindings{};
+    std::array<GamepadBinding, INPUT_ACTION_COUNT> gamepadBindings{};
 
     ClientSettings();
     static ClientSettings load(const std::filesystem::path& path);
     bool save(const std::filesystem::path& path) const;
     void resetBindings();
+    void resetGamepadBindings();
     void validate();
 };
 

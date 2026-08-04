@@ -19,6 +19,8 @@ public:
     void render(UIRenderer& ui, int width, int height, int mouseX, int mouseY);
     void onMouseButton(int button, ButtonAction action, int mouseX, int mouseY, int mods = 0);
     void onMouseMove(int mouseX, int mouseY);
+    void onGamepadNavigate(int dx, int dy);
+    void onGamepadAction(int action);
     void close(const std::function<void(ItemStack)>& drop);
 
 private:
@@ -36,6 +38,7 @@ private:
     double m_lastClickSeconds = -1.0;
     std::vector<ItemStack*> m_dragTargets;
     bool m_cursorHeldAtPress = false;
+    int m_focusX = 0, m_focusY = 0;
 
     void layout(int width, int height);
     void click(int button, int x, int y);

@@ -1,21 +1,14 @@
 #include "renderer/Shader.h"
 #include "debug/Log.h"
 #include "debug/OpenGL.h"
+#include "core/AssetStore.h"
 
-#include <fstream>
-#include <sstream>
 #include <stdexcept>
 
 // ── File reading ──────────────────────────────────────────────────────
 
 std::string Shader::readFile(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open shader file: " + path.u8string());
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
+    return AssetStore::readTextPath(path);
 }
 
 // ── Shader compilation ────────────────────────────────────────────────

@@ -17,6 +17,17 @@ enum class InputAction : uint8_t {
 
 enum class InputDevice : uint8_t { None, Keyboard, Mouse, Wheel };
 
+enum class GamepadBindingType : uint8_t { None, Button, AxisPositive, AxisNegative };
+
+struct GamepadBinding {
+    GamepadBindingType type = GamepadBindingType::None;
+    int code = 0;
+
+    bool operator==(const GamepadBinding& other) const {
+        return type == other.type && code == other.code;
+    }
+};
+
 struct InputBinding {
     InputDevice device = InputDevice::None;
     int code = 0;
@@ -30,7 +41,9 @@ constexpr size_t INPUT_ACTION_COUNT = static_cast<size_t>(InputAction::Count);
 
 const char* inputActionName(InputAction action);
 std::string inputBindingName(const InputBinding& binding);
+std::string gamepadBindingName(const GamepadBinding& binding);
 bool inputActionCanUnbind(InputAction action);
+float normalizeGamepadAxis(float value, float deadzone);
 
 class InputState {
 public:
@@ -42,6 +55,9 @@ public:
     void setVirtual(InputAction action, float strength);
     void clearVirtual();
     void update(const std::array<InputBinding, INPUT_ACTION_COUNT>& bindings);
+    void updateGamepad(const std::array<GamepadBinding, INPUT_ACTION_COUNT>& bindings,
+                       const std::array<bool, 32>& buttons,
+                       const std::array<float, 16>& axes, float deadzone);
 
     float value(InputAction action) const;
     bool held(InputAction action) const;
@@ -56,5 +72,6 @@ private:
     std::array<bool, INPUT_ACTION_COUNT> m_released{};
     std::array<float, INPUT_ACTION_COUNT> m_virtual{};
     std::array<float, INPUT_ACTION_COUNT> m_values{};
+    std::array<float, INPUT_ACTION_COUNT> m_gamepad{};
     int m_wheelDirection = 0;
 };
