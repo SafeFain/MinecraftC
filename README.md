@@ -93,14 +93,6 @@ cmake --install build-local --config Release --prefix install-local
 .\install-local\bin\minecraftc.exe
 ```
 
-### 自动构建与发行
-
-GitHub Actions 会在 Linux、Windows 和 macOS（arm64/x86-64 通用版）上构建、
-测试、检查安装资源并生成带顶层 `MinecraftC-1.1.3` 目录的便携压缩包。包内程序、
-`assets/`、启动脚本、使用说明和第三方许可证位于同一级目录；Windows 便携包
-使用静态 MSVC 运行库。推送 `v*` 标签会自动发布三个平台的安装包及
-`SHA256SUMS`。
-
 ### Android（OpenGL ES 3.0）
 
 Android 版本要求 Android 10（API 29）或更新系统以及 arm64、OpenGL ES 3.0
@@ -113,6 +105,8 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Android 构建说明和未签名 Release APK 命令见 `android/README.md`。
+跨平台 CI 会在每次运行时构建 Android arm64 未签名 Release APK；推送 `v*`
+标签后，该 APK 会与 Linux、Windows 和 macOS 构建包一同发布到 GitHub Release。
 
 无需打开图形窗口即可检查版本：
 

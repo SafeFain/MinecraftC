@@ -12,7 +12,7 @@ def sdlVersion = "3.4.10"
 def dependencyRoot = file(".deps")
 def archive = new File(dependencyRoot, "SDL3-${sdlVersion}.zip")
 def sourceRoot = new File(dependencyRoot, "SDL3-${sdlVersion}")
-def expectedSha256 = "be8dafef8ecc956e736cfd1c242c10737f3ad589a866f25ba437b7f2f6d5ced2"
+def expectedSha256 = "be8dafef3ecc956e736cfd1c242c10737f3ad589a866f25ba437b7f2f6d5ced2"
 if (!new File(sourceRoot, "CMakeLists.txt").isFile()) {
     dependencyRoot.mkdirs()
     if (!archive.isFile()) {

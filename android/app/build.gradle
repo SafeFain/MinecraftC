@@ -11,6 +11,7 @@ def versionPatch = versionMatch.group(3).toInteger()
 android {
     namespace "io.github.safefain.minecraftc"
     compileSdk 35
+    buildToolsVersion "35.0.0"
     ndkVersion "28.2.13676358"
     defaultConfig {
         applicationId "io.github.SafeFain.MinecraftC"

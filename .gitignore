@@ -1,6 +1,7 @@
 /build-local/
 /android/.deps/
 /android/.gradle/
+/android/app/.cxx/
 /android/app/build/
 /saves/
 

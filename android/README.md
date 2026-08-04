@@ -12,3 +12,8 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 The release APK is intentionally unsigned. Sign it outside the repository with
 the publisher's keystore before distribution.
+
+GitHub Actions builds the same unsigned arm64 release APK on every workflow run.
+Pushed `v*` tags publish it as
+`MinecraftC-1.1.3-android-arm64-unsigned.apk` alongside the Linux, Windows, and
+macOS packages.
