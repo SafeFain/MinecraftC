@@ -3,6 +3,7 @@
 #include "model/ModelAnimation.h"
 #include "renderer/RenderEnvironment.h"
 #include "world/BlockLightLogic.h"
+#include "core/GraphicsApi.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -33,7 +34,8 @@ public:
     ModelRenderer(const ModelRenderer&) = delete;
     ModelRenderer& operator=(const ModelRenderer&) = delete;
 
-    void initialize(const std::filesystem::path& assetRoot, bool framebufferSrgb);
+    void initialize(const std::filesystem::path& assetRoot, bool framebufferSrgb,
+                    GraphicsApi api);
     ModelHandle upload(std::shared_ptr<const ModelAsset> asset);
     void queue(const ModelDraw& draw);
     void flushOpaque(const glm::mat4& viewProjection,

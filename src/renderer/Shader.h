@@ -6,11 +6,13 @@
 #include <glm/glm.hpp>
 
 #include <glad/glad.h>
+#include "core/GraphicsApi.h"
 
 class Shader {
 public:
     Shader(const std::filesystem::path& vertexPath,
-           const std::filesystem::path& fragmentPath);
+           const std::filesystem::path& fragmentPath,
+           GraphicsApi api = GraphicsApi::OpenGL33);
     ~Shader();
 
     Shader(const Shader&) = delete;
@@ -31,6 +33,7 @@ public:
     void setInt(const std::string& name, int value) const;
 
     GLuint id() const { return m_programID; }
+    static std::string sourceForApi(std::string source, GraphicsApi api);
 
 private:
     GLuint m_programID = 0;

@@ -13,6 +13,7 @@
 #include <regex>
 #include <sstream>
 #include <stb_image.h>
+#include <new>
 
 // ── Constructor / Destructor ──────────────────────────────────────────────
 
@@ -23,10 +24,24 @@ UIRenderer::~UIRenderer() {
     if (m_quadVAO) GL_CHECK(glDeleteVertexArrays(1, &m_quadVAO));
 }
 
+void UIRenderer::reinitialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+                              const std::filesystem::path& assetRoot,
+                              GraphicsApi api) {
+    const Localization* localization = m_localization;
+    resetGraphics();
+    initialize(blockAtlasTexture, framebufferSrgb, assetRoot, api);
+    m_localization = localization;
+}
+
+void UIRenderer::resetGraphics() {
+    this->~UIRenderer();
+    new (this) UIRenderer();
+}
+
 // ── Initialization ────────────────────────────────────────────────────────
 
 void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
-                            const std::filesystem::path& assetRoot) {
+                            const std::filesystem::path& assetRoot, GraphicsApi api) {
     m_blockAtlasTexture = blockAtlasTexture;
     m_manualGamma = !framebufferSrgb;
     const std::string metadata=AssetStore::readTextPath(
@@ -58,7 +73,7 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
     // Compile UI rectangle shader
     m_uiShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "ui.vert",
-        assetRoot / "shaders" / "ui.frag"
+        assetRoot / "shaders" / "ui.frag", api
     );
 
     // Create unit-square VAO for rectangles with index buffer
@@ -89,7 +104,7 @@ void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
     GL_CHECK(glBindVertexArray(0));
 
     // Initialize font renderer
-    m_fontRenderer.initialize(m_manualGamma, assetRoot);
+    m_fontRenderer.initialize(m_manualGamma, assetRoot, api);
 }
 
 // ── Frame management ──────────────────────────────────────────────────────
@@ -110,8 +125,12 @@ void UIRenderer::beginUIFrame(int screenWidth, int screenHeight) {
     GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     // Orthographic projection: (0,0) at bottom-left, (w,h) at top-right
-    m_projection = glm::ortho(0.0f, static_cast<float>(screenWidth),
-                               0.0f, static_cast<float>(screenHeight));
+    const float fullWidth = m_canvasSize.x > 0.0f
+        ? m_canvasSize.x : static_cast<float>(screenWidth);
+    const float fullHeight = m_canvasSize.y > 0.0f
+        ? m_canvasSize.y : static_cast<float>(screenHeight);
+    m_projection = glm::ortho(-m_canvasOrigin.x, fullWidth - m_canvasOrigin.x,
+                              -m_canvasOrigin.y, fullHeight - m_canvasOrigin.y);
 }
 
 void UIRenderer::endUIFrame() {

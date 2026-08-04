@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
+#include <new>
 #include <stb_image.h>
 #include "core/Window.h"
 #include "Config.h"
@@ -93,44 +94,54 @@ Renderer::~Renderer() {
     if (m_particleVAO) GL_CHECK(glDeleteVertexArrays(1, &m_particleVAO));
 }
 
+void Renderer::reinitialize(const GraphicsCapabilities& capabilities,
+                            const std::filesystem::path& assetRoot) {
+    this->~Renderer();
+    new (this) Renderer();
+    initialize(capabilities, assetRoot);
+}
+
 // ── Initialization ────────────────────────────────────────────────────
 
-void Renderer::initialize(bool framebufferSrgb,
+void Renderer::initialize(const GraphicsCapabilities& capabilities,
                           const std::filesystem::path& assetRoot) {
-    m_framebufferSrgb = framebufferSrgb;
+    m_framebufferSrgb = capabilities.framebufferSrgb;
+    m_graphicsApi = capabilities.api;
     m_modelRenderer = std::make_unique<model::ModelRenderer>();
-    m_modelRenderer->initialize(assetRoot, framebufferSrgb);
+    m_modelRenderer->initialize(assetRoot, m_framebufferSrgb, m_graphicsApi);
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "block.vert",
-        assetRoot / "shaders" / "block.frag"
+        assetRoot / "shaders" / "block.frag", m_graphicsApi
     );
     m_wireShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "wireframe.vert",
-        assetRoot / "shaders" / "wireframe.frag"
+        assetRoot / "shaders" / "wireframe.frag", m_graphicsApi
     );
     m_skyShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "sky.vert",
-        assetRoot / "shaders" / "sky.frag"
+        assetRoot / "shaders" / "sky.frag", m_graphicsApi
     );
     m_entityShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "entity.vert",
-        assetRoot / "shaders" / "entity.frag"
+        assetRoot / "shaders" / "entity.frag", m_graphicsApi
     );
     m_cloudShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "cloud.vert",
-        assetRoot / "shaders" / "cloud.frag"
+        assetRoot / "shaders" / "cloud.frag", m_graphicsApi
     );
     m_particleShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "weather.vert",
-        assetRoot / "shaders" / "weather.frag");
+        assetRoot / "shaders" / "weather.frag", m_graphicsApi);
     m_blockAtlas.initialize(assetRoot);
 
     // Global GL state
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glEnable(GL_CULL_FACE));
-    GL_CHECK(glEnable(GL_MULTISAMPLE));
-    if (m_framebufferSrgb) GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
+    if (m_graphicsApi == GraphicsApi::OpenGL33) {
+        GL_CHECK(glEnable(GL_MULTISAMPLE));
+        if (m_framebufferSrgb) GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
+    }
     GLint samples = 0;
     GL_CHECK(glGetIntegerv(GL_SAMPLES, &samples));
     LOG_INFO("Visual pipeline: " << samples << "x MSAA, "
@@ -396,8 +407,15 @@ void Renderer::renderWireframe(const glm::vec3& blockPos,
     // Slightly enlarge to avoid z-fighting
     // (model matrix includes translation only; we use polygon offset)
 
-    GL_CHECK(glPolygonOffset(-1.0f, -1.0f));
-    GL_CHECK(glEnable(GL_POLYGON_OFFSET_LINE));
+    if (m_graphicsApi == GraphicsApi::OpenGL33) {
+        GL_CHECK(glPolygonOffset(-1.0f, -1.0f));
+        GL_CHECK(glEnable(GL_POLYGON_OFFSET_LINE));
+    } else {
+        model = glm::translate(model, glm::vec3(0.5f));
+        model = glm::scale(model, glm::vec3(1.003f));
+        model = glm::translate(model, glm::vec3(-0.5f));
+        mvp = viewProjection * model;
+    }
 
     m_wireShader->bind();
     m_wireShader->setMat4("uMVP", mvp);
@@ -405,7 +423,8 @@ void Renderer::renderWireframe(const glm::vec3& blockPos,
     GL_CHECK(glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_wireVertexCount)));
     GL_CHECK(glBindVertexArray(0));
 
-    GL_CHECK(glDisable(GL_POLYGON_OFFSET_LINE));
+    if (m_graphicsApi == GraphicsApi::OpenGL33)
+        GL_CHECK(glDisable(GL_POLYGON_OFFSET_LINE));
 }
 
 void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,

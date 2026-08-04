@@ -11,6 +11,7 @@
 #include "world/Block.h"
 #include "game/Item.h"
 #include "game/Localization.h"
+#include "core/GraphicsApi.h"
 
 class Shader;
 
@@ -23,13 +24,20 @@ public:
     UIRenderer& operator=(const UIRenderer&) = delete;
 
     void initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
-                    const std::filesystem::path& assetRoot);
+                    const std::filesystem::path& assetRoot, GraphicsApi api);
+    void reinitialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+                      const std::filesystem::path& assetRoot, GraphicsApi api);
+    void resetGraphics();
     void setLocalization(const Localization& localization) {
         m_localization = &localization;
     }
     const Localization& localization() const { return *m_localization; }
 
     void beginUIFrame(int screenWidth, int screenHeight);
+    void setCanvas(float originX, float originY, float fullWidth, float fullHeight) {
+        m_canvasOrigin = {originX, originY};
+        m_canvasSize = {fullWidth, fullHeight};
+    }
     void endUIFrame();
 
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
@@ -51,6 +59,8 @@ private:
     FontRenderer m_fontRenderer;
 
     glm::mat4 m_projection{1.0f};
+    glm::vec2 m_canvasOrigin{0.0f};
+    glm::vec2 m_canvasSize{0.0f};
 
     GLuint m_quadVAO = 0;
     GLuint m_quadVBO = 0;

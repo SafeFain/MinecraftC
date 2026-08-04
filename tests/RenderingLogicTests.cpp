@@ -1,6 +1,7 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/CameraEffects.h"
 #include "model/ModelRenderLogic.h"
+#include "renderer/ShaderDialect.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -16,6 +17,15 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const std::string desktopShader = "#version 330 core\nvoid main(){}\n";
+    require(shaderSourceForApi(desktopShader, GraphicsApi::OpenGL33) == desktopShader,
+            "desktop shader source was unexpectedly rewritten");
+    const std::string esShader = shaderSourceForApi(
+        desktopShader, GraphicsApi::OpenGLES30);
+    require(esShader.rfind("#version 300 es\nprecision highp float;\n"
+                           "precision highp int;\n", 0) == 0 &&
+            esShader.find("#version 330 core") == std::string::npos,
+            "GLES shader preamble was not generated correctly");
     require(model::modelPass(model::AlphaMode::Opaque) ==
                 model::ModelPass::Opaque &&
             model::modelPass(model::AlphaMode::Mask) ==

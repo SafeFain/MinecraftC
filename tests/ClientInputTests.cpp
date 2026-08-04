@@ -9,6 +9,7 @@
 #include "core/GamepadManager.h"
 #include <SDL3/SDL.h>
 #include "core/TextEditBuffer.h"
+#include "core/Window.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -25,6 +26,10 @@ glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
 int main(){
+    const WindowSafeArea safe = projectWindowSafeArea(
+        20, 10, 600, 330, 640, 360, 1280, 720);
+    require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,
+            "top-left logical safe area projects to bottom-left framebuffer coordinates");
     require(SDL_InitSubSystem(SDL_INIT_JOYSTICK|SDL_INIT_GAMEPAD),
             "SDL gamepad test subsystem initializes");
     SDL_VirtualJoystickDesc virtualDesc{};SDL_INIT_INTERFACE(&virtualDesc);

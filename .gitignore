@@ -1,4 +1,7 @@
 /build-local/
+/android/.deps/
+/android/.gradle/
+/android/app/build/
 /saves/
 
 # Local agent context and task state; never publish with project sources.

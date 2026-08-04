@@ -19,9 +19,9 @@ AssetStore::MemoryStream& AssetStore::MemoryStream::operator=(MemoryStream&& oth
 AssetStore::MemoryStream::~MemoryStream() { if (stream) SDL_CloseIO(stream); }
 
 AssetStore::AssetStore(const std::filesystem::path& root, uint64_t readyTimeoutMs) {
-    m_root=std::filesystem::weakly_canonical(root);
+    if (!root.empty()) m_root=std::filesystem::weakly_canonical(root);
     const std::string native = root.u8string();
-    m_storage = SDL_OpenTitleStorage(native.c_str(), 0);
+    m_storage = SDL_OpenTitleStorage(native.empty() ? nullptr : native.c_str(), 0);
     if (!m_storage) throw std::runtime_error("Could not open title storage: " + std::string(SDL_GetError()));
     RuntimeClock clock;const uint64_t started=clock.now();
     while (!SDL_StorageReady(m_storage) && RuntimeClock::milliseconds(
@@ -84,6 +84,8 @@ AssetStore::MemoryStream AssetStore::openMemory(std::string_view relative) const
 
 std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path) {
     if(s_current){
+        if (s_current->m_root.empty() && path.is_relative())
+            return s_current->readBinary(path.generic_u8string());
         std::error_code error;const auto relative=std::filesystem::relative(path,s_current->m_root,error);
         if(!error)return s_current->readBinary(relative.generic_u8string());
     }

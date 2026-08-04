@@ -6,6 +6,10 @@
 #include <stdexcept>
 #include <vector>
 
+#if defined(__ANDROID__)
+#  include <SDL3/SDL_filesystem.h>
+#endif
+
 #if defined(_WIN32)
 #  define NOMINMAX
 #  include <io.h>
@@ -98,7 +102,9 @@ fs::path unixHomeDirectory() {
 } // namespace
 
 DesktopPlatform currentDesktopPlatform() {
-#if defined(_WIN32)
+#if defined(__ANDROID__)
+    return DesktopPlatform::Android;
+#elif defined(_WIN32)
     return DesktopPlatform::Windows;
 #elif defined(__APPLE__)
     return DesktopPlatform::MacOS;
@@ -153,6 +159,8 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
             else if (!inputs.homeDirectory.empty())
                 result.dataRoot = inputs.homeDirectory / ".local" / "share" / "minecraftc";
             break;
+        case DesktopPlatform::Android:
+            break;
     }
     if (result.dataRoot.empty())
         throw std::runtime_error("Cannot determine a writable user data directory");
@@ -160,6 +168,18 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
 }
 
 RuntimePaths discoverRuntimePaths(const char* argv0) {
+#if defined(__ANDROID__)
+    (void)argv0;
+    char* preferred = SDL_GetPrefPath("SafeFain", "MinecraftC");
+    if (!preferred)
+        throw std::runtime_error("Cannot determine Android application data directory");
+    RuntimePaths result;
+    result.dataRoot = std::filesystem::u8path(preferred);
+    SDL_free(preferred);
+    // An empty title-storage override selects the APK asset namespace.
+    result.assetRoot.clear();
+    return result;
+#else
     RuntimePathInputs inputs;
     inputs.platform = currentDesktopPlatform();
     inputs.executablePath = executablePathFromSystem(argv0);
@@ -168,6 +188,7 @@ RuntimePaths discoverRuntimePaths(const char* argv0) {
     inputs.xdgDataHome = environmentPath("XDG_DATA_HOME");
     inputs.roamingAppData = windowsRoamingData();
     return resolveRuntimePaths(inputs);
+#endif
 }
 
 namespace Platform {

@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(MinecraftC VERSION 1.1.3 LANGUAGES CXX C)
 
+if(ANDROID)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -18,6 +22,8 @@ option(MINECRAFTC_PORTABLE_LAYOUT
        "Install a self-contained release layout rooted at the install prefix" OFF)
 option(MINECRAFTC_STATIC_MSVC_RUNTIME
        "Use the static MSVC runtime for portable Windows packages" OFF)
+option(MINECRAFTC_DESKTOP_GLES3
+       "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
@@ -39,8 +45,13 @@ if(MINECRAFTC_USE_SYSTEM_SDL3)
     set(MINECRAFTC_SDL_TARGET SDL3::SDL3)
 else()
     include(FetchContent)
-    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    if(ANDROID)
+        set(SDL_SHARED ON CACHE BOOL "" FORCE)
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    else()
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    endif()
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
     set(SDL_TESTS OFF CACHE BOOL "" FORCE)
     set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -62,9 +73,20 @@ else()
         GIT_TAG release-3.4.10
         GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(SDL3)
-    set(MINECRAFTC_SDL_TARGET SDL3::SDL3-static)
+    if(ANDROID)
+        set(MINECRAFTC_SDL_TARGET SDL3::SDL3-shared)
+    else()
+        set(MINECRAFTC_SDL_TARGET SDL3::SDL3-static)
+    endif()
 endif()
-find_package(OpenGL REQUIRED)
+if(ANDROID)
+    find_library(MINECRAFTC_GLES_LIBRARY GLESv3)
+    if(NOT MINECRAFTC_GLES_LIBRARY)
+        message(FATAL_ERROR "Android OpenGL ES 3 library was not found")
+    endif()
+else()
+    find_package(OpenGL REQUIRED)
+endif()
 
 add_library(minecraftc_assets STATIC src/core/AssetStore.cpp)
 target_include_directories(minecraftc_assets PUBLIC src)
@@ -93,6 +115,9 @@ add_library(minecraftc_platform STATIC src/core/Platform.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
 target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
+if(ANDROID)
+    target_link_libraries(minecraftc_platform PUBLIC ${MINECRAFTC_SDL_TARGET})
+endif()
 if(WIN32)
     target_link_libraries(minecraftc_platform PUBLIC shell32 ole32)
 endif()
@@ -102,8 +127,14 @@ elseif(MSVC)
     target_compile_options(minecraftc_platform PRIVATE /W4 /permissive- /utf-8)
 endif()
 
-add_executable(minecraftc ${SOURCES})
-target_include_directories(minecraftc PRIVATE
+if(ANDROID)
+    set(MINECRAFTC_APP_TARGET main)
+    add_library(${MINECRAFTC_APP_TARGET} SHARED ${SOURCES})
+else()
+    set(MINECRAFTC_APP_TARGET minecraftc)
+    add_executable(${MINECRAFTC_APP_TARGET} ${SOURCES})
+endif()
+target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE
     src
     external/glad/include
     external/FastNoiseLite
@@ -111,52 +142,63 @@ target_include_directories(minecraftc PRIVATE
     external/stb
     external
 )
-target_compile_definitions(minecraftc PRIVATE
+target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
     MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+if(MINECRAFTC_DESKTOP_GLES3)
+    target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
+        MINECRAFTC_FORCE_GLES3=1)
+endif()
 
 # ── Debug / logging compile-time gating ─────────────────────────────────
 # LOG_COMPILE_LEVEL strips log macros below the given level:
 #   0=Trace  1=Debug  2=Info  3=Warn  4=Error  5=Fatal
-target_compile_definitions(minecraftc PRIVATE
+target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
     $<$<CONFIG:Debug>:LOG_COMPILE_LEVEL=0>
     $<$<CONFIG:Release>:LOG_COMPILE_LEVEL=2>
 )
-target_link_libraries(minecraftc PRIVATE
+target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
     ${MINECRAFTC_SDL_TARGET}
     glm::glm
-    OpenGL::GL
     glad
     minecraftc_platform
     ${CMAKE_DL_LIBS}
 )
+if(ANDROID)
+    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
+        ${MINECRAFTC_GLES_LIBRARY} android log)
+else()
+    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE OpenGL::GL)
+endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(minecraftc PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(${MINECRAFTC_APP_TARGET} PRIVATE -Wall -Wextra -Wpedantic)
 elseif(MSVC)
-    target_compile_options(minecraftc PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(${MINECRAFTC_APP_TARGET} PRIVATE /W4 /permissive- /utf-8)
 endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT MINECRAFTC_IPO_SUPPORTED OUTPUT MINECRAFTC_IPO_ERROR)
 if(MINECRAFTC_IPO_SUPPORTED)
-    set_property(TARGET minecraftc PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    set_property(TARGET ${MINECRAFTC_APP_TARGET} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 endif()
 
 if(MINECRAFTC_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(minecraftc PRIVATE
+    target_compile_options(${MINECRAFTC_APP_TARGET} PRIVATE
         $<$<CONFIG:Debug>:-fsanitize=address,undefined -g -O0>)
-    target_link_options(minecraftc PRIVATE
+    target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE
         $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
     if(UNIX AND NOT APPLE)
-        target_link_options(minecraftc PRIVATE $<$<CONFIG:Debug>:-rdynamic>)
+        target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE $<$<CONFIG:Debug>:-rdynamic>)
     endif()
 endif()
 
 # ── Install ────────────────────────────────────────────────────────────
 
-if(MINECRAFTC_PORTABLE_LAYOUT)
+if(ANDROID)
+    # The Gradle project packages native libraries and assets.
+elseif(MINECRAFTC_PORTABLE_LAYOUT)
     install(TARGETS minecraftc RUNTIME DESTINATION .)
     install(DIRECTORY assets/ DESTINATION assets)
     install(FILES README.md THIRD_PARTY_LICENSES.md packaging/README-release.md
@@ -173,6 +215,9 @@ endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────
 include(CTest)
+if(ANDROID)
+    set(BUILD_TESTING OFF CACHE BOOL "Build tests" FORCE)
+endif()
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME release_version_cli COMMAND minecraftc --version)

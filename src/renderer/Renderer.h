@@ -27,7 +27,10 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void initialize(bool framebufferSrgb, const std::filesystem::path& assetRoot);
+    void initialize(const GraphicsCapabilities& capabilities,
+                    const std::filesystem::path& assetRoot);
+    void reinitialize(const GraphicsCapabilities& capabilities,
+                      const std::filesystem::path& assetRoot);
     void beginFrame();
     void endFrame();
     void setEnvironment(const RenderEnvironment& environment,
@@ -146,4 +149,5 @@ private:
     RenderEnvironment m_environment;
     glm::vec3 m_cameraPosition{0.0f};
     bool m_framebufferSrgb = false;
+    GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
 };

@@ -107,6 +107,8 @@ public:
 
     // Synchronous build (for first frame or when thread pool unavailable)
     void buildMeshesSync(Renderer* renderer, int maxCount = 16);
+    void invalidateGpuMeshes();
+    void restoreGpuMeshes();
 
     // ── Raycast ──────────────────────────────────────────────────────
     struct RaycastHit {

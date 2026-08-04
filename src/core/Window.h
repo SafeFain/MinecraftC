@@ -3,14 +3,37 @@
 #include "core/InputCodes.h"
 #include "core/Touch.h"
 #include "core/GamepadManager.h"
+#include "core/GraphicsApi.h"
 
 #include <array>
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 
 struct SDL_Window;
+
+struct WindowSafeArea {
+    int x = 0;
+    int y = 0;
+    int width = 1;
+    int height = 1;
+};
+
+inline WindowSafeArea projectWindowSafeArea(
+    int areaX, int areaY, int areaWidth, int areaHeight,
+    int windowWidth, int windowHeight, int pixelWidth, int pixelHeight) {
+    const double scaleX = windowWidth > 0
+        ? static_cast<double>(pixelWidth) / windowWidth : 1.0;
+    const double scaleY = windowHeight > 0
+        ? static_cast<double>(pixelHeight) / windowHeight : 1.0;
+    const int x = static_cast<int>(areaX * scaleX + 0.5);
+    const int top = static_cast<int>(areaY * scaleY + 0.5);
+    const int width = std::max(1, static_cast<int>(areaWidth * scaleX + 0.5));
+    const int height = std::max(1, static_cast<int>(areaHeight * scaleY + 0.5));
+    return {x, std::max(0, pixelHeight - top - height), width, height};
+}
 
 class Window {
 public:
@@ -48,6 +71,9 @@ public:
         return m_minimized || m_pixelWidth <= 0 || m_pixelHeight <= 0;
     }
     bool isSrgbCapable() const { return m_srgbCapable; }
+    GraphicsApi graphicsApi() const { return m_graphicsApi; }
+    GraphicsCapabilities graphicsCapabilities() const;
+    WindowSafeArea safeArea() const;
     GamepadManager& gamepads() { return *m_gamepads; }
 
     using KeyCallback =
@@ -80,6 +106,7 @@ private:
     bool m_cursorLocked = false;
     bool m_minimized = false;
     bool m_srgbCapable = false;
+    GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     bool m_touchAvailable = false;
     bool m_textInputEnabled = false;
     std::unique_ptr<GamepadManager> m_gamepads;

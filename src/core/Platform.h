@@ -8,7 +8,8 @@
 enum class DesktopPlatform {
     Linux,
     Windows,
-    MacOS
+    MacOS,
+    Android
 };
 
 struct RuntimePathInputs {

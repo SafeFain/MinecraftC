@@ -283,12 +283,13 @@ FontRenderer::~FontRenderer() {
 // ── Initialization ────────────────────────────────────────────────────────
 
 void FontRenderer::initialize(bool manualGamma,
-                              const std::filesystem::path& assetRoot) {
+                              const std::filesystem::path& assetRoot,
+                              GraphicsApi api) {
     m_manualGamma = manualGamma;
     // Compile text shader
     m_shader = std::make_unique<Shader>(
         assetRoot / "shaders" / "text.vert",
-        assetRoot / "shaders" / "text.frag"
+        assetRoot / "shaders" / "text.frag", api
     );
 
     // Create font atlas texture as RGBA (since GL_R8 may not be available)

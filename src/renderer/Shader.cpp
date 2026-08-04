@@ -2,6 +2,7 @@
 #include "debug/Log.h"
 #include "debug/OpenGL.h"
 #include "core/AssetStore.h"
+#include "renderer/ShaderDialect.h"
 
 #include <stdexcept>
 
@@ -35,9 +36,9 @@ GLuint Shader::compileShader(GLenum type, const std::string& source) {
 // ── Constructor / Destructor ──────────────────────────────────────────
 
 Shader::Shader(const std::filesystem::path& vertexPath,
-               const std::filesystem::path& fragmentPath) {
-    std::string vertexSrc   = readFile(vertexPath);
-    std::string fragmentSrc = readFile(fragmentPath);
+               const std::filesystem::path& fragmentPath, GraphicsApi api) {
+    std::string vertexSrc   = sourceForApi(readFile(vertexPath), api);
+    std::string fragmentSrc = sourceForApi(readFile(fragmentPath), api);
 
     GLuint vs = compileShader(GL_VERTEX_SHADER,   vertexSrc);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentSrc);
@@ -61,6 +62,10 @@ Shader::Shader(const std::filesystem::path& vertexPath,
 
     glDeleteShader(vs);
     glDeleteShader(fs);
+}
+
+std::string Shader::sourceForApi(std::string source, GraphicsApi api) {
+    return shaderSourceForApi(std::move(source), api);
 }
 
 Shader::~Shader() {

@@ -1609,6 +1609,22 @@ void World::buildMeshesSync(Renderer* renderer, int maxCount) {
     }
 }
 
+void World::invalidateGpuMeshes() {
+    std::shared_lock lock(m_chunkMutex);
+    for (auto& entry : m_chunks) {
+        std::lock_guard meshLock(entry.second->getMeshMutex());
+        entry.second->getMesh().abandonGpuResources();
+    }
+}
+
+void World::restoreGpuMeshes() {
+    std::shared_lock lock(m_chunkMutex);
+    for (Chunk* chunk : m_activeChunks) {
+        std::lock_guard meshLock(chunk->getMeshMutex());
+        if (!chunk->getMesh().empty()) chunk->getMesh().upload();
+    }
+}
+
 // ── Raycast ───────────────────────────────────────────────────────────
 
 std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,

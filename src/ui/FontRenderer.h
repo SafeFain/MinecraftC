@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <glm/glm.hpp>
+#include "core/GraphicsApi.h"
 #include <glad/glad.h>
 
 class Shader;
@@ -16,7 +17,8 @@ public:
     FontRenderer(const FontRenderer&) = delete;
     FontRenderer& operator=(const FontRenderer&) = delete;
 
-    void initialize(bool manualGamma, const std::filesystem::path& assetRoot);
+    void initialize(bool manualGamma, const std::filesystem::path& assetRoot,
+                    GraphicsApi api);
 
     void begin(const glm::mat4& projection);
     void end();

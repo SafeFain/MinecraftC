@@ -64,8 +64,38 @@ public:
     {}
 
     void start() { initialize(); }
-    bool iterate() { return runFrame(); }
-    void event(const SDL_Event& event) { m_window.handleEvent(&event); }
+    bool iterate() {
+        if (m_graphicsResetPending) restoreGraphics();
+        if (m_backgrounded) { SDL_Delay(100); return m_running; }
+        return runFrame();
+    }
+    void event(const SDL_Event& event) {
+        switch (event.type) {
+            case SDL_EVENT_WILL_ENTER_BACKGROUND:
+                m_backgrounded = true;
+                m_touchControls.cancelAll();
+                saveCurrentWorld();
+                break;
+            case SDL_EVENT_DID_ENTER_FOREGROUND:
+                m_backgrounded = false;
+                m_lastFrameTick = m_runtimeClock.now();
+                break;
+            case SDL_EVENT_RENDER_DEVICE_RESET:
+                m_graphicsResetPending = true;
+                break;
+            case SDL_EVENT_LOW_MEMORY:
+                LOG_WARN("Android reported low memory");
+                break;
+            case SDL_EVENT_TERMINATING:
+                saveCurrentWorld();
+                m_savedForTermination = true;
+                m_running = false;
+                break;
+            default:
+                break;
+        }
+        m_window.handleEvent(&event);
+    }
     void shutdown() { if(!m_cleaned){m_cleaned=true;cleanup();} }
 
 private:
@@ -81,6 +111,9 @@ private:
     EntityManager m_entities{m_world};
     bool        m_running = true;
     bool        m_cleaned = false;
+    bool        m_backgrounded = false;
+    bool        m_graphicsResetPending = false;
+    bool        m_savedForTermination = false;
     struct VisibleChunk { const Chunk* chunk; glm::mat4 model; float distance2; };
     std::vector<VisibleChunk> m_visibleChunks;
 
@@ -182,12 +215,15 @@ private:
         // Set initial viewport (framebuffer size already queried in Window constructor)
         glViewport(0, 0, m_window.width(), m_window.height());
 
-        m_renderer.initialize(m_window.isSrgbCapable(), m_paths.assetRoot);
+        const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
+        if (graphics.api == GraphicsApi::OpenGLES30 && graphics.majorVersion < 3)
+            throw std::runtime_error("OpenGL ES 3.0 or newer is required");
+        m_renderer.initialize(graphics, m_paths.assetRoot);
         m_entities.initializeModels(m_paths.assetRoot, m_renderer);
         m_audio.initialize();
         m_uiRenderer.initialize(
             m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
-            m_paths.assetRoot);
+            m_paths.assetRoot, graphics.api);
         m_uiRenderer.setLocalization(m_localization);
 
         // Start with cursor visible (main menu)
@@ -529,6 +565,26 @@ private:
         LOG_INFO("Renderer: " << glGetString(GL_RENDERER));
     }
 
+    void restoreGraphics() {
+        m_graphicsResetPending = false;
+        m_world.invalidateGpuMeshes();
+        if (!gladLoadGL(Window::glProcAddress))
+            throw std::runtime_error("Failed to reload graphics functions");
+        const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
+        if (graphics.api == GraphicsApi::OpenGLES30 && graphics.majorVersion < 3)
+            throw std::runtime_error("OpenGL ES 3.0 context was not restored");
+        m_uiRenderer.resetGraphics();
+        m_renderer.reinitialize(graphics, m_paths.assetRoot);
+        m_entities.initializeModels(m_paths.assetRoot, m_renderer);
+        m_uiRenderer.initialize(
+            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
+            m_paths.assetRoot, graphics.api);
+        m_uiRenderer.setLocalization(m_localization);
+        m_world.restoreGpuMeshes();
+        glViewport(0, 0, m_window.width(), m_window.height());
+        LOG_INFO("Graphics resources restored after device reset");
+    }
+
     void showMainMenu() {
         m_activeMenu = std::make_unique<MainMenu>(
             m_menuCallbacks, m_worldCatalog.list(), m_clientSettings, m_localization);
@@ -562,8 +618,9 @@ private:
         const double scaleX=windowWidth>0?static_cast<double>(framebufferWidth)/windowWidth:1.0;
         const double scaleY=windowHeight>0?static_cast<double>(framebufferHeight)/windowHeight:1.0;
         const double uiScale=std::max(1,m_guiScale);
-        return {static_cast<float>(x*scaleX/uiScale),
-                static_cast<float>((framebufferHeight-y*scaleY)/uiScale)};
+        const WindowSafeArea safe = m_window.safeArea();
+        return {static_cast<float>((x*scaleX-safe.x)/uiScale),
+                static_cast<float>((framebufferHeight-y*scaleY-safe.y)/uiScale)};
     }
 
     void dispatchTouchCommands(const std::vector<TouchCommandEvent>& commands) {
@@ -667,9 +724,10 @@ private:
                 ButtonAction::Release,m_uiTouch.position);
             m_uiTouch={};return;
         }
+        const WindowSafeArea safe = m_window.safeArea();
         m_touchControls.configure(
-            std::max(1,m_window.width()/std::max(1,m_guiScale)),
-            std::max(1,m_window.height()/std::max(1,m_guiScale)),touchConfig());
+            std::max(1,safe.width/std::max(1,m_guiScale)),
+            std::max(1,safe.height/std::max(1,m_guiScale)),touchConfig());
         glm::vec2 position=event.phase==TouchPhase::End&&m_uiTouch.active&&event.id==m_uiTouch.id
             ?m_uiTouch.position:touchToUi(event.x,event.y);
         bool gameplay=false;
@@ -823,8 +881,11 @@ private:
             m_window.setTextInputEnabled(
                 m_commandOpen || (m_activeMenu && m_activeMenu->wantsTextInput()));
             updateLongPress();
-            const int touchWidth = std::max(1, m_window.width() / std::max(1,m_guiScale));
-            const int touchHeight = std::max(1, m_window.height() / std::max(1,m_guiScale));
+            const WindowSafeArea touchSafeArea = m_window.safeArea();
+            const int touchWidth = std::max(
+                1, touchSafeArea.width / std::max(1,m_guiScale));
+            const int touchHeight = std::max(
+                1, touchSafeArea.height / std::max(1,m_guiScale));
             m_touchControls.configure(touchWidth,touchHeight,touchConfig());
             if (m_clientSettings.controlMode != ControlMode::KeyboardMouse)
                 m_touchControls.applyTo(m_input);
@@ -1156,9 +1217,15 @@ private:
 
             // ── UI Rendering ──────────────────────────────────────────
             const int fbWidth=m_window.width(),fbHeight=m_window.height();
+            const WindowSafeArea safe = m_window.safeArea();
             m_guiScale = effectiveGuiScale(fbWidth, fbHeight, m_clientSettings.guiScale);
-            const int uiWidth = std::max(1, fbWidth / m_guiScale);
-            const int uiHeight = std::max(1, fbHeight / m_guiScale);
+            const int uiWidth = std::max(1, safe.width / m_guiScale);
+            const int uiHeight = std::max(1, safe.height / m_guiScale);
+            m_uiRenderer.setCanvas(
+                static_cast<float>(safe.x) / m_guiScale,
+                static_cast<float>(safe.y) / m_guiScale,
+                static_cast<float>(fbWidth) / m_guiScale,
+                static_cast<float>(fbHeight) / m_guiScale);
 
             // Phase 1: Inventory overlay (on top of 3D world)
             if (m_inventoryOpen) {
@@ -1455,9 +1522,10 @@ private:
         const double scaleY = windowHeight > 0
             ? static_cast<double>(framebufferHeight) / windowHeight : 1.0;
         const double uiScale = std::max(1, m_guiScale);
-        m_mouseScreenX = windowX * scaleX / uiScale;
+        const WindowSafeArea safe = m_window.safeArea();
+        m_mouseScreenX = (windowX * scaleX - safe.x) / uiScale;
         m_mouseScreenY =
-            (static_cast<double>(framebufferHeight) - windowY * scaleY) / uiScale;
+            (static_cast<double>(framebufferHeight) - windowY * scaleY - safe.y) / uiScale;
     }
 
     void renderSurvivalHud(int screenWidth) {
@@ -1608,7 +1676,7 @@ private:
     }
 
     void cleanup() {
-        saveCurrentWorld();
+        if (!m_savedForTermination) saveCurrentWorld();
         Debug::Log::shutdown();
         // Resources cleaned up by destructors
     }

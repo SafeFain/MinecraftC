@@ -45,6 +45,11 @@ struct ChunkMesh {
         gpuReady = false;
     }
 
+    void abandonGpuResources() {
+        vao = vbo = ebo = 0;
+        gpuReady = false;
+    }
+
     bool empty() const {
         return vertices.empty() || indices.empty();
     }

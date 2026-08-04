@@ -11,11 +11,15 @@
 #include <stdexcept>
 
 namespace {
-void configureOpenGLAttributes(bool srgb, int samples) {
+void configureOpenGLAttributes(GraphicsApi api, bool srgb, int samples) {
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,
+                        api == GraphicsApi::OpenGLES30 ? 0 : 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                        api == GraphicsApi::OpenGLES30
+                            ? SDL_GL_CONTEXT_PROFILE_ES
+                            : SDL_GL_CONTEXT_PROFILE_CORE);
 #if defined(__APPLE__)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #endif
@@ -46,7 +50,15 @@ int projectModifiers(SDL_Keymod modifiers) {
 }
 
 Window::Window(int width, int height, const std::string& title) {
+#if defined(__ANDROID__) || defined(MINECRAFTC_FORCE_GLES3)
+    m_graphicsApi = GraphicsApi::OpenGLES30;
+#endif
+#if defined(__ANDROID__)
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "1");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+#else
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+#endif
     SDL_SetAppMetadata(
         "MinecraftC", MINECRAFTC_VERSION_STRING, "io.github.SafeFain.MinecraftC");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -70,7 +82,7 @@ Window::Window(int width, int height, const std::string& title) {
     std::string firstError;
     VisualRequest selected = requests[0];
     for (const VisualRequest& request : requests) {
-        configureOpenGLAttributes(request.srgb, request.samples);
+        configureOpenGLAttributes(m_graphicsApi, request.srgb, request.samples);
         m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
         if (m_window) {
             selected = request;
@@ -241,6 +253,27 @@ void Window::setTitle(const std::string& title) { SDL_SetWindowTitle(m_window, t
 bool Window::isKeyPressed(int key) const {
     return key >= 0 && key < static_cast<int>(m_keys.size()) &&
         m_keys[static_cast<size_t>(key)];
+}
+
+GraphicsCapabilities Window::graphicsCapabilities() const {
+    GraphicsCapabilities result;
+    result.api = m_graphicsApi;
+    result.framebufferSrgb = m_srgbCapable;
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &result.majorVersion);
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &result.minorVersion);
+    SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &result.samples);
+    result.instancing = glProcAddress("glDrawArraysInstanced") != nullptr &&
+                        glProcAddress("glVertexAttribDivisor") != nullptr;
+    return result;
+}
+
+WindowSafeArea Window::safeArea() const {
+    SDL_Rect area{};
+    if (!SDL_GetWindowSafeArea(m_window, &area))
+        return {0, 0, m_pixelWidth, m_pixelHeight};
+    return projectWindowSafeArea(area.x, area.y, area.w, area.h,
+                                 m_windowWidth, m_windowHeight,
+                                 m_pixelWidth, m_pixelHeight);
 }
 
 bool Window::isMouseButtonPressed(int button) const {
