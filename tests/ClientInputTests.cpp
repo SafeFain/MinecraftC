@@ -3,7 +3,7 @@
 #include "ui/TouchControls.h"
 #include "ui/UIRenderer.h"
 
-#include <GLFW/glfw3.h>
+#include "core/InputCodes.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -53,17 +53,33 @@ int main(){
     }
     require(ClientSettings::load(root/"invalid-options.txt").language==Language::English,
             "unsupported language falls back to English");
+    {
+        std::ofstream legacy(root/"v5-bindings.txt");
+        legacy<<"version=5\nbinding.0=1,90\nbinding.7=1,69\n"
+              <<"binding.8=1,999\nbinding.4=1,999\n";
+    }
+    const auto migrated=ClientSettings::load(root/"v5-bindings.txt");
+    require(migrated.bindings[0]==InputBinding{InputDevice::Keyboard,29}&&
+            migrated.bindings[7]==InputBinding{InputDevice::Keyboard,Key::E},
+            "v5 GLFW keyboard bindings migrate to stable physical keys");
+    require(migrated.bindings[8]==InputBinding{}&&
+            migrated.bindings[4]==ClientSettings{}.bindings[4],
+            "unknown legacy bindings unbind optional actions and restore required defaults");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");
     require(effectiveGuiScale(1920,1080,0)==3&&effectiveGuiScale(800,450,0)==1,
             "automatic GUI scale preserves minimum virtual size");
 
-    InputState input;input.beginFrame();input.keyEvent(GLFW_KEY_W,GLFW_PRESS);
+    InputState input;input.beginFrame();input.keyEvent(Key::W,ButtonAction::Press);
     input.update(loaded.bindings);
     require(input.held(InputAction::MoveForward)&&input.pressed(InputAction::MoveForward),
             "bound key exposes held and pressed state");
-    input.beginFrame();input.keyEvent(GLFW_KEY_W,GLFW_RELEASE);input.update(loaded.bindings);
+    input.beginFrame();input.keyEvent(Key::W,ButtonAction::Release);input.update(loaded.bindings);
     require(input.released(InputAction::MoveForward),"release edge is exposed");
+    input.beginFrame();input.keyEvent(Key::W,ButtonAction::Press);input.update(loaded.bindings);
+    input.beginFrame();input.clearPhysical();input.update(loaded.bindings);
+    require(input.released(InputAction::MoveForward),
+            "focus-loss physical reset releases held actions");
     input.beginFrame();input.clearVirtual();input.setVirtual(InputAction::MoveForward,.4f);
     input.update(loaded.bindings);
     require(input.held(InputAction::MoveForward)&&input.value(InputAction::MoveForward)==.4f,
@@ -72,25 +88,32 @@ int main(){
             "core bindings are protected");
 
     TouchControls touch;TouchControlConfig config;touch.configure(1000,600,config);
-    auto commands=touch.onTouch({1,TouchPhase::Begin,76,176});
+    auto commands=touch.onTouch({{0,1},TouchPhase::Begin,76,176});
     require(commands.empty(),"joystick capture emits no discrete command");
     input.beginFrame();input.clearVirtual();touch.applyTo(input);input.update(loaded.bindings);
     require(input.value(InputAction::MoveForward)>.99f&&input.held(InputAction::Sprint),
             "outer joystick produces forward movement and sprint");
-    touch.onTouch({2,TouchPhase::Begin,500,300});
-    touch.onTouch({2,TouchPhase::Move,520,310});
+    touch.onTouch({{0,2},TouchPhase::Begin,500,300});
+    touch.onTouch({{0,2},TouchPhase::Move,520,310});
     require(touch.consumeLookDelta()==glm::vec2(20,10),"look touch reports relative delta");
-    commands=touch.onTouch({3,TouchPhase::Begin,890,160});
+    commands=touch.onTouch({{0,3},TouchPhase::Begin,890,160});
     require(commands.size()==1&&commands[0].command==TouchCommand::AttackPress,
             "action button emits attack press while other touches remain active");
-    commands=touch.onTouch({3,TouchPhase::End,0,0});
+    commands=touch.onTouch({{0,3},TouchPhase::End,0,0});
     require(commands.size()==1&&commands[0].command==TouchCommand::AttackRelease,
             "action button emits matching release");
+    commands=touch.onTouch({{1,7},TouchPhase::Begin,890,160});
+    require(commands.size()==1&&commands[0].command==TouchCommand::AttackPress,
+            "touch identity includes the SDL touch device");
+    commands=touch.onTouch({{2,7},TouchPhase::Begin,890,100});
+    require(commands.size()==1&&commands[0].command==TouchCommand::UsePress,
+            "equal finger ids from different devices remain independent");
+    touch.cancelAll();
     touch.cancelAll();input.beginFrame();input.clearVirtual();touch.applyTo(input);input.update(loaded.bindings);
     require(!input.held(InputAction::MoveForward)&&input.released(InputAction::MoveForward),
             "touch cancellation releases virtual movement");
     config.leftHanded=true;touch.configure(1000,600,config);
-    touch.onTouch({4,TouchPhase::Begin,924,176});
+    touch.onTouch({{0,4},TouchPhase::Begin,924,176});
     input.beginFrame();input.clearVirtual();touch.applyTo(input);input.update(loaded.bindings);
     require(input.value(InputAction::MoveForward)>.99f,
             "left-handed layout mirrors the movement joystick");

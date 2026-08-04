@@ -11,7 +11,7 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
-    void onMouseButton(int button, int action, double x, double y) override;
+    void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
 
 private:

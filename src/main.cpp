@@ -30,10 +30,12 @@
 #include "game/ClientSettings.h"
 #include "game/Localization.h"
 #include "game/SurvivalSession.h"
+#include "game/Utf8.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
 #include <glad/glad.h>
+#include <SDL3/SDL_main.h>
 
 #include <stdexcept>
 #include <chrono>
@@ -109,7 +111,6 @@ private:
     double                m_mouseScreenX = 0.0;
     double                m_mouseScreenY = 0.0;
     bool                  m_commandOpen = false;
-    bool                  m_suppressCommandChar = false;
     std::string           m_commandInput;
     std::string           m_commandMessage;
     float                 m_commandMessageSeconds = 0.0f;
@@ -130,9 +131,9 @@ private:
     InputState m_input;
     TouchControls m_touchControls;
     bool m_touchHudVisible = false;
-    std::unordered_map<int32_t, bool> m_touchGameplay;
+    std::unordered_map<TouchContactId, bool, TouchContactHash> m_touchGameplay;
     struct UiTouchState {
-        int32_t id = -1;
+        TouchContactId id;
         glm::vec2 position{0.0f};
         glm::vec2 origin{0.0f};
         Clock::time_point started{};
@@ -164,7 +165,7 @@ private:
         m_localization.setLanguage(m_clientSettings.language);
         applyClientSettings(false);
 
-        if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress))) {
+        if (!gladLoadGL(Window::glProcAddress)) {
             throw std::runtime_error("Failed to load OpenGL functions");
         }
 
@@ -288,8 +289,8 @@ private:
         };
 
         // ── Input callbacks ───────────────────────────────────────────
-        m_window.setKeyCallback([this](int key, int /*scancode*/, int action, int /*mods*/) {
-            if (action == GLFW_PRESS && m_clientSettings.controlMode == ControlMode::Auto)
+        m_window.setKeyCallback([this](int key, int /*scancode*/, ButtonAction action, int /*mods*/) {
+            if (action == ButtonAction::Press && m_clientSettings.controlMode == ControlMode::Auto)
                 m_touchHudVisible = false;
             m_input.keyEvent(key, action);
             m_input.update(m_clientSettings.bindings);
@@ -298,19 +299,19 @@ private:
                 return binding.device == InputDevice::Keyboard && binding.code == key;
             };
             // Track key state for legacy window/system shortcuts.
-            if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-                if (key < 512) m_keys[key] = true;
-            } else if (action == GLFW_RELEASE) {
-                if (key < 512) m_keys[key] = false;
+            if (action == ButtonAction::Press || action == ButtonAction::Repeat) {
+                if (key >= 0 && key < Key::Count) m_keys[key] = true;
+            } else if (action == ButtonAction::Release) {
+                if (key >= 0 && key < Key::Count) m_keys[key] = false;
             }
 
             if (m_commandOpen) {
-                if (action == GLFW_PRESS) {
-                    if (key == GLFW_KEY_ESCAPE) {
+                if (action == ButtonAction::Press) {
+                    if (key == Key::Escape) {
                         closeCommandInput();
-                    } else if (key == GLFW_KEY_ENTER) {
+                    } else if (key == Key::Enter) {
                         executeCommand();
-                    } else if (key == GLFW_KEY_BACKSPACE &&
+                    } else if (key == Key::Backspace &&
                                !m_commandInput.empty()) {
                         m_commandInput.pop_back();
                     }
@@ -318,18 +319,17 @@ private:
                 return;
             }
 
-            if (action == GLFW_PRESS && keyBound(InputAction::Command) &&
+            if (action == ButtonAction::Press && keyBound(InputAction::Command) &&
                 m_gameState == GameState::Playing && !m_activeMenu &&
                 !m_inventoryOpen && !m_playerDead) {
                 m_commandOpen = true;
                 m_commandInput.clear();
-                m_suppressCommandChar = true;
                 m_window.setCursorLocked(false);
                 return;
             }
 
             // E key — toggle creative inventory (Playing only, no menu active)
-            if (action == GLFW_PRESS && keyBound(InputAction::Inventory)) {
+            if (action == ButtonAction::Press && keyBound(InputAction::Inventory)) {
                 if (m_gameState == GameState::Playing && !m_activeMenu &&
                     !m_player.isSpectator()) {
                     if (m_inventoryOpen) {
@@ -342,7 +342,7 @@ private:
             }
 
             // Number keys 1-9 — hotbar selection (Playing only)
-            for (int slot = 0; slot < 9 && action == GLFW_PRESS; ++slot) {
+            for (int slot = 0; slot < 9 && action == ButtonAction::Press; ++slot) {
                 if (!keyBound(static_cast<InputAction>(
                         static_cast<int>(InputAction::Hotbar1) + slot))) continue;
                 if (m_gameState == GameState::Playing) {
@@ -362,7 +362,7 @@ private:
             }
 
             // ESC handling
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+            if (key == Key::Escape && action == ButtonAction::Press) {
                 // Close inventory first if open
                 if (m_inventoryOpen) {
                     closeInventory();
@@ -384,35 +384,33 @@ private:
                 return;
             }
 
-            if (m_playerDead && action == GLFW_PRESS &&
-                (key == GLFW_KEY_ENTER || key == GLFW_KEY_SPACE)) {
+            if (m_playerDead && action == ButtonAction::Press &&
+                (key == Key::Enter || key == Key::Space)) {
                 respawnPlayer();
                 return;
             }
 
             // Route to active menu for key presses
-            if (action == GLFW_PRESS && m_activeMenu) {
+            if (action == ButtonAction::Press && m_activeMenu) {
                 m_activeMenu->onKeyPress(key);
             }
         });
-        m_window.setCharCallback([this](unsigned int codepoint) {
-            if (m_commandOpen) {
-                if (m_suppressCommandChar) {
-                    m_suppressCommandChar = false;
-                    return;
+        m_window.setCharCallback([this](std::string_view text) {
+            for (const uint32_t codepoint : decodeUtf8(text)) {
+                if (m_commandOpen) {
+                    if (codepoint >= 32 && codepoint <= 126 &&
+                        m_commandInput.size() < 80) {
+                        m_commandInput.push_back(static_cast<char>(codepoint));
+                    }
+                } else if (m_activeMenu) {
+                    m_activeMenu->onChar(codepoint);
                 }
-                if (codepoint >= 32 && codepoint <= 126 &&
-                    m_commandInput.size() < 80) {
-                    m_commandInput.push_back(static_cast<char>(codepoint));
-                }
-            } else if (m_activeMenu) {
-                m_activeMenu->onChar(codepoint);
             }
         });
 
-        m_window.setMouseButtonCallback([this](int button, int action, int mods) {
+        m_window.setMouseButtonCallback([this](int button, ButtonAction action, int mods) {
             if (m_uiTouch.active) return;
-            if (action == GLFW_PRESS && m_clientSettings.controlMode == ControlMode::Auto)
+            if (action == ButtonAction::Press && m_clientSettings.controlMode == ControlMode::Auto)
                 m_touchHudVisible = false;
             m_input.mouseEvent(button, action);
             m_input.update(m_clientSettings.bindings);
@@ -421,7 +419,7 @@ private:
                 return binding.device == InputDevice::Mouse && binding.code == button;
             };
             updateMouseScreenPosition();
-            if (action == GLFW_PRESS && m_gameState == GameState::Playing && !m_activeMenu) {
+            if (action == ButtonAction::Press && m_gameState == GameState::Playing && !m_activeMenu) {
                 if (mouseBound(InputAction::Command) && !m_inventoryOpen && !m_playerDead) {
                     m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;
                 }
@@ -435,7 +433,7 @@ private:
                     m_player.setSelectedBlock(m_hotbar.getSelectedBlock());}
             }
             if (m_inventoryOpen && (m_player.isSurvival() || m_containerOpen) &&
-                (action == GLFW_PRESS || action == GLFW_RELEASE)) {
+                (action == ButtonAction::Press || action == ButtonAction::Release)) {
                 if (m_containerOpen) m_containerScreen.onMouseButton(
                     button, action, static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY), mods);
                 else m_survivalInventory.onMouseButton(button, action,
@@ -448,9 +446,9 @@ private:
                 if (mouseBound(InputAction::Use) && !m_inventoryOpen) handleGameplayAction(true, action);
                 return;
             }
-            if (action == GLFW_PRESS || action == GLFW_RELEASE) {
+            if (action == ButtonAction::Press || action == ButtonAction::Release) {
                 if (m_inventoryOpen) {
-                    if (!m_player.isSurvival() && action == GLFW_PRESS) {
+                    if (!m_player.isSurvival() && action == ButtonAction::Press) {
                         m_inventory.onMouseClick(button,
                             static_cast<int>(m_mouseScreenX),
                             static_cast<int>(m_mouseScreenY),
@@ -481,8 +479,8 @@ private:
                 if(wheelBound(InputAction::Inventory)&&!m_player.isSpectator()){if(m_inventoryOpen)closeInventory();else openInventory();return;}
                 if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.clear();m_window.setCursorLocked(false);return;}
                 for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_hotbar.selectSlot(slot);
-                if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,GLFW_PRESS);handleGameplayAction(false,GLFW_RELEASE);}
-                    if(wheelBound(InputAction::Use)){handleGameplayAction(true,GLFW_PRESS);if(!m_inventoryOpen)handleGameplayAction(true,GLFW_RELEASE);}}
+                if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,ButtonAction::Press);handleGameplayAction(false,ButtonAction::Release);}
+                    if(wheelBound(InputAction::Use)){handleGameplayAction(true,ButtonAction::Press);if(!m_inventoryOpen)handleGameplayAction(true,ButtonAction::Release);}}
             }
             if (m_gameState == GameState::Playing && !m_activeMenu &&
                 !m_inventoryOpen && !m_commandOpen) {
@@ -495,6 +493,12 @@ private:
         });
 
         m_window.setTouchCallback([this](const TouchEvent& event) { handleTouch(event); });
+        m_window.setFocusCallback([this](bool focused) {
+            if (focused) return;
+            m_input.clearPhysical();
+            m_input.update(m_clientSettings.bindings);
+            std::fill(std::begin(m_keys), std::end(m_keys), false);
+        });
 
         // ── Show main menu ────────────────────────────────────────────
         showMainMenu();
@@ -517,12 +521,11 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
-        m_window.setRawMouseInput(m_clientSettings.rawMouseInput);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");
         if (m_clientSettings.controlMode == ControlMode::KeyboardMouse) {
-            handleGameplayAction(false,GLFW_RELEASE);
-            handleGameplayAction(true,GLFW_RELEASE);
+            handleGameplayAction(false,ButtonAction::Release);
+            handleGameplayAction(true,ButtonAction::Release);
             m_touchControls.cancelAll();
             m_touchHudVisible = false;
         }
@@ -535,8 +538,8 @@ private:
 
     glm::vec2 touchToUi(double x,double y) const {
         int windowWidth=0,windowHeight=0,framebufferWidth=0,framebufferHeight=0;
-        glfwGetWindowSize(m_window.native(),&windowWidth,&windowHeight);
-        glfwGetFramebufferSize(m_window.native(),&framebufferWidth,&framebufferHeight);
+        windowWidth=m_window.windowWidth();windowHeight=m_window.windowHeight();
+        framebufferWidth=m_window.width();framebufferHeight=m_window.height();
         const double scaleX=windowWidth>0?static_cast<double>(framebufferWidth)/windowWidth:1.0;
         const double scaleY=windowHeight>0?static_cast<double>(framebufferHeight)/windowHeight:1.0;
         const double uiScale=std::max(1,m_guiScale);
@@ -547,21 +550,21 @@ private:
     void dispatchTouchCommands(const std::vector<TouchCommandEvent>& commands) {
         for(const auto& command:commands){
             switch(command.command){
-                case TouchCommand::AttackPress:handleGameplayAction(false,GLFW_PRESS);break;
-                case TouchCommand::AttackRelease:handleGameplayAction(false,GLFW_RELEASE);break;
-                case TouchCommand::UsePress:handleGameplayAction(true,GLFW_PRESS);break;
-                case TouchCommand::UseRelease:handleGameplayAction(true,GLFW_RELEASE);break;
+                case TouchCommand::AttackPress:handleGameplayAction(false,ButtonAction::Press);break;
+                case TouchCommand::AttackRelease:handleGameplayAction(false,ButtonAction::Release);break;
+                case TouchCommand::UsePress:handleGameplayAction(true,ButtonAction::Press);break;
+                case TouchCommand::UseRelease:handleGameplayAction(true,ButtonAction::Release);break;
                 case TouchCommand::OpenInventory:
                     if(!m_player.isSpectator()) {
-                        handleGameplayAction(false,GLFW_RELEASE);
-                        handleGameplayAction(true,GLFW_RELEASE);
+                        handleGameplayAction(false,ButtonAction::Release);
+                        handleGameplayAction(true,ButtonAction::Release);
                         m_touchControls.cancelAll();
                         openInventory();
                     }
                     break;
                 case TouchCommand::Pause:
-                    handleGameplayAction(false,GLFW_RELEASE);
-                    handleGameplayAction(true,GLFW_RELEASE);
+                    handleGameplayAction(false,ButtonAction::Release);
+                    handleGameplayAction(true,ButtonAction::Release);
                     m_touchControls.cancelAll();m_gameState=GameState::Paused;m_window.setCursorLocked(false);
                     m_activeMenu=std::make_unique<PauseMenu>(m_menuCallbacks,m_localization);break;
                 case TouchCommand::SelectHotbar:
@@ -572,17 +575,17 @@ private:
         }
     }
 
-    void dispatchUiTouchButton(int button,int action,const glm::vec2& position) {
+    void dispatchUiTouchButton(int button,ButtonAction action,const glm::vec2& position) {
         const int x=static_cast<int>(position.x),y=static_cast<int>(position.y);
         if(m_inventoryOpen&&(m_player.isSurvival()||m_containerOpen)){
             if(m_containerOpen)m_containerScreen.onMouseButton(button,action,x,y);
             else m_survivalInventory.onMouseButton(button,action,x,y);
         }else if(m_inventoryOpen){
-            if(action==GLFW_PRESS)m_inventory.onMouseClick(button,x,y,[this](ItemId id){
+            if(action==ButtonAction::Press)m_inventory.onMouseClick(button,x,y,[this](ItemId id){
                 m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(),id);
                 m_player.setSelectedCreativeItem(id);m_player.setSelectedBlock(m_hotbar.getSelectedBlock());});
         }else if(m_activeMenu)m_activeMenu->onMouseButton(button,action,position.x,position.y);
-        else if(m_playerDead&&action==GLFW_RELEASE)respawnPlayer();
+        else if(m_playerDead&&action==ButtonAction::Release)respawnPlayer();
     }
 
     void dispatchUiTouchMove(const glm::vec2& position) {
@@ -610,18 +613,18 @@ private:
                 if(m_activeMenu)m_activeMenu->onScroll(scroll);else m_inventory.onScroll(scroll);
                 m_uiTouch.origin=position;m_uiTouch.scrolling=true;
             }else if(!scrollSurface&&!m_uiTouch.buttonDown&&glm::length(delta)>8.0f){
-                dispatchUiTouchButton(GLFW_MOUSE_BUTTON_LEFT,GLFW_PRESS,m_uiTouch.origin);
+                dispatchUiTouchButton(MouseButton::Left,ButtonAction::Press,m_uiTouch.origin);
                 m_uiTouch.buttonDown=true;
             }
             dispatchUiTouchMove(position);return;
         }
         if(event.phase==TouchPhase::End){
             if(m_uiTouch.buttonDown)dispatchUiTouchButton(
-                m_uiTouch.rightButton?GLFW_MOUSE_BUTTON_RIGHT:GLFW_MOUSE_BUTTON_LEFT,
-                GLFW_RELEASE,m_uiTouch.position);
+                m_uiTouch.rightButton?MouseButton::Right:MouseButton::Left,
+                ButtonAction::Release,m_uiTouch.position);
             else if(!m_uiTouch.scrolling){
-                dispatchUiTouchButton(GLFW_MOUSE_BUTTON_LEFT,GLFW_PRESS,m_uiTouch.position);
-                dispatchUiTouchButton(GLFW_MOUSE_BUTTON_LEFT,GLFW_RELEASE,m_uiTouch.position);
+                dispatchUiTouchButton(MouseButton::Left,ButtonAction::Press,m_uiTouch.position);
+                dispatchUiTouchButton(MouseButton::Left,ButtonAction::Release,m_uiTouch.position);
             }
             m_uiTouch={};
         }
@@ -631,18 +634,18 @@ private:
         if(!m_uiTouch.active||m_uiTouch.buttonDown||m_uiTouch.scrolling||
            !m_inventoryOpen||(!m_player.isSurvival()&&!m_containerOpen))return;
         if(std::chrono::duration<float>(Clock::now()-m_uiTouch.started).count()<.45f)return;
-        dispatchUiTouchButton(GLFW_MOUSE_BUTTON_RIGHT,GLFW_PRESS,m_uiTouch.position);
+        dispatchUiTouchButton(MouseButton::Right,ButtonAction::Press,m_uiTouch.position);
         m_uiTouch.buttonDown=true;m_uiTouch.rightButton=true;
     }
 
     void handleTouch(const TouchEvent& event) {
         if(event.phase==TouchPhase::Cancel){
-            handleGameplayAction(false,GLFW_RELEASE);
-            handleGameplayAction(true,GLFW_RELEASE);
+            handleGameplayAction(false,ButtonAction::Release);
+            handleGameplayAction(true,ButtonAction::Release);
             m_touchControls.cancelAll();m_touchGameplay.clear();
             if(m_uiTouch.active&&m_uiTouch.buttonDown)dispatchUiTouchButton(
-                m_uiTouch.rightButton?GLFW_MOUSE_BUTTON_RIGHT:GLFW_MOUSE_BUTTON_LEFT,
-                GLFW_RELEASE,m_uiTouch.position);
+                m_uiTouch.rightButton?MouseButton::Right:MouseButton::Left,
+                ButtonAction::Release,m_uiTouch.position);
             m_uiTouch={};return;
         }
         m_touchControls.configure(
@@ -661,7 +664,7 @@ private:
             TouchEvent converted=event;converted.x=position.x;converted.y=position.y;
             dispatchTouchCommands(m_touchControls.onTouch(converted));
             // Preserve press/release edges even when a quick tap begins and
-            // ends within one glfwPollEvents call.
+            // ends within one event-poll call.
             m_input.clearVirtual();
             m_touchControls.applyTo(m_input);
             m_input.update(m_clientSettings.bindings);
@@ -669,9 +672,9 @@ private:
         if(event.phase==TouchPhase::End)m_touchGameplay.erase(event.id);
     }
 
-    void handleGameplayAction(bool use, int action) {
-        const int logicalButton = use ? GLFW_MOUSE_BUTTON_RIGHT : GLFW_MOUSE_BUTTON_LEFT;
-        if (action == GLFW_PRESS && use && !m_player.isSpectator()) {
+    void handleGameplayAction(bool use, ButtonAction action) {
+        const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
+        if (action == ButtonAction::Press && use && !m_player.isSpectator()) {
             auto hit = m_world.raycast(m_player.getEyePosition(), m_player.getForward(),
                                        Config::REACH_DISTANCE);
             if (hit) {
@@ -802,6 +805,8 @@ private:
 
             m_input.beginFrame();
             m_input.clearVirtual();
+            m_window.setTextInputEnabled(
+                m_commandOpen || (m_activeMenu && m_activeMenu->wantsTextInput()));
             m_window.pollEvents();
             updateLongPress();
             const int touchWidth = std::max(1, m_window.width() / std::max(1,m_guiScale));
@@ -1025,7 +1030,7 @@ private:
                 if (m_clientSettings.renderClouds) {
                     m_renderer.renderClouds(
                         playerPosition, vp, m_worldMetadata.seed,
-                        static_cast<float>(glfwGetTime()),
+                        static_cast<float>(Window::timeSeconds()),
                         m_clientSettings.cloudRenderDistance);
                 }
 
@@ -1121,8 +1126,7 @@ private:
             }
 
             // ── UI Rendering ──────────────────────────────────────────
-            int fbWidth, fbHeight;
-            glfwGetFramebufferSize(m_window.native(), &fbWidth, &fbHeight);
+            const int fbWidth=m_window.width(),fbHeight=m_window.height();
             m_guiScale = effectiveGuiScale(fbWidth, fbHeight, m_clientSettings.guiScale);
             const int uiWidth = std::max(1, fbWidth / m_guiScale);
             const int uiHeight = std::max(1, fbHeight / m_guiScale);
@@ -1242,8 +1246,8 @@ private:
             m_frameTimer.endFrame();
 
             // Alt+F4 to quit
-            if (m_window.isKeyPressed(GLFW_KEY_F4) &&
-                (m_keys[GLFW_KEY_LEFT_ALT] || m_keys[GLFW_KEY_RIGHT_ALT])) {
+            if (m_window.isKeyPressed(Key::F4) &&
+                (m_keys[Key::LeftAlt] || m_keys[Key::RightAlt])) {
                 m_running = false;
             }
         }
@@ -1300,7 +1304,6 @@ private:
     void closeCommandInput() {
         m_commandOpen = false;
         m_commandInput.clear();
-        m_suppressCommandChar = false;
         if (m_gameState == GameState::Playing) m_window.setCursorLocked(true);
     }
 
@@ -1370,9 +1373,8 @@ private:
         int windowHeight = 0;
         int framebufferWidth = 0;
         int framebufferHeight = 0;
-        glfwGetWindowSize(m_window.native(), &windowWidth, &windowHeight);
-        glfwGetFramebufferSize(
-            m_window.native(), &framebufferWidth, &framebufferHeight);
+        windowWidth=m_window.windowWidth();windowHeight=m_window.windowHeight();
+        framebufferWidth=m_window.width();framebufferHeight=m_window.height();
 
         const double scaleX = windowWidth > 0
             ? static_cast<double>(framebufferWidth) / windowWidth : 1.0;

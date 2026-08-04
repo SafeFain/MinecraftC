@@ -8,7 +8,7 @@
 #include <vector>
 #include <cmath>
 #include <stb_image.h>
-#include <GLFW/glfw3.h>
+#include "core/Window.h"
 #include "Config.h"
 
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
@@ -178,11 +178,11 @@ void Renderer::initialize(bool framebufferSrgb,
     GL_CHECK(glBindVertexArray(0));
 
     m_drawArraysInstanced = reinterpret_cast<DrawArraysInstancedFn>(
-        glfwGetProcAddress("glDrawArraysInstanced"));
+        Window::glProcAddress("glDrawArraysInstanced"));
     m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
-        glfwGetProcAddress("glVertexAttribDivisor"));
+        Window::glProcAddress("glVertexAttribDivisor"));
     m_bufferSubData = reinterpret_cast<BufferSubDataFn>(
-        glfwGetProcAddress("glBufferSubData"));
+        Window::glProcAddress("glBufferSubData"));
     m_cloudInstances.reserve(MAX_CLOUD_INSTANCES);
     if (m_drawArraysInstanced && m_vertexAttribDivisor) {
         // Clouds share the static entity cube but provide position and size
@@ -311,7 +311,7 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setFloat("uStarIntensity", environment.starIntensity);
     m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
     m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
-    m_skyShader->setFloat("uWeatherTime", static_cast<float>(glfwGetTime()));
+    m_skyShader->setFloat("uWeatherTime", static_cast<float>(Window::timeSeconds()));
     m_skyShader->setInt("uRenderClouds", renderClouds ? 1 : 0);
     m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_skyVAO));
@@ -599,7 +599,7 @@ void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
     m_particleShader->setMat4("uViewProjection", viewProjection);
     m_particleShader->setVec3("uCameraRight", cameraRight);
     m_particleShader->setVec3("uCameraUp", cameraUp);
-    m_particleShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
+    m_particleShader->setFloat("uTime", static_cast<float>(Window::timeSeconds()));
     m_particleShader->setFloat("uIntensity", intensity);
     m_particleShader->setInt("uBlockAtlas", 0);
     m_particleShader->setFloat("uAtlasTiles",

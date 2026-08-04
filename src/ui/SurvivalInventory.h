@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "game/InventoryModel.h"
+#include "core/InputCodes.h"
 
 class UIRenderer;
 
@@ -14,7 +15,7 @@ public:
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight,
                 int mouseX, int mouseY);
-    void onMouseButton(int button, int action, int mouseX, int mouseY, int mods = 0);
+    void onMouseButton(int button, ButtonAction action, int mouseX, int mouseY, int mods = 0);
     void onMouseMove(int mouseX, int mouseY);
     void onClose();
     void setCraftingTable(bool enabled) { m_craftingTable = enabled; }

@@ -1,7 +1,6 @@
 #include "game/ClientSettings.h"
 #include "core/Platform.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -17,12 +16,12 @@ InputBinding wheel(int direction) { return {InputDevice::Wheel, direction}; }
 ClientSettings::ClientSettings() { resetBindings(); }
 
 void ClientSettings::resetBindings() {
-    bindings = {key(GLFW_KEY_W), key(GLFW_KEY_S), key(GLFW_KEY_A), key(GLFW_KEY_D),
-        key(GLFW_KEY_SPACE), key(GLFW_KEY_LEFT_SHIFT), key(GLFW_KEY_LEFT_CONTROL),
-        key(GLFW_KEY_E), key(GLFW_KEY_T), mouse(GLFW_MOUSE_BUTTON_LEFT),
-        mouse(GLFW_MOUSE_BUTTON_RIGHT), key(GLFW_KEY_1), key(GLFW_KEY_2),
-        key(GLFW_KEY_3), key(GLFW_KEY_4), key(GLFW_KEY_5), key(GLFW_KEY_6),
-        key(GLFW_KEY_7), key(GLFW_KEY_8), key(GLFW_KEY_9), wheel(1), wheel(-1)};
+    bindings = {key(Key::W), key(Key::S), key(Key::A), key(Key::D),
+        key(Key::Space), key(Key::LeftShift), key(Key::LeftControl),
+        key(Key::E), key(Key::T), mouse(MouseButton::Left),
+        mouse(MouseButton::Right), key(Key::Num1), key(Key::Num2),
+        key(Key::Num3), key(Key::Num4), key(Key::Num5), key(Key::Num6),
+        key(Key::Num7), key(Key::Num8), key(Key::Num9), wheel(1), wheel(-1)};
 }
 
 void ClientSettings::validate() {
@@ -63,16 +62,19 @@ void ClientSettings::validate() {
 
 ClientSettings ClientSettings::load(const std::filesystem::path& path) {
     ClientSettings settings;
+    std::array<bool, INPUT_ACTION_COUNT> bindingRead{};
     std::ifstream input(path);
     if (!input) return settings;
     std::string line;
+    int formatVersion = 0;
     while (std::getline(input, line)) {
         const size_t equals = line.find('=');
         if (equals == std::string::npos) continue;
         const std::string name = line.substr(0, equals);
         const std::string value = line.substr(equals + 1);
         try {
-            if (name == "render_distance") settings.renderDistance = std::stoi(value);
+            if (name == "version") formatVersion = std::stoi(value);
+            else if (name == "render_distance") settings.renderDistance = std::stoi(value);
             else if (name == "render_clouds")
                 settings.renderClouds = std::stoi(value) != 0;
             else if (name == "cloud_render_distance")
@@ -81,7 +83,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "auto_jump") settings.autoJump = std::stoi(value) != 0;
             else if (name == "mouse_sensitivity") settings.mouseSensitivity = std::stof(value);
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
-            else if (name == "raw_mouse_input") settings.rawMouseInput = std::stoi(value) != 0;
+            else if (name == "raw_mouse_input") { /* v5 compatibility */ }
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name == "language") settings.language = parseLanguage(value);
@@ -96,10 +98,23 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 std::istringstream stream(value);
                 int device = 0, code = 0;
                 char comma = 0;
-                if (stream >> device >> comma >> code && comma == ',')
+                if (stream >> device >> comma >> code && comma == ',') {
                     settings.bindings[index] = {static_cast<InputDevice>(device), code};
+                    bindingRead[index] = true;
+                }
             }
         } catch (const std::exception&) {}
+    }
+    if (formatVersion < FORMAT_VERSION) {
+        ClientSettings defaults;
+        for (size_t i = 0; i < settings.bindings.size(); ++i) {
+            auto& binding = settings.bindings[i];
+            if (!bindingRead[i] || binding.device != InputDevice::Keyboard) continue;
+            const int migrated = migrateLegacyGlfwKey(binding.code);
+            if (migrated != Key::Unknown) binding.code = migrated;
+            else binding = inputActionCanUnbind(static_cast<InputAction>(i))
+                ? InputBinding{} : defaults.bindings[i];
+        }
     }
     settings.validate();
     return settings;
@@ -120,7 +135,6 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "auto_jump=" << autoJump << '\n'
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
-           << "raw_mouse_input=" << rawMouseInput << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "language=" << languageCode(language) << '\n';

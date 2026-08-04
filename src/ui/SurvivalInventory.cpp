@@ -4,7 +4,7 @@
 #include "game/InventoryInteraction.h"
 #include "ui/UIRenderer.h"
 
-#include <GLFW/glfw3.h>
+#include "core/Window.h"
 #include <algorithm>
 #include <string>
 
@@ -155,8 +155,8 @@ void SurvivalInventoryScreen::takeCraftingOutput() {
 }
 
 void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
-    if (button != GLFW_MOUSE_BUTTON_LEFT && button != GLFW_MOUSE_BUTTON_RIGHT) return;
-    const bool right = button == GLFW_MOUSE_BUTTON_RIGHT;
+    if (button != MouseButton::Left && button != MouseButton::Right) return;
+    const bool right = button == MouseButton::Right;
     if (contains(m_outputRect, mouseX, mouseY)) {
         if (!right) takeCraftingOutput();
         return;
@@ -188,9 +188,9 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 }
 
 void SurvivalInventoryScreen::onMouseButton(
-    int button, int action, int mouseX, int mouseY, int mods) {
-    if (button != GLFW_MOUSE_BUTTON_LEFT && button != GLFW_MOUSE_BUTTON_RIGHT) return;
-    if (action == GLFW_PRESS) {
+    int button, ButtonAction action, int mouseX, int mouseY, int mods) {
+    if (button != MouseButton::Left && button != MouseButton::Right) return;
+    if (action == ButtonAction::Press) {
         m_pointerPressed = true;
         m_pressedButton = button;
         m_pressX = mouseX;
@@ -200,20 +200,20 @@ void SurvivalInventoryScreen::onMouseButton(
         m_dragTargets.clear();
         return;
     }
-    if (action != GLFW_RELEASE || !m_pointerPressed || button != m_pressedButton)
+    if (action != ButtonAction::Release || !m_pointerPressed || button != m_pressedButton)
         return;
 
-    if ((m_pressMods & GLFW_MOD_SHIFT) && button == GLFW_MOUSE_BUTTON_LEFT) {
+    if ((m_pressMods & KeyModifier::Shift) && button == MouseButton::Left) {
         quickMove(mouseX,mouseY);m_pointerPressed=false;m_pressedButton=-1;return;
     }
     const int deltaX = mouseX - m_pressX;
     const int deltaY = mouseY - m_pressY;
     const bool dragged = deltaX * deltaX + deltaY * deltaY >= 16;
-    const double now=glfwGetTime();
+    const double now=Window::timeSeconds();
     if(dragged && m_cursorHeldAtPress && !m_dragTargets.empty()) {
         InventoryInteraction::distribute(m_cursor,m_dragTargets,
-                                         button==GLFW_MOUSE_BUTTON_RIGHT);
-    } else if(!dragged && button==GLFW_MOUSE_BUTTON_LEFT && !m_cursor.empty() &&
+                                         button==MouseButton::Right);
+    } else if(!dragged && button==MouseButton::Left && !m_cursor.empty() &&
        m_lastClickSeconds>=0.0 && now-m_lastClickSeconds<=0.30) {
         std::vector<ItemStack*> sources;
         for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));

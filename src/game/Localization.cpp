@@ -1,6 +1,5 @@
 #include "game/Localization.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -72,7 +71,7 @@ std::string Localization::bindingName(const InputBinding& binding) const {
         return format("binding.mouse", {std::to_string(binding.code + 1)});
     if (binding.device == InputDevice::Wheel)
         return text(binding.code > 0 ? "binding.wheel_up" : "binding.wheel_down");
-    const char* name = glfwGetKeyName(binding.code, 0);
+    const char* name = physicalKeyName(binding.code);
     if (name) {
         std::string result(name);
         std::transform(result.begin(), result.end(), result.begin(),
@@ -80,16 +79,16 @@ std::string Localization::bindingName(const InputBinding& binding) const {
         return result;
     }
     switch (binding.code) {
-        case GLFW_KEY_SPACE: return text("key.space");
-        case GLFW_KEY_LEFT_SHIFT: return text("key.left_shift");
-        case GLFW_KEY_LEFT_CONTROL: return text("key.left_ctrl");
-        case GLFW_KEY_UP: return text("key.up");
-        case GLFW_KEY_DOWN: return text("key.down");
-        case GLFW_KEY_LEFT: return text("key.left");
-        case GLFW_KEY_RIGHT: return text("key.right");
-        case GLFW_KEY_ESCAPE: return "Esc";
-        case GLFW_KEY_ENTER: return "Enter";
-        case GLFW_KEY_TAB: return "Tab";
+        case Key::Space: return text("key.space");
+        case Key::LeftShift: return text("key.left_shift");
+        case Key::LeftControl: return text("key.left_ctrl");
+        case Key::Up: return text("key.up");
+        case Key::Down: return text("key.down");
+        case Key::Left: return text("key.left");
+        case Key::Right: return text("key.right");
+        case Key::Escape: return "Esc";
+        case Key::Enter: return "Enter";
+        case Key::Tab: return "Tab";
         default: return format("key.code", {std::to_string(binding.code)});
     }
 }

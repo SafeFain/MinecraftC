@@ -1,7 +1,7 @@
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 
-#include <GLFW/glfw3.h>
+#include "core/Window.h"
 #include <algorithm>
 #include "game/Utf8.h"
 
@@ -317,11 +317,11 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
 }
 
 void MainMenu::onKeyPress(int key) {
-    if (m_page == Page::Create && key == GLFW_KEY_TAB) {
+    if (m_page == Page::Create && key == Key::Tab) {
         selectField(m_field == Field::Name ? Field::Seed : Field::Name);
         return;
     }
-    if (m_page == Page::Create && key == GLFW_KEY_BACKSPACE) {
+    if (m_page == Page::Create && key == Key::Backspace) {
         std::string& value = m_field == Field::Name ? m_worldName : m_seedText;
         eraseLastUtf8Codepoint(value);
         rebuildButtons();
@@ -331,31 +331,31 @@ void MainMenu::onKeyPress(int key) {
     // Printable keys remain text input on the create screen. Arrow keys and
     // Enter provide unambiguous keyboard navigation while a field is focused.
     if (m_page == Page::Create &&
-        (key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_SPACE)) {
+        (key == Key::W || key == Key::S || key == Key::Space)) {
         return;
     }
-    if (key == GLFW_KEY_ESCAPE) {
+    if (key == Key::Escape) {
         if (m_page == Page::Create) showWorlds();
         else if (m_page == Page::Worlds) showHome();
         return;
     }
-    if (m_page == Page::Worlds && key == GLFW_KEY_ENTER && m_selectedWorld >= 0 &&
+    if (m_page == Page::Worlds && key == Key::Enter && m_selectedWorld >= 0 &&
         m_selectedIdx == m_selectedWorld - m_worldOffset) {
         if (m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
             m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         return;
     }
     switch (key) {
-        case GLFW_KEY_UP:
-        case GLFW_KEY_W:
+        case Key::Up:
+        case Key::W:
             navigateUp(m_buttons, m_selectedIdx);
             break;
-        case GLFW_KEY_DOWN:
-        case GLFW_KEY_S:
+        case Key::Down:
+        case Key::S:
             navigateDown(m_buttons, m_selectedIdx);
             break;
-        case GLFW_KEY_ENTER:
-        case GLFW_KEY_SPACE:
+        case Key::Enter:
+        case Key::Space:
             activateSelected(m_buttons, m_selectedIdx);
             break;
         default:
@@ -389,9 +389,9 @@ void MainMenu::onMouseMove(double x, double y) {
     }
 }
 
-void MainMenu::onMouseButton(int button, int action, double x, double y) {
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    if (action == GLFW_PRESS) {
+void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    if (button != MouseButton::Left) return;
+    if (action == ButtonAction::Press) {
         m_pressedButton = -1;
         m_pressedDeleteButton = -1;
         for (size_t i = 0; i < m_deleteButtons.size(); ++i) {
@@ -409,7 +409,7 @@ void MainMenu::onMouseButton(int button, int action, double x, double y) {
                 return;
             }
         }
-    } else if (action == GLFW_RELEASE && m_pressedDeleteButton >= 0) {
+    } else if (action == ButtonAction::Release && m_pressedDeleteButton >= 0) {
         const int captured = m_pressedDeleteButton;
         m_pressedDeleteButton = -1;
         m_deleteButtons[static_cast<size_t>(captured)].setPressed(false);
@@ -417,7 +417,7 @@ void MainMenu::onMouseButton(int button, int action, double x, double y) {
                 static_cast<float>(x), static_cast<float>(y))) {
             m_deleteButtons[static_cast<size_t>(captured)].activate();
         }
-    } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
+    } else if (action == ButtonAction::Release && m_pressedButton >= 0) {
         const int captured = m_pressedButton;
         m_pressedButton = -1;
         m_buttons[static_cast<size_t>(captured)].setPressed(false);
@@ -426,7 +426,7 @@ void MainMenu::onMouseButton(int button, int action, double x, double y) {
             const int visibleWorlds = std::min(6, static_cast<int>(m_worlds.size()) - m_worldOffset);
             if (m_page == Page::Worlds && captured < visibleWorlds) {
                 const int worldIndex = m_worldOffset + captured;
-                const double now = glfwGetTime();
+                const double now = Window::timeSeconds();
                 if (m_lastWorldIndex == worldIndex && m_lastWorldClick >= 0.0 &&
                     now - m_lastWorldClick <= 0.35) {
                     m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
@@ -490,19 +490,19 @@ void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
 
 void PauseMenu::onKeyPress(int key) {
     switch (key) {
-        case GLFW_KEY_UP:
-        case GLFW_KEY_W:
+        case Key::Up:
+        case Key::W:
             navigateUp(m_buttons, m_selectedIdx);
             break;
-        case GLFW_KEY_DOWN:
-        case GLFW_KEY_S:
+        case Key::Down:
+        case Key::S:
             navigateDown(m_buttons, m_selectedIdx);
             break;
-        case GLFW_KEY_ENTER:
-        case GLFW_KEY_SPACE:
+        case Key::Enter:
+        case Key::Space:
             activateSelected(m_buttons, m_selectedIdx);
             break;
-        case GLFW_KEY_ESCAPE:
+        case Key::Escape:
             // ESC acts as Resume in pause menu
             if (!m_buttons.empty()) {
                 m_buttons[0].activate();  // "Resume" button
@@ -520,9 +520,9 @@ void PauseMenu::onMouseMove(double x, double y) {
     }
 }
 
-void PauseMenu::onMouseButton(int button, int action, double x, double y) {
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    if (action == GLFW_PRESS) {
+void PauseMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    if (button != MouseButton::Left) return;
+    if (action == ButtonAction::Press) {
         m_pressedButton = -1;
         for (size_t i = 0; i < m_buttons.size(); ++i) {
             if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
@@ -531,7 +531,7 @@ void PauseMenu::onMouseButton(int button, int action, double x, double y) {
                 return;
             }
         }
-    } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
+    } else if (action == ButtonAction::Release && m_pressedButton >= 0) {
         const int captured = m_pressedButton;
         m_pressedButton = -1;
         m_buttons[static_cast<size_t>(captured)].setPressed(false);

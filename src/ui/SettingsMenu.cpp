@@ -2,7 +2,6 @@
 #include "ui/UIRenderer.h"
 #include "Config.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -79,10 +78,6 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.format("settings.invert_y", {
             m_localization.text(m_settings.invertMouseY ? "common.on" : "common.off")}), [this]{
                 m_settings.invertMouseY = !m_settings.invertMouseY; m_onChanged(); refreshButtons();
-            });
-        m_buttons.emplace_back(m_localization.format("settings.raw_mouse", {
-            m_localization.text(m_settings.rawMouseInput ? "common.on" : "common.off")}), [this]{
-                m_settings.rawMouseInput = !m_settings.rawMouseInput; m_onChanged(); refreshButtons();
             });
         m_buttons.emplace_back(m_localization.text("settings.video"), [this]{
             m_page = Page::Video; m_selectedIdx = 0; refreshButtons();
@@ -196,18 +191,18 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
 
 void SettingsMenu::onKeyPress(int key) {
     if (m_captureAction >= 0) {
-        if (key == GLFW_KEY_ESCAPE) { m_captureAction = -1; refreshButtons(); }
-        else if (key == GLFW_KEY_BACKSPACE &&
+        if (key == Key::Escape) { m_captureAction = -1; refreshButtons(); }
+        else if (key == Key::Backspace &&
                  inputActionCanUnbind(static_cast<InputAction>(m_captureAction)))
             assignBinding({});
         else assignBinding({InputDevice::Keyboard, key});
         return;
     }
     switch (key) {
-        case GLFW_KEY_UP: case GLFW_KEY_W: navigateUp(m_buttons, m_selectedIdx); break;
-        case GLFW_KEY_DOWN: case GLFW_KEY_S: navigateDown(m_buttons, m_selectedIdx); break;
-        case GLFW_KEY_ENTER: case GLFW_KEY_SPACE: activateSelected(m_buttons, m_selectedIdx); break;
-        case GLFW_KEY_ESCAPE:
+        case Key::Up: case Key::W: navigateUp(m_buttons, m_selectedIdx); break;
+        case Key::Down: case Key::S: navigateDown(m_buttons, m_selectedIdx); break;
+        case Key::Enter: case Key::Space: activateSelected(m_buttons, m_selectedIdx); break;
+        case Key::Escape:
             if (m_page != Page::General) {
                 m_captureAction = -1;
                 m_page = Page::General;
@@ -224,19 +219,19 @@ void SettingsMenu::onMouseMove(double x, double y) {
         button.setHovered(button.containsPoint(static_cast<float>(x), static_cast<float>(y)));
 }
 
-void SettingsMenu::onMouseButton(int button, int action, double x, double y) {
-    if (m_captureAction >= 0 && action == GLFW_PRESS) {
+void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    if (m_captureAction >= 0 && action == ButtonAction::Press) {
         assignBinding({InputDevice::Mouse, button});
         return;
     }
-    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
-    if (action == GLFW_PRESS) {
+    if (button != MouseButton::Left) return;
+    if (action == ButtonAction::Press) {
         m_pressedButton = -1;
         for (size_t i = 0; i < m_buttons.size(); ++i)
             if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
                 m_pressedButton = static_cast<int>(i); m_buttons[i].setPressed(true); return;
             }
-    } else if (action == GLFW_RELEASE && m_pressedButton >= 0) {
+    } else if (action == ButtonAction::Release && m_pressedButton >= 0) {
         const int captured = m_pressedButton; m_pressedButton = -1;
         m_buttons[static_cast<size_t>(captured)].setPressed(false);
         if (m_buttons[static_cast<size_t>(captured)].containsPoint(

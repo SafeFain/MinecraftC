@@ -26,14 +26,18 @@ MinecraftC 是一个使用 C++17 与 OpenGL 3.3 编写的体素沙盒游戏。�
 安装依赖：
 
 ```bash
-# Debian / Ubuntu
-sudo apt install build-essential cmake libglfw3-dev libglm-dev libgl1-mesa-dev libwayland-dev pkg-config
+# Debian / Ubuntu（SDL3 默认由 CMake 获取并静态构建）
+sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev xorg-dev \
+  libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules pkg-config
 
 # Fedora
-sudo dnf install gcc-c++ cmake glfw-devel glm-devel mesa-libGL-devel wayland-devel pkgconf-pkg-config
+sudo dnf install gcc-c++ cmake git glm-devel mesa-libGL-devel libX11-devel \
+  libXcursor-devel libXi-devel libXrandr-devel wayland-devel \
+  libxkbcommon-devel wayland-protocols-devel pkgconf-pkg-config
 
 # Arch Linux
-sudo pacman -S --needed base-devel cmake glfw-wayland glm mesa wayland
+sudo pacman -S --needed base-devel cmake git glm mesa libx11 libxcursor libxi \
+  libxrandr wayland libxkbcommon wayland-protocols
 ```
 
 构建、安装并运行：
@@ -53,13 +57,16 @@ cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
+SDL 3.4.10 默认由 CMake 固定版本下载并静态链接。若系统已经提供兼容的 SDL3
+开发包，可在配置时添加 `-DMINECRAFTC_USE_SYSTEM_SDL3=ON`。
+
 ### macOS
 
 先安装 Xcode Command Line Tools 与 Homebrew 依赖：
 
 ```bash
 xcode-select --install
-brew install cmake glfw glm
+brew install cmake git glm
 ```
 
 构建当前 Mac 的原生版本：
@@ -116,11 +123,11 @@ minecraftc --version
 
 键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。
 
-Linux Wayland 会话与 Windows 8 及更高版本支持原生多点触控：左下虚拟摇杆
+SDL3 报告触屏设备时，Linux 与 Windows 支持原生多点触控：左下虚拟摇杆
 控制移动，右侧空白区域拖动视角，屏幕动作键控制跳跃、下潜、攻击、使用、背包和暂停，快捷栏可直接
 点选。摇杆推到外圈会自动疾跑。Settings → Touch Controls 可选择自动、键鼠或
 触控模式，并调整触控灵敏度、控件大小、透明度和左右手布局。世界名、种子与
-命令文本仍需物理键盘输入；X11 和 macOS 暂时只保留键鼠操作。
+命令文本仍需物理键盘输入，程序不会主动显示系统屏幕键盘。
 
 存档默认位于：
 

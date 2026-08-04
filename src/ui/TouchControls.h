@@ -57,7 +57,7 @@ private:
     float m_moveRadius = 50.0f;
     glm::vec2 m_move{0.0f};
     glm::vec2 m_lookDelta{0.0f};
-    std::unordered_map<int32_t, Capture> m_touches;
+    std::unordered_map<TouchContactId, Capture, TouchContactHash> m_touches;
     bool m_jumpHeld = false, m_sneakHeld = false;
 
     Target targetAt(float x, float y, int& slot) const;

@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "game/InventoryModel.h"
+#include "core/InputCodes.h"
 
 class UIRenderer;
 class World;
@@ -16,7 +17,7 @@ public:
     bool open(World& world, const glm::ivec3& position);
     bool valid() const;
     void render(UIRenderer& ui, int width, int height, int mouseX, int mouseY);
-    void onMouseButton(int button, int action, int mouseX, int mouseY, int mods = 0);
+    void onMouseButton(int button, ButtonAction action, int mouseX, int mouseY, int mods = 0);
     void onMouseMove(int mouseX, int mouseY);
     void close(const std::function<void(ItemStack)>& drop);
 

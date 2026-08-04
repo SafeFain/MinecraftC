@@ -2,7 +2,6 @@
 #include "ui/UIRenderer.h"
 #include "Config.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 
 Hotbar::Hotbar() {
@@ -42,8 +41,8 @@ void Hotbar::onScroll(double yoffset) {
 }
 
 void Hotbar::onKeyPress(int key) {
-    if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
-        selectSlot(key - GLFW_KEY_1);
+    if (key >= Key::Num1 && key <= Key::Num9) {
+        selectSlot(key - Key::Num1);
     }
 }
 

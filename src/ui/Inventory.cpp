@@ -3,7 +3,6 @@
 #include "Config.h"
 #include "game/Item.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
 
@@ -92,7 +91,7 @@ void CreativeInventory::onMouseMove(int x,int y){
 }
 
 void CreativeInventory::onMouseClick(int button,int x,int y,std::function<void(ItemId)> select){
-    if(button!=GLFW_MOUSE_BUTTON_LEFT) return;
+    if(button!=MouseButton::Left) return;
     constexpr float slot=44.0f;
     for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
         m_selected=item.id;if(select)select(item.id);return;}

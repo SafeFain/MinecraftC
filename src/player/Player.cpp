@@ -5,7 +5,6 @@
 #include "Config.h"
 #include "game/SurvivalRules.h"
 #include "entity/EntityManager.h"
-#include <GLFW/glfw3.h>
 
 #include <cmath>
 #include <algorithm>
@@ -170,17 +169,17 @@ void Player::handleMovement(const InputState& input, float dt) {
     }
 }
 
-void Player::handleMouseButton(int button, int action) {
+void Player::handleMouseButton(int button, ButtonAction action) {
     if (!m_mouseLocked) return;
     if (m_gameMode == GameMode::Spectator) return;
-    if (button == GLFW_MOUSE_BUTTON_RIGHT && m_gameMode == GameMode::Survival &&
+    if (button == MouseButton::Right && m_gameMode == GameMode::Survival &&
         m_inventory.offhand().id == ItemId::SHIELD) {
-        m_blocking = action != GLFW_RELEASE;
+        m_blocking = action != ButtonAction::Release;
         if (m_blocking) return;
     }
 
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        m_mining = action != GLFW_RELEASE;
+    if (button == MouseButton::Left) {
+        m_mining = action != ButtonAction::Release;
         if (!m_mining) {
             m_miningTarget.reset();
             m_miningProgress = 0.0f;
@@ -203,7 +202,7 @@ void Player::handleMouseButton(int button, int action) {
                 m_actionCooldown = 0.15f;
             }
         }
-    } else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS &&
+    } else if (button == MouseButton::Right && action == ButtonAction::Press &&
                m_actionCooldown <= 0.0f) {
         placeBlock();
         m_actionCooldown = 0.15f;

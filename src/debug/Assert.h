@@ -18,7 +18,7 @@
 //
 // ── Examples ───────────────────────────────────────────────────────────
 //   MC_ASSERT(indexCount > 0, "Mesh built with zero indices — chunk " << cx << "," << cz);
-//   MC_CHECK(glfwInit(), "GLFW initialization failed");
+//   MC_CHECK(resource != nullptr, "Resource initialization failed");
 //   MC_VERIFY(gladLoadGL(loader), "Failed to load OpenGL functions");
 
 #ifndef NDEBUG

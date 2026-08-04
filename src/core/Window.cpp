@@ -1,169 +1,236 @@
 #include "core/Window.h"
-#include "debug/Log.h"
+
 #include "Config.h"
+#include "debug/Log.h"
+
+#include <SDL3/SDL.h>
 #include <glad/glad.h>
-#include <cstdlib>
+
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
-// ── Static callback dispatchers ───────────────────────────────────────
-
-void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self) {
-        self->handleFramebufferResize(width, height);
+namespace {
+int projectMouseButton(Uint8 button) {
+    switch (button) {
+        case SDL_BUTTON_LEFT: return MouseButton::Left;
+        case SDL_BUTTON_RIGHT: return MouseButton::Right;
+        case SDL_BUTTON_MIDDLE: return MouseButton::Middle;
+        case SDL_BUTTON_X1: return 3;
+        case SDL_BUTTON_X2: return 4;
+        default: return -1;
     }
 }
 
-void Window::cursorPosCallback(GLFWwindow* window, double x, double y) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
-    self->m_cursorDeltaX += x - self->m_lastCursorX;
-    self->m_cursorDeltaY += y - self->m_lastCursorY;
-    self->m_lastCursorX = x;
-    self->m_lastCursorY = y;
+int projectModifiers(SDL_Keymod modifiers) {
+    int result = 0;
+    if ((modifiers & SDL_KMOD_SHIFT) != 0) result |= KeyModifier::Shift;
+    if ((modifiers & SDL_KMOD_CTRL) != 0) result |= KeyModifier::Control;
+    if ((modifiers & SDL_KMOD_ALT) != 0) result |= KeyModifier::Alt;
+    if ((modifiers & SDL_KMOD_GUI) != 0) result |= KeyModifier::Super;
+    return result;
+}
 }
 
-void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_keyCallback) {
-        self->m_keyCallback(key, scancode, action, mods);
-    }
-}
-
-void Window::charCallback(GLFWwindow* window, unsigned int codepoint) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_charCallback) self->m_charCallback(codepoint);
-}
-
-void Window::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_mouseButtonCallback) {
-        self->m_mouseButtonCallback(button, action, mods);
-    }
-}
-
-void Window::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self && self->m_scrollCallback) {
-        self->m_scrollCallback(xoffset, yoffset);
-    }
-}
-
-void Window::iconifyCallback(GLFWwindow* window, int iconified) {
-    auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    if (self) {
-        self->m_minimized = (iconified != 0);
-    }
-}
-
-// ── Constructor / Destructor ──────────────────────────────────────────
-
-Window::Window(int width, int height, const std::string& title)
-    : m_width(width), m_height(height)
-{
-#if defined(__linux__)
-    // GLFW 3.4 can include both Linux backends. Prefer the compositor named by
-    // the session so a stale or inaccessible DISPLAY cannot mask Wayland touch.
-    if (std::getenv("WAYLAND_DISPLAY") && glfwPlatformSupported(GLFW_PLATFORM_WAYLAND))
-        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
-#endif
-    if (!glfwInit()) {
-        LOG_FATAL("Failed to initialize GLFW");
-        throw std::runtime_error("Failed to initialize GLFW");
+Window::Window(int width, int height, const std::string& title) {
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+    SDL_SetAppMetadata(
+        "MinecraftC", MINECRAFTC_VERSION_STRING, "io.github.SafeFain.MinecraftC");
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        LOG_FATAL("Failed to initialize SDL: " << SDL_GetError());
+        throw std::runtime_error("Failed to initialize SDL");
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #if defined(__APPLE__)
-    // macOS only exposes 3.2+ core contexts when forward compatibility is set.
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #endif
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_SAMPLES, Config::MSAA_SAMPLES);
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, Config::MSAA_SAMPLES > 0 ? 1 : 0);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, Config::MSAA_SAMPLES);
 
-    m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
+    const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
+        SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
     if (!m_window) {
-        glfwTerminate();
-        LOG_FATAL("Failed to create GLFW window");
-        throw std::runtime_error("Failed to create GLFW window");
+        const std::string error = SDL_GetError();
+        SDL_Quit();
+        LOG_FATAL("Failed to create SDL window: " << error);
+        throw std::runtime_error("Failed to create SDL window");
     }
-
-    glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(1); // VSync
-
-    glfwSetWindowUserPointer(m_window, this);
-    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
-    glfwSetCursorPosCallback(m_window, cursorPosCallback);
-    glfwSetKeyCallback(m_window, keyCallback);
-    glfwSetCharCallback(m_window, charCallback);
-    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
-    glfwSetScrollCallback(m_window, scrollCallback);
-    glfwSetWindowIconifyCallback(m_window, iconifyCallback);
-
-    // Initial cursor position
-    glfwGetCursorPos(m_window, &m_lastCursorX, &m_lastCursorY);
-
-    // Query actual framebuffer size (may differ from logical window on HiDPI)
-    int fbW, fbH;
-    glfwGetFramebufferSize(m_window, &fbW, &fbH);
-    m_width = fbW;
-    m_height = fbH;
-    m_touch = std::make_unique<TouchSource>(m_window);
-}
-
-void Window::handleFramebufferResize(int width, int height) {
-    m_width = width;
-    m_height = height;
-    glViewport(0, 0, width, height);
+    m_context = SDL_GL_CreateContext(m_window);
+    if (!m_context || !SDL_GL_MakeCurrent(
+            m_window, static_cast<SDL_GLContext>(m_context))) {
+        const std::string error = SDL_GetError();
+        if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
+        SDL_DestroyWindow(m_window);
+        m_window = nullptr;
+        SDL_Quit();
+        LOG_FATAL("Failed to create SDL OpenGL context: " << error);
+        throw std::runtime_error("Failed to create OpenGL context");
+    }
+    if (!SDL_GL_SetSwapInterval(1))
+        LOG_WARN("Could not enable VSync: " << SDL_GetError());
+    refreshSizes();
+    int srgb = 0;
+    m_srgbCapable = SDL_GL_GetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, &srgb) && srgb != 0;
+    float x = 0.0f, y = 0.0f;
+    SDL_GetMouseState(&x, &y);
+    m_cursorX = x;
+    m_cursorY = y;
+    int touchCount = 0;
+    SDL_TouchID* devices = SDL_GetTouchDevices(&touchCount);
+    m_touchAvailable = touchCount > 0;
+    SDL_free(devices);
 }
 
 Window::~Window() {
-    m_touch.reset();
-    if (m_window) {
-        glfwDestroyWindow(m_window);
+    if (m_textInputEnabled && m_window) SDL_StopTextInput(m_window);
+    if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
+    if (m_window) SDL_DestroyWindow(m_window);
+    SDL_Quit();
+}
+
+void Window::refreshSizes() {
+    SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
+    SDL_GetWindowSizeInPixels(m_window, &m_pixelWidth, &m_pixelHeight);
+    m_windowWidth = std::max(1, m_windowWidth);
+    m_windowHeight = std::max(1, m_windowHeight);
+}
+
+void Window::resetEventFrame() {
+    m_cursorDeltaX = 0.0;
+    m_cursorDeltaY = 0.0;
+}
+
+void Window::processEvent(const void* opaqueEvent) {
+    const auto& event = *static_cast<const SDL_Event*>(opaqueEvent);
+    switch (event.type) {
+        case SDL_EVENT_QUIT:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            m_shouldClose = true;
+            break;
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+            refreshSizes();
+            glViewport(0, 0, m_pixelWidth, m_pixelHeight);
+            break;
+        case SDL_EVENT_WINDOW_MINIMIZED:
+            m_minimized = true;
+            break;
+        case SDL_EVENT_WINDOW_RESTORED:
+        case SDL_EVENT_WINDOW_SHOWN:
+            m_minimized = false;
+            refreshSizes();
+            break;
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+            m_keys.fill(false);
+            m_mouse.fill(false);
+            if (m_focusCallback) m_focusCallback(false);
+            if (m_touchCallback) m_touchCallback({{}, TouchPhase::Cancel, 0.0, 0.0});
+            break;
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            if (m_focusCallback) m_focusCallback(true);
+            break;
+        case SDL_EVENT_KEY_DOWN:
+        case SDL_EVENT_KEY_UP: {
+            const int key = static_cast<int>(event.key.scancode);
+            const ButtonAction action = event.type == SDL_EVENT_KEY_UP
+                ? ButtonAction::Release
+                : (event.key.repeat ? ButtonAction::Repeat : ButtonAction::Press);
+            if (key >= 0 && key < static_cast<int>(m_keys.size()))
+                m_keys[static_cast<size_t>(key)] = action != ButtonAction::Release;
+            if (m_keyCallback)
+                m_keyCallback(key, key, action, projectModifiers(event.key.mod));
+            break;
+        }
+        case SDL_EVENT_TEXT_INPUT:
+            if (m_charCallback) m_charCallback(event.text.text);
+            break;
+        case SDL_EVENT_MOUSE_MOTION:
+            if (event.motion.which == SDL_TOUCH_MOUSEID ||
+                event.motion.which == SDL_PEN_MOUSEID) break;
+            m_cursorX = event.motion.x;
+            m_cursorY = event.motion.y;
+            m_cursorDeltaX += event.motion.xrel;
+            m_cursorDeltaY += event.motion.yrel;
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_BUTTON_UP: {
+            if (event.button.which == SDL_TOUCH_MOUSEID ||
+                event.button.which == SDL_PEN_MOUSEID) break;
+            m_cursorX = event.button.x;
+            m_cursorY = event.button.y;
+            const int button = projectMouseButton(event.button.button);
+            if (button < 0) break;
+            const ButtonAction action = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN
+                ? ButtonAction::Press : ButtonAction::Release;
+            m_mouse[static_cast<size_t>(button)] = action == ButtonAction::Press;
+            if (m_mouseButtonCallback)
+                m_mouseButtonCallback(button, action, projectModifiers(SDL_GetModState()));
+            break;
+        }
+        case SDL_EVENT_MOUSE_WHEEL:
+            if (event.wheel.which != SDL_TOUCH_MOUSEID &&
+                event.wheel.which != SDL_PEN_MOUSEID && m_scrollCallback) {
+                const double direction = event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED
+                    ? -1.0 : 1.0;
+                m_scrollCallback(event.wheel.x * direction, event.wheel.y * direction);
+            }
+            break;
+        case SDL_EVENT_FINGER_DOWN:
+        case SDL_EVENT_FINGER_MOTION:
+        case SDL_EVENT_FINGER_UP:
+        case SDL_EVENT_FINGER_CANCELED: {
+            m_touchAvailable = true;
+            if (!m_touchCallback) break;
+            TouchPhase phase = TouchPhase::Move;
+            if (event.type == SDL_EVENT_FINGER_DOWN) phase = TouchPhase::Begin;
+            else if (event.type == SDL_EVENT_FINGER_UP) phase = TouchPhase::End;
+            else if (event.type == SDL_EVENT_FINGER_CANCELED) phase = TouchPhase::Cancel;
+            m_touchCallback({
+                {static_cast<uint64_t>(event.tfinger.touchID),
+                 static_cast<uint64_t>(event.tfinger.fingerID)},
+                phase,
+                static_cast<double>(event.tfinger.x * m_windowWidth),
+                static_cast<double>(event.tfinger.y * m_windowHeight)});
+            break;
+        }
+        default:
+            break;
     }
-    glfwTerminate();
-}
-
-// ── Methods ───────────────────────────────────────────────────────────
-
-bool Window::shouldClose() const {
-    return glfwWindowShouldClose(m_window);
-}
-
-void Window::swapBuffers() {
-    glfwSwapBuffers(m_window);
 }
 
 void Window::pollEvents() {
-    // Reset per-frame cursor delta before polling
-    m_cursorDeltaX = 0.0;
-    m_cursorDeltaY = 0.0;
-    glfwPollEvents();
+    resetEventFrame();
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) processEvent(&event);
 }
 
 void Window::waitEvents(double timeoutSeconds) {
-    m_cursorDeltaX = 0.0;
-    m_cursorDeltaY = 0.0;
-    glfwWaitEventsTimeout(timeoutSeconds);
+    resetEventFrame();
+    SDL_Event event;
+    const int timeout = std::max(0, static_cast<int>(std::lround(timeoutSeconds * 1000.0)));
+    if (SDL_WaitEventTimeout(&event, timeout)) {
+        processEvent(&event);
+        while (SDL_PollEvent(&event)) processEvent(&event);
+    }
 }
 
-void Window::setTitle(const std::string& title) {
-    glfwSetWindowTitle(m_window, title.c_str());
-}
+void Window::swapBuffers() { SDL_GL_SwapWindow(m_window); }
+void Window::setTitle(const std::string& title) { SDL_SetWindowTitle(m_window, title.c_str()); }
 
 bool Window::isKeyPressed(int key) const {
-    return glfwGetKey(m_window, key) == GLFW_PRESS;
+    return key >= 0 && key < static_cast<int>(m_keys.size()) &&
+        m_keys[static_cast<size_t>(key)];
 }
 
 bool Window::isMouseButtonPressed(int button) const {
-    return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
-}
-
-bool Window::isSrgbCapable() const {
-    return glfwGetWindowAttrib(m_window, GLFW_SRGB_CAPABLE) == GLFW_TRUE;
+    return button >= 0 && button < static_cast<int>(m_mouse.size()) &&
+        m_mouse[static_cast<size_t>(button)];
 }
 
 void Window::getCursorDelta(double& dx, double& dy) {
@@ -172,27 +239,32 @@ void Window::getCursorDelta(double& dx, double& dy) {
 }
 
 void Window::getCursorPos(double& x, double& y) const {
-    glfwGetCursorPos(m_window, &x, &y);
+    x = m_cursorX;
+    y = m_cursorY;
 }
 
 void Window::setCursorLocked(bool locked) {
     m_cursorLocked = locked;
     m_cursorDeltaX = 0.0;
     m_cursorDeltaY = 0.0;
-    glfwGetCursorPos(m_window, &m_lastCursorX, &m_lastCursorY);
-    if (locked) {
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    } else {
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    }
-    if (glfwRawMouseMotionSupported())
-        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION,
-                         locked && m_rawMouseInput ? GLFW_TRUE : GLFW_FALSE);
+    if (!SDL_SetWindowRelativeMouseMode(m_window, locked))
+        LOG_WARN("Could not change relative mouse mode: " << SDL_GetError());
 }
 
-void Window::setRawMouseInput(bool enabled) {
-    m_rawMouseInput = enabled;
-    if (glfwRawMouseMotionSupported())
-        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION,
-                         m_cursorLocked && enabled ? GLFW_TRUE : GLFW_FALSE);
+void Window::setTextInputEnabled(bool enabled) {
+    if (enabled == m_textInputEnabled) return;
+    const bool changed = enabled ? SDL_StartTextInput(m_window) : SDL_StopTextInput(m_window);
+    if (!changed) {
+        LOG_WARN("Could not change SDL text input state: " << SDL_GetError());
+        return;
+    }
+    m_textInputEnabled = enabled;
+}
+
+void* Window::glProcAddress(const char* name) {
+    return reinterpret_cast<void*>(SDL_GL_GetProcAddress(name));
+}
+
+double Window::timeSeconds() {
+    return static_cast<double>(SDL_GetTicksNS()) / 1000000000.0;
 }

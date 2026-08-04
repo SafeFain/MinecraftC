@@ -79,7 +79,6 @@
   "settings.auto_jump": "Auto Jump: {0}",
   "settings.sensitivity": "Mouse Sensitivity: {0}",
   "settings.invert_y": "Invert Mouse Y: {0}",
-  "settings.raw_mouse": "Raw Mouse Input: {0}",
   "settings.video": "Video Settings...",
   "settings.controls": "Controls...",
   "settings.touch": "Touch Controls...",

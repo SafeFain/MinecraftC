@@ -1,9 +1,14 @@
 #pragma once
 
-#include <string>
-#include <functional>
-#include <GLFW/glfw3.h>
+#include "core/InputCodes.h"
 #include "core/Touch.h"
+
+#include <array>
+#include <functional>
+#include <string>
+#include <string_view>
+
+struct SDL_Window;
 
 class Window {
 public:
@@ -13,60 +18,72 @@ public:
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
-    bool shouldClose() const;
+    bool shouldClose() const { return m_shouldClose; }
     void swapBuffers();
     void pollEvents();
     void waitEvents(double timeoutSeconds);
     void setTitle(const std::string& title);
 
-    int width() const  { return m_width; }
-    int height() const { return m_height; }
+    int width() const { return m_pixelWidth; }
+    int height() const { return m_pixelHeight; }
+    int windowWidth() const { return m_windowWidth; }
+    int windowHeight() const { return m_windowHeight; }
     float aspectRatio() const {
-        return static_cast<float>(m_width) / static_cast<float>(m_height > 0 ? m_height : 1);
+        return static_cast<float>(m_pixelWidth) /
+            static_cast<float>(m_pixelHeight > 0 ? m_pixelHeight : 1);
     }
 
-    // Input queries
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;
     void getCursorDelta(double& dx, double& dy);
     void getCursorPos(double& x, double& y) const;
-
-    // Mouse lock (cursor grab)
     void setCursorLocked(bool locked);
-    void setRawMouseInput(bool enabled);
     bool isCursorLocked() const { return m_cursorLocked; }
-    bool isTouchAvailable() const { return m_touch && m_touch->available(); }
+    void setTextInputEnabled(bool enabled);
 
-    // Callbacks
-    using KeyCallback = std::function<void(int key, int scancode, int action, int mods)>;
-    void setKeyCallback(KeyCallback cb) { m_keyCallback = std::move(cb); }
+    bool isTouchAvailable() const { return m_touchAvailable; }
+    bool isMinimized() const {
+        return m_minimized || m_pixelWidth <= 0 || m_pixelHeight <= 0;
+    }
+    bool isSrgbCapable() const { return m_srgbCapable; }
 
-    using CharCallback = std::function<void(unsigned int codepoint)>;
-    void setCharCallback(CharCallback cb) { m_charCallback = std::move(cb); }
+    using KeyCallback =
+        std::function<void(int key, int scancode, ButtonAction action, int mods)>;
+    void setKeyCallback(KeyCallback callback) { m_keyCallback = std::move(callback); }
+    using CharCallback = std::function<void(std::string_view text)>;
+    void setCharCallback(CharCallback callback) { m_charCallback = std::move(callback); }
+    using MouseButtonCallback =
+        std::function<void(int button, ButtonAction action, int mods)>;
+    void setMouseButtonCallback(MouseButtonCallback callback) {
+        m_mouseButtonCallback = std::move(callback);
+    }
+    using ScrollCallback = std::function<void(double xOffset, double yOffset)>;
+    void setScrollCallback(ScrollCallback callback) { m_scrollCallback = std::move(callback); }
+    using TouchCallback = std::function<void(const TouchEvent&)>;
+    void setTouchCallback(TouchCallback callback) { m_touchCallback = std::move(callback); }
+    using FocusCallback = std::function<void(bool focused)>;
+    void setFocusCallback(FocusCallback callback) { m_focusCallback = std::move(callback); }
 
-    using MouseButtonCallback = std::function<void(int button, int action, int mods)>;
-    void setMouseButtonCallback(MouseButtonCallback cb) { m_mouseButtonCallback = std::move(cb); }
-
-    using ScrollCallback = std::function<void(double xoffset, double yoffset)>;
-    void setScrollCallback(ScrollCallback cb) { m_scrollCallback = std::move(cb); }
-    using TouchCallback = TouchSource::Callback;
-    void setTouchCallback(TouchCallback cb) { m_touch->setCallback(std::move(cb)); }
-
-    GLFWwindow* native() const { return m_window; }
-
-    bool isMinimized() const { return m_minimized || m_width <= 0 || m_height <= 0; }
-    bool isSrgbCapable() const;
+    static void* glProcAddress(const char* name);
+    static double timeSeconds();
 
 private:
-    GLFWwindow* m_window = nullptr;
-    int m_width, m_height;
+    SDL_Window* m_window = nullptr;
+    void* m_context = nullptr;
+    int m_pixelWidth = 1;
+    int m_pixelHeight = 1;
+    int m_windowWidth = 1;
+    int m_windowHeight = 1;
+    bool m_shouldClose = false;
     bool m_cursorLocked = false;
-    bool m_rawMouseInput = false;
     bool m_minimized = false;
-    std::unique_ptr<TouchSource> m_touch;
-
-    double m_lastCursorX = 0.0;
-    double m_lastCursorY = 0.0;
+    bool m_srgbCapable = false;
+    bool m_touchAvailable = false;
+    bool m_textInputEnabled = false;
+    std::array<bool, Key::Count> m_keys{};
+    std::array<bool, MouseButton::Count> m_mouse{};
+    double m_cursorX = 0.0;
+    double m_cursorY = 0.0;
     double m_cursorDeltaX = 0.0;
     double m_cursorDeltaY = 0.0;
 
@@ -74,14 +91,10 @@ private:
     CharCallback m_charCallback;
     MouseButtonCallback m_mouseButtonCallback;
     ScrollCallback m_scrollCallback;
+    TouchCallback m_touchCallback;
+    FocusCallback m_focusCallback;
 
-    static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
-    static void cursorPosCallback(GLFWwindow* window, double x, double y);
-    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    static void charCallback(GLFWwindow* window, unsigned int codepoint);
-    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
-    static void iconifyCallback(GLFWwindow* window, int iconified);
-
-    void handleFramebufferResize(int width, int height);
+    void resetEventFrame();
+    void processEvent(const void* event);
+    void refreshSizes();
 };

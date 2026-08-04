@@ -5,7 +5,7 @@
 #include "game/InventoryInteraction.h"
 #include "world/World.h"
 
-#include <GLFW/glfw3.h>
+#include "core/Window.h"
 #include <algorithm>
 
 bool ContainerScreen::open(World& world, const glm::ivec3& position) {
@@ -124,7 +124,7 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
 void ContainerScreen::click(int button, int x, int y) {
     BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
     if (!entity) return;
-    const bool right = button == GLFW_MOUSE_BUTTON_RIGHT;
+    const bool right = button == MouseButton::Right;
     for (size_t i=0;i<m_inventoryRects.size();++i) if (contains(m_inventoryRects[i],x,y)) {
         moveStack(m_cursor,m_inventory.slot(i),right); return;
     }
@@ -140,16 +140,16 @@ void ContainerScreen::click(int button, int x, int y) {
     }
 }
 
-void ContainerScreen::onMouseButton(int button,int action,int x,int y,int mods) {
-    if (button!=GLFW_MOUSE_BUTTON_LEFT && button!=GLFW_MOUSE_BUTTON_RIGHT) return;
-    if (action==GLFW_PRESS) { m_pressed=true;m_button=button;m_pressX=x;m_pressY=y;m_pressMods=mods;
+void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,int mods) {
+    if (button!=MouseButton::Left && button!=MouseButton::Right) return;
+    if (action==ButtonAction::Press) { m_pressed=true;m_button=button;m_pressX=x;m_pressY=y;m_pressMods=mods;
         m_cursorHeldAtPress=!m_cursor.empty();m_dragTargets.clear();return; }
-    if (action!=GLFW_RELEASE || !m_pressed || m_button!=button) return;
-    if((m_pressMods&GLFW_MOD_SHIFT)&&button==GLFW_MOUSE_BUTTON_LEFT){quickMove(x,y);m_pressed=false;m_button=-1;return;}
+    if (action!=ButtonAction::Release || !m_pressed || m_button!=button) return;
+    if((m_pressMods&KeyModifier::Shift)&&button==MouseButton::Left){quickMove(x,y);m_pressed=false;m_button=-1;return;}
     const int dx=x-m_pressX,dy=y-m_pressY;const bool dragged=dx*dx+dy*dy>=16;
-    const double now=glfwGetTime();
-    if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty())InventoryInteraction::distribute(m_cursor,m_dragTargets,button==GLFW_MOUSE_BUTTON_RIGHT);
-    else if(!dragged&&button==GLFW_MOUSE_BUTTON_LEFT&&!m_cursor.empty()&&m_lastClickSeconds>=0&&now-m_lastClickSeconds<=.30){
+    const double now=Window::timeSeconds();
+    if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty())InventoryInteraction::distribute(m_cursor,m_dragTargets,button==MouseButton::Right);
+    else if(!dragged&&button==MouseButton::Left&&!m_cursor.empty()&&m_lastClickSeconds>=0&&now-m_lastClickSeconds<=.30){
         std::vector<ItemStack*> sources;for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
         BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(entity){if(entity->type==BlockEntityType::Chest)for(auto& slot:entity->chest)sources.push_back(&slot);
             else{sources.push_back(&entity->input);sources.push_back(&entity->fuel);sources.push_back(&entity->output);}}

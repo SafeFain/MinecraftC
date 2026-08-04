@@ -88,9 +88,10 @@ public:
     virtual void render(UIRenderer& ui, int screenWidth, int screenHeight) = 0;
     virtual void onKeyPress(int key) = 0;
     virtual void onMouseMove(double x, double y) = 0;
-    virtual void onMouseButton(int button, int action, double x, double y) = 0;
+    virtual void onMouseButton(int button, ButtonAction action, double x, double y) = 0;
     virtual void onScroll(double) {}
     virtual void onChar(unsigned int) {}
+    virtual bool wantsTextInput() const { return false; }
 
 protected:
     void navigateUp(std::vector<Button>& buttons, int& selectedIdx);
@@ -108,9 +109,10 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
-    void onMouseButton(int button, int action, double x, double y) override;
+    void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
     void onChar(unsigned int codepoint) override;
+    bool wantsTextInput() const override { return m_page == Page::Create; }
 
 private:
     enum class Page { Home, Worlds, Create };
@@ -155,7 +157,7 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key) override;
     void onMouseMove(double x, double y) override;
-    void onMouseButton(int button, int action, double x, double y) override;
+    void onMouseButton(int button, ButtonAction action, double x, double y) override;
 
 private:
     std::vector<Button> m_buttons;

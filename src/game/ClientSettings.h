@@ -9,7 +9,7 @@
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 5;
+    static constexpr int FORMAT_VERSION = 6;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -18,7 +18,6 @@ struct ClientSettings {
     bool autoJump = true;
     float mouseSensitivity = 0.15f;
     bool invertMouseY = false;
-    bool rawMouseInput = true;
     bool smoothLighting = true;
     int guiScale = 0; // 0 = Auto
     Language language = Language::English;

@@ -1,6 +1,5 @@
 #include "core/Input.h"
 
-#include <GLFW/glfw3.h>
 #include <algorithm>
 
 namespace {
@@ -24,20 +23,20 @@ std::string inputBindingName(const InputBinding& binding) {
         return "Mouse " + std::to_string(binding.code + 1);
     if (binding.device == InputDevice::Wheel)
         return binding.code > 0 ? "Wheel Up" : "Wheel Down";
-    const char* name = glfwGetKeyName(binding.code, 0);
+    const char* name = physicalKeyName(binding.code);
     if (name) {
         std::string result(name);
         std::transform(result.begin(), result.end(), result.begin(), ::toupper);
         return result;
     }
     switch (binding.code) {
-        case GLFW_KEY_SPACE: return "Space";
-        case GLFW_KEY_LEFT_SHIFT: return "Left Shift";
-        case GLFW_KEY_LEFT_CONTROL: return "Left Ctrl";
-        case GLFW_KEY_UP: return "Up";
-        case GLFW_KEY_DOWN: return "Down";
-        case GLFW_KEY_LEFT: return "Left";
-        case GLFW_KEY_RIGHT: return "Right";
+        case Key::Space: return "Space";
+        case Key::LeftShift: return "Left Shift";
+        case Key::LeftControl: return "Left Ctrl";
+        case Key::Up: return "Up";
+        case Key::Down: return "Down";
+        case Key::Left: return "Left";
+        case Key::Right: return "Right";
         default: return "Key " + std::to_string(binding.code);
     }
 }
@@ -54,19 +53,25 @@ void InputState::beginFrame() {
     m_wheelDirection = 0;
 }
 
-void InputState::keyEvent(int key, int action) {
+void InputState::keyEvent(int key, ButtonAction action) {
     if (key >= 0 && key < static_cast<int>(m_keys.size()))
-        m_keys[static_cast<size_t>(key)] = action != GLFW_RELEASE;
+        m_keys[static_cast<size_t>(key)] = action != ButtonAction::Release;
 }
 
-void InputState::mouseEvent(int button, int action) {
+void InputState::mouseEvent(int button, ButtonAction action) {
     if (button >= 0 && button < static_cast<int>(m_mouse.size()))
-        m_mouse[static_cast<size_t>(button)] = action != GLFW_RELEASE;
+        m_mouse[static_cast<size_t>(button)] = action != ButtonAction::Release;
 }
 
 void InputState::scrollEvent(double yOffset) {
     if (yOffset > 0.0) m_wheelDirection = 1;
     else if (yOffset < 0.0) m_wheelDirection = -1;
+}
+
+void InputState::clearPhysical() {
+    m_keys.fill(false);
+    m_mouse.fill(false);
+    m_wheelDirection = 0;
 }
 
 void InputState::setVirtual(InputAction action, float strength) {

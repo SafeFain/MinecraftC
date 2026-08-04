@@ -23,7 +23,7 @@ public:
     // ── Input ───────────────────────────────────────────────────────
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
     void handleMovement(const InputState& input, float dt);
-    void handleMouseButton(int button, int action);
+    void handleMouseButton(int button, ButtonAction action);
 
     // ── Update ──────────────────────────────────────────────────────
     void update(float dt);

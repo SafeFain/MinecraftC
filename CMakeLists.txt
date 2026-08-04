@@ -9,7 +9,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 include(GNUInstallDirs)
 option(MINECRAFTC_FETCH_DEPENDENCIES
-       "Use pinned source builds of GLFW and GLM instead of system packages" OFF)
+       "Use a pinned source build of GLM instead of the system package" OFF)
+option(MINECRAFTC_USE_SYSTEM_SDL3
+       "Use a system SDL3 3.4.10+ package instead of the pinned source build" OFF)
 option(MINECRAFTC_ENABLE_SANITIZERS
        "Enable AddressSanitizer and UndefinedBehaviorSanitizer in Debug builds" OFF)
 option(MINECRAFTC_PORTABLE_LAYOUT
@@ -24,28 +26,45 @@ endif()
 
 if(MINECRAFTC_FETCH_DEPENDENCIES)
     include(FetchContent)
-    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(glfw
-        GIT_REPOSITORY https://github.com/glfw/glfw.git
-        GIT_TAG 3.4
-        GIT_SHALLOW TRUE)
     FetchContent_Declare(glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG 1.0.1
         GIT_SHALLOW TRUE)
-    FetchContent_MakeAvailable(glfw glm)
+    FetchContent_MakeAvailable(glm)
 else()
-    find_package(glfw3 3.4 REQUIRED)
     find_package(glm REQUIRED)
 endif()
-find_package(OpenGL REQUIRED)
-if(UNIX AND NOT APPLE)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+if(MINECRAFTC_USE_SYSTEM_SDL3)
+    find_package(SDL3 3.4.10 CONFIG REQUIRED)
+    set(MINECRAFTC_SDL_TARGET SDL3::SDL3)
+else()
+    include(FetchContent)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+    set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
+    set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
+    set(SDL_CAMERA OFF CACHE BOOL "" FORCE)
+    set(SDL_DIALOG OFF CACHE BOOL "" FORCE)
+    set(SDL_GPU OFF CACHE BOOL "" FORCE)
+    set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
+    set(SDL_HIDAPI OFF CACHE BOOL "" FORCE)
+    set(SDL_JOYSTICK OFF CACHE BOOL "" FORCE)
+    set(SDL_POWER OFF CACHE BOOL "" FORCE)
+    set(SDL_RENDER OFF CACHE BOOL "" FORCE)
+    set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
+    set(SDL_TRAY OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(SDL3
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG release-3.4.10
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(SDL3)
+    set(MINECRAFTC_SDL_TARGET SDL3::SDL3-static)
 endif()
+find_package(OpenGL REQUIRED)
 
 # ── GLAD (minimal OpenGL loader) ───────────────────────────────────────
 
@@ -87,9 +106,7 @@ target_include_directories(minecraftc PRIVATE
     external/miniaudio
     external
 )
-# Prevent GLFW from including GL/gl.h — we use our own GL loader
 target_compile_definitions(minecraftc PRIVATE
-    GLFW_INCLUDE_NONE
     MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
 
 # ── Debug / logging compile-time gating ─────────────────────────────────
@@ -100,16 +117,13 @@ target_compile_definitions(minecraftc PRIVATE
     $<$<CONFIG:Release>:LOG_COMPILE_LEVEL=2>
 )
 target_link_libraries(minecraftc PRIVATE
-    glfw
+    ${MINECRAFTC_SDL_TARGET}
     glm::glm
     OpenGL::GL
     glad
     minecraftc_platform
     ${CMAKE_DL_LIBS}
 )
-if(UNIX AND NOT APPLE)
-    target_link_libraries(minecraftc PRIVATE PkgConfig::WAYLAND_CLIENT)
-endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
@@ -402,14 +416,16 @@ if(BUILD_TESTING)
         src/model/ModelAnimation.cpp
         src/model/GltfLoader.cpp
         src/model/ModelRenderer.cpp
+        src/core/Window.cpp
         src/debug/Log.cpp
         src/renderer/Shader.cpp
         src/renderer/StbImageImpl.cpp)
     target_include_directories(entity_model_registry_tests PRIVATE
         src external external/cgltf external/stb external/glad/include)
-    target_compile_definitions(entity_model_registry_tests PRIVATE GLFW_INCLUDE_NONE)
+    target_compile_definitions(entity_model_registry_tests PRIVATE
+        MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
     target_link_libraries(entity_model_registry_tests PRIVATE
-        glm::glm glad glfw OpenGL::GL minecraftc_platform)
+        glm::glm glad ${MINECRAFTC_SDL_TARGET} OpenGL::GL minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(entity_model_registry_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -439,6 +455,7 @@ if(BUILD_TESTING)
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
         src/core/Input.cpp
+        src/core/InputCodes.cpp
         src/ui/TouchControls.cpp
         src/game/ClientSettings.cpp
         src/game/Language.cpp
@@ -446,8 +463,8 @@ if(BUILD_TESTING)
         src/game/Item.cpp
         src/world/Block.cpp)
     target_include_directories(client_input_tests PRIVATE src external/glad/include)
-    target_compile_definitions(client_input_tests PRIVATE GLFW_INCLUDE_NONE)
-    target_link_libraries(client_input_tests PRIVATE glm::glm glfw minecraftc_platform)
+    target_link_libraries(client_input_tests PRIVATE
+        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -456,6 +473,7 @@ if(BUILD_TESTING)
     add_executable(localization_tests
         tests/LocalizationTests.cpp
         src/core/Input.cpp
+        src/core/InputCodes.cpp
         src/game/Item.cpp
         src/game/Language.cpp
         src/game/Localization.cpp
@@ -466,7 +484,7 @@ if(BUILD_TESTING)
         src external external/stb)
     target_compile_definitions(localization_tests PRIVATE
         MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-    target_link_libraries(localization_tests PRIVATE glm::glm glfw)
+    target_link_libraries(localization_tests PRIVATE glm::glm ${MINECRAFTC_SDL_TARGET})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(localization_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
