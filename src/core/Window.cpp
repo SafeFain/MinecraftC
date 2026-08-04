@@ -11,6 +11,19 @@
 #include <stdexcept>
 
 namespace {
+void configureOpenGLAttributes(bool srgb, int samples) {
+    SDL_GL_ResetAttributes();
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#if defined(__APPLE__)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+#endif
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, srgb ? 1 : 0);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, samples > 0 ? 1 : 0);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
+}
+
 int projectMouseButton(Uint8 button) {
     switch (button) {
         case SDL_BUTTON_LEFT: return MouseButton::Left;
@@ -42,24 +55,39 @@ Window::Window(int width, int height, const std::string& title) {
     }
     m_gamepads = std::make_unique<GamepadManager>();
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-#if defined(__APPLE__)
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-#endif
-    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, Config::MSAA_SAMPLES > 0 ? 1 : 0);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, Config::MSAA_SAMPLES);
-
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
         SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
+    struct VisualRequest {
+        bool srgb;
+        int samples;
+    };
+    const VisualRequest requests[] = {
+        {true, Config::MSAA_SAMPLES},
+        {false, Config::MSAA_SAMPLES},
+        {true, 0},
+        {false, 0},
+    };
+    std::string firstError;
+    VisualRequest selected = requests[0];
+    for (const VisualRequest& request : requests) {
+        configureOpenGLAttributes(request.srgb, request.samples);
+        m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
+        if (m_window) {
+            selected = request;
+            break;
+        }
+        if (firstError.empty()) firstError = SDL_GetError();
+    }
     if (!m_window) {
         const std::string error = SDL_GetError();
         SDL_Quit();
         LOG_FATAL("Failed to create SDL window: " << error);
         throw std::runtime_error("Failed to create SDL window");
+    }
+    if (!selected.srgb || selected.samples != Config::MSAA_SAMPLES) {
+        LOG_WARN("Preferred OpenGL visual unavailable (" << firstError
+                 << "); using " << selected.samples << "x MSAA with "
+                 << (selected.srgb ? "sRGB required" : "sRGB optional"));
     }
     m_context = SDL_GL_CreateContext(m_window);
     if (!m_context || !SDL_GL_MakeCurrent(
