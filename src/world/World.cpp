@@ -11,6 +11,7 @@
 #include "game/SurvivalBlockLogic.h"
 #include "world/BlockEntityLogic.h"
 #include "world/BlockLightLogic.h"
+#include "world/FluidLogic.h"
 #include "world/WorldGenContext.h"
 
 #include <cmath>
@@ -149,6 +150,18 @@ PrecipitationType World::precipitationAt(
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
+    setBlockInternal(worldX,worldY,worldZ,id,true);
+}
+
+void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
+    if (!generatedAt(position.x,position.z)) return;
+    // Flow depth is reconstructed from persisted sources and terrain. Keeping
+    // it out of overrides prevents waterfalls from turning into huge saves.
+    setBlockInternal(position.x,position.y,position.z,id,false);
+}
+
+void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
+                             bool recordOverride) {
     if (!Config::isValidWorldY(worldY)) return;
     const BlockId previous = getBlock(worldX, worldY, worldZ);
     if (previous == id) return;
@@ -167,7 +180,7 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
         lx + lz * Config::CHUNK_SIZE_X +
         Config::worldYToStorageY(worldY) *
             Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
-    {
+    if (recordOverride) {
         std::unique_lock lock(m_chunkMutex);
         m_blockOverrides[{cx, cz}][localIndex] = id;
         m_dirtyOverrideChunks.insert({cx, cz});
@@ -195,11 +208,11 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
     if (id == BlockId::AIR && previous == BlockId::SUNFLOWER_BOTTOM &&
         worldY + 1 < Config::WORLD_MAX_Y &&
         getBlock(worldX, worldY + 1, worldZ) == BlockId::SUNFLOWER_TOP)
-        setBlock(worldX, worldY + 1, worldZ, BlockId::AIR);
+        setBlockInternal(worldX,worldY+1,worldZ,BlockId::AIR,recordOverride);
     if (id == BlockId::AIR && previous == BlockId::SUNFLOWER_TOP &&
         worldY > Config::WORLD_MIN_Y &&
         getBlock(worldX, worldY - 1, worldZ) == BlockId::SUNFLOWER_BOTTOM)
-        setBlock(worldX, worldY - 1, worldZ, BlockId::AIR);
+        setBlockInternal(worldX,worldY-1,worldZ,BlockId::AIR,recordOverride);
 }
 
 bool World::generatedAt(int worldX, int worldZ) const {
@@ -216,7 +229,7 @@ void World::scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDela
         const BlockId block = getBlock(p.x, p.y, p.z);
         if (!isFluid(block)) return;
         const uint64_t delay = std::max<uint64_t>(
-            minimumDelay, isLava(block) ? 30u : 5u);
+            minimumDelay, fluidTickDelay(isLava(block)));
         const uint64_t due = m_currentWorldTick + delay;
         const auto existing = m_scheduledFluidDue.find(p);
         if (existing != m_scheduledFluidDue.end() && existing->second <= due) return;
@@ -260,25 +273,28 @@ void World::updateFluidCell(const glm::ivec3& p, uint64_t tick) {
             desired = 1;
         } else {
             int sourceNeighbors = 0;
-            for (const glm::ivec3& offset : {glm::ivec3{1,0,0}, {-1,0,0},
-                                             {0,0,1}, {0,0,-1}}) {
+            for (const glm::ivec3& offset : FLUID_HORIZONTAL_OFFSETS) {
                 const BlockId neighbor = getBlock(
                     p.x + offset.x, p.y, p.z + offset.z);
                 if (!same(neighbor)) continue;
                 if (fluidLevel(neighbor) == 0) ++sourceNeighbors;
                 desired = std::min<uint8_t>(desired,
-                    static_cast<uint8_t>(fluidLevel(neighbor) + 1));
+                    nextFluidLevel(lava,fluidLevel(neighbor)));
             }
-            if (!lava && sourceNeighbors >= 2 && isSolid(getBlock(p.x, p.y - 1, p.z)))
-                desired = 0;
+            const BlockId below = getBlock(p.x,p.y-1,p.z);
+            if (!lava && sourceNeighbors >= 2 &&
+                (isSolid(below) || (isWater(below) && fluidLevel(below)==0))) desired=0;
         }
         if (desired > 7) {
-            setBlock(p.x, p.y, p.z, BlockId::AIR);
+            setDerivedBlock(p,BlockId::AIR);
             return;
         }
         const BlockId recomputed = fluidBlock(lava, desired);
         if (recomputed != current) {
-            setBlock(p.x, p.y, p.z, recomputed);
+            // A two-neighbor water source is permanent Minecraft state; unlike
+            // ordinary flow depth it must survive removal of its parent sources.
+            if(desired==0)setBlock(p.x,p.y,p.z,recomputed);
+            else setDerivedBlock(p,recomputed);
             current = recomputed;
         }
     }
@@ -299,32 +315,40 @@ void World::updateFluidCell(const glm::ivec3& p, uint64_t tick) {
             setBlock(below.x, below.y, below.z, BlockId::STONE);
             return;
         }
-        if (isReplaceableByFluid(target) ||
-            (same(target) && fluidLevel(target) > 1)) {
-            setBlock(below.x, below.y, below.z, fluidBlock(lava, 1));
-            scheduleFluidAround(below);
+        if (same(target)) {
+            if (fluidLevel(target)>1)setDerivedBlock(below,fluidBlock(lava,1));
+            return;
+        }
+        if (isReplaceableByFluid(target)) {
+            setDerivedBlock(below,fluidBlock(lava,1));
             return;
         }
     }
 
-    const uint8_t nextLevel = fluidLevel(current) == 0 ? 1
-        : static_cast<uint8_t>(fluidLevel(current) + 1);
+    const bool falling=same(getBlock(p.x,p.y+1,p.z));
+    const uint8_t spreadLevel=falling?0:fluidLevel(current);
+    const uint8_t nextLevel = nextFluidLevel(lava,spreadLevel);
     if (nextLevel > 7) return;
-    for (const glm::ivec3& offset : {glm::ivec3{1,0,0}, {-1,0,0},
-                                     {0,0,1}, {0,0,-1}}) {
+    const FluidSample sample=[this](const glm::ivec3& position){
+        return getBlock(position.x,position.y,position.z);};
+    const FluidAvailable available=[this](const glm::ivec3& position){
+        return Config::isValidWorldY(position.y)&&generatedAt(position.x,position.z);};
+    for (const glm::ivec3& offset : preferredFluidDirections(
+             p,lava,spreadLevel,sample,available)) {
         const glm::ivec3 q = p + offset;
-        if (!generatedAt(q.x, q.z)) continue;
         const BlockId target = getBlock(q.x, q.y, q.z);
         if (opposite(target)) {
-            if (lava) setBlock(p.x, p.y, p.z,
-                fluidLevel(current) == 0 ? BlockId::OBSIDIAN : BlockId::COBBLESTONE);
+            if (lava) {
+                setBlock(p.x,p.y,p.z,fluidLevel(current)==0
+                    ? BlockId::OBSIDIAN : BlockId::COBBLESTONE);
+            } else {
+                setBlock(q.x,q.y,q.z,fluidLevel(target)==0
+                    ? BlockId::OBSIDIAN : BlockId::COBBLESTONE);
+            }
             continue;
         }
-        if (isReplaceableByFluid(target) ||
-            (same(target) && fluidLevel(target) > nextLevel)) {
-            setBlock(q.x, q.y, q.z, fluidBlock(lava, nextLevel));
-            scheduleFluidAround(q);
-        }
+        if (fluidCanOccupy(target,lava,nextLevel))
+            setDerivedBlock(q,fluidBlock(lava,nextLevel));
     }
     (void)tick;
 }
@@ -985,11 +1009,19 @@ void World::applySavedOverrides(int cx, int cz) {
     if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) return;
 
     auto& cached = m_blockOverrides[key];
+    size_t pruned=0;
+    for (auto it=cached.begin();it!=cached.end();) {
+        if (isDerivedFluidState(it->second)){it=cached.erase(it);++pruned;}
+        else ++it;
+    }
     if (m_saveStore) {
         for (const auto& entry : m_saveStore->loadChunkOverrides(cx, cz)) {
+            if (isDerivedFluidState(entry.block)) {++pruned;continue;}
             cached[entry.localIndex] = entry.block;
         }
     }
+    if(pruned>0){m_dirtyOverrideChunks.insert(key);LOG_INFO(
+        "Pruned "<<pruned<<" legacy derived fluid overrides from chunk "<<cx<<','<<cz);}
     Chunk* chunk = chunkIt->second.get();
     for (const auto& [index, block] : cached) {
         const int x = index % Config::CHUNK_SIZE_X;

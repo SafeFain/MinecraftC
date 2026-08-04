@@ -7,6 +7,13 @@ if (!versionMatch.find()) throw new GradleException("Cannot read MinecraftC vers
 def versionMajor = versionMatch.group(1).toInteger()
 def versionMinor = versionMatch.group(2).toInteger()
 def versionPatch = versionMatch.group(3).toInteger()
+def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
+
+tasks.register("prepareLegalAssets", Copy) {
+    from new File(repositoryRoot, "LICENSE")
+    from new File(repositoryRoot, "THIRD_PARTY_LICENSES.md")
+    into generatedLegalAssetsDir
+}
 
 android {
     namespace "io.github.safefain.minecraftc"
@@ -38,7 +45,7 @@ android {
     }
     sourceSets {
         main {
-            assets.srcDirs = [new File(repositoryRoot, "assets")]
+            assets.srcDirs = [new File(repositoryRoot, "assets"), generatedLegalAssetsDir]
             java.srcDirs += new File(gradle.ext.sdlSourceDir, "android-project/app/src/main/java")
         }
     }
@@ -48,4 +55,8 @@ android {
             version "3.22.1"
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn tasks.named("prepareLegalAssets")
 }

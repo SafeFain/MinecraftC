@@ -9,7 +9,7 @@
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 7;
+    static constexpr int FORMAT_VERSION = 8;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -22,7 +22,7 @@ struct ClientSettings {
     int guiScale = 0; // 0 = Auto
     Language language = Language::English;
     ControlMode controlMode = ControlMode::Auto;
-    float touchSensitivity = 1.0f;
+    float touchSensitivity = 1.5f;
     float touchControlSize = 1.0f;
     float touchControlOpacity = 0.65f;
     bool touchLeftHanded = false;

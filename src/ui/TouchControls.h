@@ -3,6 +3,7 @@
 #include "core/Input.h"
 #include "core/Touch.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <unordered_map>
@@ -13,7 +14,7 @@ class UIRenderer;
 
 enum class TouchCommand : uint8_t {
     AttackPress, AttackRelease, UsePress, UseRelease,
-    OpenInventory, Pause, SelectHotbar
+    OpenInventory, OpenCommand, Pause, SelectHotbar
 };
 
 struct TouchCommandEvent {
@@ -22,7 +23,7 @@ struct TouchCommandEvent {
 };
 
 struct TouchControlConfig {
-    float sensitivity = 1.0f;
+    float sensitivity = 1.5f;
     float size = 1.0f;
     float opacity = 0.65f;
     bool leftHanded = false;
@@ -35,6 +36,13 @@ struct TouchRect {
     }
 };
 
+inline TouchRect touchInventoryCloseRect(int width, int height) {
+    constexpr float size = 44.0f;
+    constexpr float margin = 18.0f;
+    return {std::max(0.0f, static_cast<float>(width) - margin - size),
+            std::max(0.0f, static_cast<float>(height) - margin - size), size, size};
+}
+
 class TouchControls {
 public:
     void configure(int width, int height, const TouchControlConfig& config);
@@ -46,12 +54,14 @@ public:
     bool active() const { return !m_touches.empty(); }
 
 private:
-    enum class Target : uint8_t { Move, Look, Jump, Sneak, Attack, Use, Inventory, Pause, Hotbar };
+    enum class Target : uint8_t {
+        Move, Look, Jump, Sneak, Attack, Use, Inventory, Command, Pause, Hotbar
+    };
     struct Capture { Target target; glm::vec2 last; int slot = -1; };
 
     int m_width = 1, m_height = 1;
     TouchControlConfig m_config;
-    TouchRect m_moveArea, m_jump, m_sneak, m_attack, m_use, m_inventory, m_pause;
+    TouchRect m_moveArea, m_jump, m_sneak, m_attack, m_use, m_inventory, m_command, m_pause;
     std::array<TouchRect, 9> m_hotbar{};
     glm::vec2 m_moveCenter{0.0f};
     float m_moveRadius = 50.0f;

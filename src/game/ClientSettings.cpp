@@ -60,7 +60,7 @@ void ClientSettings::validate() {
     if (static_cast<int>(controlMode) < static_cast<int>(ControlMode::Auto) ||
         static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
         controlMode = ControlMode::Auto;
-    touchSensitivity = std::clamp(touchSensitivity, 0.5f, 2.0f);
+    touchSensitivity = std::clamp(touchSensitivity, 0.5f, 3.0f);
     gamepadDeadzone = std::clamp(gamepadDeadzone, 0.05f, 0.50f);
     gamepadLookSensitivity = std::clamp(gamepadLookSensitivity, 0.25f, 3.0f);
     gamepadRumble = std::clamp(gamepadRumble, 0.0f, 1.0f);
@@ -167,6 +167,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
     }
     if(formatVersion<FORMAT_VERSION)for(size_t i=0;i<settings.gamepadBindings.size();++i)
         if(!gamepadBindingRead[i])settings.gamepadBindings[i]=defaults.gamepadBindings[i];
+    if (formatVersion < 8 && std::abs(settings.touchSensitivity - 1.0f) < .001f)
+        settings.touchSensitivity = defaults.touchSensitivity;
     settings.validate();
     return settings;
 }
@@ -214,7 +216,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
 int effectiveGuiScale(int width, int height, int configuredScale) {
     if (configuredScale >= 1 && configuredScale <= 4) return configuredScale;
     int scale = 1;
-    while (scale < 4 && width / (scale + 1) >= 640 && height / (scale + 1) >= 360)
+    while (scale < 4 && width / (scale + 1) >= 800 && height / (scale + 1) >= 450)
         ++scale;
     return scale;
 }

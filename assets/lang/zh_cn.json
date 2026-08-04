@@ -98,6 +98,8 @@
   "touch.attack": "攻击",
   "touch.use": "使用",
   "touch.inventory": "背包",
+  "touch.command": "指令",
+  "touch.close": "关闭",
   "settings.render_distance": "渲染距离：{0}",
   "settings.clouds": "云：{0}",
   "settings.cloud_distance": "云渲染距离：{0} 格",

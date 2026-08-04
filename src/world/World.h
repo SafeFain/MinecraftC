@@ -225,6 +225,9 @@ private:
     void scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDelay = 1);
     bool generatedAt(int worldX, int worldZ) const;
     void updateFluidCell(const glm::ivec3& position, uint64_t tick);
+    void setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
+                          bool recordOverride);
+    void setDerivedBlock(const glm::ivec3& position, BlockId id);
 
     void markDirty(int cx, int cz);
     static uint64_t packedChunkKey(int cx, int cz) {

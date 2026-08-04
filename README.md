@@ -195,9 +195,15 @@ ctest --test-dir build-local --output-on-failure
 
 测试覆盖世界生成确定性、区块边界、渲染逻辑、玩家移动、生存规则、存档、实体、光照、客户端输入和完整生存进程；资产测试还检查图标确定性、二值透明度、调色板、模板边界、atlas 完整性、人工覆盖优先级，以及实时物品注册表的全覆盖。
 
+## 许可证
+
+除明确标注其他许可证的第三方组件与资产外，MinecraftC 按
+[GNU General Public License v3.0 only](LICENSE) 发布。分发修改版本时须遵守
+GPL-3.0-only 的源码提供及相同许可证要求。
+
 ## 项目说明
 
-项目中的 GLAD、FastNoiseLite 与 stb_image 位于 `external/`。资产来源记录在 [`ASSET_SOURCES.md`](ASSET_SOURCES.md)，纹理许可说明位于 [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md)，第三方资产许可模板位于 [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)。
+项目中的 GLAD、FastNoiseLite 与 stb_image 位于 `external/`。资产来源记录在 [`ASSET_SOURCES.md`](ASSET_SOURCES.md)，纹理许可说明位于 [`assets/textures/LICENSE.md`](assets/textures/LICENSE.md)，第三方许可说明位于 [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)。这些第三方材料继续适用其各自的许可证。
 # glTF entity models
 
 MinecraftC renders its eight mobs from reusable glTF 2.0 GLB assets with

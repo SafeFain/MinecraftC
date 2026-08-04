@@ -1,5 +1,6 @@
 #include "game/SurvivalRules.h"
 #include "game/InventoryModel.h"
+#include "world/FluidLogic.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -101,6 +102,34 @@ int main() {
     require(isWater(BlockId::FLOWING_WATER_7) && fluidLevel(BlockId::WATER) == 0 &&
             fluidLevel(BlockId::FLOWING_LAVA_4) == 4,
             "serialized fluid states retain material and level semantics");
+    require(nextFluidLevel(false,0)==1&&nextFluidLevel(false,6)==7&&
+            nextFluidLevel(true,0)==2&&nextFluidLevel(true,6)==8,
+            "water spreads seven flat cells while overworld lava spreads three");
+    require(isDerivedFluidState(BlockId::FLOWING_WATER_3)&&
+            isDerivedFluidState(BlockId::FLOWING_LAVA_7)&&
+            !isDerivedFluidState(BlockId::WATER)&&!isDerivedFluidState(BlockId::LAVA),
+            "legacy cleanup distinguishes rebuildable flows from persisted sources");
+    require(fluidTickDelay(false)==5&&fluidTickDelay(true)==30,
+            "water and overworld lava use Minecraft tick delays");
+    const FluidAvailable available=[](const glm::ivec3&){return true;};
+    const FluidSample nearestDrop=[](const glm::ivec3& p){
+        if(p==glm::ivec3(1,0,0))return BlockId::AIR;
+        if(p.y==1&&std::abs(p.x)+std::abs(p.z)==1)return BlockId::AIR;
+        return BlockId::STONE;
+    };
+    const auto preferred=preferredFluidDirections(
+        {0,1,0},false,0,nearestDrop,available);
+    require(preferred.size()==1&&preferred[0]==glm::ivec3(1,0,0),
+            "fluid routing chooses the nearest reachable downward path");
+    const FluidSample flat=[](const glm::ivec3& p){
+        return p.y==1&&std::abs(p.x)+std::abs(p.z)==1
+            ? BlockId::AIR : BlockId::STONE;
+    };
+    require(preferredFluidDirections({0,1,0},false,0,flat,available).size()==4,
+            "fluid spreads evenly when no direction has a nearer drop");
+    const FluidSample enclosed=[](const glm::ivec3&){return BlockId::STONE;};
+    require(preferredFluidDirections({0,1,0},false,0,enclosed,available).empty(),
+            "enclosed fluids do not report blocked spread directions");
     require(fuelTicks(ItemId::COAL) == 1600, "coal smelts eight items");
     require(fuelTicks(ItemId::DIAMOND) == 0, "non-fuels are rejected");
 

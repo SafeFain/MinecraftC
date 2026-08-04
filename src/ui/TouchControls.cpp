@@ -22,6 +22,8 @@ void TouchControls::configure(int width, int height, const TouchControlConfig& c
                 margin + button + gap + 42.0f, button, button};
     m_use = {m_attack.x, margin + 42.0f, button, button};
     m_inventory = {margin, m_height - margin - button * .72f, button * 1.25f, button * .72f};
+    m_command = {(m_width - button * 1.25f) * .5f,
+                 m_height - margin - button * .72f, button * 1.25f, button * .72f};
     m_pause = {m_width - margin - button * 1.25f, m_height - margin - button * .72f,
                button * 1.25f, button * .72f};
 
@@ -34,6 +36,7 @@ void TouchControls::configure(int width, int height, const TouchControlConfig& c
 
 TouchControls::Target TouchControls::targetAt(float x, float y, int& slot) const {
     if (m_inventory.contains(x,y)) return Target::Inventory;
+    if (m_command.contains(x,y)) return Target::Command;
     if (m_pause.contains(x,y)) return Target::Pause;
     if (m_jump.contains(x,y)) return Target::Jump;
     if (m_sneak.contains(x,y)) return Target::Sneak;
@@ -69,6 +72,7 @@ std::vector<TouchCommandEvent> TouchControls::onTouch(const TouchEvent& event) {
             case Target::Attack:commands.push_back({TouchCommand::AttackPress});break;
             case Target::Use:commands.push_back({TouchCommand::UsePress});break;
             case Target::Inventory:commands.push_back({TouchCommand::OpenInventory});break;
+            case Target::Command:commands.push_back({TouchCommand::OpenCommand});break;
             case Target::Pause:commands.push_back({TouchCommand::Pause});break;
             case Target::Hotbar:commands.push_back({TouchCommand::SelectHotbar,slot});break;
             case Target::Look:break;
@@ -125,5 +129,6 @@ void TouchControls::render(UIRenderer& ui) const {
     draw(m_attack,ui.localization().text("touch.attack").c_str());
     draw(m_use,ui.localization().text("touch.use").c_str());
     draw(m_inventory,ui.localization().text("touch.inventory").c_str());
+    draw(m_command,ui.localization().text("touch.command").c_str());
     draw(m_pause,"II");
 }

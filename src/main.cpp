@@ -611,6 +611,11 @@ private:
                 m_clientSettings.touchControlOpacity,m_clientSettings.touchLeftHanded};
     }
 
+    bool touchUiVisible() const {
+        return m_clientSettings.controlMode == ControlMode::Touch ||
+            (m_clientSettings.controlMode == ControlMode::Auto && m_touchHudVisible);
+    }
+
     glm::vec2 touchToUi(double x,double y) const {
         int windowWidth=0,windowHeight=0,framebufferWidth=0,framebufferHeight=0;
         windowWidth=m_window.windowWidth();windowHeight=m_window.windowHeight();
@@ -636,6 +641,14 @@ private:
                         handleGameplayAction(true,ButtonAction::Release);
                         m_touchControls.cancelAll();
                         openInventory();
+                    }
+                    break;
+                case TouchCommand::OpenCommand:
+                    if (!m_playerDead) {
+                        handleGameplayAction(false,ButtonAction::Release);
+                        handleGameplayAction(true,ButtonAction::Release);
+                        m_touchControls.cancelAll();
+                        m_commandOpen=true;m_commandInput.setText({});m_window.setCursorLocked(false);
                     }
                     break;
                 case TouchCommand::Pause:
@@ -730,6 +743,13 @@ private:
             std::max(1,safe.height/std::max(1,m_guiScale)),touchConfig());
         glm::vec2 position=event.phase==TouchPhase::End&&m_uiTouch.active&&event.id==m_uiTouch.id
             ?m_uiTouch.position:touchToUi(event.x,event.y);
+        if(event.phase==TouchPhase::Begin&&m_inventoryOpen&&
+           touchUiVisible()&&
+           touchInventoryCloseRect(
+               std::max(1,safe.width/std::max(1,m_guiScale)),
+               std::max(1,safe.height/std::max(1,m_guiScale))).contains(position.x,position.y)){
+            closeInventory();return;
+        }
         bool gameplay=false;
         if(event.phase==TouchPhase::Begin){
             gameplay=m_gameState==GameState::Playing&&!m_inventoryOpen&&!m_activeMenu&&
@@ -1242,6 +1262,15 @@ private:
                                        static_cast<int>(m_mouseScreenX),
                                        static_cast<int>(m_mouseScreenY));
                 }
+                if (touchUiVisible()) {
+                    const TouchRect close = touchInventoryCloseRect(uiWidth,uiHeight);
+                    m_uiRenderer.drawRect(close.x,close.y,close.w,close.h,
+                                          glm::vec4(.08f,.09f,.12f,.88f));
+                    const std::string label=m_localization.text("touch.close");
+                    const glm::vec2 labelSize=m_uiRenderer.measureText(label,.8f);
+                    m_uiRenderer.renderText(label,close.x+(close.w-labelSize.x)*.5f,
+                        close.y+(close.h-labelSize.y)*.5f,.8f,glm::vec3(1.0f));
+                }
                 m_uiRenderer.endUIFrame();
             }
 
@@ -1254,8 +1283,7 @@ private:
                     renderCrosshairAndMiningProgress(uiWidth, uiHeight);
                     if (m_itemNameSeconds > 0.0f) renderSelectedItemName(uiWidth);
                 }
-                if (m_clientSettings.controlMode == ControlMode::Touch ||
-                    (m_clientSettings.controlMode == ControlMode::Auto && m_touchHudVisible))
+                if (touchUiVisible())
                     m_touchControls.render(m_uiRenderer);
                 m_uiRenderer.endUIFrame();
             }

@@ -154,7 +154,7 @@ void SettingsMenu::refreshButtons() {
             m_settings.controlMode=static_cast<ControlMode>((static_cast<int>(m_settings.controlMode)+1)%3);m_onChanged();refreshButtons();});
         std::ostringstream sensitivity;sensitivity<<std::fixed<<std::setprecision(2)<<m_settings.touchSensitivity;
         m_buttons.emplace_back(m_localization.format("settings.touch_sensitivity",{sensitivity.str()}),[this]{
-            m_settings.touchSensitivity+=.25f;if(m_settings.touchSensitivity>2.001f)m_settings.touchSensitivity=.5f;m_onChanged();refreshButtons();});
+            m_settings.touchSensitivity+=.25f;if(m_settings.touchSensitivity>3.001f)m_settings.touchSensitivity=.5f;m_onChanged();refreshButtons();});
         m_buttons.emplace_back(m_localization.format("settings.touch_size",{std::to_string(static_cast<int>(m_settings.touchControlSize*100))}),[this]{
             constexpr float values[]={.75f,1,1.25f,1.5f};auto it=std::find(std::begin(values),std::end(values),m_settings.touchControlSize);
             m_settings.touchControlSize=values[(it==std::end(values)?0:(it-std::begin(values)+1)%4)];m_onChanged();refreshButtons();});

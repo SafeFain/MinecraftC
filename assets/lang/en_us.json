@@ -98,6 +98,8 @@
   "touch.attack": "HIT",
   "touch.use": "USE",
   "touch.inventory": "BAG",
+  "touch.command": "CHAT",
+  "touch.close": "CLOSE",
   "settings.render_distance": "Render Distance: {0}",
   "settings.clouds": "Clouds: {0}",
   "settings.cloud_distance": "Cloud Distance: {0} Blocks",

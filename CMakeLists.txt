@@ -201,7 +201,7 @@ if(ANDROID)
 elseif(MINECRAFTC_PORTABLE_LAYOUT)
     install(TARGETS minecraftc RUNTIME DESTINATION .)
     install(DIRECTORY assets/ DESTINATION assets)
-    install(FILES README.md THIRD_PARTY_LICENSES.md packaging/README-release.md
+    install(FILES LICENSE README.md THIRD_PARTY_LICENSES.md packaging/README-release.md
             DESTINATION .)
     if(WIN32)
         install(FILES packaging/run-minecraftc.cmd DESTINATION .)
@@ -211,6 +211,8 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
 else()
     install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
+    install(FILES LICENSE THIRD_PARTY_LICENSES.md
+            DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────

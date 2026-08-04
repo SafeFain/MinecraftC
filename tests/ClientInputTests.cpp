@@ -84,6 +84,10 @@ int main(){
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");
+    ClientSettings touchRange;touchRange.touchSensitivity=4.0f;touchRange.validate();
+    require(touchRange.touchSensitivity==3.0f,"touch sensitivity accepts a 3.0 maximum");
+    touchRange.touchSensitivity=0.0f;touchRange.validate();
+    require(touchRange.touchSensitivity==.5f,"touch sensitivity retains its 0.5 minimum");
     require(loaded.gamepadDeadzone==.22f&&loaded.gamepadLookSensitivity==1.5f&&
             loaded.invertGamepadY&&loaded.gamepadRumble==.6f,
             "gamepad settings round trip");
@@ -116,9 +120,13 @@ int main(){
     {std::ofstream v6(root/"v6-bindings.txt");v6<<"version=6\nbinding.0=1,"<<Key::W<<"\n";}
     require(ClientSettings::load(root/"v6-bindings.txt").bindings[0]==InputBinding{InputDevice::Keyboard,Key::W},
             "v6 physical bindings are preserved while gamepad defaults are added");
+    {std::ofstream v7(root/"v7-touch.txt");v7<<"version=7\ntouch_sensitivity=1\n";}
+    require(ClientSettings::load(root/"v7-touch.txt").touchSensitivity==1.5f,
+            "v7 default touch sensitivity migrates to the faster v8 default");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");
-    require(effectiveGuiScale(1920,1080,0)==3&&effectiveGuiScale(800,450,0)==1,
+    require(effectiveGuiScale(1920,1080,0)==2&&effectiveGuiScale(800,450,0)==1&&
+            effectiveGuiScale(1920,1080,4)==4,
             "automatic GUI scale preserves minimum virtual size");
 
     InputState input;input.beginFrame();input.keyEvent(Key::W,ButtonAction::Press);
@@ -167,7 +175,14 @@ int main(){
             "outer joystick produces forward movement and sprint");
     touch.onTouch({{0,2},TouchPhase::Begin,500,300});
     touch.onTouch({{0,2},TouchPhase::Move,520,310});
-    require(touch.consumeLookDelta()==glm::vec2(20,10),"look touch reports relative delta");
+    require(touch.consumeLookDelta()==glm::vec2(30,15),
+            "look touch uses the faster default sensitivity");
+    commands=touch.onTouch({{0,5},TouchPhase::Begin,500,560});
+    require(commands.size()==1&&commands[0].command==TouchCommand::OpenCommand,
+            "top-center touch button opens command input");
+    require(touchInventoryCloseRect(1000,600).contains(960,560)&&
+            !touchInventoryCloseRect(1000,600).contains(900,500),
+            "inventory close button stays in the top-right touch-safe area");
     commands=touch.onTouch({{0,3},TouchPhase::Begin,890,160});
     require(commands.size()==1&&commands[0].command==TouchCommand::AttackPress,
             "action button emits attack press while other touches remain active");
