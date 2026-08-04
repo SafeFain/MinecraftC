@@ -113,18 +113,17 @@ void Player::handleMovement(const InputState& input, float dt) {
     glm::vec3 planarForward(m_forward.x, 0.0f, m_forward.z);
     if (glm::length(planarForward) > 0.0f)
         planarForward = glm::normalize(planarForward);
-    if (input.held(InputAction::MoveForward))  moveDir += planarForward;
-    if (input.held(InputAction::MoveBackward)) moveDir -= planarForward;
-    if (input.held(InputAction::MoveLeft))     moveDir += m_right;
-    if (input.held(InputAction::MoveRight))    moveDir -= m_right;
+    moveDir += planarForward * input.value(InputAction::MoveForward);
+    moveDir -= planarForward * input.value(InputAction::MoveBackward);
+    moveDir += m_right * input.value(InputAction::MoveLeft);
+    moveDir -= m_right * input.value(InputAction::MoveRight);
 
     if (m_flying) {
         // Creative flight uses camera yaw for horizontal travel. Vertical
         // controls are independent, so Space+Shift holds altitude.
         glm::vec3 horizontal(moveDir.x, 0.0f, moveDir.z);
-        if (glm::length(horizontal) > 0.0f) {
-            horizontal = glm::normalize(horizontal);
-        }
+        const float horizontalLength = glm::length(horizontal);
+        if (horizontalLength > 1.0f) horizontal /= horizontalLength;
         const float flySpeed = m_isSprinting
             ? Config::CREATIVE_FLY_SPRINT_SPEED
             : Config::CREATIVE_FLY_SPEED;
@@ -146,7 +145,8 @@ void Player::handleMovement(const InputState& input, float dt) {
         glm::vec3 horizontal(moveDir.x, 0.0f, moveDir.z);
         float hLen = glm::length(horizontal);
         if (hLen > 0.0f) {
-            horizontal = horizontal / hLen * speed * dt;
+            if (hLen > 1.0f) { horizontal /= hLen; hLen = 1.0f; }
+            horizontal *= speed * dt;
             moveAndCollide(horizontal);
             if (m_gameMode == GameMode::Survival) {
                 m_survivalStats.addExhaustion(

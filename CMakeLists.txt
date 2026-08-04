@@ -38,10 +38,14 @@ if(MINECRAFTC_FETCH_DEPENDENCIES)
         GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(glfw glm)
 else()
-    find_package(glfw3 REQUIRED)
+    find_package(glfw3 3.4 REQUIRED)
     find_package(glm REQUIRED)
 endif()
 find_package(OpenGL REQUIRED)
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+endif()
 
 # ── GLAD (minimal OpenGL loader) ───────────────────────────────────────
 
@@ -103,6 +107,9 @@ target_link_libraries(minecraftc PRIVATE
     minecraftc_platform
     ${CMAKE_DL_LIBS}
 )
+if(UNIX AND NOT APPLE)
+    target_link_libraries(minecraftc PRIVATE PkgConfig::WAYLAND_CLIENT)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set_source_files_properties(src/audio/MiniaudioImpl.cpp PROPERTIES
@@ -432,12 +439,14 @@ if(BUILD_TESTING)
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
         src/core/Input.cpp
+        src/ui/TouchControls.cpp
         src/game/ClientSettings.cpp
         src/game/Language.cpp
         src/game/InventoryInteraction.cpp
         src/game/Item.cpp
         src/world/Block.cpp)
-    target_include_directories(client_input_tests PRIVATE src)
+    target_include_directories(client_input_tests PRIVATE src external/glad/include)
+    target_compile_definitions(client_input_tests PRIVATE GLFW_INCLUDE_NONE)
     target_link_libraries(client_input_tests PRIVATE glm::glm glfw minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)

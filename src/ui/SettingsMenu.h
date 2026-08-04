@@ -15,7 +15,7 @@ public:
     void onScroll(double yOffset) override;
 
 private:
-    enum class Page { General, Video, Controls };
+    enum class Page { General, Video, Controls, Touch };
 
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;

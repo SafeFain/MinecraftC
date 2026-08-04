@@ -36,8 +36,11 @@ public:
     void keyEvent(int key, int action);
     void mouseEvent(int button, int action);
     void scrollEvent(double yOffset);
+    void setVirtual(InputAction action, float strength);
+    void clearVirtual();
     void update(const std::array<InputBinding, INPUT_ACTION_COUNT>& bindings);
 
+    float value(InputAction action) const;
     bool held(InputAction action) const;
     bool pressed(InputAction action) const;
     bool released(InputAction action) const;
@@ -48,5 +51,7 @@ private:
     std::array<bool, INPUT_ACTION_COUNT> m_held{};
     std::array<bool, INPUT_ACTION_COUNT> m_pressed{};
     std::array<bool, INPUT_ACTION_COUNT> m_released{};
+    std::array<float, INPUT_ACTION_COUNT> m_virtual{};
+    std::array<float, INPUT_ACTION_COUNT> m_values{};
     int m_wheelDirection = 0;
 };

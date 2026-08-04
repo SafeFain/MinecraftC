@@ -69,6 +69,12 @@ void InputState::scrollEvent(double yOffset) {
     else if (yOffset < 0.0) m_wheelDirection = -1;
 }
 
+void InputState::setVirtual(InputAction action, float strength) {
+    m_virtual[static_cast<size_t>(action)] = std::clamp(strength, 0.0f, 1.0f);
+}
+
+void InputState::clearVirtual() { m_virtual.fill(0.0f); }
+
 void InputState::update(const std::array<InputBinding, INPUT_ACTION_COUNT>& bindings) {
     for (size_t i = 0; i < bindings.size(); ++i) {
         const auto& binding = bindings[i];
@@ -81,12 +87,15 @@ void InputState::update(const std::array<InputBinding, INPUT_ACTION_COUNT>& bind
             now = m_mouse[static_cast<size_t>(binding.code)];
         else if (binding.device == InputDevice::Wheel)
             now = m_wheelDirection == binding.code;
-        m_pressed[i] = m_pressed[i] || (now && !m_held[i]);
-        m_released[i] = m_released[i] || (!now && m_held[i]);
-        m_held[i] = now;
+        m_values[i] = std::max(now ? 1.0f : 0.0f, m_virtual[i]);
+        const bool combined = m_values[i] > 0.001f;
+        m_pressed[i] = m_pressed[i] || (combined && !m_held[i]);
+        m_released[i] = m_released[i] || (!combined && m_held[i]);
+        m_held[i] = combined;
     }
 }
 
 bool InputState::held(InputAction action) const { return m_held[static_cast<size_t>(action)]; }
 bool InputState::pressed(InputAction action) const { return m_pressed[static_cast<size_t>(action)]; }
 bool InputState::released(InputAction action) const { return m_released[static_cast<size_t>(action)]; }
+float InputState::value(InputAction action) const { return m_values[static_cast<size_t>(action)]; }

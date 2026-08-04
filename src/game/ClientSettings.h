@@ -6,8 +6,10 @@
 #include "core/Input.h"
 #include "game/Language.h"
 
+enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
+
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 4;
+    static constexpr int FORMAT_VERSION = 5;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -20,6 +22,11 @@ struct ClientSettings {
     bool smoothLighting = true;
     int guiScale = 0; // 0 = Auto
     Language language = Language::English;
+    ControlMode controlMode = ControlMode::Auto;
+    float touchSensitivity = 1.0f;
+    float touchControlSize = 1.0f;
+    float touchControlOpacity = 0.65f;
+    bool touchLeftHanded = false;
     std::array<InputBinding, INPUT_ACTION_COUNT> bindings{};
 
     ClientSettings();

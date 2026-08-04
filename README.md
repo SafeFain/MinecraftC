@@ -27,13 +27,13 @@ MinecraftC 是一个使用 C++17 与 OpenGL 3.3 编写的体素沙盒游戏。�
 
 ```bash
 # Debian / Ubuntu
-sudo apt install build-essential cmake libglfw3-dev libglm-dev libgl1-mesa-dev
+sudo apt install build-essential cmake libglfw3-dev libglm-dev libgl1-mesa-dev libwayland-dev pkg-config
 
 # Fedora
-sudo dnf install gcc-c++ cmake glfw-devel glm-devel mesa-libGL-devel
+sudo dnf install gcc-c++ cmake glfw-devel glm-devel mesa-libGL-devel wayland-devel pkgconf-pkg-config
 
 # Arch Linux
-sudo pacman -S --needed base-devel cmake glfw-x11 glm mesa
+sudo pacman -S --needed base-devel cmake glfw-wayland glm mesa wayland
 ```
 
 构建、安装并运行：
@@ -114,7 +114,15 @@ minecraftc --version
 - `T`：打开命令输入
 - `Esc`：暂停、关闭界面或返回
 
-键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。存档默认位于：
+键盘、鼠标和滚轮操作均可在 Settings → Controls 中重新绑定。
+
+Linux Wayland 会话支持原生多点触控：左下虚拟摇杆控制移动，右侧空白区域
+拖动视角，屏幕动作键控制跳跃、下潜、攻击、使用、背包和暂停，快捷栏可直接
+点选。摇杆推到外圈会自动疾跑。Settings → Touch Controls 可选择自动、键鼠或
+触控模式，并调整触控灵敏度、控件大小、透明度和左右手布局。世界名、种子与
+命令文本仍需物理键盘输入；X11、Windows 和 macOS 暂时只保留键鼠操作。
+
+存档默认位于：
 
 - Windows：`%APPDATA%\MinecraftC\saves`
 - macOS：`~/Library/Application Support/MinecraftC/saves`
@@ -125,7 +133,7 @@ minecraftc --version
 目录，`minecraftc.log` 位于其上一级数据目录。新存档使用固定 little-endian 的
 格式 v8，并兼容读取
 现有桌面平台生成的 v2–v7 存档；新建世界使用世界生成版本 v5。默认世界渲染
-距离为 8 区块；云渲染距离可在设置中选择 64–512 方块，默认为 192 方块。
+距离为 8 区块；云渲染距离可在设置中选择 64–1024 方块，默认为 192 方块。
 旧版 v5 基础区块缓存会按缓存修订号失效并重生成，玩家方块覆盖仍会保留。
 
 允许作弊的世界支持以下命令：

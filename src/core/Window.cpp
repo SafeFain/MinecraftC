@@ -2,6 +2,7 @@
 #include "debug/Log.h"
 #include "Config.h"
 #include <glad/glad.h>
+#include <cstdlib>
 #include <stdexcept>
 
 // ── Static callback dispatchers ───────────────────────────────────────
@@ -60,6 +61,12 @@ void Window::iconifyCallback(GLFWwindow* window, int iconified) {
 Window::Window(int width, int height, const std::string& title)
     : m_width(width), m_height(height)
 {
+#if defined(__linux__)
+    // GLFW 3.4 can include both Linux backends. Prefer the compositor named by
+    // the session so a stale or inaccessible DISPLAY cannot mask Wayland touch.
+    if (std::getenv("WAYLAND_DISPLAY") && glfwPlatformSupported(GLFW_PLATFORM_WAYLAND))
+        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+#endif
     if (!glfwInit()) {
         LOG_FATAL("Failed to initialize GLFW");
         throw std::runtime_error("Failed to initialize GLFW");
@@ -103,6 +110,7 @@ Window::Window(int width, int height, const std::string& title)
     glfwGetFramebufferSize(m_window, &fbW, &fbH);
     m_width = fbW;
     m_height = fbH;
+    m_touch = std::make_unique<TouchSource>(m_window);
 }
 
 void Window::handleFramebufferResize(int width, int height) {
@@ -112,6 +120,7 @@ void Window::handleFramebufferResize(int width, int height) {
 }
 
 Window::~Window() {
+    m_touch.reset();
     if (m_window) {
         glfwDestroyWindow(m_window);
     }

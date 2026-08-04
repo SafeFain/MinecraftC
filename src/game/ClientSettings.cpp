@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <system_error>
+#include <cmath>
 
 namespace {
 InputBinding key(int code) { return {InputDevice::Keyboard, code}; }
@@ -36,6 +37,16 @@ void ClientSettings::validate() {
     if (std::find(std::begin(cycles), std::end(cycles), dayCycleMinutes) == std::end(cycles))
         dayCycleMinutes = 20;
     mouseSensitivity = std::clamp(mouseSensitivity, 0.05f, 0.50f);
+    if (static_cast<int>(controlMode) < static_cast<int>(ControlMode::Auto) ||
+        static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
+        controlMode = ControlMode::Auto;
+    touchSensitivity = std::clamp(touchSensitivity, 0.5f, 2.0f);
+    constexpr float sizes[] = {.75f,1.0f,1.25f,1.5f};
+    if (std::none_of(std::begin(sizes),std::end(sizes),[this](float v){return std::abs(v-touchControlSize)<.001f;}))
+        touchControlSize=1.0f;
+    constexpr float opacities[] = {.35f,.5f,.65f,.8f,1.0f};
+    if (std::none_of(std::begin(opacities),std::end(opacities),[this](float v){return std::abs(v-touchControlOpacity)<.001f;}))
+        touchControlOpacity=.65f;
     if (guiScale < 0 || guiScale > 4) guiScale = 0;
     ClientSettings defaults;
     for (size_t i = 0; i < bindings.size(); ++i) {
@@ -74,6 +85,11 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name == "language") settings.language = parseLanguage(value);
+            else if (name == "control_mode") settings.controlMode = static_cast<ControlMode>(std::stoi(value));
+            else if (name == "touch_sensitivity") settings.touchSensitivity = std::stof(value);
+            else if (name == "touch_size") settings.touchControlSize = std::stof(value);
+            else if (name == "touch_opacity") settings.touchControlOpacity = std::stof(value);
+            else if (name == "touch_left_handed") settings.touchLeftHanded = std::stoi(value) != 0;
             else if (name.rfind("binding.", 0) == 0) {
                 const size_t index = static_cast<size_t>(std::stoul(name.substr(8)));
                 if (index >= settings.bindings.size()) continue;
@@ -108,6 +124,11 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "smooth_lighting=" << smoothLighting << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "language=" << languageCode(language) << '\n';
+    output << "control_mode=" << static_cast<int>(controlMode) << '\n'
+           << "touch_sensitivity=" << touchSensitivity << '\n'
+           << "touch_size=" << touchControlSize << '\n'
+           << "touch_opacity=" << touchControlOpacity << '\n'
+           << "touch_left_handed=" << touchLeftHanded << '\n';
     for (size_t i = 0; i < bindings.size(); ++i)
         output << "binding." << i << '=' << static_cast<int>(bindings[i].device)
                << ',' << bindings[i].code << '\n';

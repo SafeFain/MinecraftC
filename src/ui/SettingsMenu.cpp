@@ -90,6 +90,9 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.controls"), [this]{
             m_page = Page::Controls; m_selectedIdx = 0; refreshButtons();
         });
+        m_buttons.emplace_back(m_localization.text("settings.touch"), [this]{
+            m_page = Page::Touch; m_selectedIdx = 0; refreshButtons();
+        });
         m_buttons.emplace_back(m_localization.text("common.back"), m_onBack);
     } else if (m_page == Page::Video) {
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
@@ -112,7 +115,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             m_page = Page::General; m_selectedIdx = 0; refreshButtons();
         });
-    } else {
+    } else if (m_page == Page::Controls) {
         constexpr int visible = 8;
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
         for (int i = m_controlOffset; i < end; ++i) {
@@ -129,6 +132,23 @@ void SettingsMenu::refreshButtons() {
             m_captureAction = -1; m_page = Page::General;
             m_selectedIdx = 0; refreshButtons();
         });
+    } else {
+        const char* modeKey = m_settings.controlMode == ControlMode::Auto ? "settings.touch_mode_auto" :
+            m_settings.controlMode == ControlMode::KeyboardMouse ? "settings.touch_mode_keyboard" : "settings.touch_mode_touch";
+        m_buttons.emplace_back(m_localization.format("settings.touch_mode",{m_localization.text(modeKey)}),[this]{
+            m_settings.controlMode=static_cast<ControlMode>((static_cast<int>(m_settings.controlMode)+1)%3);m_onChanged();refreshButtons();});
+        std::ostringstream sensitivity;sensitivity<<std::fixed<<std::setprecision(2)<<m_settings.touchSensitivity;
+        m_buttons.emplace_back(m_localization.format("settings.touch_sensitivity",{sensitivity.str()}),[this]{
+            m_settings.touchSensitivity+=.25f;if(m_settings.touchSensitivity>2.001f)m_settings.touchSensitivity=.5f;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.format("settings.touch_size",{std::to_string(static_cast<int>(m_settings.touchControlSize*100))}),[this]{
+            constexpr float values[]={.75f,1,1.25f,1.5f};auto it=std::find(std::begin(values),std::end(values),m_settings.touchControlSize);
+            m_settings.touchControlSize=values[(it==std::end(values)?0:(it-std::begin(values)+1)%4)];m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.format("settings.touch_opacity",{std::to_string(static_cast<int>(m_settings.touchControlOpacity*100))}),[this]{
+            constexpr float values[]={.35f,.5f,.65f,.8f,1};auto it=std::find(std::begin(values),std::end(values),m_settings.touchControlOpacity);
+            m_settings.touchControlOpacity=values[(it==std::end(values)?0:(it-std::begin(values)+1)%5)];m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.format("settings.touch_layout",{m_localization.text(m_settings.touchLeftHanded?"settings.touch_left":"settings.touch_right")}),[this]{
+            m_settings.touchLeftHanded=!m_settings.touchLeftHanded;m_onChanged();refreshButtons();});
+        m_buttons.emplace_back(m_localization.text("settings.back"),[this]{m_page=Page::General;m_selectedIdx=0;refreshButtons();});
     }
     m_selectedIdx = std::clamp(m_selectedIdx, 0, std::max(0, static_cast<int>(m_buttons.size()) - 1));
     if (!m_buttons.empty()) m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
@@ -148,7 +168,8 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
                 Config::UIColors::BACKGROUND);
     const std::string title = m_localization.text(
         m_page == Page::Controls ? "settings.controls_title" :
-        m_page == Page::Video ? "settings.video_title" : "settings.title");
+        m_page == Page::Video ? "settings.video_title" :
+        m_page == Page::Touch ? "settings.touch_title" : "settings.title");
     const auto titleSize = ui.measureText(title, 3.0f);
     const float titleY = height * 0.78f;
     ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,

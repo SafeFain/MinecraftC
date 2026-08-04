@@ -3,6 +3,7 @@
 #include <string>
 #include <functional>
 #include <GLFW/glfw3.h>
+#include "core/Touch.h"
 
 class Window {
 public:
@@ -34,6 +35,7 @@ public:
     void setCursorLocked(bool locked);
     void setRawMouseInput(bool enabled);
     bool isCursorLocked() const { return m_cursorLocked; }
+    bool isTouchAvailable() const { return m_touch && m_touch->available(); }
 
     // Callbacks
     using KeyCallback = std::function<void(int key, int scancode, int action, int mods)>;
@@ -47,6 +49,8 @@ public:
 
     using ScrollCallback = std::function<void(double xoffset, double yoffset)>;
     void setScrollCallback(ScrollCallback cb) { m_scrollCallback = std::move(cb); }
+    using TouchCallback = TouchSource::Callback;
+    void setTouchCallback(TouchCallback cb) { m_touch->setCallback(std::move(cb)); }
 
     GLFWwindow* native() const { return m_window; }
 
@@ -59,6 +63,7 @@ private:
     bool m_cursorLocked = false;
     bool m_rawMouseInput = false;
     bool m_minimized = false;
+    std::unique_ptr<TouchSource> m_touch;
 
     double m_lastCursorX = 0.0;
     double m_lastCursorY = 0.0;
