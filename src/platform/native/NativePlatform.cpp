@@ -34,6 +34,7 @@ bool isAssetRoot(const fs::path& path) {
            fs::is_regular_file(path / "textures" / "definitions" / "blocks.json");
 }
 
+#if !defined(__ANDROID__)
 fs::path executablePathFromSystem(const char* argv0) {
 #if defined(_WIN32)
     std::vector<wchar_t> buffer(512);
@@ -59,7 +60,6 @@ fs::path executablePathFromSystem(const char* argv0) {
     if (argv0 && *argv0) return fs::absolute(argv0);
     throw std::runtime_error("Cannot determine executable path");
 }
-
 fs::path environmentPath(const char* name) {
     const char* value = std::getenv(name);
     return value && *value ? fs::path(value) : fs::path{};
@@ -95,6 +95,7 @@ fs::path unixHomeDirectory() {
 #endif
     return {};
 }
+#endif
 
 } // namespace
 
