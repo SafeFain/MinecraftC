@@ -1,6 +1,5 @@
 #include "core/Window.h"
 
-#include "Config.h"
 #include "debug/Log.h"
 
 #include <SDL3/SDL.h>
@@ -52,7 +51,8 @@ int projectModifiers(SDL_Keymod modifiers) {
 }
 }
 
-Window::Window(int width, int height, const std::string& title) {
+Window::Window(
+    int width, int height, const std::string& title, int preferredSamples) {
 #if defined(__ANDROID__) || defined(MINECRAFTC_FORCE_GLES3)
     m_graphicsApi = GraphicsApi::OpenGLES30;
 #endif
@@ -77,8 +77,8 @@ Window::Window(int width, int height, const std::string& title) {
         int samples;
     };
     const VisualRequest requests[] = {
-        {true, Config::MSAA_SAMPLES},
-        {false, Config::MSAA_SAMPLES},
+        {true, preferredSamples},
+        {false, preferredSamples},
         {true, 0},
         {false, 0},
     };
@@ -99,7 +99,7 @@ Window::Window(int width, int height, const std::string& title) {
         LOG_FATAL("Failed to create SDL window: " << error);
         throw std::runtime_error("Failed to create SDL window");
     }
-    if (!selected.srgb || selected.samples != Config::MSAA_SAMPLES) {
+    if (!selected.srgb || selected.samples != preferredSamples) {
         LOG_WARN("Preferred OpenGL visual unavailable (" << firstError
                  << "); using " << selected.samples << "x MSAA with "
                  << (selected.srgb ? "sRGB required" : "sRGB optional"));

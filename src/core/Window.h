@@ -35,7 +35,7 @@ inline WindowSafeArea projectWindowSafeArea(
 
 class Window {
 public:
-    Window(int width, int height, const std::string& title);
+    Window(int width, int height, const std::string& title, int preferredSamples);
     ~Window();
 
     Window(const Window&) = delete;

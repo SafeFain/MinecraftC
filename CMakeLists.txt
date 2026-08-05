@@ -154,8 +154,7 @@ add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
 target_include_directories(minecraftc_platform_sdl PRIVATE src)
 target_compile_definitions(minecraftc_platform_sdl PRIVATE
     MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
-target_link_libraries(minecraftc_platform_sdl PRIVATE
-    ${MINECRAFTC_SDL_TARGET} glm::glm)
+target_link_libraries(minecraftc_platform_sdl PRIVATE ${MINECRAFTC_SDL_TARGET})
 if(MINECRAFTC_DESKTOP_GLES3)
     target_compile_definitions(minecraftc_platform_sdl PRIVATE
         MINECRAFTC_FORCE_GLES3=1)

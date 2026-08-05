@@ -98,7 +98,8 @@ private:
     RuntimePaths m_paths;
     AssetStore m_assets;
     platform::sdl::SdlClipboard m_clipboard;
-    Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"};
+    Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC",
+                         Config::MSAA_SAMPLES};
     Renderer    m_renderer;
     Camera      m_camera;
     CameraEffects m_cameraEffects;
