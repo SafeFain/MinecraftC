@@ -12,8 +12,6 @@
 #include <string>
 #include <string_view>
 
-struct SDL_Window;
-
 struct WindowSafeArea {
     int x = 0;
     int y = 0;
@@ -92,11 +90,15 @@ public:
     void setTouchCallback(TouchCallback callback) { m_touchCallback = std::move(callback); }
     using FocusCallback = std::function<void(bool focused)>;
     void setFocusCallback(FocusCallback callback) { m_focusCallback = std::move(callback); }
+    using ResizeCallback = std::function<void(int pixelWidth, int pixelHeight)>;
+    void setResizeCallback(ResizeCallback callback) {
+        m_resizeCallback = std::move(callback);
+    }
 
-    static void* glProcAddress(const char* name);
+    static void* graphicsProcAddress(const char* name);
 
 private:
-    SDL_Window* m_window = nullptr;
+    void* m_window = nullptr;
     void* m_context = nullptr;
     int m_pixelWidth = 1;
     int m_pixelHeight = 1;
@@ -123,6 +125,7 @@ private:
     ScrollCallback m_scrollCallback;
     TouchCallback m_touchCallback;
     FocusCallback m_focusCallback;
+    ResizeCallback m_resizeCallback;
 
     void resetEventFrame();
     void processEvent(const void* event);

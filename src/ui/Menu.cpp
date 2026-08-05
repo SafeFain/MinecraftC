@@ -77,9 +77,12 @@ void Menu::activateSelected(std::vector<Button>& buttons, int selectedIdx) {
 // ── Main Menu ─────────────────────────────────────────────────────────────
 
 MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
-                   ClientSettings& settings, Localization& localization)
+                   ClientSettings& settings, Localization& localization,
+                   platform::Clipboard* clipboard)
     : m_callbacks(callbacks), m_settings(settings), m_localization(localization),
       m_worlds(std::move(worlds)) {
+    m_worldName.setClipboard(clipboard);
+    m_seedText.setClipboard(clipboard);
     m_seedText.setFilter([](uint32_t codepoint,const std::string& current){
         return (codepoint>='0'&&codepoint<='9')||(codepoint=='-'&&current.empty());
     });

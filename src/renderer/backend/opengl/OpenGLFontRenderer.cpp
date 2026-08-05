@@ -1,6 +1,6 @@
 #include "ui/FontRenderer.h"
 #include "renderer/Shader.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "debug/Log.h"
 #include "game/Utf8.h"
 #include "core/AssetStore.h"

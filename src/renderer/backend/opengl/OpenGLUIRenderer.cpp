@@ -1,7 +1,7 @@
 #include "ui/UIRenderer.h"
 #include "renderer/Shader.h"
 #include "renderer/BlockTextureAtlas.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "game/SurvivalRules.h"
 #include "core/AssetStore.h"
 
@@ -24,7 +24,8 @@ UIRenderer::~UIRenderer() {
     if (m_quadVAO) GL_CHECK(glDeleteVertexArrays(1, &m_quadVAO));
 }
 
-void UIRenderer::reinitialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+void UIRenderer::reinitialize(RenderTextureHandle blockAtlasTexture,
+                              bool framebufferSrgb,
                               const std::filesystem::path& assetRoot,
                               GraphicsApi api) {
     const Localization* localization = m_localization;
@@ -40,7 +41,8 @@ void UIRenderer::resetGraphics() {
 
 // ── Initialization ────────────────────────────────────────────────────────
 
-void UIRenderer::initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+void UIRenderer::initialize(RenderTextureHandle blockAtlasTexture,
+                            bool framebufferSrgb,
                             const std::filesystem::path& assetRoot, GraphicsApi api) {
     m_blockAtlasTexture = blockAtlasTexture;
     m_manualGamma = !framebufferSrgb;
@@ -207,7 +209,7 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
     m_uiShader->setInt("uTexture", 0);
     m_uiShader->setInt("uManualGamma", m_manualGamma ? 1 : 0);
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_blockAtlasTexture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_blockAtlasTexture.value));
     GL_CHECK(glBindVertexArray(m_quadVAO));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO));
     GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_DYNAMIC_DRAW));

@@ -7,10 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include <glad/glad.h>
 #include <glm/glm.hpp>
 
 #include "Config.h"
+#include "renderer/RenderHandles.h"
 #include "world/Block.h"
 #include "world/BlockLightLogic.h"
 
@@ -26,9 +26,7 @@ struct ChunkMesh {
     std::vector<MeshVertex> vertices;
     std::vector<unsigned int> indices;
 
-    GLuint vao = 0;
-    GLuint vbo = 0;
-    GLuint ebo = 0;
+    RenderMeshHandle renderHandle;
     size_t indexCount = 0;
     size_t opaqueIndexCount = 0;
     size_t translucentIndexOffset = 0;
@@ -46,7 +44,7 @@ struct ChunkMesh {
     }
 
     void abandonGpuResources() {
-        vao = vbo = ebo = 0;
+        renderHandle = {};
         gpuReady = false;
     }
 
@@ -60,8 +58,8 @@ struct ChunkMesh {
     }
 
     // Replace only the CPU-side geometry with a completed worker mesh.
-    // GPU ownership stays with this mesh because OpenGL resources may only be
-    // destroyed/uploaded by the render thread.
+    // GPU ownership remains in Renderer while worker-produced CPU geometry is
+    // transferred into the active chunk mesh.
     void adoptCpuGeometry(ChunkMesh& completed) {
         using std::swap;
         swap(vertices, completed.vertices);

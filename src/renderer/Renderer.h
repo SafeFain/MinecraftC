@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
 
-#include <glad/glad.h>
 #include "renderer/Shader.h"
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
@@ -33,6 +33,7 @@ public:
                       const std::filesystem::path& assetRoot);
     void beginFrame();
     void endFrame();
+    void resize(int width, int height);
     void setEnvironment(const RenderEnvironment& environment,
                         const glm::vec3& cameraPosition);
     void renderSky(const RenderEnvironment& environment,
@@ -43,6 +44,8 @@ public:
     void renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
                      const glm::mat4& viewProjection,
                      bool translucent = false);
+    void uploadChunkMesh(ChunkMesh& mesh);
+    void releaseChunkMesh(ChunkMesh& mesh);
     void beginTranslucent();
     void endTranslucent();
 
@@ -76,24 +79,29 @@ public:
                       float timeSeconds, int renderDistanceBlocks);
 
     // VAO creation helpers
-    static GLuint createVAO(const std::vector<float>& vertices,
+    static uint32_t createVAO(const std::vector<float>& vertices,
                             const std::vector<float>& colors,
                             const std::vector<unsigned int>& indices,
                             size_t& outIndexCount);
 
-    static GLuint createLineVAO(const std::vector<float>& vertices,
+    static uint32_t createLineVAO(const std::vector<float>& vertices,
                                 size_t& outVertexCount);
 
-    static void deleteVAO(GLuint vao);
+    static void deleteVAO(uint32_t vao);
 
     // Setters for current-frame camera data
     void setViewProjection(const glm::mat4& vp) { m_viewProjection = vp; }
     void setFrustum(const Frustum& f) { m_frustum = f; }
     const Frustum& getFrustum() const { return m_frustum; }
-    GLuint getBlockAtlasTexture() const { return m_blockAtlas.textureId(); }
+    RenderTextureHandle getBlockAtlasTexture() const { return m_blockAtlas.texture(); }
     bool usesFramebufferSrgb() const { return m_framebufferSrgb; }
 
 private:
+    struct GpuChunkMesh {
+        uint32_t vao = 0;
+        uint32_t vbo = 0;
+        uint32_t ebo = 0;
+    };
     struct CloudInstance {
         float x, y, z;
         float width, depth, height;
@@ -111,29 +119,30 @@ private:
     BlockTextureAtlas m_blockAtlas;
 
     // Shared wireframe cube GPU resources
-    GLuint m_wireVAO = 0;
+    uint32_t m_wireVAO = 0;
     size_t m_wireVertexCount = 0;
-    GLuint m_skyVAO = 0;
-    GLuint m_entityVAO = 0;
-    GLuint m_entityVBO = 0;
-    GLuint m_entityTexture = 0;
-    GLuint m_cloudVAO = 0;
-    GLuint m_cloudInstanceVBOs[CLOUD_INSTANCE_BUFFER_COUNT]{};
+    uint32_t m_skyVAO = 0;
+    uint32_t m_entityVAO = 0;
+    uint32_t m_entityVBO = 0;
+    uint32_t m_entityTexture = 0;
+    uint32_t m_cloudVAO = 0;
+    uint32_t m_cloudInstanceVBOs[CLOUD_INSTANCE_BUFFER_COUNT]{};
     size_t m_cloudInstanceBufferIndex = 0;
-    GLuint m_particleVAO = 0;
-    GLuint m_particleQuadVBO = 0;
-    GLuint m_particleInstanceVBO = 0;
+    uint32_t m_particleVAO = 0;
+    uint32_t m_particleQuadVBO = 0;
+    uint32_t m_particleInstanceVBO = 0;
 
 #if defined(_WIN32)
-    using DrawArraysInstancedFn = void (__stdcall *)(GLenum, GLint, GLsizei,
-                                                     GLsizei);
-    using VertexAttribDivisorFn = void (__stdcall *)(GLuint, GLuint);
-    using BufferSubDataFn = void (__stdcall *)(GLenum, GLintptr, GLsizeiptr,
+    using DrawArraysInstancedFn = void (__stdcall *)(uint32_t, int, int, int);
+    using VertexAttribDivisorFn = void (__stdcall *)(uint32_t, uint32_t);
+    using BufferSubDataFn = void (__stdcall *)(uint32_t, std::intptr_t,
+                                               std::intptr_t,
                                                const void*);
 #else
-    using DrawArraysInstancedFn = void (*)(GLenum, GLint, GLsizei, GLsizei);
-    using VertexAttribDivisorFn = void (*)(GLuint, GLuint);
-    using BufferSubDataFn = void (*)(GLenum, GLintptr, GLsizeiptr, const void*);
+    using DrawArraysInstancedFn = void (*)(uint32_t, int, int, int);
+    using VertexAttribDivisorFn = void (*)(uint32_t, uint32_t);
+    using BufferSubDataFn = void (*)(uint32_t, std::intptr_t, std::intptr_t,
+                                     const void*);
 #endif
     DrawArraysInstancedFn m_drawArraysInstanced = nullptr;
     VertexAttribDivisorFn m_vertexAttribDivisor = nullptr;
@@ -150,4 +159,6 @@ private:
     glm::vec3 m_cameraPosition{0.0f};
     bool m_framebufferSrgb = false;
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
+    std::unordered_map<uint32_t, GpuChunkMesh> m_chunkMeshes;
+    uint32_t m_nextChunkMeshHandle = 1;
 };

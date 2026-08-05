@@ -1,5 +1,5 @@
 #include "model/ModelRenderer.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "model/ModelRenderLogic.h"
 #include "renderer/Shader.h"
 #include "core/Window.h"
@@ -10,7 +10,7 @@
 
 namespace model {
 ModelRenderer::~ModelRenderer(){ clear(); }
-void ModelRenderer::initialize(const std::filesystem::path& root,bool srgb,GraphicsApi api){m_framebufferSrgb=srgb;m_vertexAttribIPointer=reinterpret_cast<VertexAttribIPointerFn>(Window::glProcAddress("glVertexAttribIPointer"));if(!m_vertexAttribIPointer)throw std::runtime_error("OpenGL integer vertex attributes are unavailable");m_shader=std::make_unique<Shader>(root/"shaders/model.vert",root/"shaders/model.frag",api);}
+void ModelRenderer::initialize(const std::filesystem::path& root,bool srgb,GraphicsApi api){m_framebufferSrgb=srgb;m_vertexAttribIPointer=reinterpret_cast<VertexAttribIPointerFn>(Window::graphicsProcAddress("glVertexAttribIPointer"));if(!m_vertexAttribIPointer)throw std::runtime_error("OpenGL integer vertex attributes are unavailable");m_shader=std::make_unique<Shader>(root/"shaders/model.vert",root/"shaders/model.frag",api);}
 ModelHandle ModelRenderer::upload(std::shared_ptr<const ModelAsset> asset){
  if(!asset) throw std::invalid_argument("cannot upload a null model asset");
  GpuModel gpu;gpu.asset=std::move(asset);

@@ -10,12 +10,21 @@
 #include <SDL3/SDL.h>
 #include "core/TextEditBuffer.h"
 #include "core/Window.h"
+#include "platform/Clipboard.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
-namespace { void require(bool v,const char* m){if(!v){std::cerr<<"FAILED: "<<m<<'\n';std::exit(1);}} }
+namespace {
+void require(bool v,const char* m){if(!v){std::cerr<<"FAILED: "<<m<<'\n';std::exit(1);}}
+class FakeClipboard final : public platform::Clipboard {
+public:
+    bool writeText(std::string_view value) override { text.assign(value); return true; }
+    bool readText(std::string& value) override { value = text; return true; }
+    std::string text;
+};
+}
 
 // TouchControls::render is linked into this logic test, but no OpenGL-backed
 // renderer is constructed. These three inert definitions keep the test focused
@@ -62,7 +71,8 @@ int main(){
     {AssetStore assets(root/"assets");
         require(assets.readText("sample.txt")=="hello"&&assets.readBinary("empty.bin").empty(),
                 "title storage reads text and empty binary assets");
-        auto stream=assets.openMemory("empty.bin");require(static_cast<bool>(stream),"empty assets expose a valid IOStream");
+        require(assets.readBinary("empty.bin").empty(),
+                "empty assets remain readable without exposing backend IO streams");
         bool missing=false;try{assets.readBinary("missing.bin");}catch(const std::exception&){missing=true;}
         require(missing,"missing title assets report failure");}
     ClientSettings settings;
@@ -163,6 +173,15 @@ int main(){
     require(edit.selectedText()=="BC\xE4\xB8\xAD","text insertion strips line breaks and selection is byte-safe");
     edit.moveEnd();edit.moveLeft(true);edit.eraseForward();
     require(edit.text()=="BC","forward deletion erases the selected multibyte codepoint");
+    FakeClipboard clipboard;
+    TextEditBuffer clipboardEdit("copy", 16, &clipboard);
+    clipboardEdit.selectAll();
+    require(clipboardEdit.copySelection() && clipboard.text == "copy",
+            "text editing writes through the injected clipboard service");
+    clipboard.text = "paste";
+    clipboardEdit.setText({});
+    require(clipboardEdit.pasteClipboard() && clipboardEdit.text() == "paste",
+            "text editing reads through the injected clipboard service");
     require(RuntimeClock::elapsed(20,10)==0&&RuntimeClock::milliseconds(2'500'000)==2&&
             RuntimeClock::fromSeconds(.5)==500'000'000,
             "runtime clock conversions saturate backwards elapsed time");

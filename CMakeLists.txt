@@ -88,7 +88,9 @@ else()
     find_package(OpenGL REQUIRED)
 endif()
 
-add_library(minecraftc_assets STATIC src/core/AssetStore.cpp)
+add_library(minecraftc_assets STATIC
+    src/core/AssetStore.cpp
+    src/platform/sdl/SdlAssetStore.cpp)
 target_include_directories(minecraftc_assets PUBLIC src)
 target_link_libraries(minecraftc_assets PUBLIC ${MINECRAFTC_SDL_TARGET})
 link_libraries(minecraftc_assets)
@@ -108,18 +110,66 @@ file(GLOB_RECURSE SOURCES
     src/*.cpp
     src/*.h
 )
-list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/Platform.cpp")
+set(MINECRAFTC_SDL_BACKEND_SOURCES
+    src/platform/sdl/SdlAudioSystem.cpp
+    src/platform/sdl/SdlClipboard.cpp
+    src/platform/sdl/SdlGamepadManager.cpp
+    src/platform/sdl/SdlMain.cpp
+    src/platform/sdl/SdlWindow.cpp)
+set(MINECRAFTC_OPENGL_BACKEND_SOURCES
+    src/renderer/backend/opengl/OpenGLBlockTextureAtlas.cpp
+    src/renderer/backend/opengl/OpenGLFontRenderer.cpp
+    src/renderer/backend/opengl/OpenGLModelRenderer.cpp
+    src/renderer/backend/opengl/OpenGLRenderer.cpp
+    src/renderer/backend/opengl/OpenGLShader.cpp
+    src/renderer/backend/opengl/OpenGLUIRenderer.cpp)
+foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
+                                MINECRAFTC_OPENGL_BACKEND_SOURCES)
+    list(REMOVE_ITEM SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/${BACKEND_SOURCE}")
+endforeach()
+list(REMOVE_ITEM SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp")
+list(REMOVE_ITEM SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeCrashHandler.cpp")
+list(REMOVE_ITEM SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlPlatformPaths.cpp")
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/AssetStore.cpp")
+list(REMOVE_ITEM SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlAssetStore.cpp")
 
-add_library(minecraftc_platform STATIC src/core/Platform.cpp)
+add_library(minecraftc_platform STATIC
+    src/platform/native/NativePlatform.cpp
+    src/platform/native/NativeCrashHandler.cpp
+    src/platform/sdl/SdlPlatformPaths.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
 target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
-if(ANDROID)
-    target_link_libraries(minecraftc_platform PUBLIC ${MINECRAFTC_SDL_TARGET})
-endif()
+target_link_libraries(minecraftc_platform PRIVATE ${MINECRAFTC_SDL_TARGET})
 if(WIN32)
     target_link_libraries(minecraftc_platform PUBLIC shell32 ole32)
+endif()
+
+add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
+target_include_directories(minecraftc_platform_sdl PRIVATE src)
+target_compile_definitions(minecraftc_platform_sdl PRIVATE
+    MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+target_link_libraries(minecraftc_platform_sdl PRIVATE ${MINECRAFTC_SDL_TARGET})
+if(MINECRAFTC_DESKTOP_GLES3)
+    target_compile_definitions(minecraftc_platform_sdl PRIVATE
+        MINECRAFTC_FORCE_GLES3=1)
+endif()
+
+add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
+target_include_directories(minecraftc_render_opengl PRIVATE
+    src external/glad/include external/stb external)
+target_link_libraries(minecraftc_render_opengl PRIVATE
+    glad glm::glm minecraftc_assets ${MINECRAFTC_SDL_TARGET})
+if(ANDROID)
+    target_link_libraries(minecraftc_render_opengl PRIVATE
+        ${MINECRAFTC_GLES_LIBRARY} android log)
+else()
+    target_link_libraries(minecraftc_render_opengl PRIVATE OpenGL::GL)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(minecraftc_platform PRIVATE -Wall -Wextra -Wpedantic)
@@ -136,7 +186,6 @@ else()
 endif()
 target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE
     src
-    external/glad/include
     external/FastNoiseLite
     external/cgltf
     external/stb
@@ -157,18 +206,12 @@ target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
     $<$<CONFIG:Release>:LOG_COMPILE_LEVEL=2>
 )
 target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
-    ${MINECRAFTC_SDL_TARGET}
     glm::glm
-    glad
     minecraftc_platform
+    minecraftc_platform_sdl
+    minecraftc_render_opengl
     ${CMAKE_DL_LIBS}
 )
-if(ANDROID)
-    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
-        ${MINECRAFTC_GLES_LIBRARY} android log)
-else()
-    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE OpenGL::GL)
-endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
@@ -221,6 +264,10 @@ if(ANDROID)
 endif()
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME api_dependency_boundaries
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tools/check_api_boundaries.py
+                --root ${CMAKE_SOURCE_DIR})
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
         PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.5")
@@ -458,11 +505,11 @@ if(BUILD_TESTING)
         src/model/AnimationMixer.cpp
         src/model/ModelAnimation.cpp
         src/model/GltfLoader.cpp
-        src/model/ModelRenderer.cpp
-        src/core/GamepadManager.cpp
-        src/core/Window.cpp
+        src/renderer/backend/opengl/OpenGLModelRenderer.cpp
+        src/platform/sdl/SdlGamepadManager.cpp
+        src/platform/sdl/SdlWindow.cpp
         src/debug/Log.cpp
-        src/renderer/Shader.cpp
+        src/renderer/backend/opengl/OpenGLShader.cpp
         src/renderer/StbImageImpl.cpp)
     target_include_directories(entity_model_registry_tests PRIVATE
         src external external/cgltf external/stb external/glad/include)
@@ -499,7 +546,7 @@ if(BUILD_TESTING)
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
         src/core/Input.cpp
-        src/core/GamepadManager.cpp
+        src/platform/sdl/SdlGamepadManager.cpp
         src/core/InputCodes.cpp
         src/core/TextEditBuffer.cpp
         src/debug/Log.cpp

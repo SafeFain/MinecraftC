@@ -5,13 +5,13 @@
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
-#include <glad/glad.h>
 
 #include "ui/FontRenderer.h"
 #include "world/Block.h"
 #include "game/Item.h"
 #include "game/Localization.h"
 #include "core/GraphicsApi.h"
+#include "renderer/RenderHandles.h"
 
 class Shader;
 
@@ -23,9 +23,9 @@ public:
     UIRenderer(const UIRenderer&) = delete;
     UIRenderer& operator=(const UIRenderer&) = delete;
 
-    void initialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+    void initialize(RenderTextureHandle blockAtlasTexture, bool framebufferSrgb,
                     const std::filesystem::path& assetRoot, GraphicsApi api);
-    void reinitialize(GLuint blockAtlasTexture, bool framebufferSrgb,
+    void reinitialize(RenderTextureHandle blockAtlasTexture, bool framebufferSrgb,
                       const std::filesystem::path& assetRoot, GraphicsApi api);
     void resetGraphics();
     void setLocalization(const Localization& localization) {
@@ -62,11 +62,11 @@ private:
     glm::vec2 m_canvasOrigin{0.0f};
     glm::vec2 m_canvasSize{0.0f};
 
-    GLuint m_quadVAO = 0;
-    GLuint m_quadVBO = 0;
-    GLuint m_quadEBO = 0;
-    GLuint m_blockAtlasTexture = 0; // shared, owned by Renderer
-    GLuint m_itemAtlasTexture = 0;  // owned by UIRenderer
+    uint32_t m_quadVAO = 0;
+    uint32_t m_quadVBO = 0;
+    uint32_t m_quadEBO = 0;
+    RenderTextureHandle m_blockAtlasTexture; // shared, owned by Renderer
+    uint32_t m_itemAtlasTexture = 0;  // owned by UIRenderer
     int m_itemAtlasColumns = 0;
     int m_itemAtlasRows = 0;
     std::unordered_map<std::string, int> m_itemAtlasIndices;
@@ -76,10 +76,10 @@ private:
     bool drawGeneratedItemIcon(float x, float y, float w, float h, ItemId item);
 
     // Saved GL state
-    GLboolean m_prevDepthTest = GL_TRUE;
-    GLboolean m_prevCullFace = GL_TRUE;
-    GLboolean m_prevBlend = GL_FALSE;
-    GLint m_prevBlendSrc = 0;
-    GLint m_prevBlendDst = 0;
-    GLint m_prevActiveTexture = 0;
+    uint8_t m_prevDepthTest = 1;
+    uint8_t m_prevCullFace = 1;
+    uint8_t m_prevBlend = 0;
+    int m_prevBlendSrc = 0;
+    int m_prevBlendDst = 0;
+    int m_prevActiveTexture = 0;
 };

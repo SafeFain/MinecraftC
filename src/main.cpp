@@ -1,8 +1,10 @@
 #include "core/Window.h"
+#include "core/ApplicationHost.h"
 #include "core/Input.h"
 #include "core/Platform.h"
 #include "core/RuntimeClock.h"
 #include "core/TextEditBuffer.h"
+#include "platform/sdl/SdlClipboard.h"
 #include "core/AssetStore.h"
 #include "renderer/Renderer.h"
 #include "renderer/Camera.h"
@@ -37,12 +39,6 @@
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
-#include <glad/glad.h>
-#define SDL_MAIN_USE_CALLBACKS 1
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_init.h>
-#include <SDL3/SDL_messagebox.h>
-
 #include <stdexcept>
 #include <chrono>
 #include <cmath>
@@ -54,7 +50,7 @@
 #include <limits>
 #include <unordered_map>
 
-class Application {
+class Application final : public ApplicationHost {
 public:
     explicit Application(RuntimePaths paths)
         : m_paths(std::move(paths)),
@@ -64,43 +60,44 @@ public:
     {}
 
     void start() { initialize(); }
-    bool iterate() {
+    bool iterate() override {
         if (m_graphicsResetPending) restoreGraphics();
-        if (m_backgrounded) { SDL_Delay(100); return m_running; }
+        if (m_backgrounded) { RuntimeClock::sleepMilliseconds(100); return m_running; }
         return runFrame();
     }
-    void event(const SDL_Event& event) {
-        switch (event.type) {
-            case SDL_EVENT_WILL_ENTER_BACKGROUND:
+    void event(ApplicationEvent event, const void* nativeEvent) override {
+        switch (event) {
+            case ApplicationEvent::EnterBackground:
                 m_backgrounded = true;
                 m_touchControls.cancelAll();
                 saveCurrentWorld();
                 break;
-            case SDL_EVENT_DID_ENTER_FOREGROUND:
+            case ApplicationEvent::EnterForeground:
                 m_backgrounded = false;
                 m_lastFrameTick = m_runtimeClock.now();
                 break;
-            case SDL_EVENT_RENDER_DEVICE_RESET:
+            case ApplicationEvent::GraphicsReset:
                 m_graphicsResetPending = true;
                 break;
-            case SDL_EVENT_LOW_MEMORY:
+            case ApplicationEvent::LowMemory:
                 LOG_WARN("Android reported low memory");
                 break;
-            case SDL_EVENT_TERMINATING:
+            case ApplicationEvent::Terminating:
                 saveCurrentWorld();
                 m_savedForTermination = true;
                 m_running = false;
                 break;
-            default:
+            case ApplicationEvent::Input:
                 break;
         }
-        m_window.handleEvent(&event);
+        if (nativeEvent) m_window.handleEvent(nativeEvent);
     }
-    void shutdown() { if(!m_cleaned){m_cleaned=true;cleanup();} }
+    void shutdown() override { if(!m_cleaned){m_cleaned=true;cleanup();} }
 
 private:
     RuntimePaths m_paths;
     AssetStore m_assets;
+    platform::sdl::SdlClipboard m_clipboard;
     Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"};
     Renderer    m_renderer;
     Camera      m_camera;
@@ -148,7 +145,7 @@ private:
     double                m_mouseScreenX = 0.0;
     double                m_mouseScreenY = 0.0;
     bool                  m_commandOpen = false;
-    TextEditBuffer        m_commandInput{{}, 80};
+    TextEditBuffer        m_commandInput{{}, 80, &m_clipboard};
     std::string           m_commandMessage;
     float                 m_commandMessageSeconds = 0.0f;
 
@@ -208,23 +205,18 @@ private:
         m_localization.setLanguage(m_clientSettings.language);
         applyClientSettings(false);
 
-        if (!gladLoadGL(Window::glProcAddress)) {
-            throw std::runtime_error("Failed to load OpenGL functions");
-        }
-
-        // Set initial viewport (framebuffer size already queried in Window constructor)
-        glViewport(0, 0, m_window.width(), m_window.height());
-
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
-        if (graphics.api == GraphicsApi::OpenGLES30 && graphics.majorVersion < 3)
-            throw std::runtime_error("OpenGL ES 3.0 or newer is required");
         m_renderer.initialize(graphics, m_paths.assetRoot);
+        m_renderer.resize(m_window.width(), m_window.height());
         m_entities.initializeModels(m_paths.assetRoot, m_renderer);
         m_audio.initialize();
         m_uiRenderer.initialize(
             m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
             m_paths.assetRoot, graphics.api);
         m_uiRenderer.setLocalization(m_localization);
+        m_window.setResizeCallback([this](int width, int height) {
+            m_renderer.resize(width, height);
+        });
 
         // Start with cursor visible (main menu)
         m_window.setCursorLocked(false);
@@ -561,18 +553,12 @@ private:
         m_lastFrameTick = m_runtimeClock.now();
 
         LOG_INFO("MinecraftC initialized");
-        LOG_INFO("OpenGL: " << glGetString(GL_VERSION));
-        LOG_INFO("Renderer: " << glGetString(GL_RENDERER));
     }
 
     void restoreGraphics() {
         m_graphicsResetPending = false;
         m_world.invalidateGpuMeshes();
-        if (!gladLoadGL(Window::glProcAddress))
-            throw std::runtime_error("Failed to reload graphics functions");
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
-        if (graphics.api == GraphicsApi::OpenGLES30 && graphics.majorVersion < 3)
-            throw std::runtime_error("OpenGL ES 3.0 context was not restored");
         m_uiRenderer.resetGraphics();
         m_renderer.reinitialize(graphics, m_paths.assetRoot);
         m_entities.initializeModels(m_paths.assetRoot, m_renderer);
@@ -581,13 +567,14 @@ private:
             m_paths.assetRoot, graphics.api);
         m_uiRenderer.setLocalization(m_localization);
         m_world.restoreGpuMeshes();
-        glViewport(0, 0, m_window.width(), m_window.height());
+        m_renderer.resize(m_window.width(), m_window.height());
         LOG_INFO("Graphics resources restored after device reset");
     }
 
     void showMainMenu() {
         m_activeMenu = std::make_unique<MainMenu>(
-            m_menuCallbacks, m_worldCatalog.list(), m_clientSettings, m_localization);
+            m_menuCallbacks, m_worldCatalog.list(), m_clientSettings, m_localization,
+            &m_clipboard);
     }
 
     void applyClientSettings(bool persist = true) {
@@ -917,7 +904,7 @@ private:
 
             // Skip rendering when minimized to save resources
             if (m_window.isMinimized()) {
-                SDL_Delay(100);
+                RuntimeClock::sleepMilliseconds(100);
                 m_window.finishEventFrame();
                 return !m_window.shouldClose()&&m_running;
             }
@@ -1776,56 +1763,22 @@ private:
     }
 };
 
-namespace {
-void reportFatal(const char* context,const std::exception& error) {
-    const std::string message=std::string("MinecraftC ")+context+" failed:\n"+error.what();
-    std::cerr<<message<<'\n';
-    LOG_FATAL(message);
-    if(!SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,"MinecraftC",message.c_str(),nullptr))
-        std::cerr<<"Could not show SDL error message: "<<SDL_GetError()<<'\n';
-}
-}
-
-SDL_AppResult SDL_AppInit(void** appstate,int argc,char** argv) {
-    try {
-        if (argc > 1) {
-            const std::string argument(argv[1]);
-            if (argument == "--version") {
-                std::cout << "MinecraftC " << Config::GAME_VERSION << '\n';
-                return SDL_APP_SUCCESS;
-            }
-            if (argument == "--help" || argument == "-h") {
-                std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
-                          << "Usage: minecraftc [--help] [--version]\n"
-                          << "Worlds and settings are stored in the platform user-data directory.\n";
-                return SDL_APP_SUCCESS;
-            }
+std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
+    if (argc > 1) {
+        const std::string argument(argv[1]);
+        if (argument == "--version") {
+            std::cout << "MinecraftC " << Config::GAME_VERSION << '\n';
+            return {};
         }
-        RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
-        auto app=std::make_unique<Application>(std::move(paths));
-        app->start();
-        *appstate=app.release();
-        return SDL_APP_CONTINUE;
-    } catch (const std::exception& error) {
-        reportFatal("startup",error);
-        return SDL_APP_FAILURE;
+        if (argument == "--help" || argument == "-h") {
+            std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
+                      << "Usage: minecraftc [--help] [--version]\n"
+                      << "Worlds and settings are stored in the platform user-data directory.\n";
+            return {};
+        }
     }
-}
-
-SDL_AppResult SDL_AppEvent(void* appstate,SDL_Event* event) {
-    if(!appstate)return SDL_APP_SUCCESS;
-    try { static_cast<Application*>(appstate)->event(*event); return SDL_APP_CONTINUE; }
-    catch(const std::exception& error){reportFatal("event handling",error);return SDL_APP_FAILURE;}
-}
-
-SDL_AppResult SDL_AppIterate(void* appstate) {
-    if(!appstate)return SDL_APP_SUCCESS;
-    try{return static_cast<Application*>(appstate)->iterate()?SDL_APP_CONTINUE:SDL_APP_SUCCESS;}
-    catch(const std::exception& error){reportFatal("runtime",error);return SDL_APP_FAILURE;}
-}
-
-void SDL_AppQuit(void* appstate,SDL_AppResult) {
-    if(!appstate)return;
-    try { auto app=std::unique_ptr<Application>(static_cast<Application*>(appstate));app->shutdown(); }
-    catch(const std::exception& error){reportFatal("shutdown",error);}
+    RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
+    auto app = std::make_unique<Application>(std::move(paths));
+    app->start();
+    return app;
 }

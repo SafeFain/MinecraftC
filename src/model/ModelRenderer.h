@@ -10,8 +10,6 @@
 #include <memory>
 #include <vector>
 
-#include <glad/glad.h>
-
 class Shader;
 
 namespace model {
@@ -50,10 +48,10 @@ public:
 
 private:
     struct GpuPrimitive {
-        GLuint vao = 0;
-        GLuint vbo = 0;
-        GLuint ebo = 0;
-        GLsizei indexCount = 0;
+        uint32_t vao = 0;
+        uint32_t vbo = 0;
+        uint32_t ebo = 0;
+        int indexCount = 0;
         int material = -1;
         int skin = -1;
         int node = -1;
@@ -61,17 +59,17 @@ private:
     struct GpuModel {
         std::shared_ptr<const ModelAsset> asset;
         std::vector<GpuPrimitive> primitives;
-        std::vector<GLuint> textures;
+        std::vector<uint32_t> textures;
     };
     std::unique_ptr<Shader> m_shader;
     std::vector<GpuModel> m_models;
     std::vector<ModelDraw> m_draws;
     bool m_framebufferSrgb = false;
 #if defined(_WIN32)
-    using VertexAttribIPointerFn = void (__stdcall *)(GLuint, GLint, GLenum,
-                                                      GLsizei, const void*);
+    using VertexAttribIPointerFn = void (__stdcall *)(uint32_t, int, uint32_t,
+                                                      int, const void*);
 #else
-    using VertexAttribIPointerFn = void (*)(GLuint, GLint, GLenum, GLsizei,
+    using VertexAttribIPointerFn = void (*)(uint32_t, int, uint32_t, int,
                                             const void*);
 #endif
     VertexAttribIPointerFn m_vertexAttribIPointer = nullptr;

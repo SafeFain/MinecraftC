@@ -1,7 +1,7 @@
 #pragma once
 
 #include <filesystem>
-#include <glad/glad.h>
+#include "renderer/RenderHandles.h"
 
 class BlockTextureAtlas {
 public:
@@ -13,9 +13,9 @@ public:
 
     bool initialize(const std::filesystem::path& assetRoot);
     void bind() const;
-    GLuint textureId() const { return m_texture; }
+    RenderTextureHandle texture() const { return m_texture; }
     static int tilesPerSide();
 
 private:
-    GLuint m_texture = 0;
+    RenderTextureHandle m_texture;
 };

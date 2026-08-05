@@ -6,11 +6,15 @@
 #include <string>
 #include <string_view>
 
+namespace platform { class Clipboard; }
+
 class TextEditBuffer {
 public:
     using Filter = std::function<bool(uint32_t, const std::string&)>;
 
-    explicit TextEditBuffer(std::string text = {}, size_t maximumCodepoints = 0);
+    explicit TextEditBuffer(std::string text = {}, size_t maximumCodepoints = 0,
+                            platform::Clipboard* clipboard = nullptr);
+    void setClipboard(platform::Clipboard* clipboard) { m_clipboard = clipboard; }
 
     const std::string& text() const { return m_text; }
     void setText(std::string text);
@@ -38,6 +42,7 @@ private:
     size_t m_anchor = 0;
     size_t m_maximumCodepoints = 0;
     Filter m_filter;
+    platform::Clipboard* m_clipboard = nullptr;
 
     bool eraseSelection();
     static size_t previousBoundary(std::string_view text, size_t position);

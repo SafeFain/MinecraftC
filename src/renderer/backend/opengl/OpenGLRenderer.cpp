@@ -1,7 +1,7 @@
 #include "renderer/Renderer.h"
 #include "model/ModelRenderer.h"
 #include "world/ChunkMesh.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "debug/Log.h"
 
 #include <algorithm>
@@ -80,6 +80,12 @@ float cloudDensity(uint64_t seed, int x, int z) {
 Renderer::Renderer() = default;
 
 Renderer::~Renderer() {
+    for (auto& [handle, mesh] : m_chunkMeshes) {
+        (void)handle;
+        if (mesh.vbo) GL_CHECK(glDeleteBuffers(1, &mesh.vbo));
+        if (mesh.ebo) GL_CHECK(glDeleteBuffers(1, &mesh.ebo));
+        if (mesh.vao) GL_CHECK(glDeleteVertexArrays(1, &mesh.vao));
+    }
     if (m_wireVAO) deleteVAO(m_wireVAO);
     if (m_skyVAO) GL_CHECK(glDeleteVertexArrays(1, &m_skyVAO));
     if (m_entityVBO) GL_CHECK(glDeleteBuffers(1, &m_entityVBO));
@@ -96,6 +102,8 @@ Renderer::~Renderer() {
 
 void Renderer::reinitialize(const GraphicsCapabilities& capabilities,
                             const std::filesystem::path& assetRoot) {
+    if (!gladLoadGL(Window::graphicsProcAddress))
+        throw std::runtime_error("Failed to reload OpenGL functions");
     this->~Renderer();
     new (this) Renderer();
     initialize(capabilities, assetRoot);
@@ -105,6 +113,12 @@ void Renderer::reinitialize(const GraphicsCapabilities& capabilities,
 
 void Renderer::initialize(const GraphicsCapabilities& capabilities,
                           const std::filesystem::path& assetRoot) {
+    if (!gladLoadGL(Window::graphicsProcAddress))
+        throw std::runtime_error("Failed to load OpenGL functions");
+    if (capabilities.api == GraphicsApi::OpenGLES30 && capabilities.majorVersion < 3)
+        throw std::runtime_error("OpenGL ES 3.0 or newer is required");
+    LOG_INFO("OpenGL: " << reinterpret_cast<const char*>(glGetString(GL_VERSION)));
+    LOG_INFO("Renderer: " << reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
     m_framebufferSrgb = capabilities.framebufferSrgb;
     m_graphicsApi = capabilities.api;
     m_modelRenderer = std::make_unique<model::ModelRenderer>();
@@ -191,11 +205,11 @@ void Renderer::initialize(const GraphicsCapabilities& capabilities,
     GL_CHECK(glBindVertexArray(0));
 
     m_drawArraysInstanced = reinterpret_cast<DrawArraysInstancedFn>(
-        Window::glProcAddress("glDrawArraysInstanced"));
+        Window::graphicsProcAddress("glDrawArraysInstanced"));
     m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
-        Window::glProcAddress("glVertexAttribDivisor"));
+        Window::graphicsProcAddress("glVertexAttribDivisor"));
     m_bufferSubData = reinterpret_cast<BufferSubDataFn>(
-        Window::glProcAddress("glBufferSubData"));
+        Window::graphicsProcAddress("glBufferSubData"));
     m_cloudInstances.reserve(MAX_CLOUD_INSTANCES);
     if (m_drawArraysInstanced && m_vertexAttribDivisor) {
         // Clouds share the static entity cube but provide position and size
@@ -295,6 +309,10 @@ void Renderer::beginFrame() {
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 }
 
+void Renderer::resize(int width, int height) {
+    GL_CHECK(glViewport(0, 0, std::max(1, width), std::max(1, height)));
+}
+
 void Renderer::endFrame() {
     // Currently a no-op; swap happens in main loop
 }
@@ -336,6 +354,71 @@ void Renderer::renderSky(const RenderEnvironment& environment,
 
 // ── Chunk rendering ───────────────────────────────────────────────────
 
+void Renderer::uploadChunkMesh(ChunkMesh& mesh) {
+    if (mesh.vertices.empty() || mesh.indices.empty()) {
+        releaseChunkMesh(mesh);
+        mesh.indexCount = 0;
+        return;
+    }
+    static_assert(sizeof(MeshVertex) == 44,
+                  "MeshVertex must be 11 tightly-packed floats");
+    static_assert(offsetof(MeshVertex, px) == 0, "px at offset 0");
+    static_assert(offsetof(MeshVertex, ao) == 12, "ao at offset 12");
+
+    if (!mesh.renderHandle) {
+        if (m_nextChunkMeshHandle == 0)
+            throw std::runtime_error("Chunk mesh handle space exhausted");
+        mesh.renderHandle.value = m_nextChunkMeshHandle++;
+    }
+    GpuChunkMesh& gpu = m_chunkMeshes[mesh.renderHandle.value];
+    const bool initializeLayout = gpu.vao == 0;
+    if (initializeLayout) {
+        GL_CHECK(glGenVertexArrays(1, &gpu.vao));
+        GL_CHECK(glGenBuffers(1, &gpu.vbo));
+        GL_CHECK(glGenBuffers(1, &gpu.ebo));
+    }
+    GL_CHECK(glBindVertexArray(gpu.vao));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+        mesh.vertices.size() * sizeof(MeshVertex), mesh.vertices.data(),
+        GL_STATIC_DRAW));
+    if (initializeLayout) {
+        GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+            sizeof(MeshVertex), reinterpret_cast<void*>(0)));
+        GL_CHECK(glEnableVertexAttribArray(0));
+        GL_CHECK(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
+            sizeof(MeshVertex), reinterpret_cast<void*>(12)));
+        GL_CHECK(glEnableVertexAttribArray(1));
+        GL_CHECK(glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE,
+            sizeof(MeshVertex), reinterpret_cast<void*>(28)));
+        GL_CHECK(glEnableVertexAttribArray(2));
+        GL_CHECK(glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
+            sizeof(MeshVertex), reinterpret_cast<void*>(40)));
+        GL_CHECK(glEnableVertexAttribArray(3));
+    }
+    GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ebo));
+    GL_CHECK(glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        mesh.indices.size() * sizeof(unsigned int), mesh.indices.data(),
+        GL_STATIC_DRAW));
+    GL_CHECK(glBindVertexArray(0));
+    mesh.indexCount = mesh.indices.size();
+    mesh.gpuReady = true;
+}
+
+void Renderer::releaseChunkMesh(ChunkMesh& mesh) {
+    if (mesh.renderHandle) {
+        const auto found = m_chunkMeshes.find(mesh.renderHandle.value);
+        if (found != m_chunkMeshes.end()) {
+            GpuChunkMesh& gpu = found->second;
+            if (gpu.vbo) GL_CHECK(glDeleteBuffers(1, &gpu.vbo));
+            if (gpu.ebo) GL_CHECK(glDeleteBuffers(1, &gpu.ebo));
+            if (gpu.vao) GL_CHECK(glDeleteVertexArrays(1, &gpu.vao));
+            m_chunkMeshes.erase(found);
+        }
+    }
+    mesh.abandonGpuResources();
+}
+
 void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
                            const glm::mat4& viewProjection, bool translucent) {
     if (!mesh.gpuReady || mesh.indexCount == 0) return;
@@ -348,7 +431,9 @@ void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
     // Shader is expected to already be bound (caller binds once per frame)
     m_blockShader->setMat4("uMVP", mvp);
     m_blockShader->setVec3("uChunkOrigin", glm::vec3(modelMatrix[3]));
-    GL_CHECK(glBindVertexArray(mesh.vao));
+    const auto found = m_chunkMeshes.find(mesh.renderHandle.value);
+    if (found == m_chunkMeshes.end()) return;
+    GL_CHECK(glBindVertexArray(found->second.vao));
     GL_CHECK(glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count),
                    GL_UNSIGNED_INT,
                    reinterpret_cast<void*>(offset * sizeof(unsigned int))));

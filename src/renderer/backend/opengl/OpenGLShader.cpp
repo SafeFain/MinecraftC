@@ -1,10 +1,16 @@
 #include "renderer/Shader.h"
 #include "debug/Log.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "core/AssetStore.h"
 #include "renderer/ShaderDialect.h"
 
 #include <stdexcept>
+#include <unordered_map>
+
+struct Shader::Impl {
+    GLuint program = 0;
+    mutable std::unordered_map<std::string, GLint> uniformCache;
+};
 
 // ── File reading ──────────────────────────────────────────────────────
 
@@ -14,7 +20,7 @@ std::string Shader::readFile(const std::filesystem::path& path) {
 
 // ── Shader compilation ────────────────────────────────────────────────
 
-GLuint Shader::compileShader(GLenum type, const std::string& source) {
+static GLuint compileShader(GLenum type, const std::string& source) {
     GLuint shader = glCreateShader(type);
     const char* src = source.c_str();
     glShaderSource(shader, 1, &src, nullptr);
@@ -36,27 +42,28 @@ GLuint Shader::compileShader(GLenum type, const std::string& source) {
 // ── Constructor / Destructor ──────────────────────────────────────────
 
 Shader::Shader(const std::filesystem::path& vertexPath,
-               const std::filesystem::path& fragmentPath, GraphicsApi api) {
+               const std::filesystem::path& fragmentPath, GraphicsApi api)
+    : m_impl(std::make_unique<Impl>()) {
     std::string vertexSrc   = sourceForApi(readFile(vertexPath), api);
     std::string fragmentSrc = sourceForApi(readFile(fragmentPath), api);
 
     GLuint vs = compileShader(GL_VERTEX_SHADER,   vertexSrc);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentSrc);
 
-    m_programID = glCreateProgram();
-    glAttachShader(m_programID, vs);
-    glAttachShader(m_programID, fs);
-    glLinkProgram(m_programID);
+    m_impl->program = glCreateProgram();
+    glAttachShader(m_impl->program, vs);
+    glAttachShader(m_impl->program, fs);
+    glLinkProgram(m_impl->program);
 
     GLint success;
-    glGetProgramiv(m_programID, GL_LINK_STATUS, &success);
+    glGetProgramiv(m_impl->program, GL_LINK_STATUS, &success);
     if (!success) {
         char infoLog[512];
-        glGetProgramInfoLog(m_programID, 512, nullptr, infoLog);
+        glGetProgramInfoLog(m_impl->program, 512, nullptr, infoLog);
         LOG_ERROR("Shader link error:\n" << infoLog);
         glDeleteShader(vs);
         glDeleteShader(fs);
-        glDeleteProgram(m_programID);
+        glDeleteProgram(m_impl->program);
         throw std::runtime_error("Shader linking failed");
     }
 
@@ -69,20 +76,17 @@ std::string Shader::sourceForApi(std::string source, GraphicsApi api) {
 }
 
 Shader::~Shader() {
-    if (m_programID != 0) {
-        glDeleteProgram(m_programID);
+    if (m_impl && m_impl->program != 0) {
+        glDeleteProgram(m_impl->program);
     }
 }
 
-Shader::Shader(Shader&& other) noexcept : m_programID(other.m_programID) {
-    other.m_programID = 0;
-}
+Shader::Shader(Shader&& other) noexcept = default;
 
 Shader& Shader::operator=(Shader&& other) noexcept {
     if (this != &other) {
-        if (m_programID != 0) glDeleteProgram(m_programID);
-        m_programID = other.m_programID;
-        other.m_programID = 0;
+        if (m_impl && m_impl->program != 0) glDeleteProgram(m_impl->program);
+        m_impl = std::move(other.m_impl);
     }
     return *this;
 }
@@ -90,20 +94,20 @@ Shader& Shader::operator=(Shader&& other) noexcept {
 // ── Methods ───────────────────────────────────────────────────────────
 
 void Shader::bind() const {
-    glUseProgram(m_programID);
+    glUseProgram(m_impl->program);
 }
 
 void Shader::unbind() const {
     glUseProgram(0);
 }
 
-GLint Shader::getUniformLocation(const std::string& name) const {
-    auto it = m_uniformCache.find(name);
-    if (it != m_uniformCache.end()) {
+int Shader::getUniformLocation(const std::string& name) const {
+    auto it = m_impl->uniformCache.find(name);
+    if (it != m_impl->uniformCache.end()) {
         return it->second;
     }
-    GLint loc = glGetUniformLocation(m_programID, name.c_str());
-    m_uniformCache[name] = loc;
+    GLint loc = glGetUniformLocation(m_impl->program, name.c_str());
+    m_impl->uniformCache[name] = loc;
     return loc;
 }
 

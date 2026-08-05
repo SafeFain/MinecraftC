@@ -1,14 +1,11 @@
 #include "core/Platform.h"
+#include "platform/sdl/SdlPlatformPaths.h"
 
 #include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 #include <vector>
-
-#if defined(__ANDROID__)
-#  include <SDL3/SDL_filesystem.h>
-#endif
 
 #if defined(_WIN32)
 #  define NOMINMAX
@@ -170,12 +167,8 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
 RuntimePaths discoverRuntimePaths(const char* argv0) {
 #if defined(__ANDROID__)
     (void)argv0;
-    char* preferred = SDL_GetPrefPath("SafeFain", "MinecraftC");
-    if (!preferred)
-        throw std::runtime_error("Cannot determine Android application data directory");
     RuntimePaths result;
-    result.dataRoot = std::filesystem::u8path(preferred);
-    SDL_free(preferred);
+    result.dataRoot = platform::sdl::preferencePath();
     // An empty title-storage override selects the APK asset namespace.
     result.assetRoot.clear();
     return result;

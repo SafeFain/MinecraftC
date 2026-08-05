@@ -1,7 +1,7 @@
 #include "renderer/BlockTextureAtlas.h"
 
 #include "debug/Log.h"
-#include "debug/OpenGL.h"
+#include "renderer/backend/opengl/OpenGLDebug.h"
 #include "world/Block.h"
 #include "core/AssetStore.h"
 
@@ -200,7 +200,7 @@ int BlockTextureAtlas::tilesPerSide() {
 }
 
 BlockTextureAtlas::~BlockTextureAtlas() {
-    if (m_texture) GL_CHECK(glDeleteTextures(1, &m_texture));
+    if (m_texture) GL_CHECK(glDeleteTextures(1, &m_texture.value));
 }
 
 bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
@@ -318,8 +318,8 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
                         tile);
     }
 
-    GL_CHECK(glGenTextures(1, &m_texture));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture));
+    GL_CHECK(glGenTextures(1, &m_texture.value));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture.value));
 
     std::array<std::vector<uint8_t>, static_cast<size_t>(BlockTexture::Count)> levelTiles;
     for (size_t i = 0; i < tiles.size(); ++i) {
@@ -395,5 +395,5 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
 
 void BlockTextureAtlas::bind() const {
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture.value));
 }

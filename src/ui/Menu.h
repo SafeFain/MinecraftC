@@ -13,6 +13,7 @@
 #include "game/Localization.h"
 
 class UIRenderer;
+namespace platform { class Clipboard; }
 
 // ── Game state ────────────────────────────────────────────────────────────
 
@@ -105,7 +106,8 @@ protected:
 class MainMenu : public Menu {
 public:
     MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
-             ClientSettings& settings, Localization& localization);
+             ClientSettings& settings, Localization& localization,
+             platform::Clipboard* clipboard);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;

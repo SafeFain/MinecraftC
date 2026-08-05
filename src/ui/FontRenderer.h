@@ -5,7 +5,6 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "core/GraphicsApi.h"
-#include <glad/glad.h>
 
 class Shader;
 
@@ -39,9 +38,9 @@ private:
     struct Impl;
     std::unique_ptr<Shader> m_shader;
     std::unique_ptr<Impl> m_impl;
-    GLuint m_atlasTexture = 0;
-    GLuint m_vao = 0;
-    GLuint m_vboPos = 0;
-    GLuint m_vboUV = 0;
+    uint32_t m_atlasTexture = 0;
+    uint32_t m_vao = 0;
+    uint32_t m_vboPos = 0;
+    uint32_t m_vboUV = 0;
     bool m_manualGamma = false;
 };

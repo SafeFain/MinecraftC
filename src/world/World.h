@@ -136,6 +136,7 @@ public:
     }
 
 private:
+    Renderer* m_renderer = nullptr;
     struct PairHash {
         size_t operator()(const std::pair<int,int>& p) const {
             return std::hash<int64_t>{}((static_cast<int64_t>(p.first) << 32)

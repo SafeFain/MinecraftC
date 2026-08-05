@@ -1,6 +1,7 @@
 #include "core/InputCodes.h"
 
-#include <SDL3/SDL_keyboard.h>
+#include <array>
+#include <cstdio>
 
 int migrateLegacyGlfwKey(int code) {
     // GLFW printable key values follow ASCII, while the project stores stable
@@ -75,6 +76,44 @@ int migrateLegacyGlfwKey(int code) {
 
 const char* physicalKeyName(int key) {
     if (key <= Key::Unknown || key >= Key::Count) return nullptr;
-    const char* name = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
-    return name && *name ? name : nullptr;
+    static constexpr std::array<const char*, 40> names = {{
+        nullptr, nullptr, nullptr, nullptr,
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
+        "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X",
+        "Y", "Z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"
+    }};
+    if (key < static_cast<int>(names.size())) return names[static_cast<size_t>(key)];
+    switch (key) {
+        case 40: return "Enter";
+        case 41: return "Escape";
+        case 42: return "Backspace";
+        case 43: return "Tab";
+        case 44: return "Space";
+        case 73: return "Insert";
+        case 74: return "Home";
+        case 75: return "Page Up";
+        case 76: return "Delete";
+        case 77: return "End";
+        case 78: return "Page Down";
+        case 79: return "Right";
+        case 80: return "Left";
+        case 81: return "Down";
+        case 82: return "Up";
+        case 224: return "Left Ctrl";
+        case 225: return "Left Shift";
+        case 226: return "Left Alt";
+        case 227: return "Left GUI";
+        case 228: return "Right Ctrl";
+        case 229: return "Right Shift";
+        case 230: return "Right Alt";
+        case 231: return "Right GUI";
+        default: break;
+    }
+    static thread_local char generated[16];
+    if (key >= 58 && key <= 69) {
+        std::snprintf(generated, sizeof(generated), "F%d", key - 57);
+        return generated;
+    }
+    std::snprintf(generated, sizeof(generated), "Key %d", key);
+    return generated;
 }

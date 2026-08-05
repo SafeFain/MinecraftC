@@ -4,13 +4,16 @@
 #include "debug/Log.h"
 
 #include <SDL3/SDL.h>
-#include <glad/glad.h>
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
 namespace {
+SDL_Window* sdlWindow(void* window) {
+    return static_cast<SDL_Window*>(window);
+}
+
 void configureOpenGLAttributes(GraphicsApi api, bool srgb, int samples) {
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -101,12 +104,12 @@ Window::Window(int width, int height, const std::string& title) {
                  << "); using " << selected.samples << "x MSAA with "
                  << (selected.srgb ? "sRGB required" : "sRGB optional"));
     }
-    m_context = SDL_GL_CreateContext(m_window);
+    m_context = SDL_GL_CreateContext(sdlWindow(m_window));
     if (!m_context || !SDL_GL_MakeCurrent(
-            m_window, static_cast<SDL_GLContext>(m_context))) {
+            sdlWindow(m_window), static_cast<SDL_GLContext>(m_context))) {
         const std::string error = SDL_GetError();
         if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
-        SDL_DestroyWindow(m_window);
+        SDL_DestroyWindow(sdlWindow(m_window));
         m_window = nullptr;
         SDL_Quit();
         LOG_FATAL("Failed to create SDL OpenGL context: " << error);
@@ -128,16 +131,16 @@ Window::Window(int width, int height, const std::string& title) {
 }
 
 Window::~Window() {
-    if (m_textInputEnabled && m_window) SDL_StopTextInput(m_window);
+    if (m_textInputEnabled && m_window) SDL_StopTextInput(sdlWindow(m_window));
     if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
-    if (m_window) SDL_DestroyWindow(m_window);
+    if (m_window) SDL_DestroyWindow(sdlWindow(m_window));
     m_gamepads.reset();
     SDL_Quit();
 }
 
 void Window::refreshSizes() {
-    SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
-    SDL_GetWindowSizeInPixels(m_window, &m_pixelWidth, &m_pixelHeight);
+    SDL_GetWindowSize(sdlWindow(m_window), &m_windowWidth, &m_windowHeight);
+    SDL_GetWindowSizeInPixels(sdlWindow(m_window), &m_pixelWidth, &m_pixelHeight);
     m_windowWidth = std::max(1, m_windowWidth);
     m_windowHeight = std::max(1, m_windowHeight);
 }
@@ -149,7 +152,6 @@ void Window::resetEventFrame() {
 
 void Window::processEvent(const void* opaqueEvent) {
     const auto& event = *static_cast<const SDL_Event*>(opaqueEvent);
-    if (m_gamepads) m_gamepads->processEvent(event);
     switch (event.type) {
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -159,7 +161,7 @@ void Window::processEvent(const void* opaqueEvent) {
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             refreshSizes();
-            glViewport(0, 0, m_pixelWidth, m_pixelHeight);
+            if (m_resizeCallback) m_resizeCallback(m_pixelWidth, m_pixelHeight);
             break;
         case SDL_EVENT_WINDOW_MINIMIZED:
             m_minimized = true;
@@ -168,6 +170,7 @@ void Window::processEvent(const void* opaqueEvent) {
         case SDL_EVENT_WINDOW_SHOWN:
             m_minimized = false;
             refreshSizes();
+            if (m_resizeCallback) m_resizeCallback(m_pixelWidth, m_pixelHeight);
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             m_keys.fill(false);
@@ -242,13 +245,28 @@ void Window::processEvent(const void* opaqueEvent) {
                 static_cast<double>(event.tfinger.y * m_windowHeight)});
             break;
         }
+        case SDL_EVENT_GAMEPAD_ADDED:
+            m_gamepads->deviceAdded(event.gdevice.which);
+            break;
+        case SDL_EVENT_GAMEPAD_REMOVED:
+            m_gamepads->deviceRemoved(event.gdevice.which);
+            break;
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            m_gamepads->deviceActive(event.gbutton.which);
+            break;
+        case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+            if (std::abs(event.gaxis.value) > 8000)
+                m_gamepads->deviceActive(event.gaxis.which);
+            break;
         default:
             break;
     }
 }
 
-void Window::swapBuffers() { SDL_GL_SwapWindow(m_window); }
-void Window::setTitle(const std::string& title) { SDL_SetWindowTitle(m_window, title.c_str()); }
+void Window::swapBuffers() { SDL_GL_SwapWindow(sdlWindow(m_window)); }
+void Window::setTitle(const std::string& title) {
+    SDL_SetWindowTitle(sdlWindow(m_window), title.c_str());
+}
 
 bool Window::isKeyPressed(int key) const {
     return key >= 0 && key < static_cast<int>(m_keys.size()) &&
@@ -262,14 +280,14 @@ GraphicsCapabilities Window::graphicsCapabilities() const {
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &result.majorVersion);
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &result.minorVersion);
     SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &result.samples);
-    result.instancing = glProcAddress("glDrawArraysInstanced") != nullptr &&
-                        glProcAddress("glVertexAttribDivisor") != nullptr;
+    result.instancing = graphicsProcAddress("glDrawArraysInstanced") != nullptr &&
+                        graphicsProcAddress("glVertexAttribDivisor") != nullptr;
     return result;
 }
 
 WindowSafeArea Window::safeArea() const {
     SDL_Rect area{};
-    if (!SDL_GetWindowSafeArea(m_window, &area))
+    if (!SDL_GetWindowSafeArea(sdlWindow(m_window), &area))
         return {0, 0, m_pixelWidth, m_pixelHeight};
     return projectWindowSafeArea(area.x, area.y, area.w, area.h,
                                  m_windowWidth, m_windowHeight,
@@ -295,13 +313,14 @@ void Window::setCursorLocked(bool locked) {
     m_cursorLocked = locked;
     m_cursorDeltaX = 0.0;
     m_cursorDeltaY = 0.0;
-    if (!SDL_SetWindowRelativeMouseMode(m_window, locked))
+    if (!SDL_SetWindowRelativeMouseMode(sdlWindow(m_window), locked))
         LOG_WARN("Could not change relative mouse mode: " << SDL_GetError());
 }
 
 void Window::setTextInputEnabled(bool enabled) {
     if (enabled == m_textInputEnabled) return;
-    const bool changed = enabled ? SDL_StartTextInput(m_window) : SDL_StopTextInput(m_window);
+    const bool changed = enabled ? SDL_StartTextInput(sdlWindow(m_window))
+                                 : SDL_StopTextInput(sdlWindow(m_window));
     if (!changed) {
         LOG_WARN("Could not change SDL text input state: " << SDL_GetError());
         return;
@@ -309,6 +328,6 @@ void Window::setTextInputEnabled(bool enabled) {
     m_textInputEnabled = enabled;
 }
 
-void* Window::glProcAddress(const char* name) {
+void* Window::graphicsProcAddress(const char* name) {
     return reinterpret_cast<void*>(SDL_GL_GetProcAddress(name));
 }

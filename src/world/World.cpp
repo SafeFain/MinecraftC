@@ -26,7 +26,7 @@ World::World() : m_generator(Config::WORLD_SEED) {}
 void World::resetForNewSeed(uint64_t newSeed) {
     std::unique_lock lock(m_chunkMutex);
     for (auto& [key, chunk] : m_chunks) {
-        chunk->getMesh().destroy();
+        if (m_renderer) m_renderer->releaseChunkMesh(chunk->getMesh());
     }
     m_chunks.clear();
     m_activeChunks.clear();
@@ -66,7 +66,7 @@ void World::resetForNewSeed(uint64_t newSeed) {
 World::~World() {
     std::unique_lock lock(m_chunkMutex);
     for (auto& [key, chunk] : m_chunks) {
-        chunk->getMesh().destroy();
+        if (m_renderer) m_renderer->releaseChunkMesh(chunk->getMesh());
     }
 }
 
@@ -521,7 +521,8 @@ void World::update(const glm::dvec3& playerPos, int loadBudgetOverride) {
                 // relight whenever the player crossed a 16-block boundary.
                 saveOverrides(key.first, key.second);
                 saveBlockEntities(key.first, key.second);
-                it->second->getMesh().destroy();
+                if (m_renderer)
+                    m_renderer->releaseChunkMesh(it->second->getMesh());
                 m_chunks.erase(it);
                 m_overridesApplied.erase(key);
                 m_blockEntities.erase(key);
@@ -1561,6 +1562,7 @@ void World::enqueueMeshBuilds(int maxInFlight) {
 void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
                                    size_t maxUploadBytes) {
     if (!renderer) return;
+    m_renderer = renderer;
 
     std::shared_lock lock(m_chunkMutex);
     std::vector<Chunk*> ready;
@@ -1597,7 +1599,7 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
         }
 
         // Upload on main thread (GL context)
-        chunk->getMesh().upload();
+        renderer->uploadChunkMesh(chunk->getMesh());
         uploadedBytes += bytes;
 
         chunk->meshReady = false;
@@ -1609,6 +1611,7 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
 
 void World::buildMeshesSync(Renderer* renderer, int maxCount) {
     if (!renderer) return;
+    m_renderer = renderer;
 
     int built = 0;
     std::shared_lock lock(m_chunkMutex);
@@ -1633,7 +1636,7 @@ void World::buildMeshesSync(Renderer* renderer, int maxCount) {
                 chunk->getColumnMaxYData(),
                 neighborFunc, lightFunc
             );
-            mesh.upload();
+            renderer->uploadChunkMesh(mesh);
         }
 
         chunk->markClean();
@@ -1645,7 +1648,10 @@ void World::invalidateGpuMeshes() {
     std::shared_lock lock(m_chunkMutex);
     for (auto& entry : m_chunks) {
         std::lock_guard meshLock(entry.second->getMeshMutex());
-        entry.second->getMesh().abandonGpuResources();
+        if (m_renderer)
+            m_renderer->releaseChunkMesh(entry.second->getMesh());
+        else
+            entry.second->getMesh().abandonGpuResources();
     }
 }
 
@@ -1653,7 +1659,8 @@ void World::restoreGpuMeshes() {
     std::shared_lock lock(m_chunkMutex);
     for (Chunk* chunk : m_activeChunks) {
         std::lock_guard meshLock(chunk->getMeshMutex());
-        if (!chunk->getMesh().empty()) chunk->getMesh().upload();
+        if (!chunk->getMesh().empty() && m_renderer)
+            m_renderer->uploadChunkMesh(chunk->getMesh());
     }
 }
 

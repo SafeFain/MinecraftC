@@ -2,9 +2,7 @@
 
 #include "debug/Log.h"
 #include "game/Utf8.h"
-
-#include <SDL3/SDL_clipboard.h>
-#include <SDL3/SDL_stdinc.h>
+#include "platform/Clipboard.h"
 
 #include <algorithm>
 
@@ -21,8 +19,11 @@ bool validUtf8(std::string_view input) {
 }
 }
 
-TextEditBuffer::TextEditBuffer(std::string text, size_t maximumCodepoints)
-    : m_maximumCodepoints(maximumCodepoints) { setText(std::move(text)); }
+TextEditBuffer::TextEditBuffer(std::string text, size_t maximumCodepoints,
+                               platform::Clipboard* clipboard)
+    : m_maximumCodepoints(maximumCodepoints), m_clipboard(clipboard) {
+    setText(std::move(text));
+}
 
 void TextEditBuffer::setText(std::string text) {
     if (!validUtf8(text)) text.clear();
@@ -110,24 +111,14 @@ std::string TextEditBuffer::selectedText() const {
 }
 
 bool TextEditBuffer::copySelection() const {
-    if (!hasSelection()) return false;
-    if (!SDL_SetClipboardText(selectedText().c_str())) {
-        LOG_WARN("Could not write SDL clipboard: " << SDL_GetError());
-        return false;
-    }
-    return true;
+    return hasSelection() && m_clipboard && m_clipboard->writeText(selectedText());
 }
 
 bool TextEditBuffer::cutSelection() { return copySelection() && eraseSelection(); }
 
 bool TextEditBuffer::pasteClipboard() {
-    char* text = SDL_GetClipboardText();
-    if (!text) {
-        LOG_WARN("Could not read SDL clipboard: " << SDL_GetError());
-        return false;
-    }
-    const std::string copy(text);
-    SDL_free(text);
+    std::string copy;
+    if (!m_clipboard || !m_clipboard->readText(copy)) return false;
     if (copy.empty()) return false;
     return insert(copy);
 }

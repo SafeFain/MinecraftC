@@ -1,11 +1,10 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <string>
-#include <unordered_map>
 #include <glm/glm.hpp>
 
-#include <glad/glad.h>
 #include "core/GraphicsApi.h"
 
 class Shader {
@@ -32,15 +31,11 @@ public:
     void setFloat(const std::string& name, float value) const;
     void setInt(const std::string& name, int value) const;
 
-    GLuint id() const { return m_programID; }
     static std::string sourceForApi(std::string source, GraphicsApi api);
 
 private:
-    GLuint m_programID = 0;
-    mutable std::unordered_map<std::string, GLint> m_uniformCache;
-
-    GLint getUniformLocation(const std::string& name) const;
-
-    static GLuint compileShader(GLenum type, const std::string& source);
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+    int getUniformLocation(const std::string& name) const;
     static std::string readFile(const std::filesystem::path& path);
 };
