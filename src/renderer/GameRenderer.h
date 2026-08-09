@@ -41,7 +41,7 @@ public:
                               int, const glm::mat4&) = 0;
     virtual void renderCompatibilityEntityCube(
         const glm::vec3&, const glm::vec3&, const glm::vec3&, int,
-        const glm::mat4&, SmoothLightSample light = {}) = 0;
+        float, const glm::mat4&, SmoothLightSample light = {}) = 0;
     virtual model::ModelRenderer& modelRenderer() = 0;
     virtual void flushModels(const glm::mat4&) = 0;
     virtual void renderEntityPart(const glm::vec3&, const glm::vec3&,

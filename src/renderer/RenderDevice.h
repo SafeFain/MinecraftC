@@ -96,6 +96,7 @@ struct DrawCommand {
     RenderMeshHandle mesh{};
     RenderMaterialHandle material{};
     glm::mat4 model{1.0f};
+    glm::vec4 tint{1.0f};
     uint32_t firstIndex = 0;
     uint32_t indexCount = 0;
 };
@@ -128,4 +129,6 @@ public:
 
 void validateMeshData(const MeshData& data);
 void validateTextureData(const TextureData& data);
+bool isMeshMaterialCompatible(MeshVertexLayout layout,
+                              MaterialPipeline pipeline);
 glm::mat4 clipSpaceCorrection(GraphicsApi api);

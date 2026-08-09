@@ -39,5 +39,7 @@ void main(){
         color.a*=0.92;
     }
     if(color.a<0.01)discard;
+    if(frame.atlasParams.y>0.5)
+        color.rgb=pow(max(color.rgb,vec3(0.0)),vec3(1.0/2.2));
     outColor=color;
 }

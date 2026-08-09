@@ -64,7 +64,8 @@ public:
     void renderCompatibilityEntityCube(
         const glm::vec3& position, const glm::vec3& size,
         const glm::vec3& color, int textureIndex,
-        const glm::mat4& viewProjection, SmoothLightSample light = {});
+        float yaw, const glm::mat4& viewProjection,
+        SmoothLightSample light = {});
     model::ModelRenderer& modelRenderer();
     void flushModels(const glm::mat4& viewProjection);
     void renderEntityPart(const glm::vec3& position, const glm::vec3& offset,

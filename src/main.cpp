@@ -40,6 +40,7 @@
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
 #include "renderer/ChunkRenderScene.h"
+#include "renderer/TexturedCubeScene.h"
 #if defined(MINECRAFTC_ENABLE_VULKAN)
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #endif
@@ -57,7 +58,8 @@
 
 class BasicRenderApplication final : public ApplicationHost {
 public:
-    BasicRenderApplication(RuntimePaths paths, GraphicsApi api)
+    BasicRenderApplication(RuntimePaths paths, GraphicsApi api,
+                           bool texturedDemo = false)
         : m_paths(std::move(paths)),
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT,
                    api == GraphicsApi::Vulkan ? "MinecraftC - Vulkan" :
@@ -76,7 +78,12 @@ public:
             renderer->resize(m_window.width(), m_window.height());
             m_renderer = std::move(renderer);
         }
-        m_scene = std::make_unique<ChunkRenderScene>(*m_renderer, m_paths.assetRoot);
+        if (texturedDemo)
+            m_texturedScene = std::make_unique<TexturedCubeScene>(
+                *m_renderer, m_paths.assetRoot);
+        else
+            m_scene = std::make_unique<ChunkRenderScene>(
+                *m_renderer, m_paths.assetRoot);
         m_window.setResizeCallback([this](int width, int height) {
             m_renderer->resize(width, height);
         });
@@ -84,7 +91,8 @@ public:
 
     bool iterate() override {
         if (!m_backgrounded && !m_window.isMinimized())
-            m_scene->render(m_window.aspectRatio());
+            (m_texturedScene ? m_texturedScene->render(m_window.aspectRatio())
+                             : m_scene->render(m_window.aspectRatio()));
         m_window.finishEventFrame();
         return m_running && !m_window.shouldClose();
     }
@@ -100,6 +108,7 @@ public:
         if (m_cleaned) return;
         m_cleaned = true;
         m_scene.reset();
+        m_texturedScene.reset();
         m_renderer->waitIdle();
         Debug::Log::shutdown();
     }
@@ -109,6 +118,7 @@ private:
     Window m_window;
     std::unique_ptr<IRenderDevice> m_renderer;
     std::unique_ptr<ChunkRenderScene> m_scene;
+    std::unique_ptr<TexturedCubeScene> m_texturedScene;
     bool m_running = true;
     bool m_backgrounded = false;
     bool m_cleaned = false;
@@ -1859,7 +1869,11 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         if (argument == "--help" || argument == "-h") {
             std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
                       << "Usage: minecraftc [--help] [--version]"
-                      << " [--renderer=opengl|vulkan|opengl-demo|vulkan-demo]"
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+                      << " [--renderer=opengl|vulkan|opengl-demo|vulkan-demo|vulkan-textured-demo]"
+#else
+                      << " [--renderer=opengl|opengl-demo]"
+#endif
                       << "\n"
                       << "Worlds and settings are stored in the platform user-data directory.\n";
             return {};
@@ -1871,6 +1885,19 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
             return std::make_unique<BasicRenderApplication>(
                 discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
                 GraphicsApi::Vulkan);
+#else
+            throw std::runtime_error(
+                "Vulkan support is disabled; rebuild with "
+                "-DMINECRAFTC_ENABLE_VULKAN=ON");
+#endif
+        }
+        if (argument == "--renderer=vulkan-textured-demo") {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+            Debug::Log::init(Debug::LogLevel::Trace, false);
+            Debug::installCrashHandlers();
+            return std::make_unique<BasicRenderApplication>(
+                discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
+                GraphicsApi::Vulkan, true);
 #else
             throw std::runtime_error(
                 "Vulkan support is disabled; rebuild with "

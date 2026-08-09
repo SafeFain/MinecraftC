@@ -40,6 +40,14 @@ void validateTextureData(const TextureData& data) {
     }
 }
 
+bool isMeshMaterialCompatible(MeshVertexLayout layout,
+                              MaterialPipeline pipeline) {
+    if (layout == MeshVertexLayout::PositionUv)
+        return pipeline == MaterialPipeline::UnlitTextured;
+    return pipeline == MaterialPipeline::ChunkOpaqueCutout ||
+           pipeline == MaterialPipeline::ChunkTranslucent;
+}
+
 glm::mat4 clipSpaceCorrection(GraphicsApi api) {
     glm::mat4 correction{1.0f};
     if (api == GraphicsApi::Vulkan) {

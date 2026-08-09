@@ -338,7 +338,7 @@ struct ChunkMesh {
                             vtx[vi].px = px; vtx[vi].py = py; vtx[vi].pz = pz;
                         };
 
-                        // Winding must be CW from outside in world space.
+                        // Winding is CCW from outside in world space.
                         // Faces on (+Y, -Z, +X) use pattern A; faces on (-Y, +Z, -X) use reversed pattern B.
                         // Pattern A: (u1,v1)->(u1,v0)->(u0,v0)->(u0,v1)
                         // Pattern B: (u0,v1)->(u0,v0)->(u1,v0)->(u1,v1)

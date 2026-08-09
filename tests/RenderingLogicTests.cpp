@@ -84,6 +84,40 @@ int main() {
         rejectedMesh = true;
     }
     require(rejectedMesh, "out-of-range mesh index was accepted");
+    std::vector<uint8_t> blocks(Config::CHUNK_VOLUME,
+                                static_cast<uint8_t>(BlockId::AIR));
+    const int blockIndex = Config::worldYToStorageY(0) *
+        Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+    blocks[static_cast<size_t>(blockIndex)] = static_cast<uint8_t>(BlockId::STONE);
+    int columnMax[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
+    ChunkMesh windingMesh;
+    windingMesh.build(0, 0, blocks.data(), columnMax,
+        [](int, int, int) { return BlockId::AIR; },
+        [](int, int, int) { return LightSample{15, 0}; });
+    for (size_t index = 0; index + 2 < windingMesh.indices.size(); index += 3) {
+        const MeshVertex& a = windingMesh.vertices[windingMesh.indices[index]];
+        const MeshVertex& b = windingMesh.vertices[windingMesh.indices[index + 1]];
+        const MeshVertex& c = windingMesh.vertices[windingMesh.indices[index + 2]];
+        const glm::vec3 normal = glm::cross(
+            glm::vec3(b.px - a.px, b.py - a.py, b.pz - a.pz),
+            glm::vec3(c.px - a.px, c.py - a.py, c.pz - a.pz));
+        const glm::ivec3 expected = FACE_OFFSETS[static_cast<size_t>(a.face)];
+        require(glm::dot(normal, glm::vec3(expected)) > 0.0f,
+                "Chunk face winding is not outward CCW");
+    }
+    require(isMeshMaterialCompatible(MeshVertexLayout::PositionUv,
+                MaterialPipeline::UnlitTextured) &&
+            isMeshMaterialCompatible(MeshVertexLayout::Chunk,
+                MaterialPipeline::ChunkOpaqueCutout) &&
+            isMeshMaterialCompatible(MeshVertexLayout::Chunk,
+                MaterialPipeline::ChunkTranslucent) &&
+            !isMeshMaterialCompatible(MeshVertexLayout::PositionUv,
+                MaterialPipeline::ChunkOpaqueCutout) &&
+            !isMeshMaterialCompatible(MeshVertexLayout::Chunk,
+                MaterialPipeline::UnlitTextured) &&
+            !isMeshMaterialCompatible(MeshVertexLayout::PositionUv,
+                MaterialPipeline::UiTextured),
+            "mesh/material compatibility matrix is incorrect");
     TextureData validTexture;
     validTexture.width = 1;
     validTexture.height = 1;

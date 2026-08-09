@@ -24,12 +24,22 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
        "Use the static MSVC runtime for portable Windows packages" OFF)
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
+set(MINECRAFTC_VULKAN_DEFAULT OFF)
+if(NOT ANDROID AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MINECRAFTC_VULKAN_DEFAULT ON)
+endif()
 option(MINECRAFTC_ENABLE_VULKAN
-       "Build the optional Linux Vulkan basic-rendering backend" OFF)
-if(MINECRAFTC_ENABLE_VULKAN AND
-   (ANDROID OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+       "Build the Linux Vulkan gameplay backend alongside OpenGL"
+       ${MINECRAFTC_VULKAN_DEFAULT})
+if(NOT ANDROID AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+   NOT MINECRAFTC_ENABLE_VULKAN)
     message(FATAL_ERROR
-        "MINECRAFTC_ENABLE_VULKAN currently supports Linux desktop only")
+        "Linux builds require both the Vulkan and OpenGL render backends; "
+        "MINECRAFTC_ENABLE_VULKAN cannot be disabled")
+elseif(MINECRAFTC_ENABLE_VULKAN AND
+       (ANDROID OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    message(FATAL_ERROR
+        "MINECRAFTC_ENABLE_VULKAN supports Linux desktop only")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -431,6 +441,7 @@ if(BUILD_TESTING)
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/RenderDevice.cpp
+        src/world/Block.cpp
     )
     target_include_directories(rendering_logic_tests PRIVATE src)
     target_link_libraries(rendering_logic_tests PRIVATE glm::glm)
@@ -550,6 +561,7 @@ if(BUILD_TESTING)
         src/model/AnimationGraph.cpp
         src/model/AnimationMixer.cpp
         src/model/ModelAnimation.cpp
+        src/model/ModelRenderer.cpp
         src/model/GltfLoader.cpp
         src/renderer/backend/opengl/OpenGLModelRenderer.cpp
         src/platform/sdl/SdlGamepadManager.cpp

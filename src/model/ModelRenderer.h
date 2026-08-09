@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-class Shader;
+class VulkanRenderer;
 
 namespace model {
 
@@ -25,15 +25,27 @@ struct ModelDraw {
     SmoothLightSample light;
 };
 
+class IModelRenderBackend {
+public:
+    virtual ~IModelRenderBackend() = default;
+    virtual ModelHandle upload(std::shared_ptr<const ModelAsset> asset) = 0;
+    virtual void queue(const ModelDraw& draw) = 0;
+    virtual void flushOpaque(const glm::mat4& viewProjection,
+        const RenderEnvironment& environment, const glm::vec3& cameraPosition,
+        float fogStart, float fogEnd) = 0;
+    virtual void flushBlend(const glm::mat4& viewProjection,
+        const RenderEnvironment& environment, const glm::vec3& cameraPosition,
+        float fogStart, float fogEnd) = 0;
+    virtual void clear() = 0;
+};
+
 class ModelRenderer {
 public:
-    ModelRenderer() = default;
+    explicit ModelRenderer(std::unique_ptr<IModelRenderBackend> backend);
     ~ModelRenderer();
     ModelRenderer(const ModelRenderer&) = delete;
     ModelRenderer& operator=(const ModelRenderer&) = delete;
 
-    void initialize(const std::filesystem::path& assetRoot, bool framebufferSrgb,
-                    GraphicsApi api);
     ModelHandle upload(std::shared_ptr<const ModelAsset> asset);
     void queue(const ModelDraw& draw);
     void flushOpaque(const glm::mat4& viewProjection,
@@ -47,36 +59,13 @@ public:
     void clear();
 
 private:
-    struct GpuPrimitive {
-        uint32_t vao = 0;
-        uint32_t vbo = 0;
-        uint32_t ebo = 0;
-        int indexCount = 0;
-        int material = -1;
-        int skin = -1;
-        int node = -1;
-    };
-    struct GpuModel {
-        std::shared_ptr<const ModelAsset> asset;
-        std::vector<GpuPrimitive> primitives;
-        std::vector<uint32_t> textures;
-    };
-    std::unique_ptr<Shader> m_shader;
-    std::vector<GpuModel> m_models;
-    std::vector<ModelDraw> m_draws;
-    bool m_framebufferSrgb = false;
-#if defined(_WIN32)
-    using VertexAttribIPointerFn = void (__stdcall *)(uint32_t, int, uint32_t,
-                                                      int, const void*);
-#else
-    using VertexAttribIPointerFn = void (*)(uint32_t, int, uint32_t, int,
-                                            const void*);
-#endif
-    VertexAttribIPointerFn m_vertexAttribIPointer = nullptr;
-
-    void flush(bool blended, const glm::mat4& viewProjection,
-               const RenderEnvironment& environment,
-               const glm::vec3& cameraPosition, float fogStart, float fogEnd);
+    std::unique_ptr<IModelRenderBackend> m_backend;
 };
+
+std::unique_ptr<ModelRenderer> createOpenGLModelRenderer(
+    const std::filesystem::path& assetRoot, bool framebufferSrgb,
+    GraphicsApi api);
+std::unique_ptr<ModelRenderer> createVulkanModelRenderer(
+    ::VulkanRenderer& renderer);
 
 } // namespace model

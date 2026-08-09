@@ -8,6 +8,7 @@ layout(push_constant) uniform FrameUniforms {
     mat4 modelViewProjection;
     vec4 atlasAndLighting;
     vec4 chunkOrigin;
+    vec4 tint;
 } frame;
 layout(location=0) out vec4 lighting;
 layout(location=1) out vec2 tileUv;

@@ -102,5 +102,6 @@ void main(){
             sky.weather.y*0.72+sky.weather.z*0.28);
         color=mix(color,cloudColor,cloud*(0.36+sky.weather.y*0.54));
     }
+    if(sky.options.y>0.5)color=pow(max(color,vec3(0.0)),vec3(1.0/2.2));
     outColor=vec4(color,1.0);
 }

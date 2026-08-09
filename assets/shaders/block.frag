@@ -24,6 +24,7 @@ uniform int uSmoothLighting;
 uniform float uAtlasTiles;
 uniform float uLavaTile;
 uniform float uWaterTile;
+uniform vec4 uTint;
 
 out vec4 outColor;
 
@@ -79,7 +80,7 @@ void main() {
         lighting += uDirectColor * sparkle * vSkyLight * 0.24;
     }
 
-    vec3 color = texel.rgb * lighting;
+    vec3 color = texel.rgb * uTint.rgb * lighting;
     float distanceToCamera = length(vWorldPosition - uCameraPosition);
     float fog = smoothstep(uFogEnd * uFogStartFraction, uFogEnd,
                            distanceToCamera);
@@ -89,5 +90,5 @@ void main() {
 
     if (uManualGamma != 0)
         color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
-    outColor = vec4(color, texel.a);
+    outColor = vec4(color, texel.a * uTint.a);
 }

@@ -9,6 +9,7 @@ layout(push_constant) uniform FrameUniforms {
     mat4 modelViewProjection;
     vec4 atlasAndLighting;
     vec4 chunkOrigin;
+    vec4 tint;
 } frame;
 layout(set=0,binding=0) uniform sampler2D blockAtlas;
 layout(set=1,binding=0) uniform ChunkEnvironment {
@@ -69,7 +70,7 @@ void main() {
             lighting.y*0.24;
     }
 
-    vec3 color=texel.rgb*illumination;
+    vec3 color=texel.rgb*frame.tint.rgb*illumination;
     float distanceToCamera=length(worldPosition-environment.cameraPosition.xyz);
     float fog=smoothstep(environment.fogColorDistance.a*
         environment.materialParams.z,environment.fogColorDistance.a,
@@ -78,5 +79,7 @@ void main() {
         environment.ambientColorIntensity.a*0.34,
         environment.fogColorDistance.rgb,skyLight);
     color=mix(color,localFog,fog);
-    outColor=vec4(color,texel.a);
+    if(environment.materialParams.w>0.5)
+        color=pow(max(color,vec3(0.0)),vec3(1.0/2.2));
+    outColor=vec4(color,texel.a*frame.tint.a);
 }

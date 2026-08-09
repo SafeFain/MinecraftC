@@ -830,14 +830,17 @@ void EntityManager::render(
             case EntityType::PrimedTnt: textureIndex = 8; break;
         }
         glm::vec3 color = renderColor(entity.type);
+        glm::vec3 visualTint(1.0f);
         if (entity.type == EntityType::PrimedTnt) {
             const float flash = std::fmod(entity.ageSeconds, 0.25f) < 0.10f ? 1.0f : 0.0f;
             color = glm::mix(glm::vec3(0.86f, 0.18f, 0.12f), glm::vec3(1.0f), flash);
         } else if (entity.hurtFlashSeconds > 0.0f) {
             color = {1.0f, 0.16f, 0.16f};
+            visualTint = color;
         } else if (entity.burningSeconds > 0.0f) {
             const float pulse = 0.08f * std::sin(entity.ageSeconds * 18.0f);
             color = {1.0f, 0.32f + pulse, 0.08f};
+            visualTint = color;
         }
         const glm::vec3 position(
             glm::dvec3(entity.position) - renderOrigin);
@@ -855,12 +858,17 @@ void EntityManager::render(
         if ((passive || hostileMob) && renderer.capabilities().gameplay) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
-                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(), light);
+                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(),
+                visualTint, light);
             continue;
         }
         if ((!passive && !hostileMob) || !renderer.capabilities().gameplay) {
+            const float facingLength = std::hypot(entity.facing.x, entity.facing.z);
+            const float yaw = facingLength > 0.001f
+                ? std::atan2(-entity.facing.x, -entity.facing.z)
+                : static_cast<float>(entity.behaviorSeed % 628u) * 0.01f;
             renderer.renderCompatibilityEntityCube(
-                position, size, color, textureIndex, viewProjection, light);
+                position, size, color, textureIndex, yaw, viewProjection, light);
             continue;
         }
 
@@ -869,6 +877,7 @@ void EntityManager::render(
         m_modelRegistry.queue(dead.type, dead.id, dead.position,
             dead.facing, dead.behaviorSeed, renderOrigin,
             glm::vec3(0.0f), renderer.modelRenderer(),
+            glm::vec3(1.0f),
             m_world.sampleLight(dead.position+glm::dvec3(0.0,0.8,0.0)));
     }
     m_modelRegistry.endFrame();

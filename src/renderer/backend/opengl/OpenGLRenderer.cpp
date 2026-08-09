@@ -84,8 +84,8 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
     m_assetRoot = assetRoot;
     m_framebufferSrgb = capabilities.framebufferSrgb;
     m_graphicsApi = capabilities.api;
-    m_modelRenderer = std::make_unique<model::ModelRenderer>();
-    m_modelRenderer->initialize(assetRoot, m_framebufferSrgb, m_graphicsApi);
+    m_modelRenderer = model::createOpenGLModelRenderer(
+        assetRoot, m_framebufferSrgb, m_graphicsApi);
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "block.vert",
@@ -397,8 +397,9 @@ void Renderer::destroyTexture(RenderTextureHandle handle) {
 RenderMaterialHandle Renderer::createMaterial(const MaterialDesc& desc) {
     if (m_basicTextures.find(desc.baseColorTexture.value) == m_basicTextures.end())
         throw std::invalid_argument("Invalid OpenGL textured material");
-    if (!desc.depthTest || !desc.backfaceCull)
-        throw std::invalid_argument("Basic material requires depth test and culling");
+    if (desc.pipeline != MaterialPipeline::UnlitTextured &&
+        (!desc.depthTest || !desc.backfaceCull))
+        throw std::invalid_argument("Chunk/UI material requires depth test and culling");
     const RenderMaterialHandle handle{m_nextBasicMaterialHandle++};
     m_basicMaterials.emplace(handle.value, BasicMaterial{desc});
     return handle;
@@ -424,6 +425,9 @@ void Renderer::draw(const DrawCommand& command) {
     const auto material = m_basicMaterials.find(command.material.value);
     if (mesh == m_basicMeshes.end() || material == m_basicMaterials.end())
         throw std::invalid_argument("Draw command contains an unknown handle");
+    if (!isMeshMaterialCompatible(mesh->second.layout,
+                                  material->second.desc.pipeline))
+        throw std::invalid_argument("OpenGL mesh/material layout mismatch");
     const auto texture = m_basicTextures.find(material->second.desc.baseColorTexture.value);
     if (texture == m_basicTextures.end())
         throw std::logic_error("Material texture no longer exists");
@@ -438,6 +442,17 @@ void Renderer::draw(const DrawCommand& command) {
         material->second.desc.pipeline == MaterialPipeline::ChunkTranslucent;
     const bool translucent =
         material->second.desc.pipeline == MaterialPipeline::ChunkTranslucent;
+    GLboolean oldDepth = GL_TRUE, oldCull = GL_TRUE;
+    const bool unlit = material->second.desc.pipeline ==
+                       MaterialPipeline::UnlitTextured;
+    if (unlit) {
+        GL_CHECK(glGetBooleanv(GL_DEPTH_TEST, &oldDepth));
+        GL_CHECK(glGetBooleanv(GL_CULL_FACE, &oldCull));
+        if (material->second.desc.depthTest) GL_CHECK(glEnable(GL_DEPTH_TEST));
+        else GL_CHECK(glDisable(GL_DEPTH_TEST));
+        if (material->second.desc.backfaceCull) GL_CHECK(glEnable(GL_CULL_FACE));
+        else GL_CHECK(glDisable(GL_CULL_FACE));
+    }
     if (chunkPipeline) {
         if (!m_blockShader) throw std::logic_error("Chunk shader is unavailable");
         shader = m_blockShader.get();
@@ -459,11 +474,13 @@ void Renderer::draw(const DrawCommand& command) {
         shader->setFloat("uLavaTile", -1.0f);
         shader->setFloat("uWaterTile", -1.0f);
         shader->setInt("uBlockAtlas", 0);
+        shader->setVec4("uTint", command.tint);
     } else {
         shader = m_basicShader.get();
         shader->bind();
         shader->setMat4("uMVP", m_basicFrame.projection * m_basicFrame.view * command.model);
         shader->setInt("uTexture", 0);
+        shader->setVec4("uTint", command.tint);
     }
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture->second.texture));
@@ -481,6 +498,12 @@ void Renderer::draw(const DrawCommand& command) {
     if (translucent) {
         GL_CHECK(glDepthMask(GL_TRUE));
         GL_CHECK(glDisable(GL_BLEND));
+    }
+    if (unlit) {
+        if (oldDepth) GL_CHECK(glEnable(GL_DEPTH_TEST));
+        else GL_CHECK(glDisable(GL_DEPTH_TEST));
+        if (oldCull) GL_CHECK(glEnable(GL_CULL_FACE));
+        else GL_CHECK(glDisable(GL_CULL_FACE));
     }
     GL_CHECK(glBindVertexArray(0));
 }
@@ -628,6 +651,7 @@ void Renderer::bindBlockShader() const {
     m_blockShader->bind();
     m_blockAtlas.bind();
     m_blockShader->setInt("uBlockAtlas", 0);
+    m_blockShader->setVec4("uTint", glm::vec4(1.0f));
     m_blockShader->setFloat("uAtlasTiles",
                             static_cast<float>(BlockTextureAtlas::tilesPerSide()));
     m_blockShader->setFloat(
@@ -695,8 +719,8 @@ void Renderer::renderEntity(const glm::vec3& position, const glm::vec3& size,
 void Renderer::renderCompatibilityEntityCube(
     const glm::vec3& position, const glm::vec3& size,
     const glm::vec3& color, int textureIndex,
-    const glm::mat4& viewProjection, SmoothLightSample light) {
-    renderEntityPart(position, glm::vec3(0.0f), size, 0.0f, color,
+    float yaw, const glm::mat4& viewProjection, SmoothLightSample light) {
+    renderEntityPart(position, glm::vec3(0.0f), size, yaw, color,
                      textureIndex, viewProjection, light);
 }
 

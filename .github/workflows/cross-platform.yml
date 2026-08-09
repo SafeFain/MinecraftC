@@ -46,7 +46,7 @@ jobs:
           cat minecraftc-smoke.log
           grep -q "MinecraftC initialized" minecraftc-smoke.log
           test "$status" -eq 124
-      - name: Verify installed Vulkan basic rendering
+      - name: Verify installed Vulkan gameplay startup
         shell: bash
         run: |
           cd "$RUNNER_TEMP"
@@ -55,7 +55,7 @@ jobs:
           status=$?
           set -e
           cat minecraftc-vulkan-smoke.log
-          grep -q "Vulkan first textured cube frame presented" minecraftc-vulkan-smoke.log
+          grep -q "Vulkan first frame presented" minecraftc-vulkan-smoke.log
           test "$status" -eq 124
       - name: Verify installed OpenGL basic rendering
         shell: bash

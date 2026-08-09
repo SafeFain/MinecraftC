@@ -1,8 +1,8 @@
 # MinecraftC
 
 MinecraftC 是一款使用 C++17、SDL3 和 OpenGL 构建的体素沙盒游戏。桌面端使用
-OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 还提供可选的 Vulkan
-基础渲染后端。游戏提供可无限加载的确定性
+OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 构建同时包含 Vulkan
+和 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本：**Release-1.1.5**
@@ -22,11 +22,11 @@ OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 还提供可选的 Vul
 
 ### Linux
 
-需要支持 C++17 的编译器、CMake 3.16+、OpenGL 3.3 和图形系统开发头文件。
+需要支持 C++17 的编译器、CMake 3.16+、OpenGL 3.3、Vulkan 和图形系统开发头文件。
 以 Debian/Ubuntu 为例：
 
 ```bash
-sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev xorg-dev \
+sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev libvulkan-dev xorg-dev \
   libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules pkg-config
 
 cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
@@ -34,28 +34,21 @@ cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
-可选的 Vulkan 后端目前使用 VMA 管理 GPU 内存，并通过通用的
-`Mesh`、`Texture`、`Material` 和 `Camera` 数据绘制带深度测试和纹理采样的
-旋转石头立方体；它尚不渲染游戏世界或 UI。同一基础场景也可由 OpenGL
-后端运行，用于核对两个后端的资源和相机语义：
+Linux Vulkan 后端使用 VMA 管理 GPU 内存，支持完整游戏世界、UI、天空、
+云、粒子、透明 Chunk、选择框和带蒙皮动画的 glTF 实体模型。通用
+`IRenderDevice` 纹理网格与生产 Chunk 的隔离回归场景也可分别运行：
 
 ```bash
 ./build-local/minecraftc --renderer=opengl-demo
+./build-local/minecraftc --renderer=vulkan-demo
+./build-local/minecraftc --renderer=vulkan-textured-demo
 ```
 
-安装 Vulkan 开发环境和可用驱动后，使用独立构建目录启用 Vulkan：
-安装 `libvulkan-dev` 和可用的 Vulkan 驱动后，使用独立构建目录启用：
+Linux 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会同时构建并作为默认
+renderer 和 Vulkan 初始化失败时的回退。可用 `--renderer=vulkan` 选择 Vulkan。
 
-```bash
-cmake -S . -B build-vulkan -DCMAKE_BUILD_TYPE=Release \
-  -DMINECRAFTC_ENABLE_VULKAN=ON
-cmake --build build-vulkan -j2
-./build-vulkan/minecraftc --renderer=vulkan
-```
-
-未指定示例 renderer 时仍启动完整的 OpenGL 游戏。完整游戏代码依赖后端无关的
-`IGameRenderer`，当前只有 OpenGL 声明完整 gameplay 能力；Vulkan 仅声明基础
-textured-mesh 能力。
+未指定 renderer 时仍启动完整的 OpenGL 游戏。完整游戏代码依赖后端无关的
+`IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
 
 Vulkan GLSL 与预编译 SPIR-V 位于 `assets/shaders/vulkan/`。普通构建不要求
 安装 `glslc`；修改着色器后可使用以下命令重新生成并检查文件：
@@ -72,9 +65,9 @@ cmake --install build-local --prefix ./install-local
 ./install-local/bin/minecraftc
 ```
 
-Fedora 对应软件包包括 `gcc-c++ cmake git glm-devel mesa-libGL-devel` 及
-X11/Wayland 开发包；Arch Linux 对应 `base-devel cmake git glm mesa` 及
-X11/Wayland 开发包。
+Fedora 对应软件包包括 `gcc-c++ cmake git glm-devel mesa-libGL-devel
+vulkan-loader-devel` 及 X11/Wayland 开发包；Arch Linux 对应 `base-devel cmake
+git glm mesa vulkan-headers vulkan-icd-loader` 及 X11/Wayland 开发包。
 
 ### Windows
 

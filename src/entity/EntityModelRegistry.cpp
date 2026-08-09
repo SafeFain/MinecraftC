@@ -231,7 +231,7 @@ void EntityModelRegistry::queue(
     const glm::vec3& facing, uint32_t behaviorSeed,
     const glm::dvec3& renderOrigin,
     const glm::vec3& cameraPosition, model::ModelRenderer& renderer,
-    SmoothLightSample light) {
+    const glm::vec3& visualTint, SmoothLightSample light) {
     m_seen.insert(id);
     const auto& definition = this->definition(type);
     InstanceEntry& entry = ensure(type, id);
@@ -253,7 +253,8 @@ void EntityModelRegistry::queue(
     const glm::vec3 illumination=glm::max(glm::vec3(sky),
         glm::vec3(1.0f,0.72f,0.38f)*block);
     renderer.queue({definition.handle, transform, &entry.instance,
-                    glm::vec4(glm::max(illumination,glm::vec3(0.025f)),1.0f),
+                    glm::vec4(glm::max(illumination,glm::vec3(0.025f)) *
+                              visualTint, 1.0f),
                     glm::dot(delta, delta), light});
 }
 

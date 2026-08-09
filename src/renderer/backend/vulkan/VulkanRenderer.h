@@ -3,9 +3,11 @@
 #include "renderer/GameRenderer.h"
 
 #include <filesystem>
+#include <array>
 #include <memory>
 
 class Window;
+namespace model { class VulkanModelBackend; }
 
 class VulkanRenderer final : public IGameRenderer {
 public:
@@ -50,7 +52,8 @@ public:
     void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&, int,
                       const glm::mat4&) override;
     void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,
-        const glm::vec3&, int, const glm::mat4&, SmoothLightSample = {}) override;
+        const glm::vec3&, int, float, const glm::mat4&,
+        SmoothLightSample = {}) override;
     model::ModelRenderer& modelRenderer() override;
     void flushModels(const glm::mat4&) override;
     void renderEntityPart(const glm::vec3&, const glm::vec3&, const glm::vec3&,
@@ -64,13 +67,14 @@ public:
     void setFrustum(const Frustum& value) override { m_frustum = value; }
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }
-    bool usesFramebufferSrgb() const override { return true; }
+    bool usesFramebufferSrgb() const override;
     void queueUiBatch(const std::vector<UiMeshVertex>& vertices,
                       const std::vector<uint32_t>& indices,
                       RenderMaterialHandle material,
                       const glm::mat4& projection);
 
 private:
+    friend class model::VulkanModelBackend;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
     Window* m_window = nullptr;
@@ -78,7 +82,9 @@ private:
     RenderTextureHandle m_blockAtlas{};
     RenderMaterialHandle m_chunkOpaque{};
     RenderMaterialHandle m_chunkTranslucent{};
-    RenderMeshHandle m_compatibilityCube{};
+    RenderTextureHandle m_entityAtlas{};
+    RenderMaterialHandle m_entityMaterial{};
+    std::array<RenderMeshHandle, 9> m_compatibilityCubes{};
     glm::mat4 m_viewProjection{1.0f};
     Frustum m_frustum;
     RenderEnvironment m_environment;

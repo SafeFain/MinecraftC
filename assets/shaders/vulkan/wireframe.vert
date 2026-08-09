@@ -2,6 +2,7 @@
 
 layout(push_constant) uniform WireUniforms {
     mat4 modelViewProjection;
+    vec4 options;
 } wire;
 
 const vec3 positions[24]=vec3[24](

@@ -43,7 +43,8 @@ public:
     void queue(EntityType type, uint64_t id, const glm::dvec3& position,
                const glm::vec3& facing, uint32_t behaviorSeed,
                const glm::dvec3& renderOrigin, const glm::vec3& cameraPosition,
-               model::ModelRenderer& renderer, SmoothLightSample light = {});
+               model::ModelRenderer& renderer, const glm::vec3& visualTint,
+               SmoothLightSample light = {});
     void endFrame();
 
 private:
