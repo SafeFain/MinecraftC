@@ -63,7 +63,7 @@ public:
         const glm::vec3&, const glm::vec3&, float) override;
     void renderClouds(const glm::dvec3&, const glm::mat4&, uint64_t, float,
                       int) override;
-    void setViewProjection(const glm::mat4& value) override { m_viewProjection = value; }
+    void setViewProjection(const glm::mat4& value) override;
     void setFrustum(const Frustum& value) override { m_frustum = value; }
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }

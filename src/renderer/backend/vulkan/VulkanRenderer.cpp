@@ -2994,6 +2994,16 @@ void VulkanRenderer::beginFrame() {
     beginFrame(frame);
 }
 
+void VulkanRenderer::setViewProjection(const glm::mat4& value) {
+    m_viewProjection = value;
+    // Gameplay supplies the camera after beginFrame(). Keep the active frame
+    // synchronized instead of rendering Chunks with the previous frame's view.
+    if (m_impl && m_impl->frameBegun) {
+        m_impl->submittedFrame.projection = value;
+        m_impl->submittedFrame.view = glm::mat4(1.0f);
+    }
+}
+
 void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
                                     const glm::vec3& cameraPosition) {
     m_environment = environment;
@@ -3065,8 +3075,14 @@ void VulkanRenderer::releaseChunkMesh(ChunkMesh& mesh) {
 
 void VulkanRenderer::renderChunk(const ChunkMesh& mesh,
                                  const glm::mat4& model,
-                                 const glm::mat4&, bool translucent) {
+                                 const glm::mat4& viewProjection,
+                                 bool translucent) {
     if (!mesh.gpuReady || !mesh.renderHandle) return;
+    // The explicit argument is authoritative for this draw path. This also
+    // prevents future call-order changes from reintroducing one-frame camera
+    // latency into the world while other passes use the current matrix.
+    m_impl->submittedFrame.projection = viewProjection;
+    m_impl->submittedFrame.view = glm::mat4(1.0f);
     const size_t count = translucent ? mesh.translucentIndexCount
                                      : mesh.opaqueIndexCount;
     if (count == 0) return;

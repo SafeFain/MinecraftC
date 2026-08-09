@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import pathlib
 import shutil
 import struct
@@ -16,6 +18,37 @@ SHADERS = ("basic_cube.vert", "basic_cube.frag", "chunk.vert", "chunk.frag",
            "sky.vert", "sky.frag", "cloud.vert", "cloud.frag",
            "wireframe.vert", "wireframe.frag", "model.vert", "model.frag")
 SPIRV_MAGIC = 0x07230203
+SOURCE_MANIFEST = "sources.sha256.json"
+
+
+def source_digest(path: pathlib.Path) -> str:
+    # Git may expose text files with CRLF on Windows. Shader freshness is based
+    # on source content, not the checkout's platform line-ending convention.
+    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
+
+
+def expected_source_manifest(shader_dir: pathlib.Path) -> dict[str, str]:
+    return {name: source_digest(shader_dir / name) for name in SHADERS}
+
+
+def validate_source_manifest(shader_dir: pathlib.Path) -> None:
+    manifest_path = shader_dir / SOURCE_MANIFEST
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"invalid Vulkan shader source manifest: {manifest_path}") from error
+    if manifest != expected_source_manifest(shader_dir):
+        raise RuntimeError(
+            "Vulkan shader sources changed without regenerating checked-in SPIR-V")
+
+
+def write_source_manifest(shader_dir: pathlib.Path) -> None:
+    manifest_path = shader_dir / SOURCE_MANIFEST
+    manifest_path.write_text(
+        json.dumps(expected_source_manifest(shader_dir), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def validate(shader_dir: pathlib.Path) -> None:
@@ -38,15 +71,6 @@ def compile_shader(glslc: str, source: pathlib.Path, output: pathlib.Path) -> No
     )
 
 
-def normalized_spirv(path: pathlib.Path) -> bytes:
-    data = bytearray(path.read_bytes())
-    # The SPIR-V generator word identifies the glslc build rather than shader
-    # semantics. Ignore it so distro compiler patch versions remain comparable.
-    if len(data) >= 12:
-        data[8:12] = b"\0\0\0\0"
-    return bytes(data)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path.cwd())
@@ -59,6 +83,7 @@ def main() -> int:
 
     if not args.generate and not args.check:
         validate(shader_dir)
+        validate_source_manifest(shader_dir)
         return 0
 
     glslc = shutil.which(args.glslc)
@@ -68,18 +93,24 @@ def main() -> int:
         for source_name in SHADERS:
             source = shader_dir / source_name
             compile_shader(glslc, source, source.with_suffix(source.suffix + ".spv"))
+        write_source_manifest(shader_dir)
         validate(shader_dir)
         return 0
 
+    # Different supported glslc releases can emit semantically equivalent but
+    # bytewise different modules. Compile every source to catch platform-local
+    # errors, and use the source manifest to detect stale checked-in binaries.
+    validate_source_manifest(shader_dir)
     with tempfile.TemporaryDirectory(prefix="minecraftc-vulkan-shaders-") as temp:
         temp_dir = pathlib.Path(temp)
         for source_name in SHADERS:
             source = shader_dir / source_name
             generated = temp_dir / (source_name + ".spv")
             compile_shader(glslc, source, generated)
-            checked_in = source.with_suffix(source.suffix + ".spv")
-            if normalized_spirv(generated) != normalized_spirv(checked_in):
-                raise RuntimeError(f"stale checked-in SPIR-V: {checked_in}")
+            data = generated.read_bytes()
+            if len(data) < 20 or len(data) % 4 != 0 or \
+                    struct.unpack_from("<I", data)[0] != SPIRV_MAGIC:
+                raise RuntimeError(f"glslc generated invalid SPIR-V: {generated}")
     validate(shader_dir)
     return 0
 
