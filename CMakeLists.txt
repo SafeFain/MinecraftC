@@ -207,7 +207,8 @@ if(MINECRAFTC_ENABLE_VULKAN)
     target_include_directories(minecraftc_render_vulkan PRIVATE src)
     target_include_directories(minecraftc_render_vulkan SYSTEM PRIVATE
         external/VulkanMemoryAllocator/include external/stb)
-    target_link_libraries(minecraftc_render_vulkan PRIVATE Vulkan::Vulkan)
+    target_link_libraries(minecraftc_render_vulkan PRIVATE
+        glm::glm Vulkan::Vulkan)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(minecraftc_render_vulkan PRIVATE
             -Wall -Wextra -Wpedantic)
