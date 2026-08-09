@@ -16,6 +16,10 @@ RULES = {
         r"(?:#\s*include\s*[<\"]glad/|\bgl[A-Z][A-Za-z0-9_]*\s*\(|"
         r"\bGL(?:uint|int|enum|sizei|boolean|sizeiptr|intptr)\b|\bGL_[A-Z0-9_]+)"
     ),
+    "vulkan": re.compile(
+        r"(?:#\s*include\s*[<\"]vulkan/|\bvk[A-Z][A-Za-z0-9_]*\s*\(|"
+        r"\bVk[A-Z][A-Za-z0-9_]*\b|\bVK_[A-Z0-9_]+)"
+    ),
     "native": re.compile(
         r"(?:#\s*include\s*[<\"](?:windows\.h|shlobj\.h|unistd\.h|pwd\.h|"
         r"mach-o/dyld\.h)[>\"]|\b(?:GetModuleFileNameW|SHGetKnownFolderPath|"
@@ -26,6 +30,10 @@ RULES = {
 ALLOWED_PREFIXES = {
     "sdl": ("src/platform/sdl/",),
     "opengl": ("src/renderer/backend/opengl/",),
+    "vulkan": (
+        "src/renderer/backend/vulkan/",
+        "src/platform/sdl/SdlWindow.cpp",
+    ),
     "native": ("src/platform/native/",),
 }
 
@@ -81,4 +89,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

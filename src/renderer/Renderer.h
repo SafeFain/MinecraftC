@@ -13,13 +13,15 @@
 #include "renderer/BlockTextureAtlas.h"
 #include "renderer/RenderEnvironment.h"
 #include "renderer/ParticleSystem.h"
+#include "renderer/CloudRenderData.h"
 #include "world/BlockLightLogic.h"
+#include "renderer/GameRenderer.h"
 
 // Forward declaration
 struct ChunkMesh;
 namespace model { class ModelRenderer; }
 
-class Renderer {
+class Renderer final : public IGameRenderer {
 public:
     Renderer();
     ~Renderer();
@@ -27,7 +29,7 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void initialize(const GraphicsCapabilities& capabilities,
+    void initialize(Window& window, const GraphicsCapabilities& capabilities,
                     const std::filesystem::path& assetRoot);
     void reinitialize(const GraphicsCapabilities& capabilities,
                       const std::filesystem::path& assetRoot);
@@ -96,17 +98,33 @@ public:
     RenderTextureHandle getBlockAtlasTexture() const { return m_blockAtlas.texture(); }
     bool usesFramebufferSrgb() const { return m_framebufferSrgb; }
 
+    RenderDeviceCapabilities capabilities() const override;
+    RenderMeshHandle createMesh(const MeshData& data) override;
+    void destroyMesh(RenderMeshHandle handle) override;
+    RenderTextureHandle createTexture(
+        const TextureData& data, const TextureSamplerDesc& sampler) override;
+    void destroyTexture(RenderTextureHandle handle) override;
+    RenderMaterialHandle createMaterial(const MaterialDesc& desc) override;
+    void destroyMaterial(RenderMaterialHandle handle) override;
+    void beginFrame(const FrameData& frame) override;
+    void draw(const DrawCommand& command) override;
+    void waitIdle() override;
+
 private:
     struct GpuChunkMesh {
         uint32_t vao = 0;
         uint32_t vbo = 0;
         uint32_t ebo = 0;
     };
-    struct CloudInstance {
-        float x, y, z;
-        float width, depth, height;
+    struct BasicMesh {
+        uint32_t vao = 0;
+        uint32_t vbo = 0;
+        uint32_t ebo = 0;
+        size_t indexCount = 0;
+        MeshVertexLayout layout = MeshVertexLayout::PositionUv;
     };
-    static constexpr size_t MAX_CLOUD_INSTANCES = 2u * 129u * 129u;
+    struct BasicTexture { uint32_t texture = 0; };
+    struct BasicMaterial { MaterialDesc desc{}; };
     static constexpr size_t CLOUD_INSTANCE_BUFFER_COUNT = 3;
 
     std::unique_ptr<Shader> m_blockShader;
@@ -161,4 +179,14 @@ private:
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     std::unordered_map<uint32_t, GpuChunkMesh> m_chunkMeshes;
     uint32_t m_nextChunkMeshHandle = 1;
+    Window* m_window = nullptr;
+    std::filesystem::path m_assetRoot;
+    std::unique_ptr<Shader> m_basicShader;
+    FrameData m_basicFrame;
+    std::unordered_map<uint32_t, BasicMesh> m_basicMeshes;
+    std::unordered_map<uint32_t, BasicTexture> m_basicTextures;
+    std::unordered_map<uint32_t, BasicMaterial> m_basicMaterials;
+    uint32_t m_nextBasicMeshHandle = 0x40000000u;
+    uint32_t m_nextBasicTextureHandle = 0x40000000u;
+    uint32_t m_nextBasicMaterialHandle = 1;
 };

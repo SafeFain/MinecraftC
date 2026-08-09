@@ -79,6 +79,7 @@ int main(){
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
+    settings.rendererBackend=RendererBackend::Vulkan;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
     settings.controlMode=ControlMode::Touch;settings.touchSensitivity=1.75f;
@@ -91,6 +92,8 @@ int main(){
             loaded.renderDistance==8&&!loaded.renderClouds&&
             loaded.cloudRenderDistance==1024&&!loaded.smoothLighting,
             "client settings round trip");
+    require(loaded.rendererBackend==RendererBackend::Vulkan,
+            "renderer backend preference round trips");
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");
@@ -109,6 +112,9 @@ int main(){
     }
     require(ClientSettings::load(root/"legacy-options.txt").language==Language::English,
             "legacy settings default to English");
+    require(ClientSettings::load(root/"legacy-options.txt").rendererBackend==
+                RendererBackend::OpenGL,
+            "legacy settings default to OpenGL");
     {
         std::ofstream invalid(root/"invalid-options.txt");
         invalid<<"version=4\nlanguage=unsupported\n";

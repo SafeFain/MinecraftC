@@ -1,4 +1,5 @@
 #include "ui/UIRenderer.h"
+#include "ui/FontRenderer.h"
 #include "renderer/Shader.h"
 #include "renderer/BlockTextureAtlas.h"
 #include "renderer/backend/opengl/OpenGLDebug.h"
@@ -15,16 +16,56 @@
 #include <stb_image.h>
 #include <new>
 
+class OpenGLUIBackend final : public IUIRenderBackend {
+public:
+    ~OpenGLUIBackend() override;
+    void initialize(RenderTextureHandle, bool, const std::filesystem::path&,
+                    GraphicsApi);
+    void reinitialize(RenderTextureHandle, bool, const std::filesystem::path&,
+                      GraphicsApi);
+    void resetGraphics();
+    void beginUIFrame(int,int) override;
+    void setCanvas(float x,float y,float w,float h) override {
+        m_canvasOrigin={x,y};m_canvasSize={w,h};
+    }
+    void endUIFrame() override;
+    void drawRect(float,float,float,float,const glm::vec4&) override;
+    void drawBlockIcon(float,float,float,float,BlockId) override;
+    void drawItemIcon(float,float,float,float,const ItemStack&) override;
+    void drawDurability(float,float,float,const ItemStack&) override;
+    void drawPanel(float,float,float,float,const glm::vec4&) override;
+    void drawTooltip(float,float,const ItemStack&) override;
+    void renderText(const std::string&,float,float,float,const glm::vec3&) override;
+    glm::vec2 measureText(const std::string&,float) override;
+    void setLocalization(const Localization* value) override {m_localization=value;}
+private:
+    std::unique_ptr<Shader> m_uiShader;
+    FontRenderer m_fontRenderer;
+    glm::mat4 m_projection{1.0f};
+    glm::vec2 m_canvasOrigin{0.0f};
+    glm::vec2 m_canvasSize{0.0f};
+    uint32_t m_quadVAO=0,m_quadVBO=0,m_quadEBO=0;
+    RenderTextureHandle m_blockAtlasTexture{};
+    uint32_t m_itemAtlasTexture=0;
+    int m_itemAtlasColumns=0,m_itemAtlasRows=0;
+    std::unordered_map<std::string,int> m_itemAtlasIndices;
+    bool m_manualGamma=false;
+    const Localization* m_localization=nullptr;
+    uint8_t m_prevDepthTest=1,m_prevCullFace=1,m_prevBlend=0;
+    int m_prevBlendSrc=0,m_prevBlendDst=0,m_prevActiveTexture=0;
+    bool drawGeneratedItemIcon(float,float,float,float,ItemId);
+};
+
 // ── Constructor / Destructor ──────────────────────────────────────────────
 
-UIRenderer::~UIRenderer() {
+OpenGLUIBackend::~OpenGLUIBackend() {
     if (m_itemAtlasTexture) GL_CHECK(glDeleteTextures(1, &m_itemAtlasTexture));
     if (m_quadEBO) GL_CHECK(glDeleteBuffers(1, &m_quadEBO));
     if (m_quadVBO) GL_CHECK(glDeleteBuffers(1, &m_quadVBO));
     if (m_quadVAO) GL_CHECK(glDeleteVertexArrays(1, &m_quadVAO));
 }
 
-void UIRenderer::reinitialize(RenderTextureHandle blockAtlasTexture,
+void OpenGLUIBackend::reinitialize(RenderTextureHandle blockAtlasTexture,
                               bool framebufferSrgb,
                               const std::filesystem::path& assetRoot,
                               GraphicsApi api) {
@@ -34,14 +75,14 @@ void UIRenderer::reinitialize(RenderTextureHandle blockAtlasTexture,
     m_localization = localization;
 }
 
-void UIRenderer::resetGraphics() {
-    this->~UIRenderer();
-    new (this) UIRenderer();
+void OpenGLUIBackend::resetGraphics() {
+    this->~OpenGLUIBackend();
+    new (this) OpenGLUIBackend();
 }
 
 // ── Initialization ────────────────────────────────────────────────────────
 
-void UIRenderer::initialize(RenderTextureHandle blockAtlasTexture,
+void OpenGLUIBackend::initialize(RenderTextureHandle blockAtlasTexture,
                             bool framebufferSrgb,
                             const std::filesystem::path& assetRoot, GraphicsApi api) {
     m_blockAtlasTexture = blockAtlasTexture;
@@ -111,7 +152,7 @@ void UIRenderer::initialize(RenderTextureHandle blockAtlasTexture,
 
 // ── Frame management ──────────────────────────────────────────────────────
 
-void UIRenderer::beginUIFrame(int screenWidth, int screenHeight) {
+void OpenGLUIBackend::beginUIFrame(int screenWidth, int screenHeight) {
     // Save current GL state
     glGetBooleanv(GL_DEPTH_TEST, &m_prevDepthTest);
     glGetBooleanv(GL_CULL_FACE, &m_prevCullFace);
@@ -135,7 +176,7 @@ void UIRenderer::beginUIFrame(int screenWidth, int screenHeight) {
                               -m_canvasOrigin.y, fullHeight - m_canvasOrigin.y);
 }
 
-void UIRenderer::endUIFrame() {
+void OpenGLUIBackend::endUIFrame() {
     // Restore previous GL state
     if (m_prevDepthTest) GL_CHECK(glEnable(GL_DEPTH_TEST)); else GL_CHECK(glDisable(GL_DEPTH_TEST));
     if (m_prevCullFace)  GL_CHECK(glEnable(GL_CULL_FACE));  else GL_CHECK(glDisable(GL_CULL_FACE));
@@ -146,7 +187,7 @@ void UIRenderer::endUIFrame() {
 
 // ── Rectangle drawing ─────────────────────────────────────────────────────
 
-void UIRenderer::drawRect(float x, float y, float w, float h,
+void OpenGLUIBackend::drawRect(float x, float y, float w, float h,
                            const glm::vec4& color) {
     m_uiShader->bind();
     m_uiShader->setMat4("uProjection", m_projection);
@@ -177,7 +218,7 @@ void UIRenderer::drawRect(float x, float y, float w, float h,
     GL_CHECK(glBindVertexArray(0));
 }
 
-void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block) {
+void OpenGLUIBackend::drawBlockIcon(float x, float y, float w, float h, BlockId block) {
     if (!m_blockAtlasTexture || block == BlockId::AIR) return;
 
     FaceDir iconFace = FaceDir::TOP;
@@ -218,13 +259,13 @@ void UIRenderer::drawBlockIcon(float x, float y, float w, float h, BlockId block
     GL_CHECK(glBindVertexArray(0));
 }
 
-void UIRenderer::drawPanel(float x, float y, float w, float h, const glm::vec4& fill) {
+void OpenGLUIBackend::drawPanel(float x, float y, float w, float h, const glm::vec4& fill) {
     drawRect(x, y, w, h, glm::vec4(0.02f, 0.02f, 0.025f, fill.a));
     drawRect(x + 2, y + 2, w - 4, h - 4, glm::vec4(0.48f, 0.48f, 0.52f, fill.a));
     drawRect(x + 4, y + 4, w - 8, h - 8, fill);
 }
 
-void UIRenderer::drawItemIcon(float x, float y, float w, float h, const ItemStack& stack) {
+void OpenGLUIBackend::drawItemIcon(float x, float y, float w, float h, const ItemStack& stack) {
     if (stack.empty()) return;
     if (drawGeneratedItemIcon(x,y,w,h,stack.id)) return;
     const auto& props = getItemProps(stack.id);
@@ -262,7 +303,7 @@ void UIRenderer::drawItemIcon(float x, float y, float w, float h, const ItemStac
     }
 }
 
-bool UIRenderer::drawGeneratedItemIcon(float x,float y,float w,float h,ItemId item) {
+bool OpenGLUIBackend::drawGeneratedItemIcon(float x,float y,float w,float h,ItemId item) {
     if (!m_itemAtlasTexture) return false;
     std::string name=getItemProps(item).name;
     for (char& c:name) c=std::isalnum(static_cast<unsigned char>(c)) ?
@@ -288,7 +329,7 @@ bool UIRenderer::drawGeneratedItemIcon(float x,float y,float w,float h,ItemId it
     return true;
 }
 
-void UIRenderer::drawTooltip(float x, float y, const ItemStack& stack) {
+void OpenGLUIBackend::drawTooltip(float x, float y, const ItemStack& stack) {
     if (stack.empty()) return;
     const auto& props = getItemProps(stack.id);
     std::string detail = m_localization
@@ -314,7 +355,7 @@ void UIRenderer::drawTooltip(float x, float y, const ItemStack& stack) {
     renderText(detail, x + 7.0f, y + 6.0f, .9f, {.95f,.90f,1.0f});
 }
 
-void UIRenderer::drawDurability(float x, float y, float w, const ItemStack& stack) {
+void OpenGLUIBackend::drawDurability(float x, float y, float w, const ItemStack& stack) {
     const auto& props = stack.empty() ? getItemProps(ItemId::EMPTY) : getItemProps(stack.id);
     if (props.maxDurability == 0 || stack.damage == 0) return;
     const float remaining = durabilityRemaining(stack);
@@ -325,13 +366,21 @@ void UIRenderer::drawDurability(float x, float y, float w, const ItemStack& stac
 
 // ── Text rendering (delegated to FontRenderer) ────────────────────────────
 
-void UIRenderer::renderText(const std::string& text, float x, float y,
+void OpenGLUIBackend::renderText(const std::string& text, float x, float y,
                               float scale, const glm::vec3& color) {
     m_fontRenderer.begin(m_projection);
     m_fontRenderer.renderText(text, x, y, scale, color);
     m_fontRenderer.end();
 }
 
-glm::vec2 UIRenderer::measureText(const std::string& text, float scale) {
+glm::vec2 OpenGLUIBackend::measureText(const std::string& text, float scale) {
     return m_fontRenderer.measureText(text, scale);
+}
+
+std::unique_ptr<IUIRenderBackend> createOpenGLUIBackend(
+    RenderTextureHandle atlas, bool srgb, const std::filesystem::path& root,
+    GraphicsApi api) {
+    auto backend = std::make_unique<OpenGLUIBackend>();
+    backend->initialize(atlas, srgb, root, api);
+    return backend;
 }

@@ -1,0 +1,87 @@
+#pragma once
+
+#include "renderer/GameRenderer.h"
+
+#include <filesystem>
+#include <memory>
+
+class Window;
+
+class VulkanRenderer final : public IGameRenderer {
+public:
+    VulkanRenderer();
+    VulkanRenderer(Window& window, const std::filesystem::path& assetRoot);
+    ~VulkanRenderer();
+
+    VulkanRenderer(const VulkanRenderer&) = delete;
+    VulkanRenderer& operator=(const VulkanRenderer&) = delete;
+
+    RenderDeviceCapabilities capabilities() const override;
+    RenderMeshHandle createMesh(const MeshData& data) override;
+    void destroyMesh(RenderMeshHandle handle) override;
+    RenderTextureHandle createTexture(
+        const TextureData& data, const TextureSamplerDesc& sampler) override;
+    void destroyTexture(RenderTextureHandle handle) override;
+    RenderMaterialHandle createMaterial(const MaterialDesc& desc) override;
+    void destroyMaterial(RenderMaterialHandle handle) override;
+    void beginFrame(const FrameData& frame) override;
+    void draw(const DrawCommand& command) override;
+    void endFrame() override;
+    void resize(int width, int height) override;
+    void waitIdle() override;
+
+    void initialize(Window& window, const GraphicsCapabilities& capabilities,
+                    const std::filesystem::path& assetRoot) override;
+    void reinitialize(const GraphicsCapabilities& capabilities,
+                      const std::filesystem::path& assetRoot) override;
+    void beginFrame() override;
+    void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
+    void renderSky(const RenderEnvironment&, const glm::mat4&, const glm::vec3&,
+                   bool) override;
+    void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
+                     bool translucent = false) override;
+    void uploadChunkMesh(ChunkMesh&) override;
+    void releaseChunkMesh(ChunkMesh&) override;
+    void beginTranslucent() override;
+    void endTranslucent() override;
+    void bindBlockShader() const override;
+    void unbindBlockShader() const override;
+    void renderWireframe(const glm::vec3&, const glm::mat4&) override;
+    void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&, int,
+                      const glm::mat4&) override;
+    void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,
+        const glm::vec3&, int, const glm::mat4&, SmoothLightSample = {}) override;
+    model::ModelRenderer& modelRenderer() override;
+    void flushModels(const glm::mat4&) override;
+    void renderEntityPart(const glm::vec3&, const glm::vec3&, const glm::vec3&,
+        float, const glm::vec3&, int, const glm::mat4&,
+        SmoothLightSample = {1.0f, 0.0f}) override;
+    void renderParticles(const std::vector<ParticleRenderData>&, const glm::mat4&,
+        const glm::vec3&, const glm::vec3&, float) override;
+    void renderClouds(const glm::dvec3&, const glm::mat4&, uint64_t, float,
+                      int) override;
+    void setViewProjection(const glm::mat4& value) override { m_viewProjection = value; }
+    void setFrustum(const Frustum& value) override { m_frustum = value; }
+    const Frustum& getFrustum() const override { return m_frustum; }
+    RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }
+    bool usesFramebufferSrgb() const override { return true; }
+    void queueUiBatch(const std::vector<UiMeshVertex>& vertices,
+                      const std::vector<uint32_t>& indices,
+                      RenderMaterialHandle material,
+                      const glm::mat4& projection);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+    Window* m_window = nullptr;
+    std::filesystem::path m_assetRoot;
+    RenderTextureHandle m_blockAtlas{};
+    RenderMaterialHandle m_chunkOpaque{};
+    RenderMaterialHandle m_chunkTranslucent{};
+    RenderMeshHandle m_compatibilityCube{};
+    glm::mat4 m_viewProjection{1.0f};
+    Frustum m_frustum;
+    RenderEnvironment m_environment;
+    glm::vec3 m_cameraPosition{0.0f};
+    std::unique_ptr<model::ModelRenderer> m_modelRenderer;
+};

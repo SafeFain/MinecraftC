@@ -1,7 +1,8 @@
 # MinecraftC
 
 MinecraftC 是一款使用 C++17、SDL3 和 OpenGL 构建的体素沙盒游戏。桌面端使用
-OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0。游戏提供可无限加载的确定性
+OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 还提供可选的 Vulkan
+基础渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本：**Release-1.1.5**
@@ -31,6 +32,37 @@ sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev xorg-dev \
 cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
 cmake --build build-local -j2
 ./build-local/minecraftc
+```
+
+可选的 Vulkan 后端目前使用 VMA 管理 GPU 内存，并通过通用的
+`Mesh`、`Texture`、`Material` 和 `Camera` 数据绘制带深度测试和纹理采样的
+旋转石头立方体；它尚不渲染游戏世界或 UI。同一基础场景也可由 OpenGL
+后端运行，用于核对两个后端的资源和相机语义：
+
+```bash
+./build-local/minecraftc --renderer=opengl-demo
+```
+
+安装 Vulkan 开发环境和可用驱动后，使用独立构建目录启用 Vulkan：
+安装 `libvulkan-dev` 和可用的 Vulkan 驱动后，使用独立构建目录启用：
+
+```bash
+cmake -S . -B build-vulkan -DCMAKE_BUILD_TYPE=Release \
+  -DMINECRAFTC_ENABLE_VULKAN=ON
+cmake --build build-vulkan -j2
+./build-vulkan/minecraftc --renderer=vulkan
+```
+
+未指定示例 renderer 时仍启动完整的 OpenGL 游戏。完整游戏代码依赖后端无关的
+`IGameRenderer`，当前只有 OpenGL 声明完整 gameplay 能力；Vulkan 仅声明基础
+textured-mesh 能力。
+
+Vulkan GLSL 与预编译 SPIR-V 位于 `assets/shaders/vulkan/`。普通构建不要求
+安装 `glslc`；修改着色器后可使用以下命令重新生成并检查文件：
+
+```bash
+python3 tools/vulkan_shaders.py --root . --generate
+python3 tools/vulkan_shaders.py --root . --check
 ```
 
 安装到独立目录：
@@ -206,6 +238,7 @@ cmake --build build-local --target texture_generator
 | 组件或资产 | 作者/维护者 | 许可证 | 位置 |
 | --- | --- | --- | --- |
 | SDL 3.4.10 | SDL contributors | Zlib | CMake FetchContent 构建目录 |
+| Vulkan Memory Allocator 3.3.0 | AMD/GPUOpen contributors | MIT | `external/VulkanMemoryAllocator/` |
 | cgltf 1.15 | jkuhlmann | MIT | `external/cgltf/` |
 | nlohmann/json 3.12.0 | Niels Lohmann | MIT | `external/nlohmann/` |
 | stb_truetype 1.26 | Sean Barrett 等贡献者 | MIT | `external/stb/stb_truetype.h` |

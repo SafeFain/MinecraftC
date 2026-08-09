@@ -2,7 +2,8 @@
 
 enum class GraphicsApi {
     OpenGL33,
-    OpenGLES30
+    OpenGLES30,
+    Vulkan
 };
 
 struct GraphicsCapabilities {

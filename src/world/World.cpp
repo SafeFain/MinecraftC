@@ -1559,7 +1559,7 @@ void World::enqueueMeshBuilds(int maxInFlight) {
     }
 }
 
-void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
+void World::processCompletedMeshes(IGameRenderer* renderer, int maxUploads,
                                    size_t maxUploadBytes) {
     if (!renderer) return;
     m_renderer = renderer;
@@ -1609,7 +1609,7 @@ void World::processCompletedMeshes(Renderer* renderer, int maxUploads,
 
 // ── Synchronous mesh building ─────────────────────────────────────────
 
-void World::buildMeshesSync(Renderer* renderer, int maxCount) {
+void World::buildMeshesSync(IGameRenderer* renderer, int maxCount) {
     if (!renderer) return;
     m_renderer = renderer;
 

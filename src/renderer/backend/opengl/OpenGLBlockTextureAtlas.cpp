@@ -1,4 +1,5 @@
 #include "renderer/BlockTextureAtlas.h"
+#include "renderer/BlockAtlasData.h"
 
 #include "debug/Log.h"
 #include "renderer/backend/opengl/OpenGLDebug.h"
@@ -204,6 +205,35 @@ BlockTextureAtlas::~BlockTextureAtlas() {
 }
 
 bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
+    try {
+        const BlockAtlasData shared = buildBlockAtlasData(assetRoot);
+        GL_CHECK(glGenTextures(1, &m_texture.value));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture.value));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8,
+                             static_cast<GLsizei>(shared.texture.width),
+                             static_cast<GLsizei>(shared.texture.height), 0,
+                             GL_RGBA, GL_UNSIGNED_BYTE,
+                             shared.texture.pixels.data()));
+        for (size_t level = 0; level < shared.texture.mipLevels.size(); ++level) {
+            const auto& mip = shared.texture.mipLevels[level];
+            GL_CHECK(glTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level + 1),
+                                 GL_SRGB8_ALPHA8, static_cast<GLsizei>(mip.width),
+                                 static_cast<GLsizei>(mip.height), 0, GL_RGBA,
+                                 GL_UNSIGNED_BYTE, mip.pixels.data()));
+        }
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                                GL_NEAREST_MIPMAP_LINEAR));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
+                                static_cast<GLint>(shared.texture.mipLevels.size())));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
+        return true;
+    } catch (const std::exception& error) {
+        LOG_WARN("Shared block atlas unavailable; using compatibility fallback: "
+                 << error.what());
+    }
     stbi_set_flip_vertically_on_load(1);
     const std::filesystem::path root = assetRoot / "textures" / "source";
     const std::filesystem::path generatedRoot = assetRoot / "textures" / "generated";

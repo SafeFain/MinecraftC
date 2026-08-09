@@ -20,7 +20,7 @@
 #include "world/BlockLightLogic.h"
 #include "game/Weather.h"
 
-class Renderer;
+class IGameRenderer;
 class ThreadPool;
 class SaveStore;
 
@@ -101,12 +101,12 @@ public:
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps GL uploads per frame to avoid pipeline stalls.
-    void processCompletedMeshes(Renderer* renderer, int maxUploads = 4,
+    void processCompletedMeshes(IGameRenderer* renderer, int maxUploads = 4,
                                 size_t maxUploadBytes =
                                     Config::MESH_UPLOAD_BYTES_PER_FRAME);
 
     // Synchronous build (for first frame or when thread pool unavailable)
-    void buildMeshesSync(Renderer* renderer, int maxCount = 16);
+    void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16);
     void invalidateGpuMeshes();
     void restoreGpuMeshes();
 
@@ -136,7 +136,7 @@ public:
     }
 
 private:
-    Renderer* m_renderer = nullptr;
+    IGameRenderer* m_renderer = nullptr;
     struct PairHash {
         size_t operator()(const std::pair<int,int>& p) const {
             return std::hash<int64_t>{}((static_cast<int64_t>(p.first) << 32)

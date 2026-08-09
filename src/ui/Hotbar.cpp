@@ -86,13 +86,9 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
         // Material thumbnail from the same atlas used by world rendering.
         float innerMargin = 4.0f;
         if (!survivalStack || !survivalStack->empty()) {
-            if (!itemProps || itemProps->placedBlock) {
-                ui.drawBlockIcon(sx + innerMargin, sy + innerMargin,
-                                 slotSize - innerMargin * 2.0f,
-                                 slotSize - innerMargin * 2.0f, id);
-            } else ui.drawItemIcon(sx + innerMargin, sy + innerMargin,
-                                   slotSize - innerMargin * 2.0f,
-                                   slotSize - innerMargin * 2.0f, *shownStack);
+            ui.drawItemIcon(sx + innerMargin, sy + innerMargin,
+                            slotSize - innerMargin * 2.0f,
+                            slotSize - innerMargin * 2.0f, *shownStack);
         }
 
         // Selection highlight

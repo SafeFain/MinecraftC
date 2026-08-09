@@ -7,9 +7,10 @@
 #include "game/Language.h"
 
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
+enum class RendererBackend : uint8_t { OpenGL, Vulkan };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 8;
+    static constexpr int FORMAT_VERSION = 9;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -19,6 +20,7 @@ struct ClientSettings {
     float mouseSensitivity = 0.15f;
     bool invertMouseY = false;
     bool smoothLighting = true;
+    RendererBackend rendererBackend = RendererBackend::OpenGL;
     int guiScale = 0; // 0 = Auto
     Language language = Language::English;
     ControlMode controlMode = ControlMode::Auto;

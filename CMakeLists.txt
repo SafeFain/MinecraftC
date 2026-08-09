@@ -24,6 +24,13 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
        "Use the static MSVC runtime for portable Windows packages" OFF)
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
+option(MINECRAFTC_ENABLE_VULKAN
+       "Build the optional Linux Vulkan basic-rendering backend" OFF)
+if(MINECRAFTC_ENABLE_VULKAN AND
+   (ANDROID OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    message(FATAL_ERROR
+        "MINECRAFTC_ENABLE_VULKAN currently supports Linux desktop only")
+endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
@@ -87,6 +94,9 @@ if(ANDROID)
 else()
     find_package(OpenGL REQUIRED)
 endif()
+if(MINECRAFTC_ENABLE_VULKAN)
+    find_package(Vulkan REQUIRED)
+endif()
 
 add_library(minecraftc_assets STATIC
     src/core/AssetStore.cpp
@@ -123,8 +133,13 @@ set(MINECRAFTC_OPENGL_BACKEND_SOURCES
     src/renderer/backend/opengl/OpenGLRenderer.cpp
     src/renderer/backend/opengl/OpenGLShader.cpp
     src/renderer/backend/opengl/OpenGLUIRenderer.cpp)
+set(MINECRAFTC_VULKAN_BACKEND_SOURCES
+    src/renderer/backend/vulkan/VulkanRenderer.cpp
+    src/renderer/backend/vulkan/VulkanUIRenderer.cpp
+    src/renderer/backend/vulkan/VmaImplementation.cpp)
 foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
-                                MINECRAFTC_OPENGL_BACKEND_SOURCES)
+                                MINECRAFTC_OPENGL_BACKEND_SOURCES
+                                MINECRAFTC_VULKAN_BACKEND_SOURCES)
     list(REMOVE_ITEM SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/${BACKEND_SOURCE}")
 endforeach()
@@ -159,6 +174,11 @@ if(MINECRAFTC_DESKTOP_GLES3)
     target_compile_definitions(minecraftc_platform_sdl PRIVATE
         MINECRAFTC_FORCE_GLES3=1)
 endif()
+if(MINECRAFTC_ENABLE_VULKAN)
+    target_compile_definitions(minecraftc_platform_sdl PRIVATE
+        MINECRAFTC_ENABLE_VULKAN=1)
+    target_link_libraries(minecraftc_platform_sdl PRIVATE Vulkan::Vulkan)
+endif()
 
 add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
 target_include_directories(minecraftc_render_opengl PRIVATE
@@ -170,6 +190,18 @@ if(ANDROID)
         ${MINECRAFTC_GLES_LIBRARY} android log)
 else()
     target_link_libraries(minecraftc_render_opengl PRIVATE OpenGL::GL)
+endif()
+if(MINECRAFTC_ENABLE_VULKAN)
+    add_library(minecraftc_render_vulkan STATIC
+        ${MINECRAFTC_VULKAN_BACKEND_SOURCES})
+    target_include_directories(minecraftc_render_vulkan PRIVATE src)
+    target_include_directories(minecraftc_render_vulkan SYSTEM PRIVATE
+        external/VulkanMemoryAllocator/include external/stb)
+    target_link_libraries(minecraftc_render_vulkan PRIVATE Vulkan::Vulkan)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(minecraftc_render_vulkan PRIVATE
+            -Wall -Wextra -Wpedantic)
+    endif()
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(minecraftc_platform PRIVATE -Wall -Wextra -Wpedantic)
@@ -197,6 +229,10 @@ if(MINECRAFTC_DESKTOP_GLES3)
     target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
         MINECRAFTC_FORCE_GLES3=1)
 endif()
+if(MINECRAFTC_ENABLE_VULKAN)
+    target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
+        MINECRAFTC_ENABLE_VULKAN=1)
+endif()
 
 # ── Debug / logging compile-time gating ─────────────────────────────────
 # LOG_COMPILE_LEVEL strips log macros below the given level:
@@ -212,6 +248,10 @@ target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
     minecraftc_render_opengl
     ${CMAKE_DL_LIBS}
 )
+if(MINECRAFTC_ENABLE_VULKAN)
+    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
+        minecraftc_render_vulkan)
+endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
@@ -274,6 +314,10 @@ if(BUILD_TESTING)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
+    add_test(NAME vulkan_shader_assets
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tools/vulkan_shaders.py
+                --root ${CMAKE_SOURCE_DIR})
 
     add_executable(model_asset_tests
         tests/ModelAssetTests.cpp
@@ -385,6 +429,8 @@ if(BUILD_TESTING)
     add_executable(rendering_logic_tests
         tests/RenderingLogicTests.cpp
         src/renderer/CameraEffects.cpp
+        src/renderer/CloudRenderData.cpp
+        src/renderer/RenderDevice.cpp
     )
     target_include_directories(rendering_logic_tests PRIVATE src)
     target_link_libraries(rendering_logic_tests PRIVATE glm::glm)

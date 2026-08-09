@@ -1,11 +1,16 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/CameraEffects.h"
+#include "renderer/CloudRenderData.h"
 #include "model/ModelRenderLogic.h"
 #include "renderer/ShaderDialect.h"
+#include "renderer/RenderDevice.h"
+#include "renderer/ParticleSystem.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -17,6 +22,88 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    static_assert(sizeof(MeshVertex) == 44);
+    static_assert(offsetof(MeshVertex, px) == 0);
+    static_assert(offsetof(MeshVertex, ao) == 12);
+    static_assert(offsetof(MeshVertex, u) == 28);
+    static_assert(offsetof(MeshVertex, tile) == 36);
+    static_assert(offsetof(MeshVertex, face) == 40);
+    static_assert(sizeof(ParticleRenderData) == 32);
+    static_assert(offsetof(ParticleRenderData, position) == 0);
+    static_assert(offsetof(ParticleRenderData, kind) == 12);
+    static_assert(offsetof(ParticleRenderData, phase) == 16);
+    static_assert(offsetof(ParticleRenderData, texture) == 20);
+    static_assert(offsetof(ParticleRenderData, size) == 24);
+    static_assert(offsetof(ParticleRenderData, rotation) == 28);
+    static_assert(sizeof(CloudInstance) == 24);
+    static_assert(offsetof(CloudInstance, x) == 0);
+    static_assert(offsetof(CloudInstance, width) == 12);
+    static_assert(offsetof(CloudInstance, height) == 20);
+    const CloudView negativeCloud = cloudView({-0.5, 64.0, -0.5}, 0.0f, 192);
+    require(negativeCloud.centerX == -1 && negativeCloud.centerZ == -1,
+            "cloud grid did not use floor coordinates");
+    require(negativeCloud.radius == 12,
+            "cloud distance did not convert to the expected radius");
+    require(cloudView({0.0, 0.0, 0.0}, 0.0f, 4096).radius == MAX_CLOUD_RADIUS,
+            "cloud distance exceeded its supported maximum");
+    const auto cloudsA = buildCloudInstances(0x123456789abcdef0ULL, -7, 11, 12);
+    const auto cloudsB = buildCloudInstances(0x123456789abcdef0ULL, -7, 11, 12);
+    const auto cloudsC = buildCloudInstances(0xfedcba9876543210ULL, -7, 11, 12);
+    const auto sameClouds = [](const auto& a, const auto& b) {
+        return a.size() == b.size() && std::equal(
+            a.begin(), a.end(), b.begin(), [](const CloudInstance& left,
+                                               const CloudInstance& right) {
+                return left.x == right.x && left.y == right.y &&
+                    left.z == right.z && left.width == right.width &&
+                    left.depth == right.depth && left.height == right.height;
+            });
+    };
+    require(!cloudsA.empty() && cloudsA.size() <= MAX_CLOUD_INSTANCES,
+            "cloud layout was empty or exceeded capacity");
+    require(sameClouds(cloudsA, cloudsB),
+            "same-seed cloud layout was not deterministic");
+    require(!sameClouds(cloudsA, cloudsC),
+            "different cloud seeds produced the same layout");
+    for (const CloudInstance& cloud : cloudsA) {
+        require(cloud.width >= 16.0f && cloud.width <= 48.0f &&
+                cloud.depth >= 16.0f && cloud.depth <= 48.0f,
+                "cloud merge exceeded its 3x3-cell limit");
+    }
+    MeshData validMesh;
+    validMesh.vertices = {{{0, 0, 0}, {0, 0}}, {{1, 0, 0}, {1, 0}},
+                          {{0, 1, 0}, {0, 1}}};
+    validMesh.indices = {0, 1, 2};
+    validMesh.opaqueIndexCount = 3;
+    validateMeshData(validMesh);
+    bool rejectedMesh = false;
+    try {
+        MeshData invalid = validMesh;
+        invalid.indices[2] = 3;
+        validateMeshData(invalid);
+    } catch (const std::invalid_argument&) {
+        rejectedMesh = true;
+    }
+    require(rejectedMesh, "out-of-range mesh index was accepted");
+    TextureData validTexture;
+    validTexture.width = 1;
+    validTexture.height = 1;
+    validTexture.pixels = {1, 2, 3, 4};
+    validateTextureData(validTexture);
+    bool rejectedTexture = false;
+    try {
+        validTexture.pixels.pop_back();
+        validateTextureData(validTexture);
+    } catch (const std::invalid_argument&) {
+        rejectedTexture = true;
+    }
+    require(rejectedTexture, "invalid RGBA texture byte count was accepted");
+    const glm::vec4 glNear = glm::vec4(0, 0, -1, 1);
+    const glm::vec4 vkNear = clipSpaceCorrection(GraphicsApi::Vulkan) * glNear;
+    require(std::abs(vkNear.z) < 0.0001f && vkNear.y == 0.0f,
+            "Vulkan clip-space depth conversion is incorrect");
+    const glm::vec4 glTop = glm::vec4(0, 1, 0, 1);
+    require((clipSpaceCorrection(GraphicsApi::Vulkan) * glTop).y == -1.0f,
+            "Vulkan clip-space Y conversion is incorrect");
     const std::string desktopShader = "#version 330 core\nvoid main(){}\n";
     require(shaderSourceForApi(desktopShader, GraphicsApi::OpenGL33) == desktopShader,
             "desktop shader source was unexpectedly rewritten");

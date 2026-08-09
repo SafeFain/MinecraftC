@@ -73,6 +73,9 @@
 
   "settings.title": "设置",
   "settings.video_title": "视频设置",
+  "settings.renderer": "渲染器：{0}（重启后生效）",
+  "settings.renderer_opengl": "OpenGL",
+  "settings.renderer_vulkan": "Vulkan",
   "settings.controls_title": "控制",
   "settings.day_static": "昼夜循环：永昼",
   "settings.day_minutes": "昼夜循环：{0} 分钟",

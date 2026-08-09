@@ -25,61 +25,21 @@ static const std::vector<float> WIRE_CUBE = {
     0,0,0, 0,1,0,   1,0,0, 1,1,0,   1,0,1, 1,1,1,   0,0,1, 0,1,1,
 };
 
-namespace {
-
-uint64_t cloudHash(uint64_t seed, int x, int z) {
-    uint64_t value = seed ^
-        static_cast<uint64_t>(static_cast<int64_t>(x)) *
-            0x9E3779B97F4A7C15ULL;
-    value ^= static_cast<uint64_t>(static_cast<int64_t>(z)) *
-             0xD1B54A32D192ED03ULL;
-    value ^= value >> 30;
-    value *= 0xBF58476D1CE4E5B9ULL;
-    value ^= value >> 27;
-    value *= 0x94D049BB133111EBULL;
-    return value ^ (value >> 31);
-}
-
-int floorDiv(int value, int divisor) {
-    int quotient = value / divisor;
-    if (value % divisor < 0) --quotient;
-    return quotient;
-}
-
-float cloudRandom(uint64_t seed, int x, int z) {
-    return static_cast<float>(cloudHash(seed, x, z) & 0xFFFFFFULL) /
-           static_cast<float>(0xFFFFFFULL);
-}
-
-float cloudValueNoise(uint64_t seed, int x, int z, int scale) {
-    const int x0 = floorDiv(x, scale);
-    const int z0 = floorDiv(z, scale);
-    float tx = static_cast<float>(x - x0 * scale) / static_cast<float>(scale);
-    float tz = static_cast<float>(z - z0 * scale) / static_cast<float>(scale);
-    tx = tx * tx * (3.0f - 2.0f * tx);
-    tz = tz * tz * (3.0f - 2.0f * tz);
-    const float a = cloudRandom(seed, x0, z0);
-    const float b = cloudRandom(seed, x0 + 1, z0);
-    const float c = cloudRandom(seed, x0, z0 + 1);
-    const float d = cloudRandom(seed, x0 + 1, z0 + 1);
-    return (a + (b - a) * tx) * (1.0f - tz) +
-           (c + (d - c) * tx) * tz;
-}
-
-float cloudDensity(uint64_t seed, int x, int z) {
-    const float broad = cloudValueNoise(seed, x, z, 8);
-    const float detail = cloudValueNoise(
-        seed ^ 0xA0761D6478BD642FULL, x + 37, z - 53, 4);
-    return broad * 0.70f + detail * 0.30f;
-}
-
-} // namespace
-
 // ── Constructor / Destructor ──────────────────────────────────────────
 
 Renderer::Renderer() = default;
 
 Renderer::~Renderer() {
+    for (auto& [handle, texture] : m_basicTextures) {
+        (void)handle;
+        if (texture.texture) GL_CHECK(glDeleteTextures(1, &texture.texture));
+    }
+    for (auto& [handle, mesh] : m_basicMeshes) {
+        (void)handle;
+        if (mesh.vbo) GL_CHECK(glDeleteBuffers(1, &mesh.vbo));
+        if (mesh.ebo) GL_CHECK(glDeleteBuffers(1, &mesh.ebo));
+        if (mesh.vao) GL_CHECK(glDeleteVertexArrays(1, &mesh.vao));
+    }
     for (auto& [handle, mesh] : m_chunkMeshes) {
         (void)handle;
         if (mesh.vbo) GL_CHECK(glDeleteBuffers(1, &mesh.vbo));
@@ -104,14 +64,15 @@ void Renderer::reinitialize(const GraphicsCapabilities& capabilities,
                             const std::filesystem::path& assetRoot) {
     if (!gladLoadGL(Window::graphicsProcAddress))
         throw std::runtime_error("Failed to reload OpenGL functions");
+    Window* window = m_window;
     this->~Renderer();
     new (this) Renderer();
-    initialize(capabilities, assetRoot);
+    initialize(*window, capabilities, assetRoot);
 }
 
 // ── Initialization ────────────────────────────────────────────────────
 
-void Renderer::initialize(const GraphicsCapabilities& capabilities,
+void Renderer::initialize(Window& window, const GraphicsCapabilities& capabilities,
                           const std::filesystem::path& assetRoot) {
     if (!gladLoadGL(Window::graphicsProcAddress))
         throw std::runtime_error("Failed to load OpenGL functions");
@@ -119,6 +80,8 @@ void Renderer::initialize(const GraphicsCapabilities& capabilities,
         throw std::runtime_error("OpenGL ES 3.0 or newer is required");
     LOG_INFO("OpenGL: " << reinterpret_cast<const char*>(glGetString(GL_VERSION)));
     LOG_INFO("Renderer: " << reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
+    m_window = &window;
+    m_assetRoot = assetRoot;
     m_framebufferSrgb = capabilities.framebufferSrgb;
     m_graphicsApi = capabilities.api;
     m_modelRenderer = std::make_unique<model::ModelRenderer>();
@@ -314,7 +277,217 @@ void Renderer::resize(int width, int height) {
 }
 
 void Renderer::endFrame() {
-    // Currently a no-op; swap happens in main loop
+    if (m_window) m_window->swapBuffers();
+}
+
+RenderDeviceCapabilities Renderer::capabilities() const {
+    return {true, true, true};
+}
+
+RenderMeshHandle Renderer::createMesh(const MeshData& data) {
+    validateMeshData(data);
+    BasicMesh mesh;
+    GL_CHECK(glGenVertexArrays(1, &mesh.vao));
+    GL_CHECK(glGenBuffers(1, &mesh.vbo));
+    GL_CHECK(glGenBuffers(1, &mesh.ebo));
+    GL_CHECK(glBindVertexArray(mesh.vao));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, mesh.vbo));
+    const bool chunkLayout = data.layout == MeshVertexLayout::Chunk;
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER,
+                          chunkLayout ? data.chunkVertices.size() * sizeof(MeshVertex)
+                                      : data.vertices.size() * sizeof(BasicMeshVertex),
+                          chunkLayout ? static_cast<const void*>(data.chunkVertices.data())
+                                      : static_cast<const void*>(data.vertices.data()),
+                          GL_STATIC_DRAW));
+    GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo));
+    GL_CHECK(glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                          data.indices.size() * sizeof(uint32_t),
+                          data.indices.data(), GL_STATIC_DRAW));
+    if (chunkLayout) {
+        GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+            reinterpret_cast<void*>(offsetof(MeshVertex, px))));
+        GL_CHECK(glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+            reinterpret_cast<void*>(offsetof(MeshVertex, ao))));
+        GL_CHECK(glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+            reinterpret_cast<void*>(offsetof(MeshVertex, u))));
+        GL_CHECK(glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(MeshVertex),
+            reinterpret_cast<void*>(offsetof(MeshVertex, face))));
+        for (GLuint attribute = 0; attribute < 4; ++attribute)
+            GL_CHECK(glEnableVertexAttribArray(attribute));
+    } else {
+        GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(BasicMeshVertex),
+            reinterpret_cast<void*>(offsetof(BasicMeshVertex, position))));
+        GL_CHECK(glEnableVertexAttribArray(0));
+        GL_CHECK(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(BasicMeshVertex),
+            reinterpret_cast<void*>(offsetof(BasicMeshVertex, uv))));
+        GL_CHECK(glEnableVertexAttribArray(1));
+    }
+    GL_CHECK(glBindVertexArray(0));
+    mesh.indexCount = data.indices.size();
+    mesh.layout = data.layout;
+    const RenderMeshHandle handle{m_nextBasicMeshHandle++};
+    m_basicMeshes.emplace(handle.value, mesh);
+    return handle;
+}
+
+void Renderer::destroyMesh(RenderMeshHandle handle) {
+    const auto it = m_basicMeshes.find(handle.value);
+    if (it == m_basicMeshes.end())
+        throw std::invalid_argument("Unknown OpenGL mesh handle");
+    BasicMesh& mesh = it->second;
+    GL_CHECK(glDeleteBuffers(1, &mesh.vbo));
+    GL_CHECK(glDeleteBuffers(1, &mesh.ebo));
+    GL_CHECK(glDeleteVertexArrays(1, &mesh.vao));
+    m_basicMeshes.erase(it);
+}
+
+RenderTextureHandle Renderer::createTexture(
+    const TextureData& data, const TextureSamplerDesc& sampler) {
+    validateTextureData(data);
+    GLuint texture = 0;
+    GL_CHECK(glGenTextures(1, &texture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture));
+    constexpr GLint LINEAR_FILTER = 0x2601;
+    constexpr GLint REPEAT_WRAP = 0x2901;
+    constexpr GLint NEAREST_MIPMAP_LINEAR_FILTER = 0x2702;
+    const GLint minFilter = sampler.minFilter == TextureFilter::Nearest
+        ? GL_NEAREST : sampler.minFilter == TextureFilter::NearestMipmapLinear
+        ? NEAREST_MIPMAP_LINEAR_FILTER : LINEAR_FILTER;
+    const GLint magFilter = sampler.magFilter == TextureFilter::Nearest
+        ? GL_NEAREST : LINEAR_FILTER;
+    const GLint wrapU = sampler.addressU == TextureAddressMode::Repeat
+        ? REPEAT_WRAP : GL_CLAMP_TO_EDGE;
+    const GLint wrapV = sampler.addressV == TextureAddressMode::Repeat
+        ? REPEAT_WRAP : GL_CLAMP_TO_EDGE;
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapU));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapV));
+    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8,
+                          static_cast<GLsizei>(data.width),
+                          static_cast<GLsizei>(data.height), 0,
+                          GL_RGBA, GL_UNSIGNED_BYTE, data.pixels.data()));
+    for (size_t level = 0; level < data.mipLevels.size(); ++level) {
+        const auto& mip = data.mipLevels[level];
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level + 1),
+            GL_SRGB8_ALPHA8, static_cast<GLsizei>(mip.width),
+            static_cast<GLsizei>(mip.height), 0, GL_RGBA, GL_UNSIGNED_BYTE,
+            mip.pixels.data()));
+    }
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
+                            static_cast<GLint>(data.mipLevels.size())));
+    const RenderTextureHandle handle{m_nextBasicTextureHandle++};
+    m_basicTextures.emplace(handle.value, BasicTexture{texture});
+    return handle;
+}
+
+void Renderer::destroyTexture(RenderTextureHandle handle) {
+    for (const auto& [id, material] : m_basicMaterials) {
+        (void)id;
+        if (material.desc.baseColorTexture == handle)
+            throw std::logic_error("Texture is still referenced by a material");
+    }
+    const auto it = m_basicTextures.find(handle.value);
+    if (it == m_basicTextures.end())
+        throw std::invalid_argument("Unknown OpenGL texture handle");
+    GL_CHECK(glDeleteTextures(1, &it->second.texture));
+    m_basicTextures.erase(it);
+}
+
+RenderMaterialHandle Renderer::createMaterial(const MaterialDesc& desc) {
+    if (m_basicTextures.find(desc.baseColorTexture.value) == m_basicTextures.end())
+        throw std::invalid_argument("Invalid OpenGL textured material");
+    if (!desc.depthTest || !desc.backfaceCull)
+        throw std::invalid_argument("Basic material requires depth test and culling");
+    const RenderMaterialHandle handle{m_nextBasicMaterialHandle++};
+    m_basicMaterials.emplace(handle.value, BasicMaterial{desc});
+    return handle;
+}
+
+void Renderer::destroyMaterial(RenderMaterialHandle handle) {
+    if (m_basicMaterials.erase(handle.value) == 0)
+        throw std::invalid_argument("Unknown OpenGL material handle");
+}
+
+void Renderer::beginFrame(const FrameData& frame) {
+    m_basicFrame = frame;
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
+    GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glCullFace(GL_BACK));
+    GL_CHECK(glClearColor(frame.clearColor.r, frame.clearColor.g,
+                          frame.clearColor.b, frame.clearColor.a));
+    GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+}
+
+void Renderer::draw(const DrawCommand& command) {
+    const auto mesh = m_basicMeshes.find(command.mesh.value);
+    const auto material = m_basicMaterials.find(command.material.value);
+    if (mesh == m_basicMeshes.end() || material == m_basicMaterials.end())
+        throw std::invalid_argument("Draw command contains an unknown handle");
+    const auto texture = m_basicTextures.find(material->second.desc.baseColorTexture.value);
+    if (texture == m_basicTextures.end())
+        throw std::logic_error("Material texture no longer exists");
+    if (material->second.desc.pipeline == MaterialPipeline::UnlitTextured && !m_basicShader) {
+        m_basicShader = std::make_unique<Shader>(
+            m_assetRoot / "shaders" / "basic_textured.vert",
+            m_assetRoot / "shaders" / "basic_textured.frag", m_graphicsApi);
+    }
+    Shader* shader = nullptr;
+    const bool chunkPipeline =
+        material->second.desc.pipeline == MaterialPipeline::ChunkOpaqueCutout ||
+        material->second.desc.pipeline == MaterialPipeline::ChunkTranslucent;
+    const bool translucent =
+        material->second.desc.pipeline == MaterialPipeline::ChunkTranslucent;
+    if (chunkPipeline) {
+        if (!m_blockShader) throw std::logic_error("Chunk shader is unavailable");
+        shader = m_blockShader.get();
+        shader->bind();
+        shader->setMat4("uMVP", m_basicFrame.projection * m_basicFrame.view * command.model);
+        shader->setVec3("uChunkOrigin", glm::vec3(0.0f));
+        shader->setVec3("uCameraPosition", glm::vec3(glm::inverse(m_basicFrame.view)[3]));
+        shader->setVec3("uLightDirection", m_basicFrame.lightDirection);
+        shader->setVec3("uDirectColor", m_basicFrame.directColor);
+        shader->setVec3("uAmbientColor", m_basicFrame.ambientColor);
+        shader->setVec3("uFogColor", glm::vec3(m_basicFrame.clearColor));
+        shader->setFloat("uDirectIntensity", 1.0f);
+        shader->setFloat("uAmbientIntensity", 1.0f);
+        shader->setFloat("uFogEnd", 10000.0f);
+        shader->setFloat("uFogStartFraction", 1.0f);
+        shader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+        shader->setInt("uSmoothLighting", material->second.desc.smoothLighting ? 1 : 0);
+        shader->setFloat("uAtlasTiles", static_cast<float>(material->second.desc.atlasTilesPerSide));
+        shader->setFloat("uLavaTile", -1.0f);
+        shader->setFloat("uWaterTile", -1.0f);
+        shader->setInt("uBlockAtlas", 0);
+    } else {
+        shader = m_basicShader.get();
+        shader->bind();
+        shader->setMat4("uMVP", m_basicFrame.projection * m_basicFrame.view * command.model);
+        shader->setInt("uTexture", 0);
+    }
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture->second.texture));
+    GL_CHECK(glBindVertexArray(mesh->second.vao));
+    if (translucent) {
+        GL_CHECK(glEnable(GL_BLEND));
+        GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+        GL_CHECK(glDepthMask(GL_FALSE));
+    }
+    const size_t count = command.indexCount ? command.indexCount : mesh->second.indexCount;
+    if (static_cast<uint64_t>(command.firstIndex) + count > mesh->second.indexCount)
+        throw std::invalid_argument("OpenGL draw range exceeds mesh indices");
+    GL_CHECK(glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(command.firstIndex) * sizeof(uint32_t))));
+    if (translucent) {
+        GL_CHECK(glDepthMask(GL_TRUE));
+        GL_CHECK(glDisable(GL_BLEND));
+    }
+    GL_CHECK(glBindVertexArray(0));
+}
+
+void Renderer::waitIdle() {
+    // OpenGL resource deletion is ordered after previously issued commands in
+    // the current context; explicit synchronization is unnecessary here.
 }
 
 void Renderer::setEnvironment(const RenderEnvironment& environment,
@@ -573,87 +746,26 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
                             int renderDistanceBlocks) {
     // A coherent density field creates broad voxel cloud masses. Adjacent cells
     // are merged before upload so extended distances retain a small draw budget.
-    constexpr int cellSize = 16;
-    constexpr int maxRadius = 1024 / cellSize;
-    const int radius = std::clamp(
-        (renderDistanceBlocks + cellSize - 1) / cellSize, 1, maxRadius);
-    const double drift = static_cast<double>(timeSeconds) * 0.8;
-    const int centerX = static_cast<int>(std::floor((playerPosition.x - drift) / cellSize));
-    const int centerZ = static_cast<int>(std::floor(playerPosition.z / cellSize));
-    const bool rebuild = m_cloudCacheRadius != radius ||
-        m_cloudCacheCenterX != centerX || m_cloudCacheCenterZ != centerZ ||
+    const CloudView cloud = cloudView(
+        playerPosition, timeSeconds, renderDistanceBlocks);
+    const bool rebuild = m_cloudCacheRadius != cloud.radius ||
+        m_cloudCacheCenterX != cloud.centerX ||
+        m_cloudCacheCenterZ != cloud.centerZ ||
         m_cloudCacheSeed != worldSeed;
     if (rebuild) {
-        m_cloudInstances.clear();
-        const int diameter = radius * 2 + 1;
-        std::vector<float> density(static_cast<size_t>(diameter * diameter));
-        for (int z = 0; z < diameter; ++z) {
-            for (int x = 0; x < diameter; ++x) {
-                density[static_cast<size_t>(x + z * diameter)] = cloudDensity(
-                    worldSeed, centerX + x - radius, centerZ + z - radius);
-            }
-        }
-
-        const auto appendLayer = [&](float threshold, float y, float height) {
-            constexpr int maxMergeCells = 3;
-            std::vector<bool> consumed(
-                static_cast<size_t>(diameter * diameter), false);
-            const auto occupied = [&](int x, int z) {
-                const size_t index = static_cast<size_t>(x + z * diameter);
-                return !consumed[index] && density[index] >= threshold;
-            };
-            for (int z = 0; z < diameter; ++z) {
-                for (int x = 0; x < diameter; ++x) {
-                    if (!occupied(x, z)) continue;
-                    int width = 1;
-                    while (width < maxMergeCells && x + width < diameter &&
-                           occupied(x + width, z))
-                        ++width;
-                    int depth = 1;
-                    bool canExtend = true;
-                    while (depth < maxMergeCells && z + depth < diameter &&
-                           canExtend) {
-                        for (int offset = 0; offset < width; ++offset) {
-                            if (!occupied(x + offset, z + depth)) {
-                                canExtend = false;
-                                break;
-                            }
-                        }
-                        if (canExtend) ++depth;
-                    }
-                    for (int dz = 0; dz < depth; ++dz) {
-                        for (int dx = 0; dx < width; ++dx) {
-                            consumed[static_cast<size_t>(
-                                x + dx + (z + dz) * diameter)] = true;
-                        }
-                    }
-                    m_cloudInstances.push_back({
-                        static_cast<float>((x - radius) * cellSize), y,
-                        static_cast<float>((z - radius) * cellSize),
-                        static_cast<float>(width * cellSize),
-                        static_cast<float>(depth * cellSize), height});
-                }
-            }
-        };
-        appendLayer(0.53f, 192.0f, 3.0f);
-        appendLayer(0.68f, 195.0f, 2.0f);
-        m_cloudCacheRadius = radius;
-        m_cloudCacheCenterX = centerX;
-        m_cloudCacheCenterZ = centerZ;
+        m_cloudInstances = buildCloudInstances(
+            worldSeed, cloud.centerX, cloud.centerZ, cloud.radius);
+        m_cloudCacheRadius = cloud.radius;
+        m_cloudCacheCenterX = cloud.centerX;
+        m_cloudCacheCenterZ = cloud.centerZ;
         m_cloudCacheSeed = worldSeed;
     }
     if (m_cloudInstances.empty()) return;
-    const glm::vec3 cloudOrigin(
-        static_cast<float>(static_cast<double>(centerX) * cellSize + drift -
-                           playerPosition.x),
-        0.0f,
-        static_cast<float>(static_cast<double>(centerZ) * cellSize -
-                           playerPosition.z));
     const glm::vec3 cloudColor = cloudColorForEnvironment(m_environment);
 
     if (!m_cloudVAO || !m_drawArraysInstanced) {
         for (const CloudInstance& instance : m_cloudInstances) {
-            renderEntity(cloudOrigin + glm::vec3(instance.x, instance.y, instance.z),
+            renderEntity(cloud.origin + glm::vec3(instance.x, instance.y, instance.z),
                          glm::vec3(instance.width, instance.height,
                                    instance.depth),
                          cloudColor, -1, viewProjection);
@@ -663,7 +775,7 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
 
     m_cloudShader->bind();
     m_cloudShader->setMat4("uViewProjection", viewProjection);
-    m_cloudShader->setVec3("uCloudOrigin", cloudOrigin);
+    m_cloudShader->setVec3("uCloudOrigin", cloud.origin);
     m_cloudShader->setVec3("uColor", cloudColor);
     m_cloudShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
     GL_CHECK(glBindVertexArray(m_cloudVAO));

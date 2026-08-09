@@ -811,7 +811,7 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
 }
 
 void EntityManager::render(
-    Renderer& renderer, const glm::mat4& viewProjection,
+    IGameRenderer& renderer, const glm::mat4& viewProjection,
     const glm::dvec3& renderOrigin) const {
     m_modelRegistry.beginFrame();
     for (const auto& entity : m_entities) {
@@ -852,13 +852,13 @@ void EntityManager::render(
                                 entity.type == EntityType::Skeleton ||
                                 entity.type == EntityType::Spider ||
                                 entity.type == EntityType::Blastling;
-        if (passive || hostileMob) {
+        if ((passive || hostileMob) && renderer.capabilities().gameplay) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
                 renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(), light);
             continue;
         }
-        if (!passive && !hostileMob) {
+        if ((!passive && !hostileMob) || !renderer.capabilities().gameplay) {
             renderer.renderCompatibilityEntityCube(
                 position, size, color, textureIndex, viewProjection, light);
             continue;
@@ -876,7 +876,8 @@ void EntityManager::render(
 }
 
 void EntityManager::initializeModels(const std::filesystem::path& assetRoot,
-                                     Renderer& renderer) {
+                                     IGameRenderer& renderer) {
     m_modelRegistry.loadAll(assetRoot);
-    m_modelRegistry.uploadAll(renderer.modelRenderer());
+    if (renderer.capabilities().gameplay)
+        m_modelRegistry.uploadAll(renderer.modelRenderer());
 }

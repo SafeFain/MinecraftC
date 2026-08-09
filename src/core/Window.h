@@ -7,10 +7,12 @@
 
 #include <array>
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 struct WindowSafeArea {
     int x = 0;
@@ -35,7 +37,8 @@ inline WindowSafeArea projectWindowSafeArea(
 
 class Window {
 public:
-    Window(int width, int height, const std::string& title, int preferredSamples);
+    Window(int width, int height, const std::string& title, int preferredSamples,
+           GraphicsApi graphicsApi = GraphicsApi::OpenGL33);
     ~Window();
 
     Window(const Window&) = delete;
@@ -71,6 +74,8 @@ public:
     bool isSrgbCapable() const { return m_srgbCapable; }
     GraphicsApi graphicsApi() const { return m_graphicsApi; }
     GraphicsCapabilities graphicsCapabilities() const;
+    std::vector<std::string> requiredVulkanInstanceExtensions() const;
+    std::uintptr_t createVulkanSurface(void* instance) const;
     WindowSafeArea safeArea() const;
     GamepadManager& gamepads() { return *m_gamepads; }
 

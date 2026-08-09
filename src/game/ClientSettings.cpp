@@ -71,6 +71,9 @@ void ClientSettings::validate() {
     if (std::none_of(std::begin(opacities),std::end(opacities),[this](float v){return std::abs(v-touchControlOpacity)<.001f;}))
         touchControlOpacity=.65f;
     if (guiScale < 0 || guiScale > 4) guiScale = 0;
+    if (rendererBackend != RendererBackend::OpenGL &&
+        rendererBackend != RendererBackend::Vulkan)
+        rendererBackend = RendererBackend::OpenGL;
     ClientSettings defaults;
     for (size_t i = 0; i < bindings.size(); ++i) {
         auto& binding = bindings[i];
@@ -120,6 +123,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
             else if (name == "raw_mouse_input") { /* v5 compatibility */ }
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
+            else if (name == "renderer") settings.rendererBackend = value == "vulkan"
+                ? RendererBackend::Vulkan : RendererBackend::OpenGL;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name == "language") settings.language = parseLanguage(value);
             else if (name == "control_mode") settings.controlMode = static_cast<ControlMode>(std::stoi(value));
@@ -189,6 +194,8 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'
+           << "renderer=" << (rendererBackend == RendererBackend::Vulkan
+                ? "vulkan" : "opengl") << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "language=" << languageCode(language) << '\n';
     output << "control_mode=" << static_cast<int>(controlMode) << '\n'

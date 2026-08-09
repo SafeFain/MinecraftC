@@ -54,9 +54,7 @@ void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
     ui.drawRect(r.x, r.y, r.w, r.h, hovered ? glm::vec4(.34f,.34f,.38f,.98f)
                                              : glm::vec4(.18f,.18f,.21f,.96f));
     if (stack.empty()) return;
-    const auto& props = getItemProps(stack.id);
-    if (props.placedBlock) ui.drawBlockIcon(r.x+4, r.y+4, r.w-8, r.h-8, *props.placedBlock);
-    else ui.drawItemIcon(r.x+4,r.y+4,r.w-8,r.h-8,stack);
+    ui.drawItemIcon(r.x+4,r.y+4,r.w-8,r.h-8,stack);
     ui.drawDurability(r.x+3,r.y+2,r.w-6,stack);
     if (stack.count > 1) ui.renderText(std::to_string(stack.count), r.x+r.w-16, r.y+2,
                                       .9f, glm::vec3(1));

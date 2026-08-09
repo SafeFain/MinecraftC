@@ -73,6 +73,9 @@
 
   "settings.title": "SETTINGS",
   "settings.video_title": "VIDEO SETTINGS",
+  "settings.renderer": "Renderer: {0} (restart required)",
+  "settings.renderer_opengl": "OpenGL",
+  "settings.renderer_vulkan": "Vulkan",
   "settings.controls_title": "CONTROLS",
   "settings.day_static": "Day Cycle: Static Day",
   "settings.day_minutes": "Day Cycle: {0} Minutes",

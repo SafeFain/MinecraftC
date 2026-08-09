@@ -54,12 +54,8 @@ void SurvivalInventoryScreen::drawStack(
                 hovered ? glm::vec4(0.34f, 0.34f, 0.38f, 0.98f)
                         : glm::vec4(0.18f, 0.18f, 0.21f, 0.96f));
     if (stack.empty()) return;
-    const auto& props = getItemProps(stack.id);
-    if (props.placedBlock) {
-        ui.drawBlockIcon(rect.x + 4.0f, rect.y + 4.0f, rect.w - 8.0f,
-                         rect.h - 8.0f, *props.placedBlock);
-    } else ui.drawItemIcon(rect.x + 4.0f, rect.y + 4.0f,
-                           rect.w - 8.0f, rect.h - 8.0f, stack);
+    ui.drawItemIcon(rect.x + 4.0f, rect.y + 4.0f,
+                    rect.w - 8.0f, rect.h - 8.0f, stack);
     ui.drawDurability(rect.x + 3.0f, rect.y + 2.0f, rect.w - 6.0f, stack);
     if (stack.count > 1) {
         const std::string text = std::to_string(stack.count);

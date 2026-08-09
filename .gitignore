@@ -1,5 +1,6 @@
 /build/
 /build-local/
+/build-vulkan/
 /cmake-build-*/
 /install-local/
 /android/.deps/
@@ -7,6 +8,11 @@
 /android/app/.cxx/
 /android/app/build/
 /saves/
+
+# Local tool state and generated Python bytecode.
+/.reasonix/
+__pycache__/
+*.py[cod]
 
 # Local agent context and task state; never publish with project sources.
 /.agents/

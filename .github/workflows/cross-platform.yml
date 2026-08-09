@@ -16,14 +16,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install OpenGL and virtual-display dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
+      - name: Install graphics and virtual-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y glslc libgl1-mesa-dev libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test
         run: ctest --test-dir build-ci --output-on-failure
+      - name: Verify checked-in Vulkan shaders
+        run: python3 tools/vulkan_shaders.py --root . --check
       - name: Install
         run: cmake --install build-ci --prefix "$RUNNER_TEMP/$RELEASE_DIR"
       - name: Verify installed assets
@@ -43,6 +45,28 @@ jobs:
           set -e
           cat minecraftc-smoke.log
           grep -q "MinecraftC initialized" minecraftc-smoke.log
+          test "$status" -eq 124
+      - name: Verify installed Vulkan basic rendering
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          set +e
+          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=vulkan > minecraftc-vulkan-smoke.log 2>&1
+          status=$?
+          set -e
+          cat minecraftc-vulkan-smoke.log
+          grep -q "Vulkan first textured cube frame presented" minecraftc-vulkan-smoke.log
+          test "$status" -eq 124
+      - name: Verify installed OpenGL basic rendering
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          set +e
+          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=opengl-demo > minecraftc-opengl-demo-smoke.log 2>&1
+          status=$?
+          set -e
+          cat minecraftc-opengl-demo-smoke.log
+          grep -q "Visual pipeline" minecraftc-opengl-demo-smoke.log
           test "$status" -eq 124
       - name: Package Linux release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.5-linux-x86_64.tar.gz" "$RELEASE_DIR"

@@ -14,7 +14,7 @@
 #include "entity/EntityModelRegistry.h"
 
 class Player;
-class Renderer;
+class IGameRenderer;
 class World;
 
 struct Entity {
@@ -68,10 +68,10 @@ public:
     void strikeLightning(Player& player, const glm::ivec3& position);
     bool attackRay(const glm::dvec3& origin, const glm::vec3& direction,
                    float reach, float damage);
-    void render(Renderer& renderer, const glm::mat4& viewProjection,
+    void render(IGameRenderer& renderer, const glm::mat4& viewProjection,
                 const glm::dvec3& renderOrigin) const;
     void initializeModels(const std::filesystem::path& assetRoot,
-                          Renderer& renderer);
+                          IGameRenderer& renderer);
     const std::vector<Entity>& entities() const { return m_entities; }
     const std::vector<DeadEntityRender>& deadEntityRenders() const {
         return m_deadEntityRenders;

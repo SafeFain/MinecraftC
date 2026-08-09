@@ -39,6 +39,10 @@
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
+#include "renderer/ChunkRenderScene.h"
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+#include "renderer/backend/vulkan/VulkanRenderer.h"
+#endif
 #include <stdexcept>
 #include <chrono>
 #include <cmath>
@@ -48,13 +52,87 @@
 #include <random>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <unordered_map>
+
+class BasicRenderApplication final : public ApplicationHost {
+public:
+    BasicRenderApplication(RuntimePaths paths, GraphicsApi api)
+        : m_paths(std::move(paths)),
+          m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT,
+                   api == GraphicsApi::Vulkan ? "MinecraftC - Vulkan" :
+                                                "MinecraftC - OpenGL Demo",
+                   api == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES, api) {
+        if (api == GraphicsApi::Vulkan) {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+            m_renderer = std::make_unique<VulkanRenderer>(m_window, m_paths.assetRoot);
+#else
+            throw std::runtime_error("Vulkan support is not enabled in this build");
+#endif
+        } else {
+            auto renderer = std::make_unique<Renderer>();
+            renderer->initialize(m_window, m_window.graphicsCapabilities(),
+                                 m_paths.assetRoot);
+            renderer->resize(m_window.width(), m_window.height());
+            m_renderer = std::move(renderer);
+        }
+        m_scene = std::make_unique<ChunkRenderScene>(*m_renderer, m_paths.assetRoot);
+        m_window.setResizeCallback([this](int width, int height) {
+            m_renderer->resize(width, height);
+        });
+    }
+
+    bool iterate() override {
+        if (!m_backgrounded && !m_window.isMinimized())
+            m_scene->render(m_window.aspectRatio());
+        m_window.finishEventFrame();
+        return m_running && !m_window.shouldClose();
+    }
+
+    void event(ApplicationEvent event, const void* nativeEvent) override {
+        if (event == ApplicationEvent::EnterBackground) m_backgrounded = true;
+        if (event == ApplicationEvent::EnterForeground) m_backgrounded = false;
+        if (event == ApplicationEvent::Terminating) m_running = false;
+        if (nativeEvent) m_window.handleEvent(nativeEvent);
+    }
+
+    void shutdown() override {
+        if (m_cleaned) return;
+        m_cleaned = true;
+        m_scene.reset();
+        m_renderer->waitIdle();
+        Debug::Log::shutdown();
+    }
+
+private:
+    RuntimePaths m_paths;
+    Window m_window;
+    std::unique_ptr<IRenderDevice> m_renderer;
+    std::unique_ptr<ChunkRenderScene> m_scene;
+    bool m_running = true;
+    bool m_backgrounded = false;
+    bool m_cleaned = false;
+};
 
 class Application final : public ApplicationHost {
 public:
-    explicit Application(RuntimePaths paths)
+    explicit Application(RuntimePaths paths,
+                         GraphicsApi graphicsApi = GraphicsApi::OpenGL33)
         : m_paths(std::move(paths)),
           m_assets(m_paths.assetRoot),
+          m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC",
+                   graphicsApi == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES,
+                   graphicsApi),
+          m_renderer(
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+              graphicsApi == GraphicsApi::Vulkan
+                  ? std::unique_ptr<IGameRenderer>(std::make_unique<VulkanRenderer>())
+                  : std::unique_ptr<IGameRenderer>(std::make_unique<Renderer>())
+#else
+              std::make_unique<Renderer>()
+#endif
+          ),
+          m_graphicsApi(graphicsApi),
           m_camera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE),
           m_worldCatalog(m_paths.savesDirectory())
     {}
@@ -98,9 +176,9 @@ private:
     RuntimePaths m_paths;
     AssetStore m_assets;
     platform::sdl::SdlClipboard m_clipboard;
-    Window      m_window{Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC",
-                         Config::MSAA_SAMPLES};
-    Renderer    m_renderer;
+    Window      m_window;
+    std::unique_ptr<IGameRenderer> m_renderer;
+    GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     Camera      m_camera;
     CameraEffects m_cameraEffects;
     ThreadPool  m_threadPool;
@@ -207,16 +285,16 @@ private:
         applyClientSettings(false);
 
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
-        m_renderer.initialize(graphics, m_paths.assetRoot);
-        m_renderer.resize(m_window.width(), m_window.height());
-        m_entities.initializeModels(m_paths.assetRoot, m_renderer);
+        m_renderer->initialize(m_window, graphics, m_paths.assetRoot);
+        m_renderer->resize(m_window.width(), m_window.height());
+        m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_audio.initialize();
-        m_uiRenderer.initialize(
-            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
+        m_uiRenderer.initialize(*m_renderer,
+            m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
             m_paths.assetRoot, graphics.api);
         m_uiRenderer.setLocalization(m_localization);
         m_window.setResizeCallback([this](int width, int height) {
-            m_renderer.resize(width, height);
+            m_renderer->resize(width, height);
         });
 
         // Start with cursor visible (main menu)
@@ -329,7 +407,13 @@ private:
                 } else {
                     showMainMenu();
                 }
-            }, m_localization);
+            }, m_localization,
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+            true
+#else
+            false
+#endif
+            );
         };
 
         // ── Input callbacks ───────────────────────────────────────────
@@ -561,14 +645,14 @@ private:
         m_world.invalidateGpuMeshes();
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
         m_uiRenderer.resetGraphics();
-        m_renderer.reinitialize(graphics, m_paths.assetRoot);
-        m_entities.initializeModels(m_paths.assetRoot, m_renderer);
-        m_uiRenderer.initialize(
-            m_renderer.getBlockAtlasTexture(), m_renderer.usesFramebufferSrgb(),
+        m_renderer->reinitialize(graphics, m_paths.assetRoot);
+        m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
+        m_uiRenderer.initialize(*m_renderer,
+            m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
             m_paths.assetRoot, graphics.api);
         m_uiRenderer.setLocalization(m_localization);
         m_world.restoreGpuMeshes();
-        m_renderer.resize(m_window.width(), m_window.height());
+        m_renderer->resize(m_window.width(), m_window.height());
         LOG_INFO("Graphics resources restored after device reset");
     }
 
@@ -1029,7 +1113,8 @@ private:
 
                 // Async mesh building
                 m_world.enqueueMeshBuilds();
-                m_world.processCompletedMeshes(&m_renderer, Config::MESH_UPLOADS_PER_FRAME);
+                m_world.processCompletedMeshes(
+                    m_renderer.get(), Config::MESH_UPLOADS_PER_FRAME);
 
                 // Camera-relative rendering keeps all GPU coordinates near
                 // zero even when the logical world position is millions of
@@ -1076,7 +1161,7 @@ private:
                     m_world.enqueueMeshBuilds(
                         Config::LOADING_MESH_TASKS_IN_FLIGHT);
                     m_world.processCompletedMeshes(
-                        &m_renderer, Config::LOADING_MESH_UPLOADS_PER_FRAME,
+                        m_renderer.get(), Config::LOADING_MESH_UPLOADS_PER_FRAME,
                         Config::LOADING_MESH_UPLOAD_BYTES_PER_FRAME);
                 }
                 const auto progress = m_world.loadingProgress();
@@ -1114,26 +1199,26 @@ private:
                     m_dayNightCycle.evaluate(), m_weather.rainGradient(),
                     m_weather.thunderGradient(), lightningFlash);
 
-                m_renderer.beginFrame();
-                m_renderer.renderSky(
+                m_renderer->beginFrame();
+                m_renderer->renderSky(
                     environment, glm::inverse(vp), m_camera.m_position,
                     m_clientSettings.renderClouds);
-                m_renderer.setEnvironment(environment, m_camera.m_position);
-                m_renderer.setViewProjection(vp);
-                m_renderer.setFrustum(frustum);
+                m_renderer->setEnvironment(environment, m_camera.m_position);
+                m_renderer->setViewProjection(vp);
+                m_renderer->setFrustum(frustum);
 
                 const glm::dvec3 playerPosition = m_player.getPosition();
                 const glm::dvec3 renderOrigin(
                     playerPosition.x, 0.0, playerPosition.z);
                 if (m_clientSettings.renderClouds) {
-                    m_renderer.renderClouds(
+                    m_renderer->renderClouds(
                         playerPosition, vp, m_worldMetadata.seed,
                         static_cast<float>(RuntimeClock::seconds(now)),
                         m_clientSettings.cloudRenderDistance);
                 }
 
                 // Bind block shader once for all chunks (saves ~N glUseProgram calls)
-                m_renderer.bindBlockShader();
+                m_renderer->bindBlockShader();
 
                 visibleChunks.clear();
                 if (visibleChunks.capacity() < m_world.getActiveChunks().size())
@@ -1163,7 +1248,7 @@ private:
                         aabbMin.z + Config::CHUNK_SIZE_Z * 0.5f);
                     glm::vec3 delta = center - m_camera.m_position;
                     visibleChunks.push_back({chunk, model, glm::dot(delta, delta)});
-                    m_renderer.renderChunk(mesh, model, vp, false);
+                    m_renderer->renderChunk(mesh, model, vp, false);
                     ++rendered;
                 }
 
@@ -1171,16 +1256,16 @@ private:
                     [](const VisibleChunk& a, const VisibleChunk& b) {
                         return a.distance2 > b.distance2;
                     });
-                m_renderer.beginTranslucent();
+                m_renderer->beginTranslucent();
                 for (const auto& visible : visibleChunks) {
-                    m_renderer.renderChunk(
+                    m_renderer->renderChunk(
                         visible.chunk->getMesh(), visible.model, vp, true);
                 }
-                m_renderer.endTranslucent();
+                m_renderer->endTranslucent();
 
-                m_entities.render(m_renderer, vp, renderOrigin);
+                m_entities.render(*m_renderer, vp, renderOrigin);
                 m_particles.buildRenderData(renderOrigin, m_particleRenderData);
-                m_renderer.renderParticles(
+                m_renderer->renderParticles(
                     m_particleRenderData, vp,
                     m_camera.right,
                     glm::normalize(glm::cross(m_camera.forward, m_camera.right)),
@@ -1193,7 +1278,7 @@ private:
                         static_cast<float>(highlighted->x - renderOrigin.x),
                         static_cast<float>(highlighted->y),
                         static_cast<float>(highlighted->z - renderOrigin.z));
-                    m_renderer.renderWireframe(pos, vp);
+                    m_renderer->renderWireframe(pos, vp);
                 }
 
                 // Title bar info
@@ -1220,7 +1305,7 @@ private:
                 }
             } else {
                 // MainMenu: just clear the screen
-                m_renderer.beginFrame();
+                m_renderer->beginFrame();
             }
 
             // ── UI Rendering ──────────────────────────────────────────
@@ -1353,8 +1438,7 @@ private:
             }
 
             // ── Finish frame ──────────────────────────────────────────
-            m_renderer.endFrame();
-            m_window.swapBuffers();
+            m_renderer->endFrame();
             m_frameTimer.endFrame();
 
             // Alt+F4 to quit
@@ -1765,21 +1849,78 @@ private:
 };
 
 std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
-    if (argc > 1) {
-        const std::string argument(argv[1]);
+    std::optional<GraphicsApi> commandLineApi;
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument(argv[index]);
         if (argument == "--version") {
             std::cout << "MinecraftC " << Config::GAME_VERSION << '\n';
             return {};
         }
         if (argument == "--help" || argument == "-h") {
             std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
-                      << "Usage: minecraftc [--help] [--version]\n"
+                      << "Usage: minecraftc [--help] [--version]"
+                      << " [--renderer=opengl|vulkan|opengl-demo|vulkan-demo]"
+                      << "\n"
                       << "Worlds and settings are stored in the platform user-data directory.\n";
             return {};
         }
+        if (argument == "--renderer=vulkan-demo") {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+            Debug::Log::init(Debug::LogLevel::Trace, false);
+            Debug::installCrashHandlers();
+            return std::make_unique<BasicRenderApplication>(
+                discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
+                GraphicsApi::Vulkan);
+#else
+            throw std::runtime_error(
+                "Vulkan support is disabled; rebuild with "
+                "-DMINECRAFTC_ENABLE_VULKAN=ON");
+#endif
+        }
+        if (argument == "--renderer=opengl-demo") {
+            Debug::Log::init(Debug::LogLevel::Trace, false);
+            Debug::installCrashHandlers();
+            return std::make_unique<BasicRenderApplication>(
+                discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
+                GraphicsApi::OpenGL33);
+        }
+        if (argument == "--renderer=opengl") {
+            commandLineApi = GraphicsApi::OpenGL33;
+            continue;
+        }
+        if (argument == "--renderer=vulkan") {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+            commandLineApi = GraphicsApi::Vulkan;
+            continue;
+#else
+            throw std::runtime_error(
+                "Vulkan support is disabled; rebuild with "
+                "-DMINECRAFTC_ENABLE_VULKAN=ON");
+#endif
+        }
+        if (argument.rfind("--renderer=", 0) == 0)
+            throw std::runtime_error("Unknown renderer: " + argument.substr(11));
     }
     RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
-    auto app = std::make_unique<Application>(std::move(paths));
-    app->start();
-    return app;
+    GraphicsApi api = GraphicsApi::OpenGL33;
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+    const ClientSettings startupSettings = ClientSettings::load(paths.settingsFile());
+    if (startupSettings.rendererBackend == RendererBackend::Vulkan)
+        api = GraphicsApi::Vulkan;
+#endif
+    if (commandLineApi) api = *commandLineApi;
+
+    try {
+        auto app = std::make_unique<Application>(paths, api);
+        app->start();
+        return app;
+    } catch (const std::exception& error) {
+        if (api != GraphicsApi::Vulkan) throw;
+        std::cerr << "Vulkan startup failed; falling back to OpenGL: "
+                  << error.what() << '\n';
+        auto fallback = std::make_unique<Application>(std::move(paths),
+                                                       GraphicsApi::OpenGL33);
+        fallback->start();
+        return fallback;
+    }
 }

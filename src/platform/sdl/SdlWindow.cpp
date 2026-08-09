@@ -3,6 +3,9 @@
 #include "debug/Log.h"
 
 #include <SDL3/SDL.h>
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+#include <SDL3/SDL_vulkan.h>
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -52,9 +55,11 @@ int projectModifiers(SDL_Keymod modifiers) {
 }
 
 Window::Window(
-    int width, int height, const std::string& title, int preferredSamples) {
+    int width, int height, const std::string& title, int preferredSamples,
+    GraphicsApi graphicsApi) : m_graphicsApi(graphicsApi) {
 #if defined(__ANDROID__) || defined(MINECRAFTC_FORCE_GLES3)
-    m_graphicsApi = GraphicsApi::OpenGLES30;
+    if (m_graphicsApi == GraphicsApi::OpenGL33)
+        m_graphicsApi = GraphicsApi::OpenGLES30;
 #endif
 #if defined(__ANDROID__)
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "1");
@@ -70,56 +75,75 @@ Window::Window(
     }
     m_gamepads = std::make_unique<GamepadManager>();
 
-    const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    struct VisualRequest {
-        bool srgb;
-        int samples;
-    };
-    const VisualRequest requests[] = {
-        {true, preferredSamples},
-        {false, preferredSamples},
-        {true, 0},
-        {false, 0},
-    };
-    std::string firstError;
-    VisualRequest selected = requests[0];
-    for (const VisualRequest& request : requests) {
-        configureOpenGLAttributes(m_graphicsApi, request.srgb, request.samples);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    flags |= m_graphicsApi == GraphicsApi::Vulkan
+        ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL;
+    if (m_graphicsApi == GraphicsApi::Vulkan) {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
         m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
-        if (m_window) {
-            selected = request;
-            break;
+        if (!m_window) {
+            const std::string error = SDL_GetError();
+            SDL_Quit();
+            LOG_FATAL("Failed to create SDL Vulkan window: " << error);
+            throw std::runtime_error("Failed to create Vulkan window");
         }
-        if (firstError.empty()) firstError = SDL_GetError();
-    }
-    if (!m_window) {
-        const std::string error = SDL_GetError();
+        refreshSizes();
+#else
         SDL_Quit();
-        LOG_FATAL("Failed to create SDL window: " << error);
-        throw std::runtime_error("Failed to create SDL window");
+        throw std::runtime_error("Vulkan support is not enabled in this build");
+#endif
+    } else {
+        struct VisualRequest {
+            bool srgb;
+            int samples;
+        };
+        const VisualRequest requests[] = {
+            {true, preferredSamples},
+            {false, preferredSamples},
+            {true, 0},
+            {false, 0},
+        };
+        std::string firstError;
+        VisualRequest selected = requests[0];
+        for (const VisualRequest& request : requests) {
+            configureOpenGLAttributes(m_graphicsApi, request.srgb, request.samples);
+            m_window = SDL_CreateWindow(title.c_str(), width, height, flags);
+            if (m_window) {
+                selected = request;
+                break;
+            }
+            if (firstError.empty()) firstError = SDL_GetError();
+        }
+        if (!m_window) {
+            const std::string error = SDL_GetError();
+            SDL_Quit();
+            LOG_FATAL("Failed to create SDL window: " << error);
+            throw std::runtime_error("Failed to create SDL window");
+        }
+        if (!selected.srgb || selected.samples != preferredSamples) {
+            LOG_WARN("Preferred OpenGL visual unavailable (" << firstError
+                     << "); using " << selected.samples << "x MSAA with "
+                     << (selected.srgb ? "sRGB required" : "sRGB optional"));
+        }
+        m_context = SDL_GL_CreateContext(sdlWindow(m_window));
+        if (!m_context || !SDL_GL_MakeCurrent(
+                sdlWindow(m_window), static_cast<SDL_GLContext>(m_context))) {
+            const std::string error = SDL_GetError();
+            if (m_context)
+                SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
+            SDL_DestroyWindow(sdlWindow(m_window));
+            m_window = nullptr;
+            SDL_Quit();
+            LOG_FATAL("Failed to create SDL OpenGL context: " << error);
+            throw std::runtime_error("Failed to create OpenGL context");
+        }
+        if (!SDL_GL_SetSwapInterval(1))
+            LOG_WARN("Could not enable VSync: " << SDL_GetError());
+        refreshSizes();
+        int srgb = 0;
+        m_srgbCapable = SDL_GL_GetAttribute(
+            SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, &srgb) && srgb != 0;
     }
-    if (!selected.srgb || selected.samples != preferredSamples) {
-        LOG_WARN("Preferred OpenGL visual unavailable (" << firstError
-                 << "); using " << selected.samples << "x MSAA with "
-                 << (selected.srgb ? "sRGB required" : "sRGB optional"));
-    }
-    m_context = SDL_GL_CreateContext(sdlWindow(m_window));
-    if (!m_context || !SDL_GL_MakeCurrent(
-            sdlWindow(m_window), static_cast<SDL_GLContext>(m_context))) {
-        const std::string error = SDL_GetError();
-        if (m_context) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_context));
-        SDL_DestroyWindow(sdlWindow(m_window));
-        m_window = nullptr;
-        SDL_Quit();
-        LOG_FATAL("Failed to create SDL OpenGL context: " << error);
-        throw std::runtime_error("Failed to create OpenGL context");
-    }
-    if (!SDL_GL_SetSwapInterval(1))
-        LOG_WARN("Could not enable VSync: " << SDL_GetError());
-    refreshSizes();
-    int srgb = 0;
-    m_srgbCapable = SDL_GL_GetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, &srgb) && srgb != 0;
     float x = 0.0f, y = 0.0f;
     SDL_GetMouseState(&x, &y);
     m_cursorX = x;
@@ -263,7 +287,10 @@ void Window::processEvent(const void* opaqueEvent) {
     }
 }
 
-void Window::swapBuffers() { SDL_GL_SwapWindow(sdlWindow(m_window)); }
+void Window::swapBuffers() {
+    if (m_graphicsApi != GraphicsApi::Vulkan)
+        SDL_GL_SwapWindow(sdlWindow(m_window));
+}
 void Window::setTitle(const std::string& title) {
     SDL_SetWindowTitle(sdlWindow(m_window), title.c_str());
 }
@@ -276,6 +303,7 @@ bool Window::isKeyPressed(int key) const {
 GraphicsCapabilities Window::graphicsCapabilities() const {
     GraphicsCapabilities result;
     result.api = m_graphicsApi;
+    if (m_graphicsApi == GraphicsApi::Vulkan) return result;
     result.framebufferSrgb = m_srgbCapable;
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &result.majorVersion);
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &result.minorVersion);
@@ -283,6 +311,41 @@ GraphicsCapabilities Window::graphicsCapabilities() const {
     result.instancing = graphicsProcAddress("glDrawArraysInstanced") != nullptr &&
                         graphicsProcAddress("glVertexAttribDivisor") != nullptr;
     return result;
+}
+
+std::vector<std::string> Window::requiredVulkanInstanceExtensions() const {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+    if (m_graphicsApi != GraphicsApi::Vulkan)
+        throw std::runtime_error("Vulkan extensions requested for a non-Vulkan window");
+    Uint32 count = 0;
+    const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&count);
+    if (!extensions)
+        throw std::runtime_error(std::string("Failed to query Vulkan extensions: ") +
+                                 SDL_GetError());
+    std::vector<std::string> result;
+    result.reserve(count);
+    for (Uint32 i = 0; i < count; ++i) result.emplace_back(extensions[i]);
+    return result;
+#else
+    throw std::runtime_error("Vulkan support is not enabled in this build");
+#endif
+}
+
+std::uintptr_t Window::createVulkanSurface(void* instance) const {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+    if (m_graphicsApi != GraphicsApi::Vulkan || !m_window)
+        throw std::runtime_error("Cannot create a surface for a non-Vulkan window");
+    VkSurfaceKHR surface{};
+    if (!SDL_Vulkan_CreateSurface(
+            sdlWindow(m_window), reinterpret_cast<VkInstance>(instance), nullptr,
+            &surface))
+        throw std::runtime_error(std::string("Failed to create Vulkan surface: ") +
+                                 SDL_GetError());
+    return reinterpret_cast<std::uintptr_t>(surface);
+#else
+    (void)instance;
+    throw std::runtime_error("Vulkan support is not enabled in this build");
+#endif
 }
 
 WindowSafeArea Window::safeArea() const {
