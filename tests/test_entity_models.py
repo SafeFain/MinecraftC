@@ -66,6 +66,8 @@ def main():
         assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"]) <= 64
         attributes = doc["meshes"][0]["primitives"][0]["attributes"]
         assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"} <= set(attributes)
+        assert doc["materials"][0].get("doubleSided") is True, \
+            f"{path.name} must remain double-sided in both render backends"
         assert doc["images"][0].get("mimeType") == "image/png" and "bufferView" in doc["images"][0]
         image_view=doc["bufferViews"][doc["images"][0]["bufferView"]]
         image=binary[image_view.get("byteOffset",0):image_view.get("byteOffset",0)+image_view["byteLength"]]

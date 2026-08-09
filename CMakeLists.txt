@@ -25,21 +25,24 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
 set(MINECRAFTC_VULKAN_DEFAULT OFF)
-if(NOT ANDROID AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if(NOT ANDROID AND
+   (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32))
     set(MINECRAFTC_VULKAN_DEFAULT ON)
 endif()
 option(MINECRAFTC_ENABLE_VULKAN
-       "Build the Linux Vulkan gameplay backend alongside OpenGL"
+       "Build the Vulkan gameplay backend alongside OpenGL"
        ${MINECRAFTC_VULKAN_DEFAULT})
-if(NOT ANDROID AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+if(NOT ANDROID AND
+   (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32) AND
    NOT MINECRAFTC_ENABLE_VULKAN)
     message(FATAL_ERROR
-        "Linux builds require both the Vulkan and OpenGL render backends; "
+        "Linux and Windows builds require both the Vulkan and OpenGL render backends; "
         "MINECRAFTC_ENABLE_VULKAN cannot be disabled")
 elseif(MINECRAFTC_ENABLE_VULKAN AND
-       (ANDROID OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+       (ANDROID OR
+        (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)))
     message(FATAL_ERROR
-        "MINECRAFTC_ENABLE_VULKAN supports Linux desktop only")
+        "MINECRAFTC_ENABLE_VULKAN supports Linux and Windows desktop only")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

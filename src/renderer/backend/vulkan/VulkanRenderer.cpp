@@ -1163,9 +1163,11 @@ struct VulkanRenderer::Impl {
             VkPipelineRasterizationStateCreateInfo raster{};
             raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
             raster.polygonMode = VK_POLYGON_MODE_FILL;
-            // ChunkMesh emits outward-facing CCW triangles in world space.
-            // clipSpaceCorrection flips Y, so Vulkan observes them clockwise.
-            raster.cullMode = VK_CULL_MODE_BACK_BIT;
+            // Keep production Chunk geometry double-sided. Its CPU triangles
+            // are outward CCW, but the complete gameplay projection/viewport
+            // path does not yet preserve one reliable framebuffer winding for
+            // every generated face; back-face culling drops exposed top faces.
+            raster.cullMode = VK_CULL_MODE_NONE;
             raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
             raster.lineWidth = 1.0f;
             VkPipelineMultisampleStateCreateInfo multisample{};

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
@@ -23,6 +24,15 @@ struct MeshVertex {
 };
 
 struct ChunkMesh {
+    // Mesh construction samples one voxel beyond each horizontal edge for
+    // face visibility, smooth lighting, and ambient occlusion.
+    inline static constexpr std::array<std::array<int, 2>, 8>
+        NEIGHBOR_DEPENDENCY_OFFSETS{{
+            {{-1, -1}}, {{0, -1}}, {{1, -1}},
+            {{-1,  0}},             {{1,  0}},
+            {{-1,  1}}, {{0,  1}}, {{1,  1}}
+        }};
+
     std::vector<MeshVertex> vertices;
     std::vector<unsigned int> indices;
 

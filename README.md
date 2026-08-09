@@ -1,8 +1,8 @@
 # MinecraftC
 
 MinecraftC 是一款使用 C++17、SDL3 和 OpenGL 构建的体素沙盒游戏。桌面端使用
-OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 构建同时包含 Vulkan
-和 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
+OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 和 Windows 构建同时包含
+Vulkan 和 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本：**Release-1.1.5**
@@ -34,7 +34,7 @@ cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
-Linux Vulkan 后端使用 VMA 管理 GPU 内存，支持完整游戏世界、UI、天空、
+Vulkan 后端使用 VMA 管理 GPU 内存，支持完整游戏世界、UI、天空、
 云、粒子、透明 Chunk、选择框和带蒙皮动画的 glTF 实体模型。通用
 `IRenderDevice` 纹理网格与生产 Chunk 的隔离回归场景也可分别运行：
 
@@ -44,8 +44,9 @@ Linux Vulkan 后端使用 VMA 管理 GPU 内存，支持完整游戏世界、UI�
 ./build-local/minecraftc --renderer=vulkan-textured-demo
 ```
 
-Linux 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会同时构建并作为默认
-renderer 和 Vulkan 初始化失败时的回退。可用 `--renderer=vulkan` 选择 Vulkan。
+Linux 和 Windows 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会同时构建并
+作为默认 renderer 和 Vulkan 初始化失败时的回退。可用 `--renderer=vulkan`
+选择 Vulkan。
 
 未指定 renderer 时仍启动完整的 OpenGL 游戏。完整游戏代码依赖后端无关的
 `IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
@@ -72,14 +73,18 @@ git glm mesa vulkan-headers vulkan-icd-loader` 及 X11/Wayland 开发包。
 ### Windows
 
 安装 Visual Studio 2022 或更高版本并勾选“使用 C++ 的桌面开发”，同时安装
-CMake 和 Git。在 PowerShell 中运行：
+CMake、Git 和 LunarG Vulkan SDK 1.4.350.0 或更新版本。在 PowerShell 中运行：
 
 ```powershell
 cmake -S . -B build-local -DMINECRAFTC_FETCH_DEPENDENCIES=ON
 cmake --build build-local --config Release --parallel 2
 cmake --install build-local --config Release --prefix install-local
 .\install-local\bin\minecraftc.exe
+.\install-local\bin\minecraftc.exe --renderer=vulkan
 ```
+
+Windows 构建始终同时包含 Vulkan 和 OpenGL，不能关闭 Vulkan。运行 Vulkan
+需要显卡驱动提供系统 Vulkan loader；未指定 renderer 时仍默认使用 OpenGL。
 
 ### macOS
 

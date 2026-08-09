@@ -12,7 +12,7 @@ namespace {
 std::shared_ptr<const model::ModelAsset> makePlaceholder() {
     auto asset = std::make_shared<model::ModelAsset>();
     asset->materials.push_back({glm::vec4(1, 0, 1, 1), -1,
-                                model::AlphaMode::Opaque, 0.5f, false});
+                                model::AlphaMode::Opaque, 0.5f, true});
     model::Primitive primitive;
     primitive.material = 0;
     const glm::vec3 corners[] = {

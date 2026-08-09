@@ -781,6 +781,19 @@ void World::processCompletedGenerations(bool rebuildLightingNow) {
             if (firstApply) {
                 generationStateChanged = true;
                 m_lightDirty = true;
+                // Existing meshes may have sampled this not-yet-generated
+                // chunk as air with zero light.  Invalidate the complete
+                // one-voxel dependency footprint, including diagonals used by
+                // corner AO and smooth lighting.
+                for (const auto& offset :
+                     ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS) {
+                    const auto neighbor = m_chunks.find(
+                        {key.first + offset[0], key.second + offset[1]});
+                    if (neighbor != m_chunks.end() &&
+                        neighbor->second->generated.load()) {
+                        neighbor->second->markDirty();
+                    }
+                }
                 const auto overrides = m_blockOverrides.find(key);
                 if (overrides != m_blockOverrides.end()) {
                     for (const auto& [index, block] : overrides->second) {

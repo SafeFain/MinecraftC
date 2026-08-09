@@ -3,7 +3,7 @@
 import argparse, json, math, pathlib, struct, zlib
 import texture_generator
 
-VERSION = 3
+VERSION = 4
 SEED = 0x4D43474C
 MODELS = {
     "cow": ((0.90,1.20,1.30),(112,72,48,255)),
@@ -77,7 +77,7 @@ def build(name,size,color):
          "nodes":[{"name":"root_bone"},{"name":name,"mesh":0,"skin":0}],
          "skins":[{"name":name+"_skin","joints":[0],"skeleton":0,"inverseBindMatrices":iba}],
          "meshes":[{"name":name+"_block","primitives":[{"attributes":{"POSITION":pos,"NORMAL":normal,"TEXCOORD_0":tex,"JOINTS_0":joints,"WEIGHTS_0":weights},"indices":inds,"material":0}]}],
-         "materials":[{"name":name+"_pixels","pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
+         "materials":[{"name":name+"_pixels","doubleSided":True,"pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
          "textures":[{"sampler":0,"source":0}],"samplers":[{"magFilter":9728,"minFilter":9728,"wrapS":33071,"wrapT":33071}],
          "images":[{"name":name+"_texture","mimeType":"image/png","bufferView":image_view}],
          "animations":animations,"accessors":buf.accessors,"bufferViews":buf.views,"buffers":[{"byteLength":len(buf.data)}]}
@@ -211,7 +211,7 @@ def build_v2(name,size,color):
     doc={"asset":{"version":"2.0","generator":f"MinecraftC entity generator v{VERSION} seed {SEED}"},"scene":0,"scenes":[{"nodes":[0,mesh_node]}],"nodes":nodes,
          "skins":[{"name":name+"_skin","joints":list(range(len(parts)+1)),"skeleton":0,"inverseBindMatrices":iba}],
          "meshes":[{"name":name+"_blocks","primitives":[{"attributes":attrs,"indices":inds,"material":0}]}],
-         "materials":[{"name":name+"_pixels","pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
+         "materials":[{"name":name+"_pixels","doubleSided":True,"pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicFactor":0,"roughnessFactor":1}}],
          "textures":[{"sampler":0,"source":0}],"samplers":[{"magFilter":9728,"minFilter":9728,"wrapS":33071,"wrapT":33071}],"images":[{"mimeType":"image/png","bufferView":image_view}],
          "animations":animations,"accessors":buf.accessors,"bufferViews":buf.views,"buffers":[{"byteLength":len(buf.data)}]}
     encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode();encoded+=b" "*((-len(encoded))%4);binary=bytes(buf.data)+b"\0"*((-len(buf.data))%4);total=28+len(encoded)+len(binary)

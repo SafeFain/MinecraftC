@@ -299,6 +299,13 @@ int main() {
     require(mesh.translucentIndexOffset == mesh.opaqueIndexCount,
             "mesh layer index ranges overlap");
 
+    std::set<std::pair<int,int>> meshNeighbors;
+    for (const auto& offset : ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS)
+        meshNeighbors.emplace(offset[0], offset[1]);
+    require(meshNeighbors.size() == 8 && meshNeighbors.count({-1,-1}) == 1 &&
+            meshNeighbors.count({1,1}) == 1 && meshNeighbors.count({0,0}) == 0,
+            "late chunk arrival does not cover all mesh dependencies");
+
     // Isolated surfaces receive full AO. A classic two-side corner around an
     // exposed top face must darken the shared vertex to the minimum level,
     // while a covered column is marked as having no direct sky light.
