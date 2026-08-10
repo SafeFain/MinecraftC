@@ -1,8 +1,8 @@
 plugins { id "com.android.application" }
 
 def repositoryRoot = rootProject.projectDir.parentFile
-def cmakeText = new File(repositoryRoot, "CMakeLists.txt").getText("UTF-8")
-def versionMatch = cmakeText =~ /project\(MinecraftC VERSION (\d+)\.(\d+)\.(\d+)/
+def versionText = new File(repositoryRoot, "VERSION").getText("UTF-8").trim()
+def versionMatch = versionText =~ /^(\d+)\.(\d+)\.(\d+)$/
 if (!versionMatch.find()) throw new GradleException("Cannot read MinecraftC version")
 def versionMajor = versionMatch.group(1).toInteger()
 def versionMinor = versionMatch.group(2).toInteger()
@@ -24,7 +24,7 @@ android {
         minSdk 29
         targetSdk 35
         versionCode versionMajor * 10000 + versionMinor * 100 + versionPatch
-        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
+        versionName versionText
         ndk { abiFilters "arm64-v8a" }
         externalNativeBuild {
             cmake {

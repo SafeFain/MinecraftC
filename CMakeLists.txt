@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(MinecraftC VERSION 1.1.5 LANGUAGES CXX C)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" MINECRAFTC_VERSION
+     LIMIT_COUNT 1)
+if(NOT MINECRAFTC_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR
+        "VERSION must contain one numeric semantic version (for example 1.2.3)")
+endif()
+project(MinecraftC VERSION "${MINECRAFTC_VERSION}" LANGUAGES CXX C)
 
 if(ANDROID)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -324,7 +330,7 @@ if(BUILD_TESTING)
                 --root ${CMAKE_SOURCE_DIR})
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
-        PASS_REGULAR_EXPRESSION "MinecraftC Release-1.1.5")
+        PASS_REGULAR_EXPRESSION "MinecraftC Release-${PROJECT_VERSION}")
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)

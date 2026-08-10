@@ -5,7 +5,8 @@ OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 和 Windows 构建同�
 Vulkan 和 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
-当前版本：**Release-1.1.5**
+当前版本由仓库根目录的 `VERSION` 文件定义；CMake、Android Gradle 和发布 CI
+均从该文件读取。
 
 ## 功能概览
 

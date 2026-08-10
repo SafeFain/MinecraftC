@@ -20,5 +20,5 @@ asset and are summarized in the root `README.md`.
 
 GitHub Actions builds the same unsigned arm64 release APK on every workflow run.
 Pushed `v*` tags publish it as
-`MinecraftC-1.1.5-android-arm64-unsigned.apk` alongside the Linux, Windows, and
+`MinecraftC-<version>-android-arm64-unsigned.apk` alongside the Linux, Windows, and
 macOS packages.

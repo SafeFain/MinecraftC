@@ -8,14 +8,18 @@ on:
 permissions:
   contents: read
 
-env:
-  RELEASE_DIR: MinecraftC-1.1.5
-
 jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Read project version
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libgl1-mesa-dev libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
@@ -34,7 +38,7 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/atlas.json"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.5"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
       - name: Verify installed OpenGL startup
         shell: bash
         run: |
@@ -69,12 +73,12 @@ jobs:
           grep -q "Visual pipeline" minecraftc-opengl-demo-smoke.log
           test "$status" -eq 124
       - name: Package Linux release
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.5-linux-x86_64.tar.gz" "$RELEASE_DIR"
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz" "$RELEASE_DIR"
       - name: Upload Linux package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-linux-x86_64
-          path: ${{ runner.temp }}/MinecraftC-1.1.5-linux-x86_64.tar.gz
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-linux-x86_64.tar.gz
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -83,6 +87,15 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v6
+      - name: Read project version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid VERSION: $version"
+          }
+          "MINECRAFTC_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_DIR=MinecraftC-$version" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Reject Windows OpenGL-only configuration
         shell: pwsh
         run: |
@@ -135,19 +148,19 @@ jobs:
           if (!(Test-Path "$stage/assets/shaders/block.vert")) { throw "Assets were not installed" }
           if (!(Test-Path "$stage/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
           $version = & "$stage/minecraftc.exe" --version
-          if ($version -ne "MinecraftC Release-1.1.5") { throw "Version check failed: $version" }
+          if ($version -ne "MinecraftC Release-$env:MINECRAFTC_VERSION") { throw "Version check failed: $version" }
           $help = (& "$stage/minecraftc.exe" --help 2>&1) -join "`n"
           if ($help -notmatch "renderer=opengl\|vulkan") {
             throw "Installed Windows executable does not advertise both renderers"
           }
       - name: Package Windows release
         shell: pwsh
-        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-1.1.5-windows-x86_64.zip"
+        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-x86_64.zip"
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-windows-x86_64
-          path: ${{ runner.temp }}/MinecraftC-1.1.5-windows-x86_64.zip
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-windows-x86_64.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -156,6 +169,13 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
+      - name: Read project version
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
       - name: Configure universal build
         run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
       - name: Build
@@ -168,14 +188,14 @@ jobs:
           lipo "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" -verify_arch arm64 x86_64
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/block.vert"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-1.1.5"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
       - name: Package macOS release
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-1.1.5-macos-universal.tar.gz" "$RELEASE_DIR"
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-macos-universal.tar.gz" "$RELEASE_DIR"
       - name: Upload macOS package
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-macos-universal
-          path: ${{ runner.temp }}/MinecraftC-1.1.5-macos-universal.tar.gz
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-macos-universal.tar.gz
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -184,6 +204,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Read project version
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -207,10 +233,12 @@ jobs:
       - name: Verify Android release APK
         run: |
           source_apk="android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          release_apk="$RUNNER_TEMP/MinecraftC-1.1.5-android-arm64-unsigned.apk"
+          release_apk="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-android-arm64-unsigned.apk"
+          IFS=. read -r version_major version_minor version_patch <<< "$MINECRAFTC_VERSION"
+          version_code=$((version_major * 10000 + version_minor * 100 + version_patch))
           test -f "$source_apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$source_apk" > "$RUNNER_TEMP/android-badging.txt"
-          grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='10105' versionName='1.1.5'" "$RUNNER_TEMP/android-badging.txt"
+          grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='$version_code' versionName='$MINECRAFTC_VERSION'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "uses-gl-es: '0x30000'" "$RUNNER_TEMP/android-badging.txt"
@@ -222,7 +250,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: minecraftc-android-arm64
-          path: ${{ runner.temp }}/MinecraftC-1.1.5-android-arm64-unsigned.apk
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-android-arm64-unsigned.apk
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
