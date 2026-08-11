@@ -204,6 +204,9 @@ jobs:
           test -f "$root/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib"
           test -f "$root/MoltenVK/LICENSE"
           echo "MINECRAFTC_MOLTENVK_ROOT=$root/MoltenVK" >> "$GITHUB_ENV"
+          # GitHub's macOS image may carry an unrelated untrusted AWS tap.
+          # Do not broaden trust merely to install an official formula.
+          brew untap aws/tap >/dev/null 2>&1 || true
           brew install shaderc
       - name: Configure universal build
         run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
@@ -285,6 +288,9 @@ jobs:
           test -f "$root/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64_x86_64-simulator/libMoltenVK.a"
           test -f "$root/MoltenVK/LICENSE"
           echo "MINECRAFTC_MOLTENVK_ROOT=$root/MoltenVK" >> "$GITHUB_ENV"
+          # GitHub's macOS image may carry an unrelated untrusted AWS tap.
+          # Do not broaden trust merely to install an official formula.
+          brew untap aws/tap >/dev/null 2>&1 || true
           brew install shaderc
       - name: Reject non-Vulkan-only iOS configurations
         shell: bash
@@ -325,26 +331,52 @@ jobs:
         run: |
           app="build-ios-simulator/Release-iphonesimulator/MinecraftC.app"
           binary="$app/MinecraftC"
-          test -x "$binary"
-          test -f "$app/shaders/vulkan/block.vert.spv"
-          test -f "$app/textures/generated/items_atlas.png"
-          test -f "$app/LICENSE"
-          test -f "$app/licenses/MoltenVK-LICENSE.txt"
-          test ! -d "$app/Frameworks/MoltenVK.framework"
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist" \
-            | grep -qx 'io.github.SafeFain.MinecraftC'
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist" \
-            | grep -qx "$MINECRAFTC_VERSION"
-          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$app/Info.plist" \
-            | grep -qx '14.0'
-          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:0' "$app/Info.plist" \
-            | grep -qx '1'
-          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$app/Info.plist" \
-            | grep -qx '2'
-          otool -L "$binary" | grep -q 'Metal.framework'
-          ! otool -L "$binary" | grep -q 'OpenGLES.framework'
-          nm -gU "$binary" | grep -q '_vkGetInstanceProcAddr$'
-          ! nm "$binary" | grep -q 'OpenGLRenderer'
+          require_file() {
+            test -f "$1" || { echo "Missing iOS bundle file: $1" >&2; exit 1; }
+          }
+          check_plist() {
+            key="$1"
+            expected="$2"
+            actual="$(/usr/libexec/PlistBuddy -c "Print :$key" "$app/Info.plist")"
+            test "$actual" = "$expected" || {
+              echo "Unexpected $key: expected '$expected', got '$actual'" >&2
+              exit 1
+            }
+          }
+          test -x "$binary" || { echo "Missing iOS executable: $binary" >&2; exit 1; }
+          require_file "$app/shaders/vulkan/block.vert.spv"
+          require_file "$app/textures/generated/items_atlas.png"
+          require_file "$app/LICENSE"
+          require_file "$app/licenses/MoltenVK-LICENSE.txt"
+          test ! -d "$app/Frameworks/MoltenVK.framework" || {
+            echo "MoltenVK must be linked statically" >&2
+            exit 1
+          }
+          check_plist CFBundleIdentifier io.github.SafeFain.MinecraftC
+          check_plist CFBundleShortVersionString "$MINECRAFTC_VERSION"
+          check_plist MinimumOSVersion 14.0
+          check_plist UIDeviceFamily:0 1
+          check_plist UIDeviceFamily:1 2
+          otool -L "$binary" > "$RUNNER_TEMP/minecraftc-ios-libraries.txt"
+          nm -gU "$binary" > "$RUNNER_TEMP/minecraftc-ios-defined-symbols.txt"
+          nm "$binary" > "$RUNNER_TEMP/minecraftc-ios-all-symbols.txt"
+          grep -q 'Metal.framework' "$RUNNER_TEMP/minecraftc-ios-libraries.txt" || {
+            echo "MinecraftC is not linked to Metal.framework" >&2
+            exit 1
+          }
+          if grep -q 'OpenGLES.framework' "$RUNNER_TEMP/minecraftc-ios-libraries.txt"; then
+            echo "Vulkan-only iOS binary unexpectedly links OpenGLES.framework" >&2
+            exit 1
+          fi
+          grep -q '_vkGetInstanceProcAddr$' \
+            "$RUNNER_TEMP/minecraftc-ios-defined-symbols.txt" || {
+            echo "Static MoltenVK entry point is not exported" >&2
+            exit 1
+          }
+          if grep -q 'OpenGLRenderer' "$RUNNER_TEMP/minecraftc-ios-all-symbols.txt"; then
+            echo "Vulkan-only iOS binary contains OpenGL renderer symbols" >&2
+            exit 1
+          fi
       - name: Smoke-test Vulkan on iPhone and iPad simulators
         shell: bash
         run: |
@@ -408,7 +440,11 @@ jobs:
           app="$archive/Products/Applications/MinecraftC.app"
           test -x "$app/MinecraftC"
           lipo "$app/MinecraftC" -verify_arch arm64
-          ! otool -L "$app/MinecraftC" | grep -q 'OpenGLES.framework'
+          otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
+          if grep -q 'OpenGLES.framework' "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"; then
+            echo "Vulkan-only iOS device binary unexpectedly links OpenGLES.framework" >&2
+            exit 1
+          fi
           ditto -c -k --sequesterRsrc --keepParent \
             "$archive" "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive.zip"
           ditto -c -k --sequesterRsrc --keepParent \
