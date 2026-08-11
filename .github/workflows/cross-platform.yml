@@ -463,11 +463,33 @@ jobs:
             -DMINECRAFTC_ENABLE_VULKAN=ON \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
           archive="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive"
+          build_settings="$RUNNER_TEMP/minecraftc-ios-device-build-settings.txt"
+          xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
+            -target minecraftc -configuration Release -sdk iphoneos \
+            -showBuildSettings CODE_SIGNING_ALLOWED=NO > "$build_settings"
+          if ! grep -Eq '^[[:space:]]*SKIP_INSTALL = NO[[:space:]]*$' "$build_settings"; then
+            echo "MinecraftC app target must set SKIP_INSTALL=NO" >&2
+            grep -E 'SKIP_INSTALL|INSTALL_PATH|TARGET_BUILD_DIR' "$build_settings" >&2 || true
+            exit 1
+          fi
+          if ! grep -Eq '^[[:space:]]*INSTALL_PATH = /Applications[[:space:]]*$' "$build_settings"; then
+            echo "MinecraftC app target must install into /Applications" >&2
+            grep -E 'SKIP_INSTALL|INSTALL_PATH|TARGET_BUILD_DIR' "$build_settings" >&2 || true
+            exit 1
+          fi
           xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
             -scheme minecraftc -configuration Release -sdk iphoneos \
             -archivePath "$archive" archive CODE_SIGNING_ALLOWED=NO
           app="$archive/Products/Applications/MinecraftC.app"
-          test -x "$app/MinecraftC"
+          if ! test -x "$app/MinecraftC"; then
+            echo "Missing archived iOS executable: $app/MinecraftC" >&2
+            echo "Archive products:" >&2
+            find "$archive/Products" -maxdepth 4 -print >&2 || true
+            echo "Uninstalled iOS app products:" >&2
+            find build-ios-device -path '*/UninstalledProducts/iphoneos/*.app' \
+              -print >&2 || true
+            exit 1
+          fi
           lipo "$app/MinecraftC" -verify_arch arm64
           otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
           if grep -q 'OpenGLES.framework' "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"; then

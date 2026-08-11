@@ -444,10 +444,19 @@ if(IOS)
         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
         XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
         XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+        XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
         XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.SafeFain.MinecraftC"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
         XCODE_GENERATE_SCHEME TRUE)
+    foreach(MINECRAFTC_IOS_LIBRARY IN ITEMS
+            minecraftc_assets
+            minecraftc_platform
+            minecraftc_platform_sdl
+            minecraftc_render_vulkan)
+        set_target_properties(${MINECRAFTC_IOS_LIBRARY} PROPERTIES
+            XCODE_ATTRIBUTE_SKIP_INSTALL "YES")
+    endforeach()
     target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE
         "-ObjC"
         "-Wl,-u,_vkGetInstanceProcAddr"
@@ -487,8 +496,13 @@ endif()
 
 # ── Install ────────────────────────────────────────────────────────────
 
-if(ANDROID OR IOS)
+if(ANDROID)
     # The Gradle project packages native libraries and assets.
+elseif(IOS)
+    # Keep the app installable so Xcode archive places it under
+    # Products/Applications instead of IntermediateBuildFilesPath/UninstalledProducts.
+    install(TARGETS ${MINECRAFTC_APP_TARGET}
+        BUNDLE DESTINATION Applications)
 elseif(MINECRAFTC_PORTABLE_LAYOUT)
     install(TARGETS minecraftc RUNTIME DESTINATION .)
     install(DIRECTORY assets/ DESTINATION assets)
