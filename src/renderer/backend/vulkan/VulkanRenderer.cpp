@@ -76,6 +76,21 @@ bool supportsDeviceExtension(VkPhysicalDevice device, const char* name) {
     });
 }
 
+#if defined(__APPLE__)
+bool supportsInstanceExtension(const char* name) {
+    uint32_t count = 0;
+    require(vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr),
+            "vkEnumerateInstanceExtensionProperties");
+    std::vector<VkExtensionProperties> extensions(count);
+    require(vkEnumerateInstanceExtensionProperties(
+                nullptr, &count, extensions.data()),
+            "vkEnumerateInstanceExtensionProperties");
+    return std::any_of(extensions.begin(), extensions.end(), [name](const auto& extension) {
+        return std::string(extension.extensionName) == name;
+    });
+}
+#endif
+
 bool supportsSwapchain(VkPhysicalDevice device) {
     return supportsDeviceExtension(device, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
@@ -470,12 +485,15 @@ struct VulkanRenderer::Impl {
     void createInstance() {
         std::vector<std::string> extensionStorage =
             window.requiredVulkanInstanceExtensions();
+        bool enumeratePortability = false;
 #if defined(__APPLE__)
-        if (std::find(extensionStorage.begin(), extensionStorage.end(),
+        enumeratePortability = supportsInstanceExtension(
+            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        if (enumeratePortability &&
+            std::find(extensionStorage.begin(), extensionStorage.end(),
                       VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) ==
-            extensionStorage.end())
-            extensionStorage.emplace_back(
-                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+                extensionStorage.end())
+            extensionStorage.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
         std::vector<const char*> extensions;
         extensions.reserve(extensionStorage.size());
@@ -494,7 +512,10 @@ struct VulkanRenderer::Impl {
         VkInstanceCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 #if defined(__APPLE__)
-        info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        if (enumeratePortability)
+            info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#else
+        (void)enumeratePortability;
 #endif
         info.pApplicationInfo = &application;
         info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
