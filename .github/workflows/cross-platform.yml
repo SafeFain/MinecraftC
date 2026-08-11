@@ -344,7 +344,8 @@ jobs:
             }
           }
           test -x "$binary" || { echo "Missing iOS executable: $binary" >&2; exit 1; }
-          require_file "$app/shaders/vulkan/block.vert.spv"
+          require_file "$app/shaders/vulkan/chunk.vert.spv"
+          require_file "$app/shaders/vulkan/chunk.frag.spv"
           require_file "$app/textures/generated/items_atlas.png"
           require_file "$app/LICENSE"
           require_file "$app/licenses/MoltenVK-LICENSE.txt"
