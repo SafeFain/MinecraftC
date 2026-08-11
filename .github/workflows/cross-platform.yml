@@ -263,6 +263,10 @@ jobs:
           grep -q "native-code: 'arm64-v8a'" "$RUNNER_TEMP/android-badging.txt"
           unzip -Z1 "$source_apk" > "$RUNNER_TEMP/android-apk-files.txt"
           grep -Fxq 'assets/LICENSE' "$RUNNER_TEMP/android-apk-files.txt"
+          unzip -p "$source_apk" lib/arm64-v8a/libmain.so \
+            > "$RUNNER_TEMP/libmain.so"
+          "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
+            -D "$RUNNER_TEMP/libmain.so" | grep -q ' T SDL_main$'
           cp "$source_apk" "$release_apk"
       - name: Upload unsigned Android package
         uses: actions/upload-artifact@v7

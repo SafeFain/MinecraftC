@@ -149,7 +149,6 @@ set(MINECRAFTC_SDL_BACKEND_SOURCES
     src/platform/sdl/SdlAudioSystem.cpp
     src/platform/sdl/SdlClipboard.cpp
     src/platform/sdl/SdlGamepadManager.cpp
-    src/platform/sdl/SdlMain.cpp
     src/platform/sdl/SdlWindow.cpp)
 set(MINECRAFTC_OPENGL_BACKEND_SOURCES
     src/renderer/backend/opengl/OpenGLBlockTextureAtlas.cpp
@@ -170,6 +169,8 @@ foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
 endforeach()
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp")
+list(REMOVE_ITEM SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlMain.cpp")
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeCrashHandler.cpp")
 list(REMOVE_ITEM SOURCES
@@ -248,6 +249,8 @@ else()
     set(MINECRAFTC_APP_TARGET minecraftc)
     add_executable(${MINECRAFTC_APP_TARGET} ${SOURCES})
 endif()
+target_sources(${MINECRAFTC_APP_TARGET} PRIVATE
+    src/platform/sdl/SdlMain.cpp)
 target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE
     src
     external/FastNoiseLite
