@@ -70,6 +70,7 @@ public:
     void setFrustum(const Frustum& value) override { m_frustum = value; }
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }
+    uint32_t blockAtlasTilesPerSide() const { return m_blockAtlasTilesPerSide; }
     bool usesFramebufferSrgb() const override;
     void queueUiBatch(const std::vector<UiMeshVertex>& vertices,
                       const std::vector<uint32_t>& indices,
@@ -83,6 +84,7 @@ private:
     Window* m_window = nullptr;
     std::filesystem::path m_assetRoot;
     RenderTextureHandle m_blockAtlas{};
+    uint32_t m_blockAtlasTilesPerSide = 0;
     RenderMaterialHandle m_chunkOpaque{};
     RenderMaterialHandle m_chunkTranslucent{};
     RenderTextureHandle m_entityAtlas{};

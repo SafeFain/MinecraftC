@@ -3,7 +3,6 @@
 #include "core/AssetStore.h"
 #include "game/SurvivalRules.h"
 #include "game/Utf8.h"
-#include "renderer/BlockTextureAtlas.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 
 #include <algorithm>
@@ -38,7 +37,10 @@ class VulkanUIBackend final:public IUIRenderBackend{
     struct Glyph{float u0=0,v0=0,u1=0,v1=0;float width=0,height=0,xoff=0,yoff=0,advance=0;};
 public:
     VulkanUIBackend(VulkanRenderer& renderer,RenderTextureHandle blocks,
-                    const std::filesystem::path& root):m_renderer(renderer){
+                    const std::filesystem::path& root):m_renderer(renderer),
+                    m_blockAtlasTilesPerSide(renderer.blockAtlasTilesPerSide()){
+        if(m_blockAtlasTilesPerSide<=0)
+            throw std::runtime_error("Vulkan block atlas is not initialized");
         TextureData white;white.width=white.height=1;white.pixels={255,255,255,255};
         m_whiteTexture=m_renderer.createTexture(white,{});
         m_whiteMaterial=material(m_whiteTexture);
@@ -82,7 +84,7 @@ public:
            block==BlockId::ACACIA_WOOD||getBlockProps(block).shape==RenderShape::Cross)
             face=FaceDir::FRONT;
         const int tile=static_cast<int>(getFaceTextureIndex(block,face));
-        const int side=BlockTextureAtlas::tilesPerSide();const float s=static_cast<float>(side);
+        const int side=m_blockAtlasTilesPerSide;const float s=static_cast<float>(side);
         const float inset=.5f/(16.0f*s);
         quad(x,y,w,h,{tile%side/s+inset,tile/side/s+inset,
              (tile%side+1)/s-inset,(tile/side+1)/s-inset},glm::vec4(1),m_blockMaterial);
@@ -156,7 +158,8 @@ private:
     std::vector<Batch> m_batches;
     RenderTextureHandle m_whiteTexture{},m_itemTexture{},m_fontTexture{};
     RenderMaterialHandle m_whiteMaterial{},m_blockMaterial{},m_itemMaterial{},m_fontMaterial{};
-    int m_itemColumns=0,m_itemRows=0;std::unordered_map<std::string,int>m_itemIndices;
+    int m_blockAtlasTilesPerSide=0,m_itemColumns=0,m_itemRows=0;
+    std::unordered_map<std::string,int>m_itemIndices;
     std::unordered_map<uint32_t,Glyph>m_glyphs;
     RenderMaterialHandle material(RenderTextureHandle texture){MaterialDesc d;
         d.pipeline=MaterialPipeline::UiTextured;d.baseColorTexture=texture;

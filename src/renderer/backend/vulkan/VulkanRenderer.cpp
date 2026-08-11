@@ -153,6 +153,19 @@ VkCompositeAlphaFlagBitsKHR chooseCompositeAlpha(VkCompositeAlphaFlagsKHR suppor
     throw std::runtime_error("Vulkan surface exposes no composite alpha mode");
 }
 
+VkSurfaceTransformFlagBitsKHR chooseSurfaceTransform(
+    const VkSurfaceCapabilitiesKHR& capabilities) {
+    // Android commonly reports a 90/270-degree current transform after the
+    // Activity enters sensor landscape. Using that transform promises that
+    // the application has already pre-rotated every 3D and UI projection.
+    // MinecraftC renders in SDL's logical orientation instead, so request
+    // identity and let the compositor apply the display rotation.
+    if ((capabilities.supportedTransforms &
+         VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0)
+        return VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    return capabilities.currentTransform;
+}
+
 struct FrameUniforms {
     glm::mat4 modelViewProjection{1.0f};
     glm::vec4 atlasAndLighting{1.0f, 1.0f, 0.0f, 0.0f};
@@ -1140,7 +1153,7 @@ struct VulkanRenderer::Impl {
         } else {
             info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
-        info.preTransform = capabilities.currentTransform;
+        info.preTransform = chooseSurfaceTransform(capabilities);
         info.compositeAlpha = chooseCompositeAlpha(capabilities.supportedCompositeAlpha);
         info.presentMode = choosePresentMode(modes, window.synchronizePresentation());
         if (!window.synchronizePresentation() &&
@@ -1170,7 +1183,9 @@ struct VulkanRenderer::Impl {
         LOG_INFO("Vulkan swapchain: " << extent.width << "x" << extent.height
                  << ", " << imageCount << " images, format "
                  << static_cast<int>(swapchainFormat) << ", "
-                 << (framebufferSrgb ? "hardware sRGB" : "shader gamma fallback"));
+                 << (framebufferSrgb ? "hardware sRGB" : "shader gamma fallback")
+                 << ", surface transform "
+                 << static_cast<uint32_t>(info.preTransform));
     }
 
     void createImageViews() {
@@ -3289,6 +3304,7 @@ void VulkanRenderer::initialize(Window& window,
     m_assetRoot = assetRoot;
     m_impl = std::make_unique<Impl>(window, assetRoot);
     const BlockAtlasData atlas = buildBlockAtlasData(assetRoot);
+    m_blockAtlasTilesPerSide = atlas.tilesPerSide;
     TextureSamplerDesc sampler;
     sampler.minFilter = TextureFilter::NearestMipmapLinear;
     sampler.addressU = TextureAddressMode::ClampToEdge;
@@ -3330,6 +3346,7 @@ void VulkanRenderer::reinitialize(const GraphicsCapabilities& capabilities,
     m_chunkTranslucent = {};
     m_chunkOpaque = {};
     m_blockAtlas = {};
+    m_blockAtlasTilesPerSide = 0;
     m_entityMaterial = {};
     m_entityAtlas = {};
     m_compatibilityCubes.fill({});
