@@ -459,8 +459,8 @@ if(IOS)
     endforeach()
     target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE
         "-ObjC"
-        "-Wl,-u,_vkGetInstanceProcAddr"
-        "-Wl,-exported_symbol,_vkGetInstanceProcAddr")
+        "LINKER:-u,_vkGetInstanceProcAddr"
+        "LINKER:-exported_symbol,_vkGetInstanceProcAddr")
     foreach(IOS_FRAMEWORK IN ITEMS Metal UIKit QuartzCore Foundation
                                    CoreGraphics IOSurface)
         find_library(MINECRAFTC_${IOS_FRAMEWORK}_FRAMEWORK ${IOS_FRAMEWORK}

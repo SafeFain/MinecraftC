@@ -56,5 +56,11 @@ Documents directory and `dlopen` its executable with local symbol visibility do
 not provide the same process model and may fail while creating the Vulkan
 window.
 
+Release archives may have their nlist symbol table stripped by Xcode. CI checks
+the dyld export information used by `dlsym`, rather than treating `nm` output as
+the runtime export contract. The app link still forces
+`_vkGetInstanceProcAddr` out of the static MoltenVK archive and marks it as an
+exported symbol.
+
 Worlds, settings, and logs use the application preference directory. Assets and
 the GPL/MoltenVK license texts are read-only Bundle resources.

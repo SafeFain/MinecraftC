@@ -370,7 +370,8 @@ jobs:
           check_plist UIDeviceFamily:0 1
           check_plist UIDeviceFamily:1 2
           otool -L "$binary" > "$RUNNER_TEMP/minecraftc-ios-libraries.txt"
-          nm -gU "$binary" > "$RUNNER_TEMP/minecraftc-ios-defined-symbols.txt"
+          xcrun dyld_info -exports "$binary" \
+            > "$RUNNER_TEMP/minecraftc-ios-exports.txt"
           nm "$binary" > "$RUNNER_TEMP/minecraftc-ios-all-symbols.txt"
           grep -q 'Metal.framework' "$RUNNER_TEMP/minecraftc-ios-libraries.txt" || {
             echo "MinecraftC is not linked to Metal.framework" >&2
@@ -381,8 +382,9 @@ jobs:
             exit 1
           fi
           grep -q '_vkGetInstanceProcAddr$' \
-            "$RUNNER_TEMP/minecraftc-ios-defined-symbols.txt" || {
+            "$RUNNER_TEMP/minecraftc-ios-exports.txt" || {
             echo "Static MoltenVK entry point is not exported" >&2
+            cat "$RUNNER_TEMP/minecraftc-ios-exports.txt" >&2
             exit 1
           }
           if grep -q 'OpenGLRenderer' "$RUNNER_TEMP/minecraftc-ios-all-symbols.txt"; then
@@ -512,11 +514,12 @@ jobs:
             cat "$RUNNER_TEMP/minecraftc-ios-device-platform.txt" >&2
             exit 1
           fi
-          nm -gU "$app/MinecraftC" \
-            > "$RUNNER_TEMP/minecraftc-ios-device-defined-symbols.txt"
+          xcrun dyld_info -exports "$app/MinecraftC" \
+            > "$RUNNER_TEMP/minecraftc-ios-device-exports.txt"
           grep -q '_vkGetInstanceProcAddr$' \
-            "$RUNNER_TEMP/minecraftc-ios-device-defined-symbols.txt" || {
-            echo "Static MoltenVK entry point is not exported by the device executable" >&2
+            "$RUNNER_TEMP/minecraftc-ios-device-exports.txt" || {
+            echo "Static MoltenVK entry point is absent from the device dyld exports" >&2
+            cat "$RUNNER_TEMP/minecraftc-ios-device-exports.txt" >&2
             exit 1
           }
           otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
