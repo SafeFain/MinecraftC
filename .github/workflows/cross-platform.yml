@@ -491,6 +491,26 @@ jobs:
             grep -E 'SKIP_INSTALL|INSTALL_PATH|TARGET_BUILD_DIR' "$build_settings" >&2 || true
             exit 1
           fi
+          if ! grep -Eq '^[[:space:]]*EXPORTED_SYMBOLS_FILE = .*/ios/MinecraftC[.]exports[[:space:]]*$' \
+            "$build_settings"; then
+            echo "MinecraftC app target is missing its exported-symbols file" >&2
+            grep -E 'EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS' "$build_settings" >&2 || true
+            exit 1
+          fi
+          if ! grep -E '^[[:space:]]*OTHER_LDFLAGS = .*[-]u,_vkGetInstanceProcAddr' \
+            "$build_settings" >/dev/null; then
+            echo "MinecraftC app target is missing the MoltenVK force-load reference" >&2
+            grep -E 'EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS' "$build_settings" >&2 || true
+            exit 1
+          fi
+          moltenvk_device="$MINECRAFTC_MOLTENVK_ROOT/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a"
+          nm -gU "$moltenvk_device" \
+            > "$RUNNER_TEMP/minecraftc-ios-moltenvk-symbols.txt"
+          if ! grep -q '_vkGetInstanceProcAddr$' \
+            "$RUNNER_TEMP/minecraftc-ios-moltenvk-symbols.txt"; then
+            echo "The pinned MoltenVK device archive does not define vkGetInstanceProcAddr" >&2
+            exit 1
+          fi
           xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
             -scheme minecraftc -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' \
@@ -520,6 +540,12 @@ jobs:
             "$RUNNER_TEMP/minecraftc-ios-device-exports.txt" || {
             echo "Static MoltenVK entry point is absent from the device dyld exports" >&2
             cat "$RUNNER_TEMP/minecraftc-ios-device-exports.txt" >&2
+            echo "Final minecraftc LinkFileList inputs:" >&2
+            find build-ios-device -path '*minecraftc.build*' \
+              -name '*.LinkFileList' -print -exec cat {} \; >&2 || true
+            echo "Final minecraftc linker build settings:" >&2
+            grep -E 'DEAD_CODE_STRIPPING|EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS|STRIP' \
+              "$build_settings" >&2 || true
             exit 1
           }
           otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
