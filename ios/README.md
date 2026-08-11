@@ -49,5 +49,12 @@ device signing. CI inspects the Mach-O platform both before and after IPA
 packaging to prevent a Simulator application from being published as a device
 IPA.
 
+The release uses statically linked MoltenVK. Install the signed IPA as a normal
+iOS application so SDL can discover the exported `vkGetInstanceProcAddr` symbol
+in the process image. Container launchers that copy an app into their own
+Documents directory and `dlopen` its executable with local symbol visibility do
+not provide the same process model and may fail while creating the Vulkan
+window.
+
 Worlds, settings, and logs use the application preference directory. Assets and
 the GPL/MoltenVK license texts are read-only Bundle resources.

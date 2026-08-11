@@ -97,7 +97,7 @@ Window::Window(
             const std::string error = SDL_GetError();
             SDL_Quit();
             LOG_FATAL("Failed to create SDL Vulkan window: " << error);
-            throw std::runtime_error("Failed to create Vulkan window");
+            throw std::runtime_error("Failed to create Vulkan window: " + error);
         }
         refreshSizes();
 #else

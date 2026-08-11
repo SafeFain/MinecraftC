@@ -509,6 +509,13 @@ jobs:
             cat "$RUNNER_TEMP/minecraftc-ios-device-platform.txt" >&2
             exit 1
           fi
+          nm -gU "$app/MinecraftC" \
+            > "$RUNNER_TEMP/minecraftc-ios-device-defined-symbols.txt"
+          grep -q '_vkGetInstanceProcAddr$' \
+            "$RUNNER_TEMP/minecraftc-ios-device-defined-symbols.txt" || {
+            echo "Static MoltenVK entry point is not exported by the device executable" >&2
+            exit 1
+          }
           otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
           if grep -q 'OpenGLES.framework' "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"; then
             echo "Vulkan-only iOS device binary unexpectedly links OpenGLES.framework" >&2
