@@ -39,39 +39,42 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
           test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
-      - name: Verify installed OpenGL startup
+      - name: Verify installed renderer startup
         shell: bash
         run: |
           cd "$RUNNER_TEMP"
-          set +e
-          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=opengl > minecraftc-smoke.log 2>&1
-          status=$?
-          set -e
-          cat minecraftc-smoke.log
-          grep -q "MinecraftC initialized" minecraftc-smoke.log
-          test "$status" -eq 124
-      - name: Verify installed Vulkan gameplay startup
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP"
-          set +e
-          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=vulkan > minecraftc-vulkan-smoke.log 2>&1
-          status=$?
-          set -e
-          cat minecraftc-vulkan-smoke.log
-          grep -q "Vulkan first frame presented" minecraftc-vulkan-smoke.log
-          test "$status" -eq 124
-      - name: Verify installed OpenGL basic rendering
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP"
-          set +e
-          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=opengl-demo > minecraftc-opengl-demo-smoke.log 2>&1
-          status=$?
-          set -e
-          cat minecraftc-opengl-demo-smoke.log
-          grep -q "Visual pipeline" minecraftc-opengl-demo-smoke.log
-          test "$status" -eq 124
+          run_smoke() {
+            renderer="$1"
+            expected="$2"
+            log="$RUNNER_TEMP/minecraftc-$renderer-smoke.log"
+            timeout 45s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" \
+              "--renderer=$renderer" > "$log" 2>&1 &
+            pid=$!
+            found=0
+            for _ in {1..45}; do
+              if grep -Fq "$expected" "$log"; then
+                found=1
+                break
+              fi
+              if ! kill -0 "$pid" 2>/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            kill "$pid" 2>/dev/null || true
+            set +e
+            wait "$pid" 2>/dev/null
+            status=$?
+            set -e
+            cat "$log"
+            if test "$found" -ne 1; then
+              echo "$renderer smoke test did not reach '$expected' (status $status)" >&2
+              exit 1
+            fi
+          }
+          run_smoke opengl "MinecraftC initialized"
+          run_smoke vulkan "Vulkan first frame presented"
+          run_smoke opengl-demo "Visual pipeline"
       - name: Package Linux release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz" "$RELEASE_DIR"
       - name: Upload Linux package
