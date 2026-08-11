@@ -36,10 +36,10 @@ std::string Localization::text(std::string_view key) const { return std::string(
 
 int main(){
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
-            defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::OpenGL&&
-            defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::OpenGL&&
+            defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&
+            defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::MacOS)==RendererBackend::Vulkan,
-            "Android and macOS default new settings to Vulkan");
+            "all supported platforms default new settings to Vulkan");
     require(migrateRendererBackend(DesktopPlatform::Android,9,
                 RendererBackend::OpenGL)==RendererBackend::Vulkan&&
             migrateRendererBackend(DesktopPlatform::Android,10,
@@ -48,7 +48,13 @@ int main(){
                 RendererBackend::OpenGL)==RendererBackend::Vulkan&&
             migrateRendererBackend(DesktopPlatform::MacOS,11,
                 RendererBackend::OpenGL)==RendererBackend::OpenGL&&
-            migrateRendererBackend(DesktopPlatform::Linux,9,
+            migrateRendererBackend(DesktopPlatform::Linux,11,
+                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
+            migrateRendererBackend(DesktopPlatform::Linux,12,
+                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
+            migrateRendererBackend(DesktopPlatform::Windows,11,
+                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
+            migrateRendererBackend(DesktopPlatform::Windows,12,
                 RendererBackend::OpenGL)==RendererBackend::OpenGL,
             "renderer migration preserves platform-specific version boundaries");
     const WindowSafeArea safe = projectWindowSafeArea(
@@ -129,8 +135,8 @@ int main(){
     require(ClientSettings::load(root/"legacy-options.txt").language==Language::English,
             "legacy settings default to English");
     require(ClientSettings::load(root/"legacy-options.txt").rendererBackend==
-                RendererBackend::OpenGL,
-            "legacy settings default to OpenGL");
+                defaultRendererBackend(currentDesktopPlatform()),
+            "legacy settings use the current platform renderer default");
     {
         std::ofstream invalid(root/"invalid-options.txt");
         invalid<<"version=4\nlanguage=unsupported\n";

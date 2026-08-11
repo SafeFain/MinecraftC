@@ -16,6 +16,10 @@ corresponding assets and source dependencies.
   arm64, and OpenGL ES 3.0.
 - Print build information without opening a window with `--version`.
 
+All supported platforms default to Vulkan and automatically fall back to
+OpenGL when Vulkan initialization is unavailable. Use `--renderer=opengl` to
+select OpenGL explicitly.
+
 Worlds and settings use the platform user-data directory documented in
 `README.md`. If startup fails, inspect `minecraftc.log` in that directory.
 Unsigned macOS downloads may require Control-clicking the executable and

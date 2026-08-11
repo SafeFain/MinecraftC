@@ -44,7 +44,7 @@ jobs:
         run: |
           cd "$RUNNER_TEMP"
           set +e
-          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" > minecraftc-smoke.log 2>&1
+          timeout 8s xvfb-run -a "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --renderer=opengl > minecraftc-smoke.log 2>&1
           status=$?
           set -e
           cat minecraftc-smoke.log

@@ -45,12 +45,12 @@ Vulkan 后端使用 VMA 管理 GPU 内存，支持完整游戏世界、UI、天�
 ./build-local/minecraftc --renderer=vulkan-textured-demo
 ```
 
-Linux 和 Windows 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会同时构建并
-作为默认 renderer 和 Vulkan 初始化失败时的回退。可用 `--renderer=vulkan`
-选择 Vulkan。
+Linux 和 Windows 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会同时构建，
+并在 Vulkan 初始化失败时作为回退。所有受支持平台现在都默认使用 Vulkan，
+也可用 `--renderer=opengl` 明确选择 OpenGL。
 
-未指定 renderer 时，Linux 和 Windows 启动 OpenGL，Android 和 macOS 启动
-Vulkan；Vulkan 初始化失败会回退相应平台的 OpenGL 后端。完整游戏代码依赖
+未指定 renderer 时所有平台都启动 Vulkan；Vulkan 初始化失败会回退相应平台的
+OpenGL 后端。完整游戏代码依赖
 后端无关的 `IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
 
 Vulkan GLSL 与预编译 SPIR-V 位于 `assets/shaders/vulkan/`。普通构建不要求
@@ -86,7 +86,8 @@ cmake --install build-local --config Release --prefix install-local
 ```
 
 Windows 构建始终同时包含 Vulkan 和 OpenGL，不能关闭 Vulkan。运行 Vulkan
-需要显卡驱动提供系统 Vulkan loader；未指定 renderer 时仍默认使用 OpenGL。
+需要显卡驱动提供系统 Vulkan loader；未指定 renderer 时默认使用 Vulkan，
+初始化失败则自动回退 OpenGL。
 
 ### macOS
 

@@ -17,16 +17,17 @@ GamepadBinding axis(int code, bool positive) {
 }
 }
 
-RendererBackend defaultRendererBackend(DesktopPlatform platform) {
-    return platform == DesktopPlatform::Android || platform == DesktopPlatform::MacOS
-        ? RendererBackend::Vulkan : RendererBackend::OpenGL;
+RendererBackend defaultRendererBackend(DesktopPlatform) {
+    return RendererBackend::Vulkan;
 }
 
 RendererBackend migrateRendererBackend(DesktopPlatform platform,
                                         int sourceFormatVersion,
                                         RendererBackend stored) {
     if ((platform == DesktopPlatform::Android && sourceFormatVersion < 10) ||
-        (platform == DesktopPlatform::MacOS && sourceFormatVersion < 11))
+        (platform == DesktopPlatform::MacOS && sourceFormatVersion < 11) ||
+        ((platform == DesktopPlatform::Linux ||
+          platform == DesktopPlatform::Windows) && sourceFormatVersion < 12))
         return RendererBackend::Vulkan;
     return stored;
 }
