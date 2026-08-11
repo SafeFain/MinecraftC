@@ -15,8 +15,10 @@ corresponding assets and source dependencies.
   with a trusted publisher or local developer key. It requires Android 10,
   arm64, and OpenGL ES 3.0.
 - iOS: the simulator ZIP runs only in an arm64 iOS Simulator. The device
-  `.xcarchive.zip` targets iOS 14+ arm64 and must be signed before installation;
-  it is Vulkan-only and statically links MoltenVK.
+  unsigned IPA targets iOS 14+ arm64 and must be signed and provisioned before
+  installation; it is Vulkan-only and statically links MoltenVK. Simulator
+  binaries cannot be converted into device applications by renaming or signing
+  them, even though both builds use arm64.
 - Print build information without opening a window with `--version`.
 
 All supported platforms default to Vulkan. Linux, Windows, macOS, and Android
@@ -29,4 +31,5 @@ Unsigned macOS downloads may require Control-clicking the executable and
 choosing Open the first time.
 The Android release APK is intentionally unsigned and cannot be installed until
 it has been signed.
-The iOS device archive is also intentionally unsigned and is not an IPA.
+The iOS device IPA is intentionally unsigned and cannot be installed until it
+has been signed with a compatible certificate and provisioning profile.

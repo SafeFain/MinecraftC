@@ -344,6 +344,14 @@ jobs:
             }
           }
           test -x "$binary" || { echo "Missing iOS executable: $binary" >&2; exit 1; }
+          xcrun vtool -show-build "$binary" \
+            > "$RUNNER_TEMP/minecraftc-ios-simulator-platform.txt"
+          if ! grep -Eq '^[[:space:]]*platform[[:space:]]+IOSSIMULATOR[[:space:]]*$' \
+            "$RUNNER_TEMP/minecraftc-ios-simulator-platform.txt"; then
+            echo "Simulator executable is not marked for the iOS Simulator platform" >&2
+            cat "$RUNNER_TEMP/minecraftc-ios-simulator-platform.txt" >&2
+            exit 1
+          fi
           require_file "$app/shaders/vulkan/chunk.vert.spv"
           require_file "$app/shaders/vulkan/chunk.frag.spv"
           require_file "$app/textures/generated/items_atlas.png"
@@ -450,7 +458,7 @@ jobs:
           }
           run_smoke iphone "$(device_type iPhone)"
           run_smoke ipad "$(device_type iPad)"
-      - name: Archive unsigned arm64 device build
+      - name: Package unsigned arm64 device IPA
         shell: bash
         run: |
           cmake -S . -B build-ios-device -G Xcode \
@@ -466,6 +474,7 @@ jobs:
           build_settings="$RUNNER_TEMP/minecraftc-ios-device-build-settings.txt"
           xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
             -target minecraftc -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -showBuildSettings CODE_SIGNING_ALLOWED=NO > "$build_settings"
           if ! grep -Eq '^[[:space:]]*SKIP_INSTALL = NO[[:space:]]*$' "$build_settings"; then
             echo "MinecraftC app target must set SKIP_INSTALL=NO" >&2
@@ -479,6 +488,7 @@ jobs:
           fi
           xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
             -scheme minecraftc -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath "$archive" archive CODE_SIGNING_ALLOWED=NO
           app="$archive/Products/Applications/MinecraftC.app"
           if ! test -x "$app/MinecraftC"; then
@@ -491,23 +501,69 @@ jobs:
             exit 1
           fi
           lipo "$app/MinecraftC" -verify_arch arm64
+          xcrun vtool -show-build "$app/MinecraftC" \
+            > "$RUNNER_TEMP/minecraftc-ios-device-platform.txt"
+          if ! grep -Eq '^[[:space:]]*platform[[:space:]]+IOS[[:space:]]*$' \
+            "$RUNNER_TEMP/minecraftc-ios-device-platform.txt"; then
+            echo "Device executable is not marked for the iOS device platform" >&2
+            cat "$RUNNER_TEMP/minecraftc-ios-device-platform.txt" >&2
+            exit 1
+          fi
           otool -L "$app/MinecraftC" > "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"
           if grep -q 'OpenGLES.framework' "$RUNNER_TEMP/minecraftc-ios-device-libraries.txt"; then
             echo "Vulkan-only iOS device binary unexpectedly links OpenGLES.framework" >&2
             exit 1
           fi
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$archive" "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive.zip"
+          if test -d "$app/_CodeSignature" || test -f "$app/embedded.mobileprovision"; then
+            echo "Unsigned iOS app unexpectedly contains signing data" >&2
+            exit 1
+          fi
+          ipa_root="$RUNNER_TEMP/minecraftc-ios-ipa"
+          ipa="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.ipa"
+          mkdir -p "$ipa_root/Payload"
+          ditto "$app" "$ipa_root/Payload/MinecraftC.app"
+          ditto -c -k --keepParent \
+            "$ipa_root/Payload" "$ipa"
+          unzip -tq "$ipa"
+          unzip -Z1 "$ipa" > "$RUNNER_TEMP/minecraftc-ios-ipa-files.txt"
+          grep -Fxq 'Payload/MinecraftC.app/MinecraftC' \
+            "$RUNNER_TEMP/minecraftc-ios-ipa-files.txt"
+          if grep -Evq '^Payload(/|$)' "$RUNNER_TEMP/minecraftc-ios-ipa-files.txt"; then
+            echo "Unsigned IPA contains files outside its Payload directory" >&2
+            exit 1
+          fi
+          if grep -Eq '^Payload/MinecraftC[.]app/(_CodeSignature/|embedded[.]mobileprovision$)' \
+            "$RUNNER_TEMP/minecraftc-ios-ipa-files.txt"; then
+            echo "Unsigned IPA unexpectedly contains signing data" >&2
+            exit 1
+          fi
+          packaged_binary="$RUNNER_TEMP/minecraftc-ios-ipa-binary"
+          unzip -p "$ipa" Payload/MinecraftC.app/MinecraftC > "$packaged_binary"
+          cmp "$app/MinecraftC" "$packaged_binary"
+          xcrun vtool -show-build "$packaged_binary" \
+            > "$RUNNER_TEMP/minecraftc-ios-ipa-platform.txt"
+          if ! grep -Eq '^[[:space:]]*platform[[:space:]]+IOS[[:space:]]*$' \
+            "$RUNNER_TEMP/minecraftc-ios-ipa-platform.txt"; then
+            echo "Packaged IPA contains a non-device executable" >&2
+            cat "$RUNNER_TEMP/minecraftc-ios-ipa-platform.txt" >&2
+            exit 1
+          fi
           ditto -c -k --sequesterRsrc --keepParent \
             build-ios-simulator/Release-iphonesimulator/MinecraftC.app \
             "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-simulator-arm64.zip"
-      - name: Upload unsigned iOS packages
+      - name: Upload unsigned iOS device IPA
         uses: actions/upload-artifact@v7
         with:
-          name: minecraftc-ios-arm64
-          path: |
-            ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-arm64-unsigned.xcarchive.zip
-            ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-simulator-arm64.zip
+          name: minecraftc-ios-device-arm64
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-arm64-unsigned.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload iOS Simulator package
+        uses: actions/upload-artifact@v7
+        with:
+          name: minecraftc-ios-simulator-arm64
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-simulator-arm64.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

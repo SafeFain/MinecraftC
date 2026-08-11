@@ -36,10 +36,18 @@ it with Xcode or `xcrun simctl install` and `xcrun simctl launch`.
 
 Configure a separate directory with `-DCMAKE_OSX_SYSROOT=iphoneos` and
 `-DCMAKE_OSX_ARCHITECTURES=arm64`. The generated project disables signing so CI
-can create an unsigned archive. For a local device build, open the generated
-Xcode project, select the `minecraftc` target, choose a development team, and
-enable automatic or manual signing. App Store/TestFlight export is intentionally
-outside the unsigned release workflow.
+can create an unsigned IPA containing `Payload/MinecraftC.app`. The IPA is a
+packaging container, not an installable signed application. For a local device
+build, open the generated Xcode project, select the `minecraftc` target, choose
+a development team, and enable automatic or manual signing. App Store/TestFlight
+export is intentionally outside the unsigned release workflow.
+
+The device IPA and Simulator ZIP are separate CI artifacts. An arm64 Simulator
+binary is still marked `iOS-simulator` in its Mach-O load commands and cannot run
+on a physical iPhone or iPad. Use only the `ios-arm64-unsigned.ipa` artifact for
+device signing. CI inspects the Mach-O platform both before and after IPA
+packaging to prevent a Simulator application from being published as a device
+IPA.
 
 Worlds, settings, and logs use the application preference directory. Assets and
 the GPL/MoltenVK license texts are read-only Bundle resources.

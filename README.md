@@ -153,7 +153,10 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 Release APK 默认未签名，发布前必须使用发行者密钥签名。详细说明见
 [android/README.md](android/README.md)。推送 `v*` 标签后，CI 会将 Android
-APK、未签名 iOS 构建与 Linux、Windows、macOS 构建包一起发布。
+APK、未签名 iOS 真机 IPA、iOS 模拟器 ZIP 与 Linux、Windows、macOS 构建包
+一起发布。未签名 IPA 需要使用兼容的证书和描述文件签名后才能安装到真机。
+模拟器 ZIP 中的 arm64 程序仍只能运行在 Apple Silicon iOS Simulator，不能签名
+后安装到 iPhone 或 iPad；真机必须使用文件名包含 `ios-arm64-unsigned.ipa` 的产物。
 
 SDL 3.4.10 默认由 CMake 按固定版本获取并静态构建。系统已安装兼容 SDL3 时可添加
 `-DMINECRAFTC_USE_SYSTEM_SDL3=ON`；需要同时获取固定版本 GLM 时使用
