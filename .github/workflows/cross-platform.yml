@@ -398,20 +398,38 @@ jobs:
             xcrun simctl boot "$udid"
             xcrun simctl bootstatus "$udid" -b
             xcrun simctl install "$udid" "$app"
+            sleep 3
             xcrun simctl launch --console "$udid" io.github.SafeFain.MinecraftC \
               > "$log" 2>&1 &
             launch_pid=$!
             found=0
-            for _ in {1..30}; do
+            launch_exited=0
+            for elapsed in {1..180}; do
               if grep -q 'Vulkan first frame presented' "$log"; then
                 found=1
                 break
               fi
-              if ! kill -0 "$launch_pid" 2>/dev/null; then break; fi
+              if ! kill -0 "$launch_pid" 2>/dev/null; then
+                launch_exited=1
+                break
+              fi
+              if test $((elapsed % 15)) -eq 0; then
+                echo "Waiting for $family Vulkan cold start (${elapsed}s/180s)"
+              fi
               sleep 1
             done
+            kill "$launch_pid" 2>/dev/null || true
+            set +e
+            wait "$launch_pid" 2>/dev/null
+            launch_status=$?
+            set -e
             cat "$log"
             if test "$found" -ne 1; then
+              if test "$launch_exited" -eq 1; then
+                echo "$family simctl launch exited before the first frame (status $launch_status)" >&2
+              else
+                echo "$family Vulkan cold start exceeded 180 seconds" >&2
+              fi
               echo "Simulator system log for failed $family launch:"
               xcrun simctl spawn "$udid" log show --style compact --last 3m \
                 --predicate 'process == "MinecraftC"' || true
@@ -419,8 +437,6 @@ jobs:
               find "$HOME/Library/Logs/DiagnosticReports" -type f \
                 -name 'MinecraftC*' -mmin -5 -print -exec cat {} \; || true
             fi
-            kill "$launch_pid" 2>/dev/null || true
-            wait "$launch_pid" 2>/dev/null || true
             xcrun simctl terminate "$udid" io.github.SafeFain.MinecraftC || true
             xcrun simctl shutdown "$udid" || true
             xcrun simctl delete "$udid"
