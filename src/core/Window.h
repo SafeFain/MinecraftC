@@ -38,7 +38,9 @@ inline WindowSafeArea projectWindowSafeArea(
 class Window {
 public:
     Window(int width, int height, const std::string& title, int preferredSamples,
-           GraphicsApi graphicsApi = GraphicsApi::OpenGL33);
+           GraphicsApi graphicsApi = GraphicsApi::OpenGL33,
+           bool synchronizePresentation = true,
+           bool highPixelDensity = true);
     ~Window();
 
     Window(const Window&) = delete;
@@ -72,6 +74,7 @@ public:
         return m_minimized || m_pixelWidth <= 0 || m_pixelHeight <= 0;
     }
     bool isSrgbCapable() const { return m_srgbCapable; }
+    bool synchronizePresentation() const { return m_synchronizePresentation; }
     GraphicsApi graphicsApi() const { return m_graphicsApi; }
     GraphicsCapabilities graphicsCapabilities() const;
     std::vector<std::string> requiredVulkanInstanceExtensions() const;
@@ -113,6 +116,7 @@ private:
     bool m_cursorLocked = false;
     bool m_minimized = false;
     bool m_srgbCapable = false;
+    bool m_synchronizePresentation = true;
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     bool m_touchAvailable = false;
     bool m_textInputEnabled = false;

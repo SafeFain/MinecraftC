@@ -2,7 +2,6 @@
 
 #include "Config.h"
 #include "debug/Log.h"
-#include "renderer/BlockAtlasData.h"
 #include "world/Block.h"
 #include "world/Chunk.h"
 #include "world/RegionGenerator.h"
@@ -86,7 +85,7 @@ void initializeLighting(const std::array<std::unique_ptr<Chunk>, 9>& chunks) {
     spread(blockQueue, false);
 }
 
-MeshData generateCenterChunk(int& surfaceY) {
+ChunkMesh generateCenterChunk(int& surfaceY) {
     WorldGenerator world(SCENE_SEED);
     RegionGenerator generator(world.getHeightPipeline(), world.getCaveGenerator(),
                               world.getTreeGenerator(), world.getOreGenerator(),
@@ -122,84 +121,86 @@ MeshData generateCenterChunk(int& surfaceY) {
     if (mesh.empty() || mesh.opaqueIndexCount == 0)
         throw std::runtime_error("Generated center ChunkMesh is empty");
     surfaceY = center.getColumnMaxY(8, 8);
-    MeshData result;
-    result.layout = MeshVertexLayout::Chunk;
-    result.chunkVertices = std::move(mesh.vertices);
-    result.indices.assign(mesh.indices.begin(), mesh.indices.end());
-    result.opaqueIndexCount = static_cast<uint32_t>(mesh.opaqueIndexCount);
-    result.translucentIndexOffset = static_cast<uint32_t>(mesh.translucentIndexOffset);
-    result.translucentIndexCount = static_cast<uint32_t>(mesh.translucentIndexCount);
-    LOG_INFO("Chunk demo mesh: " << result.chunkVertices.size() << " vertices, "
-             << result.opaqueIndexCount << " opaque/cutout indices, "
-             << result.translucentIndexCount << " translucent indices retained");
-    return result;
+    LOG_INFO("Chunk demo mesh: " << mesh.vertices.size() << " vertices, "
+             << mesh.opaqueIndexCount << " opaque/cutout indices, "
+             << mesh.translucentIndexCount << " translucent indices retained");
+    return mesh;
 }
 }
 
-ChunkRenderScene::ChunkRenderScene(IRenderDevice& renderer,
-                                   const std::filesystem::path& assetRoot)
+ChunkRenderScene::ChunkRenderScene(IGameRenderer& renderer,
+                                   const std::filesystem::path& assetRoot,
+                                   int benchmarkGridRadius)
     : m_renderer(renderer) {
-    if (!renderer.capabilities().chunkOpaqueCutout)
-        throw std::runtime_error("Renderer does not support ChunkMesh opaque/cutout");
+    (void)assetRoot;
     int surfaceY = 0;
-    MeshData mesh = generateCenterChunk(surfaceY);
-    m_opaqueIndexCount = mesh.opaqueIndexCount;
-    m_translucentIndexOffset = mesh.translucentIndexOffset;
-    m_translucentIndexCount = mesh.translucentIndexCount;
-    const BlockAtlasData atlas = buildBlockAtlasData(assetRoot);
-    m_mesh = renderer.createMesh(mesh);
-    try {
-        TextureSamplerDesc sampler;
-        sampler.minFilter = TextureFilter::NearestMipmapLinear;
-        sampler.addressU = TextureAddressMode::ClampToEdge;
-        sampler.addressV = TextureAddressMode::ClampToEdge;
-        m_texture = renderer.createTexture(atlas.texture, sampler);
-        MaterialDesc material;
-        material.pipeline = MaterialPipeline::ChunkOpaqueCutout;
-        material.baseColorTexture = m_texture;
-        material.atlasTilesPerSide = atlas.tilesPerSide;
-        m_material = renderer.createMaterial(material);
-        material.pipeline = MaterialPipeline::ChunkTranslucent;
-        m_translucentMaterial = renderer.createMaterial(material);
-    } catch (...) {
-        if (m_material) renderer.destroyMaterial(m_material);
-        if (m_texture) renderer.destroyTexture(m_texture);
-        renderer.destroyMesh(m_mesh);
-        throw;
-    }
+    m_mesh = generateCenterChunk(surfaceY);
+    m_groundHeight = static_cast<float>(surfaceY + 1);
+    renderer.uploadChunkMesh(m_mesh);
     m_camera.setPosition({39.0f, static_cast<float>(surfaceY + 17), 43.0f});
     m_camera.updateVectors(-135.0f, -28.0f);
+    if (benchmarkGridRadius > 0) {
+        for (int z = -benchmarkGridRadius; z <= benchmarkGridRadius; ++z)
+            for (int x = -benchmarkGridRadius; x <= benchmarkGridRadius; ++x)
+                m_instances.push_back(glm::translate(glm::mat4(1.0f), glm::vec3(
+                    static_cast<float>(x * Config::CHUNK_SIZE_X), 0.0f,
+                    static_cast<float>(z * Config::CHUNK_SIZE_Z))));
+        std::stable_sort(m_instances.begin(), m_instances.end(),
+            [](const glm::mat4& a, const glm::mat4& b) {
+                const glm::vec3 pa(a[3]);
+                const glm::vec3 pb(b[3]);
+                return glm::dot(pa, pa) < glm::dot(pb, pb);
+            });
+    }
 }
 
 ChunkRenderScene::~ChunkRenderScene() {
     m_renderer.waitIdle();
-    if (m_translucentMaterial) m_renderer.destroyMaterial(m_translucentMaterial);
-    if (m_material) m_renderer.destroyMaterial(m_material);
-    if (m_texture) m_renderer.destroyTexture(m_texture);
-    if (m_mesh) m_renderer.destroyMesh(m_mesh);
+    m_renderer.releaseChunkMesh(m_mesh);
 }
 
-void ChunkRenderScene::render(float aspectRatio) {
+void ChunkRenderScene::render(float aspectRatio, const ExtraPass& extraPass) {
     FrameData frame;
     frame.clearColor = {0.48f, 0.70f, 0.91f, 1.0f};
     frame.view = m_camera.getViewMatrix();
     frame.projection = m_camera.getProjectionMatrix(aspectRatio);
-    DrawCommand command;
-    command.mesh = m_mesh;
-    command.material = m_material;
-    command.indexCount = m_opaqueIndexCount;
-    m_renderer.beginFrame(frame);
-    m_renderer.draw(command);
-    // Exercise the backend's multi-draw path with a second instance sharing
-    // the same immutable production mesh and atlas resources.
-    command.model = glm::translate(glm::mat4(1.0f), glm::vec3(-18.0f, -3.0f, 0.0f));
-    m_renderer.draw(command);
-    if (m_translucentIndexCount) {
-        command.material = m_translucentMaterial;
-        command.model = glm::mat4(1.0f);
-        command.firstIndex = m_translucentIndexOffset;
-        command.indexCount = m_translucentIndexCount;
-        m_renderer.draw(command);
+    const glm::mat4 viewProjection = frame.projection * frame.view;
+    RenderEnvironment environment;
+    environment.fogColor = glm::vec3(frame.clearColor);
+    m_renderer.beginFrame();
+    m_renderer.setEnvironment(environment, m_camera.m_position);
+    m_renderer.setViewProjection(viewProjection);
+    m_renderer.bindBlockShader();
+    if (m_instances.empty()) {
+        m_renderer.renderChunk(m_mesh, glm::mat4(1.0f),
+                               viewProjection, false);
+        // Exercise the backend's multi-draw path with a second instance sharing
+        // the same immutable production mesh and atlas resources.
+        const glm::mat4 model = glm::translate(
+            glm::mat4(1.0f), glm::vec3(-18.0f, -3.0f, 0.0f));
+        m_renderer.renderChunk(m_mesh, model,
+                               viewProjection, false);
+    } else {
+        for (const glm::mat4& model : m_instances) {
+            m_renderer.renderChunk(m_mesh, model,
+                                   viewProjection, false);
+        }
     }
+    if (m_mesh.translucentIndexCount) {
+        m_renderer.beginTranslucent();
+        if (m_instances.empty()) {
+            m_renderer.renderChunk(m_mesh, glm::mat4(1.0f),
+                                   viewProjection, true);
+        } else {
+            for (auto instance = m_instances.rbegin(); instance != m_instances.rend();
+                 ++instance) {
+                m_renderer.renderChunk(m_mesh, *instance,
+                                       viewProjection, true);
+            }
+        }
+        m_renderer.endTranslucent();
+    }
+    m_renderer.unbindBlockShader();
+    if (extraPass) extraPass(viewProjection);
     m_renderer.endFrame();
 }

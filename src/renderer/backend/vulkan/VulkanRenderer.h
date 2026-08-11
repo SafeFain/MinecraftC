@@ -31,6 +31,7 @@ public:
     void endFrame() override;
     void resize(int width, int height) override;
     void waitIdle() override;
+    RendererPerformanceStats performanceStats() const override;
 
     void initialize(Window& window, const GraphicsCapabilities& capabilities,
                     const std::filesystem::path& assetRoot) override;

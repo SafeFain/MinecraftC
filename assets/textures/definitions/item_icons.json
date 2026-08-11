@@ -8,7 +8,7 @@
     "string": {}, "feather": {}, "leather": {}, "bone": {}, "arrow": {},
     "seeds": {}, "wheat": {}, "food": {}, "bow": {}, "shield": {},
     "helmet": {}, "chestplate": {}, "leggings": {}, "boots": {}, "flint": {},
-    "flint_and_steel": {}, "gunpowder": {}
+    "flint_and_steel": {}, "gunpowder": {}, "spawn_egg": {}
   },
   "handle_palette": [[66, 40, 22], [112, 72, 37], [171, 119, 61], [211, 160, 88]],
   "materials": {
@@ -25,8 +25,16 @@
     "wheat": [[95, 67, 21], [153, 108, 28], [211, 161, 45], [249, 211, 91]],
     "raw_meat": [[82, 31, 31], [139, 50, 48], [202, 88, 78], [245, 158, 139]],
     "cooked_meat": [[55, 29, 20], [103, 53, 31], [158, 86, 45], [215, 137, 77]],
-    "rotten": [[53, 62, 24], [87, 96, 35], [132, 126, 49], [184, 161, 75]]
-    ,"powder": [[32, 33, 31], [58, 61, 57], [91, 95, 88], [137, 142, 132]]
+    "rotten": [[53, 62, 24], [87, 96, 35], [132, 126, 49], [184, 161, 75]],
+    "powder": [[32, 33, 31], [58, 61, 57], [91, 95, 88], [137, 142, 132]],
+    "cow_egg": [[54, 31, 19], [104, 60, 34], [166, 105, 62], [235, 225, 200]],
+    "pig_egg": [[92, 44, 50], [164, 77, 88], [232, 137, 148], [255, 203, 207]],
+    "sheep_egg": [[65, 64, 61], [133, 130, 120], [218, 215, 201], [255, 252, 238]],
+    "chicken_egg": [[96, 75, 35], [218, 136, 31], [235, 229, 205], [255, 250, 230]],
+    "zombie_egg": [[28, 59, 44], [53, 105, 67], [91, 156, 84], [72, 118, 145]],
+    "skeleton_egg": [[45, 48, 49], [99, 104, 105], [175, 181, 178], [238, 241, 230]],
+    "spider_egg": [[29, 23, 25], [61, 43, 45], [111, 58, 53], [191, 54, 39]],
+    "blastling_egg": [[37, 27, 57], [76, 49, 111], [132, 76, 171], [219, 137, 238]]
   },
   "items": {
     "grass_block": {"generator": "block_item_icon", "block": "grass"},
@@ -154,6 +162,14 @@
     "oxeye_daisy": {"generator": "block_item_icon", "block": "oxeye_daisy"},
     "sunflower": {"generator": "block_item_icon", "block": "sunflower"},
     "flint_and_steel": {"generator": "item_sprite", "template": "flint_and_steel", "material": "iron"},
-    "gunpowder": {"generator": "item_sprite", "template": "gunpowder", "material": "powder"}
+    "gunpowder": {"generator": "item_sprite", "template": "gunpowder", "material": "powder"},
+    "cow_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "cow_egg"},
+    "pig_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "pig_egg"},
+    "sheep_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "sheep_egg"},
+    "chicken_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "chicken_egg"},
+    "zombie_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "zombie_egg"},
+    "skeleton_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "skeleton_egg"},
+    "spider_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "spider_egg"},
+    "blastling_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "blastling_egg"}
   }
 }

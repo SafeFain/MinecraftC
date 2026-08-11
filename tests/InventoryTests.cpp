@@ -18,6 +18,10 @@ int main() {
     require(static_cast<uint16_t>(ItemId::GRASS_BLOCK) ==
             static_cast<uint8_t>(BlockId::GRASS),
             "legacy block item ids remain aligned");
+    require(static_cast<uint16_t>(ItemId::GUNPOWDER) == 126 &&
+            static_cast<uint16_t>(ItemId::COW_SPAWN_EGG) == 127 &&
+            static_cast<uint16_t>(ItemId::BLASTLING_SPAWN_EGG) == 134,
+            "spawn eggs did not append after stable serialized item ids");
     require(itemForBlock(BlockId::DIAMOND_ORE) == ItemId::DIAMOND_ORE,
             "block maps to its inventory item");
     require(static_cast<uint8_t>(BlockId::ACACIA_SAPLING) == 63 &&
@@ -41,8 +45,13 @@ int main() {
     require(creativeItems.size() == static_cast<size_t>(ItemId::COUNT) - 1,
             "creative inventory does not expose every registered item");
     require(creativeItems.front() == ItemId::GRASS_BLOCK &&
-            creativeItems.back() == ItemId::GUNPOWDER,
+            creativeItems.back() == ItemId::BLASTLING_SPAWN_EGG,
             "creative inventory ordering does not follow stable item ids");
+    require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
+            getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&
+            getItemProps(ItemId::BLASTLING_SPAWN_EGG).spawnEggMob ==
+                SpawnEggMob::Blastling,
+            "spawn eggs are not registered with stable mob mappings");
 
     InventoryModel inventory;
     require(inventory.add({ItemId::COAL, 64, 0}) == 0,

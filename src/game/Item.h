@@ -146,6 +146,15 @@ enum class ItemId : uint16_t {
     FLINT_AND_STEEL,
     GUNPOWDER,
 
+    COW_SPAWN_EGG,
+    PIG_SPAWN_EGG,
+    SHEEP_SPAWN_EGG,
+    CHICKEN_SPAWN_EGG,
+    ZOMBIE_SPAWN_EGG,
+    SKELETON_SPAWN_EGG,
+    SPIDER_SPAWN_EGG,
+    BLASTLING_SPAWN_EGG,
+
     COUNT,
     POPPY = FLOWER
 };
@@ -156,7 +165,19 @@ enum class ItemKind : uint8_t {
     Tool,
     Weapon,
     Armor,
-    Food
+    Food,
+    SpawnEgg
+};
+
+enum class SpawnEggMob : uint8_t {
+    Cow,
+    Pig,
+    Sheep,
+    Chicken,
+    Zombie,
+    Skeleton,
+    Spider,
+    Blastling
 };
 
 enum class ToolKind : uint8_t {
@@ -191,6 +212,7 @@ struct ItemProperties {
     uint8_t food = 0;
     float saturation = 0.0f;
     std::optional<BlockId> placedBlock;
+    std::optional<SpawnEggMob> spawnEggMob;
 
     ItemProperties() = default;
     ItemProperties(std::string itemName, ItemKind itemKind = ItemKind::Material,
@@ -199,11 +221,12 @@ struct ItemProperties {
                    ToolTier toolTier = ToolTier::None,
                    float damage = 0.0f, float speed = 0.0f,
                    uint8_t foodValue = 0, float saturationValue = 0.0f,
-                   std::optional<BlockId> block = std::nullopt)
+                   std::optional<BlockId> block = std::nullopt,
+                   std::optional<SpawnEggMob> eggMob = std::nullopt)
         : name(std::move(itemName)), kind(itemKind), maxStack(stack),
           maxDurability(durability), tool(toolKind), tier(toolTier),
           attackDamage(damage), attackSpeed(speed), food(foodValue),
-          saturation(saturationValue), placedBlock(block) {}
+          saturation(saturationValue), placedBlock(block), spawnEggMob(eggMob) {}
 };
 
 struct ItemStack {

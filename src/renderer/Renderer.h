@@ -110,8 +110,12 @@ public:
     void beginFrame(const FrameData& frame) override;
     void draw(const DrawCommand& command) override;
     void waitIdle() override;
+    RendererPerformanceStats performanceStats() const override {
+        return m_performanceStats;
+    }
 
 private:
+    RendererPerformanceStats m_performanceStats{};
     struct GpuChunkMesh {
         uint32_t vao = 0;
         uint32_t vbo = 0;

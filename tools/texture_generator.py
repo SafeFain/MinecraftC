@@ -758,6 +758,15 @@ def generate_item_sprite(template,material,definitions):
         for y,left,right in rows:
             for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x+y)%2])
         _line(image,5,5,9,4,shades[3],1)
+    elif template=="spawn_egg":
+        rows=((2,7,8),(3,5,10),(4,4,11),(5,3,12),(6,3,12),(7,3,12),
+              (8,4,11),(9,4,11),(10,5,10),(11,6,9),(12,7,8))
+        for y,left,right in rows:
+            for x in range(left,right+1):
+                _put(image,x,y,outline if x in (left,right) else shades[2])
+        for x,y in ((6,4),(10,5),(5,7),(9,8),(7,10)):
+            _put(image,x,y,shades[0]); _put(image,x+1,y,shades[1])
+        _put(image,7,3,shades[3]); _put(image,8,3,shades[3])
     elif template=="shield":
         for y,left,right in ((2,5,10),(3,4,11),(4,4,11),(5,4,11),(6,4,11),(7,5,10),(8,5,10),(9,6,9),(10,7,8)):
             for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x>7)])

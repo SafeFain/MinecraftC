@@ -54,20 +54,27 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <iomanip>
 #include <unordered_map>
 
 class BasicRenderApplication final : public ApplicationHost {
 public:
     BasicRenderApplication(RuntimePaths paths, GraphicsApi api,
-                           bool texturedDemo = false)
+                           bool texturedDemo = false,
+                           int benchmarkFrames = 0)
         : m_paths(std::move(paths)),
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT,
                    api == GraphicsApi::Vulkan ? "MinecraftC - Vulkan" :
                                                 "MinecraftC - OpenGL Demo",
-                   api == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES, api) {
+                   api == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES, api,
+                   benchmarkFrames == 0, benchmarkFrames == 0),
+          m_benchmarkFrames(benchmarkFrames) {
         if (api == GraphicsApi::Vulkan) {
 #if defined(MINECRAFTC_ENABLE_VULKAN)
-            m_renderer = std::make_unique<VulkanRenderer>(m_window, m_paths.assetRoot);
+            auto renderer = std::make_unique<VulkanRenderer>();
+            renderer->initialize(m_window, m_window.graphicsCapabilities(),
+                                 m_paths.assetRoot);
+            m_renderer = std::move(renderer);
 #else
             throw std::runtime_error("Vulkan support is not enabled in this build");
 #endif
@@ -83,16 +90,52 @@ public:
                 *m_renderer, m_paths.assetRoot);
         else
             m_scene = std::make_unique<ChunkRenderScene>(
-                *m_renderer, m_paths.assetRoot);
+                *m_renderer, m_paths.assetRoot, benchmarkFrames > 0 ? 8 : 0);
+        if (benchmarkFrames > 0 && !texturedDemo) {
+            m_benchmarkModels = std::make_unique<EntityModelRegistry>();
+            m_benchmarkModels->loadAll(m_paths.assetRoot);
+            m_benchmarkModels->uploadAll(m_renderer->modelRenderer());
+        }
         m_window.setResizeCallback([this](int width, int height) {
             m_renderer->resize(width, height);
         });
     }
 
     bool iterate() override {
-        if (!m_backgrounded && !m_window.isMinimized())
-            (m_texturedScene ? m_texturedScene->render(m_window.aspectRatio())
-                             : m_scene->render(m_window.aspectRatio()));
+        const auto started = m_clock.now();
+        if (!m_backgrounded && !m_window.isMinimized()) {
+            if (m_texturedScene) {
+                m_texturedScene->render(m_window.aspectRatio());
+            } else if (m_benchmarkModels) {
+                m_scene->render(m_window.aspectRatio(), [this](const glm::mat4& vp) {
+                    renderBenchmarkModels(vp);
+                });
+            } else {
+                m_scene->render(m_window.aspectRatio());
+            }
+            if (m_benchmarkFrames > 0) {
+                const double elapsedMs = RuntimeClock::seconds(
+                    RuntimeClock::elapsed(started, m_clock.now())) * 1000.0;
+                ++m_renderedFrames;
+                if (m_renderedFrames > benchmarkWarmupFrames()) {
+                    m_frameSamples.push_back(elapsedMs);
+                    const RendererPerformanceStats stats = m_renderer->performanceStats();
+                    m_rendererTotals.cpuWaitMs += stats.cpuWaitMs;
+                    m_rendererTotals.cpuPrepareMs += stats.cpuPrepareMs;
+                    m_rendererTotals.cpuRecordMs += stats.cpuRecordMs;
+                    m_rendererTotals.cpuSubmitMs += stats.cpuSubmitMs;
+                    m_rendererTotals.uploadBytes += stats.uploadBytes;
+                    m_rendererTotals.drawCalls += stats.drawCalls;
+                    m_rendererTotals.pipelineBinds += stats.pipelineBinds;
+                    m_rendererTotals.descriptorBinds += stats.descriptorBinds;
+                    m_rendererTotals.vertexBufferBinds += stats.vertexBufferBinds;
+                }
+                if (static_cast<int>(m_frameSamples.size()) >= m_benchmarkFrames) {
+                    reportBenchmark();
+                    m_running = false;
+                }
+            }
+        }
         m_window.finishEventFrame();
         return m_running && !m_window.shouldClose();
     }
@@ -125,9 +168,73 @@ private:
     std::unique_ptr<IGameRenderer> m_renderer;
     std::unique_ptr<ChunkRenderScene> m_scene;
     std::unique_ptr<TexturedCubeScene> m_texturedScene;
+    std::unique_ptr<EntityModelRegistry> m_benchmarkModels;
     bool m_running = true;
     bool m_backgrounded = false;
     bool m_cleaned = false;
+    int m_benchmarkFrames = 0;
+    int m_renderedFrames = 0;
+    RuntimeClock m_clock;
+    std::vector<double> m_frameSamples;
+    RendererPerformanceStats m_rendererTotals{};
+
+    int benchmarkWarmupFrames() const {
+        return m_benchmarkFrames >= 1800 ? 600 : 60;
+    }
+
+    void renderBenchmarkModels(const glm::mat4& viewProjection) {
+        static constexpr std::array<EntityType, 4> TYPES{
+            EntityType::Cow, EntityType::Pig,
+            EntityType::Sheep, EntityType::Chicken};
+        m_benchmarkModels->beginFrame();
+        for (uint64_t id = 1; id <= 128; ++id) {
+            const EntityType type = TYPES[static_cast<size_t>(id) % TYPES.size()];
+            m_benchmarkModels->setLocomotion(type, id, 1.0f);
+            m_benchmarkModels->advance(type, id, 1.0f / 60.0f);
+            const int row = static_cast<int>((id - 1) / 16);
+            const int column = static_cast<int>((id - 1) % 16);
+            m_benchmarkModels->queue(type, id,
+                glm::dvec3(column * 3 - 22, m_scene->groundHeight(),
+                           row * 3 - 10),
+                glm::vec3(0.0f, 0.0f, -1.0f), static_cast<uint32_t>(id),
+                glm::dvec3(0.0), glm::vec3(0.0f), m_renderer->modelRenderer(),
+                glm::vec3(1.0f), {1.0f, 0.0f});
+        }
+        m_benchmarkModels->endFrame();
+        m_renderer->flushModels(viewProjection);
+    }
+
+    void reportBenchmark() {
+        std::sort(m_frameSamples.begin(), m_frameSamples.end());
+        const auto percentile = [&](double fraction) {
+            const size_t index = std::min(m_frameSamples.size() - 1,
+                static_cast<size_t>(fraction * (m_frameSamples.size() - 1)));
+            return m_frameSamples[index];
+        };
+        double total = 0.0;
+        for (double sample : m_frameSamples) total += sample;
+        const double divisor = static_cast<double>(m_frameSamples.size());
+        std::cout << std::fixed << std::setprecision(3)
+                  << "MINECRAFTC_BENCHMARK frames=" << m_frameSamples.size()
+                  << " width=" << m_window.width()
+                  << " height=" << m_window.height()
+                  << " avg_ms=" << total / divisor
+                  << " p50_ms=" << percentile(0.50)
+                  << " p95_ms=" << percentile(0.95)
+                  << " p99_ms=" << percentile(0.99)
+                  << " wait_ms=" << m_rendererTotals.cpuWaitMs / divisor
+                  << " prepare_ms=" << m_rendererTotals.cpuPrepareMs / divisor
+                  << " record_ms=" << m_rendererTotals.cpuRecordMs / divisor
+                  << " submit_ms=" << m_rendererTotals.cpuSubmitMs / divisor
+                  << " draws=" << m_rendererTotals.drawCalls / m_frameSamples.size()
+                  << " pipeline_binds="
+                  << m_rendererTotals.pipelineBinds / m_frameSamples.size()
+                  << " descriptor_binds="
+                  << m_rendererTotals.descriptorBinds / m_frameSamples.size()
+                  << " buffer_binds="
+                  << m_rendererTotals.vertexBufferBinds / m_frameSamples.size()
+                  << '\n';
+    }
 };
 
 class Application final : public ApplicationHost {
@@ -1868,6 +1975,19 @@ private:
 
 std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
     std::optional<GraphicsApi> commandLineApi;
+    int benchmarkFrames = 0;
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument(argv[index]);
+        constexpr std::string_view prefix = "--benchmark-frames=";
+        if (argument.rfind(prefix.data(), 0) == 0) {
+            const std::string value = argument.substr(prefix.size());
+            size_t parsed = 0;
+            const long frames = std::stol(value, &parsed);
+            if (parsed != value.size() || frames <= 0 || frames > 100000)
+                throw std::runtime_error("Invalid benchmark frame count: " + value);
+            benchmarkFrames = static_cast<int>(frames);
+        }
+    }
     for (int index = 1; index < argc; ++index) {
         const std::string argument(argv[index]);
         if (argument == "--version") {
@@ -1882,7 +2002,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
 #else
                       << " [--renderer=opengl|opengl-demo]"
 #endif
-                      << "\n"
+                      << " [--benchmark-frames=N]\n"
                       << "Worlds and settings are stored in the platform user-data directory.\n";
             return {};
         }
@@ -1892,7 +2012,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
             Debug::installCrashHandlers();
             return std::make_unique<BasicRenderApplication>(
                 discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
-                GraphicsApi::Vulkan);
+                GraphicsApi::Vulkan, false, benchmarkFrames);
 #else
             throw std::runtime_error(
                 "Vulkan support is disabled; rebuild with "
@@ -1905,7 +2025,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
             Debug::installCrashHandlers();
             return std::make_unique<BasicRenderApplication>(
                 discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
-                GraphicsApi::Vulkan, true);
+                GraphicsApi::Vulkan, true, benchmarkFrames);
 #else
             throw std::runtime_error(
                 "Vulkan support is disabled; rebuild with "
@@ -1917,7 +2037,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
             Debug::installCrashHandlers();
             return std::make_unique<BasicRenderApplication>(
                 discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
-                GraphicsApi::OpenGL33);
+                GraphicsApi::OpenGL33, false, benchmarkFrames);
         }
         if (argument == "--renderer=opengl") {
             commandLineApi = GraphicsApi::OpenGL33;
@@ -1935,7 +2055,10 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         }
         if (argument.rfind("--renderer=", 0) == 0)
             throw std::runtime_error("Unknown renderer: " + argument.substr(11));
+        if (argument.rfind("--benchmark-frames=", 0) == 0) continue;
     }
+    if (benchmarkFrames > 0)
+        throw std::runtime_error("--benchmark-frames requires a renderer demo");
     RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
     GraphicsApi api = GraphicsApi::OpenGL33;
 #if defined(MINECRAFTC_ENABLE_VULKAN)

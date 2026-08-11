@@ -1,27 +1,29 @@
 #pragma once
 
 #include "renderer/Camera.h"
-#include "renderer/RenderDevice.h"
+#include "renderer/GameRenderer.h"
+#include "world/ChunkMesh.h"
 
 #include <filesystem>
+#include <functional>
+#include <vector>
 
 class ChunkRenderScene {
 public:
-    ChunkRenderScene(IRenderDevice& renderer,
-                     const std::filesystem::path& assetRoot);
+    ChunkRenderScene(IGameRenderer& renderer,
+                     const std::filesystem::path& assetRoot,
+                     int benchmarkGridRadius = 0);
     ~ChunkRenderScene();
     ChunkRenderScene(const ChunkRenderScene&) = delete;
     ChunkRenderScene& operator=(const ChunkRenderScene&) = delete;
-    void render(float aspectRatio);
+    using ExtraPass = std::function<void(const glm::mat4& viewProjection)>;
+    void render(float aspectRatio, const ExtraPass& extraPass = {});
+    float groundHeight() const { return m_groundHeight; }
 
 private:
-    IRenderDevice& m_renderer;
+    IGameRenderer& m_renderer;
     Camera m_camera{62.0f, 0.1f, 256.0f};
-    RenderMeshHandle m_mesh{};
-    RenderTextureHandle m_texture{};
-    RenderMaterialHandle m_material{};
-    RenderMaterialHandle m_translucentMaterial{};
-    uint32_t m_opaqueIndexCount = 0;
-    uint32_t m_translucentIndexOffset = 0;
-    uint32_t m_translucentIndexCount = 0;
+    float m_groundHeight = 0.0f;
+    ChunkMesh m_mesh;
+    std::vector<glm::mat4> m_instances;
 };

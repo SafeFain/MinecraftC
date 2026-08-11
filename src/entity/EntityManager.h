@@ -59,6 +59,7 @@ public:
                    const glm::vec3& velocity = glm::vec3(0.0f));
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned);
+    bool spawnMob(EntityType type, const glm::dvec3& position);
     void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
                   bool removeBlock = true);
     std::vector<glm::dvec3> takeExplosionEvents();
@@ -106,7 +107,6 @@ private:
     uint64_t m_lastStreamingRevision = std::numeric_limits<uint64_t>::max();
     std::vector<glm::dvec3> m_explosionEvents;
 
-    void spawnMob(EntityType type, const glm::dvec3& position);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
     void integrateVelocity(Entity& entity, float dt);

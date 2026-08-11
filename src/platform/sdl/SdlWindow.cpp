@@ -56,7 +56,10 @@ int projectModifiers(SDL_Keymod modifiers) {
 
 Window::Window(
     int width, int height, const std::string& title, int preferredSamples,
-    GraphicsApi graphicsApi) : m_graphicsApi(graphicsApi) {
+    GraphicsApi graphicsApi, bool synchronizePresentation,
+    bool highPixelDensity)
+    : m_synchronizePresentation(synchronizePresentation),
+      m_graphicsApi(graphicsApi) {
 #if defined(__ANDROID__) || defined(MINECRAFTC_FORCE_GLES3)
     if (m_graphicsApi == GraphicsApi::OpenGL33)
         m_graphicsApi = GraphicsApi::OpenGLES30;
@@ -75,7 +78,8 @@ Window::Window(
     }
     m_gamepads = std::make_unique<GamepadManager>();
 
-    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE;
+    if (highPixelDensity) flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
     flags |= m_graphicsApi == GraphicsApi::Vulkan
         ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL;
     if (m_graphicsApi == GraphicsApi::Vulkan) {
@@ -137,8 +141,8 @@ Window::Window(
             LOG_FATAL("Failed to create SDL OpenGL context: " << error);
             throw std::runtime_error("Failed to create OpenGL context");
         }
-        if (!SDL_GL_SetSwapInterval(1))
-            LOG_WARN("Could not enable VSync: " << SDL_GetError());
+        if (!SDL_GL_SetSwapInterval(m_synchronizePresentation ? 1 : 0))
+            LOG_WARN("Could not set OpenGL swap interval: " << SDL_GetError());
         refreshSizes();
         int srgb = 0;
         m_srgbCapable = SDL_GL_GetAttribute(

@@ -10,6 +10,11 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    require(entityTypeForSpawnEgg(SpawnEggMob::Cow) == EntityType::Cow &&
+            entityTypeForSpawnEgg(SpawnEggMob::Chicken) == EntityType::Chicken &&
+            entityTypeForSpawnEgg(SpawnEggMob::Zombie) == EntityType::Zombie &&
+            entityTypeForSpawnEgg(SpawnEggMob::Blastling) == EntityType::Blastling,
+            "spawn egg mob mapping diverged from shared entity types");
     require(selectEntityPlayback(0.0f, false, false) == EntityPlayback::Idle,
             "idle playback selection failed");
     require(selectEntityPlayback(0.2f, false, false) == EntityPlayback::Walk,

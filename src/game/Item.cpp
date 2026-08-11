@@ -2,6 +2,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 
@@ -162,6 +163,28 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SUNFLOWER_BOTTOM});
     set(ItemId::FLINT_AND_STEEL, {"Flint and Steel", ItemKind::Tool, 1, 64});
     set(ItemId::GUNPOWDER, {"Gunpowder"});
+
+    const std::array<std::pair<ItemId, SpawnEggMob>, 8> spawnEggs{{
+        {ItemId::COW_SPAWN_EGG, SpawnEggMob::Cow},
+        {ItemId::PIG_SPAWN_EGG, SpawnEggMob::Pig},
+        {ItemId::SHEEP_SPAWN_EGG, SpawnEggMob::Sheep},
+        {ItemId::CHICKEN_SPAWN_EGG, SpawnEggMob::Chicken},
+        {ItemId::ZOMBIE_SPAWN_EGG, SpawnEggMob::Zombie},
+        {ItemId::SKELETON_SPAWN_EGG, SpawnEggMob::Skeleton},
+        {ItemId::SPIDER_SPAWN_EGG, SpawnEggMob::Spider},
+        {ItemId::BLASTLING_SPAWN_EGG, SpawnEggMob::Blastling}
+    }};
+    const std::array<const char*, 8> spawnEggNames{{
+        "Cow Spawn Egg", "Pig Spawn Egg", "Sheep Spawn Egg",
+        "Chicken Spawn Egg", "Zombie Spawn Egg", "Skeleton Spawn Egg",
+        "Spider Spawn Egg", "Blastling Spawn Egg"
+    }};
+    for (size_t index = 0; index < spawnEggs.size(); ++index) {
+        ItemProperties properties{
+            spawnEggNames[index], ItemKind::SpawnEgg, 64};
+        properties.spawnEggMob = spawnEggs[index].second;
+        set(spawnEggs[index].first, std::move(properties));
+    }
 
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 

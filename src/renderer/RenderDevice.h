@@ -107,6 +107,18 @@ struct RenderDeviceCapabilities {
     bool chunkOpaqueCutout = false;
 };
 
+struct RendererPerformanceStats {
+    double cpuWaitMs = 0.0;
+    double cpuPrepareMs = 0.0;
+    double cpuRecordMs = 0.0;
+    double cpuSubmitMs = 0.0;
+    uint64_t uploadBytes = 0;
+    uint32_t drawCalls = 0;
+    uint32_t pipelineBinds = 0;
+    uint32_t descriptorBinds = 0;
+    uint32_t vertexBufferBinds = 0;
+};
+
 class IRenderDevice {
 public:
     virtual ~IRenderDevice() = default;
@@ -125,6 +137,7 @@ public:
     virtual void endFrame() = 0;
     virtual void resize(int width, int height) = 0;
     virtual void waitIdle() = 0;
+    virtual RendererPerformanceStats performanceStats() const { return {}; }
 };
 
 void validateMeshData(const MeshData& data);

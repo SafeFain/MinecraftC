@@ -181,7 +181,7 @@ std::vector<glm::dvec3> EntityManager::takeExplosionEvents() {
     return result;
 }
 
-void EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
+bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
     Entity entity;
     entity.id = m_nextId++;
     entity.type = type;
@@ -196,11 +196,14 @@ void EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
         case EntityType::Skeleton:
         case EntityType::Blastling: entity.health = 20.0f; break;
         case EntityType::Spider: entity.health = 16.0f; break;
-        case EntityType::Arrow: return;
-        case EntityType::PrimedTnt: return;
-        case EntityType::Item: return;
+        case EntityType::Arrow: return false;
+        case EntityType::PrimedTnt: return false;
+        case EntityType::Item: return false;
     }
+    if (collides(entity, position)) return false;
     m_entities.push_back(entity);
+    m_dirtyEntityChunks.insert(entityChunk(position));
+    return true;
 }
 
 bool EntityManager::hostile(EntityType type) {

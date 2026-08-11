@@ -609,6 +609,19 @@ void Player::placeBlock() {
     const ItemId activeItem = m_gameMode == GameMode::Survival
         ? m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id
         : m_selectedCreativeItem;
+    const auto& activeProperties = getItemProps(activeItem);
+    if (m_gameMode == GameMode::Creative && activeProperties.spawnEggMob) {
+        if (m_entities) {
+            const glm::dvec3 spawnPosition(
+                static_cast<double>(placePos.x) + 0.5,
+                static_cast<double>(placePos.y),
+                static_cast<double>(placePos.z) + 0.5);
+            m_entities->spawnMob(
+                entityTypeForSpawnEgg(*activeProperties.spawnEggMob),
+                spawnPosition);
+        }
+        return;
+    }
     if (activeItem == ItemId::FLINT_AND_STEEL) {
         bool used = false;
         if (targetedBlock == BlockId::TNT && m_entities) {

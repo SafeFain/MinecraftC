@@ -133,7 +133,11 @@ TextureData loadRgbaTexture(const std::filesystem::path& path) {
     return texture;
 }
 
-VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& modes) {
+VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& modes,
+                                  bool synchronize) {
+    if (!synchronize &&
+        std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_IMMEDIATE_KHR) != modes.end())
+        return VK_PRESENT_MODE_IMMEDIATE_KHR;
     return std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != modes.end()
         ? VK_PRESENT_MODE_MAILBOX_KHR : VK_PRESENT_MODE_FIFO_KHR;
 }
@@ -250,6 +254,11 @@ struct VulkanRenderer::Impl {
     struct GpuMesh {
         Buffer vertex;
         Buffer index;
+        uint32_t arenaPage = std::numeric_limits<uint32_t>::max();
+        VkDeviceSize vertexOffset = 0;
+        VkDeviceSize indexOffset = 0;
+        VkDeviceSize vertexBytes = 0;
+        VkDeviceSize indexBytes = 0;
         uint32_t indexCount = 0;
         MeshVertexLayout layout = MeshVertexLayout::PositionUv;
     };
@@ -321,11 +330,13 @@ struct VulkanRenderer::Impl {
     };
     struct PendingBufferUpload {
         VkBuffer destination = VK_NULL_HANDLE;
+        VkDeviceSize destinationOffset = 0;
         std::vector<uint8_t> bytes;
     };
     struct PreparedBufferCopy {
         VkBuffer destination = VK_NULL_HANDLE;
         VkDeviceSize sourceOffset = 0;
+        VkDeviceSize destinationOffset = 0;
         VkDeviceSize size = 0;
     };
     struct PendingImageUpload {
@@ -342,6 +353,18 @@ struct VulkanRenderer::Impl {
     struct UploadFrameBuffer {
         Buffer staging;
         VkDeviceSize capacity = 0;
+    };
+    struct FreeRange {
+        VkDeviceSize offset = 0;
+        VkDeviceSize size = 0;
+    };
+    struct ChunkArenaPage {
+        Buffer vertex;
+        Buffer index;
+        VkDeviceSize vertexCapacity = 0;
+        VkDeviceSize indexCapacity = 0;
+        std::vector<FreeRange> freeVertices;
+        std::vector<FreeRange> freeIndices;
     };
 
     explicit Impl(Window& owner, std::filesystem::path root)
@@ -447,6 +470,7 @@ struct VulkanRenderer::Impl {
     std::array<CloudFrameBuffer, FRAMES_IN_FLIGHT> cloudBuffers{};
     std::array<ModelFrameBuffer, FRAMES_IN_FLIGHT> modelBuffers{};
     std::array<UploadFrameBuffer, FRAMES_IN_FLIGHT> uploadBuffers{};
+    std::vector<ChunkArenaPage> chunkArenaPages;
     std::vector<ParticleRenderData> submittedParticles;
     SkyUniforms submittedSky{};
     ChunkEnvironmentUniforms submittedChunkEnvironment{};
@@ -481,6 +505,7 @@ struct VulkanRenderer::Impl {
     std::array<std::vector<GpuMesh>, FRAMES_IN_FLIGHT> retiredMeshes{};
     bool frameBegun = false;
     bool drawQueued = false;
+    RendererPerformanceStats performance{};
 
     void createInstance() {
         std::vector<std::string> extensionStorage =
@@ -669,6 +694,137 @@ struct VulkanRenderer::Impl {
         return result;
     }
 
+    static std::optional<VkDeviceSize> allocateRange(
+        std::vector<FreeRange>& ranges, VkDeviceSize size) {
+        for (size_t index = 0; index < ranges.size(); ++index) {
+            if (ranges[index].size < size) continue;
+            const VkDeviceSize offset = ranges[index].offset;
+            ranges[index].offset += size;
+            ranges[index].size -= size;
+            if (ranges[index].size == 0) ranges.erase(ranges.begin() + index);
+            return offset;
+        }
+        return std::nullopt;
+    }
+
+    static void releaseRange(std::vector<FreeRange>& ranges,
+                             VkDeviceSize offset, VkDeviceSize size) {
+        if (size == 0) return;
+        ranges.push_back({offset, size});
+        std::sort(ranges.begin(), ranges.end(),
+            [](const FreeRange& a, const FreeRange& b) {
+                return a.offset < b.offset;
+            });
+        size_t output = 0;
+        for (const FreeRange& range : ranges) {
+            if (output > 0 &&
+                ranges[output - 1].offset + ranges[output - 1].size == range.offset) {
+                ranges[output - 1].size += range.size;
+            } else {
+                ranges[output++] = range;
+            }
+        }
+        ranges.resize(output);
+    }
+
+    uint32_t createChunkArenaPage(VkDeviceSize vertexBytes,
+                                  VkDeviceSize indexBytes) {
+        constexpr VkDeviceSize INITIAL_VERTEX_BYTES = 8u * 1024u * 1024u;
+        constexpr VkDeviceSize INITIAL_INDEX_BYTES = 2u * 1024u * 1024u;
+        ChunkArenaPage page;
+        page.vertexCapacity = std::max(INITIAL_VERTEX_BYTES, vertexBytes);
+        page.indexCapacity = std::max(INITIAL_INDEX_BYTES, indexBytes);
+        page.vertex = createBuffer(page.vertexCapacity,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        try {
+            page.index = createBuffer(page.indexCapacity,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+        } catch (...) {
+            destroyBuffer(page.vertex);
+            throw;
+        }
+        page.freeVertices.push_back({0, page.vertexCapacity});
+        page.freeIndices.push_back({0, page.indexCapacity});
+        LOG_INFO("Vulkan Chunk arena page: " << page.vertexCapacity
+                 << " vertex bytes, " << page.indexCapacity << " index bytes");
+        chunkArenaPages.push_back(std::move(page));
+        return static_cast<uint32_t>(chunkArenaPages.size() - 1);
+    }
+
+    GpuMesh createChunkGeometry(const ChunkMesh& mesh) {
+        GpuMesh result;
+        result.vertexBytes = mesh.vertices.size() * sizeof(MeshVertex);
+        result.indexBytes = mesh.indices.size() * sizeof(uint32_t);
+        std::optional<VkDeviceSize> vertexOffset;
+        std::optional<VkDeviceSize> indexOffset;
+        for (uint32_t pageIndex = 0; pageIndex < chunkArenaPages.size(); ++pageIndex) {
+            ChunkArenaPage& page = chunkArenaPages[pageIndex];
+            vertexOffset = allocateRange(page.freeVertices, result.vertexBytes);
+            if (!vertexOffset) continue;
+            indexOffset = allocateRange(page.freeIndices, result.indexBytes);
+            if (indexOffset) {
+                result.arenaPage = pageIndex;
+                break;
+            }
+            releaseRange(page.freeVertices, *vertexOffset, result.vertexBytes);
+            vertexOffset.reset();
+        }
+        if (result.arenaPage == std::numeric_limits<uint32_t>::max()) {
+            result.arenaPage = createChunkArenaPage(
+                result.vertexBytes, result.indexBytes);
+            ChunkArenaPage& page = chunkArenaPages[result.arenaPage];
+            vertexOffset = allocateRange(page.freeVertices, result.vertexBytes);
+            indexOffset = allocateRange(page.freeIndices, result.indexBytes);
+        }
+        if (!vertexOffset || !indexOffset)
+            throw std::runtime_error("Vulkan Chunk arena allocation failed");
+        result.vertexOffset = *vertexOffset;
+        result.indexOffset = *indexOffset;
+        ChunkArenaPage& page = chunkArenaPages[result.arenaPage];
+        try {
+            PendingBufferUpload vertices;
+            vertices.destination = page.vertex.handle;
+            vertices.destinationOffset = result.vertexOffset;
+            vertices.bytes.resize(static_cast<size_t>(result.vertexBytes));
+            std::memcpy(vertices.bytes.data(), mesh.vertices.data(), vertices.bytes.size());
+            pendingBufferUploads.push_back(std::move(vertices));
+            PendingBufferUpload indices;
+            indices.destination = page.index.handle;
+            indices.destinationOffset = result.indexOffset;
+            indices.bytes.resize(static_cast<size_t>(result.indexBytes));
+            std::memcpy(indices.bytes.data(), mesh.indices.data(), indices.bytes.size());
+            pendingBufferUploads.push_back(std::move(indices));
+        } catch (...) {
+            destroyGpuMesh(result);
+            throw;
+        }
+        result.indexCount = static_cast<uint32_t>(mesh.indices.size());
+        result.layout = MeshVertexLayout::Chunk;
+        return result;
+    }
+
+    void destroyGpuMesh(GpuMesh& mesh) {
+        if (mesh.arenaPage != std::numeric_limits<uint32_t>::max()) {
+            ChunkArenaPage& page = chunkArenaPages.at(mesh.arenaPage);
+            pendingBufferUploads.erase(std::remove_if(
+                pendingBufferUploads.begin(), pendingBufferUploads.end(),
+                [&](const PendingBufferUpload& upload) {
+                    return (upload.destination == page.vertex.handle &&
+                            upload.destinationOffset == mesh.vertexOffset) ||
+                           (upload.destination == page.index.handle &&
+                            upload.destinationOffset == mesh.indexOffset);
+                }), pendingBufferUploads.end());
+            releaseRange(page.freeVertices, mesh.vertexOffset, mesh.vertexBytes);
+            releaseRange(page.freeIndices, mesh.indexOffset, mesh.indexBytes);
+        } else {
+            destroyBuffer(mesh.index);
+            destroyBuffer(mesh.vertex);
+        }
+        mesh = {};
+    }
+
     GpuTexture createTextureResource(const TextureData& data,
                                      const TextureSamplerDesc& samplerDesc) {
         GpuTexture result;
@@ -786,6 +942,8 @@ struct VulkanRenderer::Impl {
 
         skyBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
                                 VK_SHADER_STAGE_FRAGMENT_BIT;
+        info.bindingCount = 1;
+        info.pBindings = &skyBinding;
         require(vkCreateDescriptorSetLayout(
                     device, &info, nullptr, &chunkDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
@@ -796,6 +954,7 @@ struct VulkanRenderer::Impl {
         modelBinding.descriptorCount = 1;
         modelBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
                                   VK_SHADER_STAGE_FRAGMENT_BIT;
+        info.bindingCount = 1;
         info.pBindings = &modelBinding;
         require(vkCreateDescriptorSetLayout(
                     device, &info, nullptr, &modelUniformDescriptorSetLayout),
@@ -983,7 +1142,11 @@ struct VulkanRenderer::Impl {
         }
         info.preTransform = capabilities.currentTransform;
         info.compositeAlpha = chooseCompositeAlpha(capabilities.supportedCompositeAlpha);
-        info.presentMode = choosePresentMode(modes);
+        info.presentMode = choosePresentMode(modes, window.synchronizePresentation());
+        if (!window.synchronizePresentation() &&
+            info.presentMode != VK_PRESENT_MODE_IMMEDIATE_KHR)
+            LOG_WARN("Vulkan benchmark requested unsynchronized presentation, but "
+                     "VK_PRESENT_MODE_IMMEDIATE_KHR is unavailable");
         info.clipped = VK_TRUE;
         require(vkCreateSwapchainKHR(device, &info, nullptr, &swapchain),
                 "vkCreateSwapchainKHR");
@@ -1208,10 +1371,10 @@ struct VulkanRenderer::Impl {
             VkPipelineRasterizationStateCreateInfo raster{};
             raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
             raster.polygonMode = VK_POLYGON_MODE_FILL;
-            // Keep production Chunk geometry double-sided. Its CPU triangles
-            // are outward CCW, but the complete gameplay projection/viewport
-            // path does not yet preserve one reliable framebuffer winding for
-            // every generated face; back-face culling drops exposed top faces.
+            // Keep Chunk culling disabled. World-space winding alone is not a
+            // sufficient cross-driver proof of Vulkan front-facing behavior
+            // after projection and viewport transforms; enabling it previously
+            // removed exposed top and side faces on real gameplay cameras.
             raster.cullMode = VK_CULL_MODE_NONE;
             raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
             raster.lineWidth = 1.0f;
@@ -1979,6 +2142,7 @@ struct VulkanRenderer::Impl {
             std::memcpy(static_cast<uint8_t*>(frame.staging.mapped) + offset,
                         upload.bytes.data(), upload.bytes.size());
             preparedBufferCopies.push_back({upload.destination, offset,
+                upload.destinationOffset,
                 static_cast<VkDeviceSize>(upload.bytes.size())});
             offset += upload.bytes.size();
         }
@@ -1997,6 +2161,7 @@ struct VulkanRenderer::Impl {
         }
         require(vmaFlushAllocation(allocator, frame.staging.allocation, 0, offset),
                 "vmaFlushAllocation");
+        performance.uploadBytes = static_cast<uint64_t>(offset);
         pendingBufferUploads.clear();
         pendingImageUploads.clear();
     }
@@ -2042,6 +2207,13 @@ struct VulkanRenderer::Impl {
     }
 
     void prepareModelBuffer() {
+        // Opaque draws have no ordering requirement. Group equal model
+        // resources so their primitive buffers and texture descriptors remain
+        // hot while recording; blended submissions retain strict depth order.
+        std::stable_sort(submittedModelOpaque.begin(), submittedModelOpaque.end(),
+            [](const ModelPassSubmission& a, const ModelPassSubmission& b) {
+                return a.draw.model < b.draw.model;
+            });
         size_t count = 0;
         forEachModelPrimitive(submittedModelOpaque, false,
             [&](const auto&, auto&, auto&, const auto&) { ++count; });
@@ -2203,7 +2375,8 @@ struct VulkanRenderer::Impl {
                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
                     static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data());
             for (const PreparedBufferCopy& copy : preparedBufferCopies) {
-                const VkBufferCopy region{copy.sourceOffset, 0, copy.size};
+                const VkBufferCopy region{copy.sourceOffset,
+                                          copy.destinationOffset, copy.size};
                 vkCmdCopyBuffer(command, staging, copy.destination, 1, &region);
             }
             for (const PreparedImageCopy& copy : preparedImageCopies)
@@ -2265,6 +2438,9 @@ struct VulkanRenderer::Impl {
                 skyPipelineLayout, 0, 1,
                 &skyBuffers[currentFrame].descriptorSet, 0, nullptr);
             vkCmdDraw(command, 3, 1, 0, 0);
+            ++performance.drawCalls;
+            ++performance.pipelineBinds;
+            ++performance.descriptorBinds;
         }
         if (cloudsQueued && !cloudInstances.empty()) {
             vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -2280,7 +2456,14 @@ struct VulkanRenderer::Impl {
                 0, sizeof(constants), &constants);
             vkCmdDraw(command, 36,
                       static_cast<uint32_t>(cloudInstances.size()), 0, 0);
+            ++performance.drawCalls;
+            ++performance.pipelineBinds;
+            ++performance.vertexBufferBinds;
         }
+        VkDescriptorSet boundMaterialSet = VK_NULL_HANDLE;
+        VkDescriptorSet boundChunkSet = VK_NULL_HANDLE;
+        VkBuffer boundVertexBuffer = VK_NULL_HANDLE;
+        VkBuffer boundIndexBuffer = VK_NULL_HANDLE;
         for (const DrawCommand& draw : submittedDraws) {
             const auto meshIt = meshes.find(draw.mesh.value);
             const auto materialIt = materials.find(draw.material.value);
@@ -2302,17 +2485,40 @@ struct VulkanRenderer::Impl {
                 vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                   requestedPipeline);
                 boundPipeline = requestedPipeline;
+                ++performance.pipelineBinds;
             }
-            vkCmdBindVertexBuffers(command, 0, 1, &mesh.vertex.handle, &offset);
-            vkCmdBindIndexBuffer(command, mesh.index.handle, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout, 0, 1,
-                                    &material.descriptorSet, 0, nullptr);
-            if (material.desc.pipeline != MaterialPipeline::UnlitTextured)
+            const bool arenaMesh =
+                mesh.arenaPage != std::numeric_limits<uint32_t>::max();
+            const VkBuffer vertexBuffer = arenaMesh
+                ? chunkArenaPages[mesh.arenaPage].vertex.handle : mesh.vertex.handle;
+            const VkBuffer indexBuffer = arenaMesh
+                ? chunkArenaPages[mesh.arenaPage].index.handle : mesh.index.handle;
+            if (boundVertexBuffer != vertexBuffer) {
+                vkCmdBindVertexBuffers(command, 0, 1, &vertexBuffer, &offset);
+                boundVertexBuffer = vertexBuffer;
+                ++performance.vertexBufferBinds;
+            }
+            if (boundIndexBuffer != indexBuffer) {
+                vkCmdBindIndexBuffer(command, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                boundIndexBuffer = indexBuffer;
+                ++performance.vertexBufferBinds;
+            }
+            if (boundMaterialSet != material.descriptorSet) {
                 vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                        pipelineLayout, 1, 1,
-                                        &chunkBuffers[currentFrame].descriptorSet,
-                                        0, nullptr);
+                                        pipelineLayout, 0, 1,
+                                        &material.descriptorSet, 0, nullptr);
+                boundMaterialSet = material.descriptorSet;
+                ++performance.descriptorBinds;
+            }
+            if (material.desc.pipeline != MaterialPipeline::UnlitTextured &&
+                boundChunkSet != chunkBuffers[currentFrame].descriptorSet) {
+                vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipelineLayout, 1, 1, &chunkBuffers[currentFrame].descriptorSet,
+                    0, nullptr);
+                boundChunkSet = chunkBuffers[currentFrame].descriptorSet;
+                ++performance.descriptorBinds;
+            }
+            const uint32_t count = draw.indexCount ? draw.indexCount : mesh.indexCount;
             const FrameUniforms constants{
                 clipSpaceCorrection(GraphicsApi::Vulkan) * submittedFrame.projection *
                     submittedFrame.view * draw.model,
@@ -2321,13 +2527,22 @@ struct VulkanRenderer::Impl {
                  material.desc.alphaCutoff, framebufferSrgb ? 0.0f : 1.0f},
                 glm::vec4(glm::vec3(draw.model[3]), 0.0f), draw.tint};
             vkCmdPushConstants(command, pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT |
-                                   VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0, sizeof(constants), &constants);
-            const uint32_t count = draw.indexCount ? draw.indexCount : mesh.indexCount;
-            vkCmdDrawIndexed(command, count, 1, draw.firstIndex, 0, 0);
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                0, sizeof(constants), &constants);
+            const uint32_t firstIndex = arenaMesh
+                ? static_cast<uint32_t>(mesh.indexOffset / sizeof(uint32_t)) +
+                    draw.firstIndex
+                : draw.firstIndex;
+            const int32_t vertexOffset = arenaMesh
+                ? static_cast<int32_t>(mesh.vertexOffset / sizeof(MeshVertex)) : 0;
+            vkCmdDrawIndexed(command, count, 1, firstIndex, vertexOffset, 0);
+            ++performance.drawCalls;
         }
         uint32_t modelUniformIndex = 0;
+        VkPipeline boundModelPipeline = VK_NULL_HANDLE;
+        VkDescriptorSet boundModelMaterial = VK_NULL_HANDLE;
+        VkBuffer boundModelVertex = VK_NULL_HANDLE;
+        VkBuffer boundModelIndex = VK_NULL_HANDLE;
         const auto drawModels = [&](std::vector<ModelPassSubmission>& submissions,
                                     bool blended) {
             forEachModelPrimitive(submissions, blended,
@@ -2338,11 +2553,24 @@ struct VulkanRenderer::Impl {
                                                 : modelBlendPipeline)
                         : (material.doubleSided ? modelOpaqueDoubleSidedPipeline
                                                 : modelOpaquePipeline);
-                    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, selected);
-                    vkCmdBindVertexBuffers(command, 0, 1,
-                                           &primitive.vertex.handle, &offset);
-                    vkCmdBindIndexBuffer(command, primitive.index.handle, 0,
-                                         VK_INDEX_TYPE_UINT32);
+                    if (boundModelPipeline != selected) {
+                        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                          selected);
+                        boundModelPipeline = selected;
+                        ++performance.pipelineBinds;
+                    }
+                    if (boundModelVertex != primitive.vertex.handle) {
+                        vkCmdBindVertexBuffers(command, 0, 1,
+                                               &primitive.vertex.handle, &offset);
+                        boundModelVertex = primitive.vertex.handle;
+                        ++performance.vertexBufferBinds;
+                    }
+                    if (boundModelIndex != primitive.index.handle) {
+                        vkCmdBindIndexBuffer(command, primitive.index.handle, 0,
+                                             VK_INDEX_TYPE_UINT32);
+                        boundModelIndex = primitive.index.handle;
+                        ++performance.vertexBufferBinds;
+                    }
                     RenderMaterialHandle textureMaterial = modelFallbackMaterial;
                     if (material.image >= 0 && static_cast<size_t>(material.image) <
                         resource.textureMaterials.size())
@@ -2353,9 +2581,14 @@ struct VulkanRenderer::Impl {
                         ++modelUniformIndex;
                         return;
                     }
-                    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        modelPipelineLayout, 0, 1, &descriptor->second.descriptorSet,
-                        0, nullptr);
+                    if (boundModelMaterial != descriptor->second.descriptorSet) {
+                        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            modelPipelineLayout, 0, 1,
+                            &descriptor->second.descriptorSet,
+                            0, nullptr);
+                        boundModelMaterial = descriptor->second.descriptorSet;
+                        ++performance.descriptorBinds;
+                    }
                     const VkDeviceSize byteOffset =
                         modelUniformIndex++ * modelUniformStride;
                     if (byteOffset > std::numeric_limits<uint32_t>::max())
@@ -2365,7 +2598,9 @@ struct VulkanRenderer::Impl {
                         modelPipelineLayout, 1, 1,
                         &modelBuffers[currentFrame].descriptorSet,
                         1, &dynamicOffset);
+                    ++performance.descriptorBinds;
                     vkCmdDrawIndexed(command, primitive.indexCount, 1, 0, 0, 0);
+                    ++performance.drawCalls;
                 });
         };
         drawModels(submittedModelOpaque, false);
@@ -2440,11 +2675,15 @@ struct VulkanRenderer::Impl {
         if (presentationSuspended) resumePresentation();
         if (presentationSuspended || !swapchain) return;
         if (swapchainDirty) recreateSwapchain();
+        performance = {};
+        RuntimeClock clock;
+        auto mark = clock.now();
         require(vkWaitForFences(device, 1, &frameFences[currentFrame], VK_TRUE,
                                 UINT64_MAX), "vkWaitForFences");
+        performance.cpuWaitMs += RuntimeClock::seconds(
+            RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
         for (GpuMesh& mesh : retiredMeshes[currentFrame]) {
-            destroyBuffer(mesh.index);
-            destroyBuffer(mesh.vertex);
+            destroyGpuMesh(mesh);
         }
         retiredMeshes[currentFrame].clear();
         uint32_t imageIndex = 0;
@@ -2461,10 +2700,14 @@ struct VulkanRenderer::Impl {
         }
         if (acquire != VK_SUCCESS && acquire != VK_SUBOPTIMAL_KHR)
             require(acquire, "vkAcquireNextImageKHR");
+        mark = clock.now();
         if (imagesInFlight[imageIndex] != VK_NULL_HANDLE)
             require(vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE,
                                     UINT64_MAX), "vkWaitForFences");
+        performance.cpuWaitMs += RuntimeClock::seconds(
+            RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
         imagesInFlight[imageIndex] = frameFences[currentFrame];
+        mark = clock.now();
         prepareSkyBuffer();
         prepareChunkBuffer();
         prepareCloudBuffer();
@@ -2472,7 +2715,13 @@ struct VulkanRenderer::Impl {
         prepareModelBuffer();
         prepareUiBuffers();
         prepareBufferUploads();
+        performance.cpuPrepareMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
+        mark = clock.now();
         recordCommandBuffer(imageIndex);
+        performance.cpuRecordMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
+        mark = clock.now();
         require(vkResetFences(device, 1, &frameFences[currentFrame]), "vkResetFences");
         const VkPipelineStageFlags waitStage =
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2495,6 +2744,8 @@ struct VulkanRenderer::Impl {
         present.pSwapchains = &swapchain;
         present.pImageIndices = &imageIndex;
         const VkResult result = vkQueuePresentKHR(presentQueue, &present);
+        performance.cpuSubmitMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
         if (result == VK_ERROR_SURFACE_LOST_KHR) {
             suspendPresentation();
         } else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
@@ -2653,17 +2904,20 @@ struct VulkanRenderer::Impl {
         if (allocator) {
             for (auto& [id, mesh] : meshes) {
                 (void)id;
-                destroyBuffer(mesh.index);
-                destroyBuffer(mesh.vertex);
+                destroyGpuMesh(mesh);
             }
             meshes.clear();
             for (auto& retired : retiredMeshes) {
                 for (GpuMesh& mesh : retired) {
-                    destroyBuffer(mesh.index);
-                    destroyBuffer(mesh.vertex);
+                    destroyGpuMesh(mesh);
                 }
                 retired.clear();
             }
+            for (ChunkArenaPage& page : chunkArenaPages) {
+                destroyBuffer(page.index);
+                destroyBuffer(page.vertex);
+            }
+            chunkArenaPages.clear();
             for (auto& [id, texture] : textures) {
                 (void)id;
                 if (texture.sampler) vkDestroySampler(device, texture.sampler, nullptr);
@@ -2681,8 +2935,9 @@ struct VulkanRenderer::Impl {
                 destroyBuffer(buffer.instance);
             for (auto& buffer : skyBuffers)
                 destroyBuffer(buffer.uniform);
-            for (auto& buffer : chunkBuffers)
+            for (auto& buffer : chunkBuffers) {
                 destroyBuffer(buffer.uniform);
+            }
             for (auto& buffer : cloudBuffers)
                 destroyBuffer(buffer.instance);
             for (auto& buffer : modelBuffers)
@@ -3020,6 +3275,10 @@ void VulkanRenderer::waitIdle() {
     if (m_impl->device) require(vkDeviceWaitIdle(m_impl->device), "vkDeviceWaitIdle");
 }
 
+RendererPerformanceStats VulkanRenderer::performanceStats() const {
+    return m_impl ? m_impl->performance : RendererPerformanceStats{};
+}
+
 void VulkanRenderer::initialize(Window& window,
                                 const GraphicsCapabilities& capabilities,
                                 const std::filesystem::path& assetRoot) {
@@ -3157,14 +3416,17 @@ void VulkanRenderer::uploadChunkMesh(ChunkMesh& mesh) {
         return;
     }
     if (mesh.renderHandle) destroyMesh(mesh.renderHandle);
-    MeshData data;
-    data.layout = MeshVertexLayout::Chunk;
-    data.chunkVertices = mesh.vertices;
-    data.indices.assign(mesh.indices.begin(), mesh.indices.end());
-    data.opaqueIndexCount = static_cast<uint32_t>(mesh.opaqueIndexCount);
-    data.translucentIndexOffset = static_cast<uint32_t>(mesh.translucentIndexOffset);
-    data.translucentIndexCount = static_cast<uint32_t>(mesh.translucentIndexCount);
-    mesh.renderHandle = createMesh(data);
+    if (m_impl->nextMeshHandle == 0)
+        throw std::runtime_error("Vulkan mesh handle space exhausted");
+    const RenderMeshHandle handle{m_impl->nextMeshHandle++};
+    Impl::GpuMesh geometry = m_impl->createChunkGeometry(mesh);
+    try {
+        m_impl->meshes.emplace(handle.value, std::move(geometry));
+    } catch (...) {
+        m_impl->destroyGpuMesh(geometry);
+        throw;
+    }
+    mesh.renderHandle = handle;
     mesh.indexCount = mesh.indices.size();
     mesh.gpuReady = true;
 }

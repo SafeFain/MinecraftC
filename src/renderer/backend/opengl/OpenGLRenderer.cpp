@@ -269,6 +269,7 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
 // ── Frame management ──────────────────────────────────────────────────
 
 void Renderer::beginFrame() {
+    m_performanceStats = {};
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 }
 
@@ -411,6 +412,7 @@ void Renderer::destroyMaterial(RenderMaterialHandle handle) {
 }
 
 void Renderer::beginFrame(const FrameData& frame) {
+    m_performanceStats = {};
     m_basicFrame = frame;
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glEnable(GL_CULL_FACE));
@@ -431,6 +433,7 @@ void Renderer::draw(const DrawCommand& command) {
     const auto texture = m_basicTextures.find(material->second.desc.baseColorTexture.value);
     if (texture == m_basicTextures.end())
         throw std::logic_error("Material texture no longer exists");
+    ++m_performanceStats.drawCalls;
     if (material->second.desc.pipeline == MaterialPipeline::UnlitTextured && !m_basicShader) {
         m_basicShader = std::make_unique<Shader>(
             m_assetRoot / "shaders" / "basic_textured.vert",
@@ -621,6 +624,7 @@ void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
     size_t count = translucent ? mesh.translucentIndexCount : mesh.opaqueIndexCount;
     size_t offset = translucent ? mesh.translucentIndexOffset : 0;
     if (count == 0) return;
+    ++m_performanceStats.drawCalls;
 
     glm::mat4 mvp = viewProjection * modelMatrix;
 

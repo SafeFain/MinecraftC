@@ -5,12 +5,28 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
+#include "game/Item.h"
+
 enum class EntityType : uint8_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
     Arrow, PrimedTnt
 };
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };
+
+inline EntityType entityTypeForSpawnEgg(SpawnEggMob mob) {
+    switch (mob) {
+        case SpawnEggMob::Cow: return EntityType::Cow;
+        case SpawnEggMob::Pig: return EntityType::Pig;
+        case SpawnEggMob::Sheep: return EntityType::Sheep;
+        case SpawnEggMob::Chicken: return EntityType::Chicken;
+        case SpawnEggMob::Zombie: return EntityType::Zombie;
+        case SpawnEggMob::Skeleton: return EntityType::Skeleton;
+        case SpawnEggMob::Spider: return EntityType::Spider;
+        case SpawnEggMob::Blastling: return EntityType::Blastling;
+    }
+    return EntityType::Cow;
+}
 
 constexpr float ENTITY_WALK_SPEED_THRESHOLD = 0.05f;
 constexpr float ENTITY_DEATH_PRESENTATION_SECONDS = 1.0f;
