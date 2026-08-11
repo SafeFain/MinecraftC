@@ -64,7 +64,9 @@ exported symbol. The final Xcode application target owns both requirements via
 `OTHER_LDFLAGS` and `ios/MinecraftC.exports`; they are not attached to an
 intermediate renderer library. It also enables executable exports explicitly
 through CMake's `ENABLE_EXPORTS` and Xcode's `LD_EXPORT_SYMBOLS`, preventing
-Xcode from applying `-no_exported_symbols` to the final app.
+Xcode from applying `-no_exported_symbols` to the final app. Release archives
+use the `non-global` strip style: local symbols are removed, while the global
+MoltenVK entry required by SDL remains available to `dlsym`.
 
 Worlds, settings, and logs use the application preference directory. Assets and
 the GPL/MoltenVK license texts are read-only Bundle resources.

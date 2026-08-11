@@ -504,6 +504,18 @@ jobs:
               "$build_settings" >&2 || true
             exit 1
           fi
+          if ! grep -Eq '^[[:space:]]*STRIP_INSTALLED_PRODUCT = YES[[:space:]]*$' \
+            "$build_settings"; then
+            echo "MinecraftC Release app must remain stripped" >&2
+            grep -E 'STRIP_INSTALLED_PRODUCT|STRIP_STYLE' "$build_settings" >&2 || true
+            exit 1
+          fi
+          if ! grep -Eq '^[[:space:]]*STRIP_STYLE = non-global[[:space:]]*$' \
+            "$build_settings"; then
+            echo "MinecraftC Release app must preserve global symbols while stripping" >&2
+            grep -E 'STRIP_INSTALLED_PRODUCT|STRIP_STYLE' "$build_settings" >&2 || true
+            exit 1
+          fi
           if ! grep -E '^[[:space:]]*OTHER_LDFLAGS = .*[-]u,_vkGetInstanceProcAddr' \
             "$build_settings" >/dev/null; then
             echo "MinecraftC app target is missing the MoltenVK force-load reference" >&2
