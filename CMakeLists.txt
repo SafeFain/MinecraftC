@@ -31,24 +31,22 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
 set(MINECRAFTC_VULKAN_DEFAULT OFF)
-if(NOT ANDROID AND
-   (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32))
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     set(MINECRAFTC_VULKAN_DEFAULT ON)
 endif()
 option(MINECRAFTC_ENABLE_VULKAN
        "Build the Vulkan gameplay backend alongside OpenGL"
        ${MINECRAFTC_VULKAN_DEFAULT})
-if(NOT ANDROID AND
-   (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32) AND
+if((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32) AND
    NOT MINECRAFTC_ENABLE_VULKAN)
     message(FATAL_ERROR
-        "Linux and Windows builds require both the Vulkan and OpenGL render backends; "
+        "Android, Linux, and Windows builds require both the Vulkan and OpenGL render backends; "
         "MINECRAFTC_ENABLE_VULKAN cannot be disabled")
 elseif(MINECRAFTC_ENABLE_VULKAN AND
-       (ANDROID OR
-        (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)))
+       NOT ANDROID AND
+       NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)
     message(FATAL_ERROR
-        "MINECRAFTC_ENABLE_VULKAN supports Linux and Windows desktop only")
+        "MINECRAFTC_ENABLE_VULKAN supports Android, Linux, and Windows only")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -110,11 +108,19 @@ if(ANDROID)
     if(NOT MINECRAFTC_GLES_LIBRARY)
         message(FATAL_ERROR "Android OpenGL ES 3 library was not found")
     endif()
+    if(MINECRAFTC_ENABLE_VULKAN)
+        find_library(MINECRAFTC_VULKAN_LIBRARY vulkan)
+        if(NOT MINECRAFTC_VULKAN_LIBRARY)
+            message(FATAL_ERROR "Android Vulkan loader library was not found")
+        endif()
+        set(MINECRAFTC_VULKAN_TARGET ${MINECRAFTC_VULKAN_LIBRARY})
+    endif()
 else()
     find_package(OpenGL REQUIRED)
-endif()
-if(MINECRAFTC_ENABLE_VULKAN)
-    find_package(Vulkan REQUIRED)
+    if(MINECRAFTC_ENABLE_VULKAN)
+        find_package(Vulkan REQUIRED)
+        set(MINECRAFTC_VULKAN_TARGET Vulkan::Vulkan)
+    endif()
 endif()
 
 add_library(minecraftc_assets STATIC
@@ -196,7 +202,8 @@ endif()
 if(MINECRAFTC_ENABLE_VULKAN)
     target_compile_definitions(minecraftc_platform_sdl PRIVATE
         MINECRAFTC_ENABLE_VULKAN=1)
-    target_link_libraries(minecraftc_platform_sdl PRIVATE Vulkan::Vulkan)
+    target_link_libraries(minecraftc_platform_sdl PRIVATE
+        ${MINECRAFTC_VULKAN_TARGET})
 endif()
 
 add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
@@ -216,8 +223,13 @@ if(MINECRAFTC_ENABLE_VULKAN)
     target_include_directories(minecraftc_render_vulkan PRIVATE src)
     target_include_directories(minecraftc_render_vulkan SYSTEM PRIVATE
         external/VulkanMemoryAllocator/include external/stb)
+    target_compile_definitions(minecraftc_render_vulkan PRIVATE
+        MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        VMA_VULKAN_VERSION=1000000)
     target_link_libraries(minecraftc_render_vulkan PRIVATE
-        glm::glm Vulkan::Vulkan)
+        glm::glm ${MINECRAFTC_VULKAN_TARGET})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(minecraftc_render_vulkan PRIVATE
             -Wall -Wextra -Wpedantic)

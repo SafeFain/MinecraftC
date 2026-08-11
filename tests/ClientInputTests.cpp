@@ -35,6 +35,18 @@ glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
 int main(){
+    require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
+            defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::OpenGL&&
+            defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::OpenGL&&
+            defaultRendererBackend(DesktopPlatform::MacOS)==RendererBackend::OpenGL,
+            "Android alone defaults new settings to Vulkan");
+    require(migrateRendererBackend(DesktopPlatform::Android,9,
+                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
+            migrateRendererBackend(DesktopPlatform::Android,10,
+                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
+            migrateRendererBackend(DesktopPlatform::Linux,9,
+                RendererBackend::OpenGL)==RendererBackend::OpenGL,
+            "renderer migration upgrades only pre-v10 Android settings");
     const WindowSafeArea safe = projectWindowSafeArea(
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,

@@ -17,7 +17,25 @@ GamepadBinding axis(int code, bool positive) {
 }
 }
 
-ClientSettings::ClientSettings() { resetBindings(); resetGamepadBindings(); }
+RendererBackend defaultRendererBackend(DesktopPlatform platform) {
+    return platform == DesktopPlatform::Android
+        ? RendererBackend::Vulkan : RendererBackend::OpenGL;
+}
+
+RendererBackend migrateRendererBackend(DesktopPlatform platform,
+                                        int sourceFormatVersion,
+                                        RendererBackend stored) {
+    if (platform == DesktopPlatform::Android &&
+        sourceFormatVersion < ClientSettings::FORMAT_VERSION)
+        return RendererBackend::Vulkan;
+    return stored;
+}
+
+ClientSettings::ClientSettings() {
+    rendererBackend = defaultRendererBackend(currentDesktopPlatform());
+    resetBindings();
+    resetGamepadBindings();
+}
 
 void ClientSettings::resetBindings() {
     bindings = {key(Key::W), key(Key::S), key(Key::A), key(Key::D),
@@ -174,6 +192,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         if(!gamepadBindingRead[i])settings.gamepadBindings[i]=defaults.gamepadBindings[i];
     if (formatVersion < 8 && std::abs(settings.touchSensitivity - 1.0f) < .001f)
         settings.touchSensitivity = defaults.touchSensitivity;
+    settings.rendererBackend = migrateRendererBackend(
+        currentDesktopPlatform(), formatVersion, settings.rendererBackend);
     settings.validate();
     return settings;
 }

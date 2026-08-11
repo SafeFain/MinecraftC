@@ -98,8 +98,14 @@ public:
     }
 
     void event(ApplicationEvent event, const void* nativeEvent) override {
-        if (event == ApplicationEvent::EnterBackground) m_backgrounded = true;
-        if (event == ApplicationEvent::EnterForeground) m_backgrounded = false;
+        if (event == ApplicationEvent::EnterBackground) {
+            m_renderer->suspendPresentation();
+            m_backgrounded = true;
+        }
+        if (event == ApplicationEvent::EnterForeground) {
+            m_renderer->resumePresentation();
+            m_backgrounded = false;
+        }
         if (event == ApplicationEvent::Terminating) m_running = false;
         if (nativeEvent) m_window.handleEvent(nativeEvent);
     }
@@ -116,7 +122,7 @@ public:
 private:
     RuntimePaths m_paths;
     Window m_window;
-    std::unique_ptr<IRenderDevice> m_renderer;
+    std::unique_ptr<IGameRenderer> m_renderer;
     std::unique_ptr<ChunkRenderScene> m_scene;
     std::unique_ptr<TexturedCubeScene> m_texturedScene;
     bool m_running = true;
@@ -156,11 +162,13 @@ public:
     void event(ApplicationEvent event, const void* nativeEvent) override {
         switch (event) {
             case ApplicationEvent::EnterBackground:
+                m_renderer->suspendPresentation();
                 m_backgrounded = true;
                 m_touchControls.cancelAll();
                 saveCurrentWorld();
                 break;
             case ApplicationEvent::EnterForeground:
+                m_renderer->resumePresentation();
                 m_backgrounded = false;
                 m_lastFrameTick = m_runtimeClock.now();
                 break;

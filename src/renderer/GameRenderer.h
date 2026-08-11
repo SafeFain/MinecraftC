@@ -24,6 +24,8 @@ public:
                             const std::filesystem::path& assetRoot) = 0;
     virtual void reinitialize(const GraphicsCapabilities& capabilities,
                               const std::filesystem::path& assetRoot) = 0;
+    virtual void suspendPresentation() {}
+    virtual void resumePresentation() {}
     virtual void beginFrame() = 0;
     virtual void setEnvironment(const RenderEnvironment&, const glm::vec3&) = 0;
     virtual void renderSky(const RenderEnvironment&, const glm::mat4&,

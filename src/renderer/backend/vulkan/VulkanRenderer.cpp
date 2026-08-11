@@ -364,6 +364,7 @@ struct VulkanRenderer::Impl {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
     bool framebufferSrgb = true;
+    bool presentationSuspended = false;
     VkExtent2D swapchainExtent{};
     std::vector<VkImage> images;
     std::vector<VkImageView> imageViews;
@@ -472,7 +473,10 @@ struct VulkanRenderer::Impl {
         VkApplicationInfo application{};
         application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         application.pApplicationName = "MinecraftC Vulkan Basic Renderer";
-        application.applicationVersion = VK_MAKE_VERSION(1, 1, 5);
+        application.applicationVersion = VK_MAKE_VERSION(
+            MINECRAFTC_VERSION_MAJOR,
+            MINECRAFTC_VERSION_MINOR,
+            MINECRAFTC_VERSION_PATCH);
         application.pEngineName = "MinecraftC";
         application.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         application.apiVersion = VK_API_VERSION_1_0;
@@ -2392,6 +2396,8 @@ struct VulkanRenderer::Impl {
     void drawFrame() {
         if (window.isMinimized() || window.width() <= 0 || window.height() <= 0)
             return;
+        if (presentationSuspended) resumePresentation();
+        if (presentationSuspended || !swapchain) return;
         if (swapchainDirty) recreateSwapchain();
         require(vkWaitForFences(device, 1, &frameFences[currentFrame], VK_TRUE,
                                 UINT64_MAX), "vkWaitForFences");
@@ -2404,6 +2410,10 @@ struct VulkanRenderer::Impl {
         const VkResult acquire = vkAcquireNextImageKHR(
             device, swapchain, UINT64_MAX, imageAvailable[currentFrame],
             VK_NULL_HANDLE, &imageIndex);
+        if (acquire == VK_ERROR_SURFACE_LOST_KHR) {
+            suspendPresentation();
+            return;
+        }
         if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
             recreateSwapchain();
             return;
@@ -2444,7 +2454,10 @@ struct VulkanRenderer::Impl {
         present.pSwapchains = &swapchain;
         present.pImageIndices = &imageIndex;
         const VkResult result = vkQueuePresentKHR(presentQueue, &present);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+        if (result == VK_ERROR_SURFACE_LOST_KHR) {
+            suspendPresentation();
+        } else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+            result == VK_SUBOPTIMAL_KHR ||
             acquire == VK_SUBOPTIMAL_KHR) {
             swapchainDirty = true;
         } else if (result != VK_SUCCESS) {
@@ -2544,11 +2557,50 @@ struct VulkanRenderer::Impl {
     }
 
     void recreateSwapchain() {
+        if (presentationSuspended || !surface) return;
         if (window.isMinimized() || window.width() <= 0 || window.height() <= 0)
             return;
         require(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
         destroySwapchain();
         createSwapchain();
+    }
+
+    void suspendPresentation() {
+        if (presentationSuspended) return;
+        if (device) require(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
+        destroySwapchain();
+        if (surface && instance) vkDestroySurfaceKHR(instance, surface, nullptr);
+        surface = VK_NULL_HANDLE;
+        presentationSuspended = true;
+        swapchainDirty = false;
+        LOG_INFO("Vulkan presentation suspended");
+    }
+
+    void resumePresentation() {
+        if (!presentationSuspended) return;
+        if (window.isMinimized() || window.width() <= 0 || window.height() <= 0)
+            return;
+        VkSurfaceKHR replacement = reinterpret_cast<VkSurfaceKHR>(
+            window.createVulkanSurface(reinterpret_cast<void*>(instance)));
+        VkBool32 supported = VK_FALSE;
+        const VkResult supportResult = vkGetPhysicalDeviceSurfaceSupportKHR(
+            physicalDevice, presentFamily, replacement, &supported);
+        if (supportResult != VK_SUCCESS || !supported) {
+            vkDestroySurfaceKHR(instance, replacement, nullptr);
+            require(supportResult, "vkGetPhysicalDeviceSurfaceSupportKHR");
+            throw std::runtime_error(
+                "Vulkan presentation queue does not support the restored surface");
+        }
+        surface = replacement;
+        try {
+            createSwapchain();
+            presentationSuspended = false;
+            LOG_INFO("Vulkan presentation resumed");
+        } catch (...) {
+            if (surface) vkDestroySurfaceKHR(instance, surface, nullptr);
+            surface = VK_NULL_HANDLE;
+            throw;
+        }
     }
 
     void cleanup() {
@@ -2983,6 +3035,14 @@ void VulkanRenderer::reinitialize(const GraphicsCapabilities& capabilities,
     m_compatibilityCubes.fill({});
     m_impl.reset();
     initialize(*m_window, capabilities, assetRoot);
+}
+
+void VulkanRenderer::suspendPresentation() {
+    if (m_impl) m_impl->suspendPresentation();
+}
+
+void VulkanRenderer::resumePresentation() {
+    if (m_impl) m_impl->resumePresentation();
 }
 
 void VulkanRenderer::beginFrame() {

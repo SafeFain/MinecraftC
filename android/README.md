@@ -4,6 +4,12 @@ Requirements: Android SDK 35, NDK 28.2.13676358, CMake 3.22.1, JDK 17, and
 Gradle 8.9 or newer. The first configuration downloads the pinned SDL 3.4.10
 source archive and verifies its SHA-256 checksum.
 
+Android builds always include both Vulkan 1.0 and OpenGL ES 3.0 gameplay
+renderers; configuring with `MINECRAFTC_ENABLE_VULKAN=OFF` is unsupported. New
+installs prefer Vulkan and fall back to OpenGL ES when Vulkan initialization is
+unavailable. Vulkan is declared as an optional device feature, so GLES-only
+devices remain installable.
+
 ```bash
 gradle -p android assembleDebug
 gradle -p android assembleRelease

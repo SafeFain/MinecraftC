@@ -36,6 +36,8 @@ public:
                     const std::filesystem::path& assetRoot) override;
     void reinitialize(const GraphicsCapabilities& capabilities,
                       const std::filesystem::path& assetRoot) override;
+    void suspendPresentation() override;
+    void resumePresentation() override;
     void beginFrame() override;
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
     void renderSky(const RenderEnvironment&, const glm::mat4&, const glm::vec3&,

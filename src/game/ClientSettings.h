@@ -4,13 +4,14 @@
 #include <filesystem>
 
 #include "core/Input.h"
+#include "core/Platform.h"
 #include "game/Language.h"
 
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class RendererBackend : uint8_t { OpenGL, Vulkan };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 9;
+    static constexpr int FORMAT_VERSION = 10;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -44,3 +45,7 @@ struct ClientSettings {
 };
 
 int effectiveGuiScale(int framebufferWidth, int framebufferHeight, int configuredScale);
+RendererBackend defaultRendererBackend(DesktopPlatform platform);
+RendererBackend migrateRendererBackend(DesktopPlatform platform,
+                                        int sourceFormatVersion,
+                                        RendererBackend stored);

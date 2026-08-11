@@ -1,8 +1,8 @@
 # MinecraftC
 
-MinecraftC 是一款使用 C++17、SDL3 和 OpenGL 构建的体素沙盒游戏。桌面端使用
-OpenGL 3.3 Core，Android 端使用 OpenGL ES 3.0；Linux 和 Windows 构建同时包含
-Vulkan 和 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
+MinecraftC 是一款使用 C++17、SDL3、OpenGL 和 Vulkan 构建的体素沙盒游戏。
+桌面 OpenGL 使用 3.3 Core，Android OpenGL 使用 ES 3.0；Linux、Windows 和
+Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本由仓库根目录的 `VERSION` 文件定义；CMake、Android Gradle 和发布 CI
@@ -105,7 +105,10 @@ cmake --build build-local -j2
 
 ### Android
 
-要求 Android 10（API 29）或更新系统、arm64 和 OpenGL ES 3.0。构建工具版本：
+要求 Android 10（API 29）或更新系统、arm64 和 OpenGL ES 3.0。APK 始终包含
+Vulkan 1.0 与 OpenGL ES 3.0 后端：新安装默认尝试 Vulkan，设备不支持或初始化
+失败时自动回退 OpenGL ES，用户也可在视频设置中切换后端并重启生效。
+Vulkan 不是安装必需能力。构建工具版本：
 
 - Android SDK Platform 35、Build Tools 35.0.0
 - NDK 28.2.13676358、CMake 3.22.1

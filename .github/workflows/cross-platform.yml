@@ -228,6 +228,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
+      - name: Reject Android OpenGL-only configuration
+        shell: bash
+        run: |
+          set +e
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" \
+            -S . -B "$RUNNER_TEMP/android-opengl-only" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/28.2.13676358/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
+            -DMINECRAFTC_ENABLE_VULKAN=OFF \
+            > "$RUNNER_TEMP/android-opengl-only.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/android-opengl-only.log"
+          test "$status" -ne 0
+          grep -q "Android, Linux, and Windows builds require both" \
+            "$RUNNER_TEMP/android-opengl-only.log"
       - name: Build unsigned Android release APK
         run: gradle -p android assembleRelease --no-daemon
       - name: Verify Android release APK
@@ -242,6 +258,8 @@ jobs:
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "uses-gl-es: '0x30000'" "$RUNNER_TEMP/android-badging.txt"
+          grep -q "uses-feature-not-required:'android.hardware.vulkan.version'" \
+            "$RUNNER_TEMP/android-badging.txt"
           grep -q "native-code: 'arm64-v8a'" "$RUNNER_TEMP/android-badging.txt"
           unzip -Z1 "$source_apk" > "$RUNNER_TEMP/android-apk-files.txt"
           grep -Fxq 'assets/LICENSE' "$RUNNER_TEMP/android-apk-files.txt"
