@@ -11,11 +11,18 @@ void UIRenderer::initialize(IGameRenderer& renderer,
 #if defined(MINECRAFTC_ENABLE_VULKAN)
     if (api == GraphicsApi::Vulkan)
         m_backend = createVulkanUIBackend(renderer, atlas, root);
+#if defined(MINECRAFTC_ENABLE_OPENGL)
     else
+#endif
 #else
     (void)renderer;
 #endif
+#if defined(MINECRAFTC_ENABLE_OPENGL)
         m_backend = createOpenGLUIBackend(atlas, srgb, root, api);
+#else
+    (void)srgb;
+    (void)api;
+#endif
     if (!m_backend) throw std::runtime_error("Could not create UI renderer backend");
     m_backend->setLocalization(m_localization);
 }

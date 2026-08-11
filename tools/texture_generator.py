@@ -1004,6 +1004,48 @@ def build_entity_atlas(output,seed):
     (output/"entity_atlas.json").write_text(
         json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
+def build_ios_app_icon(output,seed):
+    """Build an opaque, nearest-filtered grass cube icon for the iOS bundle."""
+    size=64
+    canvas=[]
+    for y in range(size):
+        shade=27+(y*18)//(size-1)
+        canvas.extend([(shade,shade+8,shade+14,255)]*size)
+    top=generate_texture("grass_top",seed)
+    side=generate_texture("grass_side",seed)
+    dirt=generate_texture("dirt",seed)
+    for y in range(20,57):
+        inset=(y-20)//2
+        for x in range(8+inset,33):
+            u=((x-(8+inset))*15)//max(1,32-(8+inset))
+            v=((y-20)*15)//36
+            canvas[y*size+x]=side[v*SIZE+u]
+        for x in range(33,57-inset):
+            u=((x-33)*15)//max(1,(56-inset)-33)
+            v=((y-20)*15)//36
+            color=dirt[v*SIZE+u]
+            canvas[y*size+x]=(max(1,color[0]-12),max(1,color[1]-12),
+                              max(1,color[2]-12),255)
+    for y in range(8,35):
+        half_width=min(y-8,34-y)*2
+        if half_width<0: continue
+        left=32-half_width; right=32+half_width
+        for x in range(left,right+1):
+            u=((x-left)*15)//max(1,right-left)
+            v=((y-8)*15)//26
+            canvas[y*size+x]=top[v*SIZE+u]
+    scale=16
+    pixels=[]
+    for color in canvas:
+        pixels.extend([color]*scale)
+    scaled=[]
+    row=size*scale
+    for y in range(size):
+        source=pixels[y*row:(y+1)*row]
+        for _ in range(scale): scaled.extend(source)
+    output.parent.mkdir(parents=True,exist_ok=True)
+    write_png(output,size*scale,size*scale,scaled)
+
 # Compact 3x5 bitmap glyphs keep contact sheets dependency-free.
 FONT={c:bits for c,bits in {
 "0":"111101101101111","1":"010110010010111","2":"111001111100111","3":"111001111001111",
@@ -1069,6 +1111,9 @@ def parse_args(argv=None):
     parser.add_argument("--build-items-atlas",action="store_true")
     parser.add_argument("--build-entity-atlas",action="store_true")
     parser.add_argument("--build-entity-skins",action="store_true")
+    parser.add_argument("--build-ios-icon",action="store_true")
+    parser.add_argument("--ios-icon-output",type=Path,default=Path(
+        "ios/Assets.xcassets/AppIcon.appiconset/AppIcon.png"))
     parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
     parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
     parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
@@ -1077,7 +1122,7 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args=parse_args(argv)
-    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
+    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.build_ios_icon or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
         local_seeds=parse_local_seeds(args.local_seed)
@@ -1087,6 +1132,7 @@ def main(argv=None):
         if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
         if args.build_entity_atlas: build_entity_atlas(args.output,args.seed)
         if args.build_entity_skins: build_entity_skins(args.output,args.seed)
+        if args.build_ios_icon: build_ios_app_icon(args.ios_icon_output,args.seed)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0

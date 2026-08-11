@@ -36,9 +36,11 @@ public:
     virtual void setLocalization(const Localization* localization) = 0;
 };
 
+#if defined(MINECRAFTC_ENABLE_OPENGL)
 std::unique_ptr<IUIRenderBackend> createOpenGLUIBackend(
     RenderTextureHandle blockAtlasTexture, bool framebufferSrgb,
     const std::filesystem::path& assetRoot, GraphicsApi api);
+#endif
 #if defined(MINECRAFTC_ENABLE_VULKAN)
 std::unique_ptr<IUIRenderBackend> createVulkanUIBackend(
     IGameRenderer& renderer, RenderTextureHandle blockAtlasTexture,

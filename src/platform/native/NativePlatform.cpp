@@ -7,15 +7,21 @@
 #include <stdexcept>
 #include <vector>
 
+#if defined(__APPLE__)
+#  include <TargetConditionals.h>
+#endif
+
 #if defined(_WIN32)
 #  define NOMINMAX
 #  include <io.h>
 #  include <windows.h>
 #  include <shlobj.h>
 #elif defined(__APPLE__)
-#  include <mach-o/dyld.h>
-#  include <pwd.h>
 #  include <unistd.h>
+#  if !TARGET_OS_IPHONE
+#    include <mach-o/dyld.h>
+#    include <pwd.h>
+#  endif
 #else
 #  include <pwd.h>
 #  include <unistd.h>
@@ -34,7 +40,7 @@ bool isAssetRoot(const fs::path& path) {
            fs::is_regular_file(path / "textures" / "definitions" / "blocks.json");
 }
 
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IPHONE)
 fs::path executablePathFromSystem(const char* argv0) {
 #if defined(_WIN32)
     std::vector<wchar_t> buffer(512);
@@ -102,6 +108,8 @@ fs::path unixHomeDirectory() {
 DesktopPlatform currentDesktopPlatform() {
 #if defined(__ANDROID__)
     return DesktopPlatform::Android;
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+    return DesktopPlatform::IOS;
 #elif defined(_WIN32)
     return DesktopPlatform::Windows;
 #elif defined(__APPLE__)
@@ -158,6 +166,7 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
                 result.dataRoot = inputs.homeDirectory / ".local" / "share" / "minecraftc";
             break;
         case DesktopPlatform::Android:
+        case DesktopPlatform::IOS:
             break;
     }
     if (result.dataRoot.empty())
@@ -166,11 +175,11 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
 }
 
 RuntimePaths discoverRuntimePaths(const char* argv0) {
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
     (void)argv0;
     RuntimePaths result;
     result.dataRoot = platform::sdl::preferencePath();
-    // An empty title-storage override selects the APK asset namespace.
+    // An empty title-storage override selects the packaged mobile asset namespace.
     result.assetRoot.clear();
     return result;
 #else

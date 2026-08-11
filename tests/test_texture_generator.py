@@ -16,6 +16,18 @@ class TextureGeneratorTests(unittest.TestCase):
         return (root / "assets/textures/definitions/item_icons.json",
                 root / "assets/textures/definitions/blocks.json")
 
+    def test_ios_app_icon_is_deterministic_opaque_and_complete(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            a = Path(first) / "AppIcon.png"
+            b = Path(second) / "AppIcon.png"
+            tg.build_ios_app_icon(a, tg.DEFAULT_SEED)
+            tg.build_ios_app_icon(b, tg.DEFAULT_SEED)
+            self.assertEqual(a.read_bytes(), b.read_bytes())
+            width, height, pixels = tg.read_generated_png(a)
+            self.assertEqual((width, height), (1024, 1024))
+            self.assertTrue(all(pixel[3] == 255 for pixel in pixels))
+            self.assertGreater(len(set(pixels)), 16)
+
     def test_entity_atlas_is_deterministic_and_complete(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             a, b = Path(first), Path(second)

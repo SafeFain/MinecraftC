@@ -6,8 +6,12 @@
 #include <cstdio>
 #include <cstdlib>
 
+#if defined(__APPLE__)
+#  include <TargetConditionals.h>
+#endif
+
 // POSIX backtrace support is available on glibc and macOS.
-#if defined(__GLIBC__) || defined(__APPLE__)
+#if defined(__GLIBC__) || (defined(__APPLE__) && !TARGET_OS_IPHONE)
 #  include <execinfo.h>
 #  define HAS_BACKTRACE 1
 #else

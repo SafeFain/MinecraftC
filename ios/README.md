@@ -1,0 +1,45 @@
+# MinecraftC for iOS
+
+The iOS client supports iOS 14 or newer on arm64 iPhone and iPad devices. It is
+landscape-only and builds only the complete Vulkan renderer, statically linked
+to MoltenVK 1.4.1. OpenGL cannot be enabled for this target.
+
+## Dependencies
+
+- Full Xcode installation
+- CMake 3.28 or newer
+- MoltenVK 1.4.1 `MoltenVK-all.tar`, extracted without changing its layout
+
+The path passed as `MINECRAFTC_MOLTENVK_ROOT` is the extracted top-level
+`MoltenVK` directory containing `MoltenVK/`, `LICENSE`, and `Docs/`.
+
+## Simulator build
+
+```bash
+cmake -S . -B build-ios-simulator -G Xcode \
+  -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=iphonesimulator \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+  -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+  -DMINECRAFTC_ENABLE_OPENGL=OFF \
+  -DMINECRAFTC_ENABLE_VULKAN=ON \
+  -DMINECRAFTC_MOLTENVK_ROOT=/path/to/MoltenVK
+cmake --build build-ios-simulator --config Release --parallel 2
+```
+
+The application is written to
+`build-ios-simulator/Release-iphonesimulator/MinecraftC.app`. Install and launch
+it with Xcode or `xcrun simctl install` and `xcrun simctl launch`.
+
+## Device build and signing
+
+Configure a separate directory with `-DCMAKE_OSX_SYSROOT=iphoneos` and
+`-DCMAKE_OSX_ARCHITECTURES=arm64`. The generated project disables signing so CI
+can create an unsigned archive. For a local device build, open the generated
+Xcode project, select the `minecraftc` target, choose a development team, and
+enable automatic or manual signing. App Store/TestFlight export is intentionally
+outside the unsigned release workflow.
+
+Worlds, settings, and logs use the application preference directory. Assets and
+the GPL/MoltenVK license texts are read-only Bundle resources.

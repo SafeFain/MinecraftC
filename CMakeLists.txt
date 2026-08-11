@@ -7,7 +7,7 @@ if(NOT MINECRAFTC_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
 endif()
 project(MinecraftC VERSION "${MINECRAFTC_VERSION}" LANGUAGES CXX C)
 
-if(ANDROID)
+if(ANDROID OR IOS)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
@@ -30,23 +30,50 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
        "Use the static MSVC runtime for portable Windows packages" OFF)
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
+set(MINECRAFTC_OPENGL_DEFAULT ON)
+if(IOS)
+    set(MINECRAFTC_OPENGL_DEFAULT OFF)
+endif()
+option(MINECRAFTC_ENABLE_OPENGL
+       "Build the OpenGL/OpenGL ES gameplay backend"
+       ${MINECRAFTC_OPENGL_DEFAULT})
 set(MINECRAFTC_VULKAN_DEFAULT OFF)
-if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR APPLE)
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR APPLE OR IOS)
     set(MINECRAFTC_VULKAN_DEFAULT ON)
 endif()
 option(MINECRAFTC_ENABLE_VULKAN
-       "Build the Vulkan gameplay backend alongside OpenGL"
+       "Build the Vulkan gameplay backend"
        ${MINECRAFTC_VULKAN_DEFAULT})
-if((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR APPLE) AND
+if(IOS AND MINECRAFTC_ENABLE_OPENGL)
+    message(FATAL_ERROR
+        "iOS is Vulkan-only; MINECRAFTC_ENABLE_OPENGL cannot be enabled")
+elseif(IOS AND NOT MINECRAFTC_ENABLE_VULKAN)
+    message(FATAL_ERROR
+        "iOS is Vulkan-only; MINECRAFTC_ENABLE_VULKAN cannot be disabled")
+elseif((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR
+        (APPLE AND NOT IOS)) AND
    NOT MINECRAFTC_ENABLE_VULKAN)
     message(FATAL_ERROR
         "Android, Linux, Windows, and macOS builds require both the Vulkan and OpenGL render backends; "
         "MINECRAFTC_ENABLE_VULKAN cannot be disabled")
+elseif((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR
+        (APPLE AND NOT IOS)) AND
+       NOT MINECRAFTC_ENABLE_OPENGL)
+    message(FATAL_ERROR
+        "Android, Linux, Windows, and macOS builds require both the Vulkan and OpenGL render backends; "
+        "MINECRAFTC_ENABLE_OPENGL cannot be disabled")
 elseif(MINECRAFTC_ENABLE_VULKAN AND
        NOT ANDROID AND
-       NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32 AND NOT APPLE)
+       NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32 AND NOT APPLE AND
+       NOT IOS)
     message(FATAL_ERROR
-        "MINECRAFTC_ENABLE_VULKAN supports Android, Linux, Windows, and macOS only")
+        "MINECRAFTC_ENABLE_VULKAN supports Android, Linux, Windows, macOS, and iOS only")
+endif()
+if(IOS AND CMAKE_VERSION VERSION_LESS 3.28)
+    message(FATAL_ERROR "iOS builds require CMake 3.28 or newer")
+endif()
+if(IOS AND MINECRAFTC_DESKTOP_GLES3)
+    message(FATAL_ERROR "MINECRAFTC_DESKTOP_GLES3 is not available for iOS")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -86,12 +113,21 @@ else()
     set(SDL_DIALOG OFF CACHE BOOL "" FORCE)
     set(SDL_GPU OFF CACHE BOOL "" FORCE)
     set(SDL_HAPTIC ON CACHE BOOL "" FORCE)
-    set(SDL_HIDAPI ON CACHE BOOL "" FORCE)
+    if(IOS)
+        set(SDL_HIDAPI OFF CACHE BOOL "" FORCE)
+    else()
+        set(SDL_HIDAPI ON CACHE BOOL "" FORCE)
+    endif()
     set(SDL_JOYSTICK ON CACHE BOOL "" FORCE)
     set(SDL_POWER OFF CACHE BOOL "" FORCE)
     set(SDL_RENDER OFF CACHE BOOL "" FORCE)
     set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
     set(SDL_TRAY OFF CACHE BOOL "" FORCE)
+    if(IOS)
+        set(SDL_OPENGL OFF CACHE BOOL "" FORCE)
+        set(SDL_OPENGLES OFF CACHE BOOL "" FORCE)
+        set(SDL_VULKAN ON CACHE BOOL "" FORCE)
+    endif()
     FetchContent_Declare(SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
         GIT_TAG release-3.4.10
@@ -116,20 +152,35 @@ if(ANDROID)
         set(MINECRAFTC_VULKAN_TARGET ${MINECRAFTC_VULKAN_LIBRARY})
     endif()
 else()
-    find_package(OpenGL REQUIRED)
+    if(MINECRAFTC_ENABLE_OPENGL)
+        find_package(OpenGL REQUIRED)
+    endif()
     if(MINECRAFTC_ENABLE_VULKAN)
         if(APPLE)
             set(MINECRAFTC_MOLTENVK_ROOT "" CACHE PATH
-                "Root of the extracted MoltenVK macOS runtime package")
+                "Root of the extracted MoltenVK Apple runtime package")
             if(NOT MINECRAFTC_MOLTENVK_ROOT)
                 message(FATAL_ERROR
-                    "macOS Vulkan builds require MINECRAFTC_MOLTENVK_ROOT to point to "
+                    "Apple Vulkan builds require MINECRAFTC_MOLTENVK_ROOT to point to "
                     "the extracted MoltenVK package root")
             endif()
             set(MINECRAFTC_MOLTENVK_INCLUDE_DIR
                 "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/include")
-            set(MINECRAFTC_MOLTENVK_LIBRARY
-                "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib")
+            if(IOS)
+                set(MINECRAFTC_MOLTENVK_XCFRAMEWORK
+                    "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/static/MoltenVK.xcframework")
+                string(TOLOWER "${CMAKE_OSX_SYSROOT}" MINECRAFTC_IOS_SYSROOT)
+                if(MINECRAFTC_IOS_SYSROOT MATCHES "iphonesimulator")
+                    set(MINECRAFTC_MOLTENVK_LIBRARY
+                        "${MINECRAFTC_MOLTENVK_XCFRAMEWORK}/ios-arm64_x86_64-simulator/libMoltenVK.a")
+                else()
+                    set(MINECRAFTC_MOLTENVK_LIBRARY
+                        "${MINECRAFTC_MOLTENVK_XCFRAMEWORK}/ios-arm64/libMoltenVK.a")
+                endif()
+            else()
+                set(MINECRAFTC_MOLTENVK_LIBRARY
+                    "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib")
+            endif()
             set(MINECRAFTC_MOLTENVK_LICENSE
                 "${MINECRAFTC_MOLTENVK_ROOT}/LICENSE")
             foreach(MOLTENVK_FILE IN ITEMS
@@ -141,7 +192,11 @@ else()
                         "MoltenVK package is incomplete: ${MOLTENVK_FILE} was not found")
                 endif()
             endforeach()
-            add_library(minecraftc_moltenvk SHARED IMPORTED GLOBAL)
+            if(IOS)
+                add_library(minecraftc_moltenvk STATIC IMPORTED GLOBAL)
+            else()
+                add_library(minecraftc_moltenvk SHARED IMPORTED GLOBAL)
+            endif()
             set_target_properties(minecraftc_moltenvk PROPERTIES
                 IMPORTED_LOCATION "${MINECRAFTC_MOLTENVK_LIBRARY}"
                 INTERFACE_INCLUDE_DIRECTORIES "${MINECRAFTC_MOLTENVK_INCLUDE_DIR}")
@@ -162,12 +217,14 @@ link_libraries(minecraftc_assets)
 
 # ── GLAD (minimal OpenGL loader) ───────────────────────────────────────
 
-add_library(glad STATIC
-    external/glad/src/glad.c
-)
-# Compile glad as C++ (uses reinterpret_cast, extern "C")
-set_source_files_properties(external/glad/src/glad.c PROPERTIES LANGUAGE CXX)
-target_include_directories(glad PUBLIC external/glad/include)
+if(MINECRAFTC_ENABLE_OPENGL)
+    add_library(glad STATIC
+        external/glad/src/glad.c
+    )
+    # Compile glad as C++ (uses reinterpret_cast, extern "C")
+    set_source_files_properties(external/glad/src/glad.c PROPERTIES LANGUAGE CXX)
+    target_include_directories(glad PUBLIC external/glad/include)
+endif()
 
 # ── Main executable ────────────────────────────────────────────────────
 
@@ -226,6 +283,10 @@ target_include_directories(minecraftc_platform_sdl PRIVATE src)
 target_compile_definitions(minecraftc_platform_sdl PRIVATE
     MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(minecraftc_platform_sdl PRIVATE ${MINECRAFTC_SDL_TARGET})
+if(MINECRAFTC_ENABLE_OPENGL)
+    target_compile_definitions(minecraftc_platform_sdl PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1)
+endif()
 if(MINECRAFTC_DESKTOP_GLES3)
     target_compile_definitions(minecraftc_platform_sdl PRIVATE
         MINECRAFTC_FORCE_GLES3=1)
@@ -236,16 +297,20 @@ if(MINECRAFTC_ENABLE_VULKAN)
     target_link_libraries(minecraftc_platform_sdl PRIVATE
         ${MINECRAFTC_VULKAN_TARGET})
 endif()
-add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
-target_include_directories(minecraftc_render_opengl PRIVATE
-    src external/glad/include external/stb external)
-target_link_libraries(minecraftc_render_opengl PRIVATE
-    glad glm::glm minecraftc_assets ${MINECRAFTC_SDL_TARGET})
-if(ANDROID)
+if(MINECRAFTC_ENABLE_OPENGL)
+    add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
+    target_include_directories(minecraftc_render_opengl PRIVATE
+        src external/glad/include external/stb external)
+    target_compile_definitions(minecraftc_render_opengl PUBLIC
+        MINECRAFTC_ENABLE_OPENGL=1)
     target_link_libraries(minecraftc_render_opengl PRIVATE
-        ${MINECRAFTC_GLES_LIBRARY} android log)
-else()
-    target_link_libraries(minecraftc_render_opengl PRIVATE OpenGL::GL)
+        glad glm::glm minecraftc_assets ${MINECRAFTC_SDL_TARGET})
+    if(ANDROID)
+        target_link_libraries(minecraftc_render_opengl PRIVATE
+            ${MINECRAFTC_GLES_LIBRARY} android log)
+    else()
+        target_link_libraries(minecraftc_render_opengl PRIVATE OpenGL::GL)
+    endif()
 endif()
 if(MINECRAFTC_ENABLE_VULKAN)
     add_library(minecraftc_render_vulkan STATIC
@@ -258,6 +323,8 @@ if(MINECRAFTC_ENABLE_VULKAN)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
+    target_compile_definitions(minecraftc_render_vulkan PUBLIC
+        MINECRAFTC_ENABLE_VULKAN=1)
     target_link_libraries(minecraftc_render_vulkan PRIVATE
         glm::glm ${MINECRAFTC_VULKAN_TARGET})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -271,9 +338,43 @@ elseif(MSVC)
     target_compile_options(minecraftc_platform PRIVATE /W4 /permissive- /utf-8)
 endif()
 
+set(MINECRAFTC_IOS_RESOURCES)
+if(IOS)
+    file(GLOB_RECURSE MINECRAFTC_IOS_ASSET_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+    foreach(IOS_ASSET IN LISTS MINECRAFTC_IOS_ASSET_FILES)
+        file(RELATIVE_PATH IOS_ASSET_RELATIVE
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${IOS_ASSET}")
+        get_filename_component(IOS_ASSET_DIRECTORY "${IOS_ASSET_RELATIVE}" DIRECTORY)
+        set_source_files_properties("${IOS_ASSET}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources/${IOS_ASSET_DIRECTORY}")
+        list(APPEND MINECRAFTC_IOS_RESOURCES "${IOS_ASSET}")
+    endforeach()
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources")
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ios")
+    configure_file("${MINECRAFTC_MOLTENVK_LICENSE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/ios/MoltenVK-LICENSE.txt" COPYONLY)
+    set_source_files_properties(
+        "${CMAKE_CURRENT_BINARY_DIR}/ios/MoltenVK-LICENSE.txt" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/licenses")
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources")
+    list(APPEND MINECRAFTC_IOS_RESOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+        "${CMAKE_CURRENT_BINARY_DIR}/ios/MoltenVK-LICENSE.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets")
+endif()
+
 if(ANDROID)
     set(MINECRAFTC_APP_TARGET main)
     add_library(${MINECRAFTC_APP_TARGET} SHARED ${SOURCES})
+elseif(IOS)
+    set(MINECRAFTC_APP_TARGET minecraftc)
+    add_executable(${MINECRAFTC_APP_TARGET} MACOSX_BUNDLE
+        ${SOURCES} ${MINECRAFTC_IOS_RESOURCES})
 else()
     set(MINECRAFTC_APP_TARGET minecraftc)
     add_executable(${MINECRAFTC_APP_TARGET} ${SOURCES})
@@ -289,6 +390,10 @@ target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE
 )
 target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
     MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+if(MINECRAFTC_ENABLE_OPENGL)
+    target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1)
+endif()
 if(MINECRAFTC_DESKTOP_GLES3)
     target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
         MINECRAFTC_FORCE_GLES3=1)
@@ -309,17 +414,51 @@ target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
     glm::glm
     minecraftc_platform
     minecraftc_platform_sdl
-    minecraftc_render_opengl
     ${CMAKE_DL_LIBS}
 )
+if(MINECRAFTC_ENABLE_OPENGL)
+    target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
+        minecraftc_render_opengl)
+endif()
 if(MINECRAFTC_ENABLE_VULKAN)
     target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
         minecraftc_render_vulkan)
 endif()
-if(APPLE)
+if(APPLE AND NOT IOS)
     set_target_properties(${MINECRAFTC_APP_TARGET} PROPERTIES
         BUILD_RPATH "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS"
         INSTALL_RPATH "@executable_path")
+endif()
+if(IOS)
+    math(EXPR MINECRAFTC_IOS_BUILD_NUMBER
+        "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
+    configure_file(ios/Info.plist.in
+        "${CMAKE_CURRENT_BINARY_DIR}/ios/Info.plist" @ONLY)
+    set_target_properties(${MINECRAFTC_APP_TARGET} PROPERTIES
+        OUTPUT_NAME "MinecraftC"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/ios/Info.plist"
+        MACOSX_BUNDLE_BUNDLE_NAME "MinecraftC"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.SafeFain.MinecraftC"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${MINECRAFTC_IOS_BUILD_NUMBER}"
+        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+        XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.SafeFain.MinecraftC"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_GENERATE_SCHEME TRUE)
+    target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE
+        "-ObjC"
+        "-Wl,-u,_vkGetInstanceProcAddr"
+        "-Wl,-exported_symbol,_vkGetInstanceProcAddr")
+    foreach(IOS_FRAMEWORK IN ITEMS Metal UIKit QuartzCore Foundation
+                                   CoreGraphics IOSurface)
+        find_library(MINECRAFTC_${IOS_FRAMEWORK}_FRAMEWORK ${IOS_FRAMEWORK}
+            REQUIRED)
+        target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
+            ${MINECRAFTC_${IOS_FRAMEWORK}_FRAMEWORK})
+    endforeach()
 endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
@@ -348,7 +487,7 @@ endif()
 
 # ── Install ────────────────────────────────────────────────────────────
 
-if(ANDROID)
+if(ANDROID OR IOS)
     # The Gradle project packages native libraries and assets.
 elseif(MINECRAFTC_PORTABLE_LAYOUT)
     install(TARGETS minecraftc RUNTIME DESTINATION .)
@@ -380,7 +519,7 @@ endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────
 include(CTest)
-if(ANDROID)
+if(ANDROID OR IOS)
     set(BUILD_TESTING OFF CACHE BOOL "Build tests" FORCE)
 endif()
 if(BUILD_TESTING)
@@ -643,6 +782,7 @@ if(BUILD_TESTING)
     target_include_directories(entity_model_registry_tests PRIVATE
         src external external/cgltf external/stb external/glad/include)
     target_compile_definitions(entity_model_registry_tests PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1
         MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
     target_link_libraries(entity_model_registry_tests PRIVATE
         glm::glm glad ${MINECRAFTC_SDL_TARGET} OpenGL::GL minecraftc_platform)

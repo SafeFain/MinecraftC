@@ -258,6 +258,173 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+  ios-arm64:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read project version
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Install pinned MoltenVK and shader compiler
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/MoltenVK-all-1.4.1.tar"
+          root="$RUNNER_TEMP/moltenvk"
+          curl -L --fail --silent --show-error \
+            https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-all.tar \
+            -o "$archive"
+          echo "2c498bf8c98b88ba1e84c1f153403d4c1a8490c122d9e2a3df238b25d4e10557  $archive" \
+            | shasum -a 256 -c -
+          mkdir -p "$root"
+          tar -xf "$archive" -C "$root"
+          test -f "$root/MoltenVK/MoltenVK/include/vulkan/vulkan.h"
+          test -f "$root/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a"
+          test -f "$root/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64_x86_64-simulator/libMoltenVK.a"
+          test -f "$root/MoltenVK/LICENSE"
+          echo "MINECRAFTC_MOLTENVK_ROOT=$root/MoltenVK" >> "$GITHUB_ENV"
+          brew install shaderc
+      - name: Reject non-Vulkan-only iOS configurations
+        shell: bash
+        run: |
+          reject_configure() {
+            build="$1"
+            expected="$2"
+            shift 2
+            set +e
+            cmake -S . -B "$build" -G Xcode -DCMAKE_SYSTEM_NAME=iOS \
+              -DCMAKE_OSX_SYSROOT=iphonesimulator \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 "$@" \
+              > "$build.log" 2>&1
+            status=$?
+            set -e
+            cat "$build.log"
+            test "$status" -ne 0
+            grep -q "$expected" "$build.log"
+          }
+          reject_configure "$RUNNER_TEMP/ios-with-opengl" \
+            "iOS is Vulkan-only" -DMINECRAFTC_ENABLE_OPENGL=ON
+          reject_configure "$RUNNER_TEMP/ios-without-vulkan" \
+            "iOS is Vulkan-only" -DMINECRAFTC_ENABLE_VULKAN=OFF
+      - name: Configure and build iOS Simulator
+        run: |
+          cmake -S . -B build-ios-simulator -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+            -DMINECRAFTC_ENABLE_OPENGL=OFF \
+            -DMINECRAFTC_ENABLE_VULKAN=ON \
+            -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
+          cmake --build build-ios-simulator --config Release --parallel 2
+      - name: Verify iOS Simulator bundle
+        shell: bash
+        run: |
+          app="build-ios-simulator/Release-iphonesimulator/MinecraftC.app"
+          binary="$app/MinecraftC"
+          test -x "$binary"
+          test -f "$app/shaders/vulkan/block.vert.spv"
+          test -f "$app/textures/generated/items_atlas.png"
+          test -f "$app/LICENSE"
+          test -f "$app/licenses/MoltenVK-LICENSE.txt"
+          test ! -d "$app/Frameworks/MoltenVK.framework"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist" \
+            | grep -qx 'io.github.SafeFain.MinecraftC'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist" \
+            | grep -qx "$MINECRAFTC_VERSION"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$app/Info.plist" \
+            | grep -qx '14.0'
+          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:0' "$app/Info.plist" \
+            | grep -qx '1'
+          /usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily:1' "$app/Info.plist" \
+            | grep -qx '2'
+          otool -L "$binary" | grep -q 'Metal.framework'
+          ! otool -L "$binary" | grep -q 'OpenGLES.framework'
+          nm -gU "$binary" | grep -q '_vkGetInstanceProcAddr$'
+          ! nm "$binary" | grep -q 'OpenGLRenderer'
+      - name: Smoke-test Vulkan on iPhone and iPad simulators
+        shell: bash
+        run: |
+          app="$PWD/build-ios-simulator/Release-iphonesimulator/MinecraftC.app"
+          runtime="$(xcrun simctl list runtimes available -j | python3 -c \
+            'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if ".iOS-" in x["identifier"] and x["isAvailable"]]; r.sort(key=lambda x:tuple(map(int,x["version"].split(".")))); print(r[-1]["identifier"])')"
+          device_type() {
+            prefix="$1"
+            xcrun simctl list devicetypes -j | python3 -c \
+              'import json,sys; p=sys.argv[1]; d=[x for x in json.load(sys.stdin)["devicetypes"] if x["name"].startswith(p)]; print(d[0]["identifier"])' \
+              "$prefix"
+          }
+          run_smoke() {
+            family="$1"
+            type="$2"
+            udid="$(xcrun simctl create "MinecraftC-$family" "$type" "$runtime")"
+            log="$RUNNER_TEMP/minecraftc-ios-$family.log"
+            xcrun simctl boot "$udid"
+            xcrun simctl bootstatus "$udid" -b
+            xcrun simctl install "$udid" "$app"
+            xcrun simctl launch --console "$udid" io.github.SafeFain.MinecraftC \
+              > "$log" 2>&1 &
+            launch_pid=$!
+            found=0
+            for _ in {1..30}; do
+              if grep -q 'Vulkan first frame presented' "$log"; then
+                found=1
+                break
+              fi
+              if ! kill -0 "$launch_pid" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            cat "$log"
+            kill "$launch_pid" 2>/dev/null || true
+            wait "$launch_pid" 2>/dev/null || true
+            xcrun simctl terminate "$udid" io.github.SafeFain.MinecraftC || true
+            xcrun simctl shutdown "$udid" || true
+            xcrun simctl delete "$udid"
+            test "$found" -eq 1
+            grep -q 'MinecraftC initialized' "$log"
+            ! grep -q 'falling back to OpenGL' "$log"
+          }
+          run_smoke iphone "$(device_type iPhone)"
+          run_smoke ipad "$(device_type iPad)"
+      - name: Archive unsigned arm64 device build
+        shell: bash
+        run: |
+          cmake -S . -B build-ios-device -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+            -DMINECRAFTC_ENABLE_OPENGL=OFF \
+            -DMINECRAFTC_ENABLE_VULKAN=ON \
+            -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
+          archive="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive"
+          xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
+            -scheme minecraftc -configuration Release -sdk iphoneos \
+            -archivePath "$archive" archive CODE_SIGNING_ALLOWED=NO
+          app="$archive/Products/Applications/MinecraftC.app"
+          test -x "$app/MinecraftC"
+          lipo "$app/MinecraftC" -verify_arch arm64
+          ! otool -L "$app/MinecraftC" | grep -q 'OpenGLES.framework'
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$archive" "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive.zip"
+          ditto -c -k --sequesterRsrc --keepParent \
+            build-ios-simulator/Release-iphonesimulator/MinecraftC.app \
+            "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-simulator-arm64.zip"
+      - name: Upload unsigned iOS packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: minecraftc-ios-arm64
+          path: |
+            ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-arm64-unsigned.xcarchive.zip
+            ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-ios-simulator-arm64.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
   android-arm64:
     runs-on: ubuntu-24.04
     steps:
@@ -337,7 +504,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, macos-universal, android-arm64]
+    needs: [linux, windows, macos-universal, ios-arm64, android-arm64]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

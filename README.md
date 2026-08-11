@@ -2,7 +2,8 @@
 
 MinecraftC 是一款使用 C++17、SDL3、OpenGL 和 Vulkan 构建的体素沙盒游戏。
 桌面 OpenGL 使用 3.3 Core，Android OpenGL 使用 ES 3.0；Linux、Windows、
-macOS 和 Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
+macOS 和 Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端，iOS
+通过 MoltenVK 提供 Vulkan-only 客户端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本由仓库根目录的 `VERSION` 文件定义；CMake、Android Gradle 和发布 CI
@@ -16,7 +17,7 @@ macOS 和 Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端�
 - 创造、生存和旁观模式；支持采集、合成、熔炼、容器、种植、战斗和死亡掉落。
 - 水与岩浆流动、流体固化、点火、连锁 TNT 爆炸、晴雨雷暴和雪地降雪。
 - 可持久化的世界、玩家、实体、天气、容器、客户端设置和出生点区块缓存。
-- JSON 驱动的方块材质、126 个物品图标，以及确定性的 16×16 像素资产管线。
+- JSON 驱动的方块材质、134 个物品图标，以及确定性的 16×16 像素资产管线。
 - 键鼠、标准手柄和原生多点触控输入；完整英语与简体中文界面。
 
 ## 快速开始
@@ -49,8 +50,8 @@ Linux 和 Windows 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会�
 并在 Vulkan 初始化失败时作为回退。所有受支持平台现在都默认使用 Vulkan，
 也可用 `--renderer=opengl` 明确选择 OpenGL。
 
-未指定 renderer 时所有平台都启动 Vulkan；Vulkan 初始化失败会回退相应平台的
-OpenGL 后端。完整游戏代码依赖
+未指定 renderer 时所有平台都启动 Vulkan；除 Vulkan-only 的 iOS 外，Vulkan
+初始化失败会回退相应平台的 OpenGL 后端。完整游戏代码依赖
 后端无关的 `IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
 
 Vulkan GLSL 与预编译 SPIR-V 位于 `assets/shaders/vulkan/`。普通构建不要求
@@ -109,6 +110,30 @@ Vulkan，初始化失败时自动回退 OpenGL。便携发布包已包含 Molten
 用户安装 Vulkan SDK。构建 Intel/Apple Silicon 通用包时添加
 `-DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`。
 
+### iOS
+
+iOS 14 或更新系统支持 iPhone 与 iPad，应用固定横屏并且只包含 Vulkan 完整
+游戏后端。Vulkan 通过静态链接的 MoltenVK 1.4.1 转换为 Metal；没有 OpenGL
+代码、后端切换或启动回退。构建需要完整 Xcode、CMake 3.28+，以及官方
+`MoltenVK-all.tar`：
+
+```bash
+cmake -S . -B build-ios-simulator -G Xcode \
+  -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=iphonesimulator \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+  -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+  -DMINECRAFTC_ENABLE_OPENGL=OFF \
+  -DMINECRAFTC_ENABLE_VULKAN=ON \
+  -DMINECRAFTC_MOLTENVK_ROOT=/path/to/extracted/MoltenVK
+cmake --build build-ios-simulator --config Release --parallel 2
+```
+
+真机使用 `iphoneos` 与 `arm64` 重新配置。生成的工程默认关闭代码签名；安装到
+真机或提交 App Store 前需要在 Xcode 中设置开发团队、签名证书和描述文件。
+完整命令、模拟器安装方式与产物说明见 [ios/README.md](ios/README.md)。
+
 ### Android
 
 要求 Android 10（API 29）或更新系统、arm64 和 OpenGL ES 3.0。APK 始终包含
@@ -128,7 +153,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 Release APK 默认未签名，发布前必须使用发行者密钥签名。详细说明见
 [android/README.md](android/README.md)。推送 `v*` 标签后，CI 会将 Android
-APK 与 Linux、Windows、macOS 构建包一起发布。
+APK、未签名 iOS 构建与 Linux、Windows、macOS 构建包一起发布。
 
 SDL 3.4.10 默认由 CMake 按固定版本获取并静态构建。系统已安装兼容 SDL3 时可添加
 `-DMINECRAFTC_USE_SYSTEM_SDL3=ON`；需要同时获取固定版本 GLM 时使用

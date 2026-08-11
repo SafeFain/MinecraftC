@@ -14,11 +14,14 @@ corresponding assets and source dependencies.
 - Android: install `MinecraftC-<version>-android-arm64-unsigned.apk` after signing it
   with a trusted publisher or local developer key. It requires Android 10,
   arm64, and OpenGL ES 3.0.
+- iOS: the simulator ZIP runs only in an arm64 iOS Simulator. The device
+  `.xcarchive.zip` targets iOS 14+ arm64 and must be signed before installation;
+  it is Vulkan-only and statically links MoltenVK.
 - Print build information without opening a window with `--version`.
 
-All supported platforms default to Vulkan and automatically fall back to
-OpenGL when Vulkan initialization is unavailable. Use `--renderer=opengl` to
-select OpenGL explicitly.
+All supported platforms default to Vulkan. Linux, Windows, macOS, and Android
+fall back to OpenGL when Vulkan initialization is unavailable and accept
+`--renderer=opengl`; iOS has no OpenGL backend or fallback.
 
 Worlds and settings use the platform user-data directory documented in
 `README.md`. If startup fails, inspect `minecraftc.log` in that directory.
@@ -26,3 +29,4 @@ Unsigned macOS downloads may require Control-clicking the executable and
 choosing Open the first time.
 The Android release APK is intentionally unsigned and cannot be installed until
 it has been signed.
+The iOS device archive is also intentionally unsigned and is not an IPA.

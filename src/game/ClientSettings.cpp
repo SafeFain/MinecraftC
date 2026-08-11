@@ -24,7 +24,8 @@ RendererBackend defaultRendererBackend(DesktopPlatform) {
 RendererBackend migrateRendererBackend(DesktopPlatform platform,
                                         int sourceFormatVersion,
                                         RendererBackend stored) {
-    if ((platform == DesktopPlatform::Android && sourceFormatVersion < 10) ||
+    if (platform == DesktopPlatform::IOS ||
+        (platform == DesktopPlatform::Android && sourceFormatVersion < 10) ||
         (platform == DesktopPlatform::MacOS && sourceFormatVersion < 11) ||
         ((platform == DesktopPlatform::Linux ||
           platform == DesktopPlatform::Windows) && sourceFormatVersion < 12))
@@ -92,7 +93,7 @@ void ClientSettings::validate() {
     if (guiScale < 0 || guiScale > 4) guiScale = 0;
     if (rendererBackend != RendererBackend::OpenGL &&
         rendererBackend != RendererBackend::Vulkan)
-        rendererBackend = RendererBackend::OpenGL;
+        rendererBackend = defaultRendererBackend(currentDesktopPlatform());
     ClientSettings defaults;
     for (size_t i = 0; i < bindings.size(); ++i) {
         auto& binding = bindings[i];

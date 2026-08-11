@@ -6,7 +6,9 @@
 #include "core/TextEditBuffer.h"
 #include "platform/sdl/SdlClipboard.h"
 #include "core/AssetStore.h"
+#if defined(MINECRAFTC_ENABLE_OPENGL)
 #include "renderer/Renderer.h"
+#endif
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
 #include "renderer/RenderEnvironment.h"
@@ -57,6 +59,23 @@
 #include <iomanip>
 #include <unordered_map>
 
+namespace {
+std::unique_ptr<IGameRenderer> createGameRenderer(GraphicsApi api) {
+    if (api == GraphicsApi::Vulkan) {
+#if defined(MINECRAFTC_ENABLE_VULKAN)
+        return std::make_unique<VulkanRenderer>();
+#else
+        throw std::runtime_error("Vulkan support is not enabled in this build");
+#endif
+    }
+#if defined(MINECRAFTC_ENABLE_OPENGL)
+    return std::make_unique<Renderer>();
+#else
+    throw std::runtime_error("OpenGL support is not enabled in this build");
+#endif
+}
+}
+
 class BasicRenderApplication final : public ApplicationHost {
 public:
     BasicRenderApplication(RuntimePaths paths, GraphicsApi api,
@@ -79,11 +98,15 @@ public:
             throw std::runtime_error("Vulkan support is not enabled in this build");
 #endif
         } else {
+#if defined(MINECRAFTC_ENABLE_OPENGL)
             auto renderer = std::make_unique<Renderer>();
             renderer->initialize(m_window, m_window.graphicsCapabilities(),
                                  m_paths.assetRoot);
             renderer->resize(m_window.width(), m_window.height());
             m_renderer = std::move(renderer);
+#else
+            throw std::runtime_error("OpenGL support is not enabled in this build");
+#endif
         }
         if (texturedDemo)
             m_texturedScene = std::make_unique<TexturedCubeScene>(
@@ -246,15 +269,7 @@ public:
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC",
                    graphicsApi == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES,
                    graphicsApi),
-          m_renderer(
-#if defined(MINECRAFTC_ENABLE_VULKAN)
-              graphicsApi == GraphicsApi::Vulkan
-                  ? std::unique_ptr<IGameRenderer>(std::make_unique<VulkanRenderer>())
-                  : std::unique_ptr<IGameRenderer>(std::make_unique<Renderer>())
-#else
-              std::make_unique<Renderer>()
-#endif
-          ),
+          m_renderer(createGameRenderer(graphicsApi)),
           m_graphicsApi(graphicsApi),
           m_camera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE),
           m_worldCatalog(m_paths.savesDirectory())
@@ -284,7 +299,7 @@ public:
                 m_graphicsResetPending = true;
                 break;
             case ApplicationEvent::LowMemory:
-                LOG_WARN("Android reported low memory");
+                LOG_WARN("The platform reported low memory");
                 break;
             case ApplicationEvent::Terminating:
                 saveCurrentWorld();
@@ -532,13 +547,18 @@ private:
                 } else {
                     showMainMenu();
                 }
-            }, m_localization,
+            }, m_localization, RendererBackendAvailability{
+#if defined(MINECRAFTC_ENABLE_OPENGL)
+            true,
+#else
+            false,
+#endif
 #if defined(MINECRAFTC_ENABLE_VULKAN)
             true
 #else
             false
 #endif
-            );
+            });
         };
 
         // ── Input callbacks ───────────────────────────────────────────
@@ -1997,10 +2017,12 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         if (argument == "--help" || argument == "-h") {
             std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
                       << "Usage: minecraftc [--help] [--version]"
-#if defined(MINECRAFTC_ENABLE_VULKAN)
+#if defined(MINECRAFTC_ENABLE_OPENGL) && defined(MINECRAFTC_ENABLE_VULKAN)
                       << " [--renderer=opengl|vulkan|opengl-demo|vulkan-demo|vulkan-textured-demo]"
-#else
+#elif defined(MINECRAFTC_ENABLE_OPENGL)
                       << " [--renderer=opengl|opengl-demo]"
+#else
+                      << " [--renderer=vulkan|vulkan-demo|vulkan-textured-demo]"
 #endif
                       << " [--benchmark-frames=N]\n"
                       << "Worlds and settings are stored in the platform user-data directory.\n";
@@ -2033,15 +2055,23 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
 #endif
         }
         if (argument == "--renderer=opengl-demo") {
+#if defined(MINECRAFTC_ENABLE_OPENGL)
             Debug::Log::init(Debug::LogLevel::Trace, false);
             Debug::installCrashHandlers();
             return std::make_unique<BasicRenderApplication>(
                 discoverRuntimePaths(argc > 0 ? argv[0] : nullptr),
                 GraphicsApi::OpenGL33, false, benchmarkFrames);
+#else
+            throw std::runtime_error("OpenGL support is disabled in this build");
+#endif
         }
         if (argument == "--renderer=opengl") {
+#if defined(MINECRAFTC_ENABLE_OPENGL)
             commandLineApi = GraphicsApi::OpenGL33;
             continue;
+#else
+            throw std::runtime_error("OpenGL support is disabled in this build");
+#endif
         }
         if (argument == "--renderer=vulkan") {
 #if defined(MINECRAFTC_ENABLE_VULKAN)
@@ -2060,7 +2090,12 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
     if (benchmarkFrames > 0)
         throw std::runtime_error("--benchmark-frames requires a renderer demo");
     RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
-    GraphicsApi api = GraphicsApi::OpenGL33;
+    GraphicsApi api =
+#if defined(MINECRAFTC_ENABLE_OPENGL)
+        GraphicsApi::OpenGL33;
+#else
+        GraphicsApi::Vulkan;
+#endif
 #if defined(MINECRAFTC_ENABLE_VULKAN)
     const ClientSettings startupSettings = ClientSettings::load(paths.settingsFile());
     if (startupSettings.rendererBackend == RendererBackend::Vulkan)
@@ -2073,6 +2108,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         app->start();
         return app;
     } catch (const std::exception& error) {
+#if defined(MINECRAFTC_ENABLE_OPENGL)
         if (api != GraphicsApi::Vulkan) throw;
         std::cerr << "Vulkan startup failed; falling back to OpenGL: "
                   << error.what() << '\n';
@@ -2080,5 +2116,9 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
                                                        GraphicsApi::OpenGL33);
         fallback->start();
         return fallback;
+#else
+        (void)error;
+        throw;
+#endif
     }
 }

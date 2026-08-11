@@ -10,10 +10,10 @@ SettingsMenu::SettingsMenu(ClientSettings& settings,
                            std::function<void()> onChanged,
                            std::function<void()> onBack,
                            const Localization& localization,
-                           bool vulkanAvailable)
+                           RendererBackendAvailability renderers)
     : m_onBack(std::move(onBack)), m_onChanged(std::move(onChanged)),
       m_settings(settings), m_localization(localization),
-      m_vulkanAvailable(vulkanAvailable) { refreshButtons(); }
+      m_renderers(renderers) { refreshButtons(); }
 
 std::string SettingsMenu::labelForRenderDist() const {
     return m_localization.format(
@@ -95,18 +95,19 @@ void SettingsMenu::refreshButtons() {
         });
         m_buttons.emplace_back(m_localization.text("common.back"), m_onBack);
     } else if (m_page == Page::Video) {
-        const std::string rendererName =
-            m_settings.rendererBackend == RendererBackend::Vulkan
-                ? m_localization.text("settings.renderer_vulkan")
-                : m_localization.text("settings.renderer_opengl");
-        m_buttons.emplace_back(m_localization.format("settings.renderer", {
-            rendererName}), [this]{
-                if (m_vulkanAvailable)
+        if (rendererBackendSwitchable(m_renderers)) {
+            const std::string rendererName =
+                m_settings.rendererBackend == RendererBackend::Vulkan
+                    ? m_localization.text("settings.renderer_vulkan")
+                    : m_localization.text("settings.renderer_opengl");
+            m_buttons.emplace_back(m_localization.format("settings.renderer", {
+                rendererName}), [this]{
                     m_settings.rendererBackend =
                         m_settings.rendererBackend == RendererBackend::OpenGL
                             ? RendererBackend::Vulkan : RendererBackend::OpenGL;
-                m_onChanged(); refreshButtons();
-            });
+                    m_onChanged(); refreshButtons();
+                });
+        }
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
         m_buttons.emplace_back(m_localization.format("settings.clouds", {
             m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),

@@ -2,6 +2,7 @@
 #include "game/InventoryInteraction.h"
 #include "ui/TouchControls.h"
 #include "ui/UIRenderer.h"
+#include "ui/SettingsMenu.h"
 
 #include "core/InputCodes.h"
 #include "core/RuntimeClock.h"
@@ -36,6 +37,7 @@ std::string Localization::text(std::string_view key) const { return std::string(
 
 int main(){
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
+            defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::MacOS)==RendererBackend::Vulkan,
@@ -55,8 +57,13 @@ int main(){
             migrateRendererBackend(DesktopPlatform::Windows,11,
                 RendererBackend::OpenGL)==RendererBackend::Vulkan&&
             migrateRendererBackend(DesktopPlatform::Windows,12,
-                RendererBackend::OpenGL)==RendererBackend::OpenGL,
+                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
+            migrateRendererBackend(DesktopPlatform::IOS,ClientSettings::FORMAT_VERSION,
+                RendererBackend::OpenGL)==RendererBackend::Vulkan,
             "renderer migration preserves platform-specific version boundaries");
+    require(!rendererBackendSwitchable({false,true})&&
+            rendererBackendSwitchable({true,true}),
+            "Vulkan-only builds did not hide renderer switching");
     const WindowSafeArea safe = projectWindowSafeArea(
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,

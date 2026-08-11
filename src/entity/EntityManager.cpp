@@ -2,10 +2,10 @@
 #include "entity/EntityLogic.h"
 
 #include "player/Player.h"
-#include "renderer/Renderer.h"
 #include "world/World.h"
 #include "game/SurvivalSession.h"
 #include "game/SurvivalRules.h"
+#include "renderer/GameRenderer.h"
 
 #include <algorithm>
 #include <cmath>

@@ -11,11 +11,16 @@
 #include <cmath>
 #include <stdexcept>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace {
 SDL_Window* sdlWindow(void* window) {
     return static_cast<SDL_Window*>(window);
 }
 
+#if defined(MINECRAFTC_ENABLE_OPENGL)
 void configureOpenGLAttributes(GraphicsApi api, bool srgb, int samples) {
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -32,6 +37,7 @@ void configureOpenGLAttributes(GraphicsApi api, bool srgb, int samples) {
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, samples > 0 ? 1 : 0);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, samples);
 }
+#endif
 
 int projectMouseButton(Uint8 button) {
     switch (button) {
@@ -64,9 +70,11 @@ Window::Window(
     if (m_graphicsApi == GraphicsApi::OpenGL33)
         m_graphicsApi = GraphicsApi::OpenGLES30;
 #endif
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "1");
+#if defined(__ANDROID__)
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+#endif
 #else
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
 #endif
@@ -97,6 +105,7 @@ Window::Window(
         throw std::runtime_error("Vulkan support is not enabled in this build");
 #endif
     } else {
+#if defined(MINECRAFTC_ENABLE_OPENGL)
         struct VisualRequest {
             bool srgb;
             int samples;
@@ -147,6 +156,10 @@ Window::Window(
         int srgb = 0;
         m_srgbCapable = SDL_GL_GetAttribute(
             SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, &srgb) && srgb != 0;
+#else
+        SDL_Quit();
+        throw std::runtime_error("OpenGL support is not enabled in this build");
+#endif
     }
     float x = 0.0f, y = 0.0f;
     SDL_GetMouseState(&x, &y);
@@ -183,8 +196,8 @@ void Window::refreshSizesAndNotify() {
 }
 
 void Window::finishEventFrame() {
-#if defined(__ANDROID__)
-    // Android may update its native Surface size without a matching SDL resize.
+#if defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+    // Mobile surfaces may resize or rotate without a matching SDL resize event.
     refreshSizesAndNotify();
 #endif
     resetEventFrame();
