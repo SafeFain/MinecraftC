@@ -98,6 +98,7 @@ public:
     }
 
     void event(ApplicationEvent event, const void* nativeEvent) override {
+        if (nativeEvent) m_window.handleEvent(nativeEvent);
         if (event == ApplicationEvent::EnterBackground) {
             m_renderer->suspendPresentation();
             m_backgrounded = true;
@@ -107,7 +108,6 @@ public:
             m_backgrounded = false;
         }
         if (event == ApplicationEvent::Terminating) m_running = false;
-        if (nativeEvent) m_window.handleEvent(nativeEvent);
     }
 
     void shutdown() override {
@@ -160,6 +160,7 @@ public:
         return runFrame();
     }
     void event(ApplicationEvent event, const void* nativeEvent) override {
+        if (nativeEvent) m_window.handleEvent(nativeEvent);
         switch (event) {
             case ApplicationEvent::EnterBackground:
                 m_renderer->suspendPresentation();
@@ -186,7 +187,6 @@ public:
             case ApplicationEvent::Input:
                 break;
         }
-        if (nativeEvent) m_window.handleEvent(nativeEvent);
     }
     void shutdown() override { if(!m_cleaned){m_cleaned=true;cleanup();} }
 

@@ -47,7 +47,7 @@ public:
     bool shouldClose() const { return m_shouldClose; }
     void swapBuffers();
     void handleEvent(const void* event) { processEvent(event); }
-    void finishEventFrame() { resetEventFrame(); }
+    void finishEventFrame();
     void setTitle(const std::string& title);
 
     int width() const { return m_pixelWidth; }
@@ -135,4 +135,5 @@ private:
     void resetEventFrame();
     void processEvent(const void* event);
     void refreshSizes();
+    void refreshSizesAndNotify();
 };

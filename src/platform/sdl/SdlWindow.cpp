@@ -169,6 +169,23 @@ void Window::refreshSizes() {
     m_windowHeight = std::max(1, m_windowHeight);
 }
 
+void Window::refreshSizesAndNotify() {
+    const int previousPixelWidth = m_pixelWidth;
+    const int previousPixelHeight = m_pixelHeight;
+    refreshSizes();
+    if ((m_pixelWidth != previousPixelWidth ||
+         m_pixelHeight != previousPixelHeight) && m_resizeCallback)
+        m_resizeCallback(m_pixelWidth, m_pixelHeight);
+}
+
+void Window::finishEventFrame() {
+#if defined(__ANDROID__)
+    // Android may update its native Surface size without a matching SDL resize.
+    refreshSizesAndNotify();
+#endif
+    resetEventFrame();
+}
+
 void Window::resetEventFrame() {
     m_cursorDeltaX = 0.0;
     m_cursorDeltaY = 0.0;
@@ -184,8 +201,8 @@ void Window::processEvent(const void* opaqueEvent) {
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-            refreshSizes();
-            if (m_resizeCallback) m_resizeCallback(m_pixelWidth, m_pixelHeight);
+        case SDL_EVENT_DISPLAY_ORIENTATION:
+            refreshSizesAndNotify();
             break;
         case SDL_EVENT_WINDOW_MINIMIZED:
             m_minimized = true;
@@ -193,8 +210,7 @@ void Window::processEvent(const void* opaqueEvent) {
         case SDL_EVENT_WINDOW_RESTORED:
         case SDL_EVENT_WINDOW_SHOWN:
             m_minimized = false;
-            refreshSizes();
-            if (m_resizeCallback) m_resizeCallback(m_pixelWidth, m_pixelHeight);
+            refreshSizesAndNotify();
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             m_keys.fill(false);
