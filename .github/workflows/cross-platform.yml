@@ -426,6 +426,10 @@ jobs:
             xcrun simctl delete "$udid"
             test "$found" -eq 1
             grep -q 'MinecraftC initialized' "$log"
+            if grep -q 'Descriptor sets binding resources using Metal argument buffers' "$log"; then
+              echo "MoltenVK simulator argument-buffer workaround was not applied" >&2
+              exit 1
+            fi
             ! grep -q 'falling back to OpenGL' "$log"
           }
           run_smoke iphone "$(device_type iPhone)"

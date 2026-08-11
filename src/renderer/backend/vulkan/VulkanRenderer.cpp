@@ -17,6 +17,10 @@
 #include <vulkan/vulkan.h>
 #include <stb_image.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -530,6 +534,15 @@ struct VulkanRenderer::Impl {
         std::vector<std::string> extensionStorage =
             window.requiredVulkanInstanceExtensions();
         bool enumeratePortability = false;
+#if defined(__APPLE__) && TARGET_OS_SIMULATOR
+        const bool configureSimulator = supportsInstanceExtension(
+            VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
+        if (configureSimulator &&
+            std::find(extensionStorage.begin(), extensionStorage.end(),
+                      VK_EXT_LAYER_SETTINGS_EXTENSION_NAME) ==
+                extensionStorage.end())
+            extensionStorage.emplace_back(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
+#endif
 #if defined(__APPLE__)
         enumeratePortability = supportsInstanceExtension(
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
@@ -555,6 +568,21 @@ struct VulkanRenderer::Impl {
         application.apiVersion = VK_API_VERSION_1_0;
         VkInstanceCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+#if defined(__APPLE__) && TARGET_OS_SIMULATOR
+        const VkBool32 disableArgumentBuffers = VK_FALSE;
+        const VkLayerSettingEXT simulatorSetting{
+            "MoltenVK",
+            "MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS",
+            VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+            1,
+            &disableArgumentBuffers};
+        const VkLayerSettingsCreateInfoEXT simulatorSettings{
+            VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
+            nullptr,
+            1,
+            &simulatorSetting};
+        if (configureSimulator) info.pNext = &simulatorSettings;
+#endif
 #if defined(__APPLE__)
         if (enumeratePortability)
             info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
