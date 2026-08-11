@@ -62,7 +62,9 @@ the runtime export contract. The app link still forces
 `_vkGetInstanceProcAddr` out of the static MoltenVK archive and marks it as an
 exported symbol. The final Xcode application target owns both requirements via
 `OTHER_LDFLAGS` and `ios/MinecraftC.exports`; they are not attached to an
-intermediate renderer library.
+intermediate renderer library. It also enables executable exports explicitly
+through CMake's `ENABLE_EXPORTS` and Xcode's `LD_EXPORT_SYMBOLS`, preventing
+Xcode from applying `-no_exported_symbols` to the final app.
 
 Worlds, settings, and logs use the application preference directory. Assets and
 the GPL/MoltenVK license texts are read-only Bundle resources.

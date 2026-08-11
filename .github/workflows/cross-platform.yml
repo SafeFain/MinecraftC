@@ -497,12 +497,31 @@ jobs:
             grep -E 'EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS' "$build_settings" >&2 || true
             exit 1
           fi
+          if ! grep -Eq '^[[:space:]]*LD_EXPORT_SYMBOLS = YES[[:space:]]*$' \
+            "$build_settings"; then
+            echo "MinecraftC app target disables executable symbol exports" >&2
+            grep -E 'EXPORTED_SYMBOLS_FILE|LD_EXPORT_SYMBOLS|OTHER_LDFLAGS' \
+              "$build_settings" >&2 || true
+            exit 1
+          fi
           if ! grep -E '^[[:space:]]*OTHER_LDFLAGS = .*[-]u,_vkGetInstanceProcAddr' \
             "$build_settings" >/dev/null; then
             echo "MinecraftC app target is missing the MoltenVK force-load reference" >&2
             grep -E 'EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS' "$build_settings" >&2 || true
             exit 1
           fi
+          if ! grep -E '^[[:space:]]*OTHER_LDFLAGS = .*[-]exported_symbol,_vkGetInstanceProcAddr' \
+            "$build_settings" >/dev/null; then
+            echo "MinecraftC app target is missing the explicit MoltenVK export" >&2
+            grep -E 'EXPORTED_SYMBOLS_FILE|LD_EXPORT_SYMBOLS|OTHER_LDFLAGS' \
+              "$build_settings" >&2 || true
+            exit 1
+          fi
+          echo "MinecraftC exported-symbols file:"
+          cat ios/MinecraftC.exports
+          echo "MinecraftC export-related build settings:"
+          grep -E 'DEAD_CODE_STRIPPING|EXPORTED_SYMBOLS_FILE|LD_EXPORT_SYMBOLS|OTHER_LDFLAGS|STRIP' \
+            "$build_settings"
           moltenvk_device="$MINECRAFTC_MOLTENVK_ROOT/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a"
           nm -gU "$moltenvk_device" \
             > "$RUNNER_TEMP/minecraftc-ios-moltenvk-symbols.txt"
@@ -544,7 +563,7 @@ jobs:
             find build-ios-device -path '*minecraftc.build*' \
               -name '*.LinkFileList' -print -exec cat {} \; >&2 || true
             echo "Final minecraftc linker build settings:" >&2
-            grep -E 'DEAD_CODE_STRIPPING|EXPORTED_SYMBOLS_FILE|OTHER_LDFLAGS|STRIP' \
+            grep -E 'DEAD_CODE_STRIPPING|EXPORTED_SYMBOLS_FILE|LD_EXPORT_SYMBOLS|OTHER_LDFLAGS|STRIP' \
               "$build_settings" >&2 || true
             exit 1
           }
