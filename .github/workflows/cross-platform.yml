@@ -258,7 +258,7 @@ jobs:
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "uses-gl-es: '0x30000'" "$RUNNER_TEMP/android-badging.txt"
-          grep -q "uses-feature-not-required:'android.hardware.vulkan.version'" \
+          grep -q "uses-feature-not-required: name='android.hardware.vulkan.version'" \
             "$RUNNER_TEMP/android-badging.txt"
           grep -q "native-code: 'arm64-v8a'" "$RUNNER_TEMP/android-badging.txt"
           unzip -Z1 "$source_apk" > "$RUNNER_TEMP/android-apk-files.txt"
