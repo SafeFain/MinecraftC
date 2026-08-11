@@ -63,7 +63,7 @@ QueueFamilies findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
     return result;
 }
 
-bool supportsSwapchain(VkPhysicalDevice device) {
+bool supportsDeviceExtension(VkPhysicalDevice device, const char* name) {
     uint32_t count = 0;
     require(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr),
             "vkEnumerateDeviceExtensionProperties");
@@ -71,9 +71,13 @@ bool supportsSwapchain(VkPhysicalDevice device) {
     require(vkEnumerateDeviceExtensionProperties(
                 device, nullptr, &count, extensions.data()),
             "vkEnumerateDeviceExtensionProperties");
-    return std::any_of(extensions.begin(), extensions.end(), [](const auto& extension) {
-        return std::string(extension.extensionName) == VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    return std::any_of(extensions.begin(), extensions.end(), [name](const auto& extension) {
+        return std::string(extension.extensionName) == name;
     });
+}
+
+bool supportsSwapchain(VkPhysicalDevice device) {
+    return supportsDeviceExtension(device, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
 
 VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) {
@@ -464,8 +468,15 @@ struct VulkanRenderer::Impl {
     bool drawQueued = false;
 
     void createInstance() {
-        const std::vector<std::string> extensionStorage =
+        std::vector<std::string> extensionStorage =
             window.requiredVulkanInstanceExtensions();
+#if defined(__APPLE__)
+        if (std::find(extensionStorage.begin(), extensionStorage.end(),
+                      VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) ==
+            extensionStorage.end())
+            extensionStorage.emplace_back(
+                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
         std::vector<const char*> extensions;
         extensions.reserve(extensionStorage.size());
         for (const std::string& extension : extensionStorage)
@@ -482,6 +493,9 @@ struct VulkanRenderer::Impl {
         application.apiVersion = VK_API_VERSION_1_0;
         VkInstanceCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+#if defined(__APPLE__)
+        info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
         info.pApplicationInfo = &application;
         info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         info.ppEnabledExtensionNames = extensions.data();
@@ -536,13 +550,19 @@ struct VulkanRenderer::Impl {
             queue.pQueuePriorities = &priority;
             queues.push_back(queue);
         }
-        const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        std::vector<const char*> extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+#if defined(__APPLE__)
+        constexpr const char* portabilitySubset = "VK_KHR_portability_subset";
+        if (supportsDeviceExtension(
+                physicalDevice, portabilitySubset))
+            extensions.push_back(portabilitySubset);
+#endif
         VkDeviceCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         info.queueCreateInfoCount = static_cast<uint32_t>(queues.size());
         info.pQueueCreateInfos = queues.data();
-        info.enabledExtensionCount = 1;
-        info.ppEnabledExtensionNames = extensions;
+        info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        info.ppEnabledExtensionNames = extensions.data();
         require(vkCreateDevice(physicalDevice, &info, nullptr, &device), "vkCreateDevice");
         vkGetDeviceQueue(device, graphicsFamily, 0, &graphicsQueue);
         vkGetDeviceQueue(device, presentFamily, 0, &presentQueue);

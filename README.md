@@ -1,8 +1,8 @@
 # MinecraftC
 
 MinecraftC 是一款使用 C++17、SDL3、OpenGL 和 Vulkan 构建的体素沙盒游戏。
-桌面 OpenGL 使用 3.3 Core，Android OpenGL 使用 ES 3.0；Linux、Windows 和
-Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
+桌面 OpenGL 使用 3.3 Core，Android OpenGL 使用 ES 3.0；Linux、Windows、
+macOS 和 Android 构建同时包含 Vulkan 与 OpenGL 完整游戏渲染后端。游戏提供可无限加载的确定性
 世界、创造/生存/旁观模式、完整昼夜与天气系统，以及中英文界面。
 
 当前版本由仓库根目录的 `VERSION` 文件定义；CMake、Android Gradle 和发布 CI
@@ -49,8 +49,9 @@ Linux 和 Windows 构建必须安装 Vulkan 开发环境；OpenGL 后端仍会�
 作为默认 renderer 和 Vulkan 初始化失败时的回退。可用 `--renderer=vulkan`
 选择 Vulkan。
 
-未指定 renderer 时仍启动完整的 OpenGL 游戏。完整游戏代码依赖后端无关的
-`IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
+未指定 renderer 时，Linux 和 Windows 启动 OpenGL，Android 和 macOS 启动
+Vulkan；Vulkan 初始化失败会回退相应平台的 OpenGL 后端。完整游戏代码依赖
+后端无关的 `IGameRenderer`，OpenGL 与 Vulkan 均声明完整 gameplay 能力。
 
 Vulkan GLSL 与预编译 SPIR-V 位于 `assets/shaders/vulkan/`。普通构建不要求
 安装 `glslc`；修改着色器后可使用以下命令重新生成并检查文件：
@@ -89,18 +90,22 @@ Windows 构建始终同时包含 Vulkan 和 OpenGL，不能关闭 Vulkan。运�
 
 ### macOS
 
-安装 Xcode Command Line Tools、CMake、Git 和 GLM：
+要求 macOS 11 或更新系统。安装 Xcode Command Line Tools、CMake、Git 和
+GLM，并下载官方 MoltenVK 1.4.1 `MoltenVK-macos.tar`：
 
 ```bash
 xcode-select --install
 brew install cmake git glm
 
-cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release \
+  -DMINECRAFTC_MOLTENVK_ROOT=/path/to/extracted/MoltenVK
 cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
-构建 Intel/Apple Silicon 通用包时添加
+macOS 构建始终同时包含 Vulkan 和 OpenGL，不能关闭 Vulkan。新设置默认
+Vulkan，初始化失败时自动回退 OpenGL。便携发布包已包含 MoltenVK，不要求最终
+用户安装 Vulkan SDK。构建 Intel/Apple Silicon 通用包时添加
 `-DMINECRAFTC_FETCH_DEPENDENCIES=ON -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`。
 
 ### Android
@@ -240,6 +245,7 @@ cmake --build build-local --target texture_generator
 | 组件或资产 | 作者/维护者 | 许可证 | 位置 |
 | --- | --- | --- | --- |
 | SDL 3.4.10 | SDL contributors | Zlib | CMake FetchContent 构建目录 |
+| MoltenVK 1.4.1 | KhronosGroup/MoltenVK contributors | Apache-2.0 | macOS 发布包 `libMoltenVK.dylib` 与 `licenses/` |
 | Vulkan Memory Allocator 3.3.0 | AMD/GPUOpen contributors | MIT | `external/VulkanMemoryAllocator/` |
 | cgltf 1.15 | jkuhlmann | MIT | `external/cgltf/` |
 | nlohmann/json 3.12.0 | Niels Lohmann | MIT | `external/nlohmann/` |

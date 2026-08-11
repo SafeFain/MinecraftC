@@ -176,19 +176,77 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
+      - name: Reject macOS OpenGL-only configuration
+        shell: bash
+        run: |
+          set +e
+          cmake -S . -B build-opengl-only -DMINECRAFTC_ENABLE_VULKAN=OFF \
+            > "$RUNNER_TEMP/macos-opengl-only.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/macos-opengl-only.log"
+          test "$status" -ne 0
+          grep -q "Android, Linux, Windows, and macOS builds require both" \
+            "$RUNNER_TEMP/macos-opengl-only.log"
+      - name: Install pinned MoltenVK and shader compiler
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/MoltenVK-macos-1.4.1.tar"
+          root="$RUNNER_TEMP/moltenvk"
+          curl -L --fail --silent --show-error \
+            https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-macos.tar \
+            -o "$archive"
+          echo "5ea0c259df7ded9a275444820f09cced54d6e5a7c7a31d262de62a5cdb7e15cf  $archive" \
+            | shasum -a 256 -c -
+          mkdir -p "$root"
+          tar -xf "$archive" -C "$root"
+          test -f "$root/MoltenVK/MoltenVK/include/vulkan/vulkan.h"
+          test -f "$root/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib"
+          test -f "$root/MoltenVK/LICENSE"
+          echo "MINECRAFTC_MOLTENVK_ROOT=$root/MoltenVK" >> "$GITHUB_ENV"
+          brew install shaderc
       - name: Configure universal build
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test native slice
         run: ctest --test-dir build-ci --output-on-failure
+      - name: Verify checked-in Vulkan shaders
+        run: python3 tools/vulkan_shaders.py --root . --check
       - name: Install and verify universal executable
         run: |
           cmake --install build-ci --prefix "$RUNNER_TEMP/$RELEASE_DIR"
           lipo "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" -verify_arch arm64 x86_64
+          lipo "$RUNNER_TEMP/$RELEASE_DIR/libMoltenVK.dylib" -verify_arch arm64 x86_64
+          otool -L "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" | grep -q '@rpath/libMoltenVK.dylib'
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
+          test -f "$RUNNER_TEMP/$RELEASE_DIR/licenses/MoltenVK-LICENSE.txt"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/block.vert"
           test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
+          "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --help | grep -q 'renderer=opengl|vulkan'
+      - name: Verify installed OpenGL and Vulkan startup
+        shell: bash
+        run: |
+          executable="$RUNNER_TEMP/$RELEASE_DIR/minecraftc"
+          run_smoke() {
+            renderer="$1"
+            expected="$2"
+            log="$RUNNER_TEMP/minecraftc-$renderer-smoke.log"
+            "$executable" "--renderer=$renderer" > "$log" 2>&1 &
+            pid=$!
+            found=0
+            for _ in {1..12}; do
+              if grep -q "$expected" "$log"; then found=1; break; fi
+              if ! kill -0 "$pid" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            cat "$log"
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            test "$found" -eq 1
+          }
+          run_smoke opengl "MinecraftC initialized"
+          run_smoke vulkan "Vulkan first frame presented"
       - name: Package macOS release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-macos-universal.tar.gz" "$RELEASE_DIR"
       - name: Upload macOS package
@@ -242,7 +300,7 @@ jobs:
           set -e
           cat "$RUNNER_TEMP/android-opengl-only.log"
           test "$status" -ne 0
-          grep -q "Android, Linux, and Windows builds require both" \
+          grep -q "Android, Linux, Windows, and macOS builds require both" \
             "$RUNNER_TEMP/android-opengl-only.log"
       - name: Build unsigned Android release APK
         run: gradle -p android assembleRelease --no-daemon

@@ -18,15 +18,15 @@ GamepadBinding axis(int code, bool positive) {
 }
 
 RendererBackend defaultRendererBackend(DesktopPlatform platform) {
-    return platform == DesktopPlatform::Android
+    return platform == DesktopPlatform::Android || platform == DesktopPlatform::MacOS
         ? RendererBackend::Vulkan : RendererBackend::OpenGL;
 }
 
 RendererBackend migrateRendererBackend(DesktopPlatform platform,
                                         int sourceFormatVersion,
                                         RendererBackend stored) {
-    if (platform == DesktopPlatform::Android &&
-        sourceFormatVersion < ClientSettings::FORMAT_VERSION)
+    if ((platform == DesktopPlatform::Android && sourceFormatVersion < 10) ||
+        (platform == DesktopPlatform::MacOS && sourceFormatVersion < 11))
         return RendererBackend::Vulkan;
     return stored;
 }

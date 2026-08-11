@@ -31,22 +31,22 @@ option(MINECRAFTC_STATIC_MSVC_RUNTIME
 option(MINECRAFTC_DESKTOP_GLES3
        "Use an OpenGL ES 3.0 context on desktop for backend validation" OFF)
 set(MINECRAFTC_VULKAN_DEFAULT OFF)
-if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR APPLE)
     set(MINECRAFTC_VULKAN_DEFAULT ON)
 endif()
 option(MINECRAFTC_ENABLE_VULKAN
        "Build the Vulkan gameplay backend alongside OpenGL"
        ${MINECRAFTC_VULKAN_DEFAULT})
-if((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32) AND
+if((ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 OR APPLE) AND
    NOT MINECRAFTC_ENABLE_VULKAN)
     message(FATAL_ERROR
-        "Android, Linux, and Windows builds require both the Vulkan and OpenGL render backends; "
+        "Android, Linux, Windows, and macOS builds require both the Vulkan and OpenGL render backends; "
         "MINECRAFTC_ENABLE_VULKAN cannot be disabled")
 elseif(MINECRAFTC_ENABLE_VULKAN AND
        NOT ANDROID AND
-       NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)
+       NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32 AND NOT APPLE)
     message(FATAL_ERROR
-        "MINECRAFTC_ENABLE_VULKAN supports Android, Linux, and Windows only")
+        "MINECRAFTC_ENABLE_VULKAN supports Android, Linux, Windows, and macOS only")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -118,8 +118,38 @@ if(ANDROID)
 else()
     find_package(OpenGL REQUIRED)
     if(MINECRAFTC_ENABLE_VULKAN)
-        find_package(Vulkan REQUIRED)
-        set(MINECRAFTC_VULKAN_TARGET Vulkan::Vulkan)
+        if(APPLE)
+            set(MINECRAFTC_MOLTENVK_ROOT "" CACHE PATH
+                "Root of the extracted MoltenVK macOS runtime package")
+            if(NOT MINECRAFTC_MOLTENVK_ROOT)
+                message(FATAL_ERROR
+                    "macOS Vulkan builds require MINECRAFTC_MOLTENVK_ROOT to point to "
+                    "the extracted MoltenVK package root")
+            endif()
+            set(MINECRAFTC_MOLTENVK_INCLUDE_DIR
+                "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/include")
+            set(MINECRAFTC_MOLTENVK_LIBRARY
+                "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib")
+            set(MINECRAFTC_MOLTENVK_LICENSE
+                "${MINECRAFTC_MOLTENVK_ROOT}/LICENSE")
+            foreach(MOLTENVK_FILE IN ITEMS
+                    "${MINECRAFTC_MOLTENVK_INCLUDE_DIR}/vulkan/vulkan.h"
+                    "${MINECRAFTC_MOLTENVK_LIBRARY}"
+                    "${MINECRAFTC_MOLTENVK_LICENSE}")
+                if(NOT EXISTS "${MOLTENVK_FILE}")
+                    message(FATAL_ERROR
+                        "MoltenVK package is incomplete: ${MOLTENVK_FILE} was not found")
+                endif()
+            endforeach()
+            add_library(minecraftc_moltenvk SHARED IMPORTED GLOBAL)
+            set_target_properties(minecraftc_moltenvk PROPERTIES
+                IMPORTED_LOCATION "${MINECRAFTC_MOLTENVK_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${MINECRAFTC_MOLTENVK_INCLUDE_DIR}")
+            set(MINECRAFTC_VULKAN_TARGET minecraftc_moltenvk)
+        else()
+            find_package(Vulkan REQUIRED)
+            set(MINECRAFTC_VULKAN_TARGET Vulkan::Vulkan)
+        endif()
     endif()
 endif()
 
@@ -206,7 +236,6 @@ if(MINECRAFTC_ENABLE_VULKAN)
     target_link_libraries(minecraftc_platform_sdl PRIVATE
         ${MINECRAFTC_VULKAN_TARGET})
 endif()
-
 add_library(minecraftc_render_opengl STATIC ${MINECRAFTC_OPENGL_BACKEND_SOURCES})
 target_include_directories(minecraftc_render_opengl PRIVATE
     src external/glad/include external/stb external)
@@ -287,6 +316,11 @@ if(MINECRAFTC_ENABLE_VULKAN)
     target_link_libraries(${MINECRAFTC_APP_TARGET} PRIVATE
         minecraftc_render_vulkan)
 endif()
+if(APPLE)
+    set_target_properties(${MINECRAFTC_APP_TARGET} PROPERTIES
+        BUILD_RPATH "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS"
+        INSTALL_RPATH "@executable_path")
+endif()
 
 # ── Compiler warnings ──────────────────────────────────────────────────
 
@@ -326,10 +360,22 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
     else()
         install(PROGRAMS packaging/run-minecraftc.sh DESTINATION .)
     endif()
+    if(APPLE)
+        install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}" DESTINATION .)
+        install(FILES "${MINECRAFTC_MOLTENVK_LICENSE}"
+                DESTINATION licenses RENAME MoltenVK-LICENSE.txt)
+    endif()
 else()
     install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
     install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    if(APPLE)
+        install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}"
+                DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(FILES "${MINECRAFTC_MOLTENVK_LICENSE}"
+                DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses
+                RENAME MoltenVK-LICENSE.txt)
+    endif()
 endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────
