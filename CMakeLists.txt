@@ -539,6 +539,16 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}/tools/vulkan_shaders.py
                 --root ${CMAKE_SOURCE_DIR})
 
+    add_executable(vulkan_index_rebase_tests
+        tests/VulkanIndexRebaseTests.cpp)
+    target_include_directories(vulkan_index_rebase_tests PRIVATE src)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_index_rebase_tests PRIVATE
+            -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vulkan_zero_base_vertex_index_rebasing
+        COMMAND vulkan_index_rebase_tests)
+
     add_executable(model_asset_tests
         tests/ModelAssetTests.cpp
         src/model/ModelAnimation.cpp)

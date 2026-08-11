@@ -9,6 +9,7 @@
 #include "renderer/BlockAtlasData.h"
 #include "renderer/CloudRenderData.h"
 #include "renderer/Shader.h"
+#include "renderer/backend/vulkan/VulkanIndexRebase.h"
 #include "Config.h"
 #include "world/Block.h"
 
@@ -845,7 +846,18 @@ struct VulkanRenderer::Impl {
             indices.destination = page.index.handle;
             indices.destinationOffset = result.indexOffset;
             indices.bytes.resize(static_cast<size_t>(result.indexBytes));
-            std::memcpy(indices.bytes.data(), mesh.indices.data(), indices.bytes.size());
+            if (result.vertexOffset % sizeof(MeshVertex) != 0)
+                throw std::runtime_error("Vulkan Chunk vertex arena is misaligned");
+            const VkDeviceSize vertexBase64 = result.vertexOffset / sizeof(MeshVertex);
+            if (vertexBase64 > std::numeric_limits<uint32_t>::max())
+                throw std::overflow_error("Vulkan Chunk vertex base exceeds uint32_t");
+            const uint32_t vertexBase = static_cast<uint32_t>(vertexBase64);
+            for (size_t index = 0; index < mesh.indices.size(); ++index) {
+                const uint32_t rebased = rebaseVulkanIndex(
+                    mesh.indices[index], vertexBase);
+                std::memcpy(indices.bytes.data() + index * sizeof(uint32_t),
+                            &rebased, sizeof(rebased));
+            }
             pendingBufferUploads.push_back(std::move(indices));
         } catch (...) {
             destroyGpuMesh(result);
@@ -2154,8 +2166,12 @@ struct VulkanRenderer::Impl {
         for (const auto& batch : submittedUi) {
             std::copy(batch.vertices.begin(), batch.vertices.end(),
                       vertices + vertexOffset);
-            std::copy(batch.indices.begin(), batch.indices.end(),
-                      indices + indexOffset);
+            if (vertexOffset > std::numeric_limits<uint32_t>::max())
+                throw std::overflow_error("Vulkan UI vertex base exceeds uint32_t");
+            const uint32_t vertexBase = static_cast<uint32_t>(vertexOffset);
+            for (size_t index = 0; index < batch.indices.size(); ++index)
+                indices[indexOffset + index] = rebaseVulkanIndex(
+                    batch.indices[index], vertexBase);
             vertexOffset += batch.vertices.size();
             indexOffset += batch.indices.size();
         }
@@ -2586,9 +2602,7 @@ struct VulkanRenderer::Impl {
                 ? static_cast<uint32_t>(mesh.indexOffset / sizeof(uint32_t)) +
                     draw.firstIndex
                 : draw.firstIndex;
-            const int32_t vertexOffset = arenaMesh
-                ? static_cast<int32_t>(mesh.vertexOffset / sizeof(MeshVertex)) : 0;
-            vkCmdDrawIndexed(command, count, 1, firstIndex, vertexOffset, 0);
+            vkCmdDrawIndexed(command, count, 1, firstIndex, 0, 0);
             ++performance.drawCalls;
         }
         uint32_t modelUniformIndex = 0;
@@ -2701,7 +2715,6 @@ struct VulkanRenderer::Impl {
             vkCmdBindVertexBuffers(command,0,1,&buffers.vertex.handle,&uiOffset);
             vkCmdBindIndexBuffer(command,buffers.index.handle,0,VK_INDEX_TYPE_UINT32);
             uint32_t firstIndex=0;
-            int32_t vertexOffset=0;
             for(const UiSubmission& batch:submittedUi){
                 const auto material=materials.find(batch.material.value);
                 if(material==materials.end())continue;
@@ -2713,9 +2726,8 @@ struct VulkanRenderer::Impl {
                     VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
                     0,sizeof(constants),&constants);
                 vkCmdDrawIndexed(command,static_cast<uint32_t>(batch.indices.size()),
-                    1,firstIndex,vertexOffset,0);
+                    1,firstIndex,0,0);
                 firstIndex+=static_cast<uint32_t>(batch.indices.size());
-                vertexOffset+=static_cast<int32_t>(batch.vertices.size());
             }
         }
         vkCmdEndRenderPass(command);
@@ -3317,9 +3329,10 @@ void VulkanRenderer::draw(const DrawCommand& command) {
 void VulkanRenderer::endFrame() {
     if (!m_impl->frameBegun)
         throw std::logic_error("No active Vulkan frame");
-    if (m_impl->drawQueued) m_impl->drawFrame();
+    const bool drawQueued = m_impl->drawQueued;
     m_impl->frameBegun = false;
     m_impl->drawQueued = false;
+    if (drawQueued) m_impl->drawFrame();
 }
 
 void VulkanRenderer::resize(int, int) { m_impl->swapchainDirty = true; }
