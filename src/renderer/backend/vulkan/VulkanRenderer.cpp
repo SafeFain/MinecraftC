@@ -388,12 +388,18 @@ struct VulkanRenderer::Impl {
                 window.createVulkanSurface(reinterpret_cast<void*>(instance)));
             pickPhysicalDevice();
             createDevice();
+            LOG_INFO("Vulkan device initialized");
             createAllocator();
+            LOG_INFO("Vulkan memory allocator initialized");
             createCommandPool();
+            LOG_INFO("Vulkan command pool initialized");
             createDescriptorLayout();
             createDescriptorPool();
+            LOG_INFO("Vulkan descriptor resources initialized");
             createSkyResources();
+            LOG_INFO("Vulkan frame resources initialized");
             createSyncObjects();
+            LOG_INFO("Vulkan synchronization initialized");
             createSwapchain();
             LOG_INFO("VulkanRenderer initialized with VMA");
         } catch (...) {
@@ -628,11 +634,15 @@ struct VulkanRenderer::Impl {
     }
 
     void createAllocator() {
+        VmaVulkanFunctions functions{};
+        functions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+        functions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
         VmaAllocatorCreateInfo info{};
         info.instance = instance;
         info.physicalDevice = physicalDevice;
         info.device = device;
         info.vulkanApiVersion = VK_API_VERSION_1_0;
+        info.pVulkanFunctions = &functions;
         require(vmaCreateAllocator(&info, &allocator), "vmaCreateAllocator");
     }
 

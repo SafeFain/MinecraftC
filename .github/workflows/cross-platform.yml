@@ -411,6 +411,14 @@ jobs:
               sleep 1
             done
             cat "$log"
+            if test "$found" -ne 1; then
+              echo "Simulator system log for failed $family launch:"
+              xcrun simctl spawn "$udid" log show --style compact --last 3m \
+                --predicate 'process == "MinecraftC"' || true
+              echo "Recent MinecraftC crash reports:"
+              find "$HOME/Library/Logs/DiagnosticReports" -type f \
+                -name 'MinecraftC*' -mmin -5 -print -exec cat {} \; || true
+            fi
             kill "$launch_pid" 2>/dev/null || true
             wait "$launch_pid" 2>/dev/null || true
             xcrun simctl terminate "$udid" io.github.SafeFain.MinecraftC || true
