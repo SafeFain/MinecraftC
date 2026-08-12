@@ -152,7 +152,7 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v8 can read v2-v7 desktop saves. The current world
-generation version is v5.
+generation version is v6.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, and `/weather`.
 Run `./build-local/minecraftc --version` to print the version without opening a

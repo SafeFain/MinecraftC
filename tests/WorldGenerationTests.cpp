@@ -8,6 +8,7 @@
 #include "Config.h"
 
 #include <cstdlib>
+#include <array>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -41,6 +42,7 @@ int main() {
     HeightPipeline other(otherLegacy, 987654321ULL);
     bool seedDiffers = false;
     std::set<Biome> observedBiomes;
+    std::array<int, BIOME_COUNT> biomeCounts{};
     int riverColumns = 0;
     int maxTerrainHeight = Config::WORLD_MIN_Y;
     int overhangColumns = 0;
@@ -54,6 +56,7 @@ int main() {
                     a.height <= Config::TERRAIN_MAX_HEIGHT,
                     "terrain height outside world");
             observedBiomes.insert(a.biome);
+            ++biomeCounts[static_cast<size_t>(a.biome)];
             maxTerrainHeight = std::max(maxTerrainHeight, a.height);
             if (a.mountainFactor > 0.55f) {
                 for (int y = a.nominalHeight - 20; y <= a.height; ++y) {
@@ -72,6 +75,10 @@ int main() {
     }
     require(seedDiffers, "different seeds produced identical surface");
     require(observedBiomes.size() >= 6, "surface lacks biome diversity");
+    require(biomeCounts[static_cast<size_t>(Biome::SWAMP)] >= 100 &&
+            biomeCounts[static_cast<size_t>(Biome::JUNGLE)] >= 100 &&
+            biomeCounts[static_cast<size_t>(Biome::BADLANDS)] >= 100,
+            "uncommon inland biomes are too sparse across the exploration sample");
     require(riverColumns > 0, "surface router produced no rivers");
     require(maxTerrainHeight >= 160, "terrain router produced no tall mountains");
     require(overhangColumns > 0, "mountain density produced no overhangs");
@@ -387,6 +394,9 @@ int main() {
 
     std::cout << "biomes=" << observedBiomes.size()
               << " rivers=" << riverColumns
+              << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
+              << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]
+              << " badlands=" << biomeCounts[static_cast<size_t>(Biome::BADLANDS)]
               << " trees=" << regionSet.size()
               << " ores=" << totalOres << '/' << sampledHostBlocks << '\n';
 }

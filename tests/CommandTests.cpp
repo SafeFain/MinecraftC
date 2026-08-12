@@ -1,4 +1,6 @@
 #include "game/Command.h"
+#include "world/BiomeLocator.h"
+#include "game/TextWrap.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -13,6 +15,56 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const auto englishLines = wrapTextPixels("alpha beta gamma", 10.0f,
+        [](const std::string& text) { return static_cast<float>(text.size()); });
+    require(englishLines.size() == 2 && englishLines[0] == "alpha beta" &&
+            englishLines[1] == "gamma", "English chat did not wrap at a word boundary");
+    const auto chineseLines = wrapTextPixels("沼泽丛林恶地", 6.0f,
+        [](const std::string& text) {
+            return static_cast<float>(utf8CodepointCount(text) * 2);
+        });
+    require(chineseLines.size() == 2 && chineseLines[0] == "沼泽丛" &&
+            chineseLines[1] == "林恶地", "CJK chat was not wrapped on UTF-8 boundaries");
+
+    const auto help = parseCommand("/help");
+    require(help.command && help.command->type == CommandType::Help,
+            "help command was not parsed");
+    const auto locate = parseCommand("/locate biome plain");
+    require(locate.command && locate.command->type == CommandType::LocateBiome &&
+            locate.command->biome == Biome::PLAINS,
+            "plain biome locate command was not parsed");
+    const auto jungle = parseCommand("/locate biome jungle");
+    require(jungle.command && jungle.command->biome == Biome::JUNGLE,
+            "jungle biome locate command was not parsed");
+    const auto deepOcean = parseCommand("/locate biome deep_ocean");
+    require(deepOcean.command && deepOcean.command->biome == Biome::DEEP_OCEAN,
+            "underscore biome locate command was not parsed");
+    for (int i = 0; i < BIOME_COUNT; ++i) {
+        const Biome biome = static_cast<Biome>(i);
+        const auto parsed = parseCommand(
+            "/locate biome " + std::string(biomeCommandName(biome)));
+        require(parsed.command && parsed.command->biome == biome,
+                "a registered biome name was not accepted by locate");
+    }
+    const auto locateError = parseCommand("/locate biome volcano");
+    require(locateError.error && locateError.error->position == 14 &&
+            locateError.error->expected == "a valid biome (see /help)",
+            "locate error did not identify the unsupported biome argument");
+    const auto timeError = parseCommand("/time noon");
+    require(timeError.error && timeError.error->position == 6 &&
+            timeError.error->expected == "set",
+            "time syntax error did not preserve its source position");
+    const auto unknown = parseCommand("/unknown");
+    require(unknown.error && unknown.error->kind == CommandErrorKind::UnknownCommand &&
+            unknown.error->position == 1,
+            "unknown command did not preserve its source position");
+
+    const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
+        [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
+            ? Biome::PLAINS : Biome::FOREST; }, 128, 32);
+    require(nearest && nearest->x == 48 && nearest->y == 0,
+            "biome locator did not refine the nearest sampled biome");
+
     require(parseGamemodeCommand("/gamemode 0") == GameMode::Survival,
             "gamemode 0 did not select Survival");
     require(parseGamemodeCommand("/gamemode 1") == GameMode::Creative,

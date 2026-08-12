@@ -42,8 +42,10 @@ HeightPipeline::HeightPipeline(const Noise&, uint64_t seed)
     configureFbm(m_continental, m_context.noiseSeed(DOMAIN_CONT), 0.00042f, 4);
     configureFbm(m_erosion, m_context.noiseSeed(DOMAIN_EROSION), 0.00105f, 4);
     configureFbm(m_weirdness, m_context.noiseSeed(DOMAIN_WEIRD), 0.00175f, 3);
-    configureFbm(m_temperature, m_context.noiseSeed(DOMAIN_TEMP), 0.00065f, 3);
-    configureFbm(m_humidity, m_context.noiseSeed(DOMAIN_HUMID), 0.00072f, 3);
+    // Climate varies faster than continentalness so inland exploration crosses
+    // several biomes without fragmenting the large-scale land/ocean layout.
+    configureFbm(m_temperature, m_context.noiseSeed(DOMAIN_TEMP), 0.00110f, 3);
+    configureFbm(m_humidity, m_context.noiseSeed(DOMAIN_HUMID), 0.00120f, 3);
 
     m_detail.SetSeed(m_context.noiseSeed(DOMAIN_DETAIL));
     m_detail.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
@@ -200,18 +202,18 @@ Biome HeightPipeline::selectBiome(const ClimateSample& c, int height,
     if (height >= 90 && c.peaksValleys > 0.20f)
         return c.humidity > 0.35f ? Biome::MEADOW : Biome::HILLS;
 
-    if (c.temperature > 0.45f && c.humidity < -0.28f) {
-        return c.erosion < -0.18f ? Biome::BADLANDS : Biome::DESERT;
+    if (c.temperature > 0.38f && c.humidity < -0.20f) {
+        return c.erosion < -0.12f ? Biome::BADLANDS : Biome::DESERT;
     }
-    if (c.temperature > 0.35f) {
-        if (c.humidity > 0.38f) return Biome::JUNGLE;
+    if (c.temperature > 0.30f) {
+        if (c.humidity > 0.30f) return Biome::JUNGLE;
         if (c.humidity < -0.10f) return Biome::SAVANNA;
     }
     if (c.temperature < -0.42f)
         return Biome::SNOW_TUNDRA;
     if (c.temperature < -0.18f)
         return Biome::TAIGA;
-    if (height <= Config::SEA_LEVEL + 2 && c.humidity > 0.35f)
+    if (height <= Config::SEA_LEVEL + 4 && c.humidity > 0.28f)
         return Biome::SWAMP;
     if (c.humidity > 0.32f) {
         if (c.weirdness < -0.28f) return Biome::FLOWER_FOREST;

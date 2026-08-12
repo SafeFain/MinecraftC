@@ -64,6 +64,9 @@ public:
     int getSurfaceY(int worldX, int worldZ) const;
     bool hasSkyAccess(int worldX, int worldY, int worldZ) const;
     PrecipitationType precipitationAt(int worldX, int worldY, int worldZ) const;
+    Biome biomeAt(int worldX, int worldZ) const;
+    std::optional<glm::ivec2> locateBiome(Biome biome, int worldX,
+                                          int worldZ) const;
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);

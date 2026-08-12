@@ -769,7 +769,9 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_multiple_world_catalog COMMAND world_catalog_tests)
 
-    add_executable(command_tests tests/CommandTests.cpp)
+    add_executable(command_tests
+        tests/CommandTests.cpp
+        src/game/Utf8.cpp)
     target_include_directories(command_tests PRIVATE src)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)

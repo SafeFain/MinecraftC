@@ -38,6 +38,7 @@
 #include "game/Localization.h"
 #include "game/SurvivalSession.h"
 #include "game/Utf8.h"
+#include "game/TextWrap.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
 #include "audio/AudioSystem.h"
@@ -52,6 +53,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <vector>
+#include <deque>
 #include <random>
 #include <iostream>
 #include <limits>
@@ -365,8 +367,8 @@ private:
     double                m_mouseScreenY = 0.0;
     bool                  m_commandOpen = false;
     TextEditBuffer        m_commandInput{{}, 80, &m_clipboard};
-    std::string           m_commandMessage;
-    float                 m_commandMessageSeconds = 0.0f;
+    std::deque<std::string> m_chatHistory;
+    float                 m_chatVisibleSeconds = 0.0f;
 
     RuntimeClock m_runtimeClock;
     RuntimeClock::Tick m_lastFrameTick = 0;
@@ -1053,6 +1055,8 @@ private:
         m_playerDead = false;
         m_commandOpen = false;
         m_commandInput.setText({});
+        m_chatHistory.clear();
+        m_chatVisibleSeconds = 0.0f;
         m_survivalTicks = m_worldMetadata.worldTicks;
         m_survivalWorldTickRemainder = 0.0f;
 
@@ -1103,9 +1107,8 @@ private:
                 RuntimeClock::elapsed(m_lastFrameTick, now)));
             m_lastFrameTick = now;
             dt = std::min(dt, 0.1f);
-            if (m_commandMessageSeconds > 0.0f)
-                m_commandMessageSeconds =
-                    std::max(0.0f, m_commandMessageSeconds - dt);
+            if (m_chatVisibleSeconds > 0.0f)
+                m_chatVisibleSeconds = std::max(0.0f, m_chatVisibleSeconds - dt);
             if (m_itemNameSeconds > 0.0f)
                 m_itemNameSeconds = std::max(0.0f, m_itemNameSeconds - dt);
             if (m_hotbar.getSelectedSlot() != m_lastHudSlot) {
@@ -1517,18 +1520,51 @@ private:
                 m_uiRenderer.endUIFrame();
             }
 
-            if (m_commandOpen || m_commandMessageSeconds > 0.0f) {
+            if (m_commandOpen || m_chatVisibleSeconds > 0.0f) {
                 m_uiRenderer.beginUIFrame(uiWidth, uiHeight);
-                const std::string text = m_commandOpen
-                    ? "> " + m_commandInput.text() + "_"
-                    : m_commandMessage;
-                m_uiRenderer.drawRect(
-                    12.0f, 18.0f, static_cast<float>(uiWidth - 24), 36.0f,
-                    glm::vec4(0.02f, 0.02f, 0.03f, 0.82f));
-                m_uiRenderer.renderText(
-                    text, 20.0f, 27.0f, 1.25f,
-                    m_commandOpen ? glm::vec3(1.0f)
-                                  : glm::vec3(1.0f, 0.82f, 0.35f));
+                constexpr float lineHeight = 25.0f;
+                const float textWidth = std::max(1.0f, static_cast<float>(uiWidth - 40));
+                auto wrap = [&](const std::string& text, float scale) {
+                    return wrapTextPixels(text, textWidth,
+                        [&](const std::string& candidate) {
+                            return m_uiRenderer.measureText(candidate, scale).x;
+                        });
+                };
+                std::vector<std::string> inputLines;
+                if (m_commandOpen) {
+                    inputLines = wrap("> " + m_commandInput.text() + "_", 1.25f);
+                }
+                const float inputHeight = m_commandOpen
+                    ? 11.0f + lineHeight * static_cast<float>(inputLines.size()) : 0.0f;
+
+                std::vector<std::string> visibleHistory;
+                for (auto message = m_chatHistory.rbegin();
+                     message != m_chatHistory.rend() && visibleHistory.size() < 8;
+                     ++message) {
+                    const auto lines = wrap(*message, 1.0f);
+                    for (auto line = lines.rbegin();
+                         line != lines.rend() && visibleHistory.size() < 8; ++line)
+                        visibleHistory.push_back(*line);
+                }
+                if (!visibleHistory.empty()) {
+                    m_uiRenderer.drawRect(12.0f, 18.0f + inputHeight,
+                        static_cast<float>(uiWidth - 24),
+                        lineHeight * static_cast<float>(visibleHistory.size()) + 8.0f,
+                        glm::vec4(0.02f, 0.02f, 0.03f, 0.72f));
+                    for (size_t i = 0; i < visibleHistory.size(); ++i)
+                        m_uiRenderer.renderText(visibleHistory[i], 20.0f,
+                            23.0f + inputHeight + lineHeight * static_cast<float>(i),
+                            1.0f, glm::vec3(1.0f, 0.88f, 0.58f));
+                }
+                if (m_commandOpen) {
+                    m_uiRenderer.drawRect(12.0f, 18.0f,
+                        static_cast<float>(uiWidth - 24), inputHeight,
+                        glm::vec4(0.02f, 0.02f, 0.03f, 0.86f));
+                    for (size_t i = 0; i < inputLines.size(); ++i)
+                        m_uiRenderer.renderText(inputLines[inputLines.size() - 1 - i],
+                            20.0f, 25.0f + lineHeight * static_cast<float>(i),
+                            1.25f, glm::vec3(1.0f));
+                }
                 m_uiRenderer.endUIFrame();
             }
 
@@ -1705,42 +1741,75 @@ private:
     }
 
     void showCommandMessage(const std::string& message) {
-        m_commandMessage = message;
-        m_commandMessageSeconds = 4.0f;
+        if (message.empty()) return;
+        m_chatHistory.push_back(message);
+        while (m_chatHistory.size() > 100) m_chatHistory.pop_front();
+        m_chatVisibleSeconds = 8.0f;
+    }
+
+    void showCommandError(const std::string& submitted, const CommandError& error) {
+        const std::string column = std::to_string(error.position + 1);
+        showCommandMessage(error.kind == CommandErrorKind::UnknownCommand
+            ? m_localization.format("message.command_unknown", {column})
+            : m_localization.format("message.command_error", {column, error.expected}));
+        showCommandMessage(submitted);
+        showCommandMessage(std::string(error.position, ' ') + "^");
     }
 
     void executeCommand() {
         const std::string submitted = m_commandInput.text();
         closeCommandInput();
+        if (submitted.empty()) return;
+        if (submitted.front() != '/') {
+            showCommandMessage(m_localization.format("message.chat_self", {submitted}));
+            return;
+        }
+
+        const CommandParseResult result = parseCommand(submitted);
+        if (result.error) {
+            showCommandError(submitted, *result.error);
+            return;
+        }
+        const ParsedCommand& command = *result.command;
+        if (command.type == CommandType::Help) {
+            showCommandMessage(m_localization.text("message.help_header"));
+            showCommandMessage("/help");
+            showCommandMessage("/gamemode 0|1|3");
+            showCommandMessage("/tp <x> <y> <z>");
+            showCommandMessage("/time set day|night");
+            showCommandMessage("/weather clear|rain|thunder");
+            showCommandMessage("/locate biome <biome>");
+            showCommandMessage(m_localization.text("message.help_biomes"));
+            return;
+        }
         if (!m_worldMetadata.cheatsEnabled) {
             showCommandMessage(m_localization.text("message.cheats_disabled"));
             return;
         }
-        const auto mode = parseGamemodeCommand(submitted);
-        if (mode) {
-            m_player.configureRules(*mode, m_worldMetadata.difficulty);
-            m_worldMetadata.gameMode = *mode;
+
+        if (command.type == CommandType::Gamemode) {
+            m_player.configureRules(command.gameMode, m_worldMetadata.difficulty);
+            m_worldMetadata.gameMode = command.gameMode;
             m_hotbar.setSurvivalInventory(
-                *mode == GameMode::Survival ? &m_player.inventory() : nullptr);
+                command.gameMode == GameMode::Survival ? &m_player.inventory() : nullptr);
             const std::string name = m_localization.text(
-                *mode == GameMode::Survival ? "common.survival" :
-                *mode == GameMode::Creative ? "common.creative" : "common.spectator");
+                command.gameMode == GameMode::Survival ? "common.survival" :
+                command.gameMode == GameMode::Creative ? "common.creative" : "common.spectator");
             showCommandMessage(m_localization.format("message.mode_changed", {name}));
             return;
         }
-        const auto target = parseTeleportCommand(submitted);
-        if (target) {
-            m_player.teleport({target->x, target->y, target->z});
+        if (command.type == CommandType::Teleport) {
+            const auto& target = command.teleport;
+            m_player.teleport({target.x, target.y, target.z});
             m_world.update(m_player.getPosition());
             m_world.enqueueGeneration();
             showCommandMessage(m_localization.format("message.teleported", {
-                std::to_string(target->x), std::to_string(target->y),
-                std::to_string(target->z)}));
+                std::to_string(target.x), std::to_string(target.y),
+                std::to_string(target.z)}));
             return;
         }
-        const auto time = parseTimeSetCommand(submitted);
-        if (time) {
-            if (*time == TimePreset::Day) {
+        if (command.type == CommandType::Time) {
+            if (command.time == TimePreset::Day) {
                 m_dayNightCycle.setDay();
                 showCommandMessage(m_localization.text("message.time_day"));
             } else {
@@ -1749,16 +1818,31 @@ private:
             }
             return;
         }
-        const auto weather = parseWeatherCommand(submitted);
-        if (weather) {
-            m_weather.setWeather(*weather);
+        if (command.type == CommandType::Weather) {
+            m_weather.setWeather(command.weather);
             showCommandMessage(m_localization.text(
-                *weather == WeatherType::Clear ? "message.weather_clear" :
-                *weather == WeatherType::Rain ? "message.weather_rain" :
+                command.weather == WeatherType::Clear ? "message.weather_clear" :
+                command.weather == WeatherType::Rain ? "message.weather_rain" :
                 "message.weather_thunder"));
             return;
         }
-        showCommandMessage(m_localization.text("message.command_usage"));
+        if (command.type == CommandType::LocateBiome) {
+            const glm::dvec3 position = m_player.getPosition();
+            const auto location = m_world.locateBiome(command.biome,
+                static_cast<int>(std::floor(position.x)),
+                static_cast<int>(std::floor(position.z)));
+            if (!location) {
+                showCommandMessage(m_localization.text("message.locate_not_found"));
+                return;
+            }
+            const double dx = static_cast<double>(location->x) - position.x;
+            const double dz = static_cast<double>(location->y) - position.z;
+            showCommandMessage(m_localization.format("message.locate_found", {
+                m_localization.text("biome." + std::string(biomeCommandName(command.biome))),
+                std::to_string(location->x),
+                std::to_string(location->y),
+                std::to_string(static_cast<int>(std::round(std::sqrt(dx * dx + dz * dz))))}));
+        }
     }
 
     void updateMouseScreenPosition() {

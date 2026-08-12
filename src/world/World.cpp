@@ -1,4 +1,5 @@
 #include "world/World.h"
+#include "world/BiomeLocator.h"
 #include "core/RuntimeClock.h"
 #include "world/ChunkMesh.h"
 #include "world/RegionGenerator.h"
@@ -147,6 +148,16 @@ PrecipitationType World::precipitationAt(
     int worldX, int worldY, int worldZ) const {
     const HeightBiome sample = m_generator.queryHeightBiome(worldX, worldZ);
     return precipitationFor(sample.biome, worldY);
+}
+
+Biome World::biomeAt(int worldX, int worldZ) const {
+    return m_generator.queryHeightBiome(worldX, worldZ).biome;
+}
+
+std::optional<glm::ivec2> World::locateBiome(
+    Biome biome, int worldX, int worldZ) const {
+    return locateNearestBiome(glm::ivec2(worldX, worldZ), biome,
+        [this](int x, int z) { return biomeAt(x, z); });
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
