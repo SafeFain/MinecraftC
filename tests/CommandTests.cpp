@@ -1,5 +1,4 @@
 #include "game/Command.h"
-#include "world/BiomeLocator.h"
 #include "game/TextWrap.h"
 
 #include <cstdlib>
@@ -58,12 +57,6 @@ int main() {
     require(unknown.error && unknown.error->kind == CommandErrorKind::UnknownCommand &&
             unknown.error->position == 1,
             "unknown command did not preserve its source position");
-
-    const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
-        [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
-            ? Biome::PLAINS : Biome::FOREST; }, 128, 32);
-    require(nearest && nearest->x == 48 && nearest->y == 0,
-            "biome locator did not refine the nearest sampled biome");
 
     require(parseGamemodeCommand("/gamemode 0") == GameMode::Survival,
             "gamemode 0 did not select Survival");

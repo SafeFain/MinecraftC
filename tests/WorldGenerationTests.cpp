@@ -5,6 +5,7 @@
 #include "world/RegionGenerator.h"
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
+#include "world/BiomeLocator.h"
 #include "Config.h"
 
 #include <cstdlib>
@@ -27,6 +28,12 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 }
 
 int main() {
+    const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
+        [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
+            ? Biome::PLAINS : Biome::FOREST; }, 128, 32);
+    require(nearest && nearest->x == 48 && nearest->y == 0,
+            "biome locator did not refine the nearest sampled biome");
+
     require(shouldRenderCubeFace(BlockId::STONE, BlockId::ICE) &&
             shouldRenderCubeFace(BlockId::DIRT, BlockId::LEAVES),
             "opaque terrain faces remain behind non-opaque solid blocks");

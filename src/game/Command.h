@@ -9,7 +9,7 @@
 
 #include "game/GameRules.h"
 #include "game/Weather.h"
-#include "world/BiomeMap.h"
+#include "world/Biome.h"
 
 enum class TimePreset { Day, Night };
 
