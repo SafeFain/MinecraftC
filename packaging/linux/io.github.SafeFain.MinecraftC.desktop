@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MinecraftC
+Comment=Voxel sandbox game
+Exec=minecraftc
+Icon=minecraftc
+Terminal=false
+Categories=Game;

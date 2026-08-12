@@ -1,5 +1,6 @@
 import hashlib
 import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,6 +28,19 @@ class TextureGeneratorTests(unittest.TestCase):
             self.assertEqual((width, height), (1024, 1024))
             self.assertTrue(all(pixel[3] == 255 for pixel in pixels))
             self.assertGreater(len(set(pixels)), 16)
+
+    def test_desktop_app_icons_are_deterministic_and_well_formed(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            a, b = Path(first), Path(second)
+            tg.build_desktop_app_icons(a, tg.DEFAULT_SEED)
+            tg.build_desktop_app_icons(b, tg.DEFAULT_SEED)
+            for name in ("minecraftc.png", "minecraftc.ico", "minecraftc.icns"):
+                self.assertEqual((a / name).read_bytes(), (b / name).read_bytes())
+            self.assertEqual((a / "minecraftc.ico").read_bytes()[:6],
+                             b"\x00\x00\x01\x00\x01\x00")
+            icns = (a / "minecraftc.icns").read_bytes()
+            self.assertEqual(icns[:4], b"icns")
+            self.assertEqual(struct.unpack(">I", icns[4:8])[0], len(icns))
 
     def test_entity_atlas_is_deterministic_and_complete(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:

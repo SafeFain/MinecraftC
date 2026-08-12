@@ -43,6 +43,8 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/atlas.json"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
+          test -f "$RUNNER_TEMP/$RELEASE_DIR/share/applications/io.github.SafeFain.MinecraftC.desktop"
+          test -f "$RUNNER_TEMP/$RELEASE_DIR/share/icons/hicolor/1024x1024/apps/minecraftc.png"
           test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
       - name: Verify installed renderer startup
         shell: bash
@@ -160,6 +162,10 @@ jobs:
           if (!(Test-Path "$stage/LICENSE")) { throw "GPL license was not installed" }
           if (!(Test-Path "$stage/assets/shaders/block.vert")) { throw "Assets were not installed" }
           if (!(Test-Path "$stage/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$stage/minecraftc.exe")
+          if ($null -eq $icon -or $icon.Width -lt 32) { throw "Executable icon is missing" }
+          $icon.Dispose()
           $version = & "$stage/minecraftc.exe" --version
           if ($version -ne "MinecraftC $env:MINECRAFTC_VERSION_DISPLAY") { throw "Version check failed: $version" }
           $help = (& "$stage/minecraftc.exe" --help 2>&1) -join "`n"
@@ -236,18 +242,23 @@ jobs:
       - name: Install and verify universal executable
         run: |
           cmake --install build-ci --prefix "$RUNNER_TEMP/$RELEASE_DIR"
-          lipo "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" -verify_arch arm64 x86_64
-          lipo "$RUNNER_TEMP/$RELEASE_DIR/libMoltenVK.dylib" -verify_arch arm64 x86_64
-          otool -L "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" | grep -q '@rpath/libMoltenVK.dylib'
+          app="$RUNNER_TEMP/$RELEASE_DIR/MinecraftC.app"
+          executable="$app/Contents/MacOS/MinecraftC"
+          moltenvk="$app/Contents/Frameworks/libMoltenVK.dylib"
+          lipo "$executable" -verify_arch arm64 x86_64
+          lipo "$moltenvk" -verify_arch arm64 x86_64
+          otool -L "$executable" | grep -q '@rpath/libMoltenVK.dylib'
+          test "$(defaults read "$app/Contents/Info" CFBundleIconFile)" = "minecraftc.icns"
+          test -f "$app/Contents/Resources/minecraftc.icns"
+          test -f "$app/Contents/Resources/assets/shaders/block.vert"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/licenses/MoltenVK-LICENSE.txt"
-          test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/block.vert"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
-          "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --help | grep -q 'renderer=opengl|vulkan'
+          test "$("$executable" --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
+          "$executable" --help | grep -q 'renderer=opengl|vulkan'
       - name: Verify installed OpenGL and Vulkan startup
         shell: bash
         run: |
-          executable="$RUNNER_TEMP/$RELEASE_DIR/minecraftc"
+          executable="$RUNNER_TEMP/$RELEASE_DIR/MinecraftC.app/Contents/MacOS/MinecraftC"
           run_smoke() {
             renderer="$1"
             expected="$2"
@@ -711,6 +722,7 @@ jobs:
           test -f "$source_apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$source_apk" > "$RUNNER_TEMP/android-badging.txt"
           grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='$version_code' versionName='$MINECRAFTC_VERSION'" "$RUNNER_TEMP/android-badging.txt"
+          grep -q "^application:.*icon='" "$RUNNER_TEMP/android-badging.txt"
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "uses-gl-es: '0x30000'" "$RUNNER_TEMP/android-badging.txt"

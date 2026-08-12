@@ -8,9 +8,11 @@ third-party licenses are summarized in `README.md` and retained beside the
 corresponding assets and source dependencies.
 
 - Windows: run `minecraftc.exe` or `run-minecraftc.cmd`.
-- Linux/macOS: run `./run-minecraftc.sh` from a terminal. The macOS package
-  includes the Apache-2.0-licensed MoltenVK runtime and defaults to Vulkan with
-  automatic OpenGL fallback.
+- Linux: run `./run-minecraftc.sh` from a terminal. A desktop entry and hicolor
+  application icon are included under `share/`.
+- macOS: open `MinecraftC.app` or run `./run-minecraftc.sh`. The application
+  bundle includes the Apache-2.0-licensed MoltenVK runtime and defaults to Vulkan
+  with automatic OpenGL fallback.
 - Android: install `MinecraftC-<version>-android-arm64-unsigned.apk` after signing it
   with a trusted publisher or local developer key. It requires Android 10,
   arm64, and OpenGL ES 3.0.

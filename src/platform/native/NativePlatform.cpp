@@ -127,9 +127,10 @@ RuntimePaths resolveRuntimePaths(const RuntimePathInputs& inputs) {
     RuntimePaths result;
     const fs::path executableDirectory = inputs.executablePath.parent_path();
     const fs::path installDataDirectory(MINECRAFTC_INSTALL_DATADIR);
-    const std::array<fs::path, 3> candidates = {
+    const std::array<fs::path, 4> candidates = {
         executableDirectory.parent_path() / installDataDirectory /
             "minecraftc" / "assets",
+        executableDirectory.parent_path() / "Resources" / "assets",
         executableDirectory / "assets",
         inputs.currentDirectory / "assets"
     };

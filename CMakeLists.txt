@@ -386,6 +386,13 @@ if(IOS)
         "${CMAKE_CURRENT_SOURCE_DIR}/ios/Assets.xcassets")
 endif()
 
+if(APPLE AND NOT IOS)
+    set(MINECRAFTC_MACOS_ICON
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/minecraftc.icns")
+    set_source_files_properties("${MINECRAFTC_MACOS_ICON}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources")
+endif()
+
 if(ANDROID)
     set(MINECRAFTC_APP_TARGET main)
     add_library(${MINECRAFTC_APP_TARGET} SHARED ${SOURCES})
@@ -393,9 +400,22 @@ elseif(IOS)
     set(MINECRAFTC_APP_TARGET minecraftc)
     add_executable(${MINECRAFTC_APP_TARGET} MACOSX_BUNDLE
         ${SOURCES} ${MINECRAFTC_IOS_RESOURCES})
+elseif(APPLE)
+    set(MINECRAFTC_APP_TARGET minecraftc)
+    add_executable(${MINECRAFTC_APP_TARGET} MACOSX_BUNDLE
+        ${SOURCES} "${MINECRAFTC_MACOS_ICON}")
 else()
     set(MINECRAFTC_APP_TARGET minecraftc)
     add_executable(${MINECRAFTC_APP_TARGET} ${SOURCES})
+endif()
+if(WIN32)
+    file(TO_CMAKE_PATH
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/minecraftc.ico"
+        MINECRAFTC_WINDOWS_ICON)
+    configure_file(packaging/windows/minecraftc.rc.in
+        "${CMAKE_CURRENT_BINARY_DIR}/minecraftc.rc" @ONLY)
+    target_sources(${MINECRAFTC_APP_TARGET} PRIVATE
+        "${CMAKE_CURRENT_BINARY_DIR}/minecraftc.rc")
 endif()
 target_sources(${MINECRAFTC_APP_TARGET} PRIVATE
     src/platform/sdl/SdlMain.cpp)
@@ -445,7 +465,14 @@ endif()
 if(APPLE AND NOT IOS)
     set_target_properties(${MINECRAFTC_APP_TARGET} PROPERTIES
         BUILD_RPATH "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS"
-        INSTALL_RPATH "@executable_path")
+        INSTALL_RPATH "@executable_path/../Frameworks"
+        OUTPUT_NAME "MinecraftC"
+        MACOSX_BUNDLE_BUNDLE_NAME "MinecraftC"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.SafeFain.MinecraftC"
+        MACOSX_BUNDLE_ICON_FILE "minecraftc.icns"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION
+            "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${PROJECT_VERSION_PATCH}")
 endif()
 if(IOS)
     math(EXPR MINECRAFTC_IOS_BUILD_NUMBER
@@ -528,8 +555,14 @@ elseif(IOS)
     install(TARGETS ${MINECRAFTC_APP_TARGET}
         BUNDLE DESTINATION Applications)
 elseif(MINECRAFTC_PORTABLE_LAYOUT)
-    install(TARGETS minecraftc RUNTIME DESTINATION .)
-    install(DIRECTORY assets/ DESTINATION assets)
+    if(APPLE)
+        install(TARGETS minecraftc BUNDLE DESTINATION .)
+        install(DIRECTORY assets/
+            DESTINATION "MinecraftC.app/Contents/Resources/assets")
+    else()
+        install(TARGETS minecraftc RUNTIME DESTINATION .)
+        install(DIRECTORY assets/ DESTINATION assets)
+    endif()
     install(FILES LICENSE README.md packaging/README-release.md
             DESTINATION .)
     if(WIN32)
@@ -538,21 +571,35 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
         install(PROGRAMS packaging/run-minecraftc.sh DESTINATION .)
     endif()
     if(APPLE)
-        install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}" DESTINATION .)
+        install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}"
+                DESTINATION "MinecraftC.app/Contents/Frameworks")
         install(FILES "${MINECRAFTC_MOLTENVK_LICENSE}"
                 DESTINATION licenses RENAME MoltenVK-LICENSE.txt)
     endif()
 else()
-    install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
+    if(APPLE)
+        install(TARGETS minecraftc BUNDLE DESTINATION .)
+        install(DIRECTORY assets/
+            DESTINATION "MinecraftC.app/Contents/Resources/assets")
+    else()
+        install(TARGETS minecraftc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(DIRECTORY assets/
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
+    endif()
     install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
     if(APPLE)
         install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}"
-                DESTINATION ${CMAKE_INSTALL_BINDIR})
+                DESTINATION "MinecraftC.app/Contents/Frameworks")
         install(FILES "${MINECRAFTC_MOLTENVK_LICENSE}"
                 DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses
                 RENAME MoltenVK-LICENSE.txt)
     endif()
+endif()
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    install(FILES packaging/linux/io.github.SafeFain.MinecraftC.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/icons/minecraftc.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/1024x1024/apps)
 endif()
 
 # ── Deterministic world-generation tests ───────────────────────────────────

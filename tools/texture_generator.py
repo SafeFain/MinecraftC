@@ -1004,8 +1004,8 @@ def build_entity_atlas(output,seed):
     (output/"entity_atlas.json").write_text(
         json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
-def build_ios_app_icon(output,seed):
-    """Build an opaque, nearest-filtered grass cube icon for the iOS bundle."""
+def build_app_icon(output,seed):
+    """Build an opaque, nearest-filtered grass cube application icon."""
     size=64
     canvas=[]
     for y in range(size):
@@ -1045,6 +1045,32 @@ def build_ios_app_icon(output,seed):
         for _ in range(scale): scaled.extend(source)
     output.parent.mkdir(parents=True,exist_ok=True)
     write_png(output,size*scale,size*scale,scaled)
+
+def build_ios_app_icon(output,seed):
+    build_app_icon(output,seed)
+
+def resize_nearest(pixels,width,height,size):
+    return [pixels[(y*height//size)*width+(x*width//size)]
+            for y in range(size) for x in range(size)]
+
+def build_desktop_app_icons(output,seed):
+    """Build Linux PNG, Windows ICO, and macOS ICNS from one icon image."""
+    output.mkdir(parents=True,exist_ok=True)
+    source=output/"minecraftc.png"
+    build_app_icon(source,seed)
+    width,height,pixels=read_generated_png(source)
+
+    icon256=png_bytes(256,256,resize_nearest(pixels,width,height,256))
+    ico_header=struct.pack("<HHH",0,1,1)
+    ico_entry=struct.pack("<BBBBHHII",0,0,0,0,1,32,len(icon256),22)
+    (output/"minecraftc.ico").write_bytes(ico_header+ico_entry+icon256)
+
+    icns_chunks=[]
+    for kind,size in ((b"ic08",256),(b"ic09",512),(b"ic10",1024)):
+        data=png_bytes(size,size,resize_nearest(pixels,width,height,size))
+        icns_chunks.append(kind+struct.pack(">I",len(data)+8)+data)
+    body=b"".join(icns_chunks)
+    (output/"minecraftc.icns").write_bytes(b"icns"+struct.pack(">I",len(body)+8)+body)
 
 # Compact 3x5 bitmap glyphs keep contact sheets dependency-free.
 FONT={c:bits for c,bits in {
@@ -1112,8 +1138,12 @@ def parse_args(argv=None):
     parser.add_argument("--build-entity-atlas",action="store_true")
     parser.add_argument("--build-entity-skins",action="store_true")
     parser.add_argument("--build-ios-icon",action="store_true")
+    parser.add_argument("--build-android-icon",action="store_true")
+    parser.add_argument("--build-desktop-icons",action="store_true")
     parser.add_argument("--ios-icon-output",type=Path,default=Path(
         "ios/Assets.xcassets/AppIcon.appiconset/AppIcon.png"))
+    parser.add_argument("--android-icon-output",type=Path,default=Path(
+        "android/app/src/main/res/drawable-nodpi/app_icon.png"))
     parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
     parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
     parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
@@ -1122,7 +1152,7 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args=parse_args(argv)
-    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.build_ios_icon or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
+    if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.build_ios_icon or args.build_android_icon or args.build_desktop_icons or args.contact_sheet): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
         local_seeds=parse_local_seeds(args.local_seed)
@@ -1132,7 +1162,9 @@ def main(argv=None):
         if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
         if args.build_entity_atlas: build_entity_atlas(args.output,args.seed)
         if args.build_entity_skins: build_entity_skins(args.output,args.seed)
-        if args.build_ios_icon: build_ios_app_icon(args.ios_icon_output,args.seed)
+        if args.build_ios_icon: build_app_icon(args.ios_icon_output,args.seed)
+        if args.build_android_icon: build_app_icon(args.android_icon_output,args.seed)
+        if args.build_desktop_icons: build_desktop_app_icons(Path("packaging/icons"),args.seed)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0
