@@ -53,12 +53,22 @@ float shadowVisibility(vec3 worldPosition, vec3 normal) {
     vec2 atlasUv = (projected.xy + vec2(column, row)) / atlasSize;
     vec2 texel = 1.0 / (uShadowResolution * atlasSize);
     float bias = 0.0008 + 0.002 * (1.0 - max(dot(normal, normalize(uLightDirection)), 0.0));
+    int taps = uShadowCascadeCount == 3 ? (cascade < 2 ? 4 : 1) :
+               uShadowCascadeCount == 2 && cascade == 0 ? 4 : 1;
     float visible = 0.0;
-    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
-        float stored = texture(uShadowMap, atlasUv + vec2(x, y) * texel).r;
-        visible += projected.z - bias <= stored ? 1.0 : 0.0;
+    if (taps == 1) {
+        visible = projected.z - bias <= texture(uShadowMap, atlasUv).r ? 1.0 : 0.0;
+    } else if (taps == 4) {
+        for (int y = -1; y <= 1; y += 2) for (int x = -1; x <= 1; x += 2)
+            visible += projected.z - bias <=
+                texture(uShadowMap, atlasUv + vec2(x, y) * texel * 0.5).r ? 1.0 : 0.0;
+        visible *= 0.25;
+    } else {
+        for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x)
+            visible += projected.z - bias <=
+                texture(uShadowMap, atlasUv + vec2(x, y) * texel).r ? 1.0 : 0.0;
+        visible /= 9.0;
     }
-    visible /= 9.0;
     float split = cascade == 0 ? uShadowSplits.x :
                   cascade == 1 ? uShadowSplits.y :
                   cascade == 2 ? uShadowSplits.z : uShadowSplits.w;

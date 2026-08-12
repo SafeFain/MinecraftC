@@ -16,11 +16,29 @@ struct ShadowConfig {
 
 inline ShadowConfig shadowConfig(ShadowQuality quality) {
     switch (quality) {
-        case ShadowQuality::Low: return {1, 1024, 64.0f};
-        case ShadowQuality::Medium: return {3, 1024, 192.0f};
-        case ShadowQuality::High: return {4, 2048, 256.0f};
+        case ShadowQuality::Low: return {1, 768, 64.0f};
+        case ShadowQuality::Medium: return {2, 1024, 128.0f};
+        case ShadowQuality::High: return {3, 1536, 192.0f};
         default: return {};
     }
+}
+
+inline int shadowFilterTaps(ShadowQuality quality, int cascade) {
+    if (quality == ShadowQuality::High) return cascade < 2 ? 4 : 1;
+    if (quality == ShadowQuality::Medium) return cascade == 0 ? 4 : 1;
+    return 1;
+}
+
+inline float shadowUpdateHz(ShadowQuality quality) {
+    if (quality == ShadowQuality::Low) return 10.0f;
+    if (quality == ShadowQuality::High) return 20.0f;
+    return quality == ShadowQuality::Medium ? 15.0f : 0.0f;
+}
+
+inline double shadowMovementThreshold(ShadowQuality quality) {
+    if (quality == ShadowQuality::Low) return 1.0;
+    if (quality == ShadowQuality::High) return 0.25;
+    return 0.5;
 }
 
 struct ShadowCascades {

@@ -23,6 +23,14 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    for (BlockId leaf : {BlockId::LEAVES, BlockId::BIRCH_LEAVES,
+                         BlockId::SPRUCE_LEAVES, BlockId::JUNGLE_LEAVES,
+                         BlockId::ACACIA_LEAVES}) {
+        require(getBlockProps(leaf).layer == RenderLayer::Cutout &&
+                    getBlockProps(leaf).alpha == 1.0f,
+                "leaf blocks must use opaque cutout rendering");
+    }
+
     static_assert(sizeof(MeshVertex) == 44);
     static_assert(offsetof(MeshVertex, px) == 0);
     static_assert(offsetof(MeshVertex, ao) == 12);
@@ -242,9 +250,21 @@ int main() {
             "thunder clouds should be darker than rain clouds");
     require(shadowConfig(ShadowQuality::Off).cascadeCount == 0 &&
             shadowConfig(ShadowQuality::Low).cascadeCount == 1 &&
-            shadowConfig(ShadowQuality::Medium).cascadeCount == 3 &&
-            shadowConfig(ShadowQuality::High).cascadeCount == 4,
+            shadowConfig(ShadowQuality::Medium).cascadeCount == 2 &&
+            shadowConfig(ShadowQuality::High).cascadeCount == 3,
             "shadow quality did not select the expected cascade count");
+    require(shadowConfig(ShadowQuality::Medium).distance == 128.0f &&
+            shadowFilterTaps(ShadowQuality::Medium, 0) == 4 &&
+            shadowFilterTaps(ShadowQuality::Medium, 1) == 1,
+            "medium shadow quality did not apply its reduced distance and filtering");
+    require(shadowConfig(ShadowQuality::Low).resolution == 768 &&
+            shadowUpdateHz(ShadowQuality::Low) == 10.0f &&
+            shadowConfig(ShadowQuality::High).resolution == 1536 &&
+            shadowConfig(ShadowQuality::High).cascadeCount == 3 &&
+            shadowFilterTaps(ShadowQuality::High, 0) == 4 &&
+            shadowFilterTaps(ShadowQuality::High, 2) == 1 &&
+            shadowUpdateHz(ShadowQuality::High) == 20.0f,
+            "low/high shadow quality performance budgets are invalid");
     const glm::mat4 shadowView = glm::lookAt(glm::vec3(0.0f, 80.0f, 0.0f),
         glm::vec3(0.0f, 80.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     const glm::mat4 shadowProjection = glm::perspective(
@@ -252,9 +272,9 @@ int main() {
     const auto cascades = buildShadowCascades(ShadowQuality::Medium,
         glm::inverse(shadowProjection * shadowView), shadowView,
         noon.lightDirection, 0.1f, 128.0f);
-    require(cascades.count == 3 && cascades.resolution == 1024 &&
+    require(cascades.count == 2 && cascades.resolution == 1024 &&
             cascades.splits.x > 0.1f && cascades.splits.x < cascades.splits.y &&
-            cascades.splits.y < cascades.splits.z && cascades.splits.z <= 128.0f,
+            cascades.splits.y <= 128.0f,
             "shadow cascade splits are invalid or ignored fog-distance clamping");
 
     // Switching back to an automatic cycle resumes from noon. Advance half a

@@ -1364,6 +1364,7 @@ private:
 
                 visibleChunks.clear();
                 std::vector<ShadowChunkSubmission> shadowChunks;
+                const float shadowDistance = shadowConfig(m_clientSettings.shadowQuality).distance;
                 if (visibleChunks.capacity() < m_world.getActiveChunks().size())
                     visibleChunks.reserve(m_world.getActiveChunks().size());
                 int rendered = 0;
@@ -1383,7 +1384,11 @@ private:
 
                     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
                         aabbMin.x, 0.0f, aabbMin.z));
-                    shadowChunks.push_back({&mesh, model, aabbMin, aabbMax});
+                    const float shadowMargin = shadowDistance + 32.0f;
+                    if (shadowDistance > 0.0f &&
+                        aabbMin.x <= shadowMargin && aabbMax.x >= -shadowMargin &&
+                        aabbMin.z <= shadowMargin && aabbMax.z >= -shadowMargin)
+                        shadowChunks.push_back({&mesh, model, aabbMin, aabbMax});
                     if (!frustum.intersectsAABB(aabbMin, aabbMax)) continue;
 
                     glm::vec3 center(
@@ -1395,7 +1400,7 @@ private:
                 }
 
                 m_renderer->renderChunkShadows(m_clientSettings.shadowQuality,
-                    glm::inverse(vp), view, shadowChunks);
+                    glm::inverse(vp), view, renderOrigin, shadowChunks);
                 m_renderer->bindBlockShader();
                 for (const auto& visible : visibleChunks) {
                     m_renderer->renderChunk(

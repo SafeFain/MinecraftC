@@ -46,6 +46,7 @@ public:
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool translucent = false) override;
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
+                            const glm::dvec3&,
                             const std::vector<ShadowChunkSubmission>&) override;
     void uploadChunkMesh(ChunkMesh&) override;
     void releaseChunkMesh(ChunkMesh&) override;

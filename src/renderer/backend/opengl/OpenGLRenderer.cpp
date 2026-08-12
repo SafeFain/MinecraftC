@@ -675,11 +675,13 @@ void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
 void Renderer::renderChunkShadows(ShadowQuality quality,
                                   const glm::mat4& inverseViewProjection,
                                   const glm::mat4& view,
+                                  const glm::dvec3& worldOrigin,
                                   const std::vector<ShadowChunkSubmission>& chunks) {
     const bool enabled = quality != ShadowQuality::Off &&
         m_environment.daylight >= 0.12f && m_environment.directIntensity >= 0.08f;
     if (!enabled || chunks.empty()) {
         m_shadowCascades = {};
+        m_shadowBaseCascades = {};
         return;
     }
     const ShadowConfig config = shadowConfig(quality);
@@ -691,7 +693,8 @@ void Renderer::renderChunkShadows(ShadowQuality quality,
         m_shadowCascades = {};
         return;
     }
-    if (quality != m_shadowQuality) {
+    const bool qualityChanged = quality != m_shadowQuality;
+    if (qualityChanged) {
         if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
         m_shadowTexture = 0;
         if (!m_shadowFramebuffer) genFramebuffers(1, &m_shadowFramebuffer);
@@ -716,10 +719,32 @@ void Renderer::renderChunkShadows(ShadowQuality quality,
         bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
         m_shadowQuality = quality;
     }
+    const double nowSeconds = RuntimeClock::seconds(RuntimeClock{}.now());
+    const bool moved = glm::distance(worldOrigin, m_lastShadowWorldOrigin) >=
+        shadowMovementThreshold(quality);
+    const float lightDelta = glm::length(glm::normalize(m_environment.lightDirection) -
+        glm::normalize(m_lastShadowDirection));
+    const bool timeDue = nowSeconds - m_lastShadowUpdateSeconds >=
+        (1.0 / shadowUpdateHz(quality));
+    const bool updateShadow = qualityChanged || m_lastShadowUpdateSeconds < 0.0 ||
+        moved || lightDelta >= 0.01f || (timeDue && lightDelta >= 0.0002f);
+    if (!updateShadow) {
+        m_shadowCascades = m_shadowBaseCascades;
+        const glm::dvec3 delta = worldOrigin - m_lastShadowWorldOrigin;
+        const glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(
+            static_cast<float>(delta.x), 0.0f, static_cast<float>(delta.z)));
+        for (int i = 0; i < m_shadowCascades.count; ++i)
+            m_shadowCascades.lightViewProjection[i] *= translation;
+        return;
+    }
     const float fogDistance = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
                               Config::CHUNK_SIZE_X;
     m_shadowCascades = buildShadowCascades(quality, inverseViewProjection, view,
         m_environment.lightDirection, Config::NEAR_PLANE, fogDistance);
+    m_shadowBaseCascades = m_shadowCascades;
+    m_lastShadowUpdateSeconds = nowSeconds;
+    m_lastShadowWorldOrigin = worldOrigin;
+    m_lastShadowDirection = m_environment.lightDirection;
     bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
     auto colorMask = glProc<ColorMaskFn>("glColorMask");
     if (!colorMask) { m_shadowCascades = {}; bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0); return; }

@@ -40,7 +40,8 @@ public:
     virtual void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                              bool translucent = false) = 0;
     virtual void renderChunkShadows(ShadowQuality, const glm::mat4& inverseViewProjection,
-        const glm::mat4& view, const std::vector<ShadowChunkSubmission>&) = 0;
+        const glm::mat4& view, const glm::dvec3& worldOrigin,
+        const std::vector<ShadowChunkSubmission>&) = 0;
     virtual void uploadChunkMesh(ChunkMesh&) = 0;
     virtual void releaseChunkMesh(ChunkMesh&) = 0;
     virtual void beginTranslucent() = 0;

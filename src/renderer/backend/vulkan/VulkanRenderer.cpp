@@ -470,7 +470,12 @@ struct VulkanRenderer::Impl {
     VkFormat shadowFormat = VK_FORMAT_UNDEFINED;
     ShadowQuality shadowQuality = ShadowQuality::Low;
     ShadowCascades shadowCascades{};
+    ShadowCascades shadowBaseCascades{};
     std::vector<ShadowChunkSubmission> submittedShadowChunks;
+    bool shadowUpdateQueued = false;
+    RuntimeClock::Tick lastShadowUpdate = 0;
+    glm::dvec3 lastShadowWorldOrigin{0.0};
+    glm::vec3 lastShadowDirection{0.0f};
     VkDescriptorSet shadowAtlasSet = VK_NULL_HANDLE;
     uint32_t submittedShadowAtlasTiles = 1;
     VkPipeline basicPipeline = VK_NULL_HANDLE;
@@ -2642,7 +2647,8 @@ struct VulkanRenderer::Impl {
                     imageBarriers.data());
             }
         }
-        if (shadowCascades.count > 0 && !submittedShadowChunks.empty() && shadowAtlasSet) {
+        if (shadowUpdateQueued && shadowCascades.count > 0 &&
+            !submittedShadowChunks.empty() && shadowAtlasSet) {
             const ShadowConfig config=shadowConfig(shadowQuality);
             const int columns=config.cascadeCount==1?1:2;
             const int rows=(config.cascadeCount+columns-1)/columns;
@@ -3525,7 +3531,7 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->drawQueued = false;
     m_impl->submittedDraws.clear();
     m_impl->submittedShadowChunks.clear();
-    m_impl->shadowCascades = {};
+    m_impl->shadowUpdateQueued = false;
     m_impl->submittedChunkEnvironment.shadowOptions = glm::vec4(0.0f);
     m_impl->submittedUi.clear();
     m_impl->submittedParticles.clear();
@@ -3755,32 +3761,58 @@ void VulkanRenderer::renderChunk(const ChunkMesh& mesh,
 
 void VulkanRenderer::renderChunkShadows(
         ShadowQuality quality, const glm::mat4& inverseViewProjection,
-        const glm::mat4& view, const std::vector<ShadowChunkSubmission>& chunks) {
+        const glm::mat4& view, const glm::dvec3& worldOrigin,
+        const std::vector<ShadowChunkSubmission>& chunks) {
     m_impl->submittedShadowChunks.clear();
-    m_impl->shadowCascades={};
+    m_impl->shadowUpdateQueued=false;
     ChunkEnvironmentUniforms& environment=m_impl->submittedChunkEnvironment;
     environment.shadowOptions=glm::vec4(0.0f);
     if(quality==ShadowQuality::Off||m_environment.daylight<0.12f||
        m_environment.directIntensity<0.08f||chunks.empty())return;
-    if(quality!=m_impl->shadowQuality){
+    const bool qualityChanged=quality!=m_impl->shadowQuality;
+    if(qualityChanged){
         require(vkDeviceWaitIdle(m_impl->device),"vkDeviceWaitIdle(shadow quality)");
         m_impl->createShadowImage(quality);
     }
+    const RuntimeClock::Tick now=RuntimeClock{}.now();
+    const bool moved=glm::distance(worldOrigin,m_impl->lastShadowWorldOrigin)>=
+        shadowMovementThreshold(quality);
+    const float lightDelta=glm::length(glm::normalize(m_environment.lightDirection)-
+        glm::normalize(m_impl->lastShadowDirection));
+    const bool timeDue=RuntimeClock::elapsed(m_impl->lastShadowUpdate,now)>=
+        RuntimeClock::fromSeconds(1.0/shadowUpdateHz(quality));
+    const bool updateShadow=qualityChanged||m_impl->lastShadowUpdate==0||
+        moved||lightDelta>=0.01f||(timeDue&&lightDelta>=0.0002f);
     const float fogDistance=(static_cast<float>(Config::RENDER_DISTANCE)+0.5f)*
                             Config::CHUNK_SIZE_X;
-    m_impl->shadowCascades=buildShadowCascades(quality,inverseViewProjection,view,
-        m_environment.lightDirection,Config::NEAR_PLANE,fogDistance);
     const glm::mat4 correction=clipSpaceCorrection(GraphicsApi::Vulkan);
+    if(updateShadow){
+        m_impl->shadowCascades=buildShadowCascades(quality,inverseViewProjection,view,
+            m_environment.lightDirection,Config::NEAR_PLANE,fogDistance);
+        for(int i=0;i<m_impl->shadowCascades.count;++i)
+            m_impl->shadowCascades.lightViewProjection[i]=correction*
+                m_impl->shadowCascades.lightViewProjection[i];
+        m_impl->shadowBaseCascades=m_impl->shadowCascades;
+        m_impl->lastShadowUpdate=now;
+        m_impl->lastShadowWorldOrigin=worldOrigin;
+        m_impl->lastShadowDirection=m_environment.lightDirection;
+        m_impl->submittedShadowChunks=chunks;
+        m_impl->shadowUpdateQueued=true;
+    }else{
+        m_impl->shadowCascades=m_impl->shadowBaseCascades;
+        const glm::dvec3 delta=worldOrigin-m_impl->lastShadowWorldOrigin;
+        const glm::mat4 translation=glm::translate(glm::mat4(1.0f),glm::vec3(
+            static_cast<float>(delta.x),0.0f,static_cast<float>(delta.z)));
+        for(int i=0;i<m_impl->shadowCascades.count;++i)
+            m_impl->shadowCascades.lightViewProjection[i]*=translation;
+    }
     for(int i=0;i<m_impl->shadowCascades.count;++i){
-        m_impl->shadowCascades.lightViewProjection[i]=correction*
-            m_impl->shadowCascades.lightViewProjection[i];
         environment.shadowMatrices[i]=m_impl->shadowCascades.lightViewProjection[i];
     }
     environment.shadowSplits=m_impl->shadowCascades.splits;
     environment.shadowOptions={static_cast<float>(m_impl->shadowCascades.count),
         static_cast<float>(m_impl->shadowCascades.resolution),
         m_impl->shadowCascades.count<=1?1.0f:2.0f,0.0f};
-    m_impl->submittedShadowChunks=chunks;
     const auto material=m_impl->materials.find(m_chunkOpaque.value);
     m_impl->shadowAtlasSet=material==m_impl->materials.end()?VK_NULL_HANDLE:
         material->second.descriptorSet;

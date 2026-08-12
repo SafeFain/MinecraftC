@@ -99,7 +99,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::STONE,        "Stone",        glm::vec3(0.50f, 0.50f, 0.50f), true, false },
     { BlockId::WOOD,         "Wood",         glm::vec3(0.55f, 0.40f, 0.20f), true, false },
     { BlockId::LEAVES,       "Leaves",       glm::vec3(0.15f, 0.55f, 0.15f), true, false,
-      RenderShape::Cube, RenderLayer::Translucent, 0.94f },
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
     { BlockId::SAND,         "Sand",         glm::vec3(0.90f, 0.84f, 0.60f), true, false },
     { BlockId::BEDROCK,      "Bedrock",      glm::vec3(0.20f, 0.20f, 0.20f), true, false },
     { BlockId::WATER,        "Water",        glm::vec3(0.20f, 0.40f, 0.90f), false, true,
@@ -130,16 +130,16 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
     { BlockId::BIRCH_WOOD,   "Birch Wood",    glm::vec3(0.82f, 0.78f, 0.62f), true, false },
     { BlockId::BIRCH_LEAVES, "Birch Leaves",  glm::vec3(0.38f, 0.66f, 0.22f), true, false,
-      RenderShape::Cube, RenderLayer::Translucent, 0.94f },
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
     { BlockId::SPRUCE_WOOD,  "Spruce Wood",   glm::vec3(0.32f, 0.22f, 0.12f), true, false },
     { BlockId::SPRUCE_LEAVES,"Spruce Leaves", glm::vec3(0.12f, 0.40f, 0.22f), true, false,
-      RenderShape::Cube, RenderLayer::Translucent, 0.95f },
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
     { BlockId::JUNGLE_WOOD,  "Jungle Wood",   glm::vec3(0.46f, 0.30f, 0.14f), true, false },
     { BlockId::JUNGLE_LEAVES,"Jungle Leaves", glm::vec3(0.10f, 0.58f, 0.15f), true, false,
-      RenderShape::Cube, RenderLayer::Translucent, 0.93f },
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
     { BlockId::ACACIA_WOOD,  "Acacia Wood",   glm::vec3(0.62f, 0.30f, 0.14f), true, false },
     { BlockId::ACACIA_LEAVES,"Acacia Leaves", glm::vec3(0.34f, 0.55f, 0.17f), true, false,
-      RenderShape::Cube, RenderLayer::Translucent, 0.94f },
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
     { BlockId::COBBLESTONE,   "Cobblestone",   glm::vec3(0.43f), true, false },
     { BlockId::CRAFTING_TABLE,"Crafting Table",glm::vec3(0.55f, 0.36f, 0.18f), true, false },
     { BlockId::FURNACE,       "Furnace",       glm::vec3(0.38f), true, false },
@@ -534,10 +534,10 @@ bool shouldRenderCubeFace(BlockId current, BlockId neighbor) {
     if (!neighborProps.solid) return true;
 
     // Preserve the opaque surface behind ice/leaves. Without this interface
-    // face, gaps or alpha in the translucent material reveal missing terrain
+    // face, gaps or alpha in the non-opaque material reveal missing terrain
     // geometry and look like an x-ray into caves below.
     return currentProps.layer == RenderLayer::Opaque &&
-           neighborProps.layer == RenderLayer::Translucent;
+           neighborProps.layer != RenderLayer::Opaque;
 }
 
 // ── Face direction offsets ────────────────────────────────────────────

@@ -1,7 +1,7 @@
 {
   "basic_cube.frag": "336f3c86260bad466d15f40c25aa38f61ee7c607d3cc8386e1c5adb65e20c970",
   "basic_cube.vert": "1adbfcef96e011cf2120e1e9e0b9d5aeeb30af87835bd3aeebc707929562bfce",
-  "chunk.frag": "a6ca0939e598eaecdf4a869248b3147616d09a3814a44cff9f246ea5fdb88ef1",
+  "chunk.frag": "ec07ef2e06f81bec3c293ae0cc81b5b3142269eca9db6ce9833ec7913d3bf2cc",
   "chunk.vert": "a868e8d403c79e670718a4d646bdf5e5ba6e11a582f61f7d787cef632312624e",
   "cloud.frag": "2eea4a41bd1478dddb6f1471ed60b65df4923d2fe8aebc978fec15cc1c51028f",
   "cloud.vert": "57ebf98bab0caa3e58f1cb5fff2c34654c8d1eccb38e135d608ae7186e228f02",

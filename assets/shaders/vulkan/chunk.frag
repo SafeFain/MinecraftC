@@ -48,10 +48,18 @@ float shadowVisibility(vec3 position,vec3 normal){
     vec2 texel=1.0/(resolution*atlasSize);
     float bias=0.0008+0.002*(1.0-max(dot(normal,
         normalize(environment.lightDirection.xyz)),0.0));
+    int taps=count==3?(cascade<2?4:1):count==2&&cascade==0?4:1;
     float visible=0.0;
-    for(int y=-1;y<=1;++y)for(int x=-1;x<=1;++x)
-        visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel).r?1.0:0.0;
-    visible/=9.0;
+    if(taps==1)visible=projected.z-bias<=texture(shadowMap,uv).r?1.0:0.0;
+    else if(taps==4){
+        for(int y=-1;y<=1;y+=2)for(int x=-1;x<=1;x+=2)
+            visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel*0.5).r?1.0:0.0;
+        visible*=0.25;
+    }else{
+        for(int y=-1;y<=1;++y)for(int x=-1;x<=1;++x)
+            visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel).r?1.0:0.0;
+        visible/=9.0;
+    }
     float split=cascade==0?environment.shadowSplits.x:cascade==1?
         environment.shadowSplits.y:cascade==2?environment.shadowSplits.z:
         environment.shadowSplits.w;

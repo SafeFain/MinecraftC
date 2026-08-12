@@ -47,6 +47,7 @@ public:
                      const glm::mat4& viewProjection,
                      bool translucent = false);
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
+                            const glm::dvec3&,
                             const std::vector<ShadowChunkSubmission>&) override;
     void uploadChunkMesh(ChunkMesh& mesh);
     void releaseChunkMesh(ChunkMesh& mesh);
@@ -147,6 +148,10 @@ private:
     uint32_t m_shadowTexture = 0;
     ShadowQuality m_shadowQuality = ShadowQuality::Off;
     ShadowCascades m_shadowCascades{};
+    ShadowCascades m_shadowBaseCascades{};
+    double m_lastShadowUpdateSeconds = -1.0;
+    glm::dvec3 m_lastShadowWorldOrigin{0.0};
+    glm::vec3 m_lastShadowDirection{0.0f};
 
     // Shared wireframe cube GPU resources
     uint32_t m_wireVAO = 0;
