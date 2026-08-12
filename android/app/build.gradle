@@ -7,8 +7,17 @@ if (!versionMatch.find()) throw new GradleException("Cannot read MinecraftC vers
 def versionMajor = versionMatch.group(1).toInteger()
 def versionMinor = versionMatch.group(2).toInteger()
 def versionPatch = versionMatch.group(3).toInteger()
-def versionChannel = versionMatch.group(4)
-def channelNumber = [alpha: 1, beta: 2, rc: 3, release: 4][versionChannel]
+def versionChannel = versionMatch.group(4).toString()
+def channelNumber
+switch (versionChannel) {
+    case "alpha": channelNumber = 1; break
+    case "beta": channelNumber = 2; break
+    case "rc": channelNumber = 3; break
+    case "release": channelNumber = 4; break
+    default: throw new GradleException("Unsupported MinecraftC version channel: ${versionChannel}")
+}
+def androidVersionCode =
+        (versionMajor * 10000 + versionMinor * 100 + versionPatch) * 10 + channelNumber
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
 
 tasks.register("prepareLegalAssets", Sync) {
@@ -25,7 +34,7 @@ android {
         applicationId "io.github.SafeFain.MinecraftC"
         minSdk 29
         targetSdk 35
-        versionCode (versionMajor * 10000 + versionMinor * 100 + versionPatch) * 10 + channelNumber
+        versionCode androidVersionCode
         versionName versionText
         ndk { abiFilters "arm64-v8a" }
         externalNativeBuild {
