@@ -298,6 +298,11 @@ int main() {
             "translucent blocks were not assigned a separate index range");
     require(mesh.translucentIndexOffset == mesh.opaqueIndexCount,
             "mesh layer index ranges overlap");
+    require(mesh.shadowCasterIndexCount > 0,
+            "terrain and foliage did not produce shadow-caster indices");
+    require(mesh.shadowCasterIndexOffset ==
+                mesh.translucentIndexOffset + mesh.translucentIndexCount,
+            "shadow-caster range does not follow visible draw ranges");
 
     std::set<std::pair<int,int>> meshNeighbors;
     for (const auto& offset : ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS)

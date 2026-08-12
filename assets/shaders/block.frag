@@ -25,8 +25,46 @@ uniform float uAtlasTiles;
 uniform float uLavaTile;
 uniform float uWaterTile;
 uniform vec4 uTint;
+uniform sampler2D uShadowMap;
+uniform mat4 uShadowMatrices[4];
+uniform vec4 uShadowSplits;
+uniform int uShadowCascadeCount;
+uniform float uShadowResolution;
+uniform int uShadowAtlasColumns;
 
 out vec4 outColor;
+
+float shadowVisibility(vec3 worldPosition, vec3 normal) {
+    if (uShadowCascadeCount == 0) return 1.0;
+    float cameraDistance = length(worldPosition - uCameraPosition);
+    int cascade = 0;
+    if (uShadowCascadeCount > 1 && cameraDistance > uShadowSplits.x) cascade = 1;
+    if (uShadowCascadeCount > 2 && cameraDistance > uShadowSplits.y) cascade = 2;
+    if (uShadowCascadeCount > 3 && cameraDistance > uShadowSplits.z) cascade = 3;
+    vec4 lightClip = uShadowMatrices[cascade] * vec4(worldPosition, 1.0);
+    vec3 projected = lightClip.xyz / lightClip.w * 0.5 + 0.5;
+    if (projected.z <= 0.0 || projected.z >= 1.0 ||
+        any(lessThan(projected.xy, vec2(0.0))) || any(greaterThan(projected.xy, vec2(1.0))))
+        return 1.0;
+    int row = cascade / uShadowAtlasColumns;
+    int column = cascade - row * uShadowAtlasColumns;
+    int rows = (uShadowCascadeCount + uShadowAtlasColumns - 1) / uShadowAtlasColumns;
+    vec2 atlasSize = vec2(float(uShadowAtlasColumns), float(rows));
+    vec2 atlasUv = (projected.xy + vec2(column, row)) / atlasSize;
+    vec2 texel = 1.0 / (uShadowResolution * atlasSize);
+    float bias = 0.0008 + 0.002 * (1.0 - max(dot(normal, normalize(uLightDirection)), 0.0));
+    float visible = 0.0;
+    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
+        float stored = texture(uShadowMap, atlasUv + vec2(x, y) * texel).r;
+        visible += projected.z - bias <= stored ? 1.0 : 0.0;
+    }
+    visible /= 9.0;
+    float split = cascade == 0 ? uShadowSplits.x :
+                  cascade == 1 ? uShadowSplits.y :
+                  cascade == 2 ? uShadowSplits.z : uShadowSplits.w;
+    float fade = smoothstep(split * 0.90, split, cameraDistance);
+    return mix(mix(0.35, 1.0, visible), 1.0, fade);
+}
 
 vec3 faceNormal(float face) {
     if (face < 0.5) return vec3( 0.0, 1.0, 0.0);
@@ -64,7 +102,8 @@ void main() {
     float skyLight = pow(clamp(sampledSky, 0.0, 1.0), 1.35);
     float blockLight = pow(clamp(sampledBlock, 0.0, 1.0), 1.35);
     vec3 lighting = uAmbientColor * uAmbientIntensity * skyLight * 0.68;
-    lighting += uDirectColor * uDirectIntensity * diffuse * skyLight * 0.46;
+    lighting += uDirectColor * uDirectIntensity * diffuse * skyLight * 0.46 *
+                shadowVisibility(vWorldPosition, normal);
     lighting = max(lighting, vec3(1.0, 0.72, 0.38) * blockLight * 1.15);
     lighting = max(lighting * ao, vec3(0.025));
 

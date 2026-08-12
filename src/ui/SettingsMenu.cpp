@@ -119,6 +119,14 @@ void SettingsMenu::refreshButtons() {
                 m_settings.smoothLighting = !m_settings.smoothLighting;
                 m_onChanged(); refreshButtons();
             });
+        const char* shadowNames[] = {"common.off", "settings.shadow_low",
+            "settings.shadow_medium", "settings.shadow_high"};
+        m_buttons.emplace_back(m_localization.format("settings.shadows", {
+            m_localization.text(shadowNames[static_cast<int>(m_settings.shadowQuality)])}), [this]{
+                m_settings.shadowQuality = static_cast<ShadowQuality>(
+                    (static_cast<int>(m_settings.shadowQuality) + 1) % 4);
+                m_onChanged(); refreshButtons();
+            });
         m_buttons.emplace_back(m_localization.format("settings.gui_scale", {
             m_settings.guiScale == 0 ? m_localization.text("common.auto") :
             std::to_string(m_settings.guiScale) + "x"}), [this]{

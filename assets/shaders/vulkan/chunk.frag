@@ -19,8 +19,45 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 ambientColorIntensity;
     vec4 fogColorDistance;
     vec4 materialParams;
+    mat4 shadowMatrices[4];
+    vec4 shadowSplits;
+    vec4 shadowOptions;
 } environment;
+layout(set=1,binding=1) uniform sampler2D shadowMap;
 layout(location=0) out vec4 outColor;
+
+float shadowVisibility(vec3 position,vec3 normal){
+    int count=int(environment.shadowOptions.x+0.5);
+    if(count==0)return 1.0;
+    float cameraDistance=length(position-environment.cameraPosition.xyz);
+    int cascade=0;
+    if(count>1&&cameraDistance>environment.shadowSplits.x)cascade=1;
+    if(count>2&&cameraDistance>environment.shadowSplits.y)cascade=2;
+    if(count>3&&cameraDistance>environment.shadowSplits.z)cascade=3;
+    vec4 clip=environment.shadowMatrices[cascade]*vec4(position,1.0);
+    vec3 projected=clip.xyz/clip.w;
+    projected.xy=projected.xy*0.5+0.5;
+    if(projected.z<=0.0||projected.z>=1.0||any(lessThan(projected.xy,vec2(0.0)))||
+       any(greaterThan(projected.xy,vec2(1.0))))return 1.0;
+    int columns=int(environment.shadowOptions.z+0.5);
+    int row=cascade/columns;int column=cascade-row*columns;
+    int rows=(count+columns-1)/columns;
+    vec2 atlasSize=vec2(columns,rows);
+    vec2 uv=(projected.xy+vec2(column,row))/atlasSize;
+    float resolution=environment.shadowOptions.y;
+    vec2 texel=1.0/(resolution*atlasSize);
+    float bias=0.0008+0.002*(1.0-max(dot(normal,
+        normalize(environment.lightDirection.xyz)),0.0));
+    float visible=0.0;
+    for(int y=-1;y<=1;++y)for(int x=-1;x<=1;++x)
+        visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel).r?1.0:0.0;
+    visible/=9.0;
+    float split=cascade==0?environment.shadowSplits.x:cascade==1?
+        environment.shadowSplits.y:cascade==2?environment.shadowSplits.z:
+        environment.shadowSplits.w;
+    float fade=smoothstep(split*0.90,split,cameraDistance);
+    return mix(mix(0.35,1.0,visible),1.0,fade);
+}
 
 vec3 faceNormal(float value) {
     if(value<0.5)return vec3(0.0,1.0,0.0);
@@ -55,7 +92,8 @@ void main() {
     vec3 illumination=environment.ambientColorIntensity.rgb*
         environment.ambientColorIntensity.a*skyLight*0.68;
     illumination+=environment.directColorIntensity.rgb*
-        environment.directColorIntensity.a*diffuse*skyLight*0.46;
+        environment.directColorIntensity.a*diffuse*skyLight*0.46*
+        shadowVisibility(worldPosition,normal);
     illumination=max(illumination,vec3(1.0,0.72,0.38)*blockLight*1.15);
     illumination=max(illumination*ao,vec3(0.025));
 

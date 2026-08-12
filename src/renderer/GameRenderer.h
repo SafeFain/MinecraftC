@@ -5,6 +5,7 @@
 #include "renderer/Frustum.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/RenderEnvironment.h"
+#include "renderer/Shadow.h"
 #include "world/BlockLightLogic.h"
 
 #include <cstdint>
@@ -14,6 +15,12 @@
 
 class Window;
 struct ChunkMesh;
+struct ShadowChunkSubmission {
+    const ChunkMesh* mesh = nullptr;
+    glm::mat4 model{1.0f};
+    glm::vec3 aabbMin{0.0f};
+    glm::vec3 aabbMax{0.0f};
+};
 namespace model { class ModelRenderer; }
 
 class IGameRenderer : public IRenderDevice {
@@ -32,6 +39,8 @@ public:
                            const glm::vec3&, bool) = 0;
     virtual void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                              bool translucent = false) = 0;
+    virtual void renderChunkShadows(ShadowQuality, const glm::mat4& inverseViewProjection,
+        const glm::mat4& view, const std::vector<ShadowChunkSubmission>&) = 0;
     virtual void uploadChunkMesh(ChunkMesh&) = 0;
     virtual void releaseChunkMesh(ChunkMesh&) = 0;
     virtual void beginTranslucent() = 0;

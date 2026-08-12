@@ -108,6 +108,7 @@ int main(){
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
+    settings.shadowQuality=ShadowQuality::High;
     settings.rendererBackend=RendererBackend::Vulkan;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
@@ -123,6 +124,8 @@ int main(){
             "client settings round trip");
     require(loaded.rendererBackend==RendererBackend::Vulkan,
             "renderer backend preference round trips");
+    require(loaded.shadowQuality==ShadowQuality::High,
+            "shadow quality preference round trips");
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");

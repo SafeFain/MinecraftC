@@ -18,7 +18,8 @@ void validateMeshData(const MeshData& data) {
         return static_cast<uint64_t>(offset) + count <= data.indices.size();
     };
     if (!validRange(data.opaqueIndexOffset, data.opaqueIndexCount) ||
-        !validRange(data.translucentIndexOffset, data.translucentIndexCount))
+        !validRange(data.translucentIndexOffset, data.translucentIndexCount) ||
+        !validRange(data.shadowCasterIndexOffset, data.shadowCasterIndexCount))
         throw std::invalid_argument("Mesh index range is outside the index array");
 }
 

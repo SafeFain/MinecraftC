@@ -5,6 +5,7 @@
 #include "renderer/ShaderDialect.h"
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
+#include "renderer/Shadow.h"
 
 #include <algorithm>
 #include <cmath>
@@ -239,6 +240,22 @@ int main() {
             "rain clouds should be darker than clear-day clouds");
     require(glm::length(thunderCloud) < glm::length(rainCloud),
             "thunder clouds should be darker than rain clouds");
+    require(shadowConfig(ShadowQuality::Off).cascadeCount == 0 &&
+            shadowConfig(ShadowQuality::Low).cascadeCount == 1 &&
+            shadowConfig(ShadowQuality::Medium).cascadeCount == 3 &&
+            shadowConfig(ShadowQuality::High).cascadeCount == 4,
+            "shadow quality did not select the expected cascade count");
+    const glm::mat4 shadowView = glm::lookAt(glm::vec3(0.0f, 80.0f, 0.0f),
+        glm::vec3(0.0f, 80.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::mat4 shadowProjection = glm::perspective(
+        glm::radians(70.0f), 16.0f / 9.0f, 0.1f, 640.0f);
+    const auto cascades = buildShadowCascades(ShadowQuality::Medium,
+        glm::inverse(shadowProjection * shadowView), shadowView,
+        noon.lightDirection, 0.1f, 128.0f);
+    require(cascades.count == 3 && cascades.resolution == 1024 &&
+            cascades.splits.x > 0.1f && cascades.splits.x < cascades.splits.y &&
+            cascades.splits.y < cascades.splits.z && cascades.splits.z <= 128.0f,
+            "shadow cascade splits are invalid or ignored fog-distance clamping");
 
     // Switching back to an automatic cycle resumes from noon. Advance half a
     // cycle in bounded frame-sized steps to reach midnight.

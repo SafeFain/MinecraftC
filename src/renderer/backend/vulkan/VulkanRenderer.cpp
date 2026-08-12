@@ -185,6 +185,14 @@ struct ChunkEnvironmentUniforms {
     glm::vec4 ambientColorIntensity{0.0f};
     glm::vec4 fogColorDistance{0.0f};
     glm::vec4 materialParams{0.0f};
+    std::array<glm::mat4,4> shadowMatrices{};
+    glm::vec4 shadowSplits{0.0f};
+    glm::vec4 shadowOptions{0.0f};
+};
+
+struct ShadowConstants {
+    glm::mat4 lightMvp{1.0f};
+    glm::vec4 atlasParams{1.0f};
 };
 
 struct ParticleUniforms {
@@ -242,7 +250,7 @@ static_assert(offsetof(SkyUniforms, options) == 160);
 static_assert(sizeof(CloudUniforms) == 96);
 static_assert(sizeof(FrameUniforms) == 112);
 static_assert(offsetof(FrameUniforms, chunkOrigin) == 80);
-static_assert(sizeof(ChunkEnvironmentUniforms) == 96);
+static_assert(sizeof(ChunkEnvironmentUniforms) == 384);
 static_assert(offsetof(ChunkEnvironmentUniforms, materialParams) == 80);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
@@ -401,6 +409,8 @@ struct VulkanRenderer::Impl {
             createDescriptorLayout();
             createDescriptorPool();
             LOG_INFO("Vulkan descriptor resources initialized");
+            createShadowPipeline();
+            createShadowImage(ShadowQuality::Low);
             createSkyResources();
             LOG_INFO("Vulkan frame resources initialized");
             createSyncObjects();
@@ -449,6 +459,20 @@ struct VulkanRenderer::Impl {
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
     VkPipeline translucentPipeline = VK_NULL_HANDLE;
+    VkImage shadowImage = VK_NULL_HANDLE;
+    VmaAllocation shadowAllocation = VK_NULL_HANDLE;
+    VkImageView shadowImageView = VK_NULL_HANDLE;
+    VkSampler shadowSampler = VK_NULL_HANDLE;
+    VkRenderPass shadowRenderPass = VK_NULL_HANDLE;
+    VkFramebuffer shadowFramebuffer = VK_NULL_HANDLE;
+    VkPipeline shadowPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout shadowPipelineLayout = VK_NULL_HANDLE;
+    VkFormat shadowFormat = VK_FORMAT_UNDEFINED;
+    ShadowQuality shadowQuality = ShadowQuality::Low;
+    ShadowCascades shadowCascades{};
+    std::vector<ShadowChunkSubmission> submittedShadowChunks;
+    VkDescriptorSet shadowAtlasSet = VK_NULL_HANDLE;
+    uint32_t submittedShadowAtlasTiles = 1;
     VkPipeline basicPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoCullPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoDepthPipeline = VK_NULL_HANDLE;
@@ -1003,10 +1027,15 @@ struct VulkanRenderer::Impl {
                     device, &info, nullptr, &skyDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
 
-        skyBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
-                                VK_SHADER_STAGE_FRAGMENT_BIT;
-        info.bindingCount = 1;
-        info.pBindings = &skyBinding;
+        std::array<VkDescriptorSetLayoutBinding,2> chunkBindings{};
+        chunkBindings[0]=skyBinding;
+        chunkBindings[0].stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT;
+        chunkBindings[1].binding=1;
+        chunkBindings[1].descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        chunkBindings[1].descriptorCount=1;
+        chunkBindings[1].stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT;
+        info.bindingCount = chunkBindings.size();
+        info.pBindings = chunkBindings.data();
         require(vkCreateDescriptorSetLayout(
                     device, &info, nullptr, &chunkDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
@@ -1046,6 +1075,143 @@ struct VulkanRenderer::Impl {
                 "vkCreateDescriptorPool");
     }
 
+    void destroyShadowImage() {
+        if (shadowFramebuffer) vkDestroyFramebuffer(device,shadowFramebuffer,nullptr);
+        if (shadowSampler) vkDestroySampler(device,shadowSampler,nullptr);
+        if (shadowImageView) vkDestroyImageView(device,shadowImageView,nullptr);
+        if (shadowImage) vmaDestroyImage(allocator,shadowImage,shadowAllocation);
+        shadowFramebuffer=VK_NULL_HANDLE;shadowSampler=VK_NULL_HANDLE;
+        shadowImageView=VK_NULL_HANDLE;shadowImage=VK_NULL_HANDLE;
+        shadowAllocation=VK_NULL_HANDLE;
+    }
+
+    void createShadowPipeline() {
+        constexpr std::array<VkFormat,3> candidates{
+            VK_FORMAT_D32_SFLOAT,VK_FORMAT_D24_UNORM_S8_UINT,VK_FORMAT_D16_UNORM};
+        for(VkFormat candidate:candidates){
+            VkFormatProperties properties{};vkGetPhysicalDeviceFormatProperties(
+                physicalDevice,candidate,&properties);
+            const VkFormatFeatureFlags required=VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT|
+                                                 VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+            if((properties.optimalTilingFeatures&required)==required){shadowFormat=candidate;break;}
+        }
+        if(shadowFormat==VK_FORMAT_UNDEFINED)
+            throw std::runtime_error("No sampleable Vulkan shadow depth format");
+        VkAttachmentDescription attachment{};
+        attachment.format=shadowFormat;attachment.samples=VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;attachment.storeOp=VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp=VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.stencilStoreOp=VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+        attachment.finalLayout=VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        const VkAttachmentReference depthRef{0,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+        VkSubpassDescription subpass{};subpass.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.pDepthStencilAttachment=&depthRef;
+        std::array<VkSubpassDependency,2> dependencies{};
+        dependencies[0].srcSubpass=VK_SUBPASS_EXTERNAL;dependencies[0].dstSubpass=0;
+        dependencies[0].srcStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[0].dstStageMask=VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependencies[0].srcAccessMask=VK_ACCESS_SHADER_READ_BIT;
+        dependencies[0].dstAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependencies[1].srcSubpass=0;dependencies[1].dstSubpass=VK_SUBPASS_EXTERNAL;
+        dependencies[1].srcStageMask=VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependencies[1].dstStageMask=VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[1].srcAccessMask=VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependencies[1].dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
+        VkRenderPassCreateInfo pass{};pass.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        pass.attachmentCount=1;pass.pAttachments=&attachment;pass.subpassCount=1;
+        pass.pSubpasses=&subpass;pass.dependencyCount=dependencies.size();
+        pass.pDependencies=dependencies.data();
+        require(vkCreateRenderPass(device,&pass,nullptr,&shadowRenderPass),"vkCreateRenderPass(shadow)");
+
+        const auto root=assetRoot/"shaders"/"vulkan";
+        VkShaderModule vertex=loadShader(root/"shadow.vert.spv");
+        VkShaderModule fragment=VK_NULL_HANDLE;
+        try {
+            fragment=loadShader(root/"shadow.frag.spv");
+            const std::array<VkPipelineShaderStageCreateInfo,2> stages{{
+                {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_VERTEX_BIT,vertex,"main",nullptr},
+                {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_FRAGMENT_BIT,fragment,"main",nullptr}}};
+            const VkVertexInputBindingDescription binding{0,sizeof(MeshVertex),VK_VERTEX_INPUT_RATE_VERTEX};
+            const std::array<VkVertexInputAttributeDescription,2> attributes{{
+                {0,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(MeshVertex,px)},
+                {2,0,VK_FORMAT_R32G32B32_SFLOAT,offsetof(MeshVertex,u)}}};
+            VkPipelineVertexInputStateCreateInfo input{};input.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            input.vertexBindingDescriptionCount=1;input.pVertexBindingDescriptions=&binding;
+            input.vertexAttributeDescriptionCount=attributes.size();input.pVertexAttributeDescriptions=attributes.data();
+            VkPipelineInputAssemblyStateCreateInfo assembly{};assembly.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            assembly.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            VkPipelineViewportStateCreateInfo viewport{};viewport.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewport.viewportCount=1;viewport.scissorCount=1;
+            VkPipelineRasterizationStateCreateInfo raster{};raster.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            raster.polygonMode=VK_POLYGON_MODE_FILL;raster.cullMode=VK_CULL_MODE_NONE;
+            raster.frontFace=VK_FRONT_FACE_CLOCKWISE;raster.lineWidth=1.0f;
+            raster.depthBiasEnable=VK_TRUE;raster.depthBiasConstantFactor=4.0f;raster.depthBiasSlopeFactor=2.0f;
+            VkPipelineMultisampleStateCreateInfo multisample{};multisample.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisample.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+            VkPipelineDepthStencilStateCreateInfo depth{};depth.sType=VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depth.depthTestEnable=VK_TRUE;depth.depthWriteEnable=VK_TRUE;depth.depthCompareOp=VK_COMPARE_OP_LESS;
+            VkPipelineColorBlendStateCreateInfo blend{};blend.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            const std::array<VkDynamicState,2> states{VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+            VkPipelineDynamicStateCreateInfo dynamic{};dynamic.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dynamic.dynamicStateCount=states.size();dynamic.pDynamicStates=states.data();
+            VkPushConstantRange range{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(ShadowConstants)};
+            VkPipelineLayoutCreateInfo layout{};layout.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layout.setLayoutCount=1;layout.pSetLayouts=&descriptorSetLayout;
+            layout.pushConstantRangeCount=1;layout.pPushConstantRanges=&range;
+            require(vkCreatePipelineLayout(device,&layout,nullptr,&shadowPipelineLayout),"vkCreatePipelineLayout(shadow)");
+            VkGraphicsPipelineCreateInfo pipelineInfo{};pipelineInfo.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.stageCount=stages.size();pipelineInfo.pStages=stages.data();pipelineInfo.pVertexInputState=&input;
+            pipelineInfo.pInputAssemblyState=&assembly;pipelineInfo.pViewportState=&viewport;
+            pipelineInfo.pRasterizationState=&raster;pipelineInfo.pMultisampleState=&multisample;
+            pipelineInfo.pDepthStencilState=&depth;pipelineInfo.pColorBlendState=&blend;
+            pipelineInfo.pDynamicState=&dynamic;pipelineInfo.layout=shadowPipelineLayout;
+            pipelineInfo.renderPass=shadowRenderPass;
+            require(vkCreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pipelineInfo,nullptr,&shadowPipeline),
+                    "vkCreateGraphicsPipelines(shadow)");
+        } catch(...) { if(fragment)vkDestroyShaderModule(device,fragment,nullptr);vkDestroyShaderModule(device,vertex,nullptr);throw; }
+        vkDestroyShaderModule(device,fragment,nullptr);vkDestroyShaderModule(device,vertex,nullptr);
+    }
+
+    void createShadowImage(ShadowQuality quality) {
+        const ShadowConfig config=shadowConfig(quality);
+        const int columns=config.cascadeCount==1?1:2;
+        const int rows=(config.cascadeCount+columns-1)/columns;
+        destroyShadowImage();shadowQuality=quality;
+        VkImageCreateInfo image{};image.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        image.imageType=VK_IMAGE_TYPE_2D;image.format=shadowFormat;
+        image.extent={static_cast<uint32_t>(config.resolution*columns),
+                      static_cast<uint32_t>(config.resolution*rows),1};
+        image.mipLevels=1;image.arrayLayers=1;image.samples=VK_SAMPLE_COUNT_1_BIT;
+        image.tiling=VK_IMAGE_TILING_OPTIMAL;image.usage=VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT|
+            VK_IMAGE_USAGE_SAMPLED_BIT;image.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+        VmaAllocationCreateInfo allocation{};allocation.usage=VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        require(vmaCreateImage(allocator,&image,&allocation,&shadowImage,&shadowAllocation,nullptr),"vmaCreateImage(shadow)");
+        VkImageViewCreateInfo view{};view.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;view.image=shadowImage;
+        view.viewType=VK_IMAGE_VIEW_TYPE_2D;view.format=shadowFormat;
+        view.subresourceRange.aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT;view.subresourceRange.levelCount=1;
+        view.subresourceRange.layerCount=1;
+        require(vkCreateImageView(device,&view,nullptr,&shadowImageView),"vkCreateImageView(shadow)");
+        VkSamplerCreateInfo sampler{};sampler.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        sampler.magFilter=VK_FILTER_NEAREST;sampler.minFilter=VK_FILTER_NEAREST;
+        sampler.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler.addressModeU=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler.addressModeV=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;sampler.maxLod=0.0f;
+        require(vkCreateSampler(device,&sampler,nullptr,&shadowSampler),"vkCreateSampler(shadow)");
+        VkFramebufferCreateInfo framebuffer{};framebuffer.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer.renderPass=shadowRenderPass;framebuffer.attachmentCount=1;
+        framebuffer.pAttachments=&shadowImageView;framebuffer.width=image.extent.width;
+        framebuffer.height=image.extent.height;framebuffer.layers=1;
+        require(vkCreateFramebuffer(device,&framebuffer,nullptr,&shadowFramebuffer),"vkCreateFramebuffer(shadow)");
+        VkDescriptorImageInfo imageInfo{shadowSampler,shadowImageView,VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+        for(auto& frame:chunkBuffers) if(frame.descriptorSet){
+            VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;write.dstSet=frame.descriptorSet;
+            write.dstBinding=1;write.descriptorCount=1;write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo=&imageInfo;vkUpdateDescriptorSets(device,1,&write,0,nullptr);
+        }
+    }
+
     void createSkyResources() {
         for (SkyFrameBuffer& frame : skyBuffers) {
             frame.uniform = createBuffer(
@@ -1062,14 +1228,10 @@ struct VulkanRenderer::Impl {
                     "vkAllocateDescriptorSets");
             VkDescriptorBufferInfo bufferInfo{
                 frame.uniform.handle, 0, sizeof(SkyUniforms)};
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = frame.descriptorSet;
-            write.dstBinding = 0;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            write.pBufferInfo = &bufferInfo;
-            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet=frame.descriptorSet;write.dstBinding=0;write.descriptorCount=1;
+            write.descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;write.pBufferInfo=&bufferInfo;
+            vkUpdateDescriptorSets(device,1,&write,0,nullptr);
         }
         for (ChunkFrameBuffer& frame : chunkBuffers) {
             frame.uniform = createBuffer(
@@ -1086,14 +1248,16 @@ struct VulkanRenderer::Impl {
                     "vkAllocateDescriptorSets");
             VkDescriptorBufferInfo bufferInfo{
                 frame.uniform.handle, 0, sizeof(ChunkEnvironmentUniforms)};
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = frame.descriptorSet;
-            write.dstBinding = 0;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            write.pBufferInfo = &bufferInfo;
-            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+            VkDescriptorImageInfo imageInfo{shadowSampler,shadowImageView,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+            std::array<VkWriteDescriptorSet,2> writes{};
+            writes[0].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;writes[0].dstSet=frame.descriptorSet;
+            writes[0].dstBinding=0;writes[0].descriptorCount=1;
+            writes[0].descriptorType=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;writes[0].pBufferInfo=&bufferInfo;
+            writes[1].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;writes[1].dstSet=frame.descriptorSet;
+            writes[1].dstBinding=1;writes[1].descriptorCount=1;
+            writes[1].descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;writes[1].pImageInfo=&imageInfo;
+            vkUpdateDescriptorSets(device,writes.size(),writes.data(),0,nullptr);
         }
     }
 
@@ -2478,6 +2642,57 @@ struct VulkanRenderer::Impl {
                     imageBarriers.data());
             }
         }
+        if (shadowCascades.count > 0 && !submittedShadowChunks.empty() && shadowAtlasSet) {
+            const ShadowConfig config=shadowConfig(shadowQuality);
+            const int columns=config.cascadeCount==1?1:2;
+            const int rows=(config.cascadeCount+columns-1)/columns;
+            VkClearValue shadowClear{};shadowClear.depthStencil={1.0f,0};
+            VkRenderPassBeginInfo shadowPass{};shadowPass.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            shadowPass.renderPass=shadowRenderPass;shadowPass.framebuffer=shadowFramebuffer;
+            shadowPass.renderArea.extent={static_cast<uint32_t>(config.resolution*columns),
+                                          static_cast<uint32_t>(config.resolution*rows)};
+            shadowPass.clearValueCount=1;shadowPass.pClearValues=&shadowClear;
+            vkCmdBeginRenderPass(command,&shadowPass,VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,shadowPipeline);
+            vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,
+                shadowPipelineLayout,0,1,&shadowAtlasSet,0,nullptr);
+            const VkDeviceSize zero=0;
+            for(int cascade=0;cascade<shadowCascades.count;++cascade){
+                const VkViewport shadowViewport{static_cast<float>((cascade%columns)*config.resolution),
+                    static_cast<float>((cascade/columns)*config.resolution),
+                    static_cast<float>(config.resolution),static_cast<float>(config.resolution),0.0f,1.0f};
+                const VkRect2D shadowScissor{{(cascade%columns)*config.resolution,
+                                               (cascade/columns)*config.resolution},
+                    {static_cast<uint32_t>(config.resolution),static_cast<uint32_t>(config.resolution)}};
+                vkCmdSetViewport(command,0,1,&shadowViewport);vkCmdSetScissor(command,0,1,&shadowScissor);
+                for(const ShadowChunkSubmission& submission:submittedShadowChunks){
+                    if(!submission.mesh||!submission.mesh->gpuReady||
+                       submission.mesh->shadowCasterIndexCount==0)continue;
+                    if(!shadowIntersectsAabb(shadowCascades.lightViewProjection[cascade],
+                        submission.aabbMin,submission.aabbMax,true))continue;
+                    const auto meshIt=meshes.find(submission.mesh->renderHandle.value);
+                    if(meshIt==meshes.end())continue;
+                    const GpuMesh& mesh=meshIt->second;
+                    const bool arena=mesh.arenaPage!=std::numeric_limits<uint32_t>::max();
+                    const VkBuffer vertex=arena?chunkArenaPages[mesh.arenaPage].vertex.handle:mesh.vertex.handle;
+                    const VkBuffer index=arena?chunkArenaPages[mesh.arenaPage].index.handle:mesh.index.handle;
+                    vkCmdBindVertexBuffers(command,0,1,&vertex,&zero);
+                    vkCmdBindIndexBuffer(command,index,0,VK_INDEX_TYPE_UINT32);
+                    ShadowConstants constants;
+                    constants.lightMvp=shadowCascades.lightViewProjection[cascade]*submission.model;
+                    constants.atlasParams.x=static_cast<float>(submittedShadowAtlasTiles);
+                    vkCmdPushConstants(command,shadowPipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+                        0,sizeof(constants),&constants);
+                    uint32_t first=static_cast<uint32_t>(submission.mesh->shadowCasterIndexOffset);
+                    if(arena)first+=static_cast<uint32_t>(mesh.indexOffset/sizeof(uint32_t));
+                    vkCmdDrawIndexed(command,static_cast<uint32_t>(submission.mesh->shadowCasterIndexCount),
+                                     1,first,0,0);
+                    ++performance.drawCalls;
+                }
+            }
+            vkCmdEndRenderPass(command);
+        }
         std::array<VkClearValue, 3> clear{};
         clear[0].color.float32[0] = submittedFrame.clearColor.r;
         clear[0].color.float32[1] = submittedFrame.clearColor.g;
@@ -2963,6 +3178,14 @@ struct VulkanRenderer::Impl {
     void cleanup() {
         if (device) vkDeviceWaitIdle(device);
         destroySwapchain();
+        destroyShadowImage();
+        if (device && shadowPipeline) vkDestroyPipeline(device,shadowPipeline,nullptr);
+        shadowPipeline=VK_NULL_HANDLE;
+        if (device && shadowPipelineLayout)
+            vkDestroyPipelineLayout(device,shadowPipelineLayout,nullptr);
+        shadowPipelineLayout=VK_NULL_HANDLE;
+        if (device && shadowRenderPass) vkDestroyRenderPass(device,shadowRenderPass,nullptr);
+        shadowRenderPass=VK_NULL_HANDLE;
         if (device && descriptorPool)
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         descriptorPool = VK_NULL_HANDLE;
@@ -3301,6 +3524,9 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->frameBegun = true;
     m_impl->drawQueued = false;
     m_impl->submittedDraws.clear();
+    m_impl->submittedShadowChunks.clear();
+    m_impl->shadowCascades = {};
+    m_impl->submittedChunkEnvironment.shadowOptions = glm::vec4(0.0f);
     m_impl->submittedUi.clear();
     m_impl->submittedParticles.clear();
     m_impl->submittedModelOpaque.clear();
@@ -3525,6 +3751,40 @@ void VulkanRenderer::renderChunk(const ChunkMesh& mesh,
         ? mesh.translucentIndexOffset : 0);
     command.indexCount = static_cast<uint32_t>(count);
     draw(command);
+}
+
+void VulkanRenderer::renderChunkShadows(
+        ShadowQuality quality, const glm::mat4& inverseViewProjection,
+        const glm::mat4& view, const std::vector<ShadowChunkSubmission>& chunks) {
+    m_impl->submittedShadowChunks.clear();
+    m_impl->shadowCascades={};
+    ChunkEnvironmentUniforms& environment=m_impl->submittedChunkEnvironment;
+    environment.shadowOptions=glm::vec4(0.0f);
+    if(quality==ShadowQuality::Off||m_environment.daylight<0.12f||
+       m_environment.directIntensity<0.08f||chunks.empty())return;
+    if(quality!=m_impl->shadowQuality){
+        require(vkDeviceWaitIdle(m_impl->device),"vkDeviceWaitIdle(shadow quality)");
+        m_impl->createShadowImage(quality);
+    }
+    const float fogDistance=(static_cast<float>(Config::RENDER_DISTANCE)+0.5f)*
+                            Config::CHUNK_SIZE_X;
+    m_impl->shadowCascades=buildShadowCascades(quality,inverseViewProjection,view,
+        m_environment.lightDirection,Config::NEAR_PLANE,fogDistance);
+    const glm::mat4 correction=clipSpaceCorrection(GraphicsApi::Vulkan);
+    for(int i=0;i<m_impl->shadowCascades.count;++i){
+        m_impl->shadowCascades.lightViewProjection[i]=correction*
+            m_impl->shadowCascades.lightViewProjection[i];
+        environment.shadowMatrices[i]=m_impl->shadowCascades.lightViewProjection[i];
+    }
+    environment.shadowSplits=m_impl->shadowCascades.splits;
+    environment.shadowOptions={static_cast<float>(m_impl->shadowCascades.count),
+        static_cast<float>(m_impl->shadowCascades.resolution),
+        m_impl->shadowCascades.count<=1?1.0f:2.0f,0.0f};
+    m_impl->submittedShadowChunks=chunks;
+    const auto material=m_impl->materials.find(m_chunkOpaque.value);
+    m_impl->shadowAtlasSet=material==m_impl->materials.end()?VK_NULL_HANDLE:
+        material->second.descriptorSet;
+    m_impl->submittedShadowAtlasTiles=m_blockAtlasTilesPerSide;
 }
 
 void VulkanRenderer::beginTranslucent() {}

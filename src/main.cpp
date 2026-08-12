@@ -1362,10 +1362,8 @@ private:
                         m_clientSettings.cloudRenderDistance);
                 }
 
-                // Bind block shader once for all chunks (saves ~N glUseProgram calls)
-                m_renderer->bindBlockShader();
-
                 visibleChunks.clear();
+                std::vector<ShadowChunkSubmission> shadowChunks;
                 if (visibleChunks.capacity() < m_world.getActiveChunks().size())
                     visibleChunks.reserve(m_world.getActiveChunks().size());
                 int rendered = 0;
@@ -1383,17 +1381,25 @@ private:
                                       static_cast<float>(chunkMaxY + 1),
                                       aabbMin.z + Config::CHUNK_SIZE_Z);
 
-                    if (!frustum.intersectsAABB(aabbMin, aabbMax)) continue;
-
                     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
                         aabbMin.x, 0.0f, aabbMin.z));
+                    shadowChunks.push_back({&mesh, model, aabbMin, aabbMax});
+                    if (!frustum.intersectsAABB(aabbMin, aabbMax)) continue;
+
                     glm::vec3 center(
                         aabbMin.x + Config::CHUNK_SIZE_X * 0.5f,
                         (Config::WORLD_MIN_Y + chunkMaxY + 1) * 0.5f,
                         aabbMin.z + Config::CHUNK_SIZE_Z * 0.5f);
                     glm::vec3 delta = center - m_camera.m_position;
                     visibleChunks.push_back({chunk, model, glm::dot(delta, delta)});
-                    m_renderer->renderChunk(mesh, model, vp, false);
+                }
+
+                m_renderer->renderChunkShadows(m_clientSettings.shadowQuality,
+                    glm::inverse(vp), view, shadowChunks);
+                m_renderer->bindBlockShader();
+                for (const auto& visible : visibleChunks) {
+                    m_renderer->renderChunk(
+                        visible.chunk->getMesh(), visible.model, vp, false);
                     ++rendered;
                 }
 

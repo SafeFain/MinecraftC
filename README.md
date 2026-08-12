@@ -15,7 +15,8 @@ Android Gradle, runtime output, and release CI.
 - 20 biomes, seven vegetation and tree forms, fluids, farming, fire, TNT, and
   moving voxel clouds.
 - Distance-prioritized generation, greedy meshing, ambient occlusion, dual-channel
-  lighting, transparent materials, and persistent spawn caches.
+  lighting, configurable cascaded shadows, transparent materials, and persistent
+  spawn caches.
 - Crafting, furnaces, containers, combat, weather, commands, and persistent
   players, entities, and worlds.
 - JSON-driven block, 126-item, and entity atlases with a deterministic 16x16
@@ -32,13 +33,29 @@ pinned SDL 3.4.10 release by default. Add
 ### Linux
 
 Install CMake, Git, GLM, OpenGL and Vulkan development packages, plus the X11
-and Wayland development headers. On Debian or Ubuntu:
+and Wayland development headers. Use the command for your distribution:
 
 ```bash
+# Debian / Ubuntu (APT)
 sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev libvulkan-dev \
   xorg-dev libwayland-dev libxkbcommon-dev wayland-protocols \
   extra-cmake-modules pkg-config
 
+# Fedora (DNF)
+sudo dnf install gcc-c++ cmake git glm-devel mesa-libGL-devel vulkan-headers \
+  vulkan-loader-devel libX11-devel libXcursor-devel libXi-devel libXrandr-devel \
+  libXext-devel libXfixes-devel wayland-devel libxkbcommon-devel \
+  wayland-protocols-devel extra-cmake-modules pkgconf-pkg-config
+
+# Arch Linux (Pacman)
+sudo pacman -S --needed base-devel cmake git glm mesa libglvnd vulkan-headers \
+  vulkan-icd-loader libx11 libxcursor libxi libxrandr libxext libxfixes wayland \
+  libxkbcommon wayland-protocols extra-cmake-modules pkgconf
+```
+
+Then build from the repository root:
+
+```bash
 cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
 cmake --build build-local -j2
 ./build-local/minecraftc

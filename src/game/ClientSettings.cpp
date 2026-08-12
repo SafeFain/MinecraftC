@@ -35,6 +35,9 @@ RendererBackend migrateRendererBackend(DesktopPlatform platform,
 
 ClientSettings::ClientSettings() {
     rendererBackend = defaultRendererBackend(currentDesktopPlatform());
+    const DesktopPlatform platform = currentDesktopPlatform();
+    shadowQuality = platform == DesktopPlatform::Android || platform == DesktopPlatform::IOS
+        ? ShadowQuality::Low : ShadowQuality::Medium;
     resetBindings();
     resetGamepadBindings();
 }
@@ -77,6 +80,9 @@ void ClientSettings::validate() {
     if (std::find(std::begin(cycles), std::end(cycles), dayCycleMinutes) == std::end(cycles))
         dayCycleMinutes = 20;
     mouseSensitivity = std::clamp(mouseSensitivity, 0.05f, 0.50f);
+    if (static_cast<int>(shadowQuality) < static_cast<int>(ShadowQuality::Off) ||
+        static_cast<int>(shadowQuality) > static_cast<int>(ShadowQuality::High))
+        shadowQuality = ShadowQuality::Medium;
     if (static_cast<int>(controlMode) < static_cast<int>(ControlMode::Auto) ||
         static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
         controlMode = ControlMode::Auto;
@@ -143,6 +149,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
             else if (name == "raw_mouse_input") { /* v5 compatibility */ }
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
+            else if (name == "shadow_quality")
+                settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
             else if (name == "renderer") settings.rendererBackend = value == "vulkan"
                 ? RendererBackend::Vulkan : RendererBackend::OpenGL;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
@@ -216,6 +224,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'
+           << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "renderer=" << (rendererBackend == RendererBackend::Vulkan
                 ? "vulkan" : "opengl") << '\n'
            << "gui_scale=" << guiScale << '\n'

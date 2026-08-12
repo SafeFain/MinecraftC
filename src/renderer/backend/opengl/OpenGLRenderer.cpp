@@ -14,6 +14,30 @@
 #include "core/AssetStore.h"
 #include "core/RuntimeClock.h"
 
+namespace {
+constexpr unsigned int GL_FRAMEBUFFER_VALUE = 0x8D40;
+constexpr unsigned int GL_DEPTH_ATTACHMENT_VALUE = 0x8D00;
+constexpr unsigned int GL_FRAMEBUFFER_COMPLETE_VALUE = 0x8CD5;
+constexpr unsigned int GL_DEPTH_COMPONENT_VALUE = 0x1902;
+constexpr unsigned int GL_DEPTH_COMPONENT24_VALUE = 0x81A6;
+constexpr unsigned int GL_CLAMP_TO_EDGE_VALUE = 0x812F;
+constexpr unsigned int GL_NONE_VALUE = 0;
+constexpr unsigned int GL_TEXTURE1_VALUE = 0x84C1;
+constexpr unsigned int GL_NEAREST_VALUE = 0x2600;
+using GenFramebuffersFn = void (*)(int, unsigned int*);
+using DeleteFramebuffersFn = void (*)(int, const unsigned int*);
+using BindFramebufferFn = void (*)(unsigned int, unsigned int);
+using FramebufferTexture2DFn = void (*)(unsigned int,unsigned int,unsigned int,unsigned int,int);
+using CheckFramebufferStatusFn = unsigned int (*)(unsigned int);
+using DrawBufferFn = void (*)(unsigned int);
+using ReadBufferFn = void (*)(unsigned int);
+using ColorMaskFn = void (*)(unsigned char,unsigned char,unsigned char,unsigned char);
+
+template<typename T> T glProc(const char* name) {
+    return reinterpret_cast<T>(Window::graphicsProcAddress(name));
+}
+}
+
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
 
 static const std::vector<float> WIRE_CUBE = {
@@ -30,6 +54,11 @@ static const std::vector<float> WIRE_CUBE = {
 Renderer::Renderer() = default;
 
 Renderer::~Renderer() {
+    if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
+    if (m_shadowFramebuffer) {
+        if (auto destroy = glProc<DeleteFramebuffersFn>("glDeleteFramebuffers"))
+            destroy(1, &m_shadowFramebuffer);
+    }
     for (auto& [handle, texture] : m_basicTextures) {
         (void)handle;
         if (texture.texture) GL_CHECK(glDeleteTextures(1, &texture.texture));
@@ -91,6 +120,9 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
         assetRoot / "shaders" / "block.vert",
         assetRoot / "shaders" / "block.frag", m_graphicsApi
     );
+    m_shadowShader = std::make_unique<Shader>(
+        assetRoot / "shaders" / "shadow.vert",
+        assetRoot / "shaders" / "shadow.frag", m_graphicsApi);
     m_wireShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "wireframe.vert",
         assetRoot / "shaders" / "wireframe.frag", m_graphicsApi
@@ -640,6 +672,97 @@ void Renderer::renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
     // VAO stays bound — next draw will bind its own
 }
 
+void Renderer::renderChunkShadows(ShadowQuality quality,
+                                  const glm::mat4& inverseViewProjection,
+                                  const glm::mat4& view,
+                                  const std::vector<ShadowChunkSubmission>& chunks) {
+    const bool enabled = quality != ShadowQuality::Off &&
+        m_environment.daylight >= 0.12f && m_environment.directIntensity >= 0.08f;
+    if (!enabled || chunks.empty()) {
+        m_shadowCascades = {};
+        return;
+    }
+    const ShadowConfig config = shadowConfig(quality);
+    auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
+    auto framebufferTexture = glProc<FramebufferTexture2DFn>("glFramebufferTexture2D");
+    auto checkFramebuffer = glProc<CheckFramebufferStatusFn>("glCheckFramebufferStatus");
+    auto genFramebuffers = glProc<GenFramebuffersFn>("glGenFramebuffers");
+    if (!bindFramebuffer || !framebufferTexture || !checkFramebuffer || !genFramebuffers) {
+        m_shadowCascades = {};
+        return;
+    }
+    if (quality != m_shadowQuality) {
+        if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
+        m_shadowTexture = 0;
+        if (!m_shadowFramebuffer) genFramebuffers(1, &m_shadowFramebuffer);
+        const int columns = config.cascadeCount == 1 ? 1 : 2;
+        const int rows = (config.cascadeCount + columns - 1) / columns;
+        GL_CHECK(glGenTextures(1, &m_shadowTexture));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_shadowTexture));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24_VALUE,
+            config.resolution * columns, config.resolution * rows, 0,
+            GL_DEPTH_COMPONENT_VALUE, GL_UNSIGNED_INT, nullptr));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_VALUE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_VALUE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE_VALUE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE_VALUE));
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
+        framebufferTexture(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
+                           GL_TEXTURE_2D, m_shadowTexture, 0);
+        if (auto drawBuffer = glProc<DrawBufferFn>("glDrawBuffer")) drawBuffer(GL_NONE_VALUE);
+        if (auto readBuffer = glProc<ReadBufferFn>("glReadBuffer")) readBuffer(GL_NONE_VALUE);
+        if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE)
+            throw std::runtime_error("OpenGL shadow framebuffer is incomplete");
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+        m_shadowQuality = quality;
+    }
+    const float fogDistance = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
+                              Config::CHUNK_SIZE_X;
+    m_shadowCascades = buildShadowCascades(quality, inverseViewProjection, view,
+        m_environment.lightDirection, Config::NEAR_PLANE, fogDistance);
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
+    auto colorMask = glProc<ColorMaskFn>("glColorMask");
+    if (!colorMask) { m_shadowCascades = {}; bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0); return; }
+    colorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
+    GL_CHECK(glDepthMask(GL_TRUE));
+    GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glEnable(GL_POLYGON_OFFSET_FILL));
+    GL_CHECK(glPolygonOffset(2.0f, 4.0f));
+    GL_CHECK(glClear(GL_DEPTH_BUFFER_BIT));
+    m_shadowShader->bind();
+    m_shadowShader->setInt("uBlockAtlas", 0);
+    m_shadowShader->setFloat("uAtlasTiles",
+        static_cast<float>(BlockTextureAtlas::tilesPerSide()));
+    m_blockAtlas.bind();
+    for (int cascade = 0; cascade < m_shadowCascades.count; ++cascade) {
+        const int columns = m_shadowCascades.count == 1 ? 1 : 2;
+        GL_CHECK(glViewport((cascade % columns) * config.resolution,
+                            (cascade / columns) * config.resolution,
+                            config.resolution, config.resolution));
+        for (const ShadowChunkSubmission& submission : chunks) {
+            if (!submission.mesh || !submission.mesh->gpuReady ||
+                submission.mesh->shadowCasterIndexCount == 0) continue;
+            if (!shadowIntersectsAabb(m_shadowCascades.lightViewProjection[cascade],
+                                      submission.aabbMin, submission.aabbMax, false)) continue;
+            const auto found = m_chunkMeshes.find(submission.mesh->renderHandle.value);
+            if (found == m_chunkMeshes.end()) continue;
+            m_shadowShader->setMat4("uLightMVP",
+                m_shadowCascades.lightViewProjection[cascade] * submission.model);
+            GL_CHECK(glBindVertexArray(found->second.vao));
+            GL_CHECK(glDrawElements(GL_TRIANGLES,
+                static_cast<GLsizei>(submission.mesh->shadowCasterIndexCount), GL_UNSIGNED_INT,
+                reinterpret_cast<void*>(submission.mesh->shadowCasterIndexOffset *
+                                        sizeof(unsigned int))));
+            ++m_performanceStats.drawCalls;
+        }
+    }
+    GL_CHECK(glDisable(GL_POLYGON_OFFSET_FILL));
+    colorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+    GL_CHECK(glViewport(0, 0, std::max(1, m_window->width()), std::max(1, m_window->height())));
+}
+
 void Renderer::beginTranslucent() {
     GL_CHECK(glEnable(GL_BLEND));
     GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -655,6 +778,18 @@ void Renderer::bindBlockShader() const {
     m_blockShader->bind();
     m_blockAtlas.bind();
     m_blockShader->setInt("uBlockAtlas", 0);
+    m_blockShader->setInt("uShadowMap", 1);
+    m_blockShader->setInt("uShadowCascadeCount", m_shadowCascades.count);
+    m_blockShader->setFloat("uShadowResolution",
+        static_cast<float>(std::max(1, m_shadowCascades.resolution)));
+    m_blockShader->setInt("uShadowAtlasColumns",
+        m_shadowCascades.count <= 1 ? 1 : 2);
+    m_blockShader->setVec4("uShadowSplits", m_shadowCascades.splits);
+    m_blockShader->setMat4Array("uShadowMatrices",
+        m_shadowCascades.lightViewProjection.data(), 4);
+    GL_CHECK(glActiveTexture(GL_TEXTURE1_VALUE));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_shadowTexture));
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
     m_blockShader->setVec4("uTint", glm::vec4(1.0f));
     m_blockShader->setFloat("uAtlasTiles",
                             static_cast<float>(BlockTextureAtlas::tilesPerSide()));

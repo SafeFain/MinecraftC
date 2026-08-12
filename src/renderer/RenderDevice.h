@@ -29,6 +29,8 @@ struct MeshData {
     uint32_t opaqueIndexCount = 0;
     uint32_t translucentIndexOffset = 0;
     uint32_t translucentIndexCount = 0;
+    uint32_t shadowCasterIndexOffset = 0;
+    uint32_t shadowCasterIndexCount = 0;
 };
 
 enum class TextureFormat {

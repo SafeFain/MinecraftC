@@ -46,6 +46,8 @@ public:
     void renderChunk(const ChunkMesh& mesh, const glm::mat4& modelMatrix,
                      const glm::mat4& viewProjection,
                      bool translucent = false);
+    void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
+                            const std::vector<ShadowChunkSubmission>&) override;
     void uploadChunkMesh(ChunkMesh& mesh);
     void releaseChunkMesh(ChunkMesh& mesh);
     void beginTranslucent();
@@ -133,6 +135,7 @@ private:
     static constexpr size_t CLOUD_INSTANCE_BUFFER_COUNT = 3;
 
     std::unique_ptr<Shader> m_blockShader;
+    std::unique_ptr<Shader> m_shadowShader;
     std::unique_ptr<Shader> m_wireShader;
     std::unique_ptr<Shader> m_skyShader;
     std::unique_ptr<Shader> m_entityShader;
@@ -140,6 +143,10 @@ private:
     std::unique_ptr<Shader> m_particleShader;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
     BlockTextureAtlas m_blockAtlas;
+    uint32_t m_shadowFramebuffer = 0;
+    uint32_t m_shadowTexture = 0;
+    ShadowQuality m_shadowQuality = ShadowQuality::Off;
+    ShadowCascades m_shadowCascades{};
 
     // Shared wireframe cube GPU resources
     uint32_t m_wireVAO = 0;

@@ -41,6 +41,8 @@ struct ChunkMesh {
     size_t opaqueIndexCount = 0;
     size_t translucentIndexOffset = 0;
     size_t translucentIndexCount = 0;
+    size_t shadowCasterIndexOffset = 0;
+    size_t shadowCasterIndexCount = 0;
     bool gpuReady = false;
 
     void clear() {
@@ -50,6 +52,8 @@ struct ChunkMesh {
         opaqueIndexCount = 0;
         translucentIndexOffset = 0;
         translucentIndexCount = 0;
+        shadowCasterIndexOffset = 0;
+        shadowCasterIndexCount = 0;
         gpuReady = false;
     }
 
@@ -78,6 +82,8 @@ struct ChunkMesh {
         swap(opaqueIndexCount, completed.opaqueIndexCount);
         swap(translucentIndexOffset, completed.translucentIndexOffset);
         swap(translucentIndexCount, completed.translucentIndexCount);
+        swap(shadowCasterIndexOffset, completed.shadowCasterIndexOffset);
+        swap(shadowCasterIndexCount, completed.shadowCasterIndexCount);
     }
 
     // ── Greedy mesh builder ──────────────────────────────────────────
@@ -97,6 +103,7 @@ struct ChunkMesh {
         clear();
         std::vector<unsigned int> opaqueIndices;
         std::vector<unsigned int> translucentIndices;
+        std::vector<unsigned int> shadowIndices;
         auto localIdx = [](int x, int worldY, int z) -> int {
             return x + z * Config::CHUNK_SIZE_X
                      + Config::worldYToStorageY(worldY) *
@@ -423,14 +430,22 @@ struct ChunkMesh {
                         for (int i = 0; i < 4; ++i) vertices.push_back(vtx[i]);
                         auto& target = getBlockProps(bid).layer == RenderLayer::Translucent
                             ? translucentIndices : opaqueIndices;
+                        const bool castsShadow = getBlockProps(bid).layer != RenderLayer::Translucent ||
+                            bid == BlockId::LEAVES || bid == BlockId::BIRCH_LEAVES ||
+                            bid == BlockId::SPRUCE_LEAVES || bid == BlockId::JUNGLE_LEAVES ||
+                            bid == BlockId::ACACIA_LEAVES;
                         if (vtx[0].ao + vtx[2].ao > vtx[1].ao + vtx[3].ao) {
                             const unsigned int flipped[] = {0, 1, 3, 1, 2, 3};
-                            for (unsigned int value : flipped)
+                            for (unsigned int value : flipped) {
                                 target.push_back(baseIdx + value);
+                                if (castsShadow) shadowIndices.push_back(baseIdx + value);
+                            }
                         } else {
                             const unsigned int standard[] = {0, 1, 2, 0, 2, 3};
-                            for (unsigned int value : standard)
+                            for (unsigned int value : standard) {
                                 target.push_back(baseIdx + value);
+                                if (castsShadow) shadowIndices.push_back(baseIdx + value);
+                            }
                         }
                     }
                 }
@@ -555,7 +570,10 @@ struct ChunkMesh {
                 0, 1, 2, 0, 2, 3,
                 2, 1, 0, 3, 2, 0
             };
-            for (unsigned int value : order) opaqueIndices.push_back(base + value);
+            for (unsigned int value : order) {
+                opaqueIndices.push_back(base + value);
+                shadowIndices.push_back(base + value);
+            }
         };
 
         for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
@@ -603,8 +621,10 @@ struct ChunkMesh {
                             vertices.push_back({
                                 p.x + x, p.y + y, p.z + z, 1.0f, sky, light,
                                 1.0f, u, v, tile, static_cast<float>(f)});
-                            opaqueIndices.push_back(base +
-                                static_cast<unsigned int>(vertices.size() - base - 1));
+                            const unsigned int index = base +
+                                static_cast<unsigned int>(vertices.size() - base - 1);
+                            opaqueIndices.push_back(index);
+                            shadowIndices.push_back(index);
                         }
                     }
                 }
@@ -617,6 +637,9 @@ struct ChunkMesh {
         translucentIndexOffset = opaqueIndexCount;
         indices.insert(indices.end(), translucentIndices.begin(), translucentIndices.end());
         translucentIndexCount = translucentIndices.size();
+        shadowCasterIndexOffset = indices.size();
+        indices.insert(indices.end(), shadowIndices.begin(), shadowIndices.end());
+        shadowCasterIndexCount = shadowIndices.size();
         indexCount = indices.size();
     }
 
