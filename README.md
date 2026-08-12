@@ -5,8 +5,9 @@ features deterministic infinite worlds, asynchronous chunk streaming, Creative,
 Survival, and Spectator modes, dynamic lighting and weather, and English and
 Simplified Chinese interfaces.
 
-The project version is defined by the root `VERSION` file and shared by CMake,
-Android Gradle, runtime output, and release CI.
+The root `VERSION` file is the single version source. It uses
+`X.Y.Z-alpha|beta|rc|release` and drives CMake, Android/iOS metadata, runtime
+output, package names, and release CI.
 
 ## Highlights
 

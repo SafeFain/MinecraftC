@@ -2,11 +2,13 @@ plugins { id "com.android.application" }
 
 def repositoryRoot = rootProject.projectDir.parentFile
 def versionText = new File(repositoryRoot, "VERSION").getText("UTF-8").trim()
-def versionMatch = versionText =~ /^(\d+)\.(\d+)\.(\d+)$/
+def versionMatch = versionText =~ /^(\d+)\.(\d+)\.(\d+)-(alpha|beta|rc|release)$/
 if (!versionMatch.find()) throw new GradleException("Cannot read MinecraftC version")
 def versionMajor = versionMatch.group(1).toInteger()
 def versionMinor = versionMatch.group(2).toInteger()
 def versionPatch = versionMatch.group(3).toInteger()
+def versionChannel = versionMatch.group(4)
+def channelNumber = [alpha: 1, beta: 2, rc: 3, release: 4][versionChannel]
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
 
 tasks.register("prepareLegalAssets", Sync) {
@@ -23,7 +25,7 @@ android {
         applicationId "io.github.SafeFain.MinecraftC"
         minSdk 29
         targetSdk 35
-        versionCode versionMajor * 10000 + versionMinor * 100 + versionPatch
+        versionCode (versionMajor * 10000 + versionMinor * 100 + versionPatch) * 10 + channelNumber
         versionName versionText
         ndk { abiFilters "arm64-v8a" }
         externalNativeBuild {

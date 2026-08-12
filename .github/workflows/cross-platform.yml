@@ -17,8 +17,13 @@ jobs:
         shell: bash
         run: |
           version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
+          core="${BASH_REMATCH[1]}"
+          channel="${BASH_REMATCH[2]}"
+          case "$channel" in alpha) label=Alpha;; beta) label=Beta;; rc) label=RC;; release) label=Release;; esac
           echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_CORE=$core" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libgl1-mesa-dev libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
@@ -38,7 +43,7 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/atlas.json"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
       - name: Verify installed renderer startup
         shell: bash
         run: |
@@ -94,10 +99,15 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+          if ($version -notmatch '^(\d+\.\d+\.\d+)-(alpha|beta|rc|release)$') {
             throw "Invalid VERSION: $version"
           }
+          $core = $Matches[1]
+          $labels = @{ alpha = 'Alpha'; beta = 'Beta'; rc = 'RC'; release = 'Release' }
+          $display = "$($labels[$Matches[2]])-$core"
           "MINECRAFTC_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "MINECRAFTC_VERSION_CORE=$core" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "MINECRAFTC_VERSION_DISPLAY=$display" | Out-File -FilePath $env:GITHUB_ENV -Append
           "RELEASE_DIR=MinecraftC-$version" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Reject Windows OpenGL-only configuration
         shell: pwsh
@@ -151,7 +161,7 @@ jobs:
           if (!(Test-Path "$stage/assets/shaders/block.vert")) { throw "Assets were not installed" }
           if (!(Test-Path "$stage/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
           $version = & "$stage/minecraftc.exe" --version
-          if ($version -ne "MinecraftC Release-$env:MINECRAFTC_VERSION") { throw "Version check failed: $version" }
+          if ($version -ne "MinecraftC $env:MINECRAFTC_VERSION_DISPLAY") { throw "Version check failed: $version" }
           $help = (& "$stage/minecraftc.exe" --help 2>&1) -join "`n"
           if ($help -notmatch "renderer=opengl\|vulkan") {
             throw "Installed Windows executable does not advertise both renderers"
@@ -176,8 +186,12 @@ jobs:
         shell: bash
         run: |
           version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
+          core="${BASH_REMATCH[1]}"; channel="${BASH_REMATCH[2]}"
+          case "$channel" in alpha) label=Alpha;; beta) label=Beta;; rc) label=RC;; release) label=Release;; esac
           echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_CORE=$core" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
       - name: Reject macOS OpenGL-only configuration
         shell: bash
@@ -228,7 +242,7 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/licenses/MoltenVK-LICENSE.txt"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/block.vert"
-          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC Release-$MINECRAFTC_VERSION"
+          test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
           "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" --help | grep -q 'renderer=opengl|vulkan'
       - name: Verify installed OpenGL and Vulkan startup
         shell: bash
@@ -272,8 +286,9 @@ jobs:
         shell: bash
         run: |
           version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
           echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_CORE=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
       - name: Install pinned MoltenVK and shader compiler
         shell: bash
         run: |
@@ -365,7 +380,7 @@ jobs:
             exit 1
           }
           check_plist CFBundleIdentifier io.github.SafeFain.MinecraftC
-          check_plist CFBundleShortVersionString "$MINECRAFTC_VERSION"
+          check_plist CFBundleShortVersionString "$MINECRAFTC_VERSION_CORE"
           check_plist MinimumOSVersion 14.0
           check_plist UIDeviceFamily:0 1
           check_plist UIDeviceFamily:1 2
@@ -646,8 +661,9 @@ jobs:
         shell: bash
         run: |
           version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
           echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MINECRAFTC_VERSION_CORE=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -688,8 +704,10 @@ jobs:
         run: |
           source_apk="android/app/build/outputs/apk/release/app-release-unsigned.apk"
           release_apk="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-android-arm64-unsigned.apk"
-          IFS=. read -r version_major version_minor version_patch <<< "$MINECRAFTC_VERSION"
-          version_code=$((version_major * 10000 + version_minor * 100 + version_patch))
+          IFS=. read -r version_major version_minor version_patch <<< "$MINECRAFTC_VERSION_CORE"
+          channel="${MINECRAFTC_VERSION##*-}"
+          case "$channel" in alpha) channel_code=1;; beta) channel_code=2;; rc) channel_code=3;; release) channel_code=4;; esac
+          version_code=$(((version_major * 10000 + version_minor * 100 + version_patch) * 10 + channel_code))
           test -f "$source_apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$source_apk" > "$RUNNER_TEMP/android-badging.txt"
           grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='$version_code' versionName='$MINECRAFTC_VERSION'" "$RUNNER_TEMP/android-badging.txt"

@@ -18,7 +18,7 @@
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>@PROJECT_VERSION@</string>
+  <string>@MINECRAFTC_VERSION_CORE@</string>
   <key>CFBundleVersion</key>
   <string>@MINECRAFTC_IOS_BUILD_NUMBER@</string>
   <key>LSRequiresIPhoneOS</key>

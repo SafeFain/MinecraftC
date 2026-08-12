@@ -7,9 +7,9 @@
 namespace Config {
 
 #ifndef MINECRAFTC_VERSION_STRING
-#  define MINECRAFTC_VERSION_STRING "0.0.0-dev"
+#  define MINECRAFTC_VERSION_STRING "Alpha-0.0.0"
 #endif
-constexpr const char* GAME_VERSION = "Release-" MINECRAFTC_VERSION_STRING;
+constexpr const char* GAME_VERSION = MINECRAFTC_VERSION_STRING;
 
 // ── Window ────────────────────────────────────────────────────────────
 constexpr int   WINDOW_WIDTH    = 1280;

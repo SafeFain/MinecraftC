@@ -1,11 +1,29 @@
 cmake_minimum_required(VERSION 3.16)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" MINECRAFTC_VERSION
      LIMIT_COUNT 1)
-if(NOT MINECRAFTC_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+if(NOT MINECRAFTC_VERSION MATCHES
+   "^([0-9]+)\\.([0-9]+)\\.([0-9]+)-(alpha|beta|rc|release)$")
     message(FATAL_ERROR
-        "VERSION must contain one numeric semantic version (for example 1.2.3)")
+        "VERSION must use X.Y.Z-alpha|beta|rc|release (for example 1.2.3-rc)")
 endif()
-project(MinecraftC VERSION "${MINECRAFTC_VERSION}" LANGUAGES CXX C)
+set(MINECRAFTC_VERSION_CORE "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+set(MINECRAFTC_VERSION_CHANNEL "${CMAKE_MATCH_4}")
+if(MINECRAFTC_VERSION_CHANNEL STREQUAL "release")
+    set(MINECRAFTC_VERSION_LABEL "Release")
+    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 4)
+elseif(MINECRAFTC_VERSION_CHANNEL STREQUAL "rc")
+    set(MINECRAFTC_VERSION_LABEL "RC")
+    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 3)
+elseif(MINECRAFTC_VERSION_CHANNEL STREQUAL "beta")
+    set(MINECRAFTC_VERSION_LABEL "Beta")
+    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 2)
+else()
+    set(MINECRAFTC_VERSION_LABEL "Alpha")
+    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 1)
+endif()
+set(MINECRAFTC_VERSION_DISPLAY
+    "${MINECRAFTC_VERSION_LABEL}-${MINECRAFTC_VERSION_CORE}")
+project(MinecraftC VERSION "${MINECRAFTC_VERSION_CORE}" LANGUAGES CXX C)
 
 if(ANDROID OR IOS)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -281,7 +299,7 @@ endif()
 add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
 target_include_directories(minecraftc_platform_sdl PRIVATE src)
 target_compile_definitions(minecraftc_platform_sdl PRIVATE
-    MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+    MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
 target_link_libraries(minecraftc_platform_sdl PRIVATE ${MINECRAFTC_SDL_TARGET})
 if(MINECRAFTC_ENABLE_OPENGL)
     target_compile_definitions(minecraftc_platform_sdl PRIVATE
@@ -389,7 +407,7 @@ target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE
     external
 )
 target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
-    MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+    MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
 if(MINECRAFTC_ENABLE_OPENGL)
     target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
         MINECRAFTC_ENABLE_OPENGL=1)
@@ -431,7 +449,7 @@ if(APPLE AND NOT IOS)
 endif()
 if(IOS)
     math(EXPR MINECRAFTC_IOS_BUILD_NUMBER
-        "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
+        "(${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}) * 10 + ${MINECRAFTC_VERSION_CHANNEL_NUMBER}")
     configure_file(ios/Info.plist.in
         "${CMAKE_CURRENT_BINARY_DIR}/ios/Info.plist" @ONLY)
     string(CONCAT MINECRAFTC_IOS_OTHER_LDFLAGS
@@ -550,7 +568,7 @@ if(BUILD_TESTING)
                 --root ${CMAKE_SOURCE_DIR})
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
-        PASS_REGULAR_EXPRESSION "MinecraftC Release-${PROJECT_VERSION}")
+        PASS_REGULAR_EXPRESSION "MinecraftC ${MINECRAFTC_VERSION_DISPLAY}")
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
@@ -815,7 +833,7 @@ if(BUILD_TESTING)
         src external external/cgltf external/stb external/glad/include)
     target_compile_definitions(entity_model_registry_tests PRIVATE
         MINECRAFTC_ENABLE_OPENGL=1
-        MINECRAFTC_VERSION_STRING="${PROJECT_VERSION}")
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(entity_model_registry_tests PRIVATE
         glm::glm glad ${MINECRAFTC_SDL_TARGET} OpenGL::GL minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
