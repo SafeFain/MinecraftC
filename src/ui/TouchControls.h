@@ -14,7 +14,7 @@ class UIRenderer;
 
 enum class TouchCommand : uint8_t {
     AttackPress, AttackRelease, UsePress, UseRelease,
-    OpenInventory, OpenCommand, Pause, SelectHotbar
+    OpenInventory, OpenCommand, Pause, ChangePerspective, SelectHotbar
 };
 
 struct TouchCommandEvent {
@@ -55,13 +55,15 @@ public:
 
 private:
     enum class Target : uint8_t {
-        Move, Look, Jump, Sneak, Attack, Use, Inventory, Command, Pause, Hotbar
+        Move, Look, Jump, Sneak, Attack, Use, Inventory, Command, Pause,
+        Perspective, Hotbar
     };
     struct Capture { Target target; glm::vec2 last; int slot = -1; };
 
     int m_width = 1, m_height = 1;
     TouchControlConfig m_config;
-    TouchRect m_moveArea, m_jump, m_sneak, m_attack, m_use, m_inventory, m_command, m_pause;
+    TouchRect m_moveArea, m_jump, m_sneak, m_attack, m_use, m_inventory,
+              m_command, m_perspective, m_pause;
     std::array<TouchRect, 9> m_hotbar{};
     glm::vec2 m_moveCenter{0.0f};
     float m_moveRadius = 50.0f;

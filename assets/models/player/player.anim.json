@@ -1,0 +1,102 @@
+{
+  "actions": {
+    "death": {
+      "clip": "death",
+      "fade_in": 0.08,
+      "fade_out": 0,
+      "layer": "death",
+      "loop": false,
+      "priority": 300
+    },
+    "fall": {
+      "clip": "fall",
+      "fade_in": 0.08,
+      "fade_out": 0.1,
+      "layer": "base",
+      "loop": true
+    },
+    "hurt": {
+      "clip": "hurt",
+      "fade_in": 0.04,
+      "fade_out": 0.1,
+      "layer": "reaction",
+      "loop": false,
+      "priority": 200
+    },
+    "idle": {
+      "clip": "idle",
+      "fade_in": 0.15,
+      "fade_out": 0.15,
+      "layer": "base",
+      "loop": true
+    },
+    "jump": {
+      "clip": "jump",
+      "fade_in": 0.08,
+      "fade_out": 0.1,
+      "layer": "base",
+      "loop": true
+    },
+    "run": {
+      "clip": "run",
+      "fade_in": 0.1,
+      "fade_out": 0.1,
+      "layer": "base",
+      "loop": true
+    },
+    "swing": {
+      "clip": "swing",
+      "fade_in": 0.03,
+      "fade_out": 0.06,
+      "layer": "action",
+      "loop": false,
+      "priority": 100
+    },
+    "walk": {
+      "clip": "walk",
+      "fade_in": 0.15,
+      "fade_out": 0.15,
+      "layer": "base",
+      "loop": true
+    }
+  },
+  "bindings": {
+    "death": "death",
+    "fall": "fall",
+    "hurt": "hurt",
+    "idle": "idle",
+    "jump": "jump",
+    "run": "run",
+    "swing": "swing",
+    "walk": "walk"
+  },
+  "layers": [
+    {
+      "blend": "override",
+      "name": "base",
+      "order": 0
+    },
+    {
+      "blend": "override",
+      "mask": {
+        "include_descendants": true,
+        "nodes": {
+          "arm_r": 1
+        }
+      },
+      "name": "action",
+      "order": 100
+    },
+    {
+      "blend": "additive",
+      "name": "reaction",
+      "order": 200
+    },
+    {
+      "blend": "override",
+      "name": "death",
+      "order": 300
+    }
+  ],
+  "version": 1
+}

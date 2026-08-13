@@ -27,7 +27,7 @@ DEFAULT_SEED = 213785369
 GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
 ENTITY_NAMES = ("cow", "pig", "sheep", "chicken", "zombie", "skeleton",
                 "spider", "blastling", "item")
-ENTITY_SKIN_NAMES = ENTITY_NAMES[:-1]
+ENTITY_SKIN_NAMES = ENTITY_NAMES[:-1] + ("player",)
 ENTITY_SKIN_SIZE = 64
 ENTITY_SKIN_LAYOUT = {
     "head_front": 0, "head_back": 1, "head_left": 2, "head_right": 3,
@@ -56,6 +56,8 @@ ENTITY_PALETTES = {
                   (70,146,48,255),(97,174,58,255),(132,204,76,255)),
     "item": ((91,55,21,255),(122,76,25,255),(158,104,31,255),
              (192,137,39,255),(223,174,58,255),(244,207,91,255)),
+    "player": ((34,52,76,255),(48,72,101,255),(61,93,126,255),
+               (88,126,154,255),(181,126,91,255),(229,177,132,255)),
 }
 NAMES = [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
@@ -596,6 +598,9 @@ def _paint_entity_face(name,tile):
         _paint_rect(tile,3,3,6,8,blackish); _paint_rect(tile,10,3,13,8,blackish)
         _paint_rect(tile,6,8,10,11,blackish); _paint_rect(tile,4,10,7,14,blackish)
         _paint_rect(tile,9,10,12,14,blackish); _paint_rect(tile,7,12,9,15,blackish)
+    elif name=="player":
+        _paint_rect(tile,3,5,5,7,(34,30,26,255)); _paint_rect(tile,11,5,13,7,(34,30,26,255))
+        _paint_rect(tile,6,10,10,11,(128,72,54,255))
 
 def _paint_entity_body(name,tile):
     if name=="skeleton":
@@ -605,6 +610,9 @@ def _paint_entity_body(name,tile):
             _paint_rect(tile,3,y,7,y+1,shadow); _paint_rect(tile,9,y,13,y+1,shadow)
     elif name=="zombie":
         _paint_rect(tile,6,1,10,3,(28,70,72,255))
+    elif name=="player":
+        _paint_rect(tile,1,1,15,15,(42,78,118,255))
+        _paint_rect(tile,1,11,15,15,(31,44,67,255))
 
 def generate_entity_skin(name,seed):
     """Generate one original 64x64 semantic skin atlas for a runtime mob."""

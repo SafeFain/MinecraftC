@@ -12,7 +12,7 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class RendererBackend : uint8_t { OpenGL, Vulkan };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 13;
+    static constexpr int FORMAT_VERSION = 14;
 
     int renderDistance = 8;
     bool renderClouds = true;

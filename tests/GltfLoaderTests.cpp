@@ -280,6 +280,12 @@ int main() {
                     loaded.asset->primitives[0].skin == 0,
                 "generated entity primitive lost its GPU skin binding");
     }
+    const auto player = model::loadGltf(
+        std::filesystem::path(MINECRAFTC_SOURCE_DIR) /
+        "assets/models/player/player.glb");
+    require(player && player.asset->findClip("swing") &&
+                player.asset->findClip("jump") && player.asset->findClip("fall"),
+            "generated player model or its required clips failed loader validation");
 
     std::cout << "gltf loader tests passed\n";
 }

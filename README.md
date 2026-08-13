@@ -7,7 +7,9 @@ Simplified Chinese interfaces.
 
 The root `VERSION` file is the single version source. It uses
 `X.Y.Z-alpha|beta|rc|release` and drives CMake, Android/iOS metadata, runtime
-output, package names, and release CI.
+output, package names, and release CI. A release tag must exactly equal
+`v<VERSION>` (for example `v1.2.2-release`). Alpha, beta, and RC tags create
+GitHub prereleases; release-channel tags create normal releases.
 
 ## Highlights
 

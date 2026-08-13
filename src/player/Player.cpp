@@ -184,7 +184,11 @@ void Player::handleMouseButton(int button, ButtonAction action) {
             m_miningTarget.reset();
             m_miningProgress = 0.0f;
             m_miningRequired = 0.0f;
-        } else if (m_actionCooldown <= 0.0f) {
+        } else {
+            startSwing();
+            m_miningSwingSeconds = 0.0f;
+        }
+        if (m_mining && m_actionCooldown <= 0.0f) {
             float damage = 1.0f;
             if (m_gameMode == GameMode::Survival) {
                 const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
@@ -204,8 +208,10 @@ void Player::handleMouseButton(int button, ButtonAction action) {
         }
     } else if (button == MouseButton::Right && action == ButtonAction::Press &&
                m_actionCooldown <= 0.0f) {
-        placeBlock();
-        m_actionCooldown = 0.15f;
+        if (placeBlock()) {
+            startSwing();
+            m_actionCooldown = 0.15f;
+        }
     }
 }
 
@@ -216,6 +222,8 @@ void Player::update(float dt) {
     if (m_actionCooldown > 0.0f) {
         m_actionCooldown -= dt;
     }
+    if (m_swingProgress < 1.0f)
+        m_swingProgress = std::min(1.0f, m_swingProgress + dt / 0.32f);
 
     updateDirectionVectors();
     applyPhysics(dt);
@@ -230,6 +238,23 @@ void Player::update(float dt) {
             m_survivalTickRemainder -= static_cast<float>(ticks);
         }
     }
+}
+
+ItemStack Player::activeItem() const {
+    if (m_gameMode == GameMode::Spectator) return {};
+    if (m_gameMode == GameMode::Survival)
+        return m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+    return {m_selectedCreativeItem, 1, 0};
+}
+
+PlayerVisualState Player::visualState() const {
+    return {m_velocity, m_onGround, m_isSprinting,
+            m_swingSequence, m_swingProgress};
+}
+
+void Player::startSwing() {
+    ++m_swingSequence;
+    m_swingProgress = 0.0f;
 }
 
 void Player::updateDirectionVectors() {
@@ -496,7 +521,7 @@ void Player::updateHighlight() {
     }
 }
 
-void Player::breakBlock() {
+bool Player::breakBlock() {
     auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (hit) {
         glm::ivec3 breakPos = hit->blockPos;
@@ -534,11 +559,18 @@ void Player::breakBlock() {
         }
         m_world.setBlock(breakPos.x, breakPos.y, breakPos.z, BlockId::AIR);
         if (m_blockBreakCallback) m_blockBreakCallback(breakPos, block);
+        return true;
     }
+    return false;
 }
 
 void Player::updateMining(float dt) {
     if (!m_mining || m_gameMode != GameMode::Survival) return;
+    m_miningSwingSeconds += dt;
+    if (m_miningSwingSeconds >= 0.30f) {
+        m_miningSwingSeconds = std::fmod(m_miningSwingSeconds, 0.30f);
+        startSwing();
+    }
     auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (!hit) {
         m_miningTarget.reset();
@@ -570,40 +602,43 @@ void Player::updateMining(float dt) {
     }
 }
 
-void Player::placeBlock() {
+bool Player::placeBlock() {
     if (m_gameMode == GameMode::Creative && m_selectedCreativeItem == ItemId::BOW) {
-        if (m_entities)
+        if (m_entities) {
             m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
                                    m_forward * 24.0f, 6.0f, true);
-        return;
+            return true;
+        }
+        return false;
     }
     if (m_gameMode == GameMode::Survival) {
         auto& selected = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (!selected.empty() && getItemProps(selected.id).kind == ItemKind::Food) {
-            if (m_survivalStats.eat(selected.id) && --selected.count == 0)
-                selected.clear();
-            return;
+            if (!m_survivalStats.eat(selected.id)) return false;
+            if (--selected.count == 0) selected.clear();
+            return true;
         }
         if (!selected.empty() && selected.id == ItemId::BOW) {
-            if (m_inventory.remove(ItemId::ARROW, 1) && m_entities) {
+            if (m_entities && m_inventory.remove(ItemId::ARROW, 1)) {
                 m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
                                        m_forward * 24.0f, 6.0f, true);
                 if (++selected.damage >= getItemProps(selected.id).maxDurability)
                     selected.clear();
+                return true;
             }
-            return;
+            return false;
         }
     }
 
     auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
-    if (!hit) return;
+    if (!hit) return false;
 
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
     const BlockId targetedBlock = m_world.getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
     if (m_gameMode == GameMode::Survival && targetedBlock == BlockId::WHITE_BED) {
         if (m_bedCallback) m_bedCallback(hit->blockPos);
-        return;
+        return true;
     }
 
     const ItemId activeItem = m_gameMode == GameMode::Survival
@@ -620,7 +655,7 @@ void Player::placeBlock() {
                 entityTypeForSpawnEgg(*activeProperties.spawnEggMob),
                 spawnPosition);
         }
-        return;
+        return m_entities != nullptr;
     }
     if (activeItem == ItemId::FLINT_AND_STEEL) {
         bool used = false;
@@ -636,14 +671,14 @@ void Player::placeBlock() {
             auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
             if (++stack.damage >= getItemProps(stack.id).maxDurability) stack.clear();
         }
-        return;
+        return used;
     }
 
     BlockId placed = m_selectedBlock;
-    if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return;
+    if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return false;
     if (m_gameMode == GameMode::Survival) {
         auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-        if (stack.empty()) return;
+        if (stack.empty()) return false;
         const auto& props = getItemProps(stack.id);
         const BlockId hitBlock = targetedBlock;
         if (props.tool == ToolKind::Hoe &&
@@ -652,23 +687,23 @@ void Player::placeBlock() {
             m_world.setBlock(hit->blockPos.x, hit->blockPos.y, hit->blockPos.z,
                              BlockId::FARMLAND);
             if (++stack.damage >= props.maxDurability) stack.clear();
-            return;
+            return true;
         }
         if (stack.id == ItemId::WHEAT_SEEDS && isFarmland(hitBlock) &&
             hit->faceNormal.y > 0 && m_world.getBlock(
                 placePos.x, placePos.y, placePos.z) == BlockId::AIR) {
             m_world.setBlock(placePos.x, placePos.y, placePos.z, BlockId::WHEAT_0);
             if (--stack.count == 0) stack.clear();
-            return;
+            return true;
         }
-        if (!props.placedBlock) return;
+        if (!props.placedBlock) return false;
         placed = *props.placedBlock;
         if (isSapling(placed)) {
             if (hit->faceNormal.y <= 0 ||
                 (hitBlock != BlockId::GRASS && hitBlock != BlockId::DIRT &&
                  hitBlock != BlockId::PODZOL) ||
                 m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR)
-                return;
+                return false;
         }
     }
 
@@ -683,7 +718,7 @@ void Player::placeBlock() {
                 m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
                 m_world.getBlock(placePos.x, placePos.y + 1, placePos.z) != BlockId::AIR ||
                 collidesWithPlayer(placePos + glm::ivec3(0, 1, 0)))
-                return;
+                return false;
             m_world.setBlock(placePos.x, placePos.y + 1, placePos.z,
                              BlockId::SUNFLOWER_TOP);
         }
@@ -692,7 +727,9 @@ void Player::placeBlock() {
             auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
             if (--stack.count == 0) stack.clear();
         }
+        return true;
     }
+    return false;
 }
 
 bool Player::collidesWithPlayer(const glm::ivec3& blockPos) const {

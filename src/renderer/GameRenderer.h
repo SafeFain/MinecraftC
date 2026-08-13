@@ -56,6 +56,7 @@ public:
         float, const glm::mat4&, SmoothLightSample light = {}) = 0;
     virtual model::ModelRenderer& modelRenderer() = 0;
     virtual void flushModels(const glm::mat4&) = 0;
+    virtual void beginViewModel(const glm::mat4& projection) = 0;
     virtual void renderEntityPart(const glm::vec3&, const glm::vec3&,
                                   const glm::vec3&, float, const glm::vec3&, int,
                                   const glm::mat4&,
@@ -69,5 +70,6 @@ public:
     virtual void setFrustum(const Frustum&) = 0;
     virtual const Frustum& getFrustum() const = 0;
     virtual RenderTextureHandle getBlockAtlasTexture() const = 0;
+    virtual uint32_t blockAtlasTilesPerSide() const = 0;
     virtual bool usesFramebufferSrgb() const = 0;
 };

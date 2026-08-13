@@ -95,7 +95,7 @@ def parts_for(name):
         return [("body",(0,.38,0),(.46,.38,.46)),("head",(0,.68,-.18),(.34,.34,.34)),
                 ("wing_l",(-.28,.40,0),(.10,.28,.32)),("wing_r",(.28,.40,0),(.10,.28,.32)),
                 ("leg_l",(-.10,.12,0),(.08,.24,.08)),("leg_r",(.10,.12,0),(.08,.24,.08))]
-    if name in {"zombie","skeleton"}:
+    if name in {"zombie","skeleton","player"}:
         thin=.14 if name=="skeleton" else .22
         return [("body",(0,1.03,0),(.52,.68,.34)),("head",(0,1.55,0),(.50,.40,.50)),
                 ("arm_l",(-.36,1.03,0),(thin,.72,thin)),("arm_r",(.36,1.03,0),(thin,.72,thin)),
@@ -118,7 +118,7 @@ def build_v2(name,size,color):
         if part=="head": return "head_"+face
         if part=="body": return "body_"+face
         if part.startswith("wing_"): return "limb_secondary"
-        if name in {"zombie","skeleton"} and part.startswith("leg_"): return "limb_secondary"
+        if name in {"zombie","skeleton","player"} and part.startswith("leg_"): return "limb_secondary"
         return "limb_primary"
     def tile_uv(slot):
         index=texture_generator.ENTITY_SKIN_LAYOUT[slot];tx,ty=index%4,index//4
@@ -174,7 +174,7 @@ def build_v2(name,size,color):
         for part in ("leg_fr","leg_bl"):
             walk.append((node[part],"rotation",(qx(-.38),qx(.38),qx(-.38))))
         walk.append((0,"translation",((0,0,0),(0,.035,0),(0,0,0))))
-    elif name in {"zombie","skeleton"}:
+    elif name in {"zombie","skeleton","player"}:
         for part,phase in (("leg_l",1),("leg_r",-1),("arm_l",-1),("arm_r",1)):
             walk.append((node[part],"rotation",(qx(.48*phase),qx(-.48*phase),qx(.48*phase))))
     elif name=="chicken":
@@ -190,6 +190,18 @@ def build_v2(name,size,color):
                      (node[f"leg_r{i}"],"rotation",(qy(-.30*phase),qy(.30*phase),qy(-.30*phase)))]
         walk.append((0,"translation",((0,0,0),(0,.025,0),(0,0,0))))
     animation("walk",1.0,walk)
+    if name=="player":
+        run=[]
+        for part,phase in (("leg_l",1),("leg_r",-1),("arm_l",-1),("arm_r",1)):
+            run.append((node[part],"rotation",(qx(.72*phase),qx(-.72*phase),qx(.72*phase))))
+        animation("run",.72,run)
+        animation("jump",.45,[(node["leg_l"],"rotation",(qx(0),qx(-.55),qx(-.55))),
+                               (node["leg_r"],"rotation",(qx(0),qx(.25),qx(.25))),
+                               (node["arm_l"],"rotation",(qx(0),qx(-.35),qx(-.35)))])
+        animation("fall",.45,[(node["leg_l"],"rotation",(qx(-.55),qx(.15),qx(.15))),
+                               (node["leg_r"],"rotation",(qx(.25),qx(-.25),qx(-.25))),
+                               (node["arm_l"],"rotation",(qx(-.35),qx(.2),qx(.2)))])
+        animation("swing",.32,[(node["arm_r"],"rotation",(qx(0),qx(-1.35),qx(0)))])
     animation("hurt",.35,[(0,"translation",((0,0,0),(0,.12,.10),(0,0,0)))])
     animation("death",1.0,[(0,"rotation",(qz(0),qz(math.pi*.5),qz(math.pi*.5)))])
     if name=="zombie":
@@ -221,6 +233,7 @@ def write_action_graph(path,name):
     action_nodes={
         "zombie":{"body":1,"head":1,"arm_l":1,"arm_r":1},
         "skeleton":{"body":1,"head":1,"arm_l":1,"arm_r":1},
+        "player":{"arm_r":1},
     }
     layers=[{"name":"base","order":0,"blend":"override"},
             {"name":"action","order":100,"blend":"override"},
@@ -234,6 +247,13 @@ def write_action_graph(path,name):
         "hurt":{"clip":"hurt","layer":"reaction","loop":False,"priority":200,"fade_in":.04,"fade_out":.10},
         "death":{"clip":"death","layer":"death","loop":False,"priority":300,"fade_in":.08,"fade_out":0},
     }
+    if name=="player":
+        actions.update({
+            "run":{"clip":"run","layer":"base","loop":True,"fade_in":.10,"fade_out":.10},
+            "jump":{"clip":"jump","layer":"base","loop":True,"fade_in":.08,"fade_out":.10},
+            "fall":{"clip":"fall","layer":"base","loop":True,"fade_in":.08,"fade_out":.10},
+            "swing":{"clip":"swing","layer":"action","loop":False,"priority":100,"fade_in":.03,"fade_out":.06},
+        })
     attack={
         "zombie":(.55,.30,"melee"),"spider":(.50,.30,"melee"),
         "skeleton":(.75,.45,"shoot"),"blastling":(1.20,1.00,"explode")}
@@ -247,10 +267,14 @@ def write_action_graph(path,name):
     path.write_text(json.dumps(graph,sort_keys=True,indent=2)+"\n",encoding="utf-8")
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument("--output",type=pathlib.Path,required=True);parser.add_argument("--fixtures",type=pathlib.Path)
+    parser=argparse.ArgumentParser();parser.add_argument("--output",type=pathlib.Path,required=True);parser.add_argument("--fixtures",type=pathlib.Path);parser.add_argument("--player-output",type=pathlib.Path)
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     for name,(size,color) in MODELS.items():
         (args.output/(name+".glb")).write_bytes(build_v2(name,size,color))
         write_action_graph(args.output/(name+".anim.json"),name)
+    if args.player_output:
+        args.player_output.mkdir(parents=True,exist_ok=True)
+        (args.player_output/"player.glb").write_bytes(build_v2("player",(.62,1.8,.42),(61,93,126,255)))
+        write_action_graph(args.player_output/"player.anim.json","player")
 
 if __name__=="__main__":main()

@@ -71,6 +71,7 @@ public:
         SmoothLightSample light = {});
     model::ModelRenderer& modelRenderer();
     void flushModels(const glm::mat4& viewProjection);
+    void beginViewModel(const glm::mat4& projection) override;
     void renderEntityPart(const glm::vec3& position, const glm::vec3& offset,
                           const glm::vec3& size, float yaw,
                           const glm::vec3& color, int textureIndex,
@@ -96,10 +97,16 @@ public:
     static void deleteVAO(uint32_t vao);
 
     // Setters for current-frame camera data
-    void setViewProjection(const glm::mat4& vp) { m_viewProjection = vp; }
+    void setViewProjection(const glm::mat4& vp) {
+        m_viewProjection = vp; m_basicFrame.projection = vp;
+        m_basicFrame.view = glm::mat4(1.0f);
+    }
     void setFrustum(const Frustum& f) { m_frustum = f; }
     const Frustum& getFrustum() const { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const { return m_blockAtlas.texture(); }
+    uint32_t blockAtlasTilesPerSide() const override {
+        return static_cast<uint32_t>(BlockTextureAtlas::tilesPerSide());
+    }
     bool usesFramebufferSrgb() const { return m_framebufferSrgb; }
 
     RenderDeviceCapabilities capabilities() const override;

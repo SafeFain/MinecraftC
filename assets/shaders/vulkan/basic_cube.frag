@@ -13,6 +13,7 @@ layout(push_constant) uniform FrameUniforms {
 
 void main() {
     vec4 color=texture(blockTexture, textureUv)*frame.tint;
+    if(color.a<0.1)discard;
     if(frame.atlasAndLighting.w>0.5)
         color.rgb=pow(max(color.rgb,vec3(0.0)),vec3(1.0/2.2));
     outColor=color;

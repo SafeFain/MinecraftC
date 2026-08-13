@@ -14,9 +14,12 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/CameraEffects.h"
+#include "renderer/HeldItemRenderer.h"
 #include "Config.h"
 #include "world/World.h"
 #include "player/Player.h"
+#include "player/PlayerVisual.h"
+#include "player/PlayerRenderer.h"
 #include "threading/ThreadPool.h"
 #include "ui/UIRenderer.h"
 #include "ui/Menu.h"
@@ -323,10 +326,14 @@ private:
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     Camera      m_camera;
     CameraEffects m_cameraEffects;
+    CameraPerspective m_perspective = CameraPerspective::FirstPerson;
+    glm::dvec3 m_cameraWorldPosition{0.0};
     ThreadPool  m_threadPool;
     World       m_world;
     Player      m_player{m_world};
     EntityManager m_entities{m_world};
+    PlayerRenderer m_playerRenderer;
+    HeldItemRenderer m_heldItemRenderer;
     bool        m_running = true;
     bool        m_cleaned = false;
     bool        m_backgrounded = false;
@@ -334,6 +341,10 @@ private:
     bool        m_savedForTermination = false;
     struct VisibleChunk { const Chunk* chunk; glm::mat4 model; float distance2; };
     std::vector<VisibleChunk> m_visibleChunks;
+
+    void cyclePerspective() {
+        m_perspective = nextPerspective(m_perspective);
+    }
 
     // ── UI / State ────────────────────────────────────────────────────
     GameState             m_gameState = GameState::MainMenu;
@@ -430,6 +441,8 @@ private:
         m_renderer->initialize(m_window, graphics, m_paths.assetRoot);
         m_renderer->resize(m_window.width(), m_window.height());
         m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
+        m_playerRenderer.initialize(m_paths.assetRoot, *m_renderer);
+        m_heldItemRenderer.initialize(*m_renderer, m_paths.assetRoot);
         m_audio.initialize();
         m_uiRenderer.initialize(*m_renderer,
             m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
@@ -622,6 +635,16 @@ private:
                 }
             }
 
+            // Discrete keyboard actions are handled in the event callback.
+            // The callback updates InputState immediately, so waiting until
+            // runFrame() would lose this press when beginFrame() clears edges.
+            if (action == ButtonAction::Press && keyBound(InputAction::Perspective) &&
+                m_gameState == GameState::Playing && !m_activeMenu &&
+                !m_inventoryOpen && !m_commandOpen) {
+                cyclePerspective();
+                return;
+            }
+
             // Number keys 1-9 — hotbar selection (Playing only)
             for (int slot = 0; slot < 9 && action == ButtonAction::Press; ++slot) {
                 if (!keyBound(static_cast<InputAction>(
@@ -705,6 +728,9 @@ private:
                 if (mouseBound(InputAction::Inventory) && !m_commandOpen && !m_player.isSpectator()) {
                     if(m_inventoryOpen)closeInventory();else openInventory();return;
                 }
+                if(mouseBound(InputAction::Perspective)&&!m_inventoryOpen&&!m_commandOpen){
+                    cyclePerspective();return;
+                }
                 for(int slot=0;slot<9;++slot)if(mouseBound(static_cast<InputAction>(
                     static_cast<int>(InputAction::Hotbar1)+slot))){m_hotbar.selectSlot(slot);
                     m_player.setSelectedSlot(slot);
@@ -757,6 +783,7 @@ private:
             if(m_gameState==GameState::Playing&&!m_commandOpen){
                 if(wheelBound(InputAction::Inventory)&&!m_player.isSpectator()){if(m_inventoryOpen)closeInventory();else openInventory();return;}
                 if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.setText({});m_window.setCursorLocked(false);return;}
+                if(wheelBound(InputAction::Perspective)&&!m_inventoryOpen){cyclePerspective();return;}
                 for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_hotbar.selectSlot(slot);
                 if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,ButtonAction::Press);handleGameplayAction(false,ButtonAction::Release);}
                     if(wheelBound(InputAction::Use)){handleGameplayAction(true,ButtonAction::Press);if(!m_inventoryOpen)handleGameplayAction(true,ButtonAction::Release);}}
@@ -792,8 +819,11 @@ private:
         m_world.invalidateGpuMeshes();
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
         m_uiRenderer.resetGraphics();
+        m_heldItemRenderer.reset();
         m_renderer->reinitialize(graphics, m_paths.assetRoot);
         m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
+        m_playerRenderer.initialize(m_paths.assetRoot, *m_renderer);
+        m_heldItemRenderer.initialize(*m_renderer, m_paths.assetRoot);
         m_uiRenderer.initialize(*m_renderer,
             m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
             m_paths.assetRoot, graphics.api);
@@ -875,6 +905,7 @@ private:
                     handleGameplayAction(true,ButtonAction::Release);
                     m_touchControls.cancelAll();m_gameState=GameState::Paused;m_window.setCursorLocked(false);
                     m_activeMenu=std::make_unique<PauseMenu>(m_menuCallbacks,m_localization);break;
+                case TouchCommand::ChangePerspective:cyclePerspective();break;
                 case TouchCommand::SelectHotbar:
                     m_hotbar.selectSlot(command.value);m_player.setSelectedSlot(command.value);
                     m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
@@ -1023,6 +1054,7 @@ private:
         const GameMode mode = m_worldMetadata.gameMode;
 
         m_gameState = GameState::LoadingWorld;
+        m_perspective = CameraPerspective::FirstPerson;
         m_loadingNewWorld = newWorld;
         m_loadingGenerationComplete = false;
         m_player.configureRules(mode, m_worldMetadata.difficulty);
@@ -1133,6 +1165,9 @@ private:
             m_input.updateGamepad(m_clientSettings.gamepadBindings, m_gamepadButtons,
                                   m_gamepadAxes, m_clientSettings.gamepadDeadzone);
             m_input.update(m_clientSettings.bindings);
+            if (m_gameState == GameState::Playing && !m_inventoryOpen &&
+                !m_commandOpen && m_input.pressed(InputAction::Perspective))
+                cyclePerspective();
             updateGamepadUi(now);
 
             // Skip rendering when minimized to save resources
@@ -1204,6 +1239,7 @@ private:
                 m_audio.setRainVolume(m_weather.rainGradient() *
                                       (rainExposure ? 0.72f : 0.06f));
                 if (!m_playerDead) m_player.update(dt);
+                m_playerRenderer.update(m_player.visualState(), dt);
                 m_cameraEffects.update(m_player.getPosition(), m_player.onGround(),
                                        m_player.isFlying(), dt);
                 m_particles.update(m_world, m_player.getPosition(), dt,
@@ -1268,9 +1304,16 @@ private:
                 // zero even when the logical world position is millions of
                 // blocks from spawn.
                 const glm::dvec3 eye = m_player.getEyePosition();
-                m_camera.setPosition(glm::vec3(
-                    0.0f, static_cast<float>(eye.y), 0.0f));
-                m_camera.updateVectors(m_player.getYaw(), m_player.getPitch());
+                m_cameraWorldPosition = resolveThirdPersonCamera(
+                    m_world, eye, m_player.getForward(), m_perspective);
+                const glm::dvec3 cameraLocal = m_cameraWorldPosition -
+                    glm::dvec3(m_player.getPosition().x, 0.0,
+                               m_player.getPosition().z);
+                m_camera.setPosition(glm::vec3(cameraLocal));
+                if (m_perspective == CameraPerspective::ThirdPersonFront)
+                    m_camera.updateVectors(m_player.getYaw() + 180.0f,
+                                           -m_player.getPitch());
+                else m_camera.updateVectors(m_player.getYaw(), m_player.getPitch());
                 m_autosaveSeconds += dt;
                 if (m_autosaveSeconds >= 30.0f) {
                     beginAutosave();
@@ -1423,6 +1466,15 @@ private:
                 m_renderer->endTranslucent();
 
                 m_entities.render(*m_renderer, vp, renderOrigin);
+                if (m_perspective != CameraPerspective::FirstPerson &&
+                    !m_player.isSpectator()) {
+                    const glm::mat4 hand = m_playerRenderer.renderThirdPerson(
+                        *m_renderer, m_player.getPosition(), renderOrigin,
+                        m_player.getYaw(), m_player.getPitch(), vp,
+                        m_world.sampleLight(m_player.getEyePosition()));
+                    m_heldItemRenderer.renderThirdPerson(
+                        m_player.activeItem(), vp, hand);
+                }
                 m_particles.buildRenderData(renderOrigin, m_particleRenderData);
                 m_renderer->renderParticles(
                     m_particleRenderData, vp,
@@ -1439,6 +1491,13 @@ private:
                         static_cast<float>(highlighted->z - renderOrigin.z));
                     m_renderer->renderWireframe(pos, vp);
                 }
+
+                if (m_perspective == CameraPerspective::FirstPerson &&
+                    m_gameState == GameState::Playing && !m_inventoryOpen &&
+                    !m_activeMenu && !m_player.isSpectator() && !m_playerDead)
+                    m_heldItemRenderer.renderFirstPerson(
+                        m_player.activeItem(), m_player.visualState().swingProgress,
+                        m_window.aspectRatio());
 
                 // Title bar info
                 if (m_gameState == GameState::Playing) {
@@ -1512,7 +1571,8 @@ private:
                 if (!m_player.isSpectator()) {
                     m_hotbar.render(m_uiRenderer, uiWidth, uiHeight);
                     if (m_player.isSurvival()) renderSurvivalHud(uiWidth);
-                    renderCrosshairAndMiningProgress(uiWidth, uiHeight);
+                    if (m_perspective != CameraPerspective::ThirdPersonFront)
+                        renderCrosshairAndMiningProgress(uiWidth, uiHeight);
                     if (m_itemNameSeconds > 0.0f) renderSelectedItemName(uiWidth);
                 }
                 if (touchUiVisible())

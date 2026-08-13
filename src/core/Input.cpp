@@ -9,7 +9,7 @@ constexpr const char* ACTION_NAMES[] = {
     "Jump", "Sneak", "Sprint", "Inventory", "Command", "Attack", "Use",
     "Hotbar 1", "Hotbar 2", "Hotbar 3", "Hotbar 4", "Hotbar 5",
     "Hotbar 6", "Hotbar 7", "Hotbar 8", "Hotbar 9",
-    "Previous Slot", "Next Slot"
+    "Previous Slot", "Next Slot", "Change Perspective"
 };
 }
 

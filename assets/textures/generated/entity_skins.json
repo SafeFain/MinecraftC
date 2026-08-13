@@ -13,6 +13,9 @@
     "pig": {
       "source": "entity_skins/pig.png"
     },
+    "player": {
+      "source": "entity_skins/player.png"
+    },
     "sheep": {
       "source": "entity_skins/sheep.png"
     },

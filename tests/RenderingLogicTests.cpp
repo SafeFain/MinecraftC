@@ -6,6 +6,7 @@
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/Shadow.h"
+#include "player/PlayerVisual.h"
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,13 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(nextPerspective(nextPerspective(nextPerspective(
+                CameraPerspective::FirstPerson))) == CameraPerspective::FirstPerson,
+            "perspective cycle did not return to first person");
+    require(firstPersonSwingTransform(0.0f) == glm::mat4(1.0f) &&
+            firstPersonSwingTransform(1.0f) == glm::mat4(1.0f) &&
+            firstPersonSwingTransform(0.5f) != glm::mat4(1.0f),
+            "first-person swing curve endpoints or motion are incorrect");
     for (BlockId leaf : {BlockId::LEAVES, BlockId::BIRCH_LEAVES,
                          BlockId::SPRUCE_LEAVES, BlockId::JUNGLE_LEAVES,
                          BlockId::ACACIA_LEAVES}) {

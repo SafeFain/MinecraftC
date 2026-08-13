@@ -62,6 +62,7 @@ public:
         SmoothLightSample = {}) override;
     model::ModelRenderer& modelRenderer() override;
     void flushModels(const glm::mat4&) override;
+    void beginViewModel(const glm::mat4& projection) override;
     void renderEntityPart(const glm::vec3&, const glm::vec3&, const glm::vec3&,
         float, const glm::vec3&, int, const glm::mat4&,
         SmoothLightSample = {1.0f, 0.0f}) override;
@@ -73,7 +74,7 @@ public:
     void setFrustum(const Frustum& value) override { m_frustum = value; }
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }
-    uint32_t blockAtlasTilesPerSide() const { return m_blockAtlasTilesPerSide; }
+    uint32_t blockAtlasTilesPerSide() const override { return m_blockAtlasTilesPerSide; }
     bool usesFramebufferSrgb() const override;
     void queueUiBatch(const std::vector<UiMeshVertex>& vertices,
                       const std::vector<uint32_t>& indices,

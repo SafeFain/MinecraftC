@@ -515,6 +515,8 @@ struct VulkanRenderer::Impl {
     bool firstFrameLogged = false;
     FrameData submittedFrame{};
     std::vector<DrawCommand> submittedDraws;
+    std::vector<DrawCommand> submittedViewModels;
+    bool queueViewModel = false;
     std::vector<UiSubmission> submittedUi;
     std::array<UiFrameBuffers, FRAMES_IN_FLIGHT> uiBuffers{};
     std::array<ParticleFrameBuffer, FRAMES_IN_FLIGHT> particleBuffers{};
@@ -2754,7 +2756,8 @@ struct VulkanRenderer::Impl {
         VkDescriptorSet boundChunkSet = VK_NULL_HANDLE;
         VkBuffer boundVertexBuffer = VK_NULL_HANDLE;
         VkBuffer boundIndexBuffer = VK_NULL_HANDLE;
-        for (const DrawCommand& draw : submittedDraws) {
+        const auto drawBasicSubmissions = [&](const std::vector<DrawCommand>& draws) {
+        for (const DrawCommand& draw : draws) {
             const auto meshIt = meshes.find(draw.mesh.value);
             const auto materialIt = materials.find(draw.material.value);
             if (meshIt == meshes.end() || materialIt == materials.end()) continue;
@@ -2809,9 +2812,10 @@ struct VulkanRenderer::Impl {
                 ++performance.descriptorBinds;
             }
             const uint32_t count = draw.indexCount ? draw.indexCount : mesh.indexCount;
+            const glm::mat4 drawViewProjection = draw.useCustomViewProjection
+                ? draw.viewProjection : submittedFrame.projection * submittedFrame.view;
             const FrameUniforms constants{
-                clipSpaceCorrection(GraphicsApi::Vulkan) * submittedFrame.projection *
-                    submittedFrame.view * draw.model,
+                clipSpaceCorrection(GraphicsApi::Vulkan) * drawViewProjection * draw.model,
                 {static_cast<float>(material.desc.atlasTilesPerSide),
                  material.desc.smoothLighting ? 1.0f : 0.0f,
                  material.desc.alphaCutoff, framebufferSrgb ? 0.0f : 1.0f},
@@ -2826,6 +2830,8 @@ struct VulkanRenderer::Impl {
             vkCmdDrawIndexed(command, count, 1, firstIndex, 0, 0);
             ++performance.drawCalls;
         }
+        };
+        drawBasicSubmissions(submittedDraws);
         uint32_t modelUniformIndex = 0;
         VkPipeline boundModelPipeline = VK_NULL_HANDLE;
         VkDescriptorSet boundModelMaterial = VK_NULL_HANDLE;
@@ -2928,6 +2934,21 @@ struct VulkanRenderer::Impl {
                                VK_SHADER_STAGE_VERTEX_BIT, 0,
                                sizeof(constants), &constants);
             vkCmdDraw(command, 24, 1, 0, 0);
+        }
+        if (!submittedViewModels.empty()) {
+            VkClearAttachment attachment{};
+            attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            attachment.clearValue.depthStencil = {1.0f, 0};
+            VkClearRect rect{};
+            rect.rect.extent = swapchainExtent;
+            rect.layerCount = 1;
+            vkCmdClearAttachments(command, 1, &attachment, 1, &rect);
+            boundPipeline = VK_NULL_HANDLE;
+            boundMaterialSet = VK_NULL_HANDLE;
+            boundChunkSet = VK_NULL_HANDLE;
+            boundVertexBuffer = VK_NULL_HANDLE;
+            boundIndexBuffer = VK_NULL_HANDLE;
+            drawBasicSubmissions(submittedViewModels);
         }
         if (!submittedUi.empty()) {
             vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,uiPipeline);
@@ -3530,6 +3551,8 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->frameBegun = true;
     m_impl->drawQueued = false;
     m_impl->submittedDraws.clear();
+    m_impl->submittedViewModels.clear();
+    m_impl->queueViewModel = false;
     m_impl->submittedShadowChunks.clear();
     m_impl->shadowUpdateQueued = false;
     m_impl->submittedChunkEnvironment.shadowOptions = glm::vec4(0.0f);
@@ -3554,7 +3577,8 @@ void VulkanRenderer::draw(const DrawCommand& command) {
     const uint64_t count = command.indexCount ? command.indexCount : mesh->second.indexCount;
     if (static_cast<uint64_t>(command.firstIndex) + count > mesh->second.indexCount)
         throw std::invalid_argument("Vulkan draw range exceeds mesh indices");
-    m_impl->submittedDraws.push_back(command);
+    if (m_impl->queueViewModel) m_impl->submittedViewModels.push_back(command);
+    else m_impl->submittedDraws.push_back(command);
     m_impl->drawQueued = true;
 }
 
@@ -3897,6 +3921,12 @@ void VulkanRenderer::flushModels(const glm::mat4& viewProjection) {
         glm::vec3(0.0f), fogEnd * Config::FOG_START_FRACTION, fogEnd);
     m_modelRenderer->flushBlend(viewProjection, m_environment,
         glm::vec3(0.0f), fogEnd * Config::FOG_START_FRACTION, fogEnd);
+}
+void VulkanRenderer::beginViewModel(const glm::mat4& projection) {
+    if (!m_impl || !m_impl->frameBegun)
+        throw std::logic_error("Vulkan view model requires an active frame");
+    m_impl->queueViewModel = true;
+    (void)projection;
 }
 void VulkanRenderer::renderEntityPart(const glm::vec3& position,
     const glm::vec3& offset, const glm::vec3& size, float,

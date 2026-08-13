@@ -428,7 +428,8 @@ void Renderer::destroyTexture(RenderTextureHandle handle) {
 }
 
 RenderMaterialHandle Renderer::createMaterial(const MaterialDesc& desc) {
-    if (m_basicTextures.find(desc.baseColorTexture.value) == m_basicTextures.end())
+    if (m_basicTextures.find(desc.baseColorTexture.value) == m_basicTextures.end() &&
+        !(desc.baseColorTexture == m_blockAtlas.texture()))
         throw std::invalid_argument("Invalid OpenGL textured material");
     if (desc.pipeline != MaterialPipeline::UnlitTextured &&
         (!desc.depthTest || !desc.backfaceCull))
@@ -463,7 +464,11 @@ void Renderer::draw(const DrawCommand& command) {
                                   material->second.desc.pipeline))
         throw std::invalid_argument("OpenGL mesh/material layout mismatch");
     const auto texture = m_basicTextures.find(material->second.desc.baseColorTexture.value);
-    if (texture == m_basicTextures.end())
+    const uint32_t textureName = texture != m_basicTextures.end()
+        ? texture->second.texture
+        : (material->second.desc.baseColorTexture == m_blockAtlas.texture()
+            ? m_blockAtlas.texture().value : 0u);
+    if (!textureName)
         throw std::logic_error("Material texture no longer exists");
     ++m_performanceStats.drawCalls;
     if (material->second.desc.pipeline == MaterialPipeline::UnlitTextured && !m_basicShader) {
@@ -492,7 +497,8 @@ void Renderer::draw(const DrawCommand& command) {
         if (!m_blockShader) throw std::logic_error("Chunk shader is unavailable");
         shader = m_blockShader.get();
         shader->bind();
-        shader->setMat4("uMVP", m_basicFrame.projection * m_basicFrame.view * command.model);
+        shader->setMat4("uMVP", (command.useCustomViewProjection
+            ? command.viewProjection : m_basicFrame.projection * m_basicFrame.view) * command.model);
         shader->setVec3("uChunkOrigin", glm::vec3(0.0f));
         shader->setVec3("uCameraPosition", glm::vec3(glm::inverse(m_basicFrame.view)[3]));
         shader->setVec3("uLightDirection", m_basicFrame.lightDirection);
@@ -513,12 +519,13 @@ void Renderer::draw(const DrawCommand& command) {
     } else {
         shader = m_basicShader.get();
         shader->bind();
-        shader->setMat4("uMVP", m_basicFrame.projection * m_basicFrame.view * command.model);
+        shader->setMat4("uMVP", (command.useCustomViewProjection
+            ? command.viewProjection : m_basicFrame.projection * m_basicFrame.view) * command.model);
         shader->setInt("uTexture", 0);
         shader->setVec4("uTint", command.tint);
     }
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture->second.texture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, textureName));
     GL_CHECK(glBindVertexArray(mesh->second.vao));
     if (translucent) {
         GL_CHECK(glEnable(GL_BLEND));
@@ -900,6 +907,11 @@ void Renderer::flushModels(const glm::mat4& viewProjection) {
         renderSpaceCamera, fogEnd * Config::FOG_START_FRACTION, fogEnd);
     m_modelRenderer->flushBlend(viewProjection, m_environment,
         renderSpaceCamera, fogEnd * Config::FOG_START_FRACTION, fogEnd);
+}
+
+void Renderer::beginViewModel(const glm::mat4& projection) {
+    GL_CHECK(glClear(GL_DEPTH_BUFFER_BIT));
+    (void)projection;
 }
 
 void Renderer::renderEntityPart(

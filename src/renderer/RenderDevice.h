@@ -99,6 +99,8 @@ struct DrawCommand {
     RenderMaterialHandle material{};
     glm::mat4 model{1.0f};
     glm::vec4 tint{1.0f};
+    glm::mat4 viewProjection{1.0f};
+    bool useCustomViewProjection = false;
     uint32_t firstIndex = 0;
     uint32_t indexCount = 0;
 };

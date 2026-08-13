@@ -3,6 +3,7 @@ import json, pathlib, struct, subprocess, sys, tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODEL_DIR = ROOT / "assets/models/entities"
+PLAYER_DIR = ROOT / "assets/models/player"
 NAMES = {"cow", "pig", "sheep", "chicken", "zombie", "skeleton", "spider", "blastling"}
 
 def document(path):
@@ -113,16 +114,38 @@ def main():
         assert graph["version"] == 1 and {"idle","walk","hurt","death"} <= set(graph["actions"])
         if path.stem in {"zombie","skeleton","spider","blastling"}:
             assert "attack" in animations and graph["actions"]["attack"]["events"]
+    player_path = PLAYER_DIR / "player.glb"
+    player_doc, _ = document(player_path)
+    player_clips = {animation["name"] for animation in player_doc["animations"]}
+    assert {"idle","walk","run","jump","fall","swing","hurt","death"} <= player_clips
+    player_nodes = {node["name"] for node in player_doc["nodes"]}
+    assert {"head","arm_r","arm_l","leg_r","leg_l"} <= player_nodes
+    player_graph = json.loads((PLAYER_DIR / "player.anim.json").read_text())
+    assert {"run","jump","fall","swing"} <= set(player_graph["actions"])
+    assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 64
+    player_image_view = player_doc["bufferViews"][player_doc["images"][0]["bufferView"]]
+    player_data = player_path.read_bytes()
+    json_length = struct.unpack_from("<I", player_data, 12)[0]
+    binary_offset = 20 + json_length + 8
+    embedded = player_data[binary_offset + player_image_view.get("byteOffset",0):
+                           binary_offset + player_image_view.get("byteOffset",0) +
+                           player_image_view["byteLength"]]
+    assert embedded == (ROOT / "assets/textures/generated/entity_skins/player.png").read_bytes()
     with tempfile.TemporaryDirectory() as directory:
         generated = pathlib.Path(directory)
+        generated_player = generated / "player"
         subprocess.run([sys.executable, str(ROOT / "tools/generate_entity_models.py"),
-                        "--output", str(generated)], check=True)
+                        "--output", str(generated),
+                        "--player-output", str(generated_player)], check=True)
         for path in files:
             assert path.read_bytes() == (generated / path.name).read_bytes(), \
                 f"{path.name} was not reproduced byte-for-byte"
             graph_name = path.stem+".anim.json"
             assert (MODEL_DIR/graph_name).read_bytes() == (generated/graph_name).read_bytes(), \
                 f"{graph_name} was not reproduced byte-for-byte"
+        assert player_path.read_bytes() == (generated_player / "player.glb").read_bytes()
+        assert (PLAYER_DIR / "player.anim.json").read_bytes() == \
+               (generated_player / "player.anim.json").read_bytes()
     print("entity model asset contract passed")
 
 if __name__ == "__main__":

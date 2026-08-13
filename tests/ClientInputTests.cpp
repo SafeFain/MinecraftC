@@ -173,6 +173,9 @@ int main(){
             "v7 default touch sensitivity migrates to the faster v8 default");
     require(loaded.bindings[static_cast<size_t>(InputAction::Inventory)]==InputBinding{InputDevice::Mouse,3},
             "mouse binding round trips");
+    require(ClientSettings{}.bindings[static_cast<size_t>(InputAction::Perspective)]==
+                InputBinding{InputDevice::Keyboard,Key::F5},
+            "perspective action defaults to F5");
     require(effectiveGuiScale(1920,1080,0)==2&&effectiveGuiScale(800,450,0)==1&&
             effectiveGuiScale(1920,1080,4)==4,
             "automatic GUI scale preserves minimum virtual size");
@@ -234,9 +237,12 @@ int main(){
     touch.onTouch({{0,2},TouchPhase::Move,520,310});
     require(touch.consumeLookDelta()==glm::vec2(30,15),
             "look touch uses the faster default sensitivity");
-    commands=touch.onTouch({{0,5},TouchPhase::Begin,500,560});
+    commands=touch.onTouch({{0,5},TouchPhase::Begin,430,560});
     require(commands.size()==1&&commands[0].command==TouchCommand::OpenCommand,
             "top-center touch button opens command input");
+    commands=touch.onTouch({{0,6},TouchPhase::Begin,500,560});
+    require(commands.size()==1&&commands[0].command==TouchCommand::ChangePerspective,
+            "top touch view button changes perspective");
     require(touchInventoryCloseRect(1000,600).contains(960,560)&&
             !touchInventoryCloseRect(1000,600).contains(900,500),
             "inventory close button stays in the top-right touch-safe area");

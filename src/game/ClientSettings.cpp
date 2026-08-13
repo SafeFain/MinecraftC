@@ -48,7 +48,8 @@ void ClientSettings::resetBindings() {
         key(Key::E), key(Key::T), mouse(MouseButton::Left),
         mouse(MouseButton::Right), key(Key::Num1), key(Key::Num2),
         key(Key::Num3), key(Key::Num4), key(Key::Num5), key(Key::Num6),
-        key(Key::Num7), key(Key::Num8), key(Key::Num9), wheel(1), wheel(-1)};
+        key(Key::Num7), key(Key::Num8), key(Key::Num9), wheel(1), wheel(-1),
+        key(Key::F5)};
 }
 
 void ClientSettings::resetGamepadBindings() {
@@ -66,6 +67,7 @@ void ClientSettings::resetGamepadBindings() {
     gamepadBindings[static_cast<size_t>(InputAction::Use)] = axis(4, true); // LT
     gamepadBindings[static_cast<size_t>(InputAction::PreviousSlot)] = button(9); // LB
     gamepadBindings[static_cast<size_t>(InputAction::NextSlot)] = button(10); // RB
+    gamepadBindings[static_cast<size_t>(InputAction::Perspective)] = button(12); // D-pad down
 }
 
 void ClientSettings::validate() {

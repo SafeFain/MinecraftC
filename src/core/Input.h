@@ -11,7 +11,7 @@ enum class InputAction : uint8_t {
     Jump, Sneak, Sprint, Inventory, Command, Attack, Use,
     Hotbar1, Hotbar2, Hotbar3, Hotbar4, Hotbar5,
     Hotbar6, Hotbar7, Hotbar8, Hotbar9,
-    PreviousSlot, NextSlot,
+    PreviousSlot, NextSlot, Perspective,
     Count
 };
 

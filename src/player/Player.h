@@ -12,6 +12,7 @@
 #include "game/SurvivalStats.h"
 #include "core/Input.h"
 #include "player/PlayerPhysics.h"
+#include "player/PlayerVisual.h"
 
 class World;
 class EntityManager;
@@ -36,6 +37,7 @@ public:
     glm::vec3 getForward() const   { return m_forward; }
     float getYaw() const   { return m_yaw; }
     float getPitch() const { return m_pitch; }
+    glm::vec3 velocity() const { return m_velocity; }
 
     std::optional<glm::ivec3> getHighlightedBlock() const { return m_highlightedBlock; }
     float getMiningProgress() const {
@@ -78,12 +80,15 @@ public:
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
     bool underwater() const { return m_airTicks < 300; }
     bool onGround() const { return m_onGround; }
+    bool isSprinting() const { return m_isSprinting; }
     void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
 
     // ── Selected block for placement ───────────────────────────────────
     void setSelectedBlock(BlockId id) { m_selectedBlock = id; }
     void setSelectedCreativeItem(ItemId id) { m_selectedCreativeItem = id; }
     BlockId getSelectedBlock() const { return m_selectedBlock; }
+    ItemStack activeItem() const;
+    PlayerVisualState visualState() const;
 
 private:
     World& m_world;
@@ -134,6 +139,9 @@ private:
     uint32_t m_burnDamageTicks = 0;
     bool m_rainExposed = false;
     bool m_blocking = false;
+    uint32_t m_swingSequence = 0;
+    float m_swingProgress = 1.0f;
+    float m_miningSwingSeconds = 0.0f;
     PlayerPhysics::HurtImmunity m_hurtImmunity;
 
     // ── Internal methods ─────────────────────────────────────────────
@@ -148,7 +156,8 @@ private:
     void updateMining(float dt);
     void updateEnvironment(uint32_t ticks);
 
-    void breakBlock();
-    void placeBlock();
+    bool breakBlock();
+    bool placeBlock();
+    void startSwing();
     bool collidesWithPlayer(const glm::ivec3& blockPos) const;
 };

@@ -31,6 +31,7 @@ constexpr int Backspace = 42;
 constexpr int Tab = 43;
 constexpr int Space = 44;
 constexpr int F4 = 61;
+constexpr int F5 = 62;
 constexpr int Home = 74;
 constexpr int Delete = 76;
 constexpr int End = 77;
