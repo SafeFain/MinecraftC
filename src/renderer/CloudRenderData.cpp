@@ -1,6 +1,7 @@
 #include "renderer/CloudRenderData.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 
@@ -84,48 +85,45 @@ std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
         }
     }
 
+    constexpr std::array<float, 2> thresholds{0.53f, 0.68f};
+    std::array<std::vector<bool>, 2> occupied;
+    for (size_t layer = 0; layer < occupied.size(); ++layer) {
+        occupied[layer].resize(density.size());
+        for (size_t index = 0; index < density.size(); ++index)
+            occupied[layer][index] = density[index] >= thresholds[layer];
+    }
+
     std::vector<CloudInstance> instances;
     instances.reserve(std::min(MAX_CLOUD_INSTANCES,
         static_cast<size_t>(diameter * diameter * 2)));
-    const auto appendLayer = [&](float threshold, float y, float height) {
-        constexpr int maxMergeCells = 3;
-        std::vector<bool> consumed(static_cast<size_t>(diameter * diameter), false);
-        const auto occupied = [&](int x, int z) {
-            const size_t index = static_cast<size_t>(x + z * diameter);
-            return !consumed[index] && density[index] >= threshold;
+    const auto appendLayer = [&](size_t layer, float y, float height) {
+        const auto isOccupied = [&](int x, int z) {
+            return x >= 0 && x < diameter && z >= 0 && z < diameter &&
+                occupied[layer][static_cast<size_t>(x + z * diameter)];
         };
         for (int z = 0; z < diameter; ++z) {
             for (int x = 0; x < diameter; ++x) {
-                if (!occupied(x, z)) continue;
-                int width = 1;
-                while (width < maxMergeCells && x + width < diameter &&
-                       occupied(x + width, z)) ++width;
-                int depth = 1;
-                bool canExtend = true;
-                while (depth < maxMergeCells && z + depth < diameter && canExtend) {
-                    for (int offset = 0; offset < width; ++offset) {
-                        if (!occupied(x + offset, z + depth)) {
-                            canExtend = false;
-                            break;
-                        }
-                    }
-                    if (canExtend) ++depth;
-                }
-                for (int dz = 0; dz < depth; ++dz) {
-                    for (int dx = 0; dx < width; ++dx) {
-                        consumed[static_cast<size_t>(
-                            x + dx + (z + dz) * diameter)] = true;
-                    }
-                }
+                const size_t index = static_cast<size_t>(x + z * diameter);
+                if (!occupied[layer][index]) continue;
+                uint32_t visibleFaces = 0;
+                if (!isOccupied(x, z - 1)) visibleFaces |= CloudNegativeZ;
+                if (!isOccupied(x, z + 1)) visibleFaces |= CloudPositiveZ;
+                if (!isOccupied(x - 1, z)) visibleFaces |= CloudNegativeX;
+                if (!isOccupied(x + 1, z)) visibleFaces |= CloudPositiveX;
+                const bool occupiedAbove = layer + 1 < occupied.size() &&
+                    occupied[layer + 1][index];
+                const bool occupiedBelow = layer > 0 && occupied[layer - 1][index];
+                if (!occupiedAbove) visibleFaces |= CloudPositiveY;
+                if (!occupiedBelow) visibleFaces |= CloudNegativeY;
                 instances.push_back({
                     static_cast<float>((x - radius) * CLOUD_CELL_SIZE), y,
                     static_cast<float>((z - radius) * CLOUD_CELL_SIZE),
-                    static_cast<float>(width * CLOUD_CELL_SIZE),
-                    static_cast<float>(depth * CLOUD_CELL_SIZE), height});
+                    static_cast<float>(CLOUD_CELL_SIZE),
+                    static_cast<float>(CLOUD_CELL_SIZE), height, visibleFaces});
             }
         }
     };
-    appendLayer(0.53f, 192.0f, 3.0f);
-    appendLayer(0.68f, 195.0f, 2.0f);
+    appendLayer(0, 192.0f, 3.0f);
+    appendLayer(1, 195.0f, 2.0f);
     return instances;
 }

@@ -20,10 +20,11 @@ const vec2 corners[6]=vec2[6](
 void main(){
     kind=inPositionKind.w;
     phase=inParticleParams.x;
-    float width=kind<0.5?inParticleParams.z:
-        (kind<1.5?0.18:(kind<2.5?0.16:inParticleParams.z));
-    float height=kind<0.5?inParticleParams.z:
-        (kind<1.5?0.22:(kind<2.5?4.2:inParticleParams.z));
+    float width=kind<0.5?inParticleParams.z:(kind<1.5?0.18:
+        (kind<2.5?0.16:(kind<3.5?inParticleParams.z:
+        inParticleParams.z*(0.65+phase*0.85))));
+    float height=kind<0.5?inParticleParams.z:(kind<1.5?0.22:
+        (kind<2.5?4.2:(kind<3.5?inParticleParams.z:0.13)));
     vec3 right=frame.cameraRightTime.xyz;
     vec3 up=frame.cameraUpIntensity.xyz;
     vec3 position=inPositionKind.xyz;

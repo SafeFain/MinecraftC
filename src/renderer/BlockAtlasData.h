@@ -6,6 +6,8 @@
 
 struct BlockAtlasData {
     TextureData texture;
+    TextureData normalTexture;
+    TextureData propertyTexture;
     uint32_t tilesPerSide = 0;
     uint32_t tileSize = 16;
 };

@@ -208,6 +208,8 @@ int BlockTextureAtlas::tilesPerSide() {
 
 BlockTextureAtlas::~BlockTextureAtlas() {
     if (m_texture) GL_CHECK(glDeleteTextures(1, &m_texture.value));
+    if (m_normalTexture) GL_CHECK(glDeleteTextures(1, &m_normalTexture));
+    if (m_propertyTexture) GL_CHECK(glDeleteTextures(1, &m_propertyTexture));
 }
 
 bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
@@ -241,6 +243,37 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
                                     static_cast<GLint>(shared.texture.mipLevels.size())));
             GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
             GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+            GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
+            const auto uploadMap = [](const TextureData& texture,
+                                      uint32_t& handle) {
+                constexpr GLint RGBA8_UNORM = 0x8058;
+                GL_CHECK(glGenTextures(1, &handle));
+                GL_CHECK(glBindTexture(GL_TEXTURE_2D, handle));
+                GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, RGBA8_UNORM,
+                    static_cast<GLsizei>(texture.width),
+                    static_cast<GLsizei>(texture.height), 0, GL_RGBA,
+                    GL_UNSIGNED_BYTE, texture.pixels.data()));
+                for (size_t level = 0; level < texture.mipLevels.size(); ++level) {
+                    const auto& mip = texture.mipLevels[level];
+                    GL_CHECK(glTexImage2D(GL_TEXTURE_2D,
+                        static_cast<GLint>(level + 1), RGBA8_UNORM,
+                        static_cast<GLsizei>(mip.width),
+                        static_cast<GLsizei>(mip.height), 0, GL_RGBA,
+                        GL_UNSIGNED_BYTE, mip.pixels.data()));
+                }
+                GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                                        GL_NEAREST_MIPMAP_LINEAR));
+                GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                                        GL_NEAREST));
+                GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
+                    static_cast<GLint>(texture.mipLevels.size())));
+                GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                                        GL_CLAMP_TO_EDGE));
+                GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                                        GL_CLAMP_TO_EDGE));
+            };
+            uploadMap(shared.normalTexture, m_normalTexture);
+            uploadMap(shared.propertyTexture, m_propertyTexture);
             GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
             g_tilesPerSide = static_cast<int>(shared.tilesPerSide);
             return true;
@@ -430,6 +463,20 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+    constexpr GLint RGBA8_UNORM = 0x8058;
+    const auto createFallbackMap = [](uint32_t& texture,
+                                      const std::array<uint8_t, 4>& pixel) {
+        GL_CHECK(glGenTextures(1, &texture));
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, RGBA8_UNORM, 1, 1, 0,
+                             GL_RGBA, GL_UNSIGNED_BYTE, pixel.data()));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+    };
+    createFallbackMap(m_normalTexture, {128, 128, 255, 255});
+    createFallbackMap(m_propertyTexture, {202, 0, 0, 128});
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
     return true;
 }
@@ -437,4 +484,12 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
 void BlockTextureAtlas::bind() const {
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_texture.value));
+}
+
+void BlockTextureAtlas::bindMaterialMaps() const {
+    GL_CHECK(glActiveTexture(GL_TEXTURE0 + 2));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_normalTexture));
+    GL_CHECK(glActiveTexture(GL_TEXTURE0 + 3));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_propertyTexture));
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
 }

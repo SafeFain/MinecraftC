@@ -119,6 +119,15 @@ void SettingsMenu::refreshButtons() {
                 m_settings.smoothLighting = !m_settings.smoothLighting;
                 m_onChanged(); refreshButtons();
             });
+        const char* visualNames[] = {"settings.visual_low", "settings.visual_medium",
+            "settings.visual_high", "settings.visual_ultra"};
+        m_buttons.emplace_back(m_localization.format("settings.visual_quality", {
+            m_localization.text(visualNames[static_cast<int>(m_settings.visualQuality)])}),
+            [this]{
+                m_settings.visualQuality = static_cast<VisualQuality>(
+                    (static_cast<int>(m_settings.visualQuality) + 1) % 4);
+                m_onChanged(); refreshButtons();
+            });
         const char* shadowNames[] = {"common.off", "settings.shadow_low",
             "settings.shadow_medium", "settings.shadow_high"};
         m_buttons.emplace_back(m_localization.format("settings.shadows", {

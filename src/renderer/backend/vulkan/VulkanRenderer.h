@@ -40,6 +40,8 @@ public:
     void suspendPresentation() override;
     void resumePresentation() override;
     void beginFrame() override;
+    void setVisualQuality(VisualQuality quality) override;
+    void finishScene(const PostProcessState& state) override;
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
     void renderSky(const RenderEnvironment&, const glm::mat4&, const glm::vec3&,
                    bool) override;
@@ -88,6 +90,10 @@ private:
     Window* m_window = nullptr;
     std::filesystem::path m_assetRoot;
     RenderTextureHandle m_blockAtlas{};
+    RenderTextureHandle m_blockNormalAtlas{};
+    RenderTextureHandle m_blockPropertyAtlas{};
+    RenderTextureHandle m_neutralNormalTexture{};
+    RenderTextureHandle m_neutralPropertyTexture{};
     uint32_t m_blockAtlasTilesPerSide = 0;
     RenderMaterialHandle m_chunkOpaque{};
     RenderMaterialHandle m_chunkTranslucent{};
@@ -98,5 +104,6 @@ private:
     Frustum m_frustum;
     RenderEnvironment m_environment;
     glm::vec3 m_cameraPosition{0.0f};
+    VisualQuality m_visualQuality = VisualQuality::Medium;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
 };

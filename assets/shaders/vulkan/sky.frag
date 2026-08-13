@@ -70,8 +70,11 @@ void main(){
     float celestial=1.0-sky.weather.y;
     float sun=smoothstep(0.99915,0.99972,dot(ray,sky.sunDirection.xyz))*celestial;
     float sunGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),96.0);
-    color+=vec3(1.0,0.72,0.38)*sunGlow*0.22*celestial;
-    color=mix(color,vec3(1.0,0.94,0.74),sun);
+    float forwardHaze=pow(max(dot(ray,sky.sunDirection.xyz),0.0),8.0)*
+        smoothstep(-0.10,0.24,sky.sunDirection.y);
+    color+=vec3(1.0,0.55,0.20)*forwardHaze*0.10*celestial;
+    color+=vec3(1.0,0.72,0.38)*sunGlow*0.34*celestial;
+    color+=vec3(3.2,2.45,1.35)*sun;
     float moon=smoothstep(0.99945,0.99978,dot(ray,sky.moonDirection.xyz))*celestial;
     float moonHalo=pow(max(dot(ray,sky.moonDirection.xyz),0.0),180.0)*celestial*sky.weather.x;
     color+=vec3(0.30,0.40,0.72)*moonHalo*0.14;
@@ -92,6 +95,16 @@ void main(){
     stars+=starLayer(starUv,starFace,96.0,0.966,1.0,sky.weather.w);
     stars+=starLayer(starUv,starFace,52.0,0.975,1.34,sky.weather.w)*1.18;
     color+=stars*clearNight*horizonFade*moonOcclusion;
+    if(sky.options.z>0.5&&ray.y>0.04){
+        vec2 cirrusUv=ray.xz/max(ray.y+0.20,0.10);
+        cirrusUv=cirrusUv*vec2(0.34,1.8)+
+            vec2(sky.weather.w*0.0025,sky.weather.w*0.0007);
+        float wisps=cloudNoise(cirrusUv)*0.58+
+            cloudNoise(cirrusUv*2.13+19.0)*0.42;
+        wisps=smoothstep(0.64,0.83,wisps)*smoothstep(0.04,0.28,ray.y)*
+            (1.0-sky.weather.y);
+        color+=vec3(0.42,0.48,0.56)*wisps*0.16;
+    }
     if(sky.options.x>0.5&&ray.y>0.025){
         vec2 uv=ray.xz/max(ray.y,0.06)*0.42+
             vec2(sky.weather.w*0.012,sky.weather.w*0.004);

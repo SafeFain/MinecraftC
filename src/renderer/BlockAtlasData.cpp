@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <stb_image.h>
@@ -47,9 +48,167 @@ std::vector<uint8_t> downsampleTiles(const std::vector<uint8_t>& source,
     }
     return target;
 }
+
+std::vector<uint8_t> downsampleLinearTiles(const std::vector<uint8_t>& source,
+                                           uint32_t tiles, uint32_t tileSize,
+                                           bool normalizeNormals) {
+    const uint32_t nextTile = tileSize / 2;
+    const uint32_t sourceWidth = tiles * tileSize;
+    const uint32_t targetWidth = tiles * nextTile;
+    std::vector<uint8_t> target(static_cast<size_t>(targetWidth) * targetWidth * 4u);
+    for (uint32_t tileY = 0; tileY < tiles; ++tileY) {
+        for (uint32_t tileX = 0; tileX < tiles; ++tileX) {
+            for (uint32_t y = 0; y < nextTile; ++y) {
+                for (uint32_t x = 0; x < nextTile; ++x) {
+                    int sum[4]{};
+                    for (uint32_t oy = 0; oy < 2; ++oy) {
+                        for (uint32_t ox = 0; ox < 2; ++ox) {
+                            const uint32_t sx = tileX * tileSize + x * 2 + ox;
+                            const uint32_t sy = tileY * tileSize + y * 2 + oy;
+                            const size_t src =
+                                (static_cast<size_t>(sy) * sourceWidth + sx) * 4u;
+                            for (int channel = 0; channel < 4; ++channel)
+                                sum[channel] += source[src + channel];
+                        }
+                    }
+                    const uint32_t dx = tileX * nextTile + x;
+                    const uint32_t dy = tileY * nextTile + y;
+                    const size_t dst =
+                        (static_cast<size_t>(dy) * targetWidth + dx) * 4u;
+                    for (int channel = 0; channel < 4; ++channel)
+                        target[dst + channel] = static_cast<uint8_t>(sum[channel] / 4);
+                    if (normalizeNormals) {
+                        float nx = target[dst] / 127.5f - 1.0f;
+                        float ny = target[dst + 1] / 127.5f - 1.0f;
+                        float nz = target[dst + 2] / 127.5f - 1.0f;
+                        const float inverseLength = 1.0f /
+                            std::max(0.0001f, std::sqrt(nx * nx + ny * ny + nz * nz));
+                        nx *= inverseLength; ny *= inverseLength; nz *= inverseLength;
+                        target[dst] = static_cast<uint8_t>(
+                            std::clamp(nx * 127.5f + 127.5f, 0.0f, 255.0f));
+                        target[dst + 1] = static_cast<uint8_t>(
+                            std::clamp(ny * 127.5f + 127.5f, 0.0f, 255.0f));
+                        target[dst + 2] = static_cast<uint8_t>(
+                            std::clamp(nz * 127.5f + 127.5f, 0.0f, 255.0f));
+                    }
+                }
+            }
+        }
+    }
+    return target;
+}
+
+uint8_t roughnessForTexture(BlockTexture texture) {
+    switch (texture) {
+        case BlockTexture::Water: return 24;
+        case BlockTexture::Glass: return 48;
+        case BlockTexture::Ice: return 42;
+        case BlockTexture::Lava: return 138;
+        case BlockTexture::IronOre:
+        case BlockTexture::GoldOre:
+        case BlockTexture::DiamondOre:
+        case BlockTexture::CoalOre: return 142;
+        case BlockTexture::Leaves:
+        case BlockTexture::BirchLeaves:
+        case BlockTexture::SpruceLeaves:
+        case BlockTexture::JungleLeaves:
+        case BlockTexture::AcaciaLeaves: return 232;
+        default: return 202;
+    }
+}
+
+uint8_t materialRoughness(size_t slot) {
+    for (size_t index = 0; index < static_cast<size_t>(BlockTexture::Count);
+         ++index) {
+        const auto texture = static_cast<BlockTexture>(index);
+        if (getAtlasTextureIndex(texture) == slot)
+            return roughnessForTexture(texture);
+    }
+    return 205;
+}
+
+void buildMaterialTextures(BlockAtlasData& result) {
+    const uint32_t width = result.texture.width;
+    result.normalTexture.width = width;
+    result.normalTexture.height = width;
+    result.normalTexture.format = TextureFormat::Rgba8Unorm;
+    result.normalTexture.pixels.resize(result.texture.pixels.size());
+    result.propertyTexture.width = width;
+    result.propertyTexture.height = width;
+    result.propertyTexture.format = TextureFormat::Rgba8Unorm;
+    result.propertyTexture.pixels.resize(result.texture.pixels.size());
+    const auto luminanceAt = [&](uint32_t tileX, uint32_t tileY, int x, int y) {
+        x = std::clamp(x, 0, static_cast<int>(TILE_SIZE) - 1);
+        y = std::clamp(y, 0, static_cast<int>(TILE_SIZE) - 1);
+        const uint32_t px = tileX * TILE_SIZE + static_cast<uint32_t>(x);
+        const uint32_t py = tileY * TILE_SIZE + static_cast<uint32_t>(y);
+        const size_t offset = (static_cast<size_t>(py) * width + px) * 4u;
+        return (result.texture.pixels[offset] * 54 +
+                result.texture.pixels[offset + 1] * 183 +
+                result.texture.pixels[offset + 2] * 19) / 256.0f;
+    };
+    for (uint32_t tileY = 0; tileY < result.tilesPerSide; ++tileY) {
+        for (uint32_t tileX = 0; tileX < result.tilesPerSide; ++tileX) {
+            const size_t slot = tileY * result.tilesPerSide + tileX;
+            const uint8_t roughness = materialRoughness(slot);
+            const bool emissive =
+                slot == getAtlasTextureIndex(BlockTexture::Lava) ||
+                slot == getAtlasTextureIndex(BlockTexture::Fire);
+            for (int y = 0; y < static_cast<int>(TILE_SIZE); ++y) {
+                for (int x = 0; x < static_cast<int>(TILE_SIZE); ++x) {
+                    const uint32_t px = tileX * TILE_SIZE + static_cast<uint32_t>(x);
+                    const uint32_t py = tileY * TILE_SIZE + static_cast<uint32_t>(y);
+                    const size_t offset = (static_cast<size_t>(py) * width + px) * 4u;
+                    const bool visible = result.texture.pixels[offset + 3] >= 8;
+                    const float dx = visible
+                        ? (luminanceAt(tileX, tileY, x - 1, y) -
+                           luminanceAt(tileX, tileY, x + 1, y)) / 255.0f : 0.0f;
+                    const float dy = visible
+                        ? (luminanceAt(tileX, tileY, x, y - 1) -
+                           luminanceAt(tileX, tileY, x, y + 1)) / 255.0f : 0.0f;
+                    const float inverseLength = 1.0f /
+                        std::sqrt(dx * dx * 1.8f + dy * dy * 1.8f + 1.0f);
+                    result.normalTexture.pixels[offset] = static_cast<uint8_t>(
+                        std::clamp(dx * 1.34164f * inverseLength * 127.5f + 127.5f,
+                                   0.0f, 255.0f));
+                    result.normalTexture.pixels[offset + 1] = static_cast<uint8_t>(
+                        std::clamp(dy * 1.34164f * inverseLength * 127.5f + 127.5f,
+                                   0.0f, 255.0f));
+                    result.normalTexture.pixels[offset + 2] = static_cast<uint8_t>(
+                        std::clamp(inverseLength * 127.5f + 127.5f, 0.0f, 255.0f));
+                    result.normalTexture.pixels[offset + 3] = 255;
+                    result.propertyTexture.pixels[offset] = roughness;
+                    result.propertyTexture.pixels[offset + 1] = 0;
+                    result.propertyTexture.pixels[offset + 2] = emissive ? 255 : 0;
+                    result.propertyTexture.pixels[offset + 3] = static_cast<uint8_t>(
+                        std::clamp(luminanceAt(tileX, tileY, x, y), 0.0f, 255.0f));
+                }
+            }
+        }
+    }
+    uint32_t tileSize = TILE_SIZE;
+    std::vector<uint8_t> normals = result.normalTexture.pixels;
+    std::vector<uint8_t> properties = result.propertyTexture.pixels;
+    while (tileSize > 1) {
+        normals = downsampleLinearTiles(normals, result.tilesPerSide, tileSize, true);
+        properties = downsampleLinearTiles(
+            properties, result.tilesPerSide, tileSize, false);
+        tileSize /= 2;
+        const uint32_t mipWidth = result.tilesPerSide * tileSize;
+        result.normalTexture.mipLevels.push_back({mipWidth, mipWidth, normals});
+        result.propertyTexture.mipLevels.push_back({mipWidth, mipWidth, properties});
+    }
+    validateTextureData(result.normalTexture);
+    validateTextureData(result.propertyTexture);
+}
 }
 
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
+    const auto generatedRoot = assetRoot / "textures" / "generated";
+    loadTextureAssetDefinitions(
+        generatedRoot / "atlas.json",
+        assetRoot / "textures" / "definitions" / "blocks.json",
+        assetRoot / "textures" / "definitions" / "items.json");
     const auto path = assetRoot / "textures" / "generated" / "atlas.png";
     const std::vector<uint8_t> encoded = AssetStore::readPath(path);
     if (encoded.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
@@ -102,6 +261,7 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
         result.texture.mipLevels.push_back({result.tilesPerSide * tileSize,
                                             result.tilesPerSide * tileSize, level});
     }
+    buildMaterialTextures(result);
     validateTextureData(result.texture);
     return result;
 }

@@ -34,9 +34,20 @@ void main(){
         float edge=smoothstep(0.0,0.18,uv.x)*
             (1.0-smoothstep(0.82,1.0,uv.x));
         color=vec4(0.78,0.87,1.0,edge*0.96);
-    }else{
+    }else if(kind<3.5){
         color=atlasFragment();
         color.a*=0.92;
+    }else{
+        vec2 centered=(uv-vec2(0.5))*vec2(2.0,2.8);
+        float radius=length(centered);
+        float inner=0.26+phase*0.34;
+        float ring=smoothstep(inner-0.09,inner,radius)*
+            (1.0-smoothstep(inner+0.02,inner+0.13,radius));
+        float crown=(1.0-smoothstep(0.18,0.46,abs(centered.x)))*
+            smoothstep(-0.20,0.46,centered.y)*
+            (1.0-smoothstep(0.46,0.82,centered.y));
+        color=vec4(0.52,0.76,0.94,
+            (ring*0.72+crown*0.25)*(1.0-phase));
     }
     if(color.a<0.01)discard;
     if(frame.atlasParams.y>0.5)

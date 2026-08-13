@@ -81,6 +81,9 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             particle.rotation += particle.angularVelocity * dt;
         } else if (particle.kind == ParticleKind::Rain) {
             particle.rotation += particle.angularVelocity * dt;
+        } else if (particle.kind == ParticleKind::RainSplash) {
+            particle.phase = std::clamp(
+                particle.age / std::max(particle.lifetime, 0.001f), 0.0f, 1.0f);
         } else if (particle.kind == ParticleKind::Snow) {
             const float sway = std::sin(particle.age * 2.4f + particle.phase * 6.283f);
             particle.velocity.x += sway * dt * 0.6f;
@@ -99,6 +102,17 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                 particle.velocity.x *= 0.62f;
                 particle.velocity.z *= 0.62f;
                 particle.position.y = std::floor(particle.position.y) + 0.02;
+            } else if (particle.kind == ParticleKind::Rain) {
+                particle.kind = ParticleKind::RainSplash;
+                particle.position = {next.x, static_cast<double>(ny) + 1.015,
+                                     next.z};
+                particle.velocity = glm::vec3(0.0f);
+                particle.age = 0.0f;
+                particle.lifetime = 0.24f;
+                particle.phase = 0.0f;
+                particle.size = 0.34f;
+                particle.rotation = 0.0f;
+                particle.angularVelocity = 0.0f;
             } else {
                 particle.age = particle.lifetime;
             }

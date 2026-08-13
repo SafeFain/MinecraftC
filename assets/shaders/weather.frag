@@ -32,7 +32,7 @@ void main() {
         float edge = smoothstep(0.0, 0.18, vUv.x) *
                      (1.0 - smoothstep(0.82, 1.0, vUv.x));
         color = vec4(0.78, 0.87, 1.0, edge * 0.96);
-    } else {
+    } else if (vKind < 3.5) {
         float tile = floor(vTexture + 0.5);
         vec2 tileOrigin = vec2(mod(tile, uAtlasTiles),
                                floor(tile / uAtlasTiles)) / uAtlasTiles;
@@ -40,6 +40,17 @@ void main() {
         vec2 localUv = fragmentOffset + vUv * 0.42;
         color = texture(uBlockAtlas, tileOrigin + localUv / uAtlasTiles);
         color.a *= 0.92;
+    } else {
+        vec2 centered = (vUv - vec2(0.5)) * vec2(2.0, 2.8);
+        float radius = length(centered);
+        float inner = 0.26 + vPhase * 0.34;
+        float ring = smoothstep(inner - 0.09, inner, radius) *
+                     (1.0 - smoothstep(inner + 0.02, inner + 0.13, radius));
+        float crown = (1.0 - smoothstep(0.18, 0.46, abs(centered.x))) *
+                      smoothstep(-0.20, 0.46, centered.y) *
+                      (1.0 - smoothstep(0.46, 0.82, centered.y));
+        color = vec4(0.52, 0.76, 0.94,
+                     (ring * 0.72 + crown * 0.25) * (1.0 - vPhase));
     }
     if (color.a < 0.01) discard;
     if (uManualGamma != 0)

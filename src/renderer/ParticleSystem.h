@@ -9,7 +9,9 @@
 
 class World;
 
-enum class ParticleKind : uint8_t { Rain, Snow, Lightning, BlockDebris };
+enum class ParticleKind : uint8_t {
+    Rain, Snow, Lightning, BlockDebris, RainSplash
+};
 
 struct ParticleRenderData {
     glm::vec3 position{0.0f};

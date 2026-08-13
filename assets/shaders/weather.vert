@@ -17,8 +17,11 @@ out float vPhase;
 void main() {
     float kind = aPositionKind.w;
     float phase = aParticleParams.x;
-    float width = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.18 : (kind < 2.5 ? 0.16 : aParticleParams.z));
-    float height = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.22 : (kind < 2.5 ? 4.2 : aParticleParams.z));
+    float width = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.18 :
+        (kind < 2.5 ? 0.16 : (kind < 3.5 ? aParticleParams.z :
+        aParticleParams.z * (0.65 + phase * 0.85))));
+    float height = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.22 :
+        (kind < 2.5 ? 4.2 : (kind < 3.5 ? aParticleParams.z : 0.13)));
     vec3 position = aPositionKind.xyz;
     if (kind > 0.5 && kind < 1.5)
         position += uCameraRight * sin(uTime * 1.7 + phase * 6.283) * 0.13;

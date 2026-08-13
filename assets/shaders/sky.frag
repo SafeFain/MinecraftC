@@ -13,6 +13,7 @@ uniform float uRainIntensity;
 uniform float uThunderIntensity;
 uniform float uWeatherTime;
 uniform int uRenderClouds;
+uniform int uRenderCirrus;
 uniform int uManualGamma;
 
 out vec4 outColor;
@@ -96,8 +97,11 @@ void main() {
     float celestial = 1.0 - uRainIntensity;
     float sun = smoothstep(0.99915, 0.99972, dot(ray, uSunDirection)) * celestial;
     float sunGlow = pow(max(dot(ray, uSunDirection), 0.0), 96.0);
-    color += vec3(1.0, 0.72, 0.38) * sunGlow * 0.22 * celestial;
-    color = mix(color, vec3(1.0, 0.94, 0.74), sun);
+    float forwardHaze = pow(max(dot(ray, uSunDirection), 0.0), 8.0) *
+                        smoothstep(-0.10, 0.24, uSunDirection.y);
+    color += vec3(1.0, 0.55, 0.20) * forwardHaze * 0.10 * celestial;
+    color += vec3(1.0, 0.72, 0.38) * sunGlow * 0.34 * celestial;
+    color += vec3(3.2, 2.45, 1.35) * sun;
 
     float moon = smoothstep(0.99945, 0.99978, dot(ray, uMoonDirection)) * celestial;
     float moonHalo = pow(max(dot(ray, uMoonDirection), 0.0), 180.0) *
@@ -128,6 +132,17 @@ void main() {
     stars += starLayer(starUv, starFace, 96.0, 0.966, 1.00, uWeatherTime);
     stars += starLayer(starUv, starFace, 52.0, 0.975, 1.34, uWeatherTime) * 1.18;
     color += stars * clearNight * horizonFade * moonOcclusion;
+
+    if (uRenderCirrus != 0 && ray.y > 0.04) {
+        vec2 cirrusUv = ray.xz / max(ray.y + 0.20, 0.10);
+        cirrusUv = cirrusUv * vec2(0.34, 1.8) +
+                   vec2(uWeatherTime * 0.0025, uWeatherTime * 0.0007);
+        float wisps = cloudNoise(cirrusUv) * 0.58 +
+                      cloudNoise(cirrusUv * 2.13 + 19.0) * 0.42;
+        wisps = smoothstep(0.64, 0.83, wisps) *
+                smoothstep(0.04, 0.28, ray.y) * (1.0 - uRainIntensity);
+        color += vec3(0.42, 0.48, 0.56) * wisps * 0.16;
+    }
 
     if (uRenderClouds != 0 && ray.y > 0.025) {
         vec2 cloudUv = ray.xz / max(ray.y, 0.06) * 0.42;

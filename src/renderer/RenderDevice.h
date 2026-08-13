@@ -34,7 +34,8 @@ struct MeshData {
 };
 
 enum class TextureFormat {
-    Rgba8Srgb
+    Rgba8Srgb,
+    Rgba8Unorm
 };
 
 enum class TextureFilter {

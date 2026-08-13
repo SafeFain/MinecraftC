@@ -6,6 +6,7 @@
 #include "renderer/ParticleSystem.h"
 #include "renderer/RenderEnvironment.h"
 #include "renderer/Shadow.h"
+#include "renderer/VisualQuality.h"
 #include "world/BlockLightLogic.h"
 
 #include <cstdint>
@@ -34,6 +35,8 @@ public:
     virtual void suspendPresentation() {}
     virtual void resumePresentation() {}
     virtual void beginFrame() = 0;
+    virtual void setVisualQuality(VisualQuality) = 0;
+    virtual void finishScene(const PostProcessState&) = 0;
     virtual void setEnvironment(const RenderEnvironment&, const glm::vec3&) = 0;
     virtual void renderSky(const RenderEnvironment&, const glm::mat4&,
                            const glm::vec3&, bool) = 0;

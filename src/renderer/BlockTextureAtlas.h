@@ -13,9 +13,12 @@ public:
 
     bool initialize(const std::filesystem::path& assetRoot);
     void bind() const;
+    void bindMaterialMaps() const;
     RenderTextureHandle texture() const { return m_texture; }
     static int tilesPerSide();
 
 private:
     RenderTextureHandle m_texture;
+    uint32_t m_normalTexture = 0;
+    uint32_t m_propertyTexture = 0;
 };

@@ -326,6 +326,7 @@ private:
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     Camera      m_camera;
     CameraEffects m_cameraEffects;
+    VisualExposure m_visualExposure;
     CameraPerspective m_perspective = CameraPerspective::FirstPerson;
     glm::dvec3 m_cameraWorldPosition{0.0};
     ThreadPool  m_threadPool;
@@ -439,6 +440,7 @@ private:
 
         const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
         m_renderer->initialize(m_window, graphics, m_paths.assetRoot);
+        m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_renderer->resize(m_window.width(), m_window.height());
         m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_playerRenderer.initialize(m_paths.assetRoot, *m_renderer);
@@ -821,6 +823,7 @@ private:
         m_uiRenderer.resetGraphics();
         m_heldItemRenderer.reset();
         m_renderer->reinitialize(graphics, m_paths.assetRoot);
+        m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_playerRenderer.initialize(m_paths.assetRoot, *m_renderer);
         m_heldItemRenderer.initialize(*m_renderer, m_paths.assetRoot);
@@ -845,6 +848,7 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
+        if (m_renderer) m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");
         if (m_clientSettings.controlMode == ControlMode::KeyboardMouse) {
@@ -1071,6 +1075,7 @@ private:
         m_lightningEvents.clear();
         m_particles.clear();
         m_cameraEffects.reset(m_player.getPosition());
+        m_visualExposure.reset();
         m_window.setCursorLocked(false);
         m_activeMenu.reset();
 
@@ -1499,6 +1504,18 @@ private:
                         m_player.activeItem(), m_player.visualState().swingProgress,
                         m_window.aspectRatio());
 
+                const SmoothLightSample eyeLight =
+                    m_world.sampleLight(m_player.getEyePosition());
+                PostProcessState postProcess;
+                postProcess.environment = environment;
+                postProcess.inverseViewProjection = glm::inverse(vp);
+                postProcess.cameraPosition = m_camera.m_position;
+                postProcess.exposure = m_visualExposure.update(
+                    eyeLight.sky, eyeLight.block, environment, dt);
+                postProcess.underwater = m_player.underwater() ? 1.0f : 0.0f;
+                postProcess.hurt = m_cameraEffects.trauma();
+                m_renderer->finishScene(postProcess);
+
                 // Title bar info
                 if (m_gameState == GameState::Playing) {
                     m_titleUpdateSeconds += dt;
@@ -1524,6 +1541,7 @@ private:
             } else {
                 // MainMenu: just clear the screen
                 m_renderer->beginFrame();
+                m_renderer->finishScene({});
             }
 
             // ── UI Rendering ──────────────────────────────────────────
@@ -2056,6 +2074,7 @@ private:
         m_player.extinguish();
         m_player.resetDamageImmunity();
         m_cameraEffects.reset(m_player.getPosition());
+        m_visualExposure.reset();
         m_world.update(m_player.getPosition());
         m_world.enqueueGeneration();
         m_world.waitForInitialGeneration(150);

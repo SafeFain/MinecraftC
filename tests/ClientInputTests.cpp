@@ -42,6 +42,12 @@ int main(){
             defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::MacOS)==RendererBackend::Vulkan,
             "all supported platforms default new settings to Vulkan");
+    require(defaultVisualQuality(DesktopPlatform::Android)==VisualQuality::Medium&&
+            defaultVisualQuality(DesktopPlatform::IOS)==VisualQuality::Medium&&
+            defaultVisualQuality(DesktopPlatform::Linux)==VisualQuality::Medium&&
+            defaultVisualQuality(DesktopPlatform::Windows)==VisualQuality::Medium&&
+            defaultVisualQuality(DesktopPlatform::MacOS)==VisualQuality::Medium,
+            "all supported platforms default visual quality to medium");
     require(migrateRendererBackend(DesktopPlatform::Android,9,
                 RendererBackend::OpenGL)==RendererBackend::Vulkan&&
             migrateRendererBackend(DesktopPlatform::Android,10,
@@ -109,6 +115,7 @@ int main(){
     settings.renderDistance=8;settings.renderClouds=false;
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
+    settings.visualQuality=VisualQuality::Ultra;
     settings.rendererBackend=RendererBackend::Vulkan;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
@@ -126,6 +133,8 @@ int main(){
             "renderer backend preference round trips");
     require(loaded.shadowQuality==ShadowQuality::High,
             "shadow quality preference round trips");
+    require(loaded.visualQuality==VisualQuality::Ultra,
+            "visual quality preference round trips");
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");

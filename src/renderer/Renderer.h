@@ -34,6 +34,8 @@ public:
     void reinitialize(const GraphicsCapabilities& capabilities,
                       const std::filesystem::path& assetRoot);
     void beginFrame();
+    void setVisualQuality(VisualQuality quality) override;
+    void finishScene(const PostProcessState& state) override;
     void endFrame();
     void resize(int width, int height);
     void setEnvironment(const RenderEnvironment& environment,
@@ -149,6 +151,7 @@ private:
     std::unique_ptr<Shader> m_entityShader;
     std::unique_ptr<Shader> m_cloudShader;
     std::unique_ptr<Shader> m_particleShader;
+    std::unique_ptr<Shader> m_postShader;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
     BlockTextureAtlas m_blockAtlas;
     uint32_t m_shadowFramebuffer = 0;
@@ -173,21 +176,36 @@ private:
     uint32_t m_particleVAO = 0;
     uint32_t m_particleQuadVBO = 0;
     uint32_t m_particleInstanceVBO = 0;
+    uint32_t m_sceneFramebuffer = 0;
+    uint32_t m_sceneResolveFramebuffer = 0;
+    uint32_t m_sceneColorTexture = 0;
+    uint32_t m_sceneColorRenderbuffer = 0;
+    uint32_t m_sceneDepthRenderbuffer = 0;
+    int m_sceneWidth = 0;
+    int m_sceneHeight = 0;
+    int m_sceneSamples = 1;
+    bool m_sceneHdr = false;
+    bool m_sceneFinished = false;
 
 #if defined(_WIN32)
     using DrawArraysInstancedFn = void (__stdcall *)(uint32_t, int, int, int);
     using VertexAttribDivisorFn = void (__stdcall *)(uint32_t, uint32_t);
+    using VertexAttribIPointerFn = void (__stdcall *)(uint32_t, int, uint32_t,
+                                                      int, const void*);
     using BufferSubDataFn = void (__stdcall *)(uint32_t, std::intptr_t,
                                                std::intptr_t,
                                                const void*);
 #else
     using DrawArraysInstancedFn = void (*)(uint32_t, int, int, int);
     using VertexAttribDivisorFn = void (*)(uint32_t, uint32_t);
+    using VertexAttribIPointerFn = void (*)(uint32_t, int, uint32_t, int,
+                                            const void*);
     using BufferSubDataFn = void (*)(uint32_t, std::intptr_t, std::intptr_t,
                                      const void*);
 #endif
     DrawArraysInstancedFn m_drawArraysInstanced = nullptr;
     VertexAttribDivisorFn m_vertexAttribDivisor = nullptr;
+    VertexAttribIPointerFn m_vertexAttribIPointer = nullptr;
     BufferSubDataFn m_bufferSubData = nullptr;
     std::vector<CloudInstance> m_cloudInstances;
     uint64_t m_cloudCacheSeed = 0;
@@ -201,6 +219,8 @@ private:
     glm::vec3 m_cameraPosition{0.0f};
     bool m_framebufferSrgb = false;
     GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
+    VisualQuality m_visualQuality = VisualQuality::Medium;
+    PostProcessState m_postProcessState{};
     std::unordered_map<uint32_t, GpuChunkMesh> m_chunkMeshes;
     uint32_t m_nextChunkMeshHandle = 1;
     Window* m_window = nullptr;
@@ -213,4 +233,8 @@ private:
     uint32_t m_nextBasicMeshHandle = 0x40000000u;
     uint32_t m_nextBasicTextureHandle = 0x40000000u;
     uint32_t m_nextBasicMaterialHandle = 1;
+
+    void createSceneTarget(int width, int height);
+    void destroySceneTarget();
+    void bindSceneTarget();
 };

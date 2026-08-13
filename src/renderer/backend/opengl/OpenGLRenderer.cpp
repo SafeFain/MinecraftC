@@ -17,13 +17,22 @@
 namespace {
 constexpr unsigned int GL_FRAMEBUFFER_VALUE = 0x8D40;
 constexpr unsigned int GL_DEPTH_ATTACHMENT_VALUE = 0x8D00;
+constexpr unsigned int GL_COLOR_ATTACHMENT0_VALUE = 0x8CE0;
 constexpr unsigned int GL_FRAMEBUFFER_COMPLETE_VALUE = 0x8CD5;
+constexpr unsigned int GL_RENDERBUFFER_VALUE = 0x8D41;
+constexpr unsigned int GL_READ_FRAMEBUFFER_VALUE = 0x8CA8;
+constexpr unsigned int GL_DRAW_FRAMEBUFFER_VALUE = 0x8CA9;
 constexpr unsigned int GL_DEPTH_COMPONENT_VALUE = 0x1902;
 constexpr unsigned int GL_DEPTH_COMPONENT24_VALUE = 0x81A6;
+constexpr unsigned int GL_RGBA16F_VALUE = 0x881A;
+constexpr unsigned int GL_RGBA8_VALUE = 0x8058;
+constexpr unsigned int GL_HALF_FLOAT_VALUE = 0x140B;
+constexpr unsigned int GL_MAX_SAMPLES_VALUE = 0x8D57;
 constexpr unsigned int GL_CLAMP_TO_EDGE_VALUE = 0x812F;
 constexpr unsigned int GL_NONE_VALUE = 0;
 constexpr unsigned int GL_TEXTURE1_VALUE = 0x84C1;
 constexpr unsigned int GL_NEAREST_VALUE = 0x2600;
+constexpr unsigned int GL_LINEAR_VALUE = 0x2601;
 using GenFramebuffersFn = void (*)(int, unsigned int*);
 using DeleteFramebuffersFn = void (*)(int, const unsigned int*);
 using BindFramebufferFn = void (*)(unsigned int, unsigned int);
@@ -32,6 +41,16 @@ using CheckFramebufferStatusFn = unsigned int (*)(unsigned int);
 using DrawBufferFn = void (*)(unsigned int);
 using ReadBufferFn = void (*)(unsigned int);
 using ColorMaskFn = void (*)(unsigned char,unsigned char,unsigned char,unsigned char);
+using GenRenderbuffersFn = void (*)(int, unsigned int*);
+using DeleteRenderbuffersFn = void (*)(int, const unsigned int*);
+using BindRenderbufferFn = void (*)(unsigned int, unsigned int);
+using RenderbufferStorageFn = void (*)(unsigned int, unsigned int, int, int);
+using RenderbufferStorageMultisampleFn = void (*)(unsigned int, int, unsigned int,
+                                                  int, int);
+using FramebufferRenderbufferFn = void (*)(unsigned int, unsigned int,
+                                           unsigned int, unsigned int);
+using BlitFramebufferFn = void (*)(int, int, int, int, int, int, int, int,
+                                   unsigned int, unsigned int);
 
 template<typename T> T glProc(const char* name) {
     return reinterpret_cast<T>(Window::graphicsProcAddress(name));
@@ -54,6 +73,7 @@ static const std::vector<float> WIRE_CUBE = {
 Renderer::Renderer() = default;
 
 Renderer::~Renderer() {
+    destroySceneTarget();
     if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
     if (m_shadowFramebuffer) {
         if (auto destroy = glProc<DeleteFramebuffersFn>("glDeleteFramebuffers"))
@@ -113,8 +133,10 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
     m_assetRoot = assetRoot;
     m_framebufferSrgb = capabilities.framebufferSrgb;
     m_graphicsApi = capabilities.api;
+    // Models are rendered into a linear scene target. Transfer encoding occurs
+    // once in the composition pass, after every world-space draw.
     m_modelRenderer = model::createOpenGLModelRenderer(
-        assetRoot, m_framebufferSrgb, m_graphicsApi);
+        assetRoot, true, m_graphicsApi);
     // Compile shaders
     m_blockShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "block.vert",
@@ -142,6 +164,9 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
     m_particleShader = std::make_unique<Shader>(
         assetRoot / "shaders" / "weather.vert",
         assetRoot / "shaders" / "weather.frag", m_graphicsApi);
+    m_postShader = std::make_unique<Shader>(
+        assetRoot / "shaders" / "post.vert",
+        assetRoot / "shaders" / "post.frag", m_graphicsApi);
     m_blockAtlas.initialize(assetRoot);
 
     // Global GL state
@@ -203,10 +228,13 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
         Window::graphicsProcAddress("glDrawArraysInstanced"));
     m_vertexAttribDivisor = reinterpret_cast<VertexAttribDivisorFn>(
         Window::graphicsProcAddress("glVertexAttribDivisor"));
+    m_vertexAttribIPointer = reinterpret_cast<VertexAttribIPointerFn>(
+        Window::graphicsProcAddress("glVertexAttribIPointer"));
     m_bufferSubData = reinterpret_cast<BufferSubDataFn>(
         Window::graphicsProcAddress("glBufferSubData"));
     m_cloudInstances.reserve(MAX_CLOUD_INSTANCES);
-    if (m_drawArraysInstanced && m_vertexAttribDivisor) {
+    if (m_drawArraysInstanced && m_vertexAttribDivisor &&
+        m_vertexAttribIPointer) {
         // Clouds share the static entity cube but provide position and size
         // per instance, reducing the entire layer to one draw call.
         GL_CHECK(glGenVertexArrays(1, &m_cloudVAO));
@@ -228,14 +256,19 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
             GL_ARRAY_BUFFER,
             m_cloudInstanceVBOs[m_cloudInstanceBufferIndex]));
         GL_CHECK(glVertexAttribPointer(
-            2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
+            2, 4, GL_FLOAT, GL_FALSE, sizeof(CloudInstance), nullptr));
         GL_CHECK(glEnableVertexAttribArray(2));
         GL_CHECK(glVertexAttribPointer(
-            3, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+            3, 2, GL_FLOAT, GL_FALSE, sizeof(CloudInstance),
             reinterpret_cast<void*>(4 * sizeof(float))));
         GL_CHECK(glEnableVertexAttribArray(3));
+        m_vertexAttribIPointer(
+            4, 1, GL_UNSIGNED_INT, sizeof(CloudInstance),
+            reinterpret_cast<void*>(offsetof(CloudInstance, visibleFaces)));
+        GL_CHECK(glEnableVertexAttribArray(4));
         m_vertexAttribDivisor(2, 1);
         m_vertexAttribDivisor(3, 1);
+        m_vertexAttribDivisor(4, 1);
         GL_CHECK(glBindVertexArray(0));
         constexpr float quad[] = {
             -0.5f, 0.0f,  0.5f, 0.0f,  0.5f, 1.0f,
@@ -296,21 +329,252 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
         LOG_WARN("Entity texture atlas unavailable or not a square 3x3 atlas");
     }
     stbi_image_free(atlas);
+    createSceneTarget(std::max(1, window.width()), std::max(1, window.height()));
 }
 
 // ── Frame management ──────────────────────────────────────────────────
 
 void Renderer::beginFrame() {
     m_performanceStats = {};
+    bindSceneTarget();
+    m_sceneFinished = false;
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 }
 
+void Renderer::setVisualQuality(VisualQuality quality) {
+    if (quality == m_visualQuality) return;
+    const int oldSamples = visualQualityConfig(m_visualQuality).sceneSamples;
+    m_visualQuality = quality;
+    if (m_window && visualQualityConfig(quality).sceneSamples != oldSamples)
+        createSceneTarget(std::max(1, m_window->width()),
+                          std::max(1, m_window->height()));
+}
+
+void Renderer::finishScene(const PostProcessState& state) {
+    m_postProcessState = state;
+    if (!m_sceneColorTexture || !m_postShader || m_sceneFinished) return;
+    auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
+    if (!bindFramebuffer) return;
+    if (m_sceneSamples > 1) {
+        if (auto blit = glProc<BlitFramebufferFn>("glBlitFramebuffer")) {
+            bindFramebuffer(GL_READ_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+            bindFramebuffer(GL_DRAW_FRAMEBUFFER_VALUE, m_sceneResolveFramebuffer);
+            blit(0, 0, m_sceneWidth, m_sceneHeight,
+                 0, 0, m_sceneWidth, m_sceneHeight,
+                 GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
+    }
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+    GL_CHECK(glViewport(0, 0, m_sceneWidth, m_sceneHeight));
+    GL_CHECK(glDisable(GL_DEPTH_TEST));
+    GL_CHECK(glDisable(GL_CULL_FACE));
+    GL_CHECK(glDepthMask(GL_FALSE));
+    m_postShader->bind();
+    m_postShader->setInt("uSceneColor", 0);
+    const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+    m_postShader->setVec4("uExposureBloom", {
+        std::clamp(state.exposure, 0.75f, 1.65f),
+        visual.bloomLevels > 0 ? 0.07f + visual.bloomLevels * 0.012f : 0.0f,
+        visual.bloomLevels > 0 ? 1.15f + visual.bloomLevels * 0.18f : 1.0f,
+        visual.bloomLevels <= 0 ? 0.0f :
+            visual.bloomLevels <= 3 ? 4.0f :
+            visual.bloomLevels <= 5 ? 8.0f : 12.0f});
+    m_postShader->setVec4("uEffects", {
+        std::clamp(state.underwater, 0.0f, 1.0f),
+        std::clamp(state.hurt, 0.0f, 1.0f),
+        m_framebufferSrgb ? 0.0f : 1.0f,
+        static_cast<float>(static_cast<int>(m_visualQuality))});
+    m_postShader->setVec4("uTexelTime", {
+        1.0f / static_cast<float>(m_sceneWidth),
+        1.0f / static_cast<float>(m_sceneHeight),
+        static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())), 0.0f});
+    m_postShader->setVec4("uEnvironment", {
+        state.environment.rainIntensity, state.environment.thunderIntensity,
+        state.environment.lightningFlash, state.environment.daylight});
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_sceneColorTexture));
+    GL_CHECK(glBindVertexArray(m_skyVAO));
+    GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
+    GL_CHECK(glBindVertexArray(0));
+    GL_CHECK(glDepthMask(GL_TRUE));
+    GL_CHECK(glEnable(GL_CULL_FACE));
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
+    ++m_performanceStats.drawCalls;
+    m_sceneFinished = true;
+}
+
 void Renderer::resize(int width, int height) {
-    GL_CHECK(glViewport(0, 0, std::max(1, width), std::max(1, height)));
+    width = std::max(1, width);
+    height = std::max(1, height);
+    if (m_sceneFramebuffer && width == m_sceneWidth && height == m_sceneHeight)
+        return;
+    createSceneTarget(width, height);
 }
 
 void Renderer::endFrame() {
     if (m_window) m_window->swapBuffers();
+}
+
+void Renderer::destroySceneTarget() {
+    if (m_sceneColorTexture)
+        GL_CHECK(glDeleteTextures(1, &m_sceneColorTexture));
+    m_sceneColorTexture = 0;
+    if (auto destroyRenderbuffers =
+            glProc<DeleteRenderbuffersFn>("glDeleteRenderbuffers")) {
+        if (m_sceneColorRenderbuffer)
+            destroyRenderbuffers(1, &m_sceneColorRenderbuffer);
+        if (m_sceneDepthRenderbuffer)
+            destroyRenderbuffers(1, &m_sceneDepthRenderbuffer);
+    }
+    m_sceneColorRenderbuffer = 0;
+    m_sceneDepthRenderbuffer = 0;
+    if (auto destroyFramebuffers =
+            glProc<DeleteFramebuffersFn>("glDeleteFramebuffers")) {
+        if (m_sceneFramebuffer)
+            destroyFramebuffers(1, &m_sceneFramebuffer);
+        if (m_sceneResolveFramebuffer &&
+            m_sceneResolveFramebuffer != m_sceneFramebuffer)
+            destroyFramebuffers(1, &m_sceneResolveFramebuffer);
+    }
+    m_sceneFramebuffer = 0;
+    m_sceneResolveFramebuffer = 0;
+    m_sceneWidth = 0;
+    m_sceneHeight = 0;
+    m_sceneSamples = 1;
+    m_sceneHdr = false;
+}
+
+void Renderer::createSceneTarget(int width, int height) {
+    auto genFramebuffers = glProc<GenFramebuffersFn>("glGenFramebuffers");
+    auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
+    auto framebufferTexture =
+        glProc<FramebufferTexture2DFn>("glFramebufferTexture2D");
+    auto checkFramebuffer =
+        glProc<CheckFramebufferStatusFn>("glCheckFramebufferStatus");
+    auto genRenderbuffers =
+        glProc<GenRenderbuffersFn>("glGenRenderbuffers");
+    auto bindRenderbuffer =
+        glProc<BindRenderbufferFn>("glBindRenderbuffer");
+    auto renderbufferStorage =
+        glProc<RenderbufferStorageFn>("glRenderbufferStorage");
+    auto framebufferRenderbuffer =
+        glProc<FramebufferRenderbufferFn>("glFramebufferRenderbuffer");
+    if (!genFramebuffers || !bindFramebuffer || !framebufferTexture ||
+        !checkFramebuffer || !genRenderbuffers || !bindRenderbuffer ||
+        !renderbufferStorage || !framebufferRenderbuffer) {
+        LOG_WARN("OpenGL scene composition unavailable: framebuffer API missing");
+        destroySceneTarget();
+        return;
+    }
+
+    destroySceneTarget();
+    m_sceneWidth = std::max(1, width);
+    m_sceneHeight = std::max(1, height);
+    genFramebuffers(1, &m_sceneResolveFramebuffer);
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneResolveFramebuffer);
+    GL_CHECK(glGenTextures(1, &m_sceneColorTexture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_sceneColorTexture));
+    const auto allocateColor = [&](unsigned int internalFormat,
+                                   unsigned int type) {
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, internalFormat,
+            m_sceneWidth, m_sceneHeight, 0, GL_RGBA, type, nullptr));
+        framebufferTexture(GL_FRAMEBUFFER_VALUE, GL_COLOR_ATTACHMENT0_VALUE,
+                           GL_TEXTURE_2D, m_sceneColorTexture, 0);
+        return checkFramebuffer(GL_FRAMEBUFFER_VALUE) ==
+               GL_FRAMEBUFFER_COMPLETE_VALUE;
+    };
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_VALUE));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_VALUE));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                             GL_CLAMP_TO_EDGE_VALUE));
+    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                             GL_CLAMP_TO_EDGE_VALUE));
+    m_sceneHdr = allocateColor(GL_RGBA16F_VALUE, GL_HALF_FLOAT_VALUE);
+    if (!m_sceneHdr) {
+        if (!allocateColor(GL_RGBA8_VALUE, GL_UNSIGNED_BYTE)) {
+            bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+            destroySceneTarget();
+            throw std::runtime_error("OpenGL scene framebuffer is incomplete");
+        }
+        LOG_WARN("OpenGL half-float color target unavailable; using RGBA8");
+    }
+
+    int maximumSamples = 1;
+    GL_CHECK(glGetIntegerv(GL_MAX_SAMPLES_VALUE, &maximumSamples));
+    const int requestedSamples = visualQualityConfig(m_visualQuality).sceneSamples;
+    m_sceneSamples = requestedSamples >= 4 && maximumSamples >= 4 ? 4 :
+                     requestedSamples >= 2 && maximumSamples >= 2 ? 2 : 1;
+    auto multisampleStorage = glProc<RenderbufferStorageMultisampleFn>(
+        "glRenderbufferStorageMultisample");
+    auto blit = glProc<BlitFramebufferFn>("glBlitFramebuffer");
+    if (!multisampleStorage || !blit) m_sceneSamples = 1;
+
+    if (m_sceneSamples > 1) {
+        genFramebuffers(1, &m_sceneFramebuffer);
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+        genRenderbuffers(1, &m_sceneColorRenderbuffer);
+        bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneColorRenderbuffer);
+        multisampleStorage(GL_RENDERBUFFER_VALUE, m_sceneSamples,
+            m_sceneHdr ? GL_RGBA16F_VALUE : GL_RGBA8_VALUE,
+            m_sceneWidth, m_sceneHeight);
+        framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_COLOR_ATTACHMENT0_VALUE,
+            GL_RENDERBUFFER_VALUE, m_sceneColorRenderbuffer);
+    } else {
+        m_sceneFramebuffer = m_sceneResolveFramebuffer;
+    }
+    genRenderbuffers(1, &m_sceneDepthRenderbuffer);
+    bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
+    if (m_sceneSamples > 1)
+        multisampleStorage(GL_RENDERBUFFER_VALUE, m_sceneSamples,
+            GL_DEPTH_COMPONENT24_VALUE, m_sceneWidth, m_sceneHeight);
+    else
+        renderbufferStorage(GL_RENDERBUFFER_VALUE, GL_DEPTH_COMPONENT24_VALUE,
+            m_sceneWidth, m_sceneHeight);
+    framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
+        GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
+    if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE &&
+        m_sceneSamples > 1) {
+        // GLES implementations commonly expose a renderable half-float texture
+        // without supporting the same format as a multisample renderbuffer.
+        // Preserve HDR and fall back to one sample instead of failing startup.
+        if (auto destroyRenderbuffers =
+                glProc<DeleteRenderbuffersFn>("glDeleteRenderbuffers")) {
+            destroyRenderbuffers(1, &m_sceneColorRenderbuffer);
+            destroyRenderbuffers(1, &m_sceneDepthRenderbuffer);
+        }
+        if (auto destroyFramebuffers =
+                glProc<DeleteFramebuffersFn>("glDeleteFramebuffers"))
+            destroyFramebuffers(1, &m_sceneFramebuffer);
+        m_sceneColorRenderbuffer = 0;
+        m_sceneDepthRenderbuffer = 0;
+        m_sceneFramebuffer = m_sceneResolveFramebuffer;
+        m_sceneSamples = 1;
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+        genRenderbuffers(1, &m_sceneDepthRenderbuffer);
+        bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
+        renderbufferStorage(GL_RENDERBUFFER_VALUE, GL_DEPTH_COMPONENT24_VALUE,
+            m_sceneWidth, m_sceneHeight);
+        framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
+            GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
+        LOG_WARN("OpenGL multisample HDR target unavailable; using 1x HDR");
+    }
+    if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE) {
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+        destroySceneTarget();
+        throw std::runtime_error("OpenGL scene framebuffer is incomplete");
+    }
+    bindRenderbuffer(GL_RENDERBUFFER_VALUE, 0);
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+    GL_CHECK(glViewport(0, 0, m_sceneWidth, m_sceneHeight));
+    LOG_INFO("OpenGL scene target: " << (m_sceneHdr ? "RGBA16F" : "RGBA8")
+             << ", " << m_sceneSamples << "x MSAA");
+}
+
+void Renderer::bindSceneTarget() {
+    if (auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer"))
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+    GL_CHECK(glViewport(0, 0, std::max(1, m_sceneWidth),
+                        std::max(1, m_sceneHeight)));
 }
 
 RenderDeviceCapabilities Renderer::capabilities() const {
@@ -396,14 +660,17 @@ RenderTextureHandle Renderer::createTexture(
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapU));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapV));
-    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8,
+    constexpr GLint RGBA8_UNORM = 0x8058;
+    const GLint internalFormat = data.format == TextureFormat::Rgba8Srgb
+        ? GL_SRGB8_ALPHA8 : RGBA8_UNORM;
+    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, internalFormat,
                           static_cast<GLsizei>(data.width),
                           static_cast<GLsizei>(data.height), 0,
                           GL_RGBA, GL_UNSIGNED_BYTE, data.pixels.data()));
     for (size_t level = 0; level < data.mipLevels.size(); ++level) {
         const auto& mip = data.mipLevels[level];
         GL_CHECK(glTexImage2D(GL_TEXTURE_2D, static_cast<GLint>(level + 1),
-            GL_SRGB8_ALPHA8, static_cast<GLsizei>(mip.width),
+            internalFormat, static_cast<GLsizei>(mip.width),
             static_cast<GLsizei>(mip.height), 0, GL_RGBA, GL_UNSIGNED_BYTE,
             mip.pixels.data()));
     }
@@ -447,6 +714,8 @@ void Renderer::destroyMaterial(RenderMaterialHandle handle) {
 void Renderer::beginFrame(const FrameData& frame) {
     m_performanceStats = {};
     m_basicFrame = frame;
+    bindSceneTarget();
+    m_sceneFinished = false;
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glEnable(GL_CULL_FACE));
     GL_CHECK(glCullFace(GL_BACK));
@@ -509,12 +778,26 @@ void Renderer::draw(const DrawCommand& command) {
         shader->setFloat("uAmbientIntensity", 1.0f);
         shader->setFloat("uFogEnd", 10000.0f);
         shader->setFloat("uFogStartFraction", 1.0f);
-        shader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+        shader->setInt("uManualGamma", 0);
         shader->setInt("uSmoothLighting", material->second.desc.smoothLighting ? 1 : 0);
         shader->setFloat("uAtlasTiles", static_cast<float>(material->second.desc.atlasTilesPerSide));
         shader->setFloat("uLavaTile", -1.0f);
         shader->setFloat("uWaterTile", -1.0f);
+        shader->setFloat("uTime", static_cast<float>(
+            RuntimeClock::seconds(RuntimeClock{}.now())));
+        shader->setFloat("uRainIntensity", m_environment.rainIntensity);
+        shader->setFloat("uThunderIntensity", m_environment.thunderIntensity);
+        const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+        shader->setFloat("uCloudShadowStrength", visual.cloudShadowSamples > 0
+            ? 0.12f + 0.035f * visual.cloudShadowSamples : 0.0f);
+        shader->setFloat("uNormalStrength", visual.normalStrength);
+        shader->setFloat("uAoStrength", visual.aoDirections > 0
+            ? std::min(1.0f, 0.58f + visual.aoDirections * 0.055f) : 0.0f);
         shader->setInt("uBlockAtlas", 0);
+        shader->setInt("uNormalAtlas", 2);
+        shader->setInt("uPropertyAtlas", 3);
+        if (material->second.desc.baseColorTexture == m_blockAtlas.texture())
+            m_blockAtlas.bindMaterialMaps();
         shader->setVec4("uTint", command.tint);
     } else {
         shader = m_basicShader.get();
@@ -579,8 +862,11 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
     m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
     m_skyShader->setFloat("uWeatherTime", static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())));
-    m_skyShader->setInt("uRenderClouds", renderClouds ? 1 : 0);
-    m_skyShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+    m_skyShader->setInt("uRenderClouds",
+                        renderClouds && visual.voxelClouds ? 1 : 0);
+    m_skyShader->setInt("uRenderCirrus", visual.cirrusClouds ? 1 : 0);
+    m_skyShader->setInt("uManualGamma", 0);
     GL_CHECK(glBindVertexArray(m_skyVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
     GL_CHECK(glBindVertexArray(0));
@@ -754,7 +1040,11 @@ void Renderer::renderChunkShadows(ShadowQuality quality,
     m_lastShadowDirection = m_environment.lightDirection;
     bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
     auto colorMask = glProc<ColorMaskFn>("glColorMask");
-    if (!colorMask) { m_shadowCascades = {}; bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0); return; }
+    if (!colorMask) {
+        m_shadowCascades = {};
+        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
+        return;
+    }
     colorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glDepthMask(GL_TRUE));
@@ -791,7 +1081,7 @@ void Renderer::renderChunkShadows(ShadowQuality quality,
     }
     GL_CHECK(glDisable(GL_POLYGON_OFFSET_FILL));
     colorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
+    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
     GL_CHECK(glViewport(0, 0, std::max(1, m_window->width()), std::max(1, m_window->height())));
 }
 
@@ -809,7 +1099,10 @@ void Renderer::endTranslucent() {
 void Renderer::bindBlockShader() const {
     m_blockShader->bind();
     m_blockAtlas.bind();
+    m_blockAtlas.bindMaterialMaps();
     m_blockShader->setInt("uBlockAtlas", 0);
+    m_blockShader->setInt("uNormalAtlas", 2);
+    m_blockShader->setInt("uPropertyAtlas", 3);
     m_blockShader->setInt("uShadowMap", 1);
     m_blockShader->setInt("uShadowCascadeCount", m_shadowCascades.count);
     m_blockShader->setFloat("uShadowResolution",
@@ -840,7 +1133,17 @@ void Renderer::bindBlockShader() const {
         "uFogEnd", (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
                    Config::CHUNK_SIZE_X);
     m_blockShader->setFloat("uFogStartFraction", Config::FOG_START_FRACTION);
-    m_blockShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_blockShader->setFloat("uTime", static_cast<float>(
+        RuntimeClock::seconds(RuntimeClock{}.now())));
+    m_blockShader->setFloat("uRainIntensity", m_environment.rainIntensity);
+    m_blockShader->setFloat("uThunderIntensity", m_environment.thunderIntensity);
+    const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+    m_blockShader->setFloat("uCloudShadowStrength", visual.cloudShadowSamples > 0
+        ? 0.12f + 0.035f * visual.cloudShadowSamples : 0.0f);
+    m_blockShader->setFloat("uNormalStrength", visual.normalStrength);
+    m_blockShader->setFloat("uAoStrength", visual.aoDirections > 0
+        ? std::min(1.0f, 0.58f + visual.aoDirections * 0.055f) : 0.0f);
+    m_blockShader->setInt("uManualGamma", 0);
     m_blockShader->setInt("uSmoothLighting", Config::SMOOTH_LIGHTING ? 1 : 0);
 }
 
@@ -930,7 +1233,7 @@ void Renderer::renderEntityPart(
     m_entityShader->setInt("uEntityAtlas", 0);
     m_entityShader->setInt("uUseTexture",
                            m_entityTexture && textureIndex >= 0 ? 1 : 0);
-    m_entityShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_entityShader->setInt("uManualGamma", 0);
     m_entityShader->setFloat("uSkyLight", light.sky);
     m_entityShader->setFloat("uBlockLight", light.block);
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
@@ -944,8 +1247,9 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
                             const glm::mat4& viewProjection,
                             uint64_t worldSeed, float timeSeconds,
                             int renderDistanceBlocks) {
-    // A coherent density field creates broad voxel cloud masses. Adjacent cells
-    // are merged before upload so extended distances retain a small draw budget.
+    if (!visualQualityConfig(m_visualQuality).voxelClouds) return;
+    // A coherent density field creates broad voxel cloud masses. Instancing
+    // keeps them to one draw while per-cell face masks remove shared surfaces.
     const CloudView cloud = cloudView(
         playerPosition, timeSeconds, renderDistanceBlocks);
     const bool rebuild = m_cloudCacheRadius != cloud.radius ||
@@ -977,7 +1281,9 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
     m_cloudShader->setMat4("uViewProjection", viewProjection);
     m_cloudShader->setVec3("uCloudOrigin", cloud.origin);
     m_cloudShader->setVec3("uColor", cloudColor);
-    m_cloudShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_cloudShader->setVec3("uLightDirection", m_environment.lightDirection);
+    m_cloudShader->setFloat("uRainIntensity", m_environment.rainIntensity);
+    m_cloudShader->setInt("uManualGamma", 0);
     GL_CHECK(glBindVertexArray(m_cloudVAO));
     if (rebuild) {
         // Rotate allocations so a grid transition never overwrites instance
@@ -988,10 +1294,13 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
             GL_ARRAY_BUFFER,
             m_cloudInstanceVBOs[m_cloudInstanceBufferIndex]));
         GL_CHECK(glVertexAttribPointer(
-            2, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr));
+            2, 4, GL_FLOAT, GL_FALSE, sizeof(CloudInstance), nullptr));
         GL_CHECK(glVertexAttribPointer(
-            3, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+            3, 2, GL_FLOAT, GL_FALSE, sizeof(CloudInstance),
             reinterpret_cast<void*>(4 * sizeof(float))));
+        m_vertexAttribIPointer(
+            4, 1, GL_UNSIGNED_INT, sizeof(CloudInstance),
+            reinterpret_cast<void*>(offsetof(CloudInstance, visibleFaces)));
         const GLsizeiptr bytes = static_cast<GLsizeiptr>(
             m_cloudInstances.size() * sizeof(CloudInstance));
         if (m_bufferSubData)
@@ -1020,7 +1329,7 @@ void Renderer::renderParticles(const std::vector<ParticleRenderData>& particles,
     m_particleShader->setInt("uBlockAtlas", 0);
     m_particleShader->setFloat("uAtlasTiles",
                                static_cast<float>(BlockTextureAtlas::tilesPerSide()));
-    m_particleShader->setInt("uManualGamma", m_framebufferSrgb ? 0 : 1);
+    m_particleShader->setInt("uManualGamma", 0);
     m_blockAtlas.bind();
     GL_CHECK(glEnable(GL_BLEND));
     GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));

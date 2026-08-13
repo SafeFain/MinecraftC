@@ -6,6 +6,7 @@
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/Shadow.h"
+#include "renderer/VisualQuality.h"
 #include "player/PlayerVisual.h"
 
 #include <algorithm>
@@ -24,6 +25,28 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const VisualQualityConfig lowVisual = visualQualityConfig(VisualQuality::Low);
+    const VisualQualityConfig mediumVisual = visualQualityConfig(VisualQuality::Medium);
+    const VisualQualityConfig highVisual = visualQualityConfig(VisualQuality::High);
+    const VisualQualityConfig ultraVisual = visualQualityConfig(VisualQuality::Ultra);
+    require(lowVisual.sceneSamples == 1 && lowVisual.bloomLevels == 0 &&
+            lowVisual.aoDirections == 0 && !lowVisual.materialNormals &&
+            mediumVisual.sceneSamples == 2 && mediumVisual.bloomLevels == 3 &&
+            mediumVisual.materialNormals && mediumVisual.voxelClouds &&
+            highVisual.sceneSamples == 4 && highVisual.aoDirections == 6 &&
+            highVisual.cirrusClouds && ultraVisual.aoDirections == 8 &&
+            ultraVisual.bloomLevels == 6,
+            "visual quality presets do not match the rendering contract");
+    static_assert(static_cast<int>(ParticleKind::RainSplash) == 4,
+                  "particle kind values are part of the shader contract");
+    VisualExposure exposure;
+    RenderEnvironment exposureEnvironment;
+    const float brightExposure = exposure.update(1.0f, 0.0f,
+                                                   exposureEnvironment, 0.016f);
+    for (int i = 0; i < 120; ++i)
+        exposure.update(0.0f, 0.0f, exposureEnvironment, 1.0f / 60.0f);
+    require(exposure.value() > brightExposure && exposure.value() <= 1.65f,
+            "visual exposure did not adapt toward a bounded cave value");
     require(nextPerspective(nextPerspective(nextPerspective(
                 CameraPerspective::FirstPerson))) == CameraPerspective::FirstPerson,
             "perspective cycle did not return to first person");
@@ -52,10 +75,11 @@ int main() {
     static_assert(offsetof(ParticleRenderData, texture) == 20);
     static_assert(offsetof(ParticleRenderData, size) == 24);
     static_assert(offsetof(ParticleRenderData, rotation) == 28);
-    static_assert(sizeof(CloudInstance) == 24);
+    static_assert(sizeof(CloudInstance) == 28);
     static_assert(offsetof(CloudInstance, x) == 0);
     static_assert(offsetof(CloudInstance, width) == 12);
     static_assert(offsetof(CloudInstance, height) == 20);
+    static_assert(offsetof(CloudInstance, visibleFaces) == 24);
     const CloudView negativeCloud = cloudView({-0.5, 64.0, -0.5}, 0.0f, 192);
     require(negativeCloud.centerX == -1 && negativeCloud.centerZ == -1,
             "cloud grid did not use floor coordinates");
@@ -72,7 +96,8 @@ int main() {
                                                const CloudInstance& right) {
                 return left.x == right.x && left.y == right.y &&
                     left.z == right.z && left.width == right.width &&
-                    left.depth == right.depth && left.height == right.height;
+                    left.depth == right.depth && left.height == right.height &&
+                    left.visibleFaces == right.visibleFaces;
             });
     };
     require(!cloudsA.empty() && cloudsA.size() <= MAX_CLOUD_INSTANCES,
@@ -81,10 +106,35 @@ int main() {
             "same-seed cloud layout was not deterministic");
     require(!sameClouds(cloudsA, cloudsC),
             "different cloud seeds produced the same layout");
+    const auto cloudAt = [&cloudsA](float x, float y, float z) {
+        return std::find_if(cloudsA.begin(), cloudsA.end(),
+            [=](const CloudInstance& cloud) {
+                return cloud.x == x && cloud.y == y && cloud.z == z;
+            });
+    };
     for (const CloudInstance& cloud : cloudsA) {
-        require(cloud.width >= 16.0f && cloud.width <= 48.0f &&
-                cloud.depth >= 16.0f && cloud.depth <= 48.0f,
-                "cloud merge exceeded its 3x3-cell limit");
+        require(cloud.width == CLOUD_CELL_SIZE && cloud.depth == CLOUD_CELL_SIZE,
+                "cloud surface cell dimensions are inconsistent");
+        require(cloud.visibleFaces != 0 &&
+                    (cloud.visibleFaces & ~CLOUD_ALL_FACES) == 0,
+                "cloud visible-face mask is invalid");
+        const auto requireSide = [&](float dx, float dz, uint32_t face) {
+            const bool neighbor = cloudAt(
+                cloud.x + dx, cloud.y, cloud.z + dz) != cloudsA.end();
+            require(((cloud.visibleFaces & face) != 0) == !neighbor,
+                    "cloud shared side face was not culled");
+        };
+        requireSide(0.0f, -CLOUD_CELL_SIZE, CloudNegativeZ);
+        requireSide(0.0f, CLOUD_CELL_SIZE, CloudPositiveZ);
+        requireSide(-CLOUD_CELL_SIZE, 0.0f, CloudNegativeX);
+        requireSide(CLOUD_CELL_SIZE, 0.0f, CloudPositiveX);
+        const float otherLayerY = cloud.y == 192.0f ? 195.0f : 192.0f;
+        const bool verticalNeighbor =
+            cloudAt(cloud.x, otherLayerY, cloud.z) != cloudsA.end();
+        const uint32_t verticalFace = cloud.y == 192.0f
+            ? CloudPositiveY : CloudNegativeY;
+        require(((cloud.visibleFaces & verticalFace) != 0) == !verticalNeighbor,
+                "cloud shared vertical face was not culled");
     }
     MeshData validMesh;
     validMesh.vertices = {{{0, 0, 0}, {0, 0}}, {{1, 0, 0}, {1, 0}},

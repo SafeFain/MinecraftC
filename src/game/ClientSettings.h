@@ -7,12 +7,13 @@
 #include "core/Platform.h"
 #include "game/Language.h"
 #include "renderer/Shadow.h"
+#include "renderer/VisualQuality.h"
 
 enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class RendererBackend : uint8_t { OpenGL, Vulkan };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 14;
+    static constexpr int FORMAT_VERSION = 15;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -23,6 +24,7 @@ struct ClientSettings {
     bool invertMouseY = false;
     bool smoothLighting = true;
     ShadowQuality shadowQuality = ShadowQuality::Medium;
+    VisualQuality visualQuality = VisualQuality::Medium;
     RendererBackend rendererBackend = RendererBackend::OpenGL;
     int guiScale = 0; // 0 = Auto
     Language language = Language::English;
@@ -51,3 +53,4 @@ RendererBackend defaultRendererBackend(DesktopPlatform platform);
 RendererBackend migrateRendererBackend(DesktopPlatform platform,
                                         int sourceFormatVersion,
                                         RendererBackend stored);
+VisualQuality defaultVisualQuality(DesktopPlatform platform);

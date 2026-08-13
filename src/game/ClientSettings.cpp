@@ -21,6 +21,11 @@ RendererBackend defaultRendererBackend(DesktopPlatform) {
     return RendererBackend::Vulkan;
 }
 
+VisualQuality defaultVisualQuality(DesktopPlatform platform) {
+    (void)platform;
+    return VisualQuality::Medium;
+}
+
 RendererBackend migrateRendererBackend(DesktopPlatform platform,
                                         int sourceFormatVersion,
                                         RendererBackend stored) {
@@ -36,6 +41,7 @@ RendererBackend migrateRendererBackend(DesktopPlatform platform,
 ClientSettings::ClientSettings() {
     rendererBackend = defaultRendererBackend(currentDesktopPlatform());
     const DesktopPlatform platform = currentDesktopPlatform();
+    visualQuality = defaultVisualQuality(platform);
     shadowQuality = platform == DesktopPlatform::Android || platform == DesktopPlatform::IOS
         ? ShadowQuality::Low : ShadowQuality::Medium;
     resetBindings();
@@ -85,6 +91,9 @@ void ClientSettings::validate() {
     if (static_cast<int>(shadowQuality) < static_cast<int>(ShadowQuality::Off) ||
         static_cast<int>(shadowQuality) > static_cast<int>(ShadowQuality::High))
         shadowQuality = ShadowQuality::Medium;
+    if (static_cast<int>(visualQuality) < static_cast<int>(VisualQuality::Low) ||
+        static_cast<int>(visualQuality) > static_cast<int>(VisualQuality::Ultra))
+        visualQuality = defaultVisualQuality(currentDesktopPlatform());
     if (static_cast<int>(controlMode) < static_cast<int>(ControlMode::Auto) ||
         static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
         controlMode = ControlMode::Auto;
@@ -153,6 +162,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "smooth_lighting") settings.smoothLighting = std::stoi(value) != 0;
             else if (name == "shadow_quality")
                 settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
+            else if (name == "visual_quality")
+                settings.visualQuality = static_cast<VisualQuality>(std::stoi(value));
             else if (name == "renderer") settings.rendererBackend = value == "vulkan"
                 ? RendererBackend::Vulkan : RendererBackend::OpenGL;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
@@ -227,6 +238,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
+           << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
            << "renderer=" << (rendererBackend == RendererBackend::Vulkan
                 ? "vulkan" : "opengl") << '\n'
            << "gui_scale=" << guiScale << '\n'
