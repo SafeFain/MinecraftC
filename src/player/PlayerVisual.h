@@ -33,6 +33,13 @@ inline PlayerLocomotion playerLocomotion(const PlayerVisualState& state) {
     return state.sprinting ? PlayerLocomotion::Run : PlayerLocomotion::Walk;
 }
 
+inline bool sprintViewEffectActive(const PlayerVisualState& state,
+                                   CameraPerspective perspective,
+                                   bool flying) {
+    return perspective == CameraPerspective::FirstPerson && !flying &&
+        state.sprinting && std::hypot(state.velocity.x, state.velocity.z) >= 0.08f;
+}
+
 inline CameraPerspective nextPerspective(CameraPerspective perspective) {
     switch (perspective) {
         case CameraPerspective::FirstPerson: return CameraPerspective::ThirdPersonBack;

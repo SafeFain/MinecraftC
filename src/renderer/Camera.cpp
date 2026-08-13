@@ -1,10 +1,22 @@
 #include "renderer/Camera.h"
+#include "Config.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
 Camera::Camera(float fovDeg, float nearPlane, float farPlane)
     : m_fovDeg(fovDeg), m_near(nearPlane), m_far(farPlane)
 {
+}
+
+void Camera::updateFov(float targetFovDeg, float dt) {
+    targetFovDeg = glm::clamp(targetFovDeg, 30.0f, 120.0f);
+    dt = glm::clamp(dt, 0.0f, 0.1f);
+    const float blend = 1.0f - std::exp(-Config::FOV_RESPONSE * dt);
+    const float updatedFov = glm::mix(m_fovDeg, targetFovDeg, blend);
+    if (std::abs(updatedFov - m_fovDeg) > 0.00001f) {
+        m_fovDeg = updatedFov;
+        m_projDirty = true;
+    }
 }
 
 void Camera::updateVectors(float yawDeg, float pitchDeg) {

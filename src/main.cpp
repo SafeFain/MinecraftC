@@ -1248,7 +1248,12 @@ private:
                 m_audio.setRainVolume(m_weather.rainGradient() *
                                       (rainExposure ? 0.72f : 0.06f));
                 if (!m_playerDead) m_player.update(dt);
-                m_playerRenderer.update(m_player.visualState(), dt);
+                const PlayerVisualState playerVisual = m_player.visualState();
+                m_playerRenderer.update(playerVisual, dt);
+                const bool sprintFov = !m_playerDead && sprintViewEffectActive(
+                    playerVisual, m_perspective, m_player.isFlying());
+                m_camera.updateFov(
+                    Config::FOV + (sprintFov ? Config::SPRINT_FOV_BOOST : 0.0f), dt);
                 m_cameraEffects.update(
                     m_player.getPosition(), m_player.onGround(),
                     m_player.isFlying(), m_player.velocity().y,

@@ -1,5 +1,6 @@
 #include "renderer/RenderEnvironment.h"
 #include "Config.h"
+#include "renderer/Camera.h"
 #include "renderer/CameraEffects.h"
 #include "renderer/CloudRenderData.h"
 #include "model/ModelRenderLogic.h"
@@ -68,6 +69,15 @@ int main() {
     visualState.sprinting = true;
     require(playerLocomotion(visualState) == PlayerLocomotion::Run,
             "sprinting velocity did not select the run animation");
+    require(sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, false),
+            "moving first-person sprint did not enable dynamic FOV");
+    require(!sprintViewEffectActive(visualState, CameraPerspective::ThirdPersonBack, false) &&
+                !sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, true),
+            "third-person or flying movement enabled sprint FOV");
+    visualState.velocity.x = 0.0f;
+    require(!sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, false),
+            "stationary sprint input enabled dynamic FOV");
+    visualState.velocity.x = Config::SPRINT_SPEED;
     visualState.grounded = false;
     visualState.velocity.y = Config::JUMP_SPEED;
     require(playerLocomotion(visualState) == PlayerLocomotion::Jump,
@@ -79,6 +89,36 @@ int main() {
             firstPersonSwingTransform(1.0f) == glm::mat4(1.0f) &&
             firstPersonSwingTransform(0.5f) != glm::mat4(1.0f),
             "first-person swing curve endpoints or motion are incorrect");
+
+    Camera sprintCamera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE);
+    const glm::mat4 baseProjection = sprintCamera.getProjectionMatrix(16.0f / 9.0f);
+    sprintCamera.updateFov(Config::FOV + Config::SPRINT_FOV_BOOST, 1.0f / 60.0f);
+    require(sprintCamera.fovDeg() > Config::FOV &&
+                sprintCamera.fovDeg() < Config::FOV + Config::SPRINT_FOV_BOOST &&
+                !nearMatrix(baseProjection,
+                            sprintCamera.getProjectionMatrix(16.0f / 9.0f)),
+            "sprint FOV did not smoothly expand or invalidate projection cache");
+    for (int i = 0; i < 120; ++i)
+        sprintCamera.updateFov(Config::FOV + Config::SPRINT_FOV_BOOST,
+                               1.0f / 60.0f);
+    require(std::abs(sprintCamera.fovDeg() -
+                     (Config::FOV + Config::SPRINT_FOV_BOOST)) < 0.001f,
+            "sprint FOV did not converge to its target");
+    for (int i = 0; i < 120; ++i)
+        sprintCamera.updateFov(Config::FOV, 1.0f / 60.0f);
+    require(std::abs(sprintCamera.fovDeg() - Config::FOV) < 0.001f,
+            "dynamic FOV did not restore the base field of view");
+
+    Camera thirtyFpsCamera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE);
+    Camera oneTwentyFpsCamera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE);
+    for (int i = 0; i < 30; ++i)
+        thirtyFpsCamera.updateFov(Config::FOV + Config::SPRINT_FOV_BOOST,
+                                  1.0f / 30.0f);
+    for (int i = 0; i < 120; ++i)
+        oneTwentyFpsCamera.updateFov(Config::FOV + Config::SPRINT_FOV_BOOST,
+                                     1.0f / 120.0f);
+    require(std::abs(thirtyFpsCamera.fovDeg() - oneTwentyFpsCamera.fovDeg()) < 0.0001f,
+            "dynamic FOV response changes with frame rate");
     for (BlockId leaf : {BlockId::LEAVES, BlockId::BIRCH_LEAVES,
                          BlockId::SPRUCE_LEAVES, BlockId::JUNGLE_LEAVES,
                          BlockId::ACACIA_LEAVES}) {

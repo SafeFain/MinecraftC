@@ -743,6 +743,7 @@ if(BUILD_TESTING)
 
     add_executable(rendering_logic_tests
         tests/RenderingLogicTests.cpp
+        src/renderer/Camera.cpp
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/RenderDevice.cpp

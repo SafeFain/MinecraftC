@@ -8,6 +8,7 @@ public:
     Camera(float fovDeg, float nearPlane, float farPlane);
 
     void updateVectors(float yawDeg, float pitchDeg);
+    void updateFov(float targetFovDeg, float dt);
 
     // Matrices (cached — only recomputed when camera moves/resizes)
     glm::mat4 getViewMatrix() const;
@@ -28,6 +29,7 @@ public:
 
     float yawDeg() const   { return m_yaw; }
     float pitchDeg() const { return m_pitch; }
+    float fovDeg() const   { return m_fovDeg; }
 
 private:
     float m_fovDeg, m_near, m_far;

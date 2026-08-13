@@ -17,10 +17,10 @@ void require(bool condition, const char* message) {
 
 int main() {
     require(std::abs(Config::PLAYER_SPEED - 4.3f) < 0.0001f &&
-                std::abs(Config::SPRINT_SPEED - 5.6f) < 0.0001f,
+                std::abs(Config::SPRINT_SPEED - 6.72f) < 0.0001f,
             "ground movement speeds do not match the classic survival pace");
-    require(Config::SPRINT_SPEED / Config::PLAYER_SPEED < 1.31f,
-            "sprint remains disproportionately faster than walking");
+    require(std::abs(Config::SPRINT_SPEED / 5.6f - 1.2f) < 0.0001f,
+            "sprint speed was not increased by exactly twenty percent");
 
     float minimumApex = 100.0f;
     float maximumApex = 0.0f;

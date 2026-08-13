@@ -15,6 +15,8 @@ constexpr const char* GAME_VERSION = MINECRAFTC_VERSION_STRING;
 constexpr int   WINDOW_WIDTH    = 1280;
 constexpr int   WINDOW_HEIGHT   = 720;
 constexpr float FOV             = 70.0f;
+constexpr float SPRINT_FOV_BOOST = 5.0f;
+constexpr float FOV_RESPONSE     = 8.0f;
 constexpr float NEAR_PLANE      = 0.1f;
 constexpr float FAR_PLANE       = 640.0f;
 
@@ -146,7 +148,7 @@ constexpr int   ICE_FREEZE_MAX_Y         = 80;
 // ── Biome ─────────────────────────────────────────────────────────────
 // ── Player ────────────────────────────────────────────────────────────
 constexpr float PLAYER_SPEED      = 4.3f;
-constexpr float SPRINT_SPEED      = 5.6f;
+constexpr float SPRINT_SPEED      = 6.72f;
 constexpr float CREATIVE_FLY_SPEED = 10.9f;
 constexpr float CREATIVE_FLY_SPRINT_SPEED = 21.6f;
 constexpr float CREATIVE_FLY_VERTICAL_SPEED = 7.5f;
