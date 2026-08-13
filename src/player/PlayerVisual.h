@@ -40,6 +40,19 @@ inline bool sprintViewEffectActive(const PlayerVisualState& state,
         state.sprinting && std::hypot(state.velocity.x, state.velocity.z) >= 0.08f;
 }
 
+inline float dynamicViewFov(float baseFov, float sprintBoost,
+                            float bowReduction,
+                            const PlayerVisualState& state,
+                            CameraPerspective perspective, bool flying,
+                            float bowCharge) {
+    float target = baseFov;
+    if (sprintViewEffectActive(state, perspective, flying))
+        target += sprintBoost;
+    if (perspective == CameraPerspective::FirstPerson)
+        target -= bowReduction * std::clamp(bowCharge, 0.0f, 1.0f);
+    return target;
+}
+
 inline CameraPerspective nextPerspective(CameraPerspective perspective) {
     switch (perspective) {
         case CameraPerspective::FirstPerson: return CameraPerspective::ThirdPersonBack;

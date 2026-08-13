@@ -866,6 +866,14 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_entity_spawning_despawn_and_sweep COMMAND entity_logic_tests)
 
+    add_executable(voxel_raycast_tests tests/VoxelRaycastTests.cpp)
+    target_include_directories(voxel_raycast_tests PRIVATE src)
+    target_link_libraries(voxel_raycast_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(voxel_raycast_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME world_voxel_raycast_distance_and_obstruction COMMAND voxel_raycast_tests)
+
     add_executable(entity_model_registry_tests
         tests/EntityModelRegistryTests.cpp
         src/entity/EntityModelRegistry.cpp

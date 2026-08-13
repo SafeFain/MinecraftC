@@ -1,4 +1,5 @@
 #include "world/World.h"
+#include "world/VoxelRaycast.h"
 #include "world/BiomeLocator.h"
 #include "core/RuntimeClock.h"
 #include "world/ChunkMesh.h"
@@ -1693,67 +1694,15 @@ void World::restoreGpuMeshes() {
 std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
                                                  const glm::vec3& direction,
                                                  float maxDistance) const {
-    const glm::dvec3 pos = origin;
-    glm::ivec3 blockPos(
-        static_cast<int>(std::floor(pos.x)),
-        static_cast<int>(std::floor(pos.y)),
-        static_cast<int>(std::floor(pos.z))
-    );
-
-    glm::ivec3 step(
-        direction.x > 0.0f ? 1 : (direction.x < 0.0f ? -1 : 0),
-        direction.y > 0.0f ? 1 : (direction.y < 0.0f ? -1 : 0),
-        direction.z > 0.0f ? 1 : (direction.z < 0.0f ? -1 : 0)
-    );
-
-    glm::dvec3 absDir = glm::abs(glm::dvec3(direction));
-    glm::dvec3 safeAbs = glm::max(absDir, glm::dvec3(1e-10));
-
-    glm::dvec3 tDelta(
-        step.x != 0 ? 1.0 / safeAbs.x : INFINITY,
-        step.y != 0 ? 1.0 / safeAbs.y : INFINITY,
-        step.z != 0 ? 1.0 / safeAbs.z : INFINITY
-    );
-
-    glm::dvec3 nextBoundary(
-        step.x > 0 ? (blockPos.x + 1) - pos.x : pos.x - blockPos.x,
-        step.y > 0 ? (blockPos.y + 1) - pos.y : pos.y - blockPos.y,
-        step.z > 0 ? (blockPos.z + 1) - pos.z : pos.z - blockPos.z
-    );
-    glm::dvec3 tMax = nextBoundary / safeAbs;
-
-    glm::ivec3 lastNormal(0);
-
-    int maxSteps = static_cast<int>(maxDistance * 3);
-    for (int i = 0; i < maxSteps; ++i) {
-        BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
-        if (id != BlockId::AIR) {
+    const auto hit = voxelRaycast(
+        origin, direction, static_cast<double>(maxDistance),
+        [this](const glm::ivec3& blockPos) {
+            if (!Config::isValidWorldY(blockPos.y)) return false;
+            const BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
+            if (id == BlockId::AIR) return false;
             const BlockProperties& props = getBlockProps(id);
-            if (props.solid || props.shape == RenderShape::Cross) {
-                return RaycastHit{blockPos, lastNormal};
-            }
-        }
-
-        lastNormal = glm::ivec3(0);
-
-        if (tMax.x <= tMax.y && tMax.x <= tMax.z) {
-            lastNormal.x = -step.x;
-            blockPos.x += step.x;
-            tMax.x += tDelta.x;
-        } else if (tMax.y <= tMax.x && tMax.y <= tMax.z) {
-            lastNormal.y = -step.y;
-            blockPos.y += step.y;
-            tMax.y += tDelta.y;
-        } else {
-            lastNormal.z = -step.z;
-            blockPos.z += step.z;
-            tMax.z += tDelta.z;
-        }
-
-        if (!Config::isValidWorldY(blockPos.y)) {
-            break;
-        }
-    }
-
-    return std::nullopt;
+            return props.solid || props.shape == RenderShape::Cross;
+        });
+    if (!hit) return std::nullopt;
+    return RaycastHit{hit->blockPos, hit->faceNormal};
 }

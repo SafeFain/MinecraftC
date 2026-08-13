@@ -1,4 +1,5 @@
 #include "entity/EntityLogic.h"
+#include "entity/ProjectileLogic.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -36,6 +37,10 @@ int main() {
             !attackImpactValid(1.5f, 1.5f, true) &&
             !attackImpactValid(1.0f, 1.5f, false),
             "attack impact range or sight revalidation failed");
+    require(explosionImpact(2.0f, 5.0f, true) == 0.6f &&
+            explosionImpact(2.0f, 5.0f, false) == 0.0f &&
+            explosionImpact(5.0f, 5.0f, true) == 0.0f,
+            "blocked or out-of-range explosions retained damage");
     require(deathPresentationVisible(0.0f) &&
             deathPresentationVisible(0.999f) &&
             !deathPresentationVisible(ENTITY_DEATH_PRESENTATION_SECONDS),
@@ -57,6 +62,48 @@ int main() {
             "eligible distant hostiles honor deterministic roll");
     require(sweptCollisionSteps(0.0) == 1 && sweptCollisionSteps(0.31) == 3,
             "projectile sweep bounds each collision step");
+    require(bowChargeStrength(0.0f) == 0.0f &&
+            bowChargeStrength(0.5f) > 0.0f &&
+            bowChargeStrength(0.5f) < 1.0f &&
+            bowChargeStrength(1.0f) == 1.0f &&
+            bowLaunchSpeed(0.0f) == BOW_MIN_SPEED &&
+            bowLaunchSpeed(1.0f) == BOW_MAX_SPEED,
+            "bow charge did not map monotonically onto launch speed");
+    const glm::vec3 inheritedShot = projectileLaunchVelocity(
+        {0.0f, 0.0f, 1.0f}, 20.0f, {2.0f, 3.0f, -1.0f});
+    require(inheritedShot == glm::vec3(2.0f, 3.0f, 19.0f),
+            "projectile did not inherit shooter velocity");
+    const glm::dvec3 oneSecond = projectilePosition(
+        {1.0, 2.0, 3.0}, {4.0f, 5.0f, 6.0f}, 1.0);
+    require(glm::length(oneSecond - glm::dvec3(5.0, 2.1, 9.0)) < 0.00001,
+            "projectile position did not apply velocity and gravity analytically");
+    const glm::dvec3 splitPosition = projectilePosition(
+        projectilePosition({1.0, 2.0, 3.0}, {4.0f, 5.0f, 6.0f}, 0.4),
+        projectileVelocityAfter({4.0f, 5.0f, 6.0f}, 0.4f), 0.6);
+    require(glm::length(splitPosition - oneSecond) < 0.00001,
+            "projectile integration changed with frame subdivision");
+    const auto ballistic = lowArcBallisticVelocity(
+        {0.0, 1.0, 0.0}, {12.0, 2.0, 0.0}, 20.0f);
+    require(ballistic.has_value(), "reachable low ballistic arc had no solution");
+    if (ballistic) {
+        const double flightSeconds = 12.0 / ballistic->x;
+        require(glm::length(projectilePosition(
+                    {0.0, 1.0, 0.0}, *ballistic, flightSeconds) -
+                glm::dvec3(12.0, 2.0, 0.0)) < 0.001,
+                "low ballistic arc did not pass through its target");
+    }
+    const auto inheritedBallistic = lowArcBallisticVelocity(
+        {0.0, 1.0, 0.0}, {12.0, 2.0, 0.0}, 20.0f,
+        {2.0f, 0.0f, 0.0f});
+    require(inheritedBallistic.has_value(),
+            "moving shooter had no reachable ballistic solution");
+    if (inheritedBallistic) {
+        const double flightSeconds = 12.0 / inheritedBallistic->x;
+        require(glm::length(projectilePosition(
+                    {0.0, 1.0, 0.0}, *inheritedBallistic, flightSeconds) -
+                glm::dvec3(12.0, 2.0, 0.0)) < 0.001,
+                "ballistic solution did not include inherited shooter velocity");
+    }
     require(!spiderTargetsPlayer(true, false, 4.0f),
             "an unprovoked daytime spider targeted the player");
     require(spiderTargetsPlayer(true, true, 17.9f),

@@ -52,6 +52,11 @@ inline glm::vec3 autonomousHorizontalVelocity(const glm::dvec3& before,
 inline bool attackImpactValid(float distance, float reach, bool clearSight) {
     return distance >= 0.0f && distance < reach && clearSight;
 }
+inline float explosionImpact(float distance, float radius, bool clearSight) {
+    if (!clearSight || distance < 0.0f || radius <= 0.0f || distance >= radius)
+        return 0.0f;
+    return 1.0f - distance / radius;
+}
 
 inline bool deathPresentationVisible(float elapsed) {
     return elapsed >= 0.0f && elapsed < ENTITY_DEATH_PRESENTATION_SECONDS;

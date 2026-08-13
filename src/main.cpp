@@ -45,6 +45,7 @@
 #include "game/TextWrap.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"
+#include "entity/ProjectileLogic.h"
 #include "audio/AudioSystem.h"
 #include "renderer/ChunkRenderScene.h"
 #include "renderer/TexturedCubeScene.h"
@@ -1254,6 +1255,9 @@ private:
             // ── Update ────────────────────────────────────────────────
             m_dayNightCycle.update(
                 dt, Config::DAY_CYCLE_MINUTES, m_gameState == GameState::Playing);
+            if (m_gameState != GameState::Playing || m_inventoryOpen ||
+                m_commandOpen || m_playerDead)
+                m_player.cancelBowCharge();
             if (m_gameState == GameState::Playing) {
                 if (m_containerOpen && (!m_containerScreen.valid())) closeInventory();
                 const glm::dvec3 playerEye = m_player.getEyePosition();
@@ -1271,10 +1275,12 @@ private:
                 if (!m_playerDead) m_player.update(dt);
                 const PlayerVisualState playerVisual = m_player.visualState();
                 m_playerRenderer.update(playerVisual, dt);
-                const bool sprintFov = !m_playerDead && sprintViewEffectActive(
-                    playerVisual, m_perspective, m_player.isFlying());
                 m_camera.updateFov(
-                    Config::FOV + (sprintFov ? Config::SPRINT_FOV_BOOST : 0.0f), dt);
+                    dynamicViewFov(
+                        Config::FOV, Config::SPRINT_FOV_BOOST,
+                        Config::BOW_FOV_REDUCTION, playerVisual,
+                        m_perspective, m_player.isFlying(),
+                        m_playerDead ? 0.0f : m_player.bowCharge()), dt);
                 m_cameraEffects.update(
                     m_player.getPosition(), m_player.onGround(),
                     m_player.isFlying(), m_player.velocity().y,
@@ -1515,6 +1521,7 @@ private:
                         m_player.activeItem(), vp, hand);
                 }
                 m_particles.buildRenderData(renderOrigin, m_particleRenderData);
+                appendBowTrajectory(renderOrigin);
                 m_renderer->renderParticles(
                     m_particleRenderData, vp,
                     m_camera.right,
@@ -1847,6 +1854,7 @@ private:
 
     void openInventory() {
         if (m_player.isSpectator()) return;
+        m_player.cancelBowCharge();
         if (m_player.isSurvival() && !m_inventoryOpen)
             m_survivalInventory.setCraftingTable(false);
         m_containerOpen = false;
@@ -1877,6 +1885,33 @@ private:
         m_entities.spawnItem(
             m_player.getEyePosition()+glm::dvec3(forward)*0.65,
             dropped,forward*4.5f+glm::vec3(0.0f,1.5f,0.0f),0.8f);
+    }
+
+    void appendBowTrajectory(const glm::dvec3& renderOrigin) {
+        const auto launch = m_player.bowLaunchPreview();
+        if (!launch) return;
+        constexpr double stepSeconds = 0.10;
+        constexpr int pointCount = 32;
+        glm::dvec3 previous = launch->origin;
+        for (int point = 1; point <= pointCount; ++point) {
+            const glm::dvec3 current = projectilePosition(
+                launch->origin, launch->velocity, point * stepSeconds);
+            const glm::dvec3 segment = current - previous;
+            const float segmentLength = static_cast<float>(glm::length(segment));
+            if (segmentLength <= 0.0001f) break;
+            if (m_world.raycast(previous, glm::normalize(glm::vec3(segment)),
+                                segmentLength))
+                break;
+            if (m_particleRenderData.size() >= ParticleSystem::MAX_PARTICLES)
+                break;
+            const float fade = static_cast<float>(point - 1) /
+                static_cast<float>(pointCount);
+            m_particleRenderData.push_back({
+                glm::vec3(current - renderOrigin),
+                static_cast<float>(ParticleKind::Trajectory),
+                0.08f + fade * 0.68f, 0.0f, 0.13f, 0.0f});
+            previous = current;
+        }
     }
 
     void openPlayerInventoryView() {

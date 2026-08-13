@@ -48,6 +48,8 @@ int main() {
             "visual quality presets do not match the rendering contract");
     static_assert(static_cast<int>(ParticleKind::RainSplash) == 4,
                   "particle kind values are part of the shader contract");
+    static_assert(static_cast<int>(ParticleKind::Trajectory) == 5,
+                  "trajectory marker must use the shader's marker branch");
     VisualExposure exposure;
     RenderEnvironment exposureEnvironment;
     const float brightExposure = exposure.update(1.0f, 0.0f,
@@ -77,6 +79,17 @@ int main() {
     visualState.velocity.x = 0.0f;
     require(!sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, false),
             "stationary sprint input enabled dynamic FOV");
+    visualState.sprinting = false;
+    require(std::abs(dynamicViewFov(
+                Config::FOV, Config::SPRINT_FOV_BOOST,
+                Config::BOW_FOV_REDUCTION, visualState,
+                CameraPerspective::FirstPerson, false, 1.0f) -
+            (Config::FOV - Config::BOW_FOV_REDUCTION)) < 0.0001f &&
+            dynamicViewFov(
+                Config::FOV, Config::SPRINT_FOV_BOOST,
+                Config::BOW_FOV_REDUCTION, visualState,
+                CameraPerspective::ThirdPersonBack, false, 1.0f) == Config::FOV,
+            "bow charge did not narrow only the first-person FOV");
     visualState.velocity.x = Config::SPRINT_SPEED;
     visualState.grounded = false;
     visualState.velocity.y = Config::JUMP_SPEED;

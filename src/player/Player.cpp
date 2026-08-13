@@ -13,6 +13,7 @@
 Player::Player(World& world) : m_world(world) {}
 
 void Player::teleport(const glm::dvec3& pos) {
+    cancelBowCharge();
     m_position = pos;
     m_velocity = glm::vec3(0.0f);
     m_visualPositionInitialized = false;
@@ -23,6 +24,7 @@ void Player::teleport(const glm::dvec3& pos) {
 }
 
 void Player::configureRules(GameMode mode, Difficulty difficulty) {
+    cancelBowCharge();
     m_gameMode = mode;
     m_difficulty = difficulty;
     m_blocking = false;
@@ -175,6 +177,13 @@ void Player::handleMovement(const InputState& input, float dt) {
 void Player::handleMouseButton(int button, ButtonAction action) {
     if (!m_mouseLocked) return;
     if (m_gameMode == GameMode::Spectator) return;
+    const ItemStack& selected =
+        m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+    if (button == MouseButton::Right && selected.id == ItemId::BOW) {
+        if (action == ButtonAction::Press) beginBowCharge();
+        else if (action == ButtonAction::Release) releaseBow();
+        return;
+    }
     if (button == MouseButton::Right && m_gameMode == GameMode::Survival &&
         m_inventory.offhand().id == ItemId::SHIELD) {
         m_blocking = action != ButtonAction::Release;
@@ -233,6 +242,18 @@ void Player::update(float dt) {
     }
     if (m_swingProgress < 1.0f)
         m_swingProgress = std::min(1.0f, m_swingProgress + dt / 0.32f);
+    if (m_bowCharging) {
+        const ItemStack& selected =
+            m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+        if (selected.id != ItemId::BOW ||
+            (m_gameMode == GameMode::Survival &&
+             m_inventory.count(ItemId::ARROW) == 0)) {
+            cancelBowCharge();
+        } else {
+            m_bowChargeSeconds = std::min(
+                BOW_FULL_CHARGE_SECONDS, m_bowChargeSeconds + dt);
+        }
+    }
 
     updateDirectionVectors();
     applyPhysics(dt);
@@ -252,6 +273,46 @@ void Player::update(float dt) {
 ItemStack Player::activeItem() const {
     if (m_gameMode == GameMode::Spectator) return {};
     return m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+}
+
+std::optional<ProjectileLaunch> Player::bowLaunchPreview() const {
+    if (!m_bowCharging || !m_entities || activeItem().id != ItemId::BOW)
+        return std::nullopt;
+    const float strength = bowCharge();
+    const glm::vec3 inherited(
+        m_visualHorizontalVelocity.x, m_velocity.y,
+        m_visualHorizontalVelocity.y);
+    return ProjectileLaunch{
+        getEyePosition() + glm::dvec3(m_forward) * 0.45,
+        projectileLaunchVelocity(
+            m_forward, bowLaunchSpeed(strength), inherited),
+        bowLaunchDamage(strength)};
+}
+
+void Player::beginBowCharge() {
+    if (m_actionCooldown > 0.0f || !m_entities) return;
+    if (m_gameMode == GameMode::Survival &&
+        m_inventory.count(ItemId::ARROW) == 0) return;
+    m_blocking = false;
+    m_bowCharging = true;
+    m_bowChargeSeconds = 0.0f;
+}
+
+void Player::releaseBow() {
+    const auto launch = bowLaunchPreview();
+    cancelBowCharge();
+    if (!launch) return;
+    if (m_gameMode == GameMode::Survival &&
+        !m_inventory.remove(ItemId::ARROW, 1)) return;
+
+    m_entities->spawnArrow(
+        launch->origin, launch->velocity, launch->damage, true);
+    if (m_gameMode == GameMode::Survival) {
+        auto& bow = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+        if (++bow.damage >= getItemProps(bow.id).maxDurability) bow.clear();
+    }
+    startSwing();
+    m_actionCooldown = 0.15f;
 }
 
 PlayerVisualState Player::visualState() const {
@@ -618,30 +679,12 @@ void Player::updateMining(float dt) {
 bool Player::placeBlock() {
     const ItemId selectedItem =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id;
-    if (m_gameMode == GameMode::Creative && selectedItem == ItemId::BOW) {
-        if (m_entities) {
-            m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
-                                   m_forward * 24.0f, 6.0f, true);
-            return true;
-        }
-        return false;
-    }
     if (m_gameMode == GameMode::Survival) {
         auto& selected = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (!selected.empty() && getItemProps(selected.id).kind == ItemKind::Food) {
             if (!m_survivalStats.eat(selected.id)) return false;
             if (--selected.count == 0) selected.clear();
             return true;
-        }
-        if (!selected.empty() && selected.id == ItemId::BOW) {
-            if (m_entities && m_inventory.remove(ItemId::ARROW, 1)) {
-                m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
-                                       m_forward * 24.0f, 6.0f, true);
-                if (++selected.damage >= getItemProps(selected.id).maxDurability)
-                    selected.clear();
-                return true;
-            }
-            return false;
         }
     }
 

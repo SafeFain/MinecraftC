@@ -10,7 +10,7 @@
 class World;
 
 enum class ParticleKind : uint8_t {
-    Rain, Snow, Lightning, BlockDebris, RainSplash
+    Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory
 };
 
 struct ParticleRenderData {

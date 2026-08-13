@@ -13,6 +13,7 @@
 #include "core/Input.h"
 #include "player/PlayerPhysics.h"
 #include "player/PlayerVisual.h"
+#include "entity/ProjectileLogic.h"
 
 class World;
 class EntityManager;
@@ -51,8 +52,11 @@ public:
     }
 
     bool isMouseLocked() const { return m_mouseLocked; }
-    void setMouseLocked(bool locked) { m_mouseLocked = locked; }
-    void toggleMouseLock() { m_mouseLocked = !m_mouseLocked; }
+    void setMouseLocked(bool locked) {
+        m_mouseLocked = locked;
+        if (!locked) cancelBowCharge();
+    }
+    void toggleMouseLock() { setMouseLocked(!m_mouseLocked); }
 
     bool isFlying() const { return m_flying; }
     bool isSurvival() const { return m_gameMode == GameMode::Survival; }
@@ -80,7 +84,11 @@ public:
     void extinguish() { m_burningSeconds = 0.0f; m_burnDamageTicks = 0; }
     void setRainExposure(bool exposed) { m_rainExposed = exposed; }
     void resetDamageImmunity() { m_hurtImmunity = {}; }
-    void setSelectedSlot(int slot) { if (slot >= 0 && slot < 9) m_selectedSlot = slot; }
+    void setSelectedSlot(int slot) {
+        if (slot < 0 || slot >= 9) return;
+        if (slot != m_selectedSlot) cancelBowCharge();
+        m_selectedSlot = slot;
+    }
     int selectedSlot() const { return m_selectedSlot; }
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
     bool underwater() const { return m_airTicks < 300; }
@@ -88,6 +96,12 @@ public:
     bool isSprinting() const { return m_isSprinting; }
     float landingSpeed() const { return m_landingSpeed; }
     void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
+    bool bowCharging() const { return m_bowCharging; }
+    float bowCharge() const {
+        return m_bowCharging ? bowChargeStrength(m_bowChargeSeconds) : 0.0f;
+    }
+    std::optional<ProjectileLaunch> bowLaunchPreview() const;
+    void cancelBowCharge() { m_bowCharging = false; m_bowChargeSeconds = 0.0f; }
 
     ItemStack activeItem() const;
     PlayerVisualState visualState() const;
@@ -146,6 +160,8 @@ private:
     uint32_t m_swingSequence = 0;
     float m_swingProgress = 1.0f;
     float m_miningSwingSeconds = 0.0f;
+    bool m_bowCharging = false;
+    float m_bowChargeSeconds = 0.0f;
     PlayerPhysics::HurtImmunity m_hurtImmunity;
 
     // ── Internal methods ─────────────────────────────────────────────
@@ -162,6 +178,8 @@ private:
 
     bool breakBlock();
     bool placeBlock();
+    void beginBowCharge();
+    void releaseBow();
     void startSwing();
     bool collidesWithPlayer(const glm::ivec3& blockPos) const;
 };

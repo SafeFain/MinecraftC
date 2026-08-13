@@ -1,5 +1,6 @@
 #include "entity/EntityManager.h"
 #include "entity/EntityLogic.h"
+#include "entity/ProjectileLogic.h"
 
 #include "player/Player.h"
 #include "world/World.h"
@@ -150,6 +151,8 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
     entity.type = EntityType::Arrow;
     entity.position = position;
     entity.velocity = velocity;
+    if (glm::length(velocity) > 0.0001f)
+        entity.facing = glm::normalize(velocity);
     entity.projectileDamage = damage;
     entity.playerOwned = playerOwned;
     entity.health = 1.0f;
@@ -432,6 +435,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             continue;
         }
 
+        const glm::vec3 previousLocomotionVelocity = entity.locomotionVelocity;
         entity.locomotionVelocity = glm::vec3(0.0f);
         integrateVelocity(entity, dt);
 
@@ -469,30 +473,53 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         glm::vec3 horizontal(delta.x, 0.0f, delta.z);
         const float distance = glm::length(horizontal);
         const glm::dvec3 attackOrigin = entity.position + glm::dvec3(0,1.2,0);
-        const glm::vec3 sightDirection = distance > 0.001f
-            ? glm::normalize(glm::vec3(player.getEyePosition() - attackOrigin))
-            : glm::vec3(0.0f, 0.0f, -1.0f);
-        const bool clearSight = distance <= 0.001f ||
-            !m_world.raycast(attackOrigin, sightDirection, distance).has_value();
+        const glm::dvec3 meleeDelta =
+            player.getPosition() + glm::dvec3(0.0, 0.9, 0.0) - attackOrigin;
+        const float meleeDistance = static_cast<float>(glm::length(meleeDelta));
+        const glm::vec3 meleeDirection = meleeDistance > 0.001f
+            ? glm::vec3(meleeDelta / static_cast<double>(meleeDistance))
+            : glm::vec3(0.0f);
+        const bool meleeClearSight = meleeDistance <= 0.001f ||
+            !m_world.raycast(
+                attackOrigin, meleeDirection, meleeDistance).has_value();
+        const glm::dvec3 rangedOrigin =
+            entity.position + glm::dvec3(0.0, 1.45, 0.0);
+        const glm::dvec3 rangedDelta = player.getEyePosition() - rangedOrigin;
+        const float rangedDistance = static_cast<float>(glm::length(rangedDelta));
+        const glm::vec3 rangedDirection = rangedDistance > 0.001f
+            ? glm::vec3(rangedDelta / static_cast<double>(rangedDistance))
+            : glm::vec3(0.0f);
+        const bool rangedClearSight = rangedDistance <= 0.001f ||
+            !m_world.raycast(
+                rangedOrigin, rangedDirection, rangedDistance).has_value();
         const auto animationEvents = m_modelRegistry.advance(
             entity.type, entity.id, dt);
         for (const auto& event : animationEvents) {
             if (!entity.attackPending) continue;
             if (event.name == "melee") {
-                if (attackImpactValid(distance, 1.5f, clearSight))
+                if (attackImpactValid(meleeDistance, 1.5f, meleeClearSight))
                     player.takeDamage(3.0f);
                 entity.attackPending = false;
             } else if (event.name == "shoot") {
-                if (attackImpactValid(distance, 14.0f, clearSight)) {
-                    const glm::vec3 aim = glm::normalize(glm::vec3(
-                        player.getEyePosition() -
-                        (entity.position + glm::dvec3(0,1.45,0))));
-                    pendingArrows.push_back({entity.position + glm::dvec3(0,1.45,0) +
-                        glm::dvec3(aim) * 0.75, aim * 22.0f, 2.0f});
+                if (attackImpactValid(
+                        rangedDistance, 14.0f, rangedClearSight)) {
+                    const glm::vec3 inheritedVelocity =
+                        entity.velocity + previousLocomotionVelocity;
+                    const auto launchVelocity = lowArcBallisticVelocity(
+                        rangedOrigin, player.getEyePosition(),
+                        bowLaunchSpeed(0.9f), inheritedVelocity);
+                    if (launchVelocity) {
+                        const glm::vec3 launchDirection =
+                            glm::normalize(*launchVelocity);
+                        pendingArrows.push_back({rangedOrigin +
+                            glm::dvec3(launchDirection) * 0.75,
+                            *launchVelocity, 2.0f});
+                    }
                 }
                 entity.attackPending = false;
             } else if (event.name == "explode") {
-                if (attackImpactValid(distance, 1.5f, clearSight)) {
+                if (attackImpactValid(
+                        meleeDistance, 1.5f, meleeClearSight)) {
                     pendingExplosions.push_back(
                         {entity.position, entity.behaviorSeed, 2.5f});
                     entity.health = 0.0f;
@@ -519,21 +546,25 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             playerTargetable, behaviorTargetsPlayer);
         if (entity.attackPending) {
             if (distance > 0.01f) entity.facing = glm::normalize(horizontal);
-        } else if (targetsPlayer && distance > 0.01f) {
-            horizontal /= distance;
+        } else if (targetsPlayer) {
+            if (distance > 0.01f) horizontal /= distance;
             const float speed = entity.type == EntityType::Spider ? 3.0f : 2.0f;
             if (entity.type == EntityType::Skeleton) {
-                if (distance > 7.0f) moveWithTerrain(entity, horizontal * speed, dt);
-                if (distance < 14.0f && clearSight && entity.actionCooldown <= 0.0f) {
+                if (distance > 7.0f && distance > 0.01f)
+                    moveWithTerrain(entity, horizontal * speed, dt);
+                if (attackImpactValid(
+                        rangedDistance, 14.0f, rangedClearSight) &&
+                    entity.actionCooldown <= 0.0f) {
                     entity.actionCooldown = 2.0f;
                     entity.attackPending = m_modelRegistry.playAction(
                         entity.type, entity.id, "attack");
                 }
-            } else {
+            } else if (distance > 0.01f) {
                 moveWithTerrain(entity, horizontal * speed, dt);
             }
             if (entity.type != EntityType::Skeleton &&
-                distance < 1.5f && clearSight && entity.actionCooldown <= 0.0f) {
+                attackImpactValid(meleeDistance, 1.5f, meleeClearSight) &&
+                entity.actionCooldown <= 0.0f) {
                 entity.actionCooldown = 1.0f;
                 entity.attackPending = m_modelRegistry.playAction(
                     entity.type, entity.id, "attack");
@@ -656,9 +687,9 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         }
         return;
     }
-    arrow.velocity.y-=9.8f*dt;
     const glm::dvec3 start=arrow.position;
-    const glm::dvec3 delta=glm::dvec3(arrow.velocity)*static_cast<double>(dt);
+    const glm::dvec3 delta=projectilePosition(
+        glm::dvec3(0.0), arrow.velocity, static_cast<double>(dt));
     const int steps=sweptCollisionSteps(glm::length(delta));
     for(int step=1;step<=steps;++step) {
         const glm::dvec3 next=start+delta*(static_cast<double>(step)/steps);
@@ -692,6 +723,9 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         }
         arrow.position=next;
     }
+    arrow.velocity=projectileVelocityAfter(arrow.velocity,dt);
+    if(glm::length(arrow.velocity)>0.0001f)
+        arrow.facing=glm::normalize(arrow.velocity);
 }
 
 void EntityManager::explode(Player& player, const glm::dvec3& center,
@@ -701,13 +735,14 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
         const glm::dvec3 delta = target - center;
         const double distance = glm::length(delta);
         if (distance >= effectRadius) return 0.0f;
-        float exposure = 1.0f;
+        bool clearSight = true;
         if (distance > 0.01) {
             const auto blocked = m_world.raycast(
                 center, glm::normalize(glm::vec3(delta)), static_cast<float>(distance));
-            if (blocked) exposure = 0.35f;
+            clearSight = !blocked.has_value();
         }
-        return std::max(0.0f, 1.0f - static_cast<float>(distance) / effectRadius) * exposure;
+        return explosionImpact(
+            static_cast<float>(distance), effectRadius, clearSight);
     };
 
     for (auto& entity : m_entities) {
