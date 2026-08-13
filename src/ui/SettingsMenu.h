@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/Menu.h"
+#include <algorithm>
 #include <functional>
 
 struct RendererBackendAvailability {
@@ -33,6 +34,22 @@ inline SettingsPage settingsParentPage(SettingsPage page) {
             return SettingsPage::General;
     }
     return SettingsPage::General;
+}
+
+struct SettingsButtonLayout {
+    float helpY = 0.0f;
+    float firstButtonY = 0.0f;
+    float buttonHeight = 0.0f;
+};
+
+inline SettingsButtonLayout settingsButtonLayout(
+    float titleY, size_t buttonCount, bool hasHelp) {
+    const float helpY = titleY - 34.0f;
+    const float contentTop = hasHelp ? helpY - 10.0f : titleY - 18.0f;
+    const float buttonHeight = std::clamp(
+        (contentTop - 14.0f) / std::max<size_t>(1, buttonCount) - 5.0f,
+        22.0f, Config::UI_BUTTON_HEIGHT);
+    return {helpY, contentTop - buttonHeight, buttonHeight};
 }
 
 class SettingsMenu : public Menu {

@@ -57,6 +57,13 @@ int main(){
     require(settingsParentPage(SettingsPage::KeyBindings)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Video)==SettingsPage::General,
             "top-level settings pages return to general settings");
+    const SettingsButtonLayout bindingLayout = settingsButtonLayout(468.0f,13,true);
+    require(bindingLayout.firstButtonY+bindingLayout.buttonHeight<=
+                bindingLayout.helpY-9.9f&&bindingLayout.firstButtonY>=0.0f,
+            "binding controls stay below help text in a short window");
+    const SettingsButtonLayout generalLayout=settingsButtonLayout(468.0f,7,false);
+    require(generalLayout.firstButtonY+generalLayout.buttonHeight<=450.1f,
+            "settings without help retain title clearance");
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&

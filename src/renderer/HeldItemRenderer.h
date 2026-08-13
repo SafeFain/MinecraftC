@@ -21,7 +21,7 @@ public:
                     const std::filesystem::path& assetRoot);
     void reset();
     void renderFirstPerson(const ItemStack& item, float swingProgress,
-                           float aspectRatio);
+                           float aspectRatio, const glm::mat4& movementTransform);
     void renderThirdPerson(const ItemStack& item, const glm::mat4& viewProjection,
                            const glm::mat4& handTransform);
 
@@ -45,4 +45,3 @@ private:
 
     CachedMesh meshFor(ItemId item);
 };
-

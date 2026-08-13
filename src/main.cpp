@@ -1249,8 +1249,10 @@ private:
                                       (rainExposure ? 0.72f : 0.06f));
                 if (!m_playerDead) m_player.update(dt);
                 m_playerRenderer.update(m_player.visualState(), dt);
-                m_cameraEffects.update(m_player.getPosition(), m_player.onGround(),
-                                       m_player.isFlying(), dt);
+                m_cameraEffects.update(
+                    m_player.getPosition(), m_player.onGround(),
+                    m_player.isFlying(), m_player.velocity().y,
+                    m_player.landingSpeed(), dt);
                 m_particles.update(m_world, m_player.getPosition(), dt,
                                    m_weather.rainGradient(),
                                    m_worldMetadata.seed ^ m_survivalTicks);
@@ -1384,7 +1386,9 @@ private:
             // ── 3D Rendering ──────────────────────────────────────────
             if (m_gameState == GameState::Playing ||
                 m_gameState == GameState::Paused) {
-                glm::mat4 view       = m_cameraEffects.viewTransform() *
+                glm::mat4 view       = m_cameraEffects.viewTransform(
+                                           m_perspective ==
+                                               CameraPerspective::FirstPerson) *
                                        m_camera.getViewMatrix();
                 glm::mat4 projection = m_camera.getProjectionMatrix(m_window.aspectRatio());
                 glm::mat4 vp         = projection * view;
@@ -1506,7 +1510,8 @@ private:
                     !m_activeMenu && !m_player.isSpectator() && !m_playerDead)
                     m_heldItemRenderer.renderFirstPerson(
                         m_player.activeItem(), m_player.visualState().swingProgress,
-                        m_window.aspectRatio());
+                        m_window.aspectRatio(),
+                        m_cameraEffects.viewModelTransform());
 
                 const SmoothLightSample eyeLight =
                     m_world.sampleLight(m_player.getEyePosition());

@@ -15,6 +15,9 @@ Player::Player(World& world) : m_world(world) {}
 void Player::teleport(const glm::dvec3& pos) {
     m_position = pos;
     m_velocity = glm::vec3(0.0f);
+    m_visualPositionInitialized = false;
+    m_visualHorizontalVelocity = glm::vec2(0.0f);
+    m_landingSpeed = 0.0f;
     m_onGround = false;
     m_fallDistance = 0.0f;
 }
@@ -218,6 +221,15 @@ void Player::handleMouseButton(int button, ButtonAction action) {
 // ── Update ────────────────────────────────────────────────────────────
 
 void Player::update(float dt) {
+    if (m_visualPositionInitialized && dt > 0.00001f) {
+        m_visualHorizontalVelocity = PlayerPhysics::horizontalVelocity(
+            m_previousVisualPosition, m_position, dt);
+    } else {
+        m_visualHorizontalVelocity = glm::vec2(0.0f);
+        m_visualPositionInitialized = true;
+    }
+    m_previousVisualPosition = m_position;
+    m_landingSpeed = 0.0f;
     PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
     if (m_actionCooldown > 0.0f) {
         m_actionCooldown -= dt;
@@ -248,7 +260,8 @@ ItemStack Player::activeItem() const {
 }
 
 PlayerVisualState Player::visualState() const {
-    return {m_velocity, m_onGround, m_isSprinting,
+    return {{m_visualHorizontalVelocity.x, m_velocity.y,
+             m_visualHorizontalVelocity.y}, m_onGround, m_isSprinting,
             m_swingSequence, m_swingProgress};
 }
 
@@ -409,17 +422,21 @@ void Player::applyPhysics(float dt) {
     if (m_flying) return; // no physics in flight mode
 
     const bool inWater = m_gameMode == GameMode::Survival && isInWater();
+    float dy = 0.0f;
     if (inWater) {
         m_fallDistance = 0.0f;
         m_velocity.y = std::max(m_velocity.y, -Config::WATER_ENTRY_MAX_FALL_SPEED);
+        dy = m_velocity.y * dt;
     } else {
-        m_velocity.y -= Config::GRAVITY * dt;
+        const PlayerPhysics::VerticalMotion motion =
+            PlayerPhysics::integrateGravity(m_velocity.y, Config::GRAVITY, dt);
+        m_velocity.y = motion.velocity;
+        dy = motion.displacement;
     }
 
     // Vertical movement is swept in bounded steps. In particular, a ceiling
     // hit retains the last non-colliding position; deriving a ceiling from the
     // old player height could push the AABB down into the floor.
-    const float dy = m_velocity.y * dt;
     const int steps = PlayerPhysics::movementSubsteps(dy);
     const float stepY = dy / static_cast<float>(steps);
     bool verticalBlocked = false;
@@ -434,6 +451,7 @@ void Player::applyPhysics(float dt) {
 
         verticalBlocked = true;
         if (stepY < 0.0f) {
+            m_landingSpeed = std::max(m_landingSpeed, -m_velocity.y);
             m_position.y = findGround() + 0.001f;
             m_onGround = true;
             if (m_gameMode == GameMode::Survival && m_fallDistance > 3.0f)

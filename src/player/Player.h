@@ -32,7 +32,12 @@ public:
     // ── State ───────────────────────────────────────────────────────
     glm::dvec3 getEyePosition() const;
     glm::dvec3 getPosition() const { return m_position; }
-    void setPosition(const glm::dvec3& pos) { m_position = pos; }
+    void setPosition(const glm::dvec3& pos) {
+        m_position = pos;
+        m_visualPositionInitialized = false;
+        m_visualHorizontalVelocity = glm::vec2(0.0f);
+        m_landingSpeed = 0.0f;
+    }
     void teleport(const glm::dvec3& pos);
     glm::vec3 getForward() const   { return m_forward; }
     float getYaw() const   { return m_yaw; }
@@ -81,6 +86,7 @@ public:
     bool underwater() const { return m_airTicks < 300; }
     bool onGround() const { return m_onGround; }
     bool isSprinting() const { return m_isSprinting; }
+    float landingSpeed() const { return m_landingSpeed; }
     void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
 
     // ── Selected block for placement ───────────────────────────────────
@@ -98,6 +104,10 @@ private:
     // Position & velocity
     glm::dvec3 m_position{0.0, 50.0, 0.0};
     glm::vec3 m_velocity{0.0f, 0.0f, 0.0f};
+    glm::dvec3 m_previousVisualPosition{0.0};
+    glm::vec2 m_visualHorizontalVelocity{0.0f};
+    bool m_visualPositionInitialized = false;
+    float m_landingSpeed = 0.0f;
 
     // View angles
     float m_yaw = 0.0f;

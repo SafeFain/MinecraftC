@@ -145,13 +145,13 @@ constexpr int   ICE_FREEZE_MAX_Y         = 80;
 
 // ── Biome ─────────────────────────────────────────────────────────────
 // ── Player ────────────────────────────────────────────────────────────
-constexpr float PLAYER_SPEED      = 8.0f;
-constexpr float SPRINT_SPEED      = 14.0f;
+constexpr float PLAYER_SPEED      = 4.3f;
+constexpr float SPRINT_SPEED      = 5.6f;
 constexpr float CREATIVE_FLY_SPEED = 10.9f;
 constexpr float CREATIVE_FLY_SPRINT_SPEED = 21.6f;
 constexpr float CREATIVE_FLY_VERTICAL_SPEED = 7.5f;
-constexpr float JUMP_SPEED        = 10.0f;
-constexpr float GRAVITY           = 25.0f;
+constexpr float JUMP_SPEED        = 8.0f;
+constexpr float GRAVITY           = 25.6f;
 constexpr float PLAYER_HEIGHT     = 1.8f;
 constexpr float PLAYER_WIDTH      = 0.6f;
 constexpr float EYE_HEIGHT        = 1.6f;

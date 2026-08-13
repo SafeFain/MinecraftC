@@ -16,6 +16,48 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(std::abs(Config::PLAYER_SPEED - 4.3f) < 0.0001f &&
+                std::abs(Config::SPRINT_SPEED - 5.6f) < 0.0001f,
+            "ground movement speeds do not match the classic survival pace");
+    require(Config::SPRINT_SPEED / Config::PLAYER_SPEED < 1.31f,
+            "sprint remains disproportionately faster than walking");
+
+    float minimumApex = 100.0f;
+    float maximumApex = 0.0f;
+    float minimumAirTime = 100.0f;
+    float maximumAirTime = 0.0f;
+    for (float frameRate : {30.0f, 60.0f, 120.0f}) {
+        const float dt = 1.0f / frameRate;
+        float height = 0.0f;
+        float velocity = Config::JUMP_SPEED;
+        float apex = 0.0f;
+        float elapsed = 0.0f;
+        while (height >= 0.0f && elapsed < 2.0f) {
+            const PlayerPhysics::VerticalMotion motion =
+                PlayerPhysics::integrateGravity(velocity, Config::GRAVITY, dt);
+            height += motion.displacement;
+            velocity = motion.velocity;
+            apex = std::max(apex, height);
+            elapsed += dt;
+        }
+        minimumApex = std::min(minimumApex, apex);
+        maximumApex = std::max(maximumApex, apex);
+        minimumAirTime = std::min(minimumAirTime, elapsed);
+        maximumAirTime = std::max(maximumAirTime, elapsed);
+    }
+    require(minimumApex > 1.24f && maximumApex < 1.251f &&
+                maximumApex - minimumApex < 0.005f,
+            "jump apex is outside the target or changes with frame rate");
+    require(minimumAirTime > 0.62f && maximumAirTime < 0.65f &&
+                maximumAirTime - minimumAirTime < 0.018f,
+            "jump airtime is outside the target or changes with frame rate");
+    const glm::vec2 visualVelocity = PlayerPhysics::horizontalVelocity(
+        {10.0, 5.0, -4.0}, {10.43, 5.0, -3.44}, 0.1f);
+    require(std::abs(visualVelocity.x - 4.3f) < 0.0001f &&
+                std::abs(visualVelocity.y - 5.6f) < 0.0001f &&
+                PlayerPhysics::horizontalVelocity({}, {}, 0.0f) == glm::vec2(0.0f),
+            "visual velocity did not reflect actual frame displacement");
+
     PlayerPhysics::HurtImmunity immunity;
     require(PlayerPhysics::damageAfterImmunity(immunity, 3.0f, 0.5f) == 3.0f,
             "first hit bypasses an inactive hurt cooldown");

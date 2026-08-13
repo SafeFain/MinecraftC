@@ -281,25 +281,24 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     const float titleY = height * 0.78f;
     ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,
                   Config::UIColors::TEXT_TITLE);
-    if (m_page == SettingsPage::KeyboardMouse ||
-        m_page == SettingsPage::Controller)
-        {
-            const std::string help = m_localization.text(
-                m_page == SettingsPage::Controller
-                    ? "settings.controller_help" : "settings.controls_help");
-            const auto helpSize = ui.measureText(help, 1.0f);
-            ui.renderText(help, (width - helpSize.x) * .5f,
-                          titleY - 34.0f, 1.0f, glm::vec3(.72f));
-        }
-    const float startY = titleY - 58.0f;
+    const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
+                         m_page == SettingsPage::Controller;
+    const SettingsButtonLayout layout = settingsButtonLayout(
+        titleY, m_buttons.size(), hasHelp);
+    if (hasHelp) {
+        const std::string help = m_localization.text(
+            m_page == SettingsPage::Controller
+                ? "settings.controller_help" : "settings.controls_help");
+        const auto helpSize = ui.measureText(help, 1.0f);
+        ui.renderText(help, (width - helpSize.x) * .5f,
+                      layout.helpY, 1.0f, glm::vec3(.72f));
+    }
     const float x = (width - Config::UI_BUTTON_WIDTH) * .5f;
-    const float buttonHeight = std::clamp(
-        (startY - 14.0f) / std::max<size_t>(1, m_buttons.size()) - 5.0f,
-        22.0f, Config::UI_BUTTON_HEIGHT);
     for (size_t i = 0; i < m_buttons.size(); ++i) {
-        const float y = startY - i * (buttonHeight + 5.0f);
+        const float y = layout.firstButtonY -
+                        i * (layout.buttonHeight + 5.0f);
         m_buttons[i].setPosition(x, y);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, buttonHeight);
+        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, layout.buttonHeight);
         m_buttons[i].render(ui);
     }
 }

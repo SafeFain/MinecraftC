@@ -22,6 +22,17 @@ struct PlayerVisualState {
     float swingProgress = 1.0f;
 };
 
+enum class PlayerLocomotion : uint8_t { Idle, Walk, Run, Jump, Fall };
+
+inline PlayerLocomotion playerLocomotion(const PlayerVisualState& state) {
+    if (!state.grounded)
+        return state.velocity.y >= 0.0f
+            ? PlayerLocomotion::Jump : PlayerLocomotion::Fall;
+    if (std::hypot(state.velocity.x, state.velocity.z) < 0.08f)
+        return PlayerLocomotion::Idle;
+    return state.sprinting ? PlayerLocomotion::Run : PlayerLocomotion::Walk;
+}
+
 inline CameraPerspective nextPerspective(CameraPerspective perspective) {
     switch (perspective) {
         case CameraPerspective::FirstPerson: return CameraPerspective::ThirdPersonBack;

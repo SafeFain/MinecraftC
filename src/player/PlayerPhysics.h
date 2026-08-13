@@ -8,6 +8,24 @@
 
 namespace PlayerPhysics {
 
+struct VerticalMotion {
+    float displacement = 0.0f;
+    float velocity = 0.0f;
+};
+
+inline VerticalMotion integrateGravity(float velocity, float gravity, float dt) {
+    dt = std::max(dt, 0.0f);
+    gravity = std::max(gravity, 0.0f);
+    const float nextVelocity = velocity - gravity * dt;
+    return {(velocity + nextVelocity) * 0.5f * dt, nextVelocity};
+}
+
+inline glm::vec2 horizontalVelocity(const glm::dvec3& previous,
+                                    const glm::dvec3& current, float dt) {
+    if (dt <= 0.00001f) return glm::vec2(0.0f);
+    return glm::vec2(current.x - previous.x, current.z - previous.z) / dt;
+}
+
 struct HurtImmunity {
     float remaining = 0.0f;
     float lastDamage = 0.0f;

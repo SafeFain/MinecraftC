@@ -1,4 +1,5 @@
 #include "renderer/RenderEnvironment.h"
+#include "Config.h"
 #include "renderer/CameraEffects.h"
 #include "renderer/CloudRenderData.h"
 #include "model/ModelRenderLogic.h"
@@ -21,6 +22,13 @@ void require(bool condition, const char* message) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
     }
+}
+
+bool nearMatrix(const glm::mat4& a, const glm::mat4& b, float epsilon = 0.0001f) {
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+            if (std::abs(a[column][row] - b[column][row]) > epsilon) return false;
+    return true;
 }
 }
 
@@ -50,6 +58,23 @@ int main() {
     require(nextPerspective(nextPerspective(nextPerspective(
                 CameraPerspective::FirstPerson))) == CameraPerspective::FirstPerson,
             "perspective cycle did not return to first person");
+    PlayerVisualState visualState;
+    visualState.grounded = true;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Idle,
+            "stationary player did not select the idle animation");
+    visualState.velocity.x = Config::PLAYER_SPEED;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Walk,
+            "actual ground velocity did not select the walk animation");
+    visualState.sprinting = true;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Run,
+            "sprinting velocity did not select the run animation");
+    visualState.grounded = false;
+    visualState.velocity.y = Config::JUMP_SPEED;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Jump,
+            "positive airborne velocity did not select the jump animation");
+    visualState.velocity.y = -1.0f;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Fall,
+            "negative airborne velocity did not select the fall animation");
     require(firstPersonSwingTransform(0.0f) == glm::mat4(1.0f) &&
             firstPersonSwingTransform(1.0f) == glm::mat4(1.0f) &&
             firstPersonSwingTransform(0.5f) != glm::mat4(1.0f),
@@ -229,22 +254,63 @@ int main() {
             "blended model draws were not sorted far-to-near");
     CameraEffects cameraEffects;
     cameraEffects.reset({0.0, 64.0, 0.0});
-    cameraEffects.update({0.0, 64.0, 0.0}, true, false, 1.0f / 60.0f);
+    cameraEffects.update({0.0, 64.0, 0.0}, true, false, 0.0f, 0.0f,
+                         1.0f / 60.0f);
     require(cameraEffects.movementBlend() == 0.0f,
             "stationary player produced view bobbing");
-    for (int i = 1; i <= 30; ++i)
-        cameraEffects.update({i * 0.08, 64.0, 0.0}, true, false, 1.0f / 60.0f);
-    require(cameraEffects.movementBlend() > 0.5f &&
+    constexpr int walkFrames = 60;
+    for (int i = 1; i <= walkFrames; ++i)
+        cameraEffects.update({Config::PLAYER_SPEED *
+                                  static_cast<double>(i) / walkFrames,
+                              64.0, 0.0},
+                             true, false, 0.0f, 0.0f, 1.0f / 60.0f);
+    require(cameraEffects.movementBlend() > 0.8f &&
             glm::length(cameraEffects.translation()) > 0.001f,
             "ground movement did not produce view bobbing");
+    require(std::abs(cameraEffects.walkPhase() /
+                         (2.0f * 3.14159265358979323846f * Config::PLAYER_SPEED) -
+                     0.44f) < 0.001f,
+            "walking camera still uses an excessive step frequency");
+    require(nearMatrix(cameraEffects.viewTransform(false), glm::mat4(1.0f)),
+            "third-person view retained first-person movement motion");
+
+    double fallY = 64.0;
+    for (int i = 0; i < 20; ++i) {
+        fallY -= 0.2;
+        cameraEffects.update({Config::PLAYER_SPEED, fallY, 0.0}, false, false,
+                             -12.0f, 0.0f,
+                             1.0f / 60.0f);
+    }
+    require(cameraEffects.translation().y > 0.01f &&
+                std::abs(cameraEffects.translation().y) <= 0.0451f &&
+                std::abs(cameraEffects.rotationDegrees().x) <= 0.651f,
+            "falling camera inertia is missing or exceeds its comfort bound");
+    cameraEffects.update({Config::PLAYER_SPEED, fallY, 0.0}, true, false,
+                         0.0f, 18.0f,
+                         1.0f / 60.0f);
+    require(cameraEffects.landingStrength() == 1.0f &&
+                std::abs(cameraEffects.translation().y) <= 0.0601f,
+            "landing compression did not use a bounded impact strength");
+    for (int i = 0; i < 30; ++i)
+        cameraEffects.update({Config::PLAYER_SPEED, fallY, 0.0}, true, false,
+                             0.0f, 0.0f,
+                             1.0f / 60.0f);
+    require(cameraEffects.landingStrength() == 0.0f,
+            "landing rebound did not settle within its target duration");
+    cameraEffects.update({100.0, 90.0, -50.0}, true, false, 0.0f, 0.0f,
+                         1.0f / 60.0f);
+    require(cameraEffects.walkPhase() == 0.0f &&
+                cameraEffects.translation() == glm::vec3(0.0f),
+            "teleport generated false movement or landing feedback");
+
     cameraEffects.onDamage(6.0f);
     require(cameraEffects.trauma() > 0.6f,
             "damage did not produce camera trauma");
-    cameraEffects.update({2.4, 64.0, 0.0}, true, false, 0.05f);
+    cameraEffects.update({100.0, 90.0, -50.0}, true, false, 0.0f, 0.0f, 0.05f);
     require(glm::length(cameraEffects.rotationDegrees()) > 0.1f,
             "damage trauma did not produce rotational shake");
     for (int i = 0; i < 20; ++i)
-        cameraEffects.update({2.4, 64.0, 0.0}, true, false, 0.05f);
+        cameraEffects.update({100.0, 90.0, -50.0}, true, false, 0.0f, 0.0f, 0.05f);
     require(cameraEffects.trauma() == 0.0f,
             "damage trauma did not decay to zero");
 

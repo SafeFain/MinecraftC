@@ -4,6 +4,7 @@
 #include "model/AnimationGraph.h"
 #include "model/ModelRenderer.h"
 #include "renderer/GameRenderer.h"
+#include "Config.h"
 
 #include <algorithm>
 #include <cmath>
@@ -36,10 +37,19 @@ void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
     const float horizontal = std::hypot(state.velocity.x, state.velocity.z);
     std::string locomotion;
     float speed = 1.0f;
-    if (!state.grounded) locomotion = state.velocity.y >= 0.0f ? "jump" : "fall";
-    else if (horizontal < 0.08f) locomotion = "idle";
-    else if (state.sprinting) { locomotion = "run"; speed = std::max(.8f,horizontal/5.6f); }
-    else { locomotion = "walk"; speed = std::max(.65f,horizontal/4.3f); }
+    switch (playerLocomotion(state)) {
+        case PlayerLocomotion::Idle: locomotion = "idle"; break;
+        case PlayerLocomotion::Jump: locomotion = "jump"; break;
+        case PlayerLocomotion::Fall: locomotion = "fall"; break;
+        case PlayerLocomotion::Run:
+            locomotion = "run";
+            speed = std::max(.8f, horizontal / Config::SPRINT_SPEED);
+            break;
+        case PlayerLocomotion::Walk:
+            locomotion = "walk";
+            speed = std::max(.65f, horizontal / Config::PLAYER_SPEED);
+            break;
+    }
     if (locomotion != m_locomotion) {
         m_mixer.play(m_graph->actionFor(locomotion), model::PlayPolicy::Replace, speed);
         m_locomotion = locomotion;
