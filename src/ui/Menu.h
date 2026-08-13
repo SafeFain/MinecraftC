@@ -59,6 +59,7 @@ public:
     void setHovered(bool h) { m_hovered = h; }
     void setSelected(bool s) { m_selected = s; }
     void setPressed(bool p) { m_pressed = p; }
+    void setLabel(std::string label) { m_label = std::move(label); }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
 
@@ -94,6 +95,7 @@ public:
     virtual void onScroll(double) {}
     virtual void onChar(unsigned int) {}
     virtual bool wantsTextInput() const { return false; }
+    virtual bool capturesPointerDrag(double, double) const { return false; }
 
 protected:
     void navigateUp(std::vector<Button>& buttons, int& selectedIdx);

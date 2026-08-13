@@ -19,6 +19,10 @@ std::string SettingsMenu::labelForRenderDist() const {
     return m_localization.format(
         "settings.render_distance", {std::to_string(m_settings.renderDistance)});
 }
+std::string SettingsMenu::frameRateLabel() const {
+    return m_localization.format(
+        "settings.frame_rate", {std::to_string(m_settings.frameRateLimit)});
+}
 std::string SettingsMenu::labelForCloudRenderDist() const {
     return m_localization.format(
         "settings.cloud_distance", {std::to_string(m_settings.cloudRenderDistance)});
@@ -74,6 +78,8 @@ void SettingsMenu::showPage(SettingsPage page) {
 
 void SettingsMenu::refreshButtons() {
     m_buttons.clear();
+    m_frameRateButton = -1;
+    m_frameRateDragging = false;
     if (m_page == SettingsPage::General) {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
@@ -110,6 +116,14 @@ void SettingsMenu::refreshButtons() {
                     m_onChanged(); refreshButtons();
                 });
         }
+        m_frameRateButton = static_cast<int>(m_buttons.size());
+        m_buttons.emplace_back(frameRateLabel(), [this] {
+            m_settings.frameRateLimit += 10;
+            if (m_settings.frameRateLimit > ClientSettings::MAX_FRAME_RATE)
+                m_settings.frameRateLimit = ClientSettings::MIN_FRAME_RATE;
+            m_onChanged();
+            refreshButtons();
+        });
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
         m_buttons.emplace_back(m_localization.format("settings.clouds", {
             m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),
@@ -301,6 +315,18 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, layout.buttonHeight);
         m_buttons[i].render(ui);
     }
+    if (m_frameRateButton >= 0 &&
+        m_frameRateButton < static_cast<int>(m_buttons.size())) {
+        const Button& slider = m_buttons[static_cast<size_t>(m_frameRateButton)];
+        const float left = slider.x() + 12.0f;
+        const float width = std::max(1.0f, slider.width() - 24.0f);
+        const float trackY = slider.y() + 3.0f;
+        const float filled = width * frameRateSliderFraction(m_settings.frameRateLimit);
+        ui.drawRect(left, trackY, width, 3.0f, glm::vec4(.12f, .12f, .16f, .9f));
+        ui.drawRect(left, trackY, filled, 3.0f, glm::vec4(.72f, .78f, 1.0f, 1.0f));
+        ui.drawRect(left + filled - 2.0f, trackY - 3.0f, 5.0f, 9.0f,
+                    glm::vec4(.95f, .95f, 1.0f, 1.0f));
+    }
 }
 
 void SettingsMenu::onKeyPress(int key, int) {
@@ -311,6 +337,15 @@ void SettingsMenu::onKeyPress(int key, int) {
             assignBinding({});
         else if (m_page != SettingsPage::Controller)
             assignBinding({InputDevice::Keyboard, key});
+        return;
+    }
+    if (m_page == SettingsPage::Video && m_selectedIdx == m_frameRateButton &&
+        (key == Key::Left || key == Key::Right)) {
+        m_settings.frameRateLimit = std::clamp(
+            m_settings.frameRateLimit + (key == Key::Right ? 1 : -1),
+            ClientSettings::MIN_FRAME_RATE, ClientSettings::MAX_FRAME_RATE);
+        m_onChanged();
+        refreshButtons();
         return;
     }
     switch (key) {
@@ -328,6 +363,7 @@ void SettingsMenu::onKeyPress(int key, int) {
 }
 
 void SettingsMenu::onMouseMove(double x, double y) {
+    if (m_frameRateDragging) setFrameRateFromPointer(x);
     for (auto& button : m_buttons)
         button.setHovered(button.containsPoint(static_cast<float>(x), static_cast<float>(y)));
 }
@@ -339,6 +375,25 @@ void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, doub
         return;
     }
     if (button != MouseButton::Left) return;
+    if (m_frameRateButton >= 0 &&
+        m_frameRateButton < static_cast<int>(m_buttons.size())) {
+        Button& slider = m_buttons[static_cast<size_t>(m_frameRateButton)];
+        if (action == ButtonAction::Press && slider.containsPoint(
+                static_cast<float>(x), static_cast<float>(y))) {
+            m_pressedButton = -1;
+            m_frameRateDragging = true;
+            slider.setPressed(true);
+            setFrameRateFromPointer(x);
+            return;
+        }
+        if (action == ButtonAction::Release && m_frameRateDragging) {
+            setFrameRateFromPointer(x);
+            slider.setPressed(false);
+            m_frameRateDragging = false;
+            m_onChanged();
+            return;
+        }
+    }
     if (action == ButtonAction::Press) {
         m_pressedButton = -1;
         for (size_t i = 0; i < m_buttons.size(); ++i)
@@ -352,6 +407,24 @@ void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, doub
                 static_cast<float>(x), static_cast<float>(y)))
             m_buttons[static_cast<size_t>(captured)].activate();
     }
+}
+
+bool SettingsMenu::capturesPointerDrag(double x, double y) const {
+    return m_frameRateButton >= 0 &&
+        m_frameRateButton < static_cast<int>(m_buttons.size()) &&
+        m_buttons[static_cast<size_t>(m_frameRateButton)].containsPoint(
+            static_cast<float>(x), static_cast<float>(y));
+}
+
+void SettingsMenu::setFrameRateFromPointer(double x) {
+    if (m_frameRateButton < 0 ||
+        m_frameRateButton >= static_cast<int>(m_buttons.size())) return;
+    Button& slider = m_buttons[static_cast<size_t>(m_frameRateButton)];
+    constexpr float inset = 12.0f;
+    m_settings.frameRateLimit = frameRateFromSlider(
+        static_cast<float>(x), slider.x() + inset,
+        std::max(1.0f, slider.width() - inset * 2.0f));
+    slider.setLabel(frameRateLabel());
 }
 
 void SettingsMenu::onScroll(double yOffset) {

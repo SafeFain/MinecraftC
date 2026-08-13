@@ -111,6 +111,7 @@
   "touch.command": "指令",
   "touch.close": "关闭",
   "settings.render_distance": "渲染距离：{0}",
+  "settings.frame_rate": "最大帧率：{0} FPS",
   "settings.clouds": "云：{0}",
   "settings.cloud_distance": "云渲染距离：{0} 格",
   "settings.smooth_lighting": "平滑光照：{0}",

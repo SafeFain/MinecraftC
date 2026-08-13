@@ -98,6 +98,10 @@ public:
     void setTouchCallback(TouchCallback callback) { m_touchCallback = std::move(callback); }
     using FocusCallback = std::function<void(bool focused)>;
     void setFocusCallback(FocusCallback callback) { m_focusCallback = std::move(callback); }
+    using ScreenKeyboardCallback = std::function<void(bool visible)>;
+    void setScreenKeyboardCallback(ScreenKeyboardCallback callback) {
+        m_screenKeyboardCallback = std::move(callback);
+    }
     using ResizeCallback = std::function<void(int pixelWidth, int pixelHeight)>;
     void setResizeCallback(ResizeCallback callback) {
         m_resizeCallback = std::move(callback);
@@ -134,6 +138,7 @@ private:
     ScrollCallback m_scrollCallback;
     TouchCallback m_touchCallback;
     FocusCallback m_focusCallback;
+    ScreenKeyboardCallback m_screenKeyboardCallback;
     ResizeCallback m_resizeCallback;
 
     void resetEventFrame();

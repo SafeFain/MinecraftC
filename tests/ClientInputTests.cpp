@@ -69,6 +69,11 @@ int main(){
     const SettingsButtonLayout generalLayout=settingsButtonLayout(468.0f,7,false);
     require(generalLayout.firstButtonY+generalLayout.buttonHeight<=450.1f,
             "settings without help retain title clearance");
+    require(frameRateFromSlider(10.0f,10.0f,170.0f)==30&&
+            frameRateFromSlider(180.0f,10.0f,170.0f)==200&&
+            frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
+            frameRateSliderFraction(30)==0.0f&&frameRateSliderFraction(200)==1.0f,
+            "frame-rate slider continuously maps its full 30-200 range");
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&
@@ -144,7 +149,8 @@ int main(){
         bool missing=false;try{assets.readBinary("missing.bin");}catch(const std::exception&){missing=true;}
         require(missing,"missing title assets report failure");}
     ClientSettings settings;
-    settings.mouseSensitivity=.42f;settings.guiScale=3;settings.invertMouseY=true;
+    settings.mouseSensitivity=.42f;settings.guiScale=3;settings.frameRateLimit=137;
+    settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
@@ -158,10 +164,17 @@ int main(){
     settings.touchControlSize=1.25f;settings.touchControlOpacity=.8f;settings.touchLeftHanded=true;
     require(settings.save(root/"options.txt"),"settings save succeeds");
     const auto loaded=ClientSettings::load(root/"options.txt");
-    require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&loaded.invertMouseY&&
+    require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&
+            loaded.frameRateLimit==137&&loaded.invertMouseY&&
             loaded.renderDistance==8&&!loaded.renderClouds&&
             loaded.cloudRenderDistance==1024&&!loaded.smoothLighting,
             "client settings round trip");
+    ClientSettings frameRateRange;frameRateRange.frameRateLimit=12;frameRateRange.validate();
+    require(frameRateRange.frameRateLimit==ClientSettings::MIN_FRAME_RATE,
+            "frame-rate validation clamps the lower bound");
+    frameRateRange.frameRateLimit=500;frameRateRange.validate();
+    require(frameRateRange.frameRateLimit==ClientSettings::MAX_FRAME_RATE,
+            "frame-rate validation clamps the upper bound");
     require(loaded.rendererBackend==RendererBackend::Vulkan,
             "renderer backend preference round trips");
     require(loaded.shadowQuality==ShadowQuality::High,

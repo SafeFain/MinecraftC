@@ -26,6 +26,10 @@ public:
     static void sleepMilliseconds(uint64_t value) {
         std::this_thread::sleep_for(std::chrono::milliseconds(value));
     }
+    static void sleepUntil(Tick deadline) {
+        std::this_thread::sleep_until(std::chrono::steady_clock::time_point(
+            std::chrono::nanoseconds(deadline)));
+    }
 
 private:
     static Tick steadyNow() {

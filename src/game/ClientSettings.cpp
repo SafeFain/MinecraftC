@@ -108,6 +108,7 @@ void ClientSettings::validate() {
     if (std::none_of(std::begin(opacities),std::end(opacities),[this](float v){return std::abs(v-touchControlOpacity)<.001f;}))
         touchControlOpacity=.65f;
     if (guiScale < 0 || guiScale > 4) guiScale = 0;
+    frameRateLimit = std::clamp(frameRateLimit, MIN_FRAME_RATE, MAX_FRAME_RATE);
     if (rendererBackend != RendererBackend::OpenGL &&
         rendererBackend != RendererBackend::Vulkan)
         rendererBackend = defaultRendererBackend(currentDesktopPlatform());
@@ -167,6 +168,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "renderer") settings.rendererBackend = value == "vulkan"
                 ? RendererBackend::Vulkan : RendererBackend::OpenGL;
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
+            else if (name == "frame_rate_limit") settings.frameRateLimit = std::stoi(value);
             else if (name == "language") settings.language = parseLanguage(value);
             else if (name == "control_mode") settings.controlMode = static_cast<ControlMode>(std::stoi(value));
             else if (name == "touch_sensitivity") settings.touchSensitivity = std::stof(value);
@@ -242,6 +244,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "renderer=" << (rendererBackend == RendererBackend::Vulkan
                 ? "vulkan" : "opengl") << '\n'
            << "gui_scale=" << guiScale << '\n'
+           << "frame_rate_limit=" << frameRateLimit << '\n'
            << "language=" << languageCode(language) << '\n';
     output << "control_mode=" << static_cast<int>(controlMode) << '\n'
            << "touch_sensitivity=" << touchSensitivity << '\n'

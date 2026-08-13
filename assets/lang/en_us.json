@@ -111,6 +111,7 @@
   "touch.command": "CHAT",
   "touch.close": "CLOSE",
   "settings.render_distance": "Render Distance: {0}",
+  "settings.frame_rate": "Max Frame Rate: {0} FPS",
   "settings.clouds": "Clouds: {0}",
   "settings.cloud_distance": "Cloud Distance: {0} Blocks",
   "settings.smooth_lighting": "Smooth Lighting: {0}",

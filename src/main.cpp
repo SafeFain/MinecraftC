@@ -822,6 +822,9 @@ private:
             m_input.update(m_clientSettings.bindings);
             std::fill(std::begin(m_keys), std::end(m_keys), false);
         });
+        m_window.setScreenKeyboardCallback([this](bool visible) {
+            if (!visible && m_commandOpen) closeCommandInput();
+        });
 
         // ── Show main menu ────────────────────────────────────────────
         showMainMenu();
@@ -964,7 +967,14 @@ private:
         if(event.phase==TouchPhase::Begin){
             if(m_uiTouch.active)return;
             m_uiTouch={event.id,position,position,m_runtimeClock.now(),true,false,false,false};
-            dispatchUiTouchMove(position);return;
+            dispatchUiTouchMove(position);
+            if (m_activeMenu && m_activeMenu->capturesPointerDrag(
+                    position.x, position.y)) {
+                dispatchUiTouchButton(
+                    MouseButton::Left, ButtonAction::Press, position);
+                m_uiTouch.buttonDown = true;
+            }
+            return;
         }
         if(!m_uiTouch.active||event.id!=m_uiTouch.id)return;
         if(event.phase==TouchPhase::Move){
@@ -1161,6 +1171,7 @@ private:
     bool runFrame() {
         if(m_window.shouldClose()||!m_running)return false;
         auto& visibleChunks=m_visibleChunks;
+            const RuntimeClock::Tick frameStarted = m_runtimeClock.now();
             m_frameTimer.beginFrame();
             const RuntimeClock::Tick now = m_runtimeClock.now();
             float dt = static_cast<float>(RuntimeClock::seconds(
@@ -1751,6 +1762,8 @@ private:
 
             // ── Finish frame ──────────────────────────────────────────
             m_renderer->endFrame();
+            m_runtimeClock.sleepUntil(frameStarted + RuntimeClock::fromSeconds(
+                1.0 / static_cast<double>(m_clientSettings.frameRateLimit)));
             m_frameTimer.endFrame();
 
             // Alt+F4 to quit

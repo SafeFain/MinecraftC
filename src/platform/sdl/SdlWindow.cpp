@@ -253,6 +253,12 @@ void Window::processEvent(const void* opaqueEvent) {
         case SDL_EVENT_TEXT_INPUT:
             if (m_charCallback) m_charCallback(event.text.text);
             break;
+        case SDL_EVENT_SCREEN_KEYBOARD_SHOWN:
+            if (m_screenKeyboardCallback) m_screenKeyboardCallback(true);
+            break;
+        case SDL_EVENT_SCREEN_KEYBOARD_HIDDEN:
+            if (m_screenKeyboardCallback) m_screenKeyboardCallback(false);
+            break;
         case SDL_EVENT_MOUSE_MOTION:
             if (event.motion.which == SDL_TOUCH_MOUSEID ||
                 event.motion.which == SDL_PEN_MOUSEID) break;

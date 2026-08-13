@@ -13,7 +13,9 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class RendererBackend : uint8_t { OpenGL, Vulkan };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 15;
+    static constexpr int FORMAT_VERSION = 16;
+    static constexpr int MIN_FRAME_RATE = 30;
+    static constexpr int MAX_FRAME_RATE = 200;
 
     int renderDistance = 8;
     bool renderClouds = true;
@@ -27,6 +29,7 @@ struct ClientSettings {
     VisualQuality visualQuality = VisualQuality::Medium;
     RendererBackend rendererBackend = RendererBackend::OpenGL;
     int guiScale = 0; // 0 = Auto
+    int frameRateLimit = MAX_FRAME_RATE;
     Language language = Language::English;
     ControlMode controlMode = ControlMode::Auto;
     float touchSensitivity = 1.5f;

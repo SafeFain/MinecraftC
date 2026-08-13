@@ -48,6 +48,10 @@ int main() {
         require(localization.hasTranslation(Language::SimplifiedChinese, key),
                 "input setting is translated in Simplified Chinese");
     }
+    require(localization.hasTranslation(Language::English, "settings.frame_rate") &&
+            localization.hasTranslation(
+                Language::SimplifiedChinese, "settings.frame_rate"),
+            "frame-rate setting is translated");
     for (size_t action = 0; action < INPUT_ACTION_COUNT; ++action)
         require(localization.hasTranslation(
             Language::SimplifiedChinese, "action." + std::to_string(action)),
