@@ -911,6 +911,7 @@ if(BUILD_TESTING)
 
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
+        src/platform/sdl/SdlAudioSystem.cpp
         src/core/Input.cpp
         src/platform/sdl/SdlGamepadManager.cpp
         src/core/InputCodes.cpp

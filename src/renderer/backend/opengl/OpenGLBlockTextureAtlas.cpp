@@ -16,6 +16,7 @@
 
 namespace {
 constexpr int TILE_SIZE = 16;
+constexpr GLint GL_RGBA8_UNORM_VALUE = 0x8058;
 using Tile = std::array<uint8_t, TILE_SIZE * TILE_SIZE * 4>;
 
 int legacyTilesPerSide() {
@@ -246,17 +247,16 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
             GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
             const auto uploadMap = [](const TextureData& texture,
                                       uint32_t& handle) {
-                constexpr GLint RGBA8_UNORM = 0x8058;
                 GL_CHECK(glGenTextures(1, &handle));
                 GL_CHECK(glBindTexture(GL_TEXTURE_2D, handle));
-                GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, RGBA8_UNORM,
+                GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_UNORM_VALUE,
                     static_cast<GLsizei>(texture.width),
                     static_cast<GLsizei>(texture.height), 0, GL_RGBA,
                     GL_UNSIGNED_BYTE, texture.pixels.data()));
                 for (size_t level = 0; level < texture.mipLevels.size(); ++level) {
                     const auto& mip = texture.mipLevels[level];
                     GL_CHECK(glTexImage2D(GL_TEXTURE_2D,
-                        static_cast<GLint>(level + 1), RGBA8_UNORM,
+                        static_cast<GLint>(level + 1), GL_RGBA8_UNORM_VALUE,
                         static_cast<GLsizei>(mip.width),
                         static_cast<GLsizei>(mip.height), 0, GL_RGBA,
                         GL_UNSIGNED_BYTE, mip.pixels.data()));
@@ -463,12 +463,11 @@ bool BlockTextureAtlas::initialize(const std::filesystem::path& assetRoot) {
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-    constexpr GLint RGBA8_UNORM = 0x8058;
     const auto createFallbackMap = [](uint32_t& texture,
                                       const std::array<uint8_t, 4>& pixel) {
         GL_CHECK(glGenTextures(1, &texture));
         GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture));
-        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, RGBA8_UNORM, 1, 1, 0,
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8_UNORM_VALUE, 1, 1, 0,
                              GL_RGBA, GL_UNSIGNED_BYTE, pixel.data()));
         GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
         GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));

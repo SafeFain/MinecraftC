@@ -532,6 +532,7 @@ private:
                 startGame(id, true);
             };
         m_menuCallbacks.onResume = [this]() {
+            m_audio.setPaused(false);
             m_gameState = GameState::Playing;
             m_window.setCursorLocked(true);
             m_activeMenu.reset();
@@ -543,6 +544,7 @@ private:
             m_saveStore.reset();
             m_terrainGenerated = false;
             m_audio.stopRain();
+            m_audio.setPaused(false);
             m_gameState = GameState::MainMenu;
             m_window.setCursorLocked(false);
             showMainMenu();
@@ -677,6 +679,7 @@ private:
 
                 if (m_gameState == GameState::Playing) {
                     // Pause the game
+                    m_audio.setPaused(true);
                     m_gameState = GameState::Paused;
                     m_window.setCursorLocked(false);
                     m_activeMenu = std::make_unique<PauseMenu>(
@@ -907,7 +910,8 @@ private:
                 case TouchCommand::Pause:
                     handleGameplayAction(false,ButtonAction::Release);
                     handleGameplayAction(true,ButtonAction::Release);
-                    m_touchControls.cancelAll();m_gameState=GameState::Paused;m_window.setCursorLocked(false);
+                    m_touchControls.cancelAll();m_audio.setPaused(true);
+                    m_gameState=GameState::Paused;m_window.setCursorLocked(false);
                     m_activeMenu=std::make_unique<PauseMenu>(m_menuCallbacks,m_localization);break;
                 case TouchCommand::ChangePerspective:cyclePerspective();break;
                 case TouchCommand::SelectHotbar:

@@ -11,6 +11,8 @@ public:
     AudioSystem& operator=(const AudioSystem&) = delete;
 
     bool initialize();
+    void setPaused(bool paused);
+    bool paused() const;
     void setRainVolume(float volume);
     void stopRain();
     void playThunder(float pan, float volume);

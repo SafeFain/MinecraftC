@@ -1,5 +1,6 @@
 #include "game/ClientSettings.h"
 #include "game/InventoryInteraction.h"
+#include "audio/AudioSystem.h"
 #include "ui/TouchControls.h"
 #include "ui/UIRenderer.h"
 #include "ui/SettingsMenu.h"
@@ -36,6 +37,19 @@ glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
 int main(){
+    require(SDL_SetHint(SDL_HINT_AUDIO_DRIVER,"dummy"),
+            "SDL dummy audio driver hint is accepted");
+    {
+        AudioSystem audio;
+        require(audio.initialize(),"SDL dummy audio device initializes");
+        require(!audio.paused(),"audio starts resumed");
+        audio.setPaused(true);
+        require(audio.paused(),"audio device pauses with the game");
+        audio.setPaused(true);
+        require(audio.paused(),"repeated audio pause is idempotent");
+        audio.setPaused(false);
+        require(!audio.paused(),"audio device resumes with the game");
+    }
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&

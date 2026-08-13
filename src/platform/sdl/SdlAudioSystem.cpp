@@ -18,6 +18,7 @@ struct AudioSystem::Impl {
     SDL_AudioStream* stream = nullptr;
     bool subsystemInitialized = false;
     bool initialized = false;
+    bool paused = false;
     std::atomic<float> rainTarget{0.0f};
     std::atomic<bool> rainReset{false};
     std::atomic<float> thunderPan{0.0f};
@@ -119,7 +120,9 @@ bool AudioSystem::initialize() {
     const SDL_AudioSpec spec{SDL_AUDIO_F32, Impl::CHANNELS, Impl::SAMPLE_RATE};
     m_impl->stream = SDL_OpenAudioDeviceStream(
         SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, Impl::callback, m_impl.get());
-    if (!m_impl->stream || !SDL_ResumeAudioStreamDevice(m_impl->stream)) {
+    const bool streamReady = m_impl->stream &&
+        (m_impl->paused || SDL_ResumeAudioStreamDevice(m_impl->stream));
+    if (!streamReady) {
         LOG_WARN("SDL audio device unavailable; weather audio disabled: " <<
                  SDL_GetError());
         if (m_impl->stream) {
@@ -133,6 +136,29 @@ bool AudioSystem::initialize() {
     m_impl->initialized = true;
     LOG_INFO("SDL weather audio initialized at 48 kHz stereo");
     return true;
+}
+
+void AudioSystem::setPaused(bool paused) {
+    if (m_impl->paused == paused) return;
+    if (!m_impl->initialized || !m_impl->stream) {
+        m_impl->paused = paused;
+        return;
+    }
+    const bool changed = paused
+        ? SDL_PauseAudioStreamDevice(m_impl->stream)
+        : SDL_ResumeAudioStreamDevice(m_impl->stream);
+    if (!changed) {
+        LOG_WARN("Could not " << (paused ? "pause" : "resume")
+                 << " SDL audio: " << SDL_GetError());
+        return;
+    }
+    m_impl->paused = paused;
+}
+
+bool AudioSystem::paused() const {
+    if (m_impl->initialized && m_impl->stream)
+        return SDL_AudioStreamDevicePaused(m_impl->stream);
+    return m_impl->paused;
 }
 
 void AudioSystem::setRainVolume(float volume) {
