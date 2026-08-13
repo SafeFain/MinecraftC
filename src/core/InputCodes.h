@@ -11,6 +11,7 @@ constexpr int A = 4;
 constexpr int C = 6;
 constexpr int D = 7;
 constexpr int E = 8;
+constexpr int Q = 20;
 constexpr int S = 22;
 constexpr int T = 23;
 constexpr int V = 25;

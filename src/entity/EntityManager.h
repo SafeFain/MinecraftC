@@ -56,7 +56,8 @@ public:
 
     void clear();
     void spawnItem(const glm::dvec3& position, ItemStack stack,
-                   const glm::vec3& velocity = glm::vec3(0.0f));
+                   const glm::vec3& velocity = glm::vec3(0.0f),
+                   float pickupDelaySeconds = 0.0f);
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned);
     bool spawnMob(EntityType type, const glm::dvec3& position);

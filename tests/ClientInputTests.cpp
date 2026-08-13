@@ -43,6 +43,11 @@ int main(){
         AudioSystem audio;
         require(audio.initialize(),"SDL dummy audio device initializes");
         require(!audio.paused(),"audio starts resumed");
+        require(audio.musicMode()==AudioMusicMode::Menu,
+                "main-menu music is the default audio mode");
+        audio.setMusicMode(AudioMusicMode::Gameplay);
+        require(audio.musicMode()==AudioMusicMode::Gameplay,
+                "gameplay music mode can be selected");
         audio.setPaused(true);
         require(audio.paused(),"audio device pauses with the game");
         audio.setPaused(true);
@@ -213,6 +218,9 @@ int main(){
     require(ClientSettings{}.bindings[static_cast<size_t>(InputAction::Perspective)]==
                 InputBinding{InputDevice::Keyboard,Key::F5},
             "perspective action defaults to F5");
+    require(ClientSettings{}.bindings[static_cast<size_t>(InputAction::DropItem)]==
+                InputBinding{InputDevice::Keyboard,Key::Q},
+            "drop-item action defaults to Q");
     require(effectiveGuiScale(1920,1080,0)==2&&effectiveGuiScale(800,450,0)==1&&
             effectiveGuiScale(1920,1080,4)==4,
             "automatic GUI scale preserves minimum virtual size");
@@ -315,6 +323,20 @@ int main(){
     ItemStack gatherCursor{ItemId::COAL,1,0},g1{ItemId::COAL,40,0},g2{ItemId::COAL,40,0};
     InventoryInteraction::gather(gatherCursor,{&g1,&g2});
     require(gatherCursor.count==64&&g1.empty()&&g2.count==17,"double click gather respects maximum");
+    ItemStack creativeSlot{};
+    InventoryInteraction::setCreativeItem(creativeSlot,ItemId::COAL);
+    require(creativeSlot.id==ItemId::COAL&&creativeSlot.count==64&&creativeSlot.damage==0,
+            "creative catalog supplies a full material stack to the real hotbar slot");
+    InventoryInteraction::setCreativeItem(creativeSlot,ItemId::DIAMOND_PICKAXE);
+    require(creativeSlot.id==ItemId::DIAMOND_PICKAXE&&creativeSlot.count==1,
+            "creative catalog respects non-stackable item limits");
+    ItemStack droppedFrom{ItemId::COAL,2,7};
+    const ItemStack dropped=InventoryInteraction::takeOne(droppedFrom);
+    require(dropped.id==ItemId::COAL&&dropped.count==1&&dropped.damage==7&&
+            droppedFrom.id==ItemId::COAL&&droppedFrom.count==1,
+            "dropping takes one item and preserves stack metadata");
+    InventoryInteraction::takeOne(droppedFrom);
+    require(droppedFrom.empty(),"dropping the final item clears the selected slot");
     std::filesystem::remove_all(root);
     std::cout<<"Client input and inventory interaction tests passed\n";
 }

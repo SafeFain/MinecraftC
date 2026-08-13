@@ -41,11 +41,18 @@ void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
         m_armorRects[i] = {originX - 64.0f, originY + (3 - i) * (slot + gap),
                            slot, slot};
     m_offhandRect = {originX + width + 20.0f, originY, slot, slot};
+    m_creativeCatalogRect = m_creativeAccess
+        ? Rect{12.0f,static_cast<float>(screenHeight)-42.0f,150.0f,28.0f}
+        : Rect{};
 }
 
 bool SurvivalInventoryScreen::contains(const Rect& rect, int x, int y) {
     return x >= rect.x && x <= rect.x + rect.w &&
            y >= rect.y && y <= rect.y + rect.h;
+}
+
+bool SurvivalInventoryScreen::creativeCatalogButtonContains(int x,int y) const {
+    return m_creativeAccess&&contains(m_creativeCatalogRect,x,y);
 }
 
 void SurvivalInventoryScreen::drawStack(
@@ -82,10 +89,20 @@ void SurvivalInventoryScreen::render(
     if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
-    const std::string title = ui.localization().text("inventory.survival");
+    const std::string title = ui.localization().text(
+        m_creativeAccess?"inventory.player_tab":"inventory.survival");
     const auto titleSize = ui.measureText(title, 2.0f);
     ui.renderText(title, (screenWidth - titleSize.x) * 0.5f,
                   screenHeight * 0.78f, 2.0f, glm::vec3(1.0f, 0.85f, 0.3f));
+    if(m_creativeAccess){
+        ui.drawRect(m_creativeCatalogRect.x,m_creativeCatalogRect.y,
+                    m_creativeCatalogRect.w,m_creativeCatalogRect.h,
+                    glm::vec4(.22f,.23f,.27f,1.0f));
+        const std::string label=ui.localization().text("inventory.creative_tab");
+        const auto size=ui.measureText(label,.72f);
+        ui.renderText(label,m_creativeCatalogRect.x+(m_creativeCatalogRect.w-size.x)*.5f,
+                      m_creativeCatalogRect.y+7.0f,.72f,glm::vec3(.92f,.92f,.95f));
+    }
     ui.renderText(ui.localization().text("inventory.crafting"),
                   screenWidth * 0.5f - 118.0f,
                   m_craftingRects[0].y + 54.0f, 1.1f, glm::vec3(0.85f));

@@ -89,10 +89,6 @@ public:
     float landingSpeed() const { return m_landingSpeed; }
     void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
 
-    // ── Selected block for placement ───────────────────────────────────
-    void setSelectedBlock(BlockId id) { m_selectedBlock = id; }
-    void setSelectedCreativeItem(ItemId id) { m_selectedCreativeItem = id; }
-    BlockId getSelectedBlock() const { return m_selectedBlock; }
     ItemStack activeItem() const;
     PlayerVisualState visualState() const;
 
@@ -128,8 +124,6 @@ private:
     // Interaction
     std::optional<glm::ivec3> m_highlightedBlock;
     float m_actionCooldown = 0.0f;
-    BlockId m_selectedBlock = BlockId::GRASS;
-    ItemId m_selectedCreativeItem = ItemId::GRASS_BLOCK;
     GameMode m_gameMode = GameMode::Creative;
     Difficulty m_difficulty = Difficulty::Normal;
     InventoryModel m_inventory;

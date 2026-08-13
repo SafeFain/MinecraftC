@@ -55,7 +55,7 @@ void ClientSettings::resetBindings() {
         mouse(MouseButton::Right), key(Key::Num1), key(Key::Num2),
         key(Key::Num3), key(Key::Num4), key(Key::Num5), key(Key::Num6),
         key(Key::Num7), key(Key::Num8), key(Key::Num9), wheel(1), wheel(-1),
-        key(Key::F5)};
+        key(Key::F5), key(Key::Q)};
 }
 
 void ClientSettings::resetGamepadBindings() {

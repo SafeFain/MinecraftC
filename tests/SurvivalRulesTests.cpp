@@ -16,6 +16,13 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(canTillBlock(ItemId::WOODEN_HOE,BlockId::GRASS,1)&&
+            canTillBlock(ItemId::DIAMOND_HOE,BlockId::DIRT,1),
+            "hoes can till the top face of grass and dirt in shared gameplay logic");
+    require(!canTillBlock(ItemId::WOODEN_PICKAXE,BlockId::DIRT,1)&&
+            !canTillBlock(ItemId::WOODEN_HOE,BlockId::STONE,1)&&
+            !canTillBlock(ItemId::WOODEN_HOE,BlockId::DIRT,0),
+            "tilling rejects non-hoes, invalid blocks, and side faces");
     const ItemStack hand{};
     const ItemStack woodenPick{ItemId::WOODEN_PICKAXE, 1, 0};
     const ItemStack stonePick{ItemId::STONE_PICKAXE, 1, 0};

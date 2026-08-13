@@ -38,4 +38,14 @@ void distribute(ItemStack& cursor,const std::vector<ItemStack*>& targets,bool on
         if(target->empty())*target={cursor.id,static_cast<uint8_t>(n),cursor.damage};else target->count+=n;
         cursor.count-=n;if(!cursor.count){cursor.clear();return;}}
 }
+void setCreativeItem(ItemStack& slot,ItemId item){
+    if(!isValidItemId(item)||item==ItemId::EMPTY){slot.clear();return;}
+    slot={item,getItemProps(item).maxStack,0};
+}
+ItemStack takeOne(ItemStack& slot){
+    if(slot.empty())return {};
+    const ItemStack result{slot.id,1,slot.damage};
+    if(--slot.count==0)slot.clear();
+    return result;
+}
 }

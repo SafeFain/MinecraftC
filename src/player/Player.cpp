@@ -193,11 +193,8 @@ void Player::handleMouseButton(int button, ButtonAction action) {
         }
         if (m_mining && m_actionCooldown <= 0.0f) {
             float damage = 1.0f;
-            if (m_gameMode == GameMode::Survival) {
-                const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-                if (!stack.empty()) damage = std::max(1.0f, getItemProps(stack.id).attackDamage);
-            } else if (m_gameMode == GameMode::Creative)
-                damage = std::max(1.0f, getItemProps(m_selectedCreativeItem).attackDamage);
+            const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+            if (!stack.empty()) damage = std::max(1.0f, getItemProps(stack.id).attackDamage);
             if (m_entities && m_entities->attackRay(
                     getEyePosition(), m_forward,
                     m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
@@ -254,9 +251,7 @@ void Player::update(float dt) {
 
 ItemStack Player::activeItem() const {
     if (m_gameMode == GameMode::Spectator) return {};
-    if (m_gameMode == GameMode::Survival)
-        return m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-    return {m_selectedCreativeItem, 1, 0};
+    return m_inventory.slot(static_cast<size_t>(m_selectedSlot));
 }
 
 PlayerVisualState Player::visualState() const {
@@ -621,7 +616,9 @@ void Player::updateMining(float dt) {
 }
 
 bool Player::placeBlock() {
-    if (m_gameMode == GameMode::Creative && m_selectedCreativeItem == ItemId::BOW) {
+    const ItemId selectedItem =
+        m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id;
+    if (m_gameMode == GameMode::Creative && selectedItem == ItemId::BOW) {
         if (m_entities) {
             m_entities->spawnArrow(getEyePosition() + glm::dvec3(m_forward) * 0.45,
                                    m_forward * 24.0f, 6.0f, true);
@@ -659,9 +656,7 @@ bool Player::placeBlock() {
         return true;
     }
 
-    const ItemId activeItem = m_gameMode == GameMode::Survival
-        ? m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id
-        : m_selectedCreativeItem;
+    const ItemId activeItem = selectedItem;
     const auto& activeProperties = getItemProps(activeItem);
     if (m_gameMode == GameMode::Creative && activeProperties.spawnEggMob) {
         if (m_entities) {
@@ -692,21 +687,22 @@ bool Player::placeBlock() {
         return used;
     }
 
-    BlockId placed = m_selectedBlock;
+    BlockId placed = activeProperties.placedBlock.value_or(BlockId::AIR);
+    auto& selectedStack=m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+    if(canTillBlock(selectedStack.id,targetedBlock,hit->faceNormal.y)){
+        m_world.setBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z,
+                         BlockId::FARMLAND);
+        if(m_gameMode==GameMode::Survival&&
+           ++selectedStack.damage>=activeProperties.maxDurability)
+            selectedStack.clear();
+        return true;
+    }
     if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return false;
     if (m_gameMode == GameMode::Survival) {
-        auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+        auto& stack = selectedStack;
         if (stack.empty()) return false;
         const auto& props = getItemProps(stack.id);
         const BlockId hitBlock = targetedBlock;
-        if (props.tool == ToolKind::Hoe &&
-            (hitBlock == BlockId::DIRT || hitBlock == BlockId::GRASS) &&
-            hit->faceNormal.y > 0) {
-            m_world.setBlock(hit->blockPos.x, hit->blockPos.y, hit->blockPos.z,
-                             BlockId::FARMLAND);
-            if (++stack.damage >= props.maxDurability) stack.clear();
-            return true;
-        }
         if (stack.id == ItemId::WHEAT_SEEDS && isFarmland(hitBlock) &&
             hit->faceNormal.y > 0 && m_world.getBlock(
                 placePos.x, placePos.y, placePos.z) == BlockId::AIR) {

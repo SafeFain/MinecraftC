@@ -24,6 +24,10 @@ void CreativeInventory::layoutSlots(int width,int height) {
     m_panelH=header+gridH+footer;
     m_panelX=(width-m_panelW)*.5f;
     m_panelY=(height-m_panelH)*.5f;
+    m_playerButtonX=m_panelX+14.0f;
+    m_playerButtonY=m_panelY+8.0f;
+    m_playerButtonW=std::min(150.0f,m_panelW*.46f);
+    m_playerButtonH=22.0f;
     const float originX=m_panelX+padding;
     const float gridTop=m_panelY+footer+gridH;
     for(size_t i=0;i<m_slots.size();++i){
@@ -51,8 +55,12 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
         std::to_string(std::max(1, m_totalRows - m_visibleRows + 1))});
     const auto pageSize=ui.measureText(page,.8f);
     ui.renderText(page,m_panelX+m_panelW-pageSize.x-18.0f,m_panelY+14.0f,.8f,{.68f,.68f,.72f});
-    ui.renderText(ui.localization().text("inventory.help"),
-                  m_panelX+16.0f,m_panelY+14.0f,.72f,{.65f,.65f,.70f});
+    ui.drawRect(m_playerButtonX,m_playerButtonY,m_playerButtonW,m_playerButtonH,
+                {.22f,.23f,.27f,1.0f});
+    const std::string playerLabel=ui.localization().text("inventory.player_tab");
+    const auto playerSize=ui.measureText(playerLabel,.72f);
+    ui.renderText(playerLabel,m_playerButtonX+(m_playerButtonW-playerSize.x)*.5f,
+                  m_playerButtonY+5.0f,.72f,{.92f,.92f,.95f});
 
     const Slot* hovered=nullptr;
     for(const auto& item:m_slots){
@@ -90,8 +98,15 @@ void CreativeInventory::onMouseMove(int x,int y){
     for(auto& item:m_slots)item.hovered=item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot;
 }
 
-void CreativeInventory::onMouseClick(int button,int x,int y,std::function<void(ItemId)> select){
+void CreativeInventory::onMouseClick(int button,int x,int y,
+                                     std::function<void(ItemId)> select,
+                                     std::function<void()> openPlayerInventory){
     if(button!=MouseButton::Left) return;
+    if(x>=m_playerButtonX&&x<=m_playerButtonX+m_playerButtonW&&
+       y>=m_playerButtonY&&y<=m_playerButtonY+m_playerButtonH){
+        if(openPlayerInventory)openPlayerInventory();
+        return;
+    }
     constexpr float slot=44.0f;
     for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
         m_selected=item.id;if(select)select(item.id);return;}

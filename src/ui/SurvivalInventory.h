@@ -21,6 +21,8 @@ public:
     void onGamepadAction(int action);
     void onClose();
     void setCraftingTable(bool enabled) { m_craftingTable = enabled; }
+    void setCreativeAccess(bool enabled) { m_creativeAccess = enabled; }
+    bool creativeCatalogButtonContains(int x, int y) const;
 
 private:
     struct Rect { float x = 0, y = 0, w = 44, h = 44; };
@@ -33,7 +35,9 @@ private:
     std::array<Rect, InventoryModel::ARMOR_SIZE> m_armorRects{};
     Rect m_offhandRect{};
     Rect m_outputRect{};
+    Rect m_creativeCatalogRect{};
     bool m_craftingTable = false;
+    bool m_creativeAccess = false;
     bool m_pointerPressed = false;
     int m_pressedButton = -1;
     int m_pressX = 0;

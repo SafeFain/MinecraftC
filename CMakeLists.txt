@@ -619,6 +619,9 @@ if(BUILD_TESTING)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
+    add_test(NAME music_assets_determinism_format_and_loop
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/test_audio_assets.py)
     add_test(NAME vulkan_shader_assets
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tools/vulkan_shaders.py

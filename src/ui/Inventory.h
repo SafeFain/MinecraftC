@@ -13,7 +13,8 @@ public:
     void render(UIRenderer& ui, int screenWidth, int screenHeight,
                 int mouseX, int mouseY);
     void onMouseClick(int button, int mouseX, int mouseY,
-                      std::function<void(ItemId)> onSelectItem);
+                      std::function<void(ItemId)> onSelectItem,
+                      std::function<void()> onOpenPlayerInventory = {});
     void onMouseMove(int mouseX, int mouseY);
     void onScroll(double yOffset);
     void onGamepadNavigate(int dx, int dy);
@@ -35,6 +36,8 @@ private:
     ItemId m_selected = ItemId::EMPTY;
     int m_focus = 0;
     float m_panelX = 0.0f, m_panelY = 0.0f, m_panelW = 0.0f, m_panelH = 0.0f;
+    float m_playerButtonX = 0.0f, m_playerButtonY = 0.0f;
+    float m_playerButtonW = 0.0f, m_playerButtonH = 0.0f;
 
     void layoutSlots(int screenWidth, int screenHeight);
 };

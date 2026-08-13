@@ -44,4 +44,5 @@ uint16_t fuelTicks(ItemId fuel);
 
 int armorPointsForItem(ItemId item);
 int totalArmorPoints(const InventoryModel& inventory);
+bool canTillBlock(ItemId tool, BlockId target, int faceNormalY);
 float durabilityRemaining(const ItemStack& stack);

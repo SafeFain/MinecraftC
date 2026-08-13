@@ -128,13 +128,15 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
 }
 
 void EntityManager::spawnItem(
-    const glm::dvec3& position, ItemStack stack, const glm::vec3& velocity) {
+    const glm::dvec3& position, ItemStack stack, const glm::vec3& velocity,
+    float pickupDelaySeconds) {
     if (stack.empty()) return;
     Entity entity;
     entity.id = m_nextId++;
     entity.type = EntityType::Item;
     entity.position = position;
     entity.velocity = velocity;
+    entity.actionCooldown = std::max(0.0f,pickupDelaySeconds);
     entity.item = stack;
     entity.behaviorSeed = hash32(static_cast<uint32_t>(entity.id));
     m_entities.push_back(entity);
@@ -423,7 +425,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             } else {
                 entity.position = next;
             }
-            if (playerCanPickup &&
+            if (playerCanPickup && entity.actionCooldown<=0.0f &&
                 glm::distance(entity.position, player.getPosition()) < 1.6) {
                 if (pickupItemStack(player.inventory(), entity.item)) entity.health = 0.0f;
             }

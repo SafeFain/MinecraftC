@@ -2,6 +2,13 @@
 
 #include <memory>
 
+class AssetStore;
+
+enum class AudioMusicMode {
+    Menu,
+    Gameplay
+};
+
 class AudioSystem {
 public:
     AudioSystem();
@@ -10,9 +17,11 @@ public:
     AudioSystem(const AudioSystem&) = delete;
     AudioSystem& operator=(const AudioSystem&) = delete;
 
-    bool initialize();
+    bool initialize(const AssetStore* assets = nullptr);
     void setPaused(bool paused);
     bool paused() const;
+    void setMusicMode(AudioMusicMode mode);
+    AudioMusicMode musicMode() const;
     void setRainVolume(float volume);
     void stopRain();
     void playThunder(float pan, float volume);

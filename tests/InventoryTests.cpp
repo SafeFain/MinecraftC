@@ -54,6 +54,8 @@ int main() {
             "spawn eggs are not registered with stable mob mappings");
 
     InventoryModel inventory;
+    for (const auto& stack : inventory.storage())
+        require(stack.empty(), "new player inventory starts with an empty hotbar and backpack");
     require(inventory.add({ItemId::COAL, 64, 0}) == 0,
             "full material stack is accepted");
     require(inventory.add({ItemId::COAL, 17, 0}) == 0,

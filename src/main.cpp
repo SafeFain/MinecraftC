@@ -40,6 +40,7 @@
 #include "game/ClientSettings.h"
 #include "game/Localization.h"
 #include "game/SurvivalSession.h"
+#include "game/InventoryInteraction.h"
 #include "game/Utf8.h"
 #include "game/TextWrap.h"
 #include "world/WorldGenContext.h"
@@ -375,6 +376,7 @@ private:
     ContainerScreen         m_containerScreen{m_player.inventory()};
     bool                    m_containerOpen = false;
     bool                  m_inventoryOpen = false;
+    bool                  m_creativeCatalogOpen = true;
     double                m_mouseScreenX = 0.0;
     double                m_mouseScreenY = 0.0;
     bool                  m_commandOpen = false;
@@ -445,7 +447,7 @@ private:
         m_entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_playerRenderer.initialize(m_paths.assetRoot, *m_renderer);
         m_heldItemRenderer.initialize(*m_renderer, m_paths.assetRoot);
-        m_audio.initialize();
+        m_audio.initialize(&m_assets);
         m_uiRenderer.initialize(*m_renderer,
             m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
             m_paths.assetRoot, graphics.api);
@@ -649,6 +651,10 @@ private:
                 return;
             }
 
+            if(action==ButtonAction::Press&&keyBound(InputAction::DropItem)&&
+               m_gameState==GameState::Playing&&!m_activeMenu&&!m_inventoryOpen&&
+               !m_commandOpen&&!m_playerDead){dropSelectedItem();return;}
+
             // Number keys 1-9 — hotbar selection (Playing only)
             for (int slot = 0; slot < 9 && action == ButtonAction::Press; ++slot) {
                 if (!keyBound(static_cast<InputAction>(
@@ -656,8 +662,6 @@ private:
                 if (m_gameState == GameState::Playing) {
                     m_hotbar.selectSlot(slot);
                     m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
-                    m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
-                    m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
                 }
                 break;
             }
@@ -736,14 +740,22 @@ private:
                 if(mouseBound(InputAction::Perspective)&&!m_inventoryOpen&&!m_commandOpen){
                     cyclePerspective();return;
                 }
+                if(mouseBound(InputAction::DropItem)&&!m_inventoryOpen&&!m_commandOpen&&
+                   !m_playerDead){dropSelectedItem();return;}
                 for(int slot=0;slot<9;++slot)if(mouseBound(static_cast<InputAction>(
                     static_cast<int>(InputAction::Hotbar1)+slot))){m_hotbar.selectSlot(slot);
-                    m_player.setSelectedSlot(slot);
-                    m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
-                    m_player.setSelectedBlock(m_hotbar.getSelectedBlock());}
+                    m_player.setSelectedSlot(slot);}
             }
-            if (m_inventoryOpen && (m_player.isSurvival() || m_containerOpen) &&
+            if (m_inventoryOpen && (playerInventoryViewOpen() || m_containerOpen) &&
                 (action == ButtonAction::Press || action == ButtonAction::Release)) {
+                if (!m_containerOpen && m_player.gameMode() == GameMode::Creative &&
+                    action == ButtonAction::Press &&
+                    m_survivalInventory.creativeCatalogButtonContains(
+                        static_cast<int>(m_mouseScreenX),static_cast<int>(m_mouseScreenY))) {
+                    m_survivalInventory.onClose();
+                    m_creativeCatalogOpen=true;
+                    return;
+                }
                 if (m_containerOpen) m_containerScreen.onMouseButton(
                     button, action, static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY), mods);
                 else m_survivalInventory.onMouseButton(button, action,
@@ -758,15 +770,14 @@ private:
             }
             if (action == ButtonAction::Press || action == ButtonAction::Release) {
                 if (m_inventoryOpen) {
-                    if (!m_player.isSurvival() && action == ButtonAction::Press) {
+                    if (m_player.gameMode()==GameMode::Creative &&
+                        m_creativeCatalogOpen && action == ButtonAction::Press) {
                         m_inventory.onMouseClick(button,
                             static_cast<int>(m_mouseScreenX),
                             static_cast<int>(m_mouseScreenY),
                             [this](ItemId id) {
-                                m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(), id);
-                                m_player.setSelectedCreativeItem(id);
-                                m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
-                            });
+                                giveCreativeItem(id);
+                            },[this](){openPlayerInventoryView();});
                     }
                 } else if (m_activeMenu) {
                     m_activeMenu->onMouseButton(button, action,
@@ -779,7 +790,8 @@ private:
             m_input.scrollEvent(yoffset);
             m_input.update(m_clientSettings.bindings);
             if (m_activeMenu) { m_activeMenu->onScroll(yoffset); return; }
-            if (m_inventoryOpen && !m_player.isSurvival() && !m_containerOpen) {
+            if (m_inventoryOpen && m_player.gameMode()==GameMode::Creative &&
+                m_creativeCatalogOpen && !m_containerOpen) {
                 m_inventory.onScroll(yoffset);
                 return;
             }
@@ -789,6 +801,7 @@ private:
                 if(wheelBound(InputAction::Inventory)&&!m_player.isSpectator()){if(m_inventoryOpen)closeInventory();else openInventory();return;}
                 if(wheelBound(InputAction::Command)&&!m_inventoryOpen&&!m_playerDead){m_commandOpen=true;m_commandInput.setText({});m_window.setCursorLocked(false);return;}
                 if(wheelBound(InputAction::Perspective)&&!m_inventoryOpen){cyclePerspective();return;}
+                if(wheelBound(InputAction::DropItem)&&!m_inventoryOpen&&!m_playerDead){dropSelectedItem();return;}
                 for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_hotbar.selectSlot(slot);
                 if(!m_inventoryOpen){if(wheelBound(InputAction::Attack)){handleGameplayAction(false,ButtonAction::Press);handleGameplayAction(false,ButtonAction::Release);}
                     if(wheelBound(InputAction::Use)){handleGameplayAction(true,ButtonAction::Press);if(!m_inventoryOpen)handleGameplayAction(true,ButtonAction::Release);}}
@@ -798,8 +811,6 @@ private:
                 if (m_input.pressed(InputAction::PreviousSlot)) m_hotbar.onScroll(1.0);
                 if (m_input.pressed(InputAction::NextSlot)) m_hotbar.onScroll(-1.0);
                 m_player.setSelectedSlot(m_hotbar.getSelectedSlot());
-                m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
-                m_player.setSelectedBlock(m_hotbar.getSelectedBlock());
             }
         });
 
@@ -840,6 +851,7 @@ private:
     }
 
     void showMainMenu() {
+        m_audio.setMusicMode(AudioMusicMode::Menu);
         m_activeMenu = std::make_unique<MainMenu>(
             m_menuCallbacks, m_worldCatalog.list(), m_clientSettings, m_localization,
             &m_clipboard);
@@ -916,21 +928,24 @@ private:
                 case TouchCommand::ChangePerspective:cyclePerspective();break;
                 case TouchCommand::SelectHotbar:
                     m_hotbar.selectSlot(command.value);m_player.setSelectedSlot(command.value);
-                    m_player.setSelectedCreativeItem(m_hotbar.getSelectedItem());
-                    m_player.setSelectedBlock(m_hotbar.getSelectedBlock());break;
+                    break;
             }
         }
     }
 
     void dispatchUiTouchButton(int button,ButtonAction action,const glm::vec2& position) {
         const int x=static_cast<int>(position.x),y=static_cast<int>(position.y);
-        if(m_inventoryOpen&&(m_player.isSurvival()||m_containerOpen)){
+        if(m_inventoryOpen&&(playerInventoryViewOpen()||m_containerOpen)){
+            if(!m_containerOpen&&m_player.gameMode()==GameMode::Creative&&
+               action==ButtonAction::Press&&
+               m_survivalInventory.creativeCatalogButtonContains(x,y)){
+                m_survivalInventory.onClose();m_creativeCatalogOpen=true;return;
+            }
             if(m_containerOpen)m_containerScreen.onMouseButton(button,action,x,y);
             else m_survivalInventory.onMouseButton(button,action,x,y);
         }else if(m_inventoryOpen){
             if(action==ButtonAction::Press)m_inventory.onMouseClick(button,x,y,[this](ItemId id){
-                m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(),id);
-                m_player.setSelectedCreativeItem(id);m_player.setSelectedBlock(m_hotbar.getSelectedBlock());});
+                giveCreativeItem(id);},[this](){openPlayerInventoryView();});
         }else if(m_activeMenu)m_activeMenu->onMouseButton(button,action,position.x,position.y);
         else if(m_playerDead&&action==ButtonAction::Release)respawnPlayer();
     }
@@ -939,7 +954,7 @@ private:
         const int x=static_cast<int>(position.x),y=static_cast<int>(position.y);
         if(m_inventoryOpen){m_inventory.onMouseMove(x,y);
             if(m_containerOpen)m_containerScreen.onMouseMove(x,y);
-            else if(m_player.isSurvival())m_survivalInventory.onMouseMove(x,y);
+            else if(playerInventoryViewOpen())m_survivalInventory.onMouseMove(x,y);
         }
         if(m_activeMenu)m_activeMenu->onMouseMove(position.x,position.y);
     }
@@ -954,7 +969,8 @@ private:
         if(event.phase==TouchPhase::Move){
             m_uiTouch.position=position;
             const glm::vec2 delta=position-m_uiTouch.origin;
-            const bool scrollSurface=m_activeMenu||(m_inventoryOpen&&!m_player.isSurvival()&&!m_containerOpen);
+            const bool scrollSurface=m_activeMenu||(m_inventoryOpen&&
+                m_player.gameMode()==GameMode::Creative&&m_creativeCatalogOpen&&!m_containerOpen);
             if(scrollSurface&&!m_uiTouch.buttonDown&&std::abs(delta.y)>24.0f){
                 const double scroll=delta.y>0.0f?-1.0:1.0;
                 if(m_activeMenu)m_activeMenu->onScroll(scroll);else m_inventory.onScroll(scroll);
@@ -979,7 +995,7 @@ private:
 
     void updateLongPress() {
         if(!m_uiTouch.active||m_uiTouch.buttonDown||m_uiTouch.scrolling||
-           !m_inventoryOpen||(!m_player.isSurvival()&&!m_containerOpen))return;
+           !m_inventoryOpen||(!playerInventoryViewOpen()&&!m_containerOpen))return;
         if(RuntimeClock::seconds(RuntimeClock::elapsed(m_uiTouch.started,m_runtimeClock.now()))<.45)return;
         dispatchUiTouchButton(MouseButton::Right,ButtonAction::Press,m_uiTouch.position);
         m_uiTouch.buttonDown=true;m_uiTouch.rightButton=true;
@@ -1055,6 +1071,7 @@ private:
 
     void startGame(const std::string& worldId, bool newWorld) {
         saveCurrentWorld();
+        m_audio.setMusicMode(AudioMusicMode::Gameplay);
         m_saveStore = std::make_unique<SaveStore>(m_worldCatalog.open(worldId));
         m_worldMetadata = m_saveStore->loadMetadata();
         if (m_worldMetadata.generationVersion != WorldGenContext::GENERATION_VERSION)
@@ -1066,9 +1083,10 @@ private:
         m_loadingNewWorld = newWorld;
         m_loadingGenerationComplete = false;
         m_player.configureRules(mode, m_worldMetadata.difficulty);
-        m_hotbar.setSurvivalInventory(
-            mode == GameMode::Survival ? &m_player.inventory() : nullptr);
         m_player.inventory() = m_worldMetadata.inventory;
+        m_hotbar.setInventory(mode == GameMode::Spectator
+            ? nullptr : &m_player.inventory());
+        m_survivalInventory.setCreativeAccess(mode == GameMode::Creative);
         m_player.survivalStats().set(
             m_worldMetadata.health, m_worldMetadata.hunger,
             m_worldMetadata.saturation, m_worldMetadata.exhaustion);
@@ -1177,6 +1195,9 @@ private:
             if (m_gameState == GameState::Playing && !m_inventoryOpen &&
                 !m_commandOpen && m_input.pressed(InputAction::Perspective))
                 cyclePerspective();
+            if(m_gameState==GameState::Playing&&!m_inventoryOpen&&!m_commandOpen&&
+               !m_playerDead&&m_input.pressed(InputAction::DropItem))
+                dropSelectedItem();
             updateGamepadUi(now);
 
             // Skip rendering when minimized to save resources
@@ -1220,7 +1241,7 @@ private:
                         static_cast<int>(m_mouseScreenY));
                     if (m_containerOpen) m_containerScreen.onMouseMove(
                         static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
-                    else if (m_player.isSurvival()) m_survivalInventory.onMouseMove(
+                    else if (playerInventoryViewOpen()) m_survivalInventory.onMouseMove(
                         static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
                 }
 
@@ -1577,7 +1598,7 @@ private:
                     m_containerScreen.render(
                         m_uiRenderer, uiWidth, uiHeight, static_cast<int>(m_mouseScreenX),
                         static_cast<int>(m_mouseScreenY));
-                } else if (m_player.isSurvival()) {
+                } else if (playerInventoryViewOpen()) {
                     m_survivalInventory.render(m_uiRenderer, uiWidth, uiHeight,
                         static_cast<int>(m_mouseScreenX), static_cast<int>(m_mouseScreenY));
                 } else {
@@ -1762,10 +1783,17 @@ private:
         if((navX!=m_gamepadNavX||navY!=m_gamepadNavY)&&(navX||navY))m_gamepadRepeatTick=now+RuntimeClock::fromSeconds(.35);
         m_gamepadNavX=navX;m_gamepadNavY=navY;
         if(m_inventoryOpen){
-            if(navigate){if(m_containerOpen)m_containerScreen.onGamepadNavigate(navX,-navY);else if(m_player.isSurvival())m_survivalInventory.onGamepadNavigate(navX,-navY);else m_inventory.onGamepadNavigate(navX,navY);}
+            if(navigate){if(m_containerOpen)m_containerScreen.onGamepadNavigate(navX,-navY);else if(playerInventoryViewOpen())m_survivalInventory.onGamepadNavigate(navX,-navY);else m_inventory.onGamepadNavigate(navX,navY);}
             if(m_containerOpen){if(pressA)m_containerScreen.onGamepadAction(0);if(pressX)m_containerScreen.onGamepadAction(1);if(pressY)m_containerScreen.onGamepadAction(2);}
-            else if(m_player.isSurvival()){if(pressA)m_survivalInventory.onGamepadAction(0);if(pressX)m_survivalInventory.onGamepadAction(1);if(pressY)m_survivalInventory.onGamepadAction(2);}
-            else if(pressA)m_inventory.onGamepadAction(true,[this](ItemId id){m_hotbar.setSlotItem(m_hotbar.getSelectedSlot(),id);m_player.setSelectedCreativeItem(id);});
+            else if(playerInventoryViewOpen()){
+                if(pressA)m_survivalInventory.onGamepadAction(0);
+                if(pressY)m_survivalInventory.onGamepadAction(2);
+                if(pressX&&m_player.gameMode()==GameMode::Creative){m_survivalInventory.onClose();m_creativeCatalogOpen=true;}
+                else if(pressX)m_survivalInventory.onGamepadAction(1);
+            }else{
+                if(pressA)m_inventory.onGamepadAction(true,[this](ItemId id){giveCreativeItem(id);});
+                if(pressX)openPlayerInventoryView();
+            }
             if(pressB)closeInventory();
         }else if(m_activeMenu){
             if(navigate){if(navY<0)m_activeMenu->onKeyPress(Key::Up);else if(navY>0)m_activeMenu->onKeyPress(Key::Down);else if(navX<0)m_activeMenu->onKeyPress(Key::Left);else if(navX>0)m_activeMenu->onKeyPress(Key::Right);}
@@ -1822,8 +1850,39 @@ private:
         if (m_player.isSurvival() && !m_inventoryOpen)
             m_survivalInventory.setCraftingTable(false);
         m_containerOpen = false;
+        m_creativeCatalogOpen = m_player.gameMode() == GameMode::Creative;
         m_inventoryOpen = true;
         m_window.setCursorLocked(false);
+    }
+
+    bool playerInventoryViewOpen() const {
+        return m_player.isSurvival() ||
+            (m_player.gameMode()==GameMode::Creative&&!m_creativeCatalogOpen);
+    }
+
+    void giveCreativeItem(ItemId id) {
+        auto& slot=m_player.inventory().slot(
+            static_cast<size_t>(m_hotbar.getSelectedSlot()));
+        InventoryInteraction::setCreativeItem(slot,id);
+        m_itemNameSeconds=2.0f;
+    }
+
+    void dropSelectedItem(){
+        if(m_player.isSpectator())return;
+        auto& slot=m_player.inventory().slot(
+            static_cast<size_t>(m_hotbar.getSelectedSlot()));
+        const ItemStack dropped=InventoryInteraction::takeOne(slot);
+        if(dropped.empty())return;
+        const glm::vec3 forward=glm::normalize(m_player.getForward());
+        m_entities.spawnItem(
+            m_player.getEyePosition()+glm::dvec3(forward)*0.65,
+            dropped,forward*4.5f+glm::vec3(0.0f,1.5f,0.0f),0.8f);
+    }
+
+    void openPlayerInventoryView() {
+        if(m_player.gameMode()!=GameMode::Creative)return;
+        m_creativeCatalogOpen=false;
+        m_survivalInventory.setCraftingTable(false);
     }
 
     void closeCommandInput() {
@@ -1882,8 +1941,10 @@ private:
         if (command.type == CommandType::Gamemode) {
             m_player.configureRules(command.gameMode, m_worldMetadata.difficulty);
             m_worldMetadata.gameMode = command.gameMode;
-            m_hotbar.setSurvivalInventory(
-                command.gameMode == GameMode::Survival ? &m_player.inventory() : nullptr);
+            m_hotbar.setInventory(command.gameMode == GameMode::Spectator
+                ? nullptr : &m_player.inventory());
+            m_survivalInventory.setCreativeAccess(
+                command.gameMode == GameMode::Creative);
             const std::string name = m_localization.text(
                 command.gameMode == GameMode::Survival ? "common.survival" :
                 command.gameMode == GameMode::Creative ? "common.creative" : "common.spectator");
@@ -2018,11 +2079,9 @@ private:
 
     void renderSelectedItemName(int screenWidth) {
         std::string name;
-        if (m_player.isSurvival()) {
-            const auto& stack = m_player.inventory().slot(
-                static_cast<size_t>(m_hotbar.getSelectedSlot()));
-            if (!stack.empty()) name = m_localization.itemName(stack.id);
-        } else name = m_localization.itemName(m_hotbar.getSelectedItem());
+        const auto& stack = m_player.inventory().slot(
+            static_cast<size_t>(m_hotbar.getSelectedSlot()));
+        if (!stack.empty()) name = m_localization.itemName(stack.id);
         if (name.empty()) return;
         const auto size = m_uiRenderer.measureText(name, 1.0f);
         const float x = (screenWidth - size.x) * .5f;
@@ -2102,7 +2161,7 @@ private:
             m_containerScreen.close([this](ItemStack stack) {
                 m_entities.spawnItem(m_player.getPosition() + glm::dvec3(0.0, 0.5, 0.0), stack);
             });
-        } else if (m_player.isSurvival()) m_survivalInventory.onClose();
+        } else if (playerInventoryViewOpen()) m_survivalInventory.onClose();
         m_containerOpen = false;
         m_inventoryOpen = false;
         m_window.setCursorLocked(true);

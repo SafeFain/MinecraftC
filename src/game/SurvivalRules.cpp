@@ -365,6 +365,11 @@ int totalArmorPoints(const InventoryModel& inventory) {
     return std::min(total, 20);
 }
 
+bool canTillBlock(ItemId tool,BlockId target,int faceNormalY){
+    return getItemProps(tool).tool==ToolKind::Hoe&&faceNormalY>0&&
+        (target==BlockId::DIRT||target==BlockId::GRASS);
+}
+
 float durabilityRemaining(const ItemStack& stack) {
     if (stack.empty()) return 0.0f;
     const uint16_t maximum = getItemProps(stack.id).maxDurability;
