@@ -12,6 +12,29 @@ inline bool rendererBackendSwitchable(RendererBackendAvailability available) {
     return available.openGL && available.vulkan;
 }
 
+enum class SettingsPage {
+    General,
+    Video,
+    KeyBindings,
+    KeyboardMouse,
+    Controller,
+    Touch
+};
+
+inline SettingsPage settingsParentPage(SettingsPage page) {
+    switch (page) {
+        case SettingsPage::KeyboardMouse:
+        case SettingsPage::Controller:
+        case SettingsPage::Touch:
+            return SettingsPage::KeyBindings;
+        case SettingsPage::Video:
+        case SettingsPage::KeyBindings:
+        case SettingsPage::General:
+            return SettingsPage::General;
+    }
+    return SettingsPage::General;
+}
+
 class SettingsMenu : public Menu {
 public:
     SettingsMenu(ClientSettings& settings, std::function<void()> onChanged,
@@ -23,12 +46,12 @@ public:
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
-    bool capturingGamepad() const { return m_page == Page::Gamepad && m_captureAction >= 0; }
+    bool capturingGamepad() const {
+        return m_page == SettingsPage::Controller && m_captureAction >= 0;
+    }
     void onGamepadBinding(GamepadBinding binding);
 
 private:
-    enum class Page { General, Video, Controls, Gamepad, Touch };
-
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
     std::function<void()> m_onBack;
@@ -36,7 +59,7 @@ private:
     ClientSettings& m_settings;
     const Localization& m_localization;
     RendererBackendAvailability m_renderers;
-    Page m_page = Page::General;
+    SettingsPage m_page = SettingsPage::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;
     int m_pressedButton = -1;
@@ -50,6 +73,7 @@ private:
     std::string labelForCloudRenderDist() const;
     std::string labelForDayCycle() const;
     std::string labelForAutoJump() const;
+    void showPage(SettingsPage page);
     void refreshButtons();
     void assignBinding(InputBinding binding);
     void assignGamepadBinding(GamepadBinding binding);

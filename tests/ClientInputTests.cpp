@@ -50,6 +50,13 @@ int main(){
         audio.setPaused(false);
         require(!audio.paused(),"audio device resumes with the game");
     }
+    require(settingsParentPage(SettingsPage::KeyboardMouse)==SettingsPage::KeyBindings&&
+            settingsParentPage(SettingsPage::Controller)==SettingsPage::KeyBindings&&
+            settingsParentPage(SettingsPage::Touch)==SettingsPage::KeyBindings,
+            "input device settings return to the key bindings hub");
+    require(settingsParentPage(SettingsPage::KeyBindings)==SettingsPage::General&&
+            settingsParentPage(SettingsPage::Video)==SettingsPage::General,
+            "top-level settings pages return to general settings");
     require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
             defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&

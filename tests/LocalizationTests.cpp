@@ -32,6 +32,22 @@ int main() {
             "Simplified Chinese strings load");
     require(localization.format("loading.chunks", {"2", "9"}) == "2 / 9 个区块",
             "localized positional formatting");
+    constexpr const char* inputSettingsKeys[] = {
+        "settings.key_bindings", "settings.key_bindings_title",
+        "settings.keyboard_mouse", "settings.keyboard_mouse_title",
+        "settings.controller", "settings.controller_title",
+        "settings.touch_controls", "settings.touch_title",
+        "settings.back_to_bindings", "settings.controller_help",
+        "settings.controller_capture", "settings.controller_deadzone",
+        "settings.controller_sensitivity", "settings.controller_invert_y",
+        "settings.controller_vibration", "settings.controller_reset"
+    };
+    for (const char* key : inputSettingsKeys) {
+        require(localization.hasTranslation(Language::English, key),
+                "input setting is translated in English");
+        require(localization.hasTranslation(Language::SimplifiedChinese, key),
+                "input setting is translated in Simplified Chinese");
+    }
     for (size_t action = 0; action < INPUT_ACTION_COUNT; ++action)
         require(localization.hasTranslation(
             Language::SimplifiedChinese, "action." + std::to_string(action)),
