@@ -52,6 +52,12 @@ int main() {
             5, {-20.0f, 64.0f, 8.0f}, {0.1f, 0.0f, 0.2f},
             12.0f, 34.0f, {}, 98765
         });
+        // PrimedTnt (EntityType value 10) must load without tripping the
+        // entity-type validation in readEntity().
+        source.entities.push_back({
+            10, {3.0f, 64.0f, -7.0f}, {0.0f, 0.2f, 0.0f},
+            1.0f, 2.5f, {}, 424242
+        });
 
         store.saveMetadata(source);
         require(store.exists(), "metadata file is created");
@@ -75,8 +81,10 @@ int main() {
                 "durable inventory item round trips");
         require(loaded.inventory.offhand().id == ItemId::SHIELD,
                 "offhand round trips");
-        require(loaded.entities.size() == 1 &&
-                loaded.entities[0].position == source.entities[0].position,
+        require(loaded.entities.size() == 2 &&
+                loaded.entities[0].position == source.entities[0].position &&
+                loaded.entities[1].type == 10 &&
+                loaded.entities[1].position == source.entities[1].position,
                 "persistent entities round trip");
 
         WorldMetadata replacement = source;

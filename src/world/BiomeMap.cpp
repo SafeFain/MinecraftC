@@ -5,7 +5,6 @@
 
 const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
     // OCEAN — deep water, sandy seafloor
-    // heightMul=1.0 preserves baseHeightRaw output; offset=-5 for deeper floor
     {
         BlockId::SAND, BlockId::SAND,
         1.0f, -5.0f,
@@ -41,7 +40,6 @@ const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
         63, 999
     },
     // MOUNTAINS — tall stone peaks, amplified height + snow caps.
-    // HeightMul/Offset toned down to reduce boundary cliffs vs neighbors.
     {
         BlockId::STONE, BlockId::STONE,
         1.08f, 7.0f,
@@ -55,7 +53,7 @@ const BiomeProperties BIOME_TABLE[BIOME_COUNT] = {
         0.05f, TreeType::OAK, TreeType::NONE,
         63, 999
     },
-    // SWAMP — low-lying wet ground (negative offset = often flooded)
+    // SWAMP — low-lying wet ground (often flooded)
     {
         BlockId::GRASS, BlockId::DIRT,
         1.0f, -3.0f,

@@ -175,8 +175,8 @@ void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
     entity.health = 1.0f;
     entity.projectileDamage = std::max(0.05f, fuseSeconds);
     entity.behaviorSeed = hash32(static_cast<uint32_t>(entity.id) ^
-        static_cast<uint32_t>(position.x * 73428767) ^
-        static_cast<uint32_t>(position.z * 912931));
+        static_cast<uint32_t>(position.x) * 73428767u ^
+        static_cast<uint32_t>(position.z) * 912931u);
     m_entities.push_back(entity);
 }
 
@@ -268,8 +268,9 @@ void EntityManager::moveWithTerrain(
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / 0.2)));
     const glm::dvec3 delta = glm::dvec3(horizontal) *
         (static_cast<double>(dt) / steps);
-    bool moved = false;
+    bool movedThisFrame = false;
     for (int i=0;i<steps;++i) {
+        bool moved = false;
         glm::dvec3 candidate = entity.position;
         candidate.x += delta.x;
         if (!collides(entity,candidate)) { entity.position.x=candidate.x; moved=true; }
@@ -281,8 +282,9 @@ void EntityManager::moveWithTerrain(
         }
         candidate=entity.position; candidate.y-=0.25;
         if (!collides(entity,candidate)) entity.position.y-=0.25;
+        movedThisFrame = movedThisFrame || moved;
     }
-    entity.stuckSeconds = moved ? 0.0f : entity.stuckSeconds + dt;
+    entity.stuckSeconds = movedThisFrame ? 0.0f : entity.stuckSeconds + dt;
     if (dt > 0.0f) {
         const glm::vec3 displacement(
             static_cast<float>(entity.position.x - start.x), 0.0f,
@@ -666,6 +668,12 @@ bool EntityManager::attackRay(
         if (along < 0.0f || along > reach) continue;
         const float perpendicular = glm::length(toEntity - direction * along);
         if (perpendicular < 0.75f && along < bestAlong) {
+            // Solid blocks between the player and the entity block melee,
+            // matching the hostile attack's line-of-sight revalidation.
+            const float distance = glm::length(toEntity);
+            if (distance > 0.001f &&
+                m_world.raycast(origin, toEntity / distance, distance).has_value())
+                continue;
             best = &entity;
             bestAlong = along;
         }
@@ -786,9 +794,10 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
                 const BlockId block = m_world.getBlock(p.x, p.y, p.z);
                 if (block == BlockId::AIR || block == BlockId::BEDROCK ||
                     block == BlockId::OBSIDIAN || isFluid(block)) continue;
-                uint32_t random = hash32(eventSeed ^ static_cast<uint32_t>(p.x * 73428767) ^
-                    static_cast<uint32_t>(p.y * 912931) ^
-                    static_cast<uint32_t>(p.z * 438289));
+                uint32_t random = hash32(eventSeed ^
+                    static_cast<uint32_t>(p.x) * 73428767u ^
+                    static_cast<uint32_t>(p.y) * 912931u ^
+                    static_cast<uint32_t>(p.z) * 438289u);
                 const float resistance = std::max(0.0f, getBlockSurvivalProps(block).hardness);
                 const float strength = power * (0.75f + (random & 255u) / 512.0f);
                 if (distance + resistance * .18f > strength) continue;
@@ -810,8 +819,9 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
         }
     }
     for (const glm::ivec3& p : chain) {
-        if (m_world.getBlock(p.x, p.y, p.z) != BlockId::TNT) continue;
-        m_world.setBlock(p.x, p.y, p.z, BlockId::AIR);
+        // The TNT block was already cleared in the destruction loop above;
+        // prime it now so a chain reaction actually propagates instead of
+        // silently vanishing.
         const uint32_t random = hash32(eventSeed ^ static_cast<uint32_t>(p.x) ^
                                        (static_cast<uint32_t>(p.z) << 16));
         primeTnt(p, .5f + static_cast<float>(random % 1001) / 1000.0f, false);

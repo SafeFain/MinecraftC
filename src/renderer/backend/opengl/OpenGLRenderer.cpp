@@ -781,8 +781,8 @@ void Renderer::draw(const DrawCommand& command) {
         shader->setInt("uManualGamma", 0);
         shader->setInt("uSmoothLighting", material->second.desc.smoothLighting ? 1 : 0);
         shader->setFloat("uAtlasTiles", static_cast<float>(material->second.desc.atlasTilesPerSide));
-        shader->setFloat("uLavaTile", -1.0f);
-        shader->setFloat("uWaterTile", -1.0f);
+        shader->setFloat("uLavaTile", static_cast<float>(getAtlasTextureIndex(BlockTexture::Lava)));
+        shader->setFloat("uWaterTile", static_cast<float>(getAtlasTextureIndex(BlockTexture::Water)));
         shader->setFloat("uTime", static_cast<float>(
             RuntimeClock::seconds(RuntimeClock{}.now())));
         shader->setFloat("uRainIntensity", m_environment.rainIntensity);
@@ -1389,10 +1389,12 @@ GLuint Renderer::createVAO(const std::vector<float>& vertices,
                  indices.data(), GL_STATIC_DRAW));
 
     GL_CHECK(glBindVertexArray(0));
-    // NOTE: VBO and EBO names are intentionally NOT deleted here.
-    // The VAO holds references to the buffer objects; deleting buffer names
-    // while the VAO references them is implementation-defined behavior.
-    // Buffer objects are freed when deleteVAO() deletes the VAO.
+    // The VAO retains references to these buffer objects, so deleting the
+    // names now is safe: storage is freed when deleteVAO() removes the last
+    // reference (glDeleteVertexArrays itself does NOT free referenced buffers).
+    GL_CHECK(glDeleteBuffers(1, &vboPos));
+    GL_CHECK(glDeleteBuffers(1, &vboCol));
+    GL_CHECK(glDeleteBuffers(1, &ebo));
 
     outIndexCount = indices.size();
     return vao;
@@ -1418,7 +1420,9 @@ GLuint Renderer::createLineVAO(const std::vector<float>& vertices,
     GL_CHECK(glEnableVertexAttribArray(0));
 
     GL_CHECK(glBindVertexArray(0));
-    // NOTE: VBO name intentionally not deleted here (same reason as createVAO)
+    // Delete the name; the VAO still references the storage, which is freed
+    // when deleteVAO() removes the last reference.
+    GL_CHECK(glDeleteBuffers(1, &vbo));
 
     outVertexCount = vertices.size() / 3;
     return vao;

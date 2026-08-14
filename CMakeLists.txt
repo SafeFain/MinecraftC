@@ -874,6 +874,14 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME world_voxel_raycast_distance_and_obstruction COMMAND voxel_raycast_tests)
 
+    add_executable(chunk_index_tests tests/ChunkIndexTests.cpp)
+    target_include_directories(chunk_index_tests PRIVATE src)
+    target_link_libraries(chunk_index_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(chunk_index_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME world_chunk_override_index_decode COMMAND chunk_index_tests)
+
     add_executable(entity_model_registry_tests
         tests/EntityModelRegistryTests.cpp
         src/entity/EntityModelRegistry.cpp

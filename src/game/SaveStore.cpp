@@ -1,6 +1,7 @@
 #include "game/SaveStore.h"
 #include "Config.h"
 #include "core/Platform.h"
+#include "entity/EntityLogic.h"
 
 #include <array>
 #include <cstring>
@@ -253,7 +254,10 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
         entity.flags = reader.read<uint8_t>();
         entity.projectileDamage = reader.read<float>();
     }
-    if (entity.type > 9) throw std::runtime_error("Save contains invalid entity type");
+    // EntityType values are serialized as uint8_t; PrimedTnt is the highest
+    // valid value, so reject anything beyond it.
+    if (entity.type > static_cast<uint8_t>(EntityType::PrimedTnt))
+        throw std::runtime_error("Save contains invalid entity type");
     return entity;
 }
 

@@ -631,7 +631,8 @@ struct ChunkMesh {
             }
         }
 
-        indices.reserve(opaqueIndices.size() + translucentIndices.size());
+        indices.reserve(opaqueIndices.size() + translucentIndices.size() +
+                        shadowIndices.size());
         indices.insert(indices.end(), opaqueIndices.begin(), opaqueIndices.end());
         opaqueIndexCount = opaqueIndices.size();
         translucentIndexOffset = opaqueIndexCount;

@@ -148,6 +148,8 @@ private:
         GL_CHECK(glGetBooleanv(GL_BLEND, &oldBlend));
         GL_CHECK(glGetBooleanv(GL_CULL_FACE, &oldCull));
         GL_CHECK(glGetBooleanv(0x0B72, &oldDepth));
+        GLint oldActiveTexture = GL_TEXTURE0;
+        GL_CHECK(glGetIntegerv(GL_ACTIVE_TEXTURE, &oldActiveTexture));
         if (blended) {
             GL_CHECK(glEnable(GL_BLEND));
             GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -210,6 +212,7 @@ private:
         if (oldBlend) GL_CHECK(glEnable(GL_BLEND)); else GL_CHECK(glDisable(GL_BLEND));
         if (oldCull) GL_CHECK(glEnable(GL_CULL_FACE)); else GL_CHECK(glDisable(GL_CULL_FACE));
         GL_CHECK(glDepthMask(oldDepth));
+        GL_CHECK(glActiveTexture(static_cast<GLenum>(oldActiveTexture)));
     }
 };
 

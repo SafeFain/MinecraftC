@@ -11,7 +11,9 @@ uint32_t InventoryModel::count(ItemId id) const {
 }
 
 uint32_t InventoryModel::add(ItemStack incoming) {
-    if (incoming.empty() || !isValidItemId(incoming.id)) return 0;
+    // Return the whole count for invalid ids so callers that treat a zero
+    // remainder as "fully picked up" do not silently discard the stack.
+    if (incoming.empty() || !isValidItemId(incoming.id)) return incoming.count;
     const uint8_t maxStack = getItemProps(incoming.id).maxStack;
     if (maxStack == 0) return incoming.count;
 

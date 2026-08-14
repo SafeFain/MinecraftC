@@ -103,3 +103,16 @@ private:
 
     void recalcColumnMax(int x, int z);
 };
+
+// Decode a chunk-local override index (x + z*CHUNK_SIZE_X
+// + storageY*CHUNK_SIZE_X*CHUNK_SIZE_Z) into local (x, z) and world Y.
+// Inverse of Chunk::index(). The Y component is a world coordinate, not a
+// storage offset.
+inline void decodeChunkIndex(uint32_t index, int& x, int& z, int& worldY) {
+    const int rem = static_cast<int>(
+        index % (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+    x = rem % Config::CHUNK_SIZE_X;
+    z = rem / Config::CHUNK_SIZE_X;
+    worldY = Config::storageYToWorldY(
+        static_cast<int>(index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z)));
+}

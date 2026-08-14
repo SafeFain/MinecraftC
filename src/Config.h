@@ -115,33 +115,9 @@ constexpr int   SNOW_LINE_DISABLED       = 999;
 // ── Deepslate ─────────────────────────────────────────────────────────
 constexpr int   DEEPSLATE_DEPTH          = 8;     // transition begins below this world Y
 
-// ── Ore Generation ────────────────────────────────────────────────────
-constexpr int   ORE_MAX_PER_CHUNK        = 50;
-
-constexpr float ORE_COAL_SCALE           = 0.05f;
-constexpr float ORE_COAL_THRESHOLD       = 0.55f;
-constexpr int   ORE_COAL_MIN_Y           = 0;
-constexpr int   ORE_COAL_MAX_Y           = 256;
-
-constexpr float ORE_IRON_SCALE           = 0.04f;
-constexpr float ORE_IRON_THRESHOLD       = 0.65f;
-constexpr int   ORE_IRON_MIN_Y           = -64;
-constexpr int   ORE_IRON_MAX_Y           = 256;
-
-constexpr float ORE_GOLD_SCALE           = 0.03f;
-constexpr float ORE_GOLD_THRESHOLD       = 0.70f;
-constexpr int   ORE_GOLD_MIN_Y           = -64;
-constexpr int   ORE_GOLD_MAX_Y           = 32;
-
-constexpr float ORE_DIAMOND_SCALE        = 0.025f;
-constexpr float ORE_DIAMOND_THRESHOLD    = 0.75f;
-constexpr int   ORE_DIAMOND_MIN_Y        = -64;
-constexpr int   ORE_DIAMOND_MAX_Y        = 16;
-
-// ── Trees ─────────────────────────────────────────────────────────────
-constexpr int   TREE_MAX_CANDIDATES      = 30;
-constexpr int   TREE_MAX_PLACEMENTS      = 50;
-constexpr float TREE_SLOPE_MAX           = 2.0f;
+// Ore frequency and depth ranges are tuned directly in src/world/OreGenerator.cpp
+// (they participate in the generation-versioned algorithm and are not runtime knobs).
+// Tree placement probability is derived from the biome in src/world/TreeGenerator.cpp.
 
 // ── Ice ───────────────────────────────────────────────────────────────
 constexpr int   ICE_FREEZE_MAX_Y         = 80;

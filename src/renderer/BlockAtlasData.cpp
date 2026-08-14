@@ -214,6 +214,11 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     if (encoded.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
         throw std::runtime_error("Block atlas is too large: " + path.string());
     int width = 0, height = 0, channels = 0;
+    // The atlas is flipped per-tile below, so it must always be decoded with
+    // the global stbi flip flag cleared. Callers elsewhere set the flag to 1
+    // for textures that need top-left->bottom-left conversion, and this shared
+    // builder can be re-invoked (graphics reset / backend switch) after that.
+    stbi_set_flip_vertically_on_load(0);
     stbi_uc* decoded = stbi_load_from_memory(encoded.data(), static_cast<int>(encoded.size()),
                                              &width, &height, &channels, STBI_rgb_alpha);
     if (!decoded || width <= 0 || width != height || width % TILE_SIZE != 0) {

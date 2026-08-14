@@ -614,9 +614,9 @@ bool Player::breakBlock() {
             }
             const ItemStack& tool = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
             const auto drops = getBlockDrops(block, tool,
-                static_cast<uint32_t>(hit->blockPos.x * 73428767 ^
-                                      hit->blockPos.y * 912931 ^
-                                      hit->blockPos.z * 438289));
+                static_cast<uint32_t>(hit->blockPos.x) * 73428767u ^
+                static_cast<uint32_t>(hit->blockPos.y) * 912931u ^
+                static_cast<uint32_t>(hit->blockPos.z) * 438289u);
             for (const auto& drop : drops) {
                 ItemStack remaining = drop;
                 remaining.count = static_cast<uint8_t>(m_inventory.add(drop));

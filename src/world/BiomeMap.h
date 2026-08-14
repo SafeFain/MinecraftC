@@ -26,9 +26,11 @@ enum class TreeType : uint8_t {
 struct BiomeProperties {
     BlockId   surfaceBlock  = BlockId::GRASS;
     BlockId   subsoilBlock  = BlockId::DIRT;
-    float     heightMul     = 0.5f;    // terrain amplitude multiplier
-    float     heightOffset  = 5.0f;    // additive elevation (blocks)
-    float     treeDensity   = 0.05f;   // 0=no trees, higher=denser
+    // Reserved: these three fields are not wired into generation. Terrain
+    // height comes from HeightPipeline and tree density from TreeGenerator.
+    float     heightMul     = 0.5f;
+    float     heightOffset  = 5.0f;
+    float     treeDensity   = 0.05f;
     TreeType  treeType1     = TreeType::OAK;
     TreeType  treeType2     = TreeType::NONE;
     int       waterLevel    = 63;      // sea-level override per biome (for swamps etc.)

@@ -142,8 +142,10 @@ private:
     IGameRenderer* m_renderer = nullptr;
     struct PairHash {
         size_t operator()(const std::pair<int,int>& p) const {
-            return std::hash<int64_t>{}((static_cast<int64_t>(p.first) << 32)
-                                        | static_cast<uint32_t>(p.second));
+            // Shift through uint64_t: left-shifting a negative int64_t is UB.
+            return std::hash<uint64_t>{}(
+                (static_cast<uint64_t>(static_cast<uint32_t>(p.first)) << 32) |
+                static_cast<uint32_t>(p.second));
         }
     };
 

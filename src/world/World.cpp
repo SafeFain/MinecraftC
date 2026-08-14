@@ -612,11 +612,11 @@ void World::enqueueGeneration() {
     });
 
     // Build a set for fast lookup
-    std::unordered_set<int64_t> available;
+    std::unordered_set<uint64_t> available;
     for (auto& [cx, cz] : ungenerated) {
-        available.insert((static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz));
+        available.insert(packedChunkKey(cx, cz));
     }
-    std::unordered_set<int64_t> visited;
+    std::unordered_set<uint64_t> visited;
 
     const int R = Config::REGION_SIZE_CHUNKS;  // 3
     const int PADDING = Config::REGION_PADDING;
@@ -630,7 +630,7 @@ void World::enqueueGeneration() {
 
     for (auto& [cx, cz] : ungenerated) {
         if (static_cast<int>(regions.size()) >= taskSlots) break;
-        int64_t key = (static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz);
+        uint64_t key = packedChunkKey(cx, cz);
         if (visited.count(key)) continue;
 
         // Check if a full R×R region is available starting at (cx, cz)
@@ -641,7 +641,7 @@ void World::enqueueGeneration() {
 
         for (int dcz = 0; dcz < R && complete; ++dcz) {
             for (int dcx = 0; dcx < R && complete; ++dcx) {
-                int64_t nkey = (static_cast<int64_t>(cx + dcx) << 32) | static_cast<uint32_t>(cz + dcz);
+                uint64_t nkey = packedChunkKey(cx + dcx, cz + dcz);
                 if (!available.count(nkey) || visited.count(nkey)) {
                     complete = false;
                     break;
@@ -657,7 +657,7 @@ void World::enqueueGeneration() {
             // Mark all chunks in region as visited and in-progress
             for (int dcz = 0; dcz < R; ++dcz) {
                 for (int dcx = 0; dcx < R; ++dcx) {
-                    int64_t nkey = (static_cast<int64_t>(cx + dcx) << 32) | static_cast<uint32_t>(cz + dcz);
+                    uint64_t nkey = packedChunkKey(cx + dcx, cz + dcz);
                     visited.insert(nkey);
                     auto it = m_chunks.find({cx + dcx, cz + dcz});
                     it->second->generationInProgress = true;
@@ -717,7 +717,7 @@ void World::enqueueGeneration() {
     int scheduledTasks = static_cast<int>(regions.size());
     for (auto& [cx, cz] : ungenerated) {
         if (scheduledTasks >= taskSlots) break;
-        int64_t key = (static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz);
+        uint64_t key = packedChunkKey(cx, cz);
         if (visited.count(key)) continue;
 
         auto it = m_chunks.find({cx, cz});
@@ -810,10 +810,8 @@ void World::processCompletedGenerations(bool rebuildLightingNow) {
                 if (overrides != m_blockOverrides.end()) {
                     for (const auto& [index, block] : overrides->second) {
                         (void)block;
-                        const int x = index % Config::CHUNK_SIZE_X;
-                        const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
-                        const int y = Config::storageYToWorldY(index /
-                            (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+                        int x = 0, z = 0, y = 0;
+                        decodeChunkIndex(index, x, z, y);
                         fluidSeeds.push_back({key.first * Config::CHUNK_SIZE_X + x,
                                               y,
                                               key.second * Config::CHUNK_SIZE_Z + z});
@@ -1050,10 +1048,8 @@ void World::applySavedOverrides(int cx, int cz) {
         "Pruned "<<pruned<<" legacy derived fluid overrides from chunk "<<cx<<','<<cz);}
     Chunk* chunk = chunkIt->second.get();
     for (const auto& [index, block] : cached) {
-        const int x = index % Config::CHUNK_SIZE_X;
-        const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
-            const int y = Config::storageYToWorldY(
-                index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+        int x = 0, z = 0, y = 0;
+        decodeChunkIndex(index, x, z, y);
         chunk->setBlock(x, y, z, block);
     }
     m_overridesApplied.insert(key);
@@ -1207,10 +1203,8 @@ void World::tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
             for (const auto& [index, block] : overrides) {
                 if (!isFarmland(block) && !isSapling(block) &&
                     !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)) continue;
-                const int y = index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
-                const int rem = index % (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
-                const int z = rem / Config::CHUNK_SIZE_X;
-                const int x = rem % Config::CHUNK_SIZE_X;
+                int x = 0, z = 0, y = 0;
+                decodeChunkIndex(index, x, z, y);
                 candidates.push_back({{key.first * Config::CHUNK_SIZE_X + x, y,
                                        key.second * Config::CHUNK_SIZE_Z + z}, block});
             }
@@ -1291,10 +1285,8 @@ void World::tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tic
             if (chunkIt == m_chunks.end() || !chunkIt->second->generated.load()) continue;
             for (const auto& [index, block] : overrides) {
                 if (block != BlockId::FIRE || fires.size() >= 256) continue;
-                const int x = index % Config::CHUNK_SIZE_X;
-                const int z = (index / Config::CHUNK_SIZE_X) % Config::CHUNK_SIZE_Z;
-                const int y = Config::storageYToWorldY(
-                    index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z));
+                int x = 0, z = 0, y = 0;
+                decodeChunkIndex(index, x, z, y);
                 fires.push_back({{key.first * Config::CHUNK_SIZE_X + x, y,
                                   key.second * Config::CHUNK_SIZE_Z + z}});
             }
