@@ -952,6 +952,96 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
 
+    add_executable(input_routing_tests
+        tests/InputRoutingTests.cpp
+        src/app/ApplicationInputController.cpp
+        src/core/Input.cpp
+        src/core/InputCodes.cpp
+        src/debug/Log.cpp
+        src/game/ClientSettings.cpp
+        src/game/Language.cpp
+        src/game/Utf8.cpp
+        src/platform/sdl/SdlGamepadManager.cpp
+        src/platform/sdl/SdlWindow.cpp
+        src/ui/TouchControls.cpp)
+    target_include_directories(input_routing_tests PRIVATE src)
+    target_compile_definitions(input_routing_tests PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(input_routing_tests PRIVATE
+        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(input_routing_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(input_routing_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME application_input_routing COMMAND input_routing_tests)
+
+    add_executable(session_flow_tests
+        tests/SessionFlowTests.cpp
+        src/app/GameSession.cpp
+        src/core/Input.cpp
+        src/core/InputCodes.cpp
+        src/debug/Log.cpp
+        src/entity/EntityManager.cpp
+        src/entity/EntityModelRegistry.cpp
+        src/game/InventoryModel.cpp
+        src/game/Item.cpp
+        src/game/SaveStore.cpp
+        src/game/SurvivalBlockLogic.cpp
+        src/game/SurvivalRules.cpp
+        src/game/SurvivalSession.cpp
+        src/game/SurvivalStats.cpp
+        src/game/Utf8.cpp
+        src/game/Weather.cpp
+        src/game/WorldCatalog.cpp
+        src/model/AnimationGraph.cpp
+        src/model/AnimationMixer.cpp
+        src/model/GltfLoader.cpp
+        src/model/ModelAnimation.cpp
+        src/model/ModelRenderer.cpp
+        src/player/Player.cpp
+        src/player/PlayerVisual.cpp
+        src/platform/sdl/SdlGamepadManager.cpp
+        src/platform/sdl/SdlWindow.cpp
+        src/renderer/Camera.cpp
+        src/renderer/CameraEffects.cpp
+        src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp
+        src/renderer/ParticleSystem.cpp
+        src/renderer/RenderDevice.cpp
+        src/renderer/StbImageImpl.cpp
+        src/renderer/backend/opengl/OpenGLModelRenderer.cpp
+        src/renderer/backend/opengl/OpenGLShader.cpp
+        src/threading/ThreadPool.cpp
+        src/world/BiomeMap.cpp
+        src/world/Block.cpp
+        src/world/BlockEntityLogic.cpp
+        src/world/CaveGenerator.cpp
+        src/world/Chunk.cpp
+        src/world/ChunkMesh.cpp
+        src/world/HeightPipeline.cpp
+        src/world/Noise.cpp
+        src/world/OreGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/TreeGenerator.cpp
+        src/world/World.cpp
+        src/world/WorldGenerator.cpp)
+    target_include_directories(session_flow_tests PRIVATE
+        src external external/FastNoiseLite external/cgltf external/stb
+        external/glad/include)
+    target_compile_definitions(session_flow_tests PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(session_flow_tests PRIVATE
+        glm::glm glad ${MINECRAFTC_SDL_TARGET} OpenGL::GL minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(session_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME game_session_flow COMMAND session_flow_tests)
+
     add_executable(localization_tests
         tests/LocalizationTests.cpp
         src/core/Input.cpp

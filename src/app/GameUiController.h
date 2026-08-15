@@ -27,6 +27,10 @@ public:
 
     void tick(float dt);
     void showMessage(const std::string& message);
+    void openCommand();
+    void openInventory(bool creativeCatalog);
+    void openCreativeCatalog();
+    void openPlayerInventoryTab();
     void closeCommand();
     bool playerInventoryViewOpen(const Player& player) const;
     void render(GameSession& session, const ClientSettings& settings,

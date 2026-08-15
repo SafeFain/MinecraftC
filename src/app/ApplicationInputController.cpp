@@ -44,9 +44,10 @@ void ApplicationInputController::bind(
     window.setTouchCallback([this](const TouchEvent& event) {
         if (m_callbacks.touch) m_callbacks.touch(event);
     });
+    // Focus loss clears held physical input inside the controller; no
+    // forwarding callback is needed by the application.
     window.setFocusCallback([this](bool focused) {
         if (!focused) clearPhysical(*m_settings);
-        if (m_callbacks.focus) m_callbacks.focus(focused);
     });
     window.setScreenKeyboardCallback([this](bool visible) {
         if (m_callbacks.screenKeyboard)

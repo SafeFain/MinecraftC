@@ -206,6 +206,27 @@ void GameUiController::showMessage(const std::string& message) {
     chatVisibleSeconds = 8.0f;
 }
 
+void GameUiController::openCommand() {
+    commandOpen = true;
+    commandInput.setText({});
+}
+
+void GameUiController::openInventory(bool creativeCatalog) {
+    containerOpen = false;
+    creativeCatalogOpen = creativeCatalog;
+    inventoryOpen = true;
+}
+
+void GameUiController::openCreativeCatalog() {
+    survivalInventory.onClose();
+    creativeCatalogOpen = true;
+}
+
+void GameUiController::openPlayerInventoryTab() {
+    creativeCatalogOpen = false;
+    survivalInventory.setCraftingTable(false);
+}
+
 void GameUiController::closeCommand() {
     commandOpen = false;
     commandInput.setText({});

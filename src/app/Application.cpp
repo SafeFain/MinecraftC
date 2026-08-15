@@ -202,9 +202,7 @@ private:
         if (action == ButtonAction::Press && keyBound(InputAction::Command) &&
             m_gameState == GameState::Playing && !m_ui.activeMenu &&
             !m_ui.inventoryOpen && !m_session.playerDead) {
-            m_ui.commandOpen = true;
-            m_ui.commandInput.setText({});
-            m_window.setCursorLocked(false);
+            openCommandInput();
             return;
         }
 
@@ -312,7 +310,7 @@ private:
         updateMouseScreenPosition();
         if (action == ButtonAction::Press && m_gameState == GameState::Playing && !m_ui.activeMenu) {
             if (mouseBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.playerDead) {
-                m_ui.commandOpen=true;m_ui.commandInput.setText({});m_window.setCursorLocked(false);return;
+                openCommandInput(); return;
             }
             if (mouseBound(InputAction::Inventory) && !m_ui.commandOpen && !m_session.player.isSpectator()) {
                 if(m_ui.inventoryOpen)closeInventory();else openInventory();return;
@@ -332,8 +330,7 @@ private:
                 action == ButtonAction::Press &&
                 m_ui.survivalInventory.creativeCatalogButtonContains(
                     static_cast<int>(m_ui.mouseScreenX),static_cast<int>(m_ui.mouseScreenY))) {
-                m_ui.survivalInventory.onClose();
-                m_ui.creativeCatalogOpen=true;
+                m_ui.openCreativeCatalog();
                 return;
             }
             if (m_ui.containerOpen) m_ui.containerScreen.onMouseButton(
@@ -377,7 +374,7 @@ private:
             return binding.device==InputDevice::Wheel&&binding.code==(yoffset>0?1:-1);};
         if(m_gameState==GameState::Playing&&!m_ui.commandOpen){
             if(wheelBound(InputAction::Inventory)&&!m_session.player.isSpectator()){if(m_ui.inventoryOpen)closeInventory();else openInventory();return;}
-            if(wheelBound(InputAction::Command)&&!m_ui.inventoryOpen&&!m_session.playerDead){m_ui.commandOpen=true;m_ui.commandInput.setText({});m_window.setCursorLocked(false);return;}
+            if(wheelBound(InputAction::Command)&&!m_ui.inventoryOpen&&!m_session.playerDead){openCommandInput();return;}
             if(wheelBound(InputAction::Perspective)&&!m_ui.inventoryOpen){cyclePerspective();return;}
             if(wheelBound(InputAction::DropItem)&&!m_ui.inventoryOpen&&!m_session.playerDead){dropSelectedItem();return;}
             for(int slot=0;slot<9;++slot)if(wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1)+slot)))m_ui.hotbar.selectSlot(slot);
@@ -405,7 +402,6 @@ private:
                 handleScrollEvent(xoffset, yoffset);
             },
             [this](const TouchEvent& event) { handleTouch(event); },
-            [](bool) {},
             [this](bool visible) {
                 if (!visible && m_ui.commandOpen) closeCommandInput();
             }
@@ -681,7 +677,7 @@ private:
                         handleGameplayAction(false,ButtonAction::Release);
                         handleGameplayAction(true,ButtonAction::Release);
                         m_inputs.touchControls.cancelAll();
-                        m_ui.commandOpen=true;m_ui.commandInput.setText({});m_window.setCursorLocked(false);
+                        openCommandInput();
                     }
                     break;
                 case TouchCommand::Pause:
@@ -704,7 +700,7 @@ private:
             if(!m_ui.containerOpen&&m_session.player.gameMode()==GameMode::Creative&&
                action==ButtonAction::Press&&
                m_ui.survivalInventory.creativeCatalogButtonContains(x,y)){
-                m_ui.survivalInventory.onClose();m_ui.creativeCatalogOpen=true;return;
+                m_ui.openCreativeCatalog();return;
             }
             if(m_ui.containerOpen)m_ui.containerScreen.onMouseButton(button,action,x,y);
             else m_ui.survivalInventory.onMouseButton(button,action,x,y);
@@ -1033,7 +1029,7 @@ private:
             else if(playerInventoryViewOpen()){
                 if(pressA)m_ui.survivalInventory.onGamepadAction(0);
                 if(pressY)m_ui.survivalInventory.onGamepadAction(2);
-                if(pressX&&m_session.player.gameMode()==GameMode::Creative){m_ui.survivalInventory.onClose();m_ui.creativeCatalogOpen=true;}
+                if(pressX&&m_session.player.gameMode()==GameMode::Creative){m_ui.openCreativeCatalog();}
                 else if(pressX)m_ui.survivalInventory.onGamepadAction(1);
             }else{
                 if(pressA)m_ui.inventory.onGamepadAction(true,[this](ItemId id){giveCreativeItem(id);});
@@ -1053,9 +1049,8 @@ private:
         m_session.player.cancelBowCharge();
         if (m_session.player.isSurvival() && !m_ui.inventoryOpen)
             m_ui.survivalInventory.setCraftingTable(false);
-        m_ui.containerOpen = false;
-        m_ui.creativeCatalogOpen = m_session.player.gameMode() == GameMode::Creative;
-        m_ui.inventoryOpen = true;
+        m_ui.openInventory(
+            m_session.player.gameMode() == GameMode::Creative);
         m_window.setCursorLocked(false);
     }
 
@@ -1084,13 +1079,17 @@ private:
 
     void openPlayerInventoryView() {
         if(m_session.player.gameMode()!=GameMode::Creative)return;
-        m_ui.creativeCatalogOpen=false;
-        m_ui.survivalInventory.setCraftingTable(false);
+        m_ui.openPlayerInventoryTab();
     }
 
     void closeCommandInput() {
         m_ui.closeCommand();
         if (m_gameState == GameState::Playing) m_window.setCursorLocked(true);
+    }
+
+    void openCommandInput() {
+        m_ui.openCommand();
+        m_window.setCursorLocked(false);
     }
 
     void showCommandMessage(const std::string& message) {

@@ -21,7 +21,6 @@ public:
         std::function<void(int, ButtonAction, int)> mouseButton;
         std::function<void(double, double)> scroll;
         std::function<void(const TouchEvent&)> touch;
-        std::function<void(bool)> focus;
         std::function<void(bool)> screenKeyboard;
     };
     struct UiTouchState {
