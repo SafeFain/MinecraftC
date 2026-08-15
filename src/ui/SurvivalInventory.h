@@ -22,6 +22,7 @@ public:
     void onClose();
     void setCraftingTable(bool enabled) { m_craftingTable = enabled; }
     void setCreativeAccess(bool enabled) { m_creativeAccess = enabled; }
+    bool creativeAccess() const { return m_creativeAccess; }
     bool creativeCatalogButtonContains(int x, int y) const;
 
 private:

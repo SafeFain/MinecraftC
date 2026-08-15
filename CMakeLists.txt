@@ -1055,6 +1055,98 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
 
+    add_executable(application_flow_tests
+        tests/ApplicationFlowTests.cpp
+        src/app/ApplicationInputController.cpp
+        src/app/ApplicationInputRouter.cpp
+        src/app/GameFlowController.cpp
+        src/app/GameScenePresenter.cpp
+        src/app/GameSession.cpp
+        src/app/GameUiController.cpp
+        src/core/Input.cpp
+        src/core/InputCodes.cpp
+        src/core/TextEditBuffer.cpp
+        src/debug/Log.cpp
+        src/entity/EntityManager.cpp
+        src/entity/EntityModelRegistry.cpp
+        src/game/ClientSettings.cpp
+        src/game/InventoryInteraction.cpp
+        src/game/InventoryModel.cpp
+        src/game/Language.cpp
+        src/game/Item.cpp
+        src/game/SaveStore.cpp
+        src/game/SurvivalBlockLogic.cpp
+        src/game/SurvivalRules.cpp
+        src/game/SurvivalSession.cpp
+        src/game/SurvivalStats.cpp
+        src/game/Utf8.cpp
+        src/game/Weather.cpp
+        src/game/WorldCatalog.cpp
+        src/model/AnimationGraph.cpp
+        src/model/AnimationMixer.cpp
+        src/model/GltfLoader.cpp
+        src/model/ModelAnimation.cpp
+        src/model/ModelRenderer.cpp
+        src/player/Player.cpp
+        src/player/PlayerRenderer.cpp
+        src/player/PlayerVisual.cpp
+        src/platform/sdl/SdlAudioSystem.cpp
+        src/platform/sdl/SdlClipboard.cpp
+        src/platform/sdl/SdlGamepadManager.cpp
+        src/platform/sdl/SdlWindow.cpp
+        src/renderer/Camera.cpp
+        src/renderer/CameraEffects.cpp
+        src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp
+        src/renderer/HeldItemRenderer.cpp
+        src/renderer/ParticleSystem.cpp
+        src/renderer/RenderDevice.cpp
+        src/renderer/StbImageImpl.cpp
+        src/renderer/backend/opengl/OpenGLModelRenderer.cpp
+        src/renderer/backend/opengl/OpenGLShader.cpp
+        src/threading/ThreadPool.cpp
+        src/ui/ContainerScreen.cpp
+        src/ui/Hotbar.cpp
+        src/ui/Inventory.cpp
+        src/ui/Menu.cpp
+        src/ui/SettingsMenu.cpp
+        src/ui/SurvivalInventory.cpp
+        src/ui/TouchControls.cpp
+        src/world/BiomeMap.cpp
+        src/world/Block.cpp
+        src/world/BlockEntityLogic.cpp
+        src/world/CaveGenerator.cpp
+        src/world/Chunk.cpp
+        src/world/ChunkMeshPipeline.cpp
+        src/world/ChunkStore.cpp
+        src/world/ChunkMesh.cpp
+        src/world/ChunkStreamer.cpp
+        src/world/FluidScheduler.cpp
+        src/world/WorldPersistence.cpp
+        src/world/HeightPipeline.cpp
+        src/world/Noise.cpp
+        src/world/OreGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/TreeGenerator.cpp
+        src/world/World.cpp
+        src/world/WorldGenerator.cpp
+        src/world/WorldLighting.cpp
+        src/world/WorldSimulation.cpp)
+    target_include_directories(application_flow_tests PRIVATE
+        src external external/FastNoiseLite external/cgltf external/stb
+        external/glad/include)
+    target_compile_definitions(application_flow_tests PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(application_flow_tests PRIVATE
+        glm::glm glad ${MINECRAFTC_SDL_TARGET} OpenGL::GL minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(application_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(application_flow_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME application_flow_state_transitions COMMAND application_flow_tests)
+
     add_executable(world_orchestration_tests
         tests/WorldOrchestrationTests.cpp
         src/debug/Log.cpp

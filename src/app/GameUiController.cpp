@@ -342,3 +342,47 @@ void GameUiController::renderCrosshairAndMiningProgress(const Player& player, in
     renderer.drawRect(barX, barY, barWidth * progress, barHeight,
                           glm::vec4(0.92f, 0.74f, 0.25f, 1.0f));
 }
+
+void GameUiController::updateMouseScreenPosition(Window& window) {
+    double windowX = 0.0;
+    double windowY = 0.0;
+    window.getCursorPos(windowX, windowY);
+
+    int windowWidth = 0;
+    int windowHeight = 0;
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    windowWidth = window.windowWidth();
+    windowHeight = window.windowHeight();
+    framebufferWidth = window.width();
+    framebufferHeight = window.height();
+
+    const double scaleX = windowWidth > 0
+        ? static_cast<double>(framebufferWidth) / windowWidth : 1.0;
+    const double scaleY = windowHeight > 0
+        ? static_cast<double>(framebufferHeight) / windowHeight : 1.0;
+    const double uiScale = std::max(1, guiScale);
+    const WindowSafeArea safe = window.safeArea();
+    mouseScreenX = (windowX * scaleX - safe.x) / uiScale;
+    mouseScreenY =
+        (static_cast<double>(framebufferHeight) - windowY * scaleY - safe.y) / uiScale;
+}
+
+glm::vec2 GameUiController::touchToUi(Window& window, double x, double y) const {
+    int windowWidth = 0;
+    int windowHeight = 0;
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    windowWidth = window.windowWidth();
+    windowHeight = window.windowHeight();
+    framebufferWidth = window.width();
+    framebufferHeight = window.height();
+    const double scaleX = windowWidth > 0
+        ? static_cast<double>(framebufferWidth) / windowWidth : 1.0;
+    const double scaleY = windowHeight > 0
+        ? static_cast<double>(framebufferHeight) / windowHeight : 1.0;
+    const double uiScale = std::max(1, guiScale);
+    const WindowSafeArea safe = window.safeArea();
+    return {static_cast<float>((x * scaleX - safe.x) / uiScale),
+            static_cast<float>((framebufferHeight - y * scaleY - safe.y) / uiScale)};
+}

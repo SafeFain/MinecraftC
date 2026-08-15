@@ -23,6 +23,7 @@ public:
     void setInventory(const InventoryModel* inventory) {
         m_inventory = inventory;
     }
+    const InventoryModel* inventory() const { return m_inventory; }
 
 private:
     int m_selectedSlot = 0;

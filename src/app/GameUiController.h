@@ -33,6 +33,10 @@ public:
     void openPlayerInventoryTab();
     void closeCommand();
     bool playerInventoryViewOpen(const Player& player) const;
+    // Window-coordinate → UI-coordinate conversion; owns mouseScreenX/Y and
+    // guiScale, so the conversion lives here with the state it writes.
+    void updateMouseScreenPosition(Window& window);
+    glm::vec2 touchToUi(Window& window, double x, double y) const;
     void render(GameSession& session, const ClientSettings& settings,
                 ApplicationInputController& inputs, Window& window,
                 GameState state, bool showCrosshair);
