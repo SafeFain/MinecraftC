@@ -20,6 +20,8 @@
 // Forward declaration
 struct ChunkMesh;
 namespace model { class ModelRenderer; }
+class OpenGLSceneTarget;
+class OpenGLShadowRenderer;
 
 class Renderer final : public IGameRenderer {
 public:
@@ -127,6 +129,7 @@ public:
     }
 
 private:
+    friend class OpenGLShadowRenderer;
     RendererPerformanceStats m_performanceStats{};
     struct GpuChunkMesh {
         uint32_t vao = 0;
@@ -154,14 +157,7 @@ private:
     std::unique_ptr<Shader> m_postShader;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
     BlockTextureAtlas m_blockAtlas;
-    uint32_t m_shadowFramebuffer = 0;
-    uint32_t m_shadowTexture = 0;
-    ShadowQuality m_shadowQuality = ShadowQuality::Off;
-    ShadowCascades m_shadowCascades{};
-    ShadowCascades m_shadowBaseCascades{};
-    double m_lastShadowUpdateSeconds = -1.0;
-    glm::dvec3 m_lastShadowWorldOrigin{0.0};
-    glm::vec3 m_lastShadowDirection{0.0f};
+    std::unique_ptr<OpenGLShadowRenderer> m_shadows;
 
     // Shared wireframe cube GPU resources
     uint32_t m_wireVAO = 0;
@@ -176,15 +172,7 @@ private:
     uint32_t m_particleVAO = 0;
     uint32_t m_particleQuadVBO = 0;
     uint32_t m_particleInstanceVBO = 0;
-    uint32_t m_sceneFramebuffer = 0;
-    uint32_t m_sceneResolveFramebuffer = 0;
-    uint32_t m_sceneColorTexture = 0;
-    uint32_t m_sceneColorRenderbuffer = 0;
-    uint32_t m_sceneDepthRenderbuffer = 0;
-    int m_sceneWidth = 0;
-    int m_sceneHeight = 0;
-    int m_sceneSamples = 1;
-    bool m_sceneHdr = false;
+    std::unique_ptr<OpenGLSceneTarget> m_sceneTarget;
     bool m_sceneFinished = false;
 
 #if defined(_WIN32)
@@ -233,8 +221,4 @@ private:
     uint32_t m_nextBasicMeshHandle = 0x40000000u;
     uint32_t m_nextBasicTextureHandle = 0x40000000u;
     uint32_t m_nextBasicMaterialHandle = 1;
-
-    void createSceneTarget(int width, int height);
-    void destroySceneTarget();
-    void bindSceneTarget();
 };

@@ -2,6 +2,9 @@
 #include "model/ModelRenderer.h"
 #include "world/ChunkMesh.h"
 #include "renderer/backend/opengl/OpenGLDebug.h"
+#include "renderer/backend/opengl/OpenGLProcs.h"
+#include "renderer/backend/opengl/OpenGLSceneTarget.h"
+#include "renderer/backend/opengl/OpenGLShadowRenderer.h"
 #include "debug/Log.h"
 
 #include <algorithm>
@@ -13,49 +16,6 @@
 #include "Config.h"
 #include "core/AssetStore.h"
 #include "core/RuntimeClock.h"
-
-namespace {
-constexpr unsigned int GL_FRAMEBUFFER_VALUE = 0x8D40;
-constexpr unsigned int GL_DEPTH_ATTACHMENT_VALUE = 0x8D00;
-constexpr unsigned int GL_COLOR_ATTACHMENT0_VALUE = 0x8CE0;
-constexpr unsigned int GL_FRAMEBUFFER_COMPLETE_VALUE = 0x8CD5;
-constexpr unsigned int GL_RENDERBUFFER_VALUE = 0x8D41;
-constexpr unsigned int GL_READ_FRAMEBUFFER_VALUE = 0x8CA8;
-constexpr unsigned int GL_DRAW_FRAMEBUFFER_VALUE = 0x8CA9;
-constexpr unsigned int GL_DEPTH_COMPONENT_VALUE = 0x1902;
-constexpr unsigned int GL_DEPTH_COMPONENT24_VALUE = 0x81A6;
-constexpr unsigned int GL_RGBA16F_VALUE = 0x881A;
-constexpr unsigned int GL_RGBA8_VALUE = 0x8058;
-constexpr unsigned int GL_HALF_FLOAT_VALUE = 0x140B;
-constexpr unsigned int GL_MAX_SAMPLES_VALUE = 0x8D57;
-constexpr unsigned int GL_CLAMP_TO_EDGE_VALUE = 0x812F;
-constexpr unsigned int GL_NONE_VALUE = 0;
-constexpr unsigned int GL_TEXTURE1_VALUE = 0x84C1;
-constexpr unsigned int GL_NEAREST_VALUE = 0x2600;
-constexpr unsigned int GL_LINEAR_VALUE = 0x2601;
-using GenFramebuffersFn = void (*)(int, unsigned int*);
-using DeleteFramebuffersFn = void (*)(int, const unsigned int*);
-using BindFramebufferFn = void (*)(unsigned int, unsigned int);
-using FramebufferTexture2DFn = void (*)(unsigned int,unsigned int,unsigned int,unsigned int,int);
-using CheckFramebufferStatusFn = unsigned int (*)(unsigned int);
-using DrawBufferFn = void (*)(unsigned int);
-using ReadBufferFn = void (*)(unsigned int);
-using ColorMaskFn = void (*)(unsigned char,unsigned char,unsigned char,unsigned char);
-using GenRenderbuffersFn = void (*)(int, unsigned int*);
-using DeleteRenderbuffersFn = void (*)(int, const unsigned int*);
-using BindRenderbufferFn = void (*)(unsigned int, unsigned int);
-using RenderbufferStorageFn = void (*)(unsigned int, unsigned int, int, int);
-using RenderbufferStorageMultisampleFn = void (*)(unsigned int, int, unsigned int,
-                                                  int, int);
-using FramebufferRenderbufferFn = void (*)(unsigned int, unsigned int,
-                                           unsigned int, unsigned int);
-using BlitFramebufferFn = void (*)(int, int, int, int, int, int, int, int,
-                                   unsigned int, unsigned int);
-
-template<typename T> T glProc(const char* name) {
-    return reinterpret_cast<T>(Window::graphicsProcAddress(name));
-}
-}
 
 // ── Wireframe cube geometry (12 line segments = 24 vertices) ──────────
 
@@ -70,15 +30,11 @@ static const std::vector<float> WIRE_CUBE = {
 
 // ── Constructor / Destructor ──────────────────────────────────────────
 
-Renderer::Renderer() = default;
+Renderer::Renderer()
+    : m_sceneTarget(std::make_unique<OpenGLSceneTarget>()),
+      m_shadows(std::make_unique<OpenGLShadowRenderer>(*this)) {}
 
 Renderer::~Renderer() {
-    destroySceneTarget();
-    if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
-    if (m_shadowFramebuffer) {
-        if (auto destroy = glProc<DeleteFramebuffersFn>("glDeleteFramebuffers"))
-            destroy(1, &m_shadowFramebuffer);
-    }
     for (auto& [handle, texture] : m_basicTextures) {
         (void)handle;
         if (texture.texture) GL_CHECK(glDeleteTextures(1, &texture.texture));
@@ -329,14 +285,15 @@ void Renderer::initialize(Window& window, const GraphicsCapabilities& capabiliti
         LOG_WARN("Entity texture atlas unavailable or not a square 3x3 atlas");
     }
     stbi_image_free(atlas);
-    createSceneTarget(std::max(1, window.width()), std::max(1, window.height()));
+    m_sceneTarget->create(std::max(1, window.width()),
+                          std::max(1, window.height()), m_visualQuality);
 }
 
 // ── Frame management ──────────────────────────────────────────────────
 
 void Renderer::beginFrame() {
     m_performanceStats = {};
-    bindSceneTarget();
+    m_sceneTarget->bind();
     m_sceneFinished = false;
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 }
@@ -346,26 +303,18 @@ void Renderer::setVisualQuality(VisualQuality quality) {
     const int oldSamples = visualQualityConfig(m_visualQuality).sceneSamples;
     m_visualQuality = quality;
     if (m_window && visualQualityConfig(quality).sceneSamples != oldSamples)
-        createSceneTarget(std::max(1, m_window->width()),
-                          std::max(1, m_window->height()));
+        m_sceneTarget->create(std::max(1, m_window->width()),
+                              std::max(1, m_window->height()), m_visualQuality);
 }
 
 void Renderer::finishScene(const PostProcessState& state) {
     m_postProcessState = state;
-    if (!m_sceneColorTexture || !m_postShader || m_sceneFinished) return;
+    if (!m_sceneTarget->colorTexture() || !m_postShader || m_sceneFinished) return;
     auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
     if (!bindFramebuffer) return;
-    if (m_sceneSamples > 1) {
-        if (auto blit = glProc<BlitFramebufferFn>("glBlitFramebuffer")) {
-            bindFramebuffer(GL_READ_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-            bindFramebuffer(GL_DRAW_FRAMEBUFFER_VALUE, m_sceneResolveFramebuffer);
-            blit(0, 0, m_sceneWidth, m_sceneHeight,
-                 0, 0, m_sceneWidth, m_sceneHeight,
-                 GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        }
-    }
+    m_sceneTarget->blitResolve();
     bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
-    GL_CHECK(glViewport(0, 0, m_sceneWidth, m_sceneHeight));
+    GL_CHECK(glViewport(0, 0, m_sceneTarget->width(), m_sceneTarget->height()));
     GL_CHECK(glDisable(GL_DEPTH_TEST));
     GL_CHECK(glDisable(GL_CULL_FACE));
     GL_CHECK(glDepthMask(GL_FALSE));
@@ -385,14 +334,14 @@ void Renderer::finishScene(const PostProcessState& state) {
         m_framebufferSrgb ? 0.0f : 1.0f,
         static_cast<float>(static_cast<int>(m_visualQuality))});
     m_postShader->setVec4("uTexelTime", {
-        1.0f / static_cast<float>(m_sceneWidth),
-        1.0f / static_cast<float>(m_sceneHeight),
+        1.0f / static_cast<float>(m_sceneTarget->width()),
+        1.0f / static_cast<float>(m_sceneTarget->height()),
         static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())), 0.0f});
     m_postShader->setVec4("uEnvironment", {
         state.environment.rainIntensity, state.environment.thunderIntensity,
         state.environment.lightningFlash, state.environment.daylight});
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_sceneColorTexture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_sceneTarget->colorTexture()));
     GL_CHECK(glBindVertexArray(m_skyVAO));
     GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 3));
     GL_CHECK(glBindVertexArray(0));
@@ -406,175 +355,14 @@ void Renderer::finishScene(const PostProcessState& state) {
 void Renderer::resize(int width, int height) {
     width = std::max(1, width);
     height = std::max(1, height);
-    if (m_sceneFramebuffer && width == m_sceneWidth && height == m_sceneHeight)
+    if (m_sceneTarget->valid() && width == m_sceneTarget->width() &&
+        height == m_sceneTarget->height())
         return;
-    createSceneTarget(width, height);
+    m_sceneTarget->create(width, height, m_visualQuality);
 }
 
 void Renderer::endFrame() {
     if (m_window) m_window->swapBuffers();
-}
-
-void Renderer::destroySceneTarget() {
-    if (m_sceneColorTexture)
-        GL_CHECK(glDeleteTextures(1, &m_sceneColorTexture));
-    m_sceneColorTexture = 0;
-    if (auto destroyRenderbuffers =
-            glProc<DeleteRenderbuffersFn>("glDeleteRenderbuffers")) {
-        if (m_sceneColorRenderbuffer)
-            destroyRenderbuffers(1, &m_sceneColorRenderbuffer);
-        if (m_sceneDepthRenderbuffer)
-            destroyRenderbuffers(1, &m_sceneDepthRenderbuffer);
-    }
-    m_sceneColorRenderbuffer = 0;
-    m_sceneDepthRenderbuffer = 0;
-    if (auto destroyFramebuffers =
-            glProc<DeleteFramebuffersFn>("glDeleteFramebuffers")) {
-        if (m_sceneFramebuffer)
-            destroyFramebuffers(1, &m_sceneFramebuffer);
-        if (m_sceneResolveFramebuffer &&
-            m_sceneResolveFramebuffer != m_sceneFramebuffer)
-            destroyFramebuffers(1, &m_sceneResolveFramebuffer);
-    }
-    m_sceneFramebuffer = 0;
-    m_sceneResolveFramebuffer = 0;
-    m_sceneWidth = 0;
-    m_sceneHeight = 0;
-    m_sceneSamples = 1;
-    m_sceneHdr = false;
-}
-
-void Renderer::createSceneTarget(int width, int height) {
-    auto genFramebuffers = glProc<GenFramebuffersFn>("glGenFramebuffers");
-    auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
-    auto framebufferTexture =
-        glProc<FramebufferTexture2DFn>("glFramebufferTexture2D");
-    auto checkFramebuffer =
-        glProc<CheckFramebufferStatusFn>("glCheckFramebufferStatus");
-    auto genRenderbuffers =
-        glProc<GenRenderbuffersFn>("glGenRenderbuffers");
-    auto bindRenderbuffer =
-        glProc<BindRenderbufferFn>("glBindRenderbuffer");
-    auto renderbufferStorage =
-        glProc<RenderbufferStorageFn>("glRenderbufferStorage");
-    auto framebufferRenderbuffer =
-        glProc<FramebufferRenderbufferFn>("glFramebufferRenderbuffer");
-    if (!genFramebuffers || !bindFramebuffer || !framebufferTexture ||
-        !checkFramebuffer || !genRenderbuffers || !bindRenderbuffer ||
-        !renderbufferStorage || !framebufferRenderbuffer) {
-        LOG_WARN("OpenGL scene composition unavailable: framebuffer API missing");
-        destroySceneTarget();
-        return;
-    }
-
-    destroySceneTarget();
-    m_sceneWidth = std::max(1, width);
-    m_sceneHeight = std::max(1, height);
-    genFramebuffers(1, &m_sceneResolveFramebuffer);
-    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneResolveFramebuffer);
-    GL_CHECK(glGenTextures(1, &m_sceneColorTexture));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_sceneColorTexture));
-    const auto allocateColor = [&](unsigned int internalFormat,
-                                   unsigned int type) {
-        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, internalFormat,
-            m_sceneWidth, m_sceneHeight, 0, GL_RGBA, type, nullptr));
-        framebufferTexture(GL_FRAMEBUFFER_VALUE, GL_COLOR_ATTACHMENT0_VALUE,
-                           GL_TEXTURE_2D, m_sceneColorTexture, 0);
-        return checkFramebuffer(GL_FRAMEBUFFER_VALUE) ==
-               GL_FRAMEBUFFER_COMPLETE_VALUE;
-    };
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_VALUE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_VALUE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-                             GL_CLAMP_TO_EDGE_VALUE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-                             GL_CLAMP_TO_EDGE_VALUE));
-    m_sceneHdr = allocateColor(GL_RGBA16F_VALUE, GL_HALF_FLOAT_VALUE);
-    if (!m_sceneHdr) {
-        if (!allocateColor(GL_RGBA8_VALUE, GL_UNSIGNED_BYTE)) {
-            bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
-            destroySceneTarget();
-            throw std::runtime_error("OpenGL scene framebuffer is incomplete");
-        }
-        LOG_WARN("OpenGL half-float color target unavailable; using RGBA8");
-    }
-
-    int maximumSamples = 1;
-    GL_CHECK(glGetIntegerv(GL_MAX_SAMPLES_VALUE, &maximumSamples));
-    const int requestedSamples = visualQualityConfig(m_visualQuality).sceneSamples;
-    m_sceneSamples = requestedSamples >= 4 && maximumSamples >= 4 ? 4 :
-                     requestedSamples >= 2 && maximumSamples >= 2 ? 2 : 1;
-    auto multisampleStorage = glProc<RenderbufferStorageMultisampleFn>(
-        "glRenderbufferStorageMultisample");
-    auto blit = glProc<BlitFramebufferFn>("glBlitFramebuffer");
-    if (!multisampleStorage || !blit) m_sceneSamples = 1;
-
-    if (m_sceneSamples > 1) {
-        genFramebuffers(1, &m_sceneFramebuffer);
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-        genRenderbuffers(1, &m_sceneColorRenderbuffer);
-        bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneColorRenderbuffer);
-        multisampleStorage(GL_RENDERBUFFER_VALUE, m_sceneSamples,
-            m_sceneHdr ? GL_RGBA16F_VALUE : GL_RGBA8_VALUE,
-            m_sceneWidth, m_sceneHeight);
-        framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_COLOR_ATTACHMENT0_VALUE,
-            GL_RENDERBUFFER_VALUE, m_sceneColorRenderbuffer);
-    } else {
-        m_sceneFramebuffer = m_sceneResolveFramebuffer;
-    }
-    genRenderbuffers(1, &m_sceneDepthRenderbuffer);
-    bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
-    if (m_sceneSamples > 1)
-        multisampleStorage(GL_RENDERBUFFER_VALUE, m_sceneSamples,
-            GL_DEPTH_COMPONENT24_VALUE, m_sceneWidth, m_sceneHeight);
-    else
-        renderbufferStorage(GL_RENDERBUFFER_VALUE, GL_DEPTH_COMPONENT24_VALUE,
-            m_sceneWidth, m_sceneHeight);
-    framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
-        GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
-    if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE &&
-        m_sceneSamples > 1) {
-        // GLES implementations commonly expose a renderable half-float texture
-        // without supporting the same format as a multisample renderbuffer.
-        // Preserve HDR and fall back to one sample instead of failing startup.
-        if (auto destroyRenderbuffers =
-                glProc<DeleteRenderbuffersFn>("glDeleteRenderbuffers")) {
-            destroyRenderbuffers(1, &m_sceneColorRenderbuffer);
-            destroyRenderbuffers(1, &m_sceneDepthRenderbuffer);
-        }
-        if (auto destroyFramebuffers =
-                glProc<DeleteFramebuffersFn>("glDeleteFramebuffers"))
-            destroyFramebuffers(1, &m_sceneFramebuffer);
-        m_sceneColorRenderbuffer = 0;
-        m_sceneDepthRenderbuffer = 0;
-        m_sceneFramebuffer = m_sceneResolveFramebuffer;
-        m_sceneSamples = 1;
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-        genRenderbuffers(1, &m_sceneDepthRenderbuffer);
-        bindRenderbuffer(GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
-        renderbufferStorage(GL_RENDERBUFFER_VALUE, GL_DEPTH_COMPONENT24_VALUE,
-            m_sceneWidth, m_sceneHeight);
-        framebufferRenderbuffer(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
-            GL_RENDERBUFFER_VALUE, m_sceneDepthRenderbuffer);
-        LOG_WARN("OpenGL multisample HDR target unavailable; using 1x HDR");
-    }
-    if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE) {
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
-        destroySceneTarget();
-        throw std::runtime_error("OpenGL scene framebuffer is incomplete");
-    }
-    bindRenderbuffer(GL_RENDERBUFFER_VALUE, 0);
-    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-    GL_CHECK(glViewport(0, 0, m_sceneWidth, m_sceneHeight));
-    LOG_INFO("OpenGL scene target: " << (m_sceneHdr ? "RGBA16F" : "RGBA8")
-             << ", " << m_sceneSamples << "x MSAA");
-}
-
-void Renderer::bindSceneTarget() {
-    if (auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer"))
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-    GL_CHECK(glViewport(0, 0, std::max(1, m_sceneWidth),
-                        std::max(1, m_sceneHeight)));
 }
 
 RenderDeviceCapabilities Renderer::capabilities() const {
@@ -714,7 +502,7 @@ void Renderer::destroyMaterial(RenderMaterialHandle handle) {
 void Renderer::beginFrame(const FrameData& frame) {
     m_performanceStats = {};
     m_basicFrame = frame;
-    bindSceneTarget();
+    m_sceneTarget->bind();
     m_sceneFinished = false;
     GL_CHECK(glEnable(GL_DEPTH_TEST));
     GL_CHECK(glEnable(GL_CULL_FACE));
@@ -970,119 +758,7 @@ void Renderer::renderChunkShadows(ShadowQuality quality,
                                   const glm::mat4& view,
                                   const glm::dvec3& worldOrigin,
                                   const std::vector<ShadowChunkSubmission>& chunks) {
-    const bool enabled = quality != ShadowQuality::Off &&
-        m_environment.daylight >= 0.12f && m_environment.directIntensity >= 0.08f;
-    if (!enabled || chunks.empty()) {
-        m_shadowCascades = {};
-        m_shadowBaseCascades = {};
-        return;
-    }
-    const ShadowConfig config = shadowConfig(quality);
-    auto bindFramebuffer = glProc<BindFramebufferFn>("glBindFramebuffer");
-    auto framebufferTexture = glProc<FramebufferTexture2DFn>("glFramebufferTexture2D");
-    auto checkFramebuffer = glProc<CheckFramebufferStatusFn>("glCheckFramebufferStatus");
-    auto genFramebuffers = glProc<GenFramebuffersFn>("glGenFramebuffers");
-    if (!bindFramebuffer || !framebufferTexture || !checkFramebuffer || !genFramebuffers) {
-        m_shadowCascades = {};
-        return;
-    }
-    const bool qualityChanged = quality != m_shadowQuality;
-    if (qualityChanged) {
-        if (m_shadowTexture) GL_CHECK(glDeleteTextures(1, &m_shadowTexture));
-        m_shadowTexture = 0;
-        if (!m_shadowFramebuffer) genFramebuffers(1, &m_shadowFramebuffer);
-        const int columns = config.cascadeCount == 1 ? 1 : 2;
-        const int rows = (config.cascadeCount + columns - 1) / columns;
-        GL_CHECK(glGenTextures(1, &m_shadowTexture));
-        GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_shadowTexture));
-        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24_VALUE,
-            config.resolution * columns, config.resolution * rows, 0,
-            GL_DEPTH_COMPONENT_VALUE, GL_UNSIGNED_INT, nullptr));
-        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_VALUE));
-        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_VALUE));
-        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE_VALUE));
-        GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE_VALUE));
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
-        framebufferTexture(GL_FRAMEBUFFER_VALUE, GL_DEPTH_ATTACHMENT_VALUE,
-                           GL_TEXTURE_2D, m_shadowTexture, 0);
-        if (auto drawBuffer = glProc<DrawBufferFn>("glDrawBuffer")) drawBuffer(GL_NONE_VALUE);
-        if (auto readBuffer = glProc<ReadBufferFn>("glReadBuffer")) readBuffer(GL_NONE_VALUE);
-        if (checkFramebuffer(GL_FRAMEBUFFER_VALUE) != GL_FRAMEBUFFER_COMPLETE_VALUE)
-            throw std::runtime_error("OpenGL shadow framebuffer is incomplete");
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, 0);
-        m_shadowQuality = quality;
-    }
-    const double nowSeconds = RuntimeClock::seconds(RuntimeClock{}.now());
-    const bool moved = glm::distance(worldOrigin, m_lastShadowWorldOrigin) >=
-        shadowMovementThreshold(quality);
-    const float lightDelta = glm::length(glm::normalize(m_environment.lightDirection) -
-        glm::normalize(m_lastShadowDirection));
-    const bool timeDue = nowSeconds - m_lastShadowUpdateSeconds >=
-        (1.0 / shadowUpdateHz(quality));
-    const bool updateShadow = qualityChanged || m_lastShadowUpdateSeconds < 0.0 ||
-        moved || lightDelta >= 0.01f || (timeDue && lightDelta >= 0.0002f);
-    if (!updateShadow) {
-        m_shadowCascades = m_shadowBaseCascades;
-        const glm::dvec3 delta = worldOrigin - m_lastShadowWorldOrigin;
-        const glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(
-            static_cast<float>(delta.x), 0.0f, static_cast<float>(delta.z)));
-        for (int i = 0; i < m_shadowCascades.count; ++i)
-            m_shadowCascades.lightViewProjection[i] *= translation;
-        return;
-    }
-    const float fogDistance = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
-                              Config::CHUNK_SIZE_X;
-    m_shadowCascades = buildShadowCascades(quality, inverseViewProjection, view,
-        m_environment.lightDirection, Config::NEAR_PLANE, fogDistance);
-    m_shadowBaseCascades = m_shadowCascades;
-    m_lastShadowUpdateSeconds = nowSeconds;
-    m_lastShadowWorldOrigin = worldOrigin;
-    m_lastShadowDirection = m_environment.lightDirection;
-    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_shadowFramebuffer);
-    auto colorMask = glProc<ColorMaskFn>("glColorMask");
-    if (!colorMask) {
-        m_shadowCascades = {};
-        bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-        return;
-    }
-    colorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-    GL_CHECK(glEnable(GL_DEPTH_TEST));
-    GL_CHECK(glDepthMask(GL_TRUE));
-    GL_CHECK(glEnable(GL_CULL_FACE));
-    GL_CHECK(glEnable(GL_POLYGON_OFFSET_FILL));
-    GL_CHECK(glPolygonOffset(2.0f, 4.0f));
-    GL_CHECK(glClear(GL_DEPTH_BUFFER_BIT));
-    m_shadowShader->bind();
-    m_shadowShader->setInt("uBlockAtlas", 0);
-    m_shadowShader->setFloat("uAtlasTiles",
-        static_cast<float>(BlockTextureAtlas::tilesPerSide()));
-    m_blockAtlas.bind();
-    for (int cascade = 0; cascade < m_shadowCascades.count; ++cascade) {
-        const int columns = m_shadowCascades.count == 1 ? 1 : 2;
-        GL_CHECK(glViewport((cascade % columns) * config.resolution,
-                            (cascade / columns) * config.resolution,
-                            config.resolution, config.resolution));
-        for (const ShadowChunkSubmission& submission : chunks) {
-            if (!submission.mesh || !submission.mesh->gpuReady ||
-                submission.mesh->shadowCasterIndexCount == 0) continue;
-            if (!shadowIntersectsAabb(m_shadowCascades.lightViewProjection[cascade],
-                                      submission.aabbMin, submission.aabbMax, false)) continue;
-            const auto found = m_chunkMeshes.find(submission.mesh->renderHandle.value);
-            if (found == m_chunkMeshes.end()) continue;
-            m_shadowShader->setMat4("uLightMVP",
-                m_shadowCascades.lightViewProjection[cascade] * submission.model);
-            GL_CHECK(glBindVertexArray(found->second.vao));
-            GL_CHECK(glDrawElements(GL_TRIANGLES,
-                static_cast<GLsizei>(submission.mesh->shadowCasterIndexCount), GL_UNSIGNED_INT,
-                reinterpret_cast<void*>(submission.mesh->shadowCasterIndexOffset *
-                                        sizeof(unsigned int))));
-            ++m_performanceStats.drawCalls;
-        }
-    }
-    GL_CHECK(glDisable(GL_POLYGON_OFFSET_FILL));
-    colorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    bindFramebuffer(GL_FRAMEBUFFER_VALUE, m_sceneFramebuffer);
-    GL_CHECK(glViewport(0, 0, std::max(1, m_window->width()), std::max(1, m_window->height())));
+    m_shadows->render(quality, inverseViewProjection, view, worldOrigin, chunks);
 }
 
 void Renderer::beginTranslucent() {
@@ -1104,16 +780,16 @@ void Renderer::bindBlockShader() const {
     m_blockShader->setInt("uNormalAtlas", 2);
     m_blockShader->setInt("uPropertyAtlas", 3);
     m_blockShader->setInt("uShadowMap", 1);
-    m_blockShader->setInt("uShadowCascadeCount", m_shadowCascades.count);
+    m_blockShader->setInt("uShadowCascadeCount", m_shadows->cascades().count);
     m_blockShader->setFloat("uShadowResolution",
-        static_cast<float>(std::max(1, m_shadowCascades.resolution)));
+        static_cast<float>(std::max(1, m_shadows->cascades().resolution)));
     m_blockShader->setInt("uShadowAtlasColumns",
-        m_shadowCascades.count <= 1 ? 1 : 2);
-    m_blockShader->setVec4("uShadowSplits", m_shadowCascades.splits);
+        m_shadows->cascades().count <= 1 ? 1 : 2);
+    m_blockShader->setVec4("uShadowSplits", m_shadows->cascades().splits);
     m_blockShader->setMat4Array("uShadowMatrices",
-        m_shadowCascades.lightViewProjection.data(), 4);
+        m_shadows->cascades().lightViewProjection.data(), 4);
     GL_CHECK(glActiveTexture(GL_TEXTURE1_VALUE));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_shadowTexture));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_shadows->texture()));
     GL_CHECK(glActiveTexture(GL_TEXTURE0));
     m_blockShader->setVec4("uTint", glm::vec4(1.0f));
     m_blockShader->setFloat("uAtlasTiles",
@@ -1389,9 +1065,10 @@ GLuint Renderer::createVAO(const std::vector<float>& vertices,
                  indices.data(), GL_STATIC_DRAW));
 
     GL_CHECK(glBindVertexArray(0));
-    // The VAO retains references to these buffer objects, so deleting the
-    // names now is safe: storage is freed when deleteVAO() removes the last
-    // reference (glDeleteVertexArrays itself does NOT free referenced buffers).
+    // The VAO retains references to these buffer objects. Deleting the names
+    // only flags the storage for deletion: it survives until deleteVAO()
+    // (glDeleteVertexArrays) releases the VAO's references, so nothing leaks
+    // and no other code needs to keep the buffer names.
     GL_CHECK(glDeleteBuffers(1, &vboPos));
     GL_CHECK(glDeleteBuffers(1, &vboCol));
     GL_CHECK(glDeleteBuffers(1, &ebo));
@@ -1421,7 +1098,7 @@ GLuint Renderer::createLineVAO(const std::vector<float>& vertices,
 
     GL_CHECK(glBindVertexArray(0));
     // Delete the name; the VAO still references the storage, which is freed
-    // when deleteVAO() removes the last reference.
+    // when deleteVAO() releases the VAO's buffer references.
     GL_CHECK(glDeleteBuffers(1, &vbo));
 
     outVertexCount = vertices.size() / 3;

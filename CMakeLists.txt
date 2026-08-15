@@ -260,7 +260,9 @@ set(MINECRAFTC_OPENGL_BACKEND_SOURCES
     src/renderer/backend/opengl/OpenGLFontRenderer.cpp
     src/renderer/backend/opengl/OpenGLModelRenderer.cpp
     src/renderer/backend/opengl/OpenGLRenderer.cpp
+    src/renderer/backend/opengl/OpenGLSceneTarget.cpp
     src/renderer/backend/opengl/OpenGLShader.cpp
+    src/renderer/backend/opengl/OpenGLShadowRenderer.cpp
     src/renderer/backend/opengl/OpenGLUIRenderer.cpp)
 set(MINECRAFTC_VULKAN_BACKEND_SOURCES
     src/renderer/backend/vulkan/VulkanHelpers.cpp
