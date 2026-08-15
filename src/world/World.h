@@ -14,7 +14,14 @@
 #include <glm/glm.hpp>
 
 #include "world/Chunk.h"
+#include "world/ChunkMeshPipeline.h"
+#include "world/ChunkStore.h"
+#include "world/ChunkStreamer.h"
+#include "world/FluidScheduler.h"
 #include "world/WorldGenerator.h"
+#include "world/WorldLighting.h"
+#include "world/WorldPersistence.h"
+#include "world/WorldSimulation.h"
 #include "world/RegionGenerationData.h"
 #include "world/BlockEntity.h"
 #include "world/BlockLightLogic.h"
@@ -33,27 +40,46 @@ public:
     World& operator=(const World&) = delete;
 
     // ── Thread pool ──────────────────────────────────────────────────
-    void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
-    void setSaveStore(SaveStore* store) { m_saveStore = store; }
-    bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max());
-    void beginModifiedChunkAutosave();
-    bool hasModifiedChunks() const {
-        return !m_dirtyOverrideChunks.empty() || !m_dirtyBlockEntityChunks.empty() ||
-               !m_pendingOverrideSaves.empty() || !m_pendingBlockEntitySaves.empty();
+    void setThreadPool(ThreadPool* pool) {
+        m_threadPool = pool;
+        m_meshes.setThreadPool(pool);
+        m_streamer.setThreadPool(pool);
     }
+    void setSaveStore(SaveStore* store) {
+        m_saveStore = store;
+        m_chunks.setSaveStore(store);
+        m_persistence.setSaveStore(store);
+        m_streamer.setSaveStore(store);
+    }
+    bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max()) {
+        return m_persistence.flushModifiedChunks(maxFiles);
+    }
+    void beginModifiedChunkAutosave() { m_persistence.beginModifiedChunkAutosave(); }
+    bool hasModifiedChunks() const { return m_persistence.hasModifiedChunks(); }
     bool hasPendingModifiedChunkSaves() const {
-        return !m_pendingOverrideSaves.empty() ||
-               !m_pendingBlockEntitySaves.empty();
+        return m_persistence.hasPendingModifiedChunkSaves();
     }
     void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
-                      bool raining = false);
-    void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick);
-    void tickBlockEntities();
-    void tickFluids(uint64_t tick);
-    std::vector<glm::ivec3> takeTntIgnitions();
-    BlockEntity* getBlockEntity(const glm::ivec3& position);
-    const BlockEntity* getBlockEntity(const glm::ivec3& position) const;
-    std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position);
+                      bool raining = false) {
+        m_simulation.tickSurvival(playerPosition, tick, raining);
+    }
+    void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick) {
+        m_simulation.tickWeather(weather, daytime, tick);
+    }
+    void tickBlockEntities() { m_persistence.tickBlockEntities(); }
+    void tickFluids(uint64_t tick) { m_fluids.tick(tick); }
+    std::vector<glm::ivec3> takeTntIgnitions() {
+        return m_simulation.takeTntIgnitions();
+    }
+    BlockEntity* getBlockEntity(const glm::ivec3& position) {
+        return m_persistence.getBlockEntity(position);
+    }
+    const BlockEntity* getBlockEntity(const glm::ivec3& position) const {
+        return m_persistence.getBlockEntity(position);
+    }
+    std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position) {
+        return m_persistence.takeBlockEntityContents(position);
+    }
 
     // ── Block queries ────────────────────────────────────────────────
     BlockId getBlock(int worldX, int worldY, int worldZ) const;
@@ -79,39 +105,55 @@ public:
     void resetForNewSeed(uint64_t newSeed);
 
     // Update chunk loading/unloading around player position
-    void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0);
+    void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0) {
+        m_streamer.update(playerPosition, loadBudgetOverride);
+    }
 
     // ── Async generation pipeline ──────────────────────────────────────
     // Enqueue terrain generation. Groups ungenerated chunks into N×N regions
     // for perfect cross-chunk continuity. Remaining singletons use the old path.
-    void enqueueGeneration();
+    void enqueueGeneration() { m_streamer.enqueueGeneration(); }
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.
-    void processCompletedGenerations(bool rebuildLightingNow = true);
+    void processCompletedGenerations(bool rebuildLightingNow = true) {
+        m_streamer.processCompletedGenerations(rebuildLightingNow);
+    }
 
     // Spin-wait for initial chunk generation (called once on first startGame)
-    void waitForInitialGeneration(int maxWaitMs = 150);
+    void waitForInitialGeneration(int maxWaitMs = 150) {
+        m_streamer.waitForInitialGeneration(maxWaitMs);
+    }
 
-    struct GenerationProgress { size_t completed = 0; size_t total = 0; };
-    GenerationProgress generationProgress() const;
-    GenerationProgress loadingProgress() const;
-    void persistGeneratedChunks();
+    using GenerationProgress = StreamingProgress;
+    GenerationProgress generationProgress() const {
+        return m_streamer.generationProgress();
+    }
+    GenerationProgress loadingProgress() const {
+        return m_streamer.loadingProgress();
+    }
+    void persistGeneratedChunks() { m_streamer.persistGeneratedChunks(); }
 
     // Enqueue mesh builds for dirty chunks (async via thread pool)
     void enqueueMeshBuilds(
-        int maxInFlight = Config::CHUNK_MESH_TASKS_IN_FLIGHT);
+        int maxInFlight = Config::CHUNK_MESH_TASKS_IN_FLIGHT) {
+        m_meshes.enqueueMeshBuilds(maxInFlight);
+    }
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps GL uploads per frame to avoid pipeline stalls.
     void processCompletedMeshes(IGameRenderer* renderer, int maxUploads = 4,
                                 size_t maxUploadBytes =
-                                    Config::MESH_UPLOAD_BYTES_PER_FRAME);
+                                    Config::MESH_UPLOAD_BYTES_PER_FRAME) {
+        m_meshes.processCompletedMeshes(renderer, maxUploads, maxUploadBytes);
+    }
 
     // Synchronous build (for first frame or when thread pool unavailable)
-    void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16);
-    void invalidateGpuMeshes();
-    void restoreGpuMeshes();
+    void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16) {
+        m_meshes.buildMeshesSync(renderer, maxCount);
+    }
+    void invalidateGpuMeshes() { m_meshes.invalidateGpuMeshes(); }
+    void restoreGpuMeshes() { m_meshes.restoreGpuMeshes(); }
 
     // ── Raycast ──────────────────────────────────────────────────────
     struct RaycastHit {
@@ -123,12 +165,11 @@ public:
                                       float maxDistance) const;
 
     // ── Rendering ────────────────────────────────────────────────────
-    const std::vector<Chunk*>& getActiveChunks() const { return m_activeChunks; }
-    uint64_t streamingRevision() const { return m_streamingRevision; }
-    bool streamingTargetReady() const {
-        return m_streamCursor >= m_desiredChunks.size() &&
-               !m_streamCleanupPending;
+    const std::vector<Chunk*>& getActiveChunks() const {
+        return m_chunks.activeChunks();
     }
+    uint64_t streamingRevision() const { return m_streamer.streamingRevision(); }
+    bool streamingTargetReady() const { return m_streamer.streamingTargetReady(); }
 
     // ── Chunk coordinate helpers ─────────────────────────────────────
     static inline int worldToChunkX(double wx) {
@@ -139,105 +180,40 @@ public:
     }
 
 private:
-    IGameRenderer* m_renderer = nullptr;
-    struct PairHash {
-        size_t operator()(const std::pair<int,int>& p) const {
-            // Shift through uint64_t: left-shifting a negative int64_t is UB.
-            return std::hash<uint64_t>{}(
-                (static_cast<uint64_t>(static_cast<uint32_t>(p.first)) << 32) |
-                static_cast<uint32_t>(p.second));
-        }
-    };
+    friend class ChunkMeshPipeline;
+    friend class ChunkStreamer;
+    friend class FluidScheduler;
+    ChunkStore m_chunks;
+    WorldPersistence m_persistence{m_chunks};
+    FluidScheduler m_fluids{*this, m_chunks};
+    ChunkMeshPipeline m_meshes{*this, m_chunks};
+    ChunkStreamer m_streamer{*this, m_chunks};
+    WorldLighting m_lighting{m_chunks};
+    WorldSimulation m_simulation{*this, m_persistence, m_chunks};
 
-    using ChunkMap = std::unordered_map<std::pair<int,int>, std::unique_ptr<Chunk>, PairHash>;
-    struct BlockPosHash {
-        size_t operator()(const glm::ivec3& p) const {
-            size_t h = std::hash<int>{}(p.x);
-            h ^= std::hash<int>{}(p.y) + 0x9e3779b9u + (h << 6) + (h >> 2);
-            h ^= std::hash<int>{}(p.z) + 0x9e3779b9u + (h << 6) + (h >> 2);
-            return h;
-        }
-    };
-    struct ScheduledFluidTick {
-        uint64_t due = 0;
-        glm::ivec3 position{0};
-    };
-    struct ScheduledFluidLater {
-        bool operator()(const ScheduledFluidTick& a,
-                        const ScheduledFluidTick& b) const {
-            if (a.due != b.due) return a.due > b.due;
-            if (a.position.y != b.position.y) return a.position.y > b.position.y;
-            if (a.position.z != b.position.z) return a.position.z > b.position.z;
-            return a.position.x > b.position.x;
-        }
-    };
-    ChunkMap m_chunks;
-    std::unordered_map<glm::ivec3, uint8_t, BlockPosHash> m_fireAges;
-    std::priority_queue<ScheduledFluidTick, std::vector<ScheduledFluidTick>,
-                        ScheduledFluidLater> m_fluidTicks;
-    std::unordered_map<glm::ivec3, uint64_t, BlockPosHash> m_scheduledFluidDue;
-    std::vector<glm::ivec3> m_tntIgnitions;
-    uint64_t m_currentWorldTick = 0;
-    std::vector<Chunk*> m_activeChunks;
+    // FluidScheduler reports TNT lit by lava contact through the owning world.
+    void pushTntIgnition(const glm::ivec3& position) {
+        m_simulation.pushTntIgnition(position);
+    }
 
-    mutable std::shared_mutex m_chunkMutex;
+    // ChunkMeshPipeline reads the streaming cursor state for near-to-far
+    // mesh prioritization.
+    int centerChunkX() const { return m_streamer.centerChunkX(); }
+    int centerChunkZ() const { return m_streamer.centerChunkZ(); }
+    int meshChunksPerFrame() const { return m_streamer.meshChunksPerFrame(); }
+
+    // ChunkStreamer drives generation and requests lighting work.
+    WorldGenerator& generator() { return m_generator; }
+    bool lightDirty() const { return m_lighting.dirty(); }
+    void markLightDirty() { m_lighting.markDirty(); }
+    void rebuildLightingNow() { m_lighting.rebuild(); }
 
     WorldGenerator m_generator;
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
 
-    int m_chunksPerFrame = 16;  // First frame loads more
-    bool m_firstUpdate = true;
-    int m_centerChunkX = 0;
-    int m_centerChunkZ = 0;
-    int m_streamCenterChunkX = std::numeric_limits<int>::max();
-    int m_streamCenterChunkZ = std::numeric_limits<int>::max();
-    int m_streamRenderDistance = -1;
-    std::vector<std::pair<int,int>> m_desiredChunks;
-    std::unordered_set<uint64_t> m_desiredChunkSet;
-    size_t m_streamCursor = 0;
-    bool m_streamCleanupPending = false;
-    uint64_t m_streamingRevision = 0;
-    std::atomic<int> m_generationTasksInFlight{0};
-
-    // ── Pending block queue ───────────────────────────────────────────
-    // Cross-region tree leaves that need to be applied when the target
-    // chunk finishes generation. Keyed by target chunk coordinates.
-    using PendingBlockVec = std::vector<RegionGenerationData::PendingBlock>;
-    std::unordered_map<std::pair<int,int>, PendingBlockVec, PairHash> m_pendingBlocks;
-    using OverrideMap = std::unordered_map<uint32_t, BlockId>;
-    std::unordered_map<std::pair<int,int>, OverrideMap, PairHash> m_blockOverrides;
-    std::unordered_set<std::pair<int,int>, PairHash> m_dirtyOverrideChunks;
-    std::unordered_set<std::pair<int,int>, PairHash> m_pendingOverrideSaves;
-    std::unordered_set<std::pair<int,int>, PairHash> m_overridesApplied;
-    using BlockEntityMap = std::unordered_map<uint32_t, BlockEntity>;
-    std::unordered_map<std::pair<int,int>, BlockEntityMap, PairHash> m_blockEntities;
-    std::unordered_set<std::pair<int,int>, PairHash> m_dirtyBlockEntityChunks;
-    std::unordered_set<std::pair<int,int>, PairHash> m_pendingBlockEntitySaves;
-    std::unordered_set<std::pair<int,int>, PairHash> m_blockEntitiesApplied;
-    bool m_lightDirty = true;
-    bool m_lightHasSources = false;
-
-    // Apply queued pending blocks to a newly-generated chunk
-    void applyPendingBlocks(int cx, int cz);
-    void applySavedOverrides(int cx, int cz);
-    void saveOverrides(int cx, int cz);
-    void loadBlockEntities(int cx, int cz);
-    void saveBlockEntities(int cx, int cz);
-    void rebuildLighting();
-    void updateLightingAt(const glm::ivec3& position);
-    bool growSapling(const glm::ivec3& position, BlockId sapling);
-    bool hasWaterForFarmland(const glm::ivec3& position, bool raining = false) const;
-    void scheduleFluidAround(const glm::ivec3& position, uint64_t minimumDelay = 1);
     bool generatedAt(int worldX, int worldZ) const;
-    void updateFluidCell(const glm::ivec3& position, uint64_t tick);
     void setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
                           bool recordOverride);
     void setDerivedBlock(const glm::ivec3& position, BlockId id);
-
-    void markDirty(int cx, int cz);
-    static uint64_t packedChunkKey(int cx, int cz) {
-        return (static_cast<uint64_t>(static_cast<uint32_t>(cx)) << 32) |
-               static_cast<uint32_t>(cz);
-    }
 };

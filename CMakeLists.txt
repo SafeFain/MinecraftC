@@ -1023,14 +1023,21 @@ if(BUILD_TESTING)
         src/world/BlockEntityLogic.cpp
         src/world/CaveGenerator.cpp
         src/world/Chunk.cpp
+        src/world/ChunkMeshPipeline.cpp
+        src/world/ChunkStore.cpp
         src/world/ChunkMesh.cpp
+        src/world/ChunkStreamer.cpp
+        src/world/FluidScheduler.cpp
+        src/world/WorldPersistence.cpp
         src/world/HeightPipeline.cpp
         src/world/Noise.cpp
         src/world/OreGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/World.cpp
-        src/world/WorldGenerator.cpp)
+        src/world/WorldGenerator.cpp
+        src/world/WorldLighting.cpp
+        src/world/WorldSimulation.cpp)
     target_include_directories(session_flow_tests PRIVATE
         src external external/FastNoiseLite external/cgltf external/stb
         external/glad/include)
@@ -1045,6 +1052,49 @@ if(BUILD_TESTING)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+
+    add_executable(world_orchestration_tests
+        tests/WorldOrchestrationTests.cpp
+        src/debug/Log.cpp
+        src/game/Item.cpp
+        src/game/SaveStore.cpp
+        src/game/SurvivalBlockLogic.cpp
+        src/game/SurvivalRules.cpp
+        src/game/Weather.cpp
+        src/threading/ThreadPool.cpp
+        src/world/BiomeMap.cpp
+        src/world/Block.cpp
+        src/world/BlockEntityLogic.cpp
+        src/world/CaveGenerator.cpp
+        src/world/Chunk.cpp
+        src/world/ChunkMeshPipeline.cpp
+        src/world/ChunkStore.cpp
+        src/world/ChunkMesh.cpp
+        src/world/ChunkStreamer.cpp
+        src/world/FluidScheduler.cpp
+        src/world/WorldPersistence.cpp
+        src/world/HeightPipeline.cpp
+        src/world/Noise.cpp
+        src/world/OreGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/TreeGenerator.cpp
+        src/world/World.cpp
+        src/world/WorldGenerator.cpp
+        src/world/WorldLighting.cpp
+        src/world/WorldSimulation.cpp)
+    target_include_directories(world_orchestration_tests PRIVATE
+        src external external/FastNoiseLite)
+    target_compile_definitions(world_orchestration_tests PRIVATE
+        MINECRAFTC_ENABLE_OPENGL=1
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(world_orchestration_tests PRIVATE
+        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(world_orchestration_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(world_orchestration_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME world_orchestration_state_transitions COMMAND world_orchestration_tests)
 
     add_executable(localization_tests
         tests/LocalizationTests.cpp
