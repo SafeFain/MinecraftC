@@ -12,6 +12,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string>
 
 namespace {
@@ -55,11 +56,28 @@ std::string Localization::text(std::string_view key) const {
 }
 
 int main() {
-    // The offscreen video driver provides a real SDL window and OpenGL
-    // context without a display, so the controller can be exercised against
-    // the true platform event pipeline.
-    require(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen"),
-            "SDL offscreen video driver hint is accepted");
+    // Prefer the platform's default video driver (desktop sessions on
+    // Windows/macOS CI and X11/Wayland hosts). Headless Linux CI falls back
+    // to the offscreen driver, which provides a real SDL window and OpenGL
+    // context where EGL is available. If no video backend can create a
+    // window, the test is skipped instead of failing the suite.
+    std::unique_ptr<Window> window;
+    try {
+        window = std::make_unique<Window>(
+            640, 480, "input routing test", 0, GraphicsApi::OpenGL33, true,
+            false);
+    } catch (const std::exception&) {
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+        try {
+            window = std::make_unique<Window>(
+                640, 480, "input routing test", 0, GraphicsApi::OpenGL33,
+                true, false);
+        } catch (const std::exception&) {
+            std::cout << "SKIP: no SDL video driver can create a window\n";
+            return 0;
+        }
+    }
+    Window& windowRef = *window;
 
     ClientSettings settings;
     int keyCalls = 0;
@@ -78,10 +96,8 @@ int main() {
     bool lastScreenKeyboard = false;
 
     {
-        Window window(640, 480, "input routing test", 0,
-                      GraphicsApi::OpenGL33, true, false);
         ApplicationInputController controller;
-        controller.bind(window, settings, {
+        controller.bind(windowRef, settings, {
             [&](int key, int, ButtonAction action, int) {
                 ++keyCalls;
                 lastKey = key;
@@ -112,7 +128,7 @@ int main() {
 
         // Key press routes into InputState and the narrow callback.
         SDL_Event down = keyEvent(SDL_EVENT_KEY_DOWN, SDL_SCANCODE_W);
-        window.handleEvent(&down);
+        windowRef.handleEvent(&down);
         require(controller.state.held(InputAction::MoveForward) &&
                     controller.state.pressed(InputAction::MoveForward),
                 "bound key press exposes held and pressed state");
@@ -124,20 +140,20 @@ int main() {
 
         // Key repeat is forwarded as a repeat edge.
         SDL_Event repeat = keyEvent(SDL_EVENT_KEY_DOWN, SDL_SCANCODE_W, true);
-        window.handleEvent(&repeat);
+        windowRef.handleEvent(&repeat);
         require(keyCalls == 2 && lastKeyAction == ButtonAction::Repeat,
                 "key callback forwards repeat edges");
 
         // beginFrame clears edges but keeps held state.
         TouchControlConfig touchConfig;
-        controller.beginFrame(window, settings, touchConfig, 1, false);
+        controller.beginFrame(windowRef, settings, touchConfig, 1, false);
         require(controller.state.held(InputAction::MoveForward) &&
                     !controller.state.pressed(InputAction::MoveForward),
                 "beginFrame clears press edges without losing held state");
 
         // Key release exposes the release edge and clears key tracking.
         SDL_Event up = keyEvent(SDL_EVENT_KEY_UP, SDL_SCANCODE_W);
-        window.handleEvent(&up);
+        windowRef.handleEvent(&up);
         require(controller.state.released(InputAction::MoveForward) &&
                     !controller.state.held(InputAction::MoveForward),
                 "bound key release exposes the release edge");
@@ -148,30 +164,30 @@ int main() {
 
         // Alt key tracking drives altPressed().
         SDL_Event altDown = keyEvent(SDL_EVENT_KEY_DOWN, SDL_SCANCODE_LALT);
-        window.handleEvent(&altDown);
+        windowRef.handleEvent(&altDown);
         require(controller.altPressed(), "alt press is tracked");
         SDL_Event altUp = keyEvent(SDL_EVENT_KEY_UP, SDL_SCANCODE_LALT);
-        window.handleEvent(&altUp);
+        windowRef.handleEvent(&altUp);
         require(!controller.altPressed(), "alt release clears tracking");
 
         // Text input forwards to the narrow text callback.
         SDL_Event text{};
         text.type = SDL_EVENT_TEXT_INPUT;
         text.text.text = "hi";
-        window.handleEvent(&text);
+        windowRef.handleEvent(&text);
         require(textCalls == 1 && lastText == "hi",
                 "text input forwards to the text callback");
 
         // Mouse button presses route into InputState and the callback.
         SDL_Event mouseDown = mouseButtonEvent(SDL_EVENT_MOUSE_BUTTON_DOWN,
                                                SDL_BUTTON_LEFT);
-        window.handleEvent(&mouseDown);
+        windowRef.handleEvent(&mouseDown);
         require(mouseCalls == 1 && lastButton == MouseButton::Left &&
                     lastButtonAction == ButtonAction::Press,
                 "mouse callback receives the button and press edge");
         SDL_Event mouseUp = mouseButtonEvent(SDL_EVENT_MOUSE_BUTTON_UP,
                                              SDL_BUTTON_LEFT);
-        window.handleEvent(&mouseUp);
+        windowRef.handleEvent(&mouseUp);
         require(lastButtonAction == ButtonAction::Release,
                 "mouse callback receives the release edge");
 
@@ -181,7 +197,7 @@ int main() {
         controller.uiTouch.position = {0.0f, 0.0f};
         controller.uiTouch.origin = {0.0f, 0.0f};
         controller.uiTouch.active = true;
-        window.handleEvent(&mouseDown);
+        windowRef.handleEvent(&mouseDown);
         require(mouseCalls == 2,
                 "physical mouse is suppressed while UI touch is active");
         controller.uiTouch = {};
@@ -192,7 +208,7 @@ int main() {
         wheel.wheel.which = 0;
         wheel.wheel.y = 1;
         wheel.wheel.direction = SDL_MOUSEWHEEL_NORMAL;
-        window.handleEvent(&wheel);
+        windowRef.handleEvent(&wheel);
         require(scrollCalls == 1 && lastScroll == 1.0,
                 "scroll callback receives the wheel delta");
 
@@ -203,39 +219,39 @@ int main() {
         touchDown.tfinger.fingerID = 2;
         touchDown.tfinger.x = 0.5f;
         touchDown.tfinger.y = 0.25f;
-        window.handleEvent(&touchDown);
+        windowRef.handleEvent(&touchDown);
         require(touchCalls == 1 && lastTouchPhase == TouchPhase::Begin,
                 "touch callback receives the begin phase");
         SDL_Event touchUp{};
         touchUp.type = SDL_EVENT_FINGER_UP;
         touchUp.tfinger.touchID = 1;
         touchUp.tfinger.fingerID = 2;
-        window.handleEvent(&touchUp);
+        windowRef.handleEvent(&touchUp);
         require(lastTouchPhase == TouchPhase::End,
                 "touch callback receives the end phase");
 
         // Screen-keyboard visibility routes to the narrow callback.
         SDL_Event keyboardShown{};
         keyboardShown.type = SDL_EVENT_SCREEN_KEYBOARD_SHOWN;
-        window.handleEvent(&keyboardShown);
+        windowRef.handleEvent(&keyboardShown);
         require(screenKeyboardCalls == 1 && lastScreenKeyboard,
                 "screen-keyboard shown routes to the callback");
         SDL_Event keyboardHidden{};
         keyboardHidden.type = SDL_EVENT_SCREEN_KEYBOARD_HIDDEN;
-        window.handleEvent(&keyboardHidden);
+        windowRef.handleEvent(&keyboardHidden);
         require(screenKeyboardCalls == 2 && !lastScreenKeyboard,
                 "screen-keyboard hidden routes to the callback");
 
         // Focus loss clears held physical input inside the controller and
         // cancels in-flight touches; the application needs no forwarding.
         SDL_Event held = keyEvent(SDL_EVENT_KEY_DOWN, SDL_SCANCODE_W);
-        window.handleEvent(&held);
+        windowRef.handleEvent(&held);
         require(controller.state.held(InputAction::MoveForward),
                 "held action is active before focus loss");
         const int touchesBeforeFocusLoss = touchCalls;
         SDL_Event focusLost{};
         focusLost.type = SDL_EVENT_WINDOW_FOCUS_LOST;
-        window.handleEvent(&focusLost);
+        windowRef.handleEvent(&focusLost);
         require(!controller.state.held(InputAction::MoveForward) &&
                     controller.state.released(InputAction::MoveForward),
                 "focus loss releases held actions");
@@ -246,7 +262,7 @@ int main() {
                 "focus loss cancels in-flight touches");
         SDL_Event focusGained{};
         focusGained.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
-        window.handleEvent(&focusGained);
+        windowRef.handleEvent(&focusGained);
         require(keyCalls == 6,
                 "focus gain forwards no synthetic key events");
     }

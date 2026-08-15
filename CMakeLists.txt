@@ -263,7 +263,11 @@ set(MINECRAFTC_OPENGL_BACKEND_SOURCES
     src/renderer/backend/opengl/OpenGLShader.cpp
     src/renderer/backend/opengl/OpenGLUIRenderer.cpp)
 set(MINECRAFTC_VULKAN_BACKEND_SOURCES
+    src/renderer/backend/vulkan/VulkanHelpers.cpp
+    src/renderer/backend/vulkan/VulkanModelBackend.cpp
+    src/renderer/backend/vulkan/VulkanPipelineFactory.cpp
     src/renderer/backend/vulkan/VulkanRenderer.cpp
+    src/renderer/backend/vulkan/VulkanResources.cpp
     src/renderer/backend/vulkan/VulkanUIRenderer.cpp
     src/renderer/backend/vulkan/VmaImplementation.cpp)
 foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
