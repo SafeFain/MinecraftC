@@ -10,7 +10,7 @@
 
 class ApplicationInputController;
 class AudioSystem;
-class ClientSettings;
+struct ClientSettings;
 class GameFlowController;
 class GameSession;
 class GameScenePresenter;

@@ -10,7 +10,7 @@
 #include <string_view>
 #include <unordered_map>
 
-class ClientSettings;
+struct ClientSettings;
 class Window;
 
 class ApplicationInputController {

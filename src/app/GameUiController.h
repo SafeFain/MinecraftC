@@ -15,7 +15,7 @@
 
 class IGameRenderer;
 class ApplicationInputController;
-class ClientSettings;
+struct ClientSettings;
 class GameSession;
 class Player;
 class Window;

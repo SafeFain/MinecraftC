@@ -7,7 +7,7 @@
 #include <string>
 
 class AudioSystem;
-class ClientSettings;
+struct ClientSettings;
 class GameSession;
 class GameScenePresenter;
 class GameUiController;

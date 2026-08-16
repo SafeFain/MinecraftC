@@ -13,7 +13,7 @@
 #include <vector>
 
 class Chunk;
-class ClientSettings;
+struct ClientSettings;
 class GameSession;
 class IGameRenderer;
 class Localization;
