@@ -6,14 +6,13 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 6;
+    static constexpr uint32_t GENERATION_VERSION = 7;
     // Base chunk caches may be invalidated without changing the user-visible
-    // generation version. Revision 2 applies the reduced flower density.
+    // generation version. v7 starts a fresh base-cache revision at 1.
     static constexpr uint32_t CHUNK_CACHE_VERSION =
-        (GENERATION_VERSION << 16) | 2u;
-    // Biome routing retains the established v3 seed-domain layout; v6 changes
-    // only climate sampling frequencies and selection thresholds.
-    static constexpr uint32_t SEED_LAYOUT_VERSION = 3;
+        (GENERATION_VERSION << 16) | 1u;
+    // Layout 4 adds independent macro-archetype, basin and landmark domains.
+    static constexpr uint32_t SEED_LAYOUT_VERSION = 4;
 
     explicit WorldGenContext(uint64_t seed) : m_seed(seed) {}
 

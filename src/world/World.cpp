@@ -131,6 +131,51 @@ std::optional<glm::ivec2> World::locateBiome(
         [this](int x, int z) { return biomeAt(x, z); });
 }
 
+glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
+    glm::ivec2 best{0};
+    glm::ivec2 fallback{0};
+    bool hasFallback = false;
+    int bestScore = std::numeric_limits<int>::max();
+    constexpr int step = 8;
+    for (int radius = 0; radius <= maximumRadius; radius += step) {
+        for (int z = -radius; z <= radius; z += step) {
+            for (int x = -radius; x <= radius; x += step) {
+                if (radius > 0 && std::abs(x) != radius && std::abs(z) != radius)
+                    continue;
+                const SurfaceColumn center = m_generator.sampleTerrainColumn(x, z);
+                if (center.height <= center.waterLevel || center.river ||
+                    center.biome == Biome::OCEAN || center.biome == Biome::DEEP_OCEAN ||
+                    center.biome == Biome::BLACK_SAND_COAST ||
+                    center.height >= Config::WORLD_MAX_Y - 8)
+                    continue;
+                if (!hasFallback) {
+                    fallback = {x, z};
+                    hasFallback = true;
+                }
+                int relief = 0;
+                for (const glm::ivec2 offset : {glm::ivec2{-2, 0}, {2, 0},
+                                                {0, -2}, {0, 2}}) {
+                    const SurfaceColumn neighbor = m_generator.sampleTerrainColumn(
+                        x + offset.x, z + offset.y);
+                    relief = std::max(relief, std::abs(neighbor.height - center.height));
+                }
+                const int score = relief * 100 + radius;
+                if (relief <= 2 && score < bestScore) {
+                    best = {x, z};
+                    bestScore = score;
+                }
+            }
+        }
+        if (bestScore != std::numeric_limits<int>::max()) break;
+    }
+    if (bestScore == std::numeric_limits<int>::max() && hasFallback)
+        best = fallback;
+    const SurfaceColumn chosen = m_generator.sampleTerrainColumn(best.x, best.y);
+    return {static_cast<double>(best.x) + 0.5,
+            static_cast<double>(chosen.height) + 1.01,
+            static_cast<double>(best.y) + 0.5};
+}
+
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
     setBlockInternal(worldX,worldY,worldZ,id,true);
 }

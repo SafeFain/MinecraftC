@@ -31,37 +31,11 @@ TreeGenerator::Candidate TreeGenerator::candidateForCell(int cellX, int cellZ) c
 }
 
 float TreeGenerator::radiusFor(Biome biome) {
-    switch (biome) {
-        case Biome::JUNGLE:       return 3.0f;
-        case Biome::FOREST:
-        case Biome::FLOWER_FOREST:
-        case Biome::BIRCH_FOREST:
-        case Biome::TAIGA:        return 4.0f;
-        case Biome::SWAMP:        return 4.5f;
-        case Biome::HILLS:
-        case Biome::MEADOW:       return 5.0f;
-        default:                  return 5.5f;
-    }
+    return getBiomeProps(biome).treeSpacing;
 }
 
 float TreeGenerator::chanceFor(Biome biome) {
-    switch (biome) {
-        case Biome::JUNGLE:       return 0.95f;
-        case Biome::FOREST:       return 0.78f;
-        case Biome::FLOWER_FOREST:return 0.66f;
-        case Biome::BIRCH_FOREST: return 0.82f;
-        case Biome::TAIGA:        return 0.68f;
-        case Biome::SWAMP:        return 0.52f;
-        case Biome::HILLS:        return 0.24f;
-        case Biome::MEADOW:       return 0.12f;
-        case Biome::PLAINS:       return 0.10f;
-        case Biome::SUNFLOWER_PLAINS: return 0.06f;
-        case Biome::SAVANNA:      return 0.18f;
-        case Biome::MOUNTAINS:    return 0.08f;
-        case Biome::DESERT:
-        case Biome::BADLANDS:     return 0.12f;
-        default:                  return 0.0f;
-    }
+    return std::min(0.95f, getBiomeProps(biome).treeDensity * 5.0f);
 }
 
 bool TreeGenerator::winsSpacing(const Candidate& candidate, float radius) const {
@@ -102,7 +76,8 @@ TreeType TreeGenerator::chooseTreeType(Biome biome, uint64_t seed, int x, int z)
     const BiomeProperties& props = getBiomeProps(biome);
     if (props.treeType1 == TreeType::NONE) return TreeType::NONE;
     uint64_t h = WorldGenContext::hashPosition(seed ^ TYPE_DOMAIN, x, 0, z);
-    if (props.treeType2 != TreeType::NONE && h % 4 == 0)
+    if (props.treeType2 != TreeType::NONE &&
+        h % props.totalTreeWeight < props.secondaryTreeWeight)
         return props.treeType2;
     return props.treeType1;
 }
@@ -119,6 +94,27 @@ int TreeGenerator::trunkHeight(TreeType type, int worldX, int worldZ) const {
         case TreeType::CACTUS:    return 1 + static_cast<int>(h % 3);
         default:                  return 4 + static_cast<int>(h % 3);
     }
+}
+
+int TreeGenerator::biomeTrunkHeight(Biome biome, TreeType type,
+                                    int worldX, int worldZ) const {
+    int height = trunkHeight(type, worldX, worldZ);
+    switch (biome) {
+        case Biome::ALPINE_TUNDRA:
+        case Biome::GLACIAL_PEAKS:
+            if (type == TreeType::SPRUCE) height += 3;
+            break;
+        case Biome::KARST_FOREST:
+        case Biome::LUSH_VALLEY:
+            if (type == TreeType::OAK || type == TreeType::JUNGLE) height += 4;
+            break;
+        case Biome::DRY_WOODLAND:
+            if (type == TreeType::ACACIA) height += 2;
+            break;
+        default:
+            break;
+    }
+    return height;
 }
 
 void TreeGenerator::generateTreesRegion(
@@ -146,7 +142,8 @@ void TreeGenerator::generateTreesRegion(
                 !winsSpacing(c, radiusFor(biome))) continue;
             TreeType type = chooseTreeType(biome, m_treeSeed, c.x, c.z);
             if (type == TreeType::NONE) continue;
-            output.push_back({lx, lz, height, trunkHeight(type, c.x, c.z), type});
+            output.push_back({lx, lz, height,
+                              biomeTrunkHeight(biome, type, c.x, c.z), type});
         }
     }
 }
@@ -173,7 +170,8 @@ std::vector<TreeGenerator::TreePlacement> TreeGenerator::generateTrees(
                 !winsSpacing(c, radiusFor(biome))) continue;
             TreeType type = chooseTreeType(biome, m_treeSeed, c.x, c.z);
             if (type != TreeType::NONE)
-                output.push_back({lx, lz, height, trunkHeight(type, c.x, c.z), type});
+                output.push_back({lx, lz, height,
+                                  biomeTrunkHeight(biome, type, c.x, c.z), type});
         }
     }
     return output;

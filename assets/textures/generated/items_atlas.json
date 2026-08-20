@@ -42,6 +42,14 @@
       "x": 7,
       "y": 8
     },
+    "basalt": {
+      "generator": "block_item_icon",
+      "index": 135,
+      "source": "assets/textures/generated/items/basalt.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 16
+    },
     "bedrock": {
       "generator": "block_item_icon",
       "index": 37,
@@ -73,6 +81,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 14
+    },
+    "black_sand": {
+      "generator": "block_item_icon",
+      "index": 140,
+      "source": "assets/textures/generated/items/black_sand.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 17
     },
     "blastling_spawn_egg": {
       "generator": "item_sprite",
@@ -161,6 +177,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 5
+    },
+    "coarse_dirt": {
+      "generator": "block_item_icon",
+      "index": 137,
+      "source": "assets/textures/generated/items/coarse_dirt.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 17
     },
     "cobblestone": {
       "generator": "block_item_icon",
@@ -458,6 +482,14 @@
       "x": 2,
       "y": 4
     },
+    "granite": {
+      "generator": "block_item_icon",
+      "index": 141,
+      "source": "assets/textures/generated/items/granite.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 17
+    },
     "grass_block": {
       "generator": "block_item_icon",
       "index": 0,
@@ -650,6 +682,14 @@
       "x": 0,
       "y": 12
     },
+    "limestone": {
+      "generator": "block_item_icon",
+      "index": 134,
+      "source": "assets/textures/generated/items/limestone.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 16
+    },
     "moss": {
       "generator": "block_item_icon",
       "index": 53,
@@ -657,6 +697,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 6
+    },
+    "mud": {
+      "generator": "block_item_icon",
+      "index": 138,
+      "source": "assets/textures/generated/items/mud.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 17
     },
     "oak_leaves": {
       "generator": "block_item_icon",
@@ -705,6 +753,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 15
+    },
+    "packed_ice": {
+      "generator": "block_item_icon",
+      "index": 139,
+      "source": "assets/textures/generated/items/packed_ice.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 17
     },
     "pig_spawn_egg": {
       "generator": "item_sprite",
@@ -986,6 +1042,14 @@
       "x": 6,
       "y": 1
     },
+    "tuff": {
+      "generator": "block_item_icon",
+      "index": 136,
+      "source": "assets/textures/generated/items/tuff.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 17
+    },
     "water": {
       "generator": "block_item_icon",
       "index": 38,
@@ -1081,7 +1145,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 17,
+  "rows": 18,
   "seed": 213785369,
   "tile_size": 16,
   "version": 1

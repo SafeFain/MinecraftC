@@ -46,6 +46,7 @@ int main() {
         source.exhaustion = 3.25f;
         source.inventory.slot(0) = {ItemId::IRON_PICKAXE, 1, 42};
         source.inventory.slot(9) = {ItemId::COAL, 37, 0};
+        source.inventory.slot(10) = {ItemId::LIMESTONE, 23, 0};
         source.inventory.armor()[1] = {ItemId::IRON_CHESTPLATE, 1, 12};
         source.inventory.offhand() = {ItemId::SHIELD, 1, 4};
         source.entities.push_back({
@@ -81,6 +82,9 @@ int main() {
                 "durable inventory item round trips");
         require(loaded.inventory.offhand().id == ItemId::SHIELD,
                 "offhand round trips");
+        require(loaded.inventory.slot(10).id == ItemId::LIMESTONE &&
+                loaded.inventory.slot(10).count == 23,
+                "v7 appended natural material item round trips");
         require(loaded.entities.size() == 2 &&
                 loaded.entities[0].position == source.entities[0].position &&
                 loaded.entities[1].type == 10 &&
@@ -127,11 +131,12 @@ int main() {
             {static_cast<uint32_t>(15 + 15 * 16 +
                 Config::worldYToStorageY(319) * 256), BlockId::DIAMOND_ORE},
             {513, BlockId::FARMLAND_7},
-            {514, BlockId::ACACIA_SAPLING}
+            {514, BlockId::ACACIA_SAPLING},
+            {515, BlockId::GRANITE}
         };
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 4, "chunk overrides round trip");
+        require(loadedOverrides.size() == 5, "chunk overrides round trip");
         require(loadedOverrides[0].block == BlockId::AIR,
                 "explicit AIR override is preserved");
         require(loadedOverrides[1].localIndex == overrides[1].localIndex,
@@ -139,6 +144,8 @@ int main() {
         require(loadedOverrides[2].block == BlockId::FARMLAND_7 &&
                 loadedOverrides[3].block == BlockId::ACACIA_SAPLING,
                 "new farming block ids round trip in save format 5");
+        require(loadedOverrides[4].block == BlockId::GRANITE,
+                "v7 appended natural block id round trips in save format 8");
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
 
@@ -146,6 +153,7 @@ int main() {
                                        static_cast<uint8_t>(BlockId::STONE));
         generated.front() = static_cast<uint8_t>(BlockId::BEDROCK);
         generated.back() = static_cast<uint8_t>(BlockId::AIR);
+        generated[513] = static_cast<uint8_t>(BlockId::BASALT);
         store.saveGeneratedChunk(-2, -7, generated,
                                  WorldGenContext::GENERATION_VERSION);
         const auto loadedGenerated = store.loadGeneratedChunk(

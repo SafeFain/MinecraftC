@@ -29,6 +29,10 @@
     "obsidian": {"texture": "obsidian"}, "dandelion": {"texture": "dandelion"},
     "blue_orchid": {"texture": "blue_orchid"}, "allium": {"texture": "allium"},
     "oxeye_daisy": {"texture": "oxeye_daisy"}, "sunflower": {"texture": "sunflower_bottom"},
+    "limestone": {"texture": "limestone"}, "basalt": {"texture": "basalt"},
+    "tuff": {"texture": "tuff"}, "coarse_dirt": {"texture": "coarse_dirt"},
+    "mud": {"texture": "mud"}, "packed_ice": {"texture": "packed_ice"},
+    "black_sand": {"texture": "black_sand"}, "granite": {"texture": "granite"},
     "copper_ore": {"texture": "copper_ore", "future": true}
   }
 }

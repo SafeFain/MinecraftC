@@ -73,7 +73,9 @@ NAMES = [
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
     "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
-    "sunflower_top", "cloud", "copper_ore",
+    "sunflower_top", "cloud", "limestone", "basalt", "tuff",
+    "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
+    "copper_ore",
 ]
 
 PALETTES = {
@@ -112,6 +114,10 @@ EXTRA_BASES = {
     "allium":(151,86,180), "oxeye_daisy":(221,220,195),
     "sunflower_bottom":(82,133,46), "sunflower_top":(224,169,28),
     "cloud":(220,225,229),
+    "limestone":(184,181,163), "basalt":(48,50,53), "tuff":(79,91,83),
+    "coarse_dirt":(104,72,42), "mud":(61,57,54),
+    "packed_ice":(91,153,195), "black_sand":(49,46,49),
+    "granite":(142,91,77),
 }
 TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle",
                "wheat_mature","oak_sapling","birch_sapling","spruce_sapling",
@@ -135,7 +141,8 @@ for _name, _ore in {"gold_ore":((125,91,31),(191,143,43),(235,190,67)),
 HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_ore","fire"}
 NATURAL = {"dirt","grass_top","stone","sand","bedrock","deepslate","gravel","clay",
            "red_sand","terracotta","podzol_top","moss","snow","snow_layer","cobblestone",
-           "cloud"}
+           "cloud","limestone","basalt","tuff","coarse_dirt","mud",
+           "packed_ice","black_sand","granite"}
 DIRECTIONAL = {"oak_planks","oak_log","birch_log","spruce_log","jungle_log","acacia_log",
                "farmland","wet_farmland","cactus_side","reeds"}
 LEAF_NAMES = {"leaves","birch_leaves","spruce_leaves","jungle_leaves","acacia_leaves"}
@@ -386,10 +393,11 @@ def generate_ore(name,seed):
     return out
 
 def generate_generic(name,seed):
-    if name in {"dirt","gravel","podzol_top"}: return generate_dirt(name,seed)
+    if name in {"dirt","gravel","podzol_top","coarse_dirt","mud"}: return generate_dirt(name,seed)
     if name=="grass_top" or name=="moss": return generate_grass(seed^sample(seed,name,0,0))
-    if name in {"stone","bedrock","deepslate","clay","terracotta","cobblestone"}: return generate_stone(name,seed)
-    if name in {"sand","red_sand","snow","snow_layer"}: return generate_sand(name,seed)
+    if name in {"stone","bedrock","deepslate","clay","terracotta","cobblestone",
+                "limestone","basalt","tuff","granite"}: return generate_stone(name,seed)
+    if name in {"sand","red_sand","black_sand","snow","snow_layer","packed_ice"}: return generate_sand(name,seed)
     if name.endswith("_ore"): return generate_ore(name,seed)
     if name in LEAF_NAMES: return generate_leaves(name,seed)
     if name.endswith("_log"): return generate_wood_side(name,seed)

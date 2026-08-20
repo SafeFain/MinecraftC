@@ -15,14 +15,14 @@ GitHub prereleases; release-channel tags create normal releases.
 
 - Deterministic terrain, biomes, caves, ores, vegetation, and trees across
   Y=-64..319.
-- 20 biomes, seven vegetation and tree forms, fluids, farming, fire, TNT, and
-  moving voxel clouds.
+- 30 biomes, 15 blended macro terrain archetypes, drainage-basin rivers, seven
+  vegetation and tree forms, fluids, farming, fire, TNT, and moving voxel clouds.
 - Distance-prioritized generation, greedy meshing, ambient occlusion, dual-channel
   lighting, configurable cascaded shadows, transparent materials, and persistent
   spawn caches.
 - Crafting, furnaces, containers, combat, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 126-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 142-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 
@@ -155,7 +155,8 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v8 can read v2-v7 desktop saves. The current world
-generation version is v6.
+generation version is v7. Older generation versions remain on disk and are
+shown as incompatible rather than migrated or blended into v7 terrain.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, and `/weather`.
 Run `./build-local/minecraftc --version` to print the version without opening a
@@ -166,6 +167,9 @@ window.
 ```bash
 ctest --test-dir build-local --output-on-failure
 git diff --check
+# seed originX originZ pixelSize blockStep outputPrefix
+./build-local/terrain_preview 1234567890 -2048 -2048 512 8 terrain-preview
+./build-local/terrain_benchmark 1592615476 9
 ```
 
 Regenerate Vulkan shaders after editing their GLSL sources:

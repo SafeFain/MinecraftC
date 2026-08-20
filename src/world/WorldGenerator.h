@@ -38,6 +38,9 @@ public:
     // ── Queries ──────────────────────────────────────────────────────────
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
+    SurfaceColumn sampleTerrainColumn(int worldX, int worldZ) const {
+        return m_heightPipeline.sampleColumn(worldX, worldZ);
+    }
 
     // ── Sub-generator access (for RegionGenerator construction) ──────────
     HeightPipeline& getHeightPipeline() { return m_heightPipeline; }

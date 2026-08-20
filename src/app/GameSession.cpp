@@ -54,6 +54,15 @@ GameMode GameSession::startWorld(
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
     world.resetForNewSeed(worldMetadata.seed);
     entities.clear();
+    if (newWorld) {
+        const glm::dvec3 spawn = world.findSafeSpawn();
+        player.setPosition(spawn);
+        worldMetadata.playerPosition = spawn;
+        worldMetadata.worldSpawn = glm::ivec3(
+            static_cast<int>(std::floor(spawn.x)),
+            static_cast<int>(std::floor(spawn.y)),
+            static_cast<int>(std::floor(spawn.z)));
+    }
     if (!newWorld) entities.loadEntities(worldMetadata.entities);
     world.update(player.getPosition());
     world.enqueueGeneration();

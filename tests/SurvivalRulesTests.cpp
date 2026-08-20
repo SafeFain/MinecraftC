@@ -16,6 +16,34 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    static_assert(static_cast<uint8_t>(BlockId::FLOWING_LAVA_7) == 88);
+    static_assert(static_cast<uint8_t>(BlockId::LIMESTONE) == 89);
+    static_assert(static_cast<uint8_t>(BlockId::BASALT) == 90);
+    static_assert(static_cast<uint8_t>(BlockId::TUFF) == 91);
+    static_assert(static_cast<uint8_t>(BlockId::COARSE_DIRT) == 92);
+    static_assert(static_cast<uint8_t>(BlockId::MUD) == 93);
+    static_assert(static_cast<uint8_t>(BlockId::PACKED_ICE) == 94);
+    static_assert(static_cast<uint8_t>(BlockId::BLACK_SAND) == 95);
+    static_assert(static_cast<uint8_t>(BlockId::GRANITE) == 96);
+    static_assert(static_cast<uint16_t>(ItemId::BLASTLING_SPAWN_EGG) == 134);
+    static_assert(static_cast<uint16_t>(ItemId::LIMESTONE) == 135);
+    static_assert(static_cast<uint16_t>(ItemId::GRANITE) == 142);
+    for (const auto& mapping : {
+             std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
+             std::pair{BlockId::BASALT, ItemId::BASALT},
+             std::pair{BlockId::TUFF, ItemId::TUFF},
+             std::pair{BlockId::COARSE_DIRT, ItemId::COARSE_DIRT},
+             std::pair{BlockId::MUD, ItemId::MUD},
+             std::pair{BlockId::PACKED_ICE, ItemId::PACKED_ICE},
+             std::pair{BlockId::BLACK_SAND, ItemId::BLACK_SAND},
+             std::pair{BlockId::GRANITE, ItemId::GRANITE}}) {
+        require(itemForBlock(mapping.first) == mapping.second,
+                "v7 natural block did not map to its appended item");
+        const auto drops = getBlockDrops(
+            mapping.first, {ItemId::WOODEN_PICKAXE, 1, 0}, 0);
+        require(drops.size() == 1 && drops.front().id == mapping.second,
+                "v7 natural block did not drop itself");
+    }
     require(canTillBlock(ItemId::WOODEN_HOE,BlockId::GRASS,1)&&
             canTillBlock(ItemId::DIAMOND_HOE,BlockId::DIRT,1),
             "hoes can till the top face of grass and dirt in shared gameplay logic");

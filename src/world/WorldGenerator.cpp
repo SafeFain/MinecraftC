@@ -58,7 +58,8 @@ void WorldGenerator::generate(Chunk& chunk,
             riverMap[x][z] = terrainColumn.river;
             const BiomeProperties& bprops = getBiomeProps(biome);
             SurfaceProfile surface = SurfaceRules::profile(
-                m_seed, wxBase + x, wzBase + z, biome);
+                m_seed, wxBase + x, wzBase + z, biome,
+                terrainColumn.archetype, terrainColumn.slope);
 
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
@@ -77,7 +78,9 @@ void WorldGenerator::generate(Chunk& chunk,
                 const int y = height - depth;
                 const BlockId current = chunk.getBlock(x, y, z);
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.setBlock(x, y, z, depth == 0 ? surface.top : surface.under);
+                chunk.setBlock(x, y, z, SurfaceRules::blockAtDepth(
+                    m_seed, worldX, worldZ, height, depth, biome,
+                    terrainColumn.archetype, terrainColumn.slope));
             }
 
             // Snow cover: if height >= biome snowLine, override surface
@@ -144,7 +147,11 @@ void WorldGenerator::generate(Chunk& chunk,
                 BlockId decoration = SurfaceRules::decoration(
                     m_seed, wx, wz, heightMap[x][z], biomeMap[x][z], riverMap[x][z]);
                 if (decoration != BlockId::AIR) {
-                    chunk.setBlock(x, heightMap[x][z] + 1, z, decoration);
+                    const int featureHeight = SurfaceRules::decorationHeight(
+                        m_seed, wx, wz, heightMap[x][z], decoration);
+                    for (int dy = 1; dy <= featureHeight; ++dy)
+                        if (heightMap[x][z] + dy < Config::WORLD_MAX_Y)
+                            chunk.setBlock(x, heightMap[x][z] + dy, z, decoration);
                     if (decoration == BlockId::SUNFLOWER_BOTTOM &&
                         heightMap[x][z] + 2 < Config::WORLD_MAX_Y)
                         chunk.setBlock(x, heightMap[x][z] + 2, z,

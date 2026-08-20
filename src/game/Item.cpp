@@ -186,6 +186,24 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         set(spawnEggs[index].first, std::move(properties));
     }
 
+    const std::array<std::pair<ItemId, BlockId>, 8> naturalBlocks{{
+        {ItemId::LIMESTONE, BlockId::LIMESTONE},
+        {ItemId::BASALT, BlockId::BASALT}, {ItemId::TUFF, BlockId::TUFF},
+        {ItemId::COARSE_DIRT, BlockId::COARSE_DIRT}, {ItemId::MUD, BlockId::MUD},
+        {ItemId::PACKED_ICE, BlockId::PACKED_ICE},
+        {ItemId::BLACK_SAND, BlockId::BLACK_SAND},
+        {ItemId::GRANITE, BlockId::GRANITE}
+    }};
+    const std::array<const char*, 8> naturalNames{{
+        "Limestone", "Basalt", "Tuff", "Coarse Dirt", "Mud",
+        "Packed Ice", "Black Sand", "Granite"
+    }};
+    for (size_t i = 0; i < naturalBlocks.size(); ++i) {
+        set(naturalBlocks[i].first,
+            {naturalNames[i], ItemKind::Block, 64, 0, ToolKind::None,
+             ToolTier::None, 0, 0, 0, 0, naturalBlocks[i].second});
+    }
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -251,6 +269,14 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_5):
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_6):
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_7): return ItemId::LAVA;
+        case static_cast<uint16_t>(BlockId::LIMESTONE): return ItemId::LIMESTONE;
+        case static_cast<uint16_t>(BlockId::BASALT): return ItemId::BASALT;
+        case static_cast<uint16_t>(BlockId::TUFF): return ItemId::TUFF;
+        case static_cast<uint16_t>(BlockId::COARSE_DIRT): return ItemId::COARSE_DIRT;
+        case static_cast<uint16_t>(BlockId::MUD): return ItemId::MUD;
+        case static_cast<uint16_t>(BlockId::PACKED_ICE): return ItemId::PACKED_ICE;
+        case static_cast<uint16_t>(BlockId::BLACK_SAND): return ItemId::BLACK_SAND;
+        case static_cast<uint16_t>(BlockId::GRANITE): return ItemId::GRANITE;
         default: return ItemId::EMPTY;
     }
 }

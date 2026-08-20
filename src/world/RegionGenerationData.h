@@ -3,6 +3,7 @@
 #include "world/BiomeMap.h"
 #include "world/Block.h"
 #include "world/CaveGenerator.h"
+#include "world/TerrainArchetype.h"
 #include <vector>
 #include <cstdint>
 
@@ -36,6 +37,14 @@ struct RegionGenerationData {
         int   height  = 0;     // final surface Y (after river carving, biome modulation, smoothing)
         int   nominalHeight = 0;
         float mountainFactor = 0.0f;
+        float slope = 0.0f;
+        float riverWeight = 0.0f;
+        int densityMinY = 0;
+        int densityMaxY = 0;
+        TerrainArchetype archetype = TerrainArchetype::ROLLING_LOWLANDS;
+        TerrainArchetype secondaryArchetype = TerrainArchetype::ROLLING_LOWLANDS;
+        float archetypeBlend = 0.0f;
+        BasinInfo basin;
         int   waterLevel = 63;
         Biome biome   = Biome::OCEAN;
         bool  isRiver = false;

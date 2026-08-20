@@ -170,6 +170,14 @@
     "zombie_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "zombie_egg"},
     "skeleton_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "skeleton_egg"},
     "spider_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "spider_egg"},
-    "blastling_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "blastling_egg"}
+    "blastling_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "blastling_egg"},
+    "limestone": {"generator": "block_item_icon", "block": "limestone"},
+    "basalt": {"generator": "block_item_icon", "block": "basalt"},
+    "tuff": {"generator": "block_item_icon", "block": "tuff"},
+    "coarse_dirt": {"generator": "block_item_icon", "block": "coarse_dirt"},
+    "mud": {"generator": "block_item_icon", "block": "mud"},
+    "packed_ice": {"generator": "block_item_icon", "block": "packed_ice"},
+    "black_sand": {"generator": "block_item_icon", "block": "black_sand"},
+    "granite": {"generator": "block_item_icon", "block": "granite"}
   }
 }

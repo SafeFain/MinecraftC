@@ -333,13 +333,22 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             Biome biome  = col.biome;
             const BiomeProperties& bprops = getBiomeProps(biome);
             SurfaceProfile surface = SurfaceRules::profile(
-                m_seed, wxBase + x, wzBase + z, biome);
+                m_seed, wxBase + x, wzBase + z, biome,
+                col.archetype, col.slope);
 
             const int worldX = wxBase + x, worldZ = wzBase + z;
             SurfaceColumn terrainColumn;
             terrainColumn.height = col.height;
             terrainColumn.nominalHeight = col.nominalHeight;
             terrainColumn.mountainFactor = col.mountainFactor;
+            terrainColumn.slope = col.slope;
+            terrainColumn.riverWeight = col.riverWeight;
+            terrainColumn.densityMinY = col.densityMinY;
+            terrainColumn.densityMaxY = col.densityMaxY;
+            terrainColumn.archetype = col.archetype;
+            terrainColumn.secondaryArchetype = col.secondaryArchetype;
+            terrainColumn.archetypeBlend = col.archetypeBlend;
+            terrainColumn.basin = col.basin;
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
             for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
@@ -357,7 +366,9 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 const int y = height - depth;
                 const BlockId current = chunk.getBlock(x, y, z);
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.setBlock(x, y, z, depth == 0 ? surface.top : surface.under);
+                chunk.setBlock(x, y, z, SurfaceRules::blockAtDepth(
+                    m_seed, worldX, worldZ, height, depth, biome,
+                    col.archetype, col.slope));
             }
 
             // Snow cover
@@ -421,7 +432,11 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 BlockId decoration = SurfaceRules::decoration(
                     m_seed, wx, wz, decoCol.height, decoCol.biome, decoCol.isRiver);
                 if (decoration != BlockId::AIR) {
-                    chunk.setBlock(x, decoCol.height + 1, z, decoration);
+                    const int featureHeight = SurfaceRules::decorationHeight(
+                        m_seed, wx, wz, decoCol.height, decoration);
+                    for (int dy = 1; dy <= featureHeight; ++dy)
+                        if (decoCol.height + dy < Config::WORLD_MAX_Y)
+                            chunk.setBlock(x, decoCol.height + dy, z, decoration);
                     if (decoration == BlockId::SUNFLOWER_BOTTOM &&
                         decoCol.height + 2 < Config::WORLD_MAX_Y)
                         chunk.setBlock(x, decoCol.height + 2, z,

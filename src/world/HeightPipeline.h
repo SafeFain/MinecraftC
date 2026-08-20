@@ -3,9 +3,11 @@
 #include "world/BiomeMap.h"
 #include "world/RegionGenerationData.h"
 #include "world/WorldGenContext.h"
+#include "world/TerrainArchetype.h"
 #include "FastNoiseLite.h"
 
 #include <cstdint>
+#include <array>
 #include <functional>
 #include <optional>
 
@@ -30,6 +32,14 @@ struct SurfaceColumn {
     int nominalHeight = 0;
     int waterLevel = 0;
     float mountainFactor = 0.0f;
+    float slope = 0.0f;
+    float riverWeight = 0.0f;
+    int densityMinY = 0;
+    int densityMaxY = 0;
+    TerrainArchetype archetype = TerrainArchetype::ROLLING_LOWLANDS;
+    TerrainArchetype secondaryArchetype = TerrainArchetype::ROLLING_LOWLANDS;
+    float archetypeBlend = 0.0f;
+    BasinInfo basin;
     Biome biome = Biome::OCEAN;
     bool river = false;
     ClimateSample climate;
@@ -77,7 +87,6 @@ private:
     FastNoiseLite m_humidity;
     FastNoiseLite m_detail;
     FastNoiseLite m_ridges;
-    FastNoiseLite m_river;
     FastNoiseLite m_surfaceWarp;
     FastNoiseLite m_surfaceDensity;
 
@@ -86,6 +95,10 @@ private:
     static float peaksAndValleys(float weirdness);
     static float spline(float value, const float* xs, const float* ys, int count);
     SurfaceColumn sampleBaseColumn(int worldX, int worldZ) const;
+    TerrainArchetype selectArchetype(uint64_t hash,
+                                     const ClimateSample& climate) const;
+    BasinInfo sampleBasin(int worldX, int worldZ) const;
     Biome selectBiome(const ClimateSample& climate, int height,
-                      bool river, bool coast, bool deepOcean) const;
+                      bool river, bool coast, bool deepOcean,
+                      TerrainArchetype archetype) const;
 };

@@ -50,9 +50,18 @@ int main() {
             precipitationFor(Biome::SAVANNA, 80) == PrecipitationType::None &&
             precipitationFor(Biome::BADLANDS, 80) == PrecipitationType::None,
             "dry biomes accepted precipitation");
+    require(precipitationFor(Biome::VOLCANIC_HIGHLANDS, 180) ==
+                PrecipitationType::None &&
+            precipitationFor(Biome::RED_CANYON, 90) == PrecipitationType::None,
+            "v7 dry terrain biomes accepted precipitation");
     require(precipitationFor(Biome::SNOW_TUNDRA, -20) ==
                 PrecipitationType::Snow,
             "snow tundra did not snow at every altitude");
+    require(precipitationFor(Biome::GLACIAL_PEAKS, 70) ==
+                PrecipitationType::Snow &&
+            precipitationFor(Biome::ALPINE_TUNDRA, 70) ==
+                PrecipitationType::Snow,
+            "v7 frozen terrain biomes did not produce snow");
     require(precipitationFor(Biome::TAIGA, 127) == PrecipitationType::Rain &&
             precipitationFor(Biome::TAIGA, 128) == PrecipitationType::Snow,
             "taiga snow-line boundary was incorrect");

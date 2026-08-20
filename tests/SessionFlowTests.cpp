@@ -78,6 +78,10 @@ int main() {
                 "metadata carries the requested seed");
         require(session.player.gameMode() == GameMode::Survival,
                 "player rules match the world mode");
+        const glm::dvec3 routedSpawn = session.world.findSafeSpawn();
+        require(session.player.getPosition() == routedSpawn &&
+                    routedSpawn.y > Config::SEA_LEVEL,
+                "new world loading is centered on a dry routed spawn");
 
         // Help routes without changing state.
         auto result = runCommand(session, localization, "/help");

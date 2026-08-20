@@ -49,10 +49,15 @@ int main() {
     HeightPipeline other(otherLegacy, 987654321ULL);
     bool seedDiffers = false;
     std::set<Biome> observedBiomes;
+    std::set<TerrainArchetype> observedArchetypes;
     std::array<int, BIOME_COUNT> biomeCounts{};
     int riverColumns = 0;
     int maxTerrainHeight = Config::WORLD_MIN_Y;
     int overhangColumns = 0;
+    int cappedColumns = 0;
+    int sampledColumns = 0;
+    int maxBasinUpstream = 0;
+    bool foundInlandLake = false;
     for (int z = -2048; z <= 2048; z += 8) {
         for (int x = -2048; x <= 2048; x += 8) {
             SurfaceColumn a = terrain.sampleColumn(x, z);
@@ -63,6 +68,9 @@ int main() {
                     a.height <= Config::TERRAIN_MAX_HEIGHT,
                     "terrain height outside world");
             observedBiomes.insert(a.biome);
+            observedArchetypes.insert(a.archetype);
+            ++sampledColumns;
+            if (a.height == Config::TERRAIN_MAX_HEIGHT) ++cappedColumns;
             ++biomeCounts[static_cast<size_t>(a.biome)];
             maxTerrainHeight = std::max(maxTerrainHeight, a.height);
             if (a.mountainFactor > 0.55f) {
@@ -75,6 +83,10 @@ int main() {
                 }
             }
             if (a.river) ++riverColumns;
+            maxBasinUpstream = std::max(
+                maxBasinUpstream, static_cast<int>(a.basin.upstreamSize));
+            foundInlandLake = foundInlandLake ||
+                (a.basin.inlandLake && a.climate.continentalness > -0.13f);
             SurfaceColumn changed = other.sampleColumn(x, z);
             if (a.height != changed.height || a.biome != changed.biome ||
                 a.river != changed.river) seedDiffers = true;
@@ -82,13 +94,65 @@ int main() {
     }
     require(seedDiffers, "different seeds produced identical surface");
     require(observedBiomes.size() >= 6, "surface lacks biome diversity");
+    require(observedArchetypes.size() >= 12,
+            "surface lacks macro terrain archetype diversity");
+    require(cappedColumns * 1000 < sampledColumns,
+            "too many terrain columns were clipped at the build ceiling");
     require(biomeCounts[static_cast<size_t>(Biome::SWAMP)] >= 100 &&
             biomeCounts[static_cast<size_t>(Biome::JUNGLE)] >= 100 &&
             biomeCounts[static_cast<size_t>(Biome::BADLANDS)] >= 100,
             "uncommon inland biomes are too sparse across the exploration sample");
     require(riverColumns > 0, "surface router produced no rivers");
+    require(maxBasinUpstream >= 4,
+            "basin graph produced no multi-tributary confluence");
+    require(foundInlandLake,
+            "basin graph produced no deterministic inland lake");
     require(maxTerrainHeight >= 160, "terrain router produced no tall mountains");
     require(overhangColumns > 0, "mountain density produced no overhangs");
+
+    // The complete v7 routing matrix is reachable across several seeds without
+    // requiring request-order randomness or enormous contiguous biome scales.
+    std::set<Biome> allBiomes = observedBiomes;
+    std::set<TerrainArchetype> allArchetypes = observedArchetypes;
+    constexpr uint64_t diversitySeeds[] = {
+        1, 42, 8675309, 0xDEADBEEFULL, 0x123456789ABCDEF0ULL,
+        999999937, 3141592653ULL
+    };
+    for (const uint64_t diversitySeed : diversitySeeds) {
+        Noise diversityLegacy(diversitySeed);
+        HeightPipeline diversity(diversityLegacy, diversitySeed);
+        std::set<Biome> localBiomes;
+        std::set<TerrainArchetype> localArchetypes;
+        std::set<TerrainArchetype> localLandArchetypes;
+        for (int z = -4096; z <= 4096; z += 64) {
+            for (int x = -4096; x <= 4096; x += 64) {
+                const SurfaceColumn column = diversity.sampleColumn(x, z);
+                localBiomes.insert(column.biome);
+                localArchetypes.insert(column.archetype);
+                if (column.archetype != TerrainArchetype::DEEP_OCEAN_TRENCH &&
+                    column.archetype != TerrainArchetype::ISLAND_ARC &&
+                    column.archetype != TerrainArchetype::COASTAL_CLIFFS)
+                    localLandArchetypes.insert(column.archetype);
+            }
+        }
+        require(localBiomes.size() >= 12,
+                "a fixed seed exposes too few nearby biomes");
+        require(localLandArchetypes.size() >= 8,
+                "a fixed seed exposes too few nearby land archetypes");
+        allBiomes.insert(localBiomes.begin(), localBiomes.end());
+        allArchetypes.insert(localArchetypes.begin(), localArchetypes.end());
+    }
+    if (allBiomes.size() != BIOME_COUNT) {
+        std::cerr << "missing biomes:";
+        for (int raw = 0; raw < BIOME_COUNT; ++raw)
+            if (allBiomes.count(static_cast<Biome>(raw)) == 0)
+                std::cerr << ' ' << biomeCommandName(static_cast<Biome>(raw));
+        std::cerr << '\n';
+    }
+    require(allBiomes.size() == BIOME_COUNT,
+            "not every v7 biome is reachable across the distribution sample");
+    require(allArchetypes.size() == TERRAIN_ARCHETYPE_COUNT,
+            "not every v7 terrain archetype is reachable across the distribution sample");
 
     // Padded-region output and direct point queries are byte-for-byte equal,
     // including negative world coordinates.
@@ -111,7 +175,15 @@ int main() {
             require(cached.height == direct.height &&
                     cached.biome == direct.biome &&
                     cached.isRiver == direct.river &&
-                    cached.waterLevel == direct.waterLevel,
+                    cached.waterLevel == direct.waterLevel &&
+                    cached.archetype == direct.archetype &&
+                    cached.secondaryArchetype == direct.secondaryArchetype &&
+                    std::abs(cached.archetypeBlend - direct.archetypeBlend) < 0.00001f &&
+                    cached.basin.upstreamSize == direct.basin.upstreamSize &&
+                    std::abs(cached.basin.channelWidth -
+                             direct.basin.channelWidth) < 0.00001f &&
+                    cached.densityMinY == direct.densityMinY &&
+                    cached.densityMaxY == direct.densityMaxY,
                     "region cache disagrees with world-coordinate sample");
         }
     }
@@ -400,6 +472,9 @@ int main() {
             "async mesh handoff dropped render-layer metadata");
 
     std::cout << "biomes=" << observedBiomes.size()
+              << "/" << allBiomes.size()
+              << " archetypes=" << observedArchetypes.size()
+              << "/" << allArchetypes.size()
               << " rivers=" << riverColumns
               << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
               << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]

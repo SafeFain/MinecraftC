@@ -15,9 +15,11 @@ uint64_t mix64(uint64_t value) {
 }
 
 PrecipitationType precipitationFor(Biome biome, int worldY) {
-    if (biome == Biome::DESERT || biome == Biome::SAVANNA ||
-        biome == Biome::BADLANDS) return PrecipitationType::None;
-    if (biome == Biome::SNOW_TUNDRA) return PrecipitationType::Snow;
+    const BiomePrecipitation precipitation = getBiomePrecipitation(biome);
+    if (precipitation == BiomePrecipitation::None)
+        return PrecipitationType::None;
+    if (precipitation == BiomePrecipitation::Snow)
+        return PrecipitationType::Snow;
     const int snowLine = getBiomeProps(biome).snowLine;
     if (snowLine < Config::SNOW_LINE_DISABLED && worldY >= snowLine)
         return PrecipitationType::Snow;

@@ -155,6 +155,15 @@ enum class ItemId : uint16_t {
     SPIDER_SPAWN_EGG,
     BLASTLING_SPAWN_EGG,
 
+    LIMESTONE,
+    BASALT,
+    TUFF,
+    COARSE_DIRT,
+    MUD,
+    PACKED_ICE,
+    BLACK_SAND,
+    GRANITE,
+
     COUNT,
     POPPY = FLOWER
 };

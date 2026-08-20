@@ -53,6 +53,8 @@ private:
     bool accepts(Biome biome, int height, bool river,
                  int worldX, int worldZ) const;
     int trunkHeight(TreeType type, int worldX, int worldZ) const;
+    int biomeTrunkHeight(Biome biome, TreeType type,
+                         int worldX, int worldZ) const;
     static float radiusFor(Biome biome);
     static float chanceFor(Biome biome);
     static int floorDiv(int value, int divisor);

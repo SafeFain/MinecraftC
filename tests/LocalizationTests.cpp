@@ -1,5 +1,6 @@
 #include "game/Localization.h"
 #include "game/Utf8.h"
+#include "world/Biome.h"
 
 #include <stb_truetype.h>
 #include <cstdlib>
@@ -60,6 +61,13 @@ int main() {
         require(localization.hasTranslation(
             Language::SimplifiedChinese, "item." + std::to_string(item)),
             "every item is translated");
+    for (int raw = 0; raw < BIOME_COUNT; ++raw) {
+        const std::string key = "biome." +
+            std::string(biomeCommandName(static_cast<Biome>(raw)));
+        require(localization.hasTranslation(Language::English, key) &&
+                localization.hasTranslation(Language::SimplifiedChinese, key),
+                "every biome is translated");
+    }
 
     std::string name = "World";
     appendUtf8(name, 0x4E16);

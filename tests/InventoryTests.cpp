@@ -45,7 +45,9 @@ int main() {
     require(creativeItems.size() == static_cast<size_t>(ItemId::COUNT) - 1,
             "creative inventory does not expose every registered item");
     require(creativeItems.front() == ItemId::GRASS_BLOCK &&
-            creativeItems.back() == ItemId::BLASTLING_SPAWN_EGG,
+            creativeItems[static_cast<size_t>(ItemId::BLASTLING_SPAWN_EGG) - 1] ==
+                ItemId::BLASTLING_SPAWN_EGG &&
+            creativeItems.back() == ItemId::GRANITE,
             "creative inventory ordering does not follow stable item ids");
     require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
             getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&

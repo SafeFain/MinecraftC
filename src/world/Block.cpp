@@ -33,7 +33,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
     "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
-    "sunflower_top", "cloud"
+    "sunflower_top", "cloud", "limestone", "basalt", "tuff",
+    "coarse_dirt", "mud", "packed_ice", "black_sand", "granite"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -220,6 +221,14 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     FLUID_ENTRY(BlockId::FLOWING_LAVA_6, "Flowing Lava", .95f, .50f, .10f, .86f),
     FLUID_ENTRY(BlockId::FLOWING_LAVA_7, "Flowing Lava", .95f, .50f, .10f, .86f),
 #undef FLUID_ENTRY
+    { BlockId::LIMESTONE,   "Limestone",   glm::vec3(.72f, .71f, .64f), true, false },
+    { BlockId::BASALT,      "Basalt",      glm::vec3(.16f, .17f, .18f), true, false },
+    { BlockId::TUFF,        "Tuff",        glm::vec3(.31f, .36f, .33f), true, false },
+    { BlockId::COARSE_DIRT, "Coarse Dirt", glm::vec3(.43f, .30f, .17f), true, false },
+    { BlockId::MUD,         "Mud",         glm::vec3(.24f, .22f, .20f), true, false },
+    { BlockId::PACKED_ICE,  "Packed Ice",  glm::vec3(.42f, .67f, .84f), true, false },
+    { BlockId::BLACK_SAND,  "Black Sand",  glm::vec3(.17f, .16f, .17f), true, false },
+    { BlockId::GRANITE,     "Granite",     glm::vec3(.57f, .37f, .31f), true, false },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -312,6 +321,14 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::FLOWING_LAVA_3: case BlockId::FLOWING_LAVA_4:
         case BlockId::FLOWING_LAVA_5: case BlockId::FLOWING_LAVA_6:
         case BlockId::FLOWING_LAVA_7: return BlockTexture::Lava;
+        case BlockId::LIMESTONE:      return BlockTexture::Limestone;
+        case BlockId::BASALT:         return BlockTexture::Basalt;
+        case BlockId::TUFF:           return BlockTexture::Tuff;
+        case BlockId::COARSE_DIRT:     return BlockTexture::CoarseDirt;
+        case BlockId::MUD:             return BlockTexture::Mud;
+        case BlockId::PACKED_ICE:      return BlockTexture::PackedIce;
+        case BlockId::BLACK_SAND:      return BlockTexture::BlackSand;
+        case BlockId::GRANITE:         return BlockTexture::Granite;
         default:                     return BlockTexture::Dirt;
     }
 }

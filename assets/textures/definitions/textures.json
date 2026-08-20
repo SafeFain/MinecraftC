@@ -14,6 +14,8 @@
     "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
     "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
-    "sunflower_top", "cloud", "copper_ore"
+    "sunflower_top", "cloud", "limestone", "basalt", "tuff",
+    "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
+    "copper_ore"
   ]
 }

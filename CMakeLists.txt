@@ -750,6 +750,34 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests)
 
+    add_executable(terrain_preview
+        tools/terrain_preview.cpp
+        src/world/HeightPipeline.cpp
+        src/world/Noise.cpp)
+    target_include_directories(terrain_preview PRIVATE src external/FastNoiseLite)
+    target_link_libraries(terrain_preview PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(terrain_preview PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    add_executable(terrain_benchmark
+        tools/terrain_benchmark.cpp
+        src/world/HeightPipeline.cpp
+        src/world/TreeGenerator.cpp
+        src/world/WorldGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/CaveGenerator.cpp
+        src/world/OreGenerator.cpp
+        src/world/Chunk.cpp
+        src/world/Noise.cpp
+        src/world/BiomeMap.cpp)
+    target_include_directories(terrain_benchmark PRIVATE
+        src external/FastNoiseLite external/glad/include)
+    target_link_libraries(terrain_benchmark PRIVATE glm::glm glad)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(terrain_benchmark PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
     add_executable(rendering_logic_tests
         tests/RenderingLogicTests.cpp
         src/renderer/Camera.cpp
@@ -846,7 +874,8 @@ if(BUILD_TESTING)
 
     add_executable(command_tests
         tests/CommandTests.cpp
-        src/game/Utf8.cpp)
+        src/game/Utf8.cpp
+        src/world/BiomeMap.cpp)
     target_include_directories(command_tests PRIVATE src)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -1199,7 +1228,8 @@ if(BUILD_TESTING)
         src/game/Localization.cpp
         src/game/Utf8.cpp
         src/ui/StbTruetypeImpl.cpp
-        src/world/Block.cpp)
+        src/world/Block.cpp
+        src/world/BiomeMap.cpp)
     target_include_directories(localization_tests PRIVATE
         src external external/stb)
     target_compile_definitions(localization_tests PRIVATE

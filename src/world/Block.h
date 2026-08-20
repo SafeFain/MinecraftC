@@ -98,7 +98,15 @@ enum class BlockId : uint8_t {
     FLOWING_LAVA_5 = 86,
     FLOWING_LAVA_6 = 87,
     FLOWING_LAVA_7 = 88,
-    COUNT        = 89,
+    LIMESTONE    = 89,
+    BASALT       = 90,
+    TUFF         = 91,
+    COARSE_DIRT  = 92,
+    MUD          = 93,
+    PACKED_ICE   = 94,
+    BLACK_SAND   = 95,
+    GRANITE      = 96,
+    COUNT        = 97,
     POPPY        = FLOWER
 };
 
@@ -159,6 +167,7 @@ enum class BlockTexture : uint8_t {
     OakSapling, BirchSapling, SpruceSapling, JungleSapling, AcaciaSapling,
     SnowLayer, Fire, Glass, Tnt, Obsidian, Dandelion, BlueOrchid, Allium,
     OxeyeDaisy, SunflowerBottom, SunflowerTop, Cloud,
+    Limestone, Basalt, Tuff, CoarseDirt, Mud, PackedIce, BlackSand, Granite,
     Count
 };
 

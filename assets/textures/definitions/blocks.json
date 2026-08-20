@@ -42,6 +42,10 @@
     "oxeye_daisy": {"all": "oxeye_daisy"},
     "sunflower": {"all": "sunflower_bottom"},
     "sunflower_top": {"all": "sunflower_top"},
+    "limestone": {"all": "limestone"}, "basalt": {"all": "basalt"},
+    "tuff": {"all": "tuff"}, "coarse_dirt": {"all": "coarse_dirt"},
+    "mud": {"all": "mud"}, "packed_ice": {"all": "packed_ice"},
+    "black_sand": {"all": "black_sand"}, "granite": {"all": "granite"},
     "copper_ore": {"all": "copper_ore", "future": true}
   }
 }
