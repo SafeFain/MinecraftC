@@ -23,6 +23,33 @@
 #include <unordered_set>
 #include <limits>
 
+namespace {
+bool rayIntersectsBlockBounds(const glm::dvec3& origin,
+                              const glm::dvec3& direction,
+                              double maximumDistance,
+                              const glm::ivec3& block,
+                              float height) {
+    double minimum = 0.0;
+    double maximum = maximumDistance;
+    const glm::dvec3 boundsMin(block);
+    const glm::dvec3 boundsMax = boundsMin + glm::dvec3(1.0, height, 1.0);
+    for (int axis = 0; axis < 3; ++axis) {
+        if (std::abs(direction[axis]) < 1e-12) {
+            if (origin[axis] < boundsMin[axis] || origin[axis] > boundsMax[axis])
+                return false;
+            continue;
+        }
+        double nearDistance = (boundsMin[axis] - origin[axis]) / direction[axis];
+        double farDistance = (boundsMax[axis] - origin[axis]) / direction[axis];
+        if (nearDistance > farDistance) std::swap(nearDistance, farDistance);
+        minimum = std::max(minimum, nearDistance);
+        maximum = std::min(maximum, farDistance);
+        if (minimum > maximum) return false;
+    }
+    return maximum >= 0.0 && minimum <= maximumDistance;
+}
+}
+
 World::World() : m_generator(Config::WORLD_SEED) {}
 
 void World::resetForNewSeed(uint64_t newSeed) {
@@ -180,6 +207,39 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
     setBlockInternal(worldX,worldY,worldZ,id,true);
 }
 
+bool World::placeBed(const glm::ivec3& foot, BedDirection direction) {
+    const glm::ivec3 head = foot + bedDirectionOffset(direction);
+    if (!Config::isValidWorldY(foot.y) || !Config::isValidWorldY(head.y) ||
+        !generatedAt(foot.x, foot.z) || !generatedAt(head.x, head.z) ||
+        getBlock(foot.x, foot.y, foot.z) != BlockId::AIR ||
+        getBlock(head.x, head.y, head.z) != BlockId::AIR ||
+        !isFullCollisionBlock(getBlock(foot.x, foot.y - 1, foot.z)) ||
+        !isFullCollisionBlock(getBlock(head.x, head.y - 1, head.z))) {
+        return false;
+    }
+    setBlockInternal(foot.x, foot.y, foot.z,
+                     bedBlock(BedPart::Foot, direction), true);
+    setBlockInternal(head.x, head.y, head.z,
+                     bedBlock(BedPart::Head, direction), true);
+    return true;
+}
+
+std::optional<glm::ivec3> World::validBedFoot(
+    const glm::ivec3& position) const {
+    const BlockId selected = getBlock(position.x, position.y, position.z);
+    BedPart part = BedPart::Foot;
+    BedDirection direction = BedDirection::North;
+    if (!decodeBed(selected, part, direction)) return std::nullopt;
+    const glm::ivec3 foot = part == BedPart::Foot
+        ? position : position - bedDirectionOffset(direction);
+    const glm::ivec3 head = foot + bedDirectionOffset(direction);
+    if (getBlock(foot.x, foot.y, foot.z) != bedBlock(BedPart::Foot, direction) ||
+        getBlock(head.x, head.y, head.z) != bedBlock(BedPart::Head, direction)) {
+        return std::nullopt;
+    }
+    return foot;
+}
+
 void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
     if (!generatedAt(position.x,position.z)) return;
     // Flow depth is reconstructed from persisted sources and terrain. Keeping
@@ -217,6 +277,20 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (lz == 0)                   m_chunks.markDirty(cx, cz - 1);
     if (lz == Config::CHUNK_SIZE_Z - 1) m_chunks.markDirty(cx, cz + 1);
     m_fluids.scheduleAround({worldX, worldY, worldZ});
+    if (isBed(previous)) {
+        BedPart previousPart = BedPart::Foot;
+        BedDirection previousDirection = BedDirection::North;
+        decodeBed(previous, previousPart, previousDirection);
+        const glm::ivec3 partner = glm::ivec3(worldX, worldY, worldZ) +
+                                   bedPartnerOffset(previous);
+        const BlockId expected = bedBlock(
+            previousPart == BedPart::Foot ? BedPart::Head : BedPart::Foot,
+            previousDirection);
+        if (getBlock(partner.x, partner.y, partner.z) == expected) {
+            setBlockInternal(partner.x, partner.y, partner.z,
+                             BlockId::AIR, recordOverride);
+        }
+    }
     if (id == BlockId::AIR && previous == BlockId::SUNFLOWER_BOTTOM &&
         worldY + 1 < Config::WORLD_MAX_Y &&
         getBlock(worldX, worldY + 1, worldZ) == BlockId::SUNFLOWER_TOP)
@@ -242,13 +316,22 @@ Chunk* World::getChunk(int cx, int cz) {
 std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
                                                  const glm::vec3& direction,
                                                  float maxDistance) const {
+    const double directionLength = glm::length(glm::dvec3(direction));
+    const glm::dvec3 normalizedDirection = directionLength > 1e-12
+        ? glm::dvec3(direction) / directionLength : glm::dvec3(0.0);
     const auto hit = voxelRaycast(
         origin, direction, static_cast<double>(maxDistance),
-        [this](const glm::ivec3& blockPos) {
+        [this, &origin, &normalizedDirection, maxDistance](
+            const glm::ivec3& blockPos) {
             if (!Config::isValidWorldY(blockPos.y)) return false;
             const BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
             if (id == BlockId::AIR) return false;
             const BlockProperties& props = getBlockProps(id);
+            if (isBed(id)) {
+                return rayIntersectsBlockBounds(
+                    origin, normalizedDirection, maxDistance, blockPos,
+                    blockCollisionHeight(id));
+            }
             return props.solid || props.shape == RenderShape::Cross;
         });
     if (!hit) return std::nullopt;

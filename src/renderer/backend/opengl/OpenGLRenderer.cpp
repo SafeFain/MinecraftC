@@ -830,10 +830,12 @@ void Renderer::unbindBlockShader() const {
 // ── Wireframe highlight ───────────────────────────────────────────────
 
 void Renderer::renderWireframe(const glm::vec3& blockPos,
+                               const glm::vec3& blockSize,
                                const glm::mat4& viewProjection) {
     if (m_wireVAO == 0) return;
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPos);
+    model = glm::scale(model, blockSize);
     glm::mat4 mvp = viewProjection * model;
 
     // Slightly enlarge to avoid z-fighting
@@ -843,7 +845,9 @@ void Renderer::renderWireframe(const glm::vec3& blockPos,
         GL_CHECK(glPolygonOffset(-1.0f, -1.0f));
         GL_CHECK(glEnable(GL_POLYGON_OFFSET_LINE));
     } else {
-        model = glm::translate(model, glm::vec3(0.5f));
+        model = glm::translate(glm::mat4(1.0f), blockPos);
+        model = glm::translate(model, blockSize * 0.5f);
+        model = glm::scale(model, blockSize);
         model = glm::scale(model, glm::vec3(1.003f));
         model = glm::translate(model, glm::vec3(-0.5f));
         mvp = viewProjection * model;

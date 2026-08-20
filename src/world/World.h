@@ -97,6 +97,8 @@ public:
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
+    bool placeBed(const glm::ivec3& foot, BedDirection direction);
+    std::optional<glm::ivec3> validBedFoot(const glm::ivec3& position) const;
 
     // ── Chunk management ─────────────────────────────────────────────
     Chunk* getChunk(int cx, int cz);

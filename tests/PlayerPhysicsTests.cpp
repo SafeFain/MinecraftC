@@ -99,6 +99,13 @@ int main() {
     require(std::abs(negativeSupport + 39.0f) < 0.001f,
             "support scan stopped at the old zero-height boundary");
 
+    blocks.clear();
+    blocks[{0, 10, 0}] = BlockId::WHITE_BED;
+    const float bedSupport =
+        PlayerPhysics::findSupportHeight(0.5f, 10.5635f, 0.5f, getter);
+    require(std::abs(bedSupport - 10.5625f) < 0.001f,
+            "player support ignored the bed's nine-sixteenths collision top");
+
     require(PlayerPhysics::shouldAutoJump(true, true, true, true, true),
             "clear grounded obstacle did not permit auto jump");
     require(!PlayerPhysics::shouldAutoJump(false, true, true, true, true),

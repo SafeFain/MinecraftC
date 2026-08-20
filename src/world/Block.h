@@ -106,7 +106,14 @@ enum class BlockId : uint8_t {
     PACKED_ICE   = 94,
     BLACK_SAND   = 95,
     GRANITE      = 96,
-    COUNT        = 97,
+    WHITE_BED_FOOT_EAST  = 97,
+    WHITE_BED_FOOT_SOUTH = 98,
+    WHITE_BED_FOOT_WEST  = 99,
+    WHITE_BED_HEAD_NORTH = 100,
+    WHITE_BED_HEAD_EAST  = 101,
+    WHITE_BED_HEAD_SOUTH = 102,
+    WHITE_BED_HEAD_WEST  = 103,
+    COUNT        = 104,
     POPPY        = FLOWER
 };
 
@@ -129,8 +136,12 @@ enum class RenderShape : uint8_t {
     Cube,
     Cross,
     SnowLayer,
-    Fluid
+    Fluid,
+    Bed
 };
+
+enum class BedPart : uint8_t { Foot, Head };
+enum class BedDirection : uint8_t { North, East, South, West };
 
 enum class RenderLayer : uint8_t {
     Opaque,
@@ -182,6 +193,18 @@ inline const BlockProperties& getBlockProps(BlockId id) {
 inline bool isSolid(BlockId id) {
     return getBlockProps(id).solid;
 }
+
+bool isBed(BlockId id);
+bool decodeBed(BlockId id, BedPart& part, BedDirection& direction);
+BlockId bedBlock(BedPart part, BedDirection direction);
+glm::ivec3 bedDirectionOffset(BedDirection direction);
+BedDirection bedDirectionFromHorizontal(const glm::vec2& direction);
+glm::ivec3 bedPartnerOffset(BlockId id);
+float blockCollisionHeight(BlockId id);
+inline bool isFullCollisionBlock(BlockId id) {
+    return blockCollisionHeight(id) >= 1.0f;
+}
+bool pointInsideBlockCollision(BlockId id, float localY);
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face);
 uint8_t getAtlasTextureIndex(BlockTexture texture);

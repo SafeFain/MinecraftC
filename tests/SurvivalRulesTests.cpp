@@ -70,6 +70,10 @@ int main() {
             "iron tier harvests diamond");
     require(getBlockDrops(BlockId::BEDROCK, ironPick).empty(),
             "bedrock is unbreakable");
+    require(getBlockDrops(BlockId::WHITE_BED_HEAD_WEST, hand).size() == 1 &&
+            getBlockDrops(BlockId::WHITE_BED_HEAD_WEST, hand)[0].id ==
+                ItemId::WHITE_BED,
+            "either serialized bed half drops one bed item");
     require(miningSeconds(BlockId::STONE, ironPick) <
             miningSeconds(BlockId::STONE, woodenPick),
             "higher tier pickaxes mine faster");

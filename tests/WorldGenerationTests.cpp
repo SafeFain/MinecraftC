@@ -10,6 +10,7 @@
 
 #include <cstdlib>
 #include <array>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -389,6 +390,42 @@ int main() {
     require(mesh.shadowCasterIndexOffset ==
                 mesh.translucentIndexOffset + mesh.translucentIndexCount,
             "shadow-caster range does not follow visible draw ranges");
+
+    std::vector<uint8_t> bedBlocks(Config::CHUNK_VOLUME, 0);
+    bedBlocks[meshIndex(8, 40, 8)] = static_cast<uint8_t>(BlockId::WHITE_BED);
+    bedBlocks[meshIndex(8, 40, 7)] =
+        static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_NORTH);
+    ChunkMesh bedMesh;
+    bedMesh.build(0, 0, bedBlocks.data(), maxY,
+        [&](int wx, int wy, int wz) {
+            if (wx < 0 || wx >= 16 || wz < 0 || wz >= 16 ||
+                !Config::isValidWorldY(wy)) return BlockId::AIR;
+            return static_cast<BlockId>(bedBlocks[meshIndex(wx, wy, wz)]);
+        }, [](int, int, int) -> LightSample { return {15, 0}; });
+    float bedMaximumY = -1000.0f;
+    bool hasFrame = false, hasMattress = false, hasPillow = false;
+    for (const MeshVertex& vertex : bedMesh.vertices) {
+        bedMaximumY = std::max(bedMaximumY, vertex.py);
+        const uint8_t tile = static_cast<uint8_t>(std::floor(vertex.tile));
+        hasFrame = hasFrame || tile == getAtlasTextureIndex(BlockTexture::Planks);
+        hasMattress = hasMattress || tile == getAtlasTextureIndex(BlockTexture::WhiteBed);
+        hasPillow = hasPillow || tile == getAtlasTextureIndex(BlockTexture::WhiteWool);
+    }
+    require(bedMesh.vertices.size() > 200 && hasFrame && hasMattress && hasPillow,
+            "bed mesh is not a composite frame, mattress, and pillow model");
+    require(std::abs(bedMaximumY - (40.0f + 9.0f / 16.0f)) < 0.0001f,
+            "bed mesh exceeds its nine-sixteenths maximum height");
+    for (size_t index = 0; index + 2 < bedMesh.indices.size(); index += 3) {
+        const MeshVertex& a = bedMesh.vertices[bedMesh.indices[index]];
+        const MeshVertex& b = bedMesh.vertices[bedMesh.indices[index + 1]];
+        const MeshVertex& c = bedMesh.vertices[bedMesh.indices[index + 2]];
+        const glm::vec3 normal = glm::cross(
+            glm::vec3(b.px-a.px,b.py-a.py,b.pz-a.pz),
+            glm::vec3(c.px-a.px,c.py-a.py,c.pz-a.pz));
+        require(glm::dot(normal, glm::vec3(
+                    FACE_OFFSETS[static_cast<size_t>(a.face)])) < 0.0f,
+                "bed cuboid face winding does not match the clockwise renderer");
+    }
 
     std::set<std::pair<int,int>> meshNeighbors;
     for (const auto& offset : ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS)

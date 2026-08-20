@@ -631,6 +631,121 @@ struct ChunkMesh {
             }
         }
 
+        // Beds are assembled from narrow frame rails, four end legs, a
+        // mattress, and a raised pillow. Each serialized half emits only the
+        // geometry inside its own voxel so beds remain valid across chunks.
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                    const BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
+                    if (!isBed(id)) continue;
+                    BedPart part = BedPart::Foot;
+                    BedDirection direction = BedDirection::North;
+                    decodeBed(id, part, direction);
+                    const glm::ivec3 partnerPosition =
+                        glm::ivec3(chunkWorldX + x, y, chunkWorldZ + z) +
+                        bedPartnerOffset(id);
+                    const BlockId expectedPartner = bedBlock(
+                        part == BedPart::Foot ? BedPart::Head : BedPart::Foot,
+                        direction);
+                    const bool paired = getNeighbor(
+                        partnerPosition.x, partnerPosition.y,
+                        partnerPosition.z) == expectedPartner;
+
+                    const glm::vec2 sampled = normalizedLight(x, y, z);
+                    const float sky = sampled.x;
+                    const float light = sampled.y;
+                    auto transform = [&](const glm::vec3& point) {
+                        glm::vec3 result = point;
+                        switch (direction) {
+                            case BedDirection::North:
+                                result.x = point.x; result.z = 1.0f - point.z; break;
+                            case BedDirection::East:
+                                result.x = point.z; result.z = point.x; break;
+                            case BedDirection::South:
+                                result.x = 1.0f - point.x; result.z = point.z; break;
+                            case BedDirection::West:
+                                result.x = 1.0f - point.z;
+                                result.z = 1.0f - point.x; break;
+                        }
+                        return result;
+                    };
+                    FaceDir seamFace = FaceDir::FRONT;
+                    if (part == BedPart::Foot) {
+                        switch (direction) {
+                            case BedDirection::North: seamFace = FaceDir::FRONT; break;
+                            case BedDirection::East: seamFace = FaceDir::RIGHT; break;
+                            case BedDirection::South: seamFace = FaceDir::BACK; break;
+                            case BedDirection::West: seamFace = FaceDir::LEFT; break;
+                        }
+                    } else {
+                        switch (direction) {
+                            case BedDirection::North: seamFace = FaceDir::BACK; break;
+                            case BedDirection::East: seamFace = FaceDir::LEFT; break;
+                            case BedDirection::South: seamFace = FaceDir::FRONT; break;
+                            case BedDirection::West: seamFace = FaceDir::RIGHT; break;
+                        }
+                    }
+                    auto emitCuboid = [&](glm::vec3 minimum, glm::vec3 maximum,
+                                          BlockTexture texture,
+                                          bool touchesSeam = false) {
+                        const glm::vec3 a = transform(minimum);
+                        const glm::vec3 b = transform(maximum);
+                        minimum = glm::min(a, b);
+                        maximum = glm::max(a, b);
+                        const float tile = encodeFlatLight(
+                            static_cast<float>(getAtlasTextureIndex(texture)),
+                            static_cast<uint8_t>(std::round(sky * 15.0f)),
+                            static_cast<uint8_t>(std::round(light * 15.0f)));
+                        for (int face = 0; face < FACE_COUNT; ++face) {
+                            if (paired && touchesSeam &&
+                                face == static_cast<int>(seamFace)) continue;
+                            const unsigned int base =
+                                static_cast<unsigned int>(vertices.size());
+                            for (int cornerIndex : FACE_INDICES[static_cast<size_t>(face)]) {
+                                const glm::vec3 corner =
+                                    CUBE_CORNERS[static_cast<size_t>(cornerIndex)];
+                                const glm::vec3 position = minimum +
+                                    corner * (maximum - minimum);
+                                const float u = (face <= 1 || face >= 4)
+                                    ? corner.z : corner.x;
+                                const float v = face <= 1 ? corner.x : corner.y;
+                                vertices.push_back({
+                                    position.x + x, position.y + y, position.z + z,
+                                    1.0f, sky, light, 1.0f, u, v, tile,
+                                    static_cast<float>(face)});
+                            }
+                            for (unsigned int index = 0; index < 6; ++index) {
+                                opaqueIndices.push_back(base + index);
+                                shadowIndices.push_back(base + index);
+                            }
+                        }
+                    };
+
+                    constexpr float U = 1.0f / 16.0f;
+                    emitCuboid({0, 2*U, 0}, {2*U, 4*U, 1},
+                               BlockTexture::Planks, true);
+                    emitCuboid({14*U, 2*U, 0}, {1, 4*U, 1},
+                               BlockTexture::Planks, true);
+                    emitCuboid({U, 4*U, 0}, {15*U, 8*U, 1},
+                               BlockTexture::WhiteBed, true);
+
+                    const float endMinimum = part == BedPart::Foot ? 0.0f : 14*U;
+                    const float endMaximum = part == BedPart::Foot ? 2*U : 1.0f;
+                    emitCuboid({2*U, 2*U, endMinimum},
+                               {14*U, 4*U, endMaximum}, BlockTexture::Planks);
+                    emitCuboid({0, 0, endMinimum},
+                               {2*U, 4*U, endMaximum}, BlockTexture::Planks);
+                    emitCuboid({14*U, 0, endMinimum},
+                               {1, 4*U, endMaximum}, BlockTexture::Planks);
+                    if (part == BedPart::Head) {
+                        emitCuboid({2*U, 8*U, 9*U},
+                                   {14*U, 9*U, 14*U}, BlockTexture::WhiteWool);
+                    }
+                }
+            }
+        }
+
         indices.reserve(opaqueIndices.size() + translucentIndices.size() +
                         shadowIndices.size());
         indices.insert(indices.end(), opaqueIndices.begin(), opaqueIndices.end());

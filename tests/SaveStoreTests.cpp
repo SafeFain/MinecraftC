@@ -132,11 +132,12 @@ int main() {
                 Config::worldYToStorageY(319) * 256), BlockId::DIAMOND_ORE},
             {513, BlockId::FARMLAND_7},
             {514, BlockId::ACACIA_SAPLING},
-            {515, BlockId::GRANITE}
+            {515, BlockId::GRANITE},
+            {516, BlockId::WHITE_BED_HEAD_EAST}
         };
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 5, "chunk overrides round trip");
+        require(loadedOverrides.size() == 6, "chunk overrides round trip");
         require(loadedOverrides[0].block == BlockId::AIR,
                 "explicit AIR override is preserved");
         require(loadedOverrides[1].localIndex == overrides[1].localIndex,
@@ -146,6 +147,8 @@ int main() {
                 "new farming block ids round trip in save format 5");
         require(loadedOverrides[4].block == BlockId::GRANITE,
                 "v7 appended natural block id round trips in save format 8");
+        require(loadedOverrides[5].block == BlockId::WHITE_BED_HEAD_EAST,
+                "appended directional bed state round trips in save format 8");
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
 

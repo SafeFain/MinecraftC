@@ -1,5 +1,6 @@
 #include "game/InventoryModel.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -31,6 +32,34 @@ int main() {
     require(getBlockProps(BlockId::SNOW_LAYER).shape == RenderShape::SnowLayer &&
             !isSolid(BlockId::SNOW_LAYER) && !isSolid(BlockId::FIRE),
             "weather block geometry or collision properties are invalid");
+    require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 104 &&
+            getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
+            std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
+                0.0001f,
+            "bed states did not append safely or use the low bed bounds");
+    for (BedDirection direction : {BedDirection::North, BedDirection::East,
+                                   BedDirection::South, BedDirection::West}) {
+        const BlockId foot = bedBlock(BedPart::Foot, direction);
+        const BlockId head = bedBlock(BedPart::Head, direction);
+        require(isBed(foot) && isBed(head) &&
+                    bedPartnerOffset(foot) == bedDirectionOffset(direction) &&
+                    bedPartnerOffset(head) == -bedDirectionOffset(direction) &&
+                    itemForBlock(foot) == ItemId::WHITE_BED &&
+                    itemForBlock(head) == ItemId::WHITE_BED,
+                "bed direction, partner, or inventory mapping is inconsistent");
+    }
+    require(bedDirectionFromHorizontal({0.0f, -1.0f}) == BedDirection::North &&
+            bedDirectionFromHorizontal({1.0f, 0.0f}) == BedDirection::East &&
+            bedDirectionFromHorizontal({0.0f, 1.0f}) == BedDirection::South &&
+            bedDirectionFromHorizontal({-1.0f, 0.0f}) == BedDirection::West,
+            "horizontal player facing does not map to all four bed directions");
+    require(shouldRenderCubeFace(BlockId::STONE, BlockId::WHITE_BED),
+            "a partial-height bed incorrectly hides its solid neighbor face");
+    require(!pointInsideBlockCollision(BlockId::AIR, 0.0f) &&
+            pointInsideBlockCollision(BlockId::WHITE_BED, 0.5f) &&
+            !pointInsideBlockCollision(BlockId::WHITE_BED, 0.75f),
+            "shared point collision does not match the low bed bounds");
     require(fireEncouragement(BlockId::LEAVES) == 30 &&
             burnOdds(BlockId::LEAVES) == 60 &&
             !isFlammable(BlockId::STONE),

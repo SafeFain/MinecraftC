@@ -78,7 +78,11 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
                        BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
         set(id, 0.2f);
     set(BlockId::WHITE_WOOL, 0.8f);
-    set(BlockId::WHITE_BED, 0.2f);
+    for (uint8_t raw = static_cast<uint8_t>(BlockId::WHITE_BED);
+         raw <= static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST); ++raw) {
+        const BlockId id = static_cast<BlockId>(raw);
+        if (isBed(id)) set(id, 0.2f);
+    }
     set(BlockId::GLASS, 0.3f);
     set(BlockId::TNT, 0.0f);
     set(BlockId::OBSIDIAN, 50.0f, ToolKind::Pickaxe, ToolTier::Diamond);

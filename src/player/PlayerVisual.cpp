@@ -37,7 +37,11 @@ glm::dvec3 resolveThirdPersonCamera(const World& world,
                 static_cast<int>(std::floor(sample.x)),
                 static_cast<int>(std::floor(sample.y)),
                 static_cast<int>(std::floor(sample.z)));
-            if (isSolid(block)) { blocked = true; break; }
+            if (pointInsideBlockCollision(
+                    block, static_cast<float>(sample.y - std::floor(sample.y)))) {
+                blocked = true;
+                break;
+            }
         }
         if (blocked) break;
         resolved = current;

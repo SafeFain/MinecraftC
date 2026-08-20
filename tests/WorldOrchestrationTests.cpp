@@ -84,7 +84,8 @@ public:
     void endTranslucent() override {}
     void bindBlockShader() const override {}
     void unbindBlockShader() const override {}
-    void renderWireframe(const glm::vec3&, const glm::mat4&) override {}
+    void renderWireframe(const glm::vec3&, const glm::vec3&,
+                         const glm::mat4&) override {}
     void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&,
                       int, const glm::mat4&) override {}
     void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,
@@ -430,6 +431,60 @@ void testFluidTicks() {
     drainWorkers(world, pool);
 }
 
+// 7. Beds are an atomic two-cell world structure. Invalid legacy halves stay
+// removable but never become valid respawn anchors.
+void testBedLifecycle() {
+    World world;
+    ThreadPool pool(2);
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(314159);
+    world.update({0.5, 64.0, 0.5}, 1);
+    world.enqueueGeneration();
+    world.waitForInitialGeneration(8000);
+    world.processCompletedGenerations();
+    drainWorkers(world, pool);
+
+    const glm::ivec3 foot{0, 300, 0};
+    const glm::ivec3 head{1, 300, 0};
+    world.setBlock(foot.x, foot.y, foot.z, BlockId::AIR);
+    world.setBlock(head.x, head.y, head.z, BlockId::AIR);
+    world.setBlock(foot.x, foot.y - 1, foot.z, BlockId::STONE);
+    world.setBlock(head.x, head.y - 1, head.z, BlockId::STONE);
+    require(world.placeBed(foot, BedDirection::East),
+            "supported empty cells rejected a directional bed");
+    const auto canonicalFoot = world.validBedFoot(head);
+    require(world.getBlock(foot.x, foot.y, foot.z) ==
+                BlockId::WHITE_BED_FOOT_EAST &&
+            world.getBlock(head.x, head.y, head.z) ==
+                BlockId::WHITE_BED_HEAD_EAST &&
+            canonicalFoot && *canonicalFoot == foot,
+            "placed bed halves are not reciprocal or canonicalized to the foot");
+    require(!world.raycast({-0.5, 300.8, 0.5}, {1.0f, 0.0f, 0.0f}, 3.0f),
+            "raycast hit the invisible upper portion of a low bed");
+    require(world.raycast(
+                {-0.5, 300.3, 0.5}, {1.0f, 0.0f, 0.0f}, 3.0f).has_value(),
+            "raycast missed the visible bed body");
+
+    world.setBlock(head.x, head.y, head.z, BlockId::AIR);
+    require(world.getBlock(foot.x, foot.y, foot.z) == BlockId::AIR &&
+            world.getBlock(head.x, head.y, head.z) == BlockId::AIR,
+            "removing the head did not atomically remove the foot");
+
+    world.setBlock(head.x, head.y, head.z, BlockId::COBBLESTONE);
+    require(!world.placeBed(foot, BedDirection::East) &&
+            world.getBlock(foot.x, foot.y, foot.z) == BlockId::AIR,
+            "occupied head space allowed a partial bed placement");
+    world.setBlock(head.x, head.y, head.z, BlockId::AIR);
+
+    world.setBlock(foot.x, foot.y, foot.z, BlockId::WHITE_BED);
+    require(!world.validBedFoot(foot),
+            "an orphaned legacy white bed became a valid respawn anchor");
+    world.setBlock(foot.x, foot.y, foot.z, BlockId::AIR);
+    require(world.getBlock(foot.x, foot.y, foot.z) == BlockId::AIR,
+            "orphaned legacy bed could not be removed");
+    drainWorkers(world, pool);
+}
+
 }  // namespace
 
 int main() {
@@ -439,6 +494,7 @@ int main() {
     testAutosaveQueue();
     testMeshPipeline();
     testFluidTicks();
+    testBedLifecycle();
     std::cout << "World orchestration tests passed\n";
     return 0;
 }

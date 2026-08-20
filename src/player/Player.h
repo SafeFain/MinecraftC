@@ -181,5 +181,6 @@ private:
     void beginBowCharge();
     void releaseBow();
     void startSwing();
-    bool collidesWithPlayer(const glm::ivec3& blockPos) const;
+    bool collidesWithPlayer(const glm::ivec3& blockPos,
+                            BlockId block = BlockId::STONE) const;
 };

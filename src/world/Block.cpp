@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <regex>
 #include <sstream>
@@ -148,7 +149,8 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::TORCH,         "Torch",         glm::vec3(0.95f, 0.72f, 0.25f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
     { BlockId::WHITE_WOOL,    "White Wool",    glm::vec3(0.92f), true, false },
-    { BlockId::WHITE_BED,     "White Bed",     glm::vec3(0.88f), true, false },
+    { BlockId::WHITE_BED,     "White Bed", glm::vec3(0.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
     { BlockId::FARMLAND,      "Farmland",      glm::vec3(0.35f, 0.20f, 0.08f), true, false },
     { BlockId::WHEAT_0,       "Wheat",         glm::vec3(0.38f, 0.52f, 0.14f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
@@ -229,6 +231,20 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     { BlockId::PACKED_ICE,  "Packed Ice",  glm::vec3(.42f, .67f, .84f), true, false },
     { BlockId::BLACK_SAND,  "Black Sand",  glm::vec3(.17f, .16f, .17f), true, false },
     { BlockId::GRANITE,     "Granite",     glm::vec3(.57f, .37f, .31f), true, false },
+    { BlockId::WHITE_BED_FOOT_EAST,  "White Bed Foot East",  glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_FOOT_SOUTH, "White Bed Foot South", glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_FOOT_WEST,  "White Bed Foot West",  glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_HEAD_NORTH, "White Bed Head North", glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_HEAD_EAST,  "White Bed Head East",  glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_HEAD_SOUTH, "White Bed Head South", glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::WHITE_BED_HEAD_WEST,  "White Bed Head West",  glm::vec3(.88f), true, true,
+      RenderShape::Bed, RenderLayer::Opaque, 1.0f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -237,6 +253,7 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
                                                        [static_cast<size_t>(face)];
         if (defined != BlockTexture::Count) return defined;
     }
+    if (isBed(id)) return BlockTexture::WhiteBed;
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
     switch (id) {
@@ -434,6 +451,86 @@ bool isSapling(BlockId id) {
     return id >= BlockId::OAK_SAPLING && id <= BlockId::ACACIA_SAPLING;
 }
 
+bool isBed(BlockId id) {
+    return id == BlockId::WHITE_BED ||
+           (id >= BlockId::WHITE_BED_FOOT_EAST &&
+            id <= BlockId::WHITE_BED_HEAD_WEST);
+}
+
+bool decodeBed(BlockId id, BedPart& part, BedDirection& direction) {
+    switch (id) {
+        case BlockId::WHITE_BED:
+            part = BedPart::Foot; direction = BedDirection::North; return true;
+        case BlockId::WHITE_BED_FOOT_EAST:
+            part = BedPart::Foot; direction = BedDirection::East; return true;
+        case BlockId::WHITE_BED_FOOT_SOUTH:
+            part = BedPart::Foot; direction = BedDirection::South; return true;
+        case BlockId::WHITE_BED_FOOT_WEST:
+            part = BedPart::Foot; direction = BedDirection::West; return true;
+        case BlockId::WHITE_BED_HEAD_NORTH:
+            part = BedPart::Head; direction = BedDirection::North; return true;
+        case BlockId::WHITE_BED_HEAD_EAST:
+            part = BedPart::Head; direction = BedDirection::East; return true;
+        case BlockId::WHITE_BED_HEAD_SOUTH:
+            part = BedPart::Head; direction = BedDirection::South; return true;
+        case BlockId::WHITE_BED_HEAD_WEST:
+            part = BedPart::Head; direction = BedDirection::West; return true;
+        default: return false;
+    }
+}
+
+BlockId bedBlock(BedPart part, BedDirection direction) {
+    if (part == BedPart::Foot) {
+        switch (direction) {
+            case BedDirection::North: return BlockId::WHITE_BED;
+            case BedDirection::East: return BlockId::WHITE_BED_FOOT_EAST;
+            case BedDirection::South: return BlockId::WHITE_BED_FOOT_SOUTH;
+            case BedDirection::West: return BlockId::WHITE_BED_FOOT_WEST;
+        }
+    }
+    switch (direction) {
+        case BedDirection::North: return BlockId::WHITE_BED_HEAD_NORTH;
+        case BedDirection::East: return BlockId::WHITE_BED_HEAD_EAST;
+        case BedDirection::South: return BlockId::WHITE_BED_HEAD_SOUTH;
+        case BedDirection::West: return BlockId::WHITE_BED_HEAD_WEST;
+    }
+    return BlockId::WHITE_BED_HEAD_NORTH;
+}
+
+glm::ivec3 bedDirectionOffset(BedDirection direction) {
+    switch (direction) {
+        case BedDirection::North: return {0, 0, -1};
+        case BedDirection::East: return {1, 0, 0};
+        case BedDirection::South: return {0, 0, 1};
+        case BedDirection::West: return {-1, 0, 0};
+    }
+    return {0, 0, -1};
+}
+
+BedDirection bedDirectionFromHorizontal(const glm::vec2& direction) {
+    if (std::abs(direction.x) > std::abs(direction.y))
+        return direction.x >= 0.0f ? BedDirection::East : BedDirection::West;
+    return direction.y >= 0.0f ? BedDirection::South : BedDirection::North;
+}
+
+glm::ivec3 bedPartnerOffset(BlockId id) {
+    BedPart part = BedPart::Foot;
+    BedDirection direction = BedDirection::North;
+    if (!decodeBed(id, part, direction)) return {0, 0, 0};
+    const glm::ivec3 towardHead = bedDirectionOffset(direction);
+    return part == BedPart::Foot ? towardHead : -towardHead;
+}
+
+float blockCollisionHeight(BlockId id) {
+    if (!isSolid(id)) return 0.0f;
+    return isBed(id) ? 9.0f / 16.0f : 1.0f;
+}
+
+bool pointInsideBlockCollision(BlockId id, float localY) {
+    return isSolid(id) && localY >= 0.0f &&
+           localY <= blockCollisionHeight(id);
+}
+
 bool isWater(BlockId id) {
     return id == BlockId::WATER ||
            (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7);
@@ -450,7 +547,7 @@ uint8_t getLightEmission(BlockId id) {
 }
 
 uint8_t getLightDampening(BlockId id) {
-    if (id == BlockId::AIR || id == BlockId::GLASS ||
+    if (id == BlockId::AIR || id == BlockId::GLASS || isBed(id) ||
         getBlockProps(id).shape == RenderShape::Cross) return 0;
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
@@ -499,6 +596,7 @@ bool isReplaceableByFluid(BlockId id) {
 }
 
 uint8_t fireEncouragement(BlockId id) {
+    if (isBed(id)) return 30;
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
@@ -507,8 +605,7 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::CHEST: return 5;
         case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
         case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
-        case BlockId::ACACIA_LEAVES: case BlockId::WHITE_WOOL:
-        case BlockId::WHITE_BED: return 30;
+        case BlockId::ACACIA_LEAVES: case BlockId::WHITE_WOOL: return 30;
         case BlockId::OAK_SAPLING: case BlockId::BIRCH_SAPLING:
         case BlockId::SPRUCE_SAPLING: case BlockId::JUNGLE_SAPLING:
         case BlockId::ACACIA_SAPLING: case BlockId::TALL_GRASS:
@@ -546,6 +643,7 @@ bool shouldRenderCubeFace(BlockId current, BlockId neighbor) {
     if (neighbor == BlockId::AIR) return true;
 
     const auto& neighborProps = getBlockProps(neighbor);
+    if (neighborProps.shape != RenderShape::Cube) return true;
     if (!currentProps.solid)
         return !neighborProps.solid && neighbor != current;
     if (!neighborProps.solid) return true;

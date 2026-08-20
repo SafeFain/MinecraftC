@@ -441,8 +441,9 @@ bool Player::checkCollision(double px, double py, double pz) const {
                 if (!props.solid) continue;
 
                 // AABB vs AABB
+                const double blockTop = by + blockCollisionHeight(id);
                 if (px - halfW < bx + 1 && px + halfW > bx &&
-                    py < by + 1 && py + Config::PLAYER_HEIGHT > by &&
+                    py < blockTop && py + Config::PLAYER_HEIGHT > by &&
                     pz - halfW < bz + 1 && pz + halfW > bz) {
                     return true;
                 }
@@ -571,7 +572,8 @@ void Player::updateEnvironment(uint32_t ticks) {
             takeDamage(4.0f);
             m_environmentDamageTicks = 0;
         }
-    } else if (isSolid(eyeBlock)) {
+    } else if (pointInsideBlockCollision(
+                   eyeBlock, static_cast<float>(getEyePosition().y - eye.y))) {
         m_environmentDamageTicks += ticks;
         if (m_environmentDamageTicks >= 10) {
             takeDamage(1.0f, true);
@@ -694,8 +696,10 @@ bool Player::placeBlock() {
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
     const BlockId targetedBlock = m_world.getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
-    if (m_gameMode == GameMode::Survival && targetedBlock == BlockId::WHITE_BED) {
-        if (m_bedCallback) m_bedCallback(hit->blockPos);
+    if (m_gameMode == GameMode::Survival && isBed(targetedBlock)) {
+        const auto foot = m_world.validBedFoot(hit->blockPos);
+        if (!foot) return false;
+        if (m_bedCallback) m_bedCallback(*foot);
         return true;
     }
 
@@ -764,7 +768,25 @@ bool Player::placeBlock() {
         }
     }
 
-    if (!collidesWithPlayer(placePos)) {
+    if (isBed(placed)) {
+        if (hit->faceNormal.y <= 0) return false;
+        const float yawRadians = glm::radians(m_yaw);
+        const BedDirection direction = bedDirectionFromHorizontal(
+            glm::vec2(std::sin(yawRadians), std::cos(yawRadians)));
+        const glm::ivec3 headPos = placePos + bedDirectionOffset(direction);
+        if (collidesWithPlayer(placePos, bedBlock(BedPart::Foot, direction)) ||
+            collidesWithPlayer(headPos, bedBlock(BedPart::Head, direction)) ||
+            !m_world.placeBed(placePos, direction)) {
+            return false;
+        }
+        if (m_gameMode == GameMode::Survival) {
+            auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+            if (--stack.count == 0) stack.clear();
+        }
+        return true;
+    }
+
+    if (!collidesWithPlayer(placePos, placed)) {
         if (placed == BlockId::SUNFLOWER_BOTTOM) {
             const BlockId soil = m_world.getBlock(
                 placePos.x, placePos.y - 1, placePos.z);
@@ -789,12 +811,13 @@ bool Player::placeBlock() {
     return false;
 }
 
-bool Player::collidesWithPlayer(const glm::ivec3& blockPos) const {
+bool Player::collidesWithPlayer(const glm::ivec3& blockPos, BlockId block) const {
     float halfW = Config::PLAYER_WIDTH / 2.0f;
     float px = m_position.x, py = m_position.y, pz = m_position.z;
     int bx = blockPos.x, by = blockPos.y, bz = blockPos.z;
 
     return (bx < px + halfW && bx + 1 > px - halfW &&
-            by < py + Config::PLAYER_HEIGHT && by + 1 > py &&
+            by < py + Config::PLAYER_HEIGHT &&
+            by + blockCollisionHeight(block) > py &&
             bz < pz + halfW && bz + 1 > pz - halfW);
 }

@@ -142,7 +142,10 @@ void GameScenePresenter::render(
                 static_cast<float>(highlighted->x - renderOrigin.x),
                 static_cast<float>(highlighted->y),
                 static_cast<float>(highlighted->z - renderOrigin.z));
-            renderer.renderWireframe(pos, vp);
+            const BlockId highlightedBlock = session.world.getBlock(
+                highlighted->x, highlighted->y, highlighted->z);
+            renderer.renderWireframe(
+                pos, glm::vec3(1.0f, blockCollisionHeight(highlightedBlock), 1.0f), vp);
         }
 
         if (perspective == CameraPerspective::FirstPerson &&

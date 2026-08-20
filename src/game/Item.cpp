@@ -223,6 +223,7 @@ const ItemProperties& getItemProps(ItemId id) {
 }
 
 ItemId itemForBlock(BlockId id) {
+    if (isBed(id)) return ItemId::WHITE_BED;
     const auto raw = static_cast<uint16_t>(id);
     if (raw > 0 && raw <= 35) return static_cast<ItemId>(raw);
     switch (raw) {
@@ -232,7 +233,6 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::CHEST): return ItemId::CHEST;
         case static_cast<uint16_t>(BlockId::TORCH): return ItemId::TORCH;
         case static_cast<uint16_t>(BlockId::WHITE_WOOL): return ItemId::WHITE_WOOL;
-        case static_cast<uint16_t>(BlockId::WHITE_BED): return ItemId::WHITE_BED;
         case static_cast<uint16_t>(BlockId::FARMLAND): return ItemId::DIRT;
         case static_cast<uint16_t>(BlockId::FARMLAND_1):
         case static_cast<uint16_t>(BlockId::FARMLAND_2):

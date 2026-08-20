@@ -367,8 +367,11 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
     const int maxY=static_cast<int>(std::floor(position.y+size.y-1e-6));
     const int minZ=static_cast<int>(std::floor(position.z-halfZ));
     const int maxZ=static_cast<int>(std::floor(position.z+halfZ-1e-6));
-    for(int y=minY;y<=maxY;++y) for(int z=minZ;z<=maxZ;++z) for(int x=minX;x<=maxX;++x)
-        if(isSolid(m_world.getBlock(x,y,z))) return true;
+    for(int y=minY;y<=maxY;++y) for(int z=minZ;z<=maxZ;++z) for(int x=minX;x<=maxX;++x) {
+        const BlockId block = m_world.getBlock(x,y,z);
+        if (position.y < y + blockCollisionHeight(block) &&
+            position.y + size.y > y && isSolid(block)) return true;
+    }
     return false;
 }
 
@@ -422,11 +425,13 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             const glm::dvec3 next = entity.position + glm::dvec3(entity.velocity) *
                 static_cast<double>(dt);
             const int belowY = static_cast<int>(std::floor(next.y - 0.05f));
-            if (belowY >= 0 && isSolid(m_world.getBlock(
-                    static_cast<int>(std::floor(next.x)), belowY,
-                    static_cast<int>(std::floor(next.z))))) {
+            const BlockId below = m_world.getBlock(
+                static_cast<int>(std::floor(next.x)), belowY,
+                static_cast<int>(std::floor(next.z)));
+            if (Config::isValidWorldY(belowY) && pointInsideBlockCollision(
+                    below, static_cast<float>(next.y - 0.05 - belowY))) {
                 entity.velocity = glm::vec3(0.0f);
-                entity.position.y = belowY + 1.05f;
+                entity.position.y = belowY + blockCollisionHeight(below) + 0.05f;
             } else {
                 entity.position = next;
             }
@@ -702,7 +707,9 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
     for(int step=1;step<=steps;++step) {
         const glm::dvec3 next=start+delta*(static_cast<double>(step)/steps);
         const glm::ivec3 block(glm::floor(next));
-        if(isSolid(m_world.getBlock(block.x,block.y,block.z))) {
+        const BlockId hitBlock = m_world.getBlock(block.x,block.y,block.z);
+        if(pointInsideBlockCollision(
+                hitBlock, static_cast<float>(next.y - block.y))) {
             arrow.position=next;arrow.velocity={0,0,0};arrow.inGround=true;return;
         }
         if (!arrow.playerOwned) {

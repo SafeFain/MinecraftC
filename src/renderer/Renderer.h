@@ -64,6 +64,7 @@ public:
 
     // Wireframe highlight
     void renderWireframe(const glm::vec3& blockPosition,
+                         const glm::vec3& blockSize,
                          const glm::mat4& viewProjection);
     void renderEntity(const glm::vec3& position, const glm::vec3& size,
                       const glm::vec3& color, int textureIndex,

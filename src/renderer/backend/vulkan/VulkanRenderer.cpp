@@ -537,11 +537,12 @@ void VulkanRenderer::endTranslucent() {}
 void VulkanRenderer::bindBlockShader() const {}
 void VulkanRenderer::unbindBlockShader() const {}
 void VulkanRenderer::renderWireframe(const glm::vec3& blockPosition,
+                                     const glm::vec3& blockSize,
                                      const glm::mat4& viewProjection) {
     if (!m_impl || !m_impl->frameBegun) return;
     glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPosition);
-    model = glm::translate(model, glm::vec3(0.5f));
-    model = glm::scale(model, glm::vec3(1.003f));
+    model = glm::translate(model, blockSize * 0.5f);
+    model = glm::scale(model, blockSize * 1.003f);
     model = glm::translate(model, glm::vec3(-0.5f));
     m_impl->wireModelViewProjection =
         clipSpaceCorrection(GraphicsApi::Vulkan) * viewProjection * model;

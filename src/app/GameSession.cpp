@@ -302,12 +302,15 @@ void GameSession::beginPlayerDeath() {
 }
 
 void GameSession::respawn() {
-    const bool bedValid = worldMetadata.bedSpawn &&
-        world.getBlock(worldMetadata.bedSpawn->x, worldMetadata.bedSpawn->y,
-                       worldMetadata.bedSpawn->z) == BlockId::WHITE_BED;
+    const std::optional<glm::ivec3> validBed = worldMetadata.bedSpawn
+        ? world.validBedFoot(*worldMetadata.bedSpawn) : std::nullopt;
+    const bool bedValid = validBed.has_value();
     const glm::ivec3 spawn = chooseRespawnPosition(
-        worldMetadata.worldSpawn, worldMetadata.bedSpawn, bedValid);
-    player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, 1.01f, 0.5f));
+        worldMetadata.worldSpawn, validBed, bedValid);
+    const float spawnHeight = bedValid
+        ? blockCollisionHeight(world.getBlock(spawn.x, spawn.y, spawn.z)) + 0.001f
+        : 1.01f;
+    player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, spawnHeight, 0.5f));
     player.survivalStats().resetAfterRespawn();
     player.extinguish();
     player.resetDamageImmunity();
