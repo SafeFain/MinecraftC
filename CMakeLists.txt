@@ -877,6 +877,7 @@ if(BUILD_TESTING)
         src/game/Utf8.cpp
         src/world/BiomeMap.cpp)
     target_include_directories(command_tests PRIVATE src)
+    target_link_libraries(command_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

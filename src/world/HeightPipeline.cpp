@@ -103,7 +103,7 @@ BasinInfo HeightPipeline::sampleBasin(int worldX, int worldZ) const {
     thread_local BasinCache cache;
 
     constexpr int side = 7;
-    auto indexOf = [](int x, int z) { return z * side + x; };
+    constexpr auto indexOf = [](int x, int z) { return z * 7 + x; };
     const int centerX = floorDiv(worldX, BASIN_CELL_SIZE);
     const int centerZ = floorDiv(worldZ, BASIN_CELL_SIZE);
     if (cache.owner != this || cache.centerX != centerX ||
