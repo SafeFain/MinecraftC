@@ -33,6 +33,7 @@ void World::resetForNewSeed(uint64_t newSeed) {
     m_fluids.clear();
     m_streamer.clear();
     m_persistence.clear();
+    m_simulation.clear();
     m_lighting.reset();
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.

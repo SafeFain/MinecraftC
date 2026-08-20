@@ -418,6 +418,15 @@ void testFluidTicks() {
     require(!ignitions.empty(), "lava ignites adjacent TNT");
     require(world.getBlock(10, 80, 0) == BlockId::AIR,
             "ignited TNT is consumed");
+
+    // A pending ignition belongs to this world only. Seed reset must clear
+    // all WorldSimulation state before the next world starts ticking.
+    world.setBlock(12, 80, 0, BlockId::TNT);
+    world.setBlock(11, 80, 0, BlockId::LAVA);
+    world.tickFluids(1070);
+    world.resetForNewSeed(1000);
+    require(world.takeTntIgnitions().empty(),
+            "seed reset clears pending TNT ignitions");
     drainWorkers(world, pool);
 }
 

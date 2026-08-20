@@ -252,8 +252,8 @@ int main() {
                 640, 480, "application flow test", 0, GraphicsApi::OpenGL33,
                 true, false);
         } catch (const std::exception&) {
-            std::cout << "SKIP: no SDL video driver can create a window\n";
-            return 0;
+            std::cerr << "FAILED: no SDL video driver can create a window\n";
+            return 1;
         }
     }
 
