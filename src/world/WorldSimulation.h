@@ -14,8 +14,8 @@ class WorldPersistence;
 
 // Owns the deterministic survival/world simulation ticks: crop and sapling
 // growth over player edits, precipitation-driven snow accumulation and melt,
-// fire spread and aging, and TNT ignition reporting (lava contact from the
-// fluid scheduler, flame contact from fire spread). Block access goes through
+// fire spread and aging, and TNT ignition reporting from fire spread. Block
+// access goes through
 // the owning World; override iteration uses the persistence component.
 class WorldSimulation {
 public:
@@ -29,12 +29,6 @@ public:
 
     // Drain the TNT ignition list accumulated since the last call.
     std::vector<glm::ivec3> takeTntIgnitions();
-
-    // Report a TNT lit by lava contact (called by the fluid scheduler
-    // through the owning world).
-    void pushTntIgnition(const glm::ivec3& position) {
-        m_tntIgnitions.push_back(position);
-    }
 
     // Drop simulation state (seed reset / teardown).
     void clear() {

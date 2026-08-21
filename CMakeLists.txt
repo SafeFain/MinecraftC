@@ -845,6 +845,16 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_mining_crafting_and_smelting COMMAND survival_rules_tests)
 
+    add_executable(fluid_logic_tests
+        tests/FluidLogicTests.cpp
+        src/world/Block.cpp)
+    target_include_directories(fluid_logic_tests PRIVATE src)
+    target_link_libraries(fluid_logic_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(fluid_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME java_26_2_fluid_logic COMMAND fluid_logic_tests)
+
     add_executable(survival_stats_tests
         tests/SurvivalStatsTests.cpp
         src/game/SurvivalStats.cpp

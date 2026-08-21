@@ -326,6 +326,7 @@ void ChunkStreamer::enqueueGeneration() {
 void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow) {
     // Apply pending tree leaves for chunks that have finished generating
     std::vector<glm::ivec3> fluidSeeds;
+    std::vector<std::pair<int, int>> fluidBoundaryChunks;
     bool generationStateChanged = false;
     m_chunks.withUnique([&](ChunkStore& store) {
         store.forEachUniqueUnlocked([&](Chunk* chunk) {
@@ -361,10 +362,17 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow) {
                             {key.first * Config::CHUNK_SIZE_X + x, y,
                              key.second * Config::CHUNK_SIZE_Z + z});
                     });
+                // Rebuild only the generated chunk's four seams.  Derived
+                // fluid states are intentionally not persisted; boundary
+                // sources and neighboring loaded fluids recreate waterfalls
+                // without treating an unavailable chunk as air.
+                fluidBoundaryChunks.push_back(key);
             }
         });
     });
     if (generationStateChanged) ++m_streamingRevision;
+    for (const auto& key : fluidBoundaryChunks)
+        m_world.m_fluids.scheduleChunkBoundary(key.first, key.second);
     for (const glm::ivec3& position : fluidSeeds)
         m_world.m_fluids.scheduleAround(position);
     if (rebuildLightingNow && m_world.lightDirty()) m_world.rebuildLightingNow();

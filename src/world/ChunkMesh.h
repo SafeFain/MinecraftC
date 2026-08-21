@@ -14,6 +14,7 @@
 #include "renderer/RenderHandles.h"
 #include "world/Block.h"
 #include "world/BlockLightLogic.h"
+#include "world/FluidLogic.h"
 
 struct MeshVertex {
     float px, py, pz;
@@ -464,23 +465,19 @@ struct ChunkMesh {
                         const BlockId other = getNeighbor(wx, wy, wz);
                         return lava ? isLava(other) : isWater(other);
                     };
+                    const FluidSample fluidSample = [&](const glm::ivec3& p) {
+                        return getNeighbor(p.x, p.y, p.z);
+                    };
+                    const FluidAvailable fluidAvailable = [&](const glm::ivec3& p) {
+                        return Config::isValidWorldY(p.y);
+                    };
                     auto cornerHeight = [&](int cornerX, int cornerZ) {
-                        float sum = 0.0f;
-                        int count = 0;
-                        for (int dz = -1; dz <= 0; ++dz) {
-                            for (int dx = -1; dx <= 0; ++dx) {
-                                const int wx = chunkWorldX + cornerX + dx;
-                                const int wz = chunkWorldZ + cornerZ + dz;
-                                const BlockId sample = getNeighbor(wx, y, wz);
-                                if ((lava && isLava(sample)) || (!lava && isWater(sample))) {
-                                    if (same(wx, y + 1, wz)) return 1.0f;
-                                    sum += fluidSurfaceHeight(sample);
-                                    ++count;
-                                }
-                            }
-                        }
-                        return count ? sum / static_cast<float>(count)
-                                     : fluidSurfaceHeight(id);
+                        // A chunk with no loaded neighbor still has a valid
+                        // local sample; callers that stream a seam rebuild it
+                        // once the adjacent chunk is published.
+                        return std::max(0.0f, fluidCornerHeight(
+                            {chunkWorldX + cornerX, y, chunkWorldZ + cornerZ},
+                            lava, fluidSample, fluidAvailable));
                     };
                     const float h00 = cornerHeight(x, z);
                     const float h10 = cornerHeight(x + 1, z);
@@ -494,9 +491,23 @@ struct ChunkMesh {
                     const float tile=encodeFlatLight(baseTile,
                         static_cast<uint8_t>(std::round(sky*15.0f)),
                         static_cast<uint8_t>(std::round(light*15.0f)));
+                    const glm::vec2 flow = fluidFlowVector(
+                        {chunkWorldX + x, y, chunkWorldZ + z}, lava,
+                        fluidSample, fluidAvailable);
                     auto emit = [&](FaceDir face, const glm::vec3 (&positions)[4]) {
                         const unsigned int base = static_cast<unsigned int>(vertices.size());
-                        const glm::vec2 uv[4] = {{1,1},{1,0},{0,0},{0,1}};
+                        glm::vec2 uv[4] = {{1,1},{1,0},{0,0},{0,1}};
+                        if (face == FaceDir::TOP && glm::length(flow) > 0.001f) {
+                            const float angle = std::atan2(flow.y, flow.x);
+                            const float c = std::cos(angle);
+                            const float s = std::sin(angle);
+                            for (glm::vec2& coordinate : uv) {
+                                const glm::vec2 centered = coordinate - glm::vec2(0.5f);
+                                coordinate = glm::vec2(
+                                    centered.x * c - centered.y * s,
+                                    centered.x * s + centered.y * c) + glm::vec2(0.5f);
+                            }
+                        }
                         for (int i = 0; i < 4; ++i) {
                             vertices.push_back({positions[i].x, positions[i].y,
                                 positions[i].z, 1.0f, sky, light, alpha,
@@ -509,8 +520,10 @@ struct ChunkMesh {
                     const float z0 = static_cast<float>(z), z1 = z0 + 1.0f;
                     const float y0 = static_cast<float>(y);
                     if (!same(chunkWorldX + x, y + 1, chunkWorldZ + z)) {
-                        const glm::vec3 p[4] = {{x1,y0+h11,z1},{x1,y0+h10,z0},
-                                                {x0,y0+h00,z0},{x0,y0+h01,z1}};
+                        const glm::vec3 p[4] = {{x1,y0+h11-0.001f,z1},
+                                                {x1,y0+h10-0.001f,z0},
+                                                {x0,y0+h00-0.001f,z0},
+                                                {x0,y0+h01-0.001f,z1}};
                         emit(FaceDir::TOP, p);
                     }
                     auto visibleSide = [&](int wx, int wy, int wz) {

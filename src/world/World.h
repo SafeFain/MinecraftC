@@ -194,11 +194,6 @@ private:
     WorldLighting m_lighting{m_chunks};
     WorldSimulation m_simulation{*this, m_persistence, m_chunks};
 
-    // FluidScheduler reports TNT lit by lava contact through the owning world.
-    void pushTntIgnition(const glm::ivec3& position) {
-        m_simulation.pushTntIgnition(position);
-    }
-
     // ChunkMeshPipeline reads the streaming cursor state for near-to-far
     // mesh prioritization.
     int centerChunkX() const { return m_streamer.centerChunkX(); }

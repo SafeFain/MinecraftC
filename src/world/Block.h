@@ -4,6 +4,7 @@
 #include <string>
 #include <array>
 #include <filesystem>
+#include <optional>
 #include <glm/glm.hpp>
 
 // ── Block ID enum ─────────────────────────────────────────────────────
@@ -113,7 +114,12 @@ enum class BlockId : uint8_t {
     WHITE_BED_HEAD_EAST  = 101,
     WHITE_BED_HEAD_SOUTH = 102,
     WHITE_BED_HEAD_WEST  = 103,
-    COUNT        = 104,
+    // Flowing fluids that are vertically falling have a distinct Java-style
+    // state.  These are appended so every pre-existing serialized ID remains
+    // stable; they are derived and never written to block overrides.
+    FALLING_WATER = 104,
+    FALLING_LAVA  = 105,
+    COUNT        = 106,
     POPPY        = FLOWER
 };
 
@@ -222,7 +228,21 @@ bool isSapling(BlockId id);
 bool isWater(BlockId id);
 bool isLava(BlockId id);
 inline bool isFluid(BlockId id) { return isWater(id) || isLava(id); }
+
+// Java-style fluid state decoded from the compact BlockId representation.
+// amount is 1..8 for a fluid; sources and falling states both carry amount 8.
+struct FluidStateInfo {
+    bool lava = false;
+    uint8_t amount = 0;
+    bool source = false;
+    bool falling = false;
+};
+
+std::optional<FluidStateInfo> decodeFluidState(BlockId id);
+bool isFallingFluid(BlockId id);
+uint8_t fluidAmount(BlockId id);
 uint8_t fluidLevel(BlockId id);
+BlockId fluidBlockFromAmount(bool lava, uint8_t amount, bool falling = false);
 BlockId fluidBlock(bool lava, uint8_t level);
 float fluidSurfaceHeight(BlockId id);
 bool isReplaceableByFluid(BlockId id);

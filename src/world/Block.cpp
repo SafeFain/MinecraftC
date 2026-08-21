@@ -245,6 +245,10 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Bed, RenderLayer::Opaque, 1.0f },
     { BlockId::WHITE_BED_HEAD_WEST,  "White Bed Head West",  glm::vec3(.88f), true, true,
       RenderShape::Bed, RenderLayer::Opaque, 1.0f },
+    { BlockId::FALLING_WATER, "Falling Water", glm::vec3(.20f, .40f, .90f), false, true,
+      RenderShape::Fluid, RenderLayer::Translucent, .62f },
+    { BlockId::FALLING_LAVA, "Falling Lava", glm::vec3(.95f, .50f, .10f), false, true,
+      RenderShape::Fluid, RenderLayer::Translucent, .86f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -338,6 +342,8 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::FLOWING_LAVA_3: case BlockId::FLOWING_LAVA_4:
         case BlockId::FLOWING_LAVA_5: case BlockId::FLOWING_LAVA_6:
         case BlockId::FLOWING_LAVA_7: return BlockTexture::Lava;
+        case BlockId::FALLING_WATER: return BlockTexture::Water;
+        case BlockId::FALLING_LAVA:  return BlockTexture::Lava;
         case BlockId::LIMESTONE:      return BlockTexture::Limestone;
         case BlockId::BASALT:         return BlockTexture::Basalt;
         case BlockId::TUFF:           return BlockTexture::Tuff;
@@ -533,12 +539,14 @@ bool pointInsideBlockCollision(BlockId id, float localY) {
 
 bool isWater(BlockId id) {
     return id == BlockId::WATER ||
-           (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7);
+           (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7) ||
+           id == BlockId::FALLING_WATER;
 }
 
 bool isLava(BlockId id) {
     return id == BlockId::LAVA ||
-           (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7);
+           (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7) ||
+           id == BlockId::FALLING_LAVA;
 }
 
 uint8_t getLightEmission(BlockId id) {
@@ -557,8 +565,37 @@ uint8_t getLightDampening(BlockId id) {
     return getBlockProps(id).transparent ? 0 : 15;
 }
 
+std::optional<FluidStateInfo> decodeFluidState(BlockId id) {
+    if (id == BlockId::WATER) return FluidStateInfo{false, 8, true, false};
+    if (id == BlockId::LAVA) return FluidStateInfo{true, 8, true, false};
+    if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)
+        return FluidStateInfo{false, static_cast<uint8_t>(8 -
+            (static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_WATER_1) + 1)),
+            false, false};
+    if (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7)
+        return FluidStateInfo{true, static_cast<uint8_t>(8 -
+            (static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_LAVA_1) + 1)),
+            false, false};
+    if (id == BlockId::FALLING_WATER)
+        return FluidStateInfo{false, 8, false, true};
+    if (id == BlockId::FALLING_LAVA)
+        return FluidStateInfo{true, 8, false, true};
+    return std::nullopt;
+}
+
+bool isFallingFluid(BlockId id) {
+    return id == BlockId::FALLING_WATER || id == BlockId::FALLING_LAVA;
+}
+
+uint8_t fluidAmount(BlockId id) {
+    const auto state = decodeFluidState(id);
+    return state ? state->amount : 0;
+}
+
 uint8_t fluidLevel(BlockId id) {
+    if (!isFluid(id)) return 0;
     if (id == BlockId::WATER || id == BlockId::LAVA) return 0;
+    if (isFallingFluid(id)) return 8;
     if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)
         return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_WATER_1) + 1;
     if (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7)
@@ -566,17 +603,30 @@ uint8_t fluidLevel(BlockId id) {
     return 0;
 }
 
+BlockId fluidBlockFromAmount(bool lava, uint8_t amount, bool falling) {
+    if (amount == 0) return BlockId::AIR;
+    amount = std::min<uint8_t>(amount, 8);
+    if (amount == 8) {
+        if (falling) return lava ? BlockId::FALLING_LAVA : BlockId::FALLING_WATER;
+        return lava ? BlockId::LAVA : BlockId::WATER;
+    }
+    const uint8_t first = static_cast<uint8_t>(
+        lava ? BlockId::FLOWING_LAVA_1 : BlockId::FLOWING_WATER_1);
+    const uint8_t level = static_cast<uint8_t>(8 - amount);
+    return static_cast<BlockId>(first + level - 1);
+}
+
 BlockId fluidBlock(bool lava, uint8_t level) {
     if (level == 0) return lava ? BlockId::LAVA : BlockId::WATER;
-    level = std::min<uint8_t>(level, 7);
+    if (level >= 8) return lava ? BlockId::FALLING_LAVA : BlockId::FALLING_WATER;
     const uint8_t first = static_cast<uint8_t>(
         lava ? BlockId::FLOWING_LAVA_1 : BlockId::FLOWING_WATER_1);
     return static_cast<BlockId>(first + level - 1);
 }
 
 float fluidSurfaceHeight(BlockId id) {
-    return isFluid(id) ? (fluidLevel(id) == 0 ? .875f : (8.0f - fluidLevel(id)) / 8.0f)
-                       : 0.0f;
+    const uint8_t amount = fluidAmount(id);
+    return amount == 0 ? 0.0f : static_cast<float>(amount) / 9.0f;
 }
 
 bool isSunflower(BlockId id) {
@@ -590,9 +640,14 @@ bool isFlower(BlockId id) {
 }
 
 bool isReplaceableByFluid(BlockId id) {
-    return id == BlockId::AIR || id == BlockId::FIRE || id == BlockId::SNOW_LAYER ||
-           id == BlockId::TALL_GRASS || id == BlockId::REEDS || isFlower(id) ||
-           isSapling(id);
+    // Java's flowing-fluid passability admits non-collision blocks, with
+    // sugar cane (REEDS) as the notable plant exception.  Crops and torches
+    // are destroyed by the incoming fluid; solid farmland and beds are not.
+    if (id == BlockId::REEDS) return false;
+    if (id == BlockId::AIR || id == BlockId::FIRE || id == BlockId::SNOW_LAYER ||
+        id == BlockId::TORCH || id == BlockId::TALL_GRASS || isFlower(id) ||
+        isSapling(id)) return true;
+    return id >= BlockId::WHEAT_0 && id <= BlockId::WHEAT_7;
 }
 
 uint8_t fireEncouragement(BlockId id) {

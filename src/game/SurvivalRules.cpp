@@ -92,6 +92,8 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     for (uint8_t raw = static_cast<uint8_t>(BlockId::FLOWING_WATER_1);
          raw <= static_cast<uint8_t>(BlockId::FLOWING_LAVA_7); ++raw)
         set(static_cast<BlockId>(raw), -1.0f, ToolKind::None, ToolTier::None, true);
+    set(BlockId::FALLING_WATER, -1.0f, ToolKind::None, ToolTier::None, true);
+    set(BlockId::FALLING_LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
     for (BlockId id : {BlockId::LIMESTONE, BlockId::BASALT, BlockId::TUFF,
                        BlockId::PACKED_ICE, BlockId::GRANITE})
         set(id, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);

@@ -250,6 +250,10 @@ void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
 void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
                              bool recordOverride) {
     if (!Config::isValidWorldY(worldY)) return;
+    // Flowing/falling states are derived simulation output. Even public
+    // placement calls must not turn them into persisted overrides; only
+    // source states and ordinary player blocks belong in saves.
+    if (isDerivedFluidState(id)) recordOverride = false;
     const BlockId previous = getBlock(worldX, worldY, worldZ);
     if (previous == id) return;
 
@@ -276,6 +280,7 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (lx == Config::CHUNK_SIZE_X - 1) m_chunks.markDirty(cx + 1, cz);
     if (lz == 0)                   m_chunks.markDirty(cx, cz - 1);
     if (lz == Config::CHUNK_SIZE_Z - 1) m_chunks.markDirty(cx, cz + 1);
+    m_fluids.onBlockChanged({worldX, worldY, worldZ}, previous, id);
     m_fluids.scheduleAround({worldX, worldY, worldZ});
     if (isBed(previous)) {
         BedPart previousPart = BedPart::Foot;

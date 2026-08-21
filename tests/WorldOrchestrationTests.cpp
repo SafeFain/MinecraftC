@@ -383,8 +383,8 @@ void testMeshPipeline() {
     drainWorkers(world, pool);
 }
 
-// 6. Fluid ticks: water falls through open air and lava ignites adjacent
-// TNT through the scheduled tick queue.
+// 6. Fluid ticks: water falls through open air. Lava does not bypass the
+// Java fire path by directly igniting adjacent TNT.
 void testFluidTicks() {
     World world;
     ThreadPool pool(2);
@@ -404,27 +404,64 @@ void testFluidTicks() {
     world.setBlock(0, 80, 0, BlockId::WATER);
     world.tickFluids(1000);
     require(isWater(world.getBlock(0, 80, 0)), "water source stays in place");
-    require(isWater(world.getBlock(0, 79, 0)),
-            "water spreads into the cell below");
+    require(world.getBlock(0, 79, 0) == BlockId::FALLING_WATER,
+            "water spreads as a distinct falling state");
     world.tickFluids(1005);
-    require(isWater(world.getBlock(0, 78, 0)), "water keeps falling");
+    require(world.getBlock(0, 78, 0) == BlockId::FALLING_WATER,
+            "water keeps falling with amount eight");
 
-    // Lava adjacent to TNT ignites it through the same tick queue. It sits
-    // beyond the water's horizontal reach so the two experiments cannot
-    // interact.
+    // Java source conversion requires two horizontal sources and a solid
+    // (or source-water) support below; the equivalent lava arrangement does
+    // not convert.
+    world.setBlock(4, 119, 0, BlockId::STONE);
+    world.setBlock(4, 120, 0, BlockId::FLOWING_WATER_7);
+    world.setBlock(3, 120, 0, BlockId::WATER);
+    world.setBlock(5, 120, 0, BlockId::WATER);
+    world.tickFluids(1010);
+    require(world.getBlock(4, 120, 0) == BlockId::WATER,
+            "two supported water sources regenerate a source block");
+    world.setBlock(8, 119, 0, BlockId::STONE);
+    world.setBlock(8, 120, 0, BlockId::FLOWING_LAVA_7);
+    world.setBlock(7, 120, 0, BlockId::LAVA);
+    world.setBlock(9, 120, 0, BlockId::LAVA);
+    world.tickFluids(1040);
+    require(world.getBlock(8, 120, 0) != BlockId::LAVA,
+            "lava does not regenerate from horizontal sources");
+
+    // Mixing is directional: water above/alongside hardens lava, water below
+    // does not, and a downward lava stream turns water into stone.
+    world.setBlock(10, 100, 0, BlockId::LAVA);
+    world.setBlock(10, 101, 0, BlockId::WATER);
+    require(world.getBlock(10, 100, 0) == BlockId::OBSIDIAN,
+            "water above a lava source creates obsidian");
+    world.setBlock(12, 100, 0, BlockId::FLOWING_LAVA_4);
+    world.setBlock(13, 100, 0, BlockId::WATER);
+    require(world.getBlock(12, 100, 0) == BlockId::COBBLESTONE,
+            "water beside flowing lava creates cobblestone");
+    world.setBlock(14, 101, 0, BlockId::LAVA);
+    world.setBlock(14, 100, 0, BlockId::WATER);
+    require(world.getBlock(14, 101, 0) == BlockId::LAVA,
+            "water below lava does not immediately harden it");
+    world.setBlock(1, 101, 0, BlockId::LAVA);
+    world.setBlock(1, 100, 0, BlockId::WATER);
+    world.tickFluids(1070);
+    require(world.getBlock(1, 100, 0) == BlockId::STONE,
+            "downward lava flowing into water creates stone");
+
+    // Lava adjacent to TNT is inert until a random lava tick creates FIRE;
+    // direct fluid contact must not enqueue an ignition.
     world.setBlock(10, 80, 0, BlockId::TNT);
     world.setBlock(9, 80, 0, BlockId::LAVA);
     world.tickFluids(1035);
     const auto ignitions = world.takeTntIgnitions();
-    require(!ignitions.empty(), "lava ignites adjacent TNT");
-    require(world.getBlock(10, 80, 0) == BlockId::AIR,
-            "ignited TNT is consumed");
+    require(ignitions.empty(), "lava contact does not bypass the fire system");
+    require(world.getBlock(10, 80, 0) == BlockId::TNT,
+            "TNT remains until a fire block reaches it");
 
     // A pending ignition belongs to this world only. Seed reset must clear
     // all WorldSimulation state before the next world starts ticking.
     world.setBlock(12, 80, 0, BlockId::TNT);
     world.setBlock(11, 80, 0, BlockId::LAVA);
-    world.tickFluids(1070);
     world.resetForNewSeed(1000);
     require(world.takeTntIgnitions().empty(),
             "seed reset clears pending TNT ignitions");

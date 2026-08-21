@@ -33,7 +33,7 @@ int main() {
             !isSolid(BlockId::SNOW_LAYER) && !isSolid(BlockId::FIRE),
             "weather block geometry or collision properties are invalid");
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 104 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 106 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,

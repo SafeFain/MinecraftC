@@ -268,7 +268,9 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_4):
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_5):
         case static_cast<uint16_t>(BlockId::FLOWING_LAVA_6):
-        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_7): return ItemId::LAVA;
+        case static_cast<uint16_t>(BlockId::FLOWING_LAVA_7):
+        case static_cast<uint16_t>(BlockId::FALLING_LAVA): return ItemId::LAVA;
+        case static_cast<uint16_t>(BlockId::FALLING_WATER): return ItemId::WATER;
         case static_cast<uint16_t>(BlockId::LIMESTONE): return ItemId::LIMESTONE;
         case static_cast<uint16_t>(BlockId::BASALT): return ItemId::BASALT;
         case static_cast<uint16_t>(BlockId::TUFF): return ItemId::TUFF;
