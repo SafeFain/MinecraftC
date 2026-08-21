@@ -338,6 +338,9 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     appendStack(payload, metadata.inventory.offhand());
     append(payload, static_cast<uint32_t>(metadata.entities.size()));
     for (const auto& entity : metadata.entities) appendEntity(payload, entity);
+    // Keep the new field at the payload tail so v2-v8 field offsets remain
+    // readable without a migration pass.
+    append(payload, static_cast<uint8_t>(metadata.worldType));
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
@@ -381,6 +384,14 @@ WorldMetadata SaveStore::loadMetadata() const {
     metadata.entities.reserve(entityCount);
     for (uint32_t i = 0; i < entityCount; ++i) {
         metadata.entities.push_back(readEntity(reader, checked.version));
+    }
+    if (checked.version >= 9) {
+        // World type was appended in v9; older saves intentionally retain the
+        // Normal default initialized in WorldMetadata.
+        const uint8_t rawWorldType = reader.read<uint8_t>();
+        if (rawWorldType > static_cast<uint8_t>(WorldType::Superflat))
+            throw std::runtime_error("Save contains invalid world type");
+        metadata.worldType = static_cast<WorldType>(rawWorldType);
     }
     if (!reader.finished()) throw std::runtime_error("Unexpected trailing save data");
     return metadata;

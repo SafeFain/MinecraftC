@@ -44,7 +44,8 @@ std::vector<WorldSummary> WorldCatalog::list() const {
             worlds.push_back({id, metadata.displayName, metadata.gameMode,
                               metadata.difficulty, metadata.seed,
                               metadata.worldTicks, metadata.generationVersion,
-                              metadata.generationVersion == WorldGenContext::GENERATION_VERSION});
+                              metadata.generationVersion == WorldGenContext::GENERATION_VERSION,
+                              metadata.worldType});
         } catch (const std::runtime_error&) {
             // Invalid worlds stay untouched on disk but are not loadable.
         }
@@ -58,7 +59,10 @@ std::vector<WorldSummary> WorldCatalog::list() const {
 
 std::string WorldCatalog::create(
     const std::string& displayName, uint64_t seed,
-    GameMode mode, Difficulty difficulty, bool cheatsEnabled) const {
+    GameMode mode, Difficulty difficulty, bool cheatsEnabled,
+    WorldType worldType) const {
+    if (static_cast<uint8_t>(worldType) > static_cast<uint8_t>(WorldType::Superflat))
+        throw std::runtime_error("Invalid world type");
     std::filesystem::create_directories(m_savesDirectory);
     const std::string base = slug(displayName);
     std::string id = base;
@@ -72,6 +76,7 @@ std::string WorldCatalog::create(
     metadata.generationVersion = WorldGenContext::GENERATION_VERSION;
     metadata.gameMode = mode;
     metadata.difficulty = difficulty;
+    metadata.worldType = worldType;
     metadata.cheatsEnabled = cheatsEnabled;
     SaveStore(m_savesDirectory / id).saveMetadata(metadata);
     return id;

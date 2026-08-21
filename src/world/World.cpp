@@ -3,7 +3,6 @@
 #include "world/BiomeLocator.h"
 #include "core/RuntimeClock.h"
 #include "world/ChunkMesh.h"
-#include "world/RegionGenerator.h"
 #include "renderer/Renderer.h"
 #include "threading/ThreadPool.h"
 #include "debug/Log.h"
@@ -50,9 +49,9 @@ bool rayIntersectsBlockBounds(const glm::dvec3& origin,
 }
 }
 
-World::World() : m_generator(Config::WORLD_SEED) {}
+World::World() : m_generator(Config::WORLD_SEED, WorldType::Normal) {}
 
-void World::resetForNewSeed(uint64_t newSeed) {
+void World::resetForNewSeed(uint64_t newSeed, WorldType worldType) {
     m_meshes.releaseAllMeshes();
     m_chunks.withUnique([&](ChunkStore& store) {
         store.clearUnlocked();
@@ -65,7 +64,7 @@ void World::resetForNewSeed(uint64_t newSeed) {
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
-    new (&m_generator) WorldGenerator(newSeed);
+    new (&m_generator) WorldGenerator(newSeed, worldType);
     Config::WORLD_SEED = newSeed;
 }
 

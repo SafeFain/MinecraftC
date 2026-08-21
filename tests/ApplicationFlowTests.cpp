@@ -259,6 +259,34 @@ int main() {
     }
 
     {
+        // Exercise the create-screen selector through the public keyboard
+        // path so the menu callback carries the selected terrain preset.
+        ClientSettings menuSettings;
+        Localization menuLocalization;
+        WorldType selectedType = WorldType::Normal;
+        bool created = false;
+        MenuCallbacks callbacks;
+        callbacks.onCreateWorld =
+            [&](const std::string&, const std::string&, GameMode,
+                WorldType type, bool) {
+                selectedType = type;
+                created = true;
+            };
+        MainMenu menu(callbacks, {}, menuSettings, menuLocalization, nullptr);
+        menu.onKeyPress(Key::Enter); // Home -> world list.
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter); // World list -> create screen.
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter); // Toggle Normal -> Superflat.
+        for (int i = 0; i < 5; ++i) menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter); // Confirm.
+        require(created && selectedType == WorldType::Superflat,
+                "create menu forwards the selected superflat type");
+    }
+
+    {
         Harness harness(root, *window);
         require(harness.flow.state() == GameState::MainMenu,
                 "fresh application is in the main menu");

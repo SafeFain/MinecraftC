@@ -7,7 +7,6 @@
 #include "world/ChunkMesh.h"
 #include "world/ChunkStore.h"
 #include "world/FluidScheduler.h"
-#include "world/RegionGenerator.h"
 #include "world/World.h"
 #include "world/WorldGenContext.h"
 #include "world/WorldGenerator.h"
@@ -228,22 +227,12 @@ void ChunkStreamer::enqueueGeneration() {
                 std::atomic<int>& count;
                 ~Completion() { --count; }
             } completion{streamerPtr->m_generationTasksInFlight};
-            // Build RegionGenerator from WorldGenerator's sub-generators
-            RegionGenerator regionGen(
-                genPtr->getHeightPipeline(),
-                genPtr->getCaveGenerator(),
-                genPtr->getTreeGenerator(),
-                genPtr->getOreGenerator(),
-                genPtr->getSeed()
-            );
-
             // Clone chunk pointers (non-const because we need to mutate)
             auto chunks = reg.chunks;
 
             std::vector<RegionGenerationData::PendingBlock> pendingOut;
-            regionGen.generateRegion(reg.originCX, reg.originCZ,
-                                     R, PADDING,
-                                     chunks, pendingOut);
+            genPtr->generateRegion(reg.originCX, reg.originCZ, R, PADDING,
+                                   chunks, pendingOut);
 
             // Store pending blocks under the chunk mutex
             streamerPtr->m_chunks.withUnique([&](ChunkStore&) {
@@ -326,9 +315,30 @@ void ChunkStreamer::enqueueGeneration() {
 void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow) {
     // Apply pending tree leaves for chunks that have finished generating
     std::vector<glm::ivec3> fluidSeeds;
-    std::vector<std::pair<int, int>> fluidBoundaryChunks;
     bool generationStateChanged = false;
     m_chunks.withUnique([&](ChunkStore& store) {
+        // Only persisted edits are fluid wake-up sources at chunk load time.
+        // Generated rivers and lakes are already stable terrain; scanning all
+        // 384 Y levels of every seam both stalls the main thread and can turn
+        // a harmless terrain boundary into an unbounded waterfall.
+        auto collectFluidSeeds = [&](int cx, int cz, int edgeX, int edgeZ) {
+            const Chunk* source = store.findUnlocked(cx, cz);
+            if (source == nullptr || !source->generated.load()) return;
+            m_world.m_persistence.forEachOverrideInChunkUnlocked(
+                cx, cz, [&](uint32_t index, BlockId block) {
+                    int x = 0, z = 0, y = 0;
+                    decodeChunkIndex(index, x, z, y);
+                    if (edgeX >= 0 && x != edgeX) return;
+                    if (edgeZ >= 0 && z != edgeZ) return;
+                    // Ordinary solid edits do not create a new flow source.
+                    // AIR edits are retained because they can expose a
+                    // natural fluid across the newly available seam.
+                    if (!isFluid(block) && block != BlockId::AIR) return;
+                    fluidSeeds.push_back({
+                        cx * Config::CHUNK_SIZE_X + x, y,
+                        cz * Config::CHUNK_SIZE_Z + z});
+                });
+        };
         store.forEachUniqueUnlocked([&](Chunk* chunk) {
             const std::pair<int,int> key{chunk->cx, chunk->cz};
             if (!chunk->generated.load()) return;
@@ -353,26 +363,21 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow) {
                         neighbor->markDirty();
                     }
                 }
-                m_world.m_persistence.forEachOverrideInChunkUnlocked(
-                    key.first, key.second,
-                    [&](uint32_t index, BlockId) {
-                        int x = 0, z = 0, y = 0;
-                        decodeChunkIndex(index, x, z, y);
-                        fluidSeeds.push_back(
-                            {key.first * Config::CHUNK_SIZE_X + x, y,
-                             key.second * Config::CHUNK_SIZE_Z + z});
-                    });
-                // Rebuild only the generated chunk's four seams.  Derived
-                // fluid states are intentionally not persisted; boundary
-                // sources and neighboring loaded fluids recreate waterfalls
-                // without treating an unavailable chunk as air.
-                fluidBoundaryChunks.push_back(key);
+                // Wake every persisted edit in the newly generated chunk,
+                // plus only the facing edge edits in its already-generated
+                // neighbors.  An AIR edit is intentionally included: it can
+                // expose a natural fluid on the other side of the seam.
+                collectFluidSeeds(key.first, key.second, -1, -1);
+                collectFluidSeeds(key.first - 1, key.second,
+                                  Config::CHUNK_SIZE_X - 1, -1);
+                collectFluidSeeds(key.first + 1, key.second, 0, -1);
+                collectFluidSeeds(key.first, key.second - 1,
+                                  -1, Config::CHUNK_SIZE_Z - 1);
+                collectFluidSeeds(key.first, key.second + 1, -1, 0);
             }
         });
     });
     if (generationStateChanged) ++m_streamingRevision;
-    for (const auto& key : fluidBoundaryChunks)
-        m_world.m_fluids.scheduleChunkBoundary(key.first, key.second);
     for (const glm::ivec3& position : fluidSeeds)
         m_world.m_fluids.scheduleAround(position);
     if (rebuildLightingNow && m_world.lightDirty()) m_world.rebuildLightingNow();

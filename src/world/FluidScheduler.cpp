@@ -67,19 +67,6 @@ void FluidScheduler::scheduleAround(const glm::ivec3& position,
         scheduleAt(position + offset, minimumDelay);
 }
 
-void FluidScheduler::scheduleChunkBoundary(int chunkX, int chunkZ) {
-    const int x0 = chunkX * Config::CHUNK_SIZE_X;
-    const int z0 = chunkZ * Config::CHUNK_SIZE_Z;
-    for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
-        for (int i = 0; i < Config::CHUNK_SIZE_X; ++i) {
-            scheduleAround({x0 + i, y, z0});
-            scheduleAround({x0 + i, y, z0 + Config::CHUNK_SIZE_Z - 1});
-            scheduleAround({x0, y, z0 + i});
-            scheduleAround({x0 + Config::CHUNK_SIZE_X - 1, y, z0 + i});
-        }
-    }
-}
-
 void FluidScheduler::clear() {
     m_fluidTicks = {};
     m_scheduledFluidDue.clear();
@@ -379,12 +366,13 @@ void FluidScheduler::randomTickLava(uint64_t tick) {
     }
 }
 
-void FluidScheduler::tick(uint64_t tick) {
+size_t FluidScheduler::tick(uint64_t tick, size_t maximumUpdates) {
     m_currentWorldTick = tick;
-    constexpr size_t MAX_UPDATES = 65536;
     size_t processed = 0;
+    size_t examined = 0;
     while (!m_fluidTicks.empty() && m_fluidTicks.top().due <= tick &&
-           processed < MAX_UPDATES) {
+           examined < maximumUpdates) {
+        ++examined;
         const ScheduledFluidTick scheduled = m_fluidTicks.top();
         m_fluidTicks.pop();
         const FluidTickKey key{scheduled.position, scheduled.lava};
@@ -401,4 +389,5 @@ void FluidScheduler::tick(uint64_t tick) {
         ++processed;
     }
     randomTickLava(tick);
+    return processed;
 }

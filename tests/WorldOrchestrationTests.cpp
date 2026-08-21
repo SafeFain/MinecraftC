@@ -347,6 +347,12 @@ void testMeshPipeline() {
     world.waitForInitialGeneration(8000);
     world.processCompletedGenerations();
     drainWorkers(world, pool);
+
+    // Natural generation writes water directly into chunks.  Loading a
+    // chunk must not treat those settled terrain fluids as newly placed
+    // sources and start a boundary-wide cascade.
+    require(world.tickFluids(1000) == 0,
+            "natural terrain fluids stay settled when a chunk loads");
     require(world.getActiveChunks().size() == 1,
             "bounded update loads exactly one chunk");
 
@@ -468,7 +474,62 @@ void testFluidTicks() {
     drainWorkers(world, pool);
 }
 
-// 7. Beds are an atomic two-cell world structure. Invalid legacy halves stay
+// 7. Superflat fluid spread: a placed source fans out over a supported flat
+// surface, and the scheduler enforces its per-tick work budget.
+void testSuperflatFluidSpreadAndBudget() {
+    World world;
+    ThreadPool pool(2);
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(1002, WorldType::Superflat);
+
+    world.update({0.5, -60.0, 0.5}, 1);
+    world.enqueueGeneration();
+    world.waitForInitialGeneration(8000);
+    world.processCompletedGenerations();
+    drainWorkers(world, pool);
+
+    const int surface = world.getSurfaceY(0, 0);
+    require(surface == Config::WORLD_MIN_Y + 3,
+            "superflat fluid test has the expected grass surface");
+    const glm::ivec3 source{8, surface + 1, 8};
+    world.setBlock(source.x, source.y, source.z, BlockId::WATER);
+    world.tickFluids(1000);
+    for (const glm::ivec3& offset : FLUID_HORIZONTAL_OFFSETS) {
+        const BlockId spread = world.getBlock(
+            source.x + offset.x, source.y, source.z + offset.z);
+        require(isWater(spread) && spread != BlockId::WATER,
+                "superflat water source spreads horizontally");
+    }
+
+    // Fill two active chunks with source cells.  There are more due tasks
+    // than one tick may inspect, so the second call must still have work left
+    // after the first bounded pass.
+    world.resetForNewSeed(1003, WorldType::Superflat);
+    world.update({0.5, -60.0, 0.5}, 2);
+    world.enqueueGeneration();
+    world.waitForInitialGeneration(8000);
+    world.processCompletedGenerations();
+    drainWorkers(world, pool);
+    std::vector<std::pair<int, int>> activeKeys;
+    for (const Chunk* chunk : world.getActiveChunks())
+        activeKeys.emplace_back(chunk->cx, chunk->cz);
+    require(activeKeys.size() == 2,
+            "fluid budget test loads two complete superflat chunks");
+    for (const auto& [cx, cz] : activeKeys)
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
+            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
+                world.setBlock(cx * Config::CHUNK_SIZE_X + x,
+                               Config::WORLD_MIN_Y + 4,
+                               cz * Config::CHUNK_SIZE_Z + z, BlockId::WATER);
+    const size_t first = world.tickFluids(2000, Config::FLUID_UPDATES_PER_TICK);
+    const size_t second = world.tickFluids(2000, Config::FLUID_UPDATES_PER_TICK);
+    require(first == Config::FLUID_UPDATES_PER_TICK &&
+                second == Config::FLUID_UPDATES_PER_TICK,
+            "fluid scheduler preserves queued work across bounded ticks");
+    drainWorkers(world, pool);
+}
+
+// 8. Beds are an atomic two-cell world structure. Invalid legacy halves stay
 // removable but never become valid respawn anchors.
 void testBedLifecycle() {
     World world;
@@ -531,6 +592,7 @@ int main() {
     testAutosaveQueue();
     testMeshPipeline();
     testFluidTicks();
+    testSuperflatFluidSpreadAndBudget();
     testBedLifecycle();
     std::cout << "World orchestration tests passed\n";
     return 0;

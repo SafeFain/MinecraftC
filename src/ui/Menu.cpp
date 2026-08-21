@@ -104,6 +104,7 @@ void MainMenu::showCreate() {
     m_worldName.setText(m_localization.text("menu.create.default_name"));
     m_seedText.setText({});
     m_createMode = GameMode::Survival;
+    m_createWorldType = WorldType::Normal;
     m_createCheats = false;
     m_field = Field::Name;
     rebuildButtons();
@@ -216,6 +217,15 @@ void MainMenu::rebuildButtons() {
                     ? GameMode::Creative : GameMode::Survival;
                 rebuildButtons();
             });
+        m_buttons.emplace_back(
+            m_localization.format("menu.create.world_type", {m_localization.text(
+                m_createWorldType == WorldType::Normal
+                    ? "common.normal" : "common.superflat")}),
+            [this]() {
+                m_createWorldType = m_createWorldType == WorldType::Normal
+                    ? WorldType::Superflat : WorldType::Normal;
+                rebuildButtons();
+            });
         m_buttons.emplace_back(fieldLabel(Field::Seed, m_seedText.text()),
                                [this]() { selectField(Field::Seed); });
         m_buttons.emplace_back(
@@ -227,7 +237,8 @@ void MainMenu::rebuildButtons() {
             });
         m_buttons.emplace_back(m_localization.text("menu.create.confirm"), [this]() {
             m_callbacks.onCreateWorld(
-                m_worldName.text(), m_seedText.text(), m_createMode, m_createCheats);
+                m_worldName.text(), m_seedText.text(), m_createMode,
+                m_createWorldType, m_createCheats);
         });
         m_buttons.emplace_back(m_localization.text("common.cancel"), [this]() { showWorlds(); });
     }
@@ -238,7 +249,7 @@ void MainMenu::rebuildButtons() {
 void MainMenu::selectField(Field field) {
     m_field = field;
     rebuildButtons();
-    m_selectedIdx = field == Field::Name ? 0 : 2;
+    m_selectedIdx = field == Field::Name ? 0 : 3;
     m_buttons[0].setSelected(false);
     m_buttons[m_selectedIdx].setSelected(true);
 }
@@ -281,10 +292,13 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
         m_selectedWorld < static_cast<int>(m_worlds.size())) {
         const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
+        const std::string worldType = m_localization.text(
+            world.worldType == WorldType::Normal
+                ? "common.normal" : "common.superflat");
         const std::string details = world.compatible
             ? m_localization.format("menu.worlds.details", {
                 std::to_string(world.seed),
-                std::to_string(world.worldTicks / 1200)})
+                std::to_string(world.worldTicks / 1200), worldType})
             : m_localization.text("menu.worlds.unsupported");
         const auto size = ui.measureText(details, 1.0f);
         ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,

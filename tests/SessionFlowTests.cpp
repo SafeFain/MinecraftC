@@ -198,6 +198,21 @@ int main() {
         drainGeneration(reopened);
     }
 
+    {
+        GameSession flat(root / "flat-saves");
+        const std::string id = flat.worldCatalog.create(
+            "Flat Test", 123, GameMode::Creative, Difficulty::Normal,
+            false, WorldType::Superflat);
+        flat.startWorld(id, true, clock.now());
+        require(flat.worldMetadata.worldType == WorldType::Superflat,
+                "session carries the superflat type into world metadata");
+        require(flat.player.getPosition().y ==
+                    static_cast<double>(Config::WORLD_MIN_Y + 3) + 1.01,
+                "superflat spawn is directly above the grass layer");
+        drainGeneration(flat);
+        flat.leaveWorld();
+    }
+
     std::filesystem::remove_all(root);
     std::cout << "Game session flow tests passed\n";
 }

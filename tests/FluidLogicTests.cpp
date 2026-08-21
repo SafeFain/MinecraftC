@@ -73,6 +73,16 @@ int main() {
                                               sample, available).size() == 4,
             "water spreads to every equally nearest downward direction");
 
+    Grid flat;
+    const FluidSample flatSample = [&flat](const glm::ivec3& p) {
+        return flat.get(p);
+    };
+    for (const glm::ivec3& offset : FLUID_HORIZONTAL_OFFSETS)
+        flat.set(origin + offset, BlockId::AIR);
+    require(preferredFluidDirectionsByAmount(origin, false, 8, false,
+                                              flatSample, available).size() == 4,
+            "water spreads across a flat supported surface without a drop");
+
     Grid nearest;
     const FluidSample nearestSample = [&nearest](const glm::ivec3& p) {
         return nearest.get(p);
@@ -86,7 +96,9 @@ int main() {
             "water uses the four-cell nearest-drop search");
     const auto lavaPath = preferredFluidDirectionsByAmount(
         origin, true, 8, false, nearestSample, available);
-    require(lavaPath.empty(), "Overworld lava uses the two-cell search");
+    require(lavaPath.size() == 1 &&
+                lavaPath.front() == glm::ivec3(1, 0, 0),
+            "Overworld lava uses the shorter two-cell search");
 
     Grid corners;
     corners.set({0, 0, 0}, BlockId::WATER);

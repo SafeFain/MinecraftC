@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <vector>
 
 namespace {
 
@@ -15,6 +17,23 @@ void require(bool condition, const char* message) {
     if (!condition) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
+    }
+}
+
+uint64_t payloadChecksum(const std::vector<uint8_t>& bytes, size_t offset) {
+    uint64_t hash = 1469598103934665603ULL;
+    for (size_t i = offset; i < bytes.size(); ++i) {
+        hash ^= bytes[i];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+void writeLittleEndian(std::vector<uint8_t>& bytes, size_t offset,
+                       uint64_t value, size_t width) {
+    for (size_t i = 0; i < width; ++i) {
+        bytes[offset + i] = static_cast<uint8_t>(value & 0xffU);
+        value >>= 8;
     }
 }
 
@@ -34,6 +53,7 @@ int main() {
         source.generationVersion = WorldGenContext::GENERATION_VERSION;
         source.gameMode = GameMode::Survival;
         source.difficulty = Difficulty::Hard;
+        source.worldType = WorldType::Superflat;
         source.cheatsEnabled = true;
         source.worldTicks = 123456;
         source.weather = {true, true, 18000, 7200, 42};
@@ -68,6 +88,8 @@ int main() {
         require(loaded.gameMode == GameMode::Survival &&
                 loaded.difficulty == Difficulty::Hard,
                 "game rules round trip");
+        require(loaded.worldType == WorldType::Superflat,
+                "world type round trips");
         require(loaded.cheatsEnabled, "cheat option round trips");
         require(loaded.weather.raining && loaded.weather.thundering &&
                 loaded.weather.rainTicks == 18000 &&
@@ -84,7 +106,7 @@ int main() {
                 "offhand round trips");
         require(loaded.inventory.slot(10).id == ItemId::LIMESTONE &&
                 loaded.inventory.slot(10).count == 23,
-                "v7 appended natural material item round trips");
+                "appended natural material item round trips");
         require(loaded.entities.size() == 2 &&
                 loaded.entities[0].position == source.entities[0].position &&
                 loaded.entities[1].type == 10 &&
@@ -118,13 +140,21 @@ int main() {
         const auto legacyPath = legacyDirectory / "level.bin";
         std::filesystem::copy_file(metadataPath, legacyPath);
         {
-            std::fstream file(legacyPath, std::ios::binary | std::ios::in | std::ios::out);
-            const char legacyVersion = 7;
-            file.seekp(8);
-            file.write(&legacyVersion, 1);
+            std::ifstream input(legacyPath, std::ios::binary);
+            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
+            require(bytes.size() > 24, "legacy fixture has a complete save header");
+            bytes.pop_back(); // v7 has no appended world-type byte.
+            writeLittleEndian(bytes, 8, 7, 4);
+            writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
+            writeLittleEndian(bytes, 16, payloadChecksum(bytes, 24), 8);
+            std::ofstream output(legacyPath, std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(bytes.data()),
+                         static_cast<std::streamsize>(bytes.size()));
         }
         require(SaveStore(legacyDirectory).loadMetadata().seed == source.seed,
                 "existing little-endian v7 metadata remains readable");
+        require(SaveStore(legacyDirectory).loadMetadata().worldType == WorldType::Normal,
+                "legacy metadata defaults to normal terrain");
 
         const std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},
@@ -146,9 +176,9 @@ int main() {
                 loadedOverrides[3].block == BlockId::ACACIA_SAPLING,
                 "new farming block ids round trip in save format 5");
         require(loadedOverrides[4].block == BlockId::GRANITE,
-                "v7 appended natural block id round trips in save format 8");
+                "v7 appended natural block id round trips in the current save format");
         require(loadedOverrides[5].block == BlockId::WHITE_BED_HEAD_EAST,
-                "appended directional bed state round trips in save format 8");
+                "appended directional bed state round trips in the current save format");
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
 

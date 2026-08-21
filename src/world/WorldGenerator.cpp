@@ -1,11 +1,13 @@
 #include "world/WorldGenerator.h"
 #include "Config.h"
+#include "world/RegionGenerator.h"
 #include "world/SurfaceRules.h"
 #include <cmath>
 #include <algorithm>
 
-WorldGenerator::WorldGenerator(uint64_t seed)
+WorldGenerator::WorldGenerator(uint64_t seed, WorldType worldType)
     : m_seed(seed)
+    , m_worldType(worldType)
     , m_noise(seed)
     , m_heightPipeline(m_noise, seed)
     , m_caveGenerator(m_noise, seed)
@@ -18,6 +20,8 @@ WorldGenerator::WorldGenerator(uint64_t seed)
 // ═══════════════════════════════════════════════════════════════════════════
 
 int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
+    if (m_worldType == WorldType::Superflat)
+        return Config::WORLD_MIN_Y + 3;
     float wx = static_cast<float>(worldX);
     float wz = static_cast<float>(worldZ);
     float h = m_heightPipeline.queryHeight(wx, wz);
@@ -25,8 +29,64 @@ int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
 }
 
 HeightBiome WorldGenerator::queryHeightBiome(int worldX, int worldZ) const {
+    if (m_worldType == WorldType::Superflat)
+        return {Config::WORLD_MIN_Y + 3, Biome::PLAINS};
     return m_heightPipeline.queryHeightBiome(
         static_cast<float>(worldX), static_cast<float>(worldZ));
+}
+
+SurfaceColumn WorldGenerator::superflatColumn() {
+    SurfaceColumn column;
+    column.height = Config::WORLD_MIN_Y + 3;
+    column.nominalHeight = column.height;
+    column.waterLevel = Config::WORLD_MIN_Y - 1;
+    column.densityMinY = Config::WORLD_MIN_Y;
+    column.densityMaxY = column.height;
+    column.biome = Biome::PLAINS;
+    column.river = false;
+    return column;
+}
+
+SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const {
+    return m_worldType == WorldType::Superflat
+        ? superflatColumn() : m_heightPipeline.sampleColumn(worldX, worldZ);
+}
+
+void WorldGenerator::populateSuperflat(Chunk& chunk) {
+    const int bedrockY = Config::WORLD_MIN_Y;
+    const int dirtTop = bedrockY + 2;
+    const int grassY = bedrockY + 3;
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            chunk.blockAt(x, bedrockY, z) = static_cast<uint8_t>(BlockId::BEDROCK);
+            for (int y = bedrockY + 1; y <= dirtTop; ++y)
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::DIRT);
+            chunk.blockAt(x, grassY, z) = static_cast<uint8_t>(BlockId::GRASS);
+            chunk.setColumnMaxY(x, z, grassY);
+        }
+    }
+    chunk.finishBulkBlockEdit();
+}
+
+void WorldGenerator::generateRegion(
+    int originCX, int originCZ, int regionSizeChunks, int padding,
+    std::vector<Chunk*>& chunks,
+    std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
+    if (m_worldType == WorldType::Superflat) {
+        for (Chunk* chunk : chunks) {
+            if (chunk == nullptr) continue;
+            populateSuperflat(*chunk);
+            chunk->generated = true;
+            chunk->generationInProgress = false;
+            chunk->markDirty();
+        }
+        pendingOut.clear();
+        return;
+    }
+    RegionGenerator regionGenerator(
+        m_heightPipeline, m_caveGenerator, m_treeGenerator, m_oreGenerator, m_seed);
+    regionGenerator.generateRegion(originCX, originCZ, regionSizeChunks, padding,
+                                   chunks, pendingOut);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -36,6 +96,10 @@ HeightBiome WorldGenerator::queryHeightBiome(int worldX, int worldZ) const {
 void WorldGenerator::generate(Chunk& chunk,
                                const NeighborQuery& neighborQuery,
                                const BlockSetter& blockSetter) {
+    if (m_worldType == WorldType::Superflat) {
+        populateSuperflat(chunk);
+        return;
+    }
     (void)neighborQuery;
     int wxBase = chunk.worldX();
     int wzBase = chunk.worldZ();

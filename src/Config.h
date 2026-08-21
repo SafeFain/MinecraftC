@@ -47,6 +47,12 @@ constexpr int   LOADING_MESH_TASKS_IN_FLIGHT = 4;
 constexpr int   LOADING_MESH_UPLOADS_PER_FRAME = 8;
 constexpr size_t LOADING_MESH_UPLOAD_BYTES_PER_FRAME = 16u * 1024u * 1024u;
 
+// Fluid updates are deliberately bounded independently from terrain and mesh
+// work.  A large player-triggered waterfall may take several ticks to settle,
+// but it must never monopolize a simulation frame or a catch-up loop.
+constexpr size_t FLUID_UPDATES_PER_TICK = 256;
+constexpr size_t FLUID_UPDATES_PER_FRAME = 512;
+
 constexpr int   RENDER_DISTANCE_OPTIONS[] = {2, 4, 6, 8, 10, 12, 16};
 constexpr int   RENDER_DISTANCE_OPTION_COUNT = 7;
 

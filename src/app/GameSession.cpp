@@ -52,7 +52,7 @@ GameMode GameSession::startWorld(
     world.setSaveStore(saveStore.get());
     entities.setSaveStore(saveStore.get());
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
-    world.resetForNewSeed(worldMetadata.seed);
+    world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType);
     entities.clear();
     if (newWorld) {
         const glm::dvec3 spawn = world.findSafeSpawn();
@@ -176,13 +176,21 @@ void GameSession::updatePlaying(
     }
 
     survivalWorldTickRemainder += dt * 20.0f;
+    size_t fluidUpdatesRemaining = Config::FLUID_UPDATES_PER_FRAME;
     while (survivalWorldTickRemainder >= 1.0f) {
         ++survivalTicks;
         survivalWorldTickRemainder -= 1.0f;
         weather.tick();
         tickLightning(feedback);
         world.tickBlockEntities();
-        world.tickFluids(survivalTicks);
+        const size_t fluidBudget = std::min(
+            Config::FLUID_UPDATES_PER_TICK, fluidUpdatesRemaining);
+        // Consume the frame allowance before dispatch.  The scheduler may
+        // encounter stale de-duplicated queue entries and return fewer live
+        // updates, but examining those entries is work that must still be
+        // bounded during a catch-up loop.
+        fluidUpdatesRemaining -= fluidBudget;
+        world.tickFluids(survivalTicks, fluidBudget);
         if ((survivalTicks % 20) == 0) {
             world.tickSurvival(
                 player.getPosition(), survivalTicks, weather.raining());

@@ -33,6 +33,13 @@ int main() {
             "Simplified Chinese strings load");
     require(localization.format("loading.chunks", {"2", "9"}) == "2 / 9 个区块",
             "localized positional formatting");
+    require(localization.hasTranslation(Language::English, "menu.create.world_type") &&
+            localization.hasTranslation(Language::SimplifiedChinese,
+                                         "menu.create.world_type") &&
+            localization.hasTranslation(Language::English, "common.superflat") &&
+            localization.hasTranslation(Language::SimplifiedChinese,
+                                         "common.superflat"),
+            "world type strings are translated in both languages");
     constexpr const char* inputSettingsKeys[] = {
         "settings.key_bindings", "settings.key_bindings_title",
         "settings.keyboard_mouse", "settings.keyboard_mouse_title",

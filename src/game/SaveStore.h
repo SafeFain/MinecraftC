@@ -44,6 +44,7 @@ struct WorldMetadata {
         float projectileDamage = 0.0f;
     };
     std::vector<PersistedEntity> entities;
+    WorldType worldType = WorldType::Normal;
 };
 
 struct BlockOverride {

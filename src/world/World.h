@@ -13,6 +13,7 @@
 
 #include <glm/glm.hpp>
 
+#include "Config.h"
 #include "world/Chunk.h"
 #include "world/ChunkMeshPipeline.h"
 #include "world/ChunkStore.h"
@@ -67,7 +68,11 @@ public:
         m_simulation.tickWeather(weather, daytime, tick);
     }
     void tickBlockEntities() { m_persistence.tickBlockEntities(); }
-    void tickFluids(uint64_t tick) { m_fluids.tick(tick); }
+    size_t tickFluids(
+        uint64_t tick,
+        size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK) {
+        return m_fluids.tick(tick, maximumUpdates);
+    }
     std::vector<glm::ivec3> takeTntIgnitions() {
         return m_simulation.takeTntIgnitions();
     }
@@ -103,9 +108,10 @@ public:
     // ── Chunk management ─────────────────────────────────────────────
     Chunk* getChunk(int cx, int cz);
 
-    // Clear all chunks and recreate generator with a new seed.
-    // Next update() + getChunk() calls will regenerate world from scratch.
-    void resetForNewSeed(uint64_t newSeed);
+    // Clear all chunks and recreate the generator with a new seed/type.
+    // Next update() + getChunk() calls regenerate the world from scratch.
+    void resetForNewSeed(uint64_t newSeed,
+                         WorldType worldType = WorldType::Normal);
 
     // Update chunk loading/unloading around player position
     void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0) {
@@ -188,7 +194,7 @@ private:
     friend class FluidScheduler;
     ChunkStore m_chunks;
     WorldPersistence m_persistence{m_chunks};
-    FluidScheduler m_fluids{*this, m_chunks};
+    FluidScheduler m_fluids{*this};
     ChunkMeshPipeline m_meshes{*this, m_chunks};
     ChunkStreamer m_streamer{*this, m_chunks};
     WorldLighting m_lighting{m_chunks};

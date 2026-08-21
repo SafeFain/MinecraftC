@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <queue>
 #include <unordered_map>
 #include <vector>
 
+#include "Config.h"
 #include "world/Block.h"
 
 class ChunkStore;
@@ -16,18 +18,20 @@ class World;
 // lava at the same coordinate as one task.
 class FluidScheduler {
 public:
-    FluidScheduler(World& world, ChunkStore& chunks)
-        : m_world(world), m_chunks(chunks) {}
+    explicit FluidScheduler(World& world) : m_world(world) {}
+    // Compatibility overload for integrations that used to pass the owning
+    // ChunkStore.  Fluid scheduling now queries it through World, so the
+    // second reference is intentionally not retained.
+    FluidScheduler(World& world, ChunkStore&) : m_world(world) {}
 
-    // Advance the current world tick and process all due fluid cells.
-    void tick(uint64_t tick);
+    // Advance the current world tick and process at most maximumUpdates due
+    // queue entries. Returns the number of live fluid cells updated; stale
+    // de-duplicated entries also consume the supplied work budget.
+    size_t tick(uint64_t tick,
+                size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK);
 
     // Schedule a position and its six neighbors for a fluid update.
     void scheduleAround(const glm::ivec3& position, uint64_t minimumDelay = 1);
-
-    // Wake only the seam cells of a newly generated chunk.  Unloaded chunks
-    // are never sampled as air and no ocean-wide scan is performed.
-    void scheduleChunkBoundary(int chunkX, int chunkZ);
 
     // Called after every world block mutation.  It applies the Java lava /
     // water mixing matrix to the changed cell and the affected lava cells.
@@ -91,7 +95,6 @@ private:
     static uint64_t hash(uint64_t value);
 
     World& m_world;
-    ChunkStore& m_chunks;
     std::priority_queue<ScheduledFluidTick, std::vector<ScheduledFluidTick>,
                         ScheduledFluidLater> m_fluidTicks;
     std::unordered_map<FluidTickKey, FluidDue, FluidTickKeyHash>

@@ -24,7 +24,8 @@ int main() {
         const std::string first = catalog.create(
             "My Survival World", 42, GameMode::Survival, Difficulty::Normal, true);
         const std::string second = catalog.create(
-            "My Survival World", 99, GameMode::Creative, Difficulty::Peaceful);
+            "My Survival World", 99, GameMode::Creative, Difficulty::Peaceful,
+            false, WorldType::Superflat);
         WorldMetadata legacy;
         legacy.displayName = "Legacy v2";
         legacy.seed = 7;
@@ -38,6 +39,7 @@ int main() {
         const auto worlds = catalog.list();
         require(worlds.size() == 4, "catalog lists compatible and legacy saves");
         bool sawLegacy = false;
+        bool sawSuperflat = false;
         for (const auto& world : worlds) {
             require(world.generationVersion == 2 || world.generationVersion == 3 ||
                     world.generationVersion == WorldGenContext::GENERATION_VERSION,
@@ -47,9 +49,15 @@ int main() {
                 require(!world.compatible, "legacy generation was marked compatible");
             } else {
                 require(world.compatible, "current generation was marked incompatible");
+                if (world.seed == 99) {
+                    require(world.worldType == WorldType::Superflat,
+                            "catalog summary preserves the superflat type");
+                    sawSuperflat = true;
+                }
             }
         }
         require(sawLegacy, "legacy world was hidden instead of marked incompatible");
+        require(sawSuperflat, "catalog lists the selected terrain type");
         require(catalog.open(first).loadMetadata().seed == 42,
                 "catalog opens the selected world");
         require(catalog.open(first).loadMetadata().cheatsEnabled,
@@ -59,6 +67,8 @@ int main() {
                 "catalog left deleted world files on disk");
         require(catalog.open(second).loadMetadata().seed == 99,
                 "deleting one world damaged another save");
+        require(catalog.open(second).loadMetadata().worldType == WorldType::Superflat,
+                "catalog persists the superflat terrain type");
         require(!catalog.deleteWorld(first),
                 "deleting an already missing world should report no change");
         bool rejected = false;

@@ -16,6 +16,7 @@ struct WorldSummary {
     uint64_t worldTicks = 0;
     uint32_t generationVersion = 0;
     bool compatible = false;
+    WorldType worldType = WorldType::Normal;
 };
 
 class WorldCatalog {
@@ -26,7 +27,8 @@ public:
     std::vector<WorldSummary> list() const;
     std::string create(const std::string& displayName, uint64_t seed,
                        GameMode mode, Difficulty difficulty,
-                       bool cheatsEnabled = false) const;
+                       bool cheatsEnabled = false,
+                       WorldType worldType = WorldType::Normal) const;
     SaveStore open(const std::string& id) const;
     bool deleteWorld(const std::string& id) const;
 

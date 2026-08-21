@@ -142,7 +142,10 @@ inline std::vector<glm::ivec3> preferredFluidDirectionsByAmount(
                                               1, direction ^ 1, sample, available);
         best = std::min(best, costs[direction]);
     }
-    if (best == unreachable) return {};
+    // A flat, supported surface has no downward route.  It is still a valid
+    // horizontal destination: Java's spread code keeps all equally best
+    // candidates instead of treating the absence of a drop as a dead end.
+    // This is what lets a source on superflat terrain fan out normally.
     std::vector<glm::ivec3> result;
     for (int direction = 0; direction < 4; ++direction)
         if (candidates[direction] && costs[direction] == best)

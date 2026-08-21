@@ -825,6 +825,57 @@ int main() {
             activeMesh.translucentIndexCount == mesh.translucentIndexCount,
             "async mesh handoff dropped render-layer metadata");
 
+    // Superflat generation is a fixed world-coordinate preset and must use
+    // the same four layers through both the region and singleton paths.
+    WorldGenerator flatRegionWorld(1234, WorldType::Superflat);
+    WorldGenerator flatOtherSeed(9876, WorldType::Superflat);
+    const int flatSurface = Config::WORLD_MIN_Y + 3;
+    require(flatRegionWorld.getTerrainHeight(-37, 91) == flatSurface &&
+            flatRegionWorld.queryHeightBiome(-37, 91).height == flatSurface &&
+            flatRegionWorld.queryHeightBiome(-37, 91).biome == Biome::PLAINS,
+            "superflat height and biome queries are fixed");
+    require(flatRegionWorld.sampleTerrainColumn(-37, 91).waterLevel ==
+                Config::WORLD_MIN_Y - 1 &&
+            !flatRegionWorld.sampleTerrainColumn(-37, 91).river,
+            "superflat columns have no water or river");
+
+    std::vector<std::unique_ptr<Chunk>> flatRegionOwned;
+    std::vector<Chunk*> flatRegionChunks;
+    for (int cz = 0; cz < 3; ++cz) {
+        for (int cx = 0; cx < 3; ++cx) {
+            flatRegionOwned.push_back(std::make_unique<Chunk>(cx - 1, cz - 1));
+            flatRegionChunks.push_back(flatRegionOwned.back().get());
+        }
+    }
+    std::vector<RegionGenerationData::PendingBlock> flatPending;
+    flatRegionWorld.generateRegion(-1, -1, 3, Config::REGION_PADDING,
+                                   flatRegionChunks, flatPending);
+    require(flatPending.empty(), "superflat region has no cross-chunk placements");
+    for (const Chunk* chunk : flatRegionChunks) {
+        require(chunk->generated.load(), "superflat region marks chunks generated");
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                require(chunk->getColumnMaxY(x, z) == flatSurface,
+                        "superflat column max is the grass layer");
+                for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                    const BlockId expected = y == Config::WORLD_MIN_Y
+                        ? BlockId::BEDROCK
+                        : y <= Config::WORLD_MIN_Y + 2 ? BlockId::DIRT
+                        : y == flatSurface ? BlockId::GRASS : BlockId::AIR;
+                    require(chunk->getBlock(x, y, z) == expected,
+                            "superflat region contains an unexpected block");
+                }
+            }
+        }
+    }
+
+    Chunk flatSingleton(-1, -1);
+    flatOtherSeed.generate(flatSingleton);
+    for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
+        require(flatSingleton.getBlock(3, y, 11) ==
+                    flatRegionChunks.front()->getBlock(3, y, 11),
+                "superflat singleton differs from region output");
+
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()
               << " archetypes=" << observedArchetypes.size()

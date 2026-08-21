@@ -28,7 +28,7 @@ enum class GameState {
 
 struct MenuCallbacks {
     std::function<void(const std::string&)> onOpenWorld;
-    std::function<void(const std::string&, const std::string&, GameMode, bool)> onCreateWorld;
+    std::function<void(const std::string&, const std::string&, GameMode, WorldType, bool)> onCreateWorld;
     std::function<std::vector<WorldSummary>()> onRefreshWorlds;
     std::function<bool(const std::string&)> onDeleteWorld;
     std::function<void()> onResume;
@@ -135,6 +135,7 @@ private:
     TextEditBuffer m_worldName{{}, 32};
     TextEditBuffer m_seedText{{}, 20};
     GameMode m_createMode = GameMode::Survival;
+    WorldType m_createWorldType = WorldType::Normal;
     bool m_createCheats = false;
     int m_worldOffset = 0;
     int m_selectedWorld = -1;

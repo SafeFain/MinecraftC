@@ -272,7 +272,7 @@ private:
         };
         m_ui.menuCallbacks.onCreateWorld =
             [this](const std::string& name, const std::string& seedText,
-                   GameMode mode, bool cheatsEnabled) {
+                   GameMode mode, WorldType worldType, bool cheatsEnabled) {
                 uint64_t seed = 0;
                 if (seedText.empty() || seedText == "-") {
                     std::random_device device;
@@ -298,7 +298,7 @@ private:
                 }
                 const std::string id = m_session.worldCatalog.create(
                     name.empty() ? m_ui.localization.text("menu.create.default_name") : name,
-                    seed, mode, Difficulty::Normal, cheatsEnabled);
+                    seed, mode, Difficulty::Normal, cheatsEnabled, worldType);
                 m_flow.startGame(id, true);
             };
         m_ui.menuCallbacks.onResume = [this]() { m_flow.resume(); };
