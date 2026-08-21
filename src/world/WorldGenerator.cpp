@@ -36,6 +36,7 @@ HeightBiome WorldGenerator::queryHeightBiome(int worldX, int worldZ) const {
 void WorldGenerator::generate(Chunk& chunk,
                                const NeighborQuery& neighborQuery,
                                const BlockSetter& blockSetter) {
+    (void)neighborQuery;
     int wxBase = chunk.worldX();
     int wzBase = chunk.worldZ();
 
@@ -43,28 +44,56 @@ void WorldGenerator::generate(Chunk& chunk,
     int   heightMap[16][16];
     Biome biomeMap[16][16];
     bool  riverMap[16][16];
-
-    m_heightPipeline.compute(wxBase, wzBase, heightMap, biomeMap, riverMap, neighborQuery);
+    std::vector<RegionGenerationData::ColumnInfo> terrainColumns(16 * 16);
+    m_heightPipeline.computePaddedRegion(
+        wxBase, wzBase, 16, 16, 0, terrainColumns.data());
 
     // ── Phase 2: Fill blocks ────────────────────────────────────────────
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             const int worldX = wxBase + x, worldZ = wzBase + z;
-            SurfaceColumn terrainColumn = m_heightPipeline.sampleColumn(worldX, worldZ);
-            int   height = terrainColumn.height;
-            Biome biome  = terrainColumn.biome;
+            const auto& column = terrainColumns[
+                static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x];
+            int   height = column.height;
+            Biome biome  = column.biome;
             heightMap[x][z] = height;
             biomeMap[x][z] = biome;
-            riverMap[x][z] = terrainColumn.river;
+            riverMap[x][z] = column.isRiver;
             const BiomeProperties& bprops = getBiomeProps(biome);
+            SurfaceRuleContext surfaceContext{
+                biome, column.archetype, height, column.waterLevel,
+                column.slope, column.localRelief,
+                column.primaryArchetypeWeight, column.volcanicWeight,
+                column.craterWeight, column.riverWeight, column.isRiver
+            };
+            surfaceContext.secondaryArchetype = column.secondaryArchetype;
+            surfaceContext.secondaryArchetypeWeight = column.archetypeBlend;
             SurfaceProfile surface = SurfaceRules::profile(
-                m_seed, wxBase + x, wzBase + z, biome,
-                terrainColumn.archetype, terrainColumn.slope);
+                m_seed, worldX, worldZ, surfaceContext);
+
+            SurfaceColumn terrainColumn;
+            terrainColumn.height = column.height;
+            terrainColumn.nominalHeight = column.nominalHeight;
+            terrainColumn.mountainFactor = column.mountainFactor;
+            terrainColumn.slope = column.slope;
+            terrainColumn.localRelief = column.localRelief;
+            terrainColumn.riverWeight = column.riverWeight;
+            terrainColumn.densityWeight = column.densityWeight;
+            terrainColumn.primaryArchetypeWeight =
+                column.primaryArchetypeWeight;
+            terrainColumn.volcanicWeight = column.volcanicWeight;
+            terrainColumn.craterWeight = column.craterWeight;
+            terrainColumn.densityMinY = column.densityMinY;
+            terrainColumn.densityMaxY = column.densityMaxY;
+            terrainColumn.archetype = column.archetype;
+            terrainColumn.secondaryArchetype = column.secondaryArchetype;
+            terrainColumn.archetypeBlend = column.archetypeBlend;
+            terrainColumn.basin = column.basin;
 
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
             for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
-                chunk.setBlock(x, y, z, BlockId::BEDROCK);
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::BEDROCK);
             }
 
             for (int y = bedrockTop + 1; y <= height; ++y) {
@@ -72,48 +101,56 @@ void WorldGenerator::generate(Chunk& chunk,
                 const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
                     WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
                         Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
-                chunk.setBlock(x, y, z, deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                    deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
             for (int depth = 0; depth <= surface.depth; ++depth) {
                 const int y = height - depth;
-                const BlockId current = chunk.getBlock(x, y, z);
+                const BlockId current = static_cast<BlockId>(
+                    chunk.blockAt(x, y, z));
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.setBlock(x, y, z, SurfaceRules::blockAtDepth(
-                    m_seed, worldX, worldZ, height, depth, biome,
-                    terrainColumn.archetype, terrainColumn.slope));
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                    SurfaceRules::blockAtDepth(
+                        m_seed, worldX, worldZ, depth, surfaceContext));
             }
 
             // Snow cover: if height >= biome snowLine, override surface
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
-                chunk.setBlock(x, height, z, BlockId::SNOW);
+                chunk.blockAt(x, height, z) =
+                    static_cast<uint8_t>(BlockId::SNOW);
             }
 
             // Water fill (oceans, lakes, rivers)
-            int waterTop = bprops.waterLevel;
+            int waterTop = column.waterLevel;
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
                     if (y < Config::WORLD_MAX_Y) {
-                        chunk.setBlock(x, y, z, BlockId::WATER);
+                        chunk.blockAt(x, y, z) =
+                            static_cast<uint8_t>(BlockId::WATER);
                     }
                 }
                 // Ice: freeze surface water in cold biomes
                 if ((biome == Biome::SNOW_TUNDRA || biome == Biome::TAIGA) &&
                     height + 1 <= Config::ICE_FREEZE_MAX_Y) {
-                    chunk.setBlock(x, height + 1, z, BlockId::ICE);
+                    chunk.blockAt(x, height + 1, z) =
+                        static_cast<uint8_t>(BlockId::ICE);
                 }
             }
+            chunk.setColumnMaxY(x, z, std::max(height, waterTop));
         }
     }
+    chunk.finishBulkBlockEdit();
 
     // ── Phase 3: Hybrid caves, liquids, then ores ───────────────────────
     std::vector<CaveColumnInfo> caveColumns(
         static_cast<size_t>(Config::CHUNK_SIZE_X) * Config::CHUNK_SIZE_Z);
     for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
         for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-            const auto& props = getBiomeProps(biomeMap[x][z]);
+            const auto& column = terrainColumns[
+                static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x];
             caveColumns[static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x] = {
-                heightMap[x][z], props.waterLevel,
-                riverMap[x][z] || heightMap[x][z] < props.waterLevel
+                heightMap[x][z], column.waterLevel,
+                riverMap[x][z] || heightMap[x][z] < column.waterLevel
             };
         }
     }

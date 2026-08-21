@@ -44,6 +44,9 @@ public:
     // Raw block array access (for WorldGenerator)
     uint8_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }
     const uint8_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
+    // Generation owns an unpublished chunk exclusively. It may fill through
+    // blockAt(), update column maxima, then publish the whole edit once.
+    void finishBulkBlockEdit() { ++m_dataRevision; m_dirty = true; }
     const uint8_t* rawBlocks() const { return m_blocks.data(); }
     void loadRawBlocks(const std::vector<uint8_t>& blocks);
     uint8_t getPackedLight(int x, int y, int z) const {

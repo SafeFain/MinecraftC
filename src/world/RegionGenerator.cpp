@@ -332,9 +332,16 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             int   height = col.height;
             Biome biome  = col.biome;
             const BiomeProperties& bprops = getBiomeProps(biome);
+            SurfaceRuleContext surfaceContext{
+                biome, col.archetype, height, col.waterLevel, col.slope,
+                col.localRelief, col.primaryArchetypeWeight,
+                col.volcanicWeight, col.craterWeight, col.riverWeight,
+                col.isRiver
+            };
+            surfaceContext.secondaryArchetype = col.secondaryArchetype;
+            surfaceContext.secondaryArchetypeWeight = col.archetypeBlend;
             SurfaceProfile surface = SurfaceRules::profile(
-                m_seed, wxBase + x, wzBase + z, biome,
-                col.archetype, col.slope);
+                m_seed, wxBase + x, wzBase + z, surfaceContext);
 
             const int worldX = wxBase + x, worldZ = wzBase + z;
             SurfaceColumn terrainColumn;
@@ -342,7 +349,12 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             terrainColumn.nominalHeight = col.nominalHeight;
             terrainColumn.mountainFactor = col.mountainFactor;
             terrainColumn.slope = col.slope;
+            terrainColumn.localRelief = col.localRelief;
             terrainColumn.riverWeight = col.riverWeight;
+            terrainColumn.densityWeight = col.densityWeight;
+            terrainColumn.primaryArchetypeWeight = col.primaryArchetypeWeight;
+            terrainColumn.volcanicWeight = col.volcanicWeight;
+            terrainColumn.craterWeight = col.craterWeight;
             terrainColumn.densityMinY = col.densityMinY;
             terrainColumn.densityMaxY = col.densityMaxY;
             terrainColumn.archetype = col.archetype;
@@ -352,7 +364,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
             for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
-                chunk.setBlock(x, y, z, BlockId::BEDROCK);
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::BEDROCK);
             }
 
             for (int y = bedrockTop + 1; y <= height; ++y) {
@@ -360,20 +372,23 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
                     WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
                         Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
-                chunk.setBlock(x, y, z, deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                    deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
             for (int depth = 0; depth <= surface.depth; ++depth) {
                 const int y = height - depth;
-                const BlockId current = chunk.getBlock(x, y, z);
+                const BlockId current = static_cast<BlockId>(
+                    chunk.blockAt(x, y, z));
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.setBlock(x, y, z, SurfaceRules::blockAtDepth(
-                    m_seed, worldX, worldZ, height, depth, biome,
-                    col.archetype, col.slope));
+                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                    SurfaceRules::blockAtDepth(
+                        m_seed, worldX, worldZ, depth, surfaceContext));
             }
 
             // Snow cover
             if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
-                chunk.setBlock(x, height, z, BlockId::SNOW);
+                chunk.blockAt(x, height, z) =
+                    static_cast<uint8_t>(BlockId::SNOW);
             }
 
             // Water fill
@@ -381,17 +396,21 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
                     if (y < Config::WORLD_MAX_Y) {
-                        chunk.setBlock(x, y, z, BlockId::WATER);
+                        chunk.blockAt(x, y, z) =
+                            static_cast<uint8_t>(BlockId::WATER);
                     }
                 }
                 // Ice in cold biomes
                 if ((biome == Biome::SNOW_TUNDRA || biome == Biome::TAIGA) &&
                     height + 1 <= Config::ICE_FREEZE_MAX_Y) {
-                    chunk.setBlock(x, height + 1, z, BlockId::ICE);
+                    chunk.blockAt(x, height + 1, z) =
+                        static_cast<uint8_t>(BlockId::ICE);
                 }
             }
+            chunk.setColumnMaxY(x, z, std::max(height, waterTop));
         }
     }
+    chunk.finishBulkBlockEdit();
 
     // Apply the precomputed cave classification after terrain fill.
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {

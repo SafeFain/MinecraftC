@@ -1,5 +1,6 @@
 #include "world/HeightPipeline.h"
 #include "world/Noise.h"
+#include "world/SurfaceRules.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -21,6 +22,51 @@ Color archetypeColor(TerrainArchetype type) {
         {190,225,240}, {65,55,55}, {115,105,100}
     };
     return colors[static_cast<uint8_t>(type)];
+}
+
+Color materialColor(BlockId block) {
+    switch (block) {
+        case BlockId::GRASS: return {90, 155, 70};
+        case BlockId::DIRT: return {125, 88, 55};
+        case BlockId::COARSE_DIRT: return {112, 83, 59};
+        case BlockId::STONE: return {125, 125, 125};
+        case BlockId::GRANITE: return {145, 105, 92};
+        case BlockId::TUFF: return {94, 105, 96};
+        case BlockId::BASALT: return {52, 52, 58};
+        case BlockId::BLACK_SAND: return {42, 40, 43};
+        case BlockId::LIMESTONE: return {195, 191, 166};
+        case BlockId::PACKED_ICE: return {130, 180, 220};
+        case BlockId::MUD: return {72, 61, 48};
+        case BlockId::MOSS: return {72, 120, 53};
+        case BlockId::SAND: return {218, 204, 139};
+        case BlockId::RED_SAND: return {179, 94, 47};
+        case BlockId::SNOW: return {238, 243, 245};
+        default: return {128, 128, 128};
+    }
+}
+
+SurfaceColumn fromRegionColumn(const RegionGenerationData::ColumnInfo& source) {
+    SurfaceColumn result;
+    result.height = source.height;
+    result.nominalHeight = source.nominalHeight;
+    result.waterLevel = source.waterLevel;
+    result.mountainFactor = source.mountainFactor;
+    result.slope = source.slope;
+    result.localRelief = source.localRelief;
+    result.riverWeight = source.riverWeight;
+    result.densityWeight = source.densityWeight;
+    result.primaryArchetypeWeight = source.primaryArchetypeWeight;
+    result.volcanicWeight = source.volcanicWeight;
+    result.craterWeight = source.craterWeight;
+    result.densityMinY = source.densityMinY;
+    result.densityMaxY = source.densityMaxY;
+    result.archetype = source.archetype;
+    result.secondaryArchetype = source.secondaryArchetype;
+    result.archetypeBlend = source.archetypeBlend;
+    result.basin = source.basin;
+    result.biome = source.biome;
+    result.river = source.isRiver;
+    return result;
 }
 
 void writePpm(const std::string& path, int width, int height,
@@ -47,17 +93,34 @@ int main(int argc, char** argv) {
     std::vector<Color> riverPixels(heightPixels.size());
     std::vector<Color> biomePixels(heightPixels.size());
     std::vector<Color> slopePixels(heightPixels.size());
+    std::vector<Color> reliefPixels(heightPixels.size());
+    std::vector<Color> densityPixels(heightPixels.size());
+    std::vector<Color> volcanoPixels(heightPixels.size());
+    std::vector<Color> craterPixels(heightPixels.size());
+    std::vector<Color> surfacePixels(heightPixels.size());
     std::vector<Color> sectionPixels(
         static_cast<size_t>(size) * Config::WORLD_HEIGHT,
         Color{190, 220, 245});
     std::ofstream crossSection(prefix + "-section.csv");
-    crossSection << "world_x,height,water,river,biome,archetype,slope\n";
+    crossSection << "world_x,height,water,river_bed,river,biome,archetype,"
+                    "secondary_archetype,primary_weight,slope,local_relief,"
+                    "density_weight,volcanic_weight,crater_weight,surface\n";
+
+    std::vector<RegionGenerationData::ColumnInfo> batchedColumns;
+    if (step == 1) {
+        batchedColumns.resize(static_cast<size_t>(size) * size);
+        terrain.computePaddedRegion(originX, originZ, size, size, 0,
+                                    batchedColumns.data());
+    }
 
     for (int py = 0; py < size; ++py) {
         for (int px = 0; px < size; ++px) {
             const int wx = originX + px * step;
             const int wz = originZ + py * step;
-            const SurfaceColumn column = terrain.sampleColumn(wx, wz);
+            const SurfaceColumn column = step == 1
+                ? fromRegionColumn(batchedColumns[
+                    static_cast<size_t>(py) * size + px])
+                : terrain.sampleColumn(wx, wz);
             const size_t index = static_cast<size_t>(py) * size + px;
             const float normalized = std::clamp(
                 static_cast<float>(column.height - Config::WORLD_MIN_Y) /
@@ -73,15 +136,45 @@ int main(int argc, char** argv) {
             const uint8_t slope = static_cast<uint8_t>(
                 std::clamp(column.slope, 0.0f, 1.0f) * 255.0f);
             slopePixels[index] = {slope, slope, slope};
+            const uint8_t relief = static_cast<uint8_t>(std::min(
+                255, column.localRelief * 8));
+            reliefPixels[index] = {relief, relief, relief};
+            const uint8_t density = static_cast<uint8_t>(
+                std::clamp(column.densityWeight, 0.0f, 1.0f) * 255.0f);
+            densityPixels[index] = {density, density, density};
+            const uint8_t volcanic = static_cast<uint8_t>(
+                std::clamp(column.volcanicWeight, 0.0f, 1.0f) * 255.0f);
+            volcanoPixels[index] = {volcanic, 48,
+                                    static_cast<uint8_t>(255 - volcanic)};
+            const uint8_t crater = static_cast<uint8_t>(
+                std::clamp(column.craterWeight, 0.0f, 1.0f) * 255.0f);
+            craterPixels[index] = {
+                crater, static_cast<uint8_t>(crater / 2), 0};
+            SurfaceRuleContext surfaceContext{
+                column.biome, column.archetype, column.height,
+                column.waterLevel, column.slope, column.localRelief,
+                column.primaryArchetypeWeight, column.volcanicWeight,
+                column.craterWeight, column.riverWeight, column.river
+            };
+            surfaceContext.secondaryArchetype = column.secondaryArchetype;
+            surfaceContext.secondaryArchetypeWeight = column.archetypeBlend;
+            const BlockId surface = SurfaceRules::profile(
+                seed, wx, wz, surfaceContext).top;
+            surfacePixels[index] = materialColor(surface);
             riverPixels[index] = column.river
                 ? Color{30, 120, 240}
                 : archetypePixels[index];
             if (py == size / 2) {
                 crossSection << wx << ',' << column.height << ','
-                    << column.waterLevel << ',' << column.river << ','
+                    << column.waterLevel << ',' << column.basin.channelBedY << ','
+                    << column.river << ','
                     << static_cast<int>(column.biome) << ','
                     << terrainArchetypeName(column.archetype) << ','
-                    << column.slope << '\n';
+                    << terrainArchetypeName(column.secondaryArchetype) << ','
+                    << column.primaryArchetypeWeight << ',' << column.slope << ','
+                    << column.localRelief << ',' << column.densityWeight << ','
+                    << column.volcanicWeight << ',' << column.craterWeight << ','
+                    << static_cast<int>(surface) << '\n';
                 for (int worldY = Config::WORLD_MIN_Y;
                      worldY < Config::WORLD_MAX_Y; ++worldY) {
                     const int imageY = Config::WORLD_MAX_Y - 1 - worldY;
@@ -103,8 +196,14 @@ int main(int argc, char** argv) {
     writePpm(prefix + "-rivers.ppm", size, size, riverPixels);
     writePpm(prefix + "-biomes.ppm", size, size, biomePixels);
     writePpm(prefix + "-slope.ppm", size, size, slopePixels);
+    writePpm(prefix + "-relief.ppm", size, size, reliefPixels);
+    writePpm(prefix + "-density.ppm", size, size, densityPixels);
+    writePpm(prefix + "-volcano.ppm", size, size, volcanoPixels);
+    writePpm(prefix + "-crater.ppm", size, size, craterPixels);
+    writePpm(prefix + "-surface.ppm", size, size, surfacePixels);
     writePpm(prefix + "-section.ppm", size, Config::WORLD_HEIGHT,
              sectionPixels);
     std::cout << "wrote " << prefix
-              << "-{height,slope,biomes,archetypes,rivers,section}.ppm and section.csv\n";
+              << "-{height,slope,relief,density,volcano,crater,surface,biomes,"
+                 "archetypes,rivers,section}.ppm and section.csv\n";
 }

@@ -33,7 +33,12 @@ struct SurfaceColumn {
     int waterLevel = 0;
     float mountainFactor = 0.0f;
     float slope = 0.0f;
+    int localRelief = 0;
     float riverWeight = 0.0f;
+    float densityWeight = 0.0f;
+    float primaryArchetypeWeight = 1.0f;
+    float volcanicWeight = 0.0f;
+    float craterWeight = 0.0f;
     int densityMinY = 0;
     int densityMaxY = 0;
     TerrainArchetype archetype = TerrainArchetype::ROLLING_LOWLANDS;
@@ -94,7 +99,11 @@ private:
     static float smoothstep(float edge0, float edge1, float value);
     static float peaksAndValleys(float weirdness);
     static float spline(float value, const float* xs, const float* ys, int count);
+    ClimateSample sampleClimate(float worldX, float worldZ) const;
     SurfaceColumn sampleBaseColumn(int worldX, int worldZ) const;
+    SurfaceColumn sampleShapedColumn(int worldX, int worldZ) const;
+    static void applySlope(SurfaceColumn& center,
+                           const std::array<SurfaceColumn, 8>& neighbors);
     TerrainArchetype selectArchetype(uint64_t hash,
                                      const ClimateSample& climate) const;
     BasinInfo sampleBasin(int worldX, int worldZ) const;

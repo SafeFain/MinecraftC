@@ -3,6 +3,7 @@
 #include "world/TreeGenerator.h"
 #include "world/WorldGenerator.h"
 #include "world/RegionGenerator.h"
+#include "world/SurfaceRules.h"
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
 #include "world/BiomeLocator.h"
@@ -44,6 +45,312 @@ int main() {
     constexpr uint64_t seed = 1234567890ULL;
     Noise legacy(seed);
     HeightPipeline terrain(legacy, seed);
+
+    // v7 selected macro-anchor types with query-point climate and produced a
+    // 70-block wall between these two adjacent user-reported columns.
+    constexpr uint64_t faultSeed = 8804448447376879172ULL;
+    Noise faultLegacy(faultSeed);
+    HeightPipeline faultTerrain(faultLegacy, faultSeed);
+    const SurfaceColumn faultLeft = faultTerrain.sampleColumn(198, 456);
+    const SurfaceColumn faultRight = faultTerrain.sampleColumn(199, 456);
+    require(std::abs(faultLeft.height - faultRight.height) <= 8,
+            "user seed retained the v7 macro-archetype height wall");
+    require(faultLeft.localRelief <= 8 && faultRight.localRelief <= 8,
+            "user seed reports excessive true local relief after routing");
+
+    // At this v8 Voronoi boundary the primary and secondary archetypes swap
+    // order. The blended height must remain continuous and independent of
+    // which candidate is evaluated first.
+    constexpr uint64_t orderingFaultSeed = 2031523183801237062ULL;
+    Noise orderingLegacy(orderingFaultSeed);
+    HeightPipeline orderingTerrain(orderingLegacy, orderingFaultSeed);
+    const SurfaceColumn orderingBefore = orderingTerrain.sampleColumn(68, -49);
+    const SurfaceColumn orderingAfter = orderingTerrain.sampleColumn(68, -48);
+    require(orderingBefore.archetype != orderingAfter.archetype,
+            "archetype-order regression did not cross the expected boundary");
+    require(orderingBefore.secondaryArchetype == orderingAfter.archetype,
+            "archetype-order regression lost the swapped candidate");
+    require(std::abs(orderingBefore.height - orderingAfter.height) <= 4,
+            "archetype-order swap produced a local height wall");
+    require(orderingBefore.localRelief <= 4 && orderingAfter.localRelief <= 4,
+            "archetype-order swap produced excessive local relief");
+
+    constexpr int orderingWindowSize = 256;
+    constexpr int orderingWindowX = -60;
+    constexpr int orderingWindowZ = -177;
+    std::vector<RegionGenerationData::ColumnInfo> orderingWindow(
+        orderingWindowSize * orderingWindowSize);
+    orderingTerrain.computePaddedRegion(
+        orderingWindowX, orderingWindowZ, orderingWindowSize,
+        orderingWindowSize, 0, orderingWindow.data());
+    size_t orderingOrdinaryEdges = 0;
+    for (int z = 0; z < orderingWindowSize; ++z) {
+        for (int x = 0; x < orderingWindowSize; ++x) {
+            const auto& center = orderingWindow[
+                static_cast<size_t>(z) * orderingWindowSize + x];
+            if (x + 1 < orderingWindowSize) {
+                const auto& east = orderingWindow[
+                    static_cast<size_t>(z) * orderingWindowSize + x + 1];
+                if (center.densityWeight < 0.05f &&
+                    east.densityWeight < 0.05f) {
+                    require(std::abs(center.height - east.height) <= 8,
+                            "ordering-fault window retained an ordinary wall");
+                    ++orderingOrdinaryEdges;
+                }
+            }
+            if (z + 1 < orderingWindowSize) {
+                const auto& south = orderingWindow[
+                    static_cast<size_t>(z + 1) * orderingWindowSize + x];
+                if (center.densityWeight < 0.05f &&
+                    south.densityWeight < 0.05f) {
+                    require(std::abs(center.height - south.height) <= 8,
+                            "ordering-fault window retained an ordinary wall");
+                    ++orderingOrdinaryEdges;
+                }
+            }
+        }
+    }
+    require(orderingOrdinaryEdges > 0,
+            "ordering-fault window contained no ordinary terrain edges");
+
+    // Four macro anchors meet near this user-reported column. Truncating the
+    // blend to three candidates discarded a still-significant coastal-cliff
+    // contribution when the candidate ranks changed, producing straight
+    // radial height and density seams.
+    constexpr uint64_t junctionFaultSeed = 7803446839731492329ULL;
+    Noise junctionLegacy(junctionFaultSeed);
+    HeightPipeline junctionTerrain(junctionLegacy, junctionFaultSeed);
+    const SurfaceColumn junctionWest = junctionTerrain.sampleColumn(-121, -541);
+    const SurfaceColumn junctionCenter = junctionTerrain.sampleColumn(-120, -541);
+    const SurfaceColumn junctionEast = junctionTerrain.sampleColumn(-119, -541);
+    const SurfaceColumn junctionNorth = junctionTerrain.sampleColumn(-120, -542);
+    const SurfaceColumn junctionSouth = junctionTerrain.sampleColumn(-120, -540);
+    require(junctionWest.secondaryArchetype !=
+                junctionCenter.secondaryArchetype &&
+            junctionCenter.secondaryArchetype !=
+                junctionSouth.secondaryArchetype,
+            "multi-anchor regression no longer crosses the expected ranks");
+    const std::array<SurfaceColumn, 5> junctionColumns{{
+        junctionWest, junctionCenter, junctionEast,
+        junctionNorth, junctionSouth
+    }};
+    for (const SurfaceColumn& column : junctionColumns)
+        require(column.localRelief <= 8,
+                "multi-anchor junction retained excessive local relief");
+    auto requireJunctionEdge = [](const SurfaceColumn& first,
+                                  const SurfaceColumn& second) {
+        require(std::abs(first.height - second.height) <= 8,
+                "multi-anchor junction retained a height seam");
+        require(std::abs(first.nominalHeight - second.nominalHeight) <= 8,
+                "multi-anchor junction retained a nominal-height seam");
+        require(std::abs(first.densityWeight - second.densityWeight) <= 0.08f,
+                "multi-anchor junction retained a density-weight seam");
+    };
+    requireJunctionEdge(junctionWest, junctionCenter);
+    requireJunctionEdge(junctionCenter, junctionEast);
+    requireJunctionEdge(junctionNorth, junctionCenter);
+    requireJunctionEdge(junctionCenter, junctionSouth);
+
+    constexpr int junctionWindowSize = 256;
+    constexpr int junctionWindowX = -248;
+    constexpr int junctionWindowZ = -669;
+    std::vector<RegionGenerationData::ColumnInfo> junctionWindow(
+        junctionWindowSize * junctionWindowSize);
+    junctionTerrain.computePaddedRegion(
+        junctionWindowX, junctionWindowZ, junctionWindowSize,
+        junctionWindowSize, 0, junctionWindow.data());
+    int maxJunctionNominalDelta = 0;
+    int maxJunctionNominalX = 0;
+    int maxJunctionNominalZ = 0;
+    float maxJunctionDensityDelta = 0.0f;
+    int maxJunctionDensityX = 0;
+    int maxJunctionDensityZ = 0;
+    auto recordSmoothMacroEdge = [&](const auto& first, const auto& second,
+                                     int worldX, int worldZ) {
+        if (first.volcanicWeight >= 0.05f ||
+            second.volcanicWeight >= 0.05f ||
+            first.riverWeight >= 0.16f || second.riverWeight >= 0.16f)
+            return;
+        const int nominalDelta = std::abs(
+            first.nominalHeight - second.nominalHeight);
+        if (nominalDelta > maxJunctionNominalDelta) {
+            maxJunctionNominalDelta = nominalDelta;
+            maxJunctionNominalX = worldX;
+            maxJunctionNominalZ = worldZ;
+        }
+        const float densityDelta = std::abs(
+            first.densityWeight - second.densityWeight);
+        if (densityDelta > maxJunctionDensityDelta) {
+            maxJunctionDensityDelta = densityDelta;
+            maxJunctionDensityX = worldX;
+            maxJunctionDensityZ = worldZ;
+        }
+    };
+    for (int z = 0; z < junctionWindowSize; ++z) {
+        for (int x = 0; x < junctionWindowSize; ++x) {
+            const auto& center = junctionWindow[
+                static_cast<size_t>(z) * junctionWindowSize + x];
+            if (x + 1 < junctionWindowSize) {
+                const auto& east = junctionWindow[
+                    static_cast<size_t>(z) * junctionWindowSize + x + 1];
+                recordSmoothMacroEdge(
+                    center, east, junctionWindowX + x,
+                    junctionWindowZ + z);
+            }
+            if (z + 1 < junctionWindowSize) {
+                const auto& south = junctionWindow[
+                    static_cast<size_t>(z + 1) * junctionWindowSize + x];
+                recordSmoothMacroEdge(
+                    center, south, junctionWindowX + x,
+                    junctionWindowZ + z);
+            }
+        }
+    }
+    if (maxJunctionNominalDelta > 12) {
+        std::cerr << "multi-anchor max nominal delta "
+                  << maxJunctionNominalDelta << " near ("
+                  << maxJunctionNominalX << ',' << maxJunctionNominalZ
+                  << ")\n";
+    }
+    require(maxJunctionNominalDelta <= 12,
+            "multi-anchor window retained a nominal-height wall");
+    if (maxJunctionDensityDelta > 0.12f) {
+        std::cerr << "multi-anchor max density delta "
+                  << maxJunctionDensityDelta << " near ("
+                  << maxJunctionDensityX << ',' << maxJunctionDensityZ
+                  << ")\n";
+    }
+    require(maxJunctionDensityDelta <= 0.12f,
+            "multi-anchor window retained a density-weight wall");
+
+    // The four principal cross-sections through the junction must remain
+    // walkable even though the diagnostic archetype labels change along them.
+    constexpr int junctionCenterIndex = 128;
+    constexpr int junctionSectionRadius = 32;
+    auto junctionAt = [&](int x, int z) -> const auto& {
+        return junctionWindow[
+            static_cast<size_t>(z) * junctionWindowSize + x];
+    };
+    for (int offset = -junctionSectionRadius;
+         offset < junctionSectionRadius; ++offset) {
+        const int a = junctionCenterIndex + offset;
+        const int b = a + 1;
+        require(std::abs(junctionAt(a, junctionCenterIndex).height -
+                         junctionAt(b, junctionCenterIndex).height) <= 8,
+                "multi-anchor east-west section retained a wall");
+        require(std::abs(junctionAt(junctionCenterIndex, a).height -
+                         junctionAt(junctionCenterIndex, b).height) <= 8,
+                "multi-anchor north-south section retained a wall");
+        require(std::abs(junctionAt(a, a).height -
+                         junctionAt(b, b).height) <= 8,
+                "multi-anchor northwest-southeast section retained a wall");
+        require(std::abs(junctionAt(a, 2 * junctionCenterIndex - a).height -
+                         junctionAt(b, 2 * junctionCenterIndex - b).height) <= 8,
+                "multi-anchor southwest-northeast section retained a wall");
+    }
+
+    size_t volcanicTopCount = 0;
+    size_t basaltTopCount = 0;
+    bool solidBasaltWindow = false;
+    for (int windowZ = -256; windowZ < 256; windowZ += 32) {
+        for (int windowX = -256; windowX < 256; windowX += 32) {
+            bool allBasalt = true;
+            for (int z = windowZ; z < windowZ + 32; ++z) {
+                for (int x = windowX; x < windowX + 32; ++x) {
+                    const float distance = std::sqrt(
+                        static_cast<float>(x * x + z * z));
+                    const float volcanicWeight = std::max(
+                        0.0f, 1.0f - distance / 256.0f);
+                    if (volcanicWeight < 0.58f) {
+                        allBasalt = false;
+                        continue;
+                    }
+                    const SurfaceRuleContext context{
+                        Biome::VOLCANIC_HIGHLANDS,
+                        TerrainArchetype::VOLCANIC_CALDERA, 142,
+                        Config::SEA_LEVEL,
+                        0.35f + 0.40f * std::abs(std::sin(
+                            static_cast<float>(x) * 0.031f)),
+                        2, 1.0f, volcanicWeight,
+                        std::max(0.0f, 1.0f - distance / 72.0f),
+                        0.0f, false
+                    };
+                    const BlockId top = SurfaceRules::profile(
+                        faultSeed, x, z, context).top;
+                    require(top != BlockId::OBSIDIAN,
+                            "natural volcanic surface generated obsidian");
+                    ++volcanicTopCount;
+                    if (top == BlockId::BASALT) ++basaltTopCount;
+                    else allBasalt = false;
+                }
+            }
+            solidBasaltWindow = solidBasaltWindow || allBasalt;
+        }
+    }
+    require(basaltTopCount * 100 >= volcanicTopCount * 15 &&
+            basaltTopCount * 100 <= volcanicTopCount * 40,
+            "volcanic highland basalt top ratio left the 15-40 percent band");
+    require(!solidBasaltWindow,
+            "volcanic surface produced a solid 32x32 basalt window");
+
+    constexpr int faultWindowSize = 512;
+    constexpr int faultWindowX = -57;
+    constexpr int faultWindowZ = 200;
+    std::vector<RegionGenerationData::ColumnInfo> faultWindow(
+        faultWindowSize * faultWindowSize);
+    faultTerrain.computePaddedRegion(
+        faultWindowX, faultWindowZ, faultWindowSize, faultWindowSize, 0,
+        faultWindow.data());
+    size_t ordinaryEdges = 0;
+    size_t gentleEdges = 0;
+    for (int z = 0; z < faultWindowSize; ++z) {
+        for (int x = 0; x < faultWindowSize; ++x) {
+            const auto& center = faultWindow[
+                static_cast<size_t>(z) * faultWindowSize + x];
+            if (x + 1 < faultWindowSize) {
+                const auto& east = faultWindow[
+                    static_cast<size_t>(z) * faultWindowSize + x + 1];
+                if (center.densityWeight < 0.05f &&
+                    east.densityWeight < 0.05f) {
+                    const int difference = std::abs(center.height - east.height);
+                    require(difference <= 12,
+                            "ordinary terrain retained an adjacent height wall");
+                    ++ordinaryEdges;
+                    if (difference <= 4) ++gentleEdges;
+                }
+            }
+            if (z + 1 < faultWindowSize) {
+                const auto& south = faultWindow[
+                    static_cast<size_t>(z + 1) * faultWindowSize + x];
+                if (center.densityWeight < 0.05f &&
+                    south.densityWeight < 0.05f) {
+                    const int difference = std::abs(center.height - south.height);
+                    require(difference <= 12,
+                            "ordinary terrain retained an adjacent height wall");
+                    ++ordinaryEdges;
+                    if (difference <= 4) ++gentleEdges;
+                }
+            }
+            if (x > 0 && x + 1 < faultWindowSize &&
+                z > 0 && z + 1 < faultWindowSize) {
+                bool isolated = true;
+                for (int dz = -1; dz <= 1; ++dz) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (dx == 0 && dz == 0) continue;
+                        const auto& neighbor = faultWindow[
+                            static_cast<size_t>(z + dz) * faultWindowSize +
+                            x + dx];
+                        isolated = isolated &&
+                            center.height - neighbor.height > 24;
+                    }
+                }
+                require(!isolated,
+                        "terrain produced an isolated 24-block column");
+            }
+        }
+    }
+    require(gentleEdges * 1000 >= ordinaryEdges * 999,
+            "fewer than 99.9 percent of ordinary adjacent edges are gentle");
 
     // Point sampling is repeatable, bounded, and seed-sensitive.
     Noise otherLegacy(987654321ULL);
@@ -111,7 +418,7 @@ int main() {
     require(maxTerrainHeight >= 160, "terrain router produced no tall mountains");
     require(overhangColumns > 0, "mountain density produced no overhangs");
 
-    // The complete v7 routing matrix is reachable across several seeds without
+    // The complete v8 routing matrix is reachable across several seeds without
     // requiring request-order randomness or enormous contiguous biome scales.
     std::set<Biome> allBiomes = observedBiomes;
     std::set<TerrainArchetype> allArchetypes = observedArchetypes;
@@ -151,9 +458,9 @@ int main() {
         std::cerr << '\n';
     }
     require(allBiomes.size() == BIOME_COUNT,
-            "not every v7 biome is reachable across the distribution sample");
+            "not every v8 biome is reachable across the distribution sample");
     require(allArchetypes.size() == TERRAIN_ARCHETYPE_COUNT,
-            "not every v7 terrain archetype is reachable across the distribution sample");
+            "not every v8 terrain archetype is reachable across the distribution sample");
 
     // Padded-region output and direct point queries are byte-for-byte equal,
     // including negative world coordinates.
@@ -177,12 +484,22 @@ int main() {
                     cached.biome == direct.biome &&
                     cached.isRiver == direct.river &&
                     cached.waterLevel == direct.waterLevel &&
+                    cached.localRelief == direct.localRelief &&
                     cached.archetype == direct.archetype &&
                     cached.secondaryArchetype == direct.secondaryArchetype &&
                     std::abs(cached.archetypeBlend - direct.archetypeBlend) < 0.00001f &&
+                    std::abs(cached.densityWeight - direct.densityWeight) < 0.00001f &&
+                    std::abs(cached.primaryArchetypeWeight -
+                             direct.primaryArchetypeWeight) < 0.00001f &&
+                    std::abs(cached.volcanicWeight - direct.volcanicWeight) < 0.00001f &&
+                    std::abs(cached.craterWeight - direct.craterWeight) < 0.00001f &&
                     cached.basin.upstreamSize == direct.basin.upstreamSize &&
                     std::abs(cached.basin.channelWidth -
                              direct.basin.channelWidth) < 0.00001f &&
+                    cached.basin.channelWaterY == direct.basin.channelWaterY &&
+                    cached.basin.channelBedY == direct.basin.channelBedY &&
+                    std::abs(cached.basin.valleyWidth -
+                             direct.basin.valleyWidth) < 0.00001f &&
                     cached.densityMinY == direct.densityMinY &&
                     cached.densityMaxY == direct.densityMaxY,
                     "region cache disagrees with world-coordinate sample");

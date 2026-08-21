@@ -27,7 +27,11 @@ constexpr int TERRAIN_ARCHETYPE_COUNT =
 struct BasinInfo {
     float channelDistance = 1000000.0f;
     float channelWidth = 0.0f;
+    float valleyWidth = 0.0f;
+    float channelWeight = 0.0f;
     float lakeWeight = 0.0f;
+    int channelBedY = 0;
+    int channelWaterY = 0;
     uint16_t upstreamSize = 0;
     bool inlandLake = false;
 };

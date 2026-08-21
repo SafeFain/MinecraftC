@@ -5,12 +5,30 @@
 #include "world/WorldGenContext.h"
 #include "Config.h"
 
+#include <cmath>
 #include <cstdint>
 
 struct SurfaceProfile {
     BlockId top = BlockId::GRASS;
     BlockId under = BlockId::DIRT;
     int depth = 3;
+};
+
+struct SurfaceRuleContext {
+    Biome biome = Biome::PLAINS;
+    TerrainArchetype archetype = TerrainArchetype::ROLLING_LOWLANDS;
+    int height = Config::SEA_LEVEL;
+    int waterLevel = Config::SEA_LEVEL;
+    float slope = 0.0f;
+    int localRelief = 0;
+    float primaryArchetypeWeight = 1.0f;
+    float volcanicWeight = 0.0f;
+    float craterWeight = 0.0f;
+    float riverWeight = 0.0f;
+    bool river = false;
+    TerrainArchetype secondaryArchetype =
+        TerrainArchetype::ROLLING_LOWLANDS;
+    float secondaryArchetypeWeight = 0.0f;
 };
 
 class SurfaceRules {
@@ -88,20 +106,17 @@ public:
     }
 
     static SurfaceProfile profile(uint64_t seed, int worldX, int worldZ,
-                                  Biome biome,
-                                  TerrainArchetype archetype =
-                                      TerrainArchetype::ROLLING_LOWLANDS,
-                                  float slope = 0.0f) {
+                                  const SurfaceRuleContext& context) {
         uint64_t h = WorldGenContext::hashPosition(
             WorldGenContext(seed).derive(0x5355524641434531ULL),
             worldX, 0, worldZ);
         SurfaceProfile result{
-            getBiomeProps(biome).surfaceBlock,
-            getBiomeProps(biome).subsoilBlock,
+            getBiomeProps(context.biome).surfaceBlock,
+            getBiomeProps(context.biome).subsoilBlock,
             3
         };
 
-        switch (biome) {
+        switch (context.biome) {
             case Biome::DEEP_OCEAN:
                 result.top = (h % 5 == 0) ? BlockId::CLAY : BlockId::GRAVEL;
                 result.under = (h % 7 == 0) ? BlockId::CLAY : BlockId::STONE;
@@ -127,7 +142,7 @@ public:
             case Biome::RED_CANYON:
                 result.top = BlockId::RED_SAND;
                 result.under = BlockId::TERRACOTTA;
-                result.depth = biome == Biome::RED_CANYON ? 7 : 5;
+                result.depth = context.biome == Biome::RED_CANYON ? 7 : 5;
                 break;
             case Biome::FOREST:
             case Biome::FLOWER_FOREST:
@@ -142,7 +157,7 @@ public:
                 result = {BlockId::PACKED_ICE, BlockId::PACKED_ICE, 5};
                 break;
             case Biome::ALPINE_TUNDRA:
-                result = slope > 0.56f
+                result = context.slope > 0.56f
                     ? SurfaceProfile{BlockId::GRANITE, BlockId::STONE, 3}
                     : SurfaceProfile{BlockId::SNOW, BlockId::COARSE_DIRT, 3};
                 break;
@@ -154,12 +169,12 @@ public:
                 result = {BlockId::LIMESTONE, BlockId::LIMESTONE, 5};
                 break;
             case Biome::KARST_FOREST:
-                result = slope > 0.48f
+                result = context.slope > 0.48f
                     ? SurfaceProfile{BlockId::LIMESTONE, BlockId::LIMESTONE, 5}
                     : SurfaceProfile{BlockId::MOSS, BlockId::LIMESTONE, 4};
                 break;
             case Biome::VOLCANIC_HIGHLANDS:
-                result = {BlockId::BASALT, BlockId::TUFF, 6};
+                result = {BlockId::TUFF, BlockId::TUFF, 6};
                 break;
             case Biome::BLACK_SAND_COAST:
                 result = {BlockId::BLACK_SAND, BlockId::BASALT, 4};
@@ -171,12 +186,46 @@ public:
             default:
                 break;
         }
-        if (slope > 0.78f && archetype != TerrainArchetype::DUNE_SEA &&
-            archetype != TerrainArchetype::RED_ROCK_CANYON &&
-            biome != Biome::GLACIAL_PEAKS &&
-            biome != Biome::VOLCANIC_HIGHLANDS &&
-            biome != Biome::LIMESTONE_HIGHLANDS &&
-            biome != Biome::KARST_FOREST) {
+
+        // Volcanic materials follow continuous masks and never replace the
+        // surrounding biome outside the cone. Basalt is deliberately sparse:
+        // steep patches, crater mottling, and narrow deterministic flow scars.
+        const float materialJitter = static_cast<float>((h >> 56) & 0xFFu) /
+                                     255.0f - 0.5f;
+        if (context.biome == Biome::BLACK_SAND_COAST &&
+            context.height <= Config::SEA_LEVEL + 6) {
+            result = {BlockId::BLACK_SAND, BlockId::TUFF, 4};
+        } else if (context.volcanicWeight >=
+                   0.35f + materialJitter * 0.08f) {
+            if (context.volcanicWeight < 0.58f) {
+                const bool wetFoot = context.riverWeight > 0.16f ||
+                    context.biome == Biome::FOREST ||
+                    context.biome == Biome::SWAMP ||
+                    context.biome == Biome::LUSH_VALLEY;
+                if (wetFoot && h % 7 == 0)
+                    result = {BlockId::GRASS, BlockId::COARSE_DIRT, 4};
+                else if (h % 3 == 0)
+                    result = {BlockId::COARSE_DIRT, BlockId::TUFF, 5};
+                else
+                    result = {BlockId::TUFF, BlockId::TUFF, 5};
+            } else {
+                const float phase = static_cast<float>((h >> 20) & 0xFFu);
+                const float flow = std::sin(
+                    (static_cast<float>(worldX) + phase) * 0.045f +
+                    std::sin(static_cast<float>(worldZ) * 0.012f) * 1.8f);
+                const bool basalt =
+                    (context.slope > 0.65f && h % 100 < 48) ||
+                    (flow > 0.84f && h % 3 == 0) ||
+                    (context.craterWeight > 0.58f && h % 4 == 0);
+                result = {basalt ? BlockId::BASALT : BlockId::TUFF,
+                          BlockId::TUFF, 6};
+            }
+        } else if (context.slope > 0.78f &&
+            context.archetype != TerrainArchetype::DUNE_SEA &&
+            context.archetype != TerrainArchetype::RED_ROCK_CANYON &&
+            context.biome != Biome::GLACIAL_PEAKS &&
+            context.biome != Biome::LIMESTONE_HIGHLANDS &&
+            context.biome != Biome::KARST_FOREST) {
             result.top = (h & 1u) ? BlockId::GRANITE : BlockId::STONE;
             result.under = BlockId::STONE;
             result.depth = 3;
@@ -185,19 +234,19 @@ public:
     }
 
     static BlockId blockAtDepth(uint64_t seed, int worldX, int worldZ,
-                                int height, int depth, Biome biome,
-                                TerrainArchetype archetype, float slope) {
+                                int depth,
+                                const SurfaceRuleContext& context) {
         const SurfaceProfile surface = profile(
-            seed, worldX, worldZ, biome, archetype, slope);
+            seed, worldX, worldZ, context);
         if (depth == 0) return surface.top;
-        if (biome == Biome::RED_CANYON) {
-            const int band = (height - depth + 512) % 9;
+        if (context.biome == Biome::RED_CANYON) {
+            const int band = (context.height - depth + 512) % 9;
             if (band == 0 || band == 1) return BlockId::GRANITE;
             return band < 5 ? BlockId::TERRACOTTA : BlockId::RED_SAND;
         }
-        if (biome == Biome::VOLCANIC_HIGHLANDS && depth >= 3)
-            return BlockId::BASALT;
-        if (biome == Biome::GLACIAL_PEAKS && depth >= 4)
+        if (context.volcanicWeight >= 0.35f && depth >= 2)
+            return BlockId::TUFF;
+        if (context.biome == Biome::GLACIAL_PEAKS && depth >= 4)
             return BlockId::STONE;
         return surface.under;
     }

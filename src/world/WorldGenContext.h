@@ -6,13 +6,13 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 7;
+    static constexpr uint32_t GENERATION_VERSION = 8;
     // Base chunk caches may be invalidated without changing the user-visible
-    // generation version. v7 starts a fresh base-cache revision at 1.
+    // generation version. v8 starts a fresh base-cache revision at 1.
     static constexpr uint32_t CHUNK_CACHE_VERSION =
         (GENERATION_VERSION << 16) | 1u;
-    // Layout 4 adds independent macro-archetype, basin and landmark domains.
-    static constexpr uint32_t SEED_LAYOUT_VERSION = 4;
+    // Layout 5 fixes macro-anchor identity and adds finite volcanic features.
+    static constexpr uint32_t SEED_LAYOUT_VERSION = 5;
 
     explicit WorldGenContext(uint64_t seed) : m_seed(seed) {}
 

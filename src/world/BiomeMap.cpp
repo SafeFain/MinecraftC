@@ -165,7 +165,7 @@ const BiomeDefinition BIOME_TABLE[BIOME_COUNT] = {
      0.12f, TreeType::JUNGLE, TreeType::OAK, 63, 999,
      BiomePrecipitation::Rain, "karst_forest", 18, 4.0f, 1, 4},
     // VOLCANIC_HIGHLANDS
-    {BlockId::BASALT, BlockId::TUFF, 1.0f, 0.0f,
+    {BlockId::TUFF, BlockId::TUFF, 1.0f, 0.0f,
      0.0f, TreeType::NONE, TreeType::NONE, 63, 999,
      BiomePrecipitation::None, "volcanic_highlands", 0, 5.5f, 1, 4},
     // BLACK_SAND_COAST

@@ -38,7 +38,12 @@ struct RegionGenerationData {
         int   nominalHeight = 0;
         float mountainFactor = 0.0f;
         float slope = 0.0f;
+        int localRelief = 0;
         float riverWeight = 0.0f;
+        float densityWeight = 0.0f;
+        float primaryArchetypeWeight = 1.0f;
+        float volcanicWeight = 0.0f;
+        float craterWeight = 0.0f;
         int densityMinY = 0;
         int densityMaxY = 0;
         TerrainArchetype archetype = TerrainArchetype::ROLLING_LOWLANDS;
