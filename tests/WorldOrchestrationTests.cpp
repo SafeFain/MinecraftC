@@ -179,57 +179,59 @@ void testChunkStreaming() {
                       "minecraftc-world-orch-streaming";
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
-    SaveStore store(root);
-    World world;
-    ThreadPool pool(2);
-    world.setThreadPool(&pool);
-    world.setSaveStore(&store);
-    world.resetForNewSeed(1001);
+    {
+        SaveStore store(root);
+        ThreadPool pool(2);
+        World world;
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(1001);
 
-    loadTarget(world);
-    generateTarget(world, pool);
-    require(isChunkActive(world, 0, 0), "spawn chunk is active");
-    const int surface = world.getSurfaceY(0, 0);
-    require(Config::isValidWorldY(surface),
-            "surface query returns a valid height");
+        loadTarget(world);
+        generateTarget(world, pool);
+        require(isChunkActive(world, 0, 0), "spawn chunk is active");
+        const int surface = world.getSurfaceY(0, 0);
+        require(Config::isValidWorldY(surface),
+                "surface query returns a valid height");
 
-    // A player edit lands in the autosave queue and round-trips to disk.
-    world.setBlock(0, surface + 1, 0, BlockId::STONE);
-    require(world.hasModifiedChunks(), "block edit registers modified chunks");
-    world.beginModifiedChunkAutosave();
-    world.flushModifiedChunks();
-    require(!world.hasModifiedChunks(), "flush empties the modified queues");
-    bool found = false;
-    for (const auto& entry : store.loadChunkOverrides(0, 0)) {
-        if (entry.block == BlockId::STONE) {
-            found = true;
-            break;
+        // A player edit lands in the autosave queue and round-trips to disk.
+        world.setBlock(0, surface + 1, 0, BlockId::STONE);
+        require(world.hasModifiedChunks(), "block edit registers modified chunks");
+        world.beginModifiedChunkAutosave();
+        world.flushModifiedChunks();
+        require(!world.hasModifiedChunks(), "flush empties the modified queues");
+        bool found = false;
+        for (const auto& entry : store.loadChunkOverrides(0, 0)) {
+            if (entry.block == BlockId::STONE) {
+                found = true;
+                break;
+            }
         }
-    }
-    require(found, "override round-trips through SaveStore");
+        require(found, "override round-trips through SaveStore");
 
-    // A second edit is left unsaved; unloading must persist it.
-    world.setBlock(1, surface + 1, 1, BlockId::COBBLESTONE);
-    const uint64_t revisionBefore = world.streamingRevision();
-    int frames = 0;
-    while (isChunkActive(world, 0, 0) && frames < 3000) {
-        world.update({100000.0, 64.0, 100000.0});
-        world.enqueueGeneration();
-        world.processCompletedGenerations();
-        ++frames;
-    }
-    require(frames < 3000, "old chunks unload after a far teleport");
-    require(world.streamingRevision() != revisionBefore,
-            "streaming revision bumps when the target changes");
-    bool cobble = false;
-    for (const auto& entry : store.loadChunkOverrides(0, 0)) {
-        if (entry.block == BlockId::COBBLESTONE) {
-            cobble = true;
-            break;
+        // A second edit is left unsaved; unloading must persist it.
+        world.setBlock(1, surface + 1, 1, BlockId::COBBLESTONE);
+        const uint64_t revisionBefore = world.streamingRevision();
+        int frames = 0;
+        while (isChunkActive(world, 0, 0) && frames < 3000) {
+            world.update({100000.0, 64.0, 100000.0});
+            world.enqueueGeneration();
+            world.processCompletedGenerations();
+            ++frames;
         }
+        require(frames < 3000, "old chunks unload after a far teleport");
+        require(world.streamingRevision() != revisionBefore,
+                "streaming revision bumps when the target changes");
+        bool cobble = false;
+        for (const auto& entry : store.loadChunkOverrides(0, 0)) {
+            if (entry.block == BlockId::COBBLESTONE) {
+                cobble = true;
+                break;
+            }
+        }
+        require(cobble, "unload persists unsaved overrides");
+        drainWorkers(world, pool);
     }
-    require(cobble, "unload persists unsaved overrides");
-    drainWorkers(world, pool);
     std::filesystem::remove_all(root);
 }
 
@@ -245,8 +247,8 @@ void testAsyncGeneratedCacheRoundTrip() {
     SaveStore store(root);
     std::vector<uint8_t> original;
     {
-        World world;
         ThreadPool pool(2);
+        World world;
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(424242);
@@ -275,30 +277,32 @@ void testAsyncGeneratedCacheRoundTrip() {
                 static_cast<uintmax_t>(Config::CHUNK_VOLUME + 128),
             "generated terrain cache uses the compact encoding when useful");
 
-    World reopened;
-    ThreadPool pool(2);
-    reopened.setThreadPool(&pool);
-    reopened.setSaveStore(&store);
-    reopened.resetForNewSeed(424242);
-    int frames = 0;
-    for (; frames < 1200; ++frames) {
-        reopened.update({0.5, 64.0, 0.5}, 1);
-        reopened.enqueueGeneration();
-        reopened.processCompletedGenerations();
-        const auto progress = reopened.generationProgress();
-        if (progress.total == 1 && progress.completed == 1 &&
-            progress.cacheHits == 1) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    {
+        ThreadPool pool(2);
+        World reopened;
+        reopened.setThreadPool(&pool);
+        reopened.setSaveStore(&store);
+        reopened.resetForNewSeed(424242);
+        int frames = 0;
+        for (; frames < 1200; ++frames) {
+            reopened.update({0.5, 64.0, 0.5}, 1);
+            reopened.enqueueGeneration();
+            reopened.processCompletedGenerations();
+            const auto progress = reopened.generationProgress();
+            if (progress.total == 1 && progress.completed == 1 &&
+                progress.cacheHits == 1) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        require(frames < 1200, "cached chunk is published without regeneration");
+        const Chunk* cached = reopened.getChunk(0, 0);
+        require(cached != nullptr && cached->generated.load(),
+                "cached chunk remains generated after publication");
+        const std::vector<uint8_t> roundTrip(
+            cached->rawBlocks(), cached->rawBlocks() + Config::CHUNK_VOLUME);
+        require(roundTrip == original,
+                "compressed cache round-trips terrain bytes exactly");
+        drainWorkers(reopened, pool);
     }
-    require(frames < 1200, "cached chunk is published without regeneration");
-    const Chunk* cached = reopened.getChunk(0, 0);
-    require(cached != nullptr && cached->generated.load(),
-            "cached chunk remains generated after publication");
-    const std::vector<uint8_t> roundTrip(
-        cached->rawBlocks(), cached->rawBlocks() + Config::CHUNK_VOLUME);
-    require(roundTrip == original,
-            "compressed cache round-trips terrain bytes exactly");
-    drainWorkers(reopened, pool);
     std::filesystem::remove_all(root);
     Config::RENDER_DISTANCE = oldRenderDistance;
 }
@@ -308,8 +312,8 @@ void testAsyncGeneratedCacheRoundTrip() {
 void testWarmChunkBacktrack() {
     const int oldRenderDistance = Config::RENDER_DISTANCE;
     Config::RENDER_DISTANCE = 0;
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(919191);
 
@@ -393,8 +397,8 @@ void testStreamingBenchmark() {
 
     Measurement cold;
     {
-        World world;
         ThreadPool pool(2);
+        World world;
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(808080);
@@ -404,8 +408,8 @@ void testStreamingBenchmark() {
 
     Measurement disk;
     {
-        World world;
         ThreadPool pool(2);
+        World world;
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(808080);
@@ -414,8 +418,8 @@ void testStreamingBenchmark() {
 
     Measurement warm;
     {
-        World world;
         ThreadPool pool(2);
+        World world;
         world.setThreadPool(&pool);
         world.resetForNewSeed(909090);
         runUntilReady(world, pool, {0.5, 64.0, 0.5}, false);
@@ -452,8 +456,8 @@ void testStreamingBenchmark() {
 // 5. Generation handoff: completed generations apply exactly once and the
 // chunk set stays fully generated afterwards.
 void testGenerationHandoff() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(42);
 
@@ -478,8 +482,8 @@ void testGenerationHandoff() {
 // 6. Seed reset: a new seed clears the world state, bumps the streaming
 // revision, and generates different terrain.
 void testSeedReset() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
 
     world.resetForNewSeed(777);
@@ -516,46 +520,49 @@ void testAutosaveQueue() {
                       "minecraftc-world-orch-autosave";
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
-    SaveStore store(root);
-    World world;
-    ThreadPool pool(2);
-    world.setThreadPool(&pool);
-    world.setSaveStore(&store);
-    world.resetForNewSeed(2024);
+    {
+        SaveStore store(root);
+        ThreadPool pool(2);
+        World world;
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(2024);
 
-    // Load a small target; the second edit targets a neighboring chunk that
-    // does not exist yet and is created on demand.
-    int frames = 0;
-    do {
-        world.update({0.5, 64.0, 0.5}, 3);
-        world.enqueueGeneration();
-        world.processCompletedGenerations();
-        ++frames;
-    } while (!world.streamingTargetReady() && frames < 400);
-    require(world.streamingTargetReady(), "small target streams in");
-    generateTarget(world, pool);
-    const int surface = world.getSurfaceY(0, 0);
-    world.setBlock(0, surface + 1, 0, BlockId::STONE);
-    world.setBlock(16, surface + 1, 0, BlockId::COBBLESTONE);
+        // Load a small target; the second edit targets a neighboring chunk that
+        // does not exist yet and is created on demand.
+        int frames = 0;
+        do {
+            world.update({0.5, 64.0, 0.5}, 3);
+            world.enqueueGeneration();
+            world.processCompletedGenerations();
+            ++frames;
+        } while (!world.streamingTargetReady() && frames < 400);
+        require(world.streamingTargetReady(), "small target streams in");
+        generateTarget(world, pool);
+        const int surface = world.getSurfaceY(0, 0);
+        world.setBlock(0, surface + 1, 0, BlockId::STONE);
+        world.setBlock(16, surface + 1, 0, BlockId::COBBLESTONE);
 
-    world.beginModifiedChunkAutosave();
-    require(world.hasPendingModifiedChunkSaves(),
-            "autosave begin moves edits into the pending queue");
-    require(!world.flushModifiedChunks(1),
-            "bounded flush leaves pending saves");
-    require(world.hasPendingModifiedChunkSaves(),
-            "pending saves remain visible after a bounded flush");
-    require(world.flushModifiedChunks(), "unbounded flush completes");
-    require(!world.hasModifiedChunks(), "all modified state is persisted");
-    drainWorkers(world, pool);
+        world.beginModifiedChunkAutosave();
+        require(world.hasPendingModifiedChunkSaves(),
+                "autosave begin moves edits into the pending queue");
+        require(!world.flushModifiedChunks(1),
+                "bounded flush leaves pending saves");
+        require(world.hasPendingModifiedChunkSaves(),
+                "pending saves remain visible after a bounded flush");
+        require(world.flushModifiedChunks(), "unbounded flush completes");
+        require(!world.hasModifiedChunks(), "all modified state is persisted");
+        drainWorkers(world, pool);
+    }
     std::filesystem::remove_all(root);
 }
 
 // 8. Mesh pipeline: completed meshes upload once, stale revisions are
 // skipped, and GPU meshes release/restore through the renderer.
 void testMeshPipeline() {
-    World world;
+    StubRenderer stub;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(555);
 
@@ -569,7 +576,6 @@ void testMeshPipeline() {
     require(world.getActiveChunks().size() == 1,
             "bounded update loads exactly one chunk");
 
-    StubRenderer stub;
     const int surface = world.getSurfaceY(0, 0);
 
     // First pass: the dirty chunk builds and uploads once.
@@ -605,8 +611,8 @@ void testMeshPipeline() {
 // 6. Fluid ticks: water falls through open air. Lava does not bypass the
 // Java fire path by directly igniting adjacent TNT.
 void testFluidTicks() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(999);
 
@@ -690,8 +696,8 @@ void testFluidTicks() {
 // 7. Natural generated fluids wake when their chunk is attached, without
 // requiring a full-height boundary scan.
 void testNaturalFluidLoading() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(1004);
 
@@ -726,8 +732,8 @@ void testNaturalFluidLoading() {
 // 8. Superflat fluid spread: a placed source fans out over a supported flat
 // surface, and the scheduler enforces its per-tick work budget.
 void testSuperflatFluidSpreadAndBudget() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(1002, WorldType::Superflat);
 
@@ -781,8 +787,8 @@ void testSuperflatFluidSpreadAndBudget() {
 // 9. Beds are an atomic two-cell world structure. Invalid legacy halves stay
 // removable but never become valid respawn anchors.
 void testBedLifecycle() {
-    World world;
     ThreadPool pool(2);
+    World world;
     world.setThreadPool(&pool);
     world.resetForNewSeed(314159);
     world.update({0.5, 64.0, 0.5}, 1);
