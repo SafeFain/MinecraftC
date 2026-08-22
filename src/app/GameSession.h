@@ -61,6 +61,10 @@ public:
     void resetTransientState(bool newWorld, uint64_t worldTicks,
                              RuntimeClock::Tick loadingStarted);
 
+    // These owners are declared in dependency order so destruction runs as
+    // World -> ThreadPool -> SaveStore.  World drains its streaming I/O while
+    // both the worker pool and the store referenced by the streamer are alive.
+    std::unique_ptr<SaveStore> saveStore;
     ThreadPool threadPool;
     World world;
     Player player;
@@ -74,7 +78,6 @@ public:
     bool loadingNewWorld = false;
     bool loadingGenerationComplete = false;
     RuntimeClock::Tick worldLoadingStarted = 0;
-    std::unique_ptr<SaveStore> saveStore;
     WorldCatalog worldCatalog;
     WorldMetadata worldMetadata;
     float autosaveSeconds = 0.0f;

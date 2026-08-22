@@ -462,6 +462,10 @@ int main() {
                 ++itemEntities;
         require(itemEntities == 1,
                 "the drop-item key spawns one dropped item");
+
+        // Leave the store attached here.  Harness destruction covers the
+        // real application shutdown order while streaming cache writes may
+        // still be draining.
     }
 
     std::cout << "PASS: application flow state transitions\n";
