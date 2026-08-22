@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <unordered_set>
 
 namespace {
@@ -103,6 +104,16 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
 
     std::vector<Chunk*> candidates;
     int availableSlots = 0;
+    const uint64_t currentFluidTick = m_world.currentFluidTick();
+    const auto fluidMeshDeferred = [currentFluidTick](const Chunk* chunk) {
+        if (chunk->fluidRevision() == chunk->fluidMeshRevision()) return false;
+        if (chunk->nonFluidRevision() != chunk->nonFluidMeshRevision()) return false;
+        const uint64_t attempted = chunk->lastFluidMeshAttemptTick();
+        if (attempted == std::numeric_limits<uint64_t>::max() ||
+            currentFluidTick < attempted)
+            return false;
+        return currentFluidTick - attempted < Config::FLUID_MESH_MERGE_TICKS;
+    };
     m_chunks.withShared([&](ChunkStore& store) {
         int inFlight = 0;
         store.forEachSharedUnlocked([&](const Chunk* chunk) {
@@ -122,7 +133,8 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
             active.insert(chunk);
             if (chunk->isDirty() && !chunk->meshInProgress.load() &&
                 chunk->generated.load() &&
-                chunk->lifecycle.load() != Chunk::LifecycleState::Warm)
+                chunk->lifecycle.load() != Chunk::LifecycleState::Warm &&
+                !fluidMeshDeferred(chunk))
                 candidates.push_back(chunk);
         }
         // Prefetch chunks are intentionally not rendered yet, but may be
@@ -130,7 +142,8 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
         store.forEachSharedUnlocked([&](Chunk* chunk) {
             if (active.count(chunk) != 0 || !chunk->isDirty() ||
                 chunk->meshInProgress.load() || !chunk->generated.load() ||
-                chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return;
+                chunk->lifecycle.load() == Chunk::LifecycleState::Warm ||
+                fluidMeshDeferred(chunk)) return;
             candidates.push_back(chunk);
         });
     });
@@ -151,6 +164,11 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
         chunkPtr->lifecycle = Chunk::LifecycleState::WaitingForMesh;
         chunkPtr->markClean();  // Mark clean NOW so we don't re-enqueue
         const uint64_t revision = chunkPtr->dataRevision();
+        const uint64_t fluidRevision = chunkPtr->fluidRevision();
+        const uint64_t nonFluidRevision = chunkPtr->nonFluidRevision();
+        chunkPtr->markFluidMeshAttempt(currentFluidTick);
+        chunkPtr->markPendingFluidMeshRevision(fluidRevision);
+        chunkPtr->markPendingNonFluidMeshRevision(nonFluidRevision);
 
         // Capture a raw pointer — the chunk is owned by the ChunkStore and
         // won't be destroyed while meshInProgress is true
@@ -158,33 +176,42 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
         const int dz = chunkPtr->cz - centerChunkZ;
         const int distance2 = dx * dx + dz * dz;
 
-        m_threadPool->enqueuePriority([this, chunkPtr, revision]() {
-            MeshSnapshot snapshot;
-            bool valid = false;
-            m_chunks.withShared([&](ChunkStore& store) {
-                valid = makeMeshSnapshot(store, chunkPtr, snapshot);
-            });
-            if (!valid) {
-                chunkPtr->meshReady = false;
-                chunkPtr->meshInProgress = false;
-                chunkPtr->markDirty();
-                return;
-            }
-            auto neighborFunc = [&snapshot](int wx, int wy, int wz) -> BlockId {
-                return snapshot.block(wx, wy, wz);
-            };
-            auto lightFunc = [&snapshot](int wx, int wy, int wz) -> LightSample {
-                return snapshot.sampleLight(wx, wy, wz);
-            };
-            chunkPtr->m_pendingMesh.build(
-                chunkPtr->worldX(), chunkPtr->worldZ(),
-                snapshot.targetBlocks.data(), snapshot.columnData(),
-                neighborFunc, lightFunc);
-            chunkPtr->pendingMeshRevision = revision;
+        m_threadPool->enqueuePriority(
+            [this, chunkPtr, revision, fluidRevision, nonFluidRevision]() {
+                MeshSnapshot snapshot;
+                bool valid = false;
+                m_chunks.withShared([&](ChunkStore& store) {
+                    valid = makeMeshSnapshot(store, chunkPtr, snapshot);
+                });
+                if (!valid) {
+                    chunkPtr->meshReady = false;
+                    chunkPtr->meshInProgress = false;
+                    chunkPtr->markDirty();
+                    return;
+                }
+                if (chunkPtr->dataRevision() != revision ||
+                    chunkPtr->fluidRevision() != fluidRevision ||
+                    chunkPtr->nonFluidRevision() != nonFluidRevision) {
+                    chunkPtr->meshReady = false;
+                    chunkPtr->meshInProgress = false;
+                    chunkPtr->markDirty();
+                    return;
+                }
+                auto neighborFunc = [&snapshot](int wx, int wy, int wz) -> BlockId {
+                    return snapshot.block(wx, wy, wz);
+                };
+                auto lightFunc = [&snapshot](int wx, int wy, int wz) -> LightSample {
+                    return snapshot.sampleLight(wx, wy, wz);
+                };
+                chunkPtr->m_pendingMesh.build(
+                    chunkPtr->worldX(), chunkPtr->worldZ(),
+                    snapshot.targetBlocks.data(), snapshot.columnData(),
+                    neighborFunc, lightFunc);
+                chunkPtr->pendingMeshRevision = revision;
 
-            // Signal completion
-            chunkPtr->meshReady = true;
-        }, 500000 - distance2);
+                // Signal completion
+                chunkPtr->meshReady = true;
+            }, 500000 - distance2);
     }
 }
 
@@ -238,6 +265,11 @@ void ChunkMeshPipeline::processCompletedMeshes(IGameRenderer* renderer,
 
         chunk->meshReady = false;
         chunk->meshInProgress = false;
+        if (chunk->pendingFluidMeshRevision() == chunk->fluidRevision())
+            chunk->markFluidMeshRevision(chunk->pendingFluidMeshRevision());
+        if (chunk->pendingNonFluidMeshRevision() == chunk->nonFluidRevision())
+            chunk->markNonFluidMeshRevision(
+                chunk->pendingNonFluidMeshRevision());
         chunk->lifecycle = Chunk::LifecycleState::Renderable;
     }
 }

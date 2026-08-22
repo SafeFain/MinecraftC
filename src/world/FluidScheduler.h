@@ -2,9 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <glm/glm.hpp>
-#include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "Config.h"
@@ -12,6 +13,21 @@
 
 class ChunkStore;
 class World;
+
+struct FluidTickBudget {
+    size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK;
+    std::chrono::steady_clock::time_point deadline =
+        std::chrono::steady_clock::time_point::max();
+};
+
+struct FluidTickStats {
+    size_t examined = 0;
+    size_t updated = 0;
+    size_t changed = 0;
+    size_t deferred = 0;
+    size_t queueSize = 0;
+    bool deadlineReached = false;
+};
 
 // Owns Java-style scheduled fluid ticks.  The queue identity is
 // (position, fluid type), matching LevelTicks rather than treating water and
@@ -24,11 +40,13 @@ public:
     // second reference is intentionally not retained.
     FluidScheduler(World& world, ChunkStore&) : m_world(world) {}
 
-    // Advance the current world tick and process at most maximumUpdates due
-    // queue entries. Returns the number of live fluid cells updated; stale
-    // de-duplicated entries also consume the supplied work budget.
-    size_t tick(uint64_t tick,
-                size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK);
+    // Advance the current world tick and process a bounded batch. Every key
+    // exists in the heap at most once, so examined entries are live work.
+    FluidTickStats tick(uint64_t tick, const FluidTickBudget& budget);
+    size_t tick(uint64_t worldTick,
+                size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK) {
+        return this->tick(worldTick, FluidTickBudget{maximumUpdates}).updated;
+    }
 
     // Schedule a position and its six neighbors for a fluid update.
     void scheduleAround(const glm::ivec3& position, uint64_t minimumDelay = 1);
@@ -71,17 +89,14 @@ private:
         glm::ivec3 position{0};
         bool lava = false;
     };
-    struct FluidDue {
-        uint64_t due = 0;
-        uint64_t order = 0;
-    };
-    struct ScheduledFluidLater {
-        bool operator()(const ScheduledFluidTick& a,
-                        const ScheduledFluidTick& b) const {
-            if (a.due != b.due) return a.due > b.due;
-            return a.order > b.order;
-        }
-    };
+    static bool earlier(const ScheduledFluidTick& a,
+                        const ScheduledFluidTick& b);
+    void swapHeapNodes(size_t first, size_t second);
+    void siftUp(size_t index);
+    void siftDown(size_t index);
+    ScheduledFluidTick removeHeapRoot();
+    void removeHeapAt(size_t index);
+    void cancelAt(const glm::ivec3& position, bool lava);
 
     void scheduleAt(const glm::ivec3& position, uint64_t minimumDelay,
                     bool forceReschedule = false);
@@ -95,10 +110,11 @@ private:
     static uint64_t hash(uint64_t value);
 
     World& m_world;
-    std::priority_queue<ScheduledFluidTick, std::vector<ScheduledFluidTick>,
-                        ScheduledFluidLater> m_fluidTicks;
-    std::unordered_map<FluidTickKey, FluidDue, FluidTickKeyHash>
-        m_scheduledFluidDue;
+    std::vector<ScheduledFluidTick> m_fluidTicks;
+    std::unordered_map<FluidTickKey, size_t, FluidTickKeyHash>
+        m_scheduledFluidIndices;
+    std::unordered_set<glm::ivec3, BlockPosHash> m_affectedSet;
+    std::vector<glm::ivec3> m_affectedPositions;
     uint64_t m_currentWorldTick = 0;
     uint64_t m_nextInsertionOrder = 0;
 };

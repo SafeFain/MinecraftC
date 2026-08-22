@@ -640,6 +640,27 @@ void testMeshPipeline() {
     require(stub.releaseCount >= 1, "invalidating meshes releases GPU buffers");
     world.restoreGpuMeshes();
     require(stub.uploadCount >= 3, "restore re-uploads active meshes");
+
+    // Pure fluid edits are merged for two game ticks, while an ordinary block
+    // edit in the same chunk bypasses that window immediately.
+    Chunk* fluidChunk = world.getActiveChunks().front();
+    world.setBlock(2, surface + 1, 2, BlockId::WATER);
+    world.tickFluids(1000, 1);
+    world.enqueueMeshBuilds(4);
+    const uint64_t firstFluidAttempt = fluidChunk->lastFluidMeshAttemptTick();
+    drainWorkers(world, pool);
+    world.processCompletedMeshes(&stub, 4);
+    world.setBlock(3, surface + 1, 2, BlockId::WATER);
+    world.tickFluids(1001, 0);
+    world.enqueueMeshBuilds(4);
+    require(fluidChunk->lastFluidMeshAttemptTick() == firstFluidAttempt,
+            "fluid-only mesh work is merged inside the 100 ms window");
+    world.setBlock(3, surface + 1, 2, BlockId::STONE);
+    world.enqueueMeshBuilds(4);
+    require(fluidChunk->lastFluidMeshAttemptTick() == 1001,
+            "ordinary block edits bypass the fluid mesh merge window");
+    drainWorkers(world, pool);
+    world.processCompletedMeshes(&stub, 4);
     drainWorkers(world, pool);
 }
 
@@ -662,6 +683,28 @@ void testFluidTicks() {
     require(world.getBlock(0, 80, 0) == BlockId::AIR,
             "sky column above the terrain is open air");
     world.setBlock(0, 80, 0, BlockId::WATER);
+    const FluidTickStats queued = world.tickFluids(
+        1, FluidTickBudget{0});
+    require(queued.queueSize == 1,
+            "a newly placed source creates one indexed fluid task");
+    world.setBlock(0, 80, 0, BlockId::AIR);
+    world.setBlock(0, 80, 0, BlockId::WATER);
+    const FluidTickStats deduplicated = world.tickFluids(
+        2, FluidTickBudget{0});
+    require(deduplicated.queueSize == 1,
+            "repeated source rescheduling keeps one heap node");
+    world.setBlock(0, 80, 0, BlockId::AIR);
+    const FluidTickStats canceled = world.tickFluids(
+        3, FluidTickBudget{0});
+    require(canceled.queueSize == 0,
+            "removing a fluid cancels its indexed heap node immediately");
+    world.setBlock(0, 80, 0, BlockId::WATER);
+    const FluidTickBudget expiredBudget{
+        Config::FLUID_UPDATES_PER_TICK,
+        std::chrono::steady_clock::now() - std::chrono::milliseconds(1)};
+    const FluidTickStats expired = world.tickFluids(8, expiredBudget);
+    require(expired.deadlineReached && expired.updated == 0,
+            "an expired shared fluid deadline defers due work safely");
     world.tickFluids(1000);
     require(isWater(world.getBlock(0, 80, 0)), "water source stays in place");
     require(world.getBlock(0, 79, 0) == BlockId::FALLING_WATER,
@@ -811,11 +854,21 @@ void testSuperflatFluidSpreadAndBudget() {
                 world.setBlock(cx * Config::CHUNK_SIZE_X + x,
                                Config::WORLD_MIN_Y + 4,
                                cz * Config::CHUNK_SIZE_Z + z, BlockId::WATER);
-    const size_t first = world.tickFluids(2000, Config::FLUID_UPDATES_PER_TICK);
-    const size_t second = world.tickFluids(2000, Config::FLUID_UPDATES_PER_TICK);
-    require(first == Config::FLUID_UPDATES_PER_TICK &&
-                second == Config::FLUID_UPDATES_PER_TICK,
+    world.resetFluidLightingStatistics();
+    const FluidTickStats first = world.tickFluids(
+        2000, FluidTickBudget{Config::FLUID_UPDATES_PER_TICK});
+    const FluidTickStats second = world.tickFluids(
+        2000, FluidTickBudget{Config::FLUID_UPDATES_PER_TICK});
+    require(first.updated == Config::FLUID_UPDATES_PER_TICK &&
+                second.updated == Config::FLUID_UPDATES_PER_TICK,
             "fluid scheduler preserves queued work across bounded ticks");
+    const auto lighting = world.fluidLightingStatistics();
+    require(lighting.columnScans <= first.changed + second.changed,
+            "fluid batch lighting scans each changed column at most once per batch");
+    std::cout << "[fluid benchmark] examined=" << first.examined + second.examined
+              << " changed=" << first.changed + second.changed
+              << " queue=" << second.queueSize
+              << " light-columns=" << lighting.columnScans << "\n";
     drainWorkers(world, pool);
 }
 

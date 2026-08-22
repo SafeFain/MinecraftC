@@ -125,9 +125,15 @@ void WorldLighting::rebuild() {
 }
 
 void WorldLighting::updateLightingAt(const glm::ivec3& position) {
+    updateLightingBatch(std::vector<glm::ivec3>{position});
+}
+
+void WorldLighting::updateLightingBatch(
+    const std::vector<glm::ivec3>& positions) {
     struct RemovalNode { int x=0,y=0,z=0;uint8_t light=0; };
     m_chunks.withUnique([&](ChunkStore& store) {
         if(m_lightDirty)return;
+        if (positions.empty()) return;
         auto findCell=[&](int wx,int y,int wz)->std::pair<Chunk*,glm::ivec3>{
             if(!Config::isValidWorldY(y))return {nullptr,glm::ivec3(0)};
             const int cx=World::worldToChunkX(wx),cz=World::worldToChunkZ(wz);
@@ -177,39 +183,58 @@ void WorldLighting::updateLightingAt(const glm::ivec3& position) {
 
     std::queue<RemovalNode> blockRemoval,skyRemoval;
     std::queue<BlockLightNode> blockAddition,skyAddition;
-    const uint8_t oldBlock=get(position.x,position.y,position.z,false);
-    const auto [cell,local]=findCell(position.x,position.y,position.z);
-    if(!cell)return;
-    const uint8_t emission=getLightEmission(cell->getBlock(local.x,local.y,local.z));
-    if(oldBlock>emission){set(position.x,position.y,position.z,false,emission);
-        blockRemoval.push({position.x,position.y,position.z,oldBlock});}
-    else if(emission>oldBlock)set(position.x,position.y,position.z,false,emission);
-    if(emission>0)blockAddition.push({position.x,position.y,position.z,emission});
-    for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
-        const uint8_t value=get(x,y,z,false);if(value)blockAddition.push({x,y,z,value});}
+    std::unordered_set<uint64_t> columns;
+    columns.reserve(positions.size());
+    for(const glm::ivec3& position : positions) {
+        const auto [cell,local]=findCell(position.x,position.y,position.z);
+        if(!cell)continue;
+        const uint8_t oldLight=get(position.x,position.y,position.z,false);
+        const uint8_t emission=getLightEmission(
+            cell->getBlock(local.x,local.y,local.z));
+        if(oldLight>emission){set(position.x,position.y,position.z,false,emission);
+            blockRemoval.push({position.x,position.y,position.z,oldLight});}
+        else if(emission>oldLight)set(position.x,position.y,position.z,false,emission);
+        if(emission>0)blockAddition.push({position.x,position.y,position.z,emission});
+        for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
+            const uint8_t value=get(x,y,z,false);if(value)blockAddition.push({x,y,z,value});}
+        const uint64_t key=(static_cast<uint64_t>(static_cast<uint32_t>(
+            position.x))<<32)|static_cast<uint32_t>(position.z);
+        columns.insert(key);
+    }
+    ++m_statistics.batches;
+    m_statistics.columnScans += columns.size();
     updateChannel(false,blockRemoval,blockAddition);
 
-    uint8_t vertical=15;
-    for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y){
-        auto [column,p]=findCell(position.x,y,position.z);if(!column)continue;
-        const uint8_t damping=getLightDampening(column->getBlock(p.x,p.y,p.z));
-        if(damping>=15)vertical=0;else if(vertical>0&&damping>0)
-            vertical=static_cast<uint8_t>(vertical>damping?vertical-damping:0);
-        const uint8_t old=get(position.x,y,position.z,true);
-        if(old>vertical){set(position.x,y,position.z,true,vertical);
-            skyRemoval.push({position.x,y,position.z,old});}
-        else if(vertical>old)set(position.x,y,position.z,true,vertical);
-        if(vertical>0)skyAddition.push({position.x,y,position.z,vertical});
+    for(const uint64_t key : columns) {
+        const int columnX=static_cast<int>(static_cast<uint32_t>(key>>32));
+        const int columnZ=static_cast<int>(static_cast<uint32_t>(key));
+        uint8_t vertical=15;
+        for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y){
+            auto [column,p]=findCell(columnX,y,columnZ);if(!column)continue;
+            const uint8_t damping=getLightDampening(column->getBlock(p.x,p.y,p.z));
+            if(damping>=15)vertical=0;else if(vertical>0&&damping>0)
+                vertical=static_cast<uint8_t>(vertical>damping?vertical-damping:0);
+            const uint8_t old=get(columnX,y,columnZ,true);
+            if(old>vertical)skyRemoval.push({columnX,y,columnZ,old});
+            if(old!=vertical){
+                set(columnX,y,columnZ,true,vertical);
+                if(vertical>0)skyAddition.push({columnX,y,columnZ,vertical});
+            }
+        }
     }
-    for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
-        const uint8_t value=get(x,y,z,true);if(value)skyAddition.push({x,y,z,value});}
+    for(const glm::ivec3& position : positions)
+        for(const auto& d:dirs){const int x=position.x+d[0],y=position.y+d[1],z=position.z+d[2];
+            const uint8_t value=get(x,y,z,true);if(value)skyAddition.push({x,y,z,value});}
     updateChannel(true,skyRemoval,skyAddition);
-    for(Chunk* chunk:changed){chunk->markDirty();
-        if(chunk->cx!=World::worldToChunkX(position.x)||chunk->cz!=World::worldToChunkZ(position.z))continue;
-        if(local.x==0){Chunk* n=store.findUnlocked(chunk->cx-1,chunk->cz);if(n)n->markDirty();}
-        if(local.x==Config::CHUNK_SIZE_X-1){Chunk* n=store.findUnlocked(chunk->cx+1,chunk->cz);if(n)n->markDirty();}
-        if(local.z==0){Chunk* n=store.findUnlocked(chunk->cx,chunk->cz-1);if(n)n->markDirty();}
-        if(local.z==Config::CHUNK_SIZE_Z-1){Chunk* n=store.findUnlocked(chunk->cx,chunk->cz+1);if(n)n->markDirty();}
+    for(Chunk* chunk:changed)chunk->markDirty();
+    for(const glm::ivec3& position : positions){
+        const int cx=World::worldToChunkX(position.x),cz=World::worldToChunkZ(position.z);
+        const int lx=position.x-cx*Config::CHUNK_SIZE_X;
+        const int lz=position.z-cz*Config::CHUNK_SIZE_Z;
+        if(lx==0){Chunk* n=store.findUnlocked(cx-1,cz);if(n)n->markDirty();}
+        if(lx==Config::CHUNK_SIZE_X-1){Chunk* n=store.findUnlocked(cx+1,cz);if(n)n->markDirty();}
+        if(lz==0){Chunk* n=store.findUnlocked(cx,cz-1);if(n)n->markDirty();}
+        if(lz==Config::CHUNK_SIZE_Z-1){Chunk* n=store.findUnlocked(cx,cz+1);if(n)n->markDirty();}
     }
     });
 }

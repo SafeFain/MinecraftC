@@ -8,18 +8,30 @@
 
 namespace {
 
-// One anchor per medium-size cell.  The cell spacing and radius range are
-// chosen together so neighbouring edge gaps stay in the intended 16–64 block
-// band while islands remain individual, navigable bodies.
-constexpr int HEAVEN_ISLAND_CELL = 120;
 constexpr int HEAVEN_ISLAND_MIN_Y = 80;
 constexpr uint64_t HEAVEN_SEED_DOMAIN = 0x484556454E5F5345ULL;
 constexpr uint64_t HEAVEN_ISLAND_DOMAIN = 0x48454156454E4953ULL;
 
+// These fields deliberately use world coordinates directly.  The broad field
+// makes archipelagos and voids, while the smaller field breaks coastlines into
+// bays, fingers, and occasional bridges without introducing a repeating cell
+// layout.  The noise period is far beyond the explored Heaven window.
+constexpr float HEAVEN_MASK_SCALE = 0.0055f;
+constexpr float HEAVEN_DETAIL_SCALE = 0.014f;
+constexpr float HEAVEN_PRESENT_THRESHOLD = 0.10f;
+constexpr float HEAVEN_TOP_SCALE = 0.0045f;
+constexpr float HEAVEN_RELIEF_SCALE = 0.010f;
+constexpr float HEAVEN_UNDERSIDE_SCALE = 0.008f;
+
+float smoothstep(float edge0, float edge1, float value) {
+    if (edge0 == edge1) return value < edge0 ? 0.0f : 1.0f;
+    const float t = std::clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 int floorDiv(int value, int divisor) {
-    int quotient = value / divisor;
-    if (value % divisor < 0) --quotient;
-    return quotient;
+    const int quotient = value / divisor;
+    return value % divisor < 0 ? quotient - 1 : quotient;
 }
 
 uint64_t dimensionSeed(uint64_t seed, DimensionId dimension) {
@@ -115,78 +127,89 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
     int worldX, int worldZ) const {
     const WorldGenContext context(m_seed);
     const uint64_t islandSeed = context.derive(HEAVEN_ISLAND_DOMAIN);
-    const int baseCellX = floorDiv(worldX, HEAVEN_ISLAND_CELL);
-    const int baseCellZ = floorDiv(worldZ, HEAVEN_ISLAND_CELL);
+    const float x = static_cast<float>(worldX);
+    const float z = static_cast<float>(worldZ);
 
-    HeavenIslandColumn best;
-    float bestFactor = 2.0f;
-    for (int dz = -1; dz <= 1; ++dz) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            const int cellX = baseCellX + dx;
-            const int cellZ = baseCellZ + dz;
-            const uint64_t h = WorldGenContext::hashPosition(
-                islandSeed, cellX, 0, cellZ);
-            const int anchorX = cellX * HEAVEN_ISLAND_CELL + 60 +
-                static_cast<int>((h >> 8) % 9) - 4;
-            const int anchorZ = cellZ * HEAVEN_ISLAND_CELL + 60 +
-                static_cast<int>((h >> 24) % 9) - 4;
-            const float radiusX = 32.0f + static_cast<float>((h >> 40) % 17);
-            const float radiusZ = 32.0f + static_cast<float>((h >> 48) % 17);
-            const float nx = static_cast<float>(worldX - anchorX) / radiusX;
-            const float nz = static_cast<float>(worldZ - anchorZ) / radiusZ;
-            const float factor = nx * nx + nz * nz;
-            // A very thin rim would create disconnected one-block shards.
-            // Keeping the mask slightly inside the ellipse gives each island
-            // a continuous core and leaves a predictable navigable gap.
-            if (factor > 0.94f || factor >= bestFactor) continue;
-            bestFactor = factor;
-            best.present = true;
-            // A low-discrepancy cell pattern guarantees that every one of the
-            // 30 overworld biomes appears in a finite exploration window;
-            // the anchor hash still offsets that pattern per world seed.
-            const int64_t biomeCode = static_cast<int64_t>(cellX) * 7 +
-                static_cast<int64_t>(cellZ) * 11 +
-                static_cast<int64_t>(h >> 56);
-            const int biomeIndex = static_cast<int>(
-                ((biomeCode % BIOME_COUNT) + BIOME_COUNT) % BIOME_COUNT);
-            best.biome = static_cast<Biome>(biomeIndex);
-            const int centerY = 132 + static_cast<int>((h >> 16) % 72);
-            // Use a low-frequency coherent field for broad, walkable summit
-            // undulation. The previous per-column hash produced unrelated
-            // -3..+3 offsets in adjacent blocks, turning every island top
-            // into a dense field of one-block pits and spikes.
-            const float reliefNoise = m_noise.octave2D(
-                static_cast<float>(worldX) * 0.018f + 137.0f,
-                static_cast<float>(worldZ) * 0.018f - 251.0f,
-                3, 0.5f, 2.0f);
-            const int relief = static_cast<int>(std::round(reliefNoise * 2.0f));
-            best.top = std::clamp(centerY + relief, 96, 236);
-            const int thickness = 16 + static_cast<int>((h >> 32) % 33);
-            const float taper = std::pow(std::max(0.0f, 1.0f - factor), 0.55f);
-            const int depth = std::max(2, static_cast<int>(
-                std::round(static_cast<float>(thickness) * taper)));
-            // Keep the island band in the intended sky corridor.  Clamping
-            // the lower edge still preserves at least a 16-block body for
-            // the lowest possible top while preventing deep roots from
-            // drifting toward the world floor.
-            best.bottom = std::max(HEAVEN_ISLAND_MIN_Y, best.top - depth + 1);
-            best.islandFactor = factor;
-        }
+    // A warped macro field creates irregular island groups.  A lower-amplitude
+    // detail field cuts the coast into natural bays and peninsulas while the
+    // threshold leaves broad voids between groups.
+    const float warpX = m_noise.noise2D(
+        x * 0.0028f + 31.0f, z * 0.0028f - 47.0f);
+    const float warpZ = m_noise.noise2D(
+        x * 0.0028f - 83.0f, z * 0.0028f + 71.0f);
+    const float macro = m_noise.octave2D(
+        (x + warpX * 72.0f) * HEAVEN_MASK_SCALE + 113.0f,
+        (z + warpZ * 72.0f) * HEAVEN_MASK_SCALE - 127.0f,
+        2, 0.55f, 2.0f);
+    const float detail = m_noise.noise2D(
+        x * HEAVEN_DETAIL_SCALE + 173.0f,
+        z * HEAVEN_DETAIL_SCALE - 229.0f);
+    const float broad = m_noise.noise2D(
+        x * 0.0022f - 401.0f,
+        z * 0.0022f + 311.0f);
+    const float field = macro * 0.76f + detail * 0.20f + broad * 0.10f;
+    if (field <= HEAVEN_PRESENT_THRESHOLD) {
+        // Void columns still return a valid biome for weather/decoration
+        // queries, but have no terrain height or density range.
+        const int biome = static_cast<int>(WorldGenContext::hashPosition(
+            islandSeed, floorDiv(worldX, 64), 0,
+            floorDiv(worldZ, 64)) % BIOME_COUNT);
+        return {false, static_cast<Biome>(biome),
+                Config::WORLD_MIN_Y - 1, Config::WORLD_MIN_Y, 1.0f};
     }
-    if (!best.present) {
-        // Keep biome queries meaningful in the void by returning the nearest
-        // anchor's biome even though its terrain column is empty.
-        const uint64_t h = WorldGenContext::hashPosition(
-            islandSeed, baseCellX, 0, baseCellZ);
-        const int64_t biomeCode = static_cast<int64_t>(baseCellX) * 7 +
-            static_cast<int64_t>(baseCellZ) * 11 +
-            static_cast<int64_t>(h >> 56);
-        best.biome = static_cast<Biome>(static_cast<int>(
-            ((biomeCode % BIOME_COUNT) + BIOME_COUNT) % BIOME_COUNT));
-        best.top = Config::WORLD_MIN_Y - 1;
-        best.bottom = Config::WORLD_MIN_Y;
-    }
-    return best;
+
+    HeavenIslandColumn island;
+    island.present = true;
+    // Keep broad, deterministic ecological bands without invoking the full
+    // overworld height pipeline for every Heaven column.  The two climate
+    // fields form a 6×5 palette grid, so nearby columns share a biome while
+    // exploration still encounters the complete existing biome table.
+    const float temperature = 0.5f + 0.5f * m_noise.noise2D(
+        x * 0.0012f + 1201.0f,
+        z * 0.0012f - 1297.0f);
+    const float humidity = 0.5f + 0.5f * m_noise.noise2D(
+        x * 0.00135f - 1433.0f,
+        z * 0.00135f + 1511.0f);
+    const int temperatureBand = std::clamp(
+        static_cast<int>(temperature * 6.0f), 0, 5);
+    const int humidityBand = std::clamp(
+        static_cast<int>(humidity * 5.0f), 0, 4);
+    island.biome = static_cast<Biome>(
+        (temperatureBand * 5 + humidityBand) % BIOME_COUNT);
+
+    // The summit height is independent of the footprint.  Its two coherent
+    // fields give wide plateaus with gentle slopes instead of a per-island
+    // spherical cap, while rounding keeps adjacent walkable columns smooth.
+    const float topBase = m_noise.octave2D(
+        x * HEAVEN_TOP_SCALE + 521.0f,
+        z * HEAVEN_TOP_SCALE - 607.0f,
+        2, 0.5f, 2.0f);
+    const float topRelief = m_noise.noise2D(
+        x * HEAVEN_RELIEF_SCALE - 733.0f,
+        z * HEAVEN_RELIEF_SCALE + 809.0f);
+    island.top = std::clamp(static_cast<int>(std::lround(
+        154.0f + topBase * 30.0f + topRelief * 10.0f)), 104, 224);
+
+    // Interior depth is driven by mask density, not distance to an anchor.
+    // The underside field then varies the taper from column to column, giving
+    // each island a broken, End-like lower silhouette without floating shards.
+    const float normalizedDensity = std::clamp(
+        (field - HEAVEN_PRESENT_THRESHOLD) /
+            (1.0f - HEAVEN_PRESENT_THRESHOLD),
+        0.0f, 1.0f);
+    const float interior = smoothstep(0.0f, 0.58f, normalizedDensity);
+    const float undersideNoise = 0.5f + 0.5f * m_noise.noise2D(
+        x * HEAVEN_UNDERSIDE_SCALE + 947.0f,
+        z * HEAVEN_UNDERSIDE_SCALE - 1013.0f);
+    const float depthValue = 6.0f + interior *
+        (20.0f + undersideNoise * 24.0f);
+    const int depth = std::clamp(static_cast<int>(std::lround(depthValue)),
+                                 6, 52);
+    island.bottom = std::max(HEAVEN_ISLAND_MIN_Y, island.top - depth + 1);
+    // Preserve the old pool predicate's meaning: low values are island
+    // interiors, high values are coastlines.
+    island.islandFactor = 1.0f - interior;
+    return island;
 }
 
 void WorldGenerator::populateHeaven(

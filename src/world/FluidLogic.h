@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -88,13 +89,28 @@ inline bool isFluidWaterHole(BlockId target, bool lava) {
 using FluidSample = std::function<BlockId(const glm::ivec3&)>;
 using FluidAvailable = std::function<bool(const glm::ivec3&)>;
 
+// Fixed-capacity result used by the scheduler's hot path. It preserves the
+// vector-like range/size API used by tests and legacy callers without a heap
+// allocation for the usual four-direction fan-out.
+struct FluidDirectionSet {
+    std::array<glm::ivec3, 4> offsets{};
+    size_t count = 0;
+    const glm::ivec3* begin() const { return offsets.data(); }
+    const glm::ivec3* end() const { return offsets.data() + count; }
+    size_t size() const { return count; }
+    bool empty() const { return count == 0; }
+    const glm::ivec3& front() const { return offsets[0]; }
+    const glm::ivec3& operator[](size_t index) const { return offsets[index]; }
+};
+
 // Java's getSlopeDistance. `amount` is the amount available in the current
 // cell; each horizontal step consumes the material-specific dropoff.
+template <typename Sample, typename Available>
 inline int fluidSlopeDistanceByAmount(const glm::ivec3& origin, bool lava,
                                       uint8_t amount, int depth,
                                       int blockedDirection,
-                                      const FluidSample& sample,
-                                      const FluidAvailable& available) {
+                                      const Sample& sample,
+                                      const Available& available) {
     constexpr int unreachable = 1000;
     if (depth >= fluidSlopeFindDistance(lava)) return unreachable;
     const uint8_t candidateAmount = amount > fluidHorizontalDecay(lava)
@@ -117,10 +133,11 @@ inline int fluidSlopeDistanceByAmount(const glm::ivec3& origin, bool lava,
     return best;
 }
 
-inline std::vector<glm::ivec3> preferredFluidDirectionsByAmount(
+template <typename Sample, typename Available>
+inline FluidDirectionSet preferredFluidDirectionsByAmount(
         const glm::ivec3& origin, bool lava, uint8_t currentAmount,
-        bool currentFalling, const FluidSample& sample,
-        const FluidAvailable& available) {
+        bool currentFalling, const Sample& sample,
+        const Available& available) {
     constexpr int unreachable = 1000;
     const uint8_t sideAmount = currentFalling
         ? static_cast<uint8_t>(7)
@@ -146,19 +163,20 @@ inline std::vector<glm::ivec3> preferredFluidDirectionsByAmount(
     // horizontal destination: Java's spread code keeps all equally best
     // candidates instead of treating the absence of a drop as a dead end.
     // This is what lets a source on superflat terrain fan out normally.
-    std::vector<glm::ivec3> result;
+    FluidDirectionSet result;
     for (int direction = 0; direction < 4; ++direction)
         if (candidates[direction] && costs[direction] == best)
-            result.push_back(FLUID_HORIZONTAL_OFFSETS[direction]);
+            result.offsets[result.count++] = FLUID_HORIZONTAL_OFFSETS[direction];
     return result;
 }
 
 // Legacy level-based routing wrappers. Their numerical behavior is kept for
 // old callers/tests while the scheduler uses the amount-based API above.
+template <typename Sample, typename Available>
 inline int fluidSlopeDistance(const glm::ivec3& origin, bool lava, uint8_t level,
                               int depth, int blockedDirection,
-                              const FluidSample& sample,
-                              const FluidAvailable& available) {
+                              const Sample& sample,
+                              const Available& available) {
     constexpr int maximumSearchDepth = 4;
     constexpr int unreachable = 1000;
     if (depth >= maximumSearchDepth) return unreachable;
@@ -178,9 +196,10 @@ inline int fluidSlopeDistance(const glm::ivec3& origin, bool lava, uint8_t level
     return best;
 }
 
-inline std::vector<glm::ivec3> preferredFluidDirections(
+template <typename Sample, typename Available>
+inline FluidDirectionSet preferredFluidDirections(
         const glm::ivec3& origin, bool lava, uint8_t currentLevel,
-        const FluidSample& sample, const FluidAvailable& available) {
+        const Sample& sample, const Available& available) {
     constexpr int unreachable = 1000;
     const uint8_t nextLevel = nextFluidLevel(lava, currentLevel);
     if (nextLevel > 7) return {};
@@ -197,10 +216,10 @@ inline std::vector<glm::ivec3> preferredFluidDirections(
             ? 0 : fluidSlopeDistance(candidate,lava,nextLevel,1,direction^1,sample,available);
         best = std::min(best,costs[direction]);
     }
-    std::vector<glm::ivec3> result;
+    FluidDirectionSet result;
     for (int direction=0;direction<4;++direction)
         if (candidates[direction]&&costs[direction]==best)
-            result.push_back(FLUID_HORIZONTAL_OFFSETS[direction]);
+            result.offsets[result.count++] = FLUID_HORIZONTAL_OFFSETS[direction];
     return result;
 }
 

@@ -232,11 +232,23 @@ int main() {
                 "heaven starts without natural entities");
         dimensions.terrainGenerated = true;
         dimensions.dayNightCycle.setDay();
-        require(dimensions.switchDimension(DimensionId::Overworld, clock.now()),
-                "session switches back to overworld");
+        dimensions.worldMetadata.heaven.safePosition = {8, 128, -4};
+        dimensions.worldMetadata.heaven.hasSafePosition = true;
+        dimensions.player.setPosition(
+            {24.5, static_cast<double>(Config::WORLD_MIN_Y - 3), 24.5});
+        require(dimensions.handleVoidFall(clock.now(), {}),
+                "heaven void fall switches back to overworld");
         require(dimensions.activeDimension() == DimensionId::Overworld &&
                     !dimensions.world.isHeaven() && dimensions.dayNightCycle.isNight(),
                 "return switch restores the overworld generator");
+        require(dimensions.worldMetadata.heaven.playerPosition ==
+                    glm::dvec3(8.5, 128.01, -3.5),
+                "void return preserves the last grounded heaven position");
+        require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
+                "session can return to heaven after a void fall");
+        require(dimensions.player.getPosition() ==
+                    glm::dvec3(8.5, 128.01, -3.5),
+                "heaven re-entry does not restore the void position");
         dimensions.leaveWorld();
         drainGeneration(dimensions);
     }

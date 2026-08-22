@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 
 namespace {
 constexpr glm::ivec3 DOWN{0, -1, 0};
@@ -25,6 +26,60 @@ bool isSource(BlockId block) {
     return state.has_value() && state->source;
 }
 
+// Slope routing revisits the same few cells while exploring four directions.
+// Keep a small per-cell cache around the origin so each coordinate crosses the
+// World/Chunk locking boundary at most once during one update.
+class FluidNeighborhoodCache {
+public:
+    FluidNeighborhoodCache(World& world, const glm::ivec3& origin)
+        : m_world(world), m_origin(origin) {}
+
+    BlockId block(const glm::ivec3& position) {
+        const int index = indexFor(position);
+        if (index < 0) return m_world.getBlock(
+            position.x, position.y, position.z);
+        if (m_cached[static_cast<size_t>(index)] == 0) {
+            m_blocks[static_cast<size_t>(index)] = m_world.getBlock(
+                position.x, position.y, position.z);
+            m_cached[static_cast<size_t>(index)] = 1;
+        }
+        return m_blocks[static_cast<size_t>(index)];
+    }
+
+    bool available(const glm::ivec3& position) {
+        if (!Config::isValidWorldY(position.y)) return false;
+        const int index = indexFor(position);
+        if (index < 0) return m_world.isGeneratedAt(position.x, position.z);
+        if (m_availableCached[static_cast<size_t>(index)] == 0) {
+            m_available[static_cast<size_t>(index)] =
+                m_world.isGeneratedAt(position.x, position.z) ? 1 : 2;
+            m_availableCached[static_cast<size_t>(index)] = 1;
+        }
+        return m_available[static_cast<size_t>(index)] == 1;
+    }
+
+private:
+    static constexpr int RADIUS = 5;
+    static constexpr int WIDTH = RADIUS * 2 + 1;
+    static constexpr int HEIGHT = 3;
+
+    int indexFor(const glm::ivec3& position) const {
+        const int x = position.x - m_origin.x + RADIUS;
+        const int y = position.y - m_origin.y + 1;
+        const int z = position.z - m_origin.z + RADIUS;
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT ||
+            z < 0 || z >= WIDTH) return -1;
+        return x + z * WIDTH + y * WIDTH * WIDTH;
+    }
+
+    World& m_world;
+    glm::ivec3 m_origin;
+    std::array<BlockId, WIDTH * WIDTH * HEIGHT> m_blocks{};
+    std::array<uint8_t, WIDTH * WIDTH * HEIGHT> m_cached{};
+    std::array<uint8_t, WIDTH * WIDTH * HEIGHT> m_available{};
+    std::array<uint8_t, WIDTH * WIDTH * HEIGHT> m_availableCached{};
+};
+
 }
 
 uint64_t FluidScheduler::hash(uint64_t value) {
@@ -35,25 +90,112 @@ uint64_t FluidScheduler::hash(uint64_t value) {
     return value ^ (value >> 31);
 }
 
+bool FluidScheduler::earlier(const ScheduledFluidTick& a,
+                             const ScheduledFluidTick& b) {
+    if (a.due != b.due) return a.due < b.due;
+    return a.order < b.order;
+}
+
+void FluidScheduler::swapHeapNodes(size_t first, size_t second) {
+    std::swap(m_fluidTicks[first], m_fluidTicks[second]);
+    m_scheduledFluidIndices[FluidTickKey{
+        m_fluidTicks[first].position, m_fluidTicks[first].lava}] = first;
+    m_scheduledFluidIndices[FluidTickKey{
+        m_fluidTicks[second].position, m_fluidTicks[second].lava}] = second;
+}
+
+void FluidScheduler::siftUp(size_t index) {
+    while (index > 0) {
+        const size_t parent = (index - 1) / 2;
+        if (!earlier(m_fluidTicks[index], m_fluidTicks[parent])) break;
+        swapHeapNodes(index, parent);
+        index = parent;
+    }
+}
+
+void FluidScheduler::siftDown(size_t index) {
+    for (;;) {
+        const size_t left = index * 2 + 1;
+        if (left >= m_fluidTicks.size()) return;
+        size_t best = left;
+        const size_t right = left + 1;
+        if (right < m_fluidTicks.size() &&
+            earlier(m_fluidTicks[right], m_fluidTicks[left])) best = right;
+        if (!earlier(m_fluidTicks[best], m_fluidTicks[index])) return;
+        swapHeapNodes(index, best);
+        index = best;
+    }
+}
+
+void FluidScheduler::removeHeapAt(size_t index) {
+    const FluidTickKey removed{
+        m_fluidTicks[index].position, m_fluidTicks[index].lava};
+    const size_t last = m_fluidTicks.size() - 1;
+    if (index != last) swapHeapNodes(index, last);
+    m_fluidTicks.pop_back();
+    m_scheduledFluidIndices.erase(removed);
+    if (index < m_fluidTicks.size()) {
+        if (index > 0 && earlier(m_fluidTicks[index],
+                                 m_fluidTicks[(index - 1) / 2]))
+            siftUp(index);
+        else
+            siftDown(index);
+    }
+}
+
+FluidScheduler::ScheduledFluidTick FluidScheduler::removeHeapRoot() {
+    ScheduledFluidTick result = m_fluidTicks.front();
+    removeHeapAt(0);
+    return result;
+}
+
+void FluidScheduler::cancelAt(const glm::ivec3& position, bool lava) {
+    const auto it = m_scheduledFluidIndices.find({position, lava});
+    if (it != m_scheduledFluidIndices.end()) removeHeapAt(it->second);
+}
+
 void FluidScheduler::scheduleAt(const glm::ivec3& position,
                                  uint64_t minimumDelay,
                                  bool forceReschedule) {
     if (!Config::isValidWorldY(position.y) ||
-        !m_world.generatedAt(position.x, position.z)) return;
+        !m_world.generatedAt(position.x, position.z)) {
+        cancelAt(position, false);
+        cancelAt(position, true);
+        return;
+    }
     const BlockId block = m_world.getBlock(position.x, position.y, position.z);
     const auto state = decodeFluidState(block);
-    if (!state.has_value()) return;
+    if (!state.has_value()) {
+        cancelAt(position, false);
+        cancelAt(position, true);
+        return;
+    }
 
     const FluidTickKey key{position, state->lava};
+    // A block can switch fluid type before its old tick reaches the root.
+    // Remove that opposite-type key now instead of leaving a stale heap node.
+    cancelAt(position, !state->lava);
     const uint64_t delay = std::max<uint64_t>(
         minimumDelay, fluidTickDelay(state->lava));
     const uint64_t due = m_currentWorldTick + delay;
-    const auto existing = m_scheduledFluidDue.find(key);
-    if (!forceReschedule && existing != m_scheduledFluidDue.end() &&
-        existing->second.due <= due) return;
+    const auto existing = m_scheduledFluidIndices.find(key);
+    if (existing != m_scheduledFluidIndices.end()) {
+        ScheduledFluidTick& entry = m_fluidTicks[existing->second];
+        if (!forceReschedule && entry.due <= due) return;
+        entry.due = due;
+        entry.order = m_nextInsertionOrder++;
+        if (existing->second > 0 && earlier(
+                entry, m_fluidTicks[(existing->second - 1) / 2]))
+            siftUp(existing->second);
+        else
+            siftDown(existing->second);
+        return;
+    }
     const uint64_t order = m_nextInsertionOrder++;
-    m_scheduledFluidDue[key] = {due, order};
-    m_fluidTicks.push({due, order, position, state->lava});
+    m_fluidTicks.push_back({due, order, position, state->lava});
+    const size_t index = m_fluidTicks.size() - 1;
+    m_scheduledFluidIndices[key] = index;
+    siftUp(index);
 }
 
 void FluidScheduler::rescheduleAt(const glm::ivec3& position, uint64_t delay) {
@@ -68,8 +210,8 @@ void FluidScheduler::scheduleAround(const glm::ivec3& position,
 }
 
 void FluidScheduler::clear() {
-    m_fluidTicks = {};
-    m_scheduledFluidDue.clear();
+    m_fluidTicks.clear();
+    m_scheduledFluidIndices.clear();
     m_currentWorldTick = 0;
     m_nextInsertionOrder = 0;
 }
@@ -264,14 +406,14 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
     if (!fell && !state->source && waterHoleBelow) return;
     if (fell && sourceNeighbors < 3) return;
     if (fell && sourceNeighbors >= 3) {
+        FluidNeighborhoodCache neighborhood(m_world, position);
         for (const glm::ivec3& offset : preferredFluidDirectionsByAmount(
                  position, lava, state->amount, state->falling,
-                 [this](const glm::ivec3& p) {
-                     return m_world.getBlock(p.x, p.y, p.z);
+                 [&neighborhood](const glm::ivec3& p) {
+                     return neighborhood.block(p);
                  },
-                 [this](const glm::ivec3& p) {
-                     return Config::isValidWorldY(p.y) &&
-                            m_world.generatedAt(p.x, p.z);
+                 [&neighborhood](const glm::ivec3& p) {
+                     return neighborhood.available(p);
                  })) {
             spreadTo(position, position + offset, lava,
                      state->falling ? 7 :
@@ -283,11 +425,12 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
         return;
     }
 
-    const FluidSample sample = [this](const glm::ivec3& p) {
-        return m_world.getBlock(p.x, p.y, p.z);
+    FluidNeighborhoodCache neighborhood(m_world, position);
+    const auto sample = [&neighborhood](const glm::ivec3& p) {
+        return neighborhood.block(p);
     };
-    const FluidAvailable available = [this](const glm::ivec3& p) {
-        return Config::isValidWorldY(p.y) && m_world.generatedAt(p.x, p.z);
+    const auto available = [&neighborhood](const glm::ivec3& p) {
+        return neighborhood.available(p);
     };
     for (const glm::ivec3& offset : preferredFluidDirectionsByAmount(
              position, lava, state->amount, state->falling, sample, available)) {
@@ -366,28 +509,47 @@ void FluidScheduler::randomTickLava(uint64_t tick) {
     }
 }
 
-size_t FluidScheduler::tick(uint64_t tick, size_t maximumUpdates) {
+FluidTickStats FluidScheduler::tick(uint64_t tick,
+                                    const FluidTickBudget& budget) {
     m_currentWorldTick = tick;
-    size_t processed = 0;
-    size_t examined = 0;
-    while (!m_fluidTicks.empty() && m_fluidTicks.top().due <= tick &&
-           examined < maximumUpdates) {
-        ++examined;
-        const ScheduledFluidTick scheduled = m_fluidTicks.top();
-        m_fluidTicks.pop();
-        const FluidTickKey key{scheduled.position, scheduled.lava};
-        const auto current = m_scheduledFluidDue.find(key);
-        if (current == m_scheduledFluidDue.end() ||
-            current->second.due != scheduled.due ||
-            current->second.order != scheduled.order) continue;
-        m_scheduledFluidDue.erase(current);
+    FluidTickStats stats;
+    m_world.beginFluidBatch(tick);
+    while (!m_fluidTicks.empty() && m_fluidTicks.front().due <= tick &&
+           stats.examined < budget.maximumUpdates) {
+        if (std::chrono::steady_clock::now() >= budget.deadline) {
+            stats.deadlineReached = true;
+            break;
+        }
+        const ScheduledFluidTick scheduled = removeHeapRoot();
+        ++stats.examined;
         if (!m_world.generatedAt(scheduled.position.x, scheduled.position.z)) continue;
         const auto state = decodeFluidState(m_world.getBlock(
             scheduled.position.x, scheduled.position.y, scheduled.position.z));
         if (!state.has_value() || state->lava != scheduled.lava) continue;
         updateCell(scheduled.position, tick);
-        ++processed;
+        ++stats.updated;
     }
+    const auto& mutations = m_world.endFluidBatch();
+    stats.changed = mutations.size();
+    m_affectedSet.clear();
+    m_affectedPositions.clear();
+    m_affectedSet.reserve(mutations.size() * 7);
+    m_affectedPositions.reserve(mutations.size() * 7);
+    for (const auto& mutation : mutations) {
+        const std::array<glm::ivec3, 7> neighborhood{{
+            mutation.position, mutation.position + FACE_OFFSETS[0],
+            mutation.position + FACE_OFFSETS[1], mutation.position + FACE_OFFSETS[2],
+            mutation.position + FACE_OFFSETS[3], mutation.position + FACE_OFFSETS[4],
+            mutation.position + FACE_OFFSETS[5]}};
+        for (const glm::ivec3& position : neighborhood)
+            if (m_affectedSet.insert(position).second)
+                m_affectedPositions.push_back(position);
+    }
+    for (const glm::ivec3& position : m_affectedPositions)
+        scheduleAt(position, 1);
     randomTickLava(tick);
-    return processed;
+    stats.deferred = (!m_fluidTicks.empty() &&
+                      m_fluidTicks.front().due <= tick) ? 1u : 0u;
+    stats.queueSize = m_fluidTicks.size();
+    return stats;
 }

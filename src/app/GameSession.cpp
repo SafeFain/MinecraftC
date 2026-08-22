@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
+#include <chrono>
 
 GameSession::GameSession(const std::filesystem::path& savesDirectory)
     : player(world), entities(world), worldCatalog(savesDirectory) {
@@ -260,6 +261,10 @@ void GameSession::updatePlaying(
 
     survivalWorldTickRemainder += dt * 20.0f;
     size_t fluidUpdatesRemaining = Config::FLUID_UPDATES_PER_FRAME;
+    const auto fluidDeadline = std::chrono::steady_clock::now() +
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double, std::milli>(
+                Config::FLUID_MAIN_THREAD_BUDGET_MS));
     while (survivalWorldTickRemainder >= 1.0f) {
         ++survivalTicks;
         survivalWorldTickRemainder -= 1.0f;
@@ -268,12 +273,12 @@ void GameSession::updatePlaying(
         world.tickBlockEntities();
         const size_t fluidBudget = std::min(
             Config::FLUID_UPDATES_PER_TICK, fluidUpdatesRemaining);
-        // Consume the frame allowance before dispatch.  The scheduler may
-        // encounter stale de-duplicated queue entries and return fewer live
-        // updates, but examining those entries is work that must still be
-        // bounded during a catch-up loop.
+        // Consume the shared frame allowance before dispatch. The scheduler
+        // also checks the common deadline between live queue entries, so a
+        // catch-up loop cannot spend the whole frame on fluid work.
         fluidUpdatesRemaining -= fluidBudget;
-        world.tickFluids(survivalTicks, fluidBudget);
+        world.tickFluids(survivalTicks,
+                         FluidTickBudget{fluidBudget, fluidDeadline});
         if ((survivalTicks % 20) == 0) {
             world.tickSurvival(
                 player.getPosition(), survivalTicks, weather.raining());
@@ -510,7 +515,18 @@ bool GameSession::handleVoidFall(
     if (dimension != DimensionId::Heaven ||
         player.getPosition().y >= static_cast<double>(Config::WORLD_MIN_Y - 2))
         return false;
+    glm::dvec3 heavenReturnPosition{0.0};
+    if (worldMetadata.heaven.hasSafePosition) {
+        const glm::ivec3& safe = worldMetadata.heaven.safePosition;
+        heavenReturnPosition = {safe.x + 0.5, safe.y + 0.01, safe.z + 0.5};
+    } else {
+        heavenReturnPosition = world.findSafeSpawn();
+    }
     if (!switchDimension(DimensionId::Overworld, loadingStarted)) return false;
+    // switchDimension saves the position that triggered the void return.
+    // Replace it with the last grounded Heaven location so the next visit
+    // cannot resume below the world and immediately fall out again.
+    worldMetadata.heaven.playerPosition = heavenReturnPosition;
     if (feedback.dimensionLoading) feedback.dimensionLoading();
     const std::optional<glm::ivec3> bed = loadValidOverworldBed();
     if (bed) {
@@ -644,7 +660,17 @@ void GameSession::loadActiveDimensionState() {
         dayNightCycle.setPhase(worldMetadata.overworldDayPhase);
         weather.reset(worldMetadata.seed, worldMetadata.weather);
     } else {
-        player.setPosition(worldMetadata.heaven.playerPosition);
+        glm::dvec3 position = worldMetadata.heaven.playerPosition;
+        if (position.y < static_cast<double>(Config::WORLD_MIN_Y)) {
+            if (worldMetadata.heaven.hasSafePosition) {
+                const glm::ivec3& safe = worldMetadata.heaven.safePosition;
+                position = {safe.x + 0.5, safe.y + 0.01, safe.z + 0.5};
+            } else {
+                position = world.findSafeSpawn();
+            }
+            worldMetadata.heaven.playerPosition = position;
+        }
+        player.setPosition(position);
         survivalTicks = worldMetadata.heaven.worldTicks;
         dayNightCycle.setPhase(worldMetadata.heaven.dayPhase);
         weather.reset(worldMetadata.seed, WeatherSaveState{});

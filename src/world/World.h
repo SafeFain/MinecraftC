@@ -68,10 +68,19 @@ public:
         m_simulation.tickWeather(weather, daytime, tick);
     }
     void tickBlockEntities() { m_persistence.tickBlockEntities(); }
+    FluidTickStats tickFluids(uint64_t tick,
+                              const FluidTickBudget& budget) {
+        m_currentFluidTick = tick;
+        return m_fluids.tick(tick, budget);
+    }
+    const LightingBatchStats& fluidLightingStatistics() const {
+        return m_lighting.statistics();
+    }
+    void resetFluidLightingStatistics() { m_lighting.resetStatistics(); }
     size_t tickFluids(
         uint64_t tick,
         size_t maximumUpdates = Config::FLUID_UPDATES_PER_TICK) {
-        return m_fluids.tick(tick, maximumUpdates);
+        return tickFluids(tick, FluidTickBudget{maximumUpdates}).updated;
     }
     std::vector<glm::ivec3> takeTntIgnitions() {
         return m_simulation.takeTntIgnitions();
@@ -186,6 +195,9 @@ public:
     const std::vector<Chunk*>& getActiveChunks() const {
         return m_chunks.activeChunks();
     }
+    bool isGeneratedAt(int worldX, int worldZ) const {
+        return generatedAt(worldX, worldZ);
+    }
     bool isHeaven() const { return m_generator.isHeaven(); }
     uint64_t streamingRevision() const { return m_streamer.streamingRevision(); }
     bool streamingTargetReady() const { return m_streamer.streamingTargetReady(); }
@@ -225,6 +237,30 @@ private:
     WorldGenerator m_generator;
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
+
+    struct FluidMutation {
+        glm::ivec3 position{0};
+        BlockId previous = BlockId::AIR;
+        BlockId current = BlockId::AIR;
+    };
+    struct FluidPositionHash {
+        size_t operator()(const glm::ivec3& p) const {
+            size_t h = std::hash<int>{}(p.x);
+            h ^= std::hash<int>{}(p.y) + 0x9e3779b9u + (h << 6) + (h >> 2);
+            h ^= std::hash<int>{}(p.z) + 0x9e3779b9u + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    void beginFluidBatch(uint64_t tick);
+    const std::vector<FluidMutation>& endFluidBatch();
+    uint64_t currentFluidTick() const { return m_currentFluidTick; }
+    bool m_fluidBatchActive = false;
+    uint64_t m_currentFluidTick = 0;
+    std::vector<FluidMutation> m_fluidMutations;
+    std::vector<FluidMutation> m_uniqueFluidMutations;
+    std::vector<glm::ivec3> m_fluidLightingPositions;
+    std::unordered_map<glm::ivec3, size_t, FluidPositionHash>
+        m_fluidMutationIndices;
 
     bool generatedAt(int worldX, int worldZ) const;
     void setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,

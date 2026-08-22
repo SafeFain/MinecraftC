@@ -11,8 +11,10 @@
 
 #include <cstdlib>
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <set>
 #include <tuple>
@@ -881,18 +883,57 @@ int main() {
     // than a continuous plane, and region/singleton generation agree.
     WorldGenerator heaven(0x123456789ULL, WorldType::Normal,
                           DimensionId::Heaven);
+    WorldGenerator heavenRepeat(0x123456789ULL, WorldType::Normal,
+                                DimensionId::Heaven);
+    WorldGenerator heavenDifferent(0x12345678AULL, WorldType::Normal,
+                                   DimensionId::Heaven);
+    constexpr std::array<glm::ivec2, 8> heavenProbes = {{
+        {-768, -768}, {-257, 113}, {-1, -1}, {0, 0},
+        {127, -389}, {384, 256}, {719, -64}, {768, 768}}};
+    bool differentSeedChanged = false;
+    for (const glm::ivec2& probe : heavenProbes) {
+        const SurfaceColumn first = heaven.sampleTerrainColumn(probe.x, probe.y);
+        const SurfaceColumn repeat = heavenRepeat.sampleTerrainColumn(
+            probe.x, probe.y);
+        require(first.height == repeat.height &&
+                    first.densityMinY == repeat.densityMinY &&
+                    first.densityMaxY == repeat.densityMaxY &&
+                    first.biome == repeat.biome,
+                "heaven generation is not deterministic for a fixed seed");
+        const SurfaceColumn other = heavenDifferent.sampleTerrainColumn(
+            probe.x, probe.y);
+        differentSeedChanged = differentSeedChanged ||
+            first.height != other.height || first.biome != other.biome ||
+            first.densityMinY != other.densityMinY;
+    }
+    require(differentSeedChanged,
+            "different Heaven seeds produced identical island samples");
     std::set<Biome> heavenBiomes;
     size_t heavenColumns = 0;
     size_t heavenAdjacentColumns = 0;
+    constexpr int heavenSampleMin = -768;
+    constexpr int heavenSampleMax = 768;
+    constexpr int heavenSampleStep = 8;
+    constexpr int heavenSampleSide =
+        (heavenSampleMax - heavenSampleMin) / heavenSampleStep + 1;
+    std::vector<uint8_t> heavenMask(
+        static_cast<size_t>(heavenSampleSide * heavenSampleSide));
+    int minimumHeavenDepth = std::numeric_limits<int>::max();
+    int maximumHeavenDepth = 0;
     for (int z = -768; z <= 768; z += 8) {
         for (int x = -768; x <= 768; x += 8) {
             const auto column = heaven.sampleTerrainColumn(x, z);
             if (column.height <= Config::WORLD_MIN_Y - 1) continue;
             ++heavenColumns;
+            const int gridX = (x - heavenSampleMin) / heavenSampleStep;
+            const int gridZ = (z - heavenSampleMin) / heavenSampleStep;
+            heavenMask[static_cast<size_t>(gridZ * heavenSampleSide + gridX)] = 1;
             heavenBiomes.insert(column.biome);
+            const int depth = column.height - column.densityMinY + 1;
+            minimumHeavenDepth = std::min(minimumHeavenDepth, depth);
+            maximumHeavenDepth = std::max(maximumHeavenDepth, depth);
             require(column.height >= 96 && column.height <= 236 &&
-                        column.height - column.densityMinY + 1 >= 2 &&
-                        column.height - column.densityMinY + 1 <= 48,
+                        depth >= 6 && depth <= 52,
                     "heaven island column exceeded its bounded vertical profile");
             const auto east = heaven.sampleTerrainColumn(x + 1, z);
             const auto south = heaven.sampleTerrainColumn(x, z + 1);
@@ -908,6 +949,45 @@ int main() {
             "heaven island field lacks density or biome diversity");
     require(heavenAdjacentColumns > 1000,
             "heaven summit smoothness test sampled too few adjacent columns");
+    std::vector<int> heavenComponentAreas;
+    for (int gridZ = 0; gridZ < heavenSampleSide; ++gridZ) {
+        for (int gridX = 0; gridX < heavenSampleSide; ++gridX) {
+            const size_t start = static_cast<size_t>(
+                gridZ * heavenSampleSide + gridX);
+            if (heavenMask[start] == 0) continue;
+            heavenMask[start] = 0;
+            std::vector<glm::ivec2> pending{{gridX, gridZ}};
+            int area = 0;
+            while (!pending.empty()) {
+                const glm::ivec2 cell = pending.back();
+                pending.pop_back();
+                ++area;
+                for (const glm::ivec2 offset : {
+                         glm::ivec2{1, 0}, glm::ivec2{-1, 0},
+                         glm::ivec2{0, 1}, glm::ivec2{0, -1}}) {
+                    const int nextX = cell.x + offset.x;
+                    const int nextZ = cell.y + offset.y;
+                    if (nextX < 0 || nextX >= heavenSampleSide ||
+                        nextZ < 0 || nextZ >= heavenSampleSide)
+                        continue;
+                    const size_t index = static_cast<size_t>(
+                        nextZ * heavenSampleSide + nextX);
+                    if (heavenMask[index] == 0) continue;
+                    heavenMask[index] = 0;
+                    pending.push_back({nextX, nextZ});
+                }
+            }
+            heavenComponentAreas.push_back(area);
+        }
+    }
+    std::sort(heavenComponentAreas.begin(), heavenComponentAreas.end());
+    require(heavenComponentAreas.size() >= 3 &&
+                heavenComponentAreas.back() >=
+                    heavenComponentAreas.front() * 3,
+            "heaven islands lack irregular group sizes or spacing");
+    require(minimumHeavenDepth <= 8 && maximumHeavenDepth >= 20 &&
+                maximumHeavenDepth - minimumHeavenDepth >= 10,
+            "heaven underside does not vary independently of the island mask");
     require(heaven.getTerrainHeight(0, 0) ==
                 heaven.queryHeightBiome(0, 0).height,
             "heaven point height and biome queries disagree");

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <atomic>
+#include <limits>
 
 #include "Config.h"
 #include "world/Block.h"
@@ -118,6 +119,52 @@ public:
     }
     uint64_t dataRevision() const { return m_dataRevision.load(); }
 
+    // Fluid-derived edits can be visually coalesced without changing the
+    // block-data revision used by persistence and mesh correctness checks.
+    void markFluidMutation(uint64_t tick) {
+        m_fluidRevision.fetch_add(1, std::memory_order_relaxed);
+        m_lastFluidMutationTick.store(tick, std::memory_order_relaxed);
+    }
+    uint64_t fluidRevision() const {
+        return m_fluidRevision.load(std::memory_order_relaxed);
+    }
+    uint64_t fluidMeshRevision() const {
+        return m_fluidMeshRevision.load(std::memory_order_relaxed);
+    }
+    void markNonFluidMutation() {
+        m_nonFluidRevision.fetch_add(1, std::memory_order_relaxed);
+    }
+    uint64_t nonFluidRevision() const {
+        return m_nonFluidRevision.load(std::memory_order_relaxed);
+    }
+    uint64_t nonFluidMeshRevision() const {
+        return m_nonFluidMeshRevision.load(std::memory_order_relaxed);
+    }
+    uint64_t pendingNonFluidMeshRevision() const {
+        return m_pendingNonFluidMeshRevision.load(std::memory_order_relaxed);
+    }
+    uint64_t pendingFluidMeshRevision() const {
+        return m_pendingFluidMeshRevision.load(std::memory_order_relaxed);
+    }
+    uint64_t lastFluidMeshAttemptTick() const {
+        return m_lastFluidMeshAttemptTick.load(std::memory_order_relaxed);
+    }
+    void markFluidMeshAttempt(uint64_t tick) {
+        m_lastFluidMeshAttemptTick.store(tick, std::memory_order_relaxed);
+    }
+    void markFluidMeshRevision(uint64_t revision) {
+        m_fluidMeshRevision.store(revision, std::memory_order_relaxed);
+    }
+    void markPendingFluidMeshRevision(uint64_t revision) {
+        m_pendingFluidMeshRevision.store(revision, std::memory_order_relaxed);
+    }
+    void markPendingNonFluidMeshRevision(uint64_t revision) {
+        m_pendingNonFluidMeshRevision.store(revision, std::memory_order_relaxed);
+    }
+    void markNonFluidMeshRevision(uint64_t revision) {
+        m_nonFluidMeshRevision.store(revision, std::memory_order_relaxed);
+    }
+
     // Column max write access (for WorldGenerator)
     void setColumnMaxY(int x, int z, int val) { m_columnMaxY[x][z] = val; }
 
@@ -157,6 +204,17 @@ private:
 
     bool m_dirty = true;
     std::atomic<uint64_t> m_dataRevision{1};
+    std::atomic<uint64_t> m_fluidRevision{0};
+    std::atomic<uint64_t> m_fluidMeshRevision{0};
+    std::atomic<uint64_t> m_pendingFluidMeshRevision{0};
+    std::atomic<uint64_t> m_nonFluidRevision{0};
+    std::atomic<uint64_t> m_nonFluidMeshRevision{0};
+    std::atomic<uint64_t> m_pendingNonFluidMeshRevision{0};
+    std::atomic<uint64_t> m_lastFluidMutationTick{0};
+    // UINT64_MAX means that no fluid-derived mesh snapshot has been
+    // attempted yet; this keeps a real tick-0 attempt distinguishable.
+    std::atomic<uint64_t> m_lastFluidMeshAttemptTick{
+        std::numeric_limits<uint64_t>::max()};
 
     ChunkMesh m_mesh;
     std::mutex m_meshMutex;

@@ -59,6 +59,11 @@ constexpr size_t LOADING_MESH_UPLOAD_BYTES_PER_FRAME = 16u * 1024u * 1024u;
 // but it must never monopolize a simulation frame or a catch-up loop.
 constexpr size_t FLUID_UPDATES_PER_TICK = 256;
 constexpr size_t FLUID_UPDATES_PER_FRAME = 512;
+// Count limits remain the deterministic backstop; this small shared slice
+// prevents a catch-up frame from spending all of its main-thread time on
+// fluid work when individual updates become expensive.
+constexpr double FLUID_MAIN_THREAD_BUDGET_MS = 1.5;
+constexpr uint64_t FLUID_MESH_MERGE_TICKS = 2; // 100 ms at 20 game ticks/s
 
 constexpr int   RENDER_DISTANCE_OPTIONS[] = {2, 4, 6, 8, 10, 12, 16};
 constexpr int   RENDER_DISTANCE_OPTION_COUNT = 7;

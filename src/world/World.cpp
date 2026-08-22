@@ -47,6 +47,49 @@ bool rayIntersectsBlockBounds(const glm::dvec3& origin,
     }
     return maximum >= 0.0 && minimum <= maximumDistance;
 }
+
+}
+
+void World::beginFluidBatch(uint64_t tick) {
+    m_currentFluidTick = tick;
+    m_fluidBatchActive = true;
+    m_fluidMutations.clear();
+    m_fluidMutations.reserve(512);
+    m_uniqueFluidMutations.clear();
+    m_fluidLightingPositions.clear();
+    m_fluidMutationIndices.clear();
+}
+
+const std::vector<World::FluidMutation>& World::endFluidBatch() {
+    if (!m_fluidBatchActive) return m_uniqueFluidMutations;
+    m_fluidBatchActive = false;
+
+    m_uniqueFluidMutations.reserve(m_fluidMutations.size());
+    m_fluidMutationIndices.reserve(m_fluidMutations.size());
+    for (const FluidMutation& mutation : m_fluidMutations) {
+        const auto [it, inserted] = m_fluidMutationIndices.emplace(
+            mutation.position, m_uniqueFluidMutations.size());
+        if (inserted) {
+            m_uniqueFluidMutations.push_back(mutation);
+        } else {
+            FluidMutation& existing = m_uniqueFluidMutations[it->second];
+            existing.current = mutation.current;
+        }
+    }
+    m_fluidMutations.clear();
+
+    m_fluidLightingPositions.reserve(m_uniqueFluidMutations.size());
+    for (const FluidMutation& mutation : m_uniqueFluidMutations) {
+        if (mutation.previous == mutation.current) continue;
+        if (getLightEmission(mutation.previous) !=
+                getLightEmission(mutation.current) ||
+            getLightDampening(mutation.previous) !=
+                getLightDampening(mutation.current))
+            m_fluidLightingPositions.push_back(mutation.position);
+    }
+    if (!m_fluidLightingPositions.empty())
+        m_lighting.updateLightingBatch(m_fluidLightingPositions);
+    return m_uniqueFluidMutations;
 }
 
 World::World()
@@ -64,6 +107,12 @@ void World::resetForNewSeed(
         store.clearUnlocked();
     });
     m_fluids.clear();
+    m_fluidBatchActive = false;
+    m_fluidMutations.clear();
+    m_uniqueFluidMutations.clear();
+    m_fluidLightingPositions.clear();
+    m_fluidMutationIndices.clear();
+    m_currentFluidTick = 0;
     m_persistence.clear();
     m_simulation.clear();
     m_lighting.reset();
@@ -262,6 +311,11 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (isDerivedFluidState(id)) recordOverride = false;
     const BlockId previous = getBlock(worldX, worldY, worldZ);
     if (previous == id) return;
+    // Replacing fluid with air is still a fluid-surface change. Replacing it
+    // with an ordinary block is a player edit and must bypass the fluid mesh
+    // merge window immediately.
+    const bool fluidMutation = isFluid(id) ||
+        (isFluid(previous) && id == BlockId::AIR);
 
     int cx = worldToChunkX(static_cast<double>(worldX));
     int cz = worldToChunkZ(static_cast<double>(worldZ));
@@ -280,14 +334,34 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (recordOverride) {
         m_persistence.recordOverride(cx, cz, localIndex, id);
     }
-    m_lighting.updateLightingAt({worldX,worldY,worldZ});
+    const glm::ivec3 position{worldX, worldY, worldZ};
+    if (m_fluidBatchActive) {
+        if (fluidMutation) chunk->markFluidMutation(m_currentFluidTick);
+        else chunk->markNonFluidMutation();
+        m_fluidMutations.push_back({position, previous, id});
+    } else {
+        if (fluidMutation) chunk->markFluidMutation(m_currentFluidTick);
+        else chunk->markNonFluidMutation();
+        m_lighting.updateLightingAt(position);
+    }
 
-    if (lx == 0)                   m_chunks.markDirty(cx - 1, cz);
-    if (lx == Config::CHUNK_SIZE_X - 1) m_chunks.markDirty(cx + 1, cz);
-    if (lz == 0)                   m_chunks.markDirty(cx, cz - 1);
-    if (lz == Config::CHUNK_SIZE_Z - 1) m_chunks.markDirty(cx, cz + 1);
-    m_fluids.onBlockChanged({worldX, worldY, worldZ}, previous, id);
-    m_fluids.scheduleAround({worldX, worldY, worldZ});
+    auto markNeighbor = [&](int neighborX, int neighborZ) {
+        Chunk* neighbor = m_chunks.find(neighborX, neighborZ);
+        if (neighbor == nullptr) return;
+        neighbor->markDirty();
+        if (fluidMutation)
+            neighbor->markFluidMutation(m_currentFluidTick);
+        else
+            neighbor->markNonFluidMutation();
+    };
+    if (lx == 0) markNeighbor(cx - 1, cz);
+    if (lx == Config::CHUNK_SIZE_X - 1) markNeighbor(cx + 1, cz);
+    if (lz == 0) markNeighbor(cx, cz - 1);
+    if (lz == Config::CHUNK_SIZE_Z - 1) markNeighbor(cx, cz + 1);
+    if (!m_fluidBatchActive) {
+        m_fluids.onBlockChanged(position, previous, id);
+        m_fluids.scheduleAround(position);
+    }
     if (isBed(previous)) {
         BedPart previousPart = BedPart::Foot;
         BedDirection previousDirection = BedDirection::North;
