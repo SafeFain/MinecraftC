@@ -24,6 +24,25 @@ struct ParsedCommand;
 
 class GameSession {
 public:
+    enum class SleepAction : uint8_t {
+        SleepUntilMorning,
+        LeaveBed,
+        TravelToHeaven
+    };
+
+    enum class SleepVisualState : uint8_t {
+        Awake,
+        Entering,
+        Choosing,
+        Leaving
+    };
+
+    enum class LoadingReason : uint8_t {
+        World,
+        EnteringHeaven,
+        ReturningOverworld
+    };
+
     struct Feedback {
         std::function<void(float)> setRainVolume;
         std::function<void(float, float)> playExplosion;
@@ -32,6 +51,10 @@ public:
         std::function<void()> playerDied;
         std::function<void()> autosaveMetadataError;
         std::function<void()> autosaveFlushError;
+        std::function<void()> sleepStarted;
+        std::function<void()> sleepEnded;
+        std::function<void()> sleepBlocked;
+        std::function<void()> dimensionLoading;
     };
     struct CommandResult {
         std::vector<std::string> messages;
@@ -52,7 +75,19 @@ public:
     bool advanceLoading(IGameRenderer* renderer, RuntimeClock::Tick now);
     void updatePlaying(float dt, IGameRenderer* renderer,
                        const Feedback& feedback);
-    void respawn();
+    bool beginSleepAtBed(const glm::ivec3& bed);
+    void chooseSleepAction(SleepAction action, RuntimeClock::Tick loadingStarted,
+                           const Feedback& feedback);
+    void cancelSleep(const Feedback& feedback);
+    bool isSleeping() const { return sleepState != SleepVisualState::Awake; }
+    SleepVisualState sleepVisualState() const { return sleepState; }
+    float sleepAnimationProgress() const { return sleepProgress; }
+    const glm::ivec3& sleepingBed() const { return sleepBed; }
+    const glm::vec3& sleepFacing() const { return sleepFacingDirection; }
+    bool handleVoidFall(RuntimeClock::Tick loadingStarted, const Feedback& feedback);
+    bool switchDimension(DimensionId target, RuntimeClock::Tick loadingStarted);
+    DimensionId activeDimension() const { return dimension; }
+    void respawn(RuntimeClock::Tick loadingStarted = 0);
     CommandResult executeCommand(const ParsedCommand& command,
                                  const Localization& localization);
     void beginAutosave(const std::function<void()>& onError);
@@ -62,9 +97,10 @@ public:
                              RuntimeClock::Tick loadingStarted);
 
     // These owners are declared in dependency order so destruction runs as
-    // World -> ThreadPool -> SaveStore.  World drains its streaming I/O while
-    // both the worker pool and the store referenced by the streamer are alive.
+    // World -> ThreadPool -> dimension SaveStore -> metadata SaveStore.
+    // World drains its streaming I/O while both stores remain alive.
     std::unique_ptr<SaveStore> saveStore;
+    std::unique_ptr<SaveStore> dimensionSaveStore;
     ThreadPool threadPool;
     World world;
     Player player;
@@ -86,8 +122,20 @@ public:
     bool playerDead = false;
     uint64_t survivalTicks = 0;
     float survivalWorldTickRemainder = 0.0f;
+    DimensionId dimension = DimensionId::Overworld;
+    LoadingReason loadingReason = LoadingReason::World;
+    SleepVisualState sleepState = SleepVisualState::Awake;
+    glm::ivec3 sleepBed{0};
+    float sleepProgress = 0.0f;
+    glm::vec3 sleepFacingDirection{0.0f, 0.0f, -1.0f};
 
 private:
+    SaveStore* activeDataStore() const;
+    void saveActiveDimensionState();
+    void loadActiveDimensionState();
+    std::optional<glm::ivec3> loadValidOverworldBed();
+    void ensureHeavenSafePosition();
+    void finishSleep(const Feedback& feedback);
     void updateSaveMetadata();
     void tickLightning(const Feedback& feedback);
     void beginPlayerDeath();

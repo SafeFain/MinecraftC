@@ -102,6 +102,27 @@ public:
     }
     std::optional<ProjectileLaunch> bowLaunchPreview() const;
     void cancelBowCharge() { m_bowCharging = false; m_bowChargeSeconds = 0.0f; }
+    void setSleepingVisual(bool sleeping, float progress = 1.0f) {
+        m_sleeping = sleeping;
+        m_sleepProgress = std::clamp(progress, 0.0f, 1.0f);
+        if (sleeping) {
+            // A sleep transition owns the player interaction state.  Clear
+            // held actions here as well as in the input router so a button
+            // that was held when the bed was clicked cannot resume mining or
+            // shielding after the wake animation.
+            m_velocity = glm::vec3(0.0f);
+            m_onGround = true;
+            m_isSprinting = false;
+            m_mining = false;
+            m_miningTarget.reset();
+            m_miningProgress = 0.0f;
+            m_miningRequired = 0.0f;
+            m_blocking = false;
+            m_actionCooldown = 0.0f;
+            m_swingProgress = 1.0f;
+            cancelBowCharge();
+        }
+    }
 
     ItemStack activeItem() const;
     PlayerVisualState visualState() const;
@@ -162,10 +183,13 @@ private:
     float m_miningSwingSeconds = 0.0f;
     bool m_bowCharging = false;
     float m_bowChargeSeconds = 0.0f;
+    bool m_sleeping = false;
+    float m_sleepProgress = 0.0f;
     PlayerPhysics::HurtImmunity m_hurtImmunity;
 
     // ── Internal methods ─────────────────────────────────────────────
     void updateDirectionVectors();
+    void updateSleeping(float dt);
     void moveAndCollide(const glm::vec3& delta);
     void moveFlyingAndCollide(const glm::vec3& delta);
     bool checkCollision(double px, double py, double pz) const;

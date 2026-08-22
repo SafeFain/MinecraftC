@@ -226,7 +226,27 @@ void Player::handleMouseButton(int button, ButtonAction action) {
 
 // ── Update ────────────────────────────────────────────────────────────
 
+void Player::updateSleeping(float dt) {
+    // Bed animation freezes movement and interaction, but survival and
+    // environmental simulation still advance so fire, drowning, hunger and
+    // hurt immunity can cancel the sleep just like normal gameplay.
+    m_visualHorizontalVelocity = glm::vec2(0.0f);
+    m_landingSpeed = 0.0f;
+    PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
+    if (m_gameMode != GameMode::Survival) return;
+    m_survivalTickRemainder += dt * 20.0f;
+    const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
+    if (ticks == 0) return;
+    m_survivalStats.tick(m_difficulty, ticks);
+    updateEnvironment(ticks);
+    m_survivalTickRemainder -= static_cast<float>(ticks);
+}
+
 void Player::update(float dt) {
+    if (m_sleeping) {
+        updateSleeping(dt);
+        return;
+    }
     if (m_visualPositionInitialized && dt > 0.00001f) {
         m_visualHorizontalVelocity = PlayerPhysics::horizontalVelocity(
             m_previousVisualPosition, m_position, dt);
@@ -318,7 +338,7 @@ void Player::releaseBow() {
 PlayerVisualState Player::visualState() const {
     return {{m_visualHorizontalVelocity.x, m_velocity.y,
              m_visualHorizontalVelocity.y}, m_onGround, m_isSprinting,
-            m_swingSequence, m_swingProgress};
+            m_swingSequence, m_swingProgress, m_sleeping, m_sleepProgress};
 }
 
 void Player::startSwing() {
@@ -521,9 +541,11 @@ void Player::applyPhysics(float dt) {
 
     // Clamp Y
     if (m_position.y < static_cast<double>(Config::WORLD_MIN_Y)) {
-        m_position.y = static_cast<double>(Config::WORLD_MIN_Y) + 0.01;
-        m_velocity.y = 0.0f;
-        m_onGround = true;
+        if (!m_world.isHeaven()) {
+            m_position.y = static_cast<double>(Config::WORLD_MIN_Y) + 0.01;
+            m_velocity.y = 0.0f;
+            m_onGround = true;
+        }
     }
     if (m_position.y > Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT) {
         m_position.y = Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT;
@@ -696,7 +718,7 @@ bool Player::placeBlock() {
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
     const BlockId targetedBlock = m_world.getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
-    if (m_gameMode == GameMode::Survival && isBed(targetedBlock)) {
+    if (isBed(targetedBlock)) {
         const auto foot = m_world.validBedFoot(hit->blockPos);
         if (!foot) return false;
         if (m_bedCallback) m_bedCallback(*foot);

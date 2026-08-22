@@ -33,6 +33,7 @@ ThreadPool::ThreadPool(size_t numThreads) {
                     LOG_ERROR("ThreadPool worker task threw unknown exception");
                 }
                 --m_activeTasks;
+                m_idleCondition.notify_all();
             }
         });
     }
@@ -73,4 +74,11 @@ void ThreadPool::enqueuePriority(std::function<void()> task, int priority) {
 size_t ThreadPool::pendingCount() const {
     std::lock_guard lock(m_queueMutex);
     return m_tasks.size();
+}
+
+void ThreadPool::waitIdle() const {
+    std::unique_lock lock(m_queueMutex);
+    m_idleCondition.wait(lock, [this] {
+        return m_tasks.empty() && m_activeTasks.load() == 0;
+    });
 }

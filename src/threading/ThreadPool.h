@@ -28,6 +28,11 @@ public:
     size_t pendingCount() const;
     bool idle() const { return pendingCount() == 0 && m_activeTasks.load() == 0; }
 
+    // Block until both queued and currently executing work has completed.
+    // World/dimension resets use this as the ownership barrier before they
+    // destroy or reconstruct objects captured by worker tasks.
+    void waitIdle() const;
+
     // Number of worker threads
     size_t threadCount() const { return m_workers.size(); }
 
@@ -45,6 +50,7 @@ private:
     std::priority_queue<PrioritizedTask> m_tasks;
     mutable std::mutex m_queueMutex;
     std::condition_variable m_condition;
+    mutable std::condition_variable m_idleCondition;
     std::atomic<bool> m_stop{false};
     std::atomic<size_t> m_activeTasks{0};
 };

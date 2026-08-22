@@ -20,6 +20,8 @@ struct PlayerVisualState {
     bool sprinting = false;
     uint32_t swingSequence = 0;
     float swingProgress = 1.0f;
+    bool sleeping = false;
+    float sleepProgress = 0.0f;
 };
 
 enum class PlayerLocomotion : uint8_t { Idle, Walk, Run, Jump, Fall };

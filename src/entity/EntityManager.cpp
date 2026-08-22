@@ -115,6 +115,11 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
     if (!m_saveStore) return true;
     if (includeAllLoaded) {
         m_pendingEntitySaves.insert(m_loadedChunks.begin(), m_loadedChunks.end());
+        // Manual entities can be created before the next streaming sync (for
+        // example, immediately after a dimension load). Include their owning
+        // chunks so a dimension switch cannot strand them in memory.
+        for (const auto& entity : m_entities)
+            m_pendingEntitySaves.insert(entityChunk(entity.position));
         m_dirtyEntityChunks.clear();
     }
     size_t savedFiles = 0;
@@ -403,10 +408,14 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         float power;
     };
     std::vector<PendingExplosion> pendingExplosions;
-    m_spawnTimer += dt;
-    if (m_spawnTimer >= 4.0f) {
-        spawnAroundPlayer(
-            player.getPosition(), (!isDay || thunderstorm) && !peaceful);
+    if (m_naturalSpawningEnabled) {
+        m_spawnTimer += dt;
+        if (m_spawnTimer >= 4.0f) {
+            spawnAroundPlayer(
+                player.getPosition(), (!isDay || thunderstorm) && !peaceful);
+            m_spawnTimer = 0.0f;
+        }
+    } else {
         m_spawnTimer = 0.0f;
     }
 

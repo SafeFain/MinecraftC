@@ -876,6 +876,75 @@ int main() {
                     flatRegionChunks.front()->getBlock(3, y, 11),
                 "superflat singleton differs from region output");
 
+    // Heaven uses a separate deterministic island field.  Its void remains
+    // air at the world bottom, columns are bounded floating islands rather
+    // than a continuous plane, and region/singleton generation agree.
+    WorldGenerator heaven(0x123456789ULL, WorldType::Normal,
+                          DimensionId::Heaven);
+    std::set<Biome> heavenBiomes;
+    size_t heavenColumns = 0;
+    size_t heavenAdjacentColumns = 0;
+    for (int z = -768; z <= 768; z += 8) {
+        for (int x = -768; x <= 768; x += 8) {
+            const auto column = heaven.sampleTerrainColumn(x, z);
+            if (column.height <= Config::WORLD_MIN_Y - 1) continue;
+            ++heavenColumns;
+            heavenBiomes.insert(column.biome);
+            require(column.height >= 96 && column.height <= 236 &&
+                        column.height - column.densityMinY + 1 >= 2 &&
+                        column.height - column.densityMinY + 1 <= 48,
+                    "heaven island column exceeded its bounded vertical profile");
+            const auto east = heaven.sampleTerrainColumn(x + 1, z);
+            const auto south = heaven.sampleTerrainColumn(x, z + 1);
+            for (const auto& neighbor : {east, south}) {
+                if (neighbor.height <= Config::WORLD_MIN_Y - 1) continue;
+                ++heavenAdjacentColumns;
+                require(std::abs(neighbor.height - column.height) <= 1,
+                        "heaven island summit contains a one-block spike or pit");
+            }
+        }
+    }
+    require(heavenColumns > 1000 && heavenBiomes.size() >= 12,
+            "heaven island field lacks density or biome diversity");
+    require(heavenAdjacentColumns > 1000,
+            "heaven summit smoothness test sampled too few adjacent columns");
+    require(heaven.getTerrainHeight(0, 0) ==
+                heaven.queryHeightBiome(0, 0).height,
+            "heaven point height and biome queries disagree");
+    require(heaven.chunkCacheVersion() != WorldGenContext::CHUNK_CACHE_VERSION &&
+                heaven.generationVersion() != WorldGenContext::GENERATION_VERSION,
+            "heaven cache and generation versions share the overworld key");
+
+    std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
+    std::vector<Chunk*> heavenRegionChunks;
+    for (int cz = 0; cz < 3; ++cz) {
+        for (int cx = 0; cx < 3; ++cx) {
+            heavenRegionOwned.push_back(std::make_unique<Chunk>(cx - 1, cz - 1));
+            heavenRegionChunks.push_back(heavenRegionOwned.back().get());
+        }
+    }
+    std::vector<RegionGenerationData::PendingBlock> heavenPending;
+    heaven.generateRegion(-1, -1, 3, Config::REGION_PADDING,
+                          heavenRegionChunks, heavenPending);
+    require(heavenPending.empty(), "heaven generation has no boundary work");
+    Chunk heavenSingleton(-1, -1);
+    heaven.generate(heavenSingleton);
+    for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
+            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
+                require(heavenSingleton.getBlock(x, y, z) ==
+                            heavenRegionChunks.front()->getBlock(x, y, z),
+                        "heaven singleton differs from region output");
+    for (const Chunk* chunk : heavenRegionChunks) {
+        require(chunk->getBlock(0, Config::WORLD_MIN_Y, 0) == BlockId::AIR,
+                "heaven void incorrectly contains a bottom block");
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
+            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
+                require(chunk->getBlock(x, Config::WORLD_MIN_Y, z) !=
+                            BlockId::BEDROCK,
+                        "heaven generated bedrock under an island");
+    }
+
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()
               << " archetypes=" << observedArchetypes.size()

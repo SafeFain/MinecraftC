@@ -36,6 +36,9 @@ struct MenuCallbacks {
     std::function<void()> onQuit;
     std::function<void()> onOpenSettings;
     std::function<void()> onSettingsChanged;
+    // Sleep actions use stable integer values so the UI layer remains
+    // independent of GameSession's gameplay headers.
+    std::function<void(int)> onSleepAction;
 };
 
 // ── Button ────────────────────────────────────────────────────────────────
@@ -159,6 +162,24 @@ private:
 class PauseMenu : public Menu {
 public:
     PauseMenu(const MenuCallbacks& callbacks, const Localization& localization);
+
+    void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
+    void onKeyPress(int key, int mods = 0) override;
+    void onMouseMove(double x, double y) override;
+    void onMouseButton(int button, ButtonAction action, double x, double y) override;
+
+private:
+    std::vector<Button> m_buttons;
+    int m_selectedIdx = 0;
+    int m_pressedButton = -1;
+};
+
+// Bed interaction overlay.  The world keeps simulating behind this menu;
+// callers decide whether the action changes time or starts a dimension load.
+class SleepMenu : public Menu {
+public:
+    SleepMenu(const MenuCallbacks& callbacks, const Localization& localization,
+              bool heaven);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;

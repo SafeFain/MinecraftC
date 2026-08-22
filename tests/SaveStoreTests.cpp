@@ -84,6 +84,13 @@ int main() {
             10, {3.0f, 64.0f, -7.0f}, {0.0f, 0.2f, 0.0f},
             1.0f, 2.5f, {}, 424242
         });
+        source.activeDimension = DimensionId::Heaven;
+        source.overworldDayPhase = 0.37f;
+        source.heaven.playerPosition = {12.5, 144.0, -8.5};
+        source.heaven.safePosition = {12, 144, -9};
+        source.heaven.hasSafePosition = true;
+        source.heaven.worldTicks = 987654;
+        source.heaven.dayPhase = 0.81f;
 
         store.saveMetadata(source);
         require(store.exists(), "metadata file is created");
@@ -117,6 +124,14 @@ int main() {
                 loaded.entities[1].type == 10 &&
                 loaded.entities[1].position == source.entities[1].position,
                 "persistent entities round trip");
+        require(loaded.activeDimension == DimensionId::Heaven &&
+                std::abs(loaded.overworldDayPhase - 0.37f) < 0.0001f &&
+                loaded.heaven.playerPosition == source.heaven.playerPosition &&
+                loaded.heaven.safePosition == source.heaven.safePosition &&
+                loaded.heaven.hasSafePosition &&
+                loaded.heaven.worldTicks == source.heaven.worldTicks &&
+                std::abs(loaded.heaven.dayPhase - source.heaven.dayPhase) < 0.0001f,
+                "independent dimension state round trips");
 
         WorldMetadata replacement = source;
         replacement.worldTicks += 1;

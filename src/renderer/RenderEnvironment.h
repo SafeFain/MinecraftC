@@ -85,6 +85,16 @@ public:
     void setDay() { m_phase = 0.0f; m_manualTimeSet = true; }
     void setNight() { m_phase = 0.5f; m_manualTimeSet = true; }
 
+    // Restore a persisted dimension phase while keeping the phase bounded.
+    // Invalid values are treated as morning so corrupted metadata cannot
+    // produce NaNs in the sky or lighting path.
+    void setPhase(float phase) {
+        if (!std::isfinite(phase) || phase < 0.0f || phase >= 1.0f)
+            phase = MORNING_PHASE;
+        m_phase = phase;
+        m_manualTimeSet = false;
+    }
+
     void update(float deltaSeconds, int cycleMinutes, bool advancing) {
         if (cycleMinutes == 0) {
             if (!m_manualTimeSet) m_phase = STATIC_DAY_PHASE;

@@ -40,7 +40,11 @@ public:
     void resetForWorld(const glm::dvec3& playerPosition);
     void resetPlayerFeedback(const glm::dvec3& playerPosition);
     void updateCamera(const World& world, const Player& player,
-                      float dt, bool playerDead);
+                      float dt, bool playerDead,
+                      bool sleeping = false,
+                      const glm::ivec3& sleepBed = glm::ivec3(0),
+                      const glm::vec3& sleepFacing = glm::vec3(0.0f, 0.0f, -1.0f),
+                      float sleepProgress = 0.0f);
     void render(GameSession& session, IGameRenderer& renderer,
                 const ClientSettings& settings, Window& window,
                 const Localization& localization, GameState state,

@@ -311,6 +311,28 @@ int main() {
         require(harness.flow.state() == GameState::Playing,
                 "completeLoading enters the playing state");
 
+        // Exercise the real render-target loading gate across both dimension
+        // resets. In particular, a budgeted final lighting handoff must keep
+        // every unprocessed completion queued until all Heaven chunks can be
+        // meshed instead of stalling partway through preparation.
+        Config::RENDER_DISTANCE = 4;
+        require(harness.session.switchDimension(
+                    DimensionId::Heaven, harness.clock.now()),
+                "playing world switches into heaven");
+        require(harness.session.player.getPosition() ==
+                    harness.session.world.findSafeSpawn(),
+                "heaven switch centers its first stream on the island spawn");
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "overworld-to-heaven loading gate completes");
+        require(harness.session.activeDimension() == DimensionId::Heaven,
+                "heaven is active after its loading gate");
+        require(harness.session.switchDimension(
+                    DimensionId::Overworld, harness.clock.now()),
+                "heaven switches back to overworld");
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "heaven-to-overworld loading gate completes");
+        Config::RENDER_DISTANCE = 2;
+
         // Pause/resume round trip through the flow.
         harness.flow.pause();
         require(harness.flow.state() == GameState::Paused,

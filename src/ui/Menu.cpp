@@ -579,3 +579,84 @@ void PauseMenu::onMouseButton(int button, ButtonAction action, double x, double 
             m_buttons[static_cast<size_t>(captured)].activate();
     }
 }
+
+// ── Sleep Menu ───────────────────────────────────────────────────────────
+
+SleepMenu::SleepMenu(
+    const MenuCallbacks& callbacks, const Localization& localization,
+    bool heaven) {
+    m_buttons.emplace_back(localization.text("sleep.until_morning"),
+        [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(0); });
+    m_buttons.emplace_back(localization.text("sleep.leave_bed"),
+        [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(1); });
+    if (!heaven) {
+        m_buttons.emplace_back(localization.text("sleep.travel_heaven"),
+            [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(2); });
+    }
+    if (!m_buttons.empty()) m_buttons[0].setSelected(true);
+}
+
+void SleepMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
+    ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
+                static_cast<float>(screenHeight),
+                glm::vec4(0.0f, 0.0f, 0.02f, 0.38f));
+    const std::string title = ui.localization().text("sleep.title");
+    constexpr float titleScale = 3.0f;
+    const auto titleSize = ui.measureText(title, titleScale);
+    const float titleX = (screenWidth - titleSize.x) * 0.5f;
+    const float titleY = screenHeight * 0.62f;
+    ui.renderText(title, titleX, titleY, titleScale,
+                  glm::vec3(1.0f, 0.88f, 0.42f));
+    const float startY = titleY - titleSize.y - 40.0f;
+    const float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
+    for (size_t i = 0; i < m_buttons.size(); ++i) {
+        const float y = startY - static_cast<float>(i) *
+            (Config::UI_BUTTON_HEIGHT + Config::UI_BUTTON_SPACING);
+        m_buttons[i].setPosition(buttonX, y);
+        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, Config::UI_BUTTON_HEIGHT);
+        m_buttons[i].render(ui);
+    }
+}
+
+void SleepMenu::onKeyPress(int key, int) {
+    switch (key) {
+        case Key::Up:
+        case Key::W: navigateUp(m_buttons, m_selectedIdx); break;
+        case Key::Down:
+        case Key::S: navigateDown(m_buttons, m_selectedIdx); break;
+        case Key::Enter:
+        case Key::Space: activateSelected(m_buttons, m_selectedIdx); break;
+        case Key::Escape:
+            if (m_buttons.size() > 1) m_buttons[1].activate();
+            break;
+        default: break;
+    }
+}
+
+void SleepMenu::onMouseMove(double x, double y) {
+    for (auto& button : m_buttons)
+        button.setHovered(button.containsPoint(static_cast<float>(x),
+                                               static_cast<float>(y)));
+}
+
+void SleepMenu::onMouseButton(
+    int button, ButtonAction action, double x, double y) {
+    if (button != MouseButton::Left) return;
+    if (action == ButtonAction::Press) {
+        m_pressedButton = -1;
+        for (size_t i = 0; i < m_buttons.size(); ++i) {
+            if (!m_buttons[i].containsPoint(static_cast<float>(x),
+                                            static_cast<float>(y))) continue;
+            m_pressedButton = static_cast<int>(i);
+            m_buttons[i].setPressed(true);
+            return;
+        }
+    } else if (action == ButtonAction::Release && m_pressedButton >= 0) {
+        const int selected = m_pressedButton;
+        m_pressedButton = -1;
+        m_buttons[static_cast<size_t>(selected)].setPressed(false);
+        if (m_buttons[static_cast<size_t>(selected)].containsPoint(
+                static_cast<float>(x), static_cast<float>(y)))
+            m_buttons[static_cast<size_t>(selected)].activate();
+    }
+}

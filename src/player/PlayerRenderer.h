@@ -21,7 +21,8 @@ public:
                                 const glm::dvec3& renderOrigin,
                                 float yawDegrees, float pitchDegrees,
                                 const glm::mat4& viewProjection,
-                                SmoothLightSample light);
+                                SmoothLightSample light,
+                                glm::vec3 sleepingFacing = glm::vec3(0.0f));
 
 private:
     std::shared_ptr<const model::ModelAsset> m_asset;
@@ -33,4 +34,5 @@ private:
     std::string m_locomotion = "idle";
     int m_headNode = -1;
     int m_rightArmNode = -1;
+    bool m_sleeping = false;
 };

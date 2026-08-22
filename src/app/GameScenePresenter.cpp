@@ -123,9 +123,11 @@ void GameScenePresenter::render(
             const glm::mat4 hand = playerRenderer.renderThirdPerson(
                 renderer, session.player.getPosition(), renderOrigin,
                 session.player.getYaw(), session.player.getPitch(), vp,
-                session.world.sampleLight(session.player.getEyePosition()));
-            heldItemRenderer.renderThirdPerson(
-                session.player.activeItem(), vp, hand);
+                session.world.sampleLight(session.player.getEyePosition()),
+                session.sleepFacing());
+            if (!session.isSleeping())
+                heldItemRenderer.renderThirdPerson(
+                    session.player.activeItem(), vp, hand);
         }
         session.particles.buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
@@ -149,7 +151,8 @@ void GameScenePresenter::render(
         }
 
         if (perspective == CameraPerspective::FirstPerson &&
-            showFirstPersonItem && !session.player.isSpectator() && !session.playerDead)
+            showFirstPersonItem && !session.player.isSpectator() &&
+            !session.playerDead && !session.isSleeping())
             heldItemRenderer.renderFirstPerson(
                 session.player.activeItem(), session.player.visualState().swingProgress,
                 window.aspectRatio(),
@@ -257,7 +260,9 @@ void GameScenePresenter::resetPlayerFeedback(
 }
 
 void GameScenePresenter::updateCamera(
-    const World& world, const Player& player, float dt, bool playerDead) {
+    const World& world, const Player& player, float dt, bool playerDead,
+    bool sleeping, const glm::ivec3& sleepBed,
+    const glm::vec3& sleepFacing, float sleepProgress) {
     const PlayerVisualState visual = player.visualState();
     playerRenderer.update(visual, dt);
     camera.updateFov(dynamicViewFov(
@@ -266,13 +271,33 @@ void GameScenePresenter::updateCamera(
         playerDead ? 0.0f : player.bowCharge()), dt);
     cameraEffects.update(player.getPosition(), player.onGround(),
         player.isFlying(), player.velocity().y, player.landingSpeed(), dt);
-    const glm::dvec3 eye = player.getEyePosition();
-    cameraWorldPosition = resolveThirdPersonCamera(
-        world, eye, player.getForward(), perspective);
+    glm::dvec3 eye = player.getEyePosition();
+    if (sleeping) {
+        const glm::vec3 facing = glm::length(sleepFacing) > 0.01f
+            ? glm::normalize(sleepFacing) : glm::vec3(0.0f, 0.0f, -1.0f);
+        const glm::dvec3 bedView = glm::dvec3(sleepBed) +
+            glm::dvec3(0.5, 0.72, 0.5) + glm::dvec3(facing * 0.30f);
+        // PlayerVisualState carries the direction of the animation: entering
+        // goes 0→1, while leaving goes 1→0. Using it here keeps the camera
+        // attached to the bed during the first leave frame and restores the
+        // original eye position smoothly.
+        const float cameraProgress = std::clamp(
+            visual.sleeping ? visual.sleepProgress : sleepProgress, 0.0f, 1.0f);
+        const float eased = cameraProgress * cameraProgress *
+            (3.0f - 2.0f * cameraProgress);
+        eye = glm::mix(eye, bedView, static_cast<double>(eased));
+        cameraWorldPosition = eye;
+    } else {
+        cameraWorldPosition = resolveThirdPersonCamera(
+            world, eye, player.getForward(), perspective);
+    }
     const glm::dvec3 cameraLocal = cameraWorldPosition -
         glm::dvec3(player.getPosition().x, 0.0, player.getPosition().z);
     camera.setPosition(glm::vec3(cameraLocal));
-    if (perspective == CameraPerspective::ThirdPersonFront)
+    if (sleeping) {
+        const float yaw = glm::degrees(std::atan2(sleepFacing.x, sleepFacing.z));
+        camera.updateVectors(yaw, -18.0f);
+    } else if (perspective == CameraPerspective::ThirdPersonFront)
         camera.updateVectors(player.getYaw() + 180.0f, -player.getPitch());
     else
         camera.updateVectors(player.getYaw(), player.getPitch());

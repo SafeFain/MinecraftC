@@ -138,7 +138,12 @@ void GameUiController::render(
         renderer.drawRect(0, 0, static_cast<float>(uiWidth),
                               static_cast<float>(uiHeight),
                               glm::vec4(.055f, .065f, .08f, 1.0f));
-        const std::string title = localization.text("loading.title");
+        const char* loadingTitleKey = "loading.title";
+        if (session.loadingReason == GameSession::LoadingReason::EnteringHeaven)
+            loadingTitleKey = "loading.enter_heaven";
+        else if (session.loadingReason == GameSession::LoadingReason::ReturningOverworld)
+            loadingTitleKey = "loading.return_overworld";
+        const std::string title = localization.text(loadingTitleKey);
         const auto titleSize = renderer.measureText(title, 3.0f);
         renderer.renderText(title, (uiWidth - titleSize.x) * 0.5f,
                                 uiHeight * 0.58f, 3.0f,

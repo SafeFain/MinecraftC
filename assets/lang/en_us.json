@@ -75,6 +75,10 @@
   "menu.pause.title": "PAUSED",
   "menu.pause.resume": "Resume",
   "menu.pause.back": "Back to Menu",
+  "sleep.title": "RESTING",
+  "sleep.until_morning": "Sleep until morning",
+  "sleep.leave_bed": "Get up",
+  "sleep.travel_heaven": "Travel to Heaven",
 
   "settings.title": "SETTINGS",
   "settings.video_title": "VIDEO SETTINGS",
@@ -155,6 +159,8 @@
   "tooltip.food": "Food +{0}",
 
   "loading.title": "LOADING WORLD",
+  "loading.enter_heaven": "ENTERING HEAVEN",
+  "loading.return_overworld": "RETURNING TO THE OVERWORLD",
   "loading.chunks": "{0} / {1} chunks",
   "loading.generating": "Generating chunks: {0} / {1}",
   "loading.cached": "Loading chunks: {0} / {1}",
@@ -167,6 +173,7 @@
 
   "message.respawn_set": "Respawn point set",
   "message.monsters_nearby": "Respawn point set; monsters are nearby",
+  "message.sleep_blocked": "You may not sleep now; monsters are nearby",
   "message.slept": "Respawn point set; slept until morning",
   "message.cheats_disabled": "Cheats are disabled for this world",
   "message.mode_changed": "Game mode changed to {0}",
@@ -176,6 +183,8 @@
   "message.weather_clear": "Set weather to clear",
   "message.weather_rain": "Set weather to rain",
   "message.weather_thunder": "Set weather to thunder",
+  "message.heaven_weather_clear": "Heaven is always clear",
+  "message.heaven_bed_day": "The bed can be used at night in Heaven",
   "message.chat_self": "<Player> {0}",
   "message.help_header": "Available commands:",
   "message.help_biomes": "Biomes: ocean, beach, plain, forest, desert, mountains, hills, swamp, taiga, snow_tundra, jungle, savanna, deep_ocean, river, stony_shore, meadow, birch_forest, badlands, flower_forest, sunflower_plains, glacial_peaks, alpine_tundra, rocky_steppe, limestone_highlands, karst_forest, volcanic_highlands, black_sand_coast, red_canyon, lush_valley, dry_woodland",

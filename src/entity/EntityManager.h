@@ -82,6 +82,9 @@ public:
     void loadEntities(const std::vector<WorldMetadata::PersistedEntity>& entities);
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
+    void setNaturalSpawningEnabled(bool enabled) {
+        m_naturalSpawningEnabled = enabled;
+    }
     void syncChunks();
     bool flushChunkEntities(size_t maxFiles = std::numeric_limits<size_t>::max(),
                             bool includeAllLoaded = false);
@@ -101,6 +104,7 @@ private:
     uint64_t m_nextId = 1;
     float m_spawnTimer = 0.0f;
     uint32_t m_spawnSequence = 0;
+    bool m_naturalSpawningEnabled = true;
     SaveStore* m_saveStore = nullptr;
     std::set<std::pair<int,int>> m_loadedChunks;
     std::set<std::pair<int,int>> m_dirtyEntityChunks;

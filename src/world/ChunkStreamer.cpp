@@ -308,6 +308,7 @@ void ChunkStreamer::enqueueCacheReads() {
     }
 
     const auto directory = m_saveStore->worldDirectory();
+    const uint32_t cacheVersion = m_world.generator().chunkCacheVersion();
     const uint64_t epoch = m_streamEpoch;
     for (const auto& key : candidates) {
         bool claimed = false;
@@ -322,7 +323,7 @@ void ChunkStreamer::enqueueCacheReads() {
         if (!claimed) continue;
         ++m_cacheReadTasksInFlight;
         ChunkStreamer* streamer = this;
-        m_cacheIo.enqueue([streamer, directory, key, epoch] {
+        m_cacheIo.enqueue([streamer, directory, key, epoch, cacheVersion] {
             bool hit = false;
             std::vector<uint8_t> blocks;
             std::vector<BlockOverride> overrides;
@@ -332,7 +333,7 @@ void ChunkStreamer::enqueueCacheReads() {
                 SaveStore loader(directory);
                 ChunkLoadBundle bundle = loader.loadChunkLoadBundle(
                     key.first, key.second,
-                    WorldGenContext::CHUNK_CACHE_VERSION);
+                    cacheVersion);
                 if (bundle.generated) {
                     hit = true;
                     blocks = std::move(*bundle.generated);
@@ -445,18 +446,19 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
         return;
     }
     const auto directory = m_saveStore->worldDirectory();
+    const uint32_t cacheVersion = m_world.generator().chunkCacheVersion();
     const int cx = chunk->cx;
     const int cz = chunk->cz;
     const uint64_t epoch = m_streamEpoch;
     const std::vector<uint8_t> blocks = chunk->baseSnapshot();
     ++m_cacheWriteTasksInFlight;
     ChunkStreamer* streamer = this;
-    m_cacheIo.enqueue([streamer, directory, cx, cz, epoch, blocks] {
+    m_cacheIo.enqueue([streamer, directory, cx, cz, epoch, blocks, cacheVersion] {
         bool success = false;
         try {
             SaveStore saver(directory);
             saver.saveGeneratedChunk(cx, cz, blocks,
-                                     WorldGenContext::CHUNK_CACHE_VERSION);
+                                     cacheVersion);
             success = true;
         } catch (...) {
             // Cache writes are best effort; terrain remains deterministic.
@@ -710,6 +712,7 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
     RuntimeClock budgetClock;
     const auto budgetStart = budgetClock.now();
     const double effectiveBudgetMs = rebuildLightingNow ? mainThreadBudgetMs : 0.0;
+    size_t processedCount = 0;
     m_chunks.withUnique([&](ChunkStore& store) {
         // Persisted edits are always fluid wake-up sources at chunk load time.
         // AIR edits are retained because they can expose a natural fluid
@@ -787,13 +790,14 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
                 }
             }
         };
-        for (const auto& key : uniqueCompleted) {
+        for (; processedCount < uniqueCompleted.size(); ++processedCount) {
             if (effectiveBudgetMs > 0.0 &&
                 RuntimeClock::seconds(RuntimeClock::elapsed(
                     budgetStart, budgetClock.now())) * 1000.0 >= effectiveBudgetMs) {
                 budgetExhausted = true;
                 break;
             }
+            const auto& key = uniqueCompleted[processedCount];
             Chunk* chunk = store.findUnlocked(key.first, key.second);
             if (chunk == nullptr) continue;
             if (!chunk->generated.load()) continue;
@@ -863,6 +867,14 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
                 packedChunkKey(key.first, key.second));
         }
     });
+    // A loading-budget cutoff must not discard the untouched completion
+    // tail. Those chunks still need saved edits, lighting initialization and
+    // the lifecycle handoff before they can ever become mesh candidates.
+    if (budgetExhausted) {
+        std::lock_guard lock(m_generationCompletionMutex);
+        for (size_t i = processedCount; i < uniqueCompleted.size(); ++i)
+            m_generationCompletions.push_back(uniqueCompleted[i]);
+    }
     if (generationStateChanged) ++m_streamingRevision;
     for (const glm::ivec3& position : fluidSeeds)
         m_world.m_fluids.scheduleAround(position);
@@ -966,6 +978,10 @@ void ChunkStreamer::waitForInitialGeneration(int maxWaitMs) {
         bool allGenerated = true;
         m_chunks.withShared([&](ChunkStore& store) {
             store.forEachSharedUnlocked([&](const Chunk* chunk) {
+                if (chunk->cacheReadInProgress.load()) {
+                    allGenerated = false;
+                    return;
+                }
                 if (!chunk->generated.load() && !chunk->generationInProgress.load()) {
                     // Not generated and not being worked on — shouldn't happen
                     // if enqueue was called, but handle gracefully

@@ -52,6 +52,16 @@ void GameFlowController::completeLoading() {
     m_window.setCursorLocked(true);
 }
 
+void GameFlowController::beginDimensionLoading() {
+    m_state = GameState::LoadingWorld;
+    m_window.setCursorLocked(false);
+    m_ui.activeMenu.reset();
+    m_ui.commandOpen = false;
+    m_ui.commandInput.setText({});
+    m_scene.resetForWorld(m_session.player.getPosition());
+    m_audio.stopRain();
+}
+
 void GameFlowController::pause() {
     m_audio.setPaused(true);
     m_state = GameState::Paused;
@@ -78,9 +88,11 @@ void GameFlowController::backToMainMenu() {
 }
 
 void GameFlowController::respawnPlayer() {
-    m_session.respawn();
+    const bool wasHeaven = m_session.activeDimension() == DimensionId::Heaven;
+    m_session.respawn(m_clock.now());
+    if (wasHeaven) beginDimensionLoading();
     m_scene.resetPlayerFeedback(m_session.player.getPosition());
-    m_window.setCursorLocked(true);
+    if (!wasHeaven) m_window.setCursorLocked(true);
 }
 
 void GameFlowController::openInventory() {

@@ -111,7 +111,8 @@ public:
     // Clear all chunks and recreate the generator with a new seed/type.
     // Next update() + getChunk() calls regenerate the world from scratch.
     void resetForNewSeed(uint64_t newSeed,
-                         WorldType worldType = WorldType::Normal);
+                         WorldType worldType = WorldType::Normal,
+                         DimensionId dimension = DimensionId::Overworld);
 
     // Update chunk loading/unloading around player position
     void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0,
@@ -185,6 +186,7 @@ public:
     const std::vector<Chunk*>& getActiveChunks() const {
         return m_chunks.activeChunks();
     }
+    bool isHeaven() const { return m_generator.isHeaven(); }
     uint64_t streamingRevision() const { return m_streamer.streamingRevision(); }
     bool streamingTargetReady() const { return m_streamer.streamingTargetReady(); }
 

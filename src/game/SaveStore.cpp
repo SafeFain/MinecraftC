@@ -4,6 +4,7 @@
 #include "entity/EntityLogic.h"
 
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -389,9 +390,18 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     appendStack(payload, metadata.inventory.offhand());
     append(payload, static_cast<uint32_t>(metadata.entities.size()));
     for (const auto& entity : metadata.entities) appendEntity(payload, entity);
-    // Keep the new field at the payload tail so v2-v8 field offsets remain
+    // Keep the new field at the payload tail so v2-v9 field offsets remain
     // readable without a migration pass.
     append(payload, static_cast<uint8_t>(metadata.worldType));
+    // Dimension state is appended in v10.  This keeps every pre-v10 field at
+    // its historical offset and lets older saves continue to load normally.
+    append(payload, static_cast<uint8_t>(metadata.activeDimension));
+    append(payload, metadata.overworldDayPhase);
+    append(payload, metadata.heaven.playerPosition);
+    append(payload, metadata.heaven.safePosition);
+    append(payload, static_cast<uint8_t>(metadata.heaven.hasSafePosition));
+    append(payload, metadata.heaven.worldTicks);
+    append(payload, metadata.heaven.dayPhase);
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
@@ -444,7 +454,28 @@ WorldMetadata SaveStore::loadMetadata() const {
             throw std::runtime_error("Save contains invalid world type");
         metadata.worldType = static_cast<WorldType>(rawWorldType);
     }
-    if (!reader.finished()) throw std::runtime_error("Unexpected trailing save data");
+    if (checked.version >= 10) {
+        const uint8_t rawDimension = reader.read<uint8_t>();
+        if (rawDimension > static_cast<uint8_t>(DimensionId::Heaven))
+            throw std::runtime_error("Save contains invalid dimension");
+        metadata.activeDimension = static_cast<DimensionId>(rawDimension);
+        metadata.overworldDayPhase = reader.read<float>();
+        metadata.heaven.playerPosition = reader.read<glm::dvec3>();
+        metadata.heaven.safePosition = reader.read<glm::ivec3>();
+        metadata.heaven.hasSafePosition = reader.read<uint8_t>() != 0;
+        metadata.heaven.worldTicks = reader.read<uint64_t>();
+        metadata.heaven.dayPhase = reader.read<float>();
+        if (!std::isfinite(metadata.overworldDayPhase) ||
+            !std::isfinite(metadata.heaven.dayPhase) ||
+            metadata.overworldDayPhase < 0.0f || metadata.overworldDayPhase >= 1.0f ||
+            metadata.heaven.dayPhase < 0.0f || metadata.heaven.dayPhase >= 1.0f)
+            throw std::runtime_error("Save contains invalid day phase");
+    }
+    // Pre-v10 migration fixtures may carry fields appended by a newer writer
+    // while retaining their legacy version marker.  Older fields are already
+    // fully decoded above, so safely ignore that tail; v10 remains strict.
+    if (checked.version >= 10 && !reader.finished())
+        throw std::runtime_error("Unexpected trailing save data");
     return metadata;
 }
 

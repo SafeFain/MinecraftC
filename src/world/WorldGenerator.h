@@ -9,6 +9,7 @@
 #include "world/Chunk.h"
 #include "world/RegionGenerationData.h"
 #include "game/GameRules.h"
+#include "Config.h"
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -30,7 +31,8 @@ public:
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
 
     explicit WorldGenerator(uint64_t seed = 1234567890ULL,
-                             WorldType worldType = WorldType::Normal);
+                             WorldType worldType = WorldType::Normal,
+                             DimensionId dimension = DimensionId::Overworld);
 
     // ── Singleton chunk generation (fallback) ────────────────────────────
     void generate(Chunk& chunk,
@@ -46,6 +48,20 @@ public:
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
     SurfaceColumn sampleTerrainColumn(int worldX, int worldZ) const;
     WorldType worldType() const { return m_worldType; }
+    DimensionId dimension() const { return m_dimension; }
+    bool isHeaven() const { return m_dimension == DimensionId::Heaven; }
+    uint32_t generationVersion() const {
+        return isHeaven() ? HEAVEN_GENERATION_VERSION :
+                            WorldGenContext::GENERATION_VERSION;
+    }
+    uint32_t chunkCacheVersion() const {
+        return isHeaven() ? HEAVEN_CHUNK_CACHE_VERSION :
+                            WorldGenContext::CHUNK_CACHE_VERSION;
+    }
+
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 2;
+    static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
+        (HEAVEN_GENERATION_VERSION << 16) | 1u;
 
     // ── Sub-generator access (for RegionGenerator construction) ──────────
     HeightPipeline& getHeightPipeline() { return m_heightPipeline; }
@@ -57,6 +73,7 @@ public:
 private:
     uint64_t m_seed;
     WorldType m_worldType = WorldType::Normal;
+    DimensionId m_dimension = DimensionId::Overworld;
     Noise          m_noise;
     HeightPipeline m_heightPipeline;
     CaveGenerator  m_caveGenerator;
@@ -75,4 +92,15 @@ private:
 
     static SurfaceColumn superflatColumn();
     static void populateSuperflat(Chunk& chunk);
+
+    struct HeavenIslandColumn {
+        bool present = false;
+        Biome biome = Biome::PLAINS;
+        int top = Config::WORLD_MIN_Y - 1;
+        int bottom = Config::WORLD_MIN_Y;
+        float islandFactor = 0.0f;
+    };
+
+    HeavenIslandColumn sampleHeavenIsland(int worldX, int worldZ) const;
+    static void populateHeaven(Chunk& chunk, WorldGenerator& generator);
 };

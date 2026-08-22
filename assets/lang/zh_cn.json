@@ -75,6 +75,10 @@
   "menu.pause.title": "游戏已暂停",
   "menu.pause.resume": "回到游戏",
   "menu.pause.back": "保存并退回主菜单",
+  "sleep.title": "睡觉",
+  "sleep.until_morning": "睡到早晨",
+  "sleep.leave_bed": "起床",
+  "sleep.travel_heaven": "前往天境",
 
   "settings.title": "设置",
   "settings.video_title": "视频设置",
@@ -155,6 +159,8 @@
   "tooltip.food": "饥饿值 +{0}",
 
   "loading.title": "正在加载世界",
+  "loading.enter_heaven": "正在进入天境",
+  "loading.return_overworld": "正在返回主世界",
   "loading.chunks": "{0} / {1} 个区块",
   "loading.generating": "正在生成区块：{0} / {1}",
   "loading.cached": "正在加载区块：{0} / {1}",
@@ -167,6 +173,7 @@
 
   "message.respawn_set": "重生点已设置",
   "message.monsters_nearby": "重生点已设置；附近有怪物",
+  "message.sleep_blocked": "现在不能睡觉；附近有怪物",
   "message.slept": "重生点已设置；已睡到早晨",
   "message.cheats_disabled": "此世界未启用作弊",
   "message.mode_changed": "游戏模式已切换为{0}",
@@ -176,6 +183,8 @@
   "message.weather_clear": "天气已设为晴朗",
   "message.weather_rain": "天气已设为降雨",
   "message.weather_thunder": "天气已设为雷暴",
+  "message.heaven_weather_clear": "天境始终晴朗",
+  "message.heaven_bed_day": "天境中的床只能在夜间使用",
   "message.chat_self": "<玩家> {0}",
   "message.help_header": "可用指令：",
   "message.help_biomes": "群系：ocean, beach, plain, forest, desert, mountains, hills, swamp, taiga, snow_tundra, jungle, savanna, deep_ocean, river, stony_shore, meadow, birch_forest, badlands, flower_forest, sunflower_plains, glacial_peaks, alpine_tundra, rocky_steppe, limestone_highlands, karst_forest, volcanic_highlands, black_sand_coast, red_canyon, lush_valley, dry_woodland",

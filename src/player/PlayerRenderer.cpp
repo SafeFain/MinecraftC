@@ -34,6 +34,15 @@ void PlayerRenderer::initialize(const std::filesystem::path& root,
 
 void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
     if (!m_asset || !m_graph) return;
+    m_sleeping = state.sleeping;
+    if (state.sleeping) {
+        if (m_locomotion != "idle") {
+            m_mixer.play(m_graph->actionFor("idle"), model::PlayPolicy::Replace);
+            m_locomotion = "idle";
+        }
+        m_mixer.advance(dt);
+        return;
+    }
     const float horizontal = std::hypot(state.velocity.x, state.velocity.z);
     std::string locomotion;
     float speed = 1.0f;
@@ -65,7 +74,8 @@ void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
 glm::mat4 PlayerRenderer::renderThirdPerson(
     IGameRenderer& renderer, const glm::dvec3& position,
     const glm::dvec3& renderOrigin, float yawDegrees, float pitchDegrees,
-    const glm::mat4& viewProjection, SmoothLightSample light) {
+    const glm::mat4& viewProjection, SmoothLightSample light,
+    glm::vec3 sleepingFacing) {
     if (!m_asset || !m_handle) return glm::mat4(1.0f);
     m_mixer.evaluate(m_instance.pose);
     if (m_headNode >= 0) {
@@ -80,8 +90,19 @@ glm::mat4 PlayerRenderer::renderThirdPerson(
         m_instance.jointPalettes.push_back(
             model::jointMatrices(*m_asset,m_instance.pose,skin));
     const glm::vec3 local=glm::vec3(position-renderOrigin);
-    const glm::mat4 world=glm::translate(glm::mat4(1),local)*
-        glm::rotate(glm::mat4(1),glm::radians(yawDegrees + 180.0f),glm::vec3(0,1,0));
+    const float facingYaw = m_sleeping && glm::length(sleepingFacing) > 0.01f
+        ? glm::degrees(std::atan2(sleepingFacing.x, sleepingFacing.z))
+        : yawDegrees;
+    glm::mat4 world = glm::translate(glm::mat4(1), local) *
+        glm::rotate(glm::mat4(1), glm::radians(facingYaw + 180.0f),
+                    glm::vec3(0, 1, 0));
+    if (m_sleeping) {
+        world = glm::translate(glm::mat4(1), local + glm::vec3(0.0f, 0.42f, 0.0f)) *
+            glm::rotate(glm::mat4(1), glm::radians(facingYaw + 180.0f),
+                        glm::vec3(0, 1, 0)) *
+            glm::rotate(glm::mat4(1), glm::radians(90.0f),
+                        glm::vec3(0, 0, 1));
+    }
     const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.35f);
     const float block=std::pow(std::clamp(light.block,0.0f,1.0f),1.35f);
     const glm::vec3 illumination=glm::max(glm::vec3(sky),

@@ -49,9 +49,13 @@ bool rayIntersectsBlockBounds(const glm::dvec3& origin,
 }
 }
 
-World::World() : m_generator(Config::WORLD_SEED, WorldType::Normal) {}
+World::World()
+    : m_generator(Config::WORLD_SEED, WorldType::Normal,
+                  DimensionId::Overworld) {}
 
-void World::resetForNewSeed(uint64_t newSeed, WorldType worldType) {
+void World::resetForNewSeed(
+    uint64_t newSeed, WorldType worldType, DimensionId dimension) {
+    if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
     // Flush the streaming cache lane while chunk snapshots are still owned by
     // the store; the next world must not inherit a half-written cache chain.
@@ -66,11 +70,12 @@ void World::resetForNewSeed(uint64_t newSeed, WorldType worldType) {
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
-    new (&m_generator) WorldGenerator(newSeed, worldType);
+    new (&m_generator) WorldGenerator(newSeed, worldType, dimension);
     Config::WORLD_SEED = newSeed;
 }
 
 World::~World() {
+    if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
 }
 

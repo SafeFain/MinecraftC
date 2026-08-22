@@ -216,6 +216,8 @@ private:
             });
         m_session.player.setDamageCallback(
             [this](float amount) {
+                if (m_session.isSleeping())
+                    m_session.cancelSleep(m_sessionFeedback);
                 m_scene.onPlayerDamaged(amount);
                 m_window.gamepads().rumble(std::min(1.0f, .2f + amount * .08f),
                                            140, m_clientSettings.gamepadRumble);
@@ -235,6 +237,25 @@ private:
         m_sessionFeedback.playerDied = [this] {
             m_window.setCursorLocked(false);
         };
+        m_sessionFeedback.sleepStarted = [this] {
+            m_ui.activeMenu = std::make_unique<SleepMenu>(
+                m_ui.menuCallbacks, m_ui.localization,
+                m_session.activeDimension() == DimensionId::Heaven);
+            m_window.setCursorLocked(false);
+        };
+        m_sessionFeedback.sleepEnded = [this] {
+            if (m_flow.state() == GameState::Playing) {
+                m_ui.activeMenu.reset();
+                m_window.setCursorLocked(true);
+            }
+        };
+        m_sessionFeedback.sleepBlocked = [this] {
+            m_flow.showCommandMessage(
+                m_ui.localization.text("message.sleep_blocked"));
+        };
+        m_sessionFeedback.dimensionLoading = [this] {
+            m_flow.beginDimensionLoading();
+        };
         m_sessionFeedback.autosaveMetadataError = [this] {
             m_flow.showCommandMessage(m_ui.localization.text("message.autosave_log"));
         };
@@ -242,15 +263,20 @@ private:
             m_flow.showCommandMessage(m_ui.localization.text("message.autosave_retry"));
         };
         m_session.player.setBedCallback([this](const glm::ivec3& bed) {
-            m_session.worldMetadata.bedSpawn = bed;
             if (!m_session.dayNightCycle.isNight()) {
-                m_flow.showCommandMessage(m_ui.localization.text("message.respawn_set"));
-            } else if (m_session.entities.hasHostileNear(glm::vec3(bed), 8.0f)) {
-                m_flow.showCommandMessage(m_ui.localization.text("message.monsters_nearby"));
-            } else {
-                m_session.dayNightCycle.resetMorning();
-                m_session.weather.setWeather(WeatherType::Clear);
-                m_flow.showCommandMessage(m_ui.localization.text("message.slept"));
+                if (m_session.activeDimension() == DimensionId::Overworld)
+                    m_session.worldMetadata.bedSpawn = bed;
+                m_flow.showCommandMessage(m_ui.localization.text(
+                    m_session.activeDimension() == DimensionId::Overworld
+                        ? "message.respawn_set" : "message.heaven_bed_day"));
+                return;
+            }
+            if (m_session.beginSleepAtBed(bed)) {
+                if (m_session.activeDimension() == DimensionId::Overworld)
+                    m_session.worldMetadata.bedSpawn = bed;
+                if (m_sessionFeedback.sleepStarted) m_sessionFeedback.sleepStarted();
+            } else if (m_sessionFeedback.sleepBlocked) {
+                m_sessionFeedback.sleepBlocked();
             }
         });
 
@@ -305,6 +331,12 @@ private:
         m_ui.menuCallbacks.onBackToMenu = [this]() { m_flow.backToMainMenu(); };
         m_ui.menuCallbacks.onQuit = [this]() { m_running = false; };
         m_ui.menuCallbacks.onSettingsChanged = [this]() { applyClientSettings(); };
+        m_ui.menuCallbacks.onSleepAction = [this](int action) {
+            if (action < 0 || action > 2) return;
+            m_session.chooseSleepAction(
+                static_cast<GameSession::SleepAction>(action),
+                m_runtimeClock.now(), m_sessionFeedback);
+        };
 
         m_ui.menuCallbacks.onOpenSettings = [this]() {
             // Save current state to restore the correct menu on back
@@ -408,8 +440,11 @@ private:
             if (m_ui.containerOpen && (!m_ui.containerScreen.valid())) m_flow.closeInventory();
             m_session.updatePlaying(
                 dt, m_renderer.get(), m_sessionFeedback);
+            if (m_session.handleVoidFall(now, m_sessionFeedback)) return;
             m_scene.updateCamera(
-                m_session.world, m_session.player, dt, m_session.playerDead);
+                m_session.world, m_session.player, dt, m_session.playerDead,
+                m_session.isSleeping(), m_session.sleepingBed(),
+                m_session.sleepFacing(), m_session.sleepAnimationProgress());
         } else if (m_flow.state() == GameState::LoadingWorld) {
             if (m_session.advanceLoading(m_renderer.get(), now))
                 m_flow.completeLoading();

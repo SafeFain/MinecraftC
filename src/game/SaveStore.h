@@ -15,6 +15,16 @@
 #include "world/BlockEntity.h"
 
 struct WorldMetadata {
+    struct DimensionState {
+        glm::dvec3 playerPosition{0.0, 120.0, 0.0};
+        glm::ivec3 safePosition{0, 120, 0};
+        bool hasSafePosition = false;
+        uint64_t worldTicks = 0;
+        // DayNightCycle deliberately stores a plain phase here so the save
+        // layer does not depend on renderer headers.
+        float dayPhase = 0.04f;
+    };
+
     std::string displayName;
     uint64_t seed = 0;
     uint32_t generationVersion = 0;
@@ -45,6 +55,9 @@ struct WorldMetadata {
     };
     std::vector<PersistedEntity> entities;
     WorldType worldType = WorldType::Normal;
+    DimensionId activeDimension = DimensionId::Overworld;
+    float overworldDayPhase = 0.04f;
+    DimensionState heaven;
 };
 
 struct BlockOverride {

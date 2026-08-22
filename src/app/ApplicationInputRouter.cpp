@@ -47,10 +47,11 @@ void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
                         textInputWanted);
     updateLongPress();
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen && m_inputs.state.pressed(InputAction::Perspective))
+        !m_ui.commandOpen && !m_ui.activeMenu &&
+        m_inputs.state.pressed(InputAction::Perspective))
         cyclePerspective();
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen && !m_session.playerDead &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
         m_inputs.state.pressed(InputAction::DropItem))
         m_flow.dropSelectedItem();
     updateGamepadUi(now);
@@ -59,7 +60,7 @@ void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
 void ApplicationInputRouter::handleFrameInput(float dt) {
     // ── Handle input ──────────────────────────────────────────
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen) {
+        !m_ui.commandOpen && !m_ui.activeMenu) {
         double dx, dy;
         m_window.getCursorDelta(dx, dy);
         m_session.player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy),
@@ -148,6 +149,14 @@ void ApplicationInputRouter::handleKeyEvent(
         return;
     }
 
+    // Menus, including the non-pausing sleep overlay, own all keyboard
+    // actions while visible.  This keeps Escape as “get up” during sleep
+    // instead of opening the pause screen.
+    if (action == ButtonAction::Press && m_ui.activeMenu) {
+        m_ui.activeMenu->onKeyPress(key, mods);
+        return;
+    }
+
     if (action == ButtonAction::Press && keyBound(InputAction::Command) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
         !m_ui.inventoryOpen && !m_session.playerDead) {
@@ -189,7 +198,7 @@ void ApplicationInputRouter::handleKeyEvent(
     for (int slot = 0; slot < 9 && action == ButtonAction::Press; ++slot) {
         if (!keyBound(static_cast<InputAction>(
                 static_cast<int>(InputAction::Hotbar1) + slot))) continue;
-        if (m_flow.state() == GameState::Playing) {
+        if (m_flow.state() == GameState::Playing && !m_ui.activeMenu) {
             m_ui.hotbar.selectSlot(slot);
             m_session.player.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
         }
@@ -229,10 +238,6 @@ void ApplicationInputRouter::handleKeyEvent(
         return;
     }
 
-    // Route to active menu for key presses
-    if (action == ButtonAction::Press && m_ui.activeMenu) {
-        m_ui.activeMenu->onKeyPress(key, mods);
-    }
 }
 
 void ApplicationInputRouter::handleTextEvent(std::string_view text) {
@@ -289,7 +294,8 @@ void ApplicationInputRouter::handleMouseButtonEvent(
             static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY), mods);
         return;
     }
-    if (!m_ui.inventoryOpen && !m_ui.commandOpen && m_flow.state() == GameState::Playing &&
+    if (!m_ui.inventoryOpen && !m_ui.commandOpen && !m_ui.activeMenu &&
+        m_flow.state() == GameState::Playing &&
         (mouseBound(InputAction::Attack) || mouseBound(InputAction::Use))) {
         if (mouseBound(InputAction::Attack)) handleGameplayAction(false, action);
         if (mouseBound(InputAction::Use) && !m_ui.inventoryOpen) handleGameplayAction(true, action);
@@ -359,6 +365,7 @@ void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
 
 void ApplicationInputRouter::dispatchTouchCommands(
     const std::vector<TouchCommandEvent>& commands) {
+    if (m_ui.activeMenu) return;
     for (const auto& command : commands) {
         switch (command.command) {
             case TouchCommand::AttackPress: handleGameplayAction(false, ButtonAction::Press); break;
@@ -526,6 +533,7 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
 }
 
 void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action) {
+    if (m_ui.activeMenu) return;
     const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
     if (action == ButtonAction::Press && use && !m_session.player.isSpectator()) {
         auto hit = m_session.world.raycast(m_session.player.getEyePosition(), m_session.player.getForward(),

@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -479,6 +480,40 @@ void testGenerationHandoff() {
     drainWorkers(world, pool);
 }
 
+// A budget cutoff during the final generation handoff must retain the
+// untouched completion tail. Dimension loading depends on a later frame being
+// able to initialize lighting and make every generated chunk meshable.
+void testBudgetedGenerationHandoff() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 2;
+    ThreadPool pool(8);
+    World world;
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(4242, WorldType::Normal, DimensionId::Heaven);
+    world.update({0.5, 120.0, 0.5}, Config::LOADING_CHUNK_LOADS_PER_FRAME);
+
+    int frames = 0;
+    for (; frames < 4000; ++frames) {
+        world.enqueueGeneration();
+        const auto progress = world.generationProgress();
+        if (progress.total > 0 && progress.completed == progress.total &&
+            pool.idle())
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(frames < 4000,
+            "heaven chunks finish before the budgeted handoff test");
+
+    world.processCompletedGenerations(
+        true, std::numeric_limits<double>::min());
+    world.processCompletedGenerations(true, 10000.0);
+    const auto handedOff = world.generationProgress();
+    require(handedOff.lightingReady == handedOff.total,
+            "budgeted generation handoff lost completion entries");
+    drainWorkers(world, pool);
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
 // 6. Seed reset: a new seed clears the world state, bumps the streaming
 // revision, and generates different terrain.
 void testSeedReset() {
@@ -846,6 +881,7 @@ int main() {
     testWarmChunkBacktrack();
     testStreamingBenchmark();
     testGenerationHandoff();
+    testBudgetedGenerationHandoff();
     testSeedReset();
     testAutosaveQueue();
     testMeshPipeline();

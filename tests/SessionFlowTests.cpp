@@ -213,6 +213,34 @@ int main() {
         flat.leaveWorld();
     }
 
+    {
+        GameSession dimensions(root / "dimension-saves");
+        const std::string id = dimensions.worldCatalog.create(
+            "Dimension Test", 999, GameMode::Creative, Difficulty::Normal,
+            true);
+        dimensions.startWorld(id, true, clock.now());
+        dimensions.terrainGenerated = true;
+        dimensions.dayNightCycle.setNight();
+        require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
+                "session switches into heaven");
+        require(dimensions.activeDimension() == DimensionId::Heaven &&
+                    dimensions.world.isHeaven() && dimensions.dimensionSaveStore,
+                "heaven switch installs its generator and data store");
+        require(!dimensions.dayNightCycle.isNight(),
+                "heaven starts with its independent day phase");
+        require(dimensions.entities.entities().empty(),
+                "heaven starts without natural entities");
+        dimensions.terrainGenerated = true;
+        dimensions.dayNightCycle.setDay();
+        require(dimensions.switchDimension(DimensionId::Overworld, clock.now()),
+                "session switches back to overworld");
+        require(dimensions.activeDimension() == DimensionId::Overworld &&
+                    !dimensions.world.isHeaven() && dimensions.dayNightCycle.isNight(),
+                "return switch restores the overworld generator");
+        dimensions.leaveWorld();
+        drainGeneration(dimensions);
+    }
+
     std::filesystem::remove_all(root);
     std::cout << "Game session flow tests passed\n";
 }

@@ -38,6 +38,7 @@ public:
     // State transitions
     void startGame(const std::string& worldId, bool newWorld);
     void completeLoading();
+    void beginDimensionLoading();
     void pause();
     void resume();
     void backToMainMenu();
