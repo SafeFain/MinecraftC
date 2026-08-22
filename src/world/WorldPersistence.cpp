@@ -59,6 +59,22 @@ void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
     });
 }
 
+void WorldPersistence::installLoadedChunkDataUnlocked(
+    int cx, int cz, const std::vector<BlockOverride>& overrides,
+    const std::vector<PersistedBlockEntity>& entities) {
+    const std::pair<int, int> key{cx, cz};
+    auto& cached = m_blockOverrides[key];
+    for (const auto& entry : overrides) {
+        if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
+            static_cast<uint8_t>(entry.block) >= static_cast<uint8_t>(BlockId::COUNT) ||
+            isDerivedFluidState(entry.block)) continue;
+        cached[entry.localIndex] = entry.block;
+    }
+    auto& target = m_blockEntities[key];
+    for (const auto& entity : entities) target[entity.localIndex] = entity.value;
+    m_prefetchedChunks.insert(key);
+}
+
 void WorldPersistence::applySavedOverridesUnlocked(int cx, int cz) {
     const std::pair<int, int> key{cx, cz};
     if (m_overridesApplied.count(key) != 0) return;
@@ -71,7 +87,7 @@ void WorldPersistence::applySavedOverridesUnlocked(int cx, int cz) {
         if (isDerivedFluidState(it->second)){it=cached.erase(it);++pruned;}
         else ++it;
     }
-    if (m_saveStore) {
+    if (m_saveStore && m_prefetchedChunks.count(key) == 0) {
         for (const auto& entry : m_saveStore->loadChunkOverrides(cx, cz)) {
             if (isDerivedFluidState(entry.block)) {++pruned;continue;}
             cached[entry.localIndex] = entry.block;
@@ -130,7 +146,7 @@ void WorldPersistence::saveBlockEntities(int cx, int cz) {
 void WorldPersistence::loadBlockEntities(int cx, int cz) {
     const std::pair<int, int> key{cx, cz};
     if (m_blockEntitiesApplied.count(key)) return;
-    if (m_saveStore) {
+    if (m_saveStore && m_prefetchedChunks.count(key) == 0) {
         auto& target = m_blockEntities[key];
         for (const auto& persisted : m_saveStore->loadBlockEntities(cx, cz))
             target[persisted.localIndex] = persisted.value;

@@ -92,14 +92,19 @@ void GameSession::safeSpawn() {
 
 bool GameSession::advanceLoading(
     IGameRenderer* renderer, RuntimeClock::Tick now) {
-    world.update(player.getPosition(), Config::LOADING_CHUNK_LOADS_PER_FRAME);
+    world.update(player.getPosition(), Config::LOADING_CHUNK_LOADS_PER_FRAME,
+                 glm::dvec3(player.velocity()));
     if (!loadingGenerationComplete) {
         world.enqueueGeneration();
         world.processCompletedGenerations(false);
         const auto generation = world.generationProgress();
         if (world.streamingTargetReady() && generation.total > 0 &&
             generation.completed == generation.total && threadPool.idle()) {
-            world.processCompletedGenerations();
+            // The preceding unbounded completion pass has drained every
+            // generated chunk.  Finish the initial lighting handoff with the
+            // larger loading-screen budget before gameplay takes over.
+            world.processCompletedGenerations(
+                true, Config::LOADING_MAIN_BUDGET_MS);
             if (loadingNewWorld) {
                 world.persistGeneratedChunks();
                 safeSpawn();
@@ -205,7 +210,7 @@ void GameSession::updatePlaying(
         [](const LightningEvent& event) { return event.seconds <= 0.0f; }),
         lightningEvents.end());
 
-    world.update(player.getPosition());
+    world.update(player.getPosition(), 0, glm::dvec3(player.velocity()));
     world.enqueueGeneration();
     world.processCompletedGenerations();
     entities.syncChunks();

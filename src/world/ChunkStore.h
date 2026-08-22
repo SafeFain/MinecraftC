@@ -5,6 +5,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -25,10 +26,9 @@ public:
 
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
 
-    // Get or create the chunk at (cx, cz), loading a cached copy from the
-    // save store when available. Generation is deferred to the generation
-    // pipeline; a fresh chunk starts all-AIR. The returned pointer stays
-    // valid until the chunk is erased from this store.
+    // Get or create the chunk at (cx, cz). Cache loading and generation are
+    // deferred to ChunkStreamer; a fresh chunk starts all-AIR. The returned
+    // pointer stays valid until the chunk is erased from this store.
     Chunk* get(int cx, int cz);
 
     // Locked lookups; return nullptr when the chunk is not loaded.
@@ -42,7 +42,8 @@ public:
     void clear();
     // Rebuild the active-chunk list sorted near-to-far from (pcx, pcz).
     // Main thread only; the list is read lock-free by renderers.
-    void rebuildActiveChunks(int pcx, int pcz);
+    void rebuildActiveChunks(int pcx, int pcz,
+                             const std::unordered_set<uint64_t>* visible = nullptr);
     const std::vector<Chunk*>& activeChunks() const { return m_activeChunks; }
     size_t size() const;
 

@@ -8,6 +8,95 @@
 #include "world/World.h"
 
 #include <algorithm>
+#include <array>
+#include <unordered_set>
+
+namespace {
+struct MeshSnapshot {
+    static constexpr int WIDTH = Config::CHUNK_SIZE_X + 2;
+    static constexpr int DEPTH = Config::CHUNK_SIZE_Z + 2;
+    int baseX = 0;
+    int baseZ = 0;
+    std::vector<uint8_t> blocks;
+    std::vector<uint8_t> light;
+    std::vector<uint8_t> targetBlocks;
+    int columns[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
+
+    int ringIndex(int x, int y, int z) const {
+        return (x + 1) + (z + 1) * WIDTH +
+            Config::worldYToStorageY(y) * WIDTH * DEPTH;
+    }
+
+    BlockId block(int wx, int y, int wz) const {
+        const int x = wx - baseX;
+        const int z = wz - baseZ;
+        if (x < -1 || x > Config::CHUNK_SIZE_X ||
+            z < -1 || z > Config::CHUNK_SIZE_Z ||
+            !Config::isValidWorldY(y)) return BlockId::AIR;
+        return static_cast<BlockId>(blocks[ringIndex(x, y, z)]);
+    }
+
+    LightSample sampleLight(int wx, int y, int wz) const {
+        const int x = wx - baseX;
+        const int z = wz - baseZ;
+        if (x < -1 || x > Config::CHUNK_SIZE_X ||
+            z < -1 || z > Config::CHUNK_SIZE_Z ||
+            !Config::isValidWorldY(y)) return {};
+        return unpackLight(light[ringIndex(x, y, z)]);
+    }
+
+    const int (*columnData() const)[Config::CHUNK_SIZE_Z] {
+        return columns;
+    }
+};
+
+bool makeMeshSnapshot(ChunkStore& store, Chunk* target, MeshSnapshot& snapshot) {
+    if (target == nullptr || !target->generated.load()) return false;
+    snapshot.baseX = target->worldX();
+    snapshot.baseZ = target->worldZ();
+    snapshot.blocks.assign(static_cast<size_t>(MeshSnapshot::WIDTH) *
+                               MeshSnapshot::DEPTH * Config::CHUNK_VOLUME / 256,
+                           0);
+    snapshot.light.assign(snapshot.blocks.size(), 0);
+    snapshot.targetBlocks.clear();
+    // The target arrays are copied separately so the 16×16×Y buffer passed to
+    // ChunkMesh retains its original layout.  The ring starts as AIR/zero and
+    // is filled from the target plus its eight possible neighbours.
+    std::vector<uint8_t> targetLight;
+    target->copyRawState(snapshot.targetBlocks, targetLight);
+    target->copyColumnMaxY(snapshot.columns);
+    for (int x = -1; x <= 1; ++x) {
+        for (int z = -1; z <= 1; ++z) {
+            Chunk* source = store.findUnlocked(target->cx + x, target->cz + z);
+            if (source == nullptr || !source->generated.load()) continue;
+            std::vector<uint8_t> sourceBlocks, sourceLight;
+            source->copyRawState(sourceBlocks, sourceLight);
+            const int minX = x == -1 ? Config::CHUNK_SIZE_X - 1 : 0;
+            const int maxX = x == 1 ? 0 : Config::CHUNK_SIZE_X - 1;
+            const int minZ = z == -1 ? Config::CHUNK_SIZE_Z - 1 : 0;
+            const int maxZ = z == 1 ? 0 : Config::CHUNK_SIZE_Z - 1;
+            for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                for (int lx = minX; lx <= maxX; ++lx) {
+                    for (int lz = minZ; lz <= maxZ; ++lz) {
+                        const int wx = source->worldX() + lx - snapshot.baseX;
+                        const int wz = source->worldZ() + lz - snapshot.baseZ;
+                        if (wx < -1 || wx > Config::CHUNK_SIZE_X ||
+                            wz < -1 || wz > Config::CHUNK_SIZE_Z) continue;
+                        const int sourceIndex = lx + lz * Config::CHUNK_SIZE_X +
+                            Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+                        const int ring = snapshot.ringIndex(wx, y, wz);
+                        snapshot.blocks[ring] = sourceBlocks[sourceIndex];
+                        snapshot.light[ring] = sourceLight[sourceIndex];
+                    }
+                }
+            }
+        }
+    }
+    // The target was copied into the ring through the x/z=0 case above.  A
+    // target copy is also retained for the builder's compact local indexing.
+    return snapshot.targetBlocks.size() == static_cast<size_t>(Config::CHUNK_VOLUME);
+}
+}
 
 void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
     if (!m_threadPool) return;
@@ -19,16 +108,29 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
         store.forEachSharedUnlocked([&](const Chunk* chunk) {
             if (chunk->meshInProgress.load()) ++inFlight;
         });
-        availableSlots = std::max(1, maxInFlight) - inFlight;
+        const int workerCount = static_cast<int>(m_threadPool->threadCount());
+        const int boundedWorkers = std::max(1,
+            workerCount > 1 ? workerCount - 1 : 1);
+        availableSlots = std::min(std::max(1, maxInFlight), boundedWorkers) -
+            inFlight;
         if (availableSlots <= 0) return;
 
-        size_t total = 0;
-        store.forEachSharedUnlocked([&](const Chunk*) { ++total; });
-        candidates.reserve(total);
+        candidates.reserve(store.activeChunks().size() + 16);
+        std::unordered_set<Chunk*> active;
+        active.reserve(store.activeChunks().size());
+        for (Chunk* chunk : store.activeChunks()) {
+            active.insert(chunk);
+            if (chunk->isDirty() && !chunk->meshInProgress.load() &&
+                chunk->generated.load() &&
+                chunk->lifecycle.load() != Chunk::LifecycleState::Warm)
+                candidates.push_back(chunk);
+        }
+        // Prefetch chunks are intentionally not rendered yet, but may be
+        // close enough to finish a mesh before they enter the active set.
         store.forEachSharedUnlocked([&](Chunk* chunk) {
-            if (!chunk->isDirty()) return;
-            if (chunk->meshInProgress.load()) return;
-            if (!chunk->generated.load()) return;  // not generated yet
+            if (active.count(chunk) != 0 || !chunk->isDirty() ||
+                chunk->meshInProgress.load() || !chunk->generated.load() ||
+                chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return;
             candidates.push_back(chunk);
         });
     });
@@ -36,14 +138,8 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
 
     const int centerChunkX = m_world.centerChunkX();
     const int centerChunkZ = m_world.centerChunkZ();
-    std::sort(candidates.begin(), candidates.end(),
-              [centerChunkX, centerChunkZ](const Chunk* a, const Chunk* b) {
-                  const int64_t adx = static_cast<int64_t>(a->cx) - centerChunkX;
-                  const int64_t adz = static_cast<int64_t>(a->cz) - centerChunkZ;
-                  const int64_t bdx = static_cast<int64_t>(b->cx) - centerChunkX;
-                  const int64_t bdz = static_cast<int64_t>(b->cz) - centerChunkZ;
-                  return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
-              });
+    (void)centerChunkX;
+    (void)centerChunkZ;
 
     const int enqueueCount = std::min(
         {m_world.meshChunksPerFrame(), availableSlots,
@@ -52,31 +148,38 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
         Chunk* chunkPtr = candidates[static_cast<size_t>(i)];
 
         chunkPtr->meshInProgress = true;
+        chunkPtr->lifecycle = Chunk::LifecycleState::WaitingForMesh;
         chunkPtr->markClean();  // Mark clean NOW so we don't re-enqueue
         const uint64_t revision = chunkPtr->dataRevision();
 
         // Capture a raw pointer — the chunk is owned by the ChunkStore and
         // won't be destroyed while meshInProgress is true
-        World* worldPtr = &m_world;
         const int dx = chunkPtr->cx - centerChunkX;
         const int dz = chunkPtr->cz - centerChunkZ;
         const int distance2 = dx * dx + dz * dz;
 
-        m_threadPool->enqueuePriority([chunkPtr, worldPtr, revision]() {
-            // Build mesh into pending buffer
-            auto neighborFunc = [worldPtr](int wx, int wy, int wz) -> BlockId {
-                return worldPtr->getBlock(wx, wy, wz);
+        m_threadPool->enqueuePriority([this, chunkPtr, revision]() {
+            MeshSnapshot snapshot;
+            bool valid = false;
+            m_chunks.withShared([&](ChunkStore& store) {
+                valid = makeMeshSnapshot(store, chunkPtr, snapshot);
+            });
+            if (!valid) {
+                chunkPtr->meshReady = false;
+                chunkPtr->meshInProgress = false;
+                chunkPtr->markDirty();
+                return;
+            }
+            auto neighborFunc = [&snapshot](int wx, int wy, int wz) -> BlockId {
+                return snapshot.block(wx, wy, wz);
             };
-            auto lightFunc = [worldPtr](int wx, int wy, int wz) -> LightSample {
-                return worldPtr->getLight(wx, wy, wz);
+            auto lightFunc = [&snapshot](int wx, int wy, int wz) -> LightSample {
+                return snapshot.sampleLight(wx, wy, wz);
             };
-
             chunkPtr->m_pendingMesh.build(
                 chunkPtr->worldX(), chunkPtr->worldZ(),
-                chunkPtr->rawBlocks(),
-                chunkPtr->getColumnMaxYData(),
-                neighborFunc, lightFunc
-            );
+                snapshot.targetBlocks.data(), snapshot.columnData(),
+                neighborFunc, lightFunc);
             chunkPtr->pendingMeshRevision = revision;
 
             // Signal completion
@@ -93,20 +196,21 @@ void ChunkMeshPipeline::processCompletedMeshes(IGameRenderer* renderer,
 
     std::vector<Chunk*> ready;
     m_chunks.withShared([&](ChunkStore& store) {
-        store.forEachSharedUnlocked([&](Chunk* chunk) {
+        std::unordered_set<Chunk*> active;
+        active.reserve(store.activeChunks().size());
+        for (Chunk* chunk : store.activeChunks()) {
+            active.insert(chunk);
             if (chunk->meshReady.load()) ready.push_back(chunk);
+        }
+        store.forEachSharedUnlocked([&](Chunk* chunk) {
+            if (active.count(chunk) == 0 && chunk->meshReady.load())
+                ready.push_back(chunk);
         });
     });
     const int centerChunkX = m_world.centerChunkX();
     const int centerChunkZ = m_world.centerChunkZ();
-    std::sort(ready.begin(), ready.end(),
-              [centerChunkX, centerChunkZ](const Chunk* a, const Chunk* b) {
-                  const int64_t adx = static_cast<int64_t>(a->cx) - centerChunkX;
-                  const int64_t adz = static_cast<int64_t>(a->cz) - centerChunkZ;
-                  const int64_t bdx = static_cast<int64_t>(b->cx) - centerChunkX;
-                  const int64_t bdz = static_cast<int64_t>(b->cz) - centerChunkZ;
-                  return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
-              });
+    (void)centerChunkX;
+    (void)centerChunkZ;
     const int uploadCount = std::min(maxUploads, static_cast<int>(ready.size()));
     size_t uploadedBytes = 0;
     for (int i = 0; i < uploadCount; ++i) {
@@ -134,6 +238,7 @@ void ChunkMeshPipeline::processCompletedMeshes(IGameRenderer* renderer,
 
         chunk->meshReady = false;
         chunk->meshInProgress = false;
+        chunk->lifecycle = Chunk::LifecycleState::Renderable;
     }
 }
 

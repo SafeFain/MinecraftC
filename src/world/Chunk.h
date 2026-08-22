@@ -2,15 +2,30 @@
 
 #include <cstdint>
 #include <array>
+#include <vector>
 #include <mutex>
+#include <shared_mutex>
 #include <atomic>
 
 #include "Config.h"
 #include "world/Block.h"
 #include "world/ChunkMesh.h"
 
+enum class ChunkLifecycleState : uint8_t {
+    Requested,
+    CacheReading,
+    Generating,
+    LocalLighting,
+    BoundaryLighting,
+    WaitingForMesh,
+    Renderable,
+    Warm
+};
+
 class Chunk {
 public:
+    using LifecycleState = ChunkLifecycleState;
+
     Chunk(int cx, int cz);
 
     // Chunk coordinates
@@ -26,6 +41,12 @@ public:
     // Column height cache
     int getColumnMaxY(int x, int z) const { return m_columnMaxY[x][z]; }
     const int (*getColumnMaxYData() const)[Config::CHUNK_SIZE_Z] { return m_columnMaxY; }
+    void copyColumnMaxY(int out[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]) const {
+        std::shared_lock lock(m_dataMutex);
+        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
+                out[x][z] = m_columnMaxY[x][z];
+    }
 
     // Global max Y across all columns (for tighter frustum culling AABB)
     int getGlobalMaxY() const {
@@ -48,24 +69,53 @@ public:
     // blockAt(), update column maxima, then publish the whole edit once.
     void finishBulkBlockEdit() { ++m_dataRevision; m_dirty = true; }
     const uint8_t* rawBlocks() const { return m_blocks.data(); }
+    void copyRawState(std::vector<uint8_t>& blocks,
+                      std::vector<uint8_t>& light) const {
+        std::shared_lock lock(m_dataMutex);
+        blocks.assign(m_blocks.begin(), m_blocks.end());
+        light.assign(m_light.begin(), m_light.end());
+    }
     void loadRawBlocks(const std::vector<uint8_t>& blocks);
+
+    // A base snapshot is captured before player overrides are applied.  It
+    // lets the asynchronous generated-cache writer persist terrain without
+    // accidentally folding edits or derived fluid states into the base cache.
+    void captureBaseSnapshot() {
+        m_baseBlocks.assign(m_blocks.begin(), m_blocks.end());
+    }
+    bool hasBaseSnapshot() const { return !m_baseBlocks.empty(); }
+    const std::vector<uint8_t>& baseSnapshot() const { return m_baseBlocks; }
+    void setBaseBlock(int x, int y, int z, BlockId id) {
+        if (!m_baseBlocks.empty()) m_baseBlocks[index(x, y, z)] =
+            static_cast<uint8_t>(id);
+    }
+    void clearBaseSnapshot() { m_baseBlocks.clear(); m_baseBlocks.shrink_to_fit(); }
     uint8_t getPackedLight(int x, int y, int z) const {
-        return x < 0 || x >= Config::CHUNK_SIZE_X || !Config::isValidWorldY(y) ||
-               z < 0 || z >= Config::CHUNK_SIZE_Z ? 0 : m_light[index(x,y,z)];
+        if (x < 0 || x >= Config::CHUNK_SIZE_X ||
+            !Config::isValidWorldY(y) || z < 0 || z >= Config::CHUNK_SIZE_Z)
+            return 0;
+        std::shared_lock lock(m_dataMutex);
+        return m_light[index(x,y,z)];
     }
     uint8_t getBlockLight(int x, int y, int z) const { return getPackedLight(x,y,z) & 0x0f; }
     uint8_t getSkyLight(int x, int y, int z) const { return getPackedLight(x,y,z) >> 4; }
     void setBlockLight(int x, int y, int z, uint8_t value) {
+        std::unique_lock lock(m_dataMutex);
         auto& packed=m_light[index(x,y,z)];
         const uint8_t next=static_cast<uint8_t>((packed&0xf0)|(value&0x0f));
         if(packed!=next){packed=next;++m_dataRevision;}
     }
     void setSkyLight(int x, int y, int z, uint8_t value) {
+        std::unique_lock lock(m_dataMutex);
         auto& packed=m_light[index(x,y,z)];
         const uint8_t next=static_cast<uint8_t>((packed&0x0f)|((value&0x0f)<<4));
         if(packed!=next){packed=next;++m_dataRevision;}
     }
-    void clearLight() { m_light.fill(0); ++m_dataRevision; }
+    void clearLight() {
+        std::unique_lock lock(m_dataMutex);
+        m_light.fill(0);
+        ++m_dataRevision;
+    }
     uint64_t dataRevision() const { return m_dataRevision.load(); }
 
     // Column max write access (for WorldGenerator)
@@ -80,6 +130,16 @@ public:
     std::atomic<bool> generationInProgress{false}; // worker is generating terrain into this chunk
     std::atomic<bool> generated{false};            // generation complete, block data is valid
     std::atomic<bool> lightingInitialized{false};
+    std::atomic<LifecycleState> lifecycle{LifecycleState::Requested};
+
+    // Cache I/O is deliberately separate from generation.  A chunk remains
+    // unpublished until cacheChecked is true, so a cache miss can cleanly
+    // enter the region/singleton generation selector.
+    std::atomic<bool> cacheReadInProgress{false};
+    std::atomic<bool> cacheChecked{false};
+    std::atomic<bool> cacheHit{false};
+    std::atomic<bool> baseCacheInProgress{false};
+    std::atomic<bool> baseCacheDirty{false};
 
     // Atomic flags for async mesh building
     std::atomic<bool> meshReady{false};      // worker finished building pending mesh
@@ -91,6 +151,8 @@ private:
     // Flat array: blocks[x + z*16 + y*16*16]
     std::array<uint8_t, Config::CHUNK_VOLUME> m_blocks{};
     std::array<uint8_t, Config::CHUNK_VOLUME> m_light{};
+    std::vector<uint8_t> m_baseBlocks;
+    mutable std::shared_mutex m_dataMutex;
     int m_columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
 
     bool m_dirty = true;

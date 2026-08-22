@@ -53,11 +53,13 @@ World::World() : m_generator(Config::WORLD_SEED, WorldType::Normal) {}
 
 void World::resetForNewSeed(uint64_t newSeed, WorldType worldType) {
     m_meshes.releaseAllMeshes();
+    // Flush the streaming cache lane while chunk snapshots are still owned by
+    // the store; the next world must not inherit a half-written cache chain.
+    m_streamer.clear();
     m_chunks.withUnique([&](ChunkStore& store) {
         store.clearUnlocked();
     });
     m_fluids.clear();
-    m_streamer.clear();
     m_persistence.clear();
     m_simulation.clear();
     m_lighting.reset();

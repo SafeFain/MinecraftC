@@ -1,9 +1,7 @@
 #include "world/ChunkStore.h"
 
 #include "Config.h"
-#include "game/SaveStore.h"
 #include "world/Chunk.h"
-#include "world/WorldGenContext.h"
 
 #include <algorithm>
 
@@ -21,15 +19,9 @@ Chunk* ChunkStore::get(int cx, int cz) {
     if (it != m_chunks.end()) return it->second.get();
 
     auto chunk = std::make_unique<Chunk>(cx, cz);
-    if (m_saveStore) {
-        if (auto cached = m_saveStore->loadGeneratedChunk(
-                cx, cz, WorldGenContext::CHUNK_CACHE_VERSION)) {
-            chunk->loadRawBlocks(*cached);
-            chunk->generated = true;
-        }
-    }
-    // Generation is deferred to the pipeline — the chunk starts as all-AIR
-    // and will be populated by a worker thread.
+    // Cache probing/loading is asynchronous in ChunkStreamer.  Keeping this
+    // constructor path allocation-only removes filesystem latency from the
+    // main thread and makes a cache miss indistinguishable from a new chunk.
     Chunk* ptr = chunk.get();
     m_chunks[key] = std::move(chunk);
     return ptr;
@@ -77,11 +69,18 @@ void ChunkStore::clearUnlocked() {
     m_activeChunks.clear();
 }
 
-void ChunkStore::rebuildActiveChunks(int pcx, int pcz) {
+void ChunkStore::rebuildActiveChunks(
+    int pcx, int pcz, const std::unordered_set<uint64_t>* visible) {
     std::shared_lock lock(m_mutex);
     m_activeChunks.clear();
     m_activeChunks.reserve(m_chunks.size());
     for (auto& [key, chunk] : m_chunks) {
+        if (visible != nullptr) {
+            const uint64_t packed =
+                (static_cast<uint64_t>(static_cast<uint32_t>(key.first)) << 32) |
+                static_cast<uint32_t>(key.second);
+            if (visible->count(packed) == 0) continue;
+        }
         m_activeChunks.push_back(chunk.get());
     }
     std::sort(m_activeChunks.begin(), m_activeChunks.end(),

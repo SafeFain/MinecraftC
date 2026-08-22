@@ -114,8 +114,9 @@ public:
                          WorldType worldType = WorldType::Normal);
 
     // Update chunk loading/unloading around player position
-    void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0) {
-        m_streamer.update(playerPosition, loadBudgetOverride);
+    void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0,
+                const glm::dvec3& playerVelocity = glm::dvec3(0.0)) {
+        m_streamer.update(playerPosition, loadBudgetOverride, playerVelocity);
     }
 
     // ── Async generation pipeline ──────────────────────────────────────
@@ -125,8 +126,11 @@ public:
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.
-    void processCompletedGenerations(bool rebuildLightingNow = true) {
-        m_streamer.processCompletedGenerations(rebuildLightingNow);
+    void processCompletedGenerations(
+        bool rebuildLightingNow = true,
+        double mainThreadBudgetMs = Config::STREAMING_MAIN_BUDGET_MS) {
+        m_streamer.processCompletedGenerations(rebuildLightingNow,
+                                               mainThreadBudgetMs);
     }
 
     // Spin-wait for initial chunk generation (called once on first startGame)
@@ -142,6 +146,10 @@ public:
         return m_streamer.loadingProgress();
     }
     void persistGeneratedChunks() { m_streamer.persistGeneratedChunks(); }
+    std::optional<std::vector<WorldMetadata::PersistedEntity>>
+    takePrefetchedChunkEntities(int cx, int cz) {
+        return m_streamer.takePrefetchedChunkEntities(cx, cz);
+    }
 
     // Enqueue mesh builds for dirty chunks (async via thread pool)
     void enqueueMeshBuilds(

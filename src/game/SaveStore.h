@@ -52,6 +52,17 @@ struct BlockOverride {
     BlockId block = BlockId::AIR;
 };
 
+// One asynchronous read unit for a resident chunk. The generated terrain is
+// optional because a cache miss must fall back to deterministic generation;
+// the remaining vectors may be empty when the corresponding partition has
+// never been written.
+struct ChunkLoadBundle {
+    std::optional<std::vector<uint8_t>> generated;
+    std::vector<BlockOverride> overrides;
+    std::vector<PersistedBlockEntity> blockEntities;
+    std::vector<WorldMetadata::PersistedEntity> entities;
+};
+
 class SaveStore {
 public:
     explicit SaveStore(std::filesystem::path worldDirectory);
@@ -67,6 +78,8 @@ public:
                             const std::vector<uint8_t>& blocks,
                             uint32_t generationVersion) const;
     std::optional<std::vector<uint8_t>> loadGeneratedChunk(
+        int chunkX, int chunkZ, uint32_t generationVersion) const;
+    ChunkLoadBundle loadChunkLoadBundle(
         int chunkX, int chunkZ, uint32_t generationVersion) const;
     void saveBlockEntities(int chunkX, int chunkZ,
                            const std::vector<PersistedBlockEntity>& entities) const;

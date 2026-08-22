@@ -29,6 +29,11 @@ uint64_t payloadChecksum(const std::vector<uint8_t>& bytes, size_t offset) {
     return hash;
 }
 
+std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), {}};
+}
+
 void writeLittleEndian(std::vector<uint8_t>& bytes, size_t offset,
                        uint64_t value, size_t width) {
     for (size_t i = 0; i < width; ++i) {
@@ -193,12 +198,68 @@ int main() {
             -2, -7, WorldGenContext::GENERATION_VERSION);
         require(loadedGenerated && *loadedGenerated == generated,
                 "pregenerated chunk cache round trips");
+        const auto generatedPath = root / "negative-coordinates" /
+            "generated" / "g.-2.-7.bin";
+        const auto compressedBytes = readBytes(generatedPath);
+        require(compressedBytes.size() > 41 && compressedBytes[40] == 1,
+                "compressible generated cache selects the RLE codec");
         require(!store.loadGeneratedChunk(
                     -2, -7, WorldGenContext::GENERATION_VERSION + 1),
                 "pregenerated chunk cache rejects a different generation version");
+
+        // Rebuild the same file using the pre-codec payload layout.  This is
+        // the format shipped by existing worlds and must remain readable.
+        std::vector<uint8_t> legacyPayload;
+        legacyPayload.resize(16 + generated.size());
+        writeLittleEndian(legacyPayload, 0,
+                          static_cast<uint32_t>(static_cast<int32_t>(-2)), 4);
+        writeLittleEndian(legacyPayload, 4,
+                          static_cast<uint32_t>(static_cast<int32_t>(-7)), 4);
+        writeLittleEndian(legacyPayload, 8,
+                          WorldGenContext::GENERATION_VERSION, 4);
+        writeLittleEndian(legacyPayload, 12,
+                          static_cast<uint32_t>(generated.size()), 4);
+        std::copy(generated.begin(), generated.end(), legacyPayload.begin() + 16);
+        auto legacyBytes = compressedBytes;
+        legacyBytes.resize(24 + legacyPayload.size());
+        std::copy(legacyPayload.begin(), legacyPayload.end(), legacyBytes.begin() + 24);
+        writeLittleEndian(legacyBytes, 12,
+                          static_cast<uint32_t>(legacyPayload.size()), 4);
+        writeLittleEndian(legacyBytes, 16, payloadChecksum(legacyBytes, 24), 8);
         {
-            std::fstream file(root / "negative-coordinates" / "generated" /
-                                  "g.-2.-7.bin",
+            std::ofstream output(generatedPath, std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(legacyBytes.data()),
+                         static_cast<std::streamsize>(legacyBytes.size()));
+        }
+        const auto loadedLegacy = store.loadGeneratedChunk(
+            -2, -7, WorldGenContext::GENERATION_VERSION);
+        require(loadedLegacy && *loadedLegacy == generated,
+                "pre-codec raw generated cache remains readable");
+
+        // An incompressible block stream uses the raw fallback marker rather
+        // than growing by the codec header and run table.
+        std::vector<uint8_t> incompressible(Config::CHUNK_VOLUME);
+        for (size_t i = 0; i < incompressible.size(); ++i)
+            incompressible[i] = static_cast<uint8_t>(i %
+                static_cast<size_t>(BlockId::COUNT));
+        store.saveGeneratedChunk(-3, 4, incompressible,
+                                 WorldGenContext::GENERATION_VERSION);
+        const auto rawFallback = readBytes(root / "negative-coordinates" /
+            "generated" / "g.-3.4.bin");
+        require(rawFallback.size() > 40 && rawFallback[40] == 0,
+                "incompressible generated cache selects raw fallback");
+        const auto loadedRawFallback = store.loadGeneratedChunk(
+            -3, 4, WorldGenContext::GENERATION_VERSION);
+        require(loadedRawFallback && *loadedRawFallback == incompressible,
+                "raw fallback cache round trips exactly");
+        const auto bundle = store.loadChunkLoadBundle(
+            -3, 4, WorldGenContext::GENERATION_VERSION);
+        require(bundle.generated && *bundle.generated == incompressible &&
+                    bundle.overrides.empty() && bundle.blockEntities.empty() &&
+                    bundle.entities.empty(),
+                "chunk load bundle publishes all cache partitions together");
+        {
+            std::fstream file(generatedPath,
                               std::ios::binary | std::ios::in | std::ios::out);
             file.seekp(-1, std::ios::end);
             const char corrupt = '\x7f';

@@ -94,8 +94,13 @@ void EntityManager::syncChunks() {
         const auto key=entityChunk(entity.position);
         return m_loadedChunks.count(key) && !active.count(key);
     }),m_entities.end());
-    for (const auto& key : active) if (!m_loadedChunks.count(key))
-        loadEntities(m_saveStore->loadChunkEntities(key.first,key.second));
+    for (const auto& key : active) if (!m_loadedChunks.count(key)) {
+        if (auto prefetched = m_world.takePrefetchedChunkEntities(
+                key.first, key.second))
+            loadEntities(std::move(*prefetched));
+        else
+            loadEntities(m_saveStore->loadChunkEntities(key.first,key.second));
+    }
     m_loadedChunks=std::move(active);
     m_lastStreamingRevision = revision;
 }

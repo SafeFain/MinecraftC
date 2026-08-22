@@ -11,6 +11,7 @@ Chunk::Chunk(int cx, int cz) : cx(cx), cz(cz) {
 void Chunk::loadRawBlocks(const std::vector<uint8_t>& blocks) {
     if (blocks.size() != m_blocks.size())
         throw std::runtime_error("Generated chunk cache has the wrong size");
+    std::unique_lock lock(m_dataMutex);
     std::copy(blocks.begin(), blocks.end(), m_blocks.begin());
     ++m_dataRevision;
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
@@ -25,6 +26,7 @@ BlockId Chunk::getBlock(int x, int y, int z) const {
         z < 0 || z >= Config::CHUNK_SIZE_Z) {
         return BlockId::AIR;
     }
+    std::shared_lock lock(m_dataMutex);
     return static_cast<BlockId>(m_blocks[index(x, y, z)]);
 }
 
@@ -35,6 +37,7 @@ void Chunk::setBlock(int x, int y, int z, BlockId id) {
         return;
     }
 
+    std::unique_lock lock(m_dataMutex);
     m_blocks[index(x, y, z)] = static_cast<uint8_t>(id);
     ++m_dataRevision;
     m_dirty = true;

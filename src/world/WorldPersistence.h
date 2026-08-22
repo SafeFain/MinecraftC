@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "game/Item.h"
+#include "game/SaveStore.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
 
@@ -44,6 +45,13 @@ public:
     // Apply saved overrides for a freshly generated chunk.
     // Caller must hold the ChunkStore lock.
     void applySavedOverridesUnlocked(int cx, int cz);
+
+    // Install disk data obtained by the asynchronous chunk-load bundle. The
+    // normal apply/load methods then consume these maps without doing main
+    // thread filesystem I/O.
+    void installLoadedChunkDataUnlocked(
+        int cx, int cz, const std::vector<BlockOverride>& overrides,
+        const std::vector<PersistedBlockEntity>& entities);
 
     // Persist dirty overrides / block entities for one chunk.
     // Caller must hold the ChunkStore lock.
@@ -84,6 +92,7 @@ public:
         m_dirtyBlockEntityChunks.clear();
         m_pendingBlockEntitySaves.clear();
         m_blockEntitiesApplied.clear();
+        m_prefetchedChunks.clear();
     }
 
     // Mark a chunk's saved state as loaded (unload bookkeeping).
@@ -94,6 +103,7 @@ public:
     }
     void eraseOverridesApplied(int cx, int cz) {
         m_overridesApplied.erase({cx, cz});
+        m_prefetchedChunks.erase({cx, cz});
     }
 
     // ── Lock-free accessors (caller holds the chunk lock) ────────────
@@ -130,4 +140,5 @@ private:
     std::unordered_set<std::pair<int, int>, PairHash> m_dirtyBlockEntityChunks;
     std::unordered_set<std::pair<int, int>, PairHash> m_pendingBlockEntitySaves;
     std::unordered_set<std::pair<int, int>, PairHash> m_blockEntitiesApplied;
+    std::unordered_set<std::pair<int, int>, PairHash> m_prefetchedChunks;
 };

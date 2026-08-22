@@ -121,6 +121,15 @@ public:
     }
 
     bool finished() const { return m_offset == m_bytes.size(); }
+    size_t remaining() const { return m_bytes.size() - m_offset; }
+
+    Bytes readBytes(size_t count) {
+        if (count > remaining()) throw std::runtime_error("Truncated save payload");
+        Bytes result(m_bytes.begin() + static_cast<std::ptrdiff_t>(m_offset),
+                     m_bytes.begin() + static_cast<std::ptrdiff_t>(m_offset + count));
+        m_offset += count;
+        return result;
+    }
 
 private:
     template<typename UInt>
@@ -146,6 +155,48 @@ uint64_t checksum(const Bytes& bytes) {
         hash *= 1099511628211ULL;
     }
     return hash;
+}
+
+// Generated chunks are predominantly long vertical runs of air, stone and
+// sediment.  A tiny deterministic RLE codec keeps the cache self-contained
+// and avoids adding a platform compression dependency.  The encoded stream is
+// a sequence of (little-endian uint16 run length, byte value) pairs.
+constexpr uint8_t GENERATED_CACHE_RAW = 0;
+constexpr uint8_t GENERATED_CACHE_RLE = 1;
+
+Bytes encodeChunkRle(const std::vector<uint8_t>& blocks) {
+    Bytes encoded;
+    encoded.reserve(blocks.size() / 2);
+    size_t offset = 0;
+    while (offset < blocks.size()) {
+        const uint8_t value = blocks[offset];
+        size_t run = 1;
+        while (offset + run < blocks.size() && blocks[offset + run] == value &&
+               run < std::numeric_limits<uint16_t>::max()) {
+            ++run;
+        }
+        append(encoded, static_cast<uint16_t>(run));
+        append(encoded, value);
+        offset += run;
+    }
+    return encoded;
+}
+
+std::vector<uint8_t> decodeChunkRle(const Bytes& encoded, size_t expectedSize) {
+    if (encoded.size() % 3 != 0)
+        throw std::runtime_error("Invalid generated chunk RLE payload");
+    std::vector<uint8_t> decoded;
+    decoded.reserve(expectedSize);
+    for (size_t offset = 0; offset < encoded.size(); offset += 3) {
+        const uint16_t run = static_cast<uint16_t>(encoded[offset]) |
+            static_cast<uint16_t>(encoded[offset + 1]) << 8;
+        if (run == 0 || decoded.size() + run > expectedSize)
+            throw std::runtime_error("Generated chunk RLE size mismatch");
+        decoded.insert(decoded.end(), run, encoded[offset + 2]);
+    }
+    if (decoded.size() != expectedSize)
+        throw std::runtime_error("Generated chunk RLE is truncated");
+    return decoded;
 }
 
 void writeAtomic(const std::filesystem::path& path, const Bytes& payload) {
@@ -473,7 +524,18 @@ void SaveStore::saveGeneratedChunk(
     append(payload, static_cast<int32_t>(chunkZ));
     append(payload, generationVersion);
     append(payload, static_cast<uint32_t>(blocks.size()));
-    payload.insert(payload.end(), blocks.begin(), blocks.end());
+    const Bytes compressed = encodeChunkRle(blocks);
+    if (compressed.size() + sizeof(uint8_t) + sizeof(uint32_t) < blocks.size()) {
+        append(payload, GENERATED_CACHE_RLE);
+        append(payload, static_cast<uint32_t>(compressed.size()));
+        payload.insert(payload.end(), compressed.begin(), compressed.end());
+    } else {
+        // Retaining a raw fallback prevents incompressible chunks from
+        // growing and keeps the on-disk format cheap for pathological data.
+        append(payload, GENERATED_CACHE_RAW);
+        append(payload, static_cast<uint32_t>(blocks.size()));
+        payload.insert(payload.end(), blocks.begin(), blocks.end());
+    }
     writeAtomic(generatedChunkPath(chunkX, chunkZ), payload);
 }
 
@@ -490,17 +552,43 @@ std::optional<std::vector<uint8_t>> SaveStore::loadGeneratedChunk(
         const uint32_t size = reader.read<uint32_t>();
         if (size != static_cast<uint32_t>(Config::CHUNK_VOLUME)) return std::nullopt;
         std::vector<uint8_t> blocks;
-        blocks.reserve(size);
-        for (uint32_t i = 0; i < size; ++i) {
-            const uint8_t block = reader.read<uint8_t>();
-            if (block >= static_cast<uint8_t>(BlockId::COUNT)) return std::nullopt;
-            blocks.push_back(block);
+        if (reader.remaining() == size) {
+            // Cache files written before the codec marker remain valid.
+            blocks = reader.readBytes(size);
+        } else {
+            const uint8_t codec = reader.read<uint8_t>();
+            const uint32_t encodedSize = reader.read<uint32_t>();
+            if (encodedSize > reader.remaining()) return std::nullopt;
+            const Bytes encoded = reader.readBytes(encodedSize);
+            if (codec == GENERATED_CACHE_RAW) {
+                if (encoded.size() != size) return std::nullopt;
+                blocks = encoded;
+            } else if (codec == GENERATED_CACHE_RLE) {
+                blocks = decodeChunkRle(encoded, size);
+            } else {
+                return std::nullopt;
+            }
         }
+        for (const uint8_t block : blocks)
+            if (block >= static_cast<uint8_t>(BlockId::COUNT)) return std::nullopt;
         if (!reader.finished()) return std::nullopt;
         return blocks;
     } catch (const std::exception&) {
         return std::nullopt;
     }
+}
+
+ChunkLoadBundle SaveStore::loadChunkLoadBundle(
+    int chunkX, int chunkZ, uint32_t generationVersion) const {
+    ChunkLoadBundle bundle;
+    bundle.generated = loadGeneratedChunk(chunkX, chunkZ, generationVersion);
+    try { bundle.overrides = loadChunkOverrides(chunkX, chunkZ); }
+    catch (...) { bundle.overrides.clear(); }
+    try { bundle.blockEntities = loadBlockEntities(chunkX, chunkZ); }
+    catch (...) { bundle.blockEntities.clear(); }
+    try { bundle.entities = loadChunkEntities(chunkX, chunkZ); }
+    catch (...) { bundle.entities.clear(); }
+    return bundle;
 }
 
 void SaveStore::saveBlockEntities(

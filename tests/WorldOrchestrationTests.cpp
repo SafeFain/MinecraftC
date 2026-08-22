@@ -15,7 +15,9 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <algorithm>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -231,7 +233,223 @@ void testChunkStreaming() {
     std::filesystem::remove_all(root);
 }
 
-// 2. Generation handoff: completed generations apply exactly once and the
+// 2. Generated base caches round-trip asynchronously and do not trigger a
+// second terrain generation on reopen.
+void testAsyncGeneratedCacheRoundTrip() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 0;
+    const auto root = std::filesystem::temp_directory_path() /
+                      "minecraftc-world-orch-generated-cache";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    SaveStore store(root);
+    std::vector<uint8_t> original;
+    {
+        World world;
+        ThreadPool pool(2);
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(424242);
+        int frames = 0;
+        for (; frames < 1200; ++frames) {
+            world.update({0.5, 64.0, 0.5}, 1);
+            world.enqueueGeneration();
+            world.processCompletedGenerations();
+            const auto progress = world.generationProgress();
+            if (progress.total == 1 && progress.completed == 1 && pool.idle()) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        require(frames < 1200, "single chunk generation completes for cache test");
+        const Chunk* chunk = world.getChunk(0, 0);
+        require(chunk != nullptr && chunk->generated.load(),
+                "generated chunk is available for cache snapshot");
+        original.assign(chunk->rawBlocks(),
+                        chunk->rawBlocks() + Config::CHUNK_VOLUME);
+        world.persistGeneratedChunks();
+        require(std::filesystem::exists(root / "generated" / "g.0.0.bin"),
+                "generated chunk cache is written asynchronously");
+    }
+
+    const auto cachePath = root / "generated" / "g.0.0.bin";
+    require(std::filesystem::file_size(cachePath) <
+                static_cast<uintmax_t>(Config::CHUNK_VOLUME + 128),
+            "generated terrain cache uses the compact encoding when useful");
+
+    World reopened;
+    ThreadPool pool(2);
+    reopened.setThreadPool(&pool);
+    reopened.setSaveStore(&store);
+    reopened.resetForNewSeed(424242);
+    int frames = 0;
+    for (; frames < 1200; ++frames) {
+        reopened.update({0.5, 64.0, 0.5}, 1);
+        reopened.enqueueGeneration();
+        reopened.processCompletedGenerations();
+        const auto progress = reopened.generationProgress();
+        if (progress.total == 1 && progress.completed == 1 &&
+            progress.cacheHits == 1) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(frames < 1200, "cached chunk is published without regeneration");
+    const Chunk* cached = reopened.getChunk(0, 0);
+    require(cached != nullptr && cached->generated.load(),
+            "cached chunk remains generated after publication");
+    const std::vector<uint8_t> roundTrip(
+        cached->rawBlocks(), cached->rawBlocks() + Config::CHUNK_VOLUME);
+    require(roundTrip == original,
+            "compressed cache round-trips terrain bytes exactly");
+    drainWorkers(reopened, pool);
+    std::filesystem::remove_all(root);
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
+// 3. A short backtrack keeps recently explored CPU data warm, so the same
+// chunk can be promoted without a cache read or a second terrain generation.
+void testWarmChunkBacktrack() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 0;
+    World world;
+    ThreadPool pool(2);
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(919191);
+
+    world.update({0.5, 64.0, 0.5}, 1);
+    world.enqueueGeneration();
+    generateTarget(world, pool);
+    Chunk* origin = world.getChunk(0, 0);
+    require(origin != nullptr && origin->generated.load(),
+            "origin chunk is generated before warm-cache turn");
+
+    world.update({16.5, 64.0, 0.5}, 1);
+    world.enqueueGeneration();
+    world.processCompletedGenerations(false);
+    require(origin->lifecycle.load() == Chunk::LifecycleState::Warm,
+            "nearby explored chunk enters the CPU warm cache");
+
+    world.update({0.5, 64.0, 0.5}, 1);
+    world.enqueueGeneration();
+    world.processCompletedGenerations(false);
+    Chunk* returned = world.getChunk(0, 0);
+    require(returned == origin && returned->generated.load() &&
+                !returned->cacheReadInProgress.load() &&
+                returned->cacheChecked.load(),
+            "warm-cache promotion reuses the existing chunk without disk I/O");
+    drainWorkers(world, pool);
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
+// 4. Small deterministic streaming benchmark. It deliberately reports
+// latency rather than asserting a machine-dependent threshold; CI still
+// exercises cold generation, disk cache revisit, warm promotion and the main
+// thread frame samples used for p50/p95/p99 diagnostics.
+void testStreamingBenchmark() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 0;
+    const auto root = std::filesystem::temp_directory_path() /
+                      "minecraftc-world-orch-streaming-benchmark";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    SaveStore store(root);
+
+    struct Measurement {
+        double elapsedMs = 0.0;
+        std::vector<double> frames;
+    };
+    auto runUntilReady = [](World& world, ThreadPool& pool,
+                            const glm::dvec3& position,
+                            bool requireCacheHit) {
+        Measurement result;
+        const auto start = std::chrono::steady_clock::now();
+        for (int frame = 0; frame < 2000; ++frame) {
+            const auto frameStart = std::chrono::steady_clock::now();
+            world.update(position, 1);
+            world.enqueueGeneration();
+            world.processCompletedGenerations();
+            const auto frameEnd = std::chrono::steady_clock::now();
+            result.frames.push_back(std::chrono::duration<double, std::milli>(
+                frameEnd - frameStart).count());
+            const auto progress = world.generationProgress();
+            if (progress.total == 1 && progress.completed == 1 &&
+                (!requireCacheHit || progress.cacheHits == 1) && pool.idle())
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        result.elapsedMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - start).count();
+        const auto progress = world.generationProgress();
+        require(progress.total == 1 && progress.completed == 1 &&
+                    (!requireCacheHit || progress.cacheHits == 1),
+                "streaming benchmark reaches its single-chunk target");
+        return result;
+    };
+    auto percentile = [](std::vector<double> samples, double fraction) {
+        if (samples.empty()) return 0.0;
+        std::sort(samples.begin(), samples.end());
+        const size_t index = std::min(
+            samples.size() - 1,
+            static_cast<size_t>(fraction * static_cast<double>(samples.size() - 1)));
+        return samples[index];
+    };
+
+    Measurement cold;
+    {
+        World world;
+        ThreadPool pool(2);
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(808080);
+        cold = runUntilReady(world, pool, {0.5, 64.0, 0.5}, false);
+        world.persistGeneratedChunks();
+    }
+
+    Measurement disk;
+    {
+        World world;
+        ThreadPool pool(2);
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(808080);
+        disk = runUntilReady(world, pool, {0.5, 64.0, 0.5}, true);
+    }
+
+    Measurement warm;
+    {
+        World world;
+        ThreadPool pool(2);
+        world.setThreadPool(&pool);
+        world.resetForNewSeed(909090);
+        runUntilReady(world, pool, {0.5, 64.0, 0.5}, false);
+        Chunk* origin = world.getChunk(0, 0);
+        world.update({16.5, 64.0, 0.5}, 1);
+        world.processCompletedGenerations(false);
+        require(origin->lifecycle.load() == Chunk::LifecycleState::Warm,
+                "benchmark warm leg promotes the origin to warm cache");
+        const auto warmStart = std::chrono::steady_clock::now();
+        const auto frameStart = warmStart;
+        world.update({0.5, 64.0, 0.5}, 1);
+        world.processCompletedGenerations(false);
+        const auto frameEnd = std::chrono::steady_clock::now();
+        warm.elapsedMs = std::chrono::duration<double, std::milli>(
+            frameEnd - warmStart).count();
+        warm.frames.push_back(std::chrono::duration<double, std::milli>(
+            frameEnd - frameStart).count());
+        require(world.getChunk(0, 0) == origin && origin->generated.load(),
+                "benchmark warm leg reuses the origin pointer");
+    }
+
+    std::cout << std::fixed << std::setprecision(2)
+              << "[streaming benchmark] cold=" << cold.elapsedMs
+              << "ms disk=" << disk.elapsedMs
+              << "ms warm=" << warm.elapsedMs
+              << "ms main(p50/p95/p99)="
+              << percentile(cold.frames, .50) << "/"
+              << percentile(cold.frames, .95) << "/"
+              << percentile(cold.frames, .99) << "ms\n";
+    std::filesystem::remove_all(root);
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
+// 5. Generation handoff: completed generations apply exactly once and the
 // chunk set stays fully generated afterwards.
 void testGenerationHandoff() {
     World world;
@@ -257,7 +475,7 @@ void testGenerationHandoff() {
     drainWorkers(world, pool);
 }
 
-// 3. Seed reset: a new seed clears the world state, bumps the streaming
+// 6. Seed reset: a new seed clears the world state, bumps the streaming
 // revision, and generates different terrain.
 void testSeedReset() {
     World world;
@@ -291,7 +509,7 @@ void testSeedReset() {
     drainWorkers(world, pool);
 }
 
-// 4. Autosave queue: bounded flushes leave pending saves visible, unbounded
+// 7. Autosave queue: bounded flushes leave pending saves visible, unbounded
 // flushes persist everything.
 void testAutosaveQueue() {
     const auto root = std::filesystem::temp_directory_path() /
@@ -333,7 +551,7 @@ void testAutosaveQueue() {
     std::filesystem::remove_all(root);
 }
 
-// 5. Mesh pipeline: completed meshes upload once, stale revisions are
+// 8. Mesh pipeline: completed meshes upload once, stale revisions are
 // skipped, and GPU meshes release/restore through the renderer.
 void testMeshPipeline() {
     World world;
@@ -348,11 +566,6 @@ void testMeshPipeline() {
     world.processCompletedGenerations();
     drainWorkers(world, pool);
 
-    // Natural generation writes water directly into chunks.  Loading a
-    // chunk must not treat those settled terrain fluids as newly placed
-    // sources and start a boundary-wide cascade.
-    require(world.tickFluids(1000) == 0,
-            "natural terrain fluids stay settled when a chunk loads");
     require(world.getActiveChunks().size() == 1,
             "bounded update loads exactly one chunk");
 
@@ -474,7 +687,43 @@ void testFluidTicks() {
     drainWorkers(world, pool);
 }
 
-// 7. Superflat fluid spread: a placed source fans out over a supported flat
+// 7. Natural generated fluids wake when their chunk is attached, without
+// requiring a full-height boundary scan.
+void testNaturalFluidLoading() {
+    World world;
+    ThreadPool pool(2);
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(1004);
+
+    world.update({0.5, 64.0, 0.5}, 1);
+    world.enqueueGeneration();
+    world.waitForInitialGeneration(8000);
+    Chunk* chunk = world.getChunk(0, 0);
+    require(chunk != nullptr && chunk->generated.load(),
+            "generated chunk is available before its first apply");
+
+    // Add a terrain-like exposed source to the unpublished generated chunk.
+    // It is deliberately on the seam so the same path also covers the
+    // boundary wake-up used when its neighboring chunk arrives later.
+    const int sourceY = Config::WORLD_MAX_Y - 2;
+    chunk->setBlock(0, sourceY - 1, 0, BlockId::STONE);
+    chunk->setBlock(0, sourceY, 0, BlockId::WATER);
+    chunk->setBlock(1, sourceY, 0, BlockId::AIR);
+    chunk->setBlock(0, sourceY, 1, BlockId::AIR);
+
+    world.processCompletedGenerations();
+    drainWorkers(world, pool);
+    require(world.tickFluids(1000, 4096) > 0,
+            "natural generated fluid is scheduled on chunk load");
+    require(isWater(world.getBlock(1, sourceY, 0)) &&
+                world.getBlock(1, sourceY, 0) != BlockId::WATER &&
+                isWater(world.getBlock(0, sourceY, 1)) &&
+                world.getBlock(0, sourceY, 1) != BlockId::WATER,
+            "natural generated source resumes horizontal flow");
+    drainWorkers(world, pool);
+}
+
+// 8. Superflat fluid spread: a placed source fans out over a supported flat
 // surface, and the scheduler enforces its per-tick work budget.
 void testSuperflatFluidSpreadAndBudget() {
     World world;
@@ -529,7 +778,7 @@ void testSuperflatFluidSpreadAndBudget() {
     drainWorkers(world, pool);
 }
 
-// 8. Beds are an atomic two-cell world structure. Invalid legacy halves stay
+// 9. Beds are an atomic two-cell world structure. Invalid legacy halves stay
 // removable but never become valid respawn anchors.
 void testBedLifecycle() {
     World world;
@@ -587,11 +836,15 @@ void testBedLifecycle() {
 
 int main() {
     testChunkStreaming();
+    testAsyncGeneratedCacheRoundTrip();
+    testWarmChunkBacktrack();
+    testStreamingBenchmark();
     testGenerationHandoff();
     testSeedReset();
     testAutosaveQueue();
     testMeshPipeline();
     testFluidTicks();
+    testNaturalFluidLoading();
     testSuperflatFluidSpreadAndBudget();
     testBedLifecycle();
     std::cout << "World orchestration tests passed\n";
