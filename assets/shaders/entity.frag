@@ -11,7 +11,7 @@ in vec2 vUV;
 
 void main() {
     vec3 color = (uUseTexture != 0 ? texture(uEntityAtlas, vUV).rgb : vec3(1.0)) * uColor;
-    float sky = pow(clamp(uSkyLight, 0.0, 1.0), 1.35);
+    float sky = pow(clamp(uSkyLight, 0.0, 1.0), 1.20);
     float block = pow(clamp(uBlockLight, 0.0, 1.0), 1.35);
     vec3 lighting = max(vec3(sky), vec3(1.0, 0.72, 0.38) * block);
     color *= max(lighting, vec3(0.025));

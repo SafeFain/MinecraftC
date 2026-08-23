@@ -7,7 +7,10 @@ MinecraftC separates authored, generated, imported, and declarative assets:
   block `atlas.png`/`atlas.json` pair, and the separate
   `items_atlas.png`/`items_atlas.json` pair.
 - `assets/textures/third_party/` contains imported packs with their licenses.
-- `assets/textures/definitions/` contains JSON block, item, and texture names.
+- `assets/textures/definitions/` contains JSON block, item, texture, style, and
+  entity-material definitions. The default generated style is
+  `bright-comfortable` (generator version 2); it uses dependency-free
+  OKLab/OKLCH role palettes and keeps the runtime tile contracts unchanged.
 
 The client loads `atlas.json`, `blocks.json`, and `items.json` before chunk
 meshing. Logical material names are converted to atlas slots from metadata;
@@ -32,7 +35,8 @@ cmake --build build-local --target texture_generator
 
 Available switches are `--generate`, `--validate`, `--build-atlas`,
 `--build-items-atlas`, `--build-entity-atlas`, `--seed`,
-`--output`, `--candidate-count`, `--contact-sheet`, and repeatable
+`--output`, `--candidate-count`, `--contact-sheet`, `--preview`,
+`--visual-report`, and repeatable
 `--local-seed MATERIAL=SEED`. Operations may be combined. A local seed selects
 one material candidate without perturbing any other material and is recorded
 in atlas metadata.
@@ -68,11 +72,18 @@ python3 tools/texture_generator.py --generate --validate --build-atlas \
 `contact_sheet.png` places one material on each row and candidates in columns;
 each cell contains the original tile and an 8x8 repeat. Its companion JSON
 lists candidate and selected local seeds. These two development files are not
-part of `atlas.png` or `atlas.json`.
+part of `atlas.png` or `atlas.json`. `--preview` additionally emits
+`block_preview.png` (tile, repeat, grass/structure board, and noon/dusk/cave
+lighting samples), `items_contact_sheet.png`, `entity_contact_sheet.png`,
+`entity_semantic_preview.png`, and `visual_report.json`. The report contains
+OKLab lightness/chroma percentiles, role palettes, binary-alpha coverage,
+edge/seam/periodicity metrics, and family structure-correlation summaries;
+CMake exposes the same operation as
+`cmake --build build-local --target texture_preview`.
 
 ## Item icons
 
-`definitions/item_icons.json` declares `block_texture`, `item_sprite`, and
+`definitions/item_icons.json` (version 2) declares `block_texture`, `item_sprite`, and
 `block_item_icon`, plus logical names, templates, and palettes. Concrete C++
 `ItemId` values are not embedded in Python. Initial templates are sword,
 pickaxe, axe, shovel, hoe, stick, ingot, gem, coal, and torch; shared materials
@@ -107,7 +118,7 @@ or carapace patterns that remain coherent on every cuboid model part. The 3x3
 atlas and its metadata are written to `generated/entity_atlas.png` and
 `generated/entity_atlas.json` with nearest filtering.
 
-`--build-entity-skins` creates eight original 64x64 runtime skins under
+`--build-entity-skins` creates nine original 64x64 runtime skins under
 `generated/entity_skins/` plus `generated/entity_skins.json`. Each 4x4 skin
 contains named 16x16 regions for all six head faces, all six body faces,
 primary and secondary limbs, detail, and fallback material. Head and body

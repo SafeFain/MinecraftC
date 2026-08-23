@@ -1,5 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
+  "generator_version": 2,
+  "style": "bright-comfortable",
   "generator_categories": ["block_texture", "item_sprite", "block_item_icon"],
   "lighting": "top_left",
   "templates": {
@@ -9,6 +11,42 @@
     "seeds": {}, "wheat": {}, "food": {}, "bow": {}, "shield": {},
     "helmet": {}, "chestplate": {}, "leggings": {}, "boots": {}, "flint": {},
     "flint_and_steel": {}, "gunpowder": {}, "spawn_egg": {}
+  },
+  "template_schema": {
+    "outline": "binary silhouette with a dark material-aware edge",
+    "parts": ["grip", "connector", "working_head", "edge", "highlight"],
+    "material_processing": "oklch_role_palette_and_linear_light_highlight",
+    "alpha": "binary",
+    "filter": "nearest"
+  },
+  "template_specs": {
+    "sword": {"outline": "long_blade", "parts": ["grip", "guard", "blade", "edge"], "material_processing": "blade_facets"},
+    "pickaxe": {"outline": "crossed_head", "parts": ["grip", "connector", "pick_head", "edge"], "material_processing": "asymmetric_chip"},
+    "axe": {"outline": "broad_head", "parts": ["grip", "connector", "axe_head", "edge"], "material_processing": "broad_warm_highlight"},
+    "shovel": {"outline": "spade", "parts": ["grip", "connector", "spade_head", "edge"], "material_processing": "center_facet"},
+    "hoe": {"outline": "narrow_tine", "parts": ["grip", "connector", "tine", "edge"], "material_processing": "small_specular"},
+    "stick": {"outline": "diagonal_rod", "parts": ["fiber", "knob"], "material_processing": "wood_grain"},
+    "ingot": {"outline": "cast_bar", "parts": ["body", "rim", "highlight"], "material_processing": "rolled_metal"},
+    "gem": {"outline": "faceted_crystal", "parts": ["dark_edge", "facets", "glint"], "material_processing": "sharp_planes"},
+    "coal": {"outline": "irregular_lump", "parts": ["dark_body", "fracture", "glint"], "material_processing": "matte_vein"},
+    "torch": {"outline": "flame_on_stick", "parts": ["handle", "ember", "flame", "glow"], "material_processing": "emissive_warm"},
+    "string": {"outline": "curved_thread", "parts": ["fiber", "bend"], "material_processing": "soft_highlight"},
+    "feather": {"outline": "barbed_quill", "parts": ["shaft", "barbs", "tip"], "material_processing": "light_edges"},
+    "bone": {"outline": "jointed_bone", "parts": ["shaft", "knobs", "highlight"], "material_processing": "porous_bone"},
+    "arrow": {"outline": "shafthead", "parts": ["shaft", "head", "fletching"], "material_processing": "metal_tip"},
+    "seeds": {"outline": "sprout_cluster", "parts": ["stem", "seed", "leaf"], "material_processing": "growth_stage"},
+    "wheat": {"outline": "grain_stalk", "parts": ["stem", "grain", "leaf"], "material_processing": "golden_grain"},
+    "food": {"outline": "food_chunk", "parts": ["crust_or_skin", "flesh", "highlight"], "material_processing": "cooked_or_raw"},
+    "bow": {"outline": "curved_limb", "parts": ["limbs", "grip", "string"], "material_processing": "wood_and_fiber"},
+    "shield": {"outline": "shield_plate", "parts": ["plate", "rim", "grip", "highlight"], "material_processing": "painted_panel"},
+    "helmet": {"outline": "head_armor", "parts": ["crown", "rim", "opening"], "material_processing": "cold_metal"},
+    "chestplate": {"outline": "torso_armor", "parts": ["plate", "shoulders", "rim"], "material_processing": "layered_metal"},
+    "leggings": {"outline": "split_leg_armor", "parts": ["left_leg", "right_leg", "waist"], "material_processing": "jointed_metal"},
+    "boots": {"outline": "paired_boots", "parts": ["left_boot", "right_boot", "sole"], "material_processing": "reinforced_edge"},
+    "flint": {"outline": "shard", "parts": ["dark_edge", "facets", "chip"], "material_processing": "stone_fracture"},
+    "flint_and_steel": {"outline": "striker_loop", "parts": ["flint", "steel", "grip"], "material_processing": "cold_metal"},
+    "gunpowder": {"outline": "granule_cluster", "parts": ["granules", "dust", "highlight"], "material_processing": "matte_powder"},
+    "spawn_egg": {"outline": "oval_egg", "parts": ["shell", "species_spots", "highlight"], "material_processing": "entity_palette_derived"}
   },
   "handle_palette": [[66, 40, 22], [112, 72, 37], [171, 119, 61], [211, 160, 88]],
   "materials": {

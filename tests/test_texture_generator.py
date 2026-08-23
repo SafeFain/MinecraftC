@@ -170,11 +170,13 @@ class TextureGeneratorTests(unittest.TestCase):
             for name in tg.HIGH_CONTRAST_NAMES:
                 self.assertGreaterEqual(tg.palette_contrast(tg.PALETTES[name]),
                                         tg.palette_contrast(tg.PALETTES["stone"]) * 1.15)
-            _, _, grass = tg.read_generated_png(a / "grass_side.png")
-            grass_colors = set(tg.PALETTES["grass_side"][4:])
-            rows = [y for y in range(15) for x in range(15)
-                    if grass[y * 16 + x] in grass_colors]
-            self.assertLess(sum(rows) / len(rows), 7.0)
+            for name in ("grass_side", "aether_grass_side"):
+                _, _, grass = tg.read_generated_png(a / f"{name}.png")
+                grass_colors = set(tg.PALETTES[name][4:])
+                self.assertTrue(all(grass[y * 16 + x] in grass_colors
+                                    for y in range(5) for x in range(16)))
+                self.assertTrue(all(grass[y * 16 + x] not in grass_colors
+                                    for y in range(8, 16) for x in range(16)))
 
             # Toroidal generation must not fake tiling by copying opposing
             # borders. The seam metric instead compares wrap adjacency with
@@ -237,6 +239,38 @@ class TextureGeneratorTests(unittest.TestCase):
             self.assertEqual(len(metadata["candidate_seeds"]), 3)
             self.assertEqual(metadata["local_seeds"]["grass_top"], 77)
             self.assertEqual((output / "stone.png").read_bytes(), baseline_stone)
+
+    def test_bright_style_metadata_and_visual_report(self):
+        root = Path(__file__).resolve().parents[1]
+        style = json.loads((root / "assets/textures/definitions/style.json").read_text())
+        self.assertEqual(style["id"], "bright-comfortable")
+        self.assertEqual(style["generator_version"], tg.GENERATOR_VERSION)
+        self.assertIn("semantic_palette", style)
+        self.assertIn("dark_materials", style["exceptions"])
+        texture_definitions = json.loads(
+            (root / "assets/textures/definitions/textures.json").read_text())
+        self.assertEqual(set(texture_definitions["family_specs"]), {
+            "soil", "turf", "stone", "ore", "wood", "foliage", "sand_ice",
+            "fluid_emissive", "constructed"})
+        item_definitions = json.loads(
+            (root / "assets/textures/definitions/item_icons.json").read_text())
+        self.assertIn("parts", item_definitions["template_schema"])
+        self.assertIn("spawn_egg", item_definitions["template_specs"])
+        entity_definitions = json.loads(
+            (root / "assets/textures/definitions/entity_styles.json").read_text())
+        self.assertEqual(entity_definitions["cross_face"]["projection"], "cube-space")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            tg.generate(output, 21)
+            tg.build_atlas(output, 21)
+            tg.build_visual_report(output, 21)
+            atlas = json.loads((output / "atlas.json").read_text())
+            report = json.loads((output / "visual_report.json").read_text())
+            self.assertEqual(atlas["generator_version"], tg.GENERATOR_VERSION)
+            self.assertEqual(atlas["style"], tg.STYLE_ID)
+            self.assertEqual(report["style"], tg.STYLE_ID)
+            self.assertEqual(set(report["textures"]), set(tg.NAMES))
+            self.assertGreater(report["textures"]["grass_top"]["oklab_lightness_mean"], .45)
 
     def test_seed_changes_output_and_atlas_metadata_is_complete(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:

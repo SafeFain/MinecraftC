@@ -1,0 +1,3942 @@
+{
+  "entities": {
+    "blastling": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.62945,
+      "oklab_lightness_p10": 0.55775,
+      "oklab_lightness_p90": 0.71103,
+      "oklch_chroma_mean": 0.14435,
+      "opaque": 4096,
+      "palette_size": 9
+    },
+    "chicken": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.89609,
+      "oklab_lightness_p10": 0.86458,
+      "oklab_lightness_p90": 0.92929,
+      "oklch_chroma_mean": 0.02887,
+      "opaque": 4096,
+      "palette_size": 18
+    },
+    "cow": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.53386,
+      "oklab_lightness_p10": 0.41505,
+      "oklab_lightness_p90": 0.65679,
+      "oklch_chroma_mean": 0.07125,
+      "opaque": 4096,
+      "palette_size": 13
+    },
+    "pig": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.70522,
+      "oklab_lightness_p10": 0.63372,
+      "oklab_lightness_p90": 0.78666,
+      "oklch_chroma_mean": 0.11096,
+      "opaque": 4096,
+      "palette_size": 11
+    },
+    "player": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.56083,
+      "oklab_lightness_p10": 0.48558,
+      "oklab_lightness_p90": 0.6423,
+      "oklch_chroma_mean": 0.06824,
+      "opaque": 4096,
+      "palette_size": 10
+    },
+    "sheep": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.77569,
+      "oklab_lightness_p10": 0.54651,
+      "oklab_lightness_p90": 0.92253,
+      "oklch_chroma_mean": 0.02131,
+      "opaque": 4096,
+      "palette_size": 10
+    },
+    "skeleton": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.80178,
+      "oklab_lightness_p10": 0.72351,
+      "oklab_lightness_p90": 0.8773,
+      "oklch_chroma_mean": 0.03386,
+      "opaque": 4096,
+      "palette_size": 11
+    },
+    "spider": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.39509,
+      "oklab_lightness_p10": 0.36446,
+      "oklab_lightness_p90": 0.42331,
+      "oklch_chroma_mean": 0.04809,
+      "opaque": 4096,
+      "palette_size": 9
+    },
+    "zombie": {
+      "alpha_ratio": 1.0,
+      "oklab_lightness_mean": 0.54785,
+      "oklab_lightness_p10": 0.47441,
+      "oklab_lightness_p90": 0.63307,
+      "oklch_chroma_mean": 0.07971,
+      "opaque": 4096,
+      "palette_size": 19
+    }
+  },
+  "family_structure_similarity": {
+    "constructed": {
+      "count": 10,
+      "max_abs_correlation": 0.7408,
+      "mean_abs_correlation": 0.15775
+    },
+    "fluid_emissive": {
+      "count": 8,
+      "max_abs_correlation": 0.99998,
+      "mean_abs_correlation": 0.17177
+    },
+    "foliage": {
+      "count": 23,
+      "max_abs_correlation": 0.99998,
+      "mean_abs_correlation": 0.25597
+    },
+    "ore": {
+      "count": 5,
+      "max_abs_correlation": 0.19056,
+      "mean_abs_correlation": 0.07348
+    },
+    "sand_ice": {
+      "count": 7,
+      "max_abs_correlation": 0.45287,
+      "mean_abs_correlation": 0.2501
+    },
+    "soil": {
+      "count": 7,
+      "max_abs_correlation": 0.43973,
+      "mean_abs_correlation": 0.15011
+    },
+    "stone": {
+      "count": 12,
+      "max_abs_correlation": 0.46585,
+      "mean_abs_correlation": 0.1433
+    },
+    "turf": {
+      "count": 5,
+      "max_abs_correlation": 0.75874,
+      "mean_abs_correlation": 0.16618
+    },
+    "wood": {
+      "count": 9,
+      "max_abs_correlation": 0.84655,
+      "mean_abs_correlation": 0.27175
+    }
+  },
+  "generator_version": 2,
+  "items": {
+    "acacia_leaves": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.50311,
+      "oklab_lightness_p10": 0.38407,
+      "oklab_lightness_p90": 0.58943,
+      "oklch_chroma_mean": 0.08261,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "acacia_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.46641,
+      "oklab_lightness_p10": 0.34149,
+      "oklab_lightness_p90": 0.5887,
+      "oklch_chroma_mean": 0.0595,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "acacia_sapling": {
+      "alpha_ratio": 0.0859,
+      "oklab_lightness_mean": 0.50184,
+      "oklab_lightness_p10": 0.39478,
+      "oklab_lightness_p90": 0.60452,
+      "oklch_chroma_mean": 0.08723,
+      "opaque": 22,
+      "palette_size": 10
+    },
+    "aether_grass": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.57624,
+      "oklab_lightness_p10": 0.30932,
+      "oklab_lightness_p90": 0.81182,
+      "oklch_chroma_mean": 0.08822,
+      "opaque": 127,
+      "palette_size": 16
+    },
+    "aether_soil": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.44782,
+      "oklab_lightness_p10": 0.33997,
+      "oklab_lightness_p90": 0.54686,
+      "oklch_chroma_mean": 0.05239,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "allium": {
+      "alpha_ratio": 0.0664,
+      "oklab_lightness_mean": 0.59825,
+      "oklab_lightness_p10": 0.48958,
+      "oklab_lightness_p90": 0.69671,
+      "oklch_chroma_mean": 0.13086,
+      "opaque": 17,
+      "palette_size": 9
+    },
+    "arrow": {
+      "alpha_ratio": 0.2344,
+      "oklab_lightness_mean": 0.45197,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.72446,
+      "oklch_chroma_mean": 0.01128,
+      "opaque": 60,
+      "palette_size": 4
+    },
+    "basalt": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.36353,
+      "oklab_lightness_p10": 0.30534,
+      "oklab_lightness_p90": 0.41944,
+      "oklch_chroma_mean": 0.00523,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "bedrock": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.39358,
+      "oklab_lightness_p10": 0.33618,
+      "oklab_lightness_p90": 0.45328,
+      "oklch_chroma_mean": 0.00437,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "birch_leaves": {
+      "alpha_ratio": 0.4688,
+      "oklab_lightness_mean": 0.52819,
+      "oklab_lightness_p10": 0.41249,
+      "oklab_lightness_p90": 0.67324,
+      "oklch_chroma_mean": 0.09821,
+      "opaque": 120,
+      "palette_size": 12
+    },
+    "birch_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.65547,
+      "oklab_lightness_p10": 0.52093,
+      "oklab_lightness_p90": 0.78843,
+      "oklch_chroma_mean": 0.04192,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "birch_sapling": {
+      "alpha_ratio": 0.0703,
+      "oklab_lightness_mean": 0.56274,
+      "oklab_lightness_p10": 0.48798,
+      "oklab_lightness_p90": 0.69156,
+      "oklch_chroma_mean": 0.10367,
+      "opaque": 18,
+      "palette_size": 8
+    },
+    "black_sand": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.34875,
+      "oklab_lightness_p10": 0.29598,
+      "oklab_lightness_p90": 0.40802,
+      "oklch_chroma_mean": 0.00543,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "blastling_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.43196,
+      "oklab_lightness_p10": 0.24161,
+      "oklab_lightness_p90": 0.53411,
+      "oklch_chroma_mean": 0.11543,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "blue_orchid": {
+      "alpha_ratio": 0.0703,
+      "oklab_lightness_mean": 0.63074,
+      "oklab_lightness_p10": 0.51279,
+      "oklab_lightness_p90": 0.772,
+      "oklch_chroma_mean": 0.08945,
+      "opaque": 18,
+      "palette_size": 8
+    },
+    "bone": {
+      "alpha_ratio": 0.2227,
+      "oklab_lightness_mean": 0.54869,
+      "oklab_lightness_p10": 0.4301,
+      "oklab_lightness_p90": 0.85775,
+      "oklch_chroma_mean": 0.02724,
+      "opaque": 57,
+      "palette_size": 3
+    },
+    "bow": {
+      "alpha_ratio": 0.2227,
+      "oklab_lightness_mean": 0.57377,
+      "oklab_lightness_p10": 0.43963,
+      "oklab_lightness_p90": 0.90283,
+      "oklch_chroma_mean": 0.06099,
+      "opaque": 57,
+      "palette_size": 3
+    },
+    "bread": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.62796,
+      "oklab_lightness_p10": 0.36956,
+      "oklab_lightness_p90": 0.75391,
+      "oklch_chroma_mean": 0.11553,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "cactus": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.50331,
+      "oklab_lightness_p10": 0.41312,
+      "oklab_lightness_p90": 0.62037,
+      "oklch_chroma_mean": 0.0883,
+      "opaque": 127,
+      "palette_size": 16
+    },
+    "chest": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.56135,
+      "oklab_lightness_p10": 0.46649,
+      "oklab_lightness_p90": 0.66632,
+      "oklch_chroma_mean": 0.07906,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "chicken_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.64248,
+      "oklab_lightness_p10": 0.38084,
+      "oklab_lightness_p90": 0.77522,
+      "oklch_chroma_mean": 0.1176,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "clay": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.62022,
+      "oklab_lightness_p10": 0.52252,
+      "oklab_lightness_p90": 0.73138,
+      "oklch_chroma_mean": 0.01735,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "cloudstone": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.74493,
+      "oklab_lightness_p10": 0.62581,
+      "oklab_lightness_p90": 0.89371,
+      "oklch_chroma_mean": 0.02831,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "coal": {
+      "alpha_ratio": 0.2031,
+      "oklab_lightness_mean": 0.51883,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.63907,
+      "oklch_chroma_mean": 0.00662,
+      "opaque": 52,
+      "palette_size": 4
+    },
+    "coal_ore": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.47564,
+      "oklab_lightness_p10": 0.29495,
+      "oklab_lightness_p90": 0.58375,
+      "oklch_chroma_mean": 0.00382,
+      "opaque": 127,
+      "palette_size": 9
+    },
+    "coarse_dirt": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.42576,
+      "oklab_lightness_p10": 0.33862,
+      "oklab_lightness_p90": 0.51711,
+      "oklch_chroma_mean": 0.05093,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "cobblestone": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.4976,
+      "oklab_lightness_p10": 0.39535,
+      "oklab_lightness_p90": 0.60429,
+      "oklch_chroma_mean": 0.00355,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "cooked_chicken": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.451,
+      "oklab_lightness_p10": 0.2535,
+      "oklab_lightness_p90": 0.555,
+      "oklch_chroma_mean": 0.09246,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "cooked_mutton": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.451,
+      "oklab_lightness_p10": 0.2535,
+      "oklab_lightness_p90": 0.555,
+      "oklch_chroma_mean": 0.09246,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "cooked_porkchop": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.451,
+      "oklab_lightness_p10": 0.2535,
+      "oklab_lightness_p90": 0.555,
+      "oklch_chroma_mean": 0.09246,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "cow_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.48658,
+      "oklab_lightness_p10": 0.27704,
+      "oklab_lightness_p90": 0.59679,
+      "oklch_chroma_mean": 0.08173,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "crafting_table": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.52648,
+      "oklab_lightness_p10": 0.4335,
+      "oklab_lightness_p90": 0.63006,
+      "oklch_chroma_mean": 0.06973,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "dandelion": {
+      "alpha_ratio": 0.0938,
+      "oklab_lightness_mean": 0.77838,
+      "oklab_lightness_p10": 0.66574,
+      "oklab_lightness_p90": 0.91007,
+      "oklch_chroma_mean": 0.13188,
+      "opaque": 24,
+      "palette_size": 10
+    },
+    "deepslate": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.3959,
+      "oklab_lightness_p10": 0.33582,
+      "oklab_lightness_p90": 0.44805,
+      "oklch_chroma_mean": 0.01007,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "diamond": {
+      "alpha_ratio": 0.2031,
+      "oklab_lightness_mean": 0.63119,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.09632,
+      "opaque": 52,
+      "palette_size": 4
+    },
+    "diamond_axe": {
+      "alpha_ratio": 0.2422,
+      "oklab_lightness_mean": 0.46395,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.06712,
+      "opaque": 62,
+      "palette_size": 6
+    },
+    "diamond_boots": {
+      "alpha_ratio": 0.1602,
+      "oklab_lightness_mean": 0.59024,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.85901,
+      "oklch_chroma_mean": 0.0851,
+      "opaque": 41,
+      "palette_size": 3
+    },
+    "diamond_chestplate": {
+      "alpha_ratio": 0.2656,
+      "oklab_lightness_mean": 0.66213,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.09696,
+      "opaque": 68,
+      "palette_size": 3
+    },
+    "diamond_helmet": {
+      "alpha_ratio": 0.1406,
+      "oklab_lightness_mean": 0.66336,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.85901,
+      "oklch_chroma_mean": 0.09626,
+      "opaque": 36,
+      "palette_size": 3
+    },
+    "diamond_hoe": {
+      "alpha_ratio": 0.2539,
+      "oklab_lightness_mean": 0.43305,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.06272,
+      "opaque": 65,
+      "palette_size": 5
+    },
+    "diamond_leggings": {
+      "alpha_ratio": 0.2266,
+      "oklab_lightness_mean": 0.58909,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.08541,
+      "opaque": 58,
+      "palette_size": 3
+    },
+    "diamond_ore": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.56057,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.75588,
+      "oklch_chroma_mean": 0.0221,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "diamond_pickaxe": {
+      "alpha_ratio": 0.3086,
+      "oklab_lightness_mean": 0.47058,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.85901,
+      "oklch_chroma_mean": 0.06759,
+      "opaque": 79,
+      "palette_size": 5
+    },
+    "diamond_shovel": {
+      "alpha_ratio": 0.207,
+      "oklab_lightness_mean": 0.44828,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.06514,
+      "opaque": 53,
+      "palette_size": 5
+    },
+    "diamond_sword": {
+      "alpha_ratio": 0.332,
+      "oklab_lightness_mean": 0.4986,
+      "oklab_lightness_p10": 0.37821,
+      "oklab_lightness_p90": 0.77129,
+      "oklch_chroma_mean": 0.07266,
+      "opaque": 85,
+      "palette_size": 5
+    },
+    "dirt": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.4603,
+      "oklab_lightness_p10": 0.35888,
+      "oklab_lightness_p90": 0.58411,
+      "oklch_chroma_mean": 0.05252,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "farmland": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.3975,
+      "oklab_lightness_p10": 0.34082,
+      "oklab_lightness_p90": 0.48397,
+      "oklch_chroma_mean": 0.0429,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "feather": {
+      "alpha_ratio": 0.2227,
+      "oklab_lightness_mean": 0.52171,
+      "oklab_lightness_p10": 0.40411,
+      "oklab_lightness_p90": 0.81643,
+      "oklch_chroma_mean": 0.02088,
+      "opaque": 57,
+      "palette_size": 3
+    },
+    "flint": {
+      "alpha_ratio": 0.0508,
+      "oklab_lightness_mean": 0.6044,
+      "oklab_lightness_p10": 0.55105,
+      "oklab_lightness_p90": 0.72446,
+      "oklch_chroma_mean": 0.008,
+      "opaque": 13,
+      "palette_size": 2
+    },
+    "flint_and_steel": {
+      "alpha_ratio": 0.3008,
+      "oklab_lightness_mean": 0.65198,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.008,
+      "opaque": 77,
+      "palette_size": 6
+    },
+    "flower": {
+      "alpha_ratio": 0.0664,
+      "oklab_lightness_mean": 0.51687,
+      "oklab_lightness_p10": 0.43626,
+      "oklab_lightness_p90": 0.6195,
+      "oklch_chroma_mean": 0.12828,
+      "opaque": 17,
+      "palette_size": 9
+    },
+    "furnace": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.4938,
+      "oklab_lightness_p10": 0.41803,
+      "oklab_lightness_p90": 0.6147,
+      "oklch_chroma_mean": 0.00277,
+      "opaque": 127,
+      "palette_size": 10
+    },
+    "glass": {
+      "alpha_ratio": 0.2344,
+      "oklab_lightness_mean": 0.81979,
+      "oklab_lightness_p10": 0.74829,
+      "oklab_lightness_p90": 0.91368,
+      "oklch_chroma_mean": 0.03363,
+      "opaque": 60,
+      "palette_size": 8
+    },
+    "gold_ingot": {
+      "alpha_ratio": 0.1758,
+      "oklab_lightness_mean": 0.59863,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.87039,
+      "oklch_chroma_mean": 0.11104,
+      "opaque": 45,
+      "palette_size": 4
+    },
+    "gold_ore": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.55451,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.75481,
+      "oklch_chroma_mean": 0.02111,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "golden_axe": {
+      "alpha_ratio": 0.2422,
+      "oklab_lightness_mean": 0.47336,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.08256,
+      "opaque": 62,
+      "palette_size": 6
+    },
+    "golden_boots": {
+      "alpha_ratio": 0.1602,
+      "oklab_lightness_mean": 0.6138,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.87039,
+      "oklch_chroma_mean": 0.10947,
+      "opaque": 41,
+      "palette_size": 3
+    },
+    "golden_chestplate": {
+      "alpha_ratio": 0.2656,
+      "oklab_lightness_mean": 0.68942,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.12502,
+      "opaque": 68,
+      "palette_size": 3
+    },
+    "golden_helmet": {
+      "alpha_ratio": 0.1406,
+      "oklab_lightness_mean": 0.68909,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.87039,
+      "oklch_chroma_mean": 0.12366,
+      "opaque": 36,
+      "palette_size": 3
+    },
+    "golden_hoe": {
+      "alpha_ratio": 0.2539,
+      "oklab_lightness_mean": 0.45036,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.07858,
+      "opaque": 65,
+      "palette_size": 5
+    },
+    "golden_leggings": {
+      "alpha_ratio": 0.2266,
+      "oklab_lightness_mean": 0.61349,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.11011,
+      "opaque": 58,
+      "palette_size": 3
+    },
+    "golden_pickaxe": {
+      "alpha_ratio": 0.3086,
+      "oklab_lightness_mean": 0.48174,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.08364,
+      "opaque": 79,
+      "palette_size": 5
+    },
+    "golden_shovel": {
+      "alpha_ratio": 0.207,
+      "oklab_lightness_mean": 0.4555,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.07909,
+      "opaque": 53,
+      "palette_size": 5
+    },
+    "golden_sword": {
+      "alpha_ratio": 0.332,
+      "oklab_lightness_mean": 0.51955,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.09285,
+      "opaque": 85,
+      "palette_size": 5
+    },
+    "granite": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.507,
+      "oklab_lightness_p10": 0.39246,
+      "oklab_lightness_p90": 0.60188,
+      "oklch_chroma_mean": 0.05978,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "grass_block": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.5243,
+      "oklab_lightness_p10": 0.35888,
+      "oklab_lightness_p90": 0.70492,
+      "oklch_chroma_mean": 0.08639,
+      "opaque": 127,
+      "palette_size": 16
+    },
+    "gravel": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.48474,
+      "oklab_lightness_p10": 0.37656,
+      "oklab_lightness_p90": 0.58403,
+      "oklch_chroma_mean": 0.00402,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "gunpowder": {
+      "alpha_ratio": 0.0508,
+      "oklab_lightness_mean": 0.48479,
+      "oklab_lightness_p10": 0.4043,
+      "oklab_lightness_p90": 0.57847,
+      "oklch_chroma_mean": 0.01014,
+      "opaque": 13,
+      "palette_size": 3
+    },
+    "ice": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.73344,
+      "oklab_lightness_p10": 0.62868,
+      "oklab_lightness_p90": 0.84521,
+      "oklch_chroma_mean": 0.04525,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "iron_axe": {
+      "alpha_ratio": 0.2422,
+      "oklab_lightness_mean": 0.5284,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.01241,
+      "opaque": 62,
+      "palette_size": 5
+    },
+    "iron_boots": {
+      "alpha_ratio": 0.1602,
+      "oklab_lightness_mean": 0.6544,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.00532,
+      "opaque": 41,
+      "palette_size": 3
+    },
+    "iron_chestplate": {
+      "alpha_ratio": 0.2656,
+      "oklab_lightness_mean": 0.73312,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.85266,
+      "oklch_chroma_mean": 0.00587,
+      "opaque": 68,
+      "palette_size": 3
+    },
+    "iron_helmet": {
+      "alpha_ratio": 0.1406,
+      "oklab_lightness_mean": 0.73382,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.00583,
+      "opaque": 36,
+      "palette_size": 3
+    },
+    "iron_hoe": {
+      "alpha_ratio": 0.2539,
+      "oklab_lightness_mean": 0.49334,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.85266,
+      "oklch_chroma_mean": 0.01185,
+      "opaque": 65,
+      "palette_size": 5
+    },
+    "iron_ingot": {
+      "alpha_ratio": 0.1758,
+      "oklab_lightness_mean": 0.63911,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.00543,
+      "opaque": 45,
+      "palette_size": 4
+    },
+    "iron_leggings": {
+      "alpha_ratio": 0.2266,
+      "oklab_lightness_mean": 0.6535,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.85266,
+      "oklch_chroma_mean": 0.00534,
+      "opaque": 58,
+      "palette_size": 3
+    },
+    "iron_ore": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.52987,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.58375,
+      "oklch_chroma_mean": 0.00644,
+      "opaque": 127,
+      "palette_size": 7
+    },
+    "iron_pickaxe": {
+      "alpha_ratio": 0.3086,
+      "oklab_lightness_mean": 0.53103,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.01072,
+      "opaque": 79,
+      "palette_size": 5
+    },
+    "iron_shovel": {
+      "alpha_ratio": 0.207,
+      "oklab_lightness_mean": 0.51047,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.93825,
+      "oklch_chroma_mean": 0.01365,
+      "opaque": 53,
+      "palette_size": 5
+    },
+    "iron_sword": {
+      "alpha_ratio": 0.332,
+      "oklab_lightness_mean": 0.56015,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.85266,
+      "oklch_chroma_mean": 0.00808,
+      "opaque": 85,
+      "palette_size": 5
+    },
+    "jungle_leaves": {
+      "alpha_ratio": 0.4727,
+      "oklab_lightness_mean": 0.49075,
+      "oklab_lightness_p10": 0.37409,
+      "oklab_lightness_p90": 0.63347,
+      "oklch_chroma_mean": 0.10483,
+      "opaque": 121,
+      "palette_size": 12
+    },
+    "jungle_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.44906,
+      "oklab_lightness_p10": 0.34014,
+      "oklab_lightness_p90": 0.57491,
+      "oklch_chroma_mean": 0.04994,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "jungle_sapling": {
+      "alpha_ratio": 0.0742,
+      "oklab_lightness_mean": 0.54323,
+      "oklab_lightness_p10": 0.39913,
+      "oklab_lightness_p90": 0.66001,
+      "oklch_chroma_mean": 0.12008,
+      "opaque": 19,
+      "palette_size": 9
+    },
+    "lava": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.57165,
+      "oklab_lightness_p10": 0.46983,
+      "oklab_lightness_p90": 0.67936,
+      "oklch_chroma_mean": 0.14657,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "leather": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.46829,
+      "oklab_lightness_p10": 0.26468,
+      "oklab_lightness_p90": 0.57439,
+      "oklch_chroma_mean": 0.09259,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "leather_boots": {
+      "alpha_ratio": 0.1602,
+      "oklab_lightness_mean": 0.43382,
+      "oklab_lightness_p10": 0.26468,
+      "oklab_lightness_p90": 0.66051,
+      "oklch_chroma_mean": 0.07933,
+      "opaque": 41,
+      "palette_size": 3
+    },
+    "leather_chestplate": {
+      "alpha_ratio": 0.2656,
+      "oklab_lightness_mean": 0.48963,
+      "oklab_lightness_p10": 0.26468,
+      "oklab_lightness_p90": 0.57439,
+      "oklch_chroma_mean": 0.09116,
+      "opaque": 68,
+      "palette_size": 3
+    },
+    "leather_helmet": {
+      "alpha_ratio": 0.1406,
+      "oklab_lightness_mean": 0.49172,
+      "oklab_lightness_p10": 0.26468,
+      "oklab_lightness_p90": 0.66051,
+      "oklch_chroma_mean": 0.09042,
+      "opaque": 36,
+      "palette_size": 3
+    },
+    "leather_leggings": {
+      "alpha_ratio": 0.2266,
+      "oklab_lightness_mean": 0.4323,
+      "oklab_lightness_p10": 0.26468,
+      "oklab_lightness_p90": 0.57439,
+      "oklch_chroma_mean": 0.07966,
+      "opaque": 58,
+      "palette_size": 3
+    },
+    "limestone": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.72571,
+      "oklab_lightness_p10": 0.63379,
+      "oklab_lightness_p90": 0.84914,
+      "oklch_chroma_mean": 0.02099,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "moss": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.47399,
+      "oklab_lightness_p10": 0.35672,
+      "oklab_lightness_p90": 0.61711,
+      "oklch_chroma_mean": 0.08042,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "mud": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.39895,
+      "oklab_lightness_p10": 0.33879,
+      "oklab_lightness_p90": 0.47752,
+      "oklch_chroma_mean": 0.00663,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "oak_leaves": {
+      "alpha_ratio": 0.4492,
+      "oklab_lightness_mean": 0.53628,
+      "oklab_lightness_p10": 0.42315,
+      "oklab_lightness_p90": 0.68359,
+      "oklch_chroma_mean": 0.10333,
+      "opaque": 115,
+      "palette_size": 12
+    },
+    "oak_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.44931,
+      "oklab_lightness_p10": 0.31809,
+      "oklab_lightness_p90": 0.57897,
+      "oklch_chroma_mean": 0.05943,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "oak_planks": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.55114,
+      "oklab_lightness_p10": 0.43403,
+      "oklab_lightness_p90": 0.64067,
+      "oklch_chroma_mean": 0.07605,
+      "opaque": 127,
+      "palette_size": 10
+    },
+    "oak_sapling": {
+      "alpha_ratio": 0.043,
+      "oklab_lightness_mean": 0.52316,
+      "oklab_lightness_p10": 0.43688,
+      "oklab_lightness_p90": 0.64323,
+      "oklch_chroma_mean": 0.10456,
+      "opaque": 11,
+      "palette_size": 7
+    },
+    "obsidian": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.29948,
+      "oklab_lightness_p10": 0.24151,
+      "oklab_lightness_p90": 0.381,
+      "oklch_chroma_mean": 0.04467,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "oxeye_daisy": {
+      "alpha_ratio": 0.082,
+      "oklab_lightness_mean": 0.84551,
+      "oklab_lightness_p10": 0.75936,
+      "oklab_lightness_p90": 0.95884,
+      "oklch_chroma_mean": 0.02813,
+      "opaque": 21,
+      "palette_size": 11
+    },
+    "packed_ice": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.62217,
+      "oklab_lightness_p10": 0.52923,
+      "oklab_lightness_p90": 0.73606,
+      "oklch_chroma_mean": 0.07467,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "pig_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.61204,
+      "oklab_lightness_p10": 0.36038,
+      "oklab_lightness_p90": 0.74106,
+      "oklch_chroma_mean": 0.09934,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "podzol": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.44918,
+      "oklab_lightness_p10": 0.35888,
+      "oklab_lightness_p90": 0.54002,
+      "oklch_chroma_mean": 0.04967,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "poppy": {
+      "alpha_ratio": 0.0664,
+      "oklab_lightness_mean": 0.56718,
+      "oklab_lightness_p10": 0.45756,
+      "oklab_lightness_p90": 0.66576,
+      "oklch_chroma_mean": 0.11968,
+      "opaque": 17,
+      "palette_size": 9
+    },
+    "raw_beef": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.48704,
+      "oklab_lightness_p10": 0.27498,
+      "oklab_lightness_p90": 0.59574,
+      "oklch_chroma_mean": 0.13303,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "raw_chicken": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.48704,
+      "oklab_lightness_p10": 0.27498,
+      "oklab_lightness_p90": 0.59574,
+      "oklch_chroma_mean": 0.13303,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "raw_gold": {
+      "alpha_ratio": 0.2031,
+      "oklab_lightness_mean": 0.66604,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.80425,
+      "oklch_chroma_mean": 0.12715,
+      "opaque": 52,
+      "palette_size": 4
+    },
+    "raw_iron": {
+      "alpha_ratio": 0.2031,
+      "oklab_lightness_mean": 0.70873,
+      "oklab_lightness_p10": 0.42484,
+      "oklab_lightness_p90": 0.85266,
+      "oklch_chroma_mean": 0.00601,
+      "opaque": 52,
+      "palette_size": 4
+    },
+    "raw_mutton": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.48704,
+      "oklab_lightness_p10": 0.27498,
+      "oklab_lightness_p90": 0.59574,
+      "oklch_chroma_mean": 0.13303,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "raw_porkchop": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.48704,
+      "oklab_lightness_p10": 0.27498,
+      "oklab_lightness_p90": 0.59574,
+      "oklch_chroma_mean": 0.13303,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "red_sand": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.52383,
+      "oklab_lightness_p10": 0.42398,
+      "oklab_lightness_p90": 0.63073,
+      "oklch_chroma_mean": 0.10225,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "reeds": {
+      "alpha_ratio": 0.0508,
+      "oklab_lightness_mean": 0.58073,
+      "oklab_lightness_p10": 0.48457,
+      "oklab_lightness_p90": 0.69151,
+      "oklch_chroma_mean": 0.08938,
+      "opaque": 13,
+      "palette_size": 9
+    },
+    "rotten_flesh": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.47645,
+      "oklab_lightness_p10": 0.26988,
+      "oklab_lightness_p90": 0.58456,
+      "oklch_chroma_mean": 0.0809,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "sand": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.77135,
+      "oklab_lightness_p10": 0.66257,
+      "oklab_lightness_p90": 0.93106,
+      "oklch_chroma_mean": 0.05473,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "sheep_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.71379,
+      "oklab_lightness_p10": 0.42754,
+      "oklab_lightness_p90": 0.85666,
+      "oklch_chroma_mean": 0.01723,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "shield": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.47713,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.59644,
+      "oklch_chroma_mean": 0.07437,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "skeleton_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.66053,
+      "oklab_lightness_p10": 0.39194,
+      "oklab_lightness_p90": 0.7959,
+      "oklch_chroma_mean": 0.00647,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "skyroot_leaves": {
+      "alpha_ratio": 0.4492,
+      "oklab_lightness_mean": 0.6165,
+      "oklab_lightness_p10": 0.52118,
+      "oklab_lightness_p90": 0.78022,
+      "oklch_chroma_mean": 0.11401,
+      "opaque": 115,
+      "palette_size": 12
+    },
+    "skyroot_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.52283,
+      "oklab_lightness_p10": 0.38852,
+      "oklab_lightness_p90": 0.66559,
+      "oklch_chroma_mean": 0.06396,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "snow": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.83981,
+      "oklab_lightness_p10": 0.74163,
+      "oklab_lightness_p90": 0.9241,
+      "oklch_chroma_mean": 0.00928,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "spider_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.3807,
+      "oklab_lightness_p10": 0.2241,
+      "oklab_lightness_p90": 0.46782,
+      "oklch_chroma_mean": 0.07191,
+      "opaque": 74,
+      "palette_size": 5
+    },
+    "spruce_leaves": {
+      "alpha_ratio": 0.4727,
+      "oklab_lightness_mean": 0.42791,
+      "oklab_lightness_p10": 0.34029,
+      "oklab_lightness_p90": 0.53212,
+      "oklch_chroma_mean": 0.04838,
+      "opaque": 121,
+      "palette_size": 12
+    },
+    "spruce_log": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.42987,
+      "oklab_lightness_p10": 0.33497,
+      "oklab_lightness_p90": 0.57491,
+      "oklch_chroma_mean": 0.03904,
+      "opaque": 127,
+      "palette_size": 18
+    },
+    "spruce_sapling": {
+      "alpha_ratio": 0.0547,
+      "oklab_lightness_mean": 0.43592,
+      "oklab_lightness_p10": 0.34143,
+      "oklab_lightness_p90": 0.55247,
+      "oklch_chroma_mean": 0.05333,
+      "opaque": 14,
+      "palette_size": 10
+    },
+    "star_crystal": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.70709,
+      "oklab_lightness_p10": 0.59744,
+      "oklab_lightness_p90": 0.85665,
+      "oklch_chroma_mean": 0.09646,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "starflower": {
+      "alpha_ratio": 0.0586,
+      "oklab_lightness_mean": 0.65918,
+      "oklab_lightness_p10": 0.51227,
+      "oklab_lightness_p90": 0.76442,
+      "oklch_chroma_mean": 0.12794,
+      "opaque": 15,
+      "palette_size": 9
+    },
+    "steak": {
+      "alpha_ratio": 0.2188,
+      "oklab_lightness_mean": 0.451,
+      "oklab_lightness_p10": 0.2535,
+      "oklab_lightness_p90": 0.555,
+      "oklch_chroma_mean": 0.09246,
+      "opaque": 56,
+      "palette_size": 4
+    },
+    "stick": {
+      "alpha_ratio": 0.2148,
+      "oklab_lightness_mean": 0.32504,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.43963,
+      "oklch_chroma_mean": 0.04897,
+      "opaque": 55,
+      "palette_size": 3
+    },
+    "stone": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.5961,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.7412,
+      "oklch_chroma_mean": 0.00387,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "stone_axe": {
+      "alpha_ratio": 0.2422,
+      "oklab_lightness_mean": 0.37674,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.01326,
+      "opaque": 62,
+      "palette_size": 7
+    },
+    "stone_hoe": {
+      "alpha_ratio": 0.2539,
+      "oklab_lightness_mean": 0.35237,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.01252,
+      "opaque": 65,
+      "palette_size": 6
+    },
+    "stone_pickaxe": {
+      "alpha_ratio": 0.3086,
+      "oklab_lightness_mean": 0.37489,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.63907,
+      "oklch_chroma_mean": 0.01214,
+      "opaque": 79,
+      "palette_size": 6
+    },
+    "stone_shovel": {
+      "alpha_ratio": 0.207,
+      "oklab_lightness_mean": 0.36056,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.01583,
+      "opaque": 53,
+      "palette_size": 6
+    },
+    "stone_sword": {
+      "alpha_ratio": 0.332,
+      "oklab_lightness_mean": 0.39912,
+      "oklab_lightness_p10": 0.29956,
+      "oklab_lightness_p90": 0.63907,
+      "oklch_chroma_mean": 0.00793,
+      "opaque": 85,
+      "palette_size": 6
+    },
+    "string": {
+      "alpha_ratio": 0.0938,
+      "oklab_lightness_mean": 0.85963,
+      "oklab_lightness_p10": 0.81643,
+      "oklab_lightness_p90": 0.90283,
+      "oklch_chroma_mean": 0.03322,
+      "opaque": 24,
+      "palette_size": 2
+    },
+    "sunflower": {
+      "alpha_ratio": 0.0898,
+      "oklab_lightness_mean": 0.55424,
+      "oklab_lightness_p10": 0.48486,
+      "oklab_lightness_p90": 0.63989,
+      "oklch_chroma_mean": 0.1132,
+      "opaque": 23,
+      "palette_size": 7
+    },
+    "sunstone": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.7234,
+      "oklab_lightness_p10": 0.61668,
+      "oklab_lightness_p90": 0.83062,
+      "oklch_chroma_mean": 0.10367,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "tall_grass": {
+      "alpha_ratio": 0.0547,
+      "oklab_lightness_mean": 0.51512,
+      "oklab_lightness_p10": 0.39661,
+      "oklab_lightness_p90": 0.6572,
+      "oklch_chroma_mean": 0.10366,
+      "opaque": 14,
+      "palette_size": 10
+    },
+    "terracotta": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.48287,
+      "oklab_lightness_p10": 0.36206,
+      "oklab_lightness_p90": 0.62146,
+      "oklch_chroma_mean": 0.0796,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "tnt": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.51801,
+      "oklab_lightness_p10": 0.43885,
+      "oklab_lightness_p90": 0.59508,
+      "oklch_chroma_mean": 0.15039,
+      "opaque": 127,
+      "palette_size": 10
+    },
+    "torch": {
+      "alpha_ratio": 0.2227,
+      "oklab_lightness_mean": 0.45504,
+      "oklab_lightness_p10": 0.39728,
+      "oklab_lightness_p90": 0.43963,
+      "oklch_chroma_mean": 0.07934,
+      "opaque": 57,
+      "palette_size": 5
+    },
+    "tuff": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.47536,
+      "oklab_lightness_p10": 0.35557,
+      "oklab_lightness_p90": 0.58746,
+      "oklch_chroma_mean": 0.01656,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "water": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.452,
+      "oklab_lightness_p10": 0.34605,
+      "oklab_lightness_p90": 0.55289,
+      "oklch_chroma_mean": 0.09604,
+      "opaque": 127,
+      "palette_size": 12
+    },
+    "wheat": {
+      "alpha_ratio": 0.0742,
+      "oklab_lightness_mean": 0.74964,
+      "oklab_lightness_p10": 0.66772,
+      "oklab_lightness_p90": 0.8411,
+      "oklch_chroma_mean": 0.13505,
+      "opaque": 19,
+      "palette_size": 3
+    },
+    "wheat_seeds": {
+      "alpha_ratio": 0.0664,
+      "oklab_lightness_mean": 0.63376,
+      "oklab_lightness_p10": 0.5574,
+      "oklab_lightness_p90": 0.72976,
+      "oklch_chroma_mean": 0.14386,
+      "opaque": 17,
+      "palette_size": 3
+    },
+    "white_bed": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.83675,
+      "oklab_lightness_p10": 0.73191,
+      "oklab_lightness_p90": 0.95893,
+      "oklch_chroma_mean": 0.01069,
+      "opaque": 127,
+      "palette_size": 11
+    },
+    "white_wool": {
+      "alpha_ratio": 0.4961,
+      "oklab_lightness_mean": 0.81283,
+      "oklab_lightness_p10": 0.69836,
+      "oklab_lightness_p90": 0.91111,
+      "oklch_chroma_mean": 0.00654,
+      "opaque": 127,
+      "palette_size": 10
+    },
+    "wooden_axe": {
+      "alpha_ratio": 0.2422,
+      "oklab_lightness_mean": 0.3646,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.0541,
+      "opaque": 62,
+      "palette_size": 7
+    },
+    "wooden_hoe": {
+      "alpha_ratio": 0.2539,
+      "oklab_lightness_mean": 0.34083,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.05029,
+      "opaque": 65,
+      "palette_size": 6
+    },
+    "wooden_pickaxe": {
+      "alpha_ratio": 0.3086,
+      "oklab_lightness_mean": 0.36146,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.05272,
+      "opaque": 79,
+      "palette_size": 6
+    },
+    "wooden_shovel": {
+      "alpha_ratio": 0.207,
+      "oklab_lightness_mean": 0.34627,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.0514,
+      "opaque": 53,
+      "palette_size": 6
+    },
+    "wooden_sword": {
+      "alpha_ratio": 0.332,
+      "oklab_lightness_mean": 0.39247,
+      "oklab_lightness_p10": 0.27714,
+      "oklab_lightness_p90": 0.61071,
+      "oklch_chroma_mean": 0.05842,
+      "opaque": 85,
+      "palette_size": 6
+    },
+    "zombie_spawn_egg": {
+      "alpha_ratio": 0.2891,
+      "oklab_lightness_mean": 0.48289,
+      "oklab_lightness_p10": 0.27652,
+      "oklab_lightness_p90": 0.59178,
+      "oklch_chroma_mean": 0.08015,
+      "opaque": 74,
+      "palette_size": 5
+    }
+  },
+  "palette_roles": [
+    "shadow",
+    "base_dark",
+    "base",
+    "base_light",
+    "highlight",
+    "accent"
+  ],
+  "previews": {
+    "blocks": "block_preview.png",
+    "entities": "entity_contact_sheet.png",
+    "entity_semantic": "entity_semantic_preview.png",
+    "items": "items_contact_sheet.png",
+    "lighting_profiles": [
+      "noon",
+      "dusk",
+      "cave"
+    ]
+  },
+  "seed": 213785369,
+  "style": "bright-comfortable",
+  "style_exceptions": {
+    "dark_materials": [
+      "deepslate",
+      "black_sand",
+      "basalt",
+      "mud",
+      "obsidian"
+    ],
+    "highlight_materials": [
+      "sand",
+      "snow",
+      "cloudstone",
+      "ice",
+      "packed_ice"
+    ]
+  },
+  "textures": {
+    "acacia_leaves": {
+      "alpha_ratio": 0.9375,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.51558,
+      "oklab_lightness_p10": 0.38407,
+      "oklab_lightness_p90": 0.64228,
+      "oklch_chroma_mean": 0.08495,
+      "opaque": 240,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08010698408925508,
+        "edge_density": 0.62695,
+        "largest_component": 0.09375,
+        "largest_rectangularity": 0.625,
+        "longest_run": 8,
+        "periodicity": 0.22098292449586385,
+        "seam_ratio": 0.7949521396606032,
+        "transitions": 321
+      }
+    },
+    "acacia_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.45701,
+      "oklab_lightness_p10": 0.34149,
+      "oklab_lightness_p90": 0.5887,
+      "oklch_chroma_mean": 0.0584,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.053012497580298745,
+        "edge_density": 0.70508,
+        "largest_component": 0.0625,
+        "largest_rectangularity": 0.14285714285714285,
+        "longest_run": 8,
+        "periodicity": 0.44698755892799474,
+        "seam_ratio": 1.1550099793184965,
+        "transitions": 361
+      }
+    },
+    "acacia_sapling": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.53887,
+      "oklab_lightness_p10": 0.39478,
+      "oklab_lightness_p90": 0.65702,
+      "oklch_chroma_mean": 0.09074,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.293679944330206,
+        "edge_density": 0.1875,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.2918207382940194,
+        "seam_ratio": 0.14972842897914862,
+        "transitions": 96
+      }
+    },
+    "aether_grass_side": {
+      "alpha_ratio": 1.0,
+      "family": "turf",
+      "oklab_lightness_mean": 0.56337,
+      "oklab_lightness_p10": 0.33997,
+      "oklab_lightness_p90": 0.81182,
+      "oklch_chroma_mean": 0.08167,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.14914609919176566,
+        "edge_density": 0.57422,
+        "largest_component": 0.13671875,
+        "largest_rectangularity": 0.5,
+        "longest_run": 7,
+        "periodicity": 0.7709011359563219,
+        "seam_ratio": 2.9270744731284193,
+        "transitions": 294
+      }
+    },
+    "aether_grass_top": {
+      "alpha_ratio": 1.0,
+      "family": "turf",
+      "oklab_lightness_mean": 0.68095,
+      "oklab_lightness_p10": 0.55227,
+      "oklab_lightness_p90": 0.81182,
+      "oklch_chroma_mean": 0.11411,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.07582213779217348,
+        "edge_density": 0.56836,
+        "largest_component": 0.15234375,
+        "largest_rectangularity": 0.3482142857142857,
+        "longest_run": 7,
+        "periodicity": 0.5580205660475536,
+        "seam_ratio": 0.4371160415606459,
+        "transitions": 291
+      }
+    },
+    "aether_soil": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.46826,
+      "oklab_lightness_p10": 0.33997,
+      "oklab_lightness_p90": 0.59753,
+      "oklch_chroma_mean": 0.05477,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.11275759762561395,
+        "edge_density": 0.57422,
+        "largest_component": 0.15234375,
+        "largest_rectangularity": 0.6857142857142857,
+        "longest_run": 8,
+        "periodicity": 0.28127793294173076,
+        "seam_ratio": 0.7079556162533841,
+        "transitions": 294
+      }
+    },
+    "allium": {
+      "alpha_ratio": 0.125,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.598,
+      "oklab_lightness_p10": 0.48958,
+      "oklab_lightness_p90": 0.69671,
+      "oklch_chroma_mean": 0.13641,
+      "opaque": 32,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.26823522724988946,
+        "edge_density": 0.17578,
+        "largest_component": 0.875,
+        "largest_rectangularity": 0.875,
+        "longest_run": 16,
+        "periodicity": 0.2855578347986091,
+        "seam_ratio": 0.16334208657662053,
+        "transitions": 90
+      }
+    },
+    "basalt": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.37614,
+      "oklab_lightness_p10": 0.30534,
+      "oklab_lightness_p90": 0.44511,
+      "oklch_chroma_mean": 0.00544,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.07944648677264476,
+        "edge_density": 0.63672,
+        "largest_component": 0.06640625,
+        "largest_rectangularity": 0.6,
+        "longest_run": 8,
+        "periodicity": 0.08902877284383069,
+        "seam_ratio": 0.9882846296792921,
+        "transitions": 326
+      }
+    },
+    "bedrock": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.41066,
+      "oklab_lightness_p10": 0.34046,
+      "oklab_lightness_p90": 0.48205,
+      "oklch_chroma_mean": 0.0046,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.038754696668427936,
+        "edge_density": 0.66992,
+        "largest_component": 0.0703125,
+        "largest_rectangularity": 0.225,
+        "longest_run": 5,
+        "periodicity": 0.2531056434408635,
+        "seam_ratio": 0.7718732349637567,
+        "transitions": 343
+      }
+    },
+    "birch_leaves": {
+      "alpha_ratio": 0.9453,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.54117,
+      "oklab_lightness_p10": 0.41249,
+      "oklab_lightness_p90": 0.67324,
+      "oklch_chroma_mean": 0.09977,
+      "opaque": 242,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.16568248396445998,
+        "edge_density": 0.57422,
+        "largest_component": 0.1015625,
+        "largest_rectangularity": 0.6190476190476191,
+        "longest_run": 7,
+        "periodicity": 0.23170117000431897,
+        "seam_ratio": 0.8464439275151628,
+        "transitions": 294
+      }
+    },
+    "birch_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.72442,
+      "oklab_lightness_p10": 0.60284,
+      "oklab_lightness_p90": 0.86331,
+      "oklch_chroma_mean": 0.03417,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04835629985060502,
+        "edge_density": 0.71875,
+        "largest_component": 0.0625,
+        "largest_rectangularity": 0.5925925925925926,
+        "longest_run": 9,
+        "periodicity": 0.5290999731341512,
+        "seam_ratio": 1.0991891843132242,
+        "transitions": 368
+      }
+    },
+    "birch_sapling": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.57427,
+      "oklab_lightness_p10": 0.43303,
+      "oklab_lightness_p90": 0.69156,
+      "oklch_chroma_mean": 0.10489,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.2694454245310918,
+        "edge_density": 0.1875,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.2939454511877154,
+        "seam_ratio": 0.15340880122230008,
+        "transitions": 96
+      }
+    },
+    "black_sand": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.36582,
+      "oklab_lightness_p10": 0.29598,
+      "oklab_lightness_p90": 0.43516,
+      "oklch_chroma_mean": 0.00539,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.039772508047442735,
+        "edge_density": 0.70508,
+        "largest_component": 0.06640625,
+        "largest_rectangularity": 0.68,
+        "longest_run": 5,
+        "periodicity": 0.3074051937098462,
+        "seam_ratio": 1.1858127003974517,
+        "transitions": 361
+      }
+    },
+    "blue_orchid": {
+      "alpha_ratio": 0.125,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.66671,
+      "oklab_lightness_p10": 0.56197,
+      "oklab_lightness_p90": 0.772,
+      "oklch_chroma_mean": 0.09675,
+      "opaque": 32,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.4330620882201248,
+        "edge_density": 0.18359,
+        "largest_component": 0.875,
+        "largest_rectangularity": 0.875,
+        "longest_run": 16,
+        "periodicity": 0.2814140720834409,
+        "seam_ratio": 0.1606254961795746,
+        "transitions": 94
+      }
+    },
+    "cactus_side": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.51421,
+      "oklab_lightness_p10": 0.41312,
+      "oklab_lightness_p90": 0.62037,
+      "oklch_chroma_mean": 0.08987,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 5,
+      "structure": {
+        "center_cross": 0.048187731486133464,
+        "edge_density": 0.71875,
+        "largest_component": 0.0234375,
+        "largest_rectangularity": 0,
+        "longest_run": 3,
+        "periodicity": 0.534843719847405,
+        "seam_ratio": 0.7399580065848047,
+        "transitions": 368
+      }
+    },
+    "cactus_top": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.54602,
+      "oklab_lightness_p10": 0.41674,
+      "oklab_lightness_p90": 0.67783,
+      "oklch_chroma_mean": 0.09529,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.18584502418944665,
+        "edge_density": 0.68945,
+        "largest_component": 0.12109375,
+        "largest_rectangularity": 0.3229166666666667,
+        "longest_run": 5,
+        "periodicity": 0.310906223854904,
+        "seam_ratio": 0.9943133882438691,
+        "transitions": 353
+      }
+    },
+    "chest": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.55027,
+      "oklab_lightness_p10": 0.40521,
+      "oklab_lightness_p90": 0.66632,
+      "oklch_chroma_mean": 0.0792,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.06736813845731081,
+        "edge_density": 0.50586,
+        "largest_component": 0.203125,
+        "largest_rectangularity": 1.0,
+        "longest_run": 14,
+        "periodicity": 0.3482831509924485,
+        "seam_ratio": 1.1496295976689341,
+        "transitions": 259
+      }
+    },
+    "clay": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.65249,
+      "oklab_lightness_p10": 0.52252,
+      "oklab_lightness_p90": 0.78267,
+      "oklch_chroma_mean": 0.01815,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.00887306953338671,
+        "edge_density": 0.67383,
+        "largest_component": 0.0546875,
+        "largest_rectangularity": 0.4642857142857143,
+        "longest_run": 6,
+        "periodicity": 0.07396060996169755,
+        "seam_ratio": 0.7586325918591122,
+        "transitions": 345
+      }
+    },
+    "cloud": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.86833,
+      "oklab_lightness_p10": 0.77715,
+      "oklab_lightness_p90": 0.95926,
+      "oklch_chroma_mean": 0.00656,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.11510009149819643,
+        "edge_density": 0.61133,
+        "largest_component": 0.13671875,
+        "largest_rectangularity": 0.5555555555555556,
+        "longest_run": 8,
+        "periodicity": 0.412271552348186,
+        "seam_ratio": 1.2144002320725071,
+        "transitions": 313
+      }
+    },
+    "cloudstone": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.76354,
+      "oklab_lightness_p10": 0.63359,
+      "oklab_lightness_p90": 0.89371,
+      "oklch_chroma_mean": 0.02904,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.16799521192750497,
+        "edge_density": 0.58594,
+        "largest_component": 0.1484375,
+        "largest_rectangularity": 0.5138888888888888,
+        "longest_run": 8,
+        "periodicity": 0.29579257512644774,
+        "seam_ratio": 0.925366597199428,
+        "transitions": 300
+      }
+    },
+    "coal_ore": {
+      "alpha_ratio": 1.0,
+      "family": "ore",
+      "oklab_lightness_mean": 0.50279,
+      "oklab_lightness_p10": 0.3804,
+      "oklab_lightness_p90": 0.58375,
+      "oklch_chroma_mean": 0.00391,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04397075711161412,
+        "edge_density": 0.53711,
+        "largest_component": 0.203125,
+        "largest_rectangularity": 0.9333333333333333,
+        "longest_run": 6,
+        "periodicity": 0.10968103781666977,
+        "seam_ratio": 0.5643612911394956,
+        "transitions": 275
+      }
+    },
+    "coarse_dirt": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.44942,
+      "oklab_lightness_p10": 0.33862,
+      "oklab_lightness_p90": 0.55936,
+      "oklch_chroma_mean": 0.05367,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.1922202072780134,
+        "edge_density": 0.64258,
+        "largest_component": 0.08203125,
+        "largest_rectangularity": 0.7,
+        "longest_run": 6,
+        "periodicity": 0.3797044099632839,
+        "seam_ratio": 1.0615964419908737,
+        "transitions": 329
+      }
+    },
+    "cobblestone": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.52504,
+      "oklab_lightness_p10": 0.39535,
+      "oklab_lightness_p90": 0.65437,
+      "oklch_chroma_mean": 0.00363,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08868209459459699,
+        "edge_density": 0.68555,
+        "largest_component": 0.0859375,
+        "largest_rectangularity": 0.46875,
+        "longest_run": 8,
+        "periodicity": 0.1756633351296398,
+        "seam_ratio": 1.200131541890361,
+        "transitions": 351
+      }
+    },
+    "copper_ore": {
+      "alpha_ratio": 1.0,
+      "family": "ore",
+      "oklab_lightness_mean": 0.52223,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.58375,
+      "oklch_chroma_mean": 0.0152,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.03911170408690546,
+        "edge_density": 0.55078,
+        "largest_component": 0.171875,
+        "largest_rectangularity": 0.3333333333333333,
+        "longest_run": 8,
+        "periodicity": 0.13566982509468353,
+        "seam_ratio": 0.5114065103715114,
+        "transitions": 282
+      }
+    },
+    "crafting_table": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.51271,
+      "oklab_lightness_p10": 0.37081,
+      "oklab_lightness_p90": 0.63006,
+      "oklch_chroma_mean": 0.0698,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.05704806044583044,
+        "edge_density": 0.49609,
+        "largest_component": 0.203125,
+        "largest_rectangularity": 1.0,
+        "longest_run": 14,
+        "periodicity": 0.24450697469895025,
+        "seam_ratio": 1.1948156844428075,
+        "transitions": 254
+      }
+    },
+    "dandelion": {
+      "alpha_ratio": 0.125,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.81938,
+      "oklab_lightness_p10": 0.66574,
+      "oklab_lightness_p90": 0.91007,
+      "oklch_chroma_mean": 0.13654,
+      "opaque": 32,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.5150430160093136,
+        "edge_density": 0.17969,
+        "largest_component": 0.875,
+        "largest_rectangularity": 0.875,
+        "longest_run": 16,
+        "periodicity": 0.27831345235022426,
+        "seam_ratio": 0.17191826159745344,
+        "transitions": 92
+      }
+    },
+    "deepslate": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.40675,
+      "oklab_lightness_p10": 0.33582,
+      "oklab_lightness_p90": 0.47689,
+      "oklch_chroma_mean": 0.01013,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.10209163428826834,
+        "edge_density": 0.62305,
+        "largest_component": 0.09375,
+        "largest_rectangularity": 0.6,
+        "longest_run": 7,
+        "periodicity": 0.19155000433946756,
+        "seam_ratio": 1.076277837000192,
+        "transitions": 319
+      }
+    },
+    "diamond_ore": {
+      "alpha_ratio": 1.0,
+      "family": "ore",
+      "oklab_lightness_mean": 0.57568,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.80768,
+      "oklch_chroma_mean": 0.02186,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04818103112092693,
+        "edge_density": 0.58203,
+        "largest_component": 0.0859375,
+        "largest_rectangularity": 0.4642857142857143,
+        "longest_run": 6,
+        "periodicity": 0.1424115369590633,
+        "seam_ratio": 0.5510861816912611,
+        "transitions": 298
+      }
+    },
+    "dirt": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.47156,
+      "oklab_lightness_p10": 0.35888,
+      "oklab_lightness_p90": 0.58411,
+      "oklch_chroma_mean": 0.0549,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.01590824193212668,
+        "edge_density": 0.58789,
+        "largest_component": 0.09375,
+        "largest_rectangularity": 0.6111111111111112,
+        "longest_run": 6,
+        "periodicity": 0.28852806025804006,
+        "seam_ratio": 1.5234522847546614,
+        "transitions": 301
+      }
+    },
+    "farmland": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.41619,
+      "oklab_lightness_p10": 0.34082,
+      "oklab_lightness_p90": 0.52192,
+      "oklch_chroma_mean": 0.04473,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.07259224340026334,
+        "edge_density": 0.67969,
+        "largest_component": 0.0625,
+        "largest_rectangularity": 0.6666666666666666,
+        "longest_run": 6,
+        "periodicity": 0.16483061415841452,
+        "seam_ratio": 0.7716639172955639,
+        "transitions": 348
+      }
+    },
+    "fire": {
+      "alpha_ratio": 0.4102,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.51867,
+      "oklab_lightness_p10": 0.37926,
+      "oklab_lightness_p90": 0.6647,
+      "oklch_chroma_mean": 0.15462,
+      "opaque": 105,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 5,
+      "structure": {
+        "center_cross": 0.41955170645416406,
+        "edge_density": 0.17188,
+        "largest_component": 0.58984375,
+        "largest_rectangularity": 0.9166666666666666,
+        "longest_run": 16,
+        "periodicity": 0.40867071139798905,
+        "seam_ratio": 1.3583454610513084,
+        "transitions": 88
+      }
+    },
+    "flower": {
+      "alpha_ratio": 0.125,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.56603,
+      "oklab_lightness_p10": 0.45756,
+      "oklab_lightness_p90": 0.66576,
+      "oklch_chroma_mean": 0.12458,
+      "opaque": 32,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.2419172370690005,
+        "edge_density": 0.17578,
+        "largest_component": 0.875,
+        "largest_rectangularity": 0.875,
+        "longest_run": 16,
+        "periodicity": 0.2845151608661268,
+        "seam_ratio": 0.15682968738808176,
+        "transitions": 90
+      }
+    },
+    "furnace": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.4897,
+      "oklab_lightness_p10": 0.35388,
+      "oklab_lightness_p90": 0.6147,
+      "oklch_chroma_mean": 0.00286,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.025280565068495773,
+        "edge_density": 0.51367,
+        "largest_component": 0.203125,
+        "largest_rectangularity": 0.625,
+        "longest_run": 14,
+        "periodicity": 0.20054845287998949,
+        "seam_ratio": 1.2149151811411096,
+        "transitions": 263
+      }
+    },
+    "glass": {
+      "alpha_ratio": 0.293,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.84732,
+      "oklab_lightness_p10": 0.77228,
+      "oklab_lightness_p90": 0.91368,
+      "oklch_chroma_mean": 0.03421,
+      "opaque": 75,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 4,
+      "structure": {
+        "center_cross": 0.37717296610318024,
+        "edge_density": 0.27344,
+        "largest_component": 0.70703125,
+        "largest_rectangularity": 0.923469387755102,
+        "longest_run": 14,
+        "periodicity": 0.31894460963370497,
+        "seam_ratio": 0.0,
+        "transitions": 140
+      }
+    },
+    "gold_ore": {
+      "alpha_ratio": 1.0,
+      "family": "ore",
+      "oklab_lightness_mean": 0.57199,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.82734,
+      "oklch_chroma_mean": 0.0236,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.07116474703136588,
+        "edge_density": 0.57031,
+        "largest_component": 0.09765625,
+        "largest_rectangularity": 0.5833333333333334,
+        "longest_run": 6,
+        "periodicity": 0.227230754552424,
+        "seam_ratio": 0.9124984201213349,
+        "transitions": 292
+      }
+    },
+    "granite": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.5225,
+      "oklab_lightness_p10": 0.39246,
+      "oklab_lightness_p90": 0.65258,
+      "oklch_chroma_mean": 0.06138,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.032406052290341,
+        "edge_density": 0.62695,
+        "largest_component": 0.1484375,
+        "largest_rectangularity": 0.5,
+        "longest_run": 7,
+        "periodicity": 0.06117116307396671,
+        "seam_ratio": 0.8777373967902631,
+        "transitions": 321
+      }
+    },
+    "grass_side": {
+      "alpha_ratio": 1.0,
+      "family": "turf",
+      "oklab_lightness_mean": 0.51784,
+      "oklab_lightness_p10": 0.35888,
+      "oklab_lightness_p90": 0.70492,
+      "oklch_chroma_mean": 0.07893,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.1405651352213663,
+        "edge_density": 0.51562,
+        "largest_component": 0.171875,
+        "largest_rectangularity": 0.6875,
+        "longest_run": 8,
+        "periodicity": 0.7334206046153081,
+        "seam_ratio": 2.7987066183326035,
+        "transitions": 264
+      }
+    },
+    "grass_top": {
+      "alpha_ratio": 1.0,
+      "family": "turf",
+      "oklab_lightness_mean": 0.57314,
+      "oklab_lightness_p10": 0.44418,
+      "oklab_lightness_p90": 0.70492,
+      "oklch_chroma_mean": 0.11107,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.1810265610526937,
+        "edge_density": 0.69141,
+        "largest_component": 0.046875,
+        "largest_rectangularity": 0.5714285714285714,
+        "longest_run": 5,
+        "periodicity": 0.06005246921725734,
+        "seam_ratio": 0.5385961403070274,
+        "transitions": 354
+      }
+    },
+    "gravel": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.50539,
+      "oklab_lightness_p10": 0.37656,
+      "oklab_lightness_p90": 0.63538,
+      "oklch_chroma_mean": 0.00422,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.017420210540940256,
+        "edge_density": 0.62305,
+        "largest_component": 0.07421875,
+        "largest_rectangularity": 0.7916666666666666,
+        "longest_run": 6,
+        "periodicity": 0.20223994671476245,
+        "seam_ratio": 0.8370408668877296,
+        "transitions": 319
+      }
+    },
+    "ice": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.76623,
+      "oklab_lightness_p10": 0.63698,
+      "oklab_lightness_p90": 0.89697,
+      "oklch_chroma_mean": 0.04711,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.03615404538365629,
+        "edge_density": 0.75,
+        "largest_component": 0.01171875,
+        "largest_rectangularity": 0,
+        "longest_run": 3,
+        "periodicity": 0.37654146386693094,
+        "seam_ratio": 2.309990863606313,
+        "transitions": 384
+      }
+    },
+    "iron_ore": {
+      "alpha_ratio": 1.0,
+      "family": "ore",
+      "oklab_lightness_mean": 0.56389,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.58375,
+      "oklch_chroma_mean": 0.00918,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.13066454837891797,
+        "edge_density": 0.54883,
+        "largest_component": 0.1484375,
+        "largest_rectangularity": 0.375,
+        "longest_run": 6,
+        "periodicity": 0.334124773960763,
+        "seam_ratio": 0.8219169820456956,
+        "transitions": 281
+      }
+    },
+    "jungle_leaves": {
+      "alpha_ratio": 0.9531,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.50232,
+      "oklab_lightness_p10": 0.37409,
+      "oklab_lightness_p90": 0.63347,
+      "oklch_chroma_mean": 0.10844,
+      "opaque": 244,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.20142735453141866,
+        "edge_density": 0.66211,
+        "largest_component": 0.109375,
+        "largest_rectangularity": 0.2916666666666667,
+        "longest_run": 7,
+        "periodicity": 0.2152429788791205,
+        "seam_ratio": 1.3004866062771352,
+        "transitions": 339
+      }
+    },
+    "jungle_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.4368,
+      "oklab_lightness_p10": 0.34014,
+      "oklab_lightness_p90": 0.54662,
+      "oklch_chroma_mean": 0.0453,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04850283788983487,
+        "edge_density": 0.73438,
+        "largest_component": 0.05859375,
+        "largest_rectangularity": 0.3611111111111111,
+        "longest_run": 6,
+        "periodicity": 0.5521326736330755,
+        "seam_ratio": 1.2385437492237166,
+        "transitions": 376
+      }
+    },
+    "jungle_sapling": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.54248,
+      "oklab_lightness_p10": 0.39913,
+      "oklab_lightness_p90": 0.66001,
+      "oklch_chroma_mean": 0.12303,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.39427662812193626,
+        "edge_density": 0.18555,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.2919780712704832,
+        "seam_ratio": 0.15173351960056808,
+        "transitions": 95
+      }
+    },
+    "lava": {
+      "alpha_ratio": 1.0,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.59906,
+      "oklab_lightness_p10": 0.46983,
+      "oklab_lightness_p90": 0.72595,
+      "oklch_chroma_mean": 0.1526,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.03602263451705563,
+        "edge_density": 0.75,
+        "largest_component": 0.01171875,
+        "largest_rectangularity": 0,
+        "longest_run": 3,
+        "periodicity": 0.3699099553830643,
+        "seam_ratio": 2.2644463509764,
+        "transitions": 384
+      }
+    },
+    "leaves": {
+      "alpha_ratio": 0.957,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.55222,
+      "oklab_lightness_p10": 0.42315,
+      "oklab_lightness_p90": 0.68359,
+      "oklch_chroma_mean": 0.10702,
+      "opaque": 245,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08758033475614453,
+        "edge_density": 0.65039,
+        "largest_component": 0.078125,
+        "largest_rectangularity": 0.6666666666666666,
+        "longest_run": 5,
+        "periodicity": 0.16268003293302014,
+        "seam_ratio": 0.9488033429864681,
+        "transitions": 333
+      }
+    },
+    "limestone": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.77058,
+      "oklab_lightness_p10": 0.64131,
+      "oklab_lightness_p90": 0.90139,
+      "oklch_chroma_mean": 0.02195,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.11045727477851734,
+        "edge_density": 0.67188,
+        "largest_component": 0.08203125,
+        "largest_rectangularity": 0.5833333333333334,
+        "longest_run": 8,
+        "periodicity": 0.15553925705164676,
+        "seam_ratio": 0.9363360638165719,
+        "transitions": 344
+      }
+    },
+    "moss": {
+      "alpha_ratio": 1.0,
+      "family": "turf",
+      "oklab_lightness_mean": 0.48696,
+      "oklab_lightness_p10": 0.35672,
+      "oklab_lightness_p90": 0.61711,
+      "oklch_chroma_mean": 0.08311,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.05604977343250484,
+        "edge_density": 0.68164,
+        "largest_component": 0.078125,
+        "largest_rectangularity": 0.4166666666666667,
+        "longest_run": 7,
+        "periodicity": 0.05019489039940005,
+        "seam_ratio": 0.8568304750662941,
+        "transitions": 349
+      }
+    },
+    "mud": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.40774,
+      "oklab_lightness_p10": 0.33879,
+      "oklab_lightness_p90": 0.47752,
+      "oklch_chroma_mean": 0.00669,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.06989700313200652,
+        "edge_density": 0.66602,
+        "largest_component": 0.0703125,
+        "largest_rectangularity": 0.225,
+        "longest_run": 5,
+        "periodicity": 0.17302311044692234,
+        "seam_ratio": 0.36094478108164346,
+        "transitions": 341
+      }
+    },
+    "oak_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.44148,
+      "oklab_lightness_p10": 0.31809,
+      "oklab_lightness_p90": 0.57897,
+      "oklch_chroma_mean": 0.05857,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.03850615675891902,
+        "edge_density": 0.71094,
+        "largest_component": 0.04296875,
+        "largest_rectangularity": 0,
+        "longest_run": 9,
+        "periodicity": 0.545778997970899,
+        "seam_ratio": 1.2839899276203663,
+        "transitions": 364
+      }
+    },
+    "oak_log_top": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.54723,
+      "oklab_lightness_p10": 0.41646,
+      "oklab_lightness_p90": 0.67785,
+      "oklch_chroma_mean": 0.07051,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04218796461122667,
+        "edge_density": 0.81836,
+        "largest_component": 0.03515625,
+        "largest_rectangularity": 0,
+        "longest_run": 5,
+        "periodicity": 0.12235477725279509,
+        "seam_ratio": 1.359995768076526,
+        "transitions": 419
+      }
+    },
+    "oak_planks": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.578,
+      "oklab_lightness_p10": 0.43403,
+      "oklab_lightness_p90": 0.64067,
+      "oklch_chroma_mean": 0.07886,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 5,
+      "structure": {
+        "center_cross": 0.10786571617418386,
+        "edge_density": 0.63086,
+        "largest_component": 0.0546875,
+        "largest_rectangularity": 0.7777777777777778,
+        "longest_run": 6,
+        "periodicity": 0.3976461021354634,
+        "seam_ratio": 1.465220632575339,
+        "transitions": 323
+      }
+    },
+    "oak_sapling": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.52665,
+      "oklab_lightness_p10": 0.384,
+      "oklab_lightness_p90": 0.64323,
+      "oklch_chroma_mean": 0.1073,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.20200557745323794,
+        "edge_density": 0.18555,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.29172720250273254,
+        "seam_ratio": 0.15056778135320667,
+        "transitions": 95
+      }
+    },
+    "obsidian": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.31114,
+      "oklab_lightness_p10": 0.24151,
+      "oklab_lightness_p90": 0.381,
+      "oklch_chroma_mean": 0.04652,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.10538068438733732,
+        "edge_density": 0.60938,
+        "largest_component": 0.1328125,
+        "largest_rectangularity": 0.25,
+        "longest_run": 7,
+        "periodicity": 0.36141051329892593,
+        "seam_ratio": 0.6274842680498257,
+        "transitions": 312
+      }
+    },
+    "oxeye_daisy": {
+      "alpha_ratio": 0.125,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.88562,
+      "oklab_lightness_p10": 0.79941,
+      "oklab_lightness_p90": 0.95884,
+      "oklch_chroma_mean": 0.02968,
+      "opaque": 32,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.6069602184826495,
+        "edge_density": 0.17773,
+        "largest_component": 0.875,
+        "largest_rectangularity": 0.875,
+        "longest_run": 16,
+        "periodicity": 0.28424859437625866,
+        "seam_ratio": 0.18231632595911085,
+        "transitions": 91
+      }
+    },
+    "packed_ice": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.65751,
+      "oklab_lightness_p10": 0.52923,
+      "oklab_lightness_p90": 0.78877,
+      "oklch_chroma_mean": 0.07791,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.10733059013773623,
+        "edge_density": 0.70508,
+        "largest_component": 0.08984375,
+        "largest_rectangularity": 0.2875,
+        "longest_run": 6,
+        "periodicity": 0.1098932049334084,
+        "seam_ratio": 0.9313047730276497,
+        "transitions": 361
+      }
+    },
+    "podzol_top": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.43517,
+      "oklab_lightness_p10": 0.34058,
+      "oklab_lightness_p90": 0.529,
+      "oklch_chroma_mean": 0.04371,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.02731661180349924,
+        "edge_density": 0.67188,
+        "largest_component": 0.0546875,
+        "largest_rectangularity": 0.21875,
+        "longest_run": 5,
+        "periodicity": 0.13011927440124288,
+        "seam_ratio": 0.7463129857731011,
+        "transitions": 344
+      }
+    },
+    "red_sand": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.55165,
+      "oklab_lightness_p10": 0.42398,
+      "oklab_lightness_p90": 0.68249,
+      "oklch_chroma_mean": 0.10649,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08876764348255747,
+        "edge_density": 0.76562,
+        "largest_component": 0.08984375,
+        "largest_rectangularity": 0.5111111111111111,
+        "longest_run": 5,
+        "periodicity": 0.16364238570267534,
+        "seam_ratio": 0.7093934765915317,
+        "transitions": 392
+      }
+    },
+    "reeds": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.6267,
+      "oklab_lightness_p10": 0.48457,
+      "oklab_lightness_p90": 0.74498,
+      "oklch_chroma_mean": 0.09655,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.49632530768151895,
+        "edge_density": 0.1875,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.29536550697293806,
+        "seam_ratio": 0.15979590984644546,
+        "transitions": 96
+      }
+    },
+    "sand": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.80159,
+      "oklab_lightness_p10": 0.67264,
+      "oklab_lightness_p90": 0.93106,
+      "oklch_chroma_mean": 0.05695,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.0515966842773007,
+        "edge_density": 0.70508,
+        "largest_component": 0.078125,
+        "largest_rectangularity": 0.20833333333333334,
+        "longest_run": 5,
+        "periodicity": 0.08842254221774787,
+        "seam_ratio": 1.0063370774422684,
+        "transitions": 361
+      }
+    },
+    "skyroot_leaves": {
+      "alpha_ratio": 0.9453,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.65097,
+      "oklab_lightness_p10": 0.52118,
+      "oklab_lightness_p90": 0.78022,
+      "oklch_chroma_mean": 0.11932,
+      "opaque": 242,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.05903314997974712,
+        "edge_density": 0.59961,
+        "largest_component": 0.11328125,
+        "largest_rectangularity": 0.7619047619047619,
+        "longest_run": 7,
+        "periodicity": 0.15894586122847132,
+        "seam_ratio": 0.6473378648645588,
+        "transitions": 307
+      }
+    },
+    "skyroot_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.50839,
+      "oklab_lightness_p10": 0.38852,
+      "oklab_lightness_p90": 0.64749,
+      "oklch_chroma_mean": 0.06258,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.035799427655804746,
+        "edge_density": 0.71875,
+        "largest_component": 0.046875,
+        "largest_rectangularity": 0.09375,
+        "longest_run": 8,
+        "periodicity": 0.5439082951497152,
+        "seam_ratio": 1.2912182997500103,
+        "transitions": 368
+      }
+    },
+    "skyroot_log_top": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.63826,
+      "oklab_lightness_p10": 0.5082,
+      "oklab_lightness_p90": 0.76861,
+      "oklch_chroma_mean": 0.07601,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04255885194640173,
+        "edge_density": 0.83594,
+        "largest_component": 0.0234375,
+        "largest_rectangularity": 0,
+        "longest_run": 5,
+        "periodicity": 0.2079257051652568,
+        "seam_ratio": 1.3027143234713143,
+        "transitions": 428
+      }
+    },
+    "snow": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.86803,
+      "oklab_lightness_p10": 0.77875,
+      "oklab_lightness_p90": 0.96031,
+      "oklch_chroma_mean": 0.00957,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04694215919926753,
+        "edge_density": 0.71484,
+        "largest_component": 0.0546875,
+        "largest_rectangularity": 0.8125,
+        "longest_run": 4,
+        "periodicity": 0.09719333662920407,
+        "seam_ratio": 0.6574917173968533,
+        "transitions": 366
+      }
+    },
+    "snow_layer": {
+      "alpha_ratio": 1.0,
+      "family": "sand_ice",
+      "oklab_lightness_mean": 0.86902,
+      "oklab_lightness_p10": 0.77875,
+      "oklab_lightness_p90": 0.96031,
+      "oklch_chroma_mean": 0.00958,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.05946884788858731,
+        "edge_density": 0.70703,
+        "largest_component": 0.06640625,
+        "largest_rectangularity": 0.7083333333333334,
+        "longest_run": 5,
+        "periodicity": 0.15559195255230915,
+        "seam_ratio": 0.5853096532164836,
+        "transitions": 362
+      }
+    },
+    "spruce_leaves": {
+      "alpha_ratio": 0.9531,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.43502,
+      "oklab_lightness_p10": 0.34029,
+      "oklab_lightness_p90": 0.53212,
+      "oklch_chroma_mean": 0.0493,
+      "opaque": 244,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.15081053985548057,
+        "edge_density": 0.66992,
+        "largest_component": 0.11328125,
+        "largest_rectangularity": 0.5918367346938775,
+        "longest_run": 7,
+        "periodicity": 0.13732398668732096,
+        "seam_ratio": 0.6223248208812534,
+        "transitions": 343
+      }
+    },
+    "spruce_log": {
+      "alpha_ratio": 1.0,
+      "family": "wood",
+      "oklab_lightness_mean": 0.406,
+      "oklab_lightness_p10": 0.33949,
+      "oklab_lightness_p90": 0.48003,
+      "oklch_chroma_mean": 0.03021,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.07130062022038722,
+        "edge_density": 0.74609,
+        "largest_component": 0.046875,
+        "largest_rectangularity": 0.5714285714285714,
+        "longest_run": 6,
+        "periodicity": 0.4534755017304989,
+        "seam_ratio": 0.9349612016501336,
+        "transitions": 382
+      }
+    },
+    "spruce_sapling": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.45619,
+      "oklab_lightness_p10": 0.34143,
+      "oklab_lightness_p90": 0.55247,
+      "oklch_chroma_mean": 0.05695,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.2076633720587834,
+        "edge_density": 0.1875,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.29262096815079486,
+        "seam_ratio": 0.14921657602651955,
+        "transitions": 96
+      }
+    },
+    "star_crystal": {
+      "alpha_ratio": 1.0,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.73125,
+      "oklab_lightness_p10": 0.60146,
+      "oklab_lightness_p90": 0.85665,
+      "oklch_chroma_mean": 0.09953,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.16580392997320445,
+        "edge_density": 0.6582,
+        "largest_component": 0.09765625,
+        "largest_rectangularity": 0.75,
+        "longest_run": 5,
+        "periodicity": 0.26306275218983044,
+        "seam_ratio": 0.5638543540523483,
+        "transitions": 337
+      }
+    },
+    "starflower": {
+      "alpha_ratio": 0.1211,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.65331,
+      "oklab_lightness_p10": 0.51227,
+      "oklab_lightness_p90": 0.76442,
+      "oklch_chroma_mean": 0.13631,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.2756471195307484,
+        "edge_density": 0.18164,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.29597716703008337,
+        "seam_ratio": 0.1749568864366856,
+        "transitions": 93
+      }
+    },
+    "stone": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.60981,
+      "oklab_lightness_p10": 0.47924,
+      "oklab_lightness_p90": 0.7412,
+      "oklch_chroma_mean": 0.00397,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.159430674585471,
+        "edge_density": 0.65234,
+        "largest_component": 0.09375,
+        "largest_rectangularity": 0.34285714285714286,
+        "longest_run": 8,
+        "periodicity": 0.18533386818075845,
+        "seam_ratio": 0.8810215163297715,
+        "transitions": 334
+      }
+    },
+    "sunflower_bottom": {
+      "alpha_ratio": 0.207,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.56731,
+      "oklab_lightness_p10": 0.48486,
+      "oklab_lightness_p90": 0.63989,
+      "oklch_chroma_mean": 0.11536,
+      "opaque": 53,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.8477634529166439,
+        "edge_density": 0.25586,
+        "largest_component": 0.79296875,
+        "largest_rectangularity": 0.79296875,
+        "longest_run": 16,
+        "periodicity": 0.2907637429138698,
+        "seam_ratio": 0.6575448473553273,
+        "transitions": 131
+      }
+    },
+    "sunflower_top": {
+      "alpha_ratio": 0.1328,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.78757,
+      "oklab_lightness_p10": 0.63493,
+      "oklab_lightness_p90": 0.87951,
+      "oklch_chroma_mean": 0.13248,
+      "opaque": 34,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.7513894178446119,
+        "edge_density": 0.1875,
+        "largest_component": 0.8671875,
+        "largest_rectangularity": 0.8671875,
+        "longest_run": 16,
+        "periodicity": 0.2815837609770717,
+        "seam_ratio": 0.1721088388507291,
+        "transitions": 96
+      }
+    },
+    "sunstone": {
+      "alpha_ratio": 1.0,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.75135,
+      "oklab_lightness_p10": 0.62224,
+      "oklab_lightness_p90": 0.87653,
+      "oklch_chroma_mean": 0.10683,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08882154256053387,
+        "edge_density": 0.63086,
+        "largest_component": 0.13671875,
+        "largest_rectangularity": 0.4375,
+        "longest_run": 8,
+        "periodicity": 0.18341645744141974,
+        "seam_ratio": 1.0843664730306424,
+        "transitions": 323
+      }
+    },
+    "tall_grass": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.53924,
+      "oklab_lightness_p10": 0.39661,
+      "oklab_lightness_p90": 0.6572,
+      "oklch_chroma_mean": 0.11078,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.20229465865373197,
+        "edge_density": 0.1875,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.29213209373904425,
+        "seam_ratio": 0.14878247998842237,
+        "transitions": 96
+      }
+    },
+    "terracotta": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.49185,
+      "oklab_lightness_p10": 0.36206,
+      "oklab_lightness_p90": 0.62146,
+      "oklch_chroma_mean": 0.08189,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.05608818709457766,
+        "edge_density": 0.66016,
+        "largest_component": 0.1171875,
+        "largest_rectangularity": 0.3125,
+        "longest_run": 6,
+        "periodicity": 0.32594097690482066,
+        "seam_ratio": 0.9237226493761286,
+        "transitions": 338
+      }
+    },
+    "tnt": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.53889,
+      "oklab_lightness_p10": 0.43885,
+      "oklab_lightness_p90": 0.6472,
+      "oklch_chroma_mean": 0.15574,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 5,
+      "structure": {
+        "center_cross": 0.4323905255016375,
+        "edge_density": 0.75977,
+        "largest_component": 0.25,
+        "largest_rectangularity": 1.0,
+        "longest_run": 16,
+        "periodicity": 0.9372867669230389,
+        "seam_ratio": 1.0483604961299602,
+        "transitions": 389
+      }
+    },
+    "torch": {
+      "alpha_ratio": 0.1211,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.67753,
+      "oklab_lightness_p10": 0.53484,
+      "oklab_lightness_p90": 0.79401,
+      "oklch_chroma_mean": 0.10915,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.28434959382121733,
+        "edge_density": 0.18164,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.2964595871362366,
+        "seam_ratio": 0.17690874350237468,
+        "transitions": 93
+      }
+    },
+    "tuff": {
+      "alpha_ratio": 1.0,
+      "family": "stone",
+      "oklab_lightness_mean": 0.46318,
+      "oklab_lightness_p10": 0.3392,
+      "oklab_lightness_p90": 0.58746,
+      "oklch_chroma_mean": 0.01653,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.10033955072316296,
+        "edge_density": 0.64258,
+        "largest_component": 0.09375,
+        "largest_rectangularity": 0.5,
+        "longest_run": 5,
+        "periodicity": 0.07946879405721693,
+        "seam_ratio": 0.9921015387456018,
+        "transitions": 329
+      }
+    },
+    "water": {
+      "alpha_ratio": 1.0,
+      "family": "fluid_emissive",
+      "oklab_lightness_mean": 0.47522,
+      "oklab_lightness_p10": 0.34605,
+      "oklab_lightness_p90": 0.6058,
+      "oklch_chroma_mean": 0.10004,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.03596169353179143,
+        "edge_density": 0.75,
+        "largest_component": 0.01171875,
+        "largest_rectangularity": 0,
+        "longest_run": 3,
+        "periodicity": 0.37385553094978996,
+        "seam_ratio": 2.2919152939054075,
+        "transitions": 384
+      }
+    },
+    "wet_farmland": {
+      "alpha_ratio": 1.0,
+      "family": "soil",
+      "oklab_lightness_mean": 0.35964,
+      "oklab_lightness_p10": 0.30039,
+      "oklab_lightness_p90": 0.43962,
+      "oklch_chroma_mean": 0.02492,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.08562103182291438,
+        "edge_density": 0.67773,
+        "largest_component": 0.08203125,
+        "largest_rectangularity": 0.6,
+        "longest_run": 6,
+        "periodicity": 0.10906121122272476,
+        "seam_ratio": 0.7012869670918718,
+        "transitions": 347
+      }
+    },
+    "wheat_mature": {
+      "alpha_ratio": 0.1211,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.7084,
+      "oklab_lightness_p10": 0.56597,
+      "oklab_lightness_p90": 0.82605,
+      "oklch_chroma_mean": 0.10541,
+      "opaque": 31,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.3006085506707578,
+        "edge_density": 0.18164,
+        "largest_component": 0.87890625,
+        "largest_rectangularity": 0.87890625,
+        "longest_run": 16,
+        "periodicity": 0.2971102865206383,
+        "seam_ratio": 0.17972174976165084,
+        "transitions": 93
+      }
+    },
+    "wheat_middle": {
+      "alpha_ratio": 0.0938,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.59011,
+      "oklab_lightness_p10": 0.45406,
+      "oklab_lightness_p90": 0.71444,
+      "oklch_chroma_mean": 0.09008,
+      "opaque": 24,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.35768142818381987,
+        "edge_density": 0.14453,
+        "largest_component": 0.90625,
+        "largest_rectangularity": 0.90625,
+        "longest_run": 16,
+        "periodicity": 0.3034960465760962,
+        "seam_ratio": 0.20358980536568472,
+        "transitions": 74
+      }
+    },
+    "wheat_young": {
+      "alpha_ratio": 0.0625,
+      "family": "foliage",
+      "oklab_lightness_mean": 0.5123,
+      "oklab_lightness_p10": 0.43289,
+      "oklab_lightness_p90": 0.63815,
+      "oklch_chroma_mean": 0.09826,
+      "opaque": 16,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.19769127993528376,
+        "edge_density": 0.09766,
+        "largest_component": 0.9375,
+        "largest_rectangularity": 0.9375,
+        "longest_run": 16,
+        "periodicity": 0.35928554689266207,
+        "seam_ratio": 0.29147305516272054,
+        "transitions": 50
+      }
+    },
+    "white_bed": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.83753,
+      "oklab_lightness_p10": 0.69873,
+      "oklab_lightness_p90": 0.95893,
+      "oklch_chroma_mean": 0.01074,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 6,
+      "structure": {
+        "center_cross": 0.04467186993868986,
+        "edge_density": 0.48633,
+        "largest_component": 0.203125,
+        "largest_rectangularity": 0.5833333333333334,
+        "longest_run": 14,
+        "periodicity": 0.2569171101264319,
+        "seam_ratio": 1.0431273628869768,
+        "transitions": 249
+      }
+    },
+    "white_wool": {
+      "alpha_ratio": 1.0,
+      "family": "constructed",
+      "oklab_lightness_mean": 0.84848,
+      "oklab_lightness_p10": 0.76558,
+      "oklab_lightness_p90": 0.95949,
+      "oklch_chroma_mean": 0.00687,
+      "opaque": 256,
+      "palette_roles": [
+        "shadow",
+        "base_dark",
+        "base",
+        "base_light",
+        "highlight",
+        "accent"
+      ],
+      "palette_size": 5,
+      "structure": {
+        "center_cross": 0.04240494532309316,
+        "edge_density": 0.63281,
+        "largest_component": 0.05078125,
+        "largest_rectangularity": 0.1625,
+        "longest_run": 4,
+        "periodicity": 0.2147972164138235,
+        "seam_ratio": 0.9683592965553091,
+        "transitions": 324
+      }
+    }
+  },
+  "version": 1
+}

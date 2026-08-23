@@ -13,7 +13,7 @@ layout(push_constant) uniform PostConstants {
 
 vec3 pbrNeutral(vec3 color){
     const float startCompression=0.8-0.04;
-    const float desaturation=0.15;
+    const float desaturation=0.10;
     float x=min(color.r,min(color.g,color.b));
     float offset=x<0.08?x-6.25*x*x:0.04;
     color-=offset;

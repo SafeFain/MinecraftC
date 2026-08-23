@@ -1,7 +1,8 @@
 # MinecraftC entity models
 
 These eight GLBs are original MinecraftC assets generated deterministically by
-`tools/generate_entity_models.py` version 4 with seed `0x4D43474C`. They are
+`tools/generate_entity_models.py` version 4 with seed `0x4D43474C`. Embedded
+skins use texture generator version 2 and the `bright-comfortable` style. They are
 licensed under CC0-1.0. No Minecraft, Mojang, or third-party model or texture
 data was copied or adapted.
 

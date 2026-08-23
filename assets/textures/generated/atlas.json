@@ -1,9 +1,12 @@
 {
   "filter": "nearest",
+  "generator_version": 2,
   "grid_size": 22,
   "seed": 213785369,
+  "style": "bright-comfortable",
   "textures": {
     "acacia_leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 37,
       "source": "acacia_leaves.png",
@@ -11,6 +14,7 @@
       "y": 1
     },
     "acacia_log": {
+      "family": "wood",
       "generated": true,
       "index": 36,
       "source": "acacia_log.png",
@@ -18,6 +22,7 @@
       "y": 1
     },
     "acacia_sapling": {
+      "family": "foliage",
       "generated": true,
       "index": 54,
       "source": "acacia_sapling.png",
@@ -25,6 +30,7 @@
       "y": 2
     },
     "aether_grass_side": {
+      "family": "turf",
       "generated": true,
       "index": 76,
       "source": "aether_grass_side.png",
@@ -32,6 +38,7 @@
       "y": 3
     },
     "aether_grass_top": {
+      "family": "turf",
       "generated": true,
       "index": 75,
       "source": "aether_grass_top.png",
@@ -39,6 +46,7 @@
       "y": 3
     },
     "aether_soil": {
+      "family": "soil",
       "generated": true,
       "index": 77,
       "source": "aether_soil.png",
@@ -46,6 +54,7 @@
       "y": 3
     },
     "allium": {
+      "family": "foliage",
       "generated": true,
       "index": 62,
       "source": "allium.png",
@@ -53,6 +62,7 @@
       "y": 2
     },
     "basalt": {
+      "family": "stone",
       "generated": true,
       "index": 68,
       "source": "basalt.png",
@@ -60,6 +70,7 @@
       "y": 3
     },
     "bedrock": {
+      "family": "stone",
       "generated": true,
       "index": 8,
       "source": "bedrock.png",
@@ -67,6 +78,7 @@
       "y": 0
     },
     "birch_leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 31,
       "source": "birch_leaves.png",
@@ -74,6 +86,7 @@
       "y": 1
     },
     "birch_log": {
+      "family": "wood",
       "generated": true,
       "index": 30,
       "source": "birch_log.png",
@@ -81,6 +94,7 @@
       "y": 1
     },
     "birch_sapling": {
+      "family": "foliage",
       "generated": true,
       "index": 51,
       "source": "birch_sapling.png",
@@ -88,6 +102,7 @@
       "y": 2
     },
     "black_sand": {
+      "family": "sand_ice",
       "generated": true,
       "index": 73,
       "source": "black_sand.png",
@@ -95,6 +110,7 @@
       "y": 3
     },
     "blue_orchid": {
+      "family": "foliage",
       "generated": true,
       "index": 61,
       "source": "blue_orchid.png",
@@ -102,6 +118,7 @@
       "y": 2
     },
     "cactus_side": {
+      "family": "constructed",
       "generated": true,
       "index": 13,
       "source": "cactus_side.png",
@@ -109,6 +126,7 @@
       "y": 0
     },
     "cactus_top": {
+      "family": "constructed",
       "generated": true,
       "index": 14,
       "source": "cactus_top.png",
@@ -116,6 +134,7 @@
       "y": 0
     },
     "chest": {
+      "family": "constructed",
       "generated": true,
       "index": 41,
       "source": "chest.png",
@@ -123,6 +142,7 @@
       "y": 1
     },
     "clay": {
+      "family": "stone",
       "generated": true,
       "index": 22,
       "source": "clay.png",
@@ -130,6 +150,7 @@
       "y": 1
     },
     "cloud": {
+      "family": "constructed",
       "generated": true,
       "index": 66,
       "source": "cloud.png",
@@ -137,6 +158,7 @@
       "y": 3
     },
     "cloudstone": {
+      "family": "stone",
       "generated": true,
       "index": 78,
       "source": "cloudstone.png",
@@ -144,6 +166,7 @@
       "y": 3
     },
     "coal_ore": {
+      "family": "ore",
       "generated": true,
       "index": 15,
       "source": "coal_ore.png",
@@ -151,6 +174,7 @@
       "y": 0
     },
     "coarse_dirt": {
+      "family": "soil",
       "generated": true,
       "index": 70,
       "source": "coarse_dirt.png",
@@ -158,6 +182,7 @@
       "y": 3
     },
     "cobblestone": {
+      "family": "stone",
       "generated": true,
       "index": 38,
       "source": "cobblestone.png",
@@ -165,6 +190,7 @@
       "y": 1
     },
     "copper_ore": {
+      "family": "ore",
       "generated": true,
       "index": 85,
       "source": "copper_ore.png",
@@ -172,6 +198,7 @@
       "y": 3
     },
     "crafting_table": {
+      "family": "constructed",
       "generated": true,
       "index": 39,
       "source": "crafting_table.png",
@@ -179,6 +206,7 @@
       "y": 1
     },
     "dandelion": {
+      "family": "foliage",
       "generated": true,
       "index": 60,
       "source": "dandelion.png",
@@ -186,6 +214,7 @@
       "y": 2
     },
     "deepslate": {
+      "family": "stone",
       "generated": true,
       "index": 12,
       "source": "deepslate.png",
@@ -193,6 +222,7 @@
       "y": 0
     },
     "diamond_ore": {
+      "family": "ore",
       "generated": true,
       "index": 18,
       "source": "diamond_ore.png",
@@ -200,6 +230,7 @@
       "y": 0
     },
     "dirt": {
+      "family": "soil",
       "generated": true,
       "index": 0,
       "source": "dirt.png",
@@ -207,6 +238,7 @@
       "y": 0
     },
     "farmland": {
+      "family": "soil",
       "generated": true,
       "index": 45,
       "source": "farmland.png",
@@ -214,6 +246,7 @@
       "y": 2
     },
     "fire": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 56,
       "source": "fire.png",
@@ -221,6 +254,7 @@
       "y": 2
     },
     "flower": {
+      "family": "foliage",
       "generated": true,
       "index": 28,
       "source": "flower.png",
@@ -228,6 +262,7 @@
       "y": 1
     },
     "furnace": {
+      "family": "constructed",
       "generated": true,
       "index": 40,
       "source": "furnace.png",
@@ -235,6 +270,7 @@
       "y": 1
     },
     "glass": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 57,
       "source": "glass.png",
@@ -242,6 +278,7 @@
       "y": 2
     },
     "gold_ore": {
+      "family": "ore",
       "generated": true,
       "index": 17,
       "source": "gold_ore.png",
@@ -249,6 +286,7 @@
       "y": 0
     },
     "granite": {
+      "family": "stone",
       "generated": true,
       "index": 74,
       "source": "granite.png",
@@ -256,6 +294,7 @@
       "y": 3
     },
     "grass_side": {
+      "family": "turf",
       "generated": true,
       "index": 2,
       "source": "grass_side.png",
@@ -263,6 +302,7 @@
       "y": 0
     },
     "grass_top": {
+      "family": "turf",
       "generated": true,
       "index": 1,
       "source": "grass_top.png",
@@ -270,6 +310,7 @@
       "y": 0
     },
     "gravel": {
+      "family": "stone",
       "generated": true,
       "index": 21,
       "source": "gravel.png",
@@ -277,6 +318,7 @@
       "y": 0
     },
     "ice": {
+      "family": "sand_ice",
       "generated": true,
       "index": 20,
       "source": "ice.png",
@@ -284,6 +326,7 @@
       "y": 0
     },
     "iron_ore": {
+      "family": "ore",
       "generated": true,
       "index": 16,
       "source": "iron_ore.png",
@@ -291,6 +334,7 @@
       "y": 0
     },
     "jungle_leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 35,
       "source": "jungle_leaves.png",
@@ -298,6 +342,7 @@
       "y": 1
     },
     "jungle_log": {
+      "family": "wood",
       "generated": true,
       "index": 34,
       "source": "jungle_log.png",
@@ -305,6 +350,7 @@
       "y": 1
     },
     "jungle_sapling": {
+      "family": "foliage",
       "generated": true,
       "index": 53,
       "source": "jungle_sapling.png",
@@ -312,6 +358,7 @@
       "y": 2
     },
     "lava": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 19,
       "source": "lava.png",
@@ -319,6 +366,7 @@
       "y": 0
     },
     "leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 6,
       "source": "leaves.png",
@@ -326,6 +374,7 @@
       "y": 0
     },
     "limestone": {
+      "family": "stone",
       "generated": true,
       "index": 67,
       "source": "limestone.png",
@@ -333,6 +382,7 @@
       "y": 3
     },
     "moss": {
+      "family": "turf",
       "generated": true,
       "index": 26,
       "source": "moss.png",
@@ -340,6 +390,7 @@
       "y": 1
     },
     "mud": {
+      "family": "soil",
       "generated": true,
       "index": 71,
       "source": "mud.png",
@@ -347,6 +398,7 @@
       "y": 3
     },
     "oak_log": {
+      "family": "wood",
       "generated": true,
       "index": 4,
       "source": "oak_log.png",
@@ -354,6 +406,7 @@
       "y": 0
     },
     "oak_log_top": {
+      "family": "wood",
       "generated": true,
       "index": 5,
       "source": "oak_log_top.png",
@@ -361,6 +414,7 @@
       "y": 0
     },
     "oak_planks": {
+      "family": "wood",
       "generated": true,
       "index": 11,
       "source": "oak_planks.png",
@@ -368,6 +422,7 @@
       "y": 0
     },
     "oak_sapling": {
+      "family": "foliage",
       "generated": true,
       "index": 50,
       "source": "oak_sapling.png",
@@ -375,6 +430,7 @@
       "y": 2
     },
     "obsidian": {
+      "family": "stone",
       "generated": true,
       "index": 59,
       "source": "obsidian.png",
@@ -382,6 +438,7 @@
       "y": 2
     },
     "oxeye_daisy": {
+      "family": "foliage",
       "generated": true,
       "index": 63,
       "source": "oxeye_daisy.png",
@@ -389,6 +446,7 @@
       "y": 2
     },
     "packed_ice": {
+      "family": "sand_ice",
       "generated": true,
       "index": 72,
       "source": "packed_ice.png",
@@ -396,6 +454,7 @@
       "y": 3
     },
     "podzol_top": {
+      "family": "soil",
       "generated": true,
       "index": 25,
       "source": "podzol_top.png",
@@ -403,6 +462,7 @@
       "y": 1
     },
     "red_sand": {
+      "family": "sand_ice",
       "generated": true,
       "index": 23,
       "source": "red_sand.png",
@@ -410,6 +470,7 @@
       "y": 1
     },
     "reeds": {
+      "family": "foliage",
       "generated": true,
       "index": 29,
       "source": "reeds.png",
@@ -417,6 +478,7 @@
       "y": 1
     },
     "sand": {
+      "family": "sand_ice",
       "generated": true,
       "index": 7,
       "source": "sand.png",
@@ -424,6 +486,7 @@
       "y": 0
     },
     "skyroot_leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 82,
       "source": "skyroot_leaves.png",
@@ -431,6 +494,7 @@
       "y": 3
     },
     "skyroot_log": {
+      "family": "wood",
       "generated": true,
       "index": 80,
       "source": "skyroot_log.png",
@@ -438,6 +502,7 @@
       "y": 3
     },
     "skyroot_log_top": {
+      "family": "wood",
       "generated": true,
       "index": 81,
       "source": "skyroot_log_top.png",
@@ -445,6 +510,7 @@
       "y": 3
     },
     "snow": {
+      "family": "sand_ice",
       "generated": true,
       "index": 10,
       "source": "snow.png",
@@ -452,6 +518,7 @@
       "y": 0
     },
     "snow_layer": {
+      "family": "sand_ice",
       "generated": true,
       "index": 55,
       "source": "snow_layer.png",
@@ -459,6 +526,7 @@
       "y": 2
     },
     "spruce_leaves": {
+      "family": "foliage",
       "generated": true,
       "index": 33,
       "source": "spruce_leaves.png",
@@ -466,6 +534,7 @@
       "y": 1
     },
     "spruce_log": {
+      "family": "wood",
       "generated": true,
       "index": 32,
       "source": "spruce_log.png",
@@ -473,6 +542,7 @@
       "y": 1
     },
     "spruce_sapling": {
+      "family": "foliage",
       "generated": true,
       "index": 52,
       "source": "spruce_sapling.png",
@@ -480,6 +550,7 @@
       "y": 2
     },
     "star_crystal": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 83,
       "source": "star_crystal.png",
@@ -487,6 +558,7 @@
       "y": 3
     },
     "starflower": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 84,
       "source": "starflower.png",
@@ -494,6 +566,7 @@
       "y": 3
     },
     "stone": {
+      "family": "stone",
       "generated": true,
       "index": 3,
       "source": "stone.png",
@@ -501,6 +574,7 @@
       "y": 0
     },
     "sunflower_bottom": {
+      "family": "foliage",
       "generated": true,
       "index": 64,
       "source": "sunflower_bottom.png",
@@ -508,6 +582,7 @@
       "y": 2
     },
     "sunflower_top": {
+      "family": "foliage",
       "generated": true,
       "index": 65,
       "source": "sunflower_top.png",
@@ -515,6 +590,7 @@
       "y": 2
     },
     "sunstone": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 79,
       "source": "sunstone.png",
@@ -522,6 +598,7 @@
       "y": 3
     },
     "tall_grass": {
+      "family": "foliage",
       "generated": true,
       "index": 27,
       "source": "tall_grass.png",
@@ -529,6 +606,7 @@
       "y": 1
     },
     "terracotta": {
+      "family": "constructed",
       "generated": true,
       "index": 24,
       "source": "terracotta.png",
@@ -536,6 +614,7 @@
       "y": 1
     },
     "tnt": {
+      "family": "constructed",
       "generated": true,
       "index": 58,
       "source": "tnt.png",
@@ -543,6 +622,7 @@
       "y": 2
     },
     "torch": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 42,
       "source": "torch.png",
@@ -550,6 +630,7 @@
       "y": 1
     },
     "tuff": {
+      "family": "stone",
       "generated": true,
       "index": 69,
       "source": "tuff.png",
@@ -557,6 +638,7 @@
       "y": 3
     },
     "water": {
+      "family": "fluid_emissive",
       "generated": true,
       "index": 9,
       "source": "water.png",
@@ -564,6 +646,7 @@
       "y": 0
     },
     "wet_farmland": {
+      "family": "soil",
       "generated": true,
       "index": 46,
       "source": "wet_farmland.png",
@@ -571,6 +654,7 @@
       "y": 2
     },
     "wheat_mature": {
+      "family": "foliage",
       "generated": true,
       "index": 49,
       "source": "wheat_mature.png",
@@ -578,6 +662,7 @@
       "y": 2
     },
     "wheat_middle": {
+      "family": "foliage",
       "generated": true,
       "index": 48,
       "source": "wheat_middle.png",
@@ -585,6 +670,7 @@
       "y": 2
     },
     "wheat_young": {
+      "family": "foliage",
       "generated": true,
       "index": 47,
       "source": "wheat_young.png",
@@ -592,6 +678,7 @@
       "y": 2
     },
     "white_bed": {
+      "family": "constructed",
       "generated": true,
       "index": 44,
       "source": "white_bed.png",
@@ -599,6 +686,7 @@
       "y": 2
     },
     "white_wool": {
+      "family": "constructed",
       "generated": true,
       "index": 43,
       "source": "white_wool.png",

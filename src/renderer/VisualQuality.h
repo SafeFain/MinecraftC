@@ -60,7 +60,7 @@ public:
                 (0.28f + environment.daylight * 0.72f),
             std::clamp(blockLight, 0.0f, 1.0f) * 0.82f);
         const float darkness = 1.0f - std::clamp(localLight, 0.0f, 1.0f);
-        float target = 0.88f + darkness * darkness * 0.72f;
+        float target = 0.95f + darkness * darkness * 0.65f;
         target -= environment.lightningFlash * 0.18f;
         target = std::clamp(target, 0.75f, 1.65f);
         if (!m_initialized) {

@@ -1,11 +1,12 @@
 {
   "columns": 8,
   "filter": "nearest",
+  "generator_version": 2,
   "items": {
     "acacia_leaves": {
       "generator": "block_item_icon",
       "index": 64,
-      "source": "assets/textures/generated/items/acacia_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/acacia_leaves.png",
       "source_kind": "generated",
       "x": 0,
       "y": 8
@@ -13,7 +14,7 @@
     "acacia_log": {
       "generator": "block_item_icon",
       "index": 63,
-      "source": "assets/textures/generated/items/acacia_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/acacia_log.png",
       "source_kind": "generated",
       "x": 7,
       "y": 7
@@ -21,7 +22,7 @@
     "acacia_sapling": {
       "generator": "block_item_icon",
       "index": 115,
-      "source": "assets/textures/generated/items/acacia_sapling.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/acacia_sapling.png",
       "source_kind": "generated",
       "x": 3,
       "y": 14
@@ -29,7 +30,7 @@
     "aether_grass": {
       "generator": "block_item_icon",
       "index": 142,
-      "source": "assets/textures/generated/items/aether_grass.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/aether_grass.png",
       "source_kind": "generated",
       "x": 6,
       "y": 17
@@ -37,7 +38,7 @@
     "aether_soil": {
       "generator": "block_item_icon",
       "index": 143,
-      "source": "assets/textures/generated/items/aether_soil.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/aether_soil.png",
       "source_kind": "generated",
       "x": 7,
       "y": 17
@@ -45,7 +46,7 @@
     "allium": {
       "generator": "block_item_icon",
       "index": 121,
-      "source": "assets/textures/generated/items/allium.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/allium.png",
       "source_kind": "generated",
       "x": 1,
       "y": 15
@@ -53,7 +54,7 @@
     "arrow": {
       "generator": "item_sprite",
       "index": 71,
-      "source": "assets/textures/generated/items/arrow.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/arrow.png",
       "source_kind": "generated",
       "x": 7,
       "y": 8
@@ -61,7 +62,7 @@
     "basalt": {
       "generator": "block_item_icon",
       "index": 135,
-      "source": "assets/textures/generated/items/basalt.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/basalt.png",
       "source_kind": "generated",
       "x": 7,
       "y": 16
@@ -69,7 +70,7 @@
     "bedrock": {
       "generator": "block_item_icon",
       "index": 37,
-      "source": "assets/textures/generated/items/bedrock.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/bedrock.png",
       "source_kind": "generated",
       "x": 5,
       "y": 4
@@ -77,7 +78,7 @@
     "birch_leaves": {
       "generator": "block_item_icon",
       "index": 58,
-      "source": "assets/textures/generated/items/birch_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/birch_leaves.png",
       "source_kind": "generated",
       "x": 2,
       "y": 7
@@ -85,7 +86,7 @@
     "birch_log": {
       "generator": "block_item_icon",
       "index": 57,
-      "source": "assets/textures/generated/items/birch_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/birch_log.png",
       "source_kind": "generated",
       "x": 1,
       "y": 7
@@ -93,7 +94,7 @@
     "birch_sapling": {
       "generator": "block_item_icon",
       "index": 112,
-      "source": "assets/textures/generated/items/birch_sapling.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/birch_sapling.png",
       "source_kind": "generated",
       "x": 0,
       "y": 14
@@ -101,7 +102,7 @@
     "black_sand": {
       "generator": "block_item_icon",
       "index": 140,
-      "source": "assets/textures/generated/items/black_sand.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/black_sand.png",
       "source_kind": "generated",
       "x": 4,
       "y": 17
@@ -109,7 +110,7 @@
     "blastling_spawn_egg": {
       "generator": "item_sprite",
       "index": 133,
-      "source": "assets/textures/generated/items/blastling_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/blastling_spawn_egg.png",
       "source_kind": "generated",
       "x": 5,
       "y": 16
@@ -117,7 +118,7 @@
     "blue_orchid": {
       "generator": "block_item_icon",
       "index": 120,
-      "source": "assets/textures/generated/items/blue_orchid.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/blue_orchid.png",
       "source_kind": "generated",
       "x": 0,
       "y": 15
@@ -125,7 +126,7 @@
     "bone": {
       "generator": "item_sprite",
       "index": 70,
-      "source": "assets/textures/generated/items/bone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/bone.png",
       "source_kind": "generated",
       "x": 6,
       "y": 8
@@ -133,7 +134,7 @@
     "bow": {
       "generator": "item_sprite",
       "index": 92,
-      "source": "assets/textures/generated/items/bow.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/bow.png",
       "source_kind": "generated",
       "x": 4,
       "y": 11
@@ -141,7 +142,7 @@
     "bread": {
       "generator": "item_sprite",
       "index": 74,
-      "source": "assets/textures/generated/items/bread.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/bread.png",
       "source_kind": "generated",
       "x": 2,
       "y": 9
@@ -149,7 +150,7 @@
     "cactus": {
       "generator": "block_item_icon",
       "index": 41,
-      "source": "assets/textures/generated/items/cactus.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cactus.png",
       "source_kind": "generated",
       "x": 1,
       "y": 5
@@ -157,7 +158,7 @@
     "chest": {
       "generator": "block_item_icon",
       "index": 8,
-      "source": "assets/textures/generated/items/chest.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/chest.png",
       "source_kind": "generated",
       "x": 0,
       "y": 1
@@ -165,7 +166,7 @@
     "chicken_spawn_egg": {
       "generator": "item_sprite",
       "index": 129,
-      "source": "assets/textures/generated/items/chicken_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/chicken_spawn_egg.png",
       "source_kind": "generated",
       "x": 1,
       "y": 16
@@ -173,7 +174,7 @@
     "clay": {
       "generator": "block_item_icon",
       "index": 49,
-      "source": "assets/textures/generated/items/clay.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/clay.png",
       "source_kind": "generated",
       "x": 1,
       "y": 6
@@ -181,7 +182,7 @@
     "cloudstone": {
       "generator": "block_item_icon",
       "index": 144,
-      "source": "assets/textures/generated/items/cloudstone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cloudstone.png",
       "source_kind": "generated",
       "x": 0,
       "y": 18
@@ -189,7 +190,7 @@
     "coal": {
       "generator": "item_sprite",
       "index": 10,
-      "source": "assets/textures/generated/items/coal.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/coal.png",
       "source_kind": "generated",
       "x": 2,
       "y": 1
@@ -197,7 +198,7 @@
     "coal_ore": {
       "generator": "block_item_icon",
       "index": 42,
-      "source": "assets/textures/generated/items/coal_ore.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/coal_ore.png",
       "source_kind": "generated",
       "x": 2,
       "y": 5
@@ -205,7 +206,7 @@
     "coarse_dirt": {
       "generator": "block_item_icon",
       "index": 137,
-      "source": "assets/textures/generated/items/coarse_dirt.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/coarse_dirt.png",
       "source_kind": "generated",
       "x": 1,
       "y": 17
@@ -213,7 +214,7 @@
     "cobblestone": {
       "generator": "block_item_icon",
       "index": 5,
-      "source": "assets/textures/generated/items/cobblestone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cobblestone.png",
       "source_kind": "generated",
       "x": 5,
       "y": 0
@@ -221,7 +222,7 @@
     "cooked_chicken": {
       "generator": "item_sprite",
       "index": 80,
-      "source": "assets/textures/generated/items/cooked_chicken.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cooked_chicken.png",
       "source_kind": "generated",
       "x": 0,
       "y": 10
@@ -229,7 +230,7 @@
     "cooked_mutton": {
       "generator": "item_sprite",
       "index": 82,
-      "source": "assets/textures/generated/items/cooked_mutton.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cooked_mutton.png",
       "source_kind": "generated",
       "x": 2,
       "y": 10
@@ -237,7 +238,7 @@
     "cooked_porkchop": {
       "generator": "item_sprite",
       "index": 78,
-      "source": "assets/textures/generated/items/cooked_porkchop.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cooked_porkchop.png",
       "source_kind": "generated",
       "x": 6,
       "y": 9
@@ -245,7 +246,7 @@
     "cow_spawn_egg": {
       "generator": "item_sprite",
       "index": 126,
-      "source": "assets/textures/generated/items/cow_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cow_spawn_egg.png",
       "source_kind": "generated",
       "x": 6,
       "y": 15
@@ -253,7 +254,7 @@
     "crafting_table": {
       "generator": "block_item_icon",
       "index": 6,
-      "source": "assets/textures/generated/items/crafting_table.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/crafting_table.png",
       "source_kind": "generated",
       "x": 6,
       "y": 0
@@ -261,7 +262,7 @@
     "dandelion": {
       "generator": "block_item_icon",
       "index": 119,
-      "source": "assets/textures/generated/items/dandelion.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/dandelion.png",
       "source_kind": "generated",
       "x": 7,
       "y": 14
@@ -269,7 +270,7 @@
     "deepslate": {
       "generator": "block_item_icon",
       "index": 40,
-      "source": "assets/textures/generated/items/deepslate.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/deepslate.png",
       "source_kind": "generated",
       "x": 0,
       "y": 5
@@ -277,7 +278,7 @@
     "diamond": {
       "generator": "item_sprite",
       "index": 13,
-      "source": "assets/textures/generated/items/diamond.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond.png",
       "source_kind": "generated",
       "x": 5,
       "y": 1
@@ -285,7 +286,7 @@
     "diamond_axe": {
       "generator": "item_sprite",
       "index": 88,
-      "source": "assets/textures/generated/items/diamond_axe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_axe.png",
       "source_kind": "generated",
       "x": 0,
       "y": 11
@@ -293,7 +294,7 @@
     "diamond_boots": {
       "generator": "item_sprite",
       "index": 109,
-      "source": "assets/textures/generated/items/diamond_boots.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_boots.png",
       "source_kind": "generated",
       "x": 5,
       "y": 13
@@ -301,7 +302,7 @@
     "diamond_chestplate": {
       "generator": "item_sprite",
       "index": 107,
-      "source": "assets/textures/generated/items/diamond_chestplate.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_chestplate.png",
       "source_kind": "generated",
       "x": 3,
       "y": 13
@@ -309,7 +310,7 @@
     "diamond_helmet": {
       "generator": "item_sprite",
       "index": 106,
-      "source": "assets/textures/generated/items/diamond_helmet.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_helmet.png",
       "source_kind": "generated",
       "x": 2,
       "y": 13
@@ -317,7 +318,7 @@
     "diamond_hoe": {
       "generator": "item_sprite",
       "index": 90,
-      "source": "assets/textures/generated/items/diamond_hoe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_hoe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 11
@@ -325,7 +326,7 @@
     "diamond_leggings": {
       "generator": "item_sprite",
       "index": 108,
-      "source": "assets/textures/generated/items/diamond_leggings.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_leggings.png",
       "source_kind": "generated",
       "x": 4,
       "y": 13
@@ -333,7 +334,7 @@
     "diamond_ore": {
       "generator": "block_item_icon",
       "index": 45,
-      "source": "assets/textures/generated/items/diamond_ore.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_ore.png",
       "source_kind": "generated",
       "x": 5,
       "y": 5
@@ -341,7 +342,7 @@
     "diamond_pickaxe": {
       "generator": "item_sprite",
       "index": 87,
-      "source": "assets/textures/generated/items/diamond_pickaxe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_pickaxe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 10
@@ -349,7 +350,7 @@
     "diamond_shovel": {
       "generator": "item_sprite",
       "index": 89,
-      "source": "assets/textures/generated/items/diamond_shovel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_shovel.png",
       "source_kind": "generated",
       "x": 1,
       "y": 11
@@ -357,7 +358,7 @@
     "diamond_sword": {
       "generator": "item_sprite",
       "index": 91,
-      "source": "assets/textures/generated/items/diamond_sword.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/diamond_sword.png",
       "source_kind": "generated",
       "x": 3,
       "y": 11
@@ -365,7 +366,7 @@
     "dirt": {
       "generator": "block_item_icon",
       "index": 1,
-      "source": "assets/textures/generated/items/dirt.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/dirt.png",
       "source_kind": "generated",
       "x": 1,
       "y": 0
@@ -373,7 +374,7 @@
     "farmland": {
       "generator": "block_item_icon",
       "index": 86,
-      "source": "assets/textures/generated/items/farmland.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/farmland.png",
       "source_kind": "generated",
       "x": 6,
       "y": 10
@@ -381,7 +382,7 @@
     "feather": {
       "generator": "item_sprite",
       "index": 68,
-      "source": "assets/textures/generated/items/feather.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/feather.png",
       "source_kind": "generated",
       "x": 4,
       "y": 8
@@ -389,7 +390,7 @@
     "flint": {
       "generator": "item_sprite",
       "index": 110,
-      "source": "assets/textures/generated/items/flint.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/flint.png",
       "source_kind": "generated",
       "x": 6,
       "y": 13
@@ -397,7 +398,7 @@
     "flint_and_steel": {
       "generator": "item_sprite",
       "index": 124,
-      "source": "assets/textures/generated/items/flint_and_steel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/flint_and_steel.png",
       "source_kind": "generated",
       "x": 4,
       "y": 15
@@ -405,7 +406,7 @@
     "furnace": {
       "generator": "block_item_icon",
       "index": 7,
-      "source": "assets/textures/generated/items/furnace.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/furnace.png",
       "source_kind": "generated",
       "x": 7,
       "y": 0
@@ -413,7 +414,7 @@
     "glass": {
       "generator": "block_item_icon",
       "index": 116,
-      "source": "assets/textures/generated/items/glass.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/glass.png",
       "source_kind": "generated",
       "x": 4,
       "y": 14
@@ -421,7 +422,7 @@
     "gold_ingot": {
       "generator": "item_sprite",
       "index": 12,
-      "source": "assets/textures/generated/items/gold_ingot.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/gold_ingot.png",
       "source_kind": "generated",
       "x": 4,
       "y": 1
@@ -429,7 +430,7 @@
     "gold_ore": {
       "generator": "block_item_icon",
       "index": 44,
-      "source": "assets/textures/generated/items/gold_ore.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/gold_ore.png",
       "source_kind": "generated",
       "x": 4,
       "y": 5
@@ -437,7 +438,7 @@
     "golden_axe": {
       "generator": "item_sprite",
       "index": 31,
-      "source": "assets/textures/generated/items/golden_axe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_axe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 3
@@ -445,7 +446,7 @@
     "golden_boots": {
       "generator": "item_sprite",
       "index": 105,
-      "source": "assets/textures/generated/items/golden_boots.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_boots.png",
       "source_kind": "generated",
       "x": 1,
       "y": 13
@@ -453,7 +454,7 @@
     "golden_chestplate": {
       "generator": "item_sprite",
       "index": 103,
-      "source": "assets/textures/generated/items/golden_chestplate.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_chestplate.png",
       "source_kind": "generated",
       "x": 7,
       "y": 12
@@ -461,7 +462,7 @@
     "golden_helmet": {
       "generator": "item_sprite",
       "index": 102,
-      "source": "assets/textures/generated/items/golden_helmet.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_helmet.png",
       "source_kind": "generated",
       "x": 6,
       "y": 12
@@ -469,7 +470,7 @@
     "golden_hoe": {
       "generator": "item_sprite",
       "index": 33,
-      "source": "assets/textures/generated/items/golden_hoe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_hoe.png",
       "source_kind": "generated",
       "x": 1,
       "y": 4
@@ -477,7 +478,7 @@
     "golden_leggings": {
       "generator": "item_sprite",
       "index": 104,
-      "source": "assets/textures/generated/items/golden_leggings.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_leggings.png",
       "source_kind": "generated",
       "x": 0,
       "y": 13
@@ -485,7 +486,7 @@
     "golden_pickaxe": {
       "generator": "item_sprite",
       "index": 30,
-      "source": "assets/textures/generated/items/golden_pickaxe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_pickaxe.png",
       "source_kind": "generated",
       "x": 6,
       "y": 3
@@ -493,7 +494,7 @@
     "golden_shovel": {
       "generator": "item_sprite",
       "index": 32,
-      "source": "assets/textures/generated/items/golden_shovel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_shovel.png",
       "source_kind": "generated",
       "x": 0,
       "y": 4
@@ -501,7 +502,7 @@
     "golden_sword": {
       "generator": "item_sprite",
       "index": 34,
-      "source": "assets/textures/generated/items/golden_sword.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/golden_sword.png",
       "source_kind": "generated",
       "x": 2,
       "y": 4
@@ -509,7 +510,7 @@
     "granite": {
       "generator": "block_item_icon",
       "index": 141,
-      "source": "assets/textures/generated/items/granite.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/granite.png",
       "source_kind": "generated",
       "x": 5,
       "y": 17
@@ -517,7 +518,7 @@
     "grass_block": {
       "generator": "block_item_icon",
       "index": 0,
-      "source": "assets/textures/generated/items/grass_block.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/grass_block.png",
       "source_kind": "generated",
       "x": 0,
       "y": 0
@@ -525,7 +526,7 @@
     "gravel": {
       "generator": "block_item_icon",
       "index": 48,
-      "source": "assets/textures/generated/items/gravel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/gravel.png",
       "source_kind": "generated",
       "x": 0,
       "y": 6
@@ -533,7 +534,7 @@
     "gunpowder": {
       "generator": "item_sprite",
       "index": 125,
-      "source": "assets/textures/generated/items/gunpowder.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/gunpowder.png",
       "source_kind": "generated",
       "x": 5,
       "y": 15
@@ -541,7 +542,7 @@
     "ice": {
       "generator": "block_item_icon",
       "index": 47,
-      "source": "assets/textures/generated/items/ice.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/ice.png",
       "source_kind": "generated",
       "x": 7,
       "y": 5
@@ -549,7 +550,7 @@
     "iron_axe": {
       "generator": "item_sprite",
       "index": 26,
-      "source": "assets/textures/generated/items/iron_axe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_axe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 3
@@ -557,7 +558,7 @@
     "iron_boots": {
       "generator": "item_sprite",
       "index": 101,
-      "source": "assets/textures/generated/items/iron_boots.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_boots.png",
       "source_kind": "generated",
       "x": 5,
       "y": 12
@@ -565,7 +566,7 @@
     "iron_chestplate": {
       "generator": "item_sprite",
       "index": 99,
-      "source": "assets/textures/generated/items/iron_chestplate.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_chestplate.png",
       "source_kind": "generated",
       "x": 3,
       "y": 12
@@ -573,7 +574,7 @@
     "iron_helmet": {
       "generator": "item_sprite",
       "index": 98,
-      "source": "assets/textures/generated/items/iron_helmet.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_helmet.png",
       "source_kind": "generated",
       "x": 2,
       "y": 12
@@ -581,7 +582,7 @@
     "iron_hoe": {
       "generator": "item_sprite",
       "index": 28,
-      "source": "assets/textures/generated/items/iron_hoe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_hoe.png",
       "source_kind": "generated",
       "x": 4,
       "y": 3
@@ -589,7 +590,7 @@
     "iron_ingot": {
       "generator": "item_sprite",
       "index": 11,
-      "source": "assets/textures/generated/items/iron_ingot.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_ingot.png",
       "source_kind": "generated",
       "x": 3,
       "y": 1
@@ -597,7 +598,7 @@
     "iron_leggings": {
       "generator": "item_sprite",
       "index": 100,
-      "source": "assets/textures/generated/items/iron_leggings.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_leggings.png",
       "source_kind": "generated",
       "x": 4,
       "y": 12
@@ -605,7 +606,7 @@
     "iron_ore": {
       "generator": "block_item_icon",
       "index": 43,
-      "source": "assets/textures/generated/items/iron_ore.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_ore.png",
       "source_kind": "generated",
       "x": 3,
       "y": 5
@@ -613,7 +614,7 @@
     "iron_pickaxe": {
       "generator": "item_sprite",
       "index": 25,
-      "source": "assets/textures/generated/items/iron_pickaxe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_pickaxe.png",
       "source_kind": "generated",
       "x": 1,
       "y": 3
@@ -621,7 +622,7 @@
     "iron_shovel": {
       "generator": "item_sprite",
       "index": 27,
-      "source": "assets/textures/generated/items/iron_shovel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_shovel.png",
       "source_kind": "generated",
       "x": 3,
       "y": 3
@@ -629,7 +630,7 @@
     "iron_sword": {
       "generator": "item_sprite",
       "index": 29,
-      "source": "assets/textures/generated/items/iron_sword.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/iron_sword.png",
       "source_kind": "generated",
       "x": 5,
       "y": 3
@@ -637,7 +638,7 @@
     "jungle_leaves": {
       "generator": "block_item_icon",
       "index": 62,
-      "source": "assets/textures/generated/items/jungle_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/jungle_leaves.png",
       "source_kind": "generated",
       "x": 6,
       "y": 7
@@ -645,7 +646,7 @@
     "jungle_log": {
       "generator": "block_item_icon",
       "index": 61,
-      "source": "assets/textures/generated/items/jungle_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/jungle_log.png",
       "source_kind": "generated",
       "x": 5,
       "y": 7
@@ -653,7 +654,7 @@
     "jungle_sapling": {
       "generator": "block_item_icon",
       "index": 114,
-      "source": "assets/textures/generated/items/jungle_sapling.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/jungle_sapling.png",
       "source_kind": "generated",
       "x": 2,
       "y": 14
@@ -661,7 +662,7 @@
     "lava": {
       "generator": "block_item_icon",
       "index": 46,
-      "source": "assets/textures/generated/items/lava.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/lava.png",
       "source_kind": "generated",
       "x": 6,
       "y": 5
@@ -669,7 +670,7 @@
     "leather": {
       "generator": "item_sprite",
       "index": 69,
-      "source": "assets/textures/generated/items/leather.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/leather.png",
       "source_kind": "generated",
       "x": 5,
       "y": 8
@@ -677,7 +678,7 @@
     "leather_boots": {
       "generator": "item_sprite",
       "index": 97,
-      "source": "assets/textures/generated/items/leather_boots.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/leather_boots.png",
       "source_kind": "generated",
       "x": 1,
       "y": 12
@@ -685,7 +686,7 @@
     "leather_chestplate": {
       "generator": "item_sprite",
       "index": 95,
-      "source": "assets/textures/generated/items/leather_chestplate.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/leather_chestplate.png",
       "source_kind": "generated",
       "x": 7,
       "y": 11
@@ -693,7 +694,7 @@
     "leather_helmet": {
       "generator": "item_sprite",
       "index": 94,
-      "source": "assets/textures/generated/items/leather_helmet.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/leather_helmet.png",
       "source_kind": "generated",
       "x": 6,
       "y": 11
@@ -701,7 +702,7 @@
     "leather_leggings": {
       "generator": "item_sprite",
       "index": 96,
-      "source": "assets/textures/generated/items/leather_leggings.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/leather_leggings.png",
       "source_kind": "generated",
       "x": 0,
       "y": 12
@@ -709,7 +710,7 @@
     "limestone": {
       "generator": "block_item_icon",
       "index": 134,
-      "source": "assets/textures/generated/items/limestone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/limestone.png",
       "source_kind": "generated",
       "x": 6,
       "y": 16
@@ -717,7 +718,7 @@
     "moss": {
       "generator": "block_item_icon",
       "index": 53,
-      "source": "assets/textures/generated/items/moss.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/moss.png",
       "source_kind": "generated",
       "x": 5,
       "y": 6
@@ -725,7 +726,7 @@
     "mud": {
       "generator": "block_item_icon",
       "index": 138,
-      "source": "assets/textures/generated/items/mud.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/mud.png",
       "source_kind": "generated",
       "x": 2,
       "y": 17
@@ -733,7 +734,7 @@
     "oak_leaves": {
       "generator": "block_item_icon",
       "index": 35,
-      "source": "assets/textures/generated/items/oak_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_leaves.png",
       "source_kind": "generated",
       "x": 3,
       "y": 4
@@ -741,7 +742,7 @@
     "oak_log": {
       "generator": "block_item_icon",
       "index": 3,
-      "source": "assets/textures/generated/items/oak_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_log.png",
       "source_kind": "generated",
       "x": 3,
       "y": 0
@@ -749,7 +750,7 @@
     "oak_planks": {
       "generator": "block_item_icon",
       "index": 4,
-      "source": "assets/textures/generated/items/oak_planks.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_planks.png",
       "source_kind": "generated",
       "x": 4,
       "y": 0
@@ -757,7 +758,7 @@
     "oak_sapling": {
       "generator": "block_item_icon",
       "index": 111,
-      "source": "assets/textures/generated/items/oak_sapling.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_sapling.png",
       "source_kind": "generated",
       "x": 7,
       "y": 13
@@ -765,7 +766,7 @@
     "obsidian": {
       "generator": "block_item_icon",
       "index": 118,
-      "source": "assets/textures/generated/items/obsidian.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/obsidian.png",
       "source_kind": "generated",
       "x": 6,
       "y": 14
@@ -773,7 +774,7 @@
     "oxeye_daisy": {
       "generator": "block_item_icon",
       "index": 122,
-      "source": "assets/textures/generated/items/oxeye_daisy.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oxeye_daisy.png",
       "source_kind": "generated",
       "x": 2,
       "y": 15
@@ -781,7 +782,7 @@
     "packed_ice": {
       "generator": "block_item_icon",
       "index": 139,
-      "source": "assets/textures/generated/items/packed_ice.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/packed_ice.png",
       "source_kind": "generated",
       "x": 3,
       "y": 17
@@ -789,7 +790,7 @@
     "pig_spawn_egg": {
       "generator": "item_sprite",
       "index": 127,
-      "source": "assets/textures/generated/items/pig_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/pig_spawn_egg.png",
       "source_kind": "generated",
       "x": 7,
       "y": 15
@@ -797,7 +798,7 @@
     "podzol": {
       "generator": "block_item_icon",
       "index": 52,
-      "source": "assets/textures/generated/items/podzol.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/podzol.png",
       "source_kind": "generated",
       "x": 4,
       "y": 6
@@ -805,7 +806,7 @@
     "poppy": {
       "generator": "block_item_icon",
       "index": 55,
-      "source": "assets/textures/generated/items/poppy.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/poppy.png",
       "source_kind": "generated",
       "x": 7,
       "y": 6
@@ -813,7 +814,7 @@
     "raw_beef": {
       "generator": "item_sprite",
       "index": 75,
-      "source": "assets/textures/generated/items/raw_beef.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_beef.png",
       "source_kind": "generated",
       "x": 3,
       "y": 9
@@ -821,7 +822,7 @@
     "raw_chicken": {
       "generator": "item_sprite",
       "index": 79,
-      "source": "assets/textures/generated/items/raw_chicken.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_chicken.png",
       "source_kind": "generated",
       "x": 7,
       "y": 9
@@ -829,7 +830,7 @@
     "raw_gold": {
       "generator": "item_sprite",
       "index": 66,
-      "source": "assets/textures/generated/items/raw_gold.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_gold.png",
       "source_kind": "generated",
       "x": 2,
       "y": 8
@@ -837,7 +838,7 @@
     "raw_iron": {
       "generator": "item_sprite",
       "index": 65,
-      "source": "assets/textures/generated/items/raw_iron.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_iron.png",
       "source_kind": "generated",
       "x": 1,
       "y": 8
@@ -845,7 +846,7 @@
     "raw_mutton": {
       "generator": "item_sprite",
       "index": 81,
-      "source": "assets/textures/generated/items/raw_mutton.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_mutton.png",
       "source_kind": "generated",
       "x": 1,
       "y": 10
@@ -853,7 +854,7 @@
     "raw_porkchop": {
       "generator": "item_sprite",
       "index": 77,
-      "source": "assets/textures/generated/items/raw_porkchop.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/raw_porkchop.png",
       "source_kind": "generated",
       "x": 5,
       "y": 9
@@ -861,7 +862,7 @@
     "red_sand": {
       "generator": "block_item_icon",
       "index": 50,
-      "source": "assets/textures/generated/items/red_sand.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/red_sand.png",
       "source_kind": "generated",
       "x": 2,
       "y": 6
@@ -869,7 +870,7 @@
     "reeds": {
       "generator": "block_item_icon",
       "index": 56,
-      "source": "assets/textures/generated/items/reeds.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/reeds.png",
       "source_kind": "generated",
       "x": 0,
       "y": 7
@@ -877,7 +878,7 @@
     "rotten_flesh": {
       "generator": "item_sprite",
       "index": 83,
-      "source": "assets/textures/generated/items/rotten_flesh.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/rotten_flesh.png",
       "source_kind": "generated",
       "x": 3,
       "y": 10
@@ -885,7 +886,7 @@
     "sand": {
       "generator": "block_item_icon",
       "index": 36,
-      "source": "assets/textures/generated/items/sand.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sand.png",
       "source_kind": "generated",
       "x": 4,
       "y": 4
@@ -893,7 +894,7 @@
     "sheep_spawn_egg": {
       "generator": "item_sprite",
       "index": 128,
-      "source": "assets/textures/generated/items/sheep_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sheep_spawn_egg.png",
       "source_kind": "generated",
       "x": 0,
       "y": 16
@@ -901,7 +902,7 @@
     "shield": {
       "generator": "item_sprite",
       "index": 93,
-      "source": "assets/textures/generated/items/shield.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/shield.png",
       "source_kind": "generated",
       "x": 5,
       "y": 11
@@ -909,7 +910,7 @@
     "skeleton_spawn_egg": {
       "generator": "item_sprite",
       "index": 131,
-      "source": "assets/textures/generated/items/skeleton_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/skeleton_spawn_egg.png",
       "source_kind": "generated",
       "x": 3,
       "y": 16
@@ -917,7 +918,7 @@
     "skyroot_leaves": {
       "generator": "block_item_icon",
       "index": 147,
-      "source": "assets/textures/generated/items/skyroot_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/skyroot_leaves.png",
       "source_kind": "generated",
       "x": 3,
       "y": 18
@@ -925,7 +926,7 @@
     "skyroot_log": {
       "generator": "block_item_icon",
       "index": 146,
-      "source": "assets/textures/generated/items/skyroot_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/skyroot_log.png",
       "source_kind": "generated",
       "x": 2,
       "y": 18
@@ -933,7 +934,7 @@
     "snow": {
       "generator": "block_item_icon",
       "index": 39,
-      "source": "assets/textures/generated/items/snow.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/snow.png",
       "source_kind": "generated",
       "x": 7,
       "y": 4
@@ -941,7 +942,7 @@
     "spider_spawn_egg": {
       "generator": "item_sprite",
       "index": 132,
-      "source": "assets/textures/generated/items/spider_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/spider_spawn_egg.png",
       "source_kind": "generated",
       "x": 4,
       "y": 16
@@ -949,7 +950,7 @@
     "spruce_leaves": {
       "generator": "block_item_icon",
       "index": 60,
-      "source": "assets/textures/generated/items/spruce_leaves.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/spruce_leaves.png",
       "source_kind": "generated",
       "x": 4,
       "y": 7
@@ -957,7 +958,7 @@
     "spruce_log": {
       "generator": "block_item_icon",
       "index": 59,
-      "source": "assets/textures/generated/items/spruce_log.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/spruce_log.png",
       "source_kind": "generated",
       "x": 3,
       "y": 7
@@ -965,7 +966,7 @@
     "spruce_sapling": {
       "generator": "block_item_icon",
       "index": 113,
-      "source": "assets/textures/generated/items/spruce_sapling.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/spruce_sapling.png",
       "source_kind": "generated",
       "x": 1,
       "y": 14
@@ -973,7 +974,7 @@
     "star_crystal": {
       "generator": "block_item_icon",
       "index": 148,
-      "source": "assets/textures/generated/items/star_crystal.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/star_crystal.png",
       "source_kind": "generated",
       "x": 4,
       "y": 18
@@ -981,7 +982,7 @@
     "starflower": {
       "generator": "block_item_icon",
       "index": 149,
-      "source": "assets/textures/generated/items/starflower.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/starflower.png",
       "source_kind": "generated",
       "x": 5,
       "y": 18
@@ -989,7 +990,7 @@
     "steak": {
       "generator": "item_sprite",
       "index": 76,
-      "source": "assets/textures/generated/items/steak.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/steak.png",
       "source_kind": "generated",
       "x": 4,
       "y": 9
@@ -997,7 +998,7 @@
     "stick": {
       "generator": "item_sprite",
       "index": 9,
-      "source": "assets/textures/generated/items/stick.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stick.png",
       "source_kind": "generated",
       "x": 1,
       "y": 1
@@ -1005,7 +1006,7 @@
     "stone": {
       "generator": "block_item_icon",
       "index": 2,
-      "source": "assets/textures/generated/items/stone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone.png",
       "source_kind": "generated",
       "x": 2,
       "y": 0
@@ -1013,7 +1014,7 @@
     "stone_axe": {
       "generator": "item_sprite",
       "index": 21,
-      "source": "assets/textures/generated/items/stone_axe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone_axe.png",
       "source_kind": "generated",
       "x": 5,
       "y": 2
@@ -1021,7 +1022,7 @@
     "stone_hoe": {
       "generator": "item_sprite",
       "index": 23,
-      "source": "assets/textures/generated/items/stone_hoe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone_hoe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 2
@@ -1029,7 +1030,7 @@
     "stone_pickaxe": {
       "generator": "item_sprite",
       "index": 20,
-      "source": "assets/textures/generated/items/stone_pickaxe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone_pickaxe.png",
       "source_kind": "generated",
       "x": 4,
       "y": 2
@@ -1037,7 +1038,7 @@
     "stone_shovel": {
       "generator": "item_sprite",
       "index": 22,
-      "source": "assets/textures/generated/items/stone_shovel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone_shovel.png",
       "source_kind": "generated",
       "x": 6,
       "y": 2
@@ -1045,7 +1046,7 @@
     "stone_sword": {
       "generator": "item_sprite",
       "index": 24,
-      "source": "assets/textures/generated/items/stone_sword.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/stone_sword.png",
       "source_kind": "generated",
       "x": 0,
       "y": 3
@@ -1053,7 +1054,7 @@
     "string": {
       "generator": "item_sprite",
       "index": 67,
-      "source": "assets/textures/generated/items/string.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/string.png",
       "source_kind": "generated",
       "x": 3,
       "y": 8
@@ -1061,7 +1062,7 @@
     "sunflower": {
       "generator": "block_item_icon",
       "index": 123,
-      "source": "assets/textures/generated/items/sunflower.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sunflower.png",
       "source_kind": "generated",
       "x": 3,
       "y": 15
@@ -1069,7 +1070,7 @@
     "sunstone": {
       "generator": "block_item_icon",
       "index": 145,
-      "source": "assets/textures/generated/items/sunstone.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sunstone.png",
       "source_kind": "generated",
       "x": 1,
       "y": 18
@@ -1077,7 +1078,7 @@
     "tall_grass": {
       "generator": "block_item_icon",
       "index": 54,
-      "source": "assets/textures/generated/items/tall_grass.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/tall_grass.png",
       "source_kind": "generated",
       "x": 6,
       "y": 6
@@ -1085,7 +1086,7 @@
     "terracotta": {
       "generator": "block_item_icon",
       "index": 51,
-      "source": "assets/textures/generated/items/terracotta.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/terracotta.png",
       "source_kind": "generated",
       "x": 3,
       "y": 6
@@ -1093,7 +1094,7 @@
     "tnt": {
       "generator": "block_item_icon",
       "index": 117,
-      "source": "assets/textures/generated/items/tnt.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/tnt.png",
       "source_kind": "generated",
       "x": 5,
       "y": 14
@@ -1101,7 +1102,7 @@
     "torch": {
       "generator": "item_sprite",
       "index": 14,
-      "source": "assets/textures/generated/items/torch.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/torch.png",
       "source_kind": "generated",
       "x": 6,
       "y": 1
@@ -1109,7 +1110,7 @@
     "tuff": {
       "generator": "block_item_icon",
       "index": 136,
-      "source": "assets/textures/generated/items/tuff.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/tuff.png",
       "source_kind": "generated",
       "x": 0,
       "y": 17
@@ -1117,7 +1118,7 @@
     "water": {
       "generator": "block_item_icon",
       "index": 38,
-      "source": "assets/textures/generated/items/water.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/water.png",
       "source_kind": "generated",
       "x": 6,
       "y": 4
@@ -1125,7 +1126,7 @@
     "wheat": {
       "generator": "item_sprite",
       "index": 73,
-      "source": "assets/textures/generated/items/wheat.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wheat.png",
       "source_kind": "generated",
       "x": 1,
       "y": 9
@@ -1133,7 +1134,7 @@
     "wheat_seeds": {
       "generator": "item_sprite",
       "index": 72,
-      "source": "assets/textures/generated/items/wheat_seeds.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wheat_seeds.png",
       "source_kind": "generated",
       "x": 0,
       "y": 9
@@ -1141,7 +1142,7 @@
     "white_bed": {
       "generator": "block_item_icon",
       "index": 85,
-      "source": "assets/textures/generated/items/white_bed.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/white_bed.png",
       "source_kind": "generated",
       "x": 5,
       "y": 10
@@ -1149,7 +1150,7 @@
     "white_wool": {
       "generator": "block_item_icon",
       "index": 84,
-      "source": "assets/textures/generated/items/white_wool.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/white_wool.png",
       "source_kind": "generated",
       "x": 4,
       "y": 10
@@ -1157,7 +1158,7 @@
     "wooden_axe": {
       "generator": "item_sprite",
       "index": 16,
-      "source": "assets/textures/generated/items/wooden_axe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wooden_axe.png",
       "source_kind": "generated",
       "x": 0,
       "y": 2
@@ -1165,7 +1166,7 @@
     "wooden_hoe": {
       "generator": "item_sprite",
       "index": 18,
-      "source": "assets/textures/generated/items/wooden_hoe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wooden_hoe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 2
@@ -1173,7 +1174,7 @@
     "wooden_pickaxe": {
       "generator": "item_sprite",
       "index": 15,
-      "source": "assets/textures/generated/items/wooden_pickaxe.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wooden_pickaxe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 1
@@ -1181,7 +1182,7 @@
     "wooden_shovel": {
       "generator": "item_sprite",
       "index": 17,
-      "source": "assets/textures/generated/items/wooden_shovel.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wooden_shovel.png",
       "source_kind": "generated",
       "x": 1,
       "y": 2
@@ -1189,7 +1190,7 @@
     "wooden_sword": {
       "generator": "item_sprite",
       "index": 19,
-      "source": "assets/textures/generated/items/wooden_sword.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/wooden_sword.png",
       "source_kind": "generated",
       "x": 3,
       "y": 2
@@ -1197,7 +1198,7 @@
     "zombie_spawn_egg": {
       "generator": "item_sprite",
       "index": 130,
-      "source": "assets/textures/generated/items/zombie_spawn_egg.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/zombie_spawn_egg.png",
       "source_kind": "generated",
       "x": 2,
       "y": 16
@@ -1211,6 +1212,20 @@
   ],
   "rows": 19,
   "seed": 213785369,
+  "style": "bright-comfortable",
+  "template_schema": {
+    "alpha": "binary",
+    "filter": "nearest",
+    "material_processing": "oklch_role_palette_and_linear_light_highlight",
+    "outline": "binary silhouette with a dark material-aware edge",
+    "parts": [
+      "grip",
+      "connector",
+      "working_head",
+      "edge",
+      "highlight"
+    ]
+  },
   "tile_size": 16,
   "version": 1
 }

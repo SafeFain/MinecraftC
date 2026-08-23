@@ -2,54 +2,103 @@
   "columns": 3,
   "entities": {
     "blastling": {
+      "features": [
+        "eye",
+        "core",
+        "limb",
+        "glow"
+      ],
       "index": 7,
       "source": "entities/blastling.png",
       "x": 1,
       "y": 2
     },
     "chicken": {
+      "features": [
+        "beak",
+        "comb",
+        "wattle",
+        "wing"
+      ],
       "index": 3,
       "source": "entities/chicken.png",
       "x": 0,
       "y": 1
     },
     "cow": {
+      "features": [
+        "head_muzzle",
+        "ear",
+        "irregular_patches",
+        "hoof"
+      ],
       "index": 0,
       "source": "entities/cow.png",
       "x": 0,
       "y": 0
     },
     "item": {
+      "features": [],
       "index": 8,
       "source": "entities/item.png",
       "x": 2,
       "y": 2
     },
     "pig": {
+      "features": [
+        "snout",
+        "nostril",
+        "ear",
+        "belly"
+      ],
       "index": 1,
       "source": "entities/pig.png",
       "x": 1,
       "y": 0
     },
     "sheep": {
+      "features": [
+        "wool_cluster",
+        "face",
+        "ear",
+        "hoof"
+      ],
       "index": 2,
       "source": "entities/sheep.png",
       "x": 2,
       "y": 0
     },
     "skeleton": {
+      "features": [
+        "skull",
+        "jaw",
+        "rib",
+        "joint"
+      ],
       "index": 5,
       "source": "entities/skeleton.png",
       "x": 2,
       "y": 1
     },
     "spider": {
+      "features": [
+        "eye_cluster",
+        "cephalothorax",
+        "abdomen",
+        "leg_joint"
+      ],
       "index": 6,
       "source": "entities/spider.png",
       "x": 0,
       "y": 2
     },
     "zombie": {
+      "features": [
+        "skin",
+        "shirt",
+        "trouser",
+        "wear"
+      ],
       "index": 4,
       "source": "entities/zombie.png",
       "x": 1,
@@ -57,8 +106,11 @@
     }
   },
   "filter": "nearest",
+  "generator_version": 2,
   "rows": 3,
   "seed": 213785369,
+  "style": "bright-comfortable",
+  "style_definition": "definitions/entity_styles.json",
   "tile_size": 16,
   "version": 1
 }

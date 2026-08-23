@@ -1282,4 +1282,10 @@ if(Python3_Interpreter_FOUND)
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Generating and validating deterministic voxel textures")
+    add_custom_target(texture_preview
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
+                --preview --candidate-count 3
+                --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Building bright-comfortable texture previews and visual report")
 endif()

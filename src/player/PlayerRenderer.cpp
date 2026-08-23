@@ -103,7 +103,7 @@ glm::mat4 PlayerRenderer::renderThirdPerson(
             glm::rotate(glm::mat4(1), glm::radians(90.0f),
                         glm::vec3(0, 0, 1));
     }
-    const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.35f);
+    const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.20f);
     const float block=std::pow(std::clamp(light.block,0.0f,1.0f),1.35f);
     const glm::vec3 illumination=glm::max(glm::vec3(sky),
         glm::vec3(1.0f,.72f,.38f)*block);

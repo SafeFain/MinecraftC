@@ -594,7 +594,7 @@ void VulkanRenderer::renderCompatibilityEntityCube(
                     glm::rotate(glm::mat4(1.0f), yaw,
                                 glm::vec3(0.0f, 1.0f, 0.0f)) *
                     glm::scale(glm::mat4(1.0f), size);
-    const float skyLight = std::pow(std::clamp(light.sky, 0.0f, 1.0f), 1.35f);
+    const float skyLight = std::pow(std::clamp(light.sky, 0.0f, 1.0f), 1.20f);
     const float blockLight = std::pow(std::clamp(light.block, 0.0f, 1.0f), 1.35f);
     const glm::vec3 illumination = glm::max(glm::vec3(skyLight),
         glm::vec3(1.0f, 0.72f, 0.38f) * blockLight);

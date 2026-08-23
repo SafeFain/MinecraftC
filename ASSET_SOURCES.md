@@ -19,7 +19,8 @@ Use one section per original or generated asset family.
   covering all registered block faces plus the future copper ore material
 - Local paths: `assets/textures/generated/`
 - Creator/tool: `tools/texture_generator.py`
-- Seed and generator version: atlas metadata records both; format version 1
+- Seed and generator version: atlas metadata records both; generator version 2,
+  visual style `bright-comfortable`, metadata format version 1
 - License: original project-generated assets
 
 ### Heaven sanctuary materials
@@ -31,7 +32,7 @@ Use one section per original or generated asset family.
 - Creator/tool: `tools/texture_generator.py`
 - Creation date: 2026-08-23
 - Seed and generator version: atlas metadata records the deterministic seed;
-  format version 1
+  generator version 2, visual style `bright-comfortable`, format version 1
 - Visual references: broad sky-island ecology references only; no external
   texture files or protected pixels were imported
 - License: original project-generated assets
@@ -42,7 +43,8 @@ Use one section per original or generated asset family.
 - Local paths: `assets/textures/generated/entities/`, `assets/textures/generated/entity_atlas.png`, `assets/textures/generated/entity_skins/`
 - Creator/tool: `tools/texture_generator.py --build-entity-atlas --build-entity-skins`
 - Creation date: 2026-07-27; semantic skins upgraded 2026-07-29
-- Seed and generator version: atlas and skin metadata record seed and format version
+- Seed and generator version: atlas and skin metadata record seed, generator
+  version 2, visual style, and format version
 - Visual references: https://www.minecraft.net/en-us/article/minecraft-mobs and the CC0 references recorded in `assets/textures/LICENSE.md`
 - License: original project-generated assets
 # Entity GLBs

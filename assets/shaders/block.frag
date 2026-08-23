@@ -165,11 +165,11 @@ void main() {
         ? 0.32
         : max(dot(normal, normalize(uLightDirection)), 0.0);
     float smoothWeight = uSmoothLighting != 0 ? 1.0 : 0.0;
-    float ao = mix(1.0, mix(0.42, 1.0, clamp(vAO, 0.0, 1.0)),
+    float ao = mix(1.0, mix(0.52, 1.0, clamp(vAO, 0.0, 1.0)),
                    smoothWeight * uAoStrength);
     float sampledSky = mix(flatSkyLight, vSkyLight, smoothWeight);
     float sampledBlock = mix(flatBlockLight, vBlockLight, smoothWeight);
-    float skyLight = pow(clamp(sampledSky, 0.0, 1.0), 1.35);
+    float skyLight = pow(clamp(sampledSky, 0.0, 1.0), 1.20);
     float blockLight = pow(clamp(sampledBlock, 0.0, 1.0), 1.35);
     float topSurface = max(geometricNormal.y, 0.0);
     float wetness = uRainIntensity * skyLight * topSurface;
@@ -179,8 +179,8 @@ void main() {
     float cloudShadow = mix(1.0, cloudNoise,
         uCloudShadowStrength * (0.45 + 0.55 * uRainIntensity));
     float visibility = shadowVisibility(vWorldPosition, normal) * cloudShadow;
-    vec3 lighting = uAmbientColor * uAmbientIntensity * skyLight * 0.62;
-    lighting += uDirectColor * uDirectIntensity * diffuse * skyLight * 0.58 *
+    vec3 lighting = uAmbientColor * uAmbientIntensity * skyLight * 0.72;
+    lighting += uDirectColor * uDirectIntensity * diffuse * skyLight * 0.52 *
                 visibility;
     lighting = max(lighting, vec3(1.0, 0.72, 0.38) * blockLight * 1.15);
     lighting = max(lighting * ao, vec3(0.025));

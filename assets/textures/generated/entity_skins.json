@@ -2,34 +2,90 @@
   "columns": 4,
   "entities": {
     "blastling": {
+      "features": [
+        "eye",
+        "core",
+        "limb",
+        "glow"
+      ],
       "source": "entity_skins/blastling.png"
     },
     "chicken": {
+      "features": [
+        "beak",
+        "comb",
+        "wattle",
+        "wing"
+      ],
       "source": "entity_skins/chicken.png"
     },
     "cow": {
+      "features": [
+        "head_muzzle",
+        "ear",
+        "irregular_patches",
+        "hoof"
+      ],
       "source": "entity_skins/cow.png"
     },
     "pig": {
+      "features": [
+        "snout",
+        "nostril",
+        "ear",
+        "belly"
+      ],
       "source": "entity_skins/pig.png"
     },
     "player": {
+      "features": [
+        "hair",
+        "face",
+        "shirt",
+        "trouser",
+        "shoe"
+      ],
       "source": "entity_skins/player.png"
     },
     "sheep": {
+      "features": [
+        "wool_cluster",
+        "face",
+        "ear",
+        "hoof"
+      ],
       "source": "entity_skins/sheep.png"
     },
     "skeleton": {
+      "features": [
+        "skull",
+        "jaw",
+        "rib",
+        "joint"
+      ],
       "source": "entity_skins/skeleton.png"
     },
     "spider": {
+      "features": [
+        "eye_cluster",
+        "cephalothorax",
+        "abdomen",
+        "leg_joint"
+      ],
       "source": "entity_skins/spider.png"
     },
     "zombie": {
+      "features": [
+        "skin",
+        "shirt",
+        "trouser",
+        "wear"
+      ],
       "source": "entity_skins/zombie.png"
     }
   },
   "filter": "nearest",
+  "generator_version": 2,
   "height": 64,
   "layout": {
     "body_back": 7,
@@ -51,6 +107,8 @@
   },
   "rows": 4,
   "seed": 213785369,
+  "style": "bright-comfortable",
+  "style_definition": "definitions/entity_styles.json",
   "tile_size": 16,
   "version": 1,
   "width": 64

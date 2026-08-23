@@ -131,8 +131,8 @@ void main() {
     vec2 flatLight=vec2(floor(packed/16.0),mod(packed,16.0))/15.0;
     vec2 light=mix(flatLight,lighting.yz,frame.atlasAndLighting.y);
     float aoWeight=frame.atlasAndLighting.y*environment.weatherParams.z;
-    float ao=mix(1.0,mix(0.42,1.0,clamp(lighting.x,0.0,1.0)),aoWeight);
-    float skyLight=pow(clamp(light.x,0.0,1.0),1.35);
+    float ao=mix(1.0,mix(0.52,1.0,clamp(lighting.x,0.0,1.0)),aoWeight);
+    float skyLight=pow(clamp(light.x,0.0,1.0),1.20);
     float blockLight=pow(clamp(light.y,0.0,1.0),1.35);
     bool isLava=abs(slot-environment.materialParams.x)<0.25;
     bool isWater=abs(slot-environment.materialParams.y)<0.25;
@@ -159,9 +159,9 @@ void main() {
         environment.weatherParams.w*(0.45+0.55*environment.weatherParams.y));
     float visibility=shadowVisibility(worldPosition,normal)*cloudShadow;
     vec3 illumination=environment.ambientColorIntensity.rgb*
-        environment.ambientColorIntensity.a*skyLight*0.62;
+        environment.ambientColorIntensity.a*skyLight*0.72;
     illumination+=environment.directColorIntensity.rgb*
-        environment.directColorIntensity.a*diffuse*skyLight*0.58*visibility;
+        environment.directColorIntensity.a*diffuse*skyLight*0.52*visibility;
     illumination=max(illumination,vec3(1.0,0.72,0.38)*blockLight*1.15);
     illumination=max(illumination*ao,vec3(0.025));
 

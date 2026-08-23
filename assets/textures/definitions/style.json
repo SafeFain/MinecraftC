@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "generator_version": 2,
+  "id": "bright-comfortable",
+  "style": "bright-comfortable",
+  "color_space": "oklch",
+  "global": {
+    "brightness": 1.08,
+    "contrast": 0.90,
+    "saturation": 1.04,
+    "shadow_floor": 0.34,
+    "highlight_ceiling": 0.92,
+    "temperature": 0.035
+  },
+  "palette_roles": [
+    "shadow", "base_dark", "base", "base_light", "highlight", "accent"
+  ],
+  "semantic_palette": {
+    "shadow": {"lightness_bias": -0.13, "chroma_scale": 0.82, "hue_shift": 0.020},
+    "base_dark": {"lightness_bias": -0.078, "chroma_scale": 0.92, "hue_shift": 0.010},
+    "base": {"lightness_bias": -0.026, "chroma_scale": 1.00, "hue_shift": 0.000},
+    "base_light": {"lightness_bias": 0.026, "chroma_scale": 1.00, "hue_shift": -0.006},
+    "highlight": {"lightness_bias": 0.078, "chroma_scale": 0.96, "hue_shift": -0.012},
+    "accent": {"lightness_bias": 0.130, "chroma_scale": 1.04, "hue_shift": -0.018}
+  },
+  "exceptions": {
+    "dark_materials": ["deepslate", "black_sand", "basalt", "mud", "obsidian"],
+    "highlight_materials": ["sand", "snow", "cloudstone", "ice", "packed_ice"]
+  },
+  "families": {
+    "soil": {"pattern": "clods", "lightness": [0.38, 0.68]},
+    "turf": {"pattern": "tufts", "lightness": [0.42, 0.74]},
+    "stone": {"pattern": "flakes_and_cracks", "lightness": [0.40, 0.76]},
+    "ore": {"pattern": "veins", "lightness": [0.32, 0.84]},
+    "wood": {"pattern": "fibers_and_rings", "lightness": [0.38, 0.78]},
+    "foliage": {"pattern": "clustered_leaves", "lightness": [0.42, 0.76]},
+    "sand_ice": {"pattern": "low_frequency_grains", "lightness": [0.58, 0.92]},
+    "fluid_emissive": {"pattern": "bands_and_glints", "lightness": [0.28, 0.94]},
+    "constructed": {"pattern": "panels_and_edges", "lightness": [0.34, 0.86]}
+  }
+}
