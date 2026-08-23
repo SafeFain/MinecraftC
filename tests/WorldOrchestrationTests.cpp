@@ -358,14 +358,21 @@ void testStreamingBenchmark() {
 
     struct Measurement {
         double elapsedMs = 0.0;
+        size_t iterations = 0;
         std::vector<double> frames;
     };
+    // The legs intentionally report latency instead of asserting a
+    // machine-dependent threshold, so give each leg a generous wall-clock
+    // budget.  The old fixed 2000-iteration cap (~2s) was tight enough to
+    // flake on loaded CI runners even when the pipeline was healthy.
     auto runUntilReady = [](World& world, ThreadPool& pool,
                             const glm::dvec3& position,
-                            bool requireCacheHit) {
+                            bool requireCacheHit, const char* leg) {
         Measurement result;
         const auto start = std::chrono::steady_clock::now();
-        for (int frame = 0; frame < 2000; ++frame) {
+        const auto deadline = start + std::chrono::seconds(60);
+        for (; result.iterations < 120000 &&
+               std::chrono::steady_clock::now() < deadline; ++result.iterations) {
             const auto frameStart = std::chrono::steady_clock::now();
             world.update(position, 1);
             world.enqueueGeneration();
@@ -382,9 +389,21 @@ void testStreamingBenchmark() {
         result.elapsedMs = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - start).count();
         const auto progress = world.generationProgress();
-        require(progress.total == 1 && progress.completed == 1 &&
-                    (!requireCacheHit || progress.cacheHits == 1),
-                "streaming benchmark reaches its single-chunk target");
+        const bool ready = progress.total == 1 && progress.completed == 1 &&
+                           (!requireCacheHit || progress.cacheHits == 1);
+        if (!ready) {
+            std::cerr << "[streaming benchmark] " << leg << " leg timed out:"
+                      << " total=" << progress.total
+                      << " completed=" << progress.completed
+                      << " cacheHits=" << progress.cacheHits
+                      << " cacheMisses=" << progress.cacheMisses
+                      << " poolPending=" << pool.pendingCount()
+                      << " poolIdle=" << pool.idle()
+                      << " elapsedMs=" << result.elapsedMs << '\n';
+        }
+        const std::string message =
+            std::string(leg) + " streaming benchmark reaches its single-chunk target";
+        require(ready, message.c_str());
         return result;
     };
     auto percentile = [](std::vector<double> samples, double fraction) {
@@ -403,7 +422,7 @@ void testStreamingBenchmark() {
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(808080);
-        cold = runUntilReady(world, pool, {0.5, 64.0, 0.5}, false);
+        cold = runUntilReady(world, pool, {0.5, 64.0, 0.5}, false, "cold");
         world.persistGeneratedChunks();
     }
 
@@ -414,7 +433,7 @@ void testStreamingBenchmark() {
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(808080);
-        disk = runUntilReady(world, pool, {0.5, 64.0, 0.5}, true);
+        disk = runUntilReady(world, pool, {0.5, 64.0, 0.5}, true, "disk");
     }
 
     Measurement warm;
@@ -423,7 +442,7 @@ void testStreamingBenchmark() {
         World world;
         world.setThreadPool(&pool);
         world.resetForNewSeed(909090);
-        runUntilReady(world, pool, {0.5, 64.0, 0.5}, false);
+        runUntilReady(world, pool, {0.5, 64.0, 0.5}, false, "warm-setup");
         Chunk* origin = world.getChunk(0, 0);
         world.update({16.5, 64.0, 0.5}, 1);
         world.processCompletedGenerations(false);

@@ -926,13 +926,16 @@ def build_entity_skins(output,seed):
               "style_definition":"definitions/entity_styles.json","entities":{}}
     for name in ENTITY_SKIN_NAMES:
         pixels=generate_entity_skin(name,seed)
-        path=skin_dir/f"{name}.png"; write_png(path,ENTITY_SKIN_SIZE,ENTITY_SKIN_SIZE,pixels)
+        # Compression level 0 (stored deflate blocks) keeps these embedded
+        # skins byte-identical across zlib versions and operating systems;
+        # entity GLBs embed the exact same bytes in their glTF buffers.
+        path=skin_dir/f"{name}.png"; write_png(path,ENTITY_SKIN_SIZE,ENTITY_SKIN_SIZE,pixels,0)
         metadata["entities"][name]={"source":f"entity_skins/{name}.png",
                                      "features":ENTITY_STYLE_DEFINITIONS["entities"][name].get("motifs", [])}
     (output/"entity_skins.json").write_text(
         json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
-def png_bytes(width,height,pixels):
+def png_bytes(width,height,pixels,compression_level=9):
     raw=bytearray()
     for y in range(height):
         raw.append(0)
@@ -940,10 +943,10 @@ def png_bytes(width,height,pixels):
     def chunk(kind,data):
         return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
     header=struct.pack(">IIBBBBB",width,height,8,6,0,0,0)
-    return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",header)+chunk(b"IDAT",zlib.compress(bytes(raw),9))+chunk(b"IEND",b"")
+    return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",header)+chunk(b"IDAT",zlib.compress(bytes(raw),compression_level))+chunk(b"IEND",b"")
 
-def write_png(path,width,height,pixels):
-    path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(png_bytes(width,height,pixels))
+def write_png(path,width,height,pixels,compression_level=9):
+    path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(png_bytes(width,height,pixels,compression_level))
 
 def load_item_icon_definitions(path):
     data=json.loads(Path(path).read_text(encoding="utf-8"))

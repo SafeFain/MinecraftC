@@ -10,6 +10,8 @@ void ParticleSystem::clear() {
     m_particles.clear();
     m_weatherEmission = 0.0f;
     m_skyMoteEmission = 0.0f;
+    m_pollenEmission = 0.0f;
+    m_sparkleEmission = 0.0f;
     m_skyDaylight = 1.0f;
 }
 
@@ -84,6 +86,54 @@ void ParticleSystem::emitSkyMote(const glm::dvec3& viewer, uint64_t seed,
     m_particles.push_back(particle);
 }
 
+void ParticleSystem::emitHeavenPollen(const glm::dvec3& viewer, uint64_t seed,
+                                      int paletteIndex) {
+    m_randomState ^= seed + 0x9E3D7B5F3C11E2A7ULL;
+    Particle particle;
+    particle.kind = ParticleKind::HeavenPollen;
+    particle.position = {
+        viewer.x + (randomFloat() * 2.0 - 1.0) * 14.0,
+        viewer.y + (randomFloat() * 2.0 - 0.45) * 10.0,
+        viewer.z + (randomFloat() * 2.0 - 1.0) * 14.0};
+    particle.velocity = {
+        (randomFloat() - 0.5f) * 0.14f,
+        (randomFloat() - 0.5f) * 0.08f,
+        (randomFloat() - 0.5f) * 0.14f};
+    particle.lifetime = 7.0f + randomFloat() * 4.0f;
+    particle.phase = randomFloat();
+    // The texture channel carries the 0..7 exclusive-biome palette index;
+    // the shader decodes it into the pollen tint.
+    particle.texture = static_cast<float>(
+        std::clamp(paletteIndex, 0, 7));
+    particle.size = 0.14f + randomFloat() * 0.10f;
+    particle.rotation = randomFloat() * 6.2831853f;
+    particle.angularVelocity = (randomFloat() - 0.5f) * 0.9f;
+    m_particles.push_back(particle);
+}
+
+void ParticleSystem::emitHeavenSparkle(const glm::dvec3& viewer, uint64_t seed,
+                                       int paletteIndex) {
+    m_randomState ^= seed + 0x4B1D2E7A9C35F0D1ULL;
+    Particle particle;
+    particle.kind = ParticleKind::HeavenSparkle;
+    particle.position = {
+        viewer.x + (randomFloat() * 2.0 - 1.0) * 13.0,
+        viewer.y + (randomFloat() * 2.0 - 0.45) * 8.0,
+        viewer.z + (randomFloat() * 2.0 - 1.0) * 13.0};
+    particle.velocity = {
+        (randomFloat() - 0.5f) * 0.05f,
+        0.06f + randomFloat() * 0.08f,
+        (randomFloat() - 0.5f) * 0.05f};
+    particle.lifetime = 0.7f + randomFloat() * 0.9f;
+    particle.phase = randomFloat();
+    particle.texture = static_cast<float>(
+        std::clamp(paletteIndex, 0, 7));
+    particle.size = 0.16f + randomFloat() * 0.14f;
+    particle.rotation = randomFloat() * 6.2831853f;
+    particle.angularVelocity = 0.0f;
+    m_particles.push_back(particle);
+}
+
 void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                             float rainIntensity, uint64_t seed,
                             DimensionId dimension, float daylight) {
@@ -99,19 +149,61 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         m_weatherEmission = 0.0f;
     }
     if (dimension == DimensionId::Heaven) {
-        m_skyMoteEmission += dt * 24.0f;
-        const int count = std::min(
+        // Light dust, drifting pollen, and star sparkles share one budgeted
+        // ambient layer.  Pollen and sparkles tint themselves with the
+        // exclusive biome sampled under a nearby column, so the air reads
+        // differently over each sanctuary.
+        m_skyMoteEmission += dt * 16.0f;
+        m_pollenEmission += dt * 10.0f;
+        m_sparkleEmission += dt * 16.0f;
+        const int dustCount = std::min(
             static_cast<int>(MAX_SKY_MOTES_PER_UPDATE),
             static_cast<int>(m_skyMoteEmission));
-        m_skyMoteEmission -= count;
-        for (int i = 0; i < count && m_particles.size() < MAX_PARTICLES; ++i)
+        const int pollenCount = std::min(
+            static_cast<int>(MAX_POLLEN_PER_UPDATE),
+            static_cast<int>(m_pollenEmission));
+        const int sparkleCount = std::min(
+            static_cast<int>(MAX_SPARKLE_PER_UPDATE),
+            static_cast<int>(m_sparkleEmission));
+        m_skyMoteEmission -= static_cast<float>(dustCount);
+        m_pollenEmission -= static_cast<float>(pollenCount);
+        m_sparkleEmission -= static_cast<float>(sparkleCount);
+        for (int i = 0; i < dustCount && m_particles.size() < MAX_PARTICLES;
+             ++i)
             emitSkyMote(viewer, seed + static_cast<uint64_t>(i) * 17u,
                         m_skyDaylight);
+        for (int i = 0; i < pollenCount && m_particles.size() < MAX_PARTICLES;
+             ++i) {
+            const int bx = static_cast<int>(std::floor(
+                viewer.x + (randomFloat() * 2.0 - 1.0) * 14.0));
+            const int bz = static_cast<int>(std::floor(
+                viewer.z + (randomFloat() * 2.0 - 1.0) * 14.0));
+            emitHeavenPollen(viewer, seed + static_cast<uint64_t>(i) * 31u,
+                             world.heavenBiomePaletteIndex(bx, bz));
+        }
+        for (int i = 0; i < sparkleCount && m_particles.size() < MAX_PARTICLES;
+             ++i) {
+            const int bx = static_cast<int>(std::floor(
+                viewer.x + (randomFloat() * 2.0 - 1.0) * 13.0));
+            const int bz = static_cast<int>(std::floor(
+                viewer.z + (randomFloat() * 2.0 - 1.0) * 13.0));
+            const int palette = world.heavenBiomePaletteIndex(bx, bz);
+            // Sparkles favour the crystal and garden sanctuaries; the
+            // mineral and bloom biomes glow more softly.
+            int gate = 40;
+            if (palette == 3 || palette == 6 || palette == 7) gate = 100;
+            else if (palette == 2 || palette == 4) gate = 70;
+            if (randomFloat() * 100.0f >= static_cast<float>(gate)) continue;
+            emitHeavenSparkle(viewer, seed + static_cast<uint64_t>(i) * 43u,
+                              palette);
+        }
     } else {
         m_skyMoteEmission = 0.0f;
+        m_pollenEmission = 0.0f;
+        m_sparkleEmission = 0.0f;
         m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
             [](const Particle& particle) {
-                return particle.kind == ParticleKind::SkyMote;
+                return particle.kind >= ParticleKind::SkyMote;
             }), m_particles.end());
     }
 
@@ -132,7 +224,8 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             const float sway = std::sin(particle.age * 2.4f + particle.phase * 6.283f);
             particle.velocity.x += sway * dt * 0.6f;
             particle.velocity.z += std::cos(particle.age * 1.9f + particle.phase) * dt * 0.4f;
-        } else if (particle.kind == ParticleKind::SkyMote) {
+        } else if (particle.kind == ParticleKind::SkyMote ||
+                   particle.kind == ParticleKind::HeavenPollen) {
             particle.velocity.x += std::sin(
                 particle.age * 0.8f + particle.phase * 6.283f) * dt * 0.035f;
             particle.velocity.y += std::cos(
@@ -140,9 +233,17 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             particle.velocity.z += std::sin(
                 particle.age * 0.7f + particle.phase * 3.3f) * dt * 0.035f;
             particle.rotation += particle.angularVelocity * dt;
+        } else if (particle.kind == ParticleKind::HeavenSparkle) {
+            particle.velocity.x += std::sin(
+                particle.age * 1.3f + particle.phase * 6.283f) * dt * 0.02f;
+            particle.velocity.y += std::cos(
+                particle.age * 2.2f + particle.phase * 3.9f) * dt * 0.015f;
+            particle.rotation += particle.angularVelocity * dt;
         }
 
-        if (particle.kind == ParticleKind::SkyMote) {
+        if (particle.kind == ParticleKind::SkyMote ||
+            particle.kind == ParticleKind::HeavenPollen ||
+            particle.kind == ParticleKind::HeavenSparkle) {
             particle.position += glm::dvec3(particle.velocity) * static_cast<double>(dt);
             continue;
         }

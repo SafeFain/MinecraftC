@@ -134,7 +134,7 @@ void GameScenePresenter::render(
         session.particles.buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
         const float particleIntensity = session.world.isHeaven()
-            ? 0.72f : session.weather.rainGradient();
+            ? 0.80f : session.weather.rainGradient();
         renderer.renderParticles(
             particleRenderData, vp,
             camera.right,

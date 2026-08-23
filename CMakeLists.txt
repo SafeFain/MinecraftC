@@ -1095,6 +1095,9 @@ if(BUILD_TESTING)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    # This test is normally sub-second; a generous ceiling turns a future
+    # deadlock into a fast, actionable CTest timeout instead of a stuck job.
+    set_tests_properties(game_session_flow PROPERTIES TIMEOUT 120)
 
     add_executable(application_flow_tests
         tests/ApplicationFlowTests.cpp
@@ -1230,6 +1233,9 @@ if(BUILD_TESTING)
         target_compile_options(world_orchestration_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME world_orchestration_state_transitions COMMAND world_orchestration_tests)
+    # The benchmark legs allow 60s each on heavily loaded CI runners; keep the
+    # whole orchestration test well under the job timeout with diagnostics.
+    set_tests_properties(world_orchestration_state_transitions PROPERTIES TIMEOUT 600)
 
     add_executable(localization_tests
         tests/LocalizationTests.cpp

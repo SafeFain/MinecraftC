@@ -207,6 +207,11 @@ Biome World::biomeAt(int worldX, int worldZ) const {
     return m_generator.queryHeightBiome(worldX, worldZ).biome;
 }
 
+int World::heavenBiomePaletteIndex(int worldX, int worldZ) const {
+    if (!m_generator.isHeaven()) return 0;
+    return static_cast<int>(m_generator.heavenBiomeAt(worldX, worldZ));
+}
+
 std::optional<glm::ivec2> World::locateBiome(
     Biome biome, int worldX, int worldZ) const {
     return locateNearestBiome(glm::ivec2(worldX, worldZ), biome,

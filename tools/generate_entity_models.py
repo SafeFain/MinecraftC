@@ -1,10 +1,49 @@
 #!/usr/bin/env python3
 """Deterministically generate MinecraftC's original block-style entity GLBs."""
-import argparse, json, math, pathlib, struct, zlib
+import argparse, json, pathlib, struct, zlib
 import texture_generator
 
 VERSION = 4
 SEED = 0x4D43474C
+
+# Quaternion components are frozen as decimal constants instead of calling
+# libm.  sin/cos can differ in the last bit between operating systems, and a
+# one-ulp animation difference changes the byte-for-byte glTF output.
+_HALF_PI = 1.5707963267948966
+_QUAT_HALF = {
+    0.0: (0.0, 1.0),
+    0.10: (0.04997916927067833, 0.9987502603949663),
+    -0.10: (-0.04997916927067833, 0.9987502603949663),
+    0.15: (0.07492970727274234, 0.9971888181122075),
+    -0.15: (-0.07492970727274234, 0.9971888181122075),
+    0.20: (0.09983341664682815, 0.9950041652780258),
+    -0.20: (-0.09983341664682815, 0.9950041652780258),
+    0.25: (0.12467473338522769, 0.992197667229329),
+    -0.25: (-0.12467473338522769, 0.992197667229329),
+    0.28: (0.1395431146442365, 0.9902159962126371),
+    -0.28: (-0.1395431146442365, 0.9902159962126371),
+    0.30: (0.14943813247359922, 0.9887710779360422),
+    -0.30: (-0.14943813247359922, 0.9887710779360422),
+    0.35: (0.17410813759359595, 0.9847265389049334),
+    -0.35: (-0.17410813759359595, 0.9847265389049334),
+    0.38: (0.18885889497650057, 0.9820042351172703),
+    -0.38: (-0.18885889497650057, 0.9820042351172703),
+    0.42: (0.20845989984609956, 0.9780309147241483),
+    -0.42: (-0.20845989984609956, 0.9780309147241483),
+    0.48: (0.23770262642713458, 0.9713379748520297),
+    -0.48: (-0.23770262642713458, 0.9713379748520297),
+    0.55: (0.27154693695611287, 0.962425197628238),
+    -0.55: (-0.27154693695611287, 0.962425197628238),
+    0.72: (0.35227423327508994, 0.9358968236779348),
+    -0.72: (-0.35227423327508994, 0.9358968236779348),
+    1.05: (0.5012130046737979, 0.8653239416229412),
+    -1.05: (-0.5012130046737979, 0.8653239416229412),
+    1.15: (0.5438347906836426, 0.8391923024206541),
+    -1.15: (-0.5438347906836426, 0.8391923024206541),
+    1.35: (0.6248973167276999, 0.7807069511324468),
+    -1.35: (-0.6248973167276999, 0.7807069511324468),
+    _HALF_PI: (0.7071067811865475, 0.7071067811865476),
+}
 MODELS = {
     "cow": ((0.90,1.20,1.30),(112,72,48,255)),
     "pig": ((0.86,0.95,1.15),(225,132,151,255)),
@@ -24,7 +63,7 @@ def png(color, accent):
             raw.extend(accent if ((x//4+y//4)&1) else color)
     def chunk(kind,data):
         return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
-    return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",width,height,8,6,0,0,0))+chunk(b"IDAT",zlib.compress(bytes(raw),9))+chunk(b"IEND",b"")
+    return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",width,height,8,6,0,0,0))+chunk(b"IDAT",zlib.compress(bytes(raw),0))+chunk(b"IEND",b"")
 
 class Buffer:
     def __init__(self): self.data=bytearray(); self.views=[]; self.accessors=[]
@@ -162,9 +201,12 @@ def build_v2(name,size,color):
             output=buf.accessor(view,5126,frame_count,"VEC4" if path=="rotation" else "VEC3")
             samplers.append({"input":ta,"output":output,"interpolation":"LINEAR"});outputs.append({"sampler":len(samplers)-1,"target":{"node":node,"path":path}})
         animations.append({"name":clip,"samplers":samplers,"channels":outputs})
-    def qx(angle):return (math.sin(angle/2),0,0,math.cos(angle/2))
-    def qy(angle):return (0,math.sin(angle/2),0,math.cos(angle/2))
-    def qz(angle):return (0,0,math.sin(angle/2),math.cos(angle/2))
+    def qx(angle):
+        sine,cosine=_QUAT_HALF[angle]; return (sine,0,0,cosine)
+    def qy(angle):
+        sine,cosine=_QUAT_HALF[angle]; return (0,sine,0,cosine)
+    def qz(angle):
+        sine,cosine=_QUAT_HALF[angle]; return (0,0,sine,cosine)
     node={part:index for index,(part,_,_) in enumerate(parts,1)}
     animation("idle",1.6,[(0,"translation",((0,0,0),(0,.025,0),(0,0,0)))])
     walk=[]
@@ -203,7 +245,7 @@ def build_v2(name,size,color):
                                (node["arm_l"],"rotation",(qx(-.35),qx(.2),qx(.2)))])
         animation("swing",.32,[(node["arm_r"],"rotation",(qx(0),qx(-1.35),qx(0)))])
     animation("hurt",.35,[(0,"translation",((0,0,0),(0,.12,.10),(0,0,0)))])
-    animation("death",1.0,[(0,"rotation",(qz(0),qz(math.pi*.5),qz(math.pi*.5)))])
+    animation("death",1.0,[(0,"rotation",(qz(0),qz(_HALF_PI),qz(_HALF_PI)))])
     if name=="zombie":
         animation("attack",.55,[(node["arm_l"],"rotation",(qx(-.2),qx(-1.15),qx(.35))),
                                  (node["arm_r"],"rotation",(qx(-.2),qx(-1.15),qx(.35)))])
@@ -219,7 +261,7 @@ def build_v2(name,size,color):
                                   (0,"translation",((0,0,0),(0,.08,0),(0,0,0)))])
     del color
     skin=texture_generator.generate_entity_skin(name,texture_generator.DEFAULT_SEED)
-    image_view=buf.add(texture_generator.png_bytes(64,64,skin))
+    image_view=buf.add(texture_generator.png_bytes(64,64,skin,0))
     doc={"asset":{"version":"2.0","generator":f"MinecraftC entity generator v{VERSION} seed {SEED}"},"scene":0,"scenes":[{"nodes":[0,mesh_node]}],"nodes":nodes,
          "skins":[{"name":name+"_skin","joints":list(range(len(parts)+1)),"skeleton":0,"inverseBindMatrices":iba}],
          "meshes":[{"name":name+"_blocks","primitives":[{"attributes":attrs,"indices":inds,"material":0}]}],

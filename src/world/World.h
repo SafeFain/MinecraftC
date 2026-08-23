@@ -105,6 +105,9 @@ public:
     bool hasSkyAccess(int worldX, int worldY, int worldZ) const;
     PrecipitationType precipitationAt(int worldX, int worldY, int worldZ) const;
     Biome biomeAt(int worldX, int worldZ) const;
+    // 0..7 palette index of the exclusive Heaven biome at a column, for the
+    // ambient particle tinting; returns 0 outside the Heaven dimension.
+    int heavenBiomePaletteIndex(int worldX, int worldZ) const;
     std::optional<glm::ivec2> locateBiome(Biome biome, int worldX,
                                           int worldZ) const;
     glm::dvec3 findSafeSpawn(int maximumRadius = 512) const;

@@ -436,9 +436,13 @@ void WorldGenerator::populateHeaven(
         }
     }
 
-    // Per-biome plants and crystals make each exclusive biome readable from a
-    // distance without introducing a new simulation system.  Every layer uses
-    // a layer-salted hash so stacked islands do not repeat the same pattern.
+    // Treeless biomes each carry a small library of coordinate-owned
+    // micro-features (rings, patches, boulders, spires, fallen logs) so their
+    // surfaces and skyline stay varied without a new simulation system.
+    // Every feature uses an independent hash salt and writes only through
+    // setLocal/setIfAir, which keeps region and singleton output identical
+    // regardless of request order.  Minor layers use a lower feature budget;
+    // zenith islets keep their lone-crystal language.
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             const int wx = baseX + x;
@@ -449,75 +453,197 @@ void WorldGenerator::populateHeaven(
                     layers[static_cast<size_t>(layer)];
                 if (!island.present || island.top + 1 >= Config::WORLD_MAX_Y)
                     continue;
+                const int top = island.top;
                 const int roll = hashPercent(
                     generator.m_seed ^ HEAVEN_DECOR_DOMAIN,
                     wx, 31 + layer * 7, wz);
-                if (layer == HEAVEN_LAYER_COUNT - 1 && roll < 60) {
+                if (layer == HEAVEN_LAYER_COUNT - 1) {
                     // Zenith islets carry a lone star crystal so the top
                     // layer reads clearly from below.
-                    setIfAir(wx, island.top + 1, wz, BlockId::STAR_CRYSTAL);
+                    if (roll < 60)
+                        setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                    continue;
                 }
+                // Full budget on the main layer, reduced on the drift layers.
+                const float layerScale = layer == 2 ? 1.0f : 0.6f;
+                const auto rollUnder = [&](int salt, int threshold) {
+                    return hashPercent(generator.m_seed ^ HEAVEN_DECOR_DOMAIN,
+                                       wx, salt + layer * 11, wz) <
+                           static_cast<int>(threshold * layerScale);
+                };
                 switch (island.biome) {
-                    case HeavenBiome::StarCrystalGarden:
-                        if (roll < 9) {
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STAR_CRYSTAL);
-                            if (roll < 4) {
-                                setIfAir(wx + 1, island.top + 1, wz,
-                                         BlockId::STAR_CRYSTAL);
-                                setIfAir(wx, island.top + 1, wz + 1,
-                                         BlockId::STAR_CRYSTAL);
-                            }
-                        } else if (roll < 20) {
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STARFLOWER);
+                    case HeavenBiome::DawnMeadow:
+                        if (rollUnder(41, 4)) {
+                            // Starflower ring with a centre bloom.
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
+                            for (int dx = -2; dx <= 2; ++dx)
+                                for (int dz = -2; dz <= 2; ++dz)
+                                    if (std::max(std::abs(dx), std::abs(dz)) == 2)
+                                        setIfAir(wx + dx, top + 1, wz + dz,
+                                                 BlockId::STARFLOWER);
+                        } else if (rollUnder(53, 9)) {
+                            setLocal(wx, top, wz, BlockId::MOSS);
+                            setLocal(wx + 1, top, wz, BlockId::MOSS);
+                            setLocal(wx, top, wz + 1, BlockId::MOSS);
+                            setLocal(wx + 1, top, wz + 1, BlockId::MOSS);
+                        } else if (rollUnder(61, 2)) {
+                            for (int i = 0; i < 3; ++i)
+                                setIfAir(wx + i, top + 1, wz,
+                                         BlockId::SKYROOT_WOOD);
+                            setIfAir(wx + 1, top + 2, wz,
+                                     BlockId::SKYROOT_LEAVES);
+                        } else if (roll < static_cast<int>(20 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
                         }
                         break;
-                    case HeavenBiome::DawnMeadow:
-                        if (roll < 20)
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STARFLOWER);
+                    case HeavenBiome::SunstoneHeights:
+                        if (rollUnder(41, 5)) {
+                            const int height = 1 + hashPercent(
+                                generator.m_seed ^ HEAVEN_DECOR_DOMAIN,
+                                wx, 71 + layer * 11, wz) % 3;
+                            for (int y = 1; y <= height; ++y)
+                                setIfAir(wx, top + y, wz, BlockId::SUNSTONE);
+                        } else if (rollUnder(53, 8)) {
+                            for (int dx = 0; dx <= 1; ++dx)
+                                for (int dz = 0; dz <= 1; ++dz)
+                                    for (int y = 1; y <= 2; ++y)
+                                        setIfAir(wx + dx, top + y, wz + dz,
+                                                 BlockId::SUNSTONE);
+                        } else if (rollUnder(61, 10)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                        }
+                        break;
+                    case HeavenBiome::StarCrystalGarden:
+                        if (rollUnder(41, 3)) {
+                            const int height = 2 + hashPercent(
+                                generator.m_seed ^ HEAVEN_DECOR_DOMAIN,
+                                wx, 71 + layer * 11, wz) % 2;
+                            for (int y = 1; y <= height; ++y)
+                                setIfAir(wx, top + y, wz,
+                                         BlockId::STAR_CRYSTAL);
+                        } else if (rollUnder(53, 6)) {
+                            setIfAir(wx, top + 1, wz, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::MOSS);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 1, wz + 1, BlockId::MOSS);
+                            setIfAir(wx, top + 2, wz, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 2, wz + 1, BlockId::MOSS);
+                        } else if (rollUnder(61, 14)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::STARFLOWER);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::STARFLOWER);
+                        } else if (roll < static_cast<int>(9 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                            if (roll < static_cast<int>(4 * layerScale)) {
+                                setIfAir(wx + 1, top + 1, wz,
+                                         BlockId::STAR_CRYSTAL);
+                                setIfAir(wx, top + 1, wz + 1,
+                                         BlockId::STAR_CRYSTAL);
+                            }
+                        } else if (roll < static_cast<int>(20 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
+                        }
                         break;
                     case HeavenBiome::CloudbloomFields:
-                        if (roll < 16)
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::CLOUD_BLOOM);
+                        if (rollUnder(41, 5)) {
+                            setIfAir(wx, top + 1, wz, BlockId::CLOUDSTONE);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::CLOUDSTONE);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::CLOUDSTONE);
+                            setIfAir(wx + 1, top + 1, wz + 1, BlockId::CLOUDSTONE);
+                        } else if (rollUnder(53, 8)) {
+                            setLocal(wx, top, wz, BlockId::MOSS);
+                            setLocal(wx + 1, top, wz, BlockId::MOSS);
+                            setLocal(wx, top, wz + 1, BlockId::MOSS);
+                            setLocal(wx + 1, top, wz + 1, BlockId::MOSS);
+                        } else if (roll < static_cast<int>(22 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::CLOUD_BLOOM);
+                            if (rollUnder(61, 40))
+                                setIfAir(wx + 1, top + 1, wz,
+                                         BlockId::CLOUD_BLOOM);
+                            if (rollUnder(71, 40))
+                                setIfAir(wx, top + 1, wz + 1,
+                                         BlockId::CLOUD_BLOOM);
+                            if (rollUnder(81, 20)) {
+                                setIfAir(wx + 1, top + 1, wz + 1,
+                                         BlockId::CLOUD_BLOOM);
+                                setIfAir(wx - 1, top + 1, wz,
+                                         BlockId::CLOUD_BLOOM);
+                            }
+                        }
+                        break;
+                    case HeavenBiome::SkystoneBarrens:
+                        if (rollUnder(41, 7)) {
+                            const int height = 2 + hashPercent(
+                                generator.m_seed ^ HEAVEN_DECOR_DOMAIN,
+                                wx, 71 + layer * 11, wz) % 3;
+                            for (int y = 1; y <= height; ++y)
+                                setIfAir(wx, top + y, wz, BlockId::SUNSTONE);
+                        } else if (rollUnder(53, 5)) {
+                            setIfAir(wx, top + 1, wz, BlockId::CLOUDSTONE);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::CLOUDSTONE);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::CLOUDSTONE);
+                            setIfAir(wx + 1, top + 1, wz + 1, BlockId::CLOUDSTONE);
+                        } else if (rollUnder(61, 6)) {
+                            setLocal(wx, top, wz, BlockId::AETHER_SOIL);
+                            setLocal(wx + 1, top, wz, BlockId::AETHER_SOIL);
+                            setLocal(wx, top, wz + 1, BlockId::AETHER_SOIL);
+                            setLocal(wx + 1, top, wz + 1, BlockId::AETHER_SOIL);
+                        } else if (roll < static_cast<int>(9 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                        }
                         break;
                     case HeavenBiome::GlimmerFen:
-                        if (roll < 12) {
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::GLOWSHROOM);
-                            if (roll < 5) {
-                                setIfAir(wx + 1, island.top + 1, wz,
+                        if (rollUnder(41, 3)) {
+                            setIfAir(wx, top + 1, wz, BlockId::GLOWSHROOM);
+                            for (int dx = -2; dx <= 2; ++dx)
+                                for (int dz = -2; dz <= 2; ++dz)
+                                    if (std::max(std::abs(dx), std::abs(dz)) == 2)
+                                        setIfAir(wx + dx, top + 1, wz + dz,
+                                                 BlockId::GLOWSHROOM);
+                        } else if (rollUnder(53, 6)) {
+                            setIfAir(wx, top + 1, wz, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::MOSS);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 1, wz + 1, BlockId::MOSS);
+                            setIfAir(wx, top + 2, wz, BlockId::MOSS);
+                            setIfAir(wx + 1, top + 2, wz + 1, BlockId::MOSS);
+                        } else if (rollUnder(61, 12)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                        } else if (roll < static_cast<int>(12 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::GLOWSHROOM);
+                            if (roll < static_cast<int>(5 * layerScale)) {
+                                setIfAir(wx + 1, top + 1, wz,
                                          BlockId::GLOWSHROOM);
-                                setIfAir(wx, island.top + 1, wz + 1,
+                                setIfAir(wx, top + 1, wz + 1,
                                          BlockId::GLOWSHROOM);
-                                setIfAir(wx + 1, island.top + 1, wz + 1,
+                                setIfAir(wx + 1, top + 1, wz + 1,
                                          BlockId::GLOWSHROOM);
                             }
                         }
                         break;
                     case HeavenBiome::MoonpearlTerrace:
-                        if (roll < 12)
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STARFLOWER);
-                        else if (roll < 16)
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STAR_CRYSTAL);
-                        break;
-                    case HeavenBiome::SkystoneBarrens:
-                        if (roll < 6) {
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::SUNSTONE);
-                            if (roll < 3)
-                                setIfAir(wx, island.top + 2, wz,
-                                         BlockId::SUNSTONE);
-                        } else if (roll < 9) {
-                            setIfAir(wx, island.top + 1, wz,
-                                     BlockId::STAR_CRYSTAL);
+                        if (rollUnder(41, 2)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
+                            for (int dx = -2; dx <= 2; ++dx)
+                                for (int dz = -2; dz <= 2; ++dz)
+                                    if (std::max(std::abs(dx), std::abs(dz)) == 2)
+                                        setIfAir(wx + dx, top + 1, wz + dz,
+                                                 BlockId::SUNSTONE);
+                        } else if (rollUnder(53, 8)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
+                            setIfAir(wx + 1, top + 1, wz, BlockId::STARFLOWER);
+                            setIfAir(wx, top + 1, wz + 1, BlockId::STARFLOWER);
+                        } else if (rollUnder(61, 6)) {
+                            setLocal(wx, top, wz, BlockId::AETHER_SOIL);
+                            setLocal(wx + 1, top, wz, BlockId::AETHER_SOIL);
+                            setLocal(wx, top, wz + 1, BlockId::AETHER_SOIL);
+                            setLocal(wx + 1, top, wz + 1, BlockId::AETHER_SOIL);
+                        } else if (roll < static_cast<int>(11 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STARFLOWER);
+                        } else if (roll < static_cast<int>(16 * layerScale)) {
+                            setIfAir(wx, top + 1, wz, BlockId::STAR_CRYSTAL);
                         }
                         break;
-                    case HeavenBiome::SunstoneHeights:
                     case HeavenBiome::SkyrootGrove:
                         break;
                 }

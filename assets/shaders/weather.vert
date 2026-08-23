@@ -20,10 +20,13 @@ void main() {
     float width = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.18 :
         (kind < 2.5 ? 0.16 : (kind < 3.5 ? aParticleParams.z :
         (kind < 5.5 ? aParticleParams.z * (0.65 + phase * 0.85) :
-         aParticleParams.z * (1.0 + 0.30 * sin(uTime * 1.6 + phase * 6.283))))));
+        (kind < 6.5 ? aParticleParams.z * (1.0 + 0.30 * sin(uTime * 1.6 + phase * 6.283)) :
+        (kind < 7.5 ? aParticleParams.z * (0.80 + 0.20 * sin(uTime * 2.2 + phase * 6.283)) :
+         aParticleParams.z * (1.0 + 0.35 * sin(uTime * 4.0 + phase * 6.283))))))));
     float height = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.22 :
         (kind < 2.5 ? 4.2 : (kind < 3.5 ? aParticleParams.z :
-        (kind < 5.5 ? 0.13 : aParticleParams.z * 1.7))));
+        (kind < 5.5 ? 0.13 : (kind < 6.5 ? aParticleParams.z * 1.7 :
+        (kind < 7.5 ? width * 0.55 : width))))));
     vec3 position = aPositionKind.xyz;
     if (kind > 0.5 && kind < 1.5)
         position += uCameraRight * sin(uTime * 1.7 + phase * 6.283) * 0.13;

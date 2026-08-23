@@ -56,11 +56,20 @@ int main() {
     static_assert(static_cast<int>(ParticleKind::Trajectory) == 5,
                   "trajectory marker must use the shader's marker branch");
     static_assert(static_cast<int>(ParticleKind::SkyMote) == 6,
-                  "Heaven light dust must use the final particle shader branch");
+                  "Heaven light dust must use the mote shader branch");
+    static_assert(static_cast<int>(ParticleKind::HeavenPollen) == 7 &&
+                      static_cast<int>(ParticleKind::HeavenSparkle) == 8,
+                  "Heaven ambient kinds append after the mote branch");
     static_assert(ParticleSystem::MAX_SKY_MOTES_PER_UPDATE == 8 &&
+                      ParticleSystem::MAX_POLLEN_PER_UPDATE == 4 &&
+                      ParticleSystem::MAX_SPARKLE_PER_UPDATE == 6 &&
                       ParticleSystem::MAX_SKY_MOTES_PER_UPDATE <
+                          ParticleSystem::MAX_PARTICLES &&
+                      ParticleSystem::MAX_POLLEN_PER_UPDATE <
+                          ParticleSystem::MAX_PARTICLES &&
+                      ParticleSystem::MAX_SPARKLE_PER_UPDATE <
                           ParticleSystem::MAX_PARTICLES,
-                  "Heaven light dust must stay within the shared particle budget");
+                  "Heaven ambient particles must stay within the shared particle budget");
     VisualExposure exposure;
     RenderEnvironment exposureEnvironment;
     const float brightExposure = exposure.update(1.0f, 0.0f,

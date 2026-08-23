@@ -988,7 +988,7 @@ int main() {
     }
     for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
         require(heavenLayerColumns[static_cast<size_t>(layer)] > 0,
-                "Heaven v5 window missed an altitude layer");
+                "Heaven v6 window missed an altitude layer");
         require(heavenLayerBiomes[static_cast<size_t>(layer)].size() ==
                     static_cast<size_t>(WorldGenerator::HEAVEN_BIOME_COUNT),
                 "heaven layer did not expose every exclusive biome");
@@ -1058,7 +1058,7 @@ int main() {
     require(heaven.chunkCacheVersion() != WorldGenContext::CHUNK_CACHE_VERSION &&
                 heaven.generationVersion() != WorldGenContext::GENERATION_VERSION &&
                 heaven.generationVersion() == WorldGenerator::HEAVEN_GENERATION_VERSION,
-            "Heaven v5 cache and generation versions share the overworld key");
+            "Heaven v6 cache and generation versions share the overworld key");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
     std::vector<Chunk*> heavenRegionChunks;
@@ -1111,7 +1111,7 @@ int main() {
     for (const auto& layerCounts : heavenBiomeCounts)
         for (const size_t count : layerCounts)
             require(count > 0,
-                    "Heaven v5 exploration window missed a biome or layer");
+                    "Heaven v6 exploration window missed a biome or layer");
 
     std::array<bool, 10> heavenMaterials{};
     bool foundLayer1 = false;
@@ -1122,6 +1122,7 @@ int main() {
     bool foundGeode = false;
     bool foundCloudspire = false;
     bool foundLandmark = false;
+    bool foundFallenLog = false;
     bool foundForbiddenBlock = false;
     for (int cz = -16; cz <= 16; ++cz) {
         for (int cx = -16; cx <= 16; ++cx) {
@@ -1171,15 +1172,70 @@ int main() {
         }
     }
     for (const bool found : heavenMaterials)
-        require(found, "Heaven v5 window missed a dedicated material");
+        require(found, "Heaven v6 window missed a dedicated material");
     require(foundLayer1 && foundLayer2 && foundLayer3 && foundLayer4 &&
                 foundLayer5,
-            "Heaven v5 window missed an altitude layer");
-    require(foundGeode, "Heaven v5 window missed a crystal geode");
-    require(foundCloudspire, "Heaven v5 window missed a cloudspire tower");
-    require(foundLandmark, "Heaven v5 window missed an Xiguang ruin landmark");
+            "Heaven v6 window missed an altitude layer");
+    require(foundGeode, "Heaven v6 window missed a crystal geode");
+    require(foundCloudspire, "Heaven v6 window missed a cloudspire tower");
+    require(foundLandmark, "Heaven v6 window missed an Xiguang ruin landmark");
     require(!foundForbiddenBlock,
-            "Heaven v5 generated bedrock or an infinite water body");
+            "Heaven v6 generated bedrock or an infinite water body");
+
+    // v6 micro-feature density: each exclusive biome owns whole 256-cell
+    // bands, so one full deterministic band of each biome (62×256 columns)
+    // must decorate a healthy share of its main-layer columns.  The origins
+    // use the L3 band formula floorDiv(x+194,256)+2*floorDiv(z+106,256)
+    // (mod 8): even bands sit in x∈[0,62), odd bands in x∈[62,128), and the
+    // z window of one band spans 256 blocks; a biomeAt guard skips boundary
+    // columns.
+    const auto floorDiv16 = [](int value) {
+        return value >= 0 ? value / 16 : (value - 15) / 16;
+    };
+    for (int biome = 0; biome < WorldGenerator::HEAVEN_BIOME_COUNT; ++biome) {
+        const int regionX0 = biome % 2 == 0 ? 0 : 64;
+        const int regionZ0 = (biome / 2) * 256 - 106;
+        size_t biomeDecorated = 0;
+        for (int cz = 0; cz < 16; ++cz) {
+            for (int cx = 0; cx < 4; ++cx) {
+                Chunk chunk(
+                    cx + floorDiv16(regionX0),
+                    cz + floorDiv16(regionZ0));
+                heaven.generate(chunk);
+                for (int z = 0; z < Config::CHUNK_SIZE_Z; z += 2) {
+                    for (int x = 0; x < Config::CHUNK_SIZE_X; x += 2) {
+                        const int wx = regionX0 + cx * 16 + x;
+                        const int wz = regionZ0 + cz * 16 + z;
+                        if (wx >= regionX0 + 62) continue;
+                        if (heaven.heavenBiomeAt(wx, wz) !=
+                            static_cast<WorldGenerator::HeavenBiome>(biome))
+                            continue;
+                        const auto mainIsland =
+                            heaven.sampleHeavenLayers(wx, wz)[2];
+                        if (!mainIsland.present ||
+                            mainIsland.top + 1 >= Config::WORLD_MAX_Y)
+                            continue;
+                        const int top = mainIsland.top;
+                        if (chunk.getBlock(x, top + 1, z) != BlockId::AIR)
+                            ++biomeDecorated;
+                        if (biome == 0 && top + 2 < Config::WORLD_MAX_Y &&
+                            x + 1 < Config::CHUNK_SIZE_X &&
+                            chunk.getBlock(x, top + 1, z) ==
+                                BlockId::SKYROOT_WOOD &&
+                            chunk.getBlock(x + 1, top + 1, z) ==
+                                BlockId::SKYROOT_WOOD &&
+                            chunk.getBlock(x, top + 2, z) == BlockId::AIR)
+                            foundFallenLog = true;
+                    }
+                }
+            }
+        }
+        require(biomeDecorated >= 30,
+                ("Heaven v6 biome " + std::to_string(biome) +
+                 " lacked surface decoration (decorated " +
+                 std::to_string(biomeDecorated) + ")").c_str());
+    }
+    require(foundFallenLog, "Heaven v6 window missed a fallen skyroot log");
 
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()

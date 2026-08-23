@@ -11,7 +11,8 @@
 class World;
 
 enum class ParticleKind : uint8_t {
-    Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote
+    Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
+    HeavenPollen, HeavenSparkle
 };
 
 struct ParticleRenderData {
@@ -27,6 +28,8 @@ class ParticleSystem {
 public:
     static constexpr size_t MAX_PARTICLES = 2048;
     static constexpr size_t MAX_SKY_MOTES_PER_UPDATE = 8;
+    static constexpr size_t MAX_POLLEN_PER_UPDATE = 4;
+    static constexpr size_t MAX_SPARKLE_PER_UPDATE = 6;
 
     void clear();
     void update(World& world, const glm::dvec3& viewer, float dt,
@@ -61,6 +64,8 @@ private:
     uint64_t m_randomState = 1;
     float m_weatherEmission = 0.0f;
     float m_skyMoteEmission = 0.0f;
+    float m_pollenEmission = 0.0f;
+    float m_sparkleEmission = 0.0f;
     float m_skyDaylight = 1.0f;
 
     uint64_t randomBits();
@@ -69,4 +74,8 @@ private:
                              uint64_t seed);
     void emitSkyMote(const glm::dvec3& viewer, uint64_t seed,
                      float daylight);
+    void emitHeavenPollen(const glm::dvec3& viewer, uint64_t seed,
+                          int paletteIndex);
+    void emitHeavenSparkle(const glm::dvec3& viewer, uint64_t seed,
+                           int paletteIndex);
 };

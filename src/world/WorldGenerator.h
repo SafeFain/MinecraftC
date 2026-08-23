@@ -82,7 +82,7 @@ public:
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
-    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 5;
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 6;
     static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
         (HEAVEN_GENERATION_VERSION << 16) | 1u;
 

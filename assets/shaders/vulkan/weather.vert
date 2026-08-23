@@ -23,10 +23,13 @@ void main(){
     float width=kind<0.5?inParticleParams.z:(kind<1.5?0.18:
         (kind<2.5?0.16:(kind<3.5?inParticleParams.z:
         (kind<5.5?inParticleParams.z*(0.65+phase*0.85):
-         inParticleParams.z*(1.0+0.30*sin(frame.cameraRightTime.w*1.6+phase*6.283))))));
+        (kind<6.5?inParticleParams.z*(1.0+0.30*sin(frame.cameraRightTime.w*1.6+phase*6.283)):
+        (kind<7.5?inParticleParams.z*(0.80+0.20*sin(frame.cameraRightTime.w*2.2+phase*6.283)):
+         inParticleParams.z*(1.0+0.35*sin(frame.cameraRightTime.w*4.0+phase*6.283))))))));
     float height=kind<0.5?inParticleParams.z:(kind<1.5?0.22:
         (kind<2.5?4.2:(kind<3.5?inParticleParams.z:
-        (kind<5.5?0.13:inParticleParams.z*1.7))));
+        (kind<5.5?0.13:(kind<6.5?inParticleParams.z*1.7:
+        (kind<7.5?width*0.55:width))))));
     vec3 right=frame.cameraRightTime.xyz;
     vec3 up=frame.cameraUpIntensity.xyz;
     vec3 position=inPositionKind.xyz;

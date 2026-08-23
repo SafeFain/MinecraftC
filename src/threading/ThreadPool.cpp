@@ -32,8 +32,14 @@ ThreadPool::ThreadPool(size_t numThreads) {
                 } catch (...) {
                     LOG_ERROR("ThreadPool worker task threw unknown exception");
                 }
-                --m_activeTasks;
-                m_idleCondition.notify_all();
+                // waitIdle() must not miss the idle transition: decrement and
+                // notify under the queue mutex so the predicate check and the
+                // condition-variable wait in waitIdle() form one atomic section.
+                {
+                    std::lock_guard lock(m_queueMutex);
+                    --m_activeTasks;
+                    m_idleCondition.notify_all();
+                }
             }
         });
     }
