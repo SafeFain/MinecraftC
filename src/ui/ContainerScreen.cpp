@@ -2,6 +2,7 @@
 
 #include "game/SurvivalRules.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "game/InventoryInteraction.h"
 #include "world/World.h"
 
@@ -51,13 +52,16 @@ void ContainerScreen::layout(int width, int height) {
 
 void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
                                 const ItemStack& stack, bool hovered) {
-    ui.drawRect(r.x, r.y, r.w, r.h, hovered ? glm::vec4(.34f,.34f,.38f,.98f)
-                                             : glm::vec4(.18f,.18f,.21f,.96f));
+    UiTheme::slot(ui, r.x, r.y, r.w, r.h,
+                  hovered ? UiTheme::WidgetState::Hover
+                          : UiTheme::WidgetState::Normal,
+                  UiTheme::SLOT);
     if (stack.empty()) return;
     ui.drawItemIcon(r.x+4,r.y+4,r.w-8,r.h-8,stack);
     ui.drawDurability(r.x+3,r.y+2,r.w-6,stack);
-    if (stack.count > 1) ui.renderText(std::to_string(stack.count), r.x+r.w-16, r.y+2,
-                                      .9f, glm::vec3(1));
+    if (stack.count > 1)
+        UiTheme::textWithShadow(ui, std::to_string(stack.count),
+                                r.x+r.w-16, r.y+2, .9f, glm::vec3(1));
 }
 
 void ContainerScreen::moveStack(ItemStack& cursor, ItemStack& slot, bool right) {
@@ -88,12 +92,26 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
+    constexpr float slot = 44.0f, gap = 4.0f;
+    const float x0 = m_inventoryRects[0].x;
+    const float invY = m_inventoryRects[0].y;
+    const float gridW = 9.0f * slot + 8.0f * gap + 20.0f;
+    const float invH = 4.0f * slot + 3.0f * gap + 24.0f;
+    const float cx = width * 0.5f, cy = invY + 285.0f;
+    UiTheme::panel(ui, x0 - 10.0f, invY - 10.0f, gridW, invH, UiTheme::PANEL);
+    if (entity->type == BlockEntityType::Chest) {
+        UiTheme::panel(ui, x0 - 10.0f, invY + 235.0f - 10.0f, gridW,
+                       3.0f * slot + 2.0f * gap + 24.0f, UiTheme::PANEL);
+    } else {
+        UiTheme::panel(ui, cx - 130.0f, cy - 34.0f, 260.0f, 124.0f,
+                       UiTheme::PANEL);
+    }
     const std::string title = ui.localization().text(
         entity->type == BlockEntityType::Chest
             ? "container.chest" : "container.furnace");
     const auto titleSize = ui.measureText(title, 2.0f);
-    ui.renderText(title, (width - titleSize.x) * .5f,
-                  height*.78f, 2, {1,.85f,.3f});
+    UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f,
+                  height*.78f, 2, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
     for (size_t i=0;i<m_inventoryRects.size();++i)
         drawStack(ui,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
     if (entity->type == BlockEntityType::Chest) {
@@ -102,10 +120,26 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
         drawStack(ui,m_containerRects[0],entity->input,contains(m_containerRects[0],mx,my));
         drawStack(ui,m_containerRects[1],entity->fuel,contains(m_containerRects[1],mx,my));
         drawStack(ui,m_containerRects[2],entity->output,contains(m_containerRects[2],mx,my));
-        if (entity->burnTotal) ui.drawRect(m_containerRects[1].x+50,m_containerRects[1].y,10,
-            44.0f*entity->burnRemaining/entity->burnTotal,{1,.45f,.08f,1});
-        if (entity->cookTotal) ui.drawRect(m_containerRects[0].x+55,m_containerRects[0].y+16,
-            100.0f*entity->cookProgress/entity->cookTotal,12,{.8f,.8f,.8f,1});
+        if (entity->burnTotal) {
+            const float burn = std::clamp(
+                static_cast<float>(entity->burnRemaining) /
+                static_cast<float>(entity->burnTotal), 0.0f, 1.0f);
+            UiTheme::sprite(ui, m_containerRects[1].x + 48.0f,
+                            m_containerRects[1].y + 6.0f, 1.5f,
+                            UiTheme::FLAME, UiTheme::FLAME_PALETTE,
+                            0.55f + 0.45f * burn);
+        }
+        if (entity->cookTotal) {
+            const float cook = std::clamp(
+                static_cast<float>(entity->cookProgress) /
+                static_cast<float>(entity->cookTotal), 0.0f, 1.0f);
+            UiTheme::progressBar(ui, m_containerRects[0].x + 55.0f,
+                                 m_containerRects[0].y + 16.0f, 100.0f, 12.0f,
+                                 cook, glm::vec4(0.78f, 0.78f, 0.78f, 1.0f));
+            UiTheme::sprite(ui, m_containerRects[0].x + 157.0f,
+                            m_containerRects[0].y + 17.0f, 2.0f,
+                            UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE);
+        }
     }
     if (!m_cursor.empty()) drawStack(ui,{static_cast<float>(mx+8),static_cast<float>(my+8),38,38},m_cursor,true);
     if (m_cursor.empty()) {

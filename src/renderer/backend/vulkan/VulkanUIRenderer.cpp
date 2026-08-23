@@ -1,4 +1,5 @@
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 
 #include "core/AssetStore.h"
 #include "game/SurvivalRules.h"
@@ -112,8 +113,9 @@ public:
         const auto& props=stack.empty()?getItemProps(ItemId::EMPTY):getItemProps(stack.id);
         if (!props.maxDurability || !stack.damage) return;
         const float value = durabilityRemaining(stack);
-        drawRect(x,y,w,4,{.02f,.02f,.02f,.95f});
-        drawRect(x+1,y+1,(w-2)*value,2,{1-value,value,.08f,1});
+        UiTheme::rect(*this,x,y,w,4,UiTheme::INK);
+        UiTheme::rect(*this,x+1,y+1,w-2,2,{.02f,.02f,.02f,.95f});
+        UiTheme::rect(*this,x+1,y+1,(w-2)*value,2,{1-value,value,.08f,1});
     }
     void drawPanel(float x,float y,float w,float h,const glm::vec4& fill)override{
         drawRect(x,y,w,h,{.02f,.02f,.025f,fill.a});
@@ -122,11 +124,7 @@ public:
     }
     void drawTooltip(float x,float y,const ItemStack& stack)override{
         if (stack.empty()) return;
-        const auto& props = getItemProps(stack.id);
-        std::string text=m_localization?m_localization->itemName(stack.id):props.name;
-        if(stack.count>1)text+=" x"+std::to_string(stack.count);
-        const auto size=measureText(text,.9f);drawPanel(x,y,size.x+14,size.y+12,{.08f,.05f,.12f,.97f});
-        renderText(text,x+7,y+6,.9f,{.95f,.90f,1});
+        UiTheme::tooltip(*this,x,y,UiTheme::tooltipDetail(stack,m_localization));
     }
     void renderText(const std::string& text,float x,float y,float scale,
                     const glm::vec3& color)override{
@@ -210,7 +208,10 @@ private:
                 stbtt_MakeCodepointBitmap(&font,bitmap.data(),w,h,w,fontScale,fontScale,static_cast<int>(cp));
                 for(int py=0;py<h;++py)for(int px=0;px<w;++px){const uint8_t a=bitmap[py*w+px];
                     const size_t dst=(static_cast<size_t>(shelfY+py)*atlasSize+shelfX+px)*4u;
-                    pixels[dst]=pixels[dst+1]=pixels[dst+2]=255;pixels[dst+3]=a;}}
+                    pixels[dst]=pixels[dst+1]=pixels[dst+2]=255;
+                    // Hard-threshold alpha keeps CJK glyphs as crisp, chunky
+                    // pixels matching the 8×14 bitmap ASCII font.
+                    pixels[dst+3]=a>=120?255:0;}}
             m_glyphs[cp]={shelfX/static_cast<float>(atlasSize),(shelfY+h)/static_cast<float>(atlasSize),
                 (shelfX+w)/static_cast<float>(atlasSize),shelfY/static_cast<float>(atlasSize),
                 static_cast<float>(w),static_cast<float>(h),static_cast<float>(x0),

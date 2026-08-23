@@ -1,5 +1,6 @@
 #include "ui/SettingsMenu.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -283,8 +284,8 @@ void SettingsMenu::onGamepadBinding(GamepadBinding binding) {
 }
 
 void SettingsMenu::render(UIRenderer& ui, int width, int height) {
-    ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
-                Config::UIColors::BACKGROUND);
+    UiTheme::dirtBackground(ui, static_cast<float>(width),
+                            static_cast<float>(height));
     const std::string title = m_localization.text(
         m_page == SettingsPage::KeyboardMouse ? "settings.keyboard_mouse_title" :
         m_page == SettingsPage::Controller ? "settings.controller_title" :
@@ -293,8 +294,8 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");
     const auto titleSize = ui.measureText(title, 3.0f);
     const float titleY = height * 0.78f;
-    ui.renderText(title, (width - titleSize.x) * .5f, titleY, 3.0f,
-                  Config::UIColors::TEXT_TITLE);
+    UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f, titleY,
+                            3.0f, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
     const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
                          m_page == SettingsPage::Controller;
     const SettingsButtonLayout layout = settingsButtonLayout(
@@ -304,8 +305,8 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
             m_page == SettingsPage::Controller
                 ? "settings.controller_help" : "settings.controls_help");
         const auto helpSize = ui.measureText(help, 1.0f);
-        ui.renderText(help, (width - helpSize.x) * .5f,
-                      layout.helpY, 1.0f, glm::vec3(.72f));
+        UiTheme::textWithShadow(ui, help, (width - helpSize.x) * .5f,
+                                layout.helpY, 1.0f, glm::vec3(.72f));
     }
     const float x = (width - Config::UI_BUTTON_WIDTH) * .5f;
     for (size_t i = 0; i < m_buttons.size(); ++i) {
@@ -322,10 +323,11 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         const float width = std::max(1.0f, slider.width() - 24.0f);
         const float trackY = slider.y() + 3.0f;
         const float filled = width * frameRateSliderFraction(m_settings.frameRateLimit);
-        ui.drawRect(left, trackY, width, 3.0f, glm::vec4(.12f, .12f, .16f, .9f));
-        ui.drawRect(left, trackY, filled, 3.0f, glm::vec4(.72f, .78f, 1.0f, 1.0f));
-        ui.drawRect(left + filled - 2.0f, trackY - 3.0f, 5.0f, 9.0f,
-                    glm::vec4(.95f, .95f, 1.0f, 1.0f));
+        UiTheme::progressBar(ui, left, trackY, width, 8.0f,
+                             frameRateSliderFraction(m_settings.frameRateLimit),
+                             UiTheme::GOLD);
+        UiTheme::beveledBody(ui, left + filled - 3.0f, trackY - 2.0f, 8.0f,
+                             12.0f, UiTheme::BUTTON_HOVER, false);
     }
 }
 

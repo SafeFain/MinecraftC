@@ -435,7 +435,9 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
             m_impl->fontScale, m_impl->fontScale, static_cast<int>(codepoint));
         std::vector<uint8_t> rgba(static_cast<size_t>(width * height * 4), 255);
         for (size_t pixel = 0; pixel < bitmap.size(); ++pixel)
-            rgba[pixel * 4 + 3] = bitmap[pixel];
+            // Hard-threshold alpha keeps CJK glyphs as crisp, chunky pixels
+            // matching the 8×14 bitmap ASCII font.
+            rgba[pixel * 4 + 3] = bitmap[pixel] >= 120 ? 255 : 0;
         const int atlasX = m_impl->shelfX;
         const int atlasY = m_impl->shelfY;
         GL_CHECK(glTexSubImage2D(

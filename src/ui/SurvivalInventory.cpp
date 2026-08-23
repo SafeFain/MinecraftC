@@ -3,6 +3,7 @@
 #include "game/SurvivalRules.h"
 #include "game/InventoryInteraction.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
@@ -57,9 +58,10 @@ bool SurvivalInventoryScreen::creativeCatalogButtonContains(int x,int y) const {
 
 void SurvivalInventoryScreen::drawStack(
     UIRenderer& ui, const Rect& rect, const ItemStack& stack, bool hovered) {
-    ui.drawRect(rect.x, rect.y, rect.w, rect.h,
-                hovered ? glm::vec4(0.34f, 0.34f, 0.38f, 0.98f)
-                        : glm::vec4(0.18f, 0.18f, 0.21f, 0.96f));
+    UiTheme::slot(ui, rect.x, rect.y, rect.w, rect.h,
+                  hovered ? UiTheme::WidgetState::Hover
+                          : UiTheme::WidgetState::Normal,
+                  UiTheme::SLOT);
     if (stack.empty()) return;
     ui.drawItemIcon(rect.x + 4.0f, rect.y + 4.0f,
                     rect.w - 8.0f, rect.h - 8.0f, stack);
@@ -67,8 +69,9 @@ void SurvivalInventoryScreen::drawStack(
     if (stack.count > 1) {
         const std::string text = std::to_string(stack.count);
         const auto size = ui.measureText(text, 0.9f);
-        ui.renderText(text, rect.x + rect.w - size.x - 2.0f, rect.y + 2.0f,
-                      0.9f, glm::vec3(1.0f));
+        UiTheme::textWithShadow(ui, text,
+            rect.x + rect.w - size.x - 2.0f, rect.y + 2.0f, 0.9f,
+            glm::vec3(1.0f));
     }
 }
 
@@ -89,23 +92,39 @@ void SurvivalInventoryScreen::render(
     if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
+    constexpr float slot = 44.0f;
+    constexpr float gap = 4.0f;
+    const float originX = m_inventoryRects[0].x;
+    const float originY = m_inventoryRects[0].y;
+    // Pixel panels behind the inventory grid, armor column and crafting grid.
+    UiTheme::panel(ui, originX - 10.0f, originY - 10.0f,
+                   9.0f * slot + 8.0f * gap + 20.0f,
+                   4.0f * slot + 3.0f * gap + 24.0f, UiTheme::PANEL);
+    UiTheme::panel(ui, originX - 64.0f - 10.0f, originY - 10.0f, 64.0f,
+                   4.0f * slot + 3.0f * gap + 24.0f, UiTheme::PANEL);
+    const int craftSize = m_craftingTable ? 3 : 2;
+    const float craftX = m_craftingRects[0].x;
+    const float craftY = m_craftingRects[craftSize * craftSize - 1].y;
+    const float craftGridH = craftSize * slot + (craftSize - 1) * gap;
+    UiTheme::panel(ui, craftX - 10.0f, craftY - 10.0f,
+                   craftGridH + 20.0f,
+                   m_craftingRects[0].y + 28.0f - craftY + 10.0f,
+                   UiTheme::PANEL);
     const std::string title = ui.localization().text(
         m_creativeAccess?"inventory.player_tab":"inventory.survival");
     const auto titleSize = ui.measureText(title, 2.0f);
-    ui.renderText(title, (screenWidth - titleSize.x) * 0.5f,
-                  screenHeight * 0.78f, 2.0f, glm::vec3(1.0f, 0.85f, 0.3f));
+    UiTheme::textWithShadow(ui, title, (screenWidth - titleSize.x) * 0.5f,
+                  screenHeight * 0.78f, 2.0f, UiTheme::TEXT_TITLE, 1.0f,
+                  2.0f, -2.0f);
     if(m_creativeAccess){
-        ui.drawRect(m_creativeCatalogRect.x,m_creativeCatalogRect.y,
-                    m_creativeCatalogRect.w,m_creativeCatalogRect.h,
-                    glm::vec4(.22f,.23f,.27f,1.0f));
         const std::string label=ui.localization().text("inventory.creative_tab");
-        const auto size=ui.measureText(label,.72f);
-        ui.renderText(label,m_creativeCatalogRect.x+(m_creativeCatalogRect.w-size.x)*.5f,
-                      m_creativeCatalogRect.y+7.0f,.72f,glm::vec3(.92f,.92f,.95f));
+        UiTheme::button(ui, m_creativeCatalogRect.x, m_creativeCatalogRect.y,
+                        m_creativeCatalogRect.w, m_creativeCatalogRect.h,
+                        label, UiTheme::WidgetState::Normal, false, 0.72f);
     }
-    ui.renderText(ui.localization().text("inventory.crafting"),
-                  screenWidth * 0.5f - 118.0f,
-                  m_craftingRects[0].y + 54.0f, 1.1f, glm::vec3(0.85f));
+    UiTheme::textWithShadow(ui, ui.localization().text("inventory.crafting"),
+                  craftX,
+                  m_craftingRects[0].y + 34.0f, 1.1f, glm::vec3(0.85f));
 
     const ItemStack* tooltip = nullptr;
     for (size_t i = 0; i < m_inventoryRects.size(); ++i) {
@@ -117,8 +136,19 @@ void SurvivalInventoryScreen::render(
     for (size_t i = 0; i < craftSlots; ++i)
         drawStack(ui, m_craftingRects[i], m_crafting[i],
                   contains(m_craftingRects[i], mouseX, mouseY));
+    const bool outputReady = !craftingOutput().empty();
     drawStack(ui, m_outputRect, craftingOutput(),
               contains(m_outputRect, mouseX, mouseY));
+    if (outputReady) {
+        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y, m_outputRect.w, 2.0f,
+                      UiTheme::GOLD);
+        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y + m_outputRect.h - 2.0f,
+                      m_outputRect.w, 2.0f, UiTheme::GOLD);
+        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y, 2.0f, m_outputRect.h,
+                      UiTheme::GOLD);
+        UiTheme::rect(ui, m_outputRect.x + m_outputRect.w - 2.0f, m_outputRect.y,
+                      2.0f, m_outputRect.h, UiTheme::GOLD);
+    }
     for (size_t i = 0; i < m_armorRects.size(); ++i)
         drawStack(ui, m_armorRects[i], m_inventory.armor()[i],
                   contains(m_armorRects[i], mouseX, mouseY));

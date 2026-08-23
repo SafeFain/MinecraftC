@@ -1,5 +1,6 @@
 #include "ui/TouchControls.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -123,17 +124,28 @@ void TouchControls::cancelAll(){m_touches.clear();m_move={0,0};m_lookDelta={0,0}
 
 void TouchControls::render(UIRenderer& ui) const {
     const float alpha=std::clamp(m_config.opacity,.35f,1.0f);
-    const auto draw=[&](const TouchRect&r,const char*label){ui.drawRect(r.x,r.y,r.w,r.h,{.08f,.09f,.12f,alpha});
-        const auto s=ui.measureText(label,1.0f);ui.renderText(label,r.x+(r.w-s.x)*.5f,r.y+(r.h-s.y)*.5f,1.0f,{1,1,1});};
-    ui.drawRect(m_moveArea.x,m_moveArea.y,m_moveArea.w,m_moveArea.h,{.08f,.09f,.12f,alpha*.7f});
+    const auto draw=[&](const TouchRect&r,const std::string&label,
+                        bool pressed){
+        UiTheme::button(ui,r.x,r.y,r.w,r.h,label,
+                        pressed ? UiTheme::WidgetState::Pressed
+                                : UiTheme::WidgetState::Normal,
+                        false,0.0f,alpha);
+    };
+    // Pixel joystick ring and knob sprites (16×16 maps).
+    const float ringPx=m_moveRadius*2.0f/16.0f;
+    UiTheme::sprite(ui,m_moveCenter.x-m_moveRadius,m_moveCenter.y-m_moveRadius,
+                    ringPx,UiTheme::RING_16,UiTheme::JOY_PALETTE,
+                    alpha*0.8f);
     const glm::vec2 knob=m_moveCenter+m_move*m_moveRadius;
-    ui.drawRect(knob.x-16,knob.y-16,32,32,{.75f,.78f,.85f,alpha});
-    draw(m_jump,ui.localization().text("touch.jump").c_str());
-    draw(m_sneak,ui.localization().text("touch.sneak").c_str());
-    draw(m_attack,ui.localization().text("touch.attack").c_str());
-    draw(m_use,ui.localization().text("touch.use").c_str());
-    draw(m_inventory,ui.localization().text("touch.inventory").c_str());
-    draw(m_command,ui.localization().text("touch.command").c_str());
-    draw(m_perspective,ui.localization().text("touch.perspective").c_str());
-    draw(m_pause,"II");
+    const float knobR=22.0f;
+    UiTheme::sprite(ui,knob.x-knobR,knob.y-knobR,knobR*2.0f/16.0f,
+                    UiTheme::DISC_16,UiTheme::JOY_PALETTE,alpha);
+    draw(m_jump,ui.localization().text("touch.jump"),m_jumpHeld);
+    draw(m_sneak,ui.localization().text("touch.sneak"),m_sneakHeld);
+    draw(m_attack,ui.localization().text("touch.attack"),false);
+    draw(m_use,ui.localization().text("touch.use"),false);
+    draw(m_inventory,ui.localization().text("touch.inventory"),false);
+    draw(m_command,ui.localization().text("touch.command"),false);
+    draw(m_perspective,ui.localization().text("touch.perspective"),false);
+    draw(m_pause,"II",false);
 }

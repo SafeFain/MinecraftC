@@ -1,5 +1,6 @@
 #include "ui/Inventory.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "Config.h"
 #include "game/Item.h"
 
@@ -44,51 +45,45 @@ void CreativeInventory::layoutSlots(int width,int height) {
 void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,int mouseY) {
     layoutSlots(width,height);
     constexpr float slot=44.0f,footer=34.0f;
-    ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),{0,0,0,.58f});
-    ui.drawPanel(m_panelX,m_panelY,m_panelW,m_panelH,{.10f,.105f,.12f,.97f});
+    ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),
+                glm::vec4(0.0f,0.0f,0.0f,.58f));
     const std::string title = ui.localization().text("inventory.creative");
-    const auto titleSize=ui.measureText(title,1.8f);
-    ui.renderText(title,m_panelX+(m_panelW-titleSize.x)*.5f,m_panelY+m_panelH-34.0f,
-                  1.8f,Config::UIColors::TEXT_TITLE);
+    UiTheme::panel(ui,m_panelX,m_panelY,m_panelW,m_panelH,UiTheme::PANEL,
+                   title,1.6f);
     const std::string page = ui.localization().format("inventory.page", {
         std::to_string(m_scrollRow + 1),
         std::to_string(std::max(1, m_totalRows - m_visibleRows + 1))});
     const auto pageSize=ui.measureText(page,.8f);
-    ui.renderText(page,m_panelX+m_panelW-pageSize.x-18.0f,m_panelY+14.0f,.8f,{.68f,.68f,.72f});
-    ui.drawRect(m_playerButtonX,m_playerButtonY,m_playerButtonW,m_playerButtonH,
-                {.22f,.23f,.27f,1.0f});
+    UiTheme::textWithShadow(ui,page,m_panelX+m_panelW-pageSize.x-18.0f,
+                            m_panelY+14.0f,.8f,UiTheme::TEXT_DIM);
     const std::string playerLabel=ui.localization().text("inventory.player_tab");
-    const auto playerSize=ui.measureText(playerLabel,.72f);
-    ui.renderText(playerLabel,m_playerButtonX+(m_playerButtonW-playerSize.x)*.5f,
-                  m_playerButtonY+5.0f,.72f,{.92f,.92f,.95f});
+    UiTheme::button(ui,m_playerButtonX,m_playerButtonY,m_playerButtonW,
+                    m_playerButtonH,playerLabel,UiTheme::WidgetState::Normal,
+                    false,0.72f);
 
     const Slot* hovered=nullptr;
     for(const auto& item:m_slots){
         if(!item.visible) continue;
         const auto& props=getItemProps(item.id);
-        ui.drawRect(item.x,item.y,slot,slot,item.hovered?glm::vec4(.34f,.34f,.38f,1)
-                                                       :glm::vec4(.17f,.17f,.20f,.98f));
         const glm::vec3 background = props.placedBlock
             ? getBlockProps(*props.placedBlock).color * .28f
-            : glm::vec3(.08f,.08f,.10f);
-        ui.drawRect(item.x+2,item.y+2,slot-4,slot-4,{background,1});
+            : glm::vec3(.10f,.09f,.08f);
+        const UiTheme::WidgetState state = item.id==m_selected
+            ? UiTheme::WidgetState::Selected
+            : item.hovered ? UiTheme::WidgetState::Hover
+                           : UiTheme::WidgetState::Normal;
+        UiTheme::slot(ui,item.x,item.y,slot,slot,state,
+                      glm::vec4(background,1.0f));
         ui.drawItemIcon(item.x+4,item.y+4,slot-8,slot-8,{item.id,1,0});
-        if(item.id==m_selected||item.hovered){
-            const glm::vec4 color=item.id==m_selected?glm::vec4(1,.82f,.22f,1):glm::vec4(1,1,1,.95f);
-            ui.drawRect(item.x,item.y,slot,2,color);ui.drawRect(item.x,item.y+slot-2,slot,2,color);
-            ui.drawRect(item.x,item.y,2,slot,color);ui.drawRect(item.x+slot-2,item.y,2,slot,color);
-        }
         if(item.hovered)hovered=&item;
     }
 
     if(m_totalRows>m_visibleRows){
-        const float trackX=m_panelX+m_panelW-12.0f;
-        const float trackY=m_panelY+footer;
-        const float trackH=m_visibleRows*slot+(m_visibleRows-1)*5.0f;
-        const float thumbH=std::max(18.0f,trackH*m_visibleRows/m_totalRows);
-        const float fraction=static_cast<float>(m_scrollRow)/std::max(1,m_totalRows-m_visibleRows);
-        ui.drawRect(trackX,trackY,4,trackH,{.04f,.04f,.05f,1});
-        ui.drawRect(trackX,trackY+(trackH-thumbH)*(1.0f-fraction),4,thumbH,{.70f,.70f,.74f,1});
+        const float trackX=m_panelX+m_panelW-16.0f;
+        const float trackY=m_panelY+footer+6.0f;
+        const float trackH=m_visibleRows*slot+(m_visibleRows-1)*5.0f-12.0f;
+        UiTheme::scrollBar(ui,trackX,trackY,6.0f,trackH,
+                           m_scrollRow,m_visibleRows,m_totalRows);
     }
     if(hovered)ui.drawTooltip(mouseX+12.0f,mouseY+12.0f,{hovered->id,1,0});
 }

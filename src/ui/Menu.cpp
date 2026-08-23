@@ -1,5 +1,6 @@
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
@@ -17,35 +18,11 @@ bool Button::containsPoint(float px, float py) const {
 }
 
 void Button::render(UIRenderer& ui) const {
-    // Choose color based on state
-    glm::vec4 bgColor = m_pressed ? glm::vec4(0.16f, 0.16f, 0.20f, 0.98f)
-                      : m_selected ? m_colors.selected
-                      : m_hovered  ? m_colors.hover
-                      :              m_colors.normal;
-
-    glm::vec3 textColor = (m_hovered || m_selected)
-                          ? m_colors.textHover
-                          : m_colors.textNormal;
-
-    // Draw button background
-    ui.drawRect(m_x, m_y, m_w, m_h, bgColor);
-
-    // Draw border when selected
-    if (m_selected) {
-        glm::vec4 borderCol(1.0f, 1.0f, 1.0f, 0.8f);
-        float bw = 2.0f;
-        ui.drawRect(m_x, m_y, m_w, bw, borderCol);             // bottom
-        ui.drawRect(m_x, m_y + m_h - bw, m_w, bw, borderCol);  // top
-        ui.drawRect(m_x, m_y, bw, m_h, borderCol);             // left
-        ui.drawRect(m_x + m_w - bw, m_y, bw, m_h, borderCol);  // right
-    }
-
-    // Draw centered label text
-    float fontSize = 1.8f;
-    auto textSize = ui.measureText(m_label, fontSize);
-    float textX = m_x + (m_w - textSize.x) * 0.5f;
-    float textY = m_y + (m_h - textSize.y) * 0.5f;
-    ui.renderText(m_label, textX, textY, fontSize, textColor);
+    UiTheme::WidgetState state = UiTheme::WidgetState::Normal;
+    if (m_pressed) state = UiTheme::WidgetState::Pressed;
+    else if (m_selected) state = UiTheme::WidgetState::Selected;
+    else if (m_hovered) state = UiTheme::WidgetState::Hover;
+    UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger);
 }
 
 void Button::activate() {
@@ -194,6 +171,7 @@ void MainMenu::rebuildButtons() {
                         (void)m_callbacks.onDeleteWorld(worldId);
                     refreshWorlds();
                 });
+            m_deleteButtons.back().setDanger(true);
         }
         m_buttons.emplace_back(m_localization.text("menu.worlds.refresh"),
                                [this]() { refreshWorlds(); });
@@ -255,18 +233,11 @@ void MainMenu::selectField(Field field) {
 }
 
 void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
-                static_cast<float>(screenHeight), glm::vec4(.08f,.11f,.15f,1));
-    constexpr float tile = 32.0f;
-    for (float y=0;y<screenHeight;y+=tile) for (float x=0;x<screenWidth;x+=tile) {
-        const bool alternate = (static_cast<int>(x/tile)+static_cast<int>(y/tile))%2;
-        ui.drawRect(x,y,tile,tile,alternate ? glm::vec4(.15f,.12f,.09f,1)
-                                            : glm::vec4(.18f,.14f,.10f,1));
-        ui.drawRect(x+2,y+2,tile-4,tile-4,{.20f,.16f,.11f,1});
-    }
+    UiTheme::menuBackground(ui, static_cast<float>(screenWidth),
+                            static_cast<float>(screenHeight));
     const float panelW = std::min(520.0f, screenWidth - 24.0f);
-    ui.drawPanel((screenWidth-panelW)*.5f, 18.0f, panelW, screenHeight-36.0f,
-                 {.07f,.075f,.09f,.94f});
+    UiTheme::panel(ui, (screenWidth-panelW)*.5f, 18.0f, panelW,
+                   screenHeight-36.0f, UiTheme::PANEL);
 
     const std::string title = m_page == Page::Home ? "MINECRAFTC" :
         m_localization.text(m_page == Page::Worlds
@@ -275,8 +246,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;
     float titleY = screenHeight * 0.68f;
-    ui.renderText(title, titleX, titleY, titleScale,
-                  glm::vec3(1.0f, 0.85f, 0.3f));  // gold
+    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
+                            UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
 
     const std::string subtitle = m_localization.text(
         m_page == Page::Create ? "menu.create.subtitle" :
@@ -285,8 +256,12 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     auto subSize = ui.measureText(subtitle, subScale);
     float subX = (screenWidth - subSize.x) * 0.5f;
     float subY = titleY - titleSize.y - 20.0f;
-    ui.renderText(subtitle, subX, subY, subScale,
-                  glm::vec3(0.6f, 0.6f, 0.7f));
+    UiTheme::textWithShadow(ui, subtitle, subX, subY, subScale,
+                            UiTheme::TEXT_DIM);
+    // Gold divider above the button list.
+    const float dividerY = subY - subSize.y - 12.0f;
+    UiTheme::rect(ui, (screenWidth - panelW) * 0.5f + 20.0f, dividerY,
+                  panelW - 40.0f, 2.0f, UiTheme::GOLD_DIM);
 
     float detailsReserve = 0.0f;
     if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
@@ -301,8 +276,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                 std::to_string(world.worldTicks / 1200), worldType})
             : m_localization.text("menu.worlds.unsupported");
         const auto size = ui.measureText(details, 1.0f);
-        ui.renderText(details, (screenWidth - size.x) * 0.5f, subY - 24.0f,
-                      1.0f, glm::vec3(0.78f));
+        UiTheme::textWithShadow(ui, details, (screenWidth - size.x) * 0.5f,
+                                subY - 24.0f, 1.0f, glm::vec3(0.78f));
         detailsReserve = size.y + 14.0f;
     }
 
@@ -333,8 +308,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
         }
     }
 
-    ui.renderText(Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
-                  glm::vec3(0.62f, 0.62f, 0.66f));
+    UiTheme::textWithShadow(ui, Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
+                            glm::vec3(0.62f, 0.62f, 0.66f));
 }
 
 void MainMenu::onKeyPress(int key, int mods) {
@@ -501,10 +476,13 @@ PauseMenu::PauseMenu(
 }
 
 void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    // Semi-transparent overlay
+    // Semi-transparent overlay over the frozen world, with a pixel vignette.
     ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
                 static_cast<float>(screenHeight),
                 glm::vec4(0.0f, 0.0f, 0.0f, 0.55f));
+    UiTheme::vignette(ui, static_cast<float>(screenWidth),
+                      static_cast<float>(screenHeight),
+                      glm::vec4(0.0f, 0.0f, 0.0f, 0.45f));
 
     // "PAUSED" title
     const std::string title = ui.localization().text("menu.pause.title");
@@ -512,8 +490,8 @@ void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;
     float titleY = screenHeight * 0.62f;
-    ui.renderText(title, titleX, titleY, titleScale,
-                  glm::vec3(1.0f, 0.85f, 0.3f));
+    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
+                            UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
 
     // Buttons
     float buttonStartY = titleY - titleSize.y - 40.0f;
@@ -600,13 +578,16 @@ void SleepMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
                 static_cast<float>(screenHeight),
                 glm::vec4(0.0f, 0.0f, 0.02f, 0.38f));
+    UiTheme::vignette(ui, static_cast<float>(screenWidth),
+                      static_cast<float>(screenHeight),
+                      glm::vec4(0.0f, 0.0f, 0.05f, 0.55f));
     const std::string title = ui.localization().text("sleep.title");
     constexpr float titleScale = 3.0f;
     const auto titleSize = ui.measureText(title, titleScale);
     const float titleX = (screenWidth - titleSize.x) * 0.5f;
     const float titleY = screenHeight * 0.62f;
-    ui.renderText(title, titleX, titleY, titleScale,
-                  glm::vec3(1.0f, 0.88f, 0.42f));
+    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
+                            glm::vec3(1.0f, 0.88f, 0.42f), 1.0f, 2.0f, -2.0f);
     const float startY = titleY - titleSize.y - 40.0f;
     const float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
     for (size_t i = 0; i < m_buttons.size(); ++i) {

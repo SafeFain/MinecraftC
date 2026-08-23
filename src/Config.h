@@ -170,15 +170,17 @@ constexpr float UI_FONT_SCALE        = 1.8f;
 constexpr float UI_TITLE_SCALE       = 4.5f;
 constexpr float UI_OVERLAY_ALPHA     = 0.55f;
 
+// Pixel-theme palette lives in src/ui/UIStyle.h (UiTheme); these constants
+// remain as the shared, backend-neutral names other subsystems may reference.
 namespace UIColors {
-    constexpr glm::vec4 BACKGROUND(0.08f, 0.08f, 0.12f, 1.0f);
+    constexpr glm::vec4 BACKGROUND(0.20f, 0.16f, 0.12f, 1.0f);
     constexpr glm::vec4 OVERLAY(0.0f, 0.0f, 0.0f, 0.55f);
-    constexpr glm::vec4 BUTTON_NORMAL(0.25f, 0.25f, 0.35f, 0.85f);
-    constexpr glm::vec4 BUTTON_HOVER(0.35f, 0.35f, 0.50f, 0.90f);
-    constexpr glm::vec4 BUTTON_SELECTED(0.45f, 0.45f, 0.60f, 0.90f);
-    constexpr glm::vec3 TEXT_NORMAL(1.0f, 1.0f, 1.0f);
-    constexpr glm::vec3 TEXT_HOVER(1.0f, 1.0f, 0.6f);
-    constexpr glm::vec3 TEXT_TITLE(1.0f, 0.85f, 0.3f);
+    constexpr glm::vec4 BUTTON_NORMAL(0.24f, 0.22f, 0.19f, 0.85f);
+    constexpr glm::vec4 BUTTON_HOVER(0.31f, 0.28f, 0.24f, 0.90f);
+    constexpr glm::vec4 BUTTON_SELECTED(0.36f, 0.33f, 0.27f, 0.90f);
+    constexpr glm::vec3 TEXT_NORMAL(0.95f, 0.93f, 0.86f);
+    constexpr glm::vec3 TEXT_HOVER(1.0f, 0.95f, 0.65f);
+    constexpr glm::vec3 TEXT_TITLE(0.98f, 0.83f, 0.38f);
 }
 
 // ── Hotbar ──────────────────────────────────────────────────────────────

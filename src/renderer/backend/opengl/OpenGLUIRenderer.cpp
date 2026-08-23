@@ -1,4 +1,5 @@
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "ui/FontRenderer.h"
 #include "renderer/Shader.h"
 #include "renderer/BlockTextureAtlas.h"
@@ -331,28 +332,7 @@ bool OpenGLUIBackend::drawGeneratedItemIcon(float x,float y,float w,float h,Item
 
 void OpenGLUIBackend::drawTooltip(float x, float y, const ItemStack& stack) {
     if (stack.empty()) return;
-    const auto& props = getItemProps(stack.id);
-    std::string detail = m_localization
-        ? m_localization->itemName(stack.id) : props.name;
-    if (stack.count > 1) detail += " x" + std::to_string(stack.count);
-    if (props.maxDurability)
-        detail += "  " + std::to_string(props.maxDurability - std::min(props.maxDurability, stack.damage)) +
-                  "/" + std::to_string(props.maxDurability);
-    else if (props.kind == ItemKind::Armor)
-        detail += "  " + (m_localization
-            ? m_localization->text("tooltip.armor") : "Armor");
-    else if (props.attackDamage > 0.0f)
-        detail += "  " + (m_localization
-            ? m_localization->format("tooltip.damage", {
-                std::to_string(static_cast<int>(props.attackDamage))})
-            : "Damage " + std::to_string(static_cast<int>(props.attackDamage)));
-    else if (props.food > 0)
-        detail += "  " + (m_localization
-            ? m_localization->format("tooltip.food", {std::to_string(props.food)})
-            : "Food +" + std::to_string(props.food));
-    const auto size = measureText(detail, .9f);
-    drawPanel(x, y, size.x + 14.0f, size.y + 12.0f, {.08f,.05f,.12f,.97f});
-    renderText(detail, x + 7.0f, y + 6.0f, .9f, {.95f,.90f,1.0f});
+    UiTheme::tooltip(*this, x, y, UiTheme::tooltipDetail(stack, m_localization));
 }
 
 void OpenGLUIBackend::drawDurability(float x, float y, float w, const ItemStack& stack) {
@@ -360,8 +340,11 @@ void OpenGLUIBackend::drawDurability(float x, float y, float w, const ItemStack&
     if (props.maxDurability == 0 || stack.damage == 0) return;
     const float remaining = durabilityRemaining(stack);
     const glm::vec4 color(1.0f - remaining, remaining, 0.08f, 1.0f);
-    drawRect(x, y, w, 4.0f, glm::vec4(0.02f, 0.02f, 0.02f, 0.95f));
-    drawRect(x + 1.0f, y + 1.0f, (w - 2.0f) * remaining, 2.0f, color);
+    UiTheme::rect(*this, x, y, w, 4.0f, UiTheme::INK);
+    UiTheme::rect(*this, x + 1.0f, y + 1.0f, w - 2.0f, 2.0f,
+                  glm::vec4(0.02f, 0.02f, 0.02f, 0.95f));
+    UiTheme::rect(*this, x + 1.0f, y + 1.0f, (w - 2.0f) * remaining, 2.0f,
+                  color);
 }
 
 // ── Text rendering (delegated to FontRenderer) ────────────────────────────

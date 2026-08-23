@@ -1,5 +1,6 @@
 #include "ui/Hotbar.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -39,9 +40,9 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
     const float barX = (static_cast<float>(screenWidth) - totalW) * 0.5f;
     const float barY = 4.0f;
 
-    // Bar background
-    ui.drawRect(barX, barY, totalW, totalH,
-                glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));
+    // Bar background: raised pixel panel with an ink frame.
+    UiTheme::panel(ui, barX, barY, totalW, totalH, UiTheme::PANEL, {}, 1.0f,
+                   0.94f);
 
     // Draw each slot
     for (int i = 0; i < numSlots; ++i) {
@@ -56,11 +57,13 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
             ? &getItemProps(shownStack->id) : nullptr;
         if (itemProps && itemProps->placedBlock) id = *itemProps->placedBlock;
         const glm::vec3 slotColor = id == BlockId::AIR
-            ? glm::vec3(.12f) : getBlockProps(id).color * .35f;
+            ? glm::vec3(.16f, .15f, .13f) : getBlockProps(id).color * .35f;
 
-        // Slot background (darker)
-        ui.drawRect(sx, sy, slotSize, slotSize,
-                    glm::vec4(slotColor, 0.9f));
+        // Recessed slot with a per-block ambient tint.
+        UiTheme::slot(ui, sx, sy, slotSize, slotSize,
+                      i == m_selectedSlot ? UiTheme::WidgetState::Selected
+                                          : UiTheme::WidgetState::Normal,
+                      glm::vec4(slotColor, 0.95f));
 
         // Material thumbnail from the same atlas used by world rendering.
         float innerMargin = 4.0f;
@@ -70,21 +73,11 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                             slotSize - innerMargin * 2.0f, *shownStack);
         }
 
-        // Selection highlight
-        if (i == m_selectedSlot) {
-            float bw = 2.5f;
-            glm::vec4 borderCol(1.0f, 1.0f, 1.0f, 0.9f);
-            ui.drawRect(sx, sy, slotSize, bw, borderCol);                      // bottom
-            ui.drawRect(sx, sy + slotSize - bw, slotSize, bw, borderCol);      // top
-            ui.drawRect(sx, sy, bw, slotSize, borderCol);                      // left
-            ui.drawRect(sx + slotSize - bw, sy, bw, slotSize, borderCol);      // right
-        }
-
         // Slot number
         std::string numLabel = std::to_string(i + 1);
         float labelScale = 1.0f;
         auto labelSize = ui.measureText(numLabel, labelScale);
-        ui.renderText(numLabel,
+        UiTheme::textWithShadow(ui, numLabel,
                       sx + (slotSize - labelSize.x) * 0.5f,
                       sy - labelSize.y - 1.0f,
                       labelScale,
@@ -95,7 +88,8 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
         if (shownStack->count > 1) {
             const std::string countLabel = std::to_string(shownStack->count);
             auto countSize = ui.measureText(countLabel, 1.0f);
-            ui.renderText(countLabel, sx + slotSize - countSize.x - 3.0f,
+            UiTheme::textWithShadow(ui, countLabel,
+                          sx + slotSize - countSize.x - 3.0f,
                           sy + 3.0f, 1.0f, glm::vec3(1.0f));
         }
     }

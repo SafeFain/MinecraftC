@@ -44,11 +44,11 @@ struct MenuCallbacks {
 // ── Button ────────────────────────────────────────────────────────────────
 
 struct ButtonColors {
-    glm::vec4 normal{0.25f, 0.25f, 0.35f, 0.85f};
-    glm::vec4 hover{0.35f, 0.35f, 0.50f, 0.90f};
-    glm::vec4 selected{0.45f, 0.45f, 0.60f, 0.90f};
-    glm::vec3 textNormal{1.0f, 1.0f, 1.0f};
-    glm::vec3 textHover{1.0f, 1.0f, 0.6f};
+    glm::vec4 normal{0.24f, 0.22f, 0.19f, 0.85f};
+    glm::vec4 hover{0.31f, 0.28f, 0.24f, 0.90f};
+    glm::vec4 selected{0.36f, 0.33f, 0.27f, 0.90f};
+    glm::vec3 textNormal{0.95f, 0.93f, 0.86f};
+    glm::vec3 textHover{1.0f, 0.95f, 0.65f};
 };
 
 class Button {
@@ -63,6 +63,7 @@ public:
     void setSelected(bool s) { m_selected = s; }
     void setPressed(bool p) { m_pressed = p; }
     void setLabel(std::string label) { m_label = std::move(label); }
+    void setDanger(bool danger) { m_danger = danger; }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
 
@@ -83,6 +84,7 @@ private:
     bool m_hovered = false;
     bool m_selected = false;
     bool m_pressed = false;
+    bool m_danger = false;
 };
 
 // ── Menu base class ───────────────────────────────────────────────────────
