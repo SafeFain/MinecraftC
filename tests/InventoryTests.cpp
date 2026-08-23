@@ -1,5 +1,6 @@
 #include "game/InventoryModel.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -81,6 +82,67 @@ int main() {
                 ItemId::AETHER_GRASS &&
             creativeItems.back() == ItemId::GLOWSHROOM,
             "creative inventory ordering does not follow stable item ids");
+
+    // Minecraft-style creative tabs: every registered item belongs to exactly
+    // one category and the category list agrees with the catalog ordering.
+    size_t categoryCounts[static_cast<size_t>(CreativeItemCategory::Count)] = {};
+    size_t categorized = 0;
+    for (uint16_t raw = 1; raw < static_cast<uint16_t>(ItemId::COUNT); ++raw) {
+        const ItemId id = static_cast<ItemId>(raw);
+        const auto category = creativeInventoryCategory(id);
+        require(category != CreativeItemCategory::Count,
+                "every registered item has a creative category");
+        const auto& bucket = creativeInventoryItemsIn(category);
+        require(std::find(bucket.begin(), bucket.end(), id) != bucket.end(),
+                "category membership agrees with its item list");
+        categoryCounts[static_cast<size_t>(category)]++;
+        categorized++;
+    }
+    require(categorized == creativeItems.size(),
+            "creative categories cover exactly the full creative catalog");
+    require(categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::BuildingBlocks)] == 40 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Nature)] == 27 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Functional)] == 7 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Tools)] == 21 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Combat)] == 24 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Food)] == 10 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::Materials)] == 15 &&
+            categoryCounts[static_cast<size_t>(
+                CreativeItemCategory::SpawnEggs)] == 8,
+            "creative category sizes do not match the tab assignment");
+    require(creativeInventoryCategory(ItemId::STONE) ==
+                CreativeItemCategory::BuildingBlocks &&
+            creativeInventoryCategory(ItemId::TORCH) ==
+                CreativeItemCategory::Functional &&
+            creativeInventoryCategory(ItemId::DIAMOND_SWORD) ==
+                CreativeItemCategory::Combat &&
+            creativeInventoryCategory(ItemId::COW_SPAWN_EGG) ==
+                CreativeItemCategory::SpawnEggs &&
+            creativeInventoryCategory(ItemId::FLOWER) ==
+                CreativeItemCategory::Nature &&
+            creativeInventoryCategory(ItemId::BREAD) ==
+                CreativeItemCategory::Food &&
+            creativeInventoryCategory(ItemId::DIAMOND) ==
+                CreativeItemCategory::Materials &&
+            creativeInventoryCategory(ItemId::IRON_PICKAXE) ==
+                CreativeItemCategory::Tools,
+            "representative items map to their Minecraft-style tabs");
+    for (size_t index = 0;
+         index < static_cast<size_t>(CreativeItemCategory::Count); ++index) {
+        const auto& info = creativeCategoryInfo(
+            static_cast<CreativeItemCategory>(index));
+        require(info.category == static_cast<CreativeItemCategory>(index) &&
+                info.localizationKey[0] != '\0' &&
+                getItemProps(info.icon).maxStack > 0,
+                "every creative tab has a valid icon and localization key");
+    }
     require(itemForBlock(BlockId::AETHER_GRASS) == ItemId::AETHER_GRASS &&
                 itemForBlock(BlockId::STARFLOWER) == ItemId::STARFLOWER &&
                 itemForBlock(BlockId::CLOUD_BLOOM) == ItemId::CLOUD_BLOOM &&

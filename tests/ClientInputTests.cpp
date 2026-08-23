@@ -193,6 +193,10 @@ int main(){
             "gamepad settings round trip");
     require(loaded.language==Language::SimplifiedChinese,
             "client language round trips");
+    ClientSettings russian;russian.language=Language::Russian;
+    require(russian.save(root/"russian-options.txt"),"russian settings save succeeds");
+    require(ClientSettings::load(root/"russian-options.txt").language==Language::Russian,
+            "new language codes round trip through settings");
     {
         std::ofstream legacy(root/"legacy-options.txt");
         legacy<<"version=3\nrender_distance=8\n";

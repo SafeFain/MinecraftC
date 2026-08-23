@@ -1241,6 +1241,7 @@ if(BUILD_TESTING)
         tests/LocalizationTests.cpp
         src/core/Input.cpp
         src/core/InputCodes.cpp
+        src/game/ArabicShaper.cpp
         src/game/Item.cpp
         src/game/Language.cpp
         src/game/Localization.cpp
@@ -1249,7 +1250,7 @@ if(BUILD_TESTING)
         src/world/Block.cpp
         src/world/BiomeMap.cpp)
     target_include_directories(localization_tests PRIVATE
-        src external external/stb)
+        src external external/stb external/nlohmann)
     target_compile_definitions(localization_tests PRIVATE
         MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     target_link_libraries(localization_tests PRIVATE glm::glm ${MINECRAFTC_SDL_TARGET})

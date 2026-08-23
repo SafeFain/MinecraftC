@@ -250,13 +250,33 @@ struct FontRenderer::Impl {
     };
     std::vector<unsigned char> fontData;
     stbtt_fontinfo font{};
+    std::vector<unsigned char> arabicData;
+    stbtt_fontinfo arabicFont{};
     std::unordered_map<uint32_t, Glyph> glyphs;
     int shelfX = 1;
     int shelfY = FontRenderer::GLYPH_H + 2;
     int shelfHeight = 0;
     bool available = false;
+    bool arabicAvailable = false;
     float fontScale = 0.0f;
+    float arabicScale = 0.0f;
     float renderScale = 1.0f;
+
+    // Returns the font that provides a glyph for the codepoint, preferring
+    // the CJK face (Latin/Cyrillic/Hangul/Kana/CJK) and falling back to the
+    // Arabic face for Arabic script and presentation forms.
+    stbtt_fontinfo* fontFor(uint32_t codepoint) {
+        if (available &&
+            stbtt_FindGlyphIndex(&font, static_cast<int>(codepoint)) != 0)
+            return &font;
+        if (arabicAvailable &&
+            stbtt_FindGlyphIndex(&arabicFont, static_cast<int>(codepoint)) != 0)
+            return &arabicFont;
+        return nullptr;
+    }
+    float scaleFor(const stbtt_fontinfo* fontInfo) const {
+        return fontInfo == &font ? fontScale : arabicScale;
+    }
 };
 
 namespace {
@@ -300,13 +320,20 @@ void FontRenderer::initialize(bool manualGamma,
         m_impl->available=!m_impl->fontData.empty()&&
             stbtt_InitFont(&m_impl->font,m_impl->fontData.data(),0)!=0;
     } catch(const std::exception&) { m_impl->available=false; }
+    constexpr float rasterHeight = 28.0f;
     if (m_impl->available) {
-        constexpr float rasterHeight = 28.0f;
         m_impl->fontScale = stbtt_ScaleForPixelHeight(&m_impl->font, rasterHeight);
         m_impl->renderScale = static_cast<float>(GLYPH_H) / rasterHeight;
     } else {
         LOG_WARN("Could not load CJK font: " << fontPath.u8string());
     }
+    const auto arabicPath = assetRoot / "fonts" / "noto" / "NotoNaskhArabic-Regular.ttf";
+    try { m_impl->arabicData=AssetStore::readPath(arabicPath);
+        m_impl->arabicAvailable=!m_impl->arabicData.empty()&&
+            stbtt_InitFont(&m_impl->arabicFont,m_impl->arabicData.data(),0)!=0;
+    } catch(const std::exception&) { m_impl->arabicAvailable=false; }
+    if (m_impl->arabicAvailable)
+        m_impl->arabicScale = stbtt_ScaleForPixelHeight(&m_impl->arabicFont, rasterHeight);
 
     GL_CHECK(glGenTextures(1, &m_atlasTexture));
     GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_atlasTexture));
@@ -368,11 +395,12 @@ glm::vec2 FontRenderer::measureText(const std::string& text, float scale) const 
         }
         if (codepoint < 128) {
             lineWidth += asciiAdvance(static_cast<char>(codepoint)) * scale;
-        } else if (m_impl->available) {
+        } else if (const auto* fontInfo = m_impl->fontFor(codepoint)) {
             int advance = 0;
             stbtt_GetCodepointHMetrics(
-                &m_impl->font, static_cast<int>(codepoint), &advance, nullptr);
-            lineWidth += advance * m_impl->fontScale * m_impl->renderScale * scale;
+                fontInfo, static_cast<int>(codepoint), &advance, nullptr);
+            lineWidth += advance * m_impl->scaleFor(fontInfo) *
+                m_impl->renderScale * scale;
         } else {
             lineWidth += GLYPH_W * scale * 0.85f;
         }
@@ -400,16 +428,16 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
     float cursorY = y;
 
     auto ensureGlyph = [this](uint32_t codepoint) -> const Impl::Glyph* {
-        if (!m_impl->available ||
-            stbtt_FindGlyphIndex(&m_impl->font, static_cast<int>(codepoint)) == 0)
-            return nullptr;
+        const auto* fontInfo = m_impl->fontFor(codepoint);
+        if (!fontInfo) return nullptr;
+        const float fontScale = m_impl->scaleFor(fontInfo);
         if (const auto found = m_impl->glyphs.find(codepoint);
             found != m_impl->glyphs.end()) return &found->second;
 
         int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
         stbtt_GetCodepointBitmapBox(
-            &m_impl->font, static_cast<int>(codepoint), m_impl->fontScale,
-            m_impl->fontScale, &x0, &y0, &x1, &y1);
+            fontInfo, static_cast<int>(codepoint), fontScale,
+            fontScale, &x0, &y0, &x1, &y1);
         const int width = std::max(1, x1 - x0);
         const int height = std::max(1, y1 - y0);
         if (m_impl->shelfX + width + 1 >= ATLAS_W) {
@@ -431,8 +459,8 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
 
         std::vector<unsigned char> bitmap(static_cast<size_t>(width * height));
         stbtt_MakeCodepointBitmap(
-            &m_impl->font, bitmap.data(), width, height, width,
-            m_impl->fontScale, m_impl->fontScale, static_cast<int>(codepoint));
+            fontInfo, bitmap.data(), width, height, width,
+            fontScale, fontScale, static_cast<int>(codepoint));
         std::vector<uint8_t> rgba(static_cast<size_t>(width * height * 4), 255);
         for (size_t pixel = 0; pixel < bitmap.size(); ++pixel)
             // Hard-threshold alpha keeps CJK glyphs as crisp, chunky pixels
@@ -446,7 +474,7 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
 
         int advance = 0;
         stbtt_GetCodepointHMetrics(
-            &m_impl->font, static_cast<int>(codepoint), &advance, nullptr);
+            fontInfo, static_cast<int>(codepoint), &advance, nullptr);
         Impl::Glyph glyph;
         glyph.atlasX = atlasX;
         glyph.atlasY = atlasY;
@@ -457,7 +485,7 @@ void FontRenderer::renderText(const std::string& text, float x, float y,
         // unlike stb_truetype's baseline-relative bitmap coordinates.
         glyph.bottomOffset =
             (GLYPH_H - height * m_impl->renderScale) * 0.5f;
-        glyph.advance = advance * m_impl->fontScale * m_impl->renderScale;
+        glyph.advance = advance * fontScale * m_impl->renderScale;
         m_impl->shelfX += width + 1;
         m_impl->shelfHeight = std::max(m_impl->shelfHeight, height);
         return &m_impl->glyphs.emplace(codepoint, glyph).first->second;

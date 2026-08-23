@@ -2,6 +2,7 @@
 #include "ui/UIStyle.h"
 
 #include "core/AssetStore.h"
+#include "game/Language.h"
 #include "game/SurvivalRules.h"
 #include "game/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
@@ -189,23 +190,53 @@ private:
         constexpr int atlasSize=2048;
         constexpr int pixelHeight=static_cast<int>(FONT_RASTER_HEIGHT);
         const auto bytes=AssetStore::readPath(root/"fonts/noto/NotoSansCJKsc-Regular.otf");
-        stbtt_fontinfo font{};if(bytes.empty()||!stbtt_InitFont(&font,bytes.data(),0))return;
+        stbtt_fontinfo font{};const bool hasCjk=!bytes.empty()&&
+            stbtt_InitFont(&font,bytes.data(),0)!=0;
+        if(!hasCjk)return;
+        // Arabic glyphs (including the presentation forms the runtime shaper
+        // emits) come from a second face that the CJK font does not cover.
+        std::vector<unsigned char> arabicBytes;stbtt_fontinfo arabicFont{};bool hasArabic=false;
+        try{arabicBytes=AssetStore::readPath(root/"fonts/noto/NotoNaskhArabic-Regular.ttf");
+            hasArabic=!arabicBytes.empty()&&
+                stbtt_InitFont(&arabicFont,arabicBytes.data(),0)!=0;
+        }catch(const std::exception&){}
+        const auto fontFor=[&](uint32_t cp)->const stbtt_fontinfo*{
+            if(stbtt_FindGlyphIndex(&font,static_cast<int>(cp))!=0)return &font;
+            if(hasArabic&&stbtt_FindGlyphIndex(&arabicFont,static_cast<int>(cp))!=0)
+                return &arabicFont;
+            return nullptr;
+        };
         std::set<uint32_t> codepoints;for(uint32_t cp=32;cp<127;++cp)codepoints.insert(cp);
-        for(const char* file:{"en_us.json","zh_cn.json"}){
-            const std::string text=AssetStore::readTextPath(root/"lang"/file);
-            for(uint32_t cp:decodeUtf8(text))if(cp>=32)codepoints.insert(cp);
+        for(const Language language:languagesByEnglishName()){
+            try{const std::string text=AssetStore::readTextPath(root/"lang"/
+                (std::string(languageCode(language))+".json"));
+                for(uint32_t cp:decodeUtf8(text))if(cp>=32)codepoints.insert(cp);
+            }catch(const std::exception&){}
+            // The language option shows each language's native name, which
+            // lives in code and never appears in the JSON files.
+            for(uint32_t cp:decodeUtf8(languageNativeName(language)))
+                if(cp>=32)codepoints.insert(cp);
         }
+        // Arabic presentation forms never appear in the JSON sources; they are
+        // produced at runtime by the Arabic shaper, so their ranges are added
+        // explicitly.
+        for(uint32_t cp=0xFB50;cp<=0xFDFF;++cp)codepoints.insert(cp);
+        for(uint32_t cp=0xFE70;cp<=0xFEFF;++cp)codepoints.insert(cp);
+        const float cjkScale=stbtt_ScaleForPixelHeight(&font,pixelHeight);
+        const float arabicScale=stbtt_ScaleForPixelHeight(&arabicFont,pixelHeight);
         std::vector<uint8_t> pixels(static_cast<size_t>(atlasSize)*atlasSize*4u,0);
-        const float fontScale=stbtt_ScaleForPixelHeight(&font,pixelHeight);
         int shelfX=1,shelfY=1,shelfHeight=0;
-        for(uint32_t cp:codepoints){int advance=0,bearing=0;
-            stbtt_GetCodepointHMetrics(&font,static_cast<int>(cp),&advance,&bearing);
-            int x0=0,y0=0,x1=0,y1=0;stbtt_GetCodepointBitmapBox(&font,static_cast<int>(cp),
+        for(uint32_t cp:codepoints){
+            const stbtt_fontinfo* face=fontFor(cp);if(!face)continue;
+            const float fontScale=face==&font?cjkScale:arabicScale;
+            int advance=0,bearing=0;
+            stbtt_GetCodepointHMetrics(face,static_cast<int>(cp),&advance,&bearing);
+            int x0=0,y0=0,x1=0,y1=0;stbtt_GetCodepointBitmapBox(face,static_cast<int>(cp),
                 fontScale,fontScale,&x0,&y0,&x1,&y1);const int w=std::max(0,x1-x0),h=std::max(0,y1-y0);
             if(shelfX+w+2>=atlasSize){shelfX=1;shelfY+=shelfHeight+2;shelfHeight=0;}
             if(shelfY+h+2>=atlasSize)break;
             if(w&&h){std::vector<uint8_t> bitmap(static_cast<size_t>(w)*h);
-                stbtt_MakeCodepointBitmap(&font,bitmap.data(),w,h,w,fontScale,fontScale,static_cast<int>(cp));
+                stbtt_MakeCodepointBitmap(face,bitmap.data(),w,h,w,fontScale,fontScale,static_cast<int>(cp));
                 for(int py=0;py<h;++py)for(int px=0;px<w;++px){const uint8_t a=bitmap[py*w+px];
                     const size_t dst=(static_cast<size_t>(shelfY+py)*atlasSize+shelfX+px)*4u;
                     pixels[dst]=pixels[dst+1]=pixels[dst+2]=255;

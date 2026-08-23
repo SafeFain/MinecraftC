@@ -84,18 +84,6 @@ void SettingsMenu::refreshButtons() {
     if (m_page == SettingsPage::General) {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
-        std::ostringstream sensitivity;
-        sensitivity << std::fixed << std::setprecision(2) << m_settings.mouseSensitivity;
-        m_buttons.emplace_back(m_localization.format(
-            "settings.sensitivity", {sensitivity.str()}), [this]{
-            m_settings.mouseSensitivity += 0.05f;
-            if (m_settings.mouseSensitivity > 0.50f) m_settings.mouseSensitivity = 0.05f;
-            m_onChanged(); refreshButtons();
-        });
-        m_buttons.emplace_back(m_localization.format("settings.invert_y", {
-            m_localization.text(m_settings.invertMouseY ? "common.on" : "common.off")}), [this]{
-                m_settings.invertMouseY = !m_settings.invertMouseY; m_onChanged(); refreshButtons();
-            });
         m_buttons.emplace_back(m_localization.text("settings.video"), [this]{
             showPage(SettingsPage::Video);
         });
@@ -176,6 +164,18 @@ void SettingsMenu::refreshButtons() {
             showPage(SettingsPage::General);
         });
     } else if (m_page == SettingsPage::KeyboardMouse) {
+        std::ostringstream sensitivity;
+        sensitivity << std::fixed << std::setprecision(2) << m_settings.mouseSensitivity;
+        m_buttons.emplace_back(m_localization.format(
+            "settings.sensitivity", {sensitivity.str()}), [this]{
+            m_settings.mouseSensitivity += 0.05f;
+            if (m_settings.mouseSensitivity > 0.50f) m_settings.mouseSensitivity = 0.05f;
+            m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.invert_y", {
+            m_localization.text(m_settings.invertMouseY ? "common.on" : "common.off")}), [this]{
+                m_settings.invertMouseY = !m_settings.invertMouseY; m_onChanged(); refreshButtons();
+            });
         constexpr int visible = 8;
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
         for (int i = m_controlOffset; i < end; ++i) {

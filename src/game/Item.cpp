@@ -234,7 +234,161 @@ std::array<ItemProperties, itemCount> buildRegistry() {
 
 const auto REGISTRY = buildRegistry();
 
+// Explicit Minecraft-style tab assignment.  The lists are audited by the
+// inventory tests: every serialized item appears in exactly one category and
+// all category sizes are asserted there.
+CreativeItemCategory categoryFor(ItemId id) {
+    switch (id) {
+        // ── Building Blocks ─────────────────────────────────────────────
+        case ItemId::GRASS_BLOCK: case ItemId::DIRT: case ItemId::STONE:
+        case ItemId::OAK_LOG: case ItemId::SAND: case ItemId::BEDROCK:
+        case ItemId::SNOW: case ItemId::OAK_PLANKS: case ItemId::DEEPSLATE:
+        case ItemId::COAL_ORE: case ItemId::IRON_ORE: case ItemId::GOLD_ORE:
+        case ItemId::DIAMOND_ORE: case ItemId::ICE: case ItemId::GRAVEL:
+        case ItemId::CLAY: case ItemId::RED_SAND: case ItemId::TERRACOTTA:
+        case ItemId::PODZOL: case ItemId::BIRCH_LOG: case ItemId::SPRUCE_LOG:
+        case ItemId::JUNGLE_LOG: case ItemId::ACACIA_LOG:
+        case ItemId::COBBLESTONE: case ItemId::GLASS: case ItemId::OBSIDIAN:
+        case ItemId::LIMESTONE: case ItemId::BASALT: case ItemId::TUFF:
+        case ItemId::COARSE_DIRT: case ItemId::MUD: case ItemId::PACKED_ICE:
+        case ItemId::BLACK_SAND: case ItemId::GRANITE:
+        case ItemId::AETHER_GRASS: case ItemId::AETHER_SOIL:
+        case ItemId::CLOUDSTONE: case ItemId::SUNSTONE:
+        case ItemId::SKYROOT_LOG: case ItemId::STAR_CRYSTAL:
+            return CreativeItemCategory::BuildingBlocks;
+
+        // ── Nature & Decoration ─────────────────────────────────────────
+        case ItemId::OAK_LEAVES: case ItemId::WATER: case ItemId::CACTUS:
+        case ItemId::LAVA: case ItemId::MOSS: case ItemId::TALL_GRASS:
+        case ItemId::FLOWER: case ItemId::REEDS: case ItemId::BIRCH_LEAVES:
+        case ItemId::SPRUCE_LEAVES: case ItemId::JUNGLE_LEAVES:
+        case ItemId::ACACIA_LEAVES: case ItemId::WHITE_WOOL:
+        case ItemId::OAK_SAPLING: case ItemId::BIRCH_SAPLING:
+        case ItemId::SPRUCE_SAPLING: case ItemId::JUNGLE_SAPLING:
+        case ItemId::ACACIA_SAPLING: case ItemId::DANDELION:
+        case ItemId::BLUE_ORCHID: case ItemId::ALLIUM:
+        case ItemId::OXEYE_DAISY: case ItemId::SUNFLOWER:
+        case ItemId::SKYROOT_LEAVES: case ItemId::STARFLOWER:
+        case ItemId::CLOUD_BLOOM: case ItemId::GLOWSHROOM:
+            return CreativeItemCategory::Nature;
+
+        // ── Functional Blocks ───────────────────────────────────────────
+        case ItemId::CRAFTING_TABLE: case ItemId::FURNACE: case ItemId::CHEST:
+        case ItemId::TORCH: case ItemId::WHITE_BED: case ItemId::FARMLAND:
+        case ItemId::TNT:
+            return CreativeItemCategory::Functional;
+
+        // ── Tools & Utilities ───────────────────────────────────────────
+        case ItemId::WOODEN_PICKAXE: case ItemId::WOODEN_AXE:
+        case ItemId::WOODEN_SHOVEL: case ItemId::WOODEN_HOE:
+        case ItemId::STONE_PICKAXE: case ItemId::STONE_AXE:
+        case ItemId::STONE_SHOVEL: case ItemId::STONE_HOE:
+        case ItemId::IRON_PICKAXE: case ItemId::IRON_AXE:
+        case ItemId::IRON_SHOVEL: case ItemId::IRON_HOE:
+        case ItemId::GOLDEN_PICKAXE: case ItemId::GOLDEN_AXE:
+        case ItemId::GOLDEN_SHOVEL: case ItemId::GOLDEN_HOE:
+        case ItemId::DIAMOND_PICKAXE: case ItemId::DIAMOND_AXE:
+        case ItemId::DIAMOND_SHOVEL: case ItemId::DIAMOND_HOE:
+        case ItemId::FLINT_AND_STEEL:
+            return CreativeItemCategory::Tools;
+
+        // ── Combat ──────────────────────────────────────────────────────
+        case ItemId::ARROW:
+        case ItemId::WOODEN_SWORD: case ItemId::STONE_SWORD:
+        case ItemId::IRON_SWORD: case ItemId::GOLDEN_SWORD:
+        case ItemId::DIAMOND_SWORD: case ItemId::BOW: case ItemId::SHIELD:
+        case ItemId::LEATHER_HELMET: case ItemId::LEATHER_CHESTPLATE:
+        case ItemId::LEATHER_LEGGINGS: case ItemId::LEATHER_BOOTS:
+        case ItemId::IRON_HELMET: case ItemId::IRON_CHESTPLATE:
+        case ItemId::IRON_LEGGINGS: case ItemId::IRON_BOOTS:
+        case ItemId::GOLDEN_HELMET: case ItemId::GOLDEN_CHESTPLATE:
+        case ItemId::GOLDEN_LEGGINGS: case ItemId::GOLDEN_BOOTS:
+        case ItemId::DIAMOND_HELMET: case ItemId::DIAMOND_CHESTPLATE:
+        case ItemId::DIAMOND_LEGGINGS: case ItemId::DIAMOND_BOOTS:
+            return CreativeItemCategory::Combat;
+
+        // ── Food ────────────────────────────────────────────────────────
+        case ItemId::BREAD: case ItemId::RAW_BEEF: case ItemId::STEAK:
+        case ItemId::RAW_PORKCHOP: case ItemId::COOKED_PORKCHOP:
+        case ItemId::RAW_CHICKEN: case ItemId::COOKED_CHICKEN:
+        case ItemId::MUTTON: case ItemId::COOKED_MUTTON:
+        case ItemId::ROTTEN_FLESH:
+            return CreativeItemCategory::Food;
+
+        // ── Materials ───────────────────────────────────────────────────
+        case ItemId::STICK: case ItemId::COAL: case ItemId::RAW_IRON:
+        case ItemId::IRON_INGOT: case ItemId::RAW_GOLD:
+        case ItemId::GOLD_INGOT: case ItemId::DIAMOND: case ItemId::STRING:
+        case ItemId::FEATHER: case ItemId::LEATHER: case ItemId::BONE:
+        case ItemId::WHEAT_SEEDS: case ItemId::WHEAT: case ItemId::FLINT:
+        case ItemId::GUNPOWDER:
+            return CreativeItemCategory::Materials;
+
+        // ── Spawn Eggs ──────────────────────────────────────────────────
+        case ItemId::COW_SPAWN_EGG: case ItemId::PIG_SPAWN_EGG:
+        case ItemId::SHEEP_SPAWN_EGG: case ItemId::CHICKEN_SPAWN_EGG:
+        case ItemId::ZOMBIE_SPAWN_EGG: case ItemId::SKELETON_SPAWN_EGG:
+        case ItemId::SPIDER_SPAWN_EGG: case ItemId::BLASTLING_SPAWN_EGG:
+            return CreativeItemCategory::SpawnEggs;
+
+        default:
+            return CreativeItemCategory::Count;
+    }
+}
+
+constexpr size_t categoryCount =
+    static_cast<size_t>(CreativeItemCategory::Count);
+
+const std::array<CreativeCategoryInfo, categoryCount> CATEGORY_INFO{{
+    {CreativeItemCategory::BuildingBlocks, "inventory.tab.building",
+     ItemId::GRASS_BLOCK},
+    {CreativeItemCategory::Nature, "inventory.tab.nature", ItemId::FLOWER},
+    {CreativeItemCategory::Functional, "inventory.tab.functional",
+     ItemId::CRAFTING_TABLE},
+    {CreativeItemCategory::Tools, "inventory.tab.tools", ItemId::IRON_PICKAXE},
+    {CreativeItemCategory::Combat, "inventory.tab.combat", ItemId::IRON_SWORD},
+    {CreativeItemCategory::Food, "inventory.tab.food", ItemId::BREAD},
+    {CreativeItemCategory::Materials, "inventory.tab.materials",
+     ItemId::DIAMOND},
+    {CreativeItemCategory::SpawnEggs, "inventory.tab.spawn_eggs",
+     ItemId::COW_SPAWN_EGG}
+}};
+
+std::array<std::vector<ItemId>, categoryCount> buildCategoryItems() {
+    std::array<std::vector<ItemId>, categoryCount> buckets;
+    for (size_t raw = 1; raw < itemCount; ++raw) {
+        const ItemId id = static_cast<ItemId>(raw);
+        const auto& props = getItemProps(id);
+        if (props.name.empty() || props.maxStack == 0) continue;
+        const auto category = categoryFor(id);
+        if (category != CreativeItemCategory::Count)
+            buckets[static_cast<size_t>(category)].push_back(id);
+    }
+    return buckets;
+}
+
+const auto CATEGORY_ITEMS = buildCategoryItems();
+
 } // namespace
+
+CreativeItemCategory creativeInventoryCategory(ItemId id) {
+    if (!isValidItemId(id)) return CreativeItemCategory::Count;
+    return categoryFor(id);
+}
+
+const std::vector<ItemId>& creativeInventoryItemsIn(
+    CreativeItemCategory category) {
+    static const std::vector<ItemId> empty;
+    if (static_cast<size_t>(category) >= categoryCount) return empty;
+    return CATEGORY_ITEMS[static_cast<size_t>(category)];
+}
+
+const CreativeCategoryInfo& creativeCategoryInfo(CreativeItemCategory category) {
+    static const CreativeCategoryInfo fallback{
+        CreativeItemCategory::Count, "", ItemId::EMPTY};
+    if (static_cast<size_t>(category) >= categoryCount) return fallback;
+    return CATEGORY_INFO[static_cast<size_t>(category)];
+}
 
 bool isValidItemId(ItemId id) {
     return static_cast<size_t>(id) < itemCount;

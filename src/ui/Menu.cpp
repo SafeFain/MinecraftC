@@ -134,9 +134,10 @@ void MainMenu::rebuildButtons() {
                                [this]() { showWorlds(); });
         m_buttons.emplace_back(m_localization.text("menu.home.settings"),
                                m_callbacks.onOpenSettings);
-        m_buttons.emplace_back(m_localization.text("menu.home.language"), [this]() {
-            m_settings.language = m_settings.language == Language::English
-                ? Language::SimplifiedChinese : Language::English;
+        m_buttons.emplace_back(m_localization.format("menu.home.language",
+                               {std::string(languageNativeName(m_settings.language))}),
+            [this]() {
+            m_settings.language = nextLanguage(m_settings.language);
             m_localization.setLanguage(m_settings.language);
             if (m_callbacks.onSettingsChanged) m_callbacks.onSettingsChanged();
             rebuildButtons();

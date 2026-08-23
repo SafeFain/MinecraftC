@@ -1,5 +1,6 @@
 #include "game/Localization.h"
 #include "core/AssetStore.h"
+#include "game/ArabicShaper.h"
 
 #include <algorithm>
 #include <cctype>
@@ -23,25 +24,49 @@ Localization::Strings Localization::loadFile(const std::filesystem::path& path) 
 }
 
 void Localization::load(const std::filesystem::path& assetRoot) {
-    m_english = loadFile(assetRoot / "lang" / "en_us.json");
-    m_chinese = loadFile(assetRoot / "lang" / "zh_cn.json");
+    m_languages[static_cast<size_t>(Language::English)] =
+        loadFile(assetRoot / "lang" / "en_us.json");
+    for (size_t index = 0; index < m_languages.size(); ++index) {
+        const auto language = static_cast<Language>(index);
+        if (language == Language::English) continue;
+        try {
+            m_languages[index] = loadFile(assetRoot / "lang" /
+                (std::string(languageCode(language)) + ".json"));
+        } catch (const std::exception&) {
+            // A missing translation file leaves the map empty; lookups fall
+            // back to English. This keeps partial installs fully usable.
+        }
+    }
 }
 
 const Localization::Strings& Localization::active() const {
-    return m_language == Language::SimplifiedChinese ? m_chinese : m_english;
+    return languageStrings(m_language);
 }
 
-std::string Localization::text(std::string_view key) const {
+const Localization::Strings& Localization::languageStrings(Language language) const {
+    return m_languages[static_cast<size_t>(language)];
+}
+
+std::string Localization::rawText(std::string_view key) const {
     const std::string owned(key);
     const auto& selected = active();
     if (const auto found = selected.find(owned); found != selected.end()) return found->second;
-    if (const auto found = m_english.find(owned); found != m_english.end()) return found->second;
+    const auto& english = languageStrings(Language::English);
+    if (const auto found = english.find(owned); found != english.end()) return found->second;
     return "[" + owned + "]";
+}
+
+std::string Localization::shaped(std::string value) const {
+    return m_language == Language::Arabic ? shapeArabic(value) : value;
+}
+
+std::string Localization::text(std::string_view key) const {
+    return shaped(rawText(key));
 }
 
 std::string Localization::format(
     std::string_view key, std::initializer_list<std::string> arguments) const {
-    std::string result = text(key);
+    std::string result = rawText(key);
     size_t index = 0;
     for (const auto& argument : arguments) {
         const std::string marker = "{" + std::to_string(index++) + "}";
@@ -51,13 +76,14 @@ std::string Localization::format(
             position += argument.size();
         }
     }
-    return result;
+    return shaped(std::move(result));
 }
 
 std::string Localization::itemName(ItemId item) const {
     const std::string key = "item." + std::to_string(static_cast<uint16_t>(item));
     const auto& selected = active();
-    if (const auto found = selected.find(key); found != selected.end()) return found->second;
+    if (const auto found = selected.find(key); found != selected.end())
+        return shaped(found->second);
     return getItemProps(item).name;
 }
 
@@ -94,6 +120,6 @@ std::string Localization::bindingName(const InputBinding& binding) const {
 }
 
 bool Localization::hasTranslation(Language language, std::string_view key) const {
-    const auto& strings = language == Language::SimplifiedChinese ? m_chinese : m_english;
+    const auto& strings = languageStrings(language);
     return strings.find(std::string(key)) != strings.end();
 }

@@ -189,6 +189,20 @@ enum class ItemKind : uint8_t {
     SpawnEgg
 };
 
+// Minecraft-style creative inventory tabs.  Every registered item belongs to
+// exactly one category; the enum order is the tab order in the catalog UI.
+enum class CreativeItemCategory : uint8_t {
+    BuildingBlocks,
+    Nature,
+    Functional,
+    Tools,
+    Combat,
+    Food,
+    Materials,
+    SpawnEggs,
+    Count
+};
+
 enum class SpawnEggMob : uint8_t {
     Cow,
     Pig,
@@ -249,6 +263,12 @@ struct ItemProperties {
           saturation(saturationValue), placedBlock(block), spawnEggMob(eggMob) {}
 };
 
+struct CreativeCategoryInfo {
+    CreativeItemCategory category;
+    const char* localizationKey;
+    ItemId icon;
+};
+
 struct ItemStack {
     ItemId id = ItemId::EMPTY;
     uint8_t count = 0;
@@ -266,3 +286,6 @@ const ItemProperties& getItemProps(ItemId id);
 bool isValidItemId(ItemId id);
 ItemId itemForBlock(BlockId id);
 std::vector<ItemId> creativeInventoryItems();
+CreativeItemCategory creativeInventoryCategory(ItemId id);
+const std::vector<ItemId>& creativeInventoryItemsIn(CreativeItemCategory category);
+const CreativeCategoryInfo& creativeCategoryInfo(CreativeItemCategory category);
