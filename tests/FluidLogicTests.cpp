@@ -32,7 +32,9 @@ int main() {
             static_cast<uint8_t>(BlockId::FALLING_LAVA) == 105 &&
             static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
             static_cast<uint8_t>(BlockId::STARFLOWER) == 113 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 114,
+            static_cast<uint8_t>(BlockId::CLOUD_BLOOM) == 114 &&
+            static_cast<uint8_t>(BlockId::GLOWSHROOM) == 115 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 116,
             "falling and Heaven states append without renumbering old ids");
     for (bool lava : {false, true}) {
         const BlockId source = fluidBlockFromAmount(lava, 8);

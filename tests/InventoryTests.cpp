@@ -34,7 +34,7 @@ int main() {
             "weather block geometry or collision properties are invalid");
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
             static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 114 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 116 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -79,17 +79,25 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::STARFLOWER,
+            creativeItems.back() == ItemId::GLOWSHROOM,
             "creative inventory ordering does not follow stable item ids");
     require(itemForBlock(BlockId::AETHER_GRASS) == ItemId::AETHER_GRASS &&
                 itemForBlock(BlockId::STARFLOWER) == ItemId::STARFLOWER &&
+                itemForBlock(BlockId::CLOUD_BLOOM) == ItemId::CLOUD_BLOOM &&
+                itemForBlock(BlockId::GLOWSHROOM) == ItemId::GLOWSHROOM &&
                 getItemProps(ItemId::STAR_CRYSTAL).maxStack == 64 &&
                 getFaceTexture(BlockId::AETHER_GRASS, FaceDir::TOP) ==
                     BlockTexture::AetherGrassTop &&
                 getFaceTexture(BlockId::SKYROOT_WOOD, FaceDir::TOP) ==
                     BlockTexture::SkyrootLogTop &&
+                getFaceTexture(BlockId::CLOUD_BLOOM, FaceDir::TOP) ==
+                    BlockTexture::CloudBloom &&
+                getFaceTexture(BlockId::GLOWSHROOM, FaceDir::TOP) ==
+                    BlockTexture::Glowshroom &&
                 getLightEmission(BlockId::STAR_CRYSTAL) == 8 &&
-                getLightEmission(BlockId::STARFLOWER) == 5,
+                getLightEmission(BlockId::STARFLOWER) == 5 &&
+                getLightEmission(BlockId::CLOUD_BLOOM) == 4 &&
+                getLightEmission(BlockId::GLOWSHROOM) == 6,
             "Heaven materials lack inventory, atlas, or light mappings");
     require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
             getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&

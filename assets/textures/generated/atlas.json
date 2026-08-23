@@ -157,6 +157,14 @@
       "x": 0,
       "y": 3
     },
+    "cloud_bloom": {
+      "family": "fluid_emissive",
+      "generated": true,
+      "index": 85,
+      "source": "cloud_bloom.png",
+      "x": 19,
+      "y": 3
+    },
     "cloudstone": {
       "family": "stone",
       "generated": true,
@@ -192,9 +200,9 @@
     "copper_ore": {
       "family": "ore",
       "generated": true,
-      "index": 85,
+      "index": 87,
       "source": "copper_ore.png",
-      "x": 19,
+      "x": 21,
       "y": 3
     },
     "crafting_table": {
@@ -276,6 +284,14 @@
       "source": "glass.png",
       "x": 13,
       "y": 2
+    },
+    "glowshroom": {
+      "family": "fluid_emissive",
+      "generated": true,
+      "index": 86,
+      "source": "glowshroom.png",
+      "x": 20,
+      "y": 3
     },
     "gold_ore": {
       "family": "ore",

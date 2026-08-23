@@ -204,7 +204,7 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, naturalBlocks[i].second});
     }
 
-    const std::array<std::pair<ItemId, BlockId>, 8> heavenBlocks{{
+    const std::array<std::pair<ItemId, BlockId>, 10> heavenBlocks{{
         {ItemId::AETHER_GRASS, BlockId::AETHER_GRASS},
         {ItemId::AETHER_SOIL, BlockId::AETHER_SOIL},
         {ItemId::CLOUDSTONE, BlockId::CLOUDSTONE},
@@ -212,11 +212,14 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         {ItemId::SKYROOT_LOG, BlockId::SKYROOT_WOOD},
         {ItemId::SKYROOT_LEAVES, BlockId::SKYROOT_LEAVES},
         {ItemId::STAR_CRYSTAL, BlockId::STAR_CRYSTAL},
-        {ItemId::STARFLOWER, BlockId::STARFLOWER}
+        {ItemId::STARFLOWER, BlockId::STARFLOWER},
+        {ItemId::CLOUD_BLOOM, BlockId::CLOUD_BLOOM},
+        {ItemId::GLOWSHROOM, BlockId::GLOWSHROOM}
     }};
-    const std::array<const char*, 8> heavenNames{{
+    const std::array<const char*, 10> heavenNames{{
         "Aether Grass", "Aether Soil", "Cloudstone", "Sunstone",
-        "Skyroot Log", "Skyroot Leaves", "Star Crystal", "Starflower"
+        "Skyroot Log", "Skyroot Leaves", "Star Crystal", "Starflower",
+        "Cloud Bloom", "Glowshroom"
     }};
     for (size_t i = 0; i < heavenBlocks.size(); ++i) {
         set(heavenBlocks[i].first,
@@ -307,6 +310,8 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::SKYROOT_LEAVES): return ItemId::SKYROOT_LEAVES;
         case static_cast<uint16_t>(BlockId::STAR_CRYSTAL): return ItemId::STAR_CRYSTAL;
         case static_cast<uint16_t>(BlockId::STARFLOWER): return ItemId::STARFLOWER;
+        case static_cast<uint16_t>(BlockId::CLOUD_BLOOM): return ItemId::CLOUD_BLOOM;
+        case static_cast<uint16_t>(BlockId::GLOWSHROOM): return ItemId::GLOWSHROOM;
         default: return ItemId::EMPTY;
     }
 }

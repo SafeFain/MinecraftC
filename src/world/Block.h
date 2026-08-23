@@ -130,7 +130,9 @@ enum class BlockId : uint8_t {
     SKYROOT_LEAVES = 111,
     STAR_CRYSTAL  = 112,
     STARFLOWER    = 113,
-    COUNT        = 114,
+    CLOUD_BLOOM   = 114,
+    GLOWSHROOM    = 115,
+    COUNT        = 116,
     POPPY        = FLOWER
 };
 
@@ -198,6 +200,7 @@ enum class BlockTexture : uint8_t {
     Limestone, Basalt, Tuff, CoarseDirt, Mud, PackedIce, BlackSand, Granite,
     AetherGrassTop, AetherGrassSide, AetherSoil, Cloudstone, Sunstone,
     SkyrootLog, SkyrootLogTop, SkyrootLeaves, StarCrystal, Starflower,
+    CloudBloom, Glowshroom,
     Count
 };
 

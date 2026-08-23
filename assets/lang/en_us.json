@@ -230,6 +230,8 @@
   "item.148": "Skyroot Leaves",
   "item.149": "Star Crystal",
   "item.150": "Starflower",
+  "item.151": "Cloud Bloom",
+  "item.152": "Glowshroom",
   "message.autosave_log": "Autosave failed; see minecraftc.log",
   "message.autosave_retry": "Autosave failed; changes will be retried",
   "message.save_log": "World save failed; see minecraftc.log"

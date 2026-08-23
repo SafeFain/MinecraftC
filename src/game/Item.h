@@ -172,6 +172,8 @@ enum class ItemId : uint16_t {
     SKYROOT_LEAVES,
     STAR_CRYSTAL,
     STARFLOWER,
+    CLOUD_BLOOM,
+    GLOWSHROOM,
 
     COUNT,
     POPPY = FLOWER

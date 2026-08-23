@@ -107,6 +107,8 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::SKYROOT_LEAVES, 0.2f);
     set(BlockId::STAR_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
     set(BlockId::STARFLOWER, 0.0f);
+    set(BlockId::CLOUD_BLOOM, 0.0f);
+    set(BlockId::GLOWSHROOM, 0.0f);
     return values;
 }
 

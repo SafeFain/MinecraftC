@@ -79,7 +79,7 @@ NAMES = [
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower", "copper_ore",
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom", "copper_ore",
 ]
 
 
@@ -188,12 +188,13 @@ EXTRA_BASES = {
     "sunstone":(214,166,72), "skyroot_log":(132,96,56),
     "skyroot_log_top":(171,132,76), "skyroot_leaves":(90,164,82),
     "star_crystal":(65,184,222), "starflower":(150,117,226),
+    "cloud_bloom":(235,240,250), "glowshroom":(128,224,199),
 }
 TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle",
                "wheat_mature","oak_sapling","birch_sapling","spruce_sapling",
                "jungle_sapling","acacia_sapling","fire","glass","dandelion",
                "blue_orchid","allium","oxeye_daisy","sunflower_bottom",
-               "sunflower_top", "starflower"}
+               "sunflower_top", "starflower", "cloud_bloom", "glowshroom"}
 
 def _srgb_to_linear(value):
     value = value / 255.0
@@ -604,7 +605,7 @@ def generate_generic(name,seed):
 PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","wheat_mature",
         "oak_sapling","birch_sapling","spruce_sapling","jungle_sapling","acacia_sapling",
         "dandelion","blue_orchid","allium","oxeye_daisy","sunflower_bottom","sunflower_top",
-        "starflower"}
+        "starflower","cloud_bloom","glowshroom"}
 
 def generate_special(name,seed,indices):
     if name in {"grass_side", "aether_grass_side"}:

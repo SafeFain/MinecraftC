@@ -224,6 +224,8 @@
     "skyroot_log": {"generator": "block_item_icon", "block": "skyroot_wood"},
     "skyroot_leaves": {"generator": "block_item_icon", "block": "skyroot_leaves"},
     "star_crystal": {"generator": "block_item_icon", "block": "star_crystal"},
-    "starflower": {"generator": "block_item_icon", "block": "starflower"}
+    "starflower": {"generator": "block_item_icon", "block": "starflower"},
+    "cloud_bloom": {"generator": "block_item_icon", "block": "cloud_bloom"},
+    "glowshroom": {"generator": "block_item_icon", "block": "glowshroom"}
   }
 }

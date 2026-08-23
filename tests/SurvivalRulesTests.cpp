@@ -30,6 +30,8 @@ int main() {
     static_assert(static_cast<uint16_t>(ItemId::GRANITE) == 142);
     static_assert(static_cast<uint16_t>(ItemId::AETHER_GRASS) == 143);
     static_assert(static_cast<uint16_t>(ItemId::STARFLOWER) == 150);
+    static_assert(static_cast<uint16_t>(ItemId::CLOUD_BLOOM) == 151);
+    static_assert(static_cast<uint16_t>(ItemId::GLOWSHROOM) == 152);
     for (const auto& mapping : {
              std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
              std::pair{BlockId::BASALT, ItemId::BASALT},
@@ -58,12 +60,16 @@ int main() {
              std::pair{BlockId::SKYROOT_WOOD, ItemId::SKYROOT_LOG},
              std::pair{BlockId::SKYROOT_LEAVES, ItemId::SKYROOT_LEAVES},
              std::pair{BlockId::STAR_CRYSTAL, ItemId::STAR_CRYSTAL},
-             std::pair{BlockId::STARFLOWER, ItemId::STARFLOWER}}) {
+             std::pair{BlockId::STARFLOWER, ItemId::STARFLOWER},
+             std::pair{BlockId::CLOUD_BLOOM, ItemId::CLOUD_BLOOM},
+             std::pair{BlockId::GLOWSHROOM, ItemId::GLOWSHROOM}}) {
         const ItemStack& tool =
             mapping.first == BlockId::AETHER_GRASS ||
             mapping.first == BlockId::AETHER_SOIL ? woodenShovel :
             mapping.first == BlockId::SKYROOT_WOOD ? woodenAxe :
             (mapping.first == BlockId::STARFLOWER ||
+             mapping.first == BlockId::CLOUD_BLOOM ||
+             mapping.first == BlockId::GLOWSHROOM ||
              mapping.first == BlockId::SKYROOT_LEAVES) ? hand : stoneHarvest;
         const auto drops = getBlockDrops(mapping.first, tool, 0);
         require(drops.size() == 1 && drops.front().id == mapping.second,

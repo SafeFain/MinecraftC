@@ -38,7 +38,7 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower"
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -263,6 +263,10 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Cube, RenderLayer::Translucent, .68f },
     { BlockId::STARFLOWER, "Starflower", glm::vec3(.64f, .52f, .96f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::CLOUD_BLOOM, "Cloud Bloom", glm::vec3(.92f, .94f, .98f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    { BlockId::GLOWSHROOM, "Glowshroom", glm::vec3(.50f, .88f, .78f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -377,6 +381,8 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::SKYROOT_LEAVES:  return BlockTexture::SkyrootLeaves;
         case BlockId::STAR_CRYSTAL:    return BlockTexture::StarCrystal;
         case BlockId::STARFLOWER:      return BlockTexture::Starflower;
+        case BlockId::CLOUD_BLOOM:     return BlockTexture::CloudBloom;
+        case BlockId::GLOWSHROOM:      return BlockTexture::Glowshroom;
         default:                     return BlockTexture::Dirt;
     }
 }
@@ -578,6 +584,8 @@ uint8_t getLightEmission(BlockId id) {
     if (id == BlockId::TORCH) return 14;
     if (id == BlockId::STAR_CRYSTAL) return 8;
     if (id == BlockId::STARFLOWER) return 5;
+    if (id == BlockId::CLOUD_BLOOM) return 4;
+    if (id == BlockId::GLOWSHROOM) return 6;
     return id == BlockId::FIRE || isLava(id) ? 15 : 0;
 }
 
@@ -664,6 +672,7 @@ bool isFlower(BlockId id) {
     return id == BlockId::FLOWER || id == BlockId::DANDELION ||
            id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
            id == BlockId::OXEYE_DAISY || id == BlockId::STARFLOWER ||
+           id == BlockId::CLOUD_BLOOM || id == BlockId::GLOWSHROOM ||
            isSunflower(id);
 }
 
@@ -700,7 +709,8 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::WHEAT_7: case BlockId::DANDELION:
         case BlockId::BLUE_ORCHID: case BlockId::ALLIUM:
         case BlockId::OXEYE_DAISY: case BlockId::SUNFLOWER_BOTTOM:
-        case BlockId::SUNFLOWER_TOP: case BlockId::STARFLOWER: return 60;
+        case BlockId::SUNFLOWER_TOP: case BlockId::STARFLOWER:
+        case BlockId::CLOUD_BLOOM: case BlockId::GLOWSHROOM: return 60;
         case BlockId::TNT: return 100;
         default: return 0;
     }

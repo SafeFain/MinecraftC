@@ -52,6 +52,7 @@
     "skyroot_wood": {"top": "skyroot_log_top", "bottom": "skyroot_log_top", "side": "skyroot_log"},
     "skyroot_leaves": {"all": "skyroot_leaves"},
     "star_crystal": {"all": "star_crystal"}, "starflower": {"all": "starflower"},
+    "cloud_bloom": {"all": "cloud_bloom"}, "glowshroom": {"all": "glowshroom"},
     "copper_ore": {"all": "copper_ore", "future": true}
   }
 }

@@ -908,7 +908,7 @@ int main() {
     }
     require(differentSeedChanged,
             "different Heaven seeds produced identical island samples");
-    std::set<Biome> heavenBiomes;
+    std::set<WorldGenerator::HeavenBiome> heavenBiomes;
     size_t heavenColumns = 0;
     size_t heavenAdjacentColumns = 0;
     constexpr int heavenSampleMin = -768;
@@ -928,13 +928,14 @@ int main() {
             const int gridX = (x - heavenSampleMin) / heavenSampleStep;
             const int gridZ = (z - heavenSampleMin) / heavenSampleStep;
             heavenMask[static_cast<size_t>(gridZ * heavenSampleSide + gridX)] = 1;
-            heavenBiomes.insert(column.biome);
+            heavenBiomes.insert(heaven.heavenBiomeAt(x, z));
             const int depth = column.height - column.densityMinY + 1;
             minimumHeavenDepth = std::min(minimumHeavenDepth, depth);
             maximumHeavenDepth = std::max(maximumHeavenDepth, depth);
-            require(column.height >= 96 && column.height <= 236 &&
-                        depth >= 6 && depth <= 52,
-                    "heaven island column exceeded its bounded vertical profile");
+            require(column.height >= 184 && column.height <= 216 &&
+                        depth >= 6 && depth <= 52 &&
+                        column.densityMinY >= 172,
+                    "heaven main island column exceeded its bounded vertical profile");
             const auto east = heaven.sampleTerrainColumn(x + 1, z);
             const auto south = heaven.sampleTerrainColumn(x, z + 1);
             for (const auto& neighbor : {east, south}) {
@@ -945,10 +946,73 @@ int main() {
             }
         }
     }
-    require(heavenColumns > 1000 && heavenBiomes.size() >= 12,
-            "heaven island field lacks density or biome diversity");
+    require(heavenColumns > 1000 && heavenBiomes.size() ==
+                static_cast<size_t>(WorldGenerator::HEAVEN_BIOME_COUNT),
+            "heaven island field lacks density or exclusive biome diversity");
     require(heavenAdjacentColumns > 1000,
             "heaven summit smoothness test sampled too few adjacent columns");
+
+    // Five altitude layers sample independently.  Every layer must appear in
+    // the window with its own top/bottom band, stacked bands keep their air
+    // gaps, and each layer exposes all eight exclusive biomes.  The shared
+    // Biome field must stay a fixed compat alias instead of the overworld
+    // palette.
+    std::array<size_t, WorldGenerator::HEAVEN_LAYER_COUNT> heavenLayerColumns{};
+    std::array<std::set<WorldGenerator::HeavenBiome>,
+               WorldGenerator::HEAVEN_LAYER_COUNT> heavenLayerBiomes;
+    constexpr std::array<int, WorldGenerator::HEAVEN_LAYER_COUNT> layerTopMin{{
+        92, 136, 184, 232, 280}};
+    constexpr std::array<int, WorldGenerator::HEAVEN_LAYER_COUNT> layerTopMax{{
+        120, 164, 216, 264, 308}};
+    constexpr std::array<int, WorldGenerator::HEAVEN_LAYER_COUNT> layerBottomMin{{
+        80, 124, 172, 220, 268}};
+    for (int z = -1024; z <= 1024; z += 16) {
+        for (int x = -1024; x <= 1024; x += 16) {
+            const auto layers = heaven.sampleHeavenLayers(x, z);
+            for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT;
+                 ++layer) {
+                const auto& island = layers[static_cast<size_t>(layer)];
+                if (!island.present) continue;
+                ++heavenLayerColumns[static_cast<size_t>(layer)];
+                heavenLayerBiomes[static_cast<size_t>(layer)].insert(
+                    island.biome);
+                require(island.top >= layerTopMin[static_cast<size_t>(layer)] &&
+                            island.top <= layerTopMax[static_cast<size_t>(layer)] &&
+                            island.bottom >= layerBottomMin[static_cast<size_t>(layer)] &&
+                            island.bottom <= island.top &&
+                            island.top - island.bottom + 1 >= 4 &&
+                            island.top < Config::WORLD_MAX_Y - 8,
+                        "heaven layer exceeded its altitude band");
+            }
+        }
+    }
+    for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
+        require(heavenLayerColumns[static_cast<size_t>(layer)] > 0,
+                "Heaven v5 window missed an altitude layer");
+        require(heavenLayerBiomes[static_cast<size_t>(layer)].size() ==
+                    static_cast<size_t>(WorldGenerator::HEAVEN_BIOME_COUNT),
+                "heaven layer did not expose every exclusive biome");
+    }
+    const auto heavenCompatAlias = [](WorldGenerator::HeavenBiome biome) {
+        switch (biome) {
+            case WorldGenerator::HeavenBiome::DawnMeadow: return Biome::PLAINS;
+            case WorldGenerator::HeavenBiome::SkyrootGrove: return Biome::FOREST;
+            case WorldGenerator::HeavenBiome::SunstoneHeights: return Biome::MOUNTAINS;
+            case WorldGenerator::HeavenBiome::StarCrystalGarden: return Biome::FLOWER_FOREST;
+            case WorldGenerator::HeavenBiome::CloudbloomFields: return Biome::MEADOW;
+            case WorldGenerator::HeavenBiome::SkystoneBarrens: return Biome::STONY_SHORE;
+            case WorldGenerator::HeavenBiome::GlimmerFen: return Biome::SWAMP;
+            case WorldGenerator::HeavenBiome::MoonpearlTerrace: return Biome::MOUNTAINS;
+        }
+        return Biome::PLAINS;
+    };
+    for (int z = -1024; z <= 1024; z += 32) {
+        for (int x = -1024; x <= 1024; x += 32) {
+            require(heaven.sampleTerrainColumn(x, z).biome ==
+                        heavenCompatAlias(heaven.heavenBiomeAt(x, z)),
+                    "heaven column leaked a non-exclusive overworld biome");
+        }
+    }
     std::vector<int> heavenComponentAreas;
     for (int gridZ = 0; gridZ < heavenSampleSide; ++gridZ) {
         for (int gridX = 0; gridX < heavenSampleSide; ++gridX) {
@@ -994,7 +1058,7 @@ int main() {
     require(heaven.chunkCacheVersion() != WorldGenContext::CHUNK_CACHE_VERSION &&
                 heaven.generationVersion() != WorldGenContext::GENERATION_VERSION &&
                 heaven.generationVersion() == WorldGenerator::HEAVEN_GENERATION_VERSION,
-            "Heaven v4 cache and generation versions share the overworld key");
+            "Heaven v5 cache and generation versions share the overworld key");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
     std::vector<Chunk*> heavenRegionChunks;
@@ -1026,27 +1090,41 @@ int main() {
                         "heaven generated bedrock under an island");
     }
 
-    // v4's four internal ecologies and the new material/landmark layer are
-    // world-coordinate driven, so a fixed exploration window should expose
-    // every visual language without depending on chunk request order.
-    std::array<size_t, 4> heavenEcologyCounts{};
+    // v5's five altitude layers, eight exclusive biomes, and the material
+    // and structure layer are world-coordinate driven, so a fixed exploration
+    // window should expose every visual language without depending on chunk
+    // request order.
+    std::array<std::array<size_t, WorldGenerator::HEAVEN_BIOME_COUNT>,
+               WorldGenerator::HEAVEN_LAYER_COUNT> heavenBiomeCounts{};
     for (int z = -1024; z <= 1024; z += 16) {
         for (int x = -1024; x <= 1024; x += 16) {
-            const SurfaceColumn column = heaven.sampleTerrainColumn(x, z);
-            if (column.height <= Config::WORLD_MIN_Y - 1) continue;
-            ++heavenEcologyCounts[static_cast<size_t>(
-                heaven.heavenEcologyAt(x, z))];
+            const auto layers = heaven.sampleHeavenLayers(x, z);
+            for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT;
+                 ++layer) {
+                const auto& island = layers[static_cast<size_t>(layer)];
+                if (!island.present) continue;
+                ++heavenBiomeCounts[static_cast<size_t>(layer)]
+                                   [static_cast<size_t>(island.biome)];
+            }
         }
     }
-    for (const size_t count : heavenEcologyCounts)
-        require(count > 0, "Heaven v4 exploration window missed an ecology");
+    for (const auto& layerCounts : heavenBiomeCounts)
+        for (const size_t count : layerCounts)
+            require(count > 0,
+                    "Heaven v5 exploration window missed a biome or layer");
 
-    std::array<bool, 8> heavenMaterials{};
-    bool foundSatellite = false;
+    std::array<bool, 10> heavenMaterials{};
+    bool foundLayer1 = false;
+    bool foundLayer2 = false;
+    bool foundLayer3 = false;
+    bool foundLayer4 = false;
+    bool foundLayer5 = false;
+    bool foundGeode = false;
+    bool foundCloudspire = false;
     bool foundLandmark = false;
     bool foundForbiddenBlock = false;
-    for (int cz = -12; cz <= 12; ++cz) {
-        for (int cx = -12; cx <= 12; ++cx) {
+    for (int cz = -16; cz <= 16; ++cz) {
+        for (int cx = -16; cx <= 16; ++cx) {
             Chunk chunk(cx, cz);
             heaven.generate(chunk);
             for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
@@ -1057,26 +1135,51 @@ int main() {
                             foundForbiddenBlock = true;
                         const auto rawBlock = static_cast<uint8_t>(block);
                         if (rawBlock >= static_cast<uint8_t>(BlockId::AETHER_GRASS) &&
-                            rawBlock <= static_cast<uint8_t>(BlockId::STARFLOWER)) {
+                            rawBlock <= static_cast<uint8_t>(BlockId::GLOWSHROOM)) {
                             heavenMaterials[static_cast<size_t>(block) -
                                              static_cast<size_t>(BlockId::AETHER_GRASS)] = true;
                         }
-                        if (y >= 240 && block == BlockId::CLOUDSTONE)
-                            foundSatellite = true;
-                        if (block == BlockId::STAR_CRYSTAL && y > Config::WORLD_MIN_Y &&
-                            chunk.getBlock(x, y - 1, z) == BlockId::SUNSTONE)
-                            foundLandmark = true;
+                        if (block == BlockId::CLOUDSTONE) {
+                            if (y >= 92 && y <= 120) foundLayer1 = true;
+                            if (y >= 136 && y <= 164) foundLayer2 = true;
+                            if (y >= 184 && y <= 216) foundLayer3 = true;
+                            if (y >= 232 && y <= 264) foundLayer4 = true;
+                            if (y >= 280 && y <= 308) foundLayer5 = true;
+                        }
+                        if (block == BlockId::STAR_CRYSTAL &&
+                            y - 2 > Config::WORLD_MIN_Y) {
+                            const BlockId below = chunk.getBlock(x, y - 1, z);
+                            const BlockId below2 = chunk.getBlock(x, y - 2, z);
+                            // Geode: stacked crystals over a moss garden
+                            // surface.  Cloudspire: crystal finial over a
+                            // cloudstone cap over a sunstone shaft.  Ruin:
+                            // crystal over sunstone over soil/moss.
+                            if (below == BlockId::STAR_CRYSTAL &&
+                                below2 == BlockId::MOSS)
+                                foundGeode = true;
+                            if (below == BlockId::CLOUDSTONE &&
+                                below2 == BlockId::SUNSTONE)
+                                foundCloudspire = true;
+                            if (below == BlockId::SUNSTONE &&
+                                (below2 == BlockId::AETHER_GRASS ||
+                                 below2 == BlockId::MOSS))
+                                foundLandmark = true;
+                        }
                     }
                 }
             }
         }
     }
     for (const bool found : heavenMaterials)
-        require(found, "Heaven v4 window missed a dedicated material");
-    require(foundSatellite, "Heaven v4 window missed a high satellite island");
-    require(foundLandmark, "Heaven v4 window missed an Xiguang ruin landmark");
+        require(found, "Heaven v5 window missed a dedicated material");
+    require(foundLayer1 && foundLayer2 && foundLayer3 && foundLayer4 &&
+                foundLayer5,
+            "Heaven v5 window missed an altitude layer");
+    require(foundGeode, "Heaven v5 window missed a crystal geode");
+    require(foundCloudspire, "Heaven v5 window missed a cloudspire tower");
+    require(foundLandmark, "Heaven v5 window missed an Xiguang ruin landmark");
     require(!foundForbiddenBlock,
-            "Heaven v4 generated bedrock or an infinite water body");
+            "Heaven v5 generated bedrock or an infinite water body");
 
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()

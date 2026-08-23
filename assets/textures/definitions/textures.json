@@ -23,6 +23,7 @@
     "water": "fluid_emissive", "lava": "fluid_emissive", "fire": "fluid_emissive",
     "torch": "fluid_emissive", "glass": "fluid_emissive", "star_crystal": "fluid_emissive",
     "starflower": "fluid_emissive", "sunstone": "fluid_emissive",
+    "cloud_bloom": "fluid_emissive", "glowshroom": "fluid_emissive",
     "crafting_table": "constructed", "furnace": "constructed", "chest": "constructed",
     "white_wool": "constructed", "white_bed": "constructed", "tnt": "constructed",
     "cactus_side": "constructed", "cactus_top": "constructed", "cloud": "constructed",
@@ -49,7 +50,7 @@
     "tall_grass", "flower", "reeds", "torch", "wheat_young", "wheat_middle", "wheat_mature",
     "oak_sapling", "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
     "fire", "glass", "dandelion", "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
-    "sunflower_top", "starflower"
+    "sunflower_top", "starflower", "cloud_bloom", "glowshroom"
   ],
   "generated": [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
@@ -69,6 +70,6 @@
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower", "copper_ore"
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom", "copper_ore"
   ]
 }
