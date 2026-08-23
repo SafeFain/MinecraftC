@@ -42,6 +42,12 @@ public:
     // removes the matching block entity. Locks internally.
     void recordOverride(int cx, int cz, uint32_t localIndex, BlockId id);
 
+    // Register a Chest/Furnace block entity for a world-generated work block
+    // (structure content). Never creates an override entry; leaves an
+    // existing player-created entity untouched. Caller holds the chunk lock.
+    void registerGeneratedBlockEntityUnlocked(int cx, int cz,
+                                              uint32_t localIndex, BlockId id);
+
     // Apply saved overrides for a freshly generated chunk.
     // Caller must hold the ChunkStore lock.
     void applySavedOverridesUnlocked(int cx, int cz);

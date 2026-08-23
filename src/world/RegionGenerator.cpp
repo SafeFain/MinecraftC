@@ -18,6 +18,7 @@ RegionGenerator::RegionGenerator(HeightPipeline& hp, CaveGenerator& cg,
     , m_treeGenerator(tg)
     , m_oreGenerator(og)
     , m_seed(seed)
+    , m_structureGenerator(seed, m_heightPipeline)
 {}
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -54,7 +55,10 @@ void RegionGenerator::generateRegion(
     // Phase 1b: Pre-compute deterministic hybrid cave volume
     precomputeCaves();
 
-    // Phase 2: Region-wide tree placement
+    // Phase 1c: Region-wide structure placement (anchors in the region core)
+    placeStructuresRegion();
+
+    // Phase 2: Region-wide tree placement (structures suppress trees)
     placeTreesRegion();
 
     // Phase 3a: Block column population (no trees yet)
@@ -243,6 +247,9 @@ void RegionGenerator::generateRegion(
         }
     }
 
+    // Phase 3c: Place all structures (now that terrain and trees exist)
+    placeStructures(chunks, pendingOut);
+
     // Phase 4: Finalize all chunks
     finalizeChunks(chunks);
 }
@@ -281,6 +288,17 @@ void RegionGenerator::precomputeCaves() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Phase 1c: Region-wide structure placement
+// ═══════════════════════════════════════════════════════════════════════════
+
+void RegionGenerator::placeStructuresRegion() {
+    m_structureGenerator.generateStructuresRegion(
+        m_regionData.worldOriginX, m_regionData.worldOriginZ,
+        m_regionData.regionSizeBlocks, m_regionData.regionSizeBlocks,
+        m_structures);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Phase 2: Region-wide tree placement
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -311,6 +329,18 @@ void RegionGenerator::placeTreesRegion()
         heightFlat.data(), biomeFlat.data(), riverFlat.data(),
         pad,
         m_regionData.trees);
+
+    // Structure reservations suppress trees inside footprints.  The query is
+    // a pure world-coordinate function, so region and singleton generation
+    // filter the same tree anchors identically.
+    m_regionData.trees.erase(std::remove_if(
+        m_regionData.trees.begin(), m_regionData.trees.end(),
+        [&](const RegionGenerationData::TreePlacement& tree) {
+            return m_structureGenerator.reservationAt(
+                m_regionData.worldOriginX + tree.localX,
+                m_regionData.worldOriginZ + tree.localZ);
+        }),
+        m_regionData.trees.end());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -464,6 +494,52 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 3c: Place structure blocks across the whole region
+// ═══════════════════════════════════════════════════════════════════════════
+
+void RegionGenerator::placeStructures(
+    std::vector<Chunk*>& chunks,
+    std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
+    const int regionSize = m_regionSizeChunks;
+    const auto floorChunk = [](int value) {
+        return value >= 0 ? value / Config::CHUNK_SIZE_X
+                          : -((-value + Config::CHUNK_SIZE_X - 1) /
+                              Config::CHUNK_SIZE_X);
+    };
+    const auto needsEntity = [](BlockId id) {
+        return id == BlockId::CHEST || id == BlockId::FURNACE;
+    };
+    const auto write = [&](int worldX, int worldY, int worldZ, BlockId id) {
+        if (!Config::isValidWorldY(worldY)) return;
+        const int localX = worldX - m_regionData.worldOriginX;
+        const int localZ = worldZ - m_regionData.worldOriginZ;
+        const int chunkCX = floorChunk(localX);
+        const int chunkCZ = floorChunk(localZ);
+        if (chunkCX >= 0 && chunkCX < regionSize &&
+            chunkCZ >= 0 && chunkCZ < regionSize) {
+            Chunk* target = chunks[static_cast<size_t>(chunkCZ) *
+                                   static_cast<size_t>(regionSize) + chunkCX];
+            if (target == nullptr) return;
+            const int inX = worldX - target->worldX();
+            const int inZ = worldZ - target->worldZ();
+            if (inX >= 0 && inX < Config::CHUNK_SIZE_X &&
+                inZ >= 0 && inZ < Config::CHUNK_SIZE_Z)
+                target->setBlock(inX, worldY, inZ, id);
+            // Work blocks need a runtime block entity.  Route them through
+            // the pending channel as an entity registration request even
+            // though the block itself was already written above.
+            if (needsEntity(id))
+                pendingOut.push_back({worldX, worldY, worldZ, id, true, true});
+        } else {
+            pendingOut.push_back(
+                {worldX, worldY, worldZ, id, true, needsEntity(id)});
+        }
+    };
+    for (const StructurePlacement& placement : m_structures)
+        StructureGenerator::build(placement, write);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -9,7 +9,9 @@
 #include "game/SaveStore.h"
 #include "renderer/GameRenderer.h"
 #include "threading/ThreadPool.h"
+#include "world/ChunkStore.h"
 #include "world/FluidLogic.h"
+#include "world/WorldPersistence.h"
 
 #include <glm/glm.hpp>
 
@@ -945,6 +947,109 @@ void testBedLifecycle() {
     drainWorkers(world, pool);
 }
 
+void testGeneratedBlockEntityRegistration() {
+    // World-generated Chest/Furnace blocks register runtime block entities
+    // without entering the player-override map, so structure work blocks
+    // stay interactive after streaming generation.
+    ChunkStore store;
+    WorldPersistence persistence(store);
+    Chunk* chunk = store.get(3, -2);
+    chunk->generated = true;
+    const int y = 70;
+    const auto localIndex = [](int x, int z, int worldY) {
+        return static_cast<uint32_t>(
+            x + z * Config::CHUNK_SIZE_X +
+            Config::worldYToStorageY(worldY) * Config::CHUNK_SIZE_X *
+                Config::CHUNK_SIZE_Z);
+    };
+    const uint32_t chestIndex = localIndex(5, 7, y);
+    const uint32_t furnaceIndex = localIndex(6, 7, y);
+    const uint32_t stoneIndex = localIndex(7, 7, y);
+    store.withUnique([&](ChunkStore&) {
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3, -2, chestIndex, BlockId::CHEST);
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3, -2, furnaceIndex, BlockId::FURNACE);
+        // Re-registration keeps the original entity instead of retyping it.
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3, -2, chestIndex, BlockId::FURNACE);
+        // Non-work blocks never register an entity.
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3, -2, stoneIndex, BlockId::STONE);
+    });
+    const BlockEntity* chestEntity = persistence.getBlockEntity(
+        {3 * 16 + 5, y, -2 * 16 + 7});
+    const BlockEntity* furnaceEntity = persistence.getBlockEntity(
+        {3 * 16 + 6, y, -2 * 16 + 7});
+    require(chestEntity && chestEntity->type == BlockEntityType::Chest,
+            "generated chest did not register a chest block entity");
+    require(furnaceEntity && furnaceEntity->type == BlockEntityType::Furnace,
+            "generated furnace did not register a furnace block entity");
+    require(persistence.getBlockEntity({3 * 16 + 7, y, -2 * 16 + 7}) == nullptr,
+            "non-work block registered a block entity");
+
+    // A player edit removing the chest also removes its entity.
+    persistence.recordOverride(3, -2, chestIndex, BlockId::AIR);
+    require(persistence.getBlockEntity({3 * 16 + 5, y, -2 * 16 + 7}) == nullptr,
+            "removing a generated chest left its block entity behind");
+}
+
+void testGeneratedStructureWorkBlocks() {
+    // Seed 8 places an abandoned camp (with a generated chest) near world
+    // origin. After streaming generation, every generated Chest/Furnace in
+    // the loaded area must carry a runtime block entity so right-clicking
+    // opens the container instead of being ignored.
+    const auto root = std::filesystem::temp_directory_path() /
+                      "minecraftc-world-orch-structure-entities";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    {
+        SaveStore store(root);
+        ThreadPool pool(2);
+        World world;
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(8);
+
+        loadTarget(world);
+        generateTarget(world, pool);
+
+        size_t chests = 0;
+        size_t missingEntities = 0;
+        for (const Chunk* chunk : world.getActiveChunks()) {
+            if (chunk == nullptr || !chunk->generated.load()) continue;
+            std::vector<uint8_t> blocks(chunk->rawBlocks(),
+                                        chunk->rawBlocks() + Config::CHUNK_VOLUME);
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                    const int top = chunk->getColumnMaxY(x, z);
+                    for (int y = std::max(Config::WORLD_MIN_Y, top - 16);
+                         y <= top; ++y) {
+                        const size_t index = static_cast<size_t>(x) +
+                            static_cast<size_t>(z) * Config::CHUNK_SIZE_X +
+                            static_cast<size_t>(Config::worldYToStorageY(y)) *
+                                Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+                        const BlockId id = static_cast<BlockId>(blocks[index]);
+                        if (id != BlockId::CHEST && id != BlockId::FURNACE)
+                            continue;
+                        if (id == BlockId::CHEST) ++chests;
+                        const glm::ivec3 position{
+                            chunk->worldX() + x, y, chunk->worldZ() + z};
+                        if (world.getBlockEntity(position) == nullptr)
+                            ++missingEntities;
+                    }
+                }
+            }
+        }
+        require(chests > 0,
+                "seed 8 generated no chest-bearing structure near spawn");
+        require(missingEntities == 0,
+                "generated structure work block is missing its block entity");
+        drainWorkers(world, pool);
+    }
+    std::filesystem::remove_all(root);
+}
+
 }  // namespace
 
 int main() {
@@ -961,6 +1066,8 @@ int main() {
     testNaturalFluidLoading();
     testSuperflatFluidSpreadAndBudget();
     testBedLifecycle();
+    testGeneratedBlockEntityRegistration();
+    testGeneratedStructureWorkBlocks();
     std::cout << "World orchestration tests passed\n";
     return 0;
 }

@@ -38,6 +38,18 @@ void WorldPersistence::forEachOverride(const OverrideVisitor& fn) const {
     });
 }
 
+void WorldPersistence::registerGeneratedBlockEntityUnlocked(
+    int cx, int cz, uint32_t localIndex, BlockId id) {
+    if (id != BlockId::CHEST && id != BlockId::FURNACE) return;
+    auto& entities = m_blockEntities[{cx, cz}];
+    if (entities.count(localIndex) != 0) return;
+    BlockEntity entity;
+    entity.type = id == BlockId::CHEST ? BlockEntityType::Chest
+                                       : BlockEntityType::Furnace;
+    entities.emplace(localIndex, entity);
+    m_dirtyBlockEntityChunks.insert({cx, cz});
+}
+
 void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
                                       BlockId id) {
     m_chunks.withUnique([&](ChunkStore&) {

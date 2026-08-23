@@ -80,12 +80,19 @@ struct RegionGenerationData {
     // ── Hybrid cave classification for the region core ─────────────────
     CaveVolume caves;
 
-    // ── Pending blocks (tree leaves that fall outside this region) ───────
+    // ── Pending blocks (cross-boundary tree leaves and structures) ─────
+    // overwrite blocks (structure material) are applied unconditionally in a
+    // second pass after ordinary leaf decorations, so final output does not
+    // depend on which neighbor region finished first. needsBlockEntity asks
+    // the streamer to register a Chest/Furnace block entity when the block is
+    // applied, so world-generated work blocks stay interactive.
     struct PendingBlock {
         int     worldX = 0;
         int     worldY = 0;
         int     worldZ = 0;
         BlockId id     = BlockId::AIR;
+        bool    overwrite = false;
+        bool    needsBlockEntity = false;
     };
     std::vector<PendingBlock> pendingBlocks;
 };

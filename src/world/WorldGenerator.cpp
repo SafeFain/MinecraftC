@@ -136,6 +136,7 @@ WorldGenerator::WorldGenerator(
     , m_caveGenerator(m_noise, m_seed)
     , m_treeGenerator(m_seed)
     , m_oreGenerator(m_noise, m_seed)
+    , m_structureGenerator(m_seed, m_heightPipeline)
 {}
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -875,7 +876,8 @@ void WorldGenerator::generateRegion(
 
 void WorldGenerator::generate(Chunk& chunk,
                                const NeighborQuery& neighborQuery,
-                               const BlockSetter& blockSetter) {
+                               const BlockSetter& blockSetter,
+                               const StructureSetter& structureSetter) {
     if (isHeaven()) {
         populateHeaven(chunk, *this);
         return;
@@ -1051,12 +1053,41 @@ void WorldGenerator::generate(Chunk& chunk,
         wxBase, wzBase, heightMap, biomeMap, riverMap);
 
     for (const auto& tp : placements) {
+        // Structure reservations suppress trees inside footprints.  The same
+        // pure query runs in region generation, keeping both paths identical.
+        if (m_structureGenerator.reservationAt(wxBase + tp.localX,
+                                               wzBase + tp.localZ))
+            continue;
         int blockX = tp.localX;
         int blockZ = tp.localZ;
         int baseY  = tp.baseY + 1;  // trunk starts one above ground
 
         placeTree(chunk, blockX, baseY, blockZ, tp.type, tp.trunkHeight,
                   blockSetter, wxBase, wzBase);
+    }
+
+    // ── Phase 4b: Structures ──────────────────────────────────────────────
+    const std::vector<StructurePlacement> structures =
+        m_structureGenerator.generateStructures(wxBase, wzBase);
+    for (const StructurePlacement& placement : structures) {
+        StructureGenerator::build(placement, [&](int worldX, int worldY,
+                                                 int worldZ, BlockId id) {
+            if (!Config::isValidWorldY(worldY)) return;
+            const bool inChunk =
+                worldX >= wxBase && worldX < wxBase + Config::CHUNK_SIZE_X &&
+                worldZ >= wzBase && worldZ < wzBase + Config::CHUNK_SIZE_Z;
+            if (inChunk) {
+                chunk.setBlock(worldX - wxBase, worldY, worldZ - wzBase, id);
+                // Chest/furnace blocks also need a runtime block entity.
+                // Reuse the structure setter as the entity-registration
+                // channel; the streamer keys it off the block id.
+                if ((id == BlockId::CHEST || id == BlockId::FURNACE) &&
+                    structureSetter)
+                    structureSetter(worldX, worldY, worldZ, id);
+            } else if (structureSetter) {
+                structureSetter(worldX, worldY, worldZ, id);
+            }
+        });
     }
 
     // ── Phase 5: Recompute column max Y ─────────────────────────────────

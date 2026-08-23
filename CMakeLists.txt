@@ -733,6 +733,7 @@ if(BUILD_TESTING)
         tests/WorldGenerationTests.cpp
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
         src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
@@ -765,13 +766,15 @@ if(BUILD_TESTING)
         tools/terrain_benchmark.cpp
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
         src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
         src/world/Chunk.cpp
         src/world/Noise.cpp
-        src/world/BiomeMap.cpp)
+        src/world/BiomeMap.cpp
+        src/world/Block.cpp)
     target_include_directories(terrain_benchmark PRIVATE
         src external/FastNoiseLite external/glad/include)
     target_link_libraries(terrain_benchmark PRIVATE glm::glm glad)
@@ -1077,6 +1080,7 @@ if(BUILD_TESTING)
         src/world/OreGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
@@ -1172,6 +1176,7 @@ if(BUILD_TESTING)
         src/world/OreGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
@@ -1216,6 +1221,7 @@ if(BUILD_TESTING)
         src/world/OreGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp

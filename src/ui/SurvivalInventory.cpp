@@ -106,15 +106,22 @@ void SurvivalInventoryScreen::render(
     const float craftX = m_craftingRects[0].x;
     const float craftY = m_craftingRects[craftSize * craftSize - 1].y;
     const float craftGridH = craftSize * slot + (craftSize - 1) * gap;
+    const std::string craftLabel = ui.localization().text("inventory.crafting");
+    // The crafting label and grid sit between the inventory panel and the
+    // title, so anchor the title above the label instead of a fixed height.
+    const float craftLabelY = craftY + craftGridH + 4.0f;
+    const float craftLabelH = ui.measureText(craftLabel, 1.1f).y;
+    const float craftPanelTop = craftLabelY + craftLabelH + 6.0f;
     UiTheme::panel(ui, craftX - 10.0f, craftY - 10.0f,
                    craftGridH + 20.0f,
-                   m_craftingRects[0].y + 28.0f - craftY + 10.0f,
+                   craftPanelTop - (craftY - 10.0f),
                    UiTheme::PANEL);
     const std::string title = ui.localization().text(
         m_creativeAccess?"inventory.player_tab":"inventory.survival");
     const auto titleSize = ui.measureText(title, 2.0f);
+    const float titleY = std::max(screenHeight * 0.78f, craftPanelTop + 8.0f);
     UiTheme::textWithShadow(ui, title, (screenWidth - titleSize.x) * 0.5f,
-                  screenHeight * 0.78f, 2.0f, UiTheme::TEXT_TITLE, 1.0f,
+                  titleY, 2.0f, UiTheme::TEXT_TITLE, 1.0f,
                   2.0f, -2.0f);
     if(m_creativeAccess){
         const std::string label=ui.localization().text("inventory.creative_tab");
@@ -122,9 +129,8 @@ void SurvivalInventoryScreen::render(
                         m_creativeCatalogRect.w, m_creativeCatalogRect.h,
                         label, UiTheme::WidgetState::Normal, false, 0.72f);
     }
-    UiTheme::textWithShadow(ui, ui.localization().text("inventory.crafting"),
-                  craftX,
-                  m_craftingRects[0].y + 34.0f, 1.1f, glm::vec3(0.85f));
+    UiTheme::textWithShadow(ui, craftLabel, craftX, craftLabelY, 1.1f,
+                            glm::vec3(0.85f));
 
     const ItemStack* tooltip = nullptr;
     for (size_t i = 0; i < m_inventoryRects.size(); ++i) {

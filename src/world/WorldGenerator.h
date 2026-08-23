@@ -6,6 +6,7 @@
 #include "world/CaveGenerator.h"
 #include "world/TreeGenerator.h"
 #include "world/OreGenerator.h"
+#include "world/StructureGenerator.h"
 #include "world/Chunk.h"
 #include "world/RegionGenerationData.h"
 #include "game/GameRules.h"
@@ -49,6 +50,9 @@ public:
     };
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
+    // Callback for structure blocks outside the current chunk.  Unlike
+    // leaves, these must overwrite whatever the target chunk already holds.
+    using StructureSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
 
     explicit WorldGenerator(uint64_t seed = 1234567890ULL,
                              WorldType worldType = WorldType::Normal,
@@ -57,7 +61,8 @@ public:
     // ── Singleton chunk generation (fallback) ────────────────────────────
     void generate(Chunk& chunk,
                   const NeighborQuery& neighborQuery = {},
-                  const BlockSetter& blockSetter = {});
+                  const BlockSetter& blockSetter = {},
+                  const StructureSetter& structureSetter = {});
 
     void generateRegion(int originCX, int originCZ, int regionSizeChunks,
                         int padding, std::vector<Chunk*>& chunks,
@@ -91,6 +96,7 @@ public:
     CaveGenerator&  getCaveGenerator()  { return m_caveGenerator; }
     TreeGenerator&  getTreeGenerator()  { return m_treeGenerator; }
     OreGenerator&   getOreGenerator()   { return m_oreGenerator; }
+    StructureGenerator& getStructureGenerator() { return m_structureGenerator; }
     uint64_t        getSeed() const     { return m_seed; }
 
 private:
@@ -102,6 +108,7 @@ private:
     CaveGenerator  m_caveGenerator;
     TreeGenerator  m_treeGenerator;
     OreGenerator   m_oreGenerator;
+    StructureGenerator m_structureGenerator;
 
     // Tree placement helper — handles all tree types
     void placeTree(Chunk& chunk, int localX, int baseY, int localZ,

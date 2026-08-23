@@ -669,18 +669,38 @@ void ChunkStreamer::enqueueGeneration() {
                 });
             };
 
+            // Structure blocks overwrite whatever the target chunk holds.
+            // They always travel through the pending channel so application
+            // stays order-independent across neighbor regions and can also
+            // register Chest/Furnace block entities for world-generated work
+            // blocks. queueGenerationCompletion makes the target chunk's
+            // completion consumer apply (and register) them promptly.
+            auto structureSetter = [this](int wx, int wy, int wz, BlockId id) {
+                if (!Config::isValidWorldY(wy)) return;
+                int bsx = World::worldToChunkX(static_cast<double>(wx));
+                int bsz = World::worldToChunkZ(static_cast<double>(wz));
+                const bool needsEntity =
+                    id == BlockId::CHEST || id == BlockId::FURNACE;
+                m_chunks.withUnique([&](ChunkStore&) {
+                    m_pendingBlocks[{bsx, bsz}].push_back(
+                        {wx, wy, wz, id, true, needsEntity});
+                });
+                queueGenerationCompletion(bsx, bsz);
+            };
+
             ChunkStreamer* streamerPtr = this;
             ++m_generationTasksInFlight;
             ++scheduledTasks;
             const int dx = cx - m_centerChunkX;
             const int dz = cz - m_centerChunkZ;
             const int distance2 = dx * dx + dz * dz;
-            m_threadPool->enqueuePriority([streamerPtr, chunkPtr, genPtr, neighborQuery, blockSetter]() {
+            m_threadPool->enqueuePriority([streamerPtr, chunkPtr, genPtr, neighborQuery, blockSetter, structureSetter]() {
                 struct Completion {
                     std::atomic<int>& count;
                     ~Completion() { --count; }
                 } completion{streamerPtr->m_generationTasksInFlight};
-                genPtr->generate(*chunkPtr, neighborQuery, blockSetter);
+                genPtr->generate(*chunkPtr, neighborQuery, blockSetter,
+                                 structureSetter);
                 chunkPtr->generated = true;
                 chunkPtr->generationInProgress = false;
                 streamerPtr->queueGenerationCompletion(chunkPtr->cx, chunkPtr->cz);
@@ -1019,22 +1039,52 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
     Chunk* chunk = store.findUnlocked(cx, cz);
     if (chunk == nullptr || !chunk->generated.load()) return false;
     bool changed = false;
-    for (auto& pb : it->second) {
-        int lx = pb.worldX - chunk->worldX();
-        int lz = pb.worldZ - chunk->worldZ();
-        if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16 &&
-            Config::isValidWorldY(pb.worldY)) {
-            BlockId cur = chunk->getBlock(lx, pb.worldY, lz);
-            bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
-                        cur == BlockId::SPRUCE_LEAVES || cur == BlockId::JUNGLE_LEAVES ||
-                        cur == BlockId::ACACIA_LEAVES;
-            if (cur == BlockId::AIR || leaf || cur == BlockId::SNOW) {
+    // Two passes make application order-independent: ordinary leaf
+    // decorations first, then overwrite structure blocks unconditionally.
+    // A structure can therefore clear AIR or cover leaves regardless of
+    // which neighbor region finished generation first. Structure Chest and
+    // Furnace blocks additionally register their runtime block entity here.
+    for (int pass = 0; pass < 2; ++pass) {
+        for (auto& pb : it->second) {
+            if ((pass == 0) == pb.overwrite) continue;
+            int lx = pb.worldX - chunk->worldX();
+            int lz = pb.worldZ - chunk->worldZ();
+            if (lx < 0 || lx >= 16 || lz < 0 || lz >= 16 ||
+                !Config::isValidWorldY(pb.worldY))
+                continue;
+            if (!pb.overwrite) {
+                BlockId cur = chunk->getBlock(lx, pb.worldY, lz);
+                bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
+                            cur == BlockId::SPRUCE_LEAVES || cur == BlockId::JUNGLE_LEAVES ||
+                            cur == BlockId::ACACIA_LEAVES;
+                if (cur != BlockId::AIR && !leaf && cur != BlockId::SNOW)
+                    continue;
                 chunk->setBlock(lx, pb.worldY, lz, pb.id);
                 changed = true;
                 if (chunk->hasBaseSnapshot()) {
                     chunk->setBaseBlock(lx, pb.worldY, lz, pb.id);
                     chunk->baseCacheDirty = true;
                 }
+                continue;
+            }
+            // Overwrite pass: skip the write when the block already matches
+            // (e.g. an in-region work block whose entity request rides the
+            // pending channel), but still register the requested entity.
+            if (chunk->getBlock(lx, pb.worldY, lz) != pb.id) {
+                chunk->setBlock(lx, pb.worldY, lz, pb.id);
+                changed = true;
+                if (chunk->hasBaseSnapshot()) {
+                    chunk->setBaseBlock(lx, pb.worldY, lz, pb.id);
+                    chunk->baseCacheDirty = true;
+                }
+            }
+            if (pb.needsBlockEntity) {
+                const uint32_t localIndex = static_cast<uint32_t>(
+                    lx + lz * Config::CHUNK_SIZE_X +
+                    Config::worldYToStorageY(pb.worldY) *
+                        Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+                m_world.m_persistence.registerGeneratedBlockEntityUnlocked(
+                    cx, cz, localIndex, pb.id);
             }
         }
     }

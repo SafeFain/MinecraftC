@@ -1,6 +1,7 @@
 #include "world/HeightPipeline.h"
 #include "world/Noise.h"
 #include "world/TreeGenerator.h"
+#include "world/StructureGenerator.h"
 #include "world/WorldGenerator.h"
 #include "world/RegionGenerator.h"
 #include "world/SurfaceRules.h"
@@ -583,74 +584,390 @@ int main() {
                 require(smallCaves.get(x,y,z)==largeCaves.get(x,y,z),
                         "cave request size changes overlapping output");
     }
-    RegionGenerator regionGenerator(
-        regionWorld.getHeightPipeline(), regionWorld.getCaveGenerator(),
-        regionWorld.getTreeGenerator(), regionWorld.getOreGenerator(), seed);
-    std::vector<std::unique_ptr<Chunk>> regionOwned;
-    std::vector<Chunk*> regionChunks;
-    for (int cz = 0; cz < 3; ++cz) {
-        for (int cx = 0; cx < 3; ++cx) {
-            regionOwned.push_back(std::make_unique<Chunk>(cx, cz));
-            regionChunks.push_back(regionOwned.back().get());
+    // Full generation equivalence: terrain, caves, ores, decorations, trees
+    // and structures must not depend on region-vs-singleton execution.
+    auto verifyFullEquivalence = [&](uint64_t equivalenceSeed, int originCX,
+                                     int originCZ) {
+        WorldGenerator regionWorld(equivalenceSeed);
+        RegionGenerator regionGenerator(
+            regionWorld.getHeightPipeline(), regionWorld.getCaveGenerator(),
+            regionWorld.getTreeGenerator(), regionWorld.getOreGenerator(),
+            equivalenceSeed);
+        std::vector<std::unique_ptr<Chunk>> regionOwned;
+        std::vector<Chunk*> regionChunks;
+        for (int cz = 0; cz < 3; ++cz) {
+            for (int cx = 0; cx < 3; ++cx) {
+                regionOwned.push_back(std::make_unique<Chunk>(
+                    originCX + cx, originCZ + cz));
+                regionChunks.push_back(regionOwned.back().get());
+            }
         }
-    }
-    std::vector<RegionGenerationData::PendingBlock> regionPending;
-    regionGenerator.generateRegion(0, 0, 3, Config::REGION_PADDING,
-                                   regionChunks, regionPending);
+        std::vector<RegionGenerationData::PendingBlock> regionPending;
+        regionGenerator.generateRegion(originCX, originCZ, 3,
+                                       Config::REGION_PADDING, regionChunks,
+                                       regionPending);
 
-    WorldGenerator singletonWorld(seed);
-    std::vector<std::unique_ptr<Chunk>> singletonOwned;
-    std::vector<RegionGenerationData::PendingBlock> singletonPending;
-    for (int cz = 0; cz < 3; ++cz) {
-        for (int cx = 0; cx < 3; ++cx) {
-            singletonOwned.push_back(std::make_unique<Chunk>(cx, cz));
-            Chunk& chunk = *singletonOwned.back();
-            singletonWorld.generate(chunk, {}, [&](int wx, int wy, int wz, BlockId id) {
-                singletonPending.push_back({wx, wy, wz, id});
-            });
+        WorldGenerator singletonWorld(equivalenceSeed);
+        std::vector<std::unique_ptr<Chunk>> singletonOwned;
+        std::vector<RegionGenerationData::PendingBlock> singletonPending;
+        for (int cz = 0; cz < 3; ++cz) {
+            for (int cx = 0; cx < 3; ++cx) {
+                singletonOwned.push_back(std::make_unique<Chunk>(
+                    originCX + cx, originCZ + cz));
+                Chunk& chunk = *singletonOwned.back();
+                singletonWorld.generate(chunk, {}, [&](int wx, int wy, int wz,
+                                                       BlockId id) {
+                    singletonPending.push_back({wx, wy, wz, id});
+                }, [&](int wx, int wy, int wz, BlockId id) {
+                    singletonPending.push_back({wx, wy, wz, id, true});
+                });
+            }
         }
-    }
-    for (const auto& block : singletonPending) {
-        int cx = block.worldX >= 0 ? block.worldX / 16 : -1;
-        int cz = block.worldZ >= 0 ? block.worldZ / 16 : -1;
-        if (cx < 0 || cx >= 3 || cz < 0 || cz >= 3) continue;
-        Chunk& chunk = *singletonOwned[static_cast<size_t>(cz) * 3 + cx];
-        int lx = block.worldX - chunk.worldX();
-        int lz = block.worldZ - chunk.worldZ();
-        BlockId current = chunk.getBlock(lx, block.worldY, lz);
-        bool leaf = current == BlockId::LEAVES ||
-                    current == BlockId::BIRCH_LEAVES ||
-                    current == BlockId::SPRUCE_LEAVES ||
-                    current == BlockId::JUNGLE_LEAVES ||
-                    current == BlockId::ACACIA_LEAVES;
-        if (current == BlockId::AIR || current == BlockId::SNOW || leaf)
-            chunk.setBlock(lx, block.worldY, lz, block.id);
-    }
-    for (size_t i = 0; i < regionChunks.size(); ++i) {
-        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
-            for (int z = 0; z < 16; ++z) {
-                for (int x = 0; x < 16; ++x) {
-                    if (regionChunks[i]->getBlock(x, y, z) !=
-                        singletonOwned[i]->getBlock(x, y, z)) {
-                        std::cerr << "mismatch chunk=" << i << " x=" << x
-                                  << " y=" << y << " z=" << z
-                                  << " region=" << static_cast<int>(regionChunks[i]->getBlock(x,y,z))
-                                  << " singleton=" << static_cast<int>(singletonOwned[i]->getBlock(x,y,z))
-                                  << " regionMax=" << regionChunks[i]->getColumnMaxY(x,z)
-                                  << " singletonMax=" << singletonOwned[i]->getColumnMaxY(x,z)
-                                  << '\n';
-                        require(false, "region and singleton full block output differ");
+        // Apply pending blocks with the streamer's two-pass semantics:
+        // leaf decorations first, then unconditional structure overwrites.
+        const auto floorChunk = [](int value) {
+            const int quotient = value / Config::CHUNK_SIZE_X;
+            return value % Config::CHUNK_SIZE_X < 0 ? quotient - 1 : quotient;
+        };
+        for (int pass = 0; pass < 2; ++pass) {
+            for (const auto& block : singletonPending) {
+                if ((pass == 0) == block.overwrite) continue;
+                const int cx = floorChunk(block.worldX) - originCX;
+                const int cz = floorChunk(block.worldZ) - originCZ;
+                if (cx < 0 || cx >= 3 || cz < 0 || cz >= 3) continue;
+                Chunk& chunk = *singletonOwned[static_cast<size_t>(cz) * 3 + cx];
+                const int lx = block.worldX - chunk.worldX();
+                const int lz = block.worldZ - chunk.worldZ();
+                if (!block.overwrite) {
+                    const BlockId current = chunk.getBlock(lx, block.worldY, lz);
+                    const bool leaf = current == BlockId::LEAVES ||
+                                current == BlockId::BIRCH_LEAVES ||
+                                current == BlockId::SPRUCE_LEAVES ||
+                                current == BlockId::JUNGLE_LEAVES ||
+                                current == BlockId::ACACIA_LEAVES;
+                    if (current != BlockId::AIR && current != BlockId::SNOW &&
+                        !leaf)
+                        continue;
+                }
+                chunk.setBlock(lx, block.worldY, lz, block.id);
+            }
+        }
+        for (size_t i = 0; i < regionChunks.size(); ++i) {
+            for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                for (int z = 0; z < 16; ++z) {
+                    for (int x = 0; x < 16; ++x) {
+                        if (regionChunks[i]->getBlock(x, y, z) !=
+                            singletonOwned[i]->getBlock(x, y, z)) {
+                            std::cerr << "mismatch seed=" << equivalenceSeed
+                                      << " chunk=" << i << " x=" << x
+                                      << " y=" << y << " z=" << z
+                                      << " region=" << static_cast<int>(regionChunks[i]->getBlock(x,y,z))
+                                      << " singleton=" << static_cast<int>(singletonOwned[i]->getBlock(x,y,z))
+                                      << '\n';
+                            require(false, "region and singleton full block output differ");
+                        }
                     }
                 }
             }
         }
+    };
+    verifyFullEquivalence(seed, 0, 0);
+
+    // Pick a seed whose structure anchor sits inside the (-1,-1) region core
+    // while its footprint crosses the region boundary, then verify full
+    // equivalence there: negative coordinates and cross-region pending
+    // overwrites are both exercised.
+    constexpr int forcedOriginCX = -1;
+    constexpr int forcedOriginCZ = -1;
+    constexpr int forcedWorldOrigin = forcedOriginCX * Config::CHUNK_SIZE_X;
+    constexpr int forcedCoreEnd = forcedWorldOrigin + 48;
+    uint64_t forcedStructureSeed = 0;
+    bool foundCrossingStructure = false;
+    for (uint64_t candidate = 1; candidate < 512 && !foundCrossingStructure;
+         ++candidate) {
+        WorldGenerator probeWorld(candidate);
+        std::vector<StructurePlacement> probeStructures;
+        probeWorld.getStructureGenerator().generateStructuresRegion(
+            forcedWorldOrigin, forcedWorldOrigin, 48, 48, probeStructures);
+        for (const StructurePlacement& placement : probeStructures) {
+            if (placement.minX < forcedWorldOrigin ||
+                placement.maxX >= forcedCoreEnd ||
+                placement.minZ < forcedWorldOrigin ||
+                placement.maxZ >= forcedCoreEnd) {
+                forcedStructureSeed = candidate;
+                foundCrossingStructure = true;
+                break;
+            }
+        }
+    }
+    require(foundCrossingStructure,
+            "no candidate seed placed a cross-boundary structure");
+    verifyFullEquivalence(forcedStructureSeed, forcedOriginCX, forcedOriginCZ);
+
+    // ── Structure placement ─────────────────────────────────────────────
+    // Anchors, footprints, and layout variants are pure world-coordinate
+    // functions. Two generators with the same seed produce identical
+    // placements, a different seed changes the window, and the region window
+    // query agrees with per-chunk queries over the same area.
+    StructureGenerator structureGenerator(seed, terrain);
+    StructureGenerator structureRepeat(seed, terrain);
+    std::vector<StructurePlacement> structureWindow;
+    std::vector<StructurePlacement> structureWindowRepeat;
+    structureGenerator.generateStructuresRegion(-512, -512, 1024, 1024,
+                                                structureWindow);
+    structureRepeat.generateStructuresRegion(-512, -512, 1024, 1024,
+                                             structureWindowRepeat);
+    require(structureWindow.size() == structureWindowRepeat.size(),
+            "same-seed structure placement changed between runs");
+    for (size_t i = 0; i < structureWindow.size(); ++i) {
+        const StructurePlacement& a = structureWindow[i];
+        const StructurePlacement& b = structureWindowRepeat[i];
+        require(a.localX == b.localX && a.localZ == b.localZ &&
+                    a.baseY == b.baseY && a.type == b.type &&
+                    a.variant == b.variant && a.minX == b.minX &&
+                    a.maxX == b.maxX && a.minZ == b.minZ && a.maxZ == b.maxZ,
+                "same-seed structure placement fields differ");
+    }
+
+    constexpr uint64_t structureOtherSeed = 987654321ULL;
+    Noise structureOtherLegacy(structureOtherSeed);
+    HeightPipeline structureOtherTerrain(structureOtherLegacy, structureOtherSeed);
+    StructureGenerator structureOther(structureOtherSeed, structureOtherTerrain);
+    std::vector<StructurePlacement> structureOtherWindow;
+    structureOther.generateStructuresRegion(-512, -512, 1024, 1024,
+                                            structureOtherWindow);
+    bool structureSeedsDiffer = structureWindow.size() != structureOtherWindow.size();
+    if (!structureSeedsDiffer) {
+        for (size_t i = 0; i < structureWindow.size(); ++i) {
+            const StructurePlacement& a = structureWindow[i];
+            const StructurePlacement& b = structureOtherWindow[i];
+            if (a.localX != b.localX || a.localZ != b.localZ ||
+                a.type != b.type) {
+                structureSeedsDiffer = true;
+                break;
+            }
+        }
+    }
+    require(structureSeedsDiffer,
+            "different seeds produced identical structure placement");
+
+    // Region-window and per-chunk placement queries agree over a shared area.
+    std::set<std::tuple<int, int, int>> structureRegionSet;
+    for (const StructurePlacement& placement : structureWindow) {
+        structureRegionSet.emplace(-512 + placement.localX,
+                                   -512 + placement.localZ,
+                                   static_cast<int>(placement.type));
+    }
+    std::set<std::tuple<int, int, int>> structureChunkSet;
+    for (int cz = -32; cz < 32; ++cz) {
+        for (int cx = -32; cx < 32; ++cx) {
+            for (const StructurePlacement& placement :
+                 structureGenerator.generateStructures(cx * 16, cz * 16)) {
+                structureChunkSet.emplace(cx * 16 + placement.localX,
+                                          cz * 16 + placement.localZ,
+                                          static_cast<int>(placement.type));
+            }
+        }
+    }
+    require(structureRegionSet == structureChunkSet,
+            "region and chunk structure placement queries differ");
+
+    // A fixed exploration window exposes every structure type, and biome
+    // gates hold at each accepted anchor.
+    std::array<size_t, static_cast<size_t>(StructureType::Count)> structureCounts{};
+    std::vector<StructurePlacement> explorationStructures;
+    structureGenerator.generateStructuresRegion(-8192, -8192, 16384, 16384,
+                                                explorationStructures);
+    bool seedDiffersStructures = false;
+    for (const StructurePlacement& placement : explorationStructures) {
+        ++structureCounts[static_cast<size_t>(placement.type)];
+        const int worldX = -8192 + placement.localX;
+        const int worldZ = -8192 + placement.localZ;
+        const HeightBiome anchorBiome = terrain.queryHeightBiome(worldX, worldZ);
+        switch (placement.type) {
+            case StructureType::DesertWell:
+            case StructureType::DesertVillage:
+                require(anchorBiome.biome == Biome::DESERT,
+                        "desert structure anchored outside a desert");
+                break;
+            case StructureType::Igloo:
+                require(anchorBiome.biome == Biome::SNOW_TUNDRA,
+                        "igloo anchored outside snowy plains");
+                break;
+            case StructureType::Village:
+                require(anchorBiome.biome == Biome::PLAINS ||
+                            anchorBiome.biome == Biome::SUNFLOWER_PLAINS ||
+                            anchorBiome.biome == Biome::MEADOW,
+                        "plains village anchored outside plains family");
+                break;
+            default:
+                break;
+        }
+    }
+    std::vector<StructurePlacement> explorationOther;
+    structureOther.generateStructuresRegion(-8192, -8192, 16384, 16384,
+                                            explorationOther);
+    if (explorationStructures.size() == explorationOther.size()) {
+        for (size_t i = 0; i < explorationStructures.size(); ++i) {
+            if (explorationStructures[i].type != explorationOther[i].type ||
+                explorationStructures[i].localX != explorationOther[i].localX ||
+                explorationStructures[i].localZ != explorationOther[i].localZ) {
+                seedDiffersStructures = true;
+                break;
+            }
+        }
+    } else {
+        seedDiffersStructures = true;
+    }
+    require(seedDiffersStructures,
+            "different seeds produced identical structure exploration windows");
+    std::cout << "structure window counts: village="
+              << structureCounts[static_cast<size_t>(StructureType::Village)]
+              << " desert_village="
+              << structureCounts[static_cast<size_t>(StructureType::DesertVillage)]
+              << " hut="
+              << structureCounts[static_cast<size_t>(StructureType::TravelerHut)]
+              << " camp="
+              << structureCounts[static_cast<size_t>(StructureType::AbandonedCamp)]
+              << " well="
+              << structureCounts[static_cast<size_t>(StructureType::DesertWell)]
+              << " igloo="
+              << structureCounts[static_cast<size_t>(StructureType::Igloo)]
+              << " tower="
+              << structureCounts[static_cast<size_t>(StructureType::RuinedTower)]
+              << " lumber="
+              << structureCounts[static_cast<size_t>(StructureType::LumberCamp)]
+              << '\n';
+    for (int t = 1; t < static_cast<int>(StructureType::Count); ++t)
+        require(structureCounts[static_cast<size_t>(t)] > 0,
+                "structure type is missing from the exploration window");
+
+    // Structure material sanity: build a chosen placement through a
+    // recording writer and confirm the signature materials appear.
+    auto countMaterials = [](const StructurePlacement& placement,
+                             std::set<BlockId>& blocks) {
+        StructureGenerator::build(placement, [&](int, int, int, BlockId id) {
+            blocks.insert(id);
+        });
+    };
+    bool checkedVillageMaterials = false;
+    bool checkedIglooMaterials = false;
+    bool checkedWellMaterials = false;
+    for (const StructurePlacement& placement : explorationStructures) {
+        std::set<BlockId> materials;
+        countMaterials(placement, materials);
+        if (placement.type == StructureType::Village && !checkedVillageMaterials) {
+            require(materials.count(BlockId::PLANKS) > 0 &&
+                        materials.count(BlockId::COBBLESTONE) > 0 &&
+                        materials.count(BlockId::WATER) > 0 &&
+                        materials.count(BlockId::FARMLAND_7) > 0,
+                    "plains village lacks signature materials");
+            checkedVillageMaterials = true;
+        }
+        if (placement.type == StructureType::DesertVillage) {
+            require(materials.count(BlockId::TERRACOTTA) > 0 &&
+                        materials.count(BlockId::SAND) > 0,
+                    "desert village lacks adobe materials");
+        }
+        if (placement.type == StructureType::Igloo && !checkedIglooMaterials) {
+            require(materials.count(BlockId::SNOW) > 0 &&
+                        materials.count(BlockId::WHITE_WOOL) > 0 &&
+                        materials.count(BlockId::WHITE_BED) > 0,
+                    "igloo lacks snow, wool, or bed materials");
+            require(materials.count(BlockId::AIR) > 0,
+                    "igloo interior is not carved out");
+            // Geometry: hollow dome with a walkable interior, intact shell,
+            // and an open entrance.
+            const int ix = (placement.minX + placement.maxX) / 2;
+            const int iz = (placement.minZ + placement.maxZ) / 2;
+            const int ibase = placement.baseY;
+            std::vector<std::tuple<int, int, int, BlockId>> iglooWrites;
+            StructureGenerator::build(placement,
+                                      [&](int x, int y, int z, BlockId id) {
+                                          iglooWrites.emplace_back(x, y, z, id);
+                                      });
+            const auto at = [&](int x, int y, int z) {
+                BlockId id = BlockId::AIR;
+                for (const auto& w : iglooWrites)
+                    if (std::get<0>(w) == x && std::get<1>(w) == y &&
+                        std::get<2>(w) == z)
+                        id = std::get<3>(w);
+                return id;
+            };
+            require(at(ix, ibase + 1, iz) == BlockId::AIR,
+                    "igloo center interior is not air");
+            require(at(ix, ibase + 4, iz) == BlockId::SNOW,
+                    "igloo dome cap is missing");
+            require(at(ix, ibase + 1, iz + 3) == BlockId::SNOW,
+                    "igloo north wall is missing");
+            require(at(ix, ibase + 1, iz - 3) == BlockId::AIR,
+                    "igloo entrance is not open");
+            checkedIglooMaterials = true;
+        }
+        if (placement.type == StructureType::DesertWell && !checkedWellMaterials) {
+            require(materials.count(BlockId::TERRACOTTA) > 0 &&
+                        materials.count(BlockId::WATER) > 0,
+                    "desert well lacks terracotta or water");
+            checkedWellMaterials = true;
+        }
+    }
+    require(checkedVillageMaterials && checkedIglooMaterials &&
+                checkedWellMaterials,
+            "exploration window did not expose village, igloo, or well");
+
+    // Structure Chest/Furnace blocks must ride the pending channel as
+    // entity-registration requests so streamed work blocks stay interactive.
+    {
+        StructurePlacement village{};
+        bool foundVillage = false;
+        for (const StructurePlacement& placement : explorationStructures) {
+            if (placement.type == StructureType::Village) {
+                village = placement;
+                foundVillage = true;
+                break;
+            }
+        }
+        require(foundVillage,
+                "no village available for entity-registration check");
+        const int anchorX = -8192 + village.localX;
+        const int anchorZ = -8192 + village.localZ;
+        const auto floorChunk16 = [](int value) {
+            const int quotient = value / Config::CHUNK_SIZE_X;
+            return value % Config::CHUNK_SIZE_X < 0 ? quotient - 1 : quotient;
+        };
+        const int originCX = floorChunk16(anchorX - 24);
+        const int originCZ = floorChunk16(anchorZ - 24);
+        WorldGenerator entityWorld(seed);
+        std::vector<std::unique_ptr<Chunk>> entityOwned;
+        std::vector<Chunk*> entityChunks;
+        for (int cz = 0; cz < 3; ++cz) {
+            for (int cx = 0; cx < 3; ++cx) {
+                entityOwned.push_back(std::make_unique<Chunk>(
+                    originCX + cx, originCZ + cz));
+                entityChunks.push_back(entityOwned.back().get());
+            }
+        }
+        std::vector<RegionGenerationData::PendingBlock> entityPending;
+        entityWorld.generateRegion(originCX, originCZ, 3,
+                                   Config::REGION_PADDING, entityChunks,
+                                   entityPending);
+        size_t workBlockRequests = 0;
+        for (const RegionGenerationData::PendingBlock& pending : entityPending) {
+            if ((pending.id == BlockId::CHEST ||
+                 pending.id == BlockId::FURNACE) &&
+                pending.overwrite && pending.needsBlockEntity)
+                ++workBlockRequests;
+        }
+        require(workBlockRequests > 0,
+                "structure work blocks did not request block-entity registration");
     }
 
     // Ore remains a sparse replacement of the host rock. This guards against
     // threshold regressions that turn most underground stone into ore.
     std::array<size_t, 4> oreCounts{};
     size_t sampledHostBlocks = 0;
-    OreGenerator& ores = singletonWorld.getOreGenerator();
+    WorldGenerator oreWorld(seed);
+    OreGenerator& ores = oreWorld.getOreGenerator();
     for (int z = -64; z < 64; ++z) {
         for (int x = -64; x < 64; ++x) {
             for (int y = 4; y < 122; ++y) {
