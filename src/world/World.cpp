@@ -230,6 +230,25 @@ glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
                     center.biome == Biome::BLACK_SAND_COAST ||
                     center.height >= Config::WORLD_MAX_Y - 8)
                     continue;
+                if (m_generator.isHeaven()) {
+                    // Heaven spawn points must sit on a primary island with
+                    // a broad walkable apron.  Sampling a small world-space
+                    // square rejects narrow ledges and detached satellites
+                    // before the streaming pipeline is started.
+                    bool broadIsland = true;
+                    for (int dz = -6; dz <= 6 && broadIsland; dz += 3) {
+                        for (int dx = -6; dx <= 6; dx += 3) {
+                            const SurfaceColumn neighbor =
+                                m_generator.sampleTerrainColumn(x + dx, z + dz);
+                            if (neighbor.height <= neighbor.waterLevel ||
+                                std::abs(neighbor.height - center.height) > 8) {
+                                broadIsland = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!broadIsland) continue;
+                }
                 if (!hasFallback) {
                     fallback = {x, z};
                     hasFallback = true;

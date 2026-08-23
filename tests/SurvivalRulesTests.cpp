@@ -28,6 +28,8 @@ int main() {
     static_assert(static_cast<uint16_t>(ItemId::BLASTLING_SPAWN_EGG) == 134);
     static_assert(static_cast<uint16_t>(ItemId::LIMESTONE) == 135);
     static_assert(static_cast<uint16_t>(ItemId::GRANITE) == 142);
+    static_assert(static_cast<uint16_t>(ItemId::AETHER_GRASS) == 143);
+    static_assert(static_cast<uint16_t>(ItemId::STARFLOWER) == 150);
     for (const auto& mapping : {
              std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
              std::pair{BlockId::BASALT, ItemId::BASALT},
@@ -44,6 +46,29 @@ int main() {
         require(drops.size() == 1 && drops.front().id == mapping.second,
                 "v7 natural block did not drop itself");
     }
+    const ItemStack hand{};
+    const ItemStack woodenShovel{ItemId::WOODEN_SHOVEL, 1, 0};
+    const ItemStack woodenAxe{ItemId::WOODEN_AXE, 1, 0};
+    const ItemStack stoneHarvest{ItemId::STONE_PICKAXE, 1, 0};
+    for (const auto& mapping : {
+             std::pair{BlockId::AETHER_GRASS, ItemId::AETHER_GRASS},
+             std::pair{BlockId::AETHER_SOIL, ItemId::AETHER_SOIL},
+             std::pair{BlockId::CLOUDSTONE, ItemId::CLOUDSTONE},
+             std::pair{BlockId::SUNSTONE, ItemId::SUNSTONE},
+             std::pair{BlockId::SKYROOT_WOOD, ItemId::SKYROOT_LOG},
+             std::pair{BlockId::SKYROOT_LEAVES, ItemId::SKYROOT_LEAVES},
+             std::pair{BlockId::STAR_CRYSTAL, ItemId::STAR_CRYSTAL},
+             std::pair{BlockId::STARFLOWER, ItemId::STARFLOWER}}) {
+        const ItemStack& tool =
+            mapping.first == BlockId::AETHER_GRASS ||
+            mapping.first == BlockId::AETHER_SOIL ? woodenShovel :
+            mapping.first == BlockId::SKYROOT_WOOD ? woodenAxe :
+            (mapping.first == BlockId::STARFLOWER ||
+             mapping.first == BlockId::SKYROOT_LEAVES) ? hand : stoneHarvest;
+        const auto drops = getBlockDrops(mapping.first, tool, 0);
+        require(drops.size() == 1 && drops.front().id == mapping.second,
+                "Heaven block did not drop its appended inventory item");
+    }
     require(canTillBlock(ItemId::WOODEN_HOE,BlockId::GRASS,1)&&
             canTillBlock(ItemId::DIAMOND_HOE,BlockId::DIRT,1),
             "hoes can till the top face of grass and dirt in shared gameplay logic");
@@ -51,7 +76,6 @@ int main() {
             !canTillBlock(ItemId::WOODEN_HOE,BlockId::STONE,1)&&
             !canTillBlock(ItemId::WOODEN_HOE,BlockId::DIRT,0),
             "tilling rejects non-hoes, invalid blocks, and side faces");
-    const ItemStack hand{};
     const ItemStack woodenPick{ItemId::WOODEN_PICKAXE, 1, 0};
     const ItemStack stonePick{ItemId::STONE_PICKAXE, 1, 0};
     const ItemStack ironPick{ItemId::IRON_PICKAXE, 1, 0};

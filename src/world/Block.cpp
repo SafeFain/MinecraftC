@@ -35,7 +35,10 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "snow_layer", "fire", "glass", "tnt", "obsidian", "dandelion",
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
     "sunflower_top", "cloud", "limestone", "basalt", "tuff",
-    "coarse_dirt", "mud", "packed_ice", "black_sand", "granite"
+    "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
+    "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
+    "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
+    "star_crystal", "starflower"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -249,6 +252,17 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Fluid, RenderLayer::Translucent, .62f },
     { BlockId::FALLING_LAVA, "Falling Lava", glm::vec3(.95f, .50f, .10f), false, true,
       RenderShape::Fluid, RenderLayer::Translucent, .86f },
+    { BlockId::AETHER_GRASS, "Aether Grass", glm::vec3(.42f, .78f, .40f), true, false },
+    { BlockId::AETHER_SOIL, "Aether Soil", glm::vec3(.50f, .36f, .22f), true, false },
+    { BlockId::CLOUDSTONE, "Cloudstone", glm::vec3(.70f, .78f, .82f), true, false },
+    { BlockId::SUNSTONE, "Sunstone", glm::vec3(.88f, .71f, .35f), true, false },
+    { BlockId::SKYROOT_WOOD, "Skyroot Wood", glm::vec3(.62f, .48f, .30f), true, false },
+    { BlockId::SKYROOT_LEAVES, "Skyroot Leaves", glm::vec3(.42f, .72f, .38f), true, false,
+      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
+    { BlockId::STAR_CRYSTAL, "Star Crystal", glm::vec3(.30f, .78f, .92f), true, true,
+      RenderShape::Cube, RenderLayer::Translucent, .68f },
+    { BlockId::STARFLOWER, "Starflower", glm::vec3(.64f, .52f, .96f), false, true,
+      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -352,6 +366,17 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::PACKED_ICE:      return BlockTexture::PackedIce;
         case BlockId::BLACK_SAND:      return BlockTexture::BlackSand;
         case BlockId::GRANITE:         return BlockTexture::Granite;
+        case BlockId::AETHER_GRASS:    return top ? BlockTexture::AetherGrassTop :
+                                             bottom ? BlockTexture::AetherSoil :
+                                             BlockTexture::AetherGrassSide;
+        case BlockId::AETHER_SOIL:     return BlockTexture::AetherSoil;
+        case BlockId::CLOUDSTONE:      return BlockTexture::Cloudstone;
+        case BlockId::SUNSTONE:        return BlockTexture::Sunstone;
+        case BlockId::SKYROOT_WOOD:    return top || bottom ? BlockTexture::SkyrootLogTop :
+                                             BlockTexture::SkyrootLog;
+        case BlockId::SKYROOT_LEAVES:  return BlockTexture::SkyrootLeaves;
+        case BlockId::STAR_CRYSTAL:    return BlockTexture::StarCrystal;
+        case BlockId::STARFLOWER:      return BlockTexture::Starflower;
         default:                     return BlockTexture::Dirt;
     }
 }
@@ -551,6 +576,8 @@ bool isLava(BlockId id) {
 
 uint8_t getLightEmission(BlockId id) {
     if (id == BlockId::TORCH) return 14;
+    if (id == BlockId::STAR_CRYSTAL) return 8;
+    if (id == BlockId::STARFLOWER) return 5;
     return id == BlockId::FIRE || isLava(id) ? 15 : 0;
 }
 
@@ -560,7 +587,7 @@ uint8_t getLightDampening(BlockId id) {
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
         id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
-        isLava(id)) return 1;
+        id == BlockId::SKYROOT_LEAVES || isLava(id)) return 1;
     if (isWater(id) || id == BlockId::ICE) return 2;
     return getBlockProps(id).transparent ? 0 : 15;
 }
@@ -636,7 +663,8 @@ bool isSunflower(BlockId id) {
 bool isFlower(BlockId id) {
     return id == BlockId::FLOWER || id == BlockId::DANDELION ||
            id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
-           id == BlockId::OXEYE_DAISY || isSunflower(id);
+           id == BlockId::OXEYE_DAISY || id == BlockId::STARFLOWER ||
+           isSunflower(id);
 }
 
 bool isReplaceableByFluid(BlockId id) {
@@ -655,12 +683,13 @@ uint8_t fireEncouragement(BlockId id) {
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-        case BlockId::ACACIA_WOOD: return 5;
+        case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: return 5;
         case BlockId::PLANKS: case BlockId::CRAFTING_TABLE:
         case BlockId::CHEST: return 5;
         case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
         case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
-        case BlockId::ACACIA_LEAVES: case BlockId::WHITE_WOOL: return 30;
+        case BlockId::ACACIA_LEAVES: case BlockId::SKYROOT_LEAVES:
+        case BlockId::WHITE_WOOL: return 30;
         case BlockId::OAK_SAPLING: case BlockId::BIRCH_SAPLING:
         case BlockId::SPRUCE_SAPLING: case BlockId::JUNGLE_SAPLING:
         case BlockId::ACACIA_SAPLING: case BlockId::TALL_GRASS:
@@ -671,7 +700,7 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::WHEAT_7: case BlockId::DANDELION:
         case BlockId::BLUE_ORCHID: case BlockId::ALLIUM:
         case BlockId::OXEYE_DAISY: case BlockId::SUNFLOWER_BOTTOM:
-        case BlockId::SUNFLOWER_TOP: return 60;
+        case BlockId::SUNFLOWER_TOP: case BlockId::STARFLOWER: return 60;
         case BlockId::TNT: return 100;
         default: return 0;
     }
@@ -684,7 +713,7 @@ uint8_t burnOdds(BlockId id) {
         switch (id) {
             case BlockId::WOOD: case BlockId::BIRCH_WOOD:
             case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-            case BlockId::ACACIA_WOOD: return 5;
+            case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: return 5;
             default: return 20;
         }
     }

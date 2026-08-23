@@ -164,6 +164,15 @@ enum class ItemId : uint16_t {
     BLACK_SAND,
     GRANITE,
 
+    AETHER_GRASS,
+    AETHER_SOIL,
+    CLOUDSTONE,
+    SUNSTONE,
+    SKYROOT_LOG,
+    SKYROOT_LEAVES,
+    STAR_CRYSTAL,
+    STARFLOWER,
+
     COUNT,
     POPPY = FLOWER
 };

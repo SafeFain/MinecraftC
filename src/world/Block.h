@@ -119,7 +119,18 @@ enum class BlockId : uint8_t {
     // stable; they are derived and never written to block overrides.
     FALLING_WATER = 104,
     FALLING_LAVA  = 105,
-    COUNT        = 106,
+    // Heaven materials are appended so every pre-existing serialized ID
+    // remains stable.  They are shared by generated terrain and the creative
+    // inventory, while the dimension decides where they naturally appear.
+    AETHER_GRASS  = 106,
+    AETHER_SOIL   = 107,
+    CLOUDSTONE    = 108,
+    SUNSTONE      = 109,
+    SKYROOT_WOOD  = 110,
+    SKYROOT_LEAVES = 111,
+    STAR_CRYSTAL  = 112,
+    STARFLOWER    = 113,
+    COUNT        = 114,
     POPPY        = FLOWER
 };
 
@@ -185,6 +196,8 @@ enum class BlockTexture : uint8_t {
     SnowLayer, Fire, Glass, Tnt, Obsidian, Dandelion, BlueOrchid, Allium,
     OxeyeDaisy, SunflowerBottom, SunflowerTop, Cloud,
     Limestone, Basalt, Tuff, CoarseDirt, Mud, PackedIce, BlackSand, Granite,
+    AetherGrassTop, AetherGrassSide, AetherSoil, Cloudstone, Sunstone,
+    SkyrootLog, SkyrootLogTop, SkyrootLeaves, StarCrystal, Starflower,
     Count
 };
 

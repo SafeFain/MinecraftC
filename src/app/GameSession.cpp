@@ -236,7 +236,8 @@ void GameSession::updatePlaying(
             weather.rainGradient() * (rainExposure ? 0.72f : 0.06f));
     if (!playerDead) player.update(dt);
     particles.update(world, player.getPosition(), dt, weather.rainGradient(),
-                     worldMetadata.seed ^ survivalTicks);
+                     worldMetadata.seed ^ survivalTicks, dimension,
+                     dayNightCycle.evaluate().daylight);
     const bool peaceful = player.difficulty() == Difficulty::Peaceful;
     entities.update(player, dt, dayNightCycle.isDay(), peaceful,
                     player.isSurvival(), !player.isSpectator(),

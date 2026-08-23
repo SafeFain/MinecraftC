@@ -37,7 +37,7 @@ void main(){
     }else if(kind<3.5){
         color=atlasFragment();
         color.a*=0.92;
-    }else{
+    }else if(kind<5.5){
         vec2 centered=(uv-vec2(0.5))*vec2(2.0,2.8);
         float radius=length(centered);
         float inner=0.26+phase*0.34;
@@ -48,6 +48,16 @@ void main(){
             (1.0-smoothstep(0.46,0.82,centered.y));
         color=vec4(0.52,0.76,0.94,
             (ring*0.72+crown*0.25)*(1.0-phase));
+    }else{
+        vec2 centered=uv-vec2(0.5);
+        float radius=length(centered*vec2(2.0));
+        float glow=1.0-smoothstep(0.05,0.72,radius);
+        float pulse=0.72+0.28*sin(frame.cameraUpIntensity.w*4.0+phase*6.283);
+        vec3 dayColor=vec3(1.0,0.84,0.38),nightColor=vec3(0.40,0.58,1.0);
+        vec3 tint=mix(nightColor,dayColor,clamp(textureIndex,0.0,1.0));
+        tint=mix(tint,vec3(0.78,0.42,1.0),0.5+0.5*sin(phase*9.0));
+        color=vec4(tint,
+            glow*pulse*0.72*frame.cameraUpIntensity.w);
     }
     if(color.a<0.01)discard;
     if(frame.atlasParams.y>0.5)

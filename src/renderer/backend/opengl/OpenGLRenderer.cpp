@@ -649,6 +649,8 @@ void Renderer::renderSky(const RenderEnvironment& environment,
     m_skyShader->setFloat("uStarIntensity", environment.starIntensity);
     m_skyShader->setFloat("uRainIntensity", environment.rainIntensity);
     m_skyShader->setFloat("uThunderIntensity", environment.thunderIntensity);
+    m_skyShader->setInt("uSkyStyle",
+                        environment.skyStyle == RenderSkyStyle::Heaven ? 1 : 0);
     m_skyShader->setFloat("uWeatherTime", static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())));
     const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
     m_skyShader->setInt("uRenderClouds",
@@ -927,6 +929,7 @@ void Renderer::renderClouds(const glm::dvec3& playerPosition,
                             const glm::mat4& viewProjection,
                             uint64_t worldSeed, float timeSeconds,
                             int renderDistanceBlocks) {
+    if (m_environment.skyStyle == RenderSkyStyle::Heaven) return;
     if (!visualQualityConfig(m_visualQuality).voxelClouds) return;
     // A coherent density field creates broad voxel cloud masses. Instancing
     // keeps them to one draw while per-cell face masks remove shared surfaces.

@@ -99,6 +99,14 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
         set(id, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
     for (BlockId id : {BlockId::COARSE_DIRT, BlockId::MUD, BlockId::BLACK_SAND})
         set(id, 0.6f, ToolKind::Shovel);
+    set(BlockId::AETHER_GRASS, 0.6f, ToolKind::Shovel);
+    set(BlockId::AETHER_SOIL, 0.5f, ToolKind::Shovel);
+    set(BlockId::CLOUDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SUNSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SKYROOT_WOOD, 2.0f, ToolKind::Axe);
+    set(BlockId::SKYROOT_LEAVES, 0.2f);
+    set(BlockId::STAR_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::STARFLOWER, 0.0f);
     return values;
 }
 

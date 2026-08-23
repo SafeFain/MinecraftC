@@ -178,6 +178,14 @@
     "mud": {"generator": "block_item_icon", "block": "mud"},
     "packed_ice": {"generator": "block_item_icon", "block": "packed_ice"},
     "black_sand": {"generator": "block_item_icon", "block": "black_sand"},
-    "granite": {"generator": "block_item_icon", "block": "granite"}
+    "granite": {"generator": "block_item_icon", "block": "granite"},
+    "aether_grass": {"generator": "block_item_icon", "block": "aether_grass"},
+    "aether_soil": {"generator": "block_item_icon", "block": "aether_soil"},
+    "cloudstone": {"generator": "block_item_icon", "block": "cloudstone"},
+    "sunstone": {"generator": "block_item_icon", "block": "sunstone"},
+    "skyroot_log": {"generator": "block_item_icon", "block": "skyroot_wood"},
+    "skyroot_leaves": {"generator": "block_item_icon", "block": "skyroot_leaves"},
+    "star_crystal": {"generator": "block_item_icon", "block": "star_crystal"},
+    "starflower": {"generator": "block_item_icon", "block": "starflower"}
   }
 }

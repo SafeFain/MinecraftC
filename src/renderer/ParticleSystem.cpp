@@ -9,6 +9,8 @@
 void ParticleSystem::clear() {
     m_particles.clear();
     m_weatherEmission = 0.0f;
+    m_skyMoteEmission = 0.0f;
+    m_skyDaylight = 1.0f;
 }
 
 uint64_t ParticleSystem::randomBits() {
@@ -58,9 +60,35 @@ void ParticleSystem::emitWeatherParticle(World& world,
     m_particles.push_back(particle);
 }
 
+void ParticleSystem::emitSkyMote(const glm::dvec3& viewer, uint64_t seed,
+                                 float daylight) {
+    m_randomState ^= seed + 0xA0761D6478BD642FULL;
+    Particle particle;
+    particle.kind = ParticleKind::SkyMote;
+    particle.position = {
+        viewer.x + (randomFloat() * 2.0 - 1.0) * 15.0,
+        viewer.y + (randomFloat() * 2.0 - 0.45) * 10.0,
+        viewer.z + (randomFloat() * 2.0 - 1.0) * 15.0};
+    particle.velocity = {
+        (randomFloat() - 0.5f) * 0.18f,
+        (randomFloat() - 0.5f) * 0.10f,
+        (randomFloat() - 0.5f) * 0.18f};
+    particle.lifetime = 5.0f + randomFloat() * 5.0f;
+    particle.phase = randomFloat();
+    // Sky motes reuse the texture channel as an environment-color scalar;
+    // ordinary weather particles continue to store their atlas tile there.
+    particle.texture = std::clamp(daylight, 0.0f, 1.0f);
+    particle.size = 0.10f + randomFloat() * 0.12f;
+    particle.rotation = randomFloat() * 6.2831853f;
+    particle.angularVelocity = (randomFloat() - 0.5f) * 1.8f;
+    m_particles.push_back(particle);
+}
+
 void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
-                            float rainIntensity, uint64_t seed) {
+                            float rainIntensity, uint64_t seed,
+                            DimensionId dimension, float daylight) {
     dt = std::min(dt, 0.1f);
+    m_skyDaylight = std::clamp(daylight, 0.0f, 1.0f);
     if (rainIntensity > 0.01f) {
         m_weatherEmission += dt * rainIntensity * 520.0f;
         const int count = std::min(64, static_cast<int>(m_weatherEmission));
@@ -69,6 +97,22 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             emitWeatherParticle(world, viewer, seed + static_cast<uint64_t>(i));
     } else {
         m_weatherEmission = 0.0f;
+    }
+    if (dimension == DimensionId::Heaven) {
+        m_skyMoteEmission += dt * 24.0f;
+        const int count = std::min(
+            static_cast<int>(MAX_SKY_MOTES_PER_UPDATE),
+            static_cast<int>(m_skyMoteEmission));
+        m_skyMoteEmission -= count;
+        for (int i = 0; i < count && m_particles.size() < MAX_PARTICLES; ++i)
+            emitSkyMote(viewer, seed + static_cast<uint64_t>(i) * 17u,
+                        m_skyDaylight);
+    } else {
+        m_skyMoteEmission = 0.0f;
+        m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
+            [](const Particle& particle) {
+                return particle.kind == ParticleKind::SkyMote;
+            }), m_particles.end());
     }
 
     for (auto& particle : m_particles) {
@@ -88,6 +132,19 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             const float sway = std::sin(particle.age * 2.4f + particle.phase * 6.283f);
             particle.velocity.x += sway * dt * 0.6f;
             particle.velocity.z += std::cos(particle.age * 1.9f + particle.phase) * dt * 0.4f;
+        } else if (particle.kind == ParticleKind::SkyMote) {
+            particle.velocity.x += std::sin(
+                particle.age * 0.8f + particle.phase * 6.283f) * dt * 0.035f;
+            particle.velocity.y += std::cos(
+                particle.age * 0.6f + particle.phase * 4.1f) * dt * 0.025f;
+            particle.velocity.z += std::sin(
+                particle.age * 0.7f + particle.phase * 3.3f) * dt * 0.035f;
+            particle.rotation += particle.angularVelocity * dt;
+        }
+
+        if (particle.kind == ParticleKind::SkyMote) {
+            particle.position += glm::dvec3(particle.velocity) * static_cast<double>(dt);
+            continue;
         }
 
         const glm::dvec3 next = particle.position + glm::dvec3(particle.velocity) *

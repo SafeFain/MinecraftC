@@ -8,9 +8,13 @@
 
 namespace {
 
-constexpr int HEAVEN_ISLAND_MIN_Y = 80;
+constexpr int HEAVEN_ISLAND_MIN_Y = 72;
 constexpr uint64_t HEAVEN_SEED_DOMAIN = 0x484556454E5F5345ULL;
 constexpr uint64_t HEAVEN_ISLAND_DOMAIN = 0x48454156454E4953ULL;
+constexpr uint64_t HEAVEN_SATELLITE_DOMAIN = 0x484556534154454CULL;
+constexpr uint64_t HEAVEN_LANDMARK_DOMAIN = 0x4845565255494E53ULL;
+constexpr uint64_t HEAVEN_ECOLOGY_DOMAIN = 0x48455645434F4C4FULL;
+constexpr int HEAVEN_LANDMARK_CELL = 192;
 
 // These fields deliberately use world coordinates directly.  The broad field
 // makes archipelagos and voids, while the smaller field breaks coastlines into
@@ -34,9 +38,28 @@ int floorDiv(int value, int divisor) {
     return value % divisor < 0 ? quotient - 1 : quotient;
 }
 
+int heavenEcologyBand(int worldX, int worldZ) {
+    // Broad, world-coordinate bands guarantee that a normal exploration
+    // window encounters all four sanctuary ecologies while retaining
+    // deterministic boundaries across chunks and negative coordinates.
+    constexpr int cellSize = 256;
+    int band = floorDiv(worldX, cellSize) + 2 * floorDiv(worldZ, cellSize);
+    band %= 4;
+    return band < 0 ? band + 4 : band;
+}
+
 uint64_t dimensionSeed(uint64_t seed, DimensionId dimension) {
     return dimension == DimensionId::Heaven
         ? WorldGenContext(seed).derive(HEAVEN_SEED_DOMAIN) : seed;
+}
+
+bool inChunk(int worldX, int worldZ, int baseX, int baseZ) {
+    return worldX >= baseX && worldX < baseX + Config::CHUNK_SIZE_X &&
+           worldZ >= baseZ && worldZ < baseZ + Config::CHUNK_SIZE_Z;
+}
+
+int hashPercent(uint64_t seed, int x, int y, int z) {
+    return static_cast<int>(WorldGenContext::hashPosition(seed, x, y, z) % 100u);
 }
 
 } // namespace
@@ -107,6 +130,11 @@ SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const 
         ? superflatColumn() : m_heightPipeline.sampleColumn(worldX, worldZ);
 }
 
+WorldGenerator::HeavenEcology WorldGenerator::heavenEcologyAt(
+    int worldX, int worldZ) const {
+    return sampleHeavenIsland(worldX, worldZ).ecology;
+}
+
 void WorldGenerator::populateSuperflat(Chunk& chunk) {
     const int bedrockY = Config::WORLD_MIN_Y;
     const int dirtTop = bedrockY + 2;
@@ -154,8 +182,11 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
         const int biome = static_cast<int>(WorldGenContext::hashPosition(
             islandSeed, floorDiv(worldX, 64), 0,
             floorDiv(worldZ, 64)) % BIOME_COUNT);
+        const auto ecology = static_cast<HeavenEcology>(
+            heavenEcologyBand(worldX, worldZ));
         return {false, static_cast<Biome>(biome),
-                Config::WORLD_MIN_Y - 1, Config::WORLD_MIN_Y, 1.0f};
+                Config::WORLD_MIN_Y - 1, Config::WORLD_MIN_Y, 1.0f,
+                ecology};
     }
 
     HeavenIslandColumn island;
@@ -176,6 +207,8 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
         static_cast<int>(humidity * 5.0f), 0, 4);
     island.biome = static_cast<Biome>(
         (temperatureBand * 5 + humidityBand) % BIOME_COUNT);
+    const int ecologyBand = heavenEcologyBand(worldX, worldZ);
+    island.ecology = static_cast<HeavenEcology>(ecologyBand);
 
     // The summit height is independent of the footprint.  Its two coherent
     // fields give wide plateaus with gentle slopes instead of a per-island
@@ -188,7 +221,7 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
         x * HEAVEN_RELIEF_SCALE - 733.0f,
         z * HEAVEN_RELIEF_SCALE + 809.0f);
     island.top = std::clamp(static_cast<int>(std::lround(
-        154.0f + topBase * 30.0f + topRelief * 10.0f)), 104, 224);
+        154.0f + topBase * 20.0f + topRelief * 4.0f)), 104, 236);
 
     // Interior depth is driven by mask density, not distance to an anchor.
     // The underside field then varies the taper from column to column, giving
@@ -205,96 +238,236 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
         (20.0f + undersideNoise * 24.0f);
     const int depth = std::clamp(static_cast<int>(std::lround(depthValue)),
                                  6, 52);
-    island.bottom = std::max(HEAVEN_ISLAND_MIN_Y, island.top - depth + 1);
+    const float spikeNoise = 0.5f + 0.5f * m_noise.noise2D(
+        x * 0.018f - 1217.0f, z * 0.018f + 1289.0f);
+    const int spikeDepth = spikeNoise > 0.72f
+        ? static_cast<int>(std::lround((spikeNoise - 0.72f) * 55.0f)) : 0;
+    island.bottom = std::max(HEAVEN_ISLAND_MIN_Y,
+                             island.top - depth - spikeDepth + 1);
     // Preserve the old pool predicate's meaning: low values are island
     // interiors, high values are coastlines.
     island.islandFactor = 1.0f - interior;
     return island;
 }
 
+WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenSatellite(
+    int worldX, int worldZ) const {
+    HeavenIslandColumn satellite;
+    satellite.ecology = heavenEcologyAt(worldX, worldZ);
+    const HeavenIslandColumn primary = sampleHeavenIsland(worldX, worldZ);
+    if (primary.present) return satellite;
+
+    const float x = static_cast<float>(worldX);
+    const float z = static_cast<float>(worldZ);
+    const float domainOffset = static_cast<float>(
+        (HEAVEN_SATELLITE_DOMAIN >> 8) & 0xffu);
+    const float broad = m_noise.octave2D(
+        x * 0.0065f + 211.0f + domainOffset,
+        z * 0.0065f - 337.0f - domainOffset, 2, 0.55f, 2.0f);
+    const float detail = m_noise.noise2D(
+        x * 0.021f - 419.0f + domainOffset * 0.5f,
+        z * 0.021f + 503.0f - domainOffset * 0.5f);
+    const float field = broad * 0.72f + detail * 0.28f;
+    // The high-field tail is intentionally uncommon, but a threshold below
+    // the signed-noise upper shoulder keeps a few satellites visible in a
+    // normal first-kilometre exploration window for every seed.
+    if (field < 0.24f) return satellite;
+
+    satellite.present = true;
+    satellite.satellite = true;
+    satellite.ecology = field > 0.82f
+        ? HeavenEcology::StarCrystalGarden : HeavenEcology::SunstoneHeights;
+    const float heightNoise = 0.5f + 0.5f * m_noise.noise2D(
+        x * 0.010f + 601.0f, z * 0.010f - 733.0f);
+    satellite.satelliteTop = std::clamp(static_cast<int>(std::lround(
+        242.0f + heightNoise * 34.0f)), 232, 286);
+    const int thickness = 5 + static_cast<int>(std::lround(heightNoise * 13.0f));
+    satellite.satelliteBottom = satellite.satelliteTop - thickness + 1;
+    satellite.top = satellite.satelliteTop;
+    satellite.bottom = satellite.satelliteBottom;
+    satellite.islandFactor = 0.45f;
+    return satellite;
+}
+
 void WorldGenerator::populateHeaven(
     Chunk& chunk, WorldGenerator& generator) {
     const int baseX = chunk.worldX();
     const int baseZ = chunk.worldZ();
-    int heightMap[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
-    Biome biomeMap[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
-    bool riverMap[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
+    const auto setLocal = [&](int worldX, int worldY, int worldZ, BlockId id) {
+        if (!inChunk(worldX, worldZ, baseX, baseZ) ||
+            !Config::isValidWorldY(worldY)) return;
+        const int localX = worldX - baseX;
+        const int localZ = worldZ - baseZ;
+        chunk.blockAt(localX, worldY, localZ) = static_cast<uint8_t>(id);
+    };
+    const auto setIfAir = [&](int worldX, int worldY, int worldZ, BlockId id) {
+        if (!inChunk(worldX, worldZ, baseX, baseZ) ||
+            !Config::isValidWorldY(worldY)) return;
+        const int localX = worldX - baseX;
+        const int localZ = worldZ - baseZ;
+        if (chunk.blockAt(localX, worldY, localZ) ==
+            static_cast<uint8_t>(BlockId::AIR))
+            chunk.blockAt(localX, worldY, localZ) = static_cast<uint8_t>(id);
+    };
+    const auto surfaceBlock = [](HeavenEcology ecology) {
+        switch (ecology) {
+            case HeavenEcology::SunstoneHeights: return BlockId::SUNSTONE;
+            case HeavenEcology::StarCrystalGarden: return BlockId::MOSS;
+            case HeavenEcology::DawnMeadow:
+            case HeavenEcology::SkyrootGrove: return BlockId::AETHER_GRASS;
+        }
+        return BlockId::AETHER_GRASS;
+    };
+    const auto fillColumn = [&](int worldX, int worldZ,
+                                const HeavenIslandColumn& island) {
+        if (!island.present) return;
+        const bool satellite = island.satellite;
+        const int bottom = satellite ? island.satelliteBottom : island.bottom;
+        const int top = satellite ? island.satelliteTop : island.top;
+        for (int worldY = bottom; worldY <= top; ++worldY) {
+            BlockId block = BlockId::CLOUDSTONE;
+            if (worldY == top) {
+                block = surfaceBlock(island.ecology);
+            } else if (!satellite && worldY >= top - 2 &&
+                       island.ecology != HeavenEcology::SunstoneHeights) {
+                block = BlockId::AETHER_SOIL;
+            } else if (island.ecology == HeavenEcology::SunstoneHeights &&
+                       hashPercent(generator.m_seed ^ HEAVEN_ECOLOGY_DOMAIN,
+                                   worldX, worldY, worldZ) < 13) {
+                block = BlockId::SUNSTONE;
+            }
+            setLocal(worldX, worldY, worldZ, block);
+        }
+    };
+
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             const int wx = baseX + x;
             const int wz = baseZ + z;
             const HeavenIslandColumn island =
                 generator.sampleHeavenIsland(wx, wz);
-            heightMap[x][z] = island.top;
-            biomeMap[x][z] = island.biome;
-            if (!island.present) {
-                chunk.setColumnMaxY(x, z, Config::WORLD_MIN_Y - 1);
-                continue;
-            }
-            const BiomeProperties& properties = getBiomeProps(island.biome);
-            SurfaceRuleContext surfaceContext;
-            surfaceContext.biome = island.biome;
-            surfaceContext.height = island.top;
-            surfaceContext.waterLevel = Config::WORLD_MIN_Y - 1;
-            const SurfaceProfile profile = SurfaceRules::profile(
-                generator.m_seed ^ HEAVEN_ISLAND_DOMAIN, wx, wz,
-                surfaceContext);
-            for (int y = island.bottom; y <= island.top; ++y) {
-                BlockId block = BlockId::STONE;
-                if (y >= island.top - profile.depth + 1)
-                    block = y == island.top ? profile.top : profile.under;
-                if (block == BlockId::STONE) {
-                    const BlockId ore = generator.m_oreGenerator.getOre(
-                        static_cast<float>(wx) + 0.5f,
-                        static_cast<float>(y) + 0.5f,
-                        static_cast<float>(wz) + 0.5f, block);
-                    if (ore != BlockId::AIR) block = ore;
-                }
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(block);
-            }
-            // Reuse the deterministic surface decoration rules. Trees are
-            // placed in a separate pass below so their trunks never alter the
-            // island body decision.
-            bool decorated = false;
-            if ((island.biome == Biome::OCEAN ||
-                 island.biome == Biome::DEEP_OCEAN) &&
-                island.islandFactor < 0.20f &&
-                island.top + 1 < Config::WORLD_MAX_Y) {
-                // Ocean biomes become small, finite summit basins rather
-                // than an unbounded sea around the floating island.
-                chunk.blockAt(x, island.top + 1, z) =
-                    static_cast<uint8_t>(BlockId::WATER);
-                decorated = true;
-            }
-            if (island.top + 1 < Config::WORLD_MAX_Y &&
-                properties.decorationDensity > 0) {
-                const BlockId decoration = SurfaceRules::decoration(
-                    generator.m_seed ^ HEAVEN_ISLAND_DOMAIN, wx, wz,
-                    island.top, island.biome, false);
-                if (decoration != BlockId::AIR) {
-                    chunk.blockAt(x, island.top + 1, z) =
-                        static_cast<uint8_t>(decoration);
-                    decorated = true;
-                }
-            }
-            chunk.setColumnMaxY(x, z, island.top + (decorated ? 1 : 0));
+            fillColumn(wx, wz, island);
+            fillColumn(wx, wz, generator.sampleHeavenSatellite(wx, wz));
         }
     }
 
-    // The normal tree selector is coordinate based, so using it here keeps
-    // island vegetation deterministic without making generation depend on a
-    // neighbouring chunk or region request order.  The island path keeps the
-    // owning trunk/canopy blocks local so singleton and region paths remain
-    // exactly equivalent.
-    const auto trees = generator.m_treeGenerator.generateTrees(
-        baseX, baseZ, heightMap, biomeMap, riverMap);
-    for (const auto& tree : trees) {
-        if (heightMap[tree.localX][tree.localZ] < Config::SEA_LEVEL)
-            continue;
-        generator.placeTree(
-            chunk, tree.localX, tree.baseY + 1, tree.localZ,
-            tree.type, tree.trunkHeight, {}, baseX, baseZ);
+    // Skyroot trees are selected in world coordinates and each chunk writes
+    // only the part of a tree it owns. This keeps region and singleton paths
+    // independent of request order while still allowing canopies to cross a
+    // chunk boundary.
+    for (int worldX = baseX - 5; worldX <= baseX + 20; ++worldX) {
+        for (int worldZ = baseZ - 5; worldZ <= baseZ + 20; ++worldZ) {
+            const HeavenIslandColumn island =
+                generator.sampleHeavenIsland(worldX, worldZ);
+            if (!island.present || island.ecology != HeavenEcology::SkyrootGrove ||
+                hashPercent(generator.m_seed ^ HEAVEN_ECOLOGY_DOMAIN,
+                            worldX, 17, worldZ) >= 10)
+                continue;
+            const int trunkHeight = 5 + hashPercent(
+                generator.m_seed ^ HEAVEN_ECOLOGY_DOMAIN, worldX, 23, worldZ) % 4;
+            for (int y = island.top + 1; y < island.top + trunkHeight; ++y)
+                setIfAir(worldX, y, worldZ, BlockId::SKYROOT_WOOD);
+            const int canopyY = island.top + trunkHeight - 1;
+            for (int dx = -2; dx <= 2; ++dx) {
+                for (int dz = -2; dz <= 2; ++dz) {
+                    const int distance = std::abs(dx) + std::abs(dz);
+                    if (distance > 3 || (distance == 3 && (dx + dz) % 2 != 0))
+                        continue;
+                    setIfAir(worldX + dx, canopyY, worldZ + dz,
+                             BlockId::SKYROOT_LEAVES);
+                    if (distance <= 1)
+                        setIfAir(worldX + dx, canopyY + 1, worldZ + dz,
+                                 BlockId::SKYROOT_LEAVES);
+                }
+            }
+        }
     }
+
+    // Glowing plants and crystals make the garden ecology readable from a
+    // distance without introducing a new simulation system.
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            const int wx = baseX + x;
+            const int wz = baseZ + z;
+            const HeavenIslandColumn island = generator.sampleHeavenIsland(wx, wz);
+            if (!island.present || island.top + 1 >= Config::WORLD_MAX_Y) continue;
+            const int roll = hashPercent(generator.m_seed ^ HEAVEN_ECOLOGY_DOMAIN,
+                                          wx, 31, wz);
+            if (island.ecology == HeavenEcology::StarCrystalGarden && roll < 9) {
+                setIfAir(wx, island.top + 1, wz, BlockId::STAR_CRYSTAL);
+                if (roll < 4) {
+                    setIfAir(wx + 1, island.top + 1, wz, BlockId::STAR_CRYSTAL);
+                    setIfAir(wx, island.top + 1, wz + 1, BlockId::STAR_CRYSTAL);
+                }
+            } else if ((island.ecology == HeavenEcology::DawnMeadow ||
+                        island.ecology == HeavenEcology::StarCrystalGarden) &&
+                       roll < 20) {
+                setIfAir(wx, island.top + 1, wz, BlockId::STARFLOWER);
+            }
+        }
+    }
+
+    // Rare coordinate-owned shrines provide a long-distance landmark. The
+    // anchor is selected from a wide cell, but every piece is written through
+    // setIfAir so the exact same structure appears regardless of chunk order.
+    const int firstCellX = floorDiv(baseX - 8, HEAVEN_LANDMARK_CELL);
+    const int lastCellX = floorDiv(baseX + 23, HEAVEN_LANDMARK_CELL);
+    const int firstCellZ = floorDiv(baseZ - 8, HEAVEN_LANDMARK_CELL);
+    const int lastCellZ = floorDiv(baseZ + 23, HEAVEN_LANDMARK_CELL);
+    for (int cellX = firstCellX; cellX <= lastCellX; ++cellX) {
+        for (int cellZ = firstCellZ; cellZ <= lastCellZ; ++cellZ) {
+            const uint64_t cellSeed = WorldGenContext::hashPosition(
+                generator.m_seed ^ HEAVEN_LANDMARK_DOMAIN, cellX, 0, cellZ);
+            if (cellSeed % 100u >= 24u) continue;
+            const int anchorX = cellX * HEAVEN_LANDMARK_CELL +
+                24 + static_cast<int>((cellSeed >> 8) % 144u);
+            const int anchorZ = cellZ * HEAVEN_LANDMARK_CELL +
+                24 + static_cast<int>((cellSeed >> 20) % 144u);
+            HeavenIslandColumn anchor =
+                generator.sampleHeavenIsland(anchorX, anchorZ);
+            int resolvedAnchorX = anchorX;
+            int resolvedAnchorZ = anchorZ;
+            if (!anchor.present) {
+                // A cell remains rare even when its first hashed point lands
+                // in the void.  Try a bounded deterministic set of points so
+                // the landmark is discoverable without making generation
+                // order or neighboring chunks observable.
+                for (int attempt = 1; attempt < 24 && !anchor.present; ++attempt) {
+                    const uint64_t candidateSeed = WorldGenContext::hashPosition(
+                        cellSeed, attempt, 2, -attempt);
+                    resolvedAnchorX = cellX * HEAVEN_LANDMARK_CELL + 24 +
+                        static_cast<int>((candidateSeed >> 8) % 144u);
+                    resolvedAnchorZ = cellZ * HEAVEN_LANDMARK_CELL + 24 +
+                        static_cast<int>((candidateSeed >> 20) % 144u);
+                    anchor = generator.sampleHeavenIsland(
+                        resolvedAnchorX, resolvedAnchorZ);
+                }
+            }
+            if (!anchor.present)
+                continue;
+            for (int dx = -4; dx <= 4; ++dx) {
+                for (int dz = -4; dz <= 4; ++dz) {
+                    if (std::abs(dx) != 4 && std::abs(dz) != 4) continue;
+                    const HeavenIslandColumn column =
+                        generator.sampleHeavenIsland(resolvedAnchorX + dx,
+                                                     resolvedAnchorZ + dz);
+                    if (!column.present || std::abs(column.top - anchor.top) > 5)
+                        continue;
+                    const int height = 2 + static_cast<int>(
+                        WorldGenContext::hashPosition(cellSeed, dx, 1, dz) % 3u);
+                    for (int y = 1; y <= height; ++y)
+                        setIfAir(resolvedAnchorX + dx, column.top + y,
+                                 resolvedAnchorZ + dz,
+                                 BlockId::SUNSTONE);
+                }
+            }
+            setIfAir(resolvedAnchorX, anchor.top + 1, resolvedAnchorZ,
+                     BlockId::SUNSTONE);
+            setIfAir(resolvedAnchorX, anchor.top + 2, resolvedAnchorZ,
+                     BlockId::STAR_CRYSTAL);
+        }
+    }
+
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             int maxY = Config::WORLD_MIN_Y - 1;

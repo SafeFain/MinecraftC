@@ -33,6 +33,10 @@
     "tuff": {"texture": "tuff"}, "coarse_dirt": {"texture": "coarse_dirt"},
     "mud": {"texture": "mud"}, "packed_ice": {"texture": "packed_ice"},
     "black_sand": {"texture": "black_sand"}, "granite": {"texture": "granite"},
+    "aether_grass": {"texture": "aether_grass_top"}, "aether_soil": {"texture": "aether_soil"},
+    "cloudstone": {"texture": "cloudstone"}, "sunstone": {"texture": "sunstone"},
+    "skyroot_log": {"texture": "skyroot_log"}, "skyroot_leaves": {"texture": "skyroot_leaves"},
+    "star_crystal": {"texture": "star_crystal"}, "starflower": {"texture": "starflower"},
     "copper_ore": {"texture": "copper_ore", "future": true}
   }
 }

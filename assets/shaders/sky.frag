@@ -14,6 +14,7 @@ uniform float uThunderIntensity;
 uniform float uWeatherTime;
 uniform int uRenderClouds;
 uniform int uRenderCirrus;
+uniform int uSkyStyle;
 uniform int uManualGamma;
 
 out vec4 outColor;
@@ -90,6 +91,8 @@ void main() {
     vec4 farPoint = uInverseViewProjection * vec4(vNdc, 1.0, 1.0);
     vec3 world = farPoint.xyz / farPoint.w;
     vec3 ray = normalize(world - uCameraPosition);
+    float heaven = uSkyStyle != 0 ? 1.0 : 0.0;
+    float daylight = smoothstep(-0.12, 0.18, uSunDirection.y);
 
     float height = smoothstep(-0.08, 0.72, ray.y);
     vec3 color = mix(uHorizonColor, uZenithColor, height);
@@ -133,7 +136,31 @@ void main() {
     stars += starLayer(starUv, starFace, 52.0, 0.975, 1.34, uWeatherTime) * 1.18;
     color += stars * clearNight * horizonFade * moonOcclusion;
 
-    if (uRenderCirrus != 0 && ray.y > 0.04) {
+    if (heaven > 0.5 && uRenderClouds != 0) {
+        vec2 seaUv = ray.xz / max(abs(ray.y), 0.12) * 0.16;
+        seaUv += vec2(uWeatherTime * 0.0022, -uWeatherTime * 0.0008);
+        float seaNoise = cloudNoise(seaUv) * 0.64 +
+                         cloudNoise(seaUv * 2.18 + 23.0) * 0.36;
+        float seaHorizon = 1.0 - smoothstep(-0.42, 0.04, ray.y);
+        float seaBreakup = smoothstep(0.40, 0.72, seaNoise);
+        vec3 seaColor = mix(vec3(0.70, 0.86, 0.96),
+                            vec3(0.94, 0.90, 0.74), daylight);
+        color = mix(color, seaColor, seaBreakup * seaHorizon * 0.82);
+    }
+
+    if (heaven > 0.5 && clearNight > 0.05 &&
+        uRenderClouds != 0 && uRenderCirrus != 0) {
+        vec2 auroraUv = ray.xz / max(ray.y + 0.55, 0.18) * 0.75;
+        auroraUv += vec2(uWeatherTime * 0.0012, -uWeatherTime * 0.0004);
+        float curtain = cloudNoise(auroraUv * 1.3) * 0.62 +
+                        cloudNoise(auroraUv * 2.7 + 11.0) * 0.38;
+        curtain = smoothstep(0.58, 0.82, curtain) *
+                  smoothstep(0.04, 0.42, ray.y) * clearNight;
+        color += mix(vec3(0.18, 0.92, 0.78), vec3(0.66, 0.38, 1.0),
+                     0.5 + 0.5 * sin(uWeatherTime * 0.04)) * curtain * 0.18;
+    }
+
+    if (uRenderClouds != 0 && uRenderCirrus != 0 && ray.y > 0.04) {
         vec2 cirrusUv = ray.xz / max(ray.y + 0.20, 0.10);
         cirrusUv = cirrusUv * vec2(0.34, 1.8) +
                    vec2(uWeatherTime * 0.0025, uWeatherTime * 0.0007);
@@ -144,7 +171,7 @@ void main() {
         color += vec3(0.42, 0.48, 0.56) * wisps * 0.16;
     }
 
-    if (uRenderClouds != 0 && ray.y > 0.025) {
+    if (uRenderClouds != 0 && ray.y > 0.025 && heaven < 0.5) {
         vec2 cloudUv = ray.xz / max(ray.y, 0.06) * 0.42;
         cloudUv += vec2(uWeatherTime * 0.012, uWeatherTime * 0.004);
         float noise = cloudNoise(cloudUv) * 0.65 +

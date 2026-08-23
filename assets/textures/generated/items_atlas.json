@@ -26,6 +26,22 @@
       "x": 3,
       "y": 14
     },
+    "aether_grass": {
+      "generator": "block_item_icon",
+      "index": 142,
+      "source": "assets/textures/generated/items/aether_grass.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 17
+    },
+    "aether_soil": {
+      "generator": "block_item_icon",
+      "index": 143,
+      "source": "assets/textures/generated/items/aether_soil.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 17
+    },
     "allium": {
       "generator": "block_item_icon",
       "index": 121,
@@ -161,6 +177,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 6
+    },
+    "cloudstone": {
+      "generator": "block_item_icon",
+      "index": 144,
+      "source": "assets/textures/generated/items/cloudstone.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 18
     },
     "coal": {
       "generator": "item_sprite",
@@ -890,6 +914,22 @@
       "x": 3,
       "y": 16
     },
+    "skyroot_leaves": {
+      "generator": "block_item_icon",
+      "index": 147,
+      "source": "assets/textures/generated/items/skyroot_leaves.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 18
+    },
+    "skyroot_log": {
+      "generator": "block_item_icon",
+      "index": 146,
+      "source": "assets/textures/generated/items/skyroot_log.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 18
+    },
     "snow": {
       "generator": "block_item_icon",
       "index": 39,
@@ -929,6 +969,22 @@
       "source_kind": "generated",
       "x": 1,
       "y": 14
+    },
+    "star_crystal": {
+      "generator": "block_item_icon",
+      "index": 148,
+      "source": "assets/textures/generated/items/star_crystal.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 18
+    },
+    "starflower": {
+      "generator": "block_item_icon",
+      "index": 149,
+      "source": "assets/textures/generated/items/starflower.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 18
     },
     "steak": {
       "generator": "item_sprite",
@@ -1009,6 +1065,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 15
+    },
+    "sunstone": {
+      "generator": "block_item_icon",
+      "index": 145,
+      "source": "assets/textures/generated/items/sunstone.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 18
     },
     "tall_grass": {
       "generator": "block_item_icon",
@@ -1145,7 +1209,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 18,
+  "rows": 19,
   "seed": 213785369,
   "tile_size": 16,
   "version": 1

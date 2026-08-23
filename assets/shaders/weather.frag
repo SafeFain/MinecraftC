@@ -40,7 +40,7 @@ void main() {
         vec2 localUv = fragmentOffset + vUv * 0.42;
         color = texture(uBlockAtlas, tileOrigin + localUv / uAtlasTiles);
         color.a *= 0.92;
-    } else {
+    } else if (vKind < 5.5) {
         vec2 centered = (vUv - vec2(0.5)) * vec2(2.0, 2.8);
         float radius = length(centered);
         float inner = 0.26 + vPhase * 0.34;
@@ -51,6 +51,18 @@ void main() {
                       (1.0 - smoothstep(0.46, 0.82, centered.y));
         color = vec4(0.52, 0.76, 0.94,
                      (ring * 0.72 + crown * 0.25) * (1.0 - vPhase));
+    } else {
+        vec2 centered = vUv - vec2(0.5);
+        float radius = length(centered * vec2(2.0, 2.0));
+        float glow = 1.0 - smoothstep(0.05, 0.72, radius);
+        float pulse = 0.72 + 0.28 * sin(uIntensity * 4.0 + vPhase * 6.283);
+        vec3 dayColor = vec3(1.0, 0.84, 0.38);
+        vec3 nightColor = vec3(0.40, 0.58, 1.0);
+        vec3 tint = mix(nightColor, dayColor, clamp(vTexture, 0.0, 1.0));
+        tint = mix(tint, vec3(0.78, 0.42, 1.0),
+                   0.5 + 0.5 * sin(vPhase * 9.0));
+        color = vec4(tint,
+                     glow * pulse * 0.72 * uIntensity);
     }
     if (color.a < 0.01) discard;
     if (uManualGamma != 0)

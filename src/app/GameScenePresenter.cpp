@@ -37,9 +37,11 @@ void GameScenePresenter::render(
         for (const auto& event : session.lightningEvents)
             lightningFlash = std::max(
                 lightningFlash, std::clamp(event.seconds / 0.2f, 0.0f, 1.0f));
-        const RenderEnvironment environment = applyWeather(
+        RenderEnvironment environment = applyWeather(
             session.dayNightCycle.evaluate(), session.weather.rainGradient(),
             session.weather.thunderGradient(), lightningFlash);
+        if (session.world.isHeaven())
+            environment = applyHeavenEnvironment(environment);
 
         renderer.beginFrame();
         renderer.renderSky(
@@ -131,11 +133,13 @@ void GameScenePresenter::render(
         }
         session.particles.buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
+        const float particleIntensity = session.world.isHeaven()
+            ? 0.72f : session.weather.rainGradient();
         renderer.renderParticles(
             particleRenderData, vp,
             camera.right,
             glm::normalize(glm::cross(camera.forward, camera.right)),
-            session.weather.rainGradient());
+            particleIntensity);
 
         // Wireframe highlight
         auto highlighted = session.player.getHighlightedBlock();

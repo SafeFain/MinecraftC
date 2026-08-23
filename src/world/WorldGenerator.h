@@ -27,6 +27,12 @@
 //
 class WorldGenerator {
 public:
+    enum class HeavenEcology : uint8_t {
+        DawnMeadow,
+        SkyrootGrove,
+        SunstoneHeights,
+        StarCrystalGarden
+    };
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
 
@@ -50,6 +56,7 @@ public:
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }
+    HeavenEcology heavenEcologyAt(int worldX, int worldZ) const;
     uint32_t generationVersion() const {
         return isHeaven() ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
@@ -59,7 +66,7 @@ public:
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
-    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 3;
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 4;
     static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
         (HEAVEN_GENERATION_VERSION << 16) | 1u;
 
@@ -99,8 +106,13 @@ private:
         int top = Config::WORLD_MIN_Y - 1;
         int bottom = Config::WORLD_MIN_Y;
         float islandFactor = 0.0f;
+        HeavenEcology ecology = HeavenEcology::DawnMeadow;
+        bool satellite = false;
+        int satelliteTop = Config::WORLD_MIN_Y - 1;
+        int satelliteBottom = Config::WORLD_MIN_Y;
     };
 
     HeavenIslandColumn sampleHeavenIsland(int worldX, int worldZ) const;
+    HeavenIslandColumn sampleHeavenSatellite(int worldX, int worldZ) const;
     static void populateHeaven(Chunk& chunk, WorldGenerator& generator);
 };

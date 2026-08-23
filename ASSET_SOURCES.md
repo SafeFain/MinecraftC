@@ -22,6 +22,20 @@ Use one section per original or generated asset family.
 - Seed and generator version: atlas metadata records both; format version 1
 - License: original project-generated assets
 
+### Heaven sanctuary materials
+
+- Logical names: `aether_grass_top`, `aether_grass_side`, `aether_soil`,
+  `cloudstone`, `sunstone`, `skyroot_log`, `skyroot_log_top`, `skyroot_leaves`,
+  `star_crystal`, `starflower`
+- Local paths: `assets/textures/generated/` and `assets/textures/generated/items/`
+- Creator/tool: `tools/texture_generator.py`
+- Creation date: 2026-08-23
+- Seed and generator version: atlas metadata records the deterministic seed;
+  format version 1
+- Visual references: broad sky-island ecology references only; no external
+  texture files or protected pixels were imported
+- License: original project-generated assets
+
 ## Procedural entity materials
 
 - Logical names: cow, pig, sheep, chicken, zombie, skeleton, spider, blastling, item

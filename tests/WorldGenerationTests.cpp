@@ -992,8 +992,9 @@ int main() {
                 heaven.queryHeightBiome(0, 0).height,
             "heaven point height and biome queries disagree");
     require(heaven.chunkCacheVersion() != WorldGenContext::CHUNK_CACHE_VERSION &&
-                heaven.generationVersion() != WorldGenContext::GENERATION_VERSION,
-            "heaven cache and generation versions share the overworld key");
+                heaven.generationVersion() != WorldGenContext::GENERATION_VERSION &&
+                heaven.generationVersion() == WorldGenerator::HEAVEN_GENERATION_VERSION,
+            "Heaven v4 cache and generation versions share the overworld key");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
     std::vector<Chunk*> heavenRegionChunks;
@@ -1024,6 +1025,58 @@ int main() {
                             BlockId::BEDROCK,
                         "heaven generated bedrock under an island");
     }
+
+    // v4's four internal ecologies and the new material/landmark layer are
+    // world-coordinate driven, so a fixed exploration window should expose
+    // every visual language without depending on chunk request order.
+    std::array<size_t, 4> heavenEcologyCounts{};
+    for (int z = -1024; z <= 1024; z += 16) {
+        for (int x = -1024; x <= 1024; x += 16) {
+            const SurfaceColumn column = heaven.sampleTerrainColumn(x, z);
+            if (column.height <= Config::WORLD_MIN_Y - 1) continue;
+            ++heavenEcologyCounts[static_cast<size_t>(
+                heaven.heavenEcologyAt(x, z))];
+        }
+    }
+    for (const size_t count : heavenEcologyCounts)
+        require(count > 0, "Heaven v4 exploration window missed an ecology");
+
+    std::array<bool, 8> heavenMaterials{};
+    bool foundSatellite = false;
+    bool foundLandmark = false;
+    bool foundForbiddenBlock = false;
+    for (int cz = -12; cz <= 12; ++cz) {
+        for (int cx = -12; cx <= 12; ++cx) {
+            Chunk chunk(cx, cz);
+            heaven.generate(chunk);
+            for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                        const BlockId block = chunk.getBlock(x, y, z);
+                        if (block == BlockId::BEDROCK || block == BlockId::WATER)
+                            foundForbiddenBlock = true;
+                        const auto rawBlock = static_cast<uint8_t>(block);
+                        if (rawBlock >= static_cast<uint8_t>(BlockId::AETHER_GRASS) &&
+                            rawBlock <= static_cast<uint8_t>(BlockId::STARFLOWER)) {
+                            heavenMaterials[static_cast<size_t>(block) -
+                                             static_cast<size_t>(BlockId::AETHER_GRASS)] = true;
+                        }
+                        if (y >= 240 && block == BlockId::CLOUDSTONE)
+                            foundSatellite = true;
+                        if (block == BlockId::STAR_CRYSTAL && y > Config::WORLD_MIN_Y &&
+                            chunk.getBlock(x, y - 1, z) == BlockId::SUNSTONE)
+                            foundLandmark = true;
+                    }
+                }
+            }
+        }
+    }
+    for (const bool found : heavenMaterials)
+        require(found, "Heaven v4 window missed a dedicated material");
+    require(foundSatellite, "Heaven v4 window missed a high satellite island");
+    require(foundLandmark, "Heaven v4 window missed an Xiguang ruin landmark");
+    require(!foundForbiddenBlock,
+            "Heaven v4 generated bedrock or an infinite water body");
 
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()

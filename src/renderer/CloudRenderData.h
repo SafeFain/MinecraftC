@@ -15,6 +15,13 @@ enum CloudFace : uint32_t {
     CloudNegativeY = 1u << 5,
 };
 
+// Backend-neutral cloud profile. Heaven uses the analytic horizon cloud sea
+// in the sky shader and therefore must not enqueue ordinary voxel cloud cells.
+enum class CloudLayerStyle : uint8_t {
+    Overworld,
+    Heaven
+};
+
 constexpr uint32_t CLOUD_ALL_FACES = (1u << 6) - 1u;
 
 struct CloudInstance {
@@ -28,6 +35,7 @@ struct CloudView {
     int centerX = 0;
     int centerZ = 0;
     glm::vec3 origin{0.0f};
+    CloudLayerStyle style = CloudLayerStyle::Overworld;
 };
 
 constexpr int CLOUD_CELL_SIZE = 16;
@@ -35,7 +43,10 @@ constexpr int MAX_CLOUD_RADIUS = 1024 / CLOUD_CELL_SIZE;
 constexpr size_t MAX_CLOUD_INSTANCES = 2u * 129u * 129u;
 
 CloudView cloudView(const glm::dvec3& playerPosition, float timeSeconds,
-                    int renderDistanceBlocks);
+                    int renderDistanceBlocks,
+                    CloudLayerStyle style = CloudLayerStyle::Overworld);
 std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
                                                int centerX, int centerZ,
-                                               int radius);
+                                               int radius,
+                                               CloudLayerStyle style =
+                                                   CloudLayerStyle::Overworld);

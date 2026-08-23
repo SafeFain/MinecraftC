@@ -53,8 +53,9 @@ float cloudDensity(uint64_t seed, int x, int z) {
 } // namespace
 
 CloudView cloudView(const glm::dvec3& playerPosition, float timeSeconds,
-                    int renderDistanceBlocks) {
+                    int renderDistanceBlocks, CloudLayerStyle style) {
     CloudView result;
+    result.style = style;
     result.radius = std::clamp(
         (renderDistanceBlocks + CLOUD_CELL_SIZE - 1) / CLOUD_CELL_SIZE,
         1, MAX_CLOUD_RADIUS);
@@ -73,9 +74,11 @@ CloudView cloudView(const glm::dvec3& playerPosition, float timeSeconds,
 
 std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
                                                int centerX, int centerZ,
-                                               int radius) {
+                                               int radius,
+                                               CloudLayerStyle style) {
     if (radius < 1 || radius > MAX_CLOUD_RADIUS)
         throw std::invalid_argument("Cloud radius is outside the supported range");
+    if (style == CloudLayerStyle::Heaven) return {};
     const int diameter = radius * 2 + 1;
     std::vector<float> density(static_cast<size_t>(diameter * diameter));
     for (int z = 0; z < diameter; ++z) {

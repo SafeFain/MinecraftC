@@ -16,6 +16,8 @@
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
     "sunflower_top", "cloud", "limestone", "basalt", "tuff",
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
-    "copper_ore"
+    "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
+    "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
+    "star_crystal", "starflower", "copper_ore"
   ]
 }

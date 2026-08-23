@@ -19,14 +19,18 @@ void main() {
     float phase = aParticleParams.x;
     float width = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.18 :
         (kind < 2.5 ? 0.16 : (kind < 3.5 ? aParticleParams.z :
-        aParticleParams.z * (0.65 + phase * 0.85))));
+        (kind < 5.5 ? aParticleParams.z * (0.65 + phase * 0.85) :
+         aParticleParams.z * (1.0 + 0.30 * sin(uTime * 1.6 + phase * 6.283))))));
     float height = kind < 0.5 ? aParticleParams.z : (kind < 1.5 ? 0.22 :
-        (kind < 2.5 ? 4.2 : (kind < 3.5 ? aParticleParams.z : 0.13)));
+        (kind < 2.5 ? 4.2 : (kind < 3.5 ? aParticleParams.z :
+        (kind < 5.5 ? 0.13 : aParticleParams.z * 1.7))));
     vec3 position = aPositionKind.xyz;
     if (kind > 0.5 && kind < 1.5)
         position += uCameraRight * sin(uTime * 1.7 + phase * 6.283) * 0.13;
     if (kind > 1.5 && kind < 2.5)
         position += uCameraRight * (fract(sin(phase * 91.7) * 43758.5) - 0.5) * 0.7;
+    if (kind > 5.5)
+        position += uCameraUp * sin(uTime * 0.9 + phase * 6.283) * 0.08;
     vec2 corner = vec2(aCorner.x, aCorner.y - 0.5);
     if (kind < 0.5 || kind > 2.5) {
         float c = cos(aParticleParams.w), s = sin(aParticleParams.w);

@@ -33,7 +33,8 @@ int main() {
             !isSolid(BlockId::SNOW_LAYER) && !isSolid(BlockId::FIRE),
             "weather block geometry or collision properties are invalid");
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 106 &&
+            static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 114 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -76,8 +77,20 @@ int main() {
     require(creativeItems.front() == ItemId::GRASS_BLOCK &&
             creativeItems[static_cast<size_t>(ItemId::BLASTLING_SPAWN_EGG) - 1] ==
                 ItemId::BLASTLING_SPAWN_EGG &&
-            creativeItems.back() == ItemId::GRANITE,
+            creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
+                ItemId::AETHER_GRASS &&
+            creativeItems.back() == ItemId::STARFLOWER,
             "creative inventory ordering does not follow stable item ids");
+    require(itemForBlock(BlockId::AETHER_GRASS) == ItemId::AETHER_GRASS &&
+                itemForBlock(BlockId::STARFLOWER) == ItemId::STARFLOWER &&
+                getItemProps(ItemId::STAR_CRYSTAL).maxStack == 64 &&
+                getFaceTexture(BlockId::AETHER_GRASS, FaceDir::TOP) ==
+                    BlockTexture::AetherGrassTop &&
+                getFaceTexture(BlockId::SKYROOT_WOOD, FaceDir::TOP) ==
+                    BlockTexture::SkyrootLogTop &&
+                getLightEmission(BlockId::STAR_CRYSTAL) == 8 &&
+                getLightEmission(BlockId::STARFLOWER) == 5,
+            "Heaven materials lack inventory, atlas, or light mappings");
     require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
             getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&
             getItemProps(ItemId::BLASTLING_SPAWN_EGG).spawnEggMob ==

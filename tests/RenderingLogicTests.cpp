@@ -46,10 +46,21 @@ int main() {
             highVisual.cirrusClouds && ultraVisual.aoDirections == 8 &&
             ultraVisual.bloomLevels == 6,
             "visual quality presets do not match the rendering contract");
+    const CloudView heavenCloudView = cloudView(
+        {0.0, 128.0, 0.0}, 0.0f, 128, CloudLayerStyle::Heaven);
+    require(buildCloudInstances(17, 0, 0, 2, CloudLayerStyle::Heaven).empty() &&
+                heavenCloudView.style == CloudLayerStyle::Heaven,
+            "Heaven cloud profile did not suppress voxel cells");
     static_assert(static_cast<int>(ParticleKind::RainSplash) == 4,
                   "particle kind values are part of the shader contract");
     static_assert(static_cast<int>(ParticleKind::Trajectory) == 5,
                   "trajectory marker must use the shader's marker branch");
+    static_assert(static_cast<int>(ParticleKind::SkyMote) == 6,
+                  "Heaven light dust must use the final particle shader branch");
+    static_assert(ParticleSystem::MAX_SKY_MOTES_PER_UPDATE == 8 &&
+                      ParticleSystem::MAX_SKY_MOTES_PER_UPDATE <
+                          ParticleSystem::MAX_PARTICLES,
+                  "Heaven light dust must stay within the shared particle budget");
     VisualExposure exposure;
     RenderEnvironment exposureEnvironment;
     const float brightExposure = exposure.update(1.0f, 0.0f,
@@ -418,6 +429,21 @@ int main() {
             "overcast weather did not hide stars");
     require(flash.ambientIntensity > thunder.ambientIntensity,
             "lightning flash did not brighten the environment");
+    const RenderEnvironment heavenNoon = applyHeavenEnvironment(noon);
+    require(heavenNoon.skyStyle == RenderSkyStyle::Heaven &&
+                heavenNoon.zenithColor.b > noon.zenithColor.b &&
+                heavenNoon.horizonColor.r > noon.horizonColor.r &&
+                heavenNoon.directIntensity < noon.directIntensity,
+            "Heaven sky style did not apply its bright sanctuary palette");
+    RenderEnvironment heavenNight = cycle.evaluate();
+    heavenNight.daylight = 0.0f;
+    heavenNight.starIntensity = 1.0f;
+    heavenNight.sunDirection = {0.0f, -1.0f, 0.0f};
+    heavenNight = applyHeavenEnvironment(heavenNight);
+    require(heavenNight.skyStyle == RenderSkyStyle::Heaven &&
+                heavenNight.zenithColor.b > heavenNight.zenithColor.r * 2.0f &&
+                heavenNight.starIntensity >= 1.0f,
+            "Heaven night sky did not retain the indigo starfield contract");
     const glm::vec3 noonCloud = cloudColorForEnvironment(noon);
     const glm::vec3 rainCloud = cloudColorForEnvironment(rain);
     const glm::vec3 thunderCloud = cloudColorForEnvironment(thunder);

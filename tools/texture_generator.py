@@ -75,7 +75,9 @@ NAMES = [
     "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
     "sunflower_top", "cloud", "limestone", "basalt", "tuff",
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
-    "copper_ore",
+    "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
+    "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
+    "star_crystal", "starflower", "copper_ore",
 ]
 
 PALETTES = {
@@ -118,12 +120,17 @@ EXTRA_BASES = {
     "coarse_dirt":(104,72,42), "mud":(61,57,54),
     "packed_ice":(91,153,195), "black_sand":(49,46,49),
     "granite":(142,91,77),
+    "aether_grass_top":(90,175,104), "aether_grass_side":(74,132,73),
+    "aether_soil":(116,82,52), "cloudstone":(156,183,194),
+    "sunstone":(214,166,72), "skyroot_log":(132,96,56),
+    "skyroot_log_top":(171,132,76), "skyroot_leaves":(90,164,82),
+    "star_crystal":(65,184,222), "starflower":(150,117,226),
 }
 TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle",
                "wheat_mature","oak_sapling","birch_sapling","spruce_sapling",
                "jungle_sapling","acacia_sapling","fire","glass","dandelion",
                "blue_orchid","allium","oxeye_daisy","sunflower_bottom",
-               "sunflower_top"}
+               "sunflower_top", "starflower"}
 
 def muted_palette(base, transparent=False):
     colors = [tuple(max(1, min(245, c+d)) for c in base)+(255,)
@@ -142,10 +149,14 @@ HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_or
 NATURAL = {"dirt","grass_top","stone","sand","bedrock","deepslate","gravel","clay",
            "red_sand","terracotta","podzol_top","moss","snow","snow_layer","cobblestone",
            "cloud","limestone","basalt","tuff","coarse_dirt","mud",
-           "packed_ice","black_sand","granite"}
+           "packed_ice","black_sand","granite", "aether_grass_top",
+           "aether_grass_side", "aether_soil", "cloudstone", "sunstone",
+           "skyroot_log", "star_crystal"}
 DIRECTIONAL = {"oak_planks","oak_log","birch_log","spruce_log","jungle_log","acacia_log",
+               "skyroot_log",
                "farmland","wet_farmland","cactus_side","reeds"}
-LEAF_NAMES = {"leaves","birch_leaves","spruce_leaves","jungle_leaves","acacia_leaves"}
+LEAF_NAMES = {"leaves","birch_leaves","spruce_leaves","jungle_leaves","acacia_leaves",
+              "skyroot_leaves"}
 
 def mix64(v):
     v=(v+0x9E3779B97F4A7C15)&0xffffffffffffffff
@@ -409,7 +420,8 @@ def generate_generic(name,seed):
 
 PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","wheat_mature",
         "oak_sapling","birch_sapling","spruce_sapling","jungle_sapling","acacia_sapling",
-        "dandelion","blue_orchid","allium","oxeye_daisy","sunflower_bottom","sunflower_top"}
+        "dandelion","blue_orchid","allium","oxeye_daisy","sunflower_bottom","sunflower_top",
+        "starflower"}
 
 def generate_special(name,seed,indices):
     if name=="grass_side":
