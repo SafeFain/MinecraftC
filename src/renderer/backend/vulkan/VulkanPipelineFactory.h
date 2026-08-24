@@ -27,6 +27,7 @@ struct FrameUniforms {
     glm::vec4 atlasAndLighting{1.0f, 1.0f, 0.0f, 0.0f};
     glm::vec4 chunkOrigin{0.0f};
     glm::vec4 tint{1.0f};
+    glm::vec4 lodWorldOrigin{0.0f};
 };
 
 struct ChunkEnvironmentUniforms {
@@ -108,7 +109,7 @@ static_assert(sizeof(SkyUniforms) == 176);
 static_assert(offsetof(SkyUniforms, weather) == 144);
 static_assert(offsetof(SkyUniforms, options) == 160);
 static_assert(sizeof(CloudUniforms) == 112);
-static_assert(sizeof(FrameUniforms) == 112);
+static_assert(sizeof(FrameUniforms) == 128);
 static_assert(offsetof(FrameUniforms, chunkOrigin) == 80);
 static_assert(sizeof(ChunkEnvironmentUniforms) == 400);
 static_assert(offsetof(ChunkEnvironmentUniforms, materialParams) == 80);

@@ -63,8 +63,9 @@ void GameScenePresenter::render(
 
         if (session.world.lodEnabled() &&
             !session.world.lodSubmissions().empty()) {
-            const float lodNear = std::max(16.0f,
-                (settings.renderDistance - 2.0f) * Config::CHUNK_SIZE_X);
+            // The LOD pass intentionally extends underneath the last two near
+            // rings, so its projection must not clip that safety overlap.
+            const float lodNear = 8.0f;
             const float lodFar = session.world.lodDistanceChunks() *
                 Config::CHUNK_SIZE_X + 64.0f;
             const glm::mat4 lodProjection = glm::perspective(
@@ -72,7 +73,7 @@ void GameScenePresenter::render(
                 lodNear, lodFar);
             const glm::mat4 lodVp = lodProjection * view;
             for (const auto& lod : session.world.lodSubmissions()) {
-                renderer.renderLod(*lod.mesh, lod.model, lodVp,
+                renderer.renderLod(*lod.mesh, lod.model, lodVp, lod.worldOffset,
                     lod.minimumDistance, lod.maximumDistance, false);
             }
             std::vector<const LodRenderSubmission*> translucentLod;
@@ -84,7 +85,7 @@ void GameScenePresenter::render(
                     return a->distance2 > b->distance2;
                 });
             for (const LodRenderSubmission* lod : translucentLod) {
-                renderer.renderLod(*lod->mesh, lod->model, lodVp,
+                renderer.renderLod(*lod->mesh, lod->model, lodVp, lod->worldOffset,
                     lod->minimumDistance, lod->maximumDistance, true);
             }
         }

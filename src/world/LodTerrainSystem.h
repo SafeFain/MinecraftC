@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -66,6 +67,7 @@ struct LodTileData {
 struct LodRenderSubmission {
     const ChunkMesh* mesh = nullptr;
     glm::mat4 model{1.0f};
+    glm::vec2 worldOffset{0.0f};
     float minimumDistance = 0.0f;
     float maximumDistance = 0.0f;
     float distance2 = 0.0f;
@@ -115,7 +117,10 @@ private:
         LodTileKey key;
         LodTileData data;
         ChunkMesh mesh;
+        std::optional<LodTileData> pendingData;
+        std::optional<ChunkMesh> pendingMesh;
         bool queued = false;
+        bool dirty = false;
         size_t gpuBytes = 0;
         float minimumDistance = 0.0f;
         float maximumDistance = 0.0f;

@@ -41,6 +41,9 @@ int main() {
     WorldGenerator normal(123456789ULL, WorldType::Normal, DimensionId::Overworld);
     const LodTileKey negative{-3, 2, 2};
     const LodTileData first = buildApproximateLodTile(normal, negative);
+    const ChunkMesh compactApproximate = buildLodTileMesh(first, 4, 24);
+    require(compactApproximate.uploadBytes() < 160u * 1024u,
+            "ordinary LOD tiles retain enough GPU budget for outer rings");
     const LodTileData repeated = buildApproximateLodTile(normal, negative);
     require(sameTile(first, repeated),
             "LOD approximation is deterministic at negative coordinates");
@@ -88,9 +91,11 @@ int main() {
             exactMesh.translucentIndexCount > 0 &&
             exactMesh.translucentIndexOffset == exactMesh.opaqueIndexCount,
             "LOD mesh hands off opaque and translucent index ranges");
+    require(exactMesh.vertices.size() < exactMesh.indices.size(),
+            "LOD faces share vertices instead of duplicating triangle corners");
 
-    require(lodHorizontalQuality(LodPrecision::Low) == 16 &&
-            lodHorizontalQuality(LodPrecision::Ultra) == 128 &&
+    require(lodHorizontalQuality(LodPrecision::Low) == 64 &&
+            lodHorizontalQuality(LodPrecision::Ultra) == 144 &&
             lodVerticalSpanLimit(LodPrecision::Medium) >= 5,
             "precision presets map to fixed horizontal and vertical quality");
     require(lodWorkBudget(LodAggressiveness::PowerSaver).maxInFlight == 1 &&

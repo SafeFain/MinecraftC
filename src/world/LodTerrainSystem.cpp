@@ -256,19 +256,25 @@ void emitFace(ChunkMesh& mesh, std::vector<unsigned int>& opaque,
     std::vector<unsigned int>& indices = properties.layer == RenderLayer::Translucent
         ? translucent : opaque;
     const unsigned int base = static_cast<unsigned int>(mesh.vertices.size());
+    std::array<int, 8> vertexForCorner;
+    vertexForCorner.fill(-1);
     for (int cornerIndex : FACE_INDICES[static_cast<size_t>(face)]) {
-        const glm::vec3 corner = CUBE_CORNERS[static_cast<size_t>(cornerIndex)];
-        const glm::vec3 position = minimum + corner * (maximum - minimum);
-        const float u = (face <= FaceDir::BOTTOM || face >= FaceDir::RIGHT)
-            ? corner.z * (maximum.z - minimum.z)
-            : corner.x * (maximum.x - minimum.x);
-        const float v = face <= FaceDir::BOTTOM
-            ? corner.x * (maximum.x - minimum.x)
-            : corner.y * (maximum.y - minimum.y);
-        mesh.vertices.push_back({position.x, position.y, position.z,
-            1.0f, 1.0f, 0.0f, properties.alpha, u, v, tile,
-            static_cast<float>(face)});
-        indices.push_back(base + static_cast<unsigned int>(mesh.vertices.size() - base - 1));
+        int& localIndex = vertexForCorner[static_cast<size_t>(cornerIndex)];
+        if (localIndex < 0) {
+            const glm::vec3 corner = CUBE_CORNERS[static_cast<size_t>(cornerIndex)];
+            const glm::vec3 position = minimum + corner * (maximum - minimum);
+            const float u = (face <= FaceDir::BOTTOM || face >= FaceDir::RIGHT)
+                ? corner.z * (maximum.z - minimum.z)
+                : corner.x * (maximum.x - minimum.x);
+            const float v = face <= FaceDir::BOTTOM
+                ? corner.x * (maximum.x - minimum.x)
+                : corner.y * (maximum.y - minimum.y);
+            localIndex = static_cast<int>(mesh.vertices.size() - base);
+            mesh.vertices.push_back({position.x, position.y, position.z,
+                1.0f, 1.0f, 0.0f, properties.alpha, u, v, tile,
+                static_cast<float>(face)});
+        }
+        indices.push_back(base + static_cast<unsigned int>(localIndex));
     }
 }
 }
@@ -388,9 +394,14 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 const float z1 = static_cast<float>((z + 1) * cellSize);
                 emitFace(mesh, opaque, translucent, FaceDir::TOP,
                     {x0, span.top + 1.0f, z0}, {x1, span.top + 1.0f, z1}, span.block);
-                emitFace(mesh, opaque, translucent, FaceDir::BOTTOM,
-                    {x0, static_cast<float>(span.bottom), z0},
-                    {x1, static_cast<float>(span.bottom), z1}, span.block);
+                // A single approximate ground span has no visible underside.
+                // Exact columns and floating multi-span terrain still retain
+                // bottoms for caves, overhangs, and Heaven islands.
+                if (column.exact || column.spans.size() > 1) {
+                    emitFace(mesh, opaque, translucent, FaceDir::BOTTOM,
+                        {x0, static_cast<float>(span.bottom), z0},
+                        {x1, static_cast<float>(span.bottom), z1}, span.block);
+                }
                 struct Side { int dx, dz; FaceDir face; };
                 constexpr Side sides[] = {{0,-1,FaceDir::FRONT}, {0,1,FaceDir::BACK},
                     {1,0,FaceDir::RIGHT}, {-1,0,FaceDir::LEFT}};
@@ -525,7 +536,11 @@ void LodTerrainSystem::rebuildSelection() {
     m_desired.clear();
     if (!m_settings.enabled || !m_generator) return;
     const int quality = lodHorizontalQuality(m_settings.precision);
-    const float inner = static_cast<float>(m_nearDistanceChunks * Config::CHUNK_SIZE_X);
+    // Keep LOD underneath the outer two full-chunk rings. The near pass clears
+    // depth and overwrites it, while an asynchronously missing near mesh still
+    // has stable terrain behind it instead of revealing the sky.
+    const float inner = static_cast<float>(std::max(1, m_nearDistanceChunks - 2) *
+        Config::CHUNK_SIZE_X);
     const float outer = static_cast<float>(m_settings.distanceChunks * Config::CHUNK_SIZE_X);
     const float centerX = static_cast<float>(m_centerChunkX * Config::CHUNK_SIZE_X + 8);
     const float centerZ = static_cast<float>(m_centerChunkZ * Config::CHUNK_SIZE_Z + 8);
@@ -552,8 +567,10 @@ void LodTerrainSystem::rebuildSelection() {
                 const float distance = std::sqrt(dx * dx + dz * dz);
                 const float margin = tileSize * 0.72f;
                 if (distance + margin < minimum || distance - margin > maximum) continue;
+                const float shaderMinimum = minimum <= inner + 0.5f
+                    ? 8.0f : minimum;
                 m_desired.push_back({{tx, tz, static_cast<uint8_t>(level)},
-                    minimum, maximum, dx * dx + dz * dz});
+                    shaderMinimum, maximum, dx * dx + dz * dz});
             }
         }
     }
@@ -569,8 +586,12 @@ void LodTerrainSystem::rebuildSelection() {
             m_renderer->releaseChunkMesh(it->second->mesh);
             it->second->gpuBytes = 0;
         }
-        m_cpuBytes -= std::min(m_cpuBytes, it->second->data.memoryBytes() +
-            it->second->mesh.uploadBytes());
+        size_t cpuBytes = it->second->data.memoryBytes() +
+            it->second->mesh.uploadBytes();
+        if (it->second->pendingData)
+            cpuBytes += it->second->pendingData->memoryBytes() +
+                it->second->pendingMesh->uploadBytes();
+        m_cpuBytes -= std::min(m_cpuBytes, cpuBytes);
         it = m_tiles.erase(it);
     }
     m_selectionDirty = false;
@@ -615,19 +636,23 @@ void LodTerrainSystem::enqueueRequests() {
         if (m_tasksInFlight.load() >= budget.maxInFlight) break;
         auto found = m_tiles.find(request.key);
         if (found != m_tiles.end() && (found->second->queued ||
-                found->second->mesh.gpuReady || !found->second->mesh.empty())) {
+                found->second->pendingMesh || (!found->second->dirty &&
+                (found->second->mesh.gpuReady || !found->second->mesh.empty())))) {
             found->second->minimumDistance = request.minimumDistance;
             found->second->maximumDistance = request.maximumDistance;
             found->second->distance2 = request.distance2;
             continue;
         }
-        auto tile = std::make_unique<Tile>();
-        tile->key = request.key;
-        tile->queued = true;
-        tile->minimumDistance = request.minimumDistance;
-        tile->maximumDistance = request.maximumDistance;
-        tile->distance2 = request.distance2;
-        m_tiles[request.key] = std::move(tile);
+        if (found == m_tiles.end()) {
+            auto tile = std::make_unique<Tile>();
+            tile->key = request.key;
+            found = m_tiles.emplace(request.key, std::move(tile)).first;
+        }
+        found->second->queued = true;
+        found->second->dirty = false;
+        found->second->minimumDistance = request.minimumDistance;
+        found->second->maximumDistance = request.maximumDistance;
+        found->second->distance2 = request.distance2;
         const uint64_t epoch = m_epoch;
         const int spanLimit = lodVerticalSpanLimit(m_settings.precision);
         WorldGenerator* generator = m_generator;
@@ -675,25 +700,16 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
 }
 
 void LodTerrainSystem::invalidateTilesForChunk(int cx, int cz) {
-    for (auto it = m_tiles.begin(); it != m_tiles.end();) {
-        const int chunksPerSide = 1 << it->first.level;
-        const int minimumX = it->first.x * chunksPerSide;
-        const int minimumZ = it->first.z * chunksPerSide;
+    for (auto& [key, tile] : m_tiles) {
+        const int chunksPerSide = 1 << key.level;
+        const int minimumX = key.x * chunksPerSide;
+        const int minimumZ = key.z * chunksPerSide;
         if (cx < minimumX || cx >= minimumX + chunksPerSide ||
-            cz < minimumZ || cz >= minimumZ + chunksPerSide) {
-            ++it;
-            continue;
-        }
-        if (it->second->mesh.gpuReady && m_renderer) {
-            m_gpuBytes -= std::min(m_gpuBytes, it->second->gpuBytes);
-            m_renderer->releaseChunkMesh(it->second->mesh);
-            it->second->gpuBytes = 0;
-        }
-        m_cpuBytes -= std::min(m_cpuBytes, it->second->data.memoryBytes() +
-            it->second->mesh.uploadBytes());
-        it = m_tiles.erase(it);
+            cz < minimumZ || cz >= minimumZ + chunksPerSide) continue;
+        // Stale-while-revalidate: never punch a visible hole while the exact
+        // replacement is generated and waiting for its GPU upload budget.
+        tile->dirty = true;
     }
-    m_selectionDirty = true;
 }
 
 void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
@@ -723,22 +739,61 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
         }
         if (!hasExact && !hasCompletion) break;
         if (hasExact) {
+            if (exact.epoch != m_epoch) continue;
             m_exactChunks.insert(packedChunkKey(exact.cx, exact.cz));
             invalidateTilesForChunk(exact.cx, exact.cz);
             continue;
         }
         auto found = m_tiles.find(completion.key);
-        if (completion.epoch != m_epoch || found == m_tiles.end()) continue;
+        if (found == m_tiles.end()) continue;
         Tile& tile = *found->second;
         tile.queued = false;
+        if (completion.epoch != m_epoch) {
+            tile.dirty = true;
+            continue;
+        }
         m_cpuBytes += completion.data.memoryBytes() + completion.mesh.uploadBytes();
-        tile.data = std::move(completion.data);
-        tile.mesh = std::move(completion.mesh);
-        const size_t bytes = tile.mesh.uploadBytes();
-        if (renderer && uploads < budget.uploadsPerFrame &&
-            uploadBytes + bytes <= budget.uploadBytesPerFrame &&
-            m_gpuBytes + bytes <= GPU_LIMIT) {
-            renderer->uploadChunkMesh(tile.mesh);
+        if (tile.mesh.gpuReady || !tile.mesh.empty()) {
+            if (tile.pendingData) {
+                m_cpuBytes -= std::min(m_cpuBytes,
+                    tile.pendingData->memoryBytes() + tile.pendingMesh->uploadBytes());
+            }
+            tile.pendingData.emplace(std::move(completion.data));
+            tile.pendingMesh.emplace(std::move(completion.mesh));
+        } else {
+            tile.data = std::move(completion.data);
+            tile.mesh = std::move(completion.mesh);
+        }
+    }
+    if (renderer) {
+        for (const Request& request : m_desired) {
+            if (uploads >= budget.uploadsPerFrame) break;
+            const auto found = m_tiles.find(request.key);
+            if (found == m_tiles.end()) continue;
+            Tile& tile = *found->second;
+            ChunkMesh* candidate = tile.pendingMesh
+                ? &*tile.pendingMesh : &tile.mesh;
+            if (candidate->empty() || (!tile.pendingMesh && candidate->gpuReady))
+                continue;
+            const size_t bytes = candidate->uploadBytes();
+            const size_t replacedGpuBytes = tile.pendingMesh ? tile.gpuBytes : 0;
+            if (uploadBytes + bytes > budget.uploadBytesPerFrame ||
+                m_gpuBytes - std::min(m_gpuBytes, replacedGpuBytes) + bytes > GPU_LIMIT)
+                continue;
+            if (tile.pendingMesh) {
+                const size_t oldCpuBytes = tile.data.memoryBytes() +
+                    tile.mesh.uploadBytes();
+                if (tile.mesh.gpuReady) renderer->releaseChunkMesh(tile.mesh);
+                m_gpuBytes -= std::min(m_gpuBytes, tile.gpuBytes);
+                renderer->uploadChunkMesh(*tile.pendingMesh);
+                tile.data = std::move(*tile.pendingData);
+                tile.mesh = std::move(*tile.pendingMesh);
+                tile.pendingData.reset();
+                tile.pendingMesh.reset();
+                m_cpuBytes -= std::min(m_cpuBytes, oldCpuBytes);
+            } else {
+                renderer->uploadChunkMesh(tile.mesh);
+            }
             tile.gpuBytes = bytes;
             m_gpuBytes += bytes;
             uploadBytes += bytes;
@@ -750,30 +805,10 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
             m_cpuBytes -= std::min(m_cpuBytes, bytes);
         }
     }
-    if (renderer) {
-        for (const Request& request : m_desired) {
-            if (uploads >= budget.uploadsPerFrame) break;
-            const auto found = m_tiles.find(request.key);
-            if (found == m_tiles.end() || found->second->mesh.empty() ||
-                found->second->mesh.gpuReady) continue;
-            const size_t bytes = found->second->mesh.uploadBytes();
-            if (uploadBytes + bytes > budget.uploadBytesPerFrame ||
-                m_gpuBytes + bytes > GPU_LIMIT) continue;
-            renderer->uploadChunkMesh(found->second->mesh);
-            found->second->gpuBytes = bytes;
-            m_gpuBytes += bytes;
-            uploadBytes += bytes;
-            ++uploads;
-            found->second->mesh.vertices.clear();
-            found->second->mesh.vertices.shrink_to_fit();
-            found->second->mesh.indices.clear();
-            found->second->mesh.indices.shrink_to_fit();
-            m_cpuBytes -= std::min(m_cpuBytes, bytes);
-        }
-    }
     if (m_cpuBytes > CPU_LIMIT) {
         for (auto it = m_tiles.begin(); it != m_tiles.end() && m_cpuBytes > CPU_LIMIT;) {
-            if (it->second->mesh.gpuReady || it->second->queued) { ++it; continue; }
+            if (it->second->mesh.gpuReady || it->second->queued ||
+                it->second->pendingMesh) { ++it; continue; }
             m_cpuBytes -= std::min(m_cpuBytes, it->second->data.memoryBytes() +
                 it->second->mesh.uploadBytes());
             it = m_tiles.erase(it);
@@ -797,6 +832,7 @@ void LodTerrainSystem::rebuildSubmissions() {
             static_cast<float>(worldX - originX), 0.0f,
             static_cast<float>(worldZ - originZ)));
         m_submissions.push_back({&found->second->mesh, model,
+            glm::vec2(static_cast<float>(worldX), static_cast<float>(worldZ)),
             request.minimumDistance, request.maximumDistance, request.distance2});
     }
 }

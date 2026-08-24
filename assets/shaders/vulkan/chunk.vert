@@ -9,6 +9,7 @@ layout(push_constant) uniform FrameUniforms {
     vec4 atlasAndLighting;
     vec4 chunkOrigin;
     vec4 tint;
+    vec4 lodWorldOrigin;
 } frame;
 layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 cameraPosition;

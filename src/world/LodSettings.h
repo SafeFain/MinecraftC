@@ -44,7 +44,10 @@ inline LodWorkBudget lodWorkBudget(LodAggressiveness value) {
 }
 
 inline int lodHorizontalQuality(LodPrecision value) {
-    constexpr int values[] = {16, 32, 64, 128};
+    // Keep even the lowest preset useful as distant terrain: a cell spans at
+    // most roughly distance / 64, while higher presets progressively retain
+    // silhouette detail instead of merely increasing vertical span storage.
+    constexpr int values[] = {64, 96, 128, 144};
     return values[static_cast<int>(value)];
 }
 

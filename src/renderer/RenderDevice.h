@@ -106,6 +106,7 @@ struct DrawCommand {
     bool lod = false;
     float lodMinimumDistance = 0.0f;
     float lodMaximumDistance = 0.0f;
+    glm::vec2 lodWorldOffset{0.0f};
 };
 
 struct RenderDeviceCapabilities {

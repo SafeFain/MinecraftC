@@ -40,6 +40,7 @@ public:
     virtual void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                              bool translucent = false) = 0;
     virtual void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
+                           const glm::vec2& worldOffset,
                            float minimumDistance, float maximumDistance,
                            bool translucent = false) = 0;
     virtual void renderChunkShadows(ShadowQuality, const glm::mat4& inverseViewProjection,

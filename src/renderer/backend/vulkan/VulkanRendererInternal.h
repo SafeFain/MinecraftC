@@ -1562,7 +1562,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                  material.desc.alphaCutoff,
                  draw.lod ? draw.lodMinimumDistance : 0.0f},
                 glm::vec4(glm::vec3(draw.model[3]),
-                          draw.lod ? draw.lodMaximumDistance : 0.0f), draw.tint};
+                          draw.lod ? draw.lodMaximumDistance : 0.0f), draw.tint,
+                glm::vec4(draw.lodWorldOffset.x, 0.0f,
+                          draw.lodWorldOffset.y, 0.0f)};
             vkCmdPushConstants(command, swapchain.pipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0, sizeof(constants), &constants);

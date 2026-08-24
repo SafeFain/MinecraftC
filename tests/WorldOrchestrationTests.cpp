@@ -75,6 +75,7 @@ public:
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool) override {}
     void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
+                   const glm::vec2&,
                    float, float, bool) override {}
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
                             const glm::dvec3&,

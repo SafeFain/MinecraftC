@@ -10,6 +10,7 @@ layout(push_constant) uniform FrameUniforms {
     vec4 atlasAndLighting;
     vec4 chunkOrigin;
     vec4 tint;
+    vec4 lodWorldOrigin;
 } frame;
 layout(set=0,binding=0) uniform sampler2D blockAtlas;
 layout(set=0,binding=1) uniform sampler2D normalAtlas;
@@ -120,12 +121,17 @@ void main() {
         float lodDistance=length(worldPosition.xz);
         float inner=frame.atlasAndLighting.w;
         float outer=frame.chunkOrigin.w;
-        float innerFade=max(16.0,inner*0.08);
-        float outerFade=max(32.0,outer*0.04);
-        float coverage=smoothstep(inner-innerFade,inner+innerFade,lodDistance)*
-            (1.0-smoothstep(outer-outerFade,outer,lodDistance));
-        float dither=fract(sin(dot(floor(worldPosition.xz),vec2(12.9898,78.233)))*43758.5453);
-        if(dither>coverage)discard;
+        float innerFade=max(16.0,inner*0.04);
+        float outerFade=max(16.0,outer*0.04);
+        float innerCoverage=smoothstep(inner-innerFade,inner+innerFade,lodDistance);
+        float outerProgress=smoothstep(outer-outerFade,outer+outerFade,lodDistance);
+        vec2 localPosition=worldPosition.xz-frame.chunkOrigin.xz;
+        vec2 stableWorldPosition=localPosition+frame.lodWorldOrigin.xz;
+        float dither=fract(sin(dot(floor(stableWorldPosition),
+            vec2(12.9898,78.233)))*43758.5453);
+        // Adjacent rings use opposite halves of the same stable threshold.
+        // Their union is complete instead of both discarding the same pixels.
+        if(dither>innerCoverage||dither<outerProgress)discard;
     }
     float tiles=frame.atlasAndLighting.x;
     float slot=floor(tile+0.5);
