@@ -115,7 +115,7 @@ jobs:
             fi
           }
           run_smoke vulkan "Vulkan first frame presented"
-          run_smoke vulkan-demo "Visual pipeline"
+          run_smoke vulkan-demo "Vulkan first frame presented"
       - name: Package Linux release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz" "$RELEASE_DIR"
       - name: Upload Linux package

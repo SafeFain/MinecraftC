@@ -46,6 +46,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
         if (!app) return SDL_APP_SUCCESS;
         *appstate = app.release();
         return SDL_APP_CONTINUE;
+    } catch (const CommandLineError& error) {
+        std::cerr << "MinecraftC command line error: " << error.what() << '\n';
+        return SDL_APP_FAILURE;
     } catch (const std::exception& error) {
         reportFatal("startup", error);
         return SDL_APP_FAILURE;
@@ -85,4 +88,3 @@ void SDL_AppQuit(void* appstate, SDL_AppResult) {
         reportFatal("shutdown", error);
     }
 }
-

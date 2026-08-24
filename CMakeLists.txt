@@ -507,7 +507,9 @@ if(BUILD_TESTING)
         PASS_REGULAR_EXPRESSION "renderer=vulkan")
     add_test(NAME removed_opengl_renderer_cli
         COMMAND minecraftc --renderer=opengl)
-    set_tests_properties(removed_opengl_renderer_cli PROPERTIES WILL_FAIL TRUE)
+    set_tests_properties(removed_opengl_renderer_cli PROPERTIES
+        WILL_FAIL TRUE
+        TIMEOUT 10)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)

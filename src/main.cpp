@@ -15,9 +15,14 @@ int benchmarkFrameCount(int argc, char** argv) {
         if (argument.rfind(prefix.data(), 0) != 0) continue;
         const std::string value = argument.substr(prefix.size());
         size_t parsed = 0;
-        const long frames = std::stol(value, &parsed);
+        long frames = 0;
+        try {
+            frames = std::stol(value, &parsed);
+        } catch (const std::exception&) {
+            throw CommandLineError("Invalid benchmark frame count: " + value);
+        }
         if (parsed != value.size() || frames <= 0 || frames > 100000)
-            throw std::runtime_error("Invalid benchmark frame count: " + value);
+            throw CommandLineError("Invalid benchmark frame count: " + value);
         return static_cast<int>(frames);
     }
     return 0;
@@ -61,12 +66,12 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
             continue;
         }
         if (argument.rfind("--renderer=", 0) == 0)
-            throw std::runtime_error("Unknown renderer: " + argument.substr(11));
+            throw CommandLineError("Unknown renderer: " + argument.substr(11));
         if (argument.rfind("--benchmark-frames=", 0) == 0) continue;
     }
 
     if (benchmarkFrames > 0)
-        throw std::runtime_error("--benchmark-frames requires a renderer demo");
+        throw CommandLineError("--benchmark-frames requires a renderer demo");
 
     return createGameApplication(std::move(paths));
 }
