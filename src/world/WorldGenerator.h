@@ -78,6 +78,9 @@ public:
     HeavenBiome heavenBiomeAt(int worldX, int worldZ) const;
     std::array<HeavenIslandColumn, HEAVEN_LAYER_COUNT> sampleHeavenLayers(
         int worldX, int worldZ) const;
+    std::optional<LocatedStructure> locateNearestHeavenStructure(
+        StructureType type, int worldX, int worldZ,
+        int maximumDistance = 8192) const;
     uint32_t generationVersion() const {
         return isHeaven() ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
@@ -129,5 +132,7 @@ private:
     HeavenIslandColumn sampleHeavenIsland(int worldX, int worldZ) const;
     HeavenIslandColumn sampleHeavenLayer(
         int worldX, int worldZ, int layer) const;
+    std::optional<LocatedStructure> heavenStructureForCell(
+        StructureType type, int cellX, int cellZ) const;
     static void populateHeaven(Chunk& chunk, WorldGenerator& generator);
 };

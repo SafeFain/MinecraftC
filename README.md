@@ -161,7 +161,9 @@ generation version is v9. Older generation versions remain on disk and are
 shown as incompatible rather than migrated or blended into v9 terrain.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
-`/locate biome <biome>`, and `/locate structure <structure>`. Command arguments
+`/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
+supports the current dimension's Overworld structures plus Heaven's
+`xiguang_ruin`, `star_crystal_geode`, and `cloudspire_tower`. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 Run `./build-local/minecraftc --version` to print the version without opening a

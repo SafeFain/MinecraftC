@@ -441,7 +441,7 @@ int StructureGenerator::floorDiv(int value, int divisor) {
 
 const StructureGenerator::TypeParams& StructureGenerator::params(
     StructureType type) {
-    static const TypeParams table[] = {
+    static constexpr std::array<TypeParams, 9> table{{
         {StructureType::None, 0, 0, 0, 0},
         {StructureType::Village, 512, 12, 6, 8},
         {StructureType::DesertVillage, 512, 12, 6, 8},
@@ -451,9 +451,9 @@ const StructureGenerator::TypeParams& StructureGenerator::params(
         {StructureType::Igloo, 80, 12, 2, 6},
         {StructureType::RuinedTower, 128, 10, 3, 10},
         {StructureType::LumberCamp, 96, 10, 2, 5},
-    };
+    }};
     const int index = static_cast<int>(type);
-    return table[index >= 0 && index < static_cast<int>(StructureType::Count)
+    return table[index >= 0 && index < static_cast<int>(table.size())
                      ? index : 0];
 }
 
@@ -562,8 +562,7 @@ bool StructureGenerator::winsOverlapSpacing(const Candidate& candidate) const {
     const int rank = candidate.type == StructureType::Village ||
                              candidate.type == StructureType::DesertVillage
                          ? 1 : 0;
-    for (int t = 1; t < static_cast<int>(StructureType::Count); ++t) {
-        const StructureType otherType = static_cast<StructureType>(t);
+    for (const StructureType otherType : OVERWORLD_STRUCTURE_TYPES) {
         const TypeParams& p = params(otherType);
         int reach = 0;
         if (otherType == candidate.type) {
@@ -620,8 +619,7 @@ void StructureGenerator::generateStructuresRegion(
     int originX, int originZ, int width, int depth,
     std::vector<StructurePlacement>& out) {
     out.clear();
-    for (int t = 1; t < static_cast<int>(StructureType::Count); ++t) {
-        const StructureType type = static_cast<StructureType>(t);
+    for (const StructureType type : OVERWORLD_STRUCTURE_TYPES) {
         const TypeParams& p = params(type);
         const int minCX = floorDiv(originX - p.cell, p.cell);
         const int maxCX = floorDiv(originX + width + p.cell, p.cell);
@@ -655,7 +653,7 @@ std::vector<StructurePlacement> StructureGenerator::generateStructures(
 
 std::optional<LocatedStructure> StructureGenerator::locateNearest(
     StructureType type, int worldX, int worldZ, int maximumDistance) const {
-    if (type == StructureType::None || type == StructureType::Count ||
+    if (!isOverworldStructure(type) ||
         maximumDistance < 0)
         return {};
 
@@ -719,8 +717,7 @@ std::optional<LocatedStructure> StructureGenerator::locateNearest(
 }
 
 bool StructureGenerator::reservationAt(int worldX, int worldZ) const {
-    for (int t = 1; t < static_cast<int>(StructureType::Count); ++t) {
-        const StructureType type = static_cast<StructureType>(t);
+    for (const StructureType type : OVERWORLD_STRUCTURE_TYPES) {
         const TypeParams& p = params(type);
         const int half = maxHalfSize(type);
         const int minCX = floorDiv(worldX - half, p.cell);

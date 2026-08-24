@@ -81,6 +81,12 @@ int main() {
                 structureSuggestions[0].text == "desert_village" &&
                 structureSuggestions[1].text == "desert_well",
             "structure argument completion did not return sorted matches");
+    const std::string heavenStructurePrefix = "/locate structure cloud";
+    const auto heavenStructureSuggestions = commandSuggestions(
+        heavenStructurePrefix, heavenStructurePrefix.size());
+    require(heavenStructureSuggestions.size() == 1 &&
+                heavenStructureSuggestions[0].text == "cloudspire_tower",
+            "Heaven structure argument completion is missing");
     const std::string middleInput = "/locate structure ruined_x extra";
     const size_t middleCursor = middleInput.find("_x");
     const auto middleSuggestions = commandSuggestions(middleInput, middleCursor);

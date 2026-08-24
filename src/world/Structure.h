@@ -15,10 +15,13 @@ enum class StructureType : uint8_t {
     Igloo,
     RuinedTower,
     LumberCamp,
+    XiguangRuin,
+    StarCrystalGeode,
+    CloudspireTower,
     Count
 };
 
-inline constexpr std::array<StructureType, 8> STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 8> OVERWORLD_STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -28,6 +31,38 @@ inline constexpr std::array<StructureType, 8> STRUCTURE_TYPES{
     StructureType::RuinedTower,
     StructureType::LumberCamp,
 };
+
+inline constexpr std::array<StructureType, 3> HEAVEN_STRUCTURE_TYPES{
+    StructureType::XiguangRuin,
+    StructureType::StarCrystalGeode,
+    StructureType::CloudspireTower,
+};
+
+inline constexpr std::array<StructureType, 11> STRUCTURE_TYPES{
+    StructureType::Village,
+    StructureType::DesertVillage,
+    StructureType::TravelerHut,
+    StructureType::AbandonedCamp,
+    StructureType::DesertWell,
+    StructureType::Igloo,
+    StructureType::RuinedTower,
+    StructureType::LumberCamp,
+    StructureType::XiguangRuin,
+    StructureType::StarCrystalGeode,
+    StructureType::CloudspireTower,
+};
+
+inline constexpr bool isOverworldStructure(StructureType type) {
+    for (const StructureType candidate : OVERWORLD_STRUCTURE_TYPES)
+        if (candidate == type) return true;
+    return false;
+}
+
+inline constexpr bool isHeavenStructure(StructureType type) {
+    for (const StructureType candidate : HEAVEN_STRUCTURE_TYPES)
+        if (candidate == type) return true;
+    return false;
+}
 
 inline constexpr std::string_view structureCommandName(StructureType type) {
     switch (type) {
@@ -39,6 +74,9 @@ inline constexpr std::string_view structureCommandName(StructureType type) {
         case StructureType::Igloo: return "igloo";
         case StructureType::RuinedTower: return "ruined_tower";
         case StructureType::LumberCamp: return "lumber_camp";
+        case StructureType::XiguangRuin: return "xiguang_ruin";
+        case StructureType::StarCrystalGeode: return "star_crystal_geode";
+        case StructureType::CloudspireTower: return "cloudspire_tower";
         default: return "none";
     }
 }

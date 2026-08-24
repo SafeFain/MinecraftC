@@ -225,11 +225,11 @@ std::optional<glm::ivec2> World::locateBiome(
 
 std::optional<glm::ivec3> World::locateStructure(
     StructureType type, int worldX, int worldZ) const {
-    if (m_generator.worldType() != WorldType::Normal ||
-        m_generator.dimension() != DimensionId::Overworld)
-        return {};
-    const auto location = m_generator.getStructureGenerator().locateNearest(
-        type, worldX, worldZ);
+    if (m_generator.worldType() != WorldType::Normal) return {};
+    const auto location = m_generator.isHeaven()
+        ? m_generator.locateNearestHeavenStructure(type, worldX, worldZ)
+        : m_generator.getStructureGenerator().locateNearest(
+              type, worldX, worldZ);
     if (!location) return {};
     return glm::ivec3(location->worldX, location->baseY, location->worldZ);
 }

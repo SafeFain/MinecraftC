@@ -838,13 +838,13 @@ int main() {
               << " lumber="
               << structureCounts[static_cast<size_t>(StructureType::LumberCamp)]
               << '\n';
-    for (int t = 1; t < static_cast<int>(StructureType::Count); ++t)
-        require(structureCounts[static_cast<size_t>(t)] > 0,
+    for (const StructureType type : OVERWORLD_STRUCTURE_TYPES)
+        require(structureCounts[static_cast<size_t>(type)] > 0,
                 "structure type is missing from the exploration window");
 
     // Locate uses the same accepted anchors and must return the globally
     // nearest one in the search radius, not merely the first cell-ring hit.
-    for (const StructureType type : STRUCTURE_TYPES) {
+    for (const StructureType type : OVERWORLD_STRUCTURE_TYPES) {
         const StructurePlacement* expected = nullptr;
         int64_t expectedDistanceSquared = std::numeric_limits<int64_t>::max();
         for (const StructurePlacement& placement : explorationStructures) {
@@ -1524,6 +1524,38 @@ int main() {
     require(foundLandmark, "Heaven v6 window missed an Xiguang ruin landmark");
     require(!foundForbiddenBlock,
             "Heaven v6 generated bedrock or an infinite water body");
+
+    // Heaven locate shares the exact cell candidate resolver used above by
+    // chunk population. All three dimension-exclusive structures must be
+    // discoverable without generating chunks, deterministic, and anchored to
+    // an eligible island layer.
+    for (const StructureType type : HEAVEN_STRUCTURE_TYPES) {
+        const auto located = heaven.locateNearestHeavenStructure(type, 0, 0);
+        const auto repeated = heaven.locateNearestHeavenStructure(type, 0, 0);
+        require(located.has_value() && repeated.has_value(),
+                "Heaven structure locator missed a registered structure");
+        require(located->worldX == repeated->worldX &&
+                    located->baseY == repeated->baseY &&
+                    located->worldZ == repeated->worldZ &&
+                    located->type == type,
+                "Heaven structure locator is not deterministic");
+        const int64_t distanceSquared =
+            static_cast<int64_t>(located->worldX) * located->worldX +
+            static_cast<int64_t>(located->worldZ) * located->worldZ;
+        require(distanceSquared <= 8192LL * 8192LL,
+                "Heaven structure locator exceeded its search radius");
+        const auto layers = heaven.sampleHeavenLayers(
+            located->worldX, located->worldZ);
+        bool matchesGeneratedLayer = false;
+        for (const auto& layer : layers)
+            matchesGeneratedLayer = matchesGeneratedLayer ||
+                (layer.present && layer.top == located->baseY);
+        require(matchesGeneratedLayer,
+                "Heaven structure locator returned a non-island anchor");
+    }
+    require(!heaven.locateNearestHeavenStructure(
+                StructureType::Village, 0, 0),
+            "Heaven locator accepted an overworld-only structure");
 
     // v6 micro-feature density: each exclusive biome owns whole 256-cell
     // bands, so one full deterministic band of each biome (62×256 columns)

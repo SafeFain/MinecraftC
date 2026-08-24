@@ -212,7 +212,7 @@
   "message.chat_self": "<プレイヤー> {0}",
   "message.help_header": "利用可能なコマンド:",
   "message.help_biomes": "バイオーム: ocean, beach, plain, forest, desert, mountains, hills, swamp, taiga, snow_tundra, jungle, savanna, deep_ocean, river, stony_shore, meadow, birch_forest, badlands, flower_forest, sunflower_plains, glacial_peaks, alpine_tundra, rocky_steppe, limestone_highlands, karst_forest, volcanic_highlands, black_sand_coast, red_canyon, lush_valley, dry_woodland",
-  "message.help_structures": "構造物: village, desert_village, traveler_hut, abandoned_camp, desert_well, igloo, ruined_tower, lumber_camp",
+  "message.help_structures": "構造物: village, desert_village, traveler_hut, abandoned_camp, desert_well, igloo, ruined_tower, lumber_camp; 天境: xiguang_ruin, star_crystal_geode, cloudspire_tower",
   "message.command_unknown": "列{0}に不明なコマンドがあります",
   "message.command_error": "列{0}に構文エラー: {1}が必要です",
   "message.locate_found": "最寄りの{0}: {1}, {2} ({3}ブロック先)",

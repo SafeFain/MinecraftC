@@ -137,6 +137,11 @@ int main() {
             session, localization, "/locate structure traveler_hut");
         require(!result.messages.empty(),
                 "structure locate reports a found or not-found message");
+        result = runCommand(
+            session, localization, "/locate structure cloudspire_tower");
+        require(result.messages.size() == 1 &&
+                    result.messages[0] == "message.locate_structure_not_found",
+                "overworld locate rejects a Heaven-only structure");
 
         // Parse failures surface structured errors.
         const CommandParseResult unknown = parseCommand("/bogus");
@@ -234,6 +239,17 @@ int main() {
                 "heaven starts with its independent day phase");
         require(dimensions.entities.entities().empty(),
                 "heaven starts without natural entities");
+        auto locateResult = runCommand(
+            dimensions, localization, "/locate structure xiguang_ruin");
+        require(locateResult.messages.size() == 1 &&
+                    locateResult.messages[0] == "message.locate_found",
+                "Heaven command locates a dimension structure");
+        locateResult = runCommand(
+            dimensions, localization, "/locate structure village");
+        require(locateResult.messages.size() == 1 &&
+                    locateResult.messages[0] ==
+                        "message.locate_structure_not_found",
+                "Heaven locate rejects an overworld-only structure");
         dimensions.terrainGenerated = true;
         dimensions.dayNightCycle.setDay();
         dimensions.worldMetadata.heaven.safePosition = {8, 128, -4};
