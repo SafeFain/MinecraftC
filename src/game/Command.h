@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cerrno>
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <optional>
@@ -10,6 +12,7 @@
 #include "game/GameRules.h"
 #include "game/Weather.h"
 #include "world/Biome.h"
+#include "world/Structure.h"
 
 enum class TimePreset { Day, Night };
 
@@ -25,7 +28,8 @@ enum class CommandType {
     Teleport,
     Time,
     Weather,
-    LocateBiome
+    LocateBiome,
+    LocateStructure
 };
 
 struct ParsedCommand {
@@ -35,6 +39,7 @@ struct ParsedCommand {
     TimePreset time = TimePreset::Day;
     WeatherType weather = WeatherType::Clear;
     Biome biome = Biome::PLAINS;
+    StructureType structure = StructureType::Village;
 };
 
 enum class CommandErrorKind { UnknownCommand, Expected };
@@ -142,20 +147,100 @@ inline CommandParseResult parseCommand(const std::string& input) {
         if (tokens.size() > 2) return expected(input, tokens, 2, "<end>");
         parsed.type = CommandType::Weather;
     } else if (name == "/locate") {
-        if (tokens.size() < 2 || tokens[1].text != "biome")
-            return expected(input, tokens, 1, "biome");
-        if (tokens.size() < 3)
-            return expected(input, tokens, 2, "<biome>");
-        const auto biome = parseBiomeCommandName(tokens[2].text);
-        if (!biome) return expected(input, tokens, 2, "a valid biome (see /help)");
+        if (tokens.size() < 2 ||
+            (tokens[1].text != "biome" && tokens[1].text != "structure"))
+            return expected(input, tokens, 1, "biome|structure");
+        if (tokens.size() < 3) return expected(
+            input, tokens, 2,
+            tokens[1].text == "biome" ? "<biome>" : "<structure>");
+        if (tokens[1].text == "biome") {
+            const auto biome = parseBiomeCommandName(tokens[2].text);
+            if (!biome)
+                return expected(input, tokens, 2,
+                                "a valid biome (see /help)");
+            parsed.type = CommandType::LocateBiome;
+            parsed.biome = *biome;
+        } else {
+            const auto structure = parseStructureCommandName(tokens[2].text);
+            if (!structure)
+                return expected(input, tokens, 2,
+                                "a valid structure (see /help)");
+            parsed.type = CommandType::LocateStructure;
+            parsed.structure = *structure;
+        }
         if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
-        parsed.type = CommandType::LocateBiome;
-        parsed.biome = *biome;
     } else {
         return {{}, CommandError{tokens[0].position + 1,
                                  CommandErrorKind::UnknownCommand, {}}};
     }
     return {parsed, {}};
+}
+
+struct CommandSuggestion {
+    size_t start = 0;
+    size_t end = 0;
+    std::string text;
+};
+
+// Brigadier-style literal/argument suggestions for the complete command tree.
+// The replacement range covers the token under the cursor, allowing Tab to
+// work in the middle of a command while preserving later arguments.
+inline std::vector<CommandSuggestion> commandSuggestions(
+    const std::string& input, size_t cursor) {
+    using namespace command_detail;
+    cursor = std::min(cursor, input.size());
+    size_t start = cursor;
+    while (start > 0 && input[start - 1] != ' ' && input[start - 1] != '\t')
+        --start;
+    size_t end = cursor;
+    while (end < input.size() && input[end] != ' ' && input[end] != '\t')
+        ++end;
+
+    const auto before = tokenize(input.substr(0, start));
+    const size_t argument = before.size();
+    const std::string_view prefix(input.data() + start, cursor - start);
+    std::vector<std::string_view> candidates;
+    auto add = [&](std::string_view candidate) {
+        if (candidate.substr(0, prefix.size()) == prefix)
+            candidates.push_back(candidate);
+    };
+
+    if (argument == 0) {
+        constexpr std::array<std::string_view, 6> commands{
+            "/gamemode", "/help", "/locate", "/time", "/tp", "/weather"};
+        for (const auto command : commands) add(command);
+    } else {
+        const std::string& command = before[0].text;
+        if (argument == 1 && command == "/gamemode") {
+            add("0"); add("1"); add("3");
+        } else if (argument == 1 && command == "/time") {
+            add("set");
+        } else if (argument == 2 && command == "/time" &&
+                   before[1].text == "set") {
+            add("day"); add("night");
+        } else if (argument == 1 && command == "/weather") {
+            add("clear"); add("rain"); add("thunder");
+        } else if (argument == 1 && command == "/locate") {
+            add("biome"); add("structure");
+        } else if (argument == 2 && command == "/locate" &&
+                   before[1].text == "biome") {
+            for (int raw = 0; raw < BIOME_COUNT; ++raw)
+                add(biomeCommandName(static_cast<Biome>(raw)));
+        } else if (argument == 2 && command == "/locate" &&
+                   before[1].text == "structure") {
+            for (const StructureType type : STRUCTURE_TYPES)
+                add(structureCommandName(type));
+        }
+    }
+
+    std::sort(candidates.begin(), candidates.end());
+    candidates.erase(std::unique(candidates.begin(), candidates.end()),
+                     candidates.end());
+    std::vector<CommandSuggestion> result;
+    result.reserve(candidates.size());
+    for (const auto candidate : candidates)
+        result.push_back({start, end, std::string(candidate)});
+    return result;
 }
 
 // Compatibility helpers retained for gameplay-independent callers.

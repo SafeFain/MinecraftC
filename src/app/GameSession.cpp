@@ -330,6 +330,8 @@ GameSession::CommandResult GameSession::executeCommand(
         message("/weather clear|rain|thunder");
         message("/locate biome <biome>");
         message(localization.text("message.help_biomes"));
+        message("/locate structure <structure>");
+        message(localization.text("message.help_structures"));
         return result;
     }
     if (!worldMetadata.cheatsEnabled) {
@@ -396,6 +398,24 @@ GameSession::CommandResult GameSession::executeCommand(
             std::to_string(location->x), std::to_string(location->y),
             std::to_string(static_cast<int>(
                 std::round(std::sqrt(dx * dx + dz * dz))))}));
+        return result;
+    }
+    if (command.type == CommandType::LocateStructure) {
+        const glm::dvec3 position = player.getPosition();
+        const auto location = world.locateStructure(
+            command.structure, static_cast<int>(std::floor(position.x)),
+            static_cast<int>(std::floor(position.z)));
+        if (!location) {
+            message(localization.text("message.locate_structure_not_found"));
+            return result;
+        }
+        const double dx = static_cast<double>(location->x) - position.x;
+        const double dz = static_cast<double>(location->z) - position.z;
+        message(localization.format("message.locate_found", {
+            std::string(structureCommandName(command.structure)),
+            std::to_string(location->x), std::to_string(location->z),
+            std::to_string(static_cast<int>(
+                std::floor(std::sqrt(dx * dx + dz * dz))))}));
     }
     return result;
 }

@@ -43,6 +43,14 @@ inline TouchRect touchInventoryCloseRect(int width, int height) {
             std::max(0.0f, static_cast<float>(height) - margin - size), size, size};
 }
 
+inline TouchRect touchCommandTabRect(int width, int /*height*/) {
+    constexpr float buttonWidth = 68.0f;
+    constexpr float buttonHeight = 30.0f;
+    constexpr float margin = 18.0f;
+    return {std::max(0.0f, static_cast<float>(width) - margin - buttonWidth),
+            21.0f, buttonWidth, buttonHeight};
+}
+
 class TouchControls {
 public:
     void configure(int width, int height, const TouchControlConfig& config);

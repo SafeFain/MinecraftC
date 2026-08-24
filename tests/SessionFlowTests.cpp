@@ -133,6 +133,10 @@ int main() {
         result = runCommand(session, localization, "/locate biome plains");
         require(!result.messages.empty(),
                 "biome locate reports a found or not-found message");
+        result = runCommand(
+            session, localization, "/locate structure traveler_hut");
+        require(!result.messages.empty(),
+                "structure locate reports a found or not-found message");
 
         // Parse failures surface structured errors.
         const CommandParseResult unknown = parseCommand("/bogus");

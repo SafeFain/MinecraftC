@@ -18,6 +18,7 @@ public:
 
     const std::string& text() const { return m_text; }
     void setText(std::string text);
+    void setText(std::string text, size_t cursor);
     size_t cursor() const { return m_cursor; }
     size_t anchor() const { return m_anchor; }
     bool hasSelection() const { return m_cursor != m_anchor; }

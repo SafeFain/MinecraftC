@@ -113,6 +113,8 @@ public:
     int heavenBiomePaletteIndex(int worldX, int worldZ) const;
     std::optional<glm::ivec2> locateBiome(Biome biome, int worldX,
                                           int worldZ) const;
+    std::optional<glm::ivec3> locateStructure(
+        StructureType type, int worldX, int worldZ) const;
     glm::dvec3 findSafeSpawn(int maximumRadius = 512) const;
 
     // Sets a block and marks affected chunks dirty

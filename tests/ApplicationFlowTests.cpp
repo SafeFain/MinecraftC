@@ -33,6 +33,7 @@
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -451,6 +452,47 @@ int main() {
                 "Enter executes and closes the console");
         require(!harness.ui.chatHistory.empty(),
                 "command execution reports a message");
+
+        // Tab follows the command tree and cycles candidates in both
+        // directions, matching the same completion path used by touch UI.
+        harness.flow.openCommandInput();
+        harness.ui.commandInput.setText("/locate ");
+        harness.router.handleKeyEvent(Key::Tab, 0, ButtonAction::Press, 0);
+        require(harness.ui.commandInput.text() == "/locate biome",
+                "Tab selects the first locate subcommand");
+        harness.router.handleKeyEvent(Key::Tab, 0, ButtonAction::Press, 0);
+        require(harness.ui.commandInput.text() == "/locate structure",
+                "repeated Tab cycles to the next locate subcommand");
+        harness.router.handleKeyEvent(
+            Key::Tab, 0, ButtonAction::Press, KeyModifier::Shift);
+        require(harness.ui.commandInput.text() == "/locate biome",
+                "Shift+Tab cycles command completion backwards");
+
+        harness.settings.controlMode = ControlMode::Touch;
+        harness.ui.commandInput.setText("/locate st");
+        harness.ui.resetCommandCompletion();
+        const WindowSafeArea safe = window->safeArea();
+        const int uiWidth = std::max(1, safe.width / harness.ui.guiScale);
+        const int uiHeight = std::max(1, safe.height / harness.ui.guiScale);
+        const TouchRect tab = touchCommandTabRect(uiWidth, uiHeight);
+        const double scaleX = static_cast<double>(window->width()) /
+                              std::max(1, window->windowWidth());
+        const double scaleY = static_cast<double>(window->height()) /
+                              std::max(1, window->windowHeight());
+        const double touchX =
+            (safe.x + (tab.x + tab.w * 0.5) * harness.ui.guiScale) / scaleX;
+        const double touchY =
+            (window->height() - safe.y -
+             (tab.y + tab.h * 0.5) * harness.ui.guiScale) / scaleY;
+        const TouchContactId tabContact{2, 1};
+        harness.router.handleTouch(
+            {tabContact, TouchPhase::Begin, touchX, touchY});
+        require(harness.ui.commandInput.text() == "/locate structure",
+                "the virtual mobile Tab uses command completion");
+        harness.router.handleTouch(
+            {tabContact, TouchPhase::End, touchX, touchY});
+        harness.settings.controlMode = ControlMode::Auto;
+        harness.flow.closeCommandInput();
 
         // Touch input in the gameplay region activates the touch HUD and
         // routes the contact as gameplay.

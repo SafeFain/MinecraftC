@@ -3,7 +3,7 @@
 MinecraftC is a C++17 voxel sandbox built with SDL3 and Vulkan. It
 features deterministic infinite worlds, asynchronous chunk streaming, Creative,
 Survival, and Spectator modes, dynamic lighting and weather, and English and
-Simplified Chinese interfaces.
+nine other localized interfaces.
 
 The root `VERSION` file is the single version source. It uses
 `X.Y.Z-alpha|beta|rc|release` and drives CMake, Android/iOS metadata, runtime
@@ -139,6 +139,7 @@ See [ios/README.md](ios/README.md) for device builds, signing, and installation.
 | Attack or break / use or place | Left / right mouse button |
 | Select hotbar slot | `1`-`9` or mouse wheel |
 | Inventory / command | `E` / `T` |
+| Complete command / previous completion | `Tab` / `Shift+Tab` |
 | Pause or back | `Esc` |
 
 Bindings are configurable under Settings > Controls. Controllers use an
@@ -156,10 +157,13 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v11 can read v2-v10 desktop saves. The current world
-generation version is v8. Older generation versions remain on disk and are
-shown as incompatible rather than migrated or blended into v8 terrain.
+generation version is v9. Older generation versions remain on disk and are
+shown as incompatible rather than migrated or blended into v9 terrain.
 
-Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, and `/weather`.
+Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
+`/locate biome <biome>`, and `/locate structure <structure>`. Command arguments
+support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
+command input is open.
 Run `./build-local/minecraftc --version` to print the version without opening a
 window.
 

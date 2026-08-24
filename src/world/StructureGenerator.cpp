@@ -653,6 +653,71 @@ std::vector<StructurePlacement> StructureGenerator::generateStructures(
     return out;
 }
 
+std::optional<LocatedStructure> StructureGenerator::locateNearest(
+    StructureType type, int worldX, int worldZ, int maximumDistance) const {
+    if (type == StructureType::None || type == StructureType::Count ||
+        maximumDistance < 0)
+        return {};
+
+    const TypeParams& p = params(type);
+    const int originCellX = floorDiv(worldX, p.cell);
+    const int originCellZ = floorDiv(worldZ, p.cell);
+    const int maximumRing = maximumDistance / p.cell + 2;
+    const int64_t maximumDistanceSquared =
+        static_cast<int64_t>(maximumDistance) * maximumDistance;
+    int64_t bestDistanceSquared = maximumDistanceSquared + 1;
+    std::optional<LocatedStructure> best;
+
+    auto inspect = [&](int offsetX, int offsetZ) {
+        const Candidate candidate = candidateForCell(
+            type, originCellX + offsetX, originCellZ + offsetZ);
+        if (!accept(candidate)) return;
+        const int64_t dx = static_cast<int64_t>(candidate.x) - worldX;
+        const int64_t dz = static_cast<int64_t>(candidate.z) - worldZ;
+        const int64_t distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared > maximumDistanceSquared) return;
+        if (distanceSquared > bestDistanceSquared) return;
+        if (distanceSquared == bestDistanceSquared && best &&
+            (candidate.x > best->worldX ||
+             (candidate.x == best->worldX && candidate.z >= best->worldZ)))
+            return;
+        bestDistanceSquared = distanceSquared;
+        best = LocatedStructure{
+            candidate.x,
+            m_heightPipeline.sampleColumn(candidate.x, candidate.z).height,
+            candidate.z,
+            type};
+    };
+
+    for (int ring = 0; ring <= maximumRing; ++ring) {
+        if (ring == 0) {
+            inspect(0, 0);
+        } else {
+            for (int x = -ring; x <= ring; ++x) {
+                inspect(x, -ring);
+                inspect(x, ring);
+            }
+            for (int z = -ring + 1; z < ring; ++z) {
+                inspect(-ring, z);
+                inspect(ring, z);
+            }
+        }
+
+        // Every unvisited cell is at least ring*cell+1 blocks away along one
+        // axis from a point in the origin cell. Once that exceeds the current
+        // best distance, the result is globally nearest, not merely the first
+        // accepted ring candidate.
+        if (best) {
+            const int64_t unvisitedLowerBound =
+                static_cast<int64_t>(ring) * p.cell + 1;
+            if (unvisitedLowerBound * unvisitedLowerBound >
+                bestDistanceSquared)
+                break;
+        }
+    }
+    return best;
+}
+
 bool StructureGenerator::reservationAt(int worldX, int worldZ) const {
     for (int t = 1; t < static_cast<int>(StructureType::Count); ++t) {
         const StructureType type = static_cast<StructureType>(t);

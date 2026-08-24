@@ -131,20 +131,44 @@ void ApplicationInputRouter::handleKeyEvent(
     };
     if (m_ui.commandOpen) {
         if (action == ButtonAction::Press) {
-            if (key == Key::Escape) {
-                m_flow.closeCommandInput();
-            } else if (key == Key::Enter) {
-                m_flow.executeCommand();
-            } else if (key == Key::Backspace) m_ui.commandInput.backspace();
-            else if (key == Key::Delete) m_ui.commandInput.eraseForward();
-            else if (key == Key::Left) m_ui.commandInput.moveLeft((mods & KeyModifier::Shift) != 0);
-            else if (key == Key::Right) m_ui.commandInput.moveRight((mods & KeyModifier::Shift) != 0);
-            else if (key == Key::Home) m_ui.commandInput.moveHome((mods & KeyModifier::Shift) != 0);
-            else if (key == Key::End) m_ui.commandInput.moveEnd((mods & KeyModifier::Shift) != 0);
-            else if ((mods & KeyModifier::Control) != 0 && key == Key::A) m_ui.commandInput.selectAll();
-            else if ((mods & KeyModifier::Control) != 0 && key == Key::C) m_ui.commandInput.copySelection();
-            else if ((mods & KeyModifier::Control) != 0 && key == Key::X) m_ui.commandInput.cutSelection();
-            else if ((mods & KeyModifier::Control) != 0 && key == Key::V) m_ui.commandInput.pasteClipboard();
+            if (key == Key::Tab) {
+                m_ui.completeCommand((mods & KeyModifier::Shift) != 0);
+            } else {
+                m_ui.resetCommandCompletion();
+                if (key == Key::Escape) {
+                    m_flow.closeCommandInput();
+                } else if (key == Key::Enter) {
+                    m_flow.executeCommand();
+                } else if (key == Key::Backspace) {
+                    m_ui.commandInput.backspace();
+                } else if (key == Key::Delete) {
+                    m_ui.commandInput.eraseForward();
+                } else if (key == Key::Left) {
+                    m_ui.commandInput.moveLeft(
+                        (mods & KeyModifier::Shift) != 0);
+                } else if (key == Key::Right) {
+                    m_ui.commandInput.moveRight(
+                        (mods & KeyModifier::Shift) != 0);
+                } else if (key == Key::Home) {
+                    m_ui.commandInput.moveHome(
+                        (mods & KeyModifier::Shift) != 0);
+                } else if (key == Key::End) {
+                    m_ui.commandInput.moveEnd(
+                        (mods & KeyModifier::Shift) != 0);
+                } else if ((mods & KeyModifier::Control) != 0 &&
+                           key == Key::A) {
+                    m_ui.commandInput.selectAll();
+                } else if ((mods & KeyModifier::Control) != 0 &&
+                           key == Key::C) {
+                    m_ui.commandInput.copySelection();
+                } else if ((mods & KeyModifier::Control) != 0 &&
+                           key == Key::X) {
+                    m_ui.commandInput.cutSelection();
+                } else if ((mods & KeyModifier::Control) != 0 &&
+                           key == Key::V) {
+                    m_ui.commandInput.pasteClipboard();
+                }
+            }
         }
         return;
     }
@@ -241,6 +265,7 @@ void ApplicationInputRouter::handleKeyEvent(
 }
 
 void ApplicationInputRouter::handleTextEvent(std::string_view text) {
+    if (m_ui.commandOpen) m_ui.resetCommandCompletion();
     for (const uint32_t codepoint : decodeUtf8(text)) {
         if (m_ui.commandOpen) {
             std::string encoded; appendUtf8(encoded, codepoint);
@@ -502,11 +527,17 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
     glm::vec2 position = event.phase == TouchPhase::End && m_inputs.uiTouch.active &&
                          event.id == m_inputs.uiTouch.id
         ? m_inputs.uiTouch.position : m_ui.touchToUi(m_window, event.x, event.y);
+    const int uiWidth = std::max(1, safe.width / std::max(1, m_ui.guiScale));
+    const int uiHeight = std::max(1, safe.height / std::max(1, m_ui.guiScale));
+    if (event.phase == TouchPhase::Begin && m_ui.commandOpen &&
+        touchUiVisible() &&
+        touchCommandTabRect(uiWidth, uiHeight).contains(position.x, position.y)) {
+        m_ui.completeCommand();
+        return;
+    }
     if (event.phase == TouchPhase::Begin && m_ui.inventoryOpen &&
         touchUiVisible() &&
-        touchInventoryCloseRect(
-            std::max(1, safe.width / std::max(1, m_ui.guiScale)),
-            std::max(1, safe.height / std::max(1, m_ui.guiScale))).contains(position.x, position.y)) {
+        touchInventoryCloseRect(uiWidth, uiHeight).contains(position.x, position.y)) {
         m_flow.closeInventory(); return;
     }
     bool gameplay = false;

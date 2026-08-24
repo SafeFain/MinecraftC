@@ -1,10 +1,12 @@
 #pragma once
 
 #include "world/BiomeMap.h"
+#include "world/Structure.h"
 #include "world/WorldGenContext.h"
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <vector>
 
 class HeightPipeline;
@@ -14,19 +16,6 @@ class HeightPipeline;
 // anchors, chance, footprint and layout variant are pure functions of world
 // cell coordinates, so a structure appears identically whether the area
 // around it is generated as one region or as nine singleton chunks.
-enum class StructureType : uint8_t {
-    None = 0,
-    Village,
-    DesertVillage,
-    TravelerHut,
-    AbandonedCamp,
-    DesertWell,
-    Igloo,
-    RuinedTower,
-    LumberCamp,
-    Count
-};
-
 struct StructurePlacement {
     int localX = 0;    // anchor local to the requested window origin
     int localZ = 0;
@@ -34,6 +23,13 @@ struct StructurePlacement {
     StructureType type = StructureType::None;
     uint64_t variant = 0;                 // deterministic layout seed
     int minX = 0, maxX = 0, minZ = 0, maxZ = 0;  // world-coordinate footprint
+};
+
+struct LocatedStructure {
+    int worldX = 0;
+    int baseY = 0;
+    int worldZ = 0;
+    StructureType type = StructureType::None;
 };
 
 class StructureGenerator {
@@ -53,6 +49,13 @@ public:
 
     std::vector<StructurePlacement> generateStructures(int chunkWorldX,
                                                        int chunkWorldZ);
+
+    // Finds the nearest accepted deterministic anchor without generating or
+    // loading chunks. Search expands by placement cell and stops only after
+    // no unvisited cell can contain a closer anchor.
+    std::optional<LocatedStructure> locateNearest(
+        StructureType type, int worldX, int worldZ,
+        int maximumDistance = 8192) const;
 
     // Pure coordinate query: does a deterministic structure reservation cover
     // this column? Both generation paths use it for tree suppression so the

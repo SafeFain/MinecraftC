@@ -842,6 +842,32 @@ int main() {
         require(structureCounts[static_cast<size_t>(t)] > 0,
                 "structure type is missing from the exploration window");
 
+    // Locate uses the same accepted anchors and must return the globally
+    // nearest one in the search radius, not merely the first cell-ring hit.
+    for (const StructureType type : STRUCTURE_TYPES) {
+        const StructurePlacement* expected = nullptr;
+        int64_t expectedDistanceSquared = std::numeric_limits<int64_t>::max();
+        for (const StructurePlacement& placement : explorationStructures) {
+            if (placement.type != type) continue;
+            const int64_t x = -8192LL + placement.localX;
+            const int64_t z = -8192LL + placement.localZ;
+            const int64_t distanceSquared = x * x + z * z;
+            if (distanceSquared > 8192LL * 8192LL ||
+                distanceSquared >= expectedDistanceSquared)
+                continue;
+            expectedDistanceSquared = distanceSquared;
+            expected = &placement;
+        }
+        const auto located = structureGenerator.locateNearest(type, 0, 0);
+        require(expected != nullptr && located.has_value(),
+                "structure locator failed to find an explored structure type");
+        require(located->worldX == -8192 + expected->localX &&
+                    located->worldZ == -8192 + expected->localZ &&
+                    located->baseY == expected->baseY &&
+                    located->type == type,
+                "structure locator disagrees with generated anchor placement");
+    }
+
     // Structure material sanity: build a chosen placement through a
     // recording writer and confirm the signature materials appear.
     auto countMaterials = [](const StructurePlacement& placement,

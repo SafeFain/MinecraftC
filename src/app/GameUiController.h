@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/TextEditBuffer.h"
+#include "game/Command.h"
 #include "game/Localization.h"
 #include "ui/ContainerScreen.h"
 #include "ui/Hotbar.h"
@@ -12,6 +13,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <vector>
 
 class IGameRenderer;
 class ApplicationInputController;
@@ -32,6 +34,8 @@ public:
     void openCreativeCatalog();
     void openPlayerInventoryTab();
     void closeCommand();
+    bool completeCommand(bool reverse = false);
+    void resetCommandCompletion();
     bool playerInventoryViewOpen(const Player& player) const;
     // Window-coordinate → UI-coordinate conversion; owns mouseScreenX/Y and
     // guiScale, so the conversion lives here with the state it writes.
@@ -64,6 +68,14 @@ public:
     float hudTime = 0.0f;
 
 private:
+    struct CommandCompletionState {
+        std::string baseText;
+        std::vector<CommandSuggestion> suggestions;
+        size_t index = 0;
+        bool active = false;
+    };
+
+    CommandCompletionState commandCompletion;
     void renderSurvivalHud(const Player& player, int screenWidth);
     void renderSelectedItemName(const Player& player, int screenWidth);
     void renderCrosshairAndMiningProgress(const Player& player,

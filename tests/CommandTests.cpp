@@ -49,6 +49,45 @@ int main() {
     require(locateError.error && locateError.error->position == 14 &&
             locateError.error->expected == "a valid biome (see /help)",
             "locate error did not identify the unsupported biome argument");
+    for (const StructureType type : STRUCTURE_TYPES) {
+        const auto parsed = parseCommand(
+            "/locate structure " + std::string(structureCommandName(type)));
+        require(parsed.command &&
+                    parsed.command->type == CommandType::LocateStructure &&
+                    parsed.command->structure == type,
+                "a registered structure name was not accepted by locate");
+    }
+    const auto namespacedStructure =
+        parseCommand("/locate structure minecraftc:igloo");
+    require(namespacedStructure.command &&
+                namespacedStructure.command->structure == StructureType::Igloo,
+            "the project-namespaced structure identifier was not accepted");
+    const auto structureError =
+        parseCommand("/locate structure stronghold");
+    require(structureError.error && structureError.error->position == 18 &&
+                structureError.error->expected ==
+                    "a valid structure (see /help)",
+            "locate error did not identify the unsupported structure argument");
+
+    const auto locateKindSuggestions = commandSuggestions("/locate st", 10);
+    require(locateKindSuggestions.size() == 1 &&
+                locateKindSuggestions[0].text == "structure" &&
+                locateKindSuggestions[0].start == 8,
+            "locate subcommand completion did not suggest structure");
+    const std::string structurePrefix = "/locate structure de";
+    const auto structureSuggestions = commandSuggestions(
+        structurePrefix, structurePrefix.size());
+    require(structureSuggestions.size() == 2 &&
+                structureSuggestions[0].text == "desert_village" &&
+                structureSuggestions[1].text == "desert_well",
+            "structure argument completion did not return sorted matches");
+    const std::string middleInput = "/locate structure ruined_x extra";
+    const size_t middleCursor = middleInput.find("_x");
+    const auto middleSuggestions = commandSuggestions(middleInput, middleCursor);
+    require(middleSuggestions.size() == 1 &&
+                middleSuggestions[0].text == "ruined_tower" &&
+                middleSuggestions[0].end == middleInput.find(' ', 18),
+            "completion in the middle of a token did not preserve its range");
     const auto timeError = parseCommand("/time noon");
     require(timeError.error && timeError.error->position == 6 &&
             timeError.error->expected == "set",

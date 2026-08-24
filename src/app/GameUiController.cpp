@@ -78,15 +78,23 @@ void GameUiController::render(
         renderer.beginUIFrame(uiWidth, uiHeight);
         constexpr float lineHeight = 25.0f;
         const float textWidth = std::max(1.0f, static_cast<float>(uiWidth - 40));
-        auto wrap = [&](const std::string& text, float scale) {
-            return wrapTextPixels(text, textWidth,
+        auto wrap = [&](const std::string& text, float scale, float width) {
+            return wrapTextPixels(text, width,
                 [&](const std::string& candidate) {
                     return renderer.measureText(candidate, scale).x;
                 });
         };
         std::vector<std::string> inputLines;
         if (commandOpen) {
-            inputLines = wrap("> " + commandInput.text() + "_", 1.25f);
+            const bool touchTabVisible =
+                settings.controlMode == ControlMode::Touch ||
+                (settings.controlMode == ControlMode::Auto &&
+                 inputs.touchHudVisible);
+            const float inputWidth = touchTabVisible
+                ? std::max(1.0f, static_cast<float>(uiWidth - 122))
+                : textWidth;
+            inputLines = wrap("> " + commandInput.text() + "_", 1.25f,
+                              inputWidth);
         }
         const float inputHeight = commandOpen
             ? 11.0f + lineHeight * static_cast<float>(inputLines.size()) : 0.0f;
@@ -95,7 +103,7 @@ void GameUiController::render(
         for (auto message = chatHistory.rbegin();
              message != chatHistory.rend() && visibleHistory.size() < 8;
              ++message) {
-            const auto lines = wrap(*message, 1.0f);
+            const auto lines = wrap(*message, 1.0f, textWidth);
             for (auto line = lines.rbegin();
                  line != lines.rend() && visibleHistory.size() < 8; ++line)
                 visibleHistory.push_back(*line);
@@ -119,6 +127,14 @@ void GameUiController::render(
                     inputLines[inputLines.size() - 1 - i],
                     20.0f, 25.0f + lineHeight * static_cast<float>(i),
                     1.25f, glm::vec3(1.0f));
+            if (settings.controlMode == ControlMode::Touch ||
+                (settings.controlMode == ControlMode::Auto &&
+                 inputs.touchHudVisible)) {
+                const TouchRect tab = touchCommandTabRect(uiWidth, uiHeight);
+                UiTheme::button(renderer, tab.x, tab.y, tab.w, tab.h,
+                    localization.text("touch.tab"),
+                    UiTheme::WidgetState::Normal, false, 0.0f, 0.92f);
+            }
         }
         renderer.endUIFrame();
     }
@@ -225,6 +241,7 @@ void GameUiController::showMessage(const std::string& message) {
 void GameUiController::openCommand() {
     commandOpen = true;
     commandInput.setText({});
+    resetCommandCompletion();
 }
 
 void GameUiController::openInventory(bool creativeCatalog) {
@@ -246,6 +263,39 @@ void GameUiController::openPlayerInventoryTab() {
 void GameUiController::closeCommand() {
     commandOpen = false;
     commandInput.setText({});
+    resetCommandCompletion();
+}
+
+bool GameUiController::completeCommand(bool reverse) {
+    if (!commandCompletion.active) {
+        commandCompletion.suggestions = commandSuggestions(
+            commandInput.text(), commandInput.cursor());
+        if (commandCompletion.suggestions.empty()) return false;
+        commandCompletion.baseText = commandInput.text();
+        commandCompletion.index = reverse
+            ? commandCompletion.suggestions.size() - 1 : 0;
+        commandCompletion.active = true;
+    } else if (reverse) {
+        commandCompletion.index = commandCompletion.index == 0
+            ? commandCompletion.suggestions.size() - 1
+            : commandCompletion.index - 1;
+    } else {
+        commandCompletion.index =
+            (commandCompletion.index + 1) % commandCompletion.suggestions.size();
+    }
+
+    const CommandSuggestion& suggestion =
+        commandCompletion.suggestions[commandCompletion.index];
+    std::string completed = commandCompletion.baseText;
+    completed.replace(suggestion.start, suggestion.end - suggestion.start,
+                      suggestion.text);
+    commandInput.setText(
+        std::move(completed), suggestion.start + suggestion.text.size());
+    return true;
+}
+
+void GameUiController::resetCommandCompletion() {
+    commandCompletion = {};
 }
 
 bool GameUiController::playerInventoryViewOpen(const Player& player) const {

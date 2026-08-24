@@ -97,6 +97,9 @@ public:
     TreeGenerator&  getTreeGenerator()  { return m_treeGenerator; }
     OreGenerator&   getOreGenerator()   { return m_oreGenerator; }
     StructureGenerator& getStructureGenerator() { return m_structureGenerator; }
+    const StructureGenerator& getStructureGenerator() const {
+        return m_structureGenerator;
+    }
     uint64_t        getSeed() const     { return m_seed; }
 
 private:

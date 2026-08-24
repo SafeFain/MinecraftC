@@ -26,9 +26,18 @@ TextEditBuffer::TextEditBuffer(std::string text, size_t maximumCodepoints,
 }
 
 void TextEditBuffer::setText(std::string text) {
+    const size_t cursor = text.size();
+    setText(std::move(text), cursor);
+}
+
+void TextEditBuffer::setText(std::string text, size_t cursor) {
     if (!validUtf8(text)) text.clear();
+    cursor = std::min(cursor, text.size());
+    while (cursor > 0 && cursor < text.size() &&
+           isContinuation(static_cast<unsigned char>(text[cursor])))
+        --cursor;
     m_text = std::move(text);
-    m_cursor = m_anchor = m_text.size();
+    m_cursor = m_anchor = cursor;
 }
 
 size_t TextEditBuffer::previousBoundary(std::string_view text, size_t position) {
