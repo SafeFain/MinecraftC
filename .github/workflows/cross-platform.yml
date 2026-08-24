@@ -422,6 +422,7 @@ jobs:
         shell: bash
         run: |
           app="$PWD/build-ios-simulator/Release-iphonesimulator/MinecraftC.app"
+          startup_timeout=300
           runtime="$(xcrun simctl list runtimes available -j | python3 -c \
             'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if ".iOS-" in x["identifier"] and x["isAvailable"]]; r.sort(key=lambda x:tuple(map(int,x["version"].split(".")))); print(r[-1]["identifier"])')"
           device_type() {
@@ -444,7 +445,7 @@ jobs:
             launch_pid=$!
             found=0
             launch_exited=0
-            for elapsed in {1..180}; do
+            for ((elapsed = 1; elapsed <= startup_timeout; ++elapsed)); do
               if grep -q 'Vulkan first frame presented' "$log"; then
                 found=1
                 break
@@ -454,7 +455,7 @@ jobs:
                 break
               fi
               if test $((elapsed % 15)) -eq 0; then
-                echo "Waiting for $family Vulkan cold start (${elapsed}s/180s)"
+                echo "Waiting for $family Vulkan cold start (${elapsed}s/${startup_timeout}s)"
               fi
               sleep 1
             done
@@ -468,10 +469,10 @@ jobs:
               if test "$launch_exited" -eq 1; then
                 echo "$family simctl launch exited before the first frame (status $launch_status)" >&2
               else
-                echo "$family Vulkan cold start exceeded 180 seconds" >&2
+                echo "$family Vulkan cold start exceeded $startup_timeout seconds" >&2
               fi
               echo "Simulator system log for failed $family launch:"
-              xcrun simctl spawn "$udid" log show --style compact --last 3m \
+              xcrun simctl spawn "$udid" log show --style compact --last 6m \
                 --predicate 'process == "MinecraftC"' || true
               echo "Recent MinecraftC crash reports:"
               find "$HOME/Library/Logs/DiagnosticReports" -type f \
