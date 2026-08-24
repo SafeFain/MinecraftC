@@ -73,11 +73,16 @@ float findSupportHeight(float px, float bottomY, float pz,
             for (int by = scanTop; by >= Config::WORLD_MIN_Y; --by) {
                 const BlockId id = getBlock(bx, by, bz);
                 if (!getBlockProps(id).solid) continue;
-                const float top = static_cast<float>(by) +
-                                  blockCollisionHeight(id);
-                if (top <= bottomY + margin) {
-                    support = std::max(support, top);
-                    break;
+                const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+                for (uint8_t i = 0; i < boxes.count; ++i) {
+                    const BlockCollisionBox& box = boxes.boxes[i];
+                    if (px + halfWidth <= bx + box.min.x ||
+                        px - halfWidth >= bx + box.max.x ||
+                        pz + halfWidth <= bz + box.min.z ||
+                        pz - halfWidth >= bz + box.max.z) continue;
+                    const float top = static_cast<float>(by) + box.max.y;
+                    if (top <= bottomY + margin)
+                        support = std::max(support, top);
                 }
             }
         }

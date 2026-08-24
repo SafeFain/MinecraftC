@@ -211,6 +211,8 @@ public:
     struct RaycastHit {
         glm::ivec3 blockPos;
         glm::ivec3 faceNormal;
+        glm::dvec3 hitPosition{0.0};
+        double distance = 0.0;
     };
     std::optional<RaycastHit> raycast(const glm::dvec3& origin,
                                       const glm::vec3& direction,

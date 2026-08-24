@@ -21,6 +21,35 @@ enum class StructureType : uint8_t {
     Count
 };
 
+enum class StructureLootProfile : uint8_t {
+    None = 0,
+    Village,
+    TravelerHut,
+    AbandonedCamp,
+    Igloo,
+    RuinedTower,
+    LumberCamp,
+    XiguangRuin,
+    StarCrystalGeode,
+    CloudspireTower
+};
+
+inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
+    switch (type) {
+        case StructureType::Village:
+        case StructureType::DesertVillage: return StructureLootProfile::Village;
+        case StructureType::TravelerHut: return StructureLootProfile::TravelerHut;
+        case StructureType::AbandonedCamp: return StructureLootProfile::AbandonedCamp;
+        case StructureType::Igloo: return StructureLootProfile::Igloo;
+        case StructureType::RuinedTower: return StructureLootProfile::RuinedTower;
+        case StructureType::LumberCamp: return StructureLootProfile::LumberCamp;
+        case StructureType::XiguangRuin: return StructureLootProfile::XiguangRuin;
+        case StructureType::StarCrystalGeode: return StructureLootProfile::StarCrystalGeode;
+        case StructureType::CloudspireTower: return StructureLootProfile::CloudspireTower;
+        default: return StructureLootProfile::None;
+    }
+}
+
 inline constexpr std::array<StructureType, 8> OVERWORLD_STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,

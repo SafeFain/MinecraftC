@@ -226,6 +226,16 @@
     "star_crystal": {"generator": "block_item_icon", "block": "star_crystal"},
     "starflower": {"generator": "block_item_icon", "block": "starflower"},
     "cloud_bloom": {"generator": "block_item_icon", "block": "cloud_bloom"},
-    "glowshroom": {"generator": "block_item_icon", "block": "glowshroom"}
+    "glowshroom": {"generator": "block_item_icon", "block": "glowshroom"},
+    "oak_planks_slab": {"generator": "block_item_icon", "block": "planks"},
+    "oak_planks_stairs": {"generator": "block_item_icon", "block": "planks"},
+    "cobblestone_slab": {"generator": "block_item_icon", "block": "cobblestone"},
+    "cobblestone_stairs": {"generator": "block_item_icon", "block": "cobblestone"},
+    "terracotta_slab": {"generator": "block_item_icon", "block": "terracotta"},
+    "terracotta_stairs": {"generator": "block_item_icon", "block": "terracotta"},
+    "sunstone_slab": {"generator": "block_item_icon", "block": "sunstone"},
+    "sunstone_stairs": {"generator": "block_item_icon", "block": "sunstone"},
+    "cloudstone_slab": {"generator": "block_item_icon", "block": "cloudstone"},
+    "cloudstone_stairs": {"generator": "block_item_icon", "block": "cloudstone"}
   }
 }

@@ -109,6 +109,16 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::STARFLOWER, 0.0f);
     set(BlockId::CLOUD_BLOOM, 0.0f);
     set(BlockId::GLOWSHROOM, 0.0f);
+    for (uint8_t raw=static_cast<uint8_t>(BlockId::PLANKS_SLAB_BOTTOM);
+         raw<static_cast<uint8_t>(BlockId::COUNT);++raw) {
+        const BlockId id=static_cast<BlockId>(raw);
+        ArchitecturalBlockState state;
+        if(!decodeArchitecturalBlock(id,state))continue;
+        if(state.material==ArchitecturalMaterial::Planks)
+            set(id,2.0f,ToolKind::Axe);
+        else
+            set(id,1.5f,ToolKind::Pickaxe,ToolTier::Wood);
+    }
     return values;
 }
 
@@ -208,6 +218,25 @@ std::vector<CraftingRecipe> buildRecipes() {
         ItemId::SAND, ItemId::GUNPOWDER, ItemId::SAND,
         ItemId::GUNPOWDER, ItemId::SAND, ItemId::GUNPOWDER},
         {ItemId::TNT, 1, 0}, false));
+    const std::array<std::tuple<ItemId, ItemId, ItemId>, 5> architecture{{
+        {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS_SLAB,
+         ItemId::OAK_PLANKS_STAIRS},
+        {ItemId::COBBLESTONE, ItemId::COBBLESTONE_SLAB,
+         ItemId::COBBLESTONE_STAIRS},
+        {ItemId::TERRACOTTA, ItemId::TERRACOTTA_SLAB,
+         ItemId::TERRACOTTA_STAIRS},
+        {ItemId::SUNSTONE, ItemId::SUNSTONE_SLAB, ItemId::SUNSTONE_STAIRS},
+        {ItemId::CLOUDSTONE, ItemId::CLOUDSTONE_SLAB,
+         ItemId::CLOUDSTONE_STAIRS},
+    }};
+    for (const auto& [material, slab, stairs] : architecture) {
+        recipes.push_back(shaped(3, 1, {material, material, material},
+                                 {slab, 6, 0}, false));
+        recipes.push_back(shaped(3, 3, {material, E, E,
+                                        material, material, E,
+                                        material, material, material},
+                                 {stairs, 4, 0}, true));
+    }
     addToolSet(recipes, ItemId::OAK_PLANKS, ItemId::WOODEN_PICKAXE);
     addToolSet(recipes, ItemId::COBBLESTONE, ItemId::STONE_PICKAXE);
     addToolSet(recipes, ItemId::IRON_INGOT, ItemId::IRON_PICKAXE);

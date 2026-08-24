@@ -35,7 +35,7 @@ int main() {
             "weather block geometry or collision properties are invalid");
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
             static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 116 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 166 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -80,7 +80,7 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::GLOWSHROOM,
+            creativeItems.back() == ItemId::CLOUDSTONE_STAIRS,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -101,7 +101,7 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 40 &&
+                CreativeItemCategory::BuildingBlocks)] == 50 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Nature)] == 27 &&
             categoryCounts[static_cast<size_t>(
@@ -161,6 +161,35 @@ int main() {
                 getLightEmission(BlockId::CLOUD_BLOOM) == 4 &&
                 getLightEmission(BlockId::GLOWSHROOM) == 6,
             "Heaven materials lack inventory, atlas, or light mappings");
+    for (uint8_t material=0;
+         material<static_cast<uint8_t>(ArchitecturalMaterial::Count);++material) {
+        for (BlockHalf half : {BlockHalf::Bottom,BlockHalf::Top}) {
+            const auto family=static_cast<ArchitecturalMaterial>(material);
+            const BlockId slab=slabBlock(family,half);
+            ArchitecturalBlockState decoded;
+            require(decodeArchitecturalBlock(slab,decoded)&&
+                        decoded.material==family&&decoded.half==half&&
+                        decoded.shape==RenderShape::Slab&&
+                        blockCollisionBoxes(slab).count==1&&
+                        itemForBlock(slab)!=ItemId::EMPTY,
+                    "architectural slab state failed round-trip or collision mapping");
+            for (BedDirection direction : {BedDirection::North,BedDirection::East,
+                                            BedDirection::South,BedDirection::West}) {
+                const BlockId stair=stairBlock(family,half,direction);
+                require(decodeArchitecturalBlock(stair,decoded)&&
+                            decoded.material==family&&decoded.half==half&&
+                            decoded.direction==direction&&
+                            decoded.shape==RenderShape::Stair&&
+                            blockCollisionBoxes(stair).count==2&&
+                            itemForBlock(stair)!=ItemId::EMPTY,
+                        "architectural stair state failed round-trip or collision mapping");
+            }
+        }
+    }
+    require(isFullCollisionBlock(BlockId::COBBLESTONE) &&
+                !isFullCollisionBlock(BlockId::COBBLESTONE_SLAB_TOP) &&
+                !isFullCollisionBlock(BlockId::COBBLESTONE_STAIRS_TOP_NORTH),
+            "partial architectural shapes were mistaken for full support blocks");
     require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
             getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&
             getItemProps(ItemId::BLASTLING_SPAWN_EGG).spawnEggMob ==

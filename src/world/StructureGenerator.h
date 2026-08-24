@@ -39,6 +39,7 @@ public:
     // work; pending writes must overwrite unconditionally.
     using StructureWriter =
         std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
+    using SurfaceSampler = std::function<int(int worldX, int worldZ)>;
 
     StructureGenerator(uint64_t seed, const HeightPipeline& heightPipeline);
 
@@ -65,7 +66,8 @@ public:
     // Write every block of a placement through the writer. Pure function of
     // the placement, so region and singleton paths produce identical blocks.
     static void build(const StructurePlacement& placement,
-                      const StructureWriter& write);
+                      const StructureWriter& write,
+                      const SurfaceSampler& surfaceSampler = {});
 
 private:
     struct TypeParams {

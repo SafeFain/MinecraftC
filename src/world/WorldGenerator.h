@@ -52,7 +52,9 @@ public:
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
     // Callback for structure blocks outside the current chunk.  Unlike
     // leaves, these must overwrite whatever the target chunk already holds.
-    using StructureSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
+    using StructureSetter = std::function<void(
+        int worldX, int worldY, int worldZ, BlockId id,
+        StructureLootProfile lootProfile, uint64_t lootSeed)>;
 
     explicit WorldGenerator(uint64_t seed = 1234567890ULL,
                              WorldType worldType = WorldType::Normal,
@@ -90,7 +92,7 @@ public:
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
-    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 6;
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 7;
     static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
         (HEAVEN_GENERATION_VERSION << 16) | 1u;
 
@@ -134,5 +136,6 @@ private:
         int worldX, int worldZ, int layer) const;
     std::optional<LocatedStructure> heavenStructureForCell(
         StructureType type, int cellX, int cellZ) const;
-    static void populateHeaven(Chunk& chunk, WorldGenerator& generator);
+    static void populateHeaven(Chunk& chunk, WorldGenerator& generator,
+                               const StructureSetter& structureSetter = {});
 };

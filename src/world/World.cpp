@@ -27,11 +27,14 @@ bool rayIntersectsBlockBounds(const glm::dvec3& origin,
                               const glm::dvec3& direction,
                               double maximumDistance,
                               const glm::ivec3& block,
-                              float height) {
+                              const BlockCollisionBox& box,
+                              double& hitDistance,
+                              glm::ivec3& faceNormal) {
     double minimum = 0.0;
     double maximum = maximumDistance;
-    const glm::dvec3 boundsMin(block);
-    const glm::dvec3 boundsMax = boundsMin + glm::dvec3(1.0, height, 1.0);
+    glm::ivec3 enteringFace(0);
+    const glm::dvec3 boundsMin = glm::dvec3(block) + glm::dvec3(box.min);
+    const glm::dvec3 boundsMax = glm::dvec3(block) + glm::dvec3(box.max);
     for (int axis = 0; axis < 3; ++axis) {
         if (std::abs(direction[axis]) < 1e-12) {
             if (origin[axis] < boundsMin[axis] || origin[axis] > boundsMax[axis])
@@ -40,12 +43,23 @@ bool rayIntersectsBlockBounds(const glm::dvec3& origin,
         }
         double nearDistance = (boundsMin[axis] - origin[axis]) / direction[axis];
         double farDistance = (boundsMax[axis] - origin[axis]) / direction[axis];
-        if (nearDistance > farDistance) std::swap(nearDistance, farDistance);
-        minimum = std::max(minimum, nearDistance);
+        int normalSign = -1;
+        if (nearDistance > farDistance) {
+            std::swap(nearDistance, farDistance);
+            normalSign = 1;
+        }
+        if (nearDistance > minimum) {
+            minimum = nearDistance;
+            enteringFace = glm::ivec3(0);
+            enteringFace[axis] = normalSign;
+        }
         maximum = std::min(maximum, farDistance);
         if (minimum > maximum) return false;
     }
-    return maximum >= 0.0 && minimum <= maximumDistance;
+    if (maximum < 0.0 || minimum > maximumDistance) return false;
+    hitDistance = minimum;
+    faceNormal = enteringFace;
+    return true;
 }
 
 }
@@ -444,21 +458,45 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
     const double directionLength = glm::length(glm::dvec3(direction));
     const glm::dvec3 normalizedDirection = directionLength > 1e-12
         ? glm::dvec3(direction) / directionLength : glm::dvec3(0.0);
+    double preciseDistance = 0.0;
+    glm::ivec3 preciseFace(0);
+    bool hasPreciseHit = false;
     const auto hit = voxelRaycast(
         origin, direction, static_cast<double>(maxDistance),
-        [this, &origin, &normalizedDirection, maxDistance](
+        [this, &origin, &normalizedDirection, maxDistance,
+         &preciseDistance, &preciseFace, &hasPreciseHit](
             const glm::ivec3& blockPos) {
             if (!Config::isValidWorldY(blockPos.y)) return false;
             const BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
             if (id == BlockId::AIR) return false;
             const BlockProperties& props = getBlockProps(id);
-            if (isBed(id)) {
-                return rayIntersectsBlockBounds(
-                    origin, normalizedDirection, maxDistance, blockPos,
-                    blockCollisionHeight(id));
+            if (props.solid) {
+                const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+                double nearest = maxDistance + 1.0;
+                glm::ivec3 nearestFace(0);
+                for (uint8_t i = 0; i < boxes.count; ++i) {
+                    double candidateDistance = 0.0;
+                    glm::ivec3 candidateFace(0);
+                    if (rayIntersectsBlockBounds(origin, normalizedDirection,
+                            maxDistance, blockPos, boxes.boxes[i],
+                            candidateDistance, candidateFace) &&
+                        candidateDistance < nearest) {
+                        nearest = candidateDistance;
+                        nearestFace = candidateFace;
+                    }
+                }
+                if (nearest > maxDistance) return false;
+                preciseDistance = nearest;
+                preciseFace = nearestFace;
+                hasPreciseHit = true;
+                return true;
             }
-            return props.solid || props.shape == RenderShape::Cross;
+            return props.shape == RenderShape::Cross;
         });
     if (!hit) return std::nullopt;
-    return RaycastHit{hit->blockPos, hit->faceNormal};
+    const double distance = hasPreciseHit ? preciseDistance : hit->distance;
+    return RaycastHit{hit->blockPos,
+                      hasPreciseHit ? preciseFace : hit->faceNormal,
+                      origin + normalizedDirection * distance,
+                      distance};
 }

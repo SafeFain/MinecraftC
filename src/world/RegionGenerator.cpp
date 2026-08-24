@@ -512,6 +512,8 @@ void RegionGenerator::placeStructures(
     const auto needsEntity = [](BlockId id) {
         return id == BlockId::CHEST || id == BlockId::FURNACE;
     };
+    StructureLootProfile activeLoot = StructureLootProfile::None;
+    uint64_t activeLootSeed = 0;
     const auto write = [&](int worldX, int worldY, int worldZ, BlockId id) {
         if (!Config::isValidWorldY(worldY)) return;
         const int localX = worldX - m_regionData.worldOriginX;
@@ -532,14 +534,28 @@ void RegionGenerator::placeStructures(
             // the pending channel as an entity registration request even
             // though the block itself was already written above.
             if (needsEntity(id))
-                pendingOut.push_back({worldX, worldY, worldZ, id, true, true});
+                pendingOut.push_back({worldX, worldY, worldZ, id, true, true,
+                                      id == BlockId::CHEST ? activeLoot
+                                                           : StructureLootProfile::None,
+                                      WorldGenContext::hashPosition(
+                                          activeLootSeed, worldX, worldY, worldZ)});
         } else {
             pendingOut.push_back(
-                {worldX, worldY, worldZ, id, true, needsEntity(id)});
+                {worldX, worldY, worldZ, id, true, needsEntity(id),
+                 id == BlockId::CHEST ? activeLoot
+                                      : StructureLootProfile::None,
+                 WorldGenContext::hashPosition(
+                     activeLootSeed, worldX, worldY, worldZ)});
         }
     };
-    for (const StructurePlacement& placement : m_structures)
-        StructureGenerator::build(placement, write);
+    for (const StructurePlacement& placement : m_structures) {
+        activeLoot = structureLootProfile(placement.type);
+        activeLootSeed = placement.variant;
+        StructureGenerator::build(placement, write,
+            [&](int worldX,int worldZ) {
+                return m_heightPipeline.sampleColumn(worldX,worldZ).height;
+            });
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

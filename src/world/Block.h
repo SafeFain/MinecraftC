@@ -132,7 +132,34 @@ enum class BlockId : uint8_t {
     STARFLOWER    = 113,
     CLOUD_BLOOM   = 114,
     GLOWSHROOM    = 115,
-    COUNT        = 116,
+    // Architectural states are appended in five contiguous ten-state
+    // families: bottom/top slab, then bottom/top stairs in NESW order.
+    PLANKS_SLAB_BOTTOM = 116, PLANKS_SLAB_TOP,
+    PLANKS_STAIRS_BOTTOM_NORTH, PLANKS_STAIRS_BOTTOM_EAST,
+    PLANKS_STAIRS_BOTTOM_SOUTH, PLANKS_STAIRS_BOTTOM_WEST,
+    PLANKS_STAIRS_TOP_NORTH, PLANKS_STAIRS_TOP_EAST,
+    PLANKS_STAIRS_TOP_SOUTH, PLANKS_STAIRS_TOP_WEST,
+    COBBLESTONE_SLAB_BOTTOM, COBBLESTONE_SLAB_TOP,
+    COBBLESTONE_STAIRS_BOTTOM_NORTH, COBBLESTONE_STAIRS_BOTTOM_EAST,
+    COBBLESTONE_STAIRS_BOTTOM_SOUTH, COBBLESTONE_STAIRS_BOTTOM_WEST,
+    COBBLESTONE_STAIRS_TOP_NORTH, COBBLESTONE_STAIRS_TOP_EAST,
+    COBBLESTONE_STAIRS_TOP_SOUTH, COBBLESTONE_STAIRS_TOP_WEST,
+    TERRACOTTA_SLAB_BOTTOM, TERRACOTTA_SLAB_TOP,
+    TERRACOTTA_STAIRS_BOTTOM_NORTH, TERRACOTTA_STAIRS_BOTTOM_EAST,
+    TERRACOTTA_STAIRS_BOTTOM_SOUTH, TERRACOTTA_STAIRS_BOTTOM_WEST,
+    TERRACOTTA_STAIRS_TOP_NORTH, TERRACOTTA_STAIRS_TOP_EAST,
+    TERRACOTTA_STAIRS_TOP_SOUTH, TERRACOTTA_STAIRS_TOP_WEST,
+    SUNSTONE_SLAB_BOTTOM, SUNSTONE_SLAB_TOP,
+    SUNSTONE_STAIRS_BOTTOM_NORTH, SUNSTONE_STAIRS_BOTTOM_EAST,
+    SUNSTONE_STAIRS_BOTTOM_SOUTH, SUNSTONE_STAIRS_BOTTOM_WEST,
+    SUNSTONE_STAIRS_TOP_NORTH, SUNSTONE_STAIRS_TOP_EAST,
+    SUNSTONE_STAIRS_TOP_SOUTH, SUNSTONE_STAIRS_TOP_WEST,
+    CLOUDSTONE_SLAB_BOTTOM, CLOUDSTONE_SLAB_TOP,
+    CLOUDSTONE_STAIRS_BOTTOM_NORTH, CLOUDSTONE_STAIRS_BOTTOM_EAST,
+    CLOUDSTONE_STAIRS_BOTTOM_SOUTH, CLOUDSTONE_STAIRS_BOTTOM_WEST,
+    CLOUDSTONE_STAIRS_TOP_NORTH, CLOUDSTONE_STAIRS_TOP_EAST,
+    CLOUDSTONE_STAIRS_TOP_SOUTH, CLOUDSTONE_STAIRS_TOP_WEST,
+    COUNT        = 166,
     POPPY        = FLOWER
 };
 
@@ -156,11 +183,34 @@ enum class RenderShape : uint8_t {
     Cross,
     SnowLayer,
     Fluid,
-    Bed
+    Bed,
+    Slab,
+    Stair
 };
 
 enum class BedPart : uint8_t { Foot, Head };
 enum class BedDirection : uint8_t { North, East, South, West };
+enum class ArchitecturalMaterial : uint8_t {
+    Planks, Cobblestone, Terracotta, Sunstone, Cloudstone, Count
+};
+enum class BlockHalf : uint8_t { Bottom, Top };
+
+struct ArchitecturalBlockState {
+    ArchitecturalMaterial material = ArchitecturalMaterial::Planks;
+    RenderShape shape = RenderShape::Cube;
+    BlockHalf half = BlockHalf::Bottom;
+    BedDirection direction = BedDirection::North;
+};
+
+struct BlockCollisionBox {
+    glm::vec3 min{0.0f};
+    glm::vec3 max{1.0f};
+};
+
+struct BlockCollisionBoxes {
+    std::array<BlockCollisionBox, 2> boxes{};
+    uint8_t count = 0;
+};
 
 enum class RenderLayer : uint8_t {
     Opaque,
@@ -222,11 +272,22 @@ BlockId bedBlock(BedPart part, BedDirection direction);
 glm::ivec3 bedDirectionOffset(BedDirection direction);
 BedDirection bedDirectionFromHorizontal(const glm::vec2& direction);
 glm::ivec3 bedPartnerOffset(BlockId id);
+bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state);
+BlockId slabBlock(ArchitecturalMaterial material, BlockHalf half);
+BlockId stairBlock(ArchitecturalMaterial material, BlockHalf half,
+                   BedDirection direction);
+BlockId architecturalBaseBlock(ArchitecturalMaterial material);
+BlockCollisionBoxes blockCollisionBoxes(BlockId id);
 float blockCollisionHeight(BlockId id);
 inline bool isFullCollisionBlock(BlockId id) {
-    return blockCollisionHeight(id) >= 1.0f;
+    const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+    if (boxes.count != 1) return false;
+    const BlockCollisionBox& box = boxes.boxes[0];
+    return box.min.x <= 0.0f && box.min.y <= 0.0f && box.min.z <= 0.0f &&
+           box.max.x >= 1.0f && box.max.y >= 1.0f && box.max.z >= 1.0f;
 }
 bool pointInsideBlockCollision(BlockId id, float localY);
+bool pointInsideBlockCollision(BlockId id, const glm::vec3& localPosition);
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face);
 uint8_t getAtlasTextureIndex(BlockTexture texture);

@@ -168,6 +168,36 @@ int main() {
     const auto* igniter = findCraftingRecipe(grid, 2, 1);
     require(igniter && igniter->output.id == ItemId::FLINT_AND_STEEL,
             "flint and iron craft flint and steel");
+    struct ArchitecturalRecipeCase {
+        ItemId material;
+        ItemId slab;
+        ItemId stairs;
+    };
+    for (const ArchitecturalRecipeCase recipeCase : {
+             ArchitecturalRecipeCase{ItemId::OAK_PLANKS, ItemId::OAK_PLANKS_SLAB,
+                                     ItemId::OAK_PLANKS_STAIRS},
+             {ItemId::COBBLESTONE, ItemId::COBBLESTONE_SLAB,
+              ItemId::COBBLESTONE_STAIRS},
+             {ItemId::TERRACOTTA, ItemId::TERRACOTTA_SLAB,
+              ItemId::TERRACOTTA_STAIRS},
+             {ItemId::SUNSTONE, ItemId::SUNSTONE_SLAB, ItemId::SUNSTONE_STAIRS},
+             {ItemId::CLOUDSTONE, ItemId::CLOUDSTONE_SLAB,
+              ItemId::CLOUDSTONE_STAIRS}}) {
+        grid.fill(ItemId::EMPTY);
+        grid[3] = grid[4] = grid[5] = recipeCase.material;
+        const auto* slabRecipe = findCraftingRecipe(grid, 3, 3);
+        require(slabRecipe && slabRecipe->output.id == recipeCase.slab &&
+                    slabRecipe->output.count == 6,
+                "architectural material does not craft six slabs");
+        grid.fill(ItemId::EMPTY);
+        grid[0] = recipeCase.material;
+        grid[3] = grid[4] = recipeCase.material;
+        grid[6] = grid[7] = grid[8] = recipeCase.material;
+        const auto* stairRecipe = findCraftingRecipe(grid, 3, 3);
+        require(stairRecipe && stairRecipe->output.id == recipeCase.stairs &&
+                    stairRecipe->output.count == 4,
+                "architectural material does not craft four stairs");
+    }
     require(isWater(BlockId::FLOWING_WATER_7) && fluidLevel(BlockId::WATER) == 0 &&
             fluidLevel(BlockId::FLOWING_LAVA_4) == 4,
             "serialized fluid states retain material and level semantics");

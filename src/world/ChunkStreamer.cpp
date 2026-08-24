@@ -675,7 +675,9 @@ void ChunkStreamer::enqueueGeneration() {
             // register Chest/Furnace block entities for world-generated work
             // blocks. queueGenerationCompletion makes the target chunk's
             // completion consumer apply (and register) them promptly.
-            auto structureSetter = [this](int wx, int wy, int wz, BlockId id) {
+            auto structureSetter = [this](int wx, int wy, int wz, BlockId id,
+                                           StructureLootProfile lootProfile,
+                                           uint64_t lootSeed) {
                 if (!Config::isValidWorldY(wy)) return;
                 int bsx = World::worldToChunkX(static_cast<double>(wx));
                 int bsz = World::worldToChunkZ(static_cast<double>(wz));
@@ -683,7 +685,10 @@ void ChunkStreamer::enqueueGeneration() {
                     id == BlockId::CHEST || id == BlockId::FURNACE;
                 m_chunks.withUnique([&](ChunkStore&) {
                     m_pendingBlocks[{bsx, bsz}].push_back(
-                        {wx, wy, wz, id, true, needsEntity});
+                        {wx, wy, wz, id, true, needsEntity,
+                         id == BlockId::CHEST ? lootProfile
+                                              : StructureLootProfile::None,
+                         lootSeed});
                 });
                 queueGenerationCompletion(bsx, bsz);
             };
@@ -1084,7 +1089,7 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
                     Config::worldYToStorageY(pb.worldY) *
                         Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
                 m_world.m_persistence.registerGeneratedBlockEntityUnlocked(
-                    cx, cz, localIndex, pb.id);
+                    cx, cz, localIndex, pb.id, pb.lootProfile, pb.lootSeed);
             }
         }
     }

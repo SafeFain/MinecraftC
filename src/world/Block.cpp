@@ -267,6 +267,23 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
     { BlockId::GLOWSHROOM, "Glowshroom", glm::vec3(.50f, .88f, .78f), false, true,
       RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+#define ARCH_FAMILY(prefix, label, color) \
+    {BlockId::prefix##_SLAB_BOTTOM, label " Slab", color, true, true, RenderShape::Slab, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_SLAB_TOP, label " Slab", color, true, true, RenderShape::Slab, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_BOTTOM_NORTH, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_BOTTOM_EAST, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_BOTTOM_SOUTH, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_BOTTOM_WEST, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_TOP_NORTH, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_TOP_EAST, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_TOP_SOUTH, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}, \
+    {BlockId::prefix##_STAIRS_TOP_WEST, label " Stairs", color, true, true, RenderShape::Stair, RenderLayer::Opaque, 1.0f}
+    ARCH_FAMILY(PLANKS, "Planks", glm::vec3(.70f, .55f, .30f)),
+    ARCH_FAMILY(COBBLESTONE, "Cobblestone", glm::vec3(.43f)),
+    ARCH_FAMILY(TERRACOTTA, "Terracotta", glm::vec3(.60f, .30f, .20f)),
+    ARCH_FAMILY(SUNSTONE, "Sunstone", glm::vec3(.88f, .71f, .35f)),
+    ARCH_FAMILY(CLOUDSTONE, "Cloudstone", glm::vec3(.70f, .78f, .82f)),
+#undef ARCH_FAMILY
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -275,6 +292,9 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
                                                        [static_cast<size_t>(face)];
         if (defined != BlockTexture::Count) return defined;
     }
+    ArchitecturalBlockState architectural;
+    if (decodeArchitecturalBlock(id, architectural))
+        return getFaceTexture(architecturalBaseBlock(architectural.material), face);
     if (isBed(id)) return BlockTexture::WhiteBed;
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
@@ -558,14 +578,121 @@ glm::ivec3 bedPartnerOffset(BlockId id) {
     return part == BedPart::Foot ? towardHead : -towardHead;
 }
 
+namespace {
+constexpr uint8_t ARCHITECTURAL_FIRST =
+    static_cast<uint8_t>(BlockId::PLANKS_SLAB_BOTTOM);
+constexpr uint8_t ARCHITECTURAL_STRIDE = 10;
+}
+
+bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
+    const uint8_t raw = static_cast<uint8_t>(id);
+    if (raw < ARCHITECTURAL_FIRST ||
+        raw >= static_cast<uint8_t>(BlockId::COUNT)) return false;
+    const uint8_t offset = raw - ARCHITECTURAL_FIRST;
+    const uint8_t material = offset / ARCHITECTURAL_STRIDE;
+    const uint8_t local = offset % ARCHITECTURAL_STRIDE;
+    if (material >= static_cast<uint8_t>(ArchitecturalMaterial::Count))
+        return false;
+    state.material = static_cast<ArchitecturalMaterial>(material);
+    if (local < 2) {
+        state.shape = RenderShape::Slab;
+        state.half = local == 0 ? BlockHalf::Bottom : BlockHalf::Top;
+        state.direction = BedDirection::North;
+    } else {
+        state.shape = RenderShape::Stair;
+        state.half = local < 6 ? BlockHalf::Bottom : BlockHalf::Top;
+        state.direction = static_cast<BedDirection>((local - 2) % 4);
+    }
+    return true;
+}
+
+BlockId slabBlock(ArchitecturalMaterial material, BlockHalf half) {
+    const uint8_t raw = ARCHITECTURAL_FIRST +
+        static_cast<uint8_t>(material) * ARCHITECTURAL_STRIDE +
+        (half == BlockHalf::Top ? 1 : 0);
+    return static_cast<BlockId>(raw);
+}
+
+BlockId stairBlock(ArchitecturalMaterial material, BlockHalf half,
+                   BedDirection direction) {
+    const uint8_t raw = ARCHITECTURAL_FIRST +
+        static_cast<uint8_t>(material) * ARCHITECTURAL_STRIDE + 2 +
+        (half == BlockHalf::Top ? 4 : 0) + static_cast<uint8_t>(direction);
+    return static_cast<BlockId>(raw);
+}
+
+BlockId architecturalBaseBlock(ArchitecturalMaterial material) {
+    switch (material) {
+        case ArchitecturalMaterial::Planks: return BlockId::PLANKS;
+        case ArchitecturalMaterial::Cobblestone: return BlockId::COBBLESTONE;
+        case ArchitecturalMaterial::Terracotta: return BlockId::TERRACOTTA;
+        case ArchitecturalMaterial::Sunstone: return BlockId::SUNSTONE;
+        case ArchitecturalMaterial::Cloudstone: return BlockId::CLOUDSTONE;
+        default: return BlockId::PLANKS;
+    }
+}
+
+BlockCollisionBoxes blockCollisionBoxes(BlockId id) {
+    BlockCollisionBoxes result;
+    const BlockProperties& props = getBlockProps(id);
+    if (!props.solid) return result;
+    ArchitecturalBlockState state;
+    if (decodeArchitecturalBlock(id, state)) {
+        if (state.shape == RenderShape::Slab) {
+            result.count = 1;
+            result.boxes[0] = state.half == BlockHalf::Bottom
+                ? BlockCollisionBox{{0, 0, 0}, {1, .5f, 1}}
+                : BlockCollisionBox{{0, .5f, 0}, {1, 1, 1}};
+            return result;
+        }
+        result.count = 2;
+        result.boxes[0] = state.half == BlockHalf::Bottom
+            ? BlockCollisionBox{{0, 0, 0}, {1, .5f, 1}}
+            : BlockCollisionBox{{0, .5f, 0}, {1, 1, 1}};
+        glm::vec3 min(0.0f), max(1.0f);
+        if (state.half == BlockHalf::Bottom) min.y = .5f;
+        else max.y = .5f;
+        switch (state.direction) {
+            case BedDirection::North: max.z = .5f; break;
+            case BedDirection::East: min.x = .5f; break;
+            case BedDirection::South: min.z = .5f; break;
+            case BedDirection::West: max.x = .5f; break;
+        }
+        result.boxes[1] = {min, max};
+        return result;
+    }
+    result.count = 1;
+    const float height = isBed(id) ? 9.0f / 16.0f : 1.0f;
+    result.boxes[0] = {{0, 0, 0}, {1, height, 1}};
+    return result;
+}
+
 float blockCollisionHeight(BlockId id) {
-    if (!isSolid(id)) return 0.0f;
-    return isBed(id) ? 9.0f / 16.0f : 1.0f;
+    const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+    float height = 0.0f;
+    for (uint8_t i = 0; i < boxes.count; ++i)
+        height = std::max(height, boxes.boxes[i].max.y);
+    return height;
 }
 
 bool pointInsideBlockCollision(BlockId id, float localY) {
-    return isSolid(id) && localY >= 0.0f &&
-           localY <= blockCollisionHeight(id);
+    const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+    for (uint8_t i = 0; i < boxes.count; ++i)
+        if (localY >= boxes.boxes[i].min.y &&
+            localY <= boxes.boxes[i].max.y) return true;
+    return false;
+}
+
+bool pointInsideBlockCollision(BlockId id, const glm::vec3& localPosition) {
+    const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+    for (uint8_t i = 0; i < boxes.count; ++i) {
+        const BlockCollisionBox& box = boxes.boxes[i];
+        if (localPosition.x >= box.min.x && localPosition.x <= box.max.x &&
+            localPosition.y >= box.min.y && localPosition.y <= box.max.y &&
+            localPosition.z >= box.min.z && localPosition.z <= box.max.z)
+            return true;
+    }
+    return false;
 }
 
 bool isWater(BlockId id) {
@@ -591,7 +718,9 @@ uint8_t getLightEmission(BlockId id) {
 
 uint8_t getLightDampening(BlockId id) {
     if (id == BlockId::AIR || id == BlockId::GLASS || isBed(id) ||
-        getBlockProps(id).shape == RenderShape::Cross) return 0;
+        getBlockProps(id).shape == RenderShape::Cross ||
+        getBlockProps(id).shape == RenderShape::Slab ||
+        getBlockProps(id).shape == RenderShape::Stair) return 0;
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
         id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
@@ -689,6 +818,9 @@ bool isReplaceableByFluid(BlockId id) {
 
 uint8_t fireEncouragement(BlockId id) {
     if (isBed(id)) return 30;
+    ArchitecturalBlockState architectural;
+    if (decodeArchitecturalBlock(id,architectural) &&
+        architectural.material==ArchitecturalMaterial::Planks) return 5;
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:

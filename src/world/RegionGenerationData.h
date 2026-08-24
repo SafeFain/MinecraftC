@@ -3,6 +3,7 @@
 #include "world/BiomeMap.h"
 #include "world/Block.h"
 #include "world/CaveGenerator.h"
+#include "world/Structure.h"
 #include "world/TerrainArchetype.h"
 #include <vector>
 #include <cstdint>
@@ -93,6 +94,8 @@ struct RegionGenerationData {
         BlockId id     = BlockId::AIR;
         bool    overwrite = false;
         bool    needsBlockEntity = false;
+        StructureLootProfile lootProfile = StructureLootProfile::None;
+        uint64_t lootSeed = 0;
     };
     std::vector<PendingBlock> pendingBlocks;
 };

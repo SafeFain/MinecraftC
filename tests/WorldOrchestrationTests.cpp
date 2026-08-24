@@ -932,6 +932,15 @@ void testBedLifecycle() {
             world.getBlock(head.x, head.y, head.z) == BlockId::AIR,
             "removing the head did not atomically remove the foot");
 
+    world.setBlock(foot.x, foot.y, foot.z, BlockId::COBBLESTONE_SLAB_BOTTOM);
+    const auto slabHit = world.raycast(
+        {0.5, 302.0, 0.5}, {0.0f, -1.0f, 0.0f}, 4.0f);
+    require(slabHit && slabHit->faceNormal == glm::ivec3(0, 1, 0) &&
+                std::abs(slabHit->hitPosition.y - 300.5) < 0.0001 &&
+                std::abs(slabHit->distance - 1.5) < 0.0001,
+            "partial-shape raycast returned the voxel boundary instead of slab surface");
+    world.setBlock(foot.x, foot.y, foot.z, BlockId::AIR);
+
     world.setBlock(head.x, head.y, head.z, BlockId::COBBLESTONE);
     require(!world.placeBed(foot, BedDirection::East) &&
             world.getBlock(foot.x, foot.y, foot.z) == BlockId::AIR,
@@ -965,6 +974,7 @@ void testGeneratedBlockEntityRegistration() {
     const uint32_t chestIndex = localIndex(5, 7, y);
     const uint32_t furnaceIndex = localIndex(6, 7, y);
     const uint32_t stoneIndex = localIndex(7, 7, y);
+    const uint32_t lootIndex = localIndex(8, 7, y);
     store.withUnique([&](ChunkStore&) {
         persistence.registerGeneratedBlockEntityUnlocked(
             3, -2, chestIndex, BlockId::CHEST);
@@ -976,6 +986,9 @@ void testGeneratedBlockEntityRegistration() {
         // Non-work blocks never register an entity.
         persistence.registerGeneratedBlockEntityUnlocked(
             3, -2, stoneIndex, BlockId::STONE);
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3, -2, lootIndex, BlockId::CHEST,
+            StructureLootProfile::CloudspireTower, 0x12345678u);
     });
     const BlockEntity* chestEntity = persistence.getBlockEntity(
         {3 * 16 + 5, y, -2 * 16 + 7});
@@ -987,6 +1000,25 @@ void testGeneratedBlockEntityRegistration() {
             "generated furnace did not register a furnace block entity");
     require(persistence.getBlockEntity({3 * 16 + 7, y, -2 * 16 + 7}) == nullptr,
             "non-work block registered a block entity");
+    const glm::ivec3 lootPosition{3 * 16 + 8, y, -2 * 16 + 7};
+    const BlockEntity* lootEntity=persistence.getBlockEntity(lootPosition);
+    require(lootEntity&&std::any_of(lootEntity->chest.begin(),lootEntity->chest.end(),
+                [](const ItemStack& stack){return !stack.empty();}),
+            "generated structure chest did not receive deterministic loot");
+    const auto originalLoot=lootEntity->chest;
+    store.withUnique([&](ChunkStore&) {
+        persistence.registerGeneratedBlockEntityUnlocked(
+            3,-2,lootIndex,BlockId::CHEST,
+            StructureLootProfile::Village,0xDEADBEEFu);
+    });
+    const auto& repeatedLoot=persistence.getBlockEntity(lootPosition)->chest;
+    bool lootUnchanged=true;
+    for(size_t i=0;i<repeatedLoot.size();++i)
+        lootUnchanged=lootUnchanged&&repeatedLoot[i].id==originalLoot[i].id&&
+            repeatedLoot[i].count==originalLoot[i].count&&
+            repeatedLoot[i].damage==originalLoot[i].damage;
+    require(lootUnchanged,
+            "re-registering a generated chest refreshed its saved loot");
 
     // A player edit removing the chest also removes its entity.
     persistence.recordOverride(3, -2, chestIndex, BlockId::AIR);

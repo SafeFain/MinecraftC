@@ -25,7 +25,7 @@ GitHub prereleases; release-channel tags create normal releases.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 142-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 162-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 
@@ -157,8 +157,9 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v11 can read v2-v10 desktop saves. The current world
-generation version is v9. Older generation versions remain on disk and are
-shown as incompatible rather than migrated or blended into v9 terrain.
+generation version is v10 (with Heaven structures at v7). Older generation
+versions remain on disk and are shown as incompatible rather than migrated or
+blended into v10 terrain.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate

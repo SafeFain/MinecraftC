@@ -12,6 +12,7 @@
 #include "game/SaveStore.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
+#include "world/Structure.h"
 
 class ChunkStore;
 class SaveStore;
@@ -46,7 +47,10 @@ public:
     // (structure content). Never creates an override entry; leaves an
     // existing player-created entity untouched. Caller holds the chunk lock.
     void registerGeneratedBlockEntityUnlocked(int cx, int cz,
-                                              uint32_t localIndex, BlockId id);
+                                              uint32_t localIndex, BlockId id,
+                                              StructureLootProfile lootProfile =
+                                                  StructureLootProfile::None,
+                                              uint64_t lootSeed = 0);
 
     // Apply saved overrides for a freshly generated chunk.
     // Caller must hold the ChunkStore lock.

@@ -618,7 +618,8 @@ int main() {
                 singletonWorld.generate(chunk, {}, [&](int wx, int wy, int wz,
                                                        BlockId id) {
                     singletonPending.push_back({wx, wy, wz, id});
-                }, [&](int wx, int wy, int wz, BlockId id) {
+                }, [&](int wx, int wy, int wz, BlockId id,
+                       StructureLootProfile, uint64_t) {
                     singletonPending.push_back({wx, wy, wz, id, true});
                 });
             }
@@ -896,9 +897,11 @@ int main() {
                     "desert village lacks adobe materials");
         }
         if (placement.type == StructureType::Igloo && !checkedIglooMaterials) {
+            bool hasBed = false;
+            for (const BlockId block : materials) hasBed = hasBed || isBed(block);
             require(materials.count(BlockId::SNOW) > 0 &&
                         materials.count(BlockId::WHITE_WOOL) > 0 &&
-                        materials.count(BlockId::WHITE_BED) > 0,
+                        hasBed,
                     "igloo lacks snow, wool, or bed materials");
             require(materials.count(BlockId::AIR) > 0,
                     "igloo interior is not carved out");
@@ -924,10 +927,17 @@ int main() {
                     "igloo center interior is not air");
             require(at(ix, ibase + 4, iz) == BlockId::SNOW,
                     "igloo dome cap is missing");
-            require(at(ix, ibase + 1, iz + 3) == BlockId::SNOW,
-                    "igloo north wall is missing");
-            require(at(ix, ibase + 1, iz - 3) == BlockId::AIR,
-                    "igloo entrance is not open");
+            int openEntrances = 0;
+            int intactWalls = 0;
+            for (const auto& direction : std::array<std::pair<int, int>, 4>{
+                     std::pair<int, int>{0, -3}, {3, 0}, {0, 3}, {-3, 0}}) {
+                const BlockId wall = at(ix + direction.first, ibase + 1,
+                                        iz + direction.second);
+                openEntrances += wall == BlockId::AIR ? 1 : 0;
+                intactWalls += wall == BlockId::SNOW ? 1 : 0;
+            }
+            require(openEntrances >= 1 && intactWalls >= 1,
+                    "rotated igloo lacks an open entrance or intact outer wall");
             checkedIglooMaterials = true;
         }
         if (placement.type == StructureType::DesertWell && !checkedWellMaterials) {
@@ -940,6 +950,50 @@ int main() {
     require(checkedVillageMaterials && checkedIglooMaterials &&
                 checkedWellMaterials,
             "exploration window did not expose village, igloo, or well");
+
+    // Every public blueprint honors its advertised horizontal reservation,
+    // remains inside the world build range, and derives visible variation only
+    // from the stable placement variant.
+    const std::array<int, 11> blueprintRadii{
+        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6};
+    for (size_t typeIndex = 0; typeIndex < STRUCTURE_TYPES.size(); ++typeIndex) {
+        const StructureType type = STRUCTURE_TYPES[typeIndex];
+        auto makePlacement = [&](uint64_t variant) {
+            StructurePlacement placement;
+            placement.type = type;
+            placement.baseY = 100;
+            placement.variant = variant;
+            const int radius = blueprintRadii[typeIndex];
+            placement.minX = -radius;
+            placement.maxX = radius;
+            placement.minZ = -radius;
+            placement.maxZ = radius;
+            return placement;
+        };
+        using StructureWrite = std::tuple<int, int, int, BlockId>;
+        std::vector<StructureWrite> firstWrites;
+        std::vector<StructureWrite> secondWrites;
+        const StructurePlacement first = makePlacement(0x1020304050607080ULL);
+        const StructurePlacement second = makePlacement(0xfedcba9876543210ULL);
+        StructureGenerator::build(first, [&](int x, int y, int z, BlockId id) {
+            require(x >= first.minX && x <= first.maxX &&
+                        z >= first.minZ && z <= first.maxZ,
+                    "structure blueprint wrote beyond its reserved footprint");
+            require(Config::isValidWorldY(y),
+                    "structure blueprint wrote beyond the world build range");
+            firstWrites.emplace_back(x, y, z, id);
+        });
+        StructureGenerator::build(second, [&](int x, int y, int z, BlockId id) {
+            require(x >= second.minX && x <= second.maxX &&
+                        z >= second.minZ && z <= second.maxZ,
+                    "variant blueprint wrote beyond its reserved footprint");
+            require(Config::isValidWorldY(y),
+                    "variant blueprint wrote beyond the world build range");
+            secondWrites.emplace_back(x, y, z, id);
+        });
+        require(!firstWrites.empty() && firstWrites != secondWrites,
+                "structure variants did not produce distinct deterministic blueprints");
+    }
 
     // Structure Chest/Furnace blocks must ride the pending channel as
     // entity-registration requests so streamed work blocks stay interactive.
@@ -1052,6 +1106,54 @@ int main() {
     require(mesh.shadowCasterIndexOffset ==
                 mesh.translucentIndexOffset + mesh.translucentIndexCount,
             "shadow-caster range does not follow visible draw ranges");
+
+    // Slabs and each stair orientation retain their exact half-block bounds,
+    // emit no translucent geometry, and hand the same triangles to shadows.
+    for (BlockHalf half : {BlockHalf::Bottom, BlockHalf::Top}) {
+        for (BedDirection direction : {BedDirection::North, BedDirection::East,
+                                       BedDirection::South, BedDirection::West}) {
+            std::vector<uint8_t> architecturalBlocks(Config::CHUNK_VOLUME, 0);
+            architecturalBlocks[meshIndex(8, 40, 8)] = static_cast<uint8_t>(
+                stairBlock(ArchitecturalMaterial::Cobblestone, half, direction));
+            architecturalBlocks[meshIndex(10, 40, 8)] = static_cast<uint8_t>(
+                slabBlock(ArchitecturalMaterial::Terracotta, half));
+            ChunkMesh architecturalMesh;
+            architecturalMesh.build(0, 0, architecturalBlocks.data(), maxY,
+                [&](int wx, int wy, int wz) {
+                    if (wx < 0 || wx >= 16 || wz < 0 || wz >= 16 ||
+                        !Config::isValidWorldY(wy)) return BlockId::AIR;
+                    return static_cast<BlockId>(
+                        architecturalBlocks[meshIndex(wx, wy, wz)]);
+                }, [](int, int, int) -> LightSample { return {15, 0}; });
+            require(architecturalMesh.opaqueIndexCount == 102 &&
+                        architecturalMesh.translucentIndexCount == 0 &&
+                        architecturalMesh.shadowCasterIndexCount == 102,
+                    "stair/slab mesh retained an internal face or lost shadow indices");
+            float minimumY = 1000.0f, maximumY = -1000.0f;
+            for (const MeshVertex& vertex : architecturalMesh.vertices) {
+                minimumY = std::min(minimumY, vertex.py);
+                maximumY = std::max(maximumY, vertex.py);
+            }
+            require(std::abs(minimumY - 40.0f) < 0.0001f &&
+                        std::abs(maximumY - 41.0f) < 0.0001f,
+                    "architectural geometry escaped its voxel bounds");
+        }
+    }
+    std::vector<uint8_t> joinedSlabs(Config::CHUNK_VOLUME, 0);
+    joinedSlabs[meshIndex(8, 40, 8)] =
+        static_cast<uint8_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
+    joinedSlabs[meshIndex(9, 40, 8)] =
+        static_cast<uint8_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
+    ChunkMesh joinedSlabMesh;
+    joinedSlabMesh.build(0, 0, joinedSlabs.data(), maxY,
+        [&](int wx, int wy, int wz) {
+            if (wx < 0 || wx >= 16 || wz < 0 || wz >= 16 ||
+                !Config::isValidWorldY(wy)) return BlockId::AIR;
+            return static_cast<BlockId>(joinedSlabs[meshIndex(wx, wy, wz)]);
+        }, [](int, int, int) -> LightSample { return {15, 0}; });
+    require(joinedSlabMesh.opaqueIndexCount == 60 &&
+                joinedSlabMesh.shadowCasterIndexCount == 60,
+            "fully covered slab boundary faces were not removed");
 
     std::vector<uint8_t> bedBlocks(Config::CHUNK_VOLUME, 0);
     bedBlocks[meshIndex(8, 40, 8)] = static_cast<uint8_t>(BlockId::WHITE_BED);
@@ -1331,7 +1433,7 @@ int main() {
     }
     for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
         require(heavenLayerColumns[static_cast<size_t>(layer)] > 0,
-                "Heaven v6 window missed an altitude layer");
+                "Heaven v7 window missed an altitude layer");
         require(heavenLayerBiomes[static_cast<size_t>(layer)].size() ==
                     static_cast<size_t>(WorldGenerator::HEAVEN_BIOME_COUNT),
                 "heaven layer did not expose every exclusive biome");
@@ -1401,7 +1503,7 @@ int main() {
     require(heaven.chunkCacheVersion() != WorldGenContext::CHUNK_CACHE_VERSION &&
                 heaven.generationVersion() != WorldGenContext::GENERATION_VERSION &&
                 heaven.generationVersion() == WorldGenerator::HEAVEN_GENERATION_VERSION,
-            "Heaven v6 cache and generation versions share the overworld key");
+            "Heaven v7 cache and generation versions share the overworld key");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
     std::vector<Chunk*> heavenRegionChunks;
@@ -1454,7 +1556,7 @@ int main() {
     for (const auto& layerCounts : heavenBiomeCounts)
         for (const size_t count : layerCounts)
             require(count > 0,
-                    "Heaven v6 exploration window missed a biome or layer");
+                    "Heaven v7 exploration window missed a biome or layer");
 
     std::array<bool, 10> heavenMaterials{};
     bool foundLayer1 = false;
@@ -1494,18 +1596,22 @@ int main() {
                             y - 2 > Config::WORLD_MIN_Y) {
                             const BlockId below = chunk.getBlock(x, y - 1, z);
                             const BlockId below2 = chunk.getBlock(x, y - 2, z);
-                            // Geode: stacked crystals over a moss garden
-                            // surface.  Cloudspire: crystal finial over a
-                            // cloudstone cap over a sunstone shaft.  Ruin:
-                            // crystal over sunstone over soil/moss.
+                            // Geode: stacked crystals over a moss garden.
+                            // Cloudspire: crystal finial over its cloudstone
+                            // crown. Ruin: crystal over the sunstone altar.
                             if (below == BlockId::STAR_CRYSTAL &&
                                 below2 == BlockId::MOSS)
                                 foundGeode = true;
+                            ArchitecturalBlockState architecture;
                             if (below == BlockId::CLOUDSTONE &&
-                                below2 == BlockId::SUNSTONE)
-                                foundCloudspire = true;
+                                (below2 == BlockId::CLOUDSTONE ||
+                                 (decodeArchitecturalBlock(below2,architecture) &&
+                                  architecture.material ==
+                                      ArchitecturalMaterial::Cloudstone)))
+                                    foundCloudspire = true;
                             if (below == BlockId::SUNSTONE &&
-                                (below2 == BlockId::AETHER_GRASS ||
+                                (below2 == BlockId::SUNSTONE ||
+                                 below2 == BlockId::AETHER_GRASS ||
                                  below2 == BlockId::MOSS))
                                 foundLandmark = true;
                         }
@@ -1515,15 +1621,15 @@ int main() {
         }
     }
     for (const bool found : heavenMaterials)
-        require(found, "Heaven v6 window missed a dedicated material");
+        require(found, "Heaven v7 window missed a dedicated material");
     require(foundLayer1 && foundLayer2 && foundLayer3 && foundLayer4 &&
                 foundLayer5,
-            "Heaven v6 window missed an altitude layer");
-    require(foundGeode, "Heaven v6 window missed a crystal geode");
-    require(foundCloudspire, "Heaven v6 window missed a cloudspire tower");
-    require(foundLandmark, "Heaven v6 window missed an Xiguang ruin landmark");
+            "Heaven v7 window missed an altitude layer");
+    require(foundGeode, "Heaven v7 window missed a crystal geode");
+    require(foundCloudspire, "Heaven v7 window missed a cloudspire tower");
+    require(foundLandmark, "Heaven v7 window missed an Xiguang ruin landmark");
     require(!foundForbiddenBlock,
-            "Heaven v6 generated bedrock or an infinite water body");
+            "Heaven v7 generated bedrock or an infinite water body");
 
     // Heaven locate shares the exact cell candidate resolver used above by
     // chunk population. All three dimension-exclusive structures must be
@@ -1557,7 +1663,7 @@ int main() {
                 StructureType::Village, 0, 0),
             "Heaven locator accepted an overworld-only structure");
 
-    // v6 micro-feature density: each exclusive biome owns whole 256-cell
+    // v7 micro-feature density: each exclusive biome owns whole 256-cell
     // bands, so one full deterministic band of each biome (62×256 columns)
     // must decorate a healthy share of its main-layer columns.  The origins
     // use the L3 band formula floorDiv(x+194,256)+2*floorDiv(z+106,256)
@@ -1606,11 +1712,11 @@ int main() {
             }
         }
         require(biomeDecorated >= 30,
-                ("Heaven v6 biome " + std::to_string(biome) +
+                ("Heaven v7 biome " + std::to_string(biome) +
                  " lacked surface decoration (decorated " +
                  std::to_string(biomeDecorated) + ")").c_str());
     }
-    require(foundFallenLog, "Heaven v6 window missed a fallen skyroot log");
+    require(foundFallenLog, "Heaven v7 window missed a fallen skyroot log");
 
     std::cout << "biomes=" << observedBiomes.size()
               << "/" << allBiomes.size()

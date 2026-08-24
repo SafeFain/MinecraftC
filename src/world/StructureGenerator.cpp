@@ -65,18 +65,49 @@ constexpr VillageStyle kDesertVillage{
     BlockId::SAND, BlockId::SAND, BlockId::TERRACOTTA};
 
 void drawRoad(const StructureGenerator::StructureWriter& write, int x0, int z0,
-              int x1, int z1, int base, BlockId path) {
+              int x1, int z1, int base, BlockId path,
+              ArchitecturalMaterial stepMaterial,
+              const StructureGenerator::SurfaceSampler& surfaceSampler) {
     int x = x0;
     int z = z0;
+    int y = base;
+    auto directionFor = [](int dx, int dz) {
+        if (dz < 0) return BedDirection::North;
+        if (dx > 0) return BedDirection::East;
+        if (dz > 0) return BedDirection::South;
+        return BedDirection::West;
+    };
+    auto pave = [&](int px,int pz,int moveX,int moveZ) {
+        const int previousX=x, previousZ=z, previousY=y;
+        const int natural=surfaceSampler?surfaceSampler(px,pz):base;
+        y=std::clamp(natural,y-1,y+1);
+        if (y > previousY) {
+            write(px,y,pz,stairBlock(stepMaterial,BlockHalf::Bottom,
+                                     directionFor(moveX,moveZ)));
+        } else {
+            write(px,y,pz,path);
+            if (y < previousY)
+                write(previousX,previousY,previousZ,
+                      stairBlock(stepMaterial,BlockHalf::Bottom,
+                                 directionFor(-moveX,-moveZ)));
+        }
+        if (y != previousY) {
+            const BlockId retaining=architecturalBaseBlock(stepMaterial);
+            write(px-moveZ,std::min(y,previousY),pz+moveX,retaining);
+            write(px+moveZ,std::min(y,previousY),pz-moveX,retaining);
+        }
+        write(px,y+1,pz,BlockId::AIR);
+        write(px,y+2,pz,BlockId::AIR);
+        x=px;
+        z=pz;
+    };
     const int stepX = x1 > x0 ? 1 : -1;
     while (x != x1) {
-        x += stepX;
-        write(x, base, z, path);
+        pave(x+stepX,z,stepX,0);
     }
     const int stepZ = z1 > z0 ? 1 : -1;
     while (z != z1) {
-        z += stepZ;
-        write(x, base, z, path);
+        pave(x,z+stepZ,0,stepZ);
     }
 }
 
@@ -89,40 +120,76 @@ void buildWell(const StructureGenerator::StructureWriter& write, int cx, int cz,
 
 void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz,
                 int base, uint64_t variant, int doorDx, int doorDz,
-                const VillageStyle& style) {
-    // Foundation ring replaces the grass/sand surface.
-    fillRing(write, hx - 2, base, hz - 2, hx + 2, hz + 2, style.foundation);
-    fillBox(write, hx - 1, base, hz - 1, hx + 1, base, hz + 1, style.floor);
-    // Corner pillars and three-high walls.
-    for (int y = base + 1; y <= base + 3; ++y) {
-        for (int z = hz - 2; z <= hz + 2; ++z) {
-            for (int x = hx - 2; x <= hx + 2; ++x) {
-                if (x > hx - 2 && x < hx + 2 && z > hz - 2 && z < hz + 2)
+                const VillageStyle& style,
+                const StructureGenerator::SurfaceSampler& surfaceSampler) {
+    const bool desert = style.wall == BlockId::TERRACOTTA;
+    const int halfX = 2 + static_cast<int>((variant >> 5) & 1u);
+    const int halfZ = 2 + static_cast<int>((variant >> 9) & 1u);
+    for(int z=hz-halfZ;z<=hz+halfZ;++z) for(int x=hx-halfX;x<=hx+halfX;++x) {
+        const int natural=surfaceSampler?surfaceSampler(x,z):base;
+        for(int y=natural+1;y<=base;++y)write(x,y,z,style.foundation);
+        if(x>hx-halfX&&x<hx+halfX&&z>hz-halfZ&&z<hz+halfZ)
+            for(int y=base+1;y<=base+4;++y)write(x,y,z,BlockId::AIR);
+    }
+    fillRing(write, hx-halfX, base, hz-halfZ, hx+halfX, hz+halfZ,
+             style.foundation);
+    fillBox(write, hx-halfX+1, base, hz-halfZ+1,
+            hx+halfX-1, base, hz+halfZ-1, style.floor);
+    for (int y = base + 1; y <= base + 4; ++y) {
+        for (int z = hz - halfZ; z <= hz + halfZ; ++z) {
+            for (int x = hx - halfX; x <= hx + halfX; ++x) {
+                if (x > hx-halfX && x < hx+halfX &&
+                    z > hz-halfZ && z < hz+halfZ)
                     continue;
-                const bool corner = (x == hx - 2 || x == hx + 2) &&
-                                    (z == hz - 2 || z == hz + 2);
+                const bool corner = (x == hx-halfX || x == hx+halfX) &&
+                                    (z == hz-halfZ || z == hz+halfZ);
                 write(x, y, z, corner ? style.pillar : style.wall);
             }
         }
     }
-    // Door opening faces the village center.
-    const int doorX = hx + doorDx * 2;
-    const int doorZ = hz + doorDz * 2;
+    const int doorX = hx + doorDx * halfX;
+    const int doorZ = hz + doorDz * halfZ;
     write(doorX, base + 1, doorZ, BlockId::AIR);
     write(doorX, base + 2, doorZ, BlockId::AIR);
-    // Glass windows on the walls perpendicular to the door.
     if (doorDx != 0) {
-        write(hx, base + 2, hz - 2, BlockId::GLASS);
-        write(hx, base + 2, hz + 2, BlockId::GLASS);
+        write(hx, base + 2, hz-halfZ, BlockId::GLASS);
+        write(hx, base + 2, hz+halfZ, BlockId::GLASS);
     } else {
-        write(hx - 2, base + 2, hz, BlockId::GLASS);
-        write(hx + 2, base + 2, hz, BlockId::GLASS);
+        write(hx-halfX, base + 2, hz, BlockId::GLASS);
+        write(hx+halfX, base + 2, hz, BlockId::GLASS);
     }
-    // Stepped plank roof.
-    fillBox(write, hx - 2, base + 4, hz - 2, hx + 2, base + 4, hz + 2,
-            style.roof);
-    fillBox(write, hx - 1, base + 5, hz - 1, hx + 1, base + 5, hz + 1,
-            style.roof);
+    if (desert) {
+        fillBox(write, hx-halfX, base+5, hz-halfZ,
+                hx+halfX, base+5, hz+halfZ,
+                slabBlock(ArchitecturalMaterial::Terracotta, BlockHalf::Bottom));
+        fillRing(write, hx-halfX, base+6, hz-halfZ,
+                 hx+halfX, hz+halfZ, BlockId::TERRACOTTA);
+    } else {
+        for (int z = hz-halfZ-1; z <= hz+halfZ+1; ++z) {
+            write(hx-halfX-1, base+5, z,
+                  stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                             BedDirection::East));
+            write(hx+halfX+1, base+5, z,
+                  stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                             BedDirection::West));
+            write(hx-halfX, base+6, z,
+                  stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                             BedDirection::East));
+            write(hx+halfX, base+6, z,
+                  stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                             BedDirection::West));
+        }
+        fillBox(write, hx-halfX+1, base+6, hz-halfZ-1,
+                hx+halfX-1, base+6, hz+halfZ+1, style.roof);
+        const int chimneyX = (variant & 1u) ? hx-halfX+1 : hx+halfX-1;
+        for (int y = base+5; y <= base+8; ++y)
+            write(chimneyX, y, hz+halfZ-1, BlockId::COBBLESTONE);
+    }
+    write(doorX+doorDx, base, doorZ+doorDz, style.path);
+    write(doorX+doorDx, base+1, doorZ+doorDz,
+          slabBlock(desert ? ArchitecturalMaterial::Terracotta
+                           : ArchitecturalMaterial::Planks,
+                    BlockHalf::Bottom));
 
     const uint64_t furnishing =
         WorldGenContext::hashPosition(variant, hx, 1, hz) % 6;
@@ -137,7 +204,7 @@ void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz
         case 1: write(hx, base + 1, hz, BlockId::CRAFTING_TABLE); break;
         case 2: write(hx, base + 1, hz, BlockId::FURNACE); break;
         case 3: write(hx, base + 1, hz, BlockId::CHEST); break;
-        case 4: write(hx + 1, base + 2, hz, BlockId::TORCH); break;
+        case 4: write(hx + 1, base + 3, hz, BlockId::TORCH); break;
         default: break;
     }
 }
@@ -173,7 +240,8 @@ void buildCactusPen(const StructureGenerator::StructureWriter& write, int cx,
 }
 
 void buildVillage(const StructurePlacement& placement,
-                  const StructureGenerator::StructureWriter& write) {
+                  const StructureGenerator::StructureWriter& write,
+                  const StructureGenerator::SurfaceSampler& surfaceSampler) {
     const bool desert = placement.type == StructureType::DesertVillage;
     const VillageStyle& style = desert ? kDesertVillage : kPlainsVillage;
     const int cx = (placement.minX + placement.maxX) / 2;
@@ -197,13 +265,17 @@ void buildVillage(const StructurePlacement& placement,
 
     // Houses ring the plaza; roads connect each door back to the well.
     constexpr std::array<std::pair<int, int>, 8> kHouseOffsets{{
-        {-13, -9}, {13, -9}, {-9, 13}, {9, 13},
-        {-14, 4}, {14, 4}, {0, -14}, {0, 14},
+        {-17, -10}, {17, -10}, {-11, 17}, {11, 17},
+        {-18, 5}, {18, 5}, {0, -18}, {0, 18},
     }};
-    const int houseCount = 4 + static_cast<int>(hash(cx, 1, cz) % 3);
+    const int houseCount = 5 + static_cast<int>(hash(cx, 1, cz) % 3);
     for (int i = 0; i < 8 && i < houseCount; ++i) {
-        const int hx = cx + kHouseOffsets[static_cast<size_t>(i)].first;
-        const int hz = cz + kHouseOffsets[static_cast<size_t>(i)].second;
+        const auto& offset = kHouseOffsets[static_cast<size_t>(i)];
+        // Adobe houses have roof terraces rather than deep eaves, so their
+        // residential ring can sit slightly closer to the plaza and remain
+        // within the advertised 41x41 desert-village reservation.
+        const int hx = cx + (desert ? offset.first * 8 / 9 : offset.first);
+        const int hz = cz + (desert ? offset.second * 8 / 9 : offset.second);
         int doorDx = cx - hx;
         int doorDz = cz - hz;
         if (std::abs(doorDx) >= std::abs(doorDz)) {
@@ -213,16 +285,41 @@ void buildVillage(const StructurePlacement& placement,
             doorDz = doorDz > 0 ? 1 : -1;
             doorDx = 0;
         }
-        drawRoad(write, cx, cz, hx, hz, base, style.path);
-        buildHouse(write, hx, hz, base, hash(cx, 2, hz), doorDx, doorDz, style);
+        drawRoad(write, cx, cz, hx, hz, base, style.path,
+                 desert ? ArchitecturalMaterial::Terracotta
+                        : ArchitecturalMaterial::Cobblestone,
+                 surfaceSampler);
+        const int houseBase=surfaceSampler
+            ? std::clamp(surfaceSampler(hx,hz),base-6,base+6) : base;
+        buildHouse(write, hx, hz, houseBase, hash(cx, 2, hz), doorDx, doorDz,
+                   style, surfaceSampler);
     }
 
     // One corner holds a farm (plains) or a cactus pen (desert).
     const uint64_t corner = hash(cx, 3, cz);
     if (desert)
-        buildCactusPen(write, cx - 14, cz + 14, base, corner);
+        buildCactusPen(write, cx - 17, cz + 17,
+            surfaceSampler?surfaceSampler(cx-17,cz+17):base, corner);
     else
-        buildFarm(write, cx - 14, cz + 14, base, corner);
+        buildFarm(write, cx - 17, cz + 17,
+            surfaceSampler?surfaceSampler(cx-17,cz+17):base, corner);
+
+    // Deterministic market canopy / public gathering lot opposite the farm.
+    const int marketX = cx + 16;
+    const int marketZ = cz + 16;
+    fillBox(write, marketX-4, base, marketZ-3,
+            marketX+4, base, marketZ+3, style.path);
+    for (const int dx : {-4, 4}) for (const int dz : {-3, 3}) {
+        for (int y=1; y<=3; ++y)
+            write(marketX+dx, base+y, marketZ+dz, style.pillar);
+    }
+    const ArchitecturalMaterial canopy = desert
+        ? ArchitecturalMaterial::Terracotta : ArchitecturalMaterial::Planks;
+    fillBox(write, marketX-4, base+4, marketZ-3,
+            marketX+4, base+4, marketZ+3,
+            slabBlock(canopy, BlockHalf::Bottom));
+    write(marketX-1, base+1, marketZ, BlockId::CHEST);
+    write(marketX+1, base+1, marketZ, BlockId::CRAFTING_TABLE);
 }
 
 void buildHut(const StructurePlacement& placement,
@@ -248,10 +345,20 @@ void buildHut(const StructurePlacement& placement,
     write(cx, base + 2, cz + 3, BlockId::AIR);
     write(cx - 3, base + 2, cz, BlockId::GLASS);
     write(cx + 3, base + 2, cz, BlockId::GLASS);
-    fillBox(write, cx - 3, base + 4, cz - 3, cx + 3, base + 4, cz + 3,
-            BlockId::PLANKS);
-    fillBox(write, cx - 2, base + 5, cz - 2, cx + 2, base + 5, cz + 2,
-            BlockId::PLANKS);
+    // Deep eaves, ridge and offset chimney make the hut readable at range.
+    for (int z=cz-4; z<=cz+4; ++z) {
+        write(cx-4, base+4, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::East));
+        write(cx+4, base+4, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::West));
+        write(cx-3, base+5, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::East));
+        write(cx+3, base+5, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::West));
+    }
+    fillBox(write, cx-2, base+5, cz-4, cx+2, base+5, cz+4, BlockId::PLANKS);
+    for (int y=base+4; y<=base+7; ++y)
+        write(cx+2, y, cz-2, BlockId::COBBLESTONE);
     write(cx - 1, base + 1, cz - 1,
           bedBlock(BedPart::Foot, BedDirection::North));
     write(cx - 1, base + 1, cz - 2,
@@ -262,6 +369,13 @@ void buildHut(const StructurePlacement& placement,
     write(cx + 1, base + 2, cz + 3, BlockId::TORCH);
     write(cx, base, cz + 4, BlockId::COARSE_DIRT);
     write(cx, base, cz + 5, BlockId::COARSE_DIRT);
+    // Side lean-to with a work bench.
+    for (int z=cz-1; z<=cz+2; ++z)
+        write(cx-4, base+3, z, slabBlock(ArchitecturalMaterial::Planks,
+                                        BlockHalf::Bottom));
+    write(cx-4, base+1, cz, BlockId::CRAFTING_TABLE);
+    write(cx + ((placement.variant & 1u) ? 3 : -3), base+1, cz+2,
+          BlockId::OAK_SAPLING);
 }
 
 void buildCamp(const StructurePlacement& placement,
@@ -292,6 +406,21 @@ void buildCamp(const StructurePlacement& placement,
     write(cx + 3, base + 2, cz - 3, BlockId::TORCH);
     const uint64_t h = WorldGenContext::hashPosition(variant, cx, 0, cz);
     if (h % 2 == 0) write(cx + 2, base + 1, cz + 2, BlockId::COBBLESTONE);
+    // Two damaged A-frame tents and bedrolls establish an actual camp layout.
+    for (const int side : {-1, 1}) {
+        const int tx = cx + side * 4;
+        for (int dz=-2; dz<=2; ++dz) {
+            write(tx-1, base+1, cz+dz, BlockId::WHITE_WOOL);
+            write(tx+1, base+1, cz+dz, BlockId::WHITE_WOOL);
+            if ((h + dz + side) % 4 != 0)
+                write(tx, base+2, cz+dz, BlockId::WHITE_WOOL);
+        }
+        write(tx, base+1, cz, BlockId::AIR);
+        write(tx, base+1, cz+1,
+              bedBlock(BedPart::Foot, BedDirection::North));
+        write(tx, base+1, cz,
+              bedBlock(BedPart::Head, BedDirection::North));
+    }
 }
 
 void buildDesertWell(const StructurePlacement& placement,
@@ -304,8 +433,12 @@ void buildDesertWell(const StructurePlacement& placement,
         for (int dx = -1; dx <= 1; ++dx) {
             write(cx + dx, base, cz + dz, BlockId::AIR);
             write(cx + dx, base - 1, cz + dz, BlockId::WATER);
+            write(cx + dx, base - 2, cz + dz, BlockId::WATER);
+            write(cx + dx, base - 3, cz + dz, BlockId::TERRACOTTA);
         }
     }
+    fillRing(write, cx - 3, base, cz - 3, cx + 3, cz + 3,
+             BlockId::SAND);
     fillRing(write, cx - 2, base + 1, cz - 2, cx + 2, cz + 2,
              BlockId::TERRACOTTA);
     for (const int dx : {-2, 2}) {
@@ -314,10 +447,25 @@ void buildDesertWell(const StructurePlacement& placement,
             write(cx + dx, base + 3, cz + dz, BlockId::TERRACOTTA);
         }
     }
-    fillRing(write, cx - 2, base + 4, cz - 2, cx + 2, cz + 2,
-             BlockId::TERRACOTTA);
+    fillBox(write, cx - 2, base + 4, cz - 2, cx + 2, base + 4, cz + 2,
+            slabBlock(ArchitecturalMaterial::Terracotta, BlockHalf::Bottom));
+    for (const int dx : {-3, 3}) {
+        write(cx+dx, base+1, cz,
+              stairBlock(ArchitecturalMaterial::Terracotta, BlockHalf::Bottom,
+                         dx < 0 ? BedDirection::East : BedDirection::West));
+    }
+    for (const int dz : {-3, 3}) {
+        write(cx, base+1, cz+dz,
+              stairBlock(ArchitecturalMaterial::Terracotta, BlockHalf::Bottom,
+                         dz < 0 ? BedDirection::South : BedDirection::North));
+    }
     write(cx - 2, base + 2, cz, BlockId::SAND);
     write(cx + 2, base + 2, cz, BlockId::SAND);
+    const int ruinX=(placement.variant&1u)?-3:3;
+    write(cx+ruinX,base+1,cz+2,BlockId::TERRACOTTA);
+    if((placement.variant>>1)&1u)
+        write(cx+ruinX,base+2,cz+2,
+              slabBlock(ArchitecturalMaterial::Terracotta,BlockHalf::Bottom));
 }
 
 void buildIgloo(const StructurePlacement& placement,
@@ -367,6 +515,19 @@ void buildIgloo(const StructurePlacement& placement,
     write(cx + 1, base + 1, cz - 1,
           bedBlock(BedPart::Head, BedDirection::North));
     write(cx, base + 2, cz + 2, BlockId::TORCH);
+    write(cx - 1, base + 1, cz + 1, BlockId::CHEST);
+    // Three-block entrance tunnel, side snow banks and a short chimney.
+    for (int dz=-6; dz<=-4; ++dz) {
+        write(cx-1, base+1, cz+dz, BlockId::SNOW);
+        write(cx+1, base+1, cz+dz, BlockId::SNOW);
+        write(cx, base+3, cz+dz, BlockId::SNOW);
+        write(cx, base+1, cz+dz, BlockId::AIR);
+        write(cx, base+2, cz+dz, BlockId::AIR);
+    }
+    fillBox(write, cx-4, base, cz-2, cx-3, base+1, cz+1, BlockId::SNOW);
+    const int chimneyX=(placement.variant&1u)?2:-2;
+    write(cx+chimneyX, base+4, cz+1, BlockId::COBBLESTONE);
+    write(cx+chimneyX, base+5, cz+1, BlockId::COBBLESTONE);
 }
 
 void buildTower(const StructurePlacement& placement,
@@ -375,24 +536,45 @@ void buildTower(const StructurePlacement& placement,
     const int cz = (placement.minZ + placement.maxZ) / 2;
     const int base = placement.baseY;
     const uint64_t variant = placement.variant;
-    const int height = 5 + static_cast<int>(
-        WorldGenContext::hashPosition(variant, cx, 0, cz) % 4);
-    fillBox(write, cx - 2, base, cz - 2, cx + 2, base, cz + 2,
+    const int height = 12 + static_cast<int>(
+        WorldGenContext::hashPosition(variant, cx, 0, cz) % 5);
+    fillBox(write, cx - 4, base, cz - 4, cx + 4, base, cz + 4,
             BlockId::COARSE_DIRT);
     for (int y = base + 1; y <= base + height; ++y) {
-        for (int dz = -2; dz <= 2; ++dz) {
-            for (int dx = -2; dx <= 2; ++dx) {
-                if (dx > -2 && dx < 2 && dz > -2 && dz < 2) continue;
+        for (int dz = -3; dz <= 3; ++dz) {
+            for (int dx = -3; dx <= 3; ++dx) {
+                if (dx > -3 && dx < 3 && dz > -3 && dz < 3) continue;
                 const uint64_t h = WorldGenContext::hashPosition(
                     variant, cx + dx, y, cz + dz);
-                // Jagged top edge and a random wall gap on the lower course.
-                if (y == base + height && h % 4 == 0) continue;
-                if (y == base + 2 && h % 13 == 0) continue;
+                if (y >= base + height - 1 && h % 4 == 0) continue;
+                if (y > base + 3 && h % 17 == 0) continue;
                 write(cx + dx, y, cz + dz,
                       h % 11 == 0 ? BlockId::MOSS : BlockId::COBBLESTONE);
             }
         }
     }
+    write(cx, base+1, cz-3, BlockId::AIR);
+    write(cx, base+2, cz-3, BlockId::AIR);
+    // Broken internal floors and a contiguous stair that winds around the core.
+    constexpr std::array<std::pair<int,int>,8> stairPath{{
+        {0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}}};
+    for (int y=base+1; y<base+height-1; ++y) {
+        const size_t phase=static_cast<size_t>(y-base-1)%stairPath.size();
+        const auto [sx,sz]=stairPath[phase];
+        const auto [nx,nz]=stairPath[(phase+1)%stairPath.size()];
+        const BedDirection direction = nz < sz ? BedDirection::North :
+            nx > sx ? BedDirection::East :
+            nz > sz ? BedDirection::South : BedDirection::West;
+        write(cx+sx, y, cz+sz,
+              stairBlock(ArchitecturalMaterial::Cobblestone, BlockHalf::Bottom,
+                         direction));
+        if ((y-base)%4==0)
+            fillRing(write,cx-2,y,cz-2,cx+2,cz+2,BlockId::COBBLESTONE);
+    }
+    write(cx+1, base+1, cz+1, BlockId::CHEST);
+    for (int dx=-4; dx<=4; dx+=2)
+        write(cx+dx, base+1, cz+4,
+              slabBlock(ArchitecturalMaterial::Cobblestone, BlockHalf::Bottom));
 }
 
 void buildLumberCamp(const StructurePlacement& placement,
@@ -421,6 +603,147 @@ void buildLumberCamp(const StructurePlacement& placement,
     // Fresh saplings on the north edge.
     for (int dx = -1; dx <= 1; ++dx)
         write(cx + dx, base + 1, cz + 3, BlockId::SPRUCE_SAPLING);
+    // Open-sided saw shelter with a broad pitched roof.
+    for (const int dx : {-5, 5}) for (const int dz : {-4, 0})
+        for (int y=1; y<=4; ++y)
+            write(cx+dx, base+y, cz+dz, BlockId::SPRUCE_WOOD);
+    for (int z=cz-5; z<=cz+1; ++z) {
+        write(cx-6, base+5, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::East));
+        write(cx+6, base+5, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::West));
+        write(cx-5, base+6, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::East));
+        write(cx+5, base+6, z, stairBlock(ArchitecturalMaterial::Planks,
+            BlockHalf::Bottom, BedDirection::West));
+        fillBox(write,cx-4,base+6,z,cx+4,base+6,z,BlockId::PLANKS);
+    }
+    // Stumps and hauling trail.
+    for (const auto& offset : std::array<std::pair<int,int>,4>{{
+            {-6,4},{-3,6},{3,6},{6,3}}})
+        write(cx+offset.first,base+1,cz+offset.second,BlockId::SPRUCE_WOOD);
+    for (int dz=5; dz<=8; ++dz)
+        write(cx,base,cz+dz,BlockId::COARSE_DIRT);
+    write(cx+((placement.variant&1u)?5:-5),base+1,cz+5,
+          BlockId::SPRUCE_SAPLING);
+}
+
+void buildXiguangRuin(const StructurePlacement& placement,
+                      const StructureGenerator::StructureWriter& write) {
+    const int cx=(placement.minX+placement.maxX)/2;
+    const int cz=(placement.minZ+placement.maxZ)/2;
+    const int base=placement.baseY;
+    const uint64_t variant=placement.variant;
+    // Raised radial sanctuary with four independently ruined gateways.
+    for (int dz=-6; dz<=6; ++dz) for (int dx=-6; dx<=6; ++dx) {
+        const int d2=dx*dx+dz*dz;
+        if (d2<=36) write(cx+dx,base+1,cz+dz,
+            d2>24 ? slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom)
+                  : BlockId::SUNSTONE);
+    }
+    for (const BedDirection direction : {BedDirection::North,BedDirection::East,
+                                         BedDirection::South,BedDirection::West}) {
+        const glm::ivec3 out=bedDirectionOffset(direction);
+        const glm::ivec3 side(-out.z,0,out.x);
+        for (int step=6; step<=9; ++step)
+            write(cx+out.x*step,base+1,cz+out.z*step,
+                  slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom));
+        const int intact=3+static_cast<int>(WorldGenContext::hashPosition(
+            variant,out.x,2,out.z)%4u);
+        for (const int s : {-2,2}) for (int y=2; y<=intact; ++y)
+            write(cx+out.x*7+side.x*s,base+y,cz+out.z*7+side.z*s,
+                  BlockId::SUNSTONE);
+        for (int s=-2; s<=2; ++s)
+            if ((variant+s+static_cast<int>(direction))%5!=0)
+                write(cx+out.x*7+side.x*s,base+intact,
+                      cz+out.z*7+side.z*s,
+                      slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom));
+    }
+    for (int y=2; y<=4; ++y) write(cx,base+y,cz,BlockId::SUNSTONE);
+    write(cx,base+5,cz,BlockId::STAR_CRYSTAL);
+    write(cx+2,base+2,cz,BlockId::CHEST);
+    for (int i=0;i<12;++i) {
+        const uint64_t h=WorldGenContext::hashPosition(variant,cx+i,7,cz-i);
+        const int dx=static_cast<int>((h>>8)%19)-9;
+        const int dz=static_cast<int>((h>>24)%19)-9;
+        write(cx+dx,base+1,cz+dz,(h&1u)?BlockId::SUNSTONE:BlockId::MOSS);
+    }
+}
+
+void buildStarCrystalGeode(const StructurePlacement& placement,
+                           const StructureGenerator::StructureWriter& write) {
+    const int cx=(placement.minX+placement.maxX)/2;
+    const int cz=(placement.minZ+placement.maxZ)/2;
+    const int base=placement.baseY;
+    const uint64_t variant=placement.variant;
+    // Cracked hollow shell; south side and roof deliberately remain open.
+    for(int dy=0;dy<=7;++dy) for(int dz=-5;dz<=5;++dz)
+        for(int dx=-5;dx<=5;++dx) {
+            const int d2=dx*dx+dz*dz+(dy-3)*(dy-3);
+            if(d2<17||d2>29) continue;
+            const uint64_t h=WorldGenContext::hashPosition(variant,dx,dy,dz);
+            if ((dz<-3&&std::abs(dx)<=1&&dy<=3) || h%13u==0) continue;
+            write(cx+dx,base+dy,cz+dz,
+                  h%5u==0?BlockId::MOSS:BlockId::CLOUDSTONE);
+        }
+    fillBox(write,cx-3,base,cz-3,cx+3,base,cz+3,BlockId::MOSS);
+    for(int dy=1;dy<=5;++dy)
+        write(cx,base+dy,cz,BlockId::STAR_CRYSTAL);
+    for (const auto& p : std::array<glm::ivec3,4>{{
+            {-2,1,1},{2,1,-1},{1,1,2},{-1,1,-2}}}) {
+        write(cx+p.x,base+p.y,cz+p.z,BlockId::STAR_CRYSTAL);
+        write(cx+p.x,base+p.y+1,cz+p.z,BlockId::STAR_CRYSTAL);
+    }
+    write(cx+3,base+1,cz+1,BlockId::CHEST);
+}
+
+void buildCloudspireTower(const StructurePlacement& placement,
+                          const StructureGenerator::StructureWriter& write) {
+    const int cx=(placement.minX+placement.maxX)/2;
+    const int cz=(placement.minZ+placement.maxZ)/2;
+    const int base=placement.baseY;
+    const int height=18+static_cast<int>(placement.variant%7u);
+    fillBox(write,cx-4,base,cz-4,cx+4,base,cz+4,BlockId::SUNSTONE);
+    constexpr std::array<std::pair<int,int>,8> stairPath{{
+        {0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}}};
+    for(int y=1;y<=height;++y) {
+        const int radius=y>height-5?2:3;
+        fillRing(write,cx-radius,base+y,cz-radius,cx+radius,cz+radius,
+                 y%5==0?BlockId::CLOUDSTONE:BlockId::SUNSTONE);
+        if(y<=3){write(cx,base+y,cz-3,BlockId::AIR);}
+        if(y==6||y==12) {
+            for(int dz=-5;dz<=5;++dz) for(int dx=-5;dx<=5;++dx) {
+                const int edge=std::max(std::abs(dx),std::abs(dz));
+                if(edge>=2)
+                    write(cx+dx,base+y,cz+dz,
+                          slabBlock(ArchitecturalMaterial::Cloudstone,
+                                    BlockHalf::Bottom));
+                if(edge==5)
+                    write(cx+dx,base+y+1,cz+dz,
+                          slabBlock(ArchitecturalMaterial::Cloudstone,
+                                    BlockHalf::Bottom));
+            }
+        }
+        const size_t phase=static_cast<size_t>(y-1)%stairPath.size();
+        const auto [sx,sz]=stairPath[phase];
+        const auto [nx,nz]=stairPath[(phase+1)%stairPath.size()];
+        const BedDirection direction = nz < sz ? BedDirection::North :
+            nx > sx ? BedDirection::East :
+            nz > sz ? BedDirection::South : BedDirection::West;
+        write(cx+sx,base+y,cz+sz,stairBlock(
+            ArchitecturalMaterial::Sunstone,BlockHalf::Bottom,
+            direction));
+    }
+    fillBox(write,cx-3,base+height+1,cz-3,cx+3,base+height+1,cz+3,
+            slabBlock(ArchitecturalMaterial::Cloudstone,BlockHalf::Bottom));
+    for (const glm::ivec3& o : std::array<glm::ivec3,4>{{
+            {3,0,0},{-3,0,0},{0,0,3},{0,0,-3}}}) {
+        write(cx+o.x,base+height+2,cz+o.z,BlockId::SUNSTONE);
+        write(cx+o.x,base+height+3,cz+o.z,BlockId::STAR_CRYSTAL);
+    }
+    write(cx,base+height+2,cz,BlockId::CLOUDSTONE);
+    write(cx,base+height+3,cz,BlockId::STAR_CRYSTAL);
+    write(cx+1,base+1,cz+1,BlockId::CHEST);
 }
 
 } // namespace
@@ -443,14 +766,14 @@ const StructureGenerator::TypeParams& StructureGenerator::params(
     StructureType type) {
     static constexpr std::array<TypeParams, 9> table{{
         {StructureType::None, 0, 0, 0, 0},
-        {StructureType::Village, 512, 12, 6, 8},
-        {StructureType::DesertVillage, 512, 12, 6, 8},
-        {StructureType::TravelerHut, 64, 10, 2, 7},
-        {StructureType::AbandonedCamp, 80, 9, 2, 4},
+        {StructureType::Village, 512, 12, 6, 16},
+        {StructureType::DesertVillage, 512, 12, 6, 15},
+        {StructureType::TravelerHut, 64, 10, 2, 9},
+        {StructureType::AbandonedCamp, 80, 9, 2, 5},
         {StructureType::DesertWell, 64, 12, 2, 6},
-        {StructureType::Igloo, 80, 12, 2, 6},
-        {StructureType::RuinedTower, 128, 10, 3, 10},
-        {StructureType::LumberCamp, 96, 10, 2, 5},
+        {StructureType::Igloo, 80, 12, 2, 7},
+        {StructureType::RuinedTower, 128, 10, 3, 18},
+        {StructureType::LumberCamp, 96, 10, 2, 8},
     }};
     const int index = static_cast<int>(type);
     return table[index >= 0 && index < static_cast<int>(table.size())
@@ -488,20 +811,24 @@ bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
 }
 
 int StructureGenerator::halfSize(StructureType type, uint64_t variant) {
+    (void)variant;
     switch (type) {
         case StructureType::Village:
-            return 14 + static_cast<int>((variant >> 8) % 5);
+            return 22;
         case StructureType::DesertVillage:
-            return 14 + static_cast<int>((variant >> 8) % 3);
+            return 20;
         case StructureType::TravelerHut:
+            return 5;
         case StructureType::Igloo:
-            return 3;
+            return 7;
         case StructureType::AbandonedCamp:
+            return 6;
         case StructureType::RuinedTower:
+            return 5;
         case StructureType::LumberCamp:
-            return 4;
+            return 8;
         case StructureType::DesertWell:
-            return 2;
+            return 4;
         default:
             return 3;
     }
@@ -509,8 +836,8 @@ int StructureGenerator::halfSize(StructureType type, uint64_t variant) {
 
 int StructureGenerator::maxHalfSize(StructureType type) {
     switch (type) {
-        case StructureType::Village: return 18;
-        case StructureType::DesertVillage: return 16;
+        case StructureType::Village: return 22;
+        case StructureType::DesertVillage: return 20;
         default: return halfSize(type, 0);
     }
 }
@@ -742,29 +1069,93 @@ bool StructureGenerator::reservationAt(int worldX, int worldZ) const {
 }
 
 void StructureGenerator::build(const StructurePlacement& placement,
-                               const StructureWriter& write) {
+                               const StructureWriter& write,
+                               const SurfaceSampler& surfaceSampler) {
+    const int centerX = (placement.minX + placement.maxX) / 2;
+    const int centerZ = (placement.minZ + placement.maxZ) / 2;
+    const int rotations = static_cast<int>((placement.variant >> 61) & 3u);
+    const bool mirror = ((placement.variant >> 60) & 1u) != 0;
+    const auto transformOffset = [&](int dx, int dz) {
+        if (mirror) dx = -dx;
+        for (int turn = 0; turn < rotations; ++turn) {
+            const int oldX = dx;
+            dx = -dz;
+            dz = oldX;
+        }
+        return std::pair<int, int>{dx, dz};
+    };
+    const auto transformDirection = [&](BedDirection direction) {
+        const glm::ivec3 offset = bedDirectionOffset(direction);
+        const auto [dx, dz] = transformOffset(offset.x, offset.z);
+        if (dz < 0) return BedDirection::North;
+        if (dx > 0) return BedDirection::East;
+        if (dz > 0) return BedDirection::South;
+        return BedDirection::West;
+    };
+    const StructureWriter transformedWrite = [&](int x, int y, int z,
+                                                   BlockId id) {
+        const auto [dx, dz] = transformOffset(x - centerX, z - centerZ);
+        ArchitecturalBlockState architecture;
+        if (decodeArchitecturalBlock(id, architecture) &&
+            architecture.shape == RenderShape::Stair) {
+            id = stairBlock(architecture.material, architecture.half,
+                            transformDirection(architecture.direction));
+        } else if (isBed(id)) {
+            BedPart part = BedPart::Foot;
+            BedDirection direction = BedDirection::North;
+            if (decodeBed(id, part, direction))
+                id = bedBlock(part, transformDirection(direction));
+        }
+        const int worldX = centerX + dx;
+        const int worldZ = centerZ + dz;
+        if (surfaceSampler && y == placement.baseY && isSolid(id)) {
+            const int naturalY = surfaceSampler(worldX, worldZ);
+            BlockId foundation = id;
+            ArchitecturalBlockState foundationState;
+            if (decodeArchitecturalBlock(id, foundationState))
+                foundation = architecturalBaseBlock(foundationState.material);
+            for (int supportY = naturalY + 1; supportY < y; ++supportY)
+                write(worldX, supportY, worldZ, foundation);
+        }
+        write(worldX, y, worldZ, id);
+    };
+    const SurfaceSampler transformedSurface = surfaceSampler
+        ? SurfaceSampler([&](int x, int z) {
+              const auto [dx, dz] = transformOffset(x - centerX, z - centerZ);
+              return surfaceSampler(centerX + dx, centerZ + dz);
+          })
+        : SurfaceSampler{};
     switch (placement.type) {
         case StructureType::Village:
         case StructureType::DesertVillage:
-            buildVillage(placement, write);
+            buildVillage(placement, transformedWrite, transformedSurface);
             break;
         case StructureType::TravelerHut:
-            buildHut(placement, write);
+            buildHut(placement, transformedWrite);
             break;
         case StructureType::AbandonedCamp:
-            buildCamp(placement, write);
+            buildCamp(placement, transformedWrite);
             break;
         case StructureType::DesertWell:
-            buildDesertWell(placement, write);
+            buildDesertWell(placement, transformedWrite);
             break;
         case StructureType::Igloo:
-            buildIgloo(placement, write);
+            buildIgloo(placement, transformedWrite);
             break;
         case StructureType::RuinedTower:
-            buildTower(placement, write);
+            buildTower(placement, transformedWrite);
             break;
         case StructureType::LumberCamp:
-            buildLumberCamp(placement, write);
+            buildLumberCamp(placement, transformedWrite);
+            break;
+        case StructureType::XiguangRuin:
+            buildXiguangRuin(placement, transformedWrite);
+            break;
+        case StructureType::StarCrystalGeode:
+            buildStarCrystalGeode(placement, transformedWrite);
+            break;
+        case StructureType::CloudspireTower:
+            buildCloudspireTower(placement, transformedWrite);
             break;
         default:
             break;

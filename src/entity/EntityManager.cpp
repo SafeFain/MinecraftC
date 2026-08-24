@@ -384,8 +384,14 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
     const int maxZ=static_cast<int>(std::floor(position.z+halfZ-1e-6));
     for(int y=minY;y<=maxY;++y) for(int z=minZ;z<=maxZ;++z) for(int x=minX;x<=maxX;++x) {
         const BlockId block = m_world.getBlock(x,y,z);
-        if (position.y < y + blockCollisionHeight(block) &&
-            position.y + size.y > y && isSolid(block)) return true;
+        const BlockCollisionBoxes boxes = blockCollisionBoxes(block);
+        for (uint8_t i = 0; i < boxes.count; ++i) {
+            const BlockCollisionBox& box = boxes.boxes[i];
+            if (position.x-halfX < x+box.max.x && position.x+halfX > x+box.min.x &&
+                position.y < y+box.max.y && position.y+size.y > y+box.min.y &&
+                position.z-halfZ < z+box.max.z && position.z+halfZ > z+box.min.z)
+                return true;
+        }
     }
     return false;
 }
@@ -449,10 +455,22 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             const BlockId below = m_world.getBlock(
                 static_cast<int>(std::floor(next.x)), belowY,
                 static_cast<int>(std::floor(next.z)));
-            if (Config::isValidWorldY(belowY) && pointInsideBlockCollision(
-                    below, static_cast<float>(next.y - 0.05 - belowY))) {
+            const glm::vec3 localBelow(
+                static_cast<float>(next.x-std::floor(next.x)),
+                static_cast<float>(next.y-0.05-belowY),
+                static_cast<float>(next.z-std::floor(next.z)));
+            if (Config::isValidWorldY(belowY) &&
+                pointInsideBlockCollision(below,localBelow)) {
                 entity.velocity = glm::vec3(0.0f);
-                entity.position.y = belowY + blockCollisionHeight(below) + 0.05f;
+                float support=0.0f;
+                const BlockCollisionBoxes boxes=blockCollisionBoxes(below);
+                for(uint8_t i=0;i<boxes.count;++i) {
+                    const auto& box=boxes.boxes[i];
+                    if(localBelow.x>=box.min.x&&localBelow.x<=box.max.x&&
+                       localBelow.z>=box.min.z&&localBelow.z<=box.max.z)
+                        support=std::max(support,box.max.y);
+                }
+                entity.position.y = belowY + support + 0.05f;
             } else {
                 entity.position = next;
             }
@@ -837,8 +855,8 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         const glm::dvec3 next=start+delta*(static_cast<double>(step)/steps);
         const glm::ivec3 block(glm::floor(next));
         const BlockId hitBlock = m_world.getBlock(block.x,block.y,block.z);
-        if(pointInsideBlockCollision(
-                hitBlock, static_cast<float>(next.y - block.y))) {
+        if(pointInsideBlockCollision(hitBlock,
+                glm::vec3(next - glm::dvec3(block)))) {
             arrow.position=next;arrow.velocity={0,0,0};arrow.inGround=true;return;
         }
         if (!arrow.playerOwned) {

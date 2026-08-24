@@ -195,6 +195,22 @@
       "x": 0,
       "y": 18
     },
+    "cloudstone_slab": {
+      "generator": "block_item_icon",
+      "index": 160,
+      "source": "assets/textures/generated/items/cloudstone_slab.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 20
+    },
+    "cloudstone_stairs": {
+      "generator": "block_item_icon",
+      "index": 161,
+      "source": "assets/textures/generated/items/cloudstone_stairs.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 20
+    },
     "coal": {
       "generator": "item_sprite",
       "index": 10,
@@ -226,6 +242,22 @@
       "source_kind": "generated",
       "x": 5,
       "y": 0
+    },
+    "cobblestone_slab": {
+      "generator": "block_item_icon",
+      "index": 154,
+      "source": "assets/textures/generated/items/cobblestone_slab.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 19
+    },
+    "cobblestone_stairs": {
+      "generator": "block_item_icon",
+      "index": 155,
+      "source": "assets/textures/generated/items/cobblestone_stairs.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 19
     },
     "cooked_chicken": {
       "generator": "item_sprite",
@@ -771,6 +803,22 @@
       "x": 4,
       "y": 0
     },
+    "oak_planks_slab": {
+      "generator": "block_item_icon",
+      "index": 152,
+      "source": "assets/textures/generated/items/oak_planks_slab.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 19
+    },
+    "oak_planks_stairs": {
+      "generator": "block_item_icon",
+      "index": 153,
+      "source": "assets/textures/generated/items/oak_planks_stairs.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 19
+    },
     "oak_sapling": {
       "generator": "block_item_icon",
       "index": 111,
@@ -1091,6 +1139,22 @@
       "x": 1,
       "y": 18
     },
+    "sunstone_slab": {
+      "generator": "block_item_icon",
+      "index": 158,
+      "source": "assets/textures/generated/items/sunstone_slab.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 19
+    },
+    "sunstone_stairs": {
+      "generator": "block_item_icon",
+      "index": 159,
+      "source": "assets/textures/generated/items/sunstone_stairs.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 19
+    },
     "tall_grass": {
       "generator": "block_item_icon",
       "index": 54,
@@ -1106,6 +1170,22 @@
       "source_kind": "generated",
       "x": 3,
       "y": 6
+    },
+    "terracotta_slab": {
+      "generator": "block_item_icon",
+      "index": 156,
+      "source": "assets/textures/generated/items/terracotta_slab.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 19
+    },
+    "terracotta_stairs": {
+      "generator": "block_item_icon",
+      "index": 157,
+      "source": "assets/textures/generated/items/terracotta_stairs.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 19
     },
     "tnt": {
       "generator": "block_item_icon",
@@ -1226,7 +1306,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 19,
+  "rows": 21,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

@@ -179,8 +179,16 @@ void GameScenePresenter::render(
                 static_cast<float>(highlighted->z - renderOrigin.z));
             const BlockId highlightedBlock = session.world.getBlock(
                 highlighted->x, highlighted->y, highlighted->z);
-            renderer.renderWireframe(
-                pos, glm::vec3(1.0f, blockCollisionHeight(highlightedBlock), 1.0f), vp);
+            const BlockCollisionBoxes boxes = blockCollisionBoxes(highlightedBlock);
+            if (boxes.count == 0) {
+                renderer.renderWireframe(pos, glm::vec3(1.0f), vp);
+            } else {
+                for (uint8_t i = 0; i < boxes.count; ++i) {
+                    const BlockCollisionBox& box = boxes.boxes[i];
+                    renderer.renderWireframe(pos + box.min,
+                        box.max - box.min, vp);
+                }
+            }
         }
 
         if (perspective == CameraPerspective::FirstPerson &&

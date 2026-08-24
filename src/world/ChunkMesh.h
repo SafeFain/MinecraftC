@@ -453,6 +453,176 @@ struct ChunkMesh {
             }
         }
 
+        // Architectural slabs and stairs are emitted as their collision-box
+        // decomposition. They deliberately stay out of greedy cube masks:
+        // partial faces must retain their half-block dimensions and state.
+        for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                    const BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
+                    const RenderShape shape = getBlockProps(id).shape;
+                    if (shape != RenderShape::Slab && shape != RenderShape::Stair)
+                        continue;
+                    const BlockCollisionBoxes geometry = blockCollisionBoxes(id);
+                    ArchitecturalBlockState architecture;
+                    decodeArchitecturalBlock(id, architecture);
+                    const glm::vec2 sampled = normalizedLight(x, y, z);
+                    auto neighborOccludes = [&](FaceDir face,
+                                                const BlockCollisionBox& box) {
+                        const bool boundary =
+                            (face == FaceDir::TOP && box.max.y == 1.0f) ||
+                            (face == FaceDir::BOTTOM && box.min.y == 0.0f) ||
+                            (face == FaceDir::FRONT && box.min.z == 0.0f) ||
+                            (face == FaceDir::BACK && box.max.z == 1.0f) ||
+                            (face == FaceDir::RIGHT && box.max.x == 1.0f) ||
+                            (face == FaceDir::LEFT && box.min.x == 0.0f);
+                        if (!boundary) return false;
+                        const glm::ivec3 off = FACE_OFFSETS[static_cast<size_t>(face)];
+                        const BlockId neighborId = getNeighbor(
+                            chunkWorldX + x + off.x, y + off.y,
+                            chunkWorldZ + z + off.z);
+                        const BlockProperties& neighbor = getBlockProps(neighborId);
+                        if (!neighbor.solid ||
+                            neighbor.layer != RenderLayer::Opaque) return false;
+                        const BlockCollisionBoxes neighborBoxes =
+                            blockCollisionBoxes(neighborId);
+                        const size_t neighborCount = std::min<size_t>(
+                            neighborBoxes.count, neighborBoxes.boxes.size());
+                        const int normalAxis = face == FaceDir::TOP ||
+                            face == FaceDir::BOTTOM ? 1 :
+                            (face == FaceDir::FRONT || face == FaceDir::BACK ? 2 : 0);
+                        const int uAxis = normalAxis == 0 ? 1 : 0;
+                        const int vAxis = normalAxis == 2 ? 1 : 2;
+                        std::array<float, 6> uCuts{};
+                        std::array<float, 6> vCuts{};
+                        int uCount = 2, vCount = 2;
+                        uCuts[0] = box.min[uAxis]; uCuts[1] = box.max[uAxis];
+                        vCuts[0] = box.min[vAxis]; vCuts[1] = box.max[vAxis];
+                        auto touchesBoundary = [&](const BlockCollisionBox& other) {
+                            switch (face) {
+                                case FaceDir::TOP: return other.min.y == 0.0f;
+                                case FaceDir::BOTTOM: return other.max.y == 1.0f;
+                                case FaceDir::FRONT: return other.max.z == 1.0f;
+                                case FaceDir::BACK: return other.min.z == 0.0f;
+                                case FaceDir::RIGHT: return other.min.x == 0.0f;
+                                case FaceDir::LEFT: return other.max.x == 1.0f;
+                            }
+                            return false;
+                        };
+                        for (size_t i = 0; i < neighborCount; ++i) {
+                            const BlockCollisionBox& other = neighborBoxes.boxes[i];
+                            if (!touchesBoundary(other)) continue;
+                            for (const float value : {other.min[uAxis], other.max[uAxis]})
+                                if (value > box.min[uAxis] && value < box.max[uAxis] &&
+                                    uCount < static_cast<int>(uCuts.size()))
+                                    uCuts[uCount++] = value;
+                            for (const float value : {other.min[vAxis], other.max[vAxis]})
+                                if (value > box.min[vAxis] && value < box.max[vAxis] &&
+                                    vCount < static_cast<int>(vCuts.size()))
+                                    vCuts[vCount++] = value;
+                        }
+                        auto insertionSort = [](auto& values, int count) {
+                            for (int i = 1; i < count; ++i) {
+                                const float value = values[i];
+                                int j = i;
+                                while (j > 0 && values[j-1] > value) {
+                                    values[j] = values[j-1];
+                                    --j;
+                                }
+                                values[j] = value;
+                            }
+                        };
+                        insertionSort(uCuts,uCount);
+                        insertionSort(vCuts,vCount);
+                        for (int ui = 0; ui + 1 < uCount; ++ui) {
+                            for (int vi = 0; vi + 1 < vCount; ++vi) {
+                                const float u = (uCuts[ui] + uCuts[ui+1]) * .5f;
+                                const float v = (vCuts[vi] + vCuts[vi+1]) * .5f;
+                                bool covered = false;
+                                for (size_t i = 0; i < neighborCount; ++i) {
+                                    const BlockCollisionBox& other = neighborBoxes.boxes[i];
+                                    covered = covered || (touchesBoundary(other) &&
+                                        u >= other.min[uAxis] && u <= other.max[uAxis] &&
+                                        v >= other.min[vAxis] && v <= other.max[vAxis]);
+                                }
+                                if (!covered) return false;
+                            }
+                        }
+                        return true;
+                    };
+                    auto emitBoxFace = [&](uint8_t boxIndex, FaceDir face) {
+                        BlockCollisionBox box=geometry.boxes[boxIndex];
+                        if (shape==RenderShape::Stair) {
+                            const bool fullHalfFace=boxIndex==0&&
+                                ((architecture.half==BlockHalf::Bottom&&
+                                  face==FaceDir::TOP)||
+                                 (architecture.half==BlockHalf::Top&&
+                                  face==FaceDir::BOTTOM));
+                            const bool coveredStepFace=boxIndex==1&&
+                                ((architecture.half==BlockHalf::Bottom&&
+                                  face==FaceDir::BOTTOM)||
+                                 (architecture.half==BlockHalf::Top&&
+                                  face==FaceDir::TOP));
+                            if(coveredStepFace)return;
+                            if(fullHalfFace) {
+                                switch(architecture.direction) {
+                                    case BedDirection::North: box.min.z=.5f;break;
+                                    case BedDirection::East: box.max.x=.5f;break;
+                                    case BedDirection::South: box.max.z=.5f;break;
+                                    case BedDirection::West: box.min.x=.5f;break;
+                                }
+                            }
+                        }
+                        if (neighborOccludes(face, box)) return;
+                        const float x0 = x + box.min.x, x1 = x + box.max.x;
+                        const float y0 = y + box.min.y, y1 = y + box.max.y;
+                        const float z0 = z + box.min.z, z1 = z + box.max.z;
+                        glm::vec3 p[4]{};
+                        switch (face) {
+                            case FaceDir::TOP:
+                                p[0]={x1,y1,z1}; p[1]={x1,y1,z0};
+                                p[2]={x0,y1,z0}; p[3]={x0,y1,z1}; break;
+                            case FaceDir::BOTTOM:
+                                p[0]={x0,y0,z1}; p[1]={x0,y0,z0};
+                                p[2]={x1,y0,z0}; p[3]={x1,y0,z1}; break;
+                            case FaceDir::FRONT:
+                                p[0]={x1,y1,z0}; p[1]={x1,y0,z0};
+                                p[2]={x0,y0,z0}; p[3]={x0,y1,z0}; break;
+                            case FaceDir::BACK:
+                                p[0]={x0,y1,z1}; p[1]={x0,y0,z1};
+                                p[2]={x1,y0,z1}; p[3]={x1,y1,z1}; break;
+                            case FaceDir::RIGHT:
+                                p[0]={x1,y1,z1}; p[1]={x1,y0,z1};
+                                p[2]={x1,y0,z0}; p[3]={x1,y1,z0}; break;
+                            case FaceDir::LEFT:
+                                p[0]={x0,y1,z0}; p[1]={x0,y0,z0};
+                                p[2]={x0,y0,z1}; p[3]={x0,y1,z1}; break;
+                        }
+                        const float tile = encodeFlatLight(
+                            static_cast<float>(getFaceTextureIndex(id, face)),
+                            static_cast<uint8_t>(std::round(sampled.x * 15.0f)),
+                            static_cast<uint8_t>(std::round(sampled.y * 15.0f)));
+                        const unsigned int base =
+                            static_cast<unsigned int>(vertices.size());
+                        const glm::vec2 uv[4]={{1,1},{1,0},{0,0},{0,1}};
+                        for (int i = 0; i < 4; ++i)
+                            vertices.push_back({p[i].x,p[i].y,p[i].z,1.0f,
+                                sampled.x,sampled.y,1.0f,uv[i].x,uv[i].y,tile,
+                                static_cast<float>(face)});
+                        for (unsigned int index : {0u,1u,2u,0u,2u,3u}) {
+                            opaqueIndices.push_back(base + index);
+                            shadowIndices.push_back(base + index);
+                        }
+                    };
+                    for (uint8_t box = 0; box < geometry.count; ++box)
+                        for (FaceDir face : {FaceDir::TOP, FaceDir::BOTTOM,
+                                             FaceDir::FRONT, FaceDir::BACK,
+                                             FaceDir::RIGHT, FaceDir::LEFT})
+                            emitBoxFace(box, face);
+                }
+            }
+        }
+
         // Fluid cells use independent quads because their level-dependent top
         // surfaces cannot participate in cube greedy merging.
         for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {

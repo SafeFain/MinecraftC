@@ -6,10 +6,10 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 9;
+    static constexpr uint32_t GENERATION_VERSION = 10;
     // Base chunk caches may be invalidated without changing the user-visible
-    // generation version. v9 adds deterministic overworld structures and
-    // starts a fresh base-cache revision at 1.
+    // generation version. v10 upgrades every deterministic structure and
+    // adds architectural block states with a fresh base-cache revision.
     static constexpr uint32_t CHUNK_CACHE_VERSION =
         (GENERATION_VERSION << 16) | 1u;
     // Layout 5 fixes macro-anchor identity and adds finite volcanic features.

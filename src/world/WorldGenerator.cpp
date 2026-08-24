@@ -388,6 +388,7 @@ std::optional<LocatedStructure> WorldGenerator::heavenStructureForCell(
             static_cast<int>((candidateSeed >> 20) %
                              static_cast<uint64_t>(span));
         anchor = sampleHeavenIsland(anchorX, anchorZ);
+        int chosenLayer = 2;
 
         bool eligible = false;
         if (type == StructureType::XiguangRuin) {
@@ -400,13 +401,32 @@ std::optional<LocatedStructure> WorldGenerator::heavenStructureForCell(
                 (type == StructureType::StarCrystalGeode &&
                  anchor.biome != HeavenBiome::StarCrystalGarden)) {
                 anchor = sampleHeavenLayer(anchorX, anchorZ, fallbackLayer);
+                chosenLayer = fallbackLayer;
             }
             eligible = anchor.present &&
                 (type != StructureType::StarCrystalGeode ||
                  anchor.biome == HeavenBiome::StarCrystalGarden);
         }
-        if (eligible)
-            return LocatedStructure{anchorX, anchor.top, anchorZ, type};
+        if (eligible) {
+            const int radius = type == StructureType::XiguangRuin ? 6 : 4;
+            int supported = 0;
+            int sampled = 0;
+            for (int dz=-radius; dz<=radius; dz+=2) {
+                for (int dx=-radius; dx<=radius; dx+=2) {
+                    ++sampled;
+                    const HeavenIslandColumn column = sampleHeavenLayer(
+                        anchorX+dx, anchorZ+dz, chosenLayer);
+                    if (column.present && std::abs(column.top-anchor.top)<=4)
+                        ++supported;
+                }
+            }
+            const int required = type == StructureType::CloudspireTower
+                ? sampled * 4 / 5 : sampled * 2 / 3;
+            if (supported >= required &&
+                (type != StructureType::CloudspireTower ||
+                 anchor.top + 28 < Config::WORLD_MAX_Y))
+                return LocatedStructure{anchorX, anchor.top, anchorZ, type};
+        }
     }
     return {};
 }
@@ -472,7 +492,8 @@ std::optional<LocatedStructure> WorldGenerator::locateNearestHeavenStructure(
 
 
 void WorldGenerator::populateHeaven(
-    Chunk& chunk, WorldGenerator& generator) {
+    Chunk& chunk, WorldGenerator& generator,
+    const StructureSetter& structureSetter) {
     const int baseX = chunk.worldX();
     const int baseZ = chunk.worldZ();
     const auto setLocal = [&](int worldX, int worldY, int worldZ, BlockId id) {
@@ -490,6 +511,22 @@ void WorldGenerator::populateHeaven(
         if (chunk.blockAt(localX, worldY, localZ) ==
             static_cast<uint8_t>(BlockId::AIR))
             chunk.blockAt(localX, worldY, localZ) = static_cast<uint8_t>(id);
+    };
+    const auto buildStructure = [&](const StructurePlacement& placement) {
+        StructureGenerator::build(placement,
+            [&](int worldX,int worldY,int worldZ,BlockId id) {
+                if (!inChunk(worldX,worldZ,baseX,baseZ) ||
+                    !Config::isValidWorldY(worldY)) return;
+                setLocal(worldX,worldY,worldZ,id);
+                if ((id==BlockId::CHEST || id==BlockId::FURNACE) &&
+                    structureSetter)
+                    structureSetter(worldX,worldY,worldZ,id,
+                        id==BlockId::CHEST
+                            ? structureLootProfile(placement.type)
+                            : StructureLootProfile::None,
+                        WorldGenContext::hashPosition(
+                            placement.variant,worldX,worldY,worldZ));
+            });
     };
     const auto surfaceBlock = [](HeavenBiome biome) {
         switch (biome) {
@@ -795,10 +832,10 @@ void WorldGenerator::populateHeaven(
     // Rare coordinate-owned shrines provide a long-distance landmark. The
     // anchor is selected from a wide cell, but every piece is written through
     // setIfAir so the exact same structure appears regardless of chunk order.
-    const int firstCellX = floorDiv(baseX - 8, HEAVEN_LANDMARK_CELL);
-    const int lastCellX = floorDiv(baseX + 23, HEAVEN_LANDMARK_CELL);
-    const int firstCellZ = floorDiv(baseZ - 8, HEAVEN_LANDMARK_CELL);
-    const int lastCellZ = floorDiv(baseZ + 23, HEAVEN_LANDMARK_CELL);
+    const int firstCellX = floorDiv(baseX - 9, HEAVEN_LANDMARK_CELL);
+    const int lastCellX = floorDiv(baseX + 24, HEAVEN_LANDMARK_CELL);
+    const int firstCellZ = floorDiv(baseZ - 9, HEAVEN_LANDMARK_CELL);
+    const int lastCellZ = floorDiv(baseZ + 24, HEAVEN_LANDMARK_CELL);
     for (int cellX = firstCellX; cellX <= lastCellX; ++cellX) {
         for (int cellZ = firstCellZ; cellZ <= lastCellZ; ++cellZ) {
             const uint64_t cellSeed = WorldGenContext::hashPosition(
@@ -806,60 +843,30 @@ void WorldGenerator::populateHeaven(
             const auto placement = generator.heavenStructureForCell(
                 StructureType::XiguangRuin, cellX, cellZ);
             if (!placement) continue;
-            const int resolvedAnchorX = placement->worldX;
-            const int resolvedAnchorZ = placement->worldZ;
-            const HeavenIslandColumn anchor = generator.sampleHeavenIsland(
-                resolvedAnchorX, resolvedAnchorZ);
-            for (int dx = -4; dx <= 4; ++dx) {
-                for (int dz = -4; dz <= 4; ++dz) {
-                    if (std::abs(dx) != 4 && std::abs(dz) != 4) continue;
-                    const HeavenIslandColumn column =
-                        generator.sampleHeavenIsland(resolvedAnchorX + dx,
-                                                     resolvedAnchorZ + dz);
-                    if (!column.present || std::abs(column.top - anchor.top) > 5)
-                        continue;
-                    const int height = 2 + static_cast<int>(
-                        WorldGenContext::hashPosition(cellSeed, dx, 1, dz) % 3u);
-                    for (int y = 1; y <= height; ++y)
-                        setIfAir(resolvedAnchorX + dx, column.top + y,
-                                 resolvedAnchorZ + dz,
-                                 BlockId::SUNSTONE);
-                }
-            }
-            setIfAir(resolvedAnchorX, anchor.top + 1, resolvedAnchorZ,
-                     BlockId::SUNSTONE);
-            setIfAir(resolvedAnchorX, anchor.top + 2, resolvedAnchorZ,
-                     BlockId::STAR_CRYSTAL);
+            const int ax=placement->worldX, az=placement->worldZ;
+            buildStructure({0,0,placement->baseY,
+                StructureType::XiguangRuin,cellSeed,
+                ax-9,ax+9,az-9,az+9});
         }
     }
 
     // Crystal geode: a floating moss ring with a stacked crystal core marks
     // Starcrystal Garden anchors on the low and main island layers.
-    const int firstGeodeCellX = floorDiv(baseX - 8, HEAVEN_GEODE_CELL);
-    const int lastGeodeCellX = floorDiv(baseX + 23, HEAVEN_GEODE_CELL);
-    const int firstGeodeCellZ = floorDiv(baseZ - 8, HEAVEN_GEODE_CELL);
-    const int lastGeodeCellZ = floorDiv(baseZ + 23, HEAVEN_GEODE_CELL);
+    const int firstGeodeCellX = floorDiv(baseX - 5, HEAVEN_GEODE_CELL);
+    const int lastGeodeCellX = floorDiv(baseX + 20, HEAVEN_GEODE_CELL);
+    const int firstGeodeCellZ = floorDiv(baseZ - 5, HEAVEN_GEODE_CELL);
+    const int lastGeodeCellZ = floorDiv(baseZ + 20, HEAVEN_GEODE_CELL);
     for (int cellX = firstGeodeCellX; cellX <= lastGeodeCellX; ++cellX) {
         for (int cellZ = firstGeodeCellZ; cellZ <= lastGeodeCellZ; ++cellZ) {
             const auto placement = generator.heavenStructureForCell(
                 StructureType::StarCrystalGeode, cellX, cellZ);
             if (!placement) continue;
-            const int resolvedAnchorX = placement->worldX;
-            const int resolvedAnchorZ = placement->worldZ;
-            const HeavenIslandColumn anchor{
-                true, HeavenBiome::StarCrystalGarden, placement->baseY,
-                Config::WORLD_MIN_Y};
-            for (int dx = -2; dx <= 2; ++dx) {
-                for (int dz = -2; dz <= 2; ++dz) {
-                    if (std::max(std::abs(dx), std::abs(dz)) != 2) continue;
-                    setIfAir(resolvedAnchorX + dx, anchor.top + 1,
-                             resolvedAnchorZ + dz, BlockId::MOSS);
-                }
-            }
-            setIfAir(resolvedAnchorX, anchor.top + 1, resolvedAnchorZ,
-                     BlockId::STAR_CRYSTAL);
-            setIfAir(resolvedAnchorX, anchor.top + 2, resolvedAnchorZ,
-                     BlockId::STAR_CRYSTAL);
+            const uint64_t cellSeed=WorldGenContext::hashPosition(
+                generator.m_seed^HEAVEN_GEODE_DOMAIN,cellX,0,cellZ);
+            const int ax=placement->worldX, az=placement->worldZ;
+            buildStructure({0,0,placement->baseY,
+                StructureType::StarCrystalGeode,cellSeed,
+                ax-5,ax+5,az-5,az+5});
         }
     }
 
@@ -868,10 +875,10 @@ void WorldGenerator::populateHeaven(
     // that a normal exploration window reliably discovers the tower; the
     // cap-over-shaft order keeps test probes distinct from the ruin and
     // geode patterns.
-    const int firstSpireCellX = floorDiv(baseX - 8, HEAVEN_SPIRE_CELL);
-    const int lastSpireCellX = floorDiv(baseX + 23, HEAVEN_SPIRE_CELL);
-    const int firstSpireCellZ = floorDiv(baseZ - 8, HEAVEN_SPIRE_CELL);
-    const int lastSpireCellZ = floorDiv(baseZ + 23, HEAVEN_SPIRE_CELL);
+    const int firstSpireCellX = floorDiv(baseX - 6, HEAVEN_SPIRE_CELL);
+    const int lastSpireCellX = floorDiv(baseX + 21, HEAVEN_SPIRE_CELL);
+    const int firstSpireCellZ = floorDiv(baseZ - 6, HEAVEN_SPIRE_CELL);
+    const int lastSpireCellZ = floorDiv(baseZ + 21, HEAVEN_SPIRE_CELL);
     for (int cellX = firstSpireCellX; cellX <= lastSpireCellX; ++cellX) {
         for (int cellZ = firstSpireCellZ; cellZ <= lastSpireCellZ; ++cellZ) {
             const uint64_t cellSeed = WorldGenContext::hashPosition(
@@ -879,18 +886,10 @@ void WorldGenerator::populateHeaven(
             const auto placement = generator.heavenStructureForCell(
                 StructureType::CloudspireTower, cellX, cellZ);
             if (!placement) continue;
-            const int resolvedAnchorX = placement->worldX;
-            const int resolvedAnchorZ = placement->worldZ;
-            const int anchorTop = placement->baseY;
-            const int height = 5 + static_cast<int>(
-                WorldGenContext::hashPosition(cellSeed, 0, 5, 0) % 4u);
-            for (int y = 1; y <= height - 2; ++y)
-                setIfAir(resolvedAnchorX, anchorTop + y, resolvedAnchorZ,
-                         BlockId::SUNSTONE);
-            setIfAir(resolvedAnchorX, anchorTop + height - 1, resolvedAnchorZ,
-                     BlockId::CLOUDSTONE);
-            setIfAir(resolvedAnchorX, anchorTop + height, resolvedAnchorZ,
-                     BlockId::STAR_CRYSTAL);
+            const int ax=placement->worldX, az=placement->worldZ;
+            buildStructure({0,0,placement->baseY,
+                StructureType::CloudspireTower,cellSeed,
+                ax-6,ax+6,az-6,az+6});
         }
     }
 
@@ -915,14 +914,20 @@ void WorldGenerator::generateRegion(
     std::vector<Chunk*>& chunks,
     std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
     if (isHeaven()) {
+        pendingOut.clear();
+        const StructureSetter structureSetter =
+            [&](int wx,int wy,int wz,BlockId id,
+                StructureLootProfile lootProfile,uint64_t lootSeed) {
+                pendingOut.push_back({wx,wy,wz,id,true,true,
+                                      lootProfile,lootSeed});
+            };
         for (Chunk* chunk : chunks) {
             if (chunk == nullptr) continue;
-            populateHeaven(*chunk, *this);
+            populateHeaven(*chunk, *this, structureSetter);
             chunk->generated = true;
             chunk->generationInProgress = false;
             chunk->markDirty();
         }
-        pendingOut.clear();
         return;
     }
     if (m_worldType == WorldType::Superflat) {
@@ -951,7 +956,7 @@ void WorldGenerator::generate(Chunk& chunk,
                                const BlockSetter& blockSetter,
                                const StructureSetter& structureSetter) {
     if (isHeaven()) {
-        populateHeaven(chunk, *this);
+        populateHeaven(chunk, *this, structureSetter);
         return;
     }
     if (m_worldType == WorldType::Superflat) {
@@ -1155,10 +1160,22 @@ void WorldGenerator::generate(Chunk& chunk,
                 // channel; the streamer keys it off the block id.
                 if ((id == BlockId::CHEST || id == BlockId::FURNACE) &&
                     structureSetter)
-                    structureSetter(worldX, worldY, worldZ, id);
+                    structureSetter(worldX, worldY, worldZ, id,
+                        id == BlockId::CHEST
+                            ? structureLootProfile(placement.type)
+                            : StructureLootProfile::None,
+                        WorldGenContext::hashPosition(
+                            placement.variant,worldX,worldY,worldZ));
             } else if (structureSetter) {
-                structureSetter(worldX, worldY, worldZ, id);
+                structureSetter(worldX, worldY, worldZ, id,
+                    id == BlockId::CHEST
+                        ? structureLootProfile(placement.type)
+                        : StructureLootProfile::None,
+                    WorldGenContext::hashPosition(
+                        placement.variant,worldX,worldY,worldZ));
             }
+        },[&](int worldX,int worldZ) {
+            return m_heightPipeline.sampleColumn(worldX,worldZ).height;
         });
     }
 

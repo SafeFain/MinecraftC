@@ -242,6 +242,30 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, heavenBlocks[i].second});
     }
 
+    const std::array<std::pair<ItemId, BlockId>, 10> architecturalBlocks{{
+        {ItemId::OAK_PLANKS_SLAB, BlockId::PLANKS_SLAB_BOTTOM},
+        {ItemId::OAK_PLANKS_STAIRS, BlockId::PLANKS_STAIRS_BOTTOM_NORTH},
+        {ItemId::COBBLESTONE_SLAB, BlockId::COBBLESTONE_SLAB_BOTTOM},
+        {ItemId::COBBLESTONE_STAIRS, BlockId::COBBLESTONE_STAIRS_BOTTOM_NORTH},
+        {ItemId::TERRACOTTA_SLAB, BlockId::TERRACOTTA_SLAB_BOTTOM},
+        {ItemId::TERRACOTTA_STAIRS, BlockId::TERRACOTTA_STAIRS_BOTTOM_NORTH},
+        {ItemId::SUNSTONE_SLAB, BlockId::SUNSTONE_SLAB_BOTTOM},
+        {ItemId::SUNSTONE_STAIRS, BlockId::SUNSTONE_STAIRS_BOTTOM_NORTH},
+        {ItemId::CLOUDSTONE_SLAB, BlockId::CLOUDSTONE_SLAB_BOTTOM},
+        {ItemId::CLOUDSTONE_STAIRS, BlockId::CLOUDSTONE_STAIRS_BOTTOM_NORTH},
+    }};
+    const std::array<const char*, 10> architecturalNames{{
+        "Oak Planks Slab", "Oak Planks Stairs", "Cobblestone Slab",
+        "Cobblestone Stairs", "Terracotta Slab", "Terracotta Stairs",
+        "Sunstone Slab", "Sunstone Stairs", "Cloudstone Slab",
+        "Cloudstone Stairs"
+    }};
+    for (size_t i = 0; i < architecturalBlocks.size(); ++i) {
+        set(architecturalBlocks[i].first,
+            {architecturalNames[i], ItemKind::Block, 64, 0, ToolKind::None,
+             ToolTier::None, 0, 0, 0, 0, architecturalBlocks[i].second});
+    }
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -270,6 +294,11 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::AETHER_GRASS: case ItemId::AETHER_SOIL:
         case ItemId::CLOUDSTONE: case ItemId::SUNSTONE:
         case ItemId::SKYROOT_LOG: case ItemId::STAR_CRYSTAL:
+        case ItemId::OAK_PLANKS_SLAB: case ItemId::OAK_PLANKS_STAIRS:
+        case ItemId::COBBLESTONE_SLAB: case ItemId::COBBLESTONE_STAIRS:
+        case ItemId::TERRACOTTA_SLAB: case ItemId::TERRACOTTA_STAIRS:
+        case ItemId::SUNSTONE_SLAB: case ItemId::SUNSTONE_STAIRS:
+        case ItemId::CLOUDSTONE_SLAB: case ItemId::CLOUDSTONE_STAIRS:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -416,6 +445,13 @@ const ItemProperties& getItemProps(ItemId id) {
 
 ItemId itemForBlock(BlockId id) {
     if (isBed(id)) return ItemId::WHITE_BED;
+    ArchitecturalBlockState architectural;
+    if (decodeArchitecturalBlock(id, architectural)) {
+        const uint16_t base = static_cast<uint16_t>(ItemId::OAK_PLANKS_SLAB) +
+            static_cast<uint16_t>(architectural.material) * 2;
+        return static_cast<ItemId>(base +
+            (architectural.shape == RenderShape::Stair ? 1 : 0));
+    }
     const auto raw = static_cast<uint16_t>(id);
     if (raw > 0 && raw <= 35) return static_cast<ItemId>(raw);
     switch (raw) {

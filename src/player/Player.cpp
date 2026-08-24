@@ -495,9 +495,15 @@ void Player::moveAndCollide(const glm::vec3& delta) {
     // Bound each collision query so a slow frame cannot carry the player
     // across a one-block wall or into a corner.
     for (int i = 0; i < steps; ++i) {
+        bool steppedThisSubstep = false;
         const double newX = m_position.x + step.x;
         if (!checkCollision(newX, m_position.y, m_position.z)) {
             m_position.x = newX;
+        } else if (m_onGround &&
+                   !checkCollision(newX, m_position.y + 0.5, m_position.z)) {
+            m_position.y += 0.5;
+            m_position.x = newX;
+            steppedThisSubstep = true;
         } else {
             blockedX = true;
             blockedTargetX = newX;
@@ -505,6 +511,10 @@ void Player::moveAndCollide(const glm::vec3& delta) {
 
         const double newZ = m_position.z + step.z;
         if (!checkCollision(m_position.x, m_position.y, newZ)) {
+            m_position.z = newZ;
+        } else if (m_onGround && !steppedThisSubstep &&
+                   !checkCollision(m_position.x, m_position.y + 0.5, newZ)) {
+            m_position.y += 0.5;
             m_position.z = newZ;
         } else {
             blockedZ = true;
@@ -581,11 +591,15 @@ bool Player::checkCollision(double px, double py, double pz) const {
                 if (!props.solid) continue;
 
                 // AABB vs AABB
-                const double blockTop = by + blockCollisionHeight(id);
-                if (px - halfW < bx + 1 && px + halfW > bx &&
-                    py < blockTop && py + Config::PLAYER_HEIGHT > by &&
-                    pz - halfW < bz + 1 && pz + halfW > bz) {
-                    return true;
+                const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
+                for (uint8_t i = 0; i < boxes.count; ++i) {
+                    const BlockCollisionBox& box = boxes.boxes[i];
+                    if (px - halfW < bx + box.max.x &&
+                        px + halfW > bx + box.min.x &&
+                        py < by + box.max.y &&
+                        py + Config::PLAYER_HEIGHT > by + box.min.y &&
+                        pz - halfW < bz + box.max.z &&
+                        pz + halfW > bz + box.min.z) return true;
                 }
             }
         }
@@ -731,8 +745,8 @@ void Player::updateEnvironment(uint32_t ticks) {
             takeDamage(source);
             m_environmentDamageTicks = 0;
         }
-    } else if (pointInsideBlockCollision(
-                   eyeBlock, static_cast<float>(getEyePosition().y - eye.y))) {
+    } else if (pointInsideBlockCollision(eyeBlock,
+                   glm::vec3(getEyePosition()-glm::dvec3(eye)))) {
         m_environmentDamageTicks += ticks;
         if (m_environmentDamageTicks >= 10) {
             DamageSourceInfo source;
@@ -932,6 +946,43 @@ bool Player::placeBlock() {
         }
     }
 
+    ArchitecturalBlockState selectedArchitecture;
+    if (decodeArchitecturalBlock(placed, selectedArchitecture)) {
+        ArchitecturalBlockState targetedArchitecture;
+        const double localHitY = hit->hitPosition.y -
+            std::floor(hit->hitPosition.y);
+        const bool mergeLowerSlab = hit->faceNormal.y > 0 ||
+            (hit->faceNormal.y == 0 && localHitY > 0.5);
+        const bool mergeUpperSlab = hit->faceNormal.y < 0 ||
+            (hit->faceNormal.y == 0 && localHitY < 0.5);
+        if (selectedArchitecture.shape == RenderShape::Slab &&
+            decodeArchitecturalBlock(targetedBlock, targetedArchitecture) &&
+            targetedArchitecture.shape == RenderShape::Slab &&
+            targetedArchitecture.material == selectedArchitecture.material &&
+            ((targetedArchitecture.half == BlockHalf::Bottom && mergeLowerSlab) ||
+             (targetedArchitecture.half == BlockHalf::Top && mergeUpperSlab))) {
+            const BlockId full = architecturalBaseBlock(
+                selectedArchitecture.material);
+            if (collidesWithPlayer(hit->blockPos, full)) return false;
+            m_world.setBlock(hit->blockPos.x, hit->blockPos.y,
+                             hit->blockPos.z, full);
+            if (m_gameMode == GameMode::Survival && --selectedStack.count == 0)
+                selectedStack.clear();
+            return true;
+        }
+        const BlockHalf half = hit->faceNormal.y < 0 ||
+            (hit->faceNormal.y == 0 && localHitY > 0.5)
+            ? BlockHalf::Top : BlockHalf::Bottom;
+        if (selectedArchitecture.shape == RenderShape::Slab) {
+            placed = slabBlock(selectedArchitecture.material, half);
+        } else {
+            const float yawRadians = glm::radians(m_yaw);
+            const BedDirection direction = bedDirectionFromHorizontal(
+                glm::vec2(std::sin(yawRadians), std::cos(yawRadians)));
+            placed = stairBlock(selectedArchitecture.material, half, direction);
+        }
+    }
+
     if (isBed(placed)) {
         if (hit->faceNormal.y <= 0) return false;
         const float yawRadians = glm::radians(m_yaw);
@@ -980,8 +1031,14 @@ bool Player::collidesWithPlayer(const glm::ivec3& blockPos, BlockId block) const
     float px = m_position.x, py = m_position.y, pz = m_position.z;
     int bx = blockPos.x, by = blockPos.y, bz = blockPos.z;
 
-    return (bx < px + halfW && bx + 1 > px - halfW &&
-            by < py + Config::PLAYER_HEIGHT &&
-            by + blockCollisionHeight(block) > py &&
-            bz < pz + halfW && bz + 1 > pz - halfW);
+    const BlockCollisionBoxes boxes = blockCollisionBoxes(block);
+    for (uint8_t i = 0; i < boxes.count; ++i) {
+        const BlockCollisionBox& box = boxes.boxes[i];
+        if (bx + box.min.x < px + halfW && bx + box.max.x > px - halfW &&
+            by + box.min.y < py + Config::PLAYER_HEIGHT &&
+            by + box.max.y > py &&
+            bz + box.min.z < pz + halfW && bz + box.max.z > pz - halfW)
+            return true;
+    }
+    return false;
 }
