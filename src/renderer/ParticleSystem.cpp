@@ -203,7 +203,9 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         m_sparkleEmission = 0.0f;
         m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
             [](const Particle& particle) {
-                return particle.kind >= ParticleKind::SkyMote;
+                return particle.kind == ParticleKind::SkyMote ||
+                       particle.kind == ParticleKind::HeavenPollen ||
+                       particle.kind == ParticleKind::HeavenSparkle;
             }), m_particles.end());
     }
 
@@ -239,11 +241,18 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             particle.velocity.y += std::cos(
                 particle.age * 2.2f + particle.phase * 3.9f) * dt * 0.015f;
             particle.rotation += particle.angularVelocity * dt;
+        } else if (particle.kind == ParticleKind::CriticalHit ||
+                   particle.kind == ParticleKind::SweepAttack) {
+            particle.phase = std::clamp(
+                particle.age / std::max(particle.lifetime, 0.001f), 0.0f, 1.0f);
+            particle.rotation += particle.angularVelocity * dt;
         }
 
         if (particle.kind == ParticleKind::SkyMote ||
             particle.kind == ParticleKind::HeavenPollen ||
-            particle.kind == ParticleKind::HeavenSparkle) {
+            particle.kind == ParticleKind::HeavenSparkle ||
+            particle.kind == ParticleKind::CriticalHit ||
+            particle.kind == ParticleKind::SweepAttack) {
             particle.position += glm::dvec3(particle.velocity) * static_cast<double>(dt);
             continue;
         }
@@ -332,6 +341,37 @@ void ParticleSystem::emitExplosion(const glm::dvec3& position) {
         particle.size = .14f + randomFloat() * .22f;
         particle.rotation = randomFloat() * 6.2831853f;
         particle.angularVelocity = (randomFloat() - .5f) * 14.0f;
+        m_particles.push_back(particle);
+    }
+}
+
+void ParticleSystem::emitCriticalHit(const glm::dvec3& position) {
+    for (int i = 0; i < 12 && m_particles.size() < MAX_PARTICLES; ++i) {
+        Particle particle;
+        particle.kind = ParticleKind::CriticalHit;
+        particle.position = position + glm::dvec3(
+            (randomFloat() - 0.5f) * 0.8f,
+            0.35f + randomFloat() * 1.2f,
+            (randomFloat() - 0.5f) * 0.8f);
+        particle.velocity = {(randomFloat() - 0.5f) * 1.4f,
+                             0.35f + randomFloat() * 1.0f,
+                             (randomFloat() - 0.5f) * 1.4f};
+        particle.lifetime = 0.28f + randomFloat() * 0.18f;
+        particle.size = 0.16f + randomFloat() * 0.12f;
+        particle.rotation = randomFloat() * 6.2831853f;
+        particle.angularVelocity = (randomFloat() - 0.5f) * 8.0f;
+        m_particles.push_back(particle);
+    }
+}
+
+void ParticleSystem::emitSweepAttack(const glm::dvec3& position) {
+    for (int i = 0; i < 3 && m_particles.size() < MAX_PARTICLES; ++i) {
+        Particle particle;
+        particle.kind = ParticleKind::SweepAttack;
+        particle.position = position + glm::dvec3(0.0, 0.75 + i * 0.18, 0.0);
+        particle.lifetime = 0.22f + i * 0.035f;
+        particle.size = 1.05f + i * 0.18f;
+        particle.rotation = -0.35f + i * 0.35f;
         m_particles.push_back(particle);
     }
 }

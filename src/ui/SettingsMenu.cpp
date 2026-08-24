@@ -113,6 +113,17 @@ void SettingsMenu::refreshButtons() {
             m_onChanged();
             refreshButtons();
         });
+        const char* indicatorNames[] = {
+            "settings.attack_crosshair", "settings.attack_hotbar",
+            "settings.attack_off"};
+        m_buttons.emplace_back(m_localization.format("settings.attack_indicator", {
+            m_localization.text(indicatorNames[
+                static_cast<int>(m_settings.attackIndicator)])}), [this] {
+            m_settings.attackIndicator = static_cast<AttackIndicator>(
+                (static_cast<int>(m_settings.attackIndicator) + 1) % 3);
+            m_onChanged();
+            refreshButtons();
+        });
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
         m_buttons.emplace_back(m_localization.format("settings.clouds", {
             m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),

@@ -147,12 +147,15 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
 }
 
 void HeldItemRenderer::renderFirstPerson(const ItemStack& item, float swing,
-                                         float aspect,
+                                         float attackStrength, float aspect,
                                          const glm::mat4& movementTransform) {
     if(!m_renderer)return;
     FrameData frame;frame.projection=glm::perspective(glm::radians(70.0f),aspect,.05f,8.0f);
     m_renderer->beginViewModel(frame.projection);
-    const glm::mat4 motion = movementTransform * firstPersonSwingTransform(swing);
+    const float lowered = (1.0f - std::clamp(attackStrength, 0.0f, 1.0f)) * 0.28f;
+    const glm::mat4 motion = movementTransform *
+        glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -lowered, 0.0f)) *
+        firstPersonSwingTransform(swing);
     DrawCommand arm;arm.mesh=m_armMesh;arm.material=m_armMaterial;
     arm.viewProjection=frame.projection;arm.useCustomViewProjection=true;
     arm.model=motion*glm::translate(glm::mat4(1),{.58f,-.66f,-.82f})*

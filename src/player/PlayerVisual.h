@@ -22,6 +22,7 @@ struct PlayerVisualState {
     float swingProgress = 1.0f;
     bool sleeping = false;
     float sleepProgress = 0.0f;
+    float attackStrength = 1.0f;
 };
 
 enum class PlayerLocomotion : uint8_t { Idle, Walk, Run, Jump, Fall };

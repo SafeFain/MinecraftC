@@ -222,6 +222,41 @@ private:
                 m_window.gamepads().rumble(std::min(1.0f, .2f + amount * .08f),
                                            140, m_clientSettings.gamepadRumble);
             });
+        m_session.player.setCombatCallback(
+            [this](const CombatFeedback& feedback) {
+                CombatSound sound = CombatSound::Miss;
+                switch (feedback.kind) {
+                    case AttackKind::Weak: sound = CombatSound::Weak; break;
+                    case AttackKind::Strong: sound = CombatSound::Strong; break;
+                    case AttackKind::Critical:
+                        sound = CombatSound::Critical;
+                        m_session.particles.emitCriticalHit(feedback.position);
+                        break;
+                    case AttackKind::Sweep:
+                        sound = CombatSound::Sweep;
+                        m_session.particles.emitSweepAttack(feedback.position);
+                        for (const auto& position : feedback.sweptPositions)
+                            m_session.particles.emitSweepAttack(position);
+                        break;
+                    case AttackKind::Miss: break;
+                }
+                m_audio.playCombat(sound);
+                const float strength = feedback.damage > 0.0f
+                    ? std::min(1.0f, .15f + feedback.damage * .06f) : .08f;
+                m_window.gamepads().rumble(
+                    strength, feedback.damage > 0.0f ? 85 : 40,
+                    m_clientSettings.gamepadRumble);
+            });
+        m_session.player.setDefenseCallback(
+            [this](const DamageOutcome& outcome) {
+                if (!outcome.blocked) return;
+                m_audio.playCombat(outcome.shieldBroken
+                    ? CombatSound::ShieldBreak : CombatSound::ShieldBlock);
+                m_window.gamepads().rumble(
+                    outcome.shieldBroken ? .85f : .45f,
+                    outcome.shieldBroken ? 220 : 120,
+                    m_clientSettings.gamepadRumble);
+            });
         m_sessionFeedback.setRainVolume =
             [this](float volume) { m_audio.setRainVolume(volume); };
         m_sessionFeedback.playExplosion = [this](float pan, float gain) {

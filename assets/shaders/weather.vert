@@ -32,7 +32,7 @@ void main() {
         position += uCameraRight * sin(uTime * 1.7 + phase * 6.283) * 0.13;
     if (kind > 1.5 && kind < 2.5)
         position += uCameraRight * (fract(sin(phase * 91.7) * 43758.5) - 0.5) * 0.7;
-    if (kind > 5.5)
+    if (kind > 5.5 && kind < 8.5)
         position += uCameraUp * sin(uTime * 0.9 + phase * 6.283) * 0.08;
     vec2 corner = vec2(aCorner.x, aCorner.y - 0.5);
     if (kind < 0.5 || kind > 2.5) {

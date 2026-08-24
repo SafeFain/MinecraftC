@@ -65,6 +65,8 @@ void GameUiController::render(
             if (session.player.isSurvival()) renderSurvivalHud(session.player, uiWidth);
             if (showCrosshair)
                 renderCrosshairAndMiningProgress(session.player, uiWidth, uiHeight);
+            renderAttackIndicator(session.player, settings.attackIndicator,
+                                  uiWidth, uiHeight);
             if (itemNameSeconds > 0.0f) renderSelectedItemName(session.player, uiWidth);
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible)))
@@ -202,6 +204,7 @@ GameUiController::GameUiController(
       commandInput({}, 80, &clipboard) {}
 
 void GameUiController::tick(float dt) {
+    hudTime += std::max(0.0f, dt);
     if (chatVisibleSeconds > 0.0f)
         chatVisibleSeconds = std::max(0.0f, chatVisibleSeconds - dt);
     if (itemNameSeconds > 0.0f)
@@ -265,6 +268,10 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
         const float hungerFill = std::clamp(
             static_cast<float>(stats.hunger()) - i * 2.0f, 0.0f, 2.0f) * 0.5f;
         const float hx = leftX + i * (unitW + gap);
+        const float hungerJitter = stats.saturation() <= 0.0f &&
+            std::fmod(hudTime * 20.0f + i * 7.0f,
+                      std::max(1.0f, stats.hunger() * 3.0f + 1.0f)) < 1.0f
+            ? std::sin(hudTime * 91.0f + i * 3.1f) * 1.5f : 0.0f;
         const float fx = rightX + (9 - i) * (unitW + gap);
         auto heart = [&](float x, float fill) {
             if (fill >= 1.0f)
@@ -279,13 +286,13 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
         };
         auto food = [&](float x, float fill) {
             if (fill >= 1.0f)
-                UiTheme::sprite(renderer, x, y, px, UiTheme::HUNGER_FULL,
+                UiTheme::sprite(renderer, x, y + hungerJitter, px, UiTheme::HUNGER_FULL,
                                 UiTheme::HUNGER_PALETTE);
             else if (fill > 0.0f)
-                UiTheme::sprite(renderer, x, y, px, UiTheme::HUNGER_HALF,
+                UiTheme::sprite(renderer, x, y + hungerJitter, px, UiTheme::HUNGER_HALF,
                                 UiTheme::HUNGER_PALETTE);
             else
-                UiTheme::sprite(renderer, x, y, px, UiTheme::HUNGER_EMPTY,
+                UiTheme::sprite(renderer, x, y + hungerJitter, px, UiTheme::HUNGER_EMPTY,
                                 UiTheme::HUNGER_PALETTE);
         };
         heart(hx, healthFill);
@@ -357,6 +364,49 @@ void GameUiController::renderCrosshairAndMiningProgress(const Player& player, in
     const float barY = centerY - 42.0f;
     UiTheme::progressBar(renderer, barX, barY, barWidth, barHeight, progress,
                          UiTheme::GOLD);
+}
+
+void GameUiController::renderAttackIndicator(
+    const Player& player, AttackIndicator mode,
+    int screenWidth, int screenHeight) {
+    if (mode == AttackIndicator::Off) return;
+    const float strength = player.attackStrength();
+    const bool readyTarget = player.hasChargedAttackTarget();
+    if (strength >= 1.0f && !readyTarget) return;
+    const glm::vec4 background(0.04f, 0.04f, 0.05f, 0.86f);
+    const glm::vec4 fill = readyTarget
+        ? glm::vec4(0.95f, 0.95f, 0.95f, 1.0f)
+        : glm::vec4(0.78f, 0.80f, 0.84f, 1.0f);
+    if (mode == AttackIndicator::Crosshair) {
+        constexpr float width = 22.0f;
+        constexpr float height = 5.0f;
+        const float x = screenWidth * 0.5f - width * 0.5f;
+        const float y = screenHeight * 0.5f - 29.0f;
+        renderer.drawRect(x - 1.0f, y - 1.0f, width + 2.0f, height + 2.0f,
+                          UiTheme::INK);
+        renderer.drawRect(x, y, width, height, background);
+        renderer.drawRect(x, y, std::floor(width * strength), height, fill);
+        if (readyTarget) {
+            renderer.drawRect(x + width * 0.5f - 1.0f, y + 8.0f,
+                              2.0f, 7.0f, fill);
+            renderer.drawRect(x + width * 0.5f - 3.5f, y + 10.5f,
+                              7.0f, 2.0f, fill);
+        }
+        return;
+    }
+
+    const float hotbarWidth = InventoryModel::HOTBAR_SIZE * Config::HOTBAR_SLOT_SIZE +
+        (InventoryModel::HOTBAR_SIZE - 1) * Config::HOTBAR_GAP +
+        Config::HOTBAR_PAD_X * 2.0f;
+    constexpr float width = 6.0f;
+    const float height = Config::HOTBAR_SLOT_SIZE;
+    const float x = (screenWidth - hotbarWidth) * 0.5f - 13.0f;
+    const float y = 4.0f + Config::HOTBAR_PAD_Y;
+    renderer.drawRect(x - 1.0f, y - 1.0f, width + 2.0f, height + 2.0f,
+                      UiTheme::INK);
+    renderer.drawRect(x, y, width, height, background);
+    const float filled = std::floor(height * strength);
+    renderer.drawRect(x, y, width, filled, fill);
 }
 
 void GameUiController::updateMouseScreenPosition(Window& window) {

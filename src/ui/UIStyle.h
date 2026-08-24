@@ -636,6 +636,15 @@ inline std::string tooltipDetail(const ItemStack& stack,
     const auto& props = getItemProps(stack.id);
     std::string detail = localization ? localization->itemName(stack.id)
                                       : props.name;
+    auto number = [](float value) {
+        const float rounded = std::round(value);
+        if (std::abs(value - rounded) < 0.001f)
+            return std::to_string(static_cast<int>(rounded));
+        std::string text = std::to_string(value);
+        while (!text.empty() && text.back() == '0') text.pop_back();
+        if (!text.empty() && text.back() == '.') text.pop_back();
+        return text;
+    };
     if (stack.count > 1) detail += " x" + std::to_string(stack.count);
     if (props.maxDurability) {
         detail += "  " +
@@ -645,12 +654,18 @@ inline std::string tooltipDetail(const ItemStack& stack,
     } else if (props.kind == ItemKind::Armor) {
         detail += "  " + (localization ? localization->text("tooltip.armor")
                                        : std::string("Armor"));
-    } else if (props.attackDamage > 0.0f) {
+    }
+    if (props.attackDamage > 0.0f && props.attackSpeed > 0.0f) {
         detail += "  " +
             (localization
                  ? localization->format("tooltip.damage",
-                    {std::to_string(static_cast<int>(props.attackDamage))})
-                 : "Damage " + std::to_string(static_cast<int>(props.attackDamage)));
+                    {number(props.attackDamage)})
+                 : "Damage " + number(props.attackDamage));
+        detail += "  " +
+            (localization
+                 ? localization->format("tooltip.attack_speed",
+                    {number(props.attackSpeed)})
+                 : "Speed " + number(props.attackSpeed));
     } else if (props.food > 0) {
         detail += "  " +
             (localization

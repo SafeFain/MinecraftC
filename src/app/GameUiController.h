@@ -61,10 +61,14 @@ public:
     int guiScale = 1;
     int lastHudSlot = -1;
     float itemNameSeconds = 0.0f;
+    float hudTime = 0.0f;
 
 private:
     void renderSurvivalHud(const Player& player, int screenWidth);
     void renderSelectedItemName(const Player& player, int screenWidth);
     void renderCrosshairAndMiningProgress(const Player& player,
                                           int screenWidth, int screenHeight);
+    void renderAttackIndicator(const Player& player,
+                               AttackIndicator mode,
+                               int screenWidth, int screenHeight);
 };

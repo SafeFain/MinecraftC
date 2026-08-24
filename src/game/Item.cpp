@@ -105,7 +105,22 @@ std::array<ItemProperties, itemCount> buildRegistry() {
             props.maxDurability = tiers[tierIndex].durability;
             props.tool = kinds[offset];
             props.tier = tiers[tierIndex].tier;
-            props.attackDamage = offset == 4 ? 4.0f + static_cast<float>(tierIndex) : 1.0f;
+            static constexpr float damages[5][5] = {
+                {2.0f, 7.0f, 2.5f, 1.0f, 4.0f},
+                {3.0f, 9.0f, 3.5f, 1.0f, 5.0f},
+                {4.0f, 9.0f, 4.5f, 1.0f, 6.0f},
+                {2.0f, 7.0f, 2.5f, 1.0f, 4.0f},
+                {5.0f, 9.0f, 5.5f, 1.0f, 7.0f}
+            };
+            static constexpr float speeds[5][5] = {
+                {1.2f, 0.8f, 1.0f, 1.0f, 1.6f},
+                {1.2f, 0.8f, 1.0f, 2.0f, 1.6f},
+                {1.2f, 0.9f, 1.0f, 3.0f, 1.6f},
+                {1.2f, 1.0f, 1.0f, 1.0f, 1.6f},
+                {1.2f, 1.0f, 1.0f, 4.0f, 1.6f}
+            };
+            props.attackDamage = damages[tierIndex][offset];
+            props.attackSpeed = speeds[tierIndex][offset];
             props.name = std::string(tierNames[tierIndex]) + names[offset];
             set(static_cast<ItemId>(base + offset), props);
         }

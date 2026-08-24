@@ -72,7 +72,8 @@ GameMode GameSession::startWorld(
     player.inventory() = worldMetadata.inventory;
     player.survivalStats().set(
         worldMetadata.health, worldMetadata.hunger,
-        worldMetadata.saturation, worldMetadata.exhaustion);
+        worldMetadata.saturation, worldMetadata.exhaustion,
+        worldMetadata.foodTickTimer);
     if (dimension == DimensionId::Heaven) {
         dimensionSaveStore = std::make_unique<SaveStore>(
             saveStore->worldDirectory() / "dimensions" / "heaven");
@@ -748,6 +749,7 @@ void GameSession::updateSaveMetadata() {
     worldMetadata.hunger = player.survivalStats().hunger();
     worldMetadata.saturation = player.survivalStats().saturation();
     worldMetadata.exhaustion = player.survivalStats().exhaustion();
+    worldMetadata.foodTickTimer = player.survivalStats().foodTickTimer();
     if (dimension == DimensionId::Overworld)
         worldMetadata.weather = weather.saveState();
     worldMetadata.entities.clear();

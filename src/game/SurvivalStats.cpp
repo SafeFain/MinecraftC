@@ -3,30 +3,28 @@
 #include <algorithm>
 
 void SurvivalStats::set(float health, uint8_t hunger, float saturation,
-                        float exhaustion) {
+                        float exhaustion, uint32_t foodTickTimer) {
     m_health = std::clamp(health, 0.0f, MAX_HEALTH);
     m_hunger = std::min(hunger, MAX_HUNGER);
     m_saturation = std::clamp(saturation, 0.0f, static_cast<float>(m_hunger));
-    m_exhaustion = std::clamp(exhaustion, 0.0f, 4.0f);
+    m_exhaustion = std::clamp(exhaustion, 0.0f, 40.0f);
+    m_foodTickTimer = foodTickTimer;
 }
 
 void SurvivalStats::resetAfterRespawn() {
     set(MAX_HEALTH, MAX_HUNGER, 5.0f, 0.0f);
-    m_regenerationTicks = 0;
-    m_starvationTicks = 0;
 }
 
 void SurvivalStats::addExhaustion(float amount) {
-    m_exhaustion += std::max(amount, 0.0f);
-    consumeExhaustion();
+    m_exhaustion = std::min(40.0f, m_exhaustion + std::max(amount, 0.0f));
 }
 
-void SurvivalStats::consumeExhaustion() {
-    while (m_exhaustion >= 4.0f) {
+void SurvivalStats::consumeExhaustion(Difficulty difficulty) {
+    if (m_exhaustion > 4.0f) {
         m_exhaustion -= 4.0f;
         if (m_saturation > 0.0f) {
             m_saturation = std::max(0.0f, m_saturation - 1.0f);
-        } else if (m_hunger > 0) {
+        } else if (difficulty != Difficulty::Peaceful && m_hunger > 0) {
             --m_hunger;
         }
     }
@@ -54,35 +52,37 @@ void SurvivalStats::heal(float amount) {
 void SurvivalStats::tick(Difficulty difficulty, uint32_t ticks) {
     for (uint32_t i = 0; i < ticks; ++i) {
         if (dead()) return;
+        consumeExhaustion(difficulty);
         if (difficulty == Difficulty::Peaceful) {
-            ++m_regenerationTicks;
-            if (m_hunger < MAX_HUNGER && m_regenerationTicks % 10 == 0) ++m_hunger;
-            if (m_health < MAX_HEALTH && m_regenerationTicks % 20 == 0) heal(1.0f);
+            ++m_foodTickTimer;
+            if (m_hunger < MAX_HUNGER && m_foodTickTimer % 10 == 0) ++m_hunger;
+            if (m_health < MAX_HEALTH && m_foodTickTimer % 20 == 0) heal(1.0f);
             continue;
         }
 
-        if (m_health < MAX_HEALTH && m_hunger >= 18) {
-            ++m_regenerationTicks;
-            const uint32_t interval = m_hunger == MAX_HUNGER && m_saturation > 0.0f
-                ? 10u : 80u;
-            if (m_regenerationTicks >= interval) {
+        if (m_health < MAX_HEALTH && m_hunger == MAX_HUNGER &&
+            m_saturation > 0.0f) {
+            if (++m_foodTickTimer >= 10) {
+                const float used = std::min(m_saturation, 6.0f);
+                heal(used / 6.0f);
+                addExhaustion(used);
+                m_foodTickTimer = 0;
+            }
+        } else if (m_health < MAX_HEALTH && m_hunger >= 18) {
+            if (++m_foodTickTimer >= 80) {
                 heal(1.0f);
                 addExhaustion(6.0f);
-                m_regenerationTicks = 0;
+                m_foodTickTimer = 0;
             }
-        } else {
-            m_regenerationTicks = 0;
-        }
-
-        if (m_hunger == 0) {
-            if (++m_starvationTicks >= 80) {
+        } else if (m_hunger == 0) {
+            if (++m_foodTickTimer >= 80) {
                 const float floor = difficulty == Difficulty::Easy ? 10.0f
                                   : difficulty == Difficulty::Normal ? 1.0f : 0.0f;
                 if (m_health > floor) damage(std::min(1.0f, m_health - floor));
-                m_starvationTicks = 0;
+                m_foodTickTimer = 0;
             }
         } else {
-            m_starvationTicks = 0;
+            m_foodTickTimer = 0;
         }
     }
 }

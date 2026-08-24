@@ -79,7 +79,7 @@ void main(){
         float pulse=0.82+0.18*sin(frame.cameraUpIntensity.w*3.0+phase*6.283);
         color=vec4(heavenPalette(textureIndex),
             blob*pulse*0.55*frame.cameraUpIntensity.w);
-    }else{
+    }else if(kind<8.5){
         // Heaven sparkle: a narrow four-point star with a sharp twinkle.
         vec2 centered=uv-vec2(0.5);
         float diamond=abs(centered.x)+abs(centered.y);
@@ -89,6 +89,22 @@ void main(){
         float twinkle=0.5+0.5*sin(frame.cameraUpIntensity.w*6.0+phase*6.283);
         color=vec4(heavenPalette(textureIndex)*1.2,
             star*twinkle*0.85*frame.cameraUpIntensity.w);
+    }else if(kind<9.5){
+        // Critical hit: a warm four-point impact spark that fades quickly.
+        vec2 centered=uv-vec2(0.5);
+        float cross=min(abs(centered.x),abs(centered.y));
+        float extent=max(abs(centered.x),abs(centered.y));
+        float star=(1.0-smoothstep(0.055,0.13,cross))*
+            (1.0-smoothstep(0.28,0.49,extent));
+        color=vec4(1.0,0.72,0.16,star*(1.0-phase));
+    }else{
+        // Sweep attack: a broad crescent arc around the primary target.
+        vec2 centered=(uv-vec2(0.5))*vec2(2.0,1.35);
+        float radius=length(centered);
+        float arc=smoothstep(0.52,0.64,radius)*
+            (1.0-smoothstep(0.76,0.90,radius));
+        arc*=smoothstep(-0.50,0.12,centered.y);
+        color=vec4(0.92,0.94,1.0,arc*(1.0-phase));
     }
     if(color.a<0.01)discard;
     if(frame.atlasParams.y>0.5)

@@ -69,6 +69,7 @@ int main() {
         source.hunger = 11;
         source.saturation = 2.5f;
         source.exhaustion = 3.25f;
+        source.foodTickTimer = 73;
         source.inventory.slot(0) = {ItemId::IRON_PICKAXE, 1, 42};
         source.inventory.slot(9) = {ItemId::COAL, 37, 0};
         source.inventory.slot(10) = {ItemId::LIMESTONE, 23, 0};
@@ -116,6 +117,8 @@ int main() {
                 "durable inventory item round trips");
         require(loaded.inventory.offhand().id == ItemId::SHIELD,
                 "offhand round trips");
+        require(loaded.foodTickTimer == source.foodTickTimer,
+                "food tick timer round trips in v11");
         require(loaded.inventory.slot(10).id == ItemId::LIMESTONE &&
                 loaded.inventory.slot(10).count == 23,
                 "appended natural material item round trips");
@@ -175,6 +178,28 @@ int main() {
                 "existing little-endian v7 metadata remains readable");
         require(SaveStore(legacyDirectory).loadMetadata().worldType == WorldType::Normal,
                 "legacy metadata defaults to normal terrain");
+
+        const auto v10Directory = root / "legacy-v10";
+        std::filesystem::create_directories(v10Directory);
+        const auto v10Path = v10Directory / "level.bin";
+        std::filesystem::copy_file(metadataPath, v10Path);
+        {
+            std::vector<uint8_t> bytes = readBytes(v10Path);
+            require(bytes.size() > 28, "v10 fixture has a food timer tail");
+            bytes.resize(bytes.size() - sizeof(uint32_t));
+            writeLittleEndian(bytes, 8, 10, 4);
+            writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
+            writeLittleEndian(bytes, 16, payloadChecksum(bytes, 24), 8);
+            std::ofstream output(v10Path, std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(bytes.data()),
+                         static_cast<std::streamsize>(bytes.size()));
+        }
+        const auto migratedV10 = SaveStore(v10Directory).loadMetadata();
+        require(migratedV10.foodTickTimer == 0,
+                "v10 metadata defaults the Java food timer to zero");
+        require(migratedV10.activeDimension == source.activeDimension &&
+                migratedV10.heaven.worldTicks == source.heaven.worldTicks,
+                "v10 dimension state remains readable after migration");
 
         const std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},

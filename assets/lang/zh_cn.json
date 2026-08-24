@@ -119,6 +119,10 @@
   "touch.close": "关闭",
   "settings.render_distance": "渲染距离：{0}",
   "settings.frame_rate": "最大帧率：{0} FPS",
+  "settings.attack_indicator": "攻击指示器：{0}",
+  "settings.attack_crosshair": "准星",
+  "settings.attack_hotbar": "快捷栏",
+  "settings.attack_off": "关闭",
   "settings.clouds": "云：{0}",
   "settings.cloud_distance": "云渲染距离：{0} 格",
   "settings.smooth_lighting": "平滑光照：{0}",
@@ -164,6 +168,7 @@
   "container.furnace": "熔炉",
   "tooltip.armor": "护甲",
   "tooltip.damage": "攻击伤害 {0}",
+  "tooltip.attack_speed": "攻击速度 {0}",
   "tooltip.food": "饥饿值 +{0}",
 
   "loading.title": "正在加载世界",

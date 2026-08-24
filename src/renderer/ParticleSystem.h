@@ -12,7 +12,7 @@ class World;
 
 enum class ParticleKind : uint8_t {
     Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
-    HeavenPollen, HeavenSparkle
+    HeavenPollen, HeavenSparkle, CriticalHit, SweepAttack
 };
 
 struct ParticleRenderData {
@@ -38,6 +38,8 @@ public:
                 float daylight = 1.0f);
     void emitBlockBreak(const glm::ivec3& position, BlockId block);
     void emitExplosion(const glm::dvec3& position);
+    void emitCriticalHit(const glm::dvec3& position);
+    void emitSweepAttack(const glm::dvec3& position);
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(
         const glm::dvec3& renderOrigin) const;

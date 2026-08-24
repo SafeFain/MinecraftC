@@ -42,6 +42,7 @@ struct AudioSystem::Impl {
     std::atomic<float> explosionPan{0.0f};
     std::atomic<float> explosionVolume{0.0f};
     std::atomic<unsigned> explosionTriggers{0};
+    std::atomic<int> combatTrigger{-1};
     float rainVolume = 0.0f;
     float rainLowLeft = 0.0f;
     float rainLowRight = 0.0f;
@@ -59,6 +60,11 @@ struct AudioSystem::Impl {
     float thunderPhase = 0.0f;
     float explosionEnvelope = 0.0f;
     float explosionFilter = 0.0f;
+    float combatEnvelope = 0.0f;
+    float combatPhase = 0.0f;
+    float combatFrequency = 220.0f;
+    float combatDecay = 0.996f;
+    float combatNoiseMix = 0.0f;
     uint32_t noiseState = 0x91e10da5u;
 
     float noise() {
@@ -118,6 +124,23 @@ struct AudioSystem::Impl {
             thunderEnvelope = thunderVolume.load();
         if (explosionTriggers.exchange(0) > 0)
             explosionEnvelope = explosionVolume.load();
+        const int requestedCombat = combatTrigger.exchange(-1);
+        if (requestedCombat >= 0) {
+            static constexpr float frequencies[] = {
+                145.0f, 205.0f, 135.0f, 520.0f, 310.0f, 760.0f, 95.0f};
+            static constexpr float envelopes[] = {
+                .16f, .20f, .27f, .30f, .25f, .30f, .38f};
+            static constexpr float decays[] = {
+                .9960f, .9964f, .9970f, .9974f, .9968f, .9972f, .9980f};
+            static constexpr float noiseMixes[] = {
+                .72f, .35f, .58f, .12f, .42f, .18f, .76f};
+            const size_t index = static_cast<size_t>(std::clamp(requestedCombat, 0, 6));
+            combatFrequency = frequencies[index];
+            combatEnvelope = envelopes[index];
+            combatDecay = decays[index];
+            combatNoiseMix = noiseMixes[index];
+            combatPhase = 0.0f;
+        }
         const float pan = std::clamp(thunderPan.load(), -1.0f, 1.0f);
         const float leftPan = std::sqrt(0.5f * (1.0f - pan));
         const float rightPan = std::sqrt(0.5f * (1.0f + pan));
@@ -190,12 +213,21 @@ struct AudioSystem::Impl {
                                     explosionEnvelope;
             explosionEnvelope *= .9989f;
             if (explosionEnvelope < .0001f) explosionEnvelope = 0.0f;
+            combatPhase += 6.283185307f * combatFrequency /
+                           static_cast<float>(SAMPLE_RATE);
+            if (combatPhase > 6.283185307f) combatPhase -= 6.283185307f;
+            combatFrequency *= 0.99994f;
+            const float combat = (std::sin(combatPhase) * (1.0f - combatNoiseMix) +
+                                  noise() * combatNoiseMix) * combatEnvelope;
+            combatEnvelope *= combatDecay;
+            if (combatEnvelope < .0001f) combatEnvelope = 0.0f;
             samples[frame * 2] = std::clamp(
-                left + rainLeft + thunder * leftPan + explosion * explosionLeft,
+                left + rainLeft + thunder * leftPan + explosion * explosionLeft +
+                    combat * .707f,
                 -1.0f, 1.0f);
             samples[frame * 2 + 1] =
                 std::clamp(right + rainRight + thunder * rightPan +
-                               explosion * explosionRight,
+                               explosion * explosionRight + combat * .707f,
                            -1.0f, 1.0f);
         }
     }
@@ -317,6 +349,11 @@ void AudioSystem::playExplosion(float pan, float volume) {
     m_impl->explosionPan = std::clamp(pan, -1.0f, 1.0f);
     m_impl->explosionVolume = std::clamp(volume, 0.0f, 1.0f);
     ++m_impl->explosionTriggers;
+}
+
+void AudioSystem::playCombat(CombatSound sound) {
+    if (!m_impl->initialized) return;
+    m_impl->combatTrigger = static_cast<int>(sound);
 }
 
 bool AudioSystem::available() const { return m_impl->initialized; }

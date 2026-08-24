@@ -14,6 +14,7 @@
 #include "player/PlayerPhysics.h"
 #include "player/PlayerVisual.h"
 #include "entity/ProjectileLogic.h"
+#include "game/CombatRules.h"
 
 class World;
 class EntityManager;
@@ -73,20 +74,30 @@ public:
     void setDamageCallback(std::function<void(float)> callback) {
         m_damageCallback = std::move(callback);
     }
+    void setCombatCallback(std::function<void(const CombatFeedback&)> callback) {
+        m_combatCallback = std::move(callback);
+    }
+    void setDefenseCallback(std::function<void(const DamageOutcome&)> callback) {
+        m_defenseCallback = std::move(callback);
+    }
     GameMode gameMode() const { return m_gameMode; }
     Difficulty difficulty() const { return m_difficulty; }
     InventoryModel& inventory() { return m_inventory; }
     const InventoryModel& inventory() const { return m_inventory; }
     SurvivalStats& survivalStats() { return m_survivalStats; }
     const SurvivalStats& survivalStats() const { return m_survivalStats; }
-    void takeDamage(float amount, bool bypassArmor = false);
+    DamageOutcome takeDamage(float amount, bool bypassArmor = false);
+    DamageOutcome takeDamage(const DamageSourceInfo& source);
     void ignite(float seconds) { m_burningSeconds = std::max(m_burningSeconds, seconds); }
     void extinguish() { m_burningSeconds = 0.0f; m_burnDamageTicks = 0; }
     void setRainExposure(bool exposed) { m_rainExposed = exposed; }
     void resetDamageImmunity() { m_hurtImmunity = {}; }
     void setSelectedSlot(int slot) {
         if (slot < 0 || slot >= 9) return;
-        if (slot != m_selectedSlot) cancelBowCharge();
+        if (slot != m_selectedSlot) {
+            cancelBowCharge();
+            m_attackTicks = 0.0f;
+        }
         m_selectedSlot = slot;
     }
     int selectedSlot() const { return m_selectedSlot; }
@@ -101,6 +112,8 @@ public:
         return m_bowCharging ? bowChargeStrength(m_bowChargeSeconds) : 0.0f;
     }
     std::optional<ProjectileLaunch> bowLaunchPreview() const;
+    float attackStrength() const;
+    bool hasChargedAttackTarget() const;
     void cancelBowCharge() { m_bowCharging = false; m_bowChargeSeconds = 0.0f; }
     void setSleepingVisual(bool sleeping, float progress = 1.0f) {
         m_sleeping = sleeping;
@@ -131,6 +144,8 @@ private:
     World& m_world;
     std::function<void(const glm::ivec3&, BlockId)> m_blockBreakCallback;
     std::function<void(float)> m_damageCallback;
+    std::function<void(const CombatFeedback&)> m_combatCallback;
+    std::function<void(const DamageOutcome&)> m_defenseCallback;
 
     // Position & velocity
     glm::dvec3 m_position{0.0, 50.0, 0.0};
@@ -178,6 +193,8 @@ private:
     uint32_t m_burnDamageTicks = 0;
     bool m_rainExposed = false;
     bool m_blocking = false;
+    float m_shieldUseTicks = 0.0f;
+    float m_attackTicks = 100.0f;
     uint32_t m_swingSequence = 0;
     float m_swingProgress = 1.0f;
     float m_miningSwingSeconds = 0.0f;

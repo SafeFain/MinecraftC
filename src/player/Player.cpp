@@ -28,6 +28,7 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
     m_gameMode = mode;
     m_difficulty = difficulty;
     m_blocking = false;
+    m_shieldUseTicks = 0.0f;
     m_mining = false;
     m_miningTarget.reset();
     m_miningProgress = 0.0f;
@@ -42,33 +43,70 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
     }
 }
 
-void Player::takeDamage(float amount, bool bypassArmor) {
-    if (m_gameMode != GameMode::Survival || amount <= 0.0f) return;
-    amount = PlayerPhysics::damageAfterImmunity(
-        m_hurtImmunity, amount, Config::PLAYER_HURT_IMMUNITY_SECONDS);
-    if (amount <= 0.0f) return;
-    if (!bypassArmor && m_blocking && m_inventory.offhand().id == ItemId::SHIELD) {
-        amount *= 0.33f;
+DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
+    DamageSourceInfo source;
+    source.amount = amount;
+    source.armorApplies = !bypassArmor;
+    source.causesExhaustion = !bypassArmor;
+    return takeDamage(source);
+}
+
+DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
+    DamageOutcome outcome;
+    outcome.rawDamage = source.amount;
+    if (m_gameMode != GameMode::Survival || source.amount <= 0.0f)
+        return outcome;
+
+    if (source.shieldBlockable && source.hasOrigin && m_blocking &&
+        m_shieldUseTicks >= 5.0f &&
+        m_inventory.offhand().id == ItemId::SHIELD &&
+        CombatRules::sourceInFront(m_position, m_forward, source.origin)) {
+        outcome.blocked = true;
         auto& shield = m_inventory.offhand();
-        if (++shield.damage >= getItemProps(shield.id).maxDurability) shield.clear();
-    }
-    if (!bypassArmor) {
-        int points = 0;
-        for (size_t slot = 0; slot < InventoryModel::ARMOR_SIZE; ++slot) {
-            auto& armor = m_inventory.armor()[slot];
-            if (armor.empty()) continue;
-            const uint16_t relative = static_cast<uint16_t>(armor.id) -
-                                      static_cast<uint16_t>(ItemId::LEATHER_HELMET);
-            if (relative < 16 && relative % 4 == slot) {
-                points += armorPointsForItem(armor.id);
-                if (++armor.damage >= getItemProps(armor.id).maxDurability)
-                    armor.clear();
-            }
+        const uint16_t wear = CombatRules::shieldDurabilityDamage(source.amount);
+        if (wear > 0 && shield.damage + wear >= getItemProps(shield.id).maxDurability) {
+            shield.clear();
+            m_blocking = false;
+            m_shieldUseTicks = 0.0f;
+            outcome.shieldBroken = true;
+        } else {
+            shield.damage = static_cast<uint16_t>(shield.damage + wear);
         }
-        amount *= 1.0f - std::min(points, 20) * 0.04f;
+        if (m_defenseCallback) m_defenseCallback(outcome);
+        return outcome;
     }
-    m_survivalStats.damage(amount);
-    if (m_damageCallback) m_damageCallback(amount);
+
+    float reduced = source.amount;
+    if (source.armorApplies) {
+        const float armor = static_cast<float>(totalArmorPoints(m_inventory));
+        float toughness = 0.0f;
+        for (const auto& stack : m_inventory.armor()) {
+            if (!stack.empty() && stack.id >= ItemId::DIAMOND_HELMET &&
+                stack.id <= ItemId::DIAMOND_BOOTS)
+                toughness += 2.0f;
+        }
+        reduced = CombatRules::armorDamage(reduced, armor, toughness);
+    }
+    const float accepted = PlayerPhysics::damageAfterImmunity(
+        m_hurtImmunity, reduced, Config::PLAYER_HURT_IMMUNITY_SECONDS);
+    if (accepted <= 0.0f) return outcome;
+
+    if (source.armorApplies) {
+        const uint16_t wear = CombatRules::armorDurabilityDamage(source.amount);
+        for (auto& armor : m_inventory.armor()) {
+            if (armor.empty()) continue;
+            const uint16_t maximum = getItemProps(armor.id).maxDurability;
+            if (maximum == 0) continue;
+            if (armor.damage + wear >= maximum) armor.clear();
+            else armor.damage = static_cast<uint16_t>(armor.damage + wear);
+        }
+    }
+    outcome.appliedDamage = accepted;
+    m_survivalStats.damage(accepted);
+    if (source.causesExhaustion) m_survivalStats.addExhaustion(0.1f);
+    m_velocity += source.impulse;
+    if (m_damageCallback) m_damageCallback(accepted);
+    return outcome;
 }
 
 // ── Input ─────────────────────────────────────────────────────────────
@@ -151,10 +189,14 @@ void Player::handleMovement(const InputState& input, float dt) {
         if (hLen > 0.0f) {
             if (hLen > 1.0f) { horizontal /= hLen; hLen = 1.0f; }
             horizontal *= speed * dt;
+            const glm::dvec2 before(m_position.x, m_position.z);
             moveAndCollide(horizontal);
             if (m_gameMode == GameMode::Survival) {
-                m_survivalStats.addExhaustion(
-                    hLen * speed * dt * (m_isSprinting ? 0.1f : 0.01f));
+                const float moved = static_cast<float>(glm::distance(
+                    before, glm::dvec2(m_position.x, m_position.z)));
+                const float rate = inWater ? 0.01f :
+                    (m_isSprinting ? 0.1f : 0.0f);
+                m_survivalStats.addExhaustion(moved * rate);
             }
         }
 
@@ -187,33 +229,90 @@ void Player::handleMouseButton(int button, ButtonAction action) {
     if (button == MouseButton::Right && m_gameMode == GameMode::Survival &&
         m_inventory.offhand().id == ItemId::SHIELD) {
         m_blocking = action != ButtonAction::Release;
+        if (!m_blocking) m_shieldUseTicks = 0.0f;
         if (m_blocking) return;
     }
 
     if (button == MouseButton::Left) {
-        m_mining = action != ButtonAction::Release;
-        if (!m_mining) {
+        if (action == ButtonAction::Release) {
+            m_mining = false;
             m_miningTarget.reset();
             m_miningProgress = 0.0f;
             m_miningRequired = 0.0f;
-        } else {
-            startSwing();
-            m_miningSwingSeconds = 0.0f;
+            return;
         }
-        if (m_mining && m_actionCooldown <= 0.0f) {
-            float damage = 1.0f;
-            const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-            if (!stack.empty()) damage = std::max(1.0f, getItemProps(stack.id).attackDamage);
-            if (m_entities && m_entities->attackRay(
-                    getEyePosition(), m_forward,
-                    m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
-                    damage)) {
-                m_mining = false;
-                m_actionCooldown = 0.6f;
-            } else if (m_gameMode == GameMode::Creative) {
-                breakBlock();
-                m_actionCooldown = 0.15f;
+        if (action != ButtonAction::Press) return;
+
+        startSwing();
+        m_miningSwingSeconds = 0.0f;
+        const auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+        const auto& properties = getItemProps(stack.id);
+        const float speed = properties.attackSpeed > 0.0f
+            ? properties.attackSpeed : CombatRules::DEFAULT_ATTACK_SPEED;
+        const float baseDamage = properties.attackDamage > 0.0f
+            ? properties.attackDamage : CombatRules::DEFAULT_ATTACK_DAMAGE;
+        const float strength = CombatRules::attackStrength(m_attackTicks, speed);
+        const bool strong = CombatRules::strongAttack(strength);
+        const bool critical = CombatRules::criticalAttack(
+            strong, m_fallDistance > 0.0f && m_velocity.y < 0.0f,
+            m_onGround, isInWater(), m_isSprinting);
+        const bool sweeping = CombatRules::sweepingAttack(
+            properties.tool == ToolKind::Sword, strong, m_onGround,
+            m_isSprinting, critical);
+        float damage = CombatRules::scaledAttackDamage(baseDamage, strength);
+        if (critical) damage *= 1.5f;
+        MeleeAttackResult result;
+        if (m_entities) {
+            result = m_entities->attackRay(
+                getEyePosition(), m_forward,
+                {m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
+                 damage, critical, sweeping, strong && m_isSprinting});
+        }
+        if (result.foundTarget) {
+            m_attackTicks = 0.0f;
+            m_mining = false;
+            if (result.primaryDamaged && m_gameMode == GameMode::Survival) {
+                m_survivalStats.addExhaustion(0.1f);
+                const bool combatTool = properties.tool == ToolKind::Sword ||
+                    properties.tool == ToolKind::Axe ||
+                    properties.tool == ToolKind::Pickaxe ||
+                    properties.tool == ToolKind::Shovel ||
+                    properties.tool == ToolKind::Hoe;
+                if (combatTool && properties.maxDurability > 0) {
+                    auto& mutableStack = m_inventory.slot(
+                        static_cast<size_t>(m_selectedSlot));
+                    const uint16_t wear = properties.tool == ToolKind::Sword ? 1 : 2;
+                    if (mutableStack.damage + wear >= properties.maxDurability)
+                        mutableStack.clear();
+                    else mutableStack.damage = static_cast<uint16_t>(
+                        mutableStack.damage + wear);
+                }
             }
+            if (m_combatCallback) {
+                AttackKind kind = result.primaryDamaged
+                    ? (critical ? AttackKind::Critical
+                       : sweeping ? AttackKind::Sweep
+                       : strong ? AttackKind::Strong : AttackKind::Weak)
+                    : AttackKind::Miss;
+                m_combatCallback({kind, result.primaryDamage,
+                                  result.primaryPosition,
+                                  result.sweptPositions});
+            }
+            return;
+        }
+
+        const auto blockHit = m_world.raycast(
+            getEyePosition(), m_forward, Config::REACH_DISTANCE);
+        if (!blockHit) {
+            m_attackTicks = 0.0f;
+            m_mining = false;
+            if (m_combatCallback)
+                m_combatCallback({AttackKind::Miss, 0.0f, {}, {}});
+        } else if (m_gameMode == GameMode::Creative) {
+            breakBlock();
+            m_actionCooldown = 0.15f;
+        } else {
+            m_mining = true;
         }
     } else if (button == MouseButton::Right && action == ButtonAction::Press &&
                m_actionCooldown <= 0.0f) {
@@ -233,6 +332,7 @@ void Player::updateSleeping(float dt) {
     m_visualHorizontalVelocity = glm::vec2(0.0f);
     m_landingSpeed = 0.0f;
     PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
+    m_attackTicks += dt * 20.0f;
     if (m_gameMode != GameMode::Survival) return;
     m_survivalTickRemainder += dt * 20.0f;
     const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
@@ -257,6 +357,8 @@ void Player::update(float dt) {
     m_previousVisualPosition = m_position;
     m_landingSpeed = 0.0f;
     PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
+    m_attackTicks += dt * 20.0f;
+    if (m_blocking) m_shieldUseTicks += dt * 20.0f;
     if (m_actionCooldown > 0.0f) {
         m_actionCooldown -= dt;
     }
@@ -338,7 +440,23 @@ void Player::releaseBow() {
 PlayerVisualState Player::visualState() const {
     return {{m_visualHorizontalVelocity.x, m_velocity.y,
              m_visualHorizontalVelocity.y}, m_onGround, m_isSprinting,
-            m_swingSequence, m_swingProgress, m_sleeping, m_sleepProgress};
+            m_swingSequence, m_swingProgress, m_sleeping, m_sleepProgress,
+            attackStrength()};
+}
+
+float Player::attackStrength() const {
+    const ItemStack& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+    const float speed = getItemProps(stack.id).attackSpeed > 0.0f
+        ? getItemProps(stack.id).attackSpeed
+        : CombatRules::DEFAULT_ATTACK_SPEED;
+    return CombatRules::attackStrength(m_attackTicks, speed);
+}
+
+bool Player::hasChargedAttackTarget() const {
+    if (!m_entities || attackStrength() < 1.0f) return false;
+    return m_entities->hasAttackTarget(
+        getEyePosition(), m_forward,
+        m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE);
 }
 
 void Player::startSwing() {
@@ -408,6 +526,8 @@ void Player::moveAndCollide(const glm::vec3& delta) {
             currentHeadroomClear, targetHeadroomClear)) {
         m_velocity.y = Config::JUMP_SPEED;
         m_onGround = false;
+        if (m_gameMode == GameMode::Survival)
+            m_survivalStats.addExhaustion(m_isSprinting ? 0.2f : 0.05f);
     }
 }
 
@@ -531,8 +651,14 @@ void Player::applyPhysics(float dt) {
             m_landingSpeed = std::max(m_landingSpeed, -m_velocity.y);
             m_position.y = findGround() + 0.001f;
             m_onGround = true;
-            if (m_gameMode == GameMode::Survival && m_fallDistance > 3.0f)
-                takeDamage(std::floor(m_fallDistance - 3.0f));
+            if (m_gameMode == GameMode::Survival && m_fallDistance > 3.0f) {
+                DamageSourceInfo source;
+                source.amount = std::floor(m_fallDistance - 3.0f);
+                source.cause = DamageCause::Fall;
+                source.armorApplies = false;
+                source.causesExhaustion = false;
+                takeDamage(source);
+            }
             m_fallDistance = 0.0f;
         }
         break;
@@ -572,7 +698,10 @@ void Player::updateEnvironment(uint32_t ticks) {
         m_burningSeconds = std::max(0.0f, m_burningSeconds - ticks / 20.0f);
         m_burnDamageTicks += ticks;
         while (m_burnDamageTicks >= 20) {
-            takeDamage(4.0f);
+            DamageSourceInfo source;
+            source.amount = 4.0f;
+            source.cause = DamageCause::Fire;
+            takeDamage(source);
             m_burnDamageTicks -= 20;
         }
     }
@@ -581,7 +710,12 @@ void Player::updateEnvironment(uint32_t ticks) {
         if (m_airTicks <= 0) {
             m_environmentDamageTicks += ticks;
             if (m_environmentDamageTicks >= 20) {
-                takeDamage(2.0f, true);
+                DamageSourceInfo source;
+                source.amount = 2.0f;
+                source.cause = DamageCause::Drowning;
+                source.armorApplies = false;
+                source.causesExhaustion = false;
+                takeDamage(source);
                 m_environmentDamageTicks = 0;
             }
         }
@@ -591,14 +725,22 @@ void Player::updateEnvironment(uint32_t ticks) {
     if (isLava(feetBlock) || isLava(eyeBlock)) {
         m_environmentDamageTicks += ticks;
         if (m_environmentDamageTicks >= 10) {
-            takeDamage(4.0f);
+            DamageSourceInfo source;
+            source.amount = 4.0f;
+            source.cause = DamageCause::Fire;
+            takeDamage(source);
             m_environmentDamageTicks = 0;
         }
     } else if (pointInsideBlockCollision(
                    eyeBlock, static_cast<float>(getEyePosition().y - eye.y))) {
         m_environmentDamageTicks += ticks;
         if (m_environmentDamageTicks >= 10) {
-            takeDamage(1.0f, true);
+            DamageSourceInfo source;
+            source.amount = 1.0f;
+            source.cause = DamageCause::Generic;
+            source.armorApplies = false;
+            source.causesExhaustion = false;
+            takeDamage(source);
             m_environmentDamageTicks = 0;
         }
     }

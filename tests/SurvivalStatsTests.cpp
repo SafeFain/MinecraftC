@@ -15,10 +15,12 @@ void require(bool condition, const char* message) {
 int main() {
     SurvivalStats stats;
     stats.set(20.0f, 20, 1.0f, 0.0f);
-    stats.addExhaustion(4.0f);
+    stats.addExhaustion(4.01f);
+    stats.tick(Difficulty::Normal, 1);
     require(stats.hunger() == 20 && stats.saturation() == 0.0f,
             "exhaustion consumes saturation first");
     stats.addExhaustion(4.0f);
+    stats.tick(Difficulty::Normal, 1);
     require(stats.hunger() == 19, "exhaustion consumes hunger after saturation");
 
     stats.set(10.0f, 10, 0.0f, 0.0f);
@@ -29,7 +31,9 @@ int main() {
 
     stats.set(5.0f, 20, 5.0f, 0.0f);
     stats.tick(Difficulty::Normal, 10);
-    require(stats.health() == 6.0f, "saturated natural regeneration is fast");
+    require(stats.health() > 5.83f && stats.health() < 5.84f,
+            "saturated natural regeneration is fractional and fast");
+    require(stats.foodTickTimer() == 0, "fast regeneration resets food timer");
 
     stats.set(20.0f, 0, 0.0f, 0.0f);
     stats.tick(Difficulty::Easy, 2000);
@@ -51,6 +55,21 @@ int main() {
     stats.tick(Difficulty::Peaceful, 11);
     require(stats.hunger() == 12 && stats.health() == 11.0f,
             "peaceful recovery advances on persistent counters");
+
+    SurvivalStats fps30;
+    SurvivalStats fps60;
+    SurvivalStats fps120;
+    fps30.set(8.0f, 20, 12.0f, 0.0f);
+    fps60.set(8.0f, 20, 12.0f, 0.0f);
+    fps120.set(8.0f, 20, 12.0f, 0.0f);
+    for (int frame = 0; frame < 30; ++frame) fps30.tick(Difficulty::Normal, 4);
+    for (int frame = 0; frame < 60; ++frame) fps60.tick(Difficulty::Normal, 2);
+    for (int frame = 0; frame < 120; ++frame) fps120.tick(Difficulty::Normal, 1);
+    require(fps30.health() == fps60.health() &&
+            fps60.health() == fps120.health() &&
+            fps30.hunger() == fps120.hunger() &&
+            fps30.saturation() == fps120.saturation(),
+            "survival outcomes depend on game ticks rather than frame rate");
     std::cout << "Survival stats tests passed\n";
     return 0;
 }

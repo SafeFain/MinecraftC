@@ -871,6 +871,18 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_health_hunger_and_starvation COMMAND survival_stats_tests)
 
+    add_executable(combat_rules_tests
+        tests/CombatRulesTests.cpp
+        src/game/Item.cpp
+        src/world/Block.cpp
+    )
+    target_include_directories(combat_rules_tests PRIVATE src)
+    target_link_libraries(combat_rules_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(combat_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME java_1_9_combat_rules COMMAND combat_rules_tests)
+
     add_executable(world_catalog_tests
         tests/WorldCatalogTests.cpp
         src/game/WorldCatalog.cpp

@@ -63,6 +63,15 @@ int main() {
             localization.hasTranslation(
                 Language::SimplifiedChinese, "settings.frame_rate"),
             "frame-rate setting is translated");
+    constexpr const char* combatKeys[] = {
+        "settings.attack_indicator", "settings.attack_crosshair",
+        "settings.attack_hotbar", "settings.attack_off",
+        "tooltip.attack_speed"
+    };
+    for (const Language language : languagesByEnglishName())
+        for (const char* key : combatKeys)
+            require(localization.hasTranslation(language, key),
+                    "combat HUD and tooltip keys are translated");
     for (size_t action = 0; action < INPUT_ACTION_COUNT; ++action)
         require(localization.hasTranslation(
             Language::SimplifiedChinese, "action." + std::to_string(action)),

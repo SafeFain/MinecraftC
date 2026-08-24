@@ -9,6 +9,10 @@ enum class AudioMusicMode {
     Gameplay
 };
 
+enum class CombatSound {
+    Miss, Weak, Strong, Critical, Sweep, ShieldBlock, ShieldBreak
+};
+
 class AudioSystem {
 public:
     AudioSystem();
@@ -26,6 +30,7 @@ public:
     void stopRain();
     void playThunder(float pan, float volume);
     void playExplosion(float pan, float volume);
+    void playCombat(CombatSound sound);
     bool available() const;
 
 private:

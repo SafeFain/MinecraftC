@@ -41,6 +41,7 @@ struct WorldMetadata {
     uint8_t hunger = 20;
     float saturation = 5.0f;
     float exhaustion = 0.0f;
+    uint32_t foodTickTimer = 0;
     InventoryModel inventory;
     struct PersistedEntity {
         uint8_t type = 0;

@@ -12,6 +12,8 @@
 #include "game/SaveStore.h"
 #include "entity/EntityLogic.h"
 #include "entity/EntityModelRegistry.h"
+#include "game/CombatRules.h"
+#include "player/PlayerPhysics.h"
 
 class Player;
 class IGameRenderer;
@@ -38,6 +40,7 @@ struct Entity {
     glm::vec3 locomotionVelocity{0.0f};
     glm::vec3 facing{0.0f, 0.0f, -1.0f};
     bool attackPending = false;
+    PlayerPhysics::HurtImmunity hurtImmunity;
 };
 
 struct DeadEntityRender {
@@ -68,8 +71,11 @@ public:
                 bool playerTargetable, bool playerCanPickup,
                 bool thunderstorm = false, bool raining = false);
     void strikeLightning(Player& player, const glm::ivec3& position);
-    bool attackRay(const glm::dvec3& origin, const glm::vec3& direction,
-                   float reach, float damage);
+    MeleeAttackResult attackRay(const glm::dvec3& origin,
+                                const glm::vec3& direction,
+                                const MeleeAttackRequest& attack);
+    bool hasAttackTarget(const glm::dvec3& origin, const glm::vec3& direction,
+                         float reach) const;
     void render(IGameRenderer& renderer, const glm::mat4& viewProjection,
                 const glm::dvec3& renderOrigin) const;
     void initializeModels(const std::filesystem::path& assetRoot,
@@ -118,8 +124,8 @@ private:
     bool collides(const Entity& entity, const glm::dvec3& position) const;
     bool exposedToSky(const Entity& entity) const;
     bool touchesWater(const Entity& entity) const;
-    void damageEntity(Entity& entity, float damage, const glm::vec3& knockback,
-                      bool playerAttack);
+    float damageEntity(Entity& entity, float damage,
+                       const glm::vec3& knockback, bool playerAttack);
     void updateArrow(Entity& entity, Player& player, float dt);
     void explode(Player& player, const glm::dvec3& center, float power,
                  uint32_t eventSeed);

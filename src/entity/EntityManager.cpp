@@ -356,16 +356,21 @@ bool EntityManager::touchesWater(const Entity& entity) const {
            isWater(m_world.getBlock(x, head, z));
 }
 
-void EntityManager::damageEntity(Entity& entity, float damage,
-                                 const glm::vec3& knockback, bool playerAttack) {
-    if (damage <= 0.0f || entity.health <= 0.0f) return;
-    entity.health -= damage;
+float EntityManager::damageEntity(Entity& entity, float damage,
+                                  const glm::vec3& knockback,
+                                  bool playerAttack) {
+    if (damage <= 0.0f || entity.health <= 0.0f) return 0.0f;
+    const float accepted = PlayerPhysics::damageAfterImmunity(
+        entity.hurtImmunity, damage, Config::PLAYER_HURT_IMMUNITY_SECONDS);
+    if (accepted <= 0.0f) return 0.0f;
+    entity.health -= accepted;
     entity.hurtFlashSeconds = 0.2f;
     if (entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling)
         m_modelRegistry.playAction(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
     if (playerAttack && entity.type == EntityType::Spider)
         entity.spiderProvoked = true;
+    return accepted;
 }
 
 bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) const {
@@ -400,6 +405,8 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             return !deathPresentationVisible(dead.elapsed);
         }), m_deadEntityRenders.end());
 
+    for (auto& entity : m_entities)
+        PlayerPhysics::tickHurtImmunity(entity.hurtImmunity, dt);
     struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
     std::vector<PendingArrow> pendingArrows;
     struct PendingExplosion {
@@ -518,8 +525,20 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         for (const auto& event : animationEvents) {
             if (!entity.attackPending) continue;
             if (event.name == "melee") {
-                if (attackImpactValid(meleeDistance, 1.5f, meleeClearSight))
-                    player.takeDamage(3.0f);
+                if (attackImpactValid(meleeDistance, 1.5f, meleeClearSight)) {
+                    DamageSourceInfo source;
+                    source.amount = 3.0f;
+                    source.cause = DamageCause::Melee;
+                    source.shieldBlockable = true;
+                    source.hasOrigin = true;
+                    source.origin = attackOrigin;
+                    glm::vec3 impulse(meleeDirection.x, 0.0f, meleeDirection.z);
+                    if (glm::length(impulse) > 0.001f)
+                        impulse = glm::normalize(impulse) * 4.0f;
+                    impulse.y = 2.0f;
+                    source.impulse = impulse;
+                    player.takeDamage(source);
+                }
                 entity.attackPending = false;
             } else if (event.name == "shoot") {
                 if (attackImpactValid(
@@ -648,7 +667,12 @@ void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) 
         }
     }
     if (player.isSurvival() && glm::distance(player.getPosition(), center) <= 3.0) {
-        player.takeDamage(5.0f);
+        DamageSourceInfo source;
+        source.amount = 5.0f;
+        source.cause = DamageCause::Lightning;
+        source.hasOrigin = true;
+        source.origin = center;
+        player.takeDamage(source);
         player.ignite(8.0f);
     }
 }
@@ -675,34 +699,125 @@ void EntityManager::dropMobLoot(const Entity& entity) {
     for (const auto& stack : loot) spawnItem(entity.position, stack);
 }
 
-bool EntityManager::attackRay(
-    const glm::dvec3& origin, const glm::vec3& direction, float reach, float damage) {
-    Entity* best = nullptr;
-    float bestAlong = reach + 1.0f;
-    for (auto& entity : m_entities) {
-        if (entity.type == EntityType::Item || entity.type == EntityType::Arrow || entity.health <= 0.0f) continue;
-        const glm::dvec3 center = entity.position + glm::dvec3(renderSize(entity.type)) * 0.5;
-        const glm::vec3 toEntity = glm::vec3(center - origin);
-        const float along = glm::dot(toEntity, direction);
-        if (along < 0.0f || along > reach) continue;
-        const float perpendicular = glm::length(toEntity - direction * along);
-        if (perpendicular < 0.75f && along < bestAlong) {
-            // Solid blocks between the player and the entity block melee,
-            // matching the hostile attack's line-of-sight revalidation.
-            const float distance = glm::length(toEntity);
-            if (distance > 0.001f &&
-                m_world.raycast(origin, toEntity / distance, distance).has_value())
-                continue;
-            best = &entity;
-            bestAlong = along;
+namespace {
+bool meleeTarget(const Entity& entity) {
+    return entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling &&
+        entity.health > 0.0f;
+}
+
+bool rayEntityAabb(const glm::dvec3& origin, const glm::vec3& direction,
+                   const Entity& entity, const glm::vec3& size,
+                   float maximum, float& along) {
+    const glm::dvec3 minimum(entity.position.x - size.x * 0.5,
+                             entity.position.y,
+                             entity.position.z - size.z * 0.5);
+    const glm::dvec3 maximumPoint(entity.position.x + size.x * 0.5,
+                                  entity.position.y + size.y,
+                                  entity.position.z + size.z * 0.5);
+    double nearDistance = 0.0;
+    double farDistance = maximum;
+    for (int axis = 0; axis < 3; ++axis) {
+        if (std::abs(direction[axis]) < 0.000001f) {
+            if (origin[axis] < minimum[axis] || origin[axis] > maximumPoint[axis])
+                return false;
+            continue;
         }
+        double first = (minimum[axis] - origin[axis]) / direction[axis];
+        double second = (maximumPoint[axis] - origin[axis]) / direction[axis];
+        if (first > second) std::swap(first, second);
+        nearDistance = std::max(nearDistance, first);
+        farDistance = std::min(farDistance, second);
+        if (nearDistance > farDistance) return false;
     }
-    if (!best) return false;
-    glm::vec3 knockback(direction.x, 0.0f, direction.z);
-    if (glm::length(knockback) > 0.001f) knockback = glm::normalize(knockback) * 4.0f;
-    knockback.y = 2.0f;
-    damageEntity(*best, damage, knockback, true);
+    if (nearDistance < 0.0 || nearDistance > maximum) return false;
+    along = static_cast<float>(nearDistance);
     return true;
+}
+}
+
+MeleeAttackResult EntityManager::attackRay(
+    const glm::dvec3& origin, const glm::vec3& direction,
+    const MeleeAttackRequest& attack) {
+    MeleeAttackResult result;
+    Entity* best = nullptr;
+    float bestAlong = attack.reach + 1.0f;
+    for (auto& entity : m_entities) {
+        if (!meleeTarget(entity)) continue;
+        float along = 0.0f;
+        if (!rayEntityAabb(origin, direction, entity, renderSize(entity.type),
+                           attack.reach, along) || along >= bestAlong)
+            continue;
+        if (along > 0.001f &&
+            m_world.raycast(origin, direction, along).has_value())
+            continue;
+        best = &entity;
+        bestAlong = along;
+    }
+    if (!best) return result;
+
+    result.foundTarget = true;
+    result.primaryPosition = best->position +
+        glm::dvec3(0.0, renderSize(best->type).y * 0.5, 0.0);
+    glm::vec3 horizontal(direction.x, 0.0f, direction.z);
+    if (glm::length(horizontal) > 0.001f)
+        horizontal = glm::normalize(horizontal) *
+            (attack.sprintKnockback ? 6.0f : 4.0f);
+    horizontal.y = 2.0f;
+    result.primaryDamage = damageEntity(
+        *best, attack.damage, horizontal, true);
+    result.primaryDamaged = result.primaryDamage > 0.0f;
+
+    if (!attack.sweeping || !result.primaryDamaged) return result;
+    const glm::vec3 bestSize = renderSize(best->type);
+    const glm::dvec3 sweepMin(
+        best->position.x - bestSize.x * 0.5 - 1.0,
+        best->position.y - 1.0,
+        best->position.z - bestSize.z * 0.5 - 1.0);
+    const glm::dvec3 sweepMax(
+        best->position.x + bestSize.x * 0.5 + 1.0,
+        best->position.y + bestSize.y + 1.0,
+        best->position.z + bestSize.z * 0.5 + 1.0);
+    for (auto& entity : m_entities) {
+        if (&entity == best || !meleeTarget(entity)) continue;
+        const glm::dvec3 center = entity.position +
+            glm::dvec3(0.0, renderSize(entity.type).y * 0.5, 0.0);
+        if (center.x < sweepMin.x || center.x > sweepMax.x ||
+            center.y < sweepMin.y || center.y > sweepMax.y ||
+            center.z < sweepMin.z || center.z > sweepMax.z ||
+            glm::distance(center, origin) >= 3.0)
+            continue;
+        const glm::vec3 delta = glm::vec3(center - origin);
+        const float distance = glm::length(delta);
+        if (distance > 0.001f &&
+            m_world.raycast(origin, delta / distance, distance).has_value())
+            continue;
+        glm::vec3 sweepKnockback(entity.position.x - best->position.x, 0.0f,
+                                 entity.position.z - best->position.z);
+        if (glm::length(sweepKnockback) > 0.001f)
+            sweepKnockback = glm::normalize(sweepKnockback) * 4.0f;
+        sweepKnockback.y = 2.0f;
+        if (damageEntity(entity, CombatRules::SWEEP_DAMAGE,
+                         sweepKnockback, true) > 0.0f)
+            result.sweptPositions.push_back(center);
+    }
+    return result;
+}
+
+bool EntityManager::hasAttackTarget(
+    const glm::dvec3& origin, const glm::vec3& direction, float reach) const {
+    float bestAlong = reach + 1.0f;
+    for (const auto& entity : m_entities) {
+        if (!meleeTarget(entity)) continue;
+        float along = 0.0f;
+        if (!rayEntityAabb(origin, direction, entity, renderSize(entity.type),
+                           reach, along) || along >= bestAlong)
+            continue;
+        if (along > 0.001f &&
+            m_world.raycast(origin, direction, along).has_value())
+            continue;
+        return true;
+    }
+    return false;
 }
 
 void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
@@ -731,7 +846,24 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
             const glm::dvec3 playerMax=player.getPosition()+glm::dvec3(.3,1.8,.3);
             if(next.x>=playerMin.x&&next.x<=playerMax.x&&next.y>=playerMin.y&&
                next.y<=playerMax.y&&next.z>=playerMin.z&&next.z<=playerMax.z) {
-                player.takeDamage(arrow.projectileDamage);
+                DamageSourceInfo source;
+                source.amount = arrow.projectileDamage;
+                source.cause = DamageCause::Projectile;
+                source.shieldBlockable = true;
+                source.hasOrigin = true;
+                source.origin = arrow.position;
+                glm::vec3 impulse(arrow.velocity.x, 0.0f, arrow.velocity.z);
+                if (glm::length(impulse) > 0.001f)
+                    impulse = glm::normalize(impulse) * 3.0f;
+                impulse.y = 1.5f;
+                source.impulse = impulse;
+                const DamageOutcome outcome = player.takeDamage(source);
+                if (outcome.blocked) {
+                    arrow.position = next;
+                    arrow.velocity *= -0.2f;
+                    arrow.playerOwned = true;
+                    return;
+                }
                 arrow.health=0;return;
             }
         }
@@ -792,11 +924,17 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
         const float impact = impactAt(player.getPosition() + glm::dvec3(0.0, 1.0, 0.0));
         if (impact > 0.0f) {
             const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);
-            player.takeDamage(damage);
             glm::vec3 direction = glm::vec3(player.getPosition() - center);
             if (glm::length(direction) > .001f) direction = glm::normalize(direction);
             direction.y = std::max(direction.y, .3f);
-            player.applyImpulse(direction * impact * 3.5f);
+            DamageSourceInfo source;
+            source.amount = damage;
+            source.cause = DamageCause::Explosion;
+            source.shieldBlockable = true;
+            source.hasOrigin = true;
+            source.origin = center;
+            source.impulse = direction * impact * 3.5f;
+            player.takeDamage(source);
         }
     }
 

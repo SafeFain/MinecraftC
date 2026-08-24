@@ -155,6 +155,7 @@ int main(){
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
+    settings.attackIndicator=AttackIndicator::Hotbar;
     settings.rendererBackend=RendererBackend::Vulkan;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
@@ -181,6 +182,8 @@ int main(){
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
             "visual quality preference round trips");
+    require(loaded.attackIndicator==AttackIndicator::Hotbar,
+            "attack indicator preference round trips");
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
             loaded.touchControlSize==1.25f&&loaded.touchControlOpacity==.8f&&loaded.touchLeftHanded,
             "touch settings round trip");
@@ -212,6 +215,13 @@ int main(){
     }
     require(ClientSettings::load(root/"invalid-options.txt").language==Language::English,
             "unsupported language falls back to English");
+    {
+        std::ofstream invalidAttack(root/"invalid-attack-options.txt");
+        invalidAttack<<"version=17\nattack_indicator=99\n";
+    }
+    require(ClientSettings::load(root/"invalid-attack-options.txt").attackIndicator==
+                AttackIndicator::Crosshair,
+            "invalid attack indicator falls back to crosshair");
     {
         std::ofstream legacy(root/"v5-bindings.txt");
         legacy<<"version=5\nbinding.0=1,90\nbinding.7=1,69\n"

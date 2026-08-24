@@ -159,6 +159,7 @@ void GameScenePresenter::render(
             !session.playerDead && !session.isSleeping())
             heldItemRenderer.renderFirstPerson(
                 session.player.activeItem(), session.player.visualState().swingProgress,
+                session.player.attackStrength(),
                 window.aspectRatio(),
                 cameraEffects.viewModelTransform());
 

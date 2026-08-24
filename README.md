@@ -20,7 +20,8 @@ GitHub prereleases; release-channel tags create normal releases.
 - Distance-prioritized generation, greedy meshing, ambient occlusion, dual-channel
   lighting, configurable cascaded shadows, transparent materials, and persistent
   spawn caches.
-- Crafting, furnaces, containers, combat, weather, commands, and persistent
+- Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
+  fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
 - JSON-driven block, 142-item, and entity atlases with a deterministic 16x16
   texture pipeline.
@@ -154,7 +155,7 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 | Android | Application-private data directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v8 can read v2-v7 desktop saves. The current world
+one exists. Save format v11 can read v2-v10 desktop saves. The current world
 generation version is v8. Older generation versions remain on disk and are
 shown as incompatible rather than migrated or blended into v8 terrain.
 

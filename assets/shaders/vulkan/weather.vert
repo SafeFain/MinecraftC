@@ -37,7 +37,8 @@ void main(){
         position+=right*sin(frame.cameraRightTime.w*1.7+phase*6.283)*0.13;
     if(kind>1.5&&kind<2.5)
         position+=right*(fract(sin(phase*91.7)*43758.5)-0.5)*0.7;
-    if(kind>5.5)position+=up*sin(frame.cameraRightTime.w*0.9+phase*6.283)*0.08;
+    if(kind>5.5&&kind<8.5)
+        position+=up*sin(frame.cameraRightTime.w*0.9+phase*6.283)*0.08;
     vec2 corner=corners[gl_VertexIndex];
     if(kind<0.5||kind>2.5){
         float c=cos(inParticleParams.w),s=sin(inParticleParams.w);
