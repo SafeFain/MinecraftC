@@ -103,6 +103,9 @@ struct DrawCommand {
     bool useCustomViewProjection = false;
     uint32_t firstIndex = 0;
     uint32_t indexCount = 0;
+    bool lod = false;
+    float lodMinimumDistance = 0.0f;
+    float lodMaximumDistance = 0.0f;
 };
 
 struct RenderDeviceCapabilities {

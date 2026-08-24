@@ -60,7 +60,8 @@ int main(){
             settingsParentPage(SettingsPage::Touch)==SettingsPage::KeyBindings,
             "input device settings return to the key bindings hub");
     require(settingsParentPage(SettingsPage::KeyBindings)==SettingsPage::General&&
-            settingsParentPage(SettingsPage::Video)==SettingsPage::General,
+            settingsParentPage(SettingsPage::Video)==SettingsPage::General&&
+            settingsParentPage(SettingsPage::Lod)==SettingsPage::Video,
             "top-level settings pages return to general settings");
     const SettingsButtonLayout bindingLayout = settingsButtonLayout(468.0f,13,true);
     require(bindingLayout.firstButtonY+bindingLayout.buttonHeight<=
@@ -124,6 +125,9 @@ int main(){
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.frameRateLimit=137;
     settings.invertMouseY=true;
     settings.renderDistance=8;settings.renderClouds=false;
+    settings.lodEnabled=false;settings.lodDistanceChunks=640;
+    settings.lodAggressiveness=LodAggressiveness::Fast;
+    settings.lodPrecision=LodPrecision::High;
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
@@ -139,6 +143,9 @@ int main(){
     require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&
             loaded.frameRateLimit==137&&loaded.invertMouseY&&
             loaded.renderDistance==8&&!loaded.renderClouds&&
+            !loaded.lodEnabled&&loaded.lodDistanceChunks==640&&
+            loaded.lodAggressiveness==LodAggressiveness::Fast&&
+            loaded.lodPrecision==LodPrecision::High&&
             loaded.cloudRenderDistance==1024&&!loaded.smoothLighting,
             "client settings round trip");
     ClientSettings frameRateRange;frameRateRange.frameRateLimit=12;frameRateRange.validate();
@@ -147,6 +154,18 @@ int main(){
     frameRateRange.frameRateLimit=500;frameRateRange.validate();
     require(frameRateRange.frameRateLimit==ClientSettings::MAX_FRAME_RATE,
             "frame-rate validation clamps the upper bound");
+    ClientSettings lodRange;lodRange.lodDistanceChunks=1;lodRange.validate();
+    require(lodRange.lodDistanceChunks==ClientSettings::MIN_LOD_DISTANCE,
+            "LOD distance validation clamps the lower bound");
+    lodRange.lodDistanceChunks=99999;lodRange.validate();
+    require(lodRange.lodDistanceChunks==ClientSettings::MAX_LOD_DISTANCE,
+            "LOD distance validation clamps the hard upper bound");
+    require(parseLodDistance("32")==32&&parseLodDistance("4096")==4096&&
+            !parseLodDistance("31")&&!parseLodDistance("4097")&&
+            !parseLodDistance("12x")&&!parseLodDistance("+32")&&
+            !parseLodDistance(" 32")&&lodDistanceNeedsWarning(513)&&
+            !lodDistanceNeedsWarning(512),
+            "LOD numeric input validates its range and warning threshold");
     require(loaded.shadowQuality==ShadowQuality::High,
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
@@ -171,11 +190,14 @@ int main(){
             "new language codes round trip through settings");
     {
         std::ofstream legacy(root/"legacy-options.txt");
-        legacy<<"version=17\nrenderer=opengl\nrender_distance=8\n";
+        legacy<<"version=18\nrenderer=opengl\nrender_distance=8\n";
     }
-    require(ClientSettings::load(root/"legacy-options.txt").language==Language::English,
-            "legacy settings default to English");
-    ClientSettings legacySettings = ClientSettings::load(root/"legacy-options.txt");
+    const ClientSettings legacySettings=ClientSettings::load(root/"legacy-options.txt");
+    require(legacySettings.language==Language::English&&legacySettings.lodEnabled&&
+            legacySettings.lodDistanceChunks==128&&
+            legacySettings.lodAggressiveness==LodAggressiveness::Balanced&&
+            legacySettings.lodPrecision==LodPrecision::Medium,
+            "v18 settings migrate to the LOD defaults");
     require(legacySettings.renderDistance==8,
             "legacy renderer setting did not prevent other settings from loading");
     require(legacySettings.save(root/"migrated-options.txt"),
@@ -183,7 +205,8 @@ int main(){
     std::ifstream migratedInput(root/"migrated-options.txt");
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
-    require(migratedText.find("version=18\n")!=std::string::npos&&
+    migratedInput.close();
+    require(migratedText.find("version=19\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     {

@@ -63,6 +63,16 @@ void ClientSettings::validate() {
     constexpr int distances[] = {2,4,6,8,10,12,16};
     if (std::find(std::begin(distances), std::end(distances), renderDistance) == std::end(distances))
         renderDistance = 8;
+    lodDistanceChunks = std::clamp(
+        lodDistanceChunks, MIN_LOD_DISTANCE, MAX_LOD_DISTANCE);
+    if (static_cast<int>(lodAggressiveness) <
+            static_cast<int>(LodAggressiveness::PowerSaver) ||
+        static_cast<int>(lodAggressiveness) >
+            static_cast<int>(LodAggressiveness::Extreme))
+        lodAggressiveness = LodAggressiveness::Balanced;
+    if (static_cast<int>(lodPrecision) < static_cast<int>(LodPrecision::Low) ||
+        static_cast<int>(lodPrecision) > static_cast<int>(LodPrecision::Ultra))
+        lodPrecision = LodPrecision::Medium;
     constexpr int cloudDistances[] = {64,96,128,192,256,512,1024};
     if (std::find(std::begin(cloudDistances), std::end(cloudDistances),
                   cloudRenderDistance) == std::end(cloudDistances))
@@ -135,6 +145,12 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         try {
             if (name == "version") formatVersion = std::stoi(value);
             else if (name == "render_distance") settings.renderDistance = std::stoi(value);
+            else if (name == "lod_enabled") settings.lodEnabled = std::stoi(value) != 0;
+            else if (name == "lod_distance") settings.lodDistanceChunks = std::stoi(value);
+            else if (name == "lod_aggressiveness")
+                settings.lodAggressiveness = static_cast<LodAggressiveness>(std::stoi(value));
+            else if (name == "lod_precision")
+                settings.lodPrecision = static_cast<LodPrecision>(std::stoi(value));
             else if (name == "render_clouds")
                 settings.renderClouds = std::stoi(value) != 0;
             else if (name == "cloud_render_distance")
@@ -215,6 +231,10 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
     if (!output) return false;
     output << "version=" << FORMAT_VERSION << '\n'
            << "render_distance=" << renderDistance << '\n'
+           << "lod_enabled=" << lodEnabled << '\n'
+           << "lod_distance=" << lodDistanceChunks << '\n'
+           << "lod_aggressiveness=" << static_cast<int>(lodAggressiveness) << '\n'
+           << "lod_precision=" << static_cast<int>(lodPrecision) << '\n'
            << "render_clouds=" << renderClouds << '\n'
            << "cloud_render_distance=" << cloudRenderDistance << '\n'
            << "day_cycle=" << dayCycleMinutes << '\n'

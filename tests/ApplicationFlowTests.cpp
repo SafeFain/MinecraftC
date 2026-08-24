@@ -124,6 +124,8 @@ public:
                    const glm::vec3&, bool) override {}
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool) override {}
+    void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
+                   float, float, bool) override {}
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
                             const glm::dvec3&,
                             const std::vector<ShadowChunkSubmission>&) override {

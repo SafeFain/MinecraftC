@@ -197,6 +197,7 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->sceneFinished = false;
     m_impl->postProcess = {};
     m_impl->submittedDraws.clear();
+    m_impl->submittedLodDraws.clear();
     m_impl->submittedViewModels.clear();
     m_impl->queueViewModel = false;
     m_impl->submittedShadowChunks.clear();
@@ -223,7 +224,8 @@ void VulkanRenderer::draw(const DrawCommand& command) {
     const uint64_t count = command.indexCount ? command.indexCount : mesh->second.indexCount;
     if (static_cast<uint64_t>(command.firstIndex) + count > mesh->second.indexCount)
         throw std::invalid_argument("Vulkan draw range exceeds mesh indices");
-    if (m_impl->queueViewModel) m_impl->submittedViewModels.push_back(command);
+    if (command.lod) m_impl->submittedLodDraws.push_back(command);
+    else if (m_impl->queueViewModel) m_impl->submittedViewModels.push_back(command);
     else m_impl->submittedDraws.push_back(command);
     m_impl->drawQueued = true;
 }
@@ -465,6 +467,34 @@ void VulkanRenderer::renderChunk(const ChunkMesh& mesh,
     command.firstIndex = static_cast<uint32_t>(translucent
         ? mesh.translucentIndexOffset : 0);
     command.indexCount = static_cast<uint32_t>(count);
+    draw(command);
+}
+
+void VulkanRenderer::renderLod(const ChunkMesh& mesh,
+                               const glm::mat4& model,
+                               const glm::mat4& viewProjection,
+                               float minimumDistance,
+                               float maximumDistance,
+                               bool translucent) {
+    if (!mesh.gpuReady || !mesh.renderHandle) return;
+    const size_t count = translucent ? mesh.translucentIndexCount
+                                     : mesh.opaqueIndexCount;
+    if (count == 0) return;
+    DrawCommand command;
+    command.mesh = mesh.renderHandle;
+    command.material = translucent ? m_chunkTranslucent : m_chunkOpaque;
+    command.model = model;
+    command.viewProjection = viewProjection;
+    command.useCustomViewProjection = true;
+    command.firstIndex = static_cast<uint32_t>(translucent
+        ? mesh.translucentIndexOffset : 0);
+    command.indexCount = static_cast<uint32_t>(count);
+    command.lod = true;
+    command.lodMinimumDistance = minimumDistance;
+    command.lodMaximumDistance = maximumDistance;
+    m_impl->submittedChunkEnvironment.fogColorDistance.a = std::max(
+        m_impl->submittedChunkEnvironment.fogColorDistance.a,
+        maximumDistance + Config::CHUNK_SIZE_X);
     draw(command);
 }
 

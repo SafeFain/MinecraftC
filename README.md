@@ -20,6 +20,8 @@ GitHub prereleases; release-channel tags create normal releases.
 - Distance-prioritized generation, greedy meshing, ambient occlusion, dual-channel
   lighting, configurable cascaded shadows, transparent materials, and persistent
   spawn caches.
+- Distant-terrain LOD outside the full chunk radius, with 32-4096 chunk distance,
+  four load presets, four precision presets, and progressively refined caches.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.

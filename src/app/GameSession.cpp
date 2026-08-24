@@ -302,6 +302,8 @@ void GameSession::updatePlaying(
     entities.syncChunks();
     world.enqueueMeshBuilds();
     world.processCompletedMeshes(renderer, Config::MESH_UPLOADS_PER_FRAME);
+    world.updateLod(player.getPosition());
+    world.processCompletedLod(renderer);
 
     if (dimension == DimensionId::Heaven) weather.setWeather(WeatherType::Clear);
     if (dimension == DimensionId::Heaven) saveActiveDimensionState();

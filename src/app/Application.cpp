@@ -395,6 +395,11 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
+        m_session.world.configureLod({
+            m_clientSettings.lodEnabled,
+            m_clientSettings.lodDistanceChunks,
+            m_clientSettings.lodAggressiveness,
+            m_clientSettings.lodPrecision});
         if (m_renderer) m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");

@@ -61,6 +61,34 @@ void GameScenePresenter::render(
                 settings.cloudRenderDistance);
         }
 
+        if (session.world.lodEnabled() &&
+            !session.world.lodSubmissions().empty()) {
+            const float lodNear = std::max(16.0f,
+                (settings.renderDistance - 2.0f) * Config::CHUNK_SIZE_X);
+            const float lodFar = session.world.lodDistanceChunks() *
+                Config::CHUNK_SIZE_X + 64.0f;
+            const glm::mat4 lodProjection = glm::perspective(
+                glm::radians(camera.fovDeg()), window.aspectRatio(),
+                lodNear, lodFar);
+            const glm::mat4 lodVp = lodProjection * view;
+            for (const auto& lod : session.world.lodSubmissions()) {
+                renderer.renderLod(*lod.mesh, lod.model, lodVp,
+                    lod.minimumDistance, lod.maximumDistance, false);
+            }
+            std::vector<const LodRenderSubmission*> translucentLod;
+            translucentLod.reserve(session.world.lodSubmissions().size());
+            for (const auto& lod : session.world.lodSubmissions())
+                translucentLod.push_back(&lod);
+            std::sort(translucentLod.begin(), translucentLod.end(),
+                [](const LodRenderSubmission* a, const LodRenderSubmission* b) {
+                    return a->distance2 > b->distance2;
+                });
+            for (const LodRenderSubmission* lod : translucentLod) {
+                renderer.renderLod(*lod->mesh, lod->model, lodVp,
+                    lod->minimumDistance, lod->maximumDistance, true);
+            }
+        }
+
         visibleChunks.clear();
         std::vector<ShadowChunkSubmission> shadowChunks;
         const float shadowDistance = shadowConfig(settings.shadowQuality).distance;

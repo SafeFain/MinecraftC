@@ -53,6 +53,16 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         }
     }
 
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument(argv[index]);
+        if (argument.rfind("--renderer=", 0) != 0) continue;
+        if (argument == "--renderer=vulkan" ||
+            argument == "--renderer=vulkan-demo" ||
+            argument == "--renderer=vulkan-textured-demo")
+            continue;
+        throw CommandLineError("Unknown renderer: " + argument.substr(11));
+    }
+
     RuntimePaths paths = discoverRuntimePaths(argc > 0 ? argv[0] : nullptr);
     for (int index = 1; index < argc; ++index) {
         const std::string argument(argv[index]);
@@ -65,8 +75,6 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
         if (argument == "--renderer=vulkan") {
             continue;
         }
-        if (argument.rfind("--renderer=", 0) == 0)
-            throw CommandLineError("Unknown renderer: " + argument.substr(11));
         if (argument.rfind("--benchmark-frames=", 0) == 0) continue;
     }
 

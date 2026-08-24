@@ -639,6 +639,35 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests)
 
+    add_executable(lod_terrain_tests
+        tests/LodTerrainTests.cpp
+        src/debug/Log.cpp
+        src/game/InventoryModel.cpp
+        src/game/Item.cpp
+        src/game/SaveStore.cpp
+        src/threading/ThreadPool.cpp
+        src/world/BiomeMap.cpp
+        src/world/Block.cpp
+        src/world/CaveGenerator.cpp
+        src/world/Chunk.cpp
+        src/world/HeightPipeline.cpp
+        src/world/LodTerrainSystem.cpp
+        src/world/Noise.cpp
+        src/world/OreGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/StructureGenerator.cpp
+        src/world/TreeGenerator.cpp
+        src/world/WorldGenerator.cpp)
+    target_include_directories(lod_terrain_tests PRIVATE
+        src external/FastNoiseLite)
+    target_link_libraries(lod_terrain_tests PRIVATE glm::glm minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(lod_terrain_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(lod_terrain_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME lod_terrain_determinism_cache_and_mesh COMMAND lod_terrain_tests)
+
     add_executable(terrain_preview
         tools/terrain_preview.cpp
         src/world/BiomeMap.cpp
@@ -960,6 +989,7 @@ if(BUILD_TESTING)
         src/world/CaveGenerator.cpp
         src/world/Chunk.cpp
         src/world/ChunkMeshPipeline.cpp
+        src/world/LodTerrainSystem.cpp
         src/world/ChunkStore.cpp
         src/world/ChunkMesh.cpp
         src/world/ChunkStreamer.cpp
@@ -1052,6 +1082,7 @@ if(BUILD_TESTING)
         src/world/CaveGenerator.cpp
         src/world/Chunk.cpp
         src/world/ChunkMeshPipeline.cpp
+        src/world/LodTerrainSystem.cpp
         src/world/ChunkStore.cpp
         src/world/ChunkMesh.cpp
         src/world/ChunkStreamer.cpp
@@ -1095,6 +1126,7 @@ if(BUILD_TESTING)
         src/world/CaveGenerator.cpp
         src/world/Chunk.cpp
         src/world/ChunkMeshPipeline.cpp
+        src/world/LodTerrainSystem.cpp
         src/world/ChunkStore.cpp
         src/world/ChunkMesh.cpp
         src/world/ChunkStreamer.cpp

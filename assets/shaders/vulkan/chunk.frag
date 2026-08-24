@@ -115,6 +115,18 @@ float valueNoise(vec2 point) {
 }
 
 void main() {
+    bool isLod=frame.atlasAndLighting.w>0.0;
+    if(isLod){
+        float lodDistance=length(worldPosition.xz);
+        float inner=frame.atlasAndLighting.w;
+        float outer=frame.chunkOrigin.w;
+        float innerFade=max(16.0,inner*0.08);
+        float outerFade=max(32.0,outer*0.04);
+        float coverage=smoothstep(inner-innerFade,inner+innerFade,lodDistance)*
+            (1.0-smoothstep(outer-outerFade,outer,lodDistance));
+        float dither=fract(sin(dot(floor(worldPosition.xz),vec2(12.9898,78.233)))*43758.5453);
+        if(dither>coverage)discard;
+    }
     float tiles=frame.atlasAndLighting.x;
     float slot=floor(tile+0.5);
     vec2 origin=vec2(mod(slot,tiles),floor(slot/tiles));
@@ -157,7 +169,7 @@ void main() {
     cloudNoise=0.58+0.42*cloudNoise;
     float cloudShadow=mix(1.0,cloudNoise,
         environment.weatherParams.w*(0.45+0.55*environment.weatherParams.y));
-    float visibility=shadowVisibility(worldPosition,normal)*cloudShadow;
+    float visibility=(isLod?1.0:shadowVisibility(worldPosition,normal))*cloudShadow;
     vec3 illumination=environment.ambientColorIntensity.rgb*
         environment.ambientColorIntensity.a*skyLight*0.72;
     illumination+=environment.directColorIntensity.rgb*

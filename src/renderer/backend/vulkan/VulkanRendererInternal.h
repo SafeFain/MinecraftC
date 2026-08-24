@@ -280,6 +280,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     bool firstFrameLogged = false;
     FrameData submittedFrame{};
     std::vector<DrawCommand> submittedDraws;
+    std::vector<DrawCommand> submittedLodDraws;
     std::vector<DrawCommand> submittedViewModels;
     bool queueViewModel = false;
     std::vector<UiSubmission> submittedUi;
@@ -1275,7 +1276,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void prepareChunkBuffer() {
-        if (submittedDraws.empty()) return;
+        if (submittedDraws.empty() && submittedLodDraws.empty()) return;
         ChunkFrameBuffer& frame = chunkBuffers[currentFrame];
         std::memcpy(frame.uniform.mapped, &submittedChunkEnvironment,
                     sizeof(submittedChunkEnvironment));
@@ -1558,8 +1559,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 clipSpaceCorrection() * drawViewProjection * draw.model,
                 {static_cast<float>(material.desc.atlasTilesPerSide),
                  material.desc.smoothLighting ? 1.0f : 0.0f,
-                 material.desc.alphaCutoff, 0.0f},
-                glm::vec4(glm::vec3(draw.model[3]), 0.0f), draw.tint};
+                 material.desc.alphaCutoff,
+                 draw.lod ? draw.lodMinimumDistance : 0.0f},
+                glm::vec4(glm::vec3(draw.model[3]),
+                          draw.lod ? draw.lodMaximumDistance : 0.0f), draw.tint};
             vkCmdPushConstants(command, swapchain.pipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0, sizeof(constants), &constants);
@@ -1571,6 +1574,21 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ++performance.drawCalls;
         }
         };
+        drawBasicSubmissions(submittedLodDraws);
+        if (!submittedLodDraws.empty()) {
+            VkClearAttachment depthClear{};
+            depthClear.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            depthClear.clearValue.depthStencil = {1.0f, 0};
+            VkClearRect clearRect{};
+            clearRect.rect = scissor;
+            clearRect.layerCount = 1;
+            vkCmdClearAttachments(command, 1, &depthClear, 1, &clearRect);
+            boundPipeline = VK_NULL_HANDLE;
+            boundMaterialSet = VK_NULL_HANDLE;
+            boundChunkSet = VK_NULL_HANDLE;
+            boundVertexBuffer = VK_NULL_HANDLE;
+            boundIndexBuffer = VK_NULL_HANDLE;
+        }
         drawBasicSubmissions(submittedDraws);
         uint32_t modelUniformIndex = 0;
         VkPipeline boundModelPipeline = VK_NULL_HANDLE;

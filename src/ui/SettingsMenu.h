@@ -4,10 +4,12 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 
 enum class SettingsPage {
     General,
     Video,
+    Lod,
     KeyBindings,
     KeyboardMouse,
     Controller,
@@ -21,6 +23,9 @@ inline SettingsPage settingsParentPage(SettingsPage page) {
         case SettingsPage::Touch:
             return SettingsPage::KeyBindings;
         case SettingsPage::Video:
+            return SettingsPage::General;
+        case SettingsPage::Lod:
+            return SettingsPage::Video;
         case SettingsPage::KeyBindings:
         case SettingsPage::General:
             return SettingsPage::General;
@@ -58,6 +63,25 @@ inline float frameRateSliderFraction(int frameRate) {
         static_cast<float>(ClientSettings::MAX_FRAME_RATE - ClientSettings::MIN_FRAME_RATE);
 }
 
+inline std::optional<int> parseLodDistance(const std::string& text) {
+    if (text.empty() || !std::all_of(text.begin(), text.end(),
+            [](unsigned char character) { return character >= '0' && character <= '9'; }))
+        return std::nullopt;
+    try {
+        size_t consumed = 0;
+        const int value = std::stoi(text, &consumed);
+        if (consumed != text.size() || value < ClientSettings::MIN_LOD_DISTANCE ||
+            value > ClientSettings::MAX_LOD_DISTANCE) return std::nullopt;
+        return value;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+inline bool lodDistanceNeedsWarning(int value) {
+    return value > ClientSettings::LOD_WARNING_DISTANCE;
+}
+
 class SettingsMenu : public Menu {
 public:
     SettingsMenu(ClientSettings& settings, std::function<void()> onChanged,
@@ -68,6 +92,8 @@ public:
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
+    void onChar(unsigned int codepoint) override;
+    bool wantsTextInput() const override { return m_lodDistanceEditing; }
     bool capturesPointerDrag(double x, double y) const override;
     bool capturingGamepad() const {
         return m_page == SettingsPage::Controller && m_captureAction >= 0;
@@ -87,6 +113,11 @@ private:
     int m_pressedButton = -1;
     int m_frameRateButton = -1;
     bool m_frameRateDragging = false;
+    TextEditBuffer m_lodDistanceText{{}, 4};
+    bool m_lodDistanceEditing = false;
+    bool m_lodDistanceInvalid = false;
+    bool m_lodWarningPending = false;
+    int m_pendingLodDistance = 0;
 
     void cycleRenderDistance();
     void toggleCloudRendering();
@@ -103,4 +134,6 @@ private:
     void assignGamepadBinding(GamepadBinding binding);
     std::string frameRateLabel() const;
     void setFrameRateFromPointer(double x);
+    void beginLodDistanceEdit();
+    void commitLodDistanceEdit();
 };

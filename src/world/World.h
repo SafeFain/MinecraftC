@@ -23,6 +23,7 @@
 #include "world/WorldLighting.h"
 #include "world/WorldPersistence.h"
 #include "world/WorldSimulation.h"
+#include "world/LodTerrainSystem.h"
 #include "world/RegionGenerationData.h"
 #include "world/BlockEntity.h"
 #include "world/BlockLightLogic.h"
@@ -45,12 +46,14 @@ public:
         m_threadPool = pool;
         m_meshes.setThreadPool(pool);
         m_streamer.setThreadPool(pool);
+        m_lod.setThreadPool(pool);
     }
     void setSaveStore(SaveStore* store) {
         m_saveStore = store;
         m_chunks.setSaveStore(store);
         m_persistence.setSaveStore(store);
         m_streamer.setSaveStore(store);
+        m_lod.setSaveStore(store);
     }
     bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max()) {
         return m_persistence.flushModifiedChunks(maxFiles);
@@ -182,8 +185,25 @@ public:
     void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16) {
         m_meshes.buildMeshesSync(renderer, maxCount);
     }
-    void invalidateGpuMeshes() { m_meshes.invalidateGpuMeshes(); }
+    void invalidateGpuMeshes() {
+        m_meshes.invalidateGpuMeshes();
+        m_lod.releaseGpuMeshes(true);
+    }
     void restoreGpuMeshes() { m_meshes.restoreGpuMeshes(); }
+
+    void configureLod(const LodSettings& settings) { m_lod.configure(settings); }
+    void updateLod(const glm::dvec3& playerPosition) {
+        m_lod.update(playerPosition, Config::RENDER_DISTANCE,
+                     m_chunks.activeChunks());
+    }
+    void processCompletedLod(IGameRenderer* renderer) {
+        m_lod.processCompleted(renderer);
+    }
+    const std::vector<LodRenderSubmission>& lodSubmissions() const {
+        return m_lod.submissions();
+    }
+    bool lodEnabled() const { return m_lod.enabled(); }
+    int lodDistanceChunks() const { return m_lod.distanceChunks(); }
 
     // ── Raycast ──────────────────────────────────────────────────────
     struct RaycastHit {
@@ -222,6 +242,7 @@ private:
     FluidScheduler m_fluids{*this};
     ChunkMeshPipeline m_meshes{*this, m_chunks};
     ChunkStreamer m_streamer{*this, m_chunks};
+    LodTerrainSystem m_lod;
     WorldLighting m_lighting{m_chunks};
     WorldSimulation m_simulation{*this, m_persistence, m_chunks};
 

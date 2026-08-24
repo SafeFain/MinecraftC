@@ -72,6 +72,9 @@ void SettingsMenu::showPage(SettingsPage page) {
     m_selectedIdx = 0;
     m_controlOffset = 0;
     m_captureAction = -1;
+    m_lodDistanceEditing = false;
+    m_lodDistanceInvalid = false;
+    m_lodWarningPending = false;
     refreshButtons();
 }
 
@@ -143,9 +146,60 @@ void SettingsMenu::refreshButtons() {
                 m_settings.guiScale = (m_settings.guiScale + 1) % 5;
                 m_onChanged(); refreshButtons();
         });
+        m_buttons.emplace_back(m_localization.text("settings.lod"), [this]{
+            showPage(SettingsPage::Lod);
+        });
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             showPage(SettingsPage::General);
         });
+    } else if (m_page == SettingsPage::Lod) {
+        if (m_lodWarningPending) {
+            m_buttons.emplace_back(m_localization.text("settings.lod_warning_apply"), [this] {
+                m_settings.lodDistanceChunks = m_pendingLodDistance;
+                m_lodWarningPending = false;
+                m_onChanged();
+                refreshButtons();
+            });
+            m_buttons.emplace_back(m_localization.text("common.cancel"), [this] {
+                m_lodWarningPending = false;
+                refreshButtons();
+            });
+        } else {
+            m_buttons.emplace_back(m_localization.format("settings.lod_enabled", {
+                m_localization.text(m_settings.lodEnabled ? "common.on" : "common.off")}),
+                [this] {
+                    m_settings.lodEnabled = !m_settings.lodEnabled;
+                    m_onChanged(); refreshButtons();
+                });
+            const std::string distance = m_lodDistanceEditing
+                ? "> " + m_lodDistanceText.text() + "_ <"
+                : std::to_string(m_settings.lodDistanceChunks);
+            m_buttons.emplace_back(m_localization.format(
+                "settings.lod_distance", {distance}), [this] { beginLodDistanceEdit(); });
+            const char* aggressiveness[] = {
+                "settings.lod_power_saver", "settings.lod_balanced",
+                "settings.lod_fast", "settings.lod_extreme"};
+            m_buttons.emplace_back(m_localization.format("settings.lod_aggressiveness", {
+                m_localization.text(aggressiveness[
+                    static_cast<int>(m_settings.lodAggressiveness)])}), [this] {
+                m_settings.lodAggressiveness = static_cast<LodAggressiveness>(
+                    (static_cast<int>(m_settings.lodAggressiveness) + 1) % 4);
+                m_onChanged(); refreshButtons();
+            });
+            const char* precision[] = {
+                "settings.lod_low", "settings.lod_medium",
+                "settings.lod_high", "settings.lod_ultra"};
+            m_buttons.emplace_back(m_localization.format("settings.lod_precision", {
+                m_localization.text(precision[static_cast<int>(m_settings.lodPrecision)])}),
+                [this] {
+                    m_settings.lodPrecision = static_cast<LodPrecision>(
+                        (static_cast<int>(m_settings.lodPrecision) + 1) % 4);
+                    m_onChanged(); refreshButtons();
+                });
+            m_buttons.emplace_back(m_localization.text("settings.lod_back"), [this] {
+                showPage(SettingsPage::Video);
+            });
+        }
     } else if (m_page == SettingsPage::KeyBindings) {
         m_buttons.emplace_back(m_localization.text("settings.keyboard_mouse"), [this]{
             showPage(SettingsPage::KeyboardMouse);
@@ -285,6 +339,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     const std::string title = m_localization.text(
         m_page == SettingsPage::KeyboardMouse ? "settings.keyboard_mouse_title" :
         m_page == SettingsPage::Controller ? "settings.controller_title" :
+        m_page == SettingsPage::Lod ? "settings.lod_title" :
         m_page == SettingsPage::Video ? "settings.video_title" :
         m_page == SettingsPage::KeyBindings ? "settings.key_bindings_title" :
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");
@@ -293,13 +348,18 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f, titleY,
                             3.0f, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
     const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
-                         m_page == SettingsPage::Controller;
+                         m_page == SettingsPage::Controller ||
+                         m_page == SettingsPage::Lod;
     const SettingsButtonLayout layout = settingsButtonLayout(
         titleY, m_buttons.size(), hasHelp);
     if (hasHelp) {
         const std::string help = m_localization.text(
-            m_page == SettingsPage::Controller
-                ? "settings.controller_help" : "settings.controls_help");
+            m_page == SettingsPage::Lod
+                ? (m_lodWarningPending ? "settings.lod_warning" :
+                   m_lodDistanceInvalid ? "settings.lod_distance_invalid" :
+                                          "settings.lod_help")
+                : m_page == SettingsPage::Controller
+                    ? "settings.controller_help" : "settings.controls_help");
         const auto helpSize = ui.measureText(help, 1.0f);
         UiTheme::textWithShadow(ui, help, (width - helpSize.x) * .5f,
                                 layout.helpY, 1.0f, glm::vec3(.72f));
@@ -327,7 +387,27 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     }
 }
 
-void SettingsMenu::onKeyPress(int key, int) {
+void SettingsMenu::onKeyPress(int key, int mods) {
+    if (m_lodWarningPending && key == Key::Escape) {
+        m_lodWarningPending = false;
+        refreshButtons();
+        return;
+    }
+    if (m_lodDistanceEditing) {
+        const bool selecting = (mods & KeyModifier::Shift) != 0;
+        const bool control = (mods & KeyModifier::Control) != 0;
+        if (key == Key::Enter) commitLodDistanceEdit();
+        else if (key == Key::Escape) {
+            m_lodDistanceEditing = false; m_lodDistanceInvalid = false; refreshButtons();
+        } else if (key == Key::Backspace) { m_lodDistanceText.backspace(); refreshButtons(); }
+        else if (key == Key::Delete) { m_lodDistanceText.eraseForward(); refreshButtons(); }
+        else if (key == Key::Left) { m_lodDistanceText.moveLeft(selecting); refreshButtons(); }
+        else if (key == Key::Right) { m_lodDistanceText.moveRight(selecting); refreshButtons(); }
+        else if (key == Key::Home) { m_lodDistanceText.moveHome(selecting); refreshButtons(); }
+        else if (key == Key::End) { m_lodDistanceText.moveEnd(selecting); refreshButtons(); }
+        else if (control && key == Key::A) { m_lodDistanceText.selectAll(); refreshButtons(); }
+        return;
+    }
     if (m_captureAction >= 0) {
         if (key == Key::Escape) { m_captureAction = -1; refreshButtons(); }
         else if (key == Key::Backspace &&
@@ -358,6 +438,43 @@ void SettingsMenu::onKeyPress(int key, int) {
             break;
         default: break;
     }
+}
+
+void SettingsMenu::onChar(unsigned int codepoint) {
+    if (!m_lodDistanceEditing || codepoint < '0' || codepoint > '9') return;
+    m_lodDistanceText.insert(std::string(1, static_cast<char>(codepoint)));
+    m_lodDistanceInvalid = false;
+    refreshButtons();
+}
+
+void SettingsMenu::beginLodDistanceEdit() {
+    m_lodDistanceText.setText(std::to_string(m_settings.lodDistanceChunks));
+    m_lodDistanceText.selectAll();
+    m_lodDistanceEditing = true;
+    m_lodDistanceInvalid = false;
+    refreshButtons();
+}
+
+void SettingsMenu::commitLodDistanceEdit() {
+    const std::optional<int> parsed = parseLodDistance(m_lodDistanceText.text());
+    if (!parsed) {
+        m_lodDistanceInvalid = true;
+        refreshButtons();
+        return;
+    }
+    const int value = *parsed;
+    m_lodDistanceEditing = false;
+    m_lodDistanceInvalid = false;
+    if (lodDistanceNeedsWarning(value) &&
+        value != m_settings.lodDistanceChunks) {
+        m_pendingLodDistance = value;
+        m_lodWarningPending = true;
+        refreshButtons();
+        return;
+    }
+    m_settings.lodDistanceChunks = value;
+    m_onChanged();
+    refreshButtons();
 }
 
 void SettingsMenu::onMouseMove(double x, double y) {

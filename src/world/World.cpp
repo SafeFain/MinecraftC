@@ -94,12 +94,15 @@ const std::vector<World::FluidMutation>& World::endFluidBatch() {
 
 World::World()
     : m_generator(Config::WORLD_SEED, WorldType::Normal,
-                  DimensionId::Overworld) {}
+                  DimensionId::Overworld) {
+    m_lod.reset(&m_generator);
+}
 
 void World::resetForNewSeed(
     uint64_t newSeed, WorldType worldType, DimensionId dimension) {
     if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
+    m_lod.reset(nullptr);
     // Flush the streaming cache lane while chunk snapshots are still owned by
     // the store; the next world must not inherit a half-written cache chain.
     m_streamer.clear();
@@ -120,12 +123,14 @@ void World::resetForNewSeed(
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
     new (&m_generator) WorldGenerator(newSeed, worldType, dimension);
+    m_lod.reset(&m_generator);
     Config::WORLD_SEED = newSeed;
 }
 
 World::~World() {
     if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
+    m_lod.releaseGpuMeshes();
 }
 
 // ── Block queries ─────────────────────────────────────────────────────
