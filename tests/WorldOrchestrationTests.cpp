@@ -64,10 +64,8 @@ public:
     void waitIdle() override {}
 
     // ── IGameRenderer ──────────────────────────────────────────────
-    void initialize(Window&, const GraphicsCapabilities&,
-                    const std::filesystem::path&) override {}
-    void reinitialize(const GraphicsCapabilities&,
-                      const std::filesystem::path&) override {}
+    void initialize(Window&, const std::filesystem::path&) override {}
+    void reinitialize(const std::filesystem::path&) override {}
     void beginFrame() override {}
     void setVisualQuality(VisualQuality) override {}
     void finishScene(const PostProcessState&) override {}
@@ -116,7 +114,6 @@ public:
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return {}; }
     uint32_t blockAtlasTilesPerSide() const override { return 1; }
-    bool usesFramebufferSrgb() const override { return false; }
 
 private:
     Frustum m_frustum;

@@ -203,7 +203,7 @@ void ChunkRenderScene::render(float aspectRatio, const ExtraPass& extraPass) {
     m_renderer.unbindBlockShader();
     if (extraPass) extraPass(viewProjection);
     // Resolve the offscreen scene target and compose it to the default
-    // framebuffer; the OpenGL backend otherwise leaves it blank.
+    // framebuffer before drawing the scene.
     m_renderer.finishScene(PostProcessState{});
     m_renderer.endFrame();
 }

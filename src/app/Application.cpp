@@ -13,9 +13,6 @@
 #include "core/TextEditBuffer.h"
 #include "platform/sdl/SdlClipboard.h"
 #include "core/AssetStore.h"
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-#include "renderer/Renderer.h"
-#endif
 #include "renderer/Camera.h"
 #include "renderer/Frustum.h"
 #include "renderer/RenderEnvironment.h"
@@ -56,9 +53,7 @@
 #include "audio/AudioSystem.h"
 #include "renderer/ChunkRenderScene.h"
 #include "renderer/TexturedCubeScene.h"
-#if defined(MINECRAFTC_ENABLE_VULKAN)
 #include "renderer/backend/vulkan/VulkanRenderer.h"
-#endif
 #include <stdexcept>
 #include <chrono>
 #include <cmath>
@@ -73,34 +68,13 @@
 #include <iomanip>
 #include <unordered_map>
 
-namespace {
-std::unique_ptr<IGameRenderer> createGameRenderer(GraphicsApi api) {
-    if (api == GraphicsApi::Vulkan) {
-#if defined(MINECRAFTC_ENABLE_VULKAN)
-        return std::make_unique<VulkanRenderer>();
-#else
-        throw std::runtime_error("Vulkan support is not enabled in this build");
-#endif
-    }
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-    return std::make_unique<Renderer>();
-#else
-    throw std::runtime_error("OpenGL support is not enabled in this build");
-#endif
-}
-}
-
 class Application final : public ApplicationHost {
 public:
-    explicit Application(RuntimePaths paths,
-                         GraphicsApi graphicsApi = GraphicsApi::OpenGL33)
+    explicit Application(RuntimePaths paths)
         : m_paths(std::move(paths)),
           m_assets(m_paths.assetRoot),
-          m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC",
-                   graphicsApi == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES,
-                   graphicsApi),
-          m_renderer(createGameRenderer(graphicsApi)),
-          m_graphicsApi(graphicsApi),
+          m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"),
+          m_renderer(std::make_unique<VulkanRenderer>()),
           m_session(m_paths.savesDirectory()),
           m_ui(m_session.player, m_clipboard),
           m_flow(m_session, m_ui, m_scene, m_audio, m_window, m_runtimeClock,
@@ -152,7 +126,6 @@ private:
     platform::sdl::SdlClipboard m_clipboard;
     Window      m_window;
     std::unique_ptr<IGameRenderer> m_renderer;
-    GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
     GameSession m_session;
     GameScenePresenter m_scene;
     GameUiController m_ui;
@@ -190,16 +163,14 @@ private:
         m_ui.localization.setLanguage(m_clientSettings.language);
         applyClientSettings(false);
 
-        const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
-        m_renderer->initialize(m_window, graphics, m_paths.assetRoot);
+        m_renderer->initialize(m_window, m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_renderer->resize(m_window.width(), m_window.height());
         m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_scene.initialize(*m_renderer, m_paths.assetRoot);
         m_audio.initialize(&m_assets);
         m_ui.renderer.initialize(*m_renderer,
-            m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
-            m_paths.assetRoot, graphics.api);
+            m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
         m_ui.renderer.setLocalization(m_ui.localization);
         m_window.setResizeCallback([this](int width, int height) {
             m_renderer->resize(width, height);
@@ -387,18 +358,7 @@ private:
                 } else {
                     m_flow.showMainMenu();
                 }
-            }, m_ui.localization, RendererBackendAvailability{
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-            true,
-#else
-            false,
-#endif
-#if defined(MINECRAFTC_ENABLE_VULKAN)
-            true
-#else
-            false
-#endif
-            });
+            }, m_ui.localization);
         };
 
         // ── Input callbacks ───────────────────────────────────────────
@@ -415,16 +375,14 @@ private:
     void restoreGraphics() {
         m_graphicsResetPending = false;
         m_session.world.invalidateGpuMeshes();
-        const GraphicsCapabilities graphics = m_window.graphicsCapabilities();
         m_ui.renderer.resetGraphics();
         m_scene.resetGraphics();
-        m_renderer->reinitialize(graphics, m_paths.assetRoot);
+        m_renderer->reinitialize(m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_scene.restoreGraphics(*m_renderer, m_paths.assetRoot);
         m_ui.renderer.initialize(*m_renderer,
-            m_renderer->getBlockAtlasTexture(), m_renderer->usesFramebufferSrgb(),
-            m_paths.assetRoot, graphics.api);
+            m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
         m_ui.renderer.setLocalization(m_ui.localization);
         m_session.world.restoreGpuMeshes();
         m_renderer->resize(m_window.width(), m_window.height());
@@ -532,9 +490,8 @@ private:
     }
 };
 
-std::unique_ptr<ApplicationHost> createGameApplication(
-    RuntimePaths paths, GraphicsApi api) {
-    auto app = std::make_unique<Application>(std::move(paths), api);
+std::unique_ptr<ApplicationHost> createGameApplication(RuntimePaths paths) {
+    auto app = std::make_unique<Application>(std::move(paths));
     app->start();
     return app;
 }

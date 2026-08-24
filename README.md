@@ -1,6 +1,6 @@
 # MinecraftC
 
-MinecraftC is a C++17 voxel sandbox built with SDL3, Vulkan, and OpenGL. It
+MinecraftC is a C++17 voxel sandbox built with SDL3 and Vulkan. It
 features deterministic infinite worlds, asynchronous chunk streaming, Creative,
 Survival, and Spectator modes, dynamic lighting and weather, and English and
 Simplified Chinese interfaces.
@@ -36,23 +36,23 @@ pinned SDL 3.4.10 release by default. Add
 
 ### Linux
 
-Install CMake, Git, GLM, OpenGL and Vulkan development packages, plus the X11
+Install CMake, Git, GLM and Vulkan development packages, plus the X11
 and Wayland development headers. Use the command for your distribution:
 
 ```bash
 # Debian / Ubuntu (APT)
-sudo apt install build-essential cmake git libglm-dev libgl1-mesa-dev libvulkan-dev \
+sudo apt install build-essential cmake git libglm-dev libvulkan-dev mesa-vulkan-drivers \
   xorg-dev libwayland-dev libxkbcommon-dev wayland-protocols \
   extra-cmake-modules pkg-config
 
 # Fedora (DNF)
-sudo dnf install gcc-c++ cmake git glm-devel mesa-libGL-devel vulkan-headers \
+sudo dnf install gcc-c++ cmake git glm-devel vulkan-headers \
   vulkan-loader-devel libX11-devel libXcursor-devel libXi-devel libXrandr-devel \
   libXext-devel libXfixes-devel wayland-devel libxkbcommon-devel \
   wayland-protocols-devel extra-cmake-modules pkgconf-pkg-config
 
 # Arch Linux (Pacman)
-sudo pacman -S --needed base-devel cmake git glm mesa libglvnd vulkan-headers \
+sudo pacman -S --needed base-devel cmake git glm vulkan-headers \
   vulkan-icd-loader libx11 libxcursor libxi libxrandr libxext libxfixes wayland \
   libxkbcommon wayland-protocols extra-cmake-modules pkgconf
 ```
@@ -65,9 +65,9 @@ cmake --build build-local -j2
 ./build-local/minecraftc
 ```
 
-Linux, Windows, Android, and macOS include both gameplay renderers. Vulkan is
-the default and falls back to OpenGL when initialization fails. Select OpenGL
-explicitly with `--renderer=opengl`.
+All supported platforms use Vulkan exclusively. `--renderer=vulkan` remains a
+compatibility alias; Vulkan initialization failures are reported without a
+fallback renderer.
 
 ### Windows
 
@@ -97,7 +97,7 @@ cmake --build build-local -j2
 ### Android
 
 Android builds target arm64 devices running Android 10 (API 29) or newer and
-include Vulkan 1.0 with an OpenGL ES 3.0 fallback. The pinned toolchain uses SDK
+require Vulkan 1.0. The pinned toolchain uses SDK
 Platform 35, Build Tools 35.0.0, NDK 28.2.13676358, CMake 3.22.1, and JDK 17.
 
 ```bash
@@ -120,8 +120,6 @@ cmake -S . -B build-ios-simulator -G Xcode \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
   -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
-  -DMINECRAFTC_ENABLE_OPENGL=OFF \
-  -DMINECRAFTC_ENABLE_VULKAN=ON \
   -DMINECRAFTC_MOLTENVK_ROOT=/path/to/MoltenVK
 cmake --build build-ios-simulator --config Release --parallel 2
 ```

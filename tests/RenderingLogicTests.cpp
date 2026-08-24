@@ -4,7 +4,6 @@
 #include "renderer/CameraEffects.h"
 #include "renderer/CloudRenderData.h"
 #include "model/ModelRenderLogic.h"
-#include "renderer/ShaderDialect.h"
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/Shadow.h"
@@ -297,21 +296,12 @@ int main() {
     }
     require(rejectedTexture, "invalid RGBA texture byte count was accepted");
     const glm::vec4 glNear = glm::vec4(0, 0, -1, 1);
-    const glm::vec4 vkNear = clipSpaceCorrection(GraphicsApi::Vulkan) * glNear;
+    const glm::vec4 vkNear = clipSpaceCorrection() * glNear;
     require(std::abs(vkNear.z) < 0.0001f && vkNear.y == 0.0f,
             "Vulkan clip-space depth conversion is incorrect");
     const glm::vec4 glTop = glm::vec4(0, 1, 0, 1);
-    require((clipSpaceCorrection(GraphicsApi::Vulkan) * glTop).y == -1.0f,
+    require((clipSpaceCorrection() * glTop).y == -1.0f,
             "Vulkan clip-space Y conversion is incorrect");
-    const std::string desktopShader = "#version 330 core\nvoid main(){}\n";
-    require(shaderSourceForApi(desktopShader, GraphicsApi::OpenGL33) == desktopShader,
-            "desktop shader source was unexpectedly rewritten");
-    const std::string esShader = shaderSourceForApi(
-        desktopShader, GraphicsApi::OpenGLES30);
-    require(esShader.rfind("#version 300 es\nprecision highp float;\n"
-                           "precision highp int;\n", 0) == 0 &&
-            esShader.find("#version 330 core") == std::string::npos,
-            "GLES shader preamble was not generated correctly");
     require(model::modelPass(model::AlphaMode::Opaque) ==
                 model::ModelPass::Opaque &&
             model::modelPass(model::AlphaMode::Mask) ==

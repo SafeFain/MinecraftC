@@ -932,7 +932,7 @@ void VulkanPipelineFactory::createSecondaryPipelines(
         depth.depthWriteEnable = VK_TRUE;
         depth.depthCompareOp = VK_COMPARE_OP_LESS;
         // The shared compatibility cube uses legacy per-face winding. Clouds
-        // are opaque, so double-sided rasterization preserves the OpenGL
+        // are opaque, so double-sided rasterization preserves the established
         // silhouette without making winding part of the shared data contract.
         raster.cullMode = VK_CULL_MODE_NONE;
         createGraphics("cloud.vert.spv", "cloud.frag.spv", cloudVertexInput,

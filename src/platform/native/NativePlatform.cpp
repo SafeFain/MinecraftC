@@ -36,7 +36,7 @@ namespace {
 namespace fs = std::filesystem;
 
 bool isAssetRoot(const fs::path& path) {
-    return fs::is_regular_file(path / "shaders" / "block.vert") &&
+    return fs::is_regular_file(path / "shaders" / "vulkan" / "chunk.vert.spv") &&
            fs::is_regular_file(path / "textures" / "definitions" / "blocks.json");
 }
 

@@ -147,7 +147,7 @@ and verify them with `python3 tests/test_entity_models.py`.
 5. Regenerate, validate, and build the atlas. Do not add UV coordinates to C++.
 6. Add the semantic C++ material enum/name mapping only when the new block must
    coexist with the legacy procedural compatibility atlas.
-7. Run the Release build, full CTest suite, `git diff --check`, and OpenGL smoke
+7. Run the Release build, full CTest suite, `git diff --check`, and Vulkan smoke
    test.
 
 For third-party art, place files under `third_party/<pack>/`, retain the

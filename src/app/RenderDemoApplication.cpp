@@ -8,12 +8,7 @@
 #include "entity/EntityModelRegistry.h"
 #include "renderer/ChunkRenderScene.h"
 #include "renderer/TexturedCubeScene.h"
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-#include "renderer/Renderer.h"
-#endif
-#if defined(MINECRAFTC_ENABLE_VULKAN)
 #include "renderer/backend/vulkan/VulkanRenderer.h"
-#endif
 
 #include <algorithm>
 #include <array>
@@ -26,36 +21,17 @@
 
 class BasicRenderApplication final : public ApplicationHost {
 public:
-    BasicRenderApplication(RuntimePaths paths, GraphicsApi api,
-                           bool texturedDemo = false,
+    BasicRenderApplication(RuntimePaths paths, bool texturedDemo = false,
                            int benchmarkFrames = 0)
         : m_paths(std::move(paths)),
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT,
-                   api == GraphicsApi::Vulkan ? "MinecraftC - Vulkan" :
-                                                "MinecraftC - OpenGL Demo",
-                   api == GraphicsApi::Vulkan ? 0 : Config::MSAA_SAMPLES, api,
+                   "MinecraftC - Vulkan",
+                   Window::SurfaceMode::Vulkan,
                    benchmarkFrames == 0, benchmarkFrames == 0),
           m_benchmarkFrames(benchmarkFrames) {
-        if (api == GraphicsApi::Vulkan) {
-#if defined(MINECRAFTC_ENABLE_VULKAN)
-            auto renderer = std::make_unique<VulkanRenderer>();
-            renderer->initialize(m_window, m_window.graphicsCapabilities(),
-                                 m_paths.assetRoot);
-            m_renderer = std::move(renderer);
-#else
-            throw std::runtime_error("Vulkan support is not enabled in this build");
-#endif
-        } else {
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-            auto renderer = std::make_unique<Renderer>();
-            renderer->initialize(m_window, m_window.graphicsCapabilities(),
-                                 m_paths.assetRoot);
-            renderer->resize(m_window.width(), m_window.height());
-            m_renderer = std::move(renderer);
-#else
-            throw std::runtime_error("OpenGL support is not enabled in this build");
-#endif
-        }
+        auto renderer = std::make_unique<VulkanRenderer>();
+        renderer->initialize(m_window, m_paths.assetRoot);
+        m_renderer = std::move(renderer);
         if (texturedDemo)
             m_texturedScene = std::make_unique<TexturedCubeScene>(
                 *m_renderer, m_paths.assetRoot);
@@ -210,10 +186,9 @@ private:
 
 
 std::unique_ptr<ApplicationHost> createRenderDemoApplication(
-    RuntimePaths paths, GraphicsApi api, bool texturedDemo,
-    int benchmarkFrames) {
+    RuntimePaths paths, bool texturedDemo, int benchmarkFrames) {
     Debug::Log::init(Debug::LogLevel::Trace, false);
     Debug::installCrashHandlers();
     return std::make_unique<BasicRenderApplication>(
-        std::move(paths), api, texturedDemo, benchmarkFrames);
+        std::move(paths), texturedDemo, benchmarkFrames);
 }

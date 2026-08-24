@@ -64,7 +64,7 @@ public:
         m_batches.clear();
         const float fullW=m_canvasSize.x>0?m_canvasSize.x:static_cast<float>(width);
         const float fullH=m_canvasSize.y>0?m_canvasSize.y:static_cast<float>(height);
-        m_projection=clipSpaceCorrection(GraphicsApi::Vulkan)*glm::ortho(
+        m_projection=clipSpaceCorrection()*glm::ortho(
             -m_canvasOrigin.x,fullW-m_canvasOrigin.x,-m_canvasOrigin.y,
             fullH-m_canvasOrigin.y);
     }

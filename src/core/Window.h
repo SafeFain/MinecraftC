@@ -3,7 +3,6 @@
 #include "core/InputCodes.h"
 #include "core/Touch.h"
 #include "core/GamepadManager.h"
-#include "core/GraphicsApi.h"
 
 #include <array>
 #include <algorithm>
@@ -37,8 +36,10 @@ inline WindowSafeArea projectWindowSafeArea(
 
 class Window {
 public:
-    Window(int width, int height, const std::string& title, int preferredSamples,
-           GraphicsApi graphicsApi = GraphicsApi::OpenGL33,
+    enum class SurfaceMode { Vulkan, InputOnly };
+
+    Window(int width, int height, const std::string& title,
+           SurfaceMode surfaceMode = SurfaceMode::Vulkan,
            bool synchronizePresentation = true,
            bool highPixelDensity = true);
     ~Window();
@@ -47,7 +48,6 @@ public:
     Window& operator=(const Window&) = delete;
 
     bool shouldClose() const { return m_shouldClose; }
-    void swapBuffers();
     void handleEvent(const void* event) { processEvent(event); }
     void finishEventFrame();
     void setTitle(const std::string& title);
@@ -73,10 +73,7 @@ public:
     bool isMinimized() const {
         return m_minimized || m_pixelWidth <= 0 || m_pixelHeight <= 0;
     }
-    bool isSrgbCapable() const { return m_srgbCapable; }
     bool synchronizePresentation() const { return m_synchronizePresentation; }
-    GraphicsApi graphicsApi() const { return m_graphicsApi; }
-    GraphicsCapabilities graphicsCapabilities() const;
     std::vector<std::string> requiredVulkanInstanceExtensions() const;
     std::uintptr_t createVulkanSurface(void* instance) const;
     WindowSafeArea safeArea() const;
@@ -107,11 +104,8 @@ public:
         m_resizeCallback = std::move(callback);
     }
 
-    static void* graphicsProcAddress(const char* name);
-
 private:
     void* m_window = nullptr;
-    void* m_context = nullptr;
     int m_pixelWidth = 1;
     int m_pixelHeight = 1;
     int m_windowWidth = 1;
@@ -119,9 +113,8 @@ private:
     bool m_shouldClose = false;
     bool m_cursorLocked = false;
     bool m_minimized = false;
-    bool m_srgbCapable = false;
     bool m_synchronizePresentation = true;
-    GraphicsApi m_graphicsApi = GraphicsApi::OpenGL33;
+    SurfaceMode m_surfaceMode = SurfaceMode::Vulkan;
     bool m_touchAvailable = false;
     bool m_textInputEnabled = false;
     std::unique_ptr<GamepadManager> m_gamepads;

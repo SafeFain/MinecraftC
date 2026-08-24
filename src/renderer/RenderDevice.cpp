@@ -49,12 +49,10 @@ bool isMeshMaterialCompatible(MeshVertexLayout layout,
            pipeline == MaterialPipeline::ChunkTranslucent;
 }
 
-glm::mat4 clipSpaceCorrection(GraphicsApi api) {
+glm::mat4 clipSpaceCorrection() {
     glm::mat4 correction{1.0f};
-    if (api == GraphicsApi::Vulkan) {
-        correction[1][1] = -1.0f;
-        correction[2][2] = 0.5f;
-        correction[3][2] = 0.5f;
-    }
+    correction[1][1] = -1.0f;
+    correction[2][2] = 0.5f;
+    correction[3][2] = 0.5f;
     return correction;
 }

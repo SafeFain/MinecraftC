@@ -82,9 +82,6 @@
 
   "settings.title": "SETTINGS",
   "settings.video_title": "VIDEO SETTINGS",
-  "settings.renderer": "Renderer: {0} (restart required)",
-  "settings.renderer_opengl": "OpenGL",
-  "settings.renderer_vulkan": "Vulkan",
   "settings.key_bindings_title": "KEY BINDINGS",
   "settings.keyboard_mouse_title": "KEYBOARD & MOUSE",
   "settings.controller_title": "CONTROLLER",

@@ -5,15 +5,6 @@
 #include <cmath>
 #include <functional>
 
-struct RendererBackendAvailability {
-    bool openGL = true;
-    bool vulkan = false;
-};
-
-inline bool rendererBackendSwitchable(RendererBackendAvailability available) {
-    return available.openGL && available.vulkan;
-}
-
 enum class SettingsPage {
     General,
     Video,
@@ -70,8 +61,7 @@ inline float frameRateSliderFraction(int frameRate) {
 class SettingsMenu : public Menu {
 public:
     SettingsMenu(ClientSettings& settings, std::function<void()> onChanged,
-                 std::function<void()> onBack, const Localization& localization,
-                 RendererBackendAvailability renderers = {});
+                 std::function<void()> onBack, const Localization& localization);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;
@@ -91,7 +81,6 @@ private:
     std::function<void()> m_onChanged;
     ClientSettings& m_settings;
     const Localization& m_localization;
-    RendererBackendAvailability m_renderers;
     SettingsPage m_page = SettingsPage::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;

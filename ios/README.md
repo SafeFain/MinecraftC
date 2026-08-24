@@ -1,8 +1,8 @@
 # MinecraftC for iOS
 
 The iOS client supports iOS 14 or newer on arm64 iPhone and iPad devices. It is
-landscape-only and builds only the complete Vulkan renderer, statically linked
-to MoltenVK 1.4.1. OpenGL cannot be enabled for this target.
+landscape-only and builds the Vulkan renderer, statically linked to MoltenVK
+1.4.1, consistently with every other supported platform.
 
 ## Dependencies
 
@@ -22,8 +22,6 @@ cmake -S . -B build-ios-simulator -G Xcode \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
   -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
-  -DMINECRAFTC_ENABLE_OPENGL=OFF \
-  -DMINECRAFTC_ENABLE_VULKAN=ON \
   -DMINECRAFTC_MOLTENVK_ROOT=/path/to/MoltenVK
 cmake --build build-ios-simulator --config Release --parallel 2
 ```

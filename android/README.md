@@ -8,11 +8,9 @@ The launcher icon shares the deterministic grass-block artwork used by iOS.
 Regenerate it from the repository root with
 `python3 tools/texture_generator.py --build-android-icon`.
 
-Android builds always include both Vulkan 1.0 and OpenGL ES 3.0 gameplay
-renderers; configuring with `MINECRAFTC_ENABLE_VULKAN=OFF` is unsupported. New
-installs prefer Vulkan and fall back to OpenGL ES when Vulkan initialization is
-unavailable. Vulkan is declared as an optional device feature, so GLES-only
-devices remain installable.
+Android builds use the Vulkan 1.0 gameplay renderer exclusively. Vulkan is a
+required device feature, so devices without Vulkan support cannot install the
+application and initialization failures do not use a fallback renderer.
 
 ```bash
 gradle -p android assembleDebug

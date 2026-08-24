@@ -3,7 +3,6 @@
 #include "model/ModelAnimation.h"
 #include "renderer/RenderEnvironment.h"
 #include "world/BlockLightLogic.h"
-#include "core/GraphicsApi.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -62,9 +61,6 @@ private:
     std::unique_ptr<IModelRenderBackend> m_backend;
 };
 
-std::unique_ptr<ModelRenderer> createOpenGLModelRenderer(
-    const std::filesystem::path& assetRoot, bool framebufferSrgb,
-    GraphicsApi api);
 std::unique_ptr<ModelRenderer> createVulkanModelRenderer(
     ::VulkanRenderer& renderer);
 

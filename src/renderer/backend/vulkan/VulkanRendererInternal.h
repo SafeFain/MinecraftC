@@ -10,7 +10,6 @@
 #include "model/ModelRenderLogic.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/CloudRenderData.h"
-#include "renderer/Shader.h"
 #include "renderer/backend/vulkan/VulkanHelpers.h"
 #include "renderer/backend/vulkan/VulkanIndexRebase.h"
 #include "renderer/backend/vulkan/VulkanPipelineFactory.h"
@@ -1220,7 +1219,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             const model::Material& material) {
             ModelUniforms uniforms;
             uniforms.joints.fill(glm::mat4(1));
-            uniforms.viewProjection = clipSpaceCorrection(GraphicsApi::Vulkan) *
+            uniforms.viewProjection = clipSpaceCorrection() *
                                       submission.viewProjection;
             uniforms.model = submission.draw.transform;
             uniforms.node = glm::mat4(1);
@@ -1480,7 +1479,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             const VkBuffer buffer = cloudBuffers[currentFrame].instance.handle;
             vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
             const CloudUniforms constants{
-                clipSpaceCorrection(GraphicsApi::Vulkan) * cloudViewProjection,
+                clipSpaceCorrection() * cloudViewProjection,
                 glm::vec4(cloudOrigin, 0.0f), glm::vec4(cloudColor, 0.0f),
                 glm::vec4(glm::normalize(submittedFrame.lightDirection),
                           postProcess.environment.rainIntensity)};
@@ -1556,7 +1555,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             const glm::mat4 drawViewProjection = draw.useCustomViewProjection
                 ? draw.viewProjection : submittedFrame.projection * submittedFrame.view;
             const FrameUniforms constants{
-                clipSpaceCorrection(GraphicsApi::Vulkan) * drawViewProjection * draw.model,
+                clipSpaceCorrection() * drawViewProjection * draw.model,
                 {static_cast<float>(material.desc.atlasTilesPerSide),
                  material.desc.smoothLighting ? 1.0f : 0.0f,
                  material.desc.alphaCutoff, 0.0f},
@@ -1651,7 +1650,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     swapchain.particlePipelineLayout,0,1,&material->second.descriptorSet,
                     0,nullptr);
                 ParticleUniforms constants;
-                constants.viewProjection=clipSpaceCorrection(GraphicsApi::Vulkan)*
+                constants.viewProjection=clipSpaceCorrection()*
                     particleViewProjection;
                 constants.cameraRightTime=glm::vec4(particleCameraRight,particleTime);
                 constants.cameraUpIntensity=glm::vec4(particleCameraUp,

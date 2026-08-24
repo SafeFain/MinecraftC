@@ -29,7 +29,7 @@ RULES = {
 
 ALLOWED_PREFIXES = {
     "sdl": ("src/platform/sdl/",),
-    "opengl": ("src/renderer/backend/opengl/",),
+    "opengl": (),
     "vulkan": (
         "src/renderer/backend/vulkan/",
         "src/platform/sdl/SdlWindow.cpp",

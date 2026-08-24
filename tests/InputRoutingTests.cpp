@@ -44,7 +44,7 @@ SDL_Event mouseButtonEvent(SDL_EventType type, Uint8 button) {
 }
 }
 
-// TouchControls::render is linked into this logic test, but no OpenGL-backed
+// TouchControls::render is linked into this logic test, but no graphics-backed
 // renderer is constructed. These inert definitions keep the test focused on
 // input capture and routing (same pattern as ClientInputTests).
 void UIRenderer::drawRect(float, float, float, float, const glm::vec4&) {}
@@ -58,19 +58,19 @@ std::string Localization::text(std::string_view key) const {
 int main() {
     // Prefer the platform's default video driver (desktop sessions on
     // Windows/macOS CI and X11/Wayland hosts). Headless Linux CI falls back
-    // to the offscreen driver, which provides a real SDL window and OpenGL
-    // context where EGL is available. If no video backend can create a
+    // to the offscreen driver. No presentation surface is needed because this
+    // test only validates input routing. If no video backend can create a
     // window, the test is skipped instead of failing the suite.
     std::unique_ptr<Window> window;
     try {
         window = std::make_unique<Window>(
-            640, 480, "input routing test", 0, GraphicsApi::OpenGL33, true,
-            false);
+            640, 480, "input routing test", Window::SurfaceMode::InputOnly,
+            true, false);
     } catch (const std::exception&) {
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
         try {
             window = std::make_unique<Window>(
-                640, 480, "input routing test", 0, GraphicsApi::OpenGL33,
+                640, 480, "input routing test", Window::SurfaceMode::InputOnly,
                 true, false);
         } catch (const std::exception&) {
             std::cerr << "FAILED: no SDL video driver can create a window\n";

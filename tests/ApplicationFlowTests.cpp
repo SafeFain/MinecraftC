@@ -6,7 +6,7 @@
 // behavior that Application.cpp previously owned untested.
 //
 // The same stub pattern as InputRoutingTests/SessionFlowTests keeps this
-// target free of OpenGL and asset loading: UIRenderer and Localization are
+// target free of graphics backend and asset loading: UIRenderer and Localization are
 // provided as inert link-level definitions.
 
 #include "app/ApplicationInputController.h"
@@ -41,8 +41,8 @@
 #include <string>
 #include <thread>
 
-// UIRenderer is a GL-backed facade; the flow tests never render, so these
-// inert definitions keep the target free of the OpenGL backend (same pattern
+// UIRenderer is a graphics-backed facade; the flow tests never render, so these
+// inert definitions keep the target free of the Vulkan backend (same pattern
 // as InputRoutingTests).
 UIRenderer::~UIRenderer() = default;
 void UIRenderer::beginUIFrame(int, int) {}
@@ -112,10 +112,8 @@ public:
     RendererPerformanceStats performanceStats() const override { return {}; }
 
     // ── IGameRenderer ──────────────────────────────────────────────
-    void initialize(Window&, const GraphicsCapabilities&,
-                    const std::filesystem::path&) override {}
-    void reinitialize(const GraphicsCapabilities&,
-                      const std::filesystem::path&) override {}
+    void initialize(Window&, const std::filesystem::path&) override {}
+    void reinitialize(const std::filesystem::path&) override {}
     void suspendPresentation() override {}
     void resumePresentation() override {}
     void beginFrame() override {}
@@ -163,7 +161,6 @@ public:
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return {}; }
     uint32_t blockAtlasTilesPerSide() const override { return 1; }
-    bool usesFramebufferSrgb() const override { return false; }
 
 private:
     Frustum m_frustum;
@@ -244,13 +241,13 @@ int main() {
     std::unique_ptr<Window> window;
     try {
         window = std::make_unique<Window>(
-            640, 480, "application flow test", 0, GraphicsApi::OpenGL33, true,
-            false);
+            640, 480, "application flow test", Window::SurfaceMode::InputOnly,
+            true, false);
     } catch (const std::exception&) {
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
         try {
             window = std::make_unique<Window>(
-                640, 480, "application flow test", 0, GraphicsApi::OpenGL33,
+                640, 480, "application flow test", Window::SurfaceMode::InputOnly,
                 true, false);
         } catch (const std::exception&) {
             std::cerr << "FAILED: no SDL video driver can create a window\n";

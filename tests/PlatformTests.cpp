@@ -21,7 +21,8 @@ void require(bool condition, const char* message) {
 void makeAssets(const fs::path& root) {
     fs::create_directories(root / "shaders");
     fs::create_directories(root / "textures" / "definitions");
-    std::ofstream(root / "shaders" / "block.vert") << "shader";
+    fs::create_directories(root / "shaders" / "vulkan");
+    std::ofstream(root / "shaders" / "vulkan" / "chunk.vert.spv") << "shader";
     std::ofstream(root / "textures" / "definitions" / "blocks.json") << "{}";
 }
 

@@ -9,7 +9,6 @@
 #include "model/ModelRenderLogic.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/CloudRenderData.h"
-#include "renderer/Shader.h"
 #include "renderer/backend/vulkan/VulkanHelpers.h"
 #include "renderer/backend/vulkan/VulkanIndexRebase.h"
 #include "renderer/backend/vulkan/VulkanPipelineFactory.h"
@@ -249,10 +248,7 @@ RendererPerformanceStats VulkanRenderer::performanceStats() const {
 }
 
 void VulkanRenderer::initialize(Window& window,
-                                const GraphicsCapabilities& capabilities,
                                 const std::filesystem::path& assetRoot) {
-    if (capabilities.api != GraphicsApi::Vulkan)
-        throw std::invalid_argument("VulkanRenderer requires a Vulkan window");
     if (m_impl) throw std::logic_error("VulkanRenderer is already initialized");
     m_window = &window;
     m_assetRoot = assetRoot;
@@ -295,8 +291,7 @@ void VulkanRenderer::initialize(Window& window,
     m_modelRenderer = model::createVulkanModelRenderer(*this);
 }
 
-void VulkanRenderer::reinitialize(const GraphicsCapabilities& capabilities,
-                                  const std::filesystem::path& assetRoot) {
+void VulkanRenderer::reinitialize(const std::filesystem::path& assetRoot) {
     if (!m_window) throw std::logic_error("VulkanRenderer has no window");
     waitIdle();
     m_modelRenderer.reset();
@@ -323,7 +318,7 @@ void VulkanRenderer::reinitialize(const GraphicsCapabilities& capabilities,
     m_entityAtlas = {};
     m_compatibilityCubes.fill({});
     m_impl.reset();
-    initialize(*m_window, capabilities, assetRoot);
+    initialize(*m_window, assetRoot);
 }
 
 void VulkanRenderer::suspendPresentation() {
@@ -406,7 +401,7 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
     SkyUniforms& sky = m_impl->submittedSky;
     const glm::mat4 viewProjection = glm::inverse(inverseViewProjection);
     sky.inverseViewProjection = glm::inverse(
-        clipSpaceCorrection(GraphicsApi::Vulkan) * viewProjection);
+        clipSpaceCorrection() * viewProjection);
     sky.cameraPosition = glm::vec4(cameraPosition, 0.0f);
     sky.sunDirection = glm::vec4(environment.sunDirection, 0.0f);
     sky.moonDirection = glm::vec4(environment.moonDirection, 0.0f);
@@ -499,7 +494,7 @@ void VulkanRenderer::renderChunkShadows(
         moved||lightDelta>=0.01f||(timeDue&&lightDelta>=0.0002f);
     const float fogDistance=(static_cast<float>(Config::RENDER_DISTANCE)+0.5f)*
                             Config::CHUNK_SIZE_X;
-    const glm::mat4 correction=clipSpaceCorrection(GraphicsApi::Vulkan);
+    const glm::mat4 correction=clipSpaceCorrection();
     if(updateShadow){
         m_impl->shadowCascades=buildShadowCascades(quality,inverseViewProjection,view,
             m_environment.lightDirection,Config::NEAR_PLANE,fogDistance);
@@ -546,7 +541,7 @@ void VulkanRenderer::renderWireframe(const glm::vec3& blockPosition,
     model = glm::scale(model, blockSize * 1.003f);
     model = glm::translate(model, glm::vec3(-0.5f));
     m_impl->wireModelViewProjection =
-        clipSpaceCorrection(GraphicsApi::Vulkan) * viewProjection * model;
+        clipSpaceCorrection() * viewProjection * model;
     m_impl->wireQueued = true;
     m_impl->drawQueued = true;
 }
@@ -602,9 +597,6 @@ void VulkanRenderer::renderCompatibilityEntityCube(
     draw(command);
 }
 model::ModelRenderer& VulkanRenderer::modelRenderer() { return *m_modelRenderer; }
-bool VulkanRenderer::usesFramebufferSrgb() const {
-    return m_impl && m_impl->swapchain.framebufferSrgb;
-}
 void VulkanRenderer::flushModels(const glm::mat4& viewProjection) {
     const float fogEnd = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
                          Config::CHUNK_SIZE_X;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "renderer/RenderDevice.h"
-#include "core/GraphicsApi.h"
 #include "renderer/Frustum.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/RenderEnvironment.h"
@@ -28,10 +27,8 @@ class IGameRenderer : public IRenderDevice {
 public:
     using IRenderDevice::beginFrame;
     virtual void initialize(Window& window,
-                            const GraphicsCapabilities& capabilities,
                             const std::filesystem::path& assetRoot) = 0;
-    virtual void reinitialize(const GraphicsCapabilities& capabilities,
-                              const std::filesystem::path& assetRoot) = 0;
+    virtual void reinitialize(const std::filesystem::path& assetRoot) = 0;
     virtual void suspendPresentation() {}
     virtual void resumePresentation() {}
     virtual void beginFrame() = 0;
@@ -75,5 +72,4 @@ public:
     virtual const Frustum& getFrustum() const = 0;
     virtual RenderTextureHandle getBlockAtlasTexture() const = 0;
     virtual uint32_t blockAtlasTilesPerSide() const = 0;
-    virtual bool usesFramebufferSrgb() const = 0;
 };

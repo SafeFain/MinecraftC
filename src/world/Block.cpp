@@ -774,7 +774,7 @@ const std::array<glm::vec3, 8> CUBE_CORNERS = {{
 }};
 
 // ── Face vertex indices (6 faces × 6 indices for 2 triangles) ─────────
-// Winding: CCW from outside the cube (matches OpenGL default with
+// Winding: CCW from outside the cube (matches the renderer convention with
 // standard lookAt view matrix which has det=-1, flipping to screen-CCW)
 
 const std::array<std::array<int, 6>, 6> FACE_INDICES = {{

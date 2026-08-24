@@ -33,10 +33,9 @@ public:
     void waitIdle() override;
     RendererPerformanceStats performanceStats() const override;
 
-    void initialize(Window& window, const GraphicsCapabilities& capabilities,
+    void initialize(Window& window,
                     const std::filesystem::path& assetRoot) override;
-    void reinitialize(const GraphicsCapabilities& capabilities,
-                      const std::filesystem::path& assetRoot) override;
+    void reinitialize(const std::filesystem::path& assetRoot) override;
     void suspendPresentation() override;
     void resumePresentation() override;
     void beginFrame() override;
@@ -78,7 +77,6 @@ public:
     const Frustum& getFrustum() const override { return m_frustum; }
     RenderTextureHandle getBlockAtlasTexture() const override { return m_blockAtlas; }
     uint32_t blockAtlasTilesPerSide() const override { return m_blockAtlasTilesPerSide; }
-    bool usesFramebufferSrgb() const override;
     void queueUiBatch(const std::vector<UiMeshVertex>& vertices,
                       const std::vector<uint32_t>& indices,
                       RenderMaterialHandle material,

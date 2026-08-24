@@ -13,7 +13,7 @@ half-texel-inset UVs, and a genuine multi-joint skin
 containing a root plus rigidly weighted body-part joints. Every vertex uses at
 most four weights and every skin remains below the 64-joint runtime limit. Each
 block-style material is explicitly double-sided so animated entities retain
-their exterior surfaces across both OpenGL and Vulkan projection paths. Each
+their exterior surfaces in the Vulkan projection path. Each
 asset contains seamless `idle`, `walk`, `hurt`, and `death` animation clips.
 Hostile assets also contain an original `attack` clip. Adjacent version-1
 `.anim.json` files define runtime layers, masks, transitions, priorities, and

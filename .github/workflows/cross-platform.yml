@@ -58,9 +58,9 @@ jobs:
           echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
       - name: Install graphics and virtual-display dependencies
-        run: sudo apt-get update && sudo apt-get install -y glslc libgl1-mesa-dev libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
+        run: sudo apt-get update && sudo apt-get install -y glslc libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test
@@ -75,9 +75,12 @@ jobs:
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/atlas.json"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/items_atlas.png"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/textures/generated/cloud.png"
+          test -f "$RUNNER_TEMP/$RELEASE_DIR/assets/shaders/vulkan/chunk.vert.spv"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/share/applications/io.github.SafeFain.MinecraftC.desktop"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/share/icons/hicolor/1024x1024/apps/minecraftc.png"
           test "$($RUNNER_TEMP/$RELEASE_DIR/minecraftc --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
+          ! ldd "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" | grep -E 'lib(GL|GLES|EGL)'
+          ! nm -C "$RUNNER_TEMP/$RELEASE_DIR/minecraftc" | grep -E 'OpenGLRenderer|gladLoad'
       - name: Verify installed renderer startup
         shell: bash
         run: |
@@ -111,9 +114,8 @@ jobs:
               exit 1
             fi
           }
-          run_smoke opengl "MinecraftC initialized"
           run_smoke vulkan "Vulkan first frame presented"
-          run_smoke opengl-demo "Visual pipeline"
+          run_smoke vulkan-demo "Visual pipeline"
       - name: Package Linux release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz" "$RELEASE_DIR"
       - name: Upload Linux package
@@ -144,15 +146,6 @@ jobs:
           "MINECRAFTC_VERSION_CORE=$core" | Out-File -FilePath $env:GITHUB_ENV -Append
           "MINECRAFTC_VERSION_DISPLAY=$display" | Out-File -FilePath $env:GITHUB_ENV -Append
           "RELEASE_DIR=MinecraftC-$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Reject Windows OpenGL-only configuration
-        shell: pwsh
-        run: |
-          cmake -S . -B build-opengl-only -DMINECRAFTC_ENABLE_VULKAN=OFF
-          if ($LASTEXITCODE -eq 0) {
-            throw "Windows unexpectedly accepted an OpenGL-only build"
-          }
-          Write-Host "Windows OpenGL-only configuration was rejected as expected"
-          exit 0
       - name: Install pinned Vulkan SDK
         shell: pwsh
         run: |
@@ -179,7 +172,7 @@ jobs:
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$sdk/Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Configure
-        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci --config Release --parallel 2
       - name: Test
@@ -193,7 +186,7 @@ jobs:
           cmake --install build-ci --config Release --prefix $stage
           if (!(Test-Path "$stage/minecraftc.exe")) { throw "Executable was not installed" }
           if (!(Test-Path "$stage/LICENSE")) { throw "GPL license was not installed" }
-          if (!(Test-Path "$stage/assets/shaders/block.vert")) { throw "Assets were not installed" }
+          if (!(Test-Path "$stage/assets/shaders/vulkan/chunk.vert.spv")) { throw "Assets were not installed" }
           if (!(Test-Path "$stage/assets/textures/generated/atlas.json")) { throw "Block atlas was not installed" }
           Add-Type -AssemblyName System.Drawing
           $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$stage/minecraftc.exe")
@@ -202,8 +195,17 @@ jobs:
           $version = & "$stage/minecraftc.exe" --version
           if ($version -ne "MinecraftC $env:MINECRAFTC_VERSION_DISPLAY") { throw "Version check failed: $version" }
           $help = (& "$stage/minecraftc.exe" --help 2>&1) -join "`n"
-          if ($help -notmatch "renderer=opengl\|vulkan") {
-            throw "Installed Windows executable does not advertise both renderers"
+          if ($help -notmatch "renderer=vulkan\|vulkan-demo\|vulkan-textured-demo") {
+            throw "Installed Windows executable does not advertise Vulkan renderer modes"
+          }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem "$vs/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe" |
+            Sort-Object FullName | Select-Object -Last 1
+          if (!$dumpbin) { throw "dumpbin.exe was not found" }
+          $dependencies = (& $dumpbin.FullName /dependents "$stage/minecraftc.exe" 2>&1) -join "`n"
+          if ($dependencies -match "OPENGL32.dll") {
+            throw "Installed Windows executable unexpectedly links OpenGL"
           }
       - name: Package Windows release
         shell: pwsh
@@ -233,18 +235,6 @@ jobs:
           echo "MINECRAFTC_VERSION_CORE=$core" >> "$GITHUB_ENV"
           echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
-      - name: Reject macOS OpenGL-only configuration
-        shell: bash
-        run: |
-          set +e
-          cmake -S . -B build-opengl-only -DMINECRAFTC_ENABLE_VULKAN=OFF \
-            > "$RUNNER_TEMP/macos-opengl-only.log" 2>&1
-          status=$?
-          set -e
-          cat "$RUNNER_TEMP/macos-opengl-only.log"
-          test "$status" -ne 0
-          grep -q "Android, Linux, Windows, and macOS builds require both" \
-            "$RUNNER_TEMP/macos-opengl-only.log"
       - name: Install pinned MoltenVK and shader compiler
         shell: bash
         run: |
@@ -266,7 +256,7 @@ jobs:
           brew untap aws/tap >/dev/null 2>&1 || true
           brew install shaderc
       - name: Configure universal build
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_ENABLE_VULKAN=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test native slice
@@ -282,14 +272,15 @@ jobs:
           lipo "$executable" -verify_arch arm64 x86_64
           lipo "$moltenvk" -verify_arch arm64 x86_64
           otool -L "$executable" | grep -q '@rpath/libMoltenVK.dylib'
+          ! otool -L "$executable" | grep -E 'OpenGL|OpenGLES'
           test "$(defaults read "$app/Contents/Info" CFBundleIconFile)" = "minecraftc.icns"
           test -f "$app/Contents/Resources/minecraftc.icns"
-          test -f "$app/Contents/Resources/assets/shaders/block.vert"
+          test -f "$app/Contents/Resources/assets/shaders/vulkan/chunk.vert.spv"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/licenses/MoltenVK-LICENSE.txt"
           test "$("$executable" --version)" = "MinecraftC $MINECRAFTC_VERSION_DISPLAY"
-          "$executable" --help | grep -q 'renderer=opengl|vulkan'
-      - name: Verify installed OpenGL and Vulkan startup
+          "$executable" --help | grep -q 'renderer=vulkan|vulkan-demo|vulkan-textured-demo'
+      - name: Verify installed Vulkan startup
         shell: bash
         run: |
           executable="$RUNNER_TEMP/$RELEASE_DIR/MinecraftC.app/Contents/MacOS/MinecraftC"
@@ -310,7 +301,6 @@ jobs:
             wait "$pid" 2>/dev/null || true
             test "$found" -eq 1
           }
-          run_smoke opengl "MinecraftC initialized"
           run_smoke vulkan "Vulkan first frame presented"
       - name: Package macOS release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-macos-universal.tar.gz" "$RELEASE_DIR"
@@ -356,28 +346,6 @@ jobs:
           # Do not broaden trust merely to install an official formula.
           brew untap aws/tap >/dev/null 2>&1 || true
           brew install shaderc
-      - name: Reject non-Vulkan-only iOS configurations
-        shell: bash
-        run: |
-          reject_configure() {
-            build="$1"
-            expected="$2"
-            shift 2
-            set +e
-            cmake -S . -B "$build" -G Xcode -DCMAKE_SYSTEM_NAME=iOS \
-              -DCMAKE_OSX_SYSROOT=iphonesimulator \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 "$@" \
-              > "$build.log" 2>&1
-            status=$?
-            set -e
-            cat "$build.log"
-            test "$status" -ne 0
-            grep -q "$expected" "$build.log"
-          }
-          reject_configure "$RUNNER_TEMP/ios-with-opengl" \
-            "iOS is Vulkan-only" -DMINECRAFTC_ENABLE_OPENGL=ON
-          reject_configure "$RUNNER_TEMP/ios-without-vulkan" \
-            "iOS is Vulkan-only" -DMINECRAFTC_ENABLE_VULKAN=OFF
       - name: Configure and build iOS Simulator
         run: |
           cmake -S . -B build-ios-simulator -G Xcode \
@@ -386,8 +354,6 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
-            -DMINECRAFTC_ENABLE_OPENGL=OFF \
-            -DMINECRAFTC_ENABLE_VULKAN=ON \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
           cmake --build build-ios-simulator --config Release --parallel 2
       - name: Verify iOS Simulator bundle
@@ -520,7 +486,6 @@ jobs:
               echo "MoltenVK simulator argument-buffer workaround was not applied" >&2
               exit 1
             fi
-            ! grep -q 'falling back to OpenGL' "$log"
           }
           run_smoke iphone "$(device_type iPhone)"
           run_smoke ipad "$(device_type iPad)"
@@ -533,8 +498,6 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
-            -DMINECRAFTC_ENABLE_OPENGL=OFF \
-            -DMINECRAFTC_ENABLE_VULKAN=ON \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
           archive="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive"
           build_settings="$RUNNER_TEMP/minecraftc-ios-device-build-settings.txt"
@@ -729,22 +692,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
-      - name: Reject Android OpenGL-only configuration
-        shell: bash
-        run: |
-          set +e
-          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" \
-            -S . -B "$RUNNER_TEMP/android-opengl-only" \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/28.2.13676358/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
-            -DMINECRAFTC_ENABLE_VULKAN=OFF \
-            > "$RUNNER_TEMP/android-opengl-only.log" 2>&1
-          status=$?
-          set -e
-          cat "$RUNNER_TEMP/android-opengl-only.log"
-          test "$status" -ne 0
-          grep -q "Android, Linux, Windows, and macOS builds require both" \
-            "$RUNNER_TEMP/android-opengl-only.log"
       - name: Build unsigned Android release APK
         run: gradle -p android assembleRelease --no-daemon
       - name: Verify Android release APK
@@ -761,8 +708,8 @@ jobs:
           grep -q "^application:.*icon='" "$RUNNER_TEMP/android-badging.txt"
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
-          grep -q "uses-gl-es: '0x30000'" "$RUNNER_TEMP/android-badging.txt"
-          grep -q "uses-feature-not-required: name='android.hardware.vulkan.version'" \
+          ! grep -q "uses-gl-es:" "$RUNNER_TEMP/android-badging.txt"
+          grep -q "uses-feature: name='android.hardware.vulkan.version'" \
             "$RUNNER_TEMP/android-badging.txt"
           grep -q "native-code: 'arm64-v8a'" "$RUNNER_TEMP/android-badging.txt"
           unzip -Z1 "$source_apk" > "$RUNNER_TEMP/android-apk-files.txt"
@@ -771,6 +718,8 @@ jobs:
             > "$RUNNER_TEMP/libmain.so"
           "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
             -D "$RUNNER_TEMP/libmain.so" | grep -q ' T SDL_main$'
+          ! "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -d "$RUNNER_TEMP/libmain.so" | grep -E 'lib(GLES|EGL)'
           cp "$source_apk" "$release_apk"
       - name: Upload unsigned Android package
         uses: actions/upload-artifact@v7

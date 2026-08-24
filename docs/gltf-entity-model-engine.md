@@ -15,7 +15,7 @@ MinecraftC's glTF entity model and animation engine was merged into `main` on
 - Validated glTF 2.0/GLB loading through vendored cgltf 1.15, including skins,
   node hierarchy, embedded PNG images, supported interpolation modes, strict
   accessor validation, and a 64-joint limit.
-- Main-thread OpenGL model resources, integer joint attributes, GPU linear
+- Main-thread Vulkan model resources, integer joint attributes, GPU linear
   blend skinning, opaque/masked/blended passes, nearest sRGB textures,
   environment lighting, fog, and gamma handling.
 - Shared per-type entity assets and stable per-ID animation instances with
@@ -41,8 +41,8 @@ the required `idle`, `walk`, `hurt`, and `death` clips. Details are in
 - CTest passed 23/23 after the merge.
 - `git diff --check` passed.
 - Installation contained exactly eight entity GLBs and both model shaders.
-- A six-second xvfb OpenGL startup reached normal initialization on OpenGL 4.6
-  without fallback warnings or OpenGL errors.
+- A six-second xvfb Vulkan startup reached normal initialization and presented
+  the first frame without validation errors.
 - Project loader tests load all eight runtime GLBs; deterministic asset tests
   regenerate and compare them byte-for-byte.
 

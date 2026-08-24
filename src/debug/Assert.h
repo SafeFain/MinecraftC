@@ -19,7 +19,7 @@
 // ── Examples ───────────────────────────────────────────────────────────
 //   MC_ASSERT(indexCount > 0, "Mesh built with zero indices — chunk " << cx << "," << cz);
 //   MC_CHECK(resource != nullptr, "Resource initialization failed");
-//   MC_VERIFY(gladLoadGL(loader), "Failed to load OpenGL functions");
+//   MC_VERIFY(loadRuntimeDependency(), "Failed to load runtime dependency");
 
 #ifndef NDEBUG
   #define MC_ASSERT(cond, msg)                                                  \

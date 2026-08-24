@@ -47,12 +47,9 @@ def png_dimensions(data):
     return struct.unpack_from(">II",data,16)
 
 def main():
-    opengl_vertex_shader = (ROOT / "assets/shaders/model.vert").read_text()
     vulkan_vertex_shader = (ROOT / "assets/shaders/vulkan/model.vert").read_text()
-    assert "vUV=vec2(aUV.x,1.0-aUV.y)" in opengl_vertex_shader, \
-        "OpenGL model texture V correction no longer matches the Vulkan reference"
     assert "uv=inUv" in vulkan_vertex_shader, \
-        "Vulkan reference model UV contract changed"
+        "Vulkan model UV contract changed"
     files = list(MODEL_DIR.glob("*.glb"))
     assert {path.stem for path in files} == NAMES, "expected exactly eight entity GLBs"
     graphs = list(MODEL_DIR.glob("*.anim.json"))

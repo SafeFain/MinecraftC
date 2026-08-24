@@ -28,7 +28,7 @@ public:
 };
 }
 
-// TouchControls::render is linked into this logic test, but no OpenGL-backed
+// TouchControls::render is linked into this logic test, but no graphics-backed
 // renderer is constructed. These three inert definitions keep the test focused
 // on touch capture and input output.
 void UIRenderer::drawRect(float,float,float,float,const glm::vec4&) {}
@@ -74,40 +74,12 @@ int main(){
             frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
             frameRateSliderFraction(30)==0.0f&&frameRateSliderFraction(200)==1.0f,
             "frame-rate slider continuously maps its full 30-200 range");
-    require(defaultRendererBackend(DesktopPlatform::Android)==RendererBackend::Vulkan&&
-            defaultRendererBackend(DesktopPlatform::IOS)==RendererBackend::Vulkan&&
-            defaultRendererBackend(DesktopPlatform::Linux)==RendererBackend::Vulkan&&
-            defaultRendererBackend(DesktopPlatform::Windows)==RendererBackend::Vulkan&&
-            defaultRendererBackend(DesktopPlatform::MacOS)==RendererBackend::Vulkan,
-            "all supported platforms default new settings to Vulkan");
     require(defaultVisualQuality(DesktopPlatform::Android)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::IOS)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::Linux)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::Windows)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::MacOS)==VisualQuality::Medium,
             "all supported platforms default visual quality to medium");
-    require(migrateRendererBackend(DesktopPlatform::Android,9,
-                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
-            migrateRendererBackend(DesktopPlatform::Android,10,
-                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
-            migrateRendererBackend(DesktopPlatform::MacOS,10,
-                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
-            migrateRendererBackend(DesktopPlatform::MacOS,11,
-                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
-            migrateRendererBackend(DesktopPlatform::Linux,11,
-                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
-            migrateRendererBackend(DesktopPlatform::Linux,12,
-                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
-            migrateRendererBackend(DesktopPlatform::Windows,11,
-                RendererBackend::OpenGL)==RendererBackend::Vulkan&&
-            migrateRendererBackend(DesktopPlatform::Windows,12,
-                RendererBackend::OpenGL)==RendererBackend::OpenGL&&
-            migrateRendererBackend(DesktopPlatform::IOS,ClientSettings::FORMAT_VERSION,
-                RendererBackend::OpenGL)==RendererBackend::Vulkan,
-            "renderer migration preserves platform-specific version boundaries");
-    require(!rendererBackendSwitchable({false,true})&&
-            rendererBackendSwitchable({true,true}),
-            "Vulkan-only builds did not hide renderer switching");
     const WindowSafeArea safe = projectWindowSafeArea(
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,
@@ -156,7 +128,6 @@ int main(){
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
     settings.attackIndicator=AttackIndicator::Hotbar;
-    settings.rendererBackend=RendererBackend::Vulkan;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
     settings.controlMode=ControlMode::Touch;settings.touchSensitivity=1.75f;
@@ -176,8 +147,6 @@ int main(){
     frameRateRange.frameRateLimit=500;frameRateRange.validate();
     require(frameRateRange.frameRateLimit==ClientSettings::MAX_FRAME_RATE,
             "frame-rate validation clamps the upper bound");
-    require(loaded.rendererBackend==RendererBackend::Vulkan,
-            "renderer backend preference round trips");
     require(loaded.shadowQuality==ShadowQuality::High,
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
@@ -202,13 +171,21 @@ int main(){
             "new language codes round trip through settings");
     {
         std::ofstream legacy(root/"legacy-options.txt");
-        legacy<<"version=3\nrender_distance=8\n";
+        legacy<<"version=17\nrenderer=opengl\nrender_distance=8\n";
     }
     require(ClientSettings::load(root/"legacy-options.txt").language==Language::English,
             "legacy settings default to English");
-    require(ClientSettings::load(root/"legacy-options.txt").rendererBackend==
-                defaultRendererBackend(currentDesktopPlatform()),
-            "legacy settings use the current platform renderer default");
+    ClientSettings legacySettings = ClientSettings::load(root/"legacy-options.txt");
+    require(legacySettings.renderDistance==8,
+            "legacy renderer setting did not prevent other settings from loading");
+    require(legacySettings.save(root/"migrated-options.txt"),
+            "legacy settings migration save succeeds");
+    std::ifstream migratedInput(root/"migrated-options.txt");
+    const std::string migratedText(
+        (std::istreambuf_iterator<char>(migratedInput)), {});
+    require(migratedText.find("version=18\n")!=std::string::npos&&
+            migratedText.find("renderer=")==std::string::npos,
+            "legacy renderer setting was not removed during migration");
     {
         std::ofstream invalid(root/"invalid-options.txt");
         invalid<<"version=4\nlanguage=unsupported\n";

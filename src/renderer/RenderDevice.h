@@ -1,7 +1,6 @@
 #pragma once
 
 #include "renderer/RenderHandles.h"
-#include "core/GraphicsApi.h"
 
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -149,4 +148,4 @@ void validateMeshData(const MeshData& data);
 void validateTextureData(const TextureData& data);
 bool isMeshMaterialCompatible(MeshVertexLayout layout,
                               MaterialPipeline pipeline);
-glm::mat4 clipSpaceCorrection(GraphicsApi api);
+glm::mat4 clipSpaceCorrection();

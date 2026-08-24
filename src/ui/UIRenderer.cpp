@@ -6,32 +6,16 @@
 UIRenderer::~UIRenderer() = default;
 
 void UIRenderer::initialize(IGameRenderer& renderer,
-    RenderTextureHandle atlas, bool srgb, const std::filesystem::path& root,
-    GraphicsApi api) {
-#if defined(MINECRAFTC_ENABLE_VULKAN)
-    if (api == GraphicsApi::Vulkan)
-        m_backend = createVulkanUIBackend(renderer, atlas, root);
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-    else
-#endif
-#else
-    (void)renderer;
-#endif
-#if defined(MINECRAFTC_ENABLE_OPENGL)
-        m_backend = createOpenGLUIBackend(atlas, srgb, root, api);
-#else
-    (void)srgb;
-    (void)api;
-#endif
+    RenderTextureHandle atlas, const std::filesystem::path& root) {
+    m_backend = createVulkanUIBackend(renderer, atlas, root);
     if (!m_backend) throw std::runtime_error("Could not create UI renderer backend");
     m_backend->setLocalization(m_localization);
 }
 
 void UIRenderer::reinitialize(IGameRenderer& renderer,
-    RenderTextureHandle atlas, bool srgb, const std::filesystem::path& root,
-    GraphicsApi api) {
+    RenderTextureHandle atlas, const std::filesystem::path& root) {
     resetGraphics();
-    initialize(renderer, atlas, srgb, root, api);
+    initialize(renderer, atlas, root);
 }
 
 void UIRenderer::resetGraphics() { m_backend.reset(); }

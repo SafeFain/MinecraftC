@@ -41,7 +41,6 @@ android {
             cmake {
                 arguments "-DANDROID_PLATFORM=android-29", "-DANDROID_STL=c++_shared",
                           "-DBUILD_TESTING=OFF", "-DMINECRAFTC_FETCH_DEPENDENCIES=ON",
-                          "-DMINECRAFTC_ENABLE_VULKAN=ON",
                           "-DFETCHCONTENT_SOURCE_DIR_SDL3=${gradle.ext.sdlSourceDir.absolutePath}"
                 cppFlags "-std=c++17"
             }

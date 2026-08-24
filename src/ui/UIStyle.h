@@ -4,7 +4,7 @@
 //
 // Shared, backend-neutral visual theme for every menu, inventory, container
 // and HUD surface.  All decorations are composed from plain colored quads
-// (drawRect) and text so OpenGL and Vulkan render identical output without
+// (drawRect) and text so all UI elements share identical output without
 // any new texture assets.  Every helper is a template over any object that
 // exposes drawRect/renderText/measureText (UIRenderer and both UI backends).
 

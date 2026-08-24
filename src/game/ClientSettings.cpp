@@ -17,29 +17,12 @@ GamepadBinding axis(int code, bool positive) {
 }
 }
 
-RendererBackend defaultRendererBackend(DesktopPlatform) {
-    return RendererBackend::Vulkan;
-}
-
 VisualQuality defaultVisualQuality(DesktopPlatform platform) {
     (void)platform;
     return VisualQuality::Medium;
 }
 
-RendererBackend migrateRendererBackend(DesktopPlatform platform,
-                                        int sourceFormatVersion,
-                                        RendererBackend stored) {
-    if (platform == DesktopPlatform::IOS ||
-        (platform == DesktopPlatform::Android && sourceFormatVersion < 10) ||
-        (platform == DesktopPlatform::MacOS && sourceFormatVersion < 11) ||
-        ((platform == DesktopPlatform::Linux ||
-          platform == DesktopPlatform::Windows) && sourceFormatVersion < 12))
-        return RendererBackend::Vulkan;
-    return stored;
-}
-
 ClientSettings::ClientSettings() {
-    rendererBackend = defaultRendererBackend(currentDesktopPlatform());
     const DesktopPlatform platform = currentDesktopPlatform();
     visualQuality = defaultVisualQuality(platform);
     shadowQuality = platform == DesktopPlatform::Android || platform == DesktopPlatform::IOS
@@ -113,9 +96,6 @@ void ClientSettings::validate() {
         attackIndicator != AttackIndicator::Hotbar &&
         attackIndicator != AttackIndicator::Off)
         attackIndicator = AttackIndicator::Crosshair;
-    if (rendererBackend != RendererBackend::OpenGL &&
-        rendererBackend != RendererBackend::Vulkan)
-        rendererBackend = defaultRendererBackend(currentDesktopPlatform());
     ClientSettings defaults;
     for (size_t i = 0; i < bindings.size(); ++i) {
         auto& binding = bindings[i];
@@ -169,8 +149,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
             else if (name == "visual_quality")
                 settings.visualQuality = static_cast<VisualQuality>(std::stoi(value));
-            else if (name == "renderer") settings.rendererBackend = value == "vulkan"
-                ? RendererBackend::Vulkan : RendererBackend::OpenGL;
+            else if (name == "renderer") { /* v17 compatibility */ }
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name == "frame_rate_limit") settings.frameRateLimit = std::stoi(value);
             else if (name == "attack_indicator")
@@ -223,8 +202,6 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         if(!gamepadBindingRead[i])settings.gamepadBindings[i]=defaults.gamepadBindings[i];
     if (formatVersion < 8 && std::abs(settings.touchSensitivity - 1.0f) < .001f)
         settings.touchSensitivity = defaults.touchSensitivity;
-    settings.rendererBackend = migrateRendererBackend(
-        currentDesktopPlatform(), formatVersion, settings.rendererBackend);
     settings.validate();
     return settings;
 }
@@ -247,8 +224,6 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "smooth_lighting=" << smoothLighting << '\n'
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
-           << "renderer=" << (rendererBackend == RendererBackend::Vulkan
-                ? "vulkan" : "opengl") << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "frame_rate_limit=" << frameRateLimit << '\n'
            << "attack_indicator=" << static_cast<int>(attackIndicator) << '\n'

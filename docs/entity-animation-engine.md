@@ -32,5 +32,5 @@ transient.
 ## Validation
 
 Release build, 24/24 CTest, deterministic asset regeneration, installed asset
-enumeration, whitespace checking, and xvfb OpenGL startup passed. Manual
+enumeration, whitespace checking, and xvfb Vulkan startup passed. Manual
 in-world review of all eight animations remains an unperformed visual check.

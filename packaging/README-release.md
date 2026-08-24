@@ -11,11 +11,10 @@ corresponding assets and source dependencies.
 - Linux: run `./run-minecraftc.sh` from a terminal. A desktop entry and hicolor
   application icon are included under `share/`.
 - macOS: open `MinecraftC.app` or run `./run-minecraftc.sh`. The application
-  bundle includes the Apache-2.0-licensed MoltenVK runtime and defaults to Vulkan
-  with automatic OpenGL fallback.
+  bundle includes the Apache-2.0-licensed MoltenVK runtime.
 - Android: install `MinecraftC-<version>-android-arm64-unsigned.apk` after signing it
   with a trusted publisher or local developer key. It requires Android 10,
-  arm64, and OpenGL ES 3.0.
+  arm64, and Vulkan 1.0.
 - iOS: the simulator ZIP runs only in an arm64 iOS Simulator. The device
   unsigned IPA targets iOS 14+ arm64 and must be signed and provisioned before
   installation; it is Vulkan-only and statically links MoltenVK. Simulator
@@ -23,9 +22,8 @@ corresponding assets and source dependencies.
   them, even though both builds use arm64.
 - Print build information without opening a window with `--version`.
 
-All supported platforms default to Vulkan. Linux, Windows, macOS, and Android
-fall back to OpenGL when Vulkan initialization is unavailable and accept
-`--renderer=opengl`; iOS has no OpenGL backend or fallback.
+All supported platforms use Vulkan exclusively. `--renderer=vulkan` remains a
+compatibility alias; initialization failures have no fallback renderer.
 
 Worlds and settings use the platform user-data directory documented in
 `README.md`. If startup fails, inspect `minecraftc.log` in that directory.

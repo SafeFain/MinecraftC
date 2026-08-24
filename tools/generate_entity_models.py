@@ -173,7 +173,7 @@ def build_v2(name,size,color):
         for normal,face,face_name in zip(normals,faces,face_names):
             base=len(vertices)//64
             for corner,tex in zip(face,tile_uv(semantic(part,face_name))):vertices.extend(struct.pack("<3f3f2f4H8x4f",*corners[corner],*normal,*tex,joint,0,0,0,1,0,0,0))
-            # glTF/OpenGL use counter-clockwise front faces. The cuboid corner
+            # glTF uses counter-clockwise front faces. The cuboid corner
             # lists above are clockwise when viewed from the outward normal.
             indices += [base,base+2,base+1,base,base+3,base+2]
     vv=buf.add(vertices,34962);buf.views[vv]["byteStride"]=64
