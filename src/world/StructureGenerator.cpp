@@ -186,10 +186,13 @@ void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz
             write(chimneyX, y, hz+halfZ-1, BlockId::COBBLESTONE);
     }
     write(doorX+doorDx, base, doorZ+doorDz, style.path);
-    write(doorX+doorDx, base+1, doorZ+doorDz,
-          slabBlock(desert ? ArchitecturalMaterial::Terracotta
-                           : ArchitecturalMaterial::Planks,
-                    BlockHalf::Bottom));
+    // Keep the exterior threshold flush with the path. A half slab at
+    // base+1 occupies the villager's body space (villagers stand at base+1),
+    // so every generated doorway becomes an impassable step. The path itself
+    // supplies the ground and the two clear cells below the roofline remain
+    // open for both villagers and the ground-path validator.
+    write(doorX+doorDx, base+1, doorZ+doorDz, BlockId::AIR);
+    write(doorX+doorDx, base+2, doorZ+doorDz, BlockId::AIR);
 
     // A generated house is one residential unit. Its bed supplies the
     // deterministic initial villager request and the paired workstation lets

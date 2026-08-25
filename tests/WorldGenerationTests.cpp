@@ -903,12 +903,38 @@ int main() {
                         materials.count(BlockId::FARMLAND_7) > 0 &&
                         hasBed && hasWorkstation,
                     "plains village lacks signature materials");
+            std::vector<std::tuple<int, int, int, BlockId>> villageWrites;
+            StructureGenerator::build(
+                placement, [&](int x, int y, int z, BlockId id) {
+                    villageWrites.emplace_back(x, y, z, id);
+                });
+            for (const auto& write : villageWrites) {
+                ArchitecturalBlockState state;
+                if (std::get<1>(write) == placement.baseY + 1 &&
+                    decodeArchitecturalBlock(std::get<3>(write), state)) {
+                    require(state.shape != RenderShape::Slab,
+                            "village doorway retained a body-blocking low slab");
+                }
+            }
             checkedVillageMaterials = true;
         }
         if (placement.type == StructureType::DesertVillage) {
             require(materials.count(BlockId::TERRACOTTA) > 0 &&
                         materials.count(BlockId::SAND) > 0,
                     "desert village lacks adobe materials");
+            std::vector<std::tuple<int, int, int, BlockId>> villageWrites;
+            StructureGenerator::build(
+                placement, [&](int x, int y, int z, BlockId id) {
+                    villageWrites.emplace_back(x, y, z, id);
+                });
+            for (const auto& write : villageWrites) {
+                ArchitecturalBlockState state;
+                if (std::get<1>(write) == placement.baseY + 1 &&
+                    decodeArchitecturalBlock(std::get<3>(write), state)) {
+                    require(state.shape != RenderShape::Slab,
+                            "desert village doorway retained a body-blocking low slab");
+                }
+            }
         }
         if (placement.type == StructureType::Igloo && !checkedIglooMaterials) {
             bool hasBed = false;
