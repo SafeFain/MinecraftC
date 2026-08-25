@@ -74,6 +74,8 @@ public:
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
     SurfaceColumn sampleTerrainColumn(int worldX, int worldZ) const;
+    std::vector<TreeGenerator::TreePlacement> sampleLodTrees(
+        int worldOriginX, int worldOriginZ, int width, int depth) const;
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }

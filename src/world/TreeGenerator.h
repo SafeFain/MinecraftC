@@ -5,6 +5,7 @@
 #include "world/WorldGenContext.h"
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 // Order-independent world-grid vegetation placement. Candidate anchors and
@@ -28,13 +29,19 @@ public:
         const Biome* biomeMap,
         const uint8_t* riverMap,
         int padding,
-        std::vector<RegionGenerationData::TreePlacement>& placementsOut);
+        std::vector<RegionGenerationData::TreePlacement>& placementsOut) const;
 
     std::vector<TreePlacement> generateTrees(
         int chunkWorldX, int chunkWorldZ,
         const int heightMap[16][16],
         const Biome biomeMap[16][16],
         const bool riverMap[16][16]);
+
+    using TerrainSampler = std::function<void(
+        int worldX, int worldZ, int& height, Biome& biome, bool& river)>;
+    std::vector<TreePlacement> generateTreesForArea(
+        int worldOriginX, int worldOriginZ, int width, int depth,
+        const TerrainSampler& sampleTerrain) const;
 
     static TreeType chooseTreeType(Biome biome, uint64_t seed, int x, int z);
 

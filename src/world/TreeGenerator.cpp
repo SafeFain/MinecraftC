@@ -120,7 +120,7 @@ int TreeGenerator::biomeTrunkHeight(Biome biome, TreeType type,
 void TreeGenerator::generateTreesRegion(
     int originX, int originZ, int width, int depth,
     const int* heights, const Biome* biomes, const uint8_t* rivers,
-    int, std::vector<RegionGenerationData::TreePlacement>& output)
+    int, std::vector<RegionGenerationData::TreePlacement>& output) const
 {
     output.clear();
     int minCellX = floorDiv(originX - CELL_SIZE, CELL_SIZE);
@@ -146,6 +146,36 @@ void TreeGenerator::generateTreesRegion(
                               biomeTrunkHeight(biome, type, c.x, c.z), type});
         }
     }
+}
+
+std::vector<TreeGenerator::TreePlacement> TreeGenerator::generateTreesForArea(
+    int originX, int originZ, int width, int depth,
+    const TerrainSampler& sampleTerrain) const {
+    std::vector<TreePlacement> output;
+    const int minCellX = floorDiv(originX - CELL_SIZE, CELL_SIZE);
+    const int maxCellX = floorDiv(originX + width + CELL_SIZE, CELL_SIZE);
+    const int minCellZ = floorDiv(originZ - CELL_SIZE, CELL_SIZE);
+    const int maxCellZ = floorDiv(originZ + depth + CELL_SIZE, CELL_SIZE);
+    for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+        for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+            const Candidate candidate = candidateForCell(cellX, cellZ);
+            if (candidate.x < originX || candidate.x >= originX + width ||
+                candidate.z < originZ || candidate.z >= originZ + depth) continue;
+            int height = Config::WORLD_MIN_Y;
+            Biome biome = Biome::PLAINS;
+            bool river = false;
+            sampleTerrain(candidate.x, candidate.z, height, biome, river);
+            if (!accepts(biome, height, river, candidate.x, candidate.z) ||
+                !winsSpacing(candidate, radiusFor(biome))) continue;
+            const TreeType type = chooseTreeType(
+                biome, m_treeSeed, candidate.x, candidate.z);
+            if (type == TreeType::NONE) continue;
+            output.push_back({candidate.x - originX, candidate.z - originZ,
+                height, biomeTrunkHeight(
+                    biome, type, candidate.x, candidate.z), type});
+        }
+    }
+    return output;
 }
 
 std::vector<TreeGenerator::TreePlacement> TreeGenerator::generateTrees(

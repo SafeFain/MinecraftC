@@ -193,6 +193,30 @@ SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const 
         ? superflatColumn() : m_heightPipeline.sampleColumn(worldX, worldZ);
 }
 
+std::vector<TreeGenerator::TreePlacement> WorldGenerator::sampleLodTrees(
+    int worldOriginX, int worldOriginZ, int width, int depth) const {
+    if (isHeaven() || m_worldType == WorldType::Superflat ||
+        width <= 0 || depth <= 0) return {};
+
+    std::vector<TreeGenerator::TreePlacement> result =
+        m_treeGenerator.generateTreesForArea(
+            worldOriginX, worldOriginZ, width, depth,
+            [this](int worldX, int worldZ, int& height,
+                   Biome& biome, bool& river) {
+                const SurfaceColumn column = sampleTerrainColumn(worldX, worldZ);
+                height = column.height;
+                biome = column.biome;
+                river = column.river;
+            });
+    result.erase(std::remove_if(result.begin(), result.end(),
+        [&](const TreeGenerator::TreePlacement& placement) {
+            return m_structureGenerator.reservationAt(
+                worldOriginX + placement.localX,
+                worldOriginZ + placement.localZ);
+        }), result.end());
+    return result;
+}
+
 WorldGenerator::HeavenBiome WorldGenerator::heavenBiomeAt(
     int worldX, int worldZ) const {
     return sampleHeavenIsland(worldX, worldZ).biome;

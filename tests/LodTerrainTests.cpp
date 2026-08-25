@@ -31,6 +31,12 @@ bool sameTile(const LodTileData& a, const LodTileData& b) {
     return true;
 }
 
+bool isLodTreeBlock(BlockId block) {
+    return block == BlockId::LEAVES || block == BlockId::BIRCH_LEAVES ||
+           block == BlockId::SPRUCE_LEAVES || block == BlockId::JUNGLE_LEAVES ||
+           block == BlockId::ACACIA_LEAVES || block == BlockId::CACTUS_BLOCK;
+}
+
 int blockIndex(int x, int y, int z) {
     return x + z * Config::CHUNK_SIZE_X +
         Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
@@ -50,6 +56,43 @@ int main() {
     WorldGenerator other(987654321ULL, WorldType::Normal, DimensionId::Overworld);
     require(!sameTile(first, buildApproximateLodTile(other, negative)),
             "LOD approximation varies with the world seed");
+
+    bool foundTree = false;
+    bool foundSubCellWater = false;
+    for (int tz = -3; tz <= 3 && (!foundTree || !foundSubCellWater); ++tz) {
+        for (int tx = -3; tx <= 3 && (!foundTree || !foundSubCellWater); ++tx) {
+            constexpr int level = 2;
+            constexpr int cellSize = 1 << level;
+            const LodTileKey key{tx, tz, level};
+            const LodTileData tile = buildApproximateLodTile(normal, key);
+            const int originX = tx * LodTileData::SIDE * cellSize;
+            const int originZ = tz * LodTileData::SIDE * cellSize;
+            for (int z = 0; z < LodTileData::SIDE; ++z) {
+                for (int x = 0; x < LodTileData::SIDE; ++x) {
+                    bool hasWater = false;
+                    for (const LodSpan& span : tile.at(x, z).spans) {
+                        foundTree = foundTree || isLodTreeBlock(span.block);
+                        hasWater = hasWater || isWater(span.block);
+                    }
+                    const SurfaceColumn center = normal.sampleTerrainColumn(
+                        originX + x * cellSize + cellSize / 2,
+                        originZ + z * cellSize + cellSize / 2);
+                    if (hasWater && center.waterLevel <= center.height)
+                        foundSubCellWater = true;
+                }
+            }
+        }
+    }
+    require(foundTree,
+            "fine approximate LOD retains deterministic tree silhouettes");
+    require(foundSubCellWater,
+            "fine approximate LOD retains water missed by its center sample");
+    const LodTileData coarseTrees = buildApproximateLodTile(normal, {0, 0, 4});
+    for (const LodColumn& column : coarseTrees.columns) {
+        for (const LodSpan& span : column.spans)
+            require(!isLodTreeBlock(span.block),
+                    "coarse LOD does not magnify individual trees into giant cubes");
+    }
 
     WorldGenerator flat(5, WorldType::Superflat, DimensionId::Overworld);
     const LodTileData flatTile = buildApproximateLodTile(flat, {0, 0, 1});
@@ -94,6 +137,15 @@ int main() {
     require(exactMesh.vertices.size() < exactMesh.indices.size(),
             "LOD faces share vertices instead of duplicating triangle corners");
 
+    LodTileData ocean;
+    for (LodColumn& column : ocean.columns)
+        column.spans.push_back({40, 62, BlockId::WATER});
+    const ChunkMesh oceanMesh = buildLodTileMesh(ocean, 8, 24);
+    require(oceanMesh.opaqueIndexCount == 0 &&
+            oceanMesh.translucentIndexCount ==
+                LodTileData::SIDE * LodTileData::SIDE * 6,
+            "LOD oceans omit artificial full-depth walls at tile boundaries");
+
     require(lodHorizontalQuality(LodPrecision::Low) == 64 &&
             lodHorizontalQuality(LodPrecision::Ultra) == 144 &&
             lodVerticalSpanLimit(LodPrecision::Medium) >= 5,
@@ -122,7 +174,7 @@ int main() {
                 "asynchronous LOD completion publishes bounded CPU data");
     }
     bool cacheFound = false;
-    const auto tileDirectory = root / "lod" / "r1" / "d_0" / "tiles";
+    const auto tileDirectory = root / "lod" / "r2" / "d_0" / "tiles";
     for (const auto& entry : std::filesystem::directory_iterator(tileDirectory)) {
         cacheFound = entry.is_regular_file();
         if (cacheFound) {
