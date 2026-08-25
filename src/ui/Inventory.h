@@ -20,6 +20,7 @@ public:
     void onScroll(double yOffset);
     void onGamepadNavigate(int dx, int dy);
     void onGamepadAction(bool select, std::function<void(ItemId)> onSelectItem);
+    ItemId hoveredItem() const;
 
 private:
     struct Slot {

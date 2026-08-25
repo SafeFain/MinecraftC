@@ -169,7 +169,7 @@ void CreativeInventory::onMouseMove(int x,int y){
 void CreativeInventory::onMouseClick(int button,int x,int y,
                                      std::function<void(ItemId)> select,
                                      std::function<void()> openPlayerInventory){
-    if(button!=MouseButton::Left) return;
+    if(button!=MouseButton::Left && button!=MouseButton::Middle) return;
     for(size_t i=0;i<m_tabs.size();++i){
         const auto& tab=m_tabs[i];
         if(x>=tab.x&&x<=tab.x+tab.w&&y>=tab.y&&y<=tab.y+tab.h){
@@ -230,4 +230,10 @@ void CreativeInventory::onGamepadAction(bool select,std::function<void(ItemId)> 
     if(m_focus<0||m_focus>=static_cast<int>(m_slots.size()))return;
     m_selected=m_slots[static_cast<size_t>(m_focus)].id;
     if(callback)callback(m_selected);
+}
+
+ItemId CreativeInventory::hoveredItem() const {
+    for (const auto& item : m_slots)
+        if (item.visible && item.hovered) return item.id;
+    return ItemId::EMPTY;
 }

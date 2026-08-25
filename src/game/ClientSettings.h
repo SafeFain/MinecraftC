@@ -14,7 +14,7 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class AttackIndicator : uint8_t { Crosshair, Hotbar, Off };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 19;
+    static constexpr int FORMAT_VERSION = 20;
     static constexpr int MIN_FRAME_RATE = 30;
     static constexpr int MAX_FRAME_RATE = 200;
     static constexpr int MIN_LOD_DISTANCE = 32;

@@ -89,6 +89,8 @@ ItemStack SurvivalInventoryScreen::craftingOutput() const {
 void SurvivalInventoryScreen::render(
     UIRenderer& ui, int screenWidth, int screenHeight, int mouseX, int mouseY) {
     layout(screenWidth, screenHeight);
+    m_pointerX = mouseX;
+    m_pointerY = mouseY;
     if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
@@ -240,7 +242,21 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 
 void SurvivalInventoryScreen::onMouseButton(
     int button, ButtonAction action, int mouseX, int mouseY, int mods) {
+    m_pointerX=mouseX;m_pointerY=mouseY;
     if(action==ButtonAction::Press){m_focusX=mouseX;m_focusY=mouseY;}
+    if (button == MouseButton::Middle && m_creativeAccess) {
+        if (action == ButtonAction::Press) {
+            if (ItemStack* hovered = hoveredStack(mouseX, mouseY);
+                hovered && !hovered->empty())
+                InventoryInteraction::setCreativeItem(m_cursor, hovered->id);
+            m_pointerPressed = true;
+            m_pressedButton = button;
+        } else if (action == ButtonAction::Release) {
+            m_pointerPressed = false;
+            m_pressedButton = -1;
+        }
+        return;
+    }
     if (button != MouseButton::Left && button != MouseButton::Right) return;
     if (action == ButtonAction::Press) {
         m_pointerPressed = true;
@@ -285,6 +301,21 @@ void SurvivalInventoryScreen::onMouseButton(
 }
 
 void SurvivalInventoryScreen::onMouseMove(int x,int y){
+    m_pointerX=x;m_pointerY=y;
+    if (m_pointerPressed && m_pressedButton == MouseButton::Middle &&
+        m_creativeAccess && !m_cursor.empty()) {
+        for (size_t i = 0; i < m_inventoryRects.size(); ++i)
+            if (contains(m_inventoryRects[i], x, y)) {
+                InventoryInteraction::setCreativeItem(m_inventory.slot(i), m_cursor.id);
+                return;
+            }
+        const size_t count=m_craftingTable?9:4;
+        for(size_t i=0;i<count;++i)if(contains(m_craftingRects[i],x,y)){
+            InventoryInteraction::setCreativeItem(m_crafting[i],m_cursor.id);
+            return;
+        }
+        return;
+    }
     if(!m_pointerPressed||!m_cursorHeldAtPress) return;
     ItemStack* target=nullptr;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
@@ -311,6 +342,50 @@ void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
 void SurvivalInventoryScreen::onGamepadAction(int action) {
     if(action==2)quickMove(m_focusX,m_focusY);
     else performClick(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
+}
+
+ItemStack* SurvivalInventoryScreen::hoveredStack(int x, int y) {
+    for (size_t i = 0; i < m_inventoryRects.size(); ++i)
+        if (contains(m_inventoryRects[i], x, y)) return &m_inventory.slot(i);
+    for (size_t i = 0; i < m_armorRects.size(); ++i)
+        if (contains(m_armorRects[i], x, y)) return &m_inventory.armor()[i];
+    if (contains(m_offhandRect, x, y)) return &m_inventory.offhand();
+    const size_t craftSlots = m_craftingTable ? 9 : 4;
+    for (size_t i = 0; i < craftSlots; ++i)
+        if (contains(m_craftingRects[i], x, y)) return &m_crafting[i];
+    return nullptr;
+}
+
+bool SurvivalInventoryScreen::swapHoveredWithHotbar(int hotbarSlot) {
+    if (hotbarSlot < 0 || hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
+        return false;
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered) return false;
+    ItemStack& hotbar = m_inventory.slot(static_cast<size_t>(hotbarSlot));
+    if (hovered == &hotbar) return true;
+    for (size_t i = 0; i < m_inventory.armor().size(); ++i)
+        if (hovered == &m_inventory.armor()[i] && !hotbar.empty() &&
+            !acceptsArmor(i, hotbar.id)) return false;
+    std::swap(*hovered, hotbar);
+    return true;
+}
+
+bool SurvivalInventoryScreen::swapHoveredWithOffhand() {
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered) return false;
+    ItemStack& offhand = m_inventory.offhand();
+    if (hovered == &offhand) return true;
+    std::swap(*hovered, offhand);
+    return true;
+}
+
+ItemStack SurvivalInventoryScreen::dropHovered(bool entireStack) {
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered || hovered->empty()) return {};
+    if (!entireStack) return InventoryInteraction::takeOne(*hovered);
+    ItemStack dropped = *hovered;
+    hovered->clear();
+    return dropped;
 }
 
 bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {

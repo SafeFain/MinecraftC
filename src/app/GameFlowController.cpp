@@ -119,8 +119,9 @@ void GameFlowController::closeInventory() {
     m_window.setCursorLocked(true);
 }
 
-void GameFlowController::openCommandInput() {
+void GameFlowController::openCommandInput(const std::string& initialText) {
     m_ui.openCommand();
+    m_ui.commandInput.setText(initialText);
     m_window.setCursorLocked(false);
 }
 
@@ -161,23 +162,73 @@ void GameFlowController::openPlayerInventoryView() {
     m_ui.openPlayerInventoryTab();
 }
 
-void GameFlowController::giveCreativeItem(ItemId id) {
+void GameFlowController::giveCreativeItem(ItemId id, int hotbarSlot) {
+    if (hotbarSlot < 0 || hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
+        hotbarSlot = m_ui.hotbar.getSelectedSlot();
     auto& slot = m_session.player.inventory().slot(
-        static_cast<size_t>(m_ui.hotbar.getSelectedSlot()));
+        static_cast<size_t>(hotbarSlot));
     InventoryInteraction::setCreativeItem(slot, id);
     m_ui.itemNameSeconds = 2.0f;
 }
 
-void GameFlowController::dropSelectedItem() {
+void GameFlowController::dropSelectedItem(bool entireStack) {
     if (m_session.player.isSpectator()) return;
     auto& slot = m_session.player.inventory().slot(
         static_cast<size_t>(m_ui.hotbar.getSelectedSlot()));
-    const ItemStack dropped = InventoryInteraction::takeOne(slot);
+    ItemStack dropped = slot;
+    if (!entireStack) dropped = InventoryInteraction::takeOne(slot);
+    else slot.clear();
+    dropInventoryItem(dropped);
+}
+
+void GameFlowController::dropInventoryItem(ItemStack dropped) {
     if (dropped.empty()) return;
     const glm::vec3 forward = glm::normalize(m_session.player.getForward());
     m_session.entities.spawnItem(
         m_session.player.getEyePosition() + glm::dvec3(forward) * 0.65,
         dropped, forward * 4.5f + glm::vec3(0.0f, 1.5f, 0.0f), 0.8f);
+}
+
+void GameFlowController::pickBlock() {
+    if (m_session.player.isSpectator()) return;
+    const auto hit = m_session.world.raycast(
+        m_session.player.getEyePosition(), m_session.player.getForward(),
+        Config::REACH_DISTANCE);
+    if (!hit) return;
+    const ItemId item = itemForBlock(m_session.world.getBlock(
+        hit->blockPos.x, hit->blockPos.y, hit->blockPos.z));
+    if (item == ItemId::EMPTY) return;
+
+    auto& inventory = m_session.player.inventory();
+    int source = -1;
+    for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) {
+        if (inventory.slot(i).id == item) { source = static_cast<int>(i); break; }
+    }
+    if (source >= 0 && source < static_cast<int>(InventoryModel::HOTBAR_SIZE)) {
+        m_ui.hotbar.selectSlot(source);
+        m_session.player.setSelectedSlot(source);
+        return;
+    }
+
+    const int selected = m_ui.hotbar.getSelectedSlot();
+    if (m_session.player.gameMode() == GameMode::Creative) {
+        InventoryInteraction::setCreativeItem(
+            inventory.slot(static_cast<size_t>(selected)), item);
+    } else if (source >= 0) {
+        std::swap(inventory.slot(static_cast<size_t>(selected)),
+                  inventory.slot(static_cast<size_t>(source)));
+    }
+    m_session.player.setSelectedSlot(selected);
+    m_ui.itemNameSeconds = 2.0f;
+}
+
+void GameFlowController::swapOffhand() {
+    if (m_session.player.isSpectator()) return;
+    auto& inventory = m_session.player.inventory();
+    std::swap(inventory.slot(static_cast<size_t>(m_ui.hotbar.getSelectedSlot())),
+              inventory.offhand());
+    m_session.player.cancelBowCharge();
+    m_ui.itemNameSeconds = 2.0f;
 }
 
 bool GameFlowController::playerInventoryViewOpen() const {

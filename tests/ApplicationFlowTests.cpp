@@ -55,6 +55,9 @@ void UIRenderer::drawItemIcon(float, float, float, float, const ItemStack&) {}
 void UIRenderer::drawDurability(float, float, float, const ItemStack&) {}
 void UIRenderer::drawPanel(float, float, float, float, const glm::vec4&) {}
 void UIRenderer::drawTooltip(float, float, const ItemStack&) {}
+void UIRenderer::setLocalization(const Localization& localization) {
+    m_localization = &localization;
+}
 void UIRenderer::renderText(const std::string&, float, float, float,
                             const glm::vec3&) {}
 glm::vec2 UIRenderer::measureText(const std::string&, float) {
@@ -220,6 +223,8 @@ struct Harness {
         bind(InputAction::Command, Key::C);
         bind(InputAction::Perspective, Key::X);
         bind(InputAction::DropItem, Key::Q);
+        bind(InputAction::DirectCommand, Key::Slash);
+        bind(InputAction::SwapOffhand, Key::F);
         bind(InputAction::Hotbar1, Key::Num1);
     }
 
@@ -453,6 +458,11 @@ int main() {
         require(!harness.ui.chatHistory.empty(),
                 "command execution reports a message");
 
+        harness.router.handleKeyEvent(Key::Slash, 0, ButtonAction::Press, 0);
+        require(harness.ui.commandOpen && harness.ui.commandInput.text() == "/",
+                "the direct-command binding opens a slash-prefilled console");
+        harness.flow.closeCommandInput();
+
         // Tab follows the command tree and cycles candidates in both
         // directions, matching the same completion path used by touch UI.
         harness.flow.openCommandInput();
@@ -526,6 +536,57 @@ int main() {
                 ++itemEntities;
         require(itemEntities == 1,
                 "the drop-item key spawns one dropped item");
+        require(harness.session.player.inventory().slot(0).count == 63,
+                "plain drop removes one item from the selected stack");
+
+        harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
+        require(harness.session.player.inventory().slot(0).empty() &&
+                    harness.session.player.inventory().offhand().count == 63,
+                "the swap-offhand binding exchanges the selected and offhand stacks");
+        harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
+        harness.router.handleKeyEvent(
+            Key::Q, 0, ButtonAction::Press, KeyModifier::Control);
+        itemEntities = 0;
+        for (const Entity& entity : harness.session.entities.entities())
+            if (entity.type == EntityType::Item && !entity.item.empty())
+                ++itemEntities;
+        require(itemEntities == 2 &&
+                    harness.session.player.inventory().slot(0).empty(),
+                "Ctrl plus drop removes and spawns the entire selected stack");
+
+        harness.session.player.setPosition({0.5, 200.0, 0.5});
+        harness.session.world.setBlock(0, 201, 2, BlockId::STONE);
+        harness.flow.pickBlock();
+        require(harness.session.player.inventory().slot(0).id == ItemId::STONE &&
+                    harness.session.player.inventory().slot(0).count == 64,
+                "creative pick block supplies the targeted block as a full stack");
+        harness.session.world.setBlock(0, 201, 2, BlockId::AIR);
+
+        // Java inventory shortcuts act on the hovered slot: number keys swap
+        // with that hotbar slot, F swaps with offhand, and Q/Ctrl+Q drops.
+        harness.flow.giveCreativeItem(ItemId::STONE, 0);
+        harness.session.player.inventory().slot(9) = {ItemId::DIRT, 8, 0};
+        harness.flow.openInventory();
+        harness.flow.openPlayerInventoryView();
+        UIRenderer inertUi;
+        Localization inertLocalization;
+        inertUi.setLocalization(inertLocalization);
+        harness.ui.survivalInventory.render(inertUi, 640, 480, 128, 257);
+        harness.ui.survivalInventory.onMouseMove(128, 257);
+        harness.router.handleKeyEvent(Key::Num1, 0, ButtonAction::Press, 0);
+        require(harness.session.player.inventory().slot(0).id == ItemId::DIRT &&
+                    harness.session.player.inventory().slot(9).id == ItemId::STONE,
+                "an inventory number shortcut swaps the hovered stack with its hotbar slot");
+        harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
+        require(harness.session.player.inventory().slot(9).empty() &&
+                    harness.session.player.inventory().offhand().id == ItemId::STONE,
+                "inventory F swaps the hovered stack with the offhand slot");
+        harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
+        harness.router.handleKeyEvent(
+            Key::Q, 0, ButtonAction::Press, KeyModifier::Control);
+        require(harness.session.player.inventory().slot(9).empty(),
+                "inventory Ctrl+Q drops the complete hovered stack");
+        harness.flow.closeInventory();
 
         // Leave the store attached here.  Harness destruction covers the
         // real application shutdown order while streaming cache writes may

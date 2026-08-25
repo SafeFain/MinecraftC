@@ -303,6 +303,15 @@ void Window::setCursorLocked(bool locked) {
         LOG_WARN("Could not change relative mouse mode: " << SDL_GetError());
 }
 
+bool Window::isFullscreen() const {
+    return (SDL_GetWindowFlags(sdlWindow(m_window)) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+void Window::toggleFullscreen() {
+    if (!SDL_SetWindowFullscreen(sdlWindow(m_window), !isFullscreen()))
+        LOG_WARN("Could not toggle fullscreen: " << SDL_GetError());
+}
+
 void Window::setTextInputEnabled(bool enabled) {
     if (enabled == m_textInputEnabled) return;
     const bool changed = enabled ? SDL_StartTextInput(sdlWindow(m_window))

@@ -88,6 +88,7 @@ void ContainerScreen::quickMove(int x,int y) {
 
 void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int my) {
     layout(width, height);
+    m_pointerX=mx;m_pointerY=my;
     if(m_focusX||m_focusY){mx=m_focusX;my=m_focusY;}
     const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
     if (!entity) return;
@@ -175,6 +176,7 @@ void ContainerScreen::click(int button, int x, int y) {
 }
 
 void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,int mods) {
+    m_pointerX=x;m_pointerY=y;
     if(action==ButtonAction::Press){m_focusX=x;m_focusY=y;}
     if (button!=MouseButton::Left && button!=MouseButton::Right) return;
     if (action==ButtonAction::Press) { m_pressed=true;m_button=button;m_pressX=x;m_pressY=y;m_pressMods=mods;
@@ -194,7 +196,7 @@ void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,i
     m_pressed=false;m_button=-1;
 }
 
-void ContainerScreen::onMouseMove(int x,int y){if(!m_pressed||!m_cursorHeldAtPress)return;ItemStack* target=nullptr;
+void ContainerScreen::onMouseMove(int x,int y){m_pointerX=x;m_pointerY=y;if(!m_pressed||!m_cursorHeldAtPress)return;ItemStack* target=nullptr;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
     BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(!target&&entity&&entity->type==BlockEntityType::Chest)
         for(int i=0;i<27;++i)if(contains(m_containerRects[i],x,y)){target=&entity->chest[i];break;}
@@ -218,6 +220,61 @@ void ContainerScreen::onGamepadNavigate(int dx,int dy) {
 void ContainerScreen::onGamepadAction(int action) {
     if(action==2)quickMove(m_focusX,m_focusY);
     else click(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
+}
+
+ItemStack* ContainerScreen::hoveredStack(int x, int y) {
+    for (size_t i = 0; i < m_inventoryRects.size(); ++i)
+        if (contains(m_inventoryRects[i], x, y)) return &m_inventory.slot(i);
+    BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
+    if (!entity) return nullptr;
+    const int count = entity->type == BlockEntityType::Chest ? 27 : 3;
+    for (int i = 0; i < count; ++i) {
+        if (!contains(m_containerRects[static_cast<size_t>(i)], x, y)) continue;
+        if (entity->type == BlockEntityType::Chest) return &entity->chest[i];
+        return i == 0 ? &entity->input : i == 1 ? &entity->fuel : &entity->output;
+    }
+    return nullptr;
+}
+
+bool ContainerScreen::swapHoveredWithHotbar(int hotbarSlot) {
+    if (hotbarSlot < 0 || hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
+        return false;
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered) return false;
+    ItemStack& hotbar = m_inventory.slot(static_cast<size_t>(hotbarSlot));
+    if (hovered == &hotbar) return true;
+    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    if(entity&&entity->type==BlockEntityType::Furnace){
+        if(hovered==&entity->input&&!hotbar.empty()&&!findSmeltingRecipe(hotbar.id))return false;
+        if(hovered==&entity->fuel&&!hotbar.empty()&&!fuelTicks(hotbar.id))return false;
+        if(hovered==&entity->output&&!hotbar.empty())return false;
+    }
+    std::swap(*hovered, hotbar);
+    return true;
+}
+
+bool ContainerScreen::swapHoveredWithOffhand() {
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered) return false;
+    ItemStack& offhand = m_inventory.offhand();
+    if (hovered == &offhand) return true;
+    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    if(entity&&entity->type==BlockEntityType::Furnace){
+        if(hovered==&entity->input&&!offhand.empty()&&!findSmeltingRecipe(offhand.id))return false;
+        if(hovered==&entity->fuel&&!offhand.empty()&&!fuelTicks(offhand.id))return false;
+        if(hovered==&entity->output&&!offhand.empty())return false;
+    }
+    std::swap(*hovered, offhand);
+    return true;
+}
+
+ItemStack ContainerScreen::dropHovered(bool entireStack) {
+    ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
+    if (!hovered || hovered->empty()) return {};
+    if (!entireStack) return InventoryInteraction::takeOne(*hovered);
+    ItemStack dropped = *hovered;
+    hovered->clear();
+    return dropped;
 }
 
 void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {

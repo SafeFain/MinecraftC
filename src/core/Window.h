@@ -67,6 +67,8 @@ public:
     void getCursorPos(double& x, double& y) const;
     void setCursorLocked(bool locked);
     bool isCursorLocked() const { return m_cursorLocked; }
+    bool isFullscreen() const;
+    void toggleFullscreen();
     void setTextInputEnabled(bool enabled);
 
     bool isTouchAvailable() const { return m_touchAvailable; }

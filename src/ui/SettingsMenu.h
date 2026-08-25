@@ -98,6 +98,9 @@ public:
     bool capturingGamepad() const {
         return m_page == SettingsPage::Controller && m_captureAction >= 0;
     }
+    bool capturingKeyboardMouse() const {
+        return m_page == SettingsPage::KeyboardMouse && m_captureAction >= 0;
+    }
     void onGamepadBinding(GamepadBinding binding);
 
 private:

@@ -206,7 +206,7 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=19\n")!=std::string::npos&&
+    require(migratedText.find("version=20\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     {
@@ -248,6 +248,15 @@ int main(){
     require(ClientSettings{}.bindings[static_cast<size_t>(InputAction::DropItem)]==
                 InputBinding{InputDevice::Keyboard,Key::Q},
             "drop-item action defaults to Q");
+    require(ClientSettings{}.bindings[static_cast<size_t>(InputAction::DirectCommand)]==
+                InputBinding{InputDevice::Keyboard,Key::Slash}&&
+            ClientSettings{}.bindings[static_cast<size_t>(InputAction::PickBlock)]==
+                InputBinding{InputDevice::Mouse,MouseButton::Middle}&&
+            ClientSettings{}.bindings[static_cast<size_t>(InputAction::SwapOffhand)]==
+                InputBinding{InputDevice::Keyboard,Key::F}&&
+            ClientSettings{}.bindings[static_cast<size_t>(InputAction::Fullscreen)]==
+                InputBinding{InputDevice::Keyboard,Key::F11},
+            "Java command, pick-block, offhand and fullscreen defaults are installed");
     require(effectiveGuiScale(1920,1080,0)==2&&effectiveGuiScale(800,450,0)==1&&
             effectiveGuiScale(1920,1080,4)==4,
             "automatic GUI scale preserves minimum virtual size");

@@ -54,6 +54,14 @@ void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
         !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
         m_inputs.state.pressed(InputAction::DropItem))
         m_flow.dropSelectedItem();
+    if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
+        m_inputs.state.pressed(InputAction::PickBlock))
+        m_flow.pickBlock();
+    if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
+        m_inputs.state.pressed(InputAction::SwapOffhand))
+        m_flow.swapOffhand();
     updateGamepadUi(now);
 }
 
@@ -129,6 +137,13 @@ void ApplicationInputRouter::handleKeyEvent(
         const auto& binding = m_settings.bindings[static_cast<size_t>(inputAction)];
         return binding.device == InputDevice::Keyboard && binding.code == key;
     };
+    if (action == ButtonAction::Press && keyBound(InputAction::Fullscreen)) {
+        auto* settingsMenu = dynamic_cast<SettingsMenu*>(m_ui.activeMenu.get());
+        if (!settingsMenu || !settingsMenu->capturingKeyboardMouse()) {
+            m_window.toggleFullscreen();
+            return;
+        }
+    }
     if (m_ui.commandOpen) {
         if (action == ButtonAction::Press) {
             if (key == Key::Tab) {
@@ -188,6 +203,13 @@ void ApplicationInputRouter::handleKeyEvent(
         return;
     }
 
+    if (action == ButtonAction::Press && keyBound(InputAction::DirectCommand) &&
+        m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
+        !m_ui.inventoryOpen && !m_session.playerDead) {
+        m_flow.openCommandInput("/");
+        return;
+    }
+
     // E key — toggle creative inventory (Playing only, no menu active)
     if (action == ButtonAction::Press && keyBound(InputAction::Inventory)) {
         if (m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
@@ -214,7 +236,52 @@ void ApplicationInputRouter::handleKeyEvent(
     if (action == ButtonAction::Press && keyBound(InputAction::DropItem) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
         !m_ui.inventoryOpen && !m_ui.commandOpen && !m_session.playerDead) {
-        m_flow.dropSelectedItem();
+        m_flow.dropSelectedItem((mods & KeyModifier::Control) != 0);
+        return;
+    }
+
+    if (action == ButtonAction::Press && m_ui.inventoryOpen &&
+        m_flow.state() == GameState::Playing) {
+        for (int slot = 0; slot < 9; ++slot) {
+            if (!keyBound(static_cast<InputAction>(
+                    static_cast<int>(InputAction::Hotbar1) + slot))) continue;
+            if (m_ui.containerOpen) m_ui.containerScreen.swapHoveredWithHotbar(slot);
+            else if (m_ui.playerInventoryViewOpen(m_session.player))
+                m_ui.survivalInventory.swapHoveredWithHotbar(slot);
+            else if (m_session.player.gameMode() == GameMode::Creative) {
+                const ItemId item = m_ui.inventory.hoveredItem();
+                if (item != ItemId::EMPTY) m_flow.giveCreativeItem(item, slot);
+            }
+            return;
+        }
+        if (keyBound(InputAction::SwapOffhand)) {
+            if (m_ui.containerOpen) m_ui.containerScreen.swapHoveredWithOffhand();
+            else if (m_ui.playerInventoryViewOpen(m_session.player))
+                m_ui.survivalInventory.swapHoveredWithOffhand();
+            return;
+        }
+        if (keyBound(InputAction::DropItem)) {
+            ItemStack dropped;
+            const bool entire = (mods & KeyModifier::Control) != 0;
+            if (m_ui.containerOpen) dropped = m_ui.containerScreen.dropHovered(entire);
+            else if (m_ui.playerInventoryViewOpen(m_session.player))
+                dropped = m_ui.survivalInventory.dropHovered(entire);
+            m_flow.dropInventoryItem(dropped);
+            return;
+        }
+    }
+
+    if (action == ButtonAction::Press && keyBound(InputAction::PickBlock) &&
+        m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
+        !m_ui.inventoryOpen && !m_session.playerDead) {
+        m_flow.pickBlock();
+        return;
+    }
+
+    if (action == ButtonAction::Press && keyBound(InputAction::SwapOffhand) &&
+        m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
+        !m_ui.inventoryOpen && !m_session.playerDead) {
+        m_flow.swapOffhand();
         return;
     }
 
@@ -222,7 +289,8 @@ void ApplicationInputRouter::handleKeyEvent(
     for (int slot = 0; slot < 9 && action == ButtonAction::Press; ++slot) {
         if (!keyBound(static_cast<InputAction>(
                 static_cast<int>(InputAction::Hotbar1) + slot))) continue;
-        if (m_flow.state() == GameState::Playing && !m_ui.activeMenu) {
+        if (m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
+            !m_ui.inventoryOpen && !m_ui.commandOpen) {
             m_ui.hotbar.selectSlot(slot);
             m_session.player.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
         }
@@ -286,9 +354,19 @@ void ApplicationInputRouter::handleMouseButtonEvent(
         return binding.device == InputDevice::Mouse && binding.code == button;
     };
     m_ui.updateMouseScreenPosition(m_window);
+    if (action == ButtonAction::Press && mouseBound(InputAction::Fullscreen)) {
+        auto* settingsMenu = dynamic_cast<SettingsMenu*>(m_ui.activeMenu.get());
+        if (!settingsMenu || !settingsMenu->capturingKeyboardMouse()) {
+            m_window.toggleFullscreen();
+            return;
+        }
+    }
     if (action == ButtonAction::Press && m_flow.state() == GameState::Playing && !m_ui.activeMenu) {
         if (mouseBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.playerDead) {
             m_flow.openCommandInput(); return;
+        }
+        if (mouseBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+            m_flow.openCommandInput("/"); return;
         }
         if (mouseBound(InputAction::Inventory) && !m_ui.commandOpen && !m_session.player.isSpectator()) {
             if (m_ui.inventoryOpen) m_flow.closeInventory(); else m_flow.openInventory(); return;
@@ -298,6 +376,10 @@ void ApplicationInputRouter::handleMouseButtonEvent(
         }
         if (mouseBound(InputAction::DropItem) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
             !m_session.playerDead) { m_flow.dropSelectedItem(); return; }
+        if (mouseBound(InputAction::PickBlock) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
+            !m_session.playerDead) { m_flow.pickBlock(); return; }
+        if (mouseBound(InputAction::SwapOffhand) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
+            !m_session.playerDead) { m_flow.swapOffhand(); return; }
         for (int slot = 0; slot < 9; ++slot) if (mouseBound(static_cast<InputAction>(
             static_cast<int>(InputAction::Hotbar1) + slot))) {
             m_ui.hotbar.selectSlot(slot);
@@ -361,15 +443,25 @@ void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
         return binding.device == InputDevice::Wheel && binding.code == (yoffset > 0 ? 1 : -1);
     };
     if (m_flow.state() == GameState::Playing && !m_ui.commandOpen) {
+        if (wheelBound(InputAction::Fullscreen)) { m_window.toggleFullscreen(); return; }
         if (wheelBound(InputAction::Inventory) && !m_session.player.isSpectator()) {
             if (m_ui.inventoryOpen) m_flow.closeInventory(); else m_flow.openInventory(); return;
         }
         if (wheelBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.playerDead) {
             m_flow.openCommandInput(); return;
         }
+        if (wheelBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+            m_flow.openCommandInput("/"); return;
+        }
         if (wheelBound(InputAction::Perspective) && !m_ui.inventoryOpen) { cyclePerspective(); return; }
         if (wheelBound(InputAction::DropItem) && !m_ui.inventoryOpen && !m_session.playerDead) {
             m_flow.dropSelectedItem(); return;
+        }
+        if (wheelBound(InputAction::PickBlock) && !m_ui.inventoryOpen && !m_session.playerDead) {
+            m_flow.pickBlock(); return;
+        }
+        if (wheelBound(InputAction::SwapOffhand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+            m_flow.swapOffhand(); return;
         }
         for (int slot = 0; slot < 9; ++slot)
             if (wheelBound(static_cast<InputAction>(static_cast<int>(InputAction::Hotbar1) + slot)))

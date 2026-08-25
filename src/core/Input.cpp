@@ -6,10 +6,11 @@
 namespace {
 constexpr const char* ACTION_NAMES[] = {
     "Move Forward", "Move Backward", "Move Left", "Move Right",
-    "Jump", "Sneak", "Sprint", "Inventory", "Command", "Attack", "Use",
+    "Jump", "Sneak", "Sprint", "Inventory", "Open Chat", "Attack", "Use",
     "Hotbar 1", "Hotbar 2", "Hotbar 3", "Hotbar 4", "Hotbar 5",
     "Hotbar 6", "Hotbar 7", "Hotbar 8", "Hotbar 9",
-    "Previous Slot", "Next Slot", "Change Perspective", "Drop Item"
+    "Previous Slot", "Next Slot", "Change Perspective", "Drop Item",
+    "Open Command", "Pick Block", "Swap Offhand", "Toggle Fullscreen"
 };
 }
 

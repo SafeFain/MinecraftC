@@ -13,6 +13,7 @@ enum class InputAction : uint8_t {
     Hotbar6, Hotbar7, Hotbar8, Hotbar9,
     PreviousSlot, NextSlot, Perspective,
     DropItem,
+    DirectCommand, PickBlock, SwapOffhand, Fullscreen,
     Count
 };
 

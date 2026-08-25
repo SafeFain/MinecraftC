@@ -89,6 +89,7 @@ const char* physicalKeyName(int key) {
         case 42: return "Backspace";
         case 43: return "Tab";
         case 44: return "Space";
+        case 56: return "/";
         case 73: return "Insert";
         case 74: return "Home";
         case 75: return "Page Up";

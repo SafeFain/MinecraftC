@@ -15,6 +15,7 @@ class Window;
 struct CommandError;
 namespace platform { class Clipboard; }
 enum class ItemId : std::uint16_t;
+struct ItemStack;
 
 // Owns the application state machine (GameState) and every transition between
 // game states plus the UI/session actions those transitions perform: starting
@@ -47,12 +48,15 @@ public:
     // UI transitions
     void openInventory();
     void closeInventory();
-    void openCommandInput();
+    void openCommandInput(const std::string& initialText = {});
     void closeCommandInput();
     void executeCommand();
     void openPlayerInventoryView();
-    void giveCreativeItem(ItemId id);
-    void dropSelectedItem();
+    void giveCreativeItem(ItemId id, int hotbarSlot = -1);
+    void dropSelectedItem(bool entireStack = false);
+    void dropInventoryItem(ItemStack stack);
+    void pickBlock();
+    void swapOffhand();
     bool playerInventoryViewOpen() const;
 
     // Command console feedback

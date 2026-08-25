@@ -19,6 +19,9 @@ public:
     void onMouseMove(int mouseX, int mouseY);
     void onGamepadNavigate(int dx, int dy);
     void onGamepadAction(int action);
+    bool swapHoveredWithHotbar(int hotbarSlot);
+    bool swapHoveredWithOffhand();
+    ItemStack dropHovered(bool entireStack);
     void onClose();
     void setCraftingTable(bool enabled) { m_craftingTable = enabled; }
     void setCreativeAccess(bool enabled) { m_creativeAccess = enabled; }
@@ -48,6 +51,7 @@ private:
     std::vector<ItemStack*> m_dragTargets;
     bool m_cursorHeldAtPress = false;
     int m_focusX = 0, m_focusY = 0;
+    int m_pointerX = 0, m_pointerY = 0;
 
     void layout(int screenWidth, int screenHeight);
     ItemStack craftingOutput() const;
@@ -55,6 +59,7 @@ private:
     void clickStack(ItemStack& stack, bool rightClick);
     void performClick(int button, int mouseX, int mouseY);
     void quickMove(int mouseX, int mouseY);
+    ItemStack* hoveredStack(int mouseX, int mouseY);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,
                           const ItemStack& stack, bool hovered);

@@ -21,6 +21,9 @@ public:
     void onMouseMove(int mouseX, int mouseY);
     void onGamepadNavigate(int dx, int dy);
     void onGamepadAction(int action);
+    bool swapHoveredWithHotbar(int hotbarSlot);
+    bool swapHoveredWithOffhand();
+    ItemStack dropHovered(bool entireStack);
     void close(const std::function<void(ItemStack)>& drop);
 
 private:
@@ -39,10 +42,12 @@ private:
     std::vector<ItemStack*> m_dragTargets;
     bool m_cursorHeldAtPress = false;
     int m_focusX = 0, m_focusY = 0;
+    int m_pointerX = 0, m_pointerY = 0;
 
     void layout(int width, int height);
     void click(int button, int x, int y);
     void quickMove(int x, int y);
+    ItemStack* hoveredStack(int x, int y);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,
                           const ItemStack& stack, bool hovered);
