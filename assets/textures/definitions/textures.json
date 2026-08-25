@@ -12,7 +12,8 @@
     "limestone": "stone", "basalt": "stone", "tuff": "stone", "granite": "stone",
     "cloudstone": "stone", "obsidian": "stone",
     "coal_ore": "ore", "copper_ore": "ore", "iron_ore": "ore",
-    "gold_ore": "ore", "diamond_ore": "ore",
+    "gold_ore": "ore", "diamond_ore": "ore", "emerald_ore": "ore",
+    "deepslate_emerald_ore": "ore",
     "oak_log": "wood", "oak_log_top": "wood", "oak_planks": "wood",
     "birch_log": "wood", "spruce_log": "wood", "jungle_log": "wood", "acacia_log": "wood",
     "skyroot_log": "wood", "skyroot_log_top": "wood",
@@ -26,6 +27,9 @@
     "cloud_bloom": "fluid_emissive", "glowshroom": "fluid_emissive",
     "crafting_table": "constructed", "furnace": "constructed", "chest": "constructed",
     "white_wool": "constructed", "white_bed": "constructed", "tnt": "constructed",
+    "composter": "constructed", "fletching_table": "constructed", "loom": "constructed",
+    "cauldron": "constructed", "blast_furnace": "constructed",
+    "smithing_table": "constructed", "grindstone": "constructed",
     "cactus_side": "constructed", "cactus_top": "constructed", "cloud": "constructed",
     "terracotta": "constructed", "tall_grass": "foliage", "flower": "foliage",
     "reeds": "foliage", "wheat_young": "foliage", "wheat_middle": "foliage",
@@ -70,6 +74,9 @@
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower", "cloud_bloom", "glowshroom", "copper_ore"
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "emerald_ore", "deepslate_emerald_ore", "composter", "fletching_table",
+    "loom", "cauldron", "blast_furnace", "smithing_table", "grindstone",
+    "copper_ore"
   ]
 }

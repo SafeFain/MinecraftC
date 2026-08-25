@@ -74,6 +74,15 @@
       ],
       "source": "entity_skins/spider.png"
     },
+    "villager": {
+      "features": [
+        "brow",
+        "nose",
+        "robe",
+        "profession_badge"
+      ],
+      "source": "entity_skins/villager.png"
+    },
     "zombie": {
       "features": [
         "skin",
@@ -82,6 +91,15 @@
         "wear"
       ],
       "source": "entity_skins/zombie.png"
+    },
+    "zombie_villager": {
+      "features": [
+        "brow",
+        "nose",
+        "torn_robe",
+        "decay"
+      ],
+      "source": "entity_skins/zombie_villager.png"
     }
   },
   "filter": "nearest",

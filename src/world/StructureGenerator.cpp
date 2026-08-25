@@ -191,22 +191,24 @@ void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz
                            : ArchitecturalMaterial::Planks,
                     BlockHalf::Bottom));
 
-    const uint64_t furnishing =
-        WorldGenContext::hashPosition(variant, hx, 1, hz) % 6;
-    switch (furnishing) {
-        case 0: {
-            const BlockId foot = bedBlock(BedPart::Foot, BedDirection::North);
-            const BlockId head = bedBlock(BedPart::Head, BedDirection::North);
-            write(hx - 1, base + 1, hz, foot);
-            write(hx - 1, base + 1, hz - 1, head);
-            break;
-        }
-        case 1: write(hx, base + 1, hz, BlockId::CRAFTING_TABLE); break;
-        case 2: write(hx, base + 1, hz, BlockId::FURNACE); break;
-        case 3: write(hx, base + 1, hz, BlockId::CHEST); break;
-        case 4: write(hx + 1, base + 3, hz, BlockId::TORCH); break;
-        default: break;
-    }
+    // A generated house is one residential unit. Its bed supplies the
+    // deterministic initial villager request and the paired workstation lets
+    // the runtime POI system assign that villager's profession.
+    const BlockId foot = bedBlock(BedPart::Foot, BedDirection::North);
+    const BlockId head = bedBlock(BedPart::Head, BedDirection::North);
+    write(hx - 1, base + 1, hz, foot);
+    write(hx - 1, base + 1, hz - 1, head);
+    constexpr std::array<BlockId, 7> workstations{{
+        BlockId::COMPOSTER, BlockId::FLETCHING_TABLE, BlockId::LOOM,
+        BlockId::CAULDRON, BlockId::BLAST_FURNACE, BlockId::SMITHING_TABLE,
+        BlockId::GRINDSTONE,
+    }};
+    const size_t profession = static_cast<size_t>(
+        WorldGenContext::hashPosition(variant, hx, base, hz) %
+        workstations.size());
+    write(hx + 1, base + 1, hz, workstations[profession]);
+    if ((variant & 3u) == 0u)
+        write(hx + 1, base + 3, hz, BlockId::TORCH);
 }
 
 void buildFarm(const StructureGenerator::StructureWriter& write, int cx, int cz,
@@ -766,8 +768,12 @@ const StructureGenerator::TypeParams& StructureGenerator::params(
     StructureType type) {
     static constexpr std::array<TypeParams, 9> table{{
         {StructureType::None, 0, 0, 0, 0},
-        {StructureType::Village, 512, 12, 6, 16},
-        {StructureType::DesertVillage, 512, 12, 6, 15},
+        // Village candidates still pass biome, spacing and full-footprint
+        // terrain checks. Plains have a 40% cell chance; desert candidates run
+        // every cell because the single eligible desert biome is much rarer.
+        // Both remain meaningfully gated after the old 12% prefilter.
+        {StructureType::Village, 512, 40, 6, 16},
+        {StructureType::DesertVillage, 512, 100, 6, 15},
         {StructureType::TravelerHut, 64, 10, 2, 9},
         {StructureType::AbandonedCamp, 80, 9, 2, 5},
         {StructureType::DesertWell, 64, 12, 2, 6},
@@ -944,7 +950,7 @@ bool StructureGenerator::accept(const Candidate& candidate) const {
 
 void StructureGenerator::generateStructuresRegion(
     int originX, int originZ, int width, int depth,
-    std::vector<StructurePlacement>& out) {
+    std::vector<StructurePlacement>& out) const {
     out.clear();
     for (const StructureType type : OVERWORLD_STRUCTURE_TYPES) {
         const TypeParams& p = params(type);
@@ -971,7 +977,7 @@ void StructureGenerator::generateStructuresRegion(
 }
 
 std::vector<StructurePlacement> StructureGenerator::generateStructures(
-    int chunkWorldX, int chunkWorldZ) {
+    int chunkWorldX, int chunkWorldZ) const {
     std::vector<StructurePlacement> out;
     generateStructuresRegion(chunkWorldX, chunkWorldZ, Config::CHUNK_SIZE_X,
                              Config::CHUNK_SIZE_Z, out);

@@ -159,7 +159,17 @@ enum class BlockId : uint8_t {
     CLOUDSTONE_STAIRS_BOTTOM_SOUTH, CLOUDSTONE_STAIRS_BOTTOM_WEST,
     CLOUDSTONE_STAIRS_TOP_NORTH, CLOUDSTONE_STAIRS_TOP_EAST,
     CLOUDSTONE_STAIRS_TOP_SOUTH, CLOUDSTONE_STAIRS_TOP_WEST,
-    COUNT        = 166,
+    // Villager economy blocks are appended to preserve every serialized ID.
+    EMERALD_ORE = 166,
+    DEEPSLATE_EMERALD_ORE,
+    COMPOSTER,
+    FLETCHING_TABLE,
+    LOOM,
+    CAULDRON,
+    BLAST_FURNACE,
+    SMITHING_TABLE,
+    GRINDSTONE,
+    COUNT        = 175,
     POPPY        = FLOWER
 };
 
@@ -251,6 +261,8 @@ enum class BlockTexture : uint8_t {
     AetherGrassTop, AetherGrassSide, AetherSoil, Cloudstone, Sunstone,
     SkyrootLog, SkyrootLogTop, SkyrootLeaves, StarCrystal, Starflower,
     CloudBloom, Glowshroom,
+    EmeraldOre, DeepslateEmeraldOre, Composter, FletchingTable, Loom,
+    Cauldron, BlastFurnace, SmithingTable, Grindstone,
     Count
 };
 
@@ -267,6 +279,7 @@ inline bool isSolid(BlockId id) {
 }
 
 bool isBed(BlockId id);
+bool isVillagerWorkstation(BlockId id);
 bool decodeBed(BlockId id, BedPart& part, BedDirection& direction);
 BlockId bedBlock(BedPart part, BedDirection direction);
 glm::ivec3 bedDirectionOffset(BedDirection direction);

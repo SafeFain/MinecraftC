@@ -48,6 +48,12 @@
     "sunstone_stairs": {"texture": "sunstone"},
     "cloudstone_slab": {"texture": "cloudstone"},
     "cloudstone_stairs": {"texture": "cloudstone"},
+    "emerald_ore": {"texture": "emerald_ore"},
+    "deepslate_emerald_ore": {"texture": "deepslate_emerald_ore"},
+    "composter": {"texture": "composter"},
+    "fletching_table": {"texture": "fletching_table"}, "loom": {"texture": "loom"},
+    "cauldron": {"texture": "cauldron"}, "blast_furnace": {"texture": "blast_furnace"},
+    "smithing_table": {"texture": "smithing_table"}, "grindstone": {"texture": "grindstone"},
     "copper_ore": {"texture": "copper_ore", "future": true}
   }
 }

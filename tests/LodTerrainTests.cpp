@@ -87,6 +87,20 @@ int main() {
             "fine approximate LOD retains deterministic tree silhouettes");
     require(foundSubCellWater,
             "fine approximate LOD retains water missed by its center sample");
+    LodColumn recoveredWater;
+    recoveredWater.spans.push_back({58, 61, BlockId::SAND});
+    recoveredWater.spans.push_back({62, 62, BlockId::WATER});
+    LodColumn dryExact;
+    dryExact.exact = true;
+    dryExact.spans.push_back({58, 62, BlockId::SAND});
+    refineLodColumn(recoveredWater, dryExact, 4);
+    require(!recoveredWater.exact && recoveredWater.spans.size() == 2 &&
+            recoveredWater.spans.back().block == BlockId::WATER,
+            "exact center refinement preserves recovered sub-cell water");
+    refineLodColumn(recoveredWater, dryExact, 1);
+    require(recoveredWater.exact && recoveredWater.spans.size() == 1 &&
+            recoveredWater.spans.front().block == BlockId::SAND,
+            "one-block LOD accepts exact dry terrain refinement");
     const LodTileData coarseTrees = buildApproximateLodTile(normal, {0, 0, 4});
     for (const LodColumn& column : coarseTrees.columns) {
         for (const LodSpan& span : column.spans)

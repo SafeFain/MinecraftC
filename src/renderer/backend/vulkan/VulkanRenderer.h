@@ -102,7 +102,7 @@ private:
     RenderMaterialHandle m_chunkTranslucent{};
     RenderTextureHandle m_entityAtlas{};
     RenderMaterialHandle m_entityMaterial{};
-    std::array<RenderMeshHandle, 9> m_compatibilityCubes{};
+    std::array<RenderMeshHandle, 11> m_compatibilityCubes{};
     glm::mat4 m_viewProjection{1.0f};
     Frustum m_frustum;
     RenderEnvironment m_environment;

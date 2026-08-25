@@ -822,6 +822,13 @@ int main() {
     }
     require(seedDiffersStructures,
             "different seeds produced identical structure exploration windows");
+    // Generation v12 raises real accepted village density, not merely the
+    // number of pre-biome candidates. The same v11 seed/window produced 12
+    // plains villages and 2 desert villages.
+    require(structureCounts[static_cast<size_t>(StructureType::Village)] >= 36 &&
+                structureCounts[static_cast<size_t>(
+                    StructureType::DesertVillage)] >= 4,
+            "v12 village density fell back to the sparse v11 baseline");
     std::cout << "structure window counts: village="
               << structureCounts[static_cast<size_t>(StructureType::Village)]
               << " desert_village="
@@ -884,10 +891,17 @@ int main() {
         std::set<BlockId> materials;
         countMaterials(placement, materials);
         if (placement.type == StructureType::Village && !checkedVillageMaterials) {
+            bool hasBed = false;
+            bool hasWorkstation = false;
+            for (const BlockId block : materials) {
+                hasBed = hasBed || isBed(block);
+                hasWorkstation = hasWorkstation || isVillagerWorkstation(block);
+            }
             require(materials.count(BlockId::PLANKS) > 0 &&
                         materials.count(BlockId::COBBLESTONE) > 0 &&
                         materials.count(BlockId::WATER) > 0 &&
-                        materials.count(BlockId::FARMLAND_7) > 0,
+                        materials.count(BlockId::FARMLAND_7) > 0 &&
+                        hasBed && hasWorkstation,
                     "plains village lacks signature materials");
             checkedVillageMaterials = true;
         }
@@ -1009,15 +1023,32 @@ int main() {
         }
         require(foundVillage,
                 "no village available for entity-registration check");
-        const int anchorX = -8192 + village.localX;
-        const int anchorZ = -8192 + village.localZ;
-        const auto floorChunk16 = [](int value) {
+        const auto floorChunk = [](int value) {
             const int quotient = value / Config::CHUNK_SIZE_X;
             return value % Config::CHUNK_SIZE_X < 0 ? quotient - 1 : quotient;
         };
-        const int originCX = floorChunk16(anchorX - 24);
-        const int originCZ = floorChunk16(anchorZ - 24);
         WorldGenerator entityWorld(seed);
+        std::vector<WorldGenerator::VillageSpawnRequest> spawnRequests;
+        WorldGenerator repeatEntityWorld(seed);
+        for (int cz = floorChunk(village.minZ); cz <= floorChunk(village.maxZ); ++cz) {
+            for (int cx = floorChunk(village.minX); cx <= floorChunk(village.maxX); ++cx) {
+                const auto first = entityWorld.villageSpawnsForChunk(cx, cz);
+                const auto repeat = repeatEntityWorld.villageSpawnsForChunk(cx, cz);
+                require(first.size() == repeat.size(),
+                        "village population request count changed for equal seed");
+                for (size_t i = 0; i < first.size(); ++i)
+                    require(first[i].position == repeat[i].position &&
+                                first[i].seed == repeat[i].seed,
+                            "village population request changed for equal seed");
+                spawnRequests.insert(spawnRequests.end(), first.begin(), first.end());
+            }
+        }
+        require(!spawnRequests.empty(),
+                "generated village beds produced no villager population requests");
+        const int anchorX = -8192 + village.localX;
+        const int anchorZ = -8192 + village.localZ;
+        const int originCX = floorChunk(anchorX - 24);
+        const int originCZ = floorChunk(anchorZ - 24);
         std::vector<std::unique_ptr<Chunk>> entityOwned;
         std::vector<Chunk*> entityChunks;
         for (int cz = 0; cz < 3; ++cz) {
@@ -1080,6 +1111,59 @@ int main() {
     require(oreCounts[0] > 0 && oreCounts[1] > 0 &&
             oreCounts[2] > 0 && oreCounts[3] > 0,
             "sparse ore tuning removed an ore type from the sample");
+
+    // Emeralds use the v11 coordinate-attempt distribution and are entirely
+    // gated by mountain-family biomes.
+    Noise sameEmeraldNoise(seed);
+    OreGenerator sameEmeralds(sameEmeraldNoise, seed);
+    WorldGenerator otherOreWorld(seed + 1);
+    OreGenerator& otherEmeralds = otherOreWorld.getOreGenerator();
+    size_t emeraldCount = 0;
+    size_t deepEmeraldCount = 0;
+    size_t differentSeedDisagreements = 0;
+    for (int z = -48; z < 48; ++z) {
+        for (int x = -48; x < 48; ++x) {
+            // Sample the complete deepslate band and the high-density band
+            // around the Y=232 triangular peak. This covers both variants
+            // without turning the distribution regression into a full-volume
+            // chunk-generation benchmark.
+            for (int y = -16; y <= 260; ++y) {
+                if (y >= 0 && y < 200) continue;
+                const BlockId host = y < 0 ? BlockId::DEEPSLATE : BlockId::STONE;
+                const BlockId first = ores.getOre(x + .5f, y + .5f, z + .5f,
+                                                   host, Biome::MOUNTAINS);
+                const BlockId repeat = sameEmeralds.getOre(
+                    x + .5f, y + .5f, z + .5f, host, Biome::MOUNTAINS);
+                require(first == repeat,
+                        "emerald generation changed for an equal seed");
+                const BlockId plains = ores.getOre(
+                    x + .5f, y + .5f, z + .5f, host, Biome::PLAINS);
+                require(plains != BlockId::EMERALD_ORE &&
+                            plains != BlockId::DEEPSLATE_EMERALD_ORE,
+                        "emerald generated outside a mountain-family biome");
+                if (first == BlockId::EMERALD_ORE) ++emeraldCount;
+                if (first == BlockId::DEEPSLATE_EMERALD_ORE) ++deepEmeraldCount;
+                const BlockId other = otherEmeralds.getOre(
+                    x + .5f, y + .5f, z + .5f, host, Biome::MOUNTAINS);
+                if (first != other &&
+                    (first == BlockId::EMERALD_ORE ||
+                     first == BlockId::DEEPSLATE_EMERALD_ORE ||
+                     other == BlockId::EMERALD_ORE ||
+                     other == BlockId::DEEPSLATE_EMERALD_ORE))
+                    ++differentSeedDisagreements;
+            }
+            require(ores.getOre(x + .5f, -16.5f, z + .5f,
+                                 BlockId::DEEPSLATE, Biome::MOUNTAINS) !=
+                        BlockId::DEEPSLATE_EMERALD_ORE,
+                    "emerald generated below its Y=-16 lower bound");
+        }
+    }
+    std::cout << "emerald sample normal=" << emeraldCount
+              << " deep=" << deepEmeraldCount
+              << " seed_disagreements=" << differentSeedDisagreements << '\n';
+    require(emeraldCount > 0 && deepEmeraldCount > 0 &&
+                differentSeedDisagreements > 0,
+            "emerald attempts lack stone/deepslate variants or seed variation");
 
     // CPU mesh classification: plants use opaque/cutout cross geometry while
     // water and leaves occupy the translucent draw range.

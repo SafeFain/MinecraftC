@@ -446,10 +446,10 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             int wx = wxBase + x, wz = wzBase + z;
+            const auto& surfaceColumn = m_regionData.col(
+                pad + localCX * Config::CHUNK_SIZE_X + x,
+                pad + localCZ * Config::CHUNK_SIZE_Z + z);
             for (int y = Config::CAVE_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
-                const auto& surfaceColumn = m_regionData.col(
-                    pad + localCX * Config::CHUNK_SIZE_X + x,
-                    pad + localCZ * Config::CHUNK_SIZE_Z + z);
                 if (y > surfaceColumn.height - Config::CAVE_DRY_ROOF) continue;
                 CaveCell cell = m_regionData.caves.get(wx, y, wz);
                 if (cell == CaveCell::Solid) continue;
@@ -466,9 +466,11 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             // Ores only replace rock that remains after carving.
             for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId existing = chunk.getBlock(x, y, z);
-                if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE) continue;
+                if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE &&
+                    existing != BlockId::GRANITE && existing != BlockId::TUFF) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
-                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f, existing);
+                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
+                    existing, surfaceColumn.biome);
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
 

@@ -46,10 +46,10 @@ public:
     // Anchors are restricted to [originX, originX+width) ×
     // [originZ, originZ+depth); footprints may extend beyond the window.
     void generateStructuresRegion(int originX, int originZ, int width, int depth,
-                                  std::vector<StructurePlacement>& out);
+                                  std::vector<StructurePlacement>& out) const;
 
     std::vector<StructurePlacement> generateStructures(int chunkWorldX,
-                                                       int chunkWorldZ);
+                                                       int chunkWorldZ) const;
 
     // Finds the nearest accepted deterministic anchor without generating or
     // loading chunks. Search expands by placement cell and stops only after

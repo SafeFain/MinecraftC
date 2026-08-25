@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/Block.h"
+#include "world/Biome.h"
 #include "world/WorldGenContext.h"
 #include "FastNoiseLite.h"
 
@@ -13,7 +14,8 @@ public:
     OreGenerator(const Noise& legacyNoise, uint64_t seed);
 
     BlockId getOre(float worldX, float worldY, float worldZ,
-                   BlockId existingBlock) const;
+                   BlockId existingBlock, Biome biome = Biome::PLAINS) const;
+    static bool emeraldBiome(Biome biome);
 
 private:
     WorldGenContext m_context;

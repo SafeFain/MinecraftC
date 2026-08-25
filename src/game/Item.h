@@ -186,6 +186,19 @@ enum class ItemId : uint16_t {
     CLOUDSTONE_SLAB,
     CLOUDSTONE_STAIRS,
 
+    EMERALD,
+    EMERALD_ORE,
+    DEEPSLATE_EMERALD_ORE,
+    COMPOSTER,
+    FLETCHING_TABLE,
+    LOOM,
+    CAULDRON,
+    BLAST_FURNACE,
+    SMITHING_TABLE,
+    GRINDSTONE,
+    VILLAGER_SPAWN_EGG,
+    ZOMBIE_VILLAGER_SPAWN_EGG,
+
     COUNT,
     POPPY = FLOWER
 };
@@ -222,7 +235,9 @@ enum class SpawnEggMob : uint8_t {
     Zombie,
     Skeleton,
     Spider,
-    Blastling
+    Blastling,
+    Villager,
+    ZombieVillager
 };
 
 enum class ToolKind : uint8_t {

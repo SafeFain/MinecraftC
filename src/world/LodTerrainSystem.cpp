@@ -217,6 +217,11 @@ int lodTreeRadius(TreeType type) {
     }
 }
 
+bool hasFluidSpan(const LodColumn& column) {
+    return std::any_of(column.spans.begin(), column.spans.end(),
+        [](const LodSpan& span) { return isFluid(span.block); });
+}
+
 void overlayExactChunks(LodTileData& tile, const LodTileKey& key,
                         const std::filesystem::path& root,
                         const WorldGenerator& generator,
@@ -244,7 +249,7 @@ void overlayExactChunks(LodTileData& tile, const LodTileKey& key,
                 const int sampleX = originX + tx * cellSize + cellSize / 2;
                 const int sampleZ = originZ + tz * cellSize + cellSize / 2;
                 if (wx == sampleX && wz == sampleZ)
-                    tile.at(tx, tz) = exact.at(x, z);
+                    refineLodColumn(tile.at(tx, tz), exact.at(x, z), cellSize);
             }
         }
     }
@@ -480,6 +485,18 @@ LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks,
         }
     }
     return tile;
+}
+
+void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
+                     int cellSize) {
+    // Fine approximate cells deliberately recover narrow water that their
+    // center sample misses. A later exact center-column extraction must not
+    // erase that sub-cell coverage, otherwise exploration alternates the same
+    // coarse cell between its blue water surface and yellow seabed. Level zero
+    // is already a one-block exact match and should always accept refinement.
+    if (cellSize > 1 && hasFluidSpan(approximate) && !hasFluidSpan(exact))
+        return;
+    approximate = exact;
 }
 
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,

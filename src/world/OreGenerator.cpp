@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
+#include <unordered_set>
 
 namespace {
 constexpr uint64_t COAL_DOMAIN = 0x4F52455F434F414CULL;
@@ -10,6 +12,89 @@ constexpr uint64_t IRON_DOMAIN = 0x4F52455F49524F4EULL;
 constexpr uint64_t GOLD_DOMAIN = 0x4F52455F474F4C44ULL;
 constexpr uint64_t DIAM_DOMAIN = 0x4F52455F4449414DULL;
 constexpr uint64_t VEIN_DOMAIN = 0x4F52455F5645494EULL;
+constexpr uint64_t EMERALD_DOMAIN = 0x4F52455F454D4552ULL;
+
+int floorDiv16(int value) {
+    int quotient = value / 16;
+    if (value % 16 < 0) --quotient;
+    return quotient;
+}
+
+uint32_t localOreIndex(int x, int y, int z) {
+    return static_cast<uint32_t>((y + 64) * 256 + z * 16 + x);
+}
+
+struct EmeraldCacheEntry {
+    uint64_t seed = 0;
+    int chunkX = 0;
+    int chunkZ = 0;
+    std::unordered_set<uint32_t> blocks;
+};
+
+const std::unordered_set<uint32_t>& emeraldCandidates(
+    uint64_t seed, int targetChunkX, int targetChunkZ) {
+    thread_local std::deque<EmeraldCacheEntry> cache;
+    for (auto it = cache.begin(); it != cache.end(); ++it) {
+        if (it->seed == seed && it->chunkX == targetChunkX &&
+            it->chunkZ == targetChunkZ) {
+            if (it != cache.begin()) {
+                EmeraldCacheEntry hit = std::move(*it);
+                cache.erase(it);
+                cache.push_front(std::move(hit));
+            }
+            return cache.front().blocks;
+        }
+    }
+    EmeraldCacheEntry entry;
+    entry.seed = seed;
+    entry.chunkX = targetChunkX;
+    entry.chunkZ = targetChunkZ;
+    const int targetMinX = targetChunkX * 16;
+    const int targetMinZ = targetChunkZ * 16;
+    for (int sourceChunkZ = targetChunkZ - 1;
+         sourceChunkZ <= targetChunkZ + 1; ++sourceChunkZ) {
+        for (int sourceChunkX = targetChunkX - 1;
+             sourceChunkX <= targetChunkX + 1; ++sourceChunkX) {
+            for (int attempt = 0; attempt < 100; ++attempt) {
+                uint64_t random = WorldGenContext::hashPosition(
+                    seed ^ EMERALD_DOMAIN, sourceChunkX, attempt, sourceChunkZ);
+                int x = sourceChunkX * 16 + static_cast<int>(random & 15u);
+                int z = sourceChunkZ * 16 + static_cast<int>((random >> 4) & 15u);
+                const double u = static_cast<double>((random >> 8) & 0xffffffu) /
+                    static_cast<double>(0x1000000u);
+                constexpr double minimum = -16.0;
+                constexpr double maximum = 320.0;
+                constexpr double mode = 232.0;
+                constexpr double split = (mode - minimum) / (maximum - minimum);
+                const double sampledY = u < split
+                    ? minimum + std::sqrt(u * (maximum - minimum) *
+                                          (mode - minimum))
+                    : maximum - std::sqrt((1.0 - u) * (maximum - minimum) *
+                                           (maximum - mode));
+                int y = std::clamp(static_cast<int>(std::floor(sampledY)),
+                                   -16, 319);
+                const int count = static_cast<int>((random >> 32) % 5u);
+                for (int block = 0; block < count; ++block) {
+                    if (floorDiv16(x) == targetChunkX && floorDiv16(z) == targetChunkZ &&
+                        y >= -64 && y <= 319) {
+                        entry.blocks.insert(localOreIndex(
+                            x - targetMinX, y, z - targetMinZ));
+                    }
+                    random = WorldGenContext::mix(random +
+                        static_cast<uint64_t>(block) + 0x9E3779B97F4A7C15ULL);
+                    switch (random % 6u) {
+                        case 0: ++x; break; case 1: --x; break;
+                        case 2: ++z; break; case 3: --z; break;
+                        case 4: ++y; break; default: --y; break;
+                    }
+                }
+            }
+        }
+    }
+    cache.push_front(std::move(entry));
+    if (cache.size() > 24) cache.pop_back();
+    return cache.front().blocks;
+}
 }
 
 void OreGenerator::configure(FastNoiseLite& noise, int seed, float frequency) {
@@ -38,7 +123,33 @@ float OreGenerator::triangle(float y, float minY, float peakY, float maxY) {
     return (maxY - y) / (maxY - peakY);
 }
 
-BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing) const {
+bool OreGenerator::emeraldBiome(Biome biome) {
+    switch (biome) {
+        case Biome::MOUNTAINS: case Biome::HILLS: case Biome::MEADOW:
+        case Biome::GLACIAL_PEAKS: case Biome::ALPINE_TUNDRA:
+        case Biome::ROCKY_STEPPE: case Biome::LIMESTONE_HIGHLANDS:
+        case Biome::VOLCANIC_HIGHLANDS: return true;
+        default: return false;
+    }
+}
+
+BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing,
+                             Biome biome) const {
+    const int worldX = static_cast<int>(std::floor(x));
+    const int worldY = static_cast<int>(std::floor(y));
+    const int worldZ = static_cast<int>(std::floor(z));
+    if (emeraldBiome(biome) && worldY >= -16 && worldY <= 319 &&
+        (existing == BlockId::STONE || existing == BlockId::DEEPSLATE ||
+         existing == BlockId::GRANITE || existing == BlockId::TUFF)) {
+        const int chunkX = floorDiv16(worldX);
+        const int chunkZ = floorDiv16(worldZ);
+        const auto& candidates = emeraldCandidates(m_context.seed(), chunkX, chunkZ);
+        const uint32_t index = localOreIndex(
+            worldX - chunkX * 16, worldY, worldZ - chunkZ * 16);
+        if (candidates.count(index) != 0)
+            return existing == BlockId::DEEPSLATE
+                ? BlockId::DEEPSLATE_EMERALD_ORE : BlockId::EMERALD_ORE;
+    }
     if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE)
         return BlockId::AIR;
 

@@ -77,6 +77,8 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                     const LodTileKey& key);
 LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks,
                                  int maximumSpans = 24);
+void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
+                     int cellSize);
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans);
 

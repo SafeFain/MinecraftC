@@ -304,16 +304,21 @@ void ApplicationInputRouter::handleMouseButtonEvent(
             m_session.player.setSelectedSlot(slot);
         }
     }
-    if (m_ui.inventoryOpen && (m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen) &&
+    if (m_ui.inventoryOpen && (m_ui.tradeOpen ||
+        m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen) &&
         (action == ButtonAction::Press || action == ButtonAction::Release)) {
-        if (!m_ui.containerOpen && m_session.player.gameMode() == GameMode::Creative &&
+        if (!m_ui.containerOpen && !m_ui.tradeOpen &&
+            m_session.player.gameMode() == GameMode::Creative &&
             action == ButtonAction::Press &&
             m_ui.survivalInventory.creativeCatalogButtonContains(
                 static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY))) {
             m_ui.openCreativeCatalog();
             return;
         }
-        if (m_ui.containerOpen) m_ui.containerScreen.onMouseButton(
+        if (m_ui.tradeOpen) m_ui.tradeScreen.onMouseButton(
+            button, action, static_cast<int>(m_ui.mouseScreenX),
+            static_cast<int>(m_ui.mouseScreenY));
+        else if (m_ui.containerOpen) m_ui.containerScreen.onMouseButton(
             button, action, static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY), mods);
         else m_ui.survivalInventory.onMouseButton(button, action,
             static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY), mods);
@@ -347,7 +352,7 @@ void ApplicationInputRouter::handleMouseButtonEvent(
 void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
     if (m_ui.activeMenu) { m_ui.activeMenu->onScroll(yoffset); return; }
     if (m_ui.inventoryOpen && m_session.player.gameMode() == GameMode::Creative &&
-        m_ui.creativeCatalogOpen && !m_ui.containerOpen) {
+        m_ui.creativeCatalogOpen && !m_ui.containerOpen && !m_ui.tradeOpen) {
         m_ui.inventory.onScroll(yoffset);
         return;
     }
@@ -431,13 +436,16 @@ void ApplicationInputRouter::dispatchTouchCommands(
 void ApplicationInputRouter::dispatchUiTouchButton(
     int button, ButtonAction action, const glm::vec2& position) {
     const int x = static_cast<int>(position.x), y = static_cast<int>(position.y);
-    if (m_ui.inventoryOpen && (m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen)) {
-        if (!m_ui.containerOpen && m_session.player.gameMode() == GameMode::Creative &&
+    if (m_ui.inventoryOpen && (m_ui.tradeOpen ||
+        m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen)) {
+        if (!m_ui.containerOpen && !m_ui.tradeOpen &&
+            m_session.player.gameMode() == GameMode::Creative &&
             action == ButtonAction::Press &&
             m_ui.survivalInventory.creativeCatalogButtonContains(x, y)) {
             m_ui.openCreativeCatalog(); return;
         }
-        if (m_ui.containerOpen) m_ui.containerScreen.onMouseButton(button, action, x, y);
+        if (m_ui.tradeOpen) m_ui.tradeScreen.onMouseButton(button, action, x, y);
+        else if (m_ui.containerOpen) m_ui.containerScreen.onMouseButton(button, action, x, y);
         else m_ui.survivalInventory.onMouseButton(button, action, x, y);
     } else if (m_ui.inventoryOpen) {
         if (action == ButtonAction::Press) m_ui.inventory.onMouseClick(button, x, y,
@@ -477,7 +485,7 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
         const glm::vec2 delta = position - m_inputs.uiTouch.origin;
         const bool scrollSurface = m_ui.activeMenu || (m_ui.inventoryOpen &&
             m_session.player.gameMode() == GameMode::Creative &&
-            m_ui.creativeCatalogOpen && !m_ui.containerOpen);
+            m_ui.creativeCatalogOpen && !m_ui.containerOpen && !m_ui.tradeOpen);
         if (scrollSurface && !m_inputs.uiTouch.buttonDown && std::abs(delta.y) > 24.0f) {
             const double scroll = delta.y > 0.0f ? -1.0 : 1.0;
             if (m_ui.activeMenu) m_ui.activeMenu->onScroll(scroll); else m_ui.inventory.onScroll(scroll);
@@ -502,7 +510,8 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
 
 void ApplicationInputRouter::updateLongPress() {
     if (!m_inputs.uiTouch.active || m_inputs.uiTouch.buttonDown || m_inputs.uiTouch.scrolling ||
-        !m_ui.inventoryOpen || (!m_ui.playerInventoryViewOpen(m_session.player) && !m_ui.containerOpen))
+        !m_ui.inventoryOpen || (!m_ui.tradeOpen &&
+        !m_ui.playerInventoryViewOpen(m_session.player) && !m_ui.containerOpen))
         return;
     if (RuntimeClock::seconds(RuntimeClock::elapsed(m_inputs.uiTouch.started, m_clock.now())) < .45)
         return;
@@ -567,6 +576,17 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
     if (m_ui.activeMenu) return;
     const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
     if (action == ButtonAction::Press && use && !m_session.player.isSpectator()) {
+        if (const auto villager = m_session.entities.useRay(
+                m_session.player.getEyePosition(),
+                m_session.player.getForward(), 3.0f)) {
+            if (m_ui.tradeScreen.open(m_session.entities, *villager)) {
+                m_ui.containerOpen = false;
+                m_ui.tradeOpen = true;
+                m_ui.inventoryOpen = true;
+                m_window.setCursorLocked(false);
+                return;
+            }
+        }
         auto hit = m_session.world.raycast(m_session.player.getEyePosition(), m_session.player.getForward(),
                                    Config::REACH_DISTANCE);
         if (hit) {
@@ -579,6 +599,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
             }
             if (target == BlockId::CHEST || target == BlockId::FURNACE) {
                 if (m_ui.containerScreen.open(m_session.world, hit->blockPos)) {
+                    m_ui.tradeOpen = false;
                     m_ui.containerOpen = true;
                     m_ui.inventoryOpen = true;
                     m_window.setCursorLocked(false);
@@ -632,11 +653,14 @@ void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
     m_inputs.gamepadNavX = navX; m_inputs.gamepadNavY = navY;
     if (m_ui.inventoryOpen) {
         if (navigate) {
-            if (m_ui.containerOpen) m_ui.containerScreen.onGamepadNavigate(navX, -navY);
+            if (m_ui.tradeOpen) m_ui.tradeScreen.onGamepadNavigate(navX, -navY);
+            else if (m_ui.containerOpen) m_ui.containerScreen.onGamepadNavigate(navX, -navY);
             else if (m_ui.playerInventoryViewOpen(m_session.player)) m_ui.survivalInventory.onGamepadNavigate(navX, -navY);
             else m_ui.inventory.onGamepadNavigate(navX, navY);
         }
-        if (m_ui.containerOpen) {
+        if (m_ui.tradeOpen) {
+            if (pressA) m_ui.tradeScreen.onGamepadAction();
+        } else if (m_ui.containerOpen) {
             if (pressA) m_ui.containerScreen.onGamepadAction(0);
             if (pressX) m_ui.containerScreen.onGamepadAction(1);
             if (pressY) m_ui.containerScreen.onGamepadAction(2);

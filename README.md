@@ -156,10 +156,15 @@ Windows, and Android and can be adjusted under Settings > Touch Controls.
 | Android | Application-private data directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v11 can read v2-v10 desktop saves. The current world
-generation version is v10 (with Heaven structures at v7). Older generation
+one exists. Save format v12 can read v2-v11 desktop saves. The current world
+generation version is v12 (with Heaven structures at v7). Generation v11 adds
+mountain emerald ore, staffed plains/desert villages, seven villager
+workstations, dynamic bed/workstation village claims, infection, spawn eggs,
+and fixed five-level profession trading. Generation v12 makes both physical
+village variants substantially more common while retaining their biome,
+spacing, terrain-fit, and deterministic placement checks. Older generation
 versions remain on disk and are shown as incompatible rather than migrated or
-blended into v10 terrain.
+blended into v12 terrain.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate

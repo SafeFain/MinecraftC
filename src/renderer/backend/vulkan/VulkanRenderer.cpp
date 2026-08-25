@@ -288,7 +288,7 @@ void VulkanRenderer::initialize(Window& window,
         assetRoot / "textures" / "generated" / "entity_atlas.png"), entitySampler);
     material.pipeline = MaterialPipeline::ChunkOpaqueCutout;
     material.baseColorTexture = m_entityAtlas;
-    material.atlasTilesPerSide = 3;
+    material.atlasTilesPerSide = 4;
     m_entityMaterial = createMaterial(material);
     m_modelRenderer = model::createVulkanModelRenderer(*this);
 }
@@ -586,7 +586,7 @@ void VulkanRenderer::renderEntity(const glm::vec3& position, const glm::vec3& si
 void VulkanRenderer::renderCompatibilityEntityCube(
     const glm::vec3& position, const glm::vec3& size, const glm::vec3& color,
     int textureIndex, float yaw, const glm::mat4&, SmoothLightSample light) {
-    const size_t slot = static_cast<size_t>(std::clamp(textureIndex, 0, 8));
+    const size_t slot = static_cast<size_t>(std::clamp(textureIndex, 0, 10));
     RenderMeshHandle& compatibilityCube = m_compatibilityCubes[slot];
     if (!compatibilityCube) {
         MeshData mesh;

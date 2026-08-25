@@ -48,6 +48,9 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::IRON_ORE, 3.0f, ToolKind::Pickaxe, ToolTier::Stone);
     set(BlockId::GOLD_ORE, 3.0f, ToolKind::Pickaxe, ToolTier::Iron);
     set(BlockId::DIAMOND_ORE, 3.0f, ToolKind::Pickaxe, ToolTier::Iron);
+    set(BlockId::EMERALD_ORE, 3.0f, ToolKind::Pickaxe, ToolTier::Iron);
+    set(BlockId::DEEPSLATE_EMERALD_ORE, 4.5f, ToolKind::Pickaxe,
+        ToolTier::Iron);
     set(BlockId::LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::ICE, 0.5f, ToolKind::Pickaxe);
     set(BlockId::GRAVEL, 0.6f, ToolKind::Shovel);
@@ -72,8 +75,13 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
         set(id, 0.0f);
     for (BlockId id : {BlockId::BIRCH_WOOD, BlockId::SPRUCE_WOOD,
                        BlockId::JUNGLE_WOOD, BlockId::ACACIA_WOOD,
-                       BlockId::CRAFTING_TABLE, BlockId::CHEST})
+                       BlockId::CRAFTING_TABLE, BlockId::CHEST,
+                       BlockId::COMPOSTER, BlockId::FLETCHING_TABLE,
+                       BlockId::LOOM})
         set(id, 2.0f, ToolKind::Axe);
+    for (BlockId id : {BlockId::CAULDRON, BlockId::BLAST_FURNACE,
+                       BlockId::SMITHING_TABLE, BlockId::GRINDSTONE})
+        set(id, 3.5f, ToolKind::Pickaxe, ToolTier::Wood);
     for (BlockId id : {BlockId::BIRCH_LEAVES, BlockId::SPRUCE_LEAVES,
                        BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
         set(id, 0.2f);
@@ -218,6 +226,39 @@ std::vector<CraftingRecipe> buildRecipes() {
         ItemId::SAND, ItemId::GUNPOWDER, ItemId::SAND,
         ItemId::GUNPOWDER, ItemId::SAND, ItemId::GUNPOWDER},
         {ItemId::TNT, 1, 0}, false));
+    recipes.push_back(shaped(3, 3, {
+        ItemId::OAK_PLANKS, E, ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS, E, ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
+        {ItemId::COMPOSTER, 1, 0}, false));
+    recipes.push_back(shaped(2, 3, {
+        ItemId::FLINT, ItemId::FLINT,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
+        {ItemId::FLETCHING_TABLE, 1, 0}, false));
+    recipes.push_back(shaped(2, 2, {
+        ItemId::STRING, ItemId::STRING,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
+        {ItemId::LOOM, 1, 0}, false));
+    recipes.push_back(shaped(3, 3, {
+        ItemId::IRON_INGOT, E, ItemId::IRON_INGOT,
+        ItemId::IRON_INGOT, E, ItemId::IRON_INGOT,
+        ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT},
+        {ItemId::CAULDRON, 1, 0}, false));
+    recipes.push_back(shaped(3, 3, {
+        ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT,
+        ItemId::IRON_INGOT, ItemId::FURNACE, ItemId::IRON_INGOT,
+        ItemId::STONE, ItemId::STONE, ItemId::STONE},
+        {ItemId::BLAST_FURNACE, 1, 0}, false));
+    recipes.push_back(shaped(2, 3, {
+        ItemId::IRON_INGOT, ItemId::IRON_INGOT,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
+        {ItemId::SMITHING_TABLE, 1, 0}, false));
+    recipes.push_back(shaped(3, 2, {
+        ItemId::STICK, ItemId::COBBLESTONE_SLAB, ItemId::STICK,
+        ItemId::OAK_PLANKS, E, ItemId::OAK_PLANKS},
+        {ItemId::GRINDSTONE, 1, 0}, false));
     const std::array<std::tuple<ItemId, ItemId, ItemId>, 5> architecture{{
         {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS_SLAB,
          ItemId::OAK_PLANKS_STAIRS},
@@ -301,6 +342,9 @@ std::vector<ItemStack> getBlockDrops(
         case BlockId::IRON_ORE: return {{ItemId::RAW_IRON, 1, 0}};
         case BlockId::GOLD_ORE: return {{ItemId::RAW_GOLD, 1, 0}};
         case BlockId::DIAMOND_ORE: return {{ItemId::DIAMOND, 1, 0}};
+        case BlockId::EMERALD_ORE:
+        case BlockId::DEEPSLATE_EMERALD_ORE:
+            return {{ItemId::EMERALD, 1, 0}};
         case BlockId::GLASS:
         case BlockId::SUNFLOWER_TOP: return {};
         case BlockId::TALL_GRASS:

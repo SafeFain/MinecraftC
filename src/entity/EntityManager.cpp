@@ -10,6 +10,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <queue>
+#include <tuple>
 
 namespace {
 uint32_t hash32(uint32_t value) {
@@ -35,6 +37,9 @@ void EntityManager::clear() {
     m_pendingEntitySaves.clear();
     m_lastStreamingRevision = std::numeric_limits<uint64_t>::max();
     m_explosionEvents.clear();
+    m_poiChunks.clear();
+    m_logicalVillages.clear();
+    m_villageRefreshSeconds = 0.0f;
     m_modelRegistry.clearInstances();
 }
 
@@ -47,6 +52,7 @@ std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const 
             entity.health, entity.ageSeconds, entity.item, entity.behaviorSeed,
             static_cast<uint8_t>((entity.inGround ? 1 : 0) |
                                  (entity.playerOwned ? 2 : 0)), entity.projectileDamage
+            , entity.villager
         });
     }
     return saved;
@@ -67,6 +73,7 @@ void EntityManager::loadEntities(
         entity.inGround = (source.flags & 1) != 0;
         entity.playerOwned = (source.flags & 2) != 0;
         entity.projectileDamage = source.projectileDamage;
+        entity.villager = source.villager;
         m_entities.push_back(entity);
     }
 }
@@ -84,7 +91,7 @@ void EntityManager::syncChunks() {
             saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage});
+                entity.projectileDamage, entity.villager});
         }
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_dirtyEntityChunks.erase(key);
@@ -100,6 +107,42 @@ void EntityManager::syncChunks() {
             loadEntities(std::move(*prefetched));
         else
             loadEntities(m_saveStore->loadChunkEntities(key.first,key.second));
+        if (m_saveStore->loadChunkEntityPopulationVersion(
+                key.first, key.second) < 1u) {
+            for (const auto& request :
+                 m_world.villageSpawnsForChunk(key.first, key.second)) {
+                const bool alreadyMerged = std::any_of(
+                    m_entities.begin(), m_entities.end(),
+                    [&](const Entity& entity) {
+                        return entity.type == EntityType::Villager &&
+                            entity.behaviorSeed == request.seed &&
+                            entity.position == request.position;
+                    });
+                if (alreadyMerged) continue;
+                if (!spawnMob(EntityType::Villager, request.position)) continue;
+                Entity& villager = m_entities.back();
+                villager.behaviorSeed = request.seed;
+                villager.villager.offerSeed = request.seed;
+            }
+            std::vector<WorldMetadata::PersistedEntity> populated;
+            for (const Entity& entity : m_entities) {
+                if (entityChunk(entity.position) != key) continue;
+                populated.push_back({static_cast<uint8_t>(entity.type),
+                    entity.position,entity.velocity,entity.health,
+                    entity.ageSeconds,entity.item,entity.behaviorSeed,
+                    static_cast<uint8_t>((entity.inGround?1:0) |
+                                         (entity.playerOwned?2:0)),
+                    entity.projectileDamage,entity.villager});
+            }
+            // Persist the merged entities first. If a crash interrupts this
+            // sequence, the absent revision marker safely retries and merges
+            // the same deterministic requests on the next load.
+            m_saveStore->saveChunkEntities(
+                key.first, key.second, populated);
+            m_saveStore->saveChunkEntityPopulationVersion(
+                key.first, key.second, 1u);
+            m_dirtyEntityChunks.insert(key);
+        }
     }
     m_loadedChunks=std::move(active);
     m_lastStreamingRevision = revision;
@@ -130,7 +173,7 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
             saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage});
+                entity.projectileDamage, entity.villager});
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_pendingEntitySaves.erase(key);
         ++savedFiles;
@@ -211,6 +254,11 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
         case EntityType::Skeleton:
         case EntityType::Blastling: entity.health = 20.0f; break;
         case EntityType::Spider: entity.health = 16.0f; break;
+        case EntityType::Villager:
+            entity.health = 20.0f;
+            entity.villager.offerSeed = entity.behaviorSeed;
+            break;
+        case EntityType::ZombieVillager: entity.health = 20.0f; break;
         case EntityType::Arrow: return false;
         case EntityType::PrimedTnt: return false;
         case EntityType::Item: return false;
@@ -223,7 +271,8 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
 
 bool EntityManager::hostile(EntityType type) {
     return type == EntityType::Zombie || type == EntityType::Skeleton ||
-           type == EntityType::Spider || type == EntityType::Blastling;
+           type == EntityType::Spider || type == EntityType::Blastling ||
+           type == EntityType::ZombieVillager;
 }
 
 bool EntityManager::hasHostileNear(const glm::dvec3& position, float radius) const {
@@ -232,6 +281,317 @@ bool EntityManager::hasHostileNear(const glm::dvec3& position, float radius) con
             return hostile(entity.type) && entity.health > 0.0f &&
                    glm::distance(entity.position, position) <= radius;
         });
+}
+
+const Entity* EntityManager::entityById(uint64_t entityId) const {
+    const auto found = std::find_if(m_entities.begin(), m_entities.end(),
+        [entityId](const Entity& entity) { return entity.id == entityId; });
+    return found == m_entities.end() ? nullptr : &*found;
+}
+
+std::optional<uint64_t> EntityManager::useRay(
+    const glm::dvec3& origin, const glm::vec3& direction, float reach) const {
+    const auto block = m_world.raycast(origin, direction, reach);
+    double maximum = block ? block->distance : static_cast<double>(reach);
+    std::optional<uint64_t> selected;
+    for (const Entity& entity : m_entities) {
+        if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
+        const glm::vec3 size = renderSize(entity.type);
+        const glm::dvec3 minimum = entity.position +
+            glm::dvec3(-size.x * .5, 0.0, -size.z * .5);
+        const glm::dvec3 maximumBox = entity.position +
+            glm::dvec3(size.x * .5, size.y, size.z * .5);
+        double nearDistance = 0.0;
+        double farDistance = maximum;
+        for (int axis = 0; axis < 3; ++axis) {
+            const double component = direction[axis];
+            if (std::abs(component) < 1e-9) {
+                if (origin[axis] < minimum[axis] || origin[axis] > maximumBox[axis]) {
+                    nearDistance = maximum + 1.0;
+                    break;
+                }
+                continue;
+            }
+            double first = (minimum[axis] - origin[axis]) / component;
+            double second = (maximumBox[axis] - origin[axis]) / component;
+            if (first > second) std::swap(first, second);
+            nearDistance = std::max(nearDistance, first);
+            farDistance = std::min(farDistance, second);
+        }
+        if (nearDistance <= farDistance && nearDistance >= 0.0 &&
+            nearDistance < maximum) {
+            maximum = nearDistance;
+            selected = entity.id;
+        }
+    }
+    return selected;
+}
+
+TradeResult EntityManager::tradeWith(
+    uint64_t entityId, uint8_t offerIndex, InventoryModel& inventory) {
+    auto found = std::find_if(m_entities.begin(), m_entities.end(),
+        [entityId](const Entity& entity) { return entity.id == entityId; });
+    if (found == m_entities.end() || found->type != EntityType::Villager ||
+        found->health <= 0.0f)
+        return TradeResult::InvalidOffer;
+    const TradeResult result = executeVillagerTrade(
+        found->villager, offerIndex, inventory);
+    if (result == TradeResult::Success)
+        m_dirtyEntityChunks.insert(entityChunk(found->position));
+    return result;
+}
+
+bool EntityManager::isLogicalVillageMember(uint64_t entityId) const {
+    const Entity* entity = entityById(entityId);
+    return entity && entity->type == EntityType::Villager &&
+        entity->villager.hasBed && entity->villager.hasWorkstation;
+}
+
+bool EntityManager::villagerUsable(
+    uint64_t entityId, const glm::dvec3& origin,
+    const glm::vec3& direction, float reach) const {
+    const Entity* entity = entityById(entityId);
+    return entity && entity->type == EntityType::Villager &&
+        entity->health > 0.0f &&
+        useRay(origin, direction, reach) == entityId;
+}
+
+bool EntityManager::poiAccessible(const glm::ivec3& position) const {
+    static constexpr glm::ivec3 offsets[] = {
+        {1,0,0},{-1,0,0},{0,0,1},{0,0,-1}
+    };
+    for (const glm::ivec3& offset : offsets) {
+        const glm::ivec3 feet = position + offset;
+        if (m_world.getBlock(feet.x, feet.y, feet.z) == BlockId::AIR &&
+            m_world.getBlock(feet.x, feet.y + 1, feet.z) == BlockId::AIR)
+            return true;
+    }
+    return false;
+}
+
+bool EntityManager::groundPathReachable(
+    const glm::dvec3& origin, const glm::ivec3& poi) const {
+    const glm::ivec3 originBlock(glm::floor(origin));
+    auto walkable = [&](const glm::ivec3& position) {
+        if (!Config::isValidWorldY(position.y) ||
+            !Config::isValidWorldY(position.y + 1)) return false;
+        return blockCollisionBoxes(m_world.getBlock(
+                   position.x, position.y, position.z)).count == 0 &&
+               blockCollisionBoxes(m_world.getBlock(
+                   position.x, position.y + 1, position.z)).count == 0 &&
+               blockCollisionBoxes(m_world.getBlock(
+                   position.x, position.y - 1, position.z)).count != 0;
+    };
+    glm::ivec3 start = originBlock;
+    if (!walkable(start)) {
+        bool found = false;
+        for (int dy = -2; dy <= 2 && !found; ++dy) {
+            const glm::ivec3 candidate = originBlock + glm::ivec3(0,dy,0);
+            if (walkable(candidate)) { start = candidate; found = true; }
+        }
+        if (!found) return false;
+    }
+    std::queue<glm::ivec3> open;
+    std::set<std::tuple<int,int,int>> visited;
+    open.push(start);
+    visited.emplace(start.x,start.y,start.z);
+    constexpr size_t budget = 4096;
+    while (!open.empty() && visited.size() <= budget) {
+        const glm::ivec3 current = open.front();
+        open.pop();
+        if (std::abs(current.x - poi.x) + std::abs(current.z - poi.z) == 1 &&
+            std::abs(current.y - poi.y) <= 1)
+            return true;
+        static constexpr glm::ivec2 directions[] = {
+            {1,0},{-1,0},{0,1},{0,-1}
+        };
+        for (const glm::ivec2& direction : directions) {
+            for (int dy : {0, 1, -1}) {
+                const glm::ivec3 next(current.x + direction.x,
+                                      current.y + dy,
+                                      current.z + direction.y);
+                const glm::dvec3 fromOrigin = glm::dvec3(next) - origin;
+                if (glm::dot(fromOrigin, fromOrigin) > 48.0 * 48.0 ||
+                    !walkable(next)) continue;
+                if (visited.emplace(next.x,next.y,next.z).second) {
+                    open.push(next);
+                    break;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void EntityManager::rebuildLogicalVillages() {
+    m_logicalVillages.clear();
+    auto floorSubchunk = [](int coordinate) {
+        int result = coordinate / 16;
+        if (coordinate % 16 < 0) --result;
+        return result;
+    };
+    auto overlaps = [](const LogicalVillage& a, const LogicalVillage& b) {
+        return a.minimumSubchunk.x <= b.maximumSubchunk.x &&
+               a.maximumSubchunk.x >= b.minimumSubchunk.x &&
+               a.minimumSubchunk.y <= b.maximumSubchunk.y &&
+               a.maximumSubchunk.y >= b.minimumSubchunk.y &&
+               a.minimumSubchunk.z <= b.maximumSubchunk.z &&
+               a.maximumSubchunk.z >= b.minimumSubchunk.z;
+    };
+    for (const Entity& entity : m_entities) {
+        if (entity.type != EntityType::Villager || entity.health <= 0.0f ||
+            !entity.villager.hasBed || !entity.villager.hasWorkstation) continue;
+        const glm::ivec3 bed(floorSubchunk(entity.villager.claimedBed.x),
+                            floorSubchunk(entity.villager.claimedBed.y),
+                            floorSubchunk(entity.villager.claimedBed.z));
+        const glm::ivec3 work(floorSubchunk(entity.villager.claimedWorkstation.x),
+                             floorSubchunk(entity.villager.claimedWorkstation.y),
+                             floorSubchunk(entity.villager.claimedWorkstation.z));
+        LogicalVillage village;
+        village.minimumSubchunk = glm::min(bed, work) - glm::ivec3(1);
+        village.maximumSubchunk = glm::max(bed, work) + glm::ivec3(1);
+        village.members.push_back(entity.id);
+        m_logicalVillages.push_back(std::move(village));
+    }
+    for (size_t i = 0; i < m_logicalVillages.size(); ++i) {
+        for (size_t j = i + 1; j < m_logicalVillages.size();) {
+            if (!overlaps(m_logicalVillages[i], m_logicalVillages[j])) {
+                ++j;
+                continue;
+            }
+            m_logicalVillages[i].minimumSubchunk = glm::min(
+                m_logicalVillages[i].minimumSubchunk,
+                m_logicalVillages[j].minimumSubchunk);
+            m_logicalVillages[i].maximumSubchunk = glm::max(
+                m_logicalVillages[i].maximumSubchunk,
+                m_logicalVillages[j].maximumSubchunk);
+            m_logicalVillages[i].members.insert(
+                m_logicalVillages[i].members.end(),
+                m_logicalVillages[j].members.begin(),
+                m_logicalVillages[j].members.end());
+            m_logicalVillages.erase(m_logicalVillages.begin() + j);
+            j = i + 1;
+        }
+    }
+}
+
+void EntityManager::refreshVillageClaims() {
+    std::set<std::pair<int,int>> active;
+    for (const Chunk* chunk : m_world.getActiveChunks()) {
+        if (!chunk->generated.load()) continue;
+        const auto key = std::make_pair(chunk->cx, chunk->cz);
+        active.insert(key);
+        PoiChunk& indexed = m_poiChunks[key];
+        if (indexed.revision == chunk->dataRevision()) continue;
+        indexed = {};
+        indexed.revision = chunk->dataRevision();
+        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+                const int top = chunk->getColumnMaxY(x, z);
+                for (int y = Config::WORLD_MIN_Y; y <= top; ++y) {
+                    const BlockId block = chunk->getBlock(x, y, z);
+                    const glm::ivec3 worldPosition(
+                        chunk->worldX() + x, y, chunk->worldZ() + z);
+                    BedPart part = BedPart::Foot;
+                    BedDirection direction = BedDirection::North;
+                    if (decodeBed(block, part, direction) && part == BedPart::Foot)
+                        indexed.beds.push_back(worldPosition);
+                    else if (isVillagerWorkstation(block))
+                        indexed.workstations.push_back(worldPosition);
+                }
+            }
+        }
+    }
+    for (auto it = m_poiChunks.begin(); it != m_poiChunks.end();) {
+        if (active.count(it->first) == 0) it = m_poiChunks.erase(it);
+        else ++it;
+    }
+    std::set<std::tuple<int,int,int>> usedBeds;
+    std::set<std::tuple<int,int,int>> usedWorkstations;
+    for (Entity& entity : m_entities) {
+        if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
+        VillagerData& data = entity.villager;
+        if (data.hasBed) {
+            const auto valid = m_world.validBedFoot(data.claimedBed);
+            if (!valid || *valid != data.claimedBed || !poiAccessible(data.claimedBed))
+                data.hasBed = false;
+            else if (!usedBeds.emplace(data.claimedBed.x,data.claimedBed.y,
+                                       data.claimedBed.z).second)
+                data.hasBed = false;
+        }
+        if (data.hasWorkstation) {
+            const BlockId block = m_world.getBlock(
+                data.claimedWorkstation.x, data.claimedWorkstation.y,
+                data.claimedWorkstation.z);
+            const VillagerProfession profession = professionForWorkstation(block);
+            if (profession == VillagerProfession::Unemployed ||
+                (data.professionLocked && profession != data.profession) ||
+                !poiAccessible(data.claimedWorkstation)) {
+                data.hasWorkstation = false;
+                if (!data.professionLocked) data.profession = VillagerProfession::Unemployed;
+            } else {
+                if (!data.professionLocked) data.profession = profession;
+                if (!usedWorkstations.emplace(data.claimedWorkstation.x,
+                                               data.claimedWorkstation.y,
+                                               data.claimedWorkstation.z).second) {
+                    data.hasWorkstation = false;
+                    if (!data.professionLocked)
+                        data.profession = VillagerProfession::Unemployed;
+                }
+            }
+        }
+    }
+    auto nearest = [&](const Entity& entity, bool bed,
+                       VillagerProfession required) -> std::optional<glm::ivec3> {
+        double best = 48.0 * 48.0 + 1.0;
+        std::optional<glm::ivec3> result;
+        for (const auto& [key, indexed] : m_poiChunks) {
+            (void)key;
+            const auto& positions = bed ? indexed.beds : indexed.workstations;
+            for (const glm::ivec3& position : positions) {
+                const auto tuple = std::make_tuple(position.x,position.y,position.z);
+                if ((bed ? usedBeds : usedWorkstations).count(tuple) != 0) continue;
+                if (!bed && required != VillagerProfession::Unemployed &&
+                    professionForWorkstation(m_world.getBlock(
+                        position.x,position.y,position.z)) != required) continue;
+                const glm::dvec3 delta = entity.position -
+                    (glm::dvec3(position) + glm::dvec3(.5));
+                const double distance = glm::dot(delta, delta);
+                if (distance > 48.0 * 48.0 || !poiAccessible(position) ||
+                    !groundPathReachable(entity.position, position)) continue;
+                if (!result || distance < best ||
+                    (distance == best && std::tie(position.x,position.y,position.z) <
+                                         std::tie(result->x,result->y,result->z))) {
+                    best = distance;
+                    result = position;
+                }
+            }
+        }
+        return result;
+    };
+    for (Entity& entity : m_entities) {
+        if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
+        VillagerData& data = entity.villager;
+        if (!data.hasBed) {
+            if (const auto bed = nearest(entity, true, VillagerProfession::Unemployed)) {
+                data.claimedBed = *bed;
+                data.hasBed = true;
+                usedBeds.emplace(bed->x,bed->y,bed->z);
+            }
+        }
+        if (!data.hasWorkstation) {
+            const VillagerProfession required = data.professionLocked
+                ? data.profession : VillagerProfession::Unemployed;
+            if (const auto work = nearest(entity, false, required)) {
+                data.claimedWorkstation = *work;
+                data.hasWorkstation = true;
+                data.profession = professionForWorkstation(m_world.getBlock(
+                    work->x,work->y,work->z));
+                usedWorkstations.emplace(work->x,work->y,work->z);
+            }
+        }
+    }
+    rebuildLogicalVillages();
 }
 
 void EntityManager::spawnAroundPlayer(
@@ -266,8 +626,11 @@ void EntityManager::spawnAroundPlayer(
         EntityType::Zombie, EntityType::Skeleton, EntityType::Spider,
         EntityType::Blastling
     };
-    const EntityType type = spawnHostile
+    EntityType type = spawnHostile
         ? hostileTypes[random % 4] : passiveTypes[random % 4];
+    if (type == EntityType::Zombie &&
+        naturalZombieBecomesVillager(hash32(random ^ 0x5a17u)))
+        type = EntityType::ZombieVillager;
     spawnMob(type, glm::dvec3(x + 0.5, static_cast<double>(surface), z + 0.5));
 }
 
@@ -365,7 +728,9 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     if (accepted <= 0.0f) return 0.0f;
     entity.health -= accepted;
     entity.hurtFlashSeconds = 0.2f;
-    if (entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling)
+    if ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
+        entity.type == EntityType::Villager ||
+        entity.type == EntityType::ZombieVillager)
         m_modelRegistry.playAction(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
     if (playerAttack && entity.type == EntityType::Spider)
@@ -398,7 +763,7 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
-                           bool thunderstorm, bool raining) {
+                           bool thunderstorm, bool raining, uint64_t worldTick) {
     for (const auto& entity : m_entities)
         m_dirtyEntityChunks.insert(entityChunk(entity.position));
     for (auto& dead : m_deadEntityRenders) {
@@ -430,6 +795,11 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         }
     } else {
         m_spawnTimer = 0.0f;
+    }
+    m_villageRefreshSeconds += dt;
+    if (m_villageRefreshSeconds >= 1.0f) {
+        refreshVillageClaims();
+        m_villageRefreshSeconds = 0.0f;
     }
 
     for (auto& entity : m_entities) {
@@ -498,7 +868,8 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                     entity.position.y + renderSize(entity.type).y * 0.5)), z) ==
                     BlockId::FIRE;
             const bool undead = entity.type == EntityType::Zombie ||
-                                entity.type == EntityType::Skeleton;
+                                entity.type == EntityType::Skeleton ||
+                                entity.type == EntityType::ZombieVillager;
             const bool ignited = fireContact ||
                 (undead && isDay && !thunderstorm && exposed);
             const bool extinguished = inWater || wetByRain;
@@ -513,6 +884,126 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             if (extinguished)
                 entity.burnDamageSeconds = 0.0f;
             if (entity.health <= 0.0f) continue;
+        }
+
+        if (entity.type == EntityType::Villager) {
+            VillagerData& villager = entity.villager;
+            const uint32_t tickInDay = static_cast<uint32_t>(worldTick % 24000u);
+            const uint32_t day = static_cast<uint32_t>(worldTick / 24000u);
+            if (villager.lastRestockDay != day) {
+                villager.lastRestockDay = day;
+                villager.restocksToday = 0;
+            }
+            const bool firstWorkWindow = tickInDay >= 2000u && tickInDay < 4000u;
+            const bool secondWorkWindow = tickInDay >= 9000u && tickInDay < 11000u;
+            const bool working = firstWorkWindow || secondWorkWindow;
+            glm::dvec3 destination = entity.position;
+            bool hasDestination = false;
+            if (!isDay && villager.hasBed) {
+                destination = glm::dvec3(villager.claimedBed) +
+                    glm::dvec3(.5, .6, .5);
+                hasDestination = true;
+            } else if (working && villager.hasWorkstation) {
+                destination = glm::dvec3(villager.claimedWorkstation) +
+                    glm::dvec3(.5, 0.0, .5);
+                hasDestination = true;
+            } else if (villager.hasBed && villager.hasWorkstation) {
+                const glm::dvec3 center =
+                    (glm::dvec3(villager.claimedBed) +
+                     glm::dvec3(villager.claimedWorkstation)) * .5 +
+                    glm::dvec3(.5, 0.0, .5);
+                if (glm::distance(entity.position, center) > 12.0) {
+                    destination = center;
+                    hasDestination = true;
+                }
+            }
+            const double destinationDistance =
+                hasDestination ? glm::distance(entity.position, destination) : 0.0;
+            entity.sleeping = !isDay && villager.hasBed &&
+                destinationDistance < 1.25;
+            if (!entity.sleeping) {
+                if (hasDestination && destinationDistance > .65) {
+                    glm::vec3 direction(destination - entity.position);
+                    direction.y = 0.0f;
+                    if (glm::length(direction) > .001f)
+                        moveWithTerrain(entity, glm::normalize(direction) * .75f, dt);
+                } else if (!hasDestination) {
+                    const float angle = static_cast<float>(hash32(
+                        entity.behaviorSeed + static_cast<uint32_t>(
+                            entity.ageSeconds / 3.0f)) % 6283) * .001f;
+                    moveWithTerrain(entity, {std::cos(angle) * .45f, 0.0f,
+                                             std::sin(angle) * .45f}, dt);
+                }
+            }
+            if (working && villager.hasWorkstation && destinationDistance < 1.6 &&
+                ((firstWorkWindow && villager.restocksToday < 1) ||
+                 (secondWorkWindow && villager.restocksToday < 2)))
+                restockVillager(villager, day, true);
+            m_modelRegistry.advance(entity.type, entity.id, dt);
+            m_modelRegistry.setLocomotion(entity.type, entity.id,
+                std::hypot(entity.locomotionVelocity.x,
+                           entity.locomotionVelocity.z));
+            continue;
+        }
+
+        if (entity.type == EntityType::Zombie ||
+            entity.type == EntityType::ZombieVillager) {
+            Entity* villagerTarget = nullptr;
+            double nearest = 18.0;
+            for (Entity& candidate : m_entities) {
+                if (candidate.type != EntityType::Villager ||
+                    candidate.health <= 0.0f) continue;
+                const double distance = glm::distance(
+                    candidate.position, entity.position);
+                if (distance < nearest) {
+                    nearest = distance;
+                    villagerTarget = &candidate;
+                }
+            }
+            if (villagerTarget) {
+                const glm::dvec3 targetCenter = villagerTarget->position +
+                    glm::dvec3(0.0, .9, 0.0);
+                const glm::dvec3 origin = entity.position +
+                    glm::dvec3(0.0, 1.2, 0.0);
+                const glm::dvec3 delta = targetCenter - origin;
+                const float targetDistance = static_cast<float>(glm::length(delta));
+                const glm::vec3 direction = targetDistance > .001f
+                    ? glm::vec3(delta / static_cast<double>(targetDistance))
+                    : glm::vec3(0.0f);
+                const bool clear = targetDistance <= .001f ||
+                    !m_world.raycast(origin, direction, targetDistance).has_value();
+                if (targetDistance > 1.45f) {
+                    glm::vec3 horizontal(direction.x, 0.0f, direction.z);
+                    if (glm::length(horizontal) > .001f)
+                        moveWithTerrain(entity, glm::normalize(horizontal) * 2.0f, dt);
+                } else if (clear && entity.actionCooldown <= 0.0f) {
+                    entity.actionCooldown = 1.0f;
+                    glm::vec3 knockback(direction.x, 0.0f, direction.z);
+                    if (glm::length(knockback) > .001f)
+                        knockback = glm::normalize(knockback) * 3.0f;
+                    knockback.y = 1.5f;
+                    damageEntity(*villagerTarget, 3.0f, knockback, false);
+                    if (villagerTarget->health <= 0.0f) {
+                        const uint32_t roll = hash32(entity.behaviorSeed ^
+                            villagerTarget->behaviorSeed ^
+                            static_cast<uint32_t>(worldTick));
+                        const bool convert = villagerInfectionConverts(
+                            player.difficulty(), roll);
+                        if (convert) {
+                            villagerTarget->type = EntityType::ZombieVillager;
+                            villagerTarget->health = 20.0f;
+                            villagerTarget->villager.hasBed = false;
+                            villagerTarget->villager.hasWorkstation = false;
+                            villagerTarget->sleeping = false;
+                        }
+                    }
+                }
+                m_modelRegistry.advance(entity.type, entity.id, dt);
+                m_modelRegistry.setLocomotion(entity.type, entity.id,
+                    std::hypot(entity.locomotionVelocity.x,
+                               entity.locomotionVelocity.z));
+                continue;
+            }
         }
 
         const glm::vec3 delta = glm::vec3(player.getPosition() - entity.position);
@@ -710,6 +1201,10 @@ void EntityManager::dropMobLoot(const Entity& entity) {
             loot = {{ItemId::BONE, 1, 0}, {ItemId::ARROW, 1, 0}}; break;
         case EntityType::Spider: loot = {{ItemId::STRING, 1, 0}}; break;
         case EntityType::Blastling: loot = {{ItemId::GUNPOWDER, 1, 0}}; break;
+        case EntityType::Villager: break;
+        case EntityType::ZombieVillager:
+            loot = {{ItemId::ROTTEN_FLESH, 1, 0}};
+            break;
         case EntityType::Arrow:
         case EntityType::Item: break;
         case EntityType::PrimedTnt: break;
@@ -719,7 +1214,9 @@ void EntityManager::dropMobLoot(const Entity& entity) {
 
 namespace {
 bool meleeTarget(const Entity& entity) {
-    return entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling &&
+    return ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
+            entity.type == EntityType::Villager ||
+            entity.type == EntityType::ZombieVillager) &&
         entity.health > 0.0f;
 }
 
@@ -1017,6 +1514,8 @@ glm::vec3 EntityManager::renderColor(EntityType type) {
         case EntityType::Skeleton: return {0.72f, 0.72f, 0.68f};
         case EntityType::Spider: return {0.16f, 0.08f, 0.07f};
         case EntityType::Blastling: return {0.35f, 0.72f, 0.30f};
+        case EntityType::Villager: return {0.56f,0.36f,0.22f};
+        case EntityType::ZombieVillager: return {0.27f,0.48f,0.29f};
         case EntityType::Arrow: return {0.58f,0.42f,0.20f};
         case EntityType::PrimedTnt: return {0.86f,0.18f,0.12f};
     }
@@ -1030,6 +1529,8 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
         case EntityType::PrimedTnt: return {0.98f,0.98f,0.98f};
         case EntityType::Chicken: return {0.45f, 0.65f, 0.45f};
         case EntityType::Spider: return {1.2f, 0.55f, 1.2f};
+        case EntityType::Villager:
+        case EntityType::ZombieVillager: return {0.62f,1.80f,0.48f};
         case EntityType::Cow:
         case EntityType::Pig:
         case EntityType::Sheep: return {0.9f, 1.2f, 1.3f};
@@ -1052,6 +1553,8 @@ void EntityManager::render(
             case EntityType::Skeleton: textureIndex = 5; break;
             case EntityType::Spider: textureIndex = 6; break;
             case EntityType::Blastling: textureIndex = 7; break;
+            case EntityType::Villager: textureIndex = 9; break;
+            case EntityType::ZombieVillager: textureIndex = 10; break;
             case EntityType::Item: textureIndex = 8; break;
             case EntityType::Arrow: textureIndex = 8; break;
             case EntityType::PrimedTnt: textureIndex = 8; break;
@@ -1077,16 +1580,18 @@ void EntityManager::render(
         const bool passive = entity.type == EntityType::Cow ||
                              entity.type == EntityType::Pig ||
                              entity.type == EntityType::Sheep ||
-                             entity.type == EntityType::Chicken;
+                             entity.type == EntityType::Chicken ||
+                             entity.type == EntityType::Villager;
         const bool hostileMob = entity.type == EntityType::Zombie ||
                                 entity.type == EntityType::Skeleton ||
-                                entity.type == EntityType::Spider ||
-                                entity.type == EntityType::Blastling;
+                             entity.type == EntityType::Spider ||
+                             entity.type == EntityType::Blastling ||
+                             entity.type == EntityType::ZombieVillager;
         if ((passive || hostileMob) && renderer.capabilities().gameplay) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
                 renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(),
-                visualTint, light);
+                visualTint, light, entity.sleeping);
             continue;
         }
         if ((!passive && !hostileMob) || !renderer.capabilities().gameplay) {

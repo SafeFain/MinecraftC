@@ -179,7 +179,7 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     set(ItemId::FLINT_AND_STEEL, {"Flint and Steel", ItemKind::Tool, 1, 64});
     set(ItemId::GUNPOWDER, {"Gunpowder"});
 
-    const std::array<std::pair<ItemId, SpawnEggMob>, 8> spawnEggs{{
+    const std::array<std::pair<ItemId, SpawnEggMob>, 10> spawnEggs{{
         {ItemId::COW_SPAWN_EGG, SpawnEggMob::Cow},
         {ItemId::PIG_SPAWN_EGG, SpawnEggMob::Pig},
         {ItemId::SHEEP_SPAWN_EGG, SpawnEggMob::Sheep},
@@ -187,12 +187,15 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         {ItemId::ZOMBIE_SPAWN_EGG, SpawnEggMob::Zombie},
         {ItemId::SKELETON_SPAWN_EGG, SpawnEggMob::Skeleton},
         {ItemId::SPIDER_SPAWN_EGG, SpawnEggMob::Spider},
-        {ItemId::BLASTLING_SPAWN_EGG, SpawnEggMob::Blastling}
+        {ItemId::BLASTLING_SPAWN_EGG, SpawnEggMob::Blastling},
+        {ItemId::VILLAGER_SPAWN_EGG, SpawnEggMob::Villager},
+        {ItemId::ZOMBIE_VILLAGER_SPAWN_EGG, SpawnEggMob::ZombieVillager}
     }};
-    const std::array<const char*, 8> spawnEggNames{{
+    const std::array<const char*, 10> spawnEggNames{{
         "Cow Spawn Egg", "Pig Spawn Egg", "Sheep Spawn Egg",
         "Chicken Spawn Egg", "Zombie Spawn Egg", "Skeleton Spawn Egg",
-        "Spider Spawn Egg", "Blastling Spawn Egg"
+        "Spider Spawn Egg", "Blastling Spawn Egg", "Villager Spawn Egg",
+        "Zombie Villager Spawn Egg"
     }};
     for (size_t index = 0; index < spawnEggs.size(); ++index) {
         ItemProperties properties{
@@ -266,6 +269,29 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, architecturalBlocks[i].second});
     }
 
+    set(ItemId::EMERALD, {"Emerald"});
+    const std::array<std::pair<ItemId, BlockId>, 9> villagerBlocks{{
+        {ItemId::EMERALD_ORE, BlockId::EMERALD_ORE},
+        {ItemId::DEEPSLATE_EMERALD_ORE, BlockId::DEEPSLATE_EMERALD_ORE},
+        {ItemId::COMPOSTER, BlockId::COMPOSTER},
+        {ItemId::FLETCHING_TABLE, BlockId::FLETCHING_TABLE},
+        {ItemId::LOOM, BlockId::LOOM},
+        {ItemId::CAULDRON, BlockId::CAULDRON},
+        {ItemId::BLAST_FURNACE, BlockId::BLAST_FURNACE},
+        {ItemId::SMITHING_TABLE, BlockId::SMITHING_TABLE},
+        {ItemId::GRINDSTONE, BlockId::GRINDSTONE},
+    }};
+    const std::array<const char*, 9> villagerBlockNames{{
+        "Emerald Ore", "Deepslate Emerald Ore", "Composter",
+        "Fletching Table", "Loom", "Cauldron", "Blast Furnace",
+        "Smithing Table", "Grindstone"
+    }};
+    for (size_t i = 0; i < villagerBlocks.size(); ++i) {
+        set(villagerBlocks[i].first,
+            {villagerBlockNames[i], ItemKind::Block, 64, 0, ToolKind::None,
+             ToolTier::None, 0, 0, 0, 0, villagerBlocks[i].second});
+    }
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -299,6 +325,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::TERRACOTTA_SLAB: case ItemId::TERRACOTTA_STAIRS:
         case ItemId::SUNSTONE_SLAB: case ItemId::SUNSTONE_STAIRS:
         case ItemId::CLOUDSTONE_SLAB: case ItemId::CLOUDSTONE_STAIRS:
+        case ItemId::EMERALD_ORE: case ItemId::DEEPSLATE_EMERALD_ORE:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -320,6 +347,10 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::CRAFTING_TABLE: case ItemId::FURNACE: case ItemId::CHEST:
         case ItemId::TORCH: case ItemId::WHITE_BED: case ItemId::FARMLAND:
         case ItemId::TNT:
+        case ItemId::COMPOSTER: case ItemId::FLETCHING_TABLE:
+        case ItemId::LOOM: case ItemId::CAULDRON:
+        case ItemId::BLAST_FURNACE: case ItemId::SMITHING_TABLE:
+        case ItemId::GRINDSTONE:
             return CreativeItemCategory::Functional;
 
         // ── Tools & Utilities ───────────────────────────────────────────
@@ -366,6 +397,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::FEATHER: case ItemId::LEATHER: case ItemId::BONE:
         case ItemId::WHEAT_SEEDS: case ItemId::WHEAT: case ItemId::FLINT:
         case ItemId::GUNPOWDER:
+        case ItemId::EMERALD:
             return CreativeItemCategory::Materials;
 
         // ── Spawn Eggs ──────────────────────────────────────────────────
@@ -373,6 +405,8 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::SHEEP_SPAWN_EGG: case ItemId::CHICKEN_SPAWN_EGG:
         case ItemId::ZOMBIE_SPAWN_EGG: case ItemId::SKELETON_SPAWN_EGG:
         case ItemId::SPIDER_SPAWN_EGG: case ItemId::BLASTLING_SPAWN_EGG:
+        case ItemId::VILLAGER_SPAWN_EGG:
+        case ItemId::ZOMBIE_VILLAGER_SPAWN_EGG:
             return CreativeItemCategory::SpawnEggs;
 
         default:
@@ -483,6 +517,16 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::OXEYE_DAISY): return ItemId::OXEYE_DAISY;
         case static_cast<uint16_t>(BlockId::SUNFLOWER_BOTTOM): return ItemId::SUNFLOWER;
         case static_cast<uint16_t>(BlockId::SUNFLOWER_TOP): return ItemId::EMPTY;
+        case static_cast<uint16_t>(BlockId::EMERALD_ORE): return ItemId::EMERALD_ORE;
+        case static_cast<uint16_t>(BlockId::DEEPSLATE_EMERALD_ORE):
+            return ItemId::DEEPSLATE_EMERALD_ORE;
+        case static_cast<uint16_t>(BlockId::COMPOSTER): return ItemId::COMPOSTER;
+        case static_cast<uint16_t>(BlockId::FLETCHING_TABLE): return ItemId::FLETCHING_TABLE;
+        case static_cast<uint16_t>(BlockId::LOOM): return ItemId::LOOM;
+        case static_cast<uint16_t>(BlockId::CAULDRON): return ItemId::CAULDRON;
+        case static_cast<uint16_t>(BlockId::BLAST_FURNACE): return ItemId::BLAST_FURNACE;
+        case static_cast<uint16_t>(BlockId::SMITHING_TABLE): return ItemId::SMITHING_TABLE;
+        case static_cast<uint16_t>(BlockId::GRINDSTONE): return ItemId::GRINDSTONE;
         case static_cast<uint16_t>(BlockId::FLOWING_WATER_1):
         case static_cast<uint16_t>(BlockId::FLOWING_WATER_2):
         case static_cast<uint16_t>(BlockId::FLOWING_WATER_3):

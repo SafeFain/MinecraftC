@@ -33,7 +33,10 @@ void GameUiController::render(
     // Phase 1: Inventory overlay (on top of 3D world)
     if (inventoryOpen) {
         renderer.beginUIFrame(uiWidth, uiHeight);
-        if (containerOpen) {
+        if (tradeOpen) {
+            tradeScreen.render(renderer, uiWidth, uiHeight,
+                static_cast<int>(mouseScreenX), static_cast<int>(mouseScreenY));
+        } else if (containerOpen) {
             containerScreen.render(
                 renderer, uiWidth, uiHeight, static_cast<int>(mouseScreenX),
                 static_cast<int>(mouseScreenY));
@@ -217,6 +220,7 @@ GameUiController::GameUiController(
     Player& player, platform::Clipboard& clipboard)
     : survivalInventory(player.inventory()),
       containerScreen(player.inventory()),
+      tradeScreen(player.inventory()),
       commandInput({}, 80, &clipboard) {}
 
 void GameUiController::tick(float dt) {
@@ -246,6 +250,7 @@ void GameUiController::openCommand() {
 
 void GameUiController::openInventory(bool creativeCatalog) {
     containerOpen = false;
+    tradeOpen = false;
     creativeCatalogOpen = creativeCatalog;
     inventoryOpen = true;
 }

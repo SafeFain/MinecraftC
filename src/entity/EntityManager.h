@@ -5,6 +5,8 @@
 #include <vector>
 #include <set>
 #include <limits>
+#include <map>
+#include <optional>
 
 #include <glm/glm.hpp>
 
@@ -41,6 +43,8 @@ struct Entity {
     glm::vec3 facing{0.0f, 0.0f, -1.0f};
     bool attackPending = false;
     PlayerPhysics::HurtImmunity hurtImmunity;
+    VillagerData villager;
+    bool sleeping = false;
 };
 
 struct DeadEntityRender {
@@ -69,7 +73,8 @@ public:
     std::vector<glm::dvec3> takeExplosionEvents();
     void update(Player& player, float dt, bool isDay, bool peaceful,
                 bool playerTargetable, bool playerCanPickup,
-                bool thunderstorm = false, bool raining = false);
+                bool thunderstorm = false, bool raining = false,
+                uint64_t worldTick = 0);
     void strikeLightning(Player& player, const glm::ivec3& position);
     MeleeAttackResult attackRay(const glm::dvec3& origin,
                                 const glm::vec3& direction,
@@ -87,6 +92,16 @@ public:
     std::vector<WorldMetadata::PersistedEntity> saveEntities() const;
     void loadEntities(const std::vector<WorldMetadata::PersistedEntity>& entities);
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
+    std::optional<uint64_t> useRay(const glm::dvec3& origin,
+                                   const glm::vec3& direction,
+                                   float reach) const;
+    TradeResult tradeWith(uint64_t entityId, uint8_t offerIndex,
+                          InventoryModel& inventory);
+    const Entity* entityById(uint64_t entityId) const;
+    bool isLogicalVillageMember(uint64_t entityId) const;
+    size_t logicalVillageCount() const { return m_logicalVillages.size(); }
+    bool villagerUsable(uint64_t entityId, const glm::dvec3& origin,
+                        const glm::vec3& direction, float reach) const;
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
     void setNaturalSpawningEnabled(bool enabled) {
         m_naturalSpawningEnabled = enabled;
@@ -117,6 +132,19 @@ private:
     std::set<std::pair<int,int>> m_pendingEntitySaves;
     uint64_t m_lastStreamingRevision = std::numeric_limits<uint64_t>::max();
     std::vector<glm::dvec3> m_explosionEvents;
+    struct PoiChunk {
+        uint64_t revision = 0;
+        std::vector<glm::ivec3> beds;
+        std::vector<glm::ivec3> workstations;
+    };
+    std::map<std::pair<int,int>, PoiChunk> m_poiChunks;
+    struct LogicalVillage {
+        glm::ivec3 minimumSubchunk{0};
+        glm::ivec3 maximumSubchunk{0};
+        std::vector<uint64_t> members;
+    };
+    std::vector<LogicalVillage> m_logicalVillages;
+    float m_villageRefreshSeconds = 0.0f;
 
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
@@ -133,4 +161,9 @@ private:
     static bool hostile(EntityType type);
     static glm::vec3 renderColor(EntityType type);
     static glm::vec3 renderSize(EntityType type);
+    void refreshVillageClaims();
+    bool poiAccessible(const glm::ivec3& position) const;
+    bool groundPathReachable(const glm::dvec3& origin,
+                             const glm::ivec3& poi) const;
+    void rebuildLogicalVillages();
 };

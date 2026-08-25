@@ -99,7 +99,8 @@ std::string graphContractError(EntityType type,
         if (!graph.findAction(graph.actionFor(semantic)))
             return std::string("missing required semantic action ") + semantic;
     const bool hostile = type == EntityType::Zombie || type == EntityType::Skeleton ||
-                         type == EntityType::Spider || type == EntityType::Blastling;
+                         type == EntityType::Spider || type == EntityType::Blastling ||
+                         type == EntityType::ZombieVillager;
     if (!hostile) return {};
     const model::AnimationActionDefinition* attack =
         graph.findAction(graph.actionFor("attack"));
@@ -121,7 +122,9 @@ EntityModelRegistry::EntityModelRegistry(Loader loader)
         {EntityType::Zombie,"zombie.glb",{},{},0,false},
         {EntityType::Skeleton,"skeleton.glb",{},{},0,false},
         {EntityType::Spider,"spider.glb",{},{},0,false},
-        {EntityType::Blastling,"blastling.glb",{},{},0,false}}},
+        {EntityType::Blastling,"blastling.glb",{},{},0,false},
+        {EntityType::Villager,"villager.glb",{},{},0,false},
+        {EntityType::ZombieVillager,"zombie_villager.glb",{},{},0,false}}},
       m_placeholder(makePlaceholder()) {}
 
 void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot) {
@@ -231,7 +234,7 @@ void EntityModelRegistry::queue(
     const glm::vec3& facing, uint32_t behaviorSeed,
     const glm::dvec3& renderOrigin,
     const glm::vec3& cameraPosition, model::ModelRenderer& renderer,
-    const glm::vec3& visualTint, SmoothLightSample light) {
+    const glm::vec3& visualTint, SmoothLightSample light, bool sleeping) {
     m_seen.insert(id);
     const auto& definition = this->definition(type);
     InstanceEntry& entry = ensure(type, id);
@@ -245,8 +248,12 @@ void EntityModelRegistry::queue(
         ? std::atan2(-facing.x, -facing.z)
         : static_cast<float>(behaviorSeed % 628u) * 0.01f;
     const glm::vec3 localPosition(glm::dvec3(position) - renderOrigin);
-    const glm::mat4 transform = glm::translate(glm::mat4(1), localPosition) *
+    glm::mat4 transform = glm::translate(glm::mat4(1), localPosition) *
         glm::rotate(glm::mat4(1), yaw, glm::vec3(0,1,0));
+    if (sleeping)
+        transform = transform * glm::translate(
+            glm::mat4(1), glm::vec3(0.0f,.45f,0.0f)) *
+            glm::rotate(glm::mat4(1), 1.57079632679f, glm::vec3(0,0,1));
     const glm::vec3 delta = localPosition - cameraPosition;
     const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.20f);
     const float block=std::pow(std::clamp(light.block,0.0f,1.0f),1.35f);

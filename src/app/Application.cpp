@@ -436,6 +436,10 @@ private:
             m_session.player.cancelBowCharge();
         if (m_flow.state() == GameState::Playing) {
             if (m_ui.containerOpen && (!m_ui.containerScreen.valid())) m_flow.closeInventory();
+            if (m_ui.tradeOpen && !m_ui.tradeScreen.valid(
+                    m_session.player.getEyePosition(),
+                    m_session.player.getForward()))
+                m_flow.closeInventory();
             m_session.updatePlaying(
                 dt, m_renderer.get(), m_sessionFeedback);
             if (m_session.handleVoidFall(now, m_sessionFeedback)) return;

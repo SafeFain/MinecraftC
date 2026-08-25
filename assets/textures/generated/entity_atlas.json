@@ -1,5 +1,5 @@
 {
-  "columns": 3,
+  "columns": 4,
   "entities": {
     "blastling": {
       "features": [
@@ -10,8 +10,8 @@
       ],
       "index": 7,
       "source": "entities/blastling.png",
-      "x": 1,
-      "y": 2
+      "x": 3,
+      "y": 1
     },
     "chicken": {
       "features": [
@@ -22,8 +22,8 @@
       ],
       "index": 3,
       "source": "entities/chicken.png",
-      "x": 0,
-      "y": 1
+      "x": 3,
+      "y": 0
     },
     "cow": {
       "features": [
@@ -41,7 +41,7 @@
       "features": [],
       "index": 8,
       "source": "entities/item.png",
-      "x": 2,
+      "x": 0,
       "y": 2
     },
     "pig": {
@@ -77,7 +77,7 @@
       ],
       "index": 5,
       "source": "entities/skeleton.png",
-      "x": 2,
+      "x": 1,
       "y": 1
     },
     "spider": {
@@ -89,7 +89,19 @@
       ],
       "index": 6,
       "source": "entities/spider.png",
-      "x": 0,
+      "x": 2,
+      "y": 1
+    },
+    "villager": {
+      "features": [
+        "brow",
+        "nose",
+        "robe",
+        "profession_badge"
+      ],
+      "index": 9,
+      "source": "entities/villager.png",
+      "x": 1,
       "y": 2
     },
     "zombie": {
@@ -101,13 +113,25 @@
       ],
       "index": 4,
       "source": "entities/zombie.png",
-      "x": 1,
+      "x": 0,
       "y": 1
+    },
+    "zombie_villager": {
+      "features": [
+        "brow",
+        "nose",
+        "torn_robe",
+        "decay"
+      ],
+      "index": 10,
+      "source": "entities/zombie_villager.png",
+      "x": 2,
+      "y": 2
     }
   },
   "filter": "nearest",
   "generator_version": 2,
-  "rows": 3,
+  "rows": 4,
   "seed": 213785369,
   "style": "bright-comfortable",
   "style_definition": "definitions/entity_styles.json",

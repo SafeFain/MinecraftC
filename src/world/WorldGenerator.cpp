@@ -1124,9 +1124,11 @@ void WorldGenerator::generate(Chunk& chunk,
             }
             for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId current = chunk.getBlock(x, y, z);
-                if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
+                if (current != BlockId::STONE && current != BlockId::DEEPSLATE &&
+                    current != BlockId::GRANITE && current != BlockId::TUFF) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
-                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f, current);
+                    static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
+                    current, biomeMap[x][z]);
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
             if (heightMap[x][z] + 1 < Config::WORLD_MAX_Y &&
@@ -1397,4 +1399,49 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
         default:
             break;
     }
+}
+
+std::vector<WorldGenerator::VillageSpawnRequest>
+WorldGenerator::villageSpawnsForChunk(int chunkX, int chunkZ) const {
+    std::vector<VillageSpawnRequest> requests;
+    if (m_dimension != DimensionId::Overworld ||
+        m_worldType != WorldType::Normal) return requests;
+    const int originX = chunkX * Config::CHUNK_SIZE_X;
+    const int originZ = chunkZ * Config::CHUNK_SIZE_Z;
+    std::vector<StructurePlacement> placements;
+    constexpr int margin = 64;
+    m_structureGenerator.generateStructuresRegion(
+        originX - margin, originZ - margin,
+        Config::CHUNK_SIZE_X + margin * 2,
+        Config::CHUNK_SIZE_Z + margin * 2, placements);
+    for (const StructurePlacement& placement : placements) {
+        if (placement.type != StructureType::Village &&
+            placement.type != StructureType::DesertVillage) continue;
+        StructureGenerator::build(placement,
+            [&](int x, int y, int z, BlockId block) {
+                BedPart part = BedPart::Foot;
+                BedDirection direction = BedDirection::North;
+                if (x < originX || x >= originX + Config::CHUNK_SIZE_X ||
+                    z < originZ || z >= originZ + Config::CHUNK_SIZE_Z ||
+                    !decodeBed(block, part, direction) || part != BedPart::Foot)
+                    return;
+                const uint64_t hash = WorldGenContext::hashPosition(
+                    placement.variant, x, y, z);
+                requests.push_back({glm::dvec3(x + 1.5, y, z + .5),
+                    static_cast<uint32_t>(hash ^ (hash >> 32))});
+            }, [&](int x, int z) {
+                return m_heightPipeline.sampleColumn(x, z).height;
+            });
+    }
+    std::sort(requests.begin(), requests.end(),
+        [](const VillageSpawnRequest& a, const VillageSpawnRequest& b) {
+            if (a.position.x != b.position.x) return a.position.x < b.position.x;
+            if (a.position.y != b.position.y) return a.position.y < b.position.y;
+            return a.position.z < b.position.z;
+        });
+    requests.erase(std::unique(requests.begin(), requests.end(),
+        [](const VillageSpawnRequest& a, const VillageSpawnRequest& b) {
+            return a.position == b.position;
+        }), requests.end());
+    return requests;
 }

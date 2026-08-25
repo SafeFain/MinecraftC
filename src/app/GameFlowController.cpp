@@ -106,12 +106,15 @@ void GameFlowController::openInventory() {
 }
 
 void GameFlowController::closeInventory() {
-    if (m_ui.containerOpen) {
+    if (m_ui.tradeOpen) {
+        m_ui.tradeScreen.close();
+    } else if (m_ui.containerOpen) {
         m_ui.containerScreen.close([this](ItemStack stack) {
             m_session.entities.spawnItem(m_session.player.getPosition() + glm::dvec3(0.0, 0.5, 0.0), stack);
         });
     } else if (playerInventoryViewOpen()) m_ui.survivalInventory.onClose();
     m_ui.containerOpen = false;
+    m_ui.tradeOpen = false;
     m_ui.inventoryOpen = false;
     m_window.setCursorLocked(true);
 }

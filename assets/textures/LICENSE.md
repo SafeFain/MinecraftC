@@ -51,6 +51,10 @@ box renderer uses material swatches in `generated/entity_atlas.png`. These
 their source record and reproduction command are documented in
 `ASSET_SOURCES.md` and `ASSET_PIPELINE.md`.
 
+The emerald, workstation, villager, zombie-villager, and spawn-egg graphics
+added for generation v11 are deterministic original procedural assets from
+the same generator and are released under CC0-1.0.
+
 Additional CC0 visual references reviewed for entity and crop readability:
 
 - “Pixel Animals 16x16” by GrumpyDiamond:

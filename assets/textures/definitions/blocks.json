@@ -53,6 +53,12 @@
     "skyroot_leaves": {"all": "skyroot_leaves"},
     "star_crystal": {"all": "star_crystal"}, "starflower": {"all": "starflower"},
     "cloud_bloom": {"all": "cloud_bloom"}, "glowshroom": {"all": "glowshroom"},
+    "emerald_ore": {"all": "emerald_ore"},
+    "deepslate_emerald_ore": {"all": "deepslate_emerald_ore"},
+    "composter": {"all": "composter"},
+    "fletching_table": {"all": "fletching_table"}, "loom": {"all": "loom"},
+    "cauldron": {"all": "cauldron"}, "blast_furnace": {"all": "blast_furnace"},
+    "smithing_table": {"all": "smithing_table"}, "grindstone": {"all": "grindstone"},
     "copper_ore": {"all": "copper_ore", "future": true}
   }
 }

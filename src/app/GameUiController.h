@@ -8,6 +8,7 @@
 #include "ui/Inventory.h"
 #include "ui/Menu.h"
 #include "ui/SurvivalInventory.h"
+#include "ui/VillagerTradeScreen.h"
 #include "ui/UIRenderer.h"
 
 #include <deque>
@@ -53,7 +54,9 @@ public:
     CreativeInventory inventory;
     SurvivalInventoryScreen survivalInventory;
     ContainerScreen containerScreen;
+    VillagerTradeScreen tradeScreen;
     bool containerOpen = false;
+    bool tradeOpen = false;
     bool inventoryOpen = false;
     bool creativeCatalogOpen = true;
     double mouseScreenX = 0.0;

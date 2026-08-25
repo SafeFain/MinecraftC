@@ -6,9 +6,12 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 10;
+    static constexpr uint32_t GENERATION_VERSION = 12;
     // Base chunk caches may be invalidated without changing the user-visible
-    // generation version. v10 upgrades every deterministic structure and
+    // generation version. v12 increases plains/desert village placement
+    // density. v11 added emerald attempts plus deterministic
+    // village furnishing/population while retaining the v10 terrain and
+    // structure placement contracts. v10 upgraded every deterministic structure and
     // adds architectural block states with a fresh base-cache revision.
     static constexpr uint32_t CHUNK_CACHE_VERSION =
         (GENERATION_VERSION << 16) | 1u;

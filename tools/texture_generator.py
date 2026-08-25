@@ -28,8 +28,8 @@ STYLE_ID = "bright-comfortable"
 DEFAULT_SEED = 213785369
 GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
 ENTITY_NAMES = ("cow", "pig", "sheep", "chicken", "zombie", "skeleton",
-                "spider", "blastling", "item")
-ENTITY_SKIN_NAMES = ENTITY_NAMES[:-1] + ("player",)
+                "spider", "blastling", "item", "villager", "zombie_villager")
+ENTITY_SKIN_NAMES = tuple(name for name in ENTITY_NAMES if name != "item") + ("player",)
 ENTITY_SKIN_SIZE = 64
 ENTITY_SKIN_LAYOUT = {
     "head_front": 0, "head_back": 1, "head_left": 2, "head_right": 3,
@@ -58,6 +58,10 @@ ENTITY_PALETTES = {
                   (70,146,48,255),(97,174,58,255),(132,204,76,255)),
     "item": ((91,55,21,255),(122,76,25,255),(158,104,31,255),
              (192,137,39,255),(223,174,58,255),(244,207,91,255)),
+    "villager": ((62,39,27,255),(91,57,35,255),(126,78,45,255),
+                  (159,104,62,255),(190,139,91,255),(220,177,128,255)),
+    "zombie_villager": ((31,63,39,255),(43,82,48,255),(58,104,59,255),
+                         (78,124,70,255),(109,145,86,255),(145,169,106,255)),
     "player": ((34,52,76,255),(48,72,101,255),(61,93,126,255),
                (88,126,154,255),(181,126,91,255),(229,177,132,255)),
 }
@@ -79,7 +83,10 @@ NAMES = [
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower", "cloud_bloom", "glowshroom", "copper_ore",
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "emerald_ore", "deepslate_emerald_ore", "composter", "fletching_table",
+    "loom", "cauldron", "blast_furnace", "smithing_table", "grindstone",
+    "copper_ore",
 ]
 
 
@@ -160,7 +167,12 @@ PALETTES = {
 EXTRA_BASES = {
     "bedrock":(58,59,62), "water":(47,92,156), "snow":(218,226,231),
     "deepslate":(54,58,64), "cactus_side":(57,111,57), "cactus_top":(76,128,64),
-    "gold_ore":(190,145,50), "diamond_ore":(54,174,169), "lava":(211,80,25),
+    "gold_ore":(190,145,50), "diamond_ore":(54,174,169),
+    "emerald_ore":(35,181,92), "deepslate_emerald_ore":(31,145,78),
+    "composter":(122,79,39), "fletching_table":(168,140,85),
+    "loom":(165,139,98), "cauldron":(71,75,77),
+    "blast_furnace":(78,82,84), "smithing_table":(64,88,89),
+    "grindstone":(119,117,108), "lava":(211,80,25),
     "ice":(142,187,205), "gravel":(103,100,98), "clay":(133,146,156),
     "red_sand":(172,87,48), "terracotta":(142,76,55), "podzol_top":(91,65,42),
     "moss":(67,108,52), "tall_grass":(59,124,52), "flower":(175,68,83),
@@ -274,7 +286,8 @@ _ENTITY_BASES = {
     "sheep": (197, 193, 181), "chicken": (222, 216, 197),
     "zombie": (62, 119, 82), "skeleton": (185, 179, 155),
     "spider": (72, 41, 36), "blastling": (75, 148, 60),
-    "item": (174, 116, 39), "player": (76, 111, 145),
+    "item": (174, 116, 39), "villager": (157, 105, 66),
+    "zombie_villager": (72, 119, 73), "player": (76, 111, 145),
 }
 for _name, _base in _ENTITY_BASES.items():
     _entity_palette = _role_palette(_base, shadow_floor=0.30,
@@ -319,6 +332,8 @@ for _name, _ore in {
     "iron_ore": ("iron", (213, 179, 147)),
     "gold_ore": ("gold", (218, 164, 55)),
     "diamond_ore": ("diamond", (57, 190, 181)),
+    "emerald_ore": ("emerald", (42, 202, 112)),
+    "deepslate_emerald_ore": ("emerald", (42, 202, 112)),
 }.items():
     _ore_palette = _role_palette(_ore[1], shadow_floor=0.26,
                                  chroma_scale=1.12, levels=6)
@@ -328,7 +343,10 @@ PALETTES["coal_ore"] = PALETTES["stone"][:3] + [
 PALETTES["copper_ore"] = PALETTES["stone"][:3] + [
     (82, 51, 40, 255), (151, 83, 58, 255), (225, 143, 97, 255)]
 
-HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_ore","fire"}
+PALETTES["deepslate_emerald_ore"] = PALETTES["deepslate"][:3] + \
+    PALETTES["deepslate_emerald_ore"][3:]
+HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_ore",
+                       "emerald_ore","deepslate_emerald_ore","fire"}
 NATURAL = {"dirt","grass_top","stone","sand","bedrock","deepslate","gravel","clay",
            "red_sand","terracotta","podzol_top","moss","snow","snow_layer","cobblestone",
            "cloud","limestone","basalt","tuff","coarse_dirt","mud",
@@ -646,7 +664,9 @@ def generate_special(name,seed,indices):
         indices=[1 if (x+y)%5==0 or (x-y)%7==0 else 2+(sample(seed,name,x//2,y//2)%4) for y in range(SIZE) for x in range(SIZE)]
     elif name in {"cactus_side","reeds"}:
         indices=[1+((x+round(math.sin(y*.7)))%5) for y in range(SIZE) for x in range(SIZE)]
-    elif name in {"crafting_table","furnace","chest","white_bed"}:
+    elif name in {"crafting_table","furnace","chest","white_bed","composter",
+                 "fletching_table","loom","cauldron","blast_furnace",
+                 "smithing_table","grindstone"}:
         indices=[]
         for y in range(SIZE):
             for x in range(SIZE):
@@ -734,6 +754,10 @@ def _entity_part_palette(name, part):
                              (47,116,113,255),(61,135,126,255),(79,153,140,255)),
         ("zombie","secondary"): ((42,32,63,255),(55,41,82,255),(68,51,101,255),
                                   (82,63,119,255),(99,78,138,255),(119,97,157,255)),
+        ("villager","body"): ((45,30,23,255),(67,43,30,255),(92,58,37,255),
+                                 (121,76,46,255),(154,103,67,255),(190,142,99,255)),
+        ("zombie_villager","body"): ((25,46,31,255),(33,63,39,255),(45,82,49,255),
+                                        (58,103,59,255),(77,126,73,255),(103,151,91,255)),
         ("chicken","primary"): ((111,70,17,255),(145,91,20,255),(180,114,24,255),
                                  (211,143,31,255),(235,174,48,255),(247,202,78,255)),
         ("chicken","head"): ((169,166,151,255),(187,185,170,255),(205,203,188,255),
@@ -790,6 +814,8 @@ def _entity_surface_indices(name,part,face,seed):
             elif name=="zombie" and part=="body":
                 index=4 if cy>0 else 2
                 if marking>1.48: index=5
+            elif name in {"villager","zombie_villager"} and part=="body":
+                index=4 if cy>1 else 3
             elif name=="skeleton" and part in {"body","primary","secondary"}:
                 index=max(2,min(5,index+1))
                 if abs(cx)<2 or abs(cz)<2: index=1
@@ -843,6 +869,12 @@ def _paint_entity_face(name,tile):
     elif name=="zombie":
         _paint_rect(tile,3,4,6,7,(26,40,29,255)); _paint_rect(tile,10,4,13,7,(26,40,29,255))
         _paint_rect(tile,5,10,11,12,(31,55,38,255)); _paint_rect(tile,7,9,9,10,(43,73,48,255))
+    elif name in {"villager","zombie_villager"}:
+        eye=(30,25,22,255) if name=="villager" else (18,32,20,255)
+        nose=(126,78,48,255) if name=="villager" else (51,91,53,255)
+        _paint_rect(tile,3,4,6,7,eye); _paint_rect(tile,10,4,13,7,eye)
+        _paint_rect(tile,6,7,10,13,nose)
+        _paint_rect(tile,4,2,7,3,eye); _paint_rect(tile,9,2,12,3,eye)
     elif name=="skeleton":
         _paint_rect(tile,2,3,6,8,blackish); _paint_rect(tile,10,3,14,8,blackish)
         _paint_rect(tile,7,7,9,10,(48,44,37,255)); _paint_rect(tile,5,12,11,13,(72,65,54,255))
@@ -889,6 +921,13 @@ def _paint_entity_body(name,tile):
             _paint_rect(tile,3,y,7,y+1,shadow); _paint_rect(tile,9,y,13,y+1,shadow)
     elif name=="zombie":
         _paint_rect(tile,6,1,10,3,(28,70,72,255))
+    elif name=="villager":
+        _paint_rect(tile,1,1,15,15,(112,70,43,255))
+        _paint_rect(tile,6,1,10,15,(151,101,65,255))
+    elif name=="zombie_villager":
+        _paint_rect(tile,1,1,15,15,(47,83,49,255))
+        _paint_rect(tile,6,1,10,15,(75,119,70,255))
+        _paint_rect(tile,2,10,5,13,(29,49,32,255))
     elif name=="player":
         _paint_rect(tile,1,1,15,15,(42,78,118,255))
         _paint_rect(tile,1,11,15,15,(31,44,67,255))
@@ -980,7 +1019,8 @@ def load_item_icon_definitions(path):
         "pig_egg": (220, 125, 139), "sheep_egg": (198, 194, 180),
         "chicken_egg": (218, 155, 46), "zombie_egg": (68, 129, 83),
         "skeleton_egg": (170, 176, 173), "spider_egg": (119, 56, 51),
-        "blastling_egg": (116, 72, 157),
+        "blastling_egg": (116, 72, 157), "villager_egg": (151, 102, 63),
+        "zombie_villager_egg": (75, 122, 69), "emerald": (42, 202, 112),
     }
     for material, base in item_bases.items():
         if material not in data["materials"]:
@@ -1348,7 +1388,8 @@ def build_atlas(output,seed,local_seeds=None):
     (output/"atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
 def build_entity_atlas(output,seed):
-    columns=3; rows=3; atlas=[(0,0,0,0)]*(columns*SIZE*rows*SIZE)
+    columns=math.ceil(math.sqrt(len(ENTITY_NAMES))); rows=columns
+    atlas=[(0,0,0,255)]*(columns*SIZE*rows*SIZE)
     metadata={"version":1,"generator_version":GENERATOR_VERSION,"style":STYLE_ID,
               "tile_size":SIZE,"columns":columns,"rows":rows,
               "filter":"nearest","seed":seed,

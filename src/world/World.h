@@ -116,6 +116,10 @@ public:
     std::optional<glm::ivec3> locateStructure(
         StructureType type, int worldX, int worldZ) const;
     glm::dvec3 findSafeSpawn(int maximumRadius = 512) const;
+    std::vector<WorldGenerator::VillageSpawnRequest> villageSpawnsForChunk(
+        int chunkX, int chunkZ) const {
+        return m_generator.villageSpawnsForChunk(chunkX, chunkZ);
+    }
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);

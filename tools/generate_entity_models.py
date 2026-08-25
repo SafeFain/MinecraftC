@@ -53,6 +53,8 @@ MODELS = {
     "skeleton": ((0.48,1.78,0.34),(196,192,174,255)),
     "spider": ((1.25,0.58,1.20),(64,48,55,255)),
     "blastling": ((0.72,1.35,0.72),(105,170,102,255)),
+    "villager": ((0.62,1.80,0.48),(162,111,72,255)),
+    "zombie_villager": ((0.62,1.80,0.48),(78,132,80,255)),
 }
 
 def png(color, accent):
@@ -134,7 +136,7 @@ def parts_for(name):
         return [("body",(0,.38,0),(.46,.38,.46)),("head",(0,.68,-.18),(.34,.34,.34)),
                 ("wing_l",(-.28,.40,0),(.10,.28,.32)),("wing_r",(.28,.40,0),(.10,.28,.32)),
                 ("leg_l",(-.10,.12,0),(.08,.24,.08)),("leg_r",(.10,.12,0),(.08,.24,.08))]
-    if name in {"zombie","skeleton","player"}:
+    if name in {"zombie","skeleton","player","villager","zombie_villager"}:
         thin=.14 if name=="skeleton" else .22
         return [("body",(0,1.03,0),(.52,.68,.34)),("head",(0,1.55,0),(.50,.40,.50)),
                 ("arm_l",(-.36,1.03,0),(thin,.72,thin)),("arm_r",(.36,1.03,0),(thin,.72,thin)),
@@ -157,7 +159,7 @@ def build_v2(name,size,color):
         if part=="head": return "head_"+face
         if part=="body": return "body_"+face
         if part.startswith("wing_"): return "limb_secondary"
-        if name in {"zombie","skeleton","player"} and part.startswith("leg_"): return "limb_secondary"
+        if name in {"zombie","skeleton","player","villager","zombie_villager"} and part.startswith("leg_"): return "limb_secondary"
         return "limb_primary"
     def tile_uv(slot):
         index=texture_generator.ENTITY_SKIN_LAYOUT[slot];tx,ty=index%4,index//4
@@ -216,7 +218,7 @@ def build_v2(name,size,color):
         for part in ("leg_fr","leg_bl"):
             walk.append((node[part],"rotation",(qx(-.38),qx(.38),qx(-.38))))
         walk.append((0,"translation",((0,0,0),(0,.035,0),(0,0,0))))
-    elif name in {"zombie","skeleton","player"}:
+    elif name in {"zombie","skeleton","player","villager","zombie_villager"}:
         for part,phase in (("leg_l",1),("leg_r",-1),("arm_l",-1),("arm_r",1)):
             walk.append((node[part],"rotation",(qx(.48*phase),qx(-.48*phase),qx(.48*phase))))
     elif name=="chicken":
@@ -246,7 +248,7 @@ def build_v2(name,size,color):
         animation("swing",.32,[(node["arm_r"],"rotation",(qx(0),qx(-1.35),qx(0)))])
     animation("hurt",.35,[(0,"translation",((0,0,0),(0,.12,.10),(0,0,0)))])
     animation("death",1.0,[(0,"rotation",(qz(0),qz(_HALF_PI),qz(_HALF_PI)))])
-    if name=="zombie":
+    if name in {"zombie","zombie_villager"}:
         animation("attack",.55,[(node["arm_l"],"rotation",(qx(-.2),qx(-1.15),qx(.35))),
                                  (node["arm_r"],"rotation",(qx(-.2),qx(-1.15),qx(.35)))])
     elif name=="skeleton":
@@ -274,6 +276,7 @@ def build_v2(name,size,color):
 def write_action_graph(path,name):
     action_nodes={
         "zombie":{"body":1,"head":1,"arm_l":1,"arm_r":1},
+        "zombie_villager":{"body":1,"head":1,"arm_l":1,"arm_r":1},
         "skeleton":{"body":1,"head":1,"arm_l":1,"arm_r":1},
         "player":{"arm_r":1},
     }
@@ -297,7 +300,8 @@ def write_action_graph(path,name):
             "swing":{"clip":"swing","layer":"action","loop":False,"priority":100,"fade_in":.03,"fade_out":.06},
         })
     attack={
-        "zombie":(.55,.30,"melee"),"spider":(.50,.30,"melee"),
+        "zombie":(.55,.30,"melee"),"zombie_villager":(.55,.30,"melee"),
+        "spider":(.50,.30,"melee"),
         "skeleton":(.75,.45,"shoot"),"blastling":(1.20,1.00,"explode")}
     if name in attack:
         duration,event_time,event=attack[name]

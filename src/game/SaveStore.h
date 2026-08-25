@@ -11,6 +11,7 @@
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
 #include "game/Weather.h"
+#include "game/VillagerTrade.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
 
@@ -53,6 +54,7 @@ struct WorldMetadata {
         uint32_t behaviorSeed = 0;
         uint8_t flags = 0;
         float projectileDamage = 0.0f;
+        VillagerData villager;
     };
     std::vector<PersistedEntity> entities;
     WorldType worldType = WorldType::Normal;
@@ -101,6 +103,9 @@ public:
     void saveChunkEntities(int chunkX, int chunkZ,
                            const std::vector<WorldMetadata::PersistedEntity>& entities) const;
     std::vector<WorldMetadata::PersistedEntity> loadChunkEntities(int chunkX, int chunkZ) const;
+    void saveChunkEntityPopulationVersion(int chunkX, int chunkZ,
+                                          uint32_t version) const;
+    uint32_t loadChunkEntityPopulationVersion(int chunkX, int chunkZ) const;
 
 private:
     std::filesystem::path m_worldDirectory;
@@ -109,4 +114,5 @@ private:
     std::filesystem::path generatedChunkPath(int chunkX, int chunkZ) const;
     std::filesystem::path blockEntityPath(int chunkX, int chunkZ) const;
     std::filesystem::path entityPath(int chunkX, int chunkZ) const;
+    std::filesystem::path entityPopulationPath(int chunkX, int chunkZ) const;
 };

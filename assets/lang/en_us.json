@@ -274,6 +274,11 @@
   "item.160": "Sunstone Stairs",
   "item.161": "Cloudstone Slab",
   "item.162": "Cloudstone Stairs",
+  "item.163": "Emerald", "item.164": "Emerald Ore", "item.165": "Deepslate Emerald Ore",
+  "item.166": "Composter", "item.167": "Fletching Table", "item.168": "Loom",
+  "item.169": "Cauldron", "item.170": "Blast Furnace", "item.171": "Smithing Table",
+  "item.172": "Grindstone", "item.173": "Villager Spawn Egg", "item.174": "Zombie Villager Spawn Egg",
+  "entity.villager": "Villager", "entity.zombie_villager": "Zombie Villager", "trade.title": "TRADING",
   "message.autosave_log": "Autosave failed; see minecraftc.log",
   "message.autosave_retry": "Autosave failed; changes will be retried",
   "message.save_log": "World save failed; see minecraftc.log"

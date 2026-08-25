@@ -52,9 +52,9 @@ class TextureGeneratorTests(unittest.TestCase):
             metadata = json.loads((a / "entity_atlas.json").read_text())
             self.assertEqual(tuple(metadata["entities"]), tuple(sorted(tg.ENTITY_NAMES)))
             self.assertEqual({entry["index"] for entry in metadata["entities"].values()},
-                             set(range(9)))
+                             set(range(len(tg.ENTITY_NAMES))))
             width, height, pixels = tg.read_generated_png(a / "entity_atlas.png")
-            self.assertEqual((width, height), (48, 48))
+            self.assertEqual((width, height), (64, 64))
             self.assertTrue(all(pixel[3] == 255 for pixel in pixels))
             for name in tg.ENTITY_NAMES:
                 _, _, tile = tg.read_generated_png(a / "entities" / f"{name}.png")

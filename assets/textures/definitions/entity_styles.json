@@ -19,6 +19,8 @@
     "skeleton": {"motifs": ["skull", "jaw", "rib", "joint"], "marking": "bone"},
     "spider": {"motifs": ["eye_cluster", "cephalothorax", "abdomen", "leg_joint"], "marking": "carapace"},
     "blastling": {"motifs": ["eye", "core", "limb", "glow"], "marking": "energy"},
+    "villager": {"motifs": ["brow", "nose", "robe", "profession_badge"], "marking": "robe"},
+    "zombie_villager": {"motifs": ["brow", "nose", "torn_robe", "decay"], "marking": "undead_robe"},
     "player": {"motifs": ["hair", "face", "shirt", "trouser", "shoe"], "marking": "adventurer"}
   }
 }

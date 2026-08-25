@@ -29,19 +29,19 @@
     },
     "aether_grass": {
       "generator": "block_item_icon",
-      "index": 142,
+      "index": 144,
       "source": "assets/textures/generated/items/aether_grass.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 17
+      "x": 0,
+      "y": 18
     },
     "aether_soil": {
       "generator": "block_item_icon",
-      "index": 143,
+      "index": 145,
       "source": "assets/textures/generated/items/aether_soil.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 17
+      "x": 1,
+      "y": 18
     },
     "allium": {
       "generator": "block_item_icon",
@@ -61,11 +61,11 @@
     },
     "basalt": {
       "generator": "block_item_icon",
-      "index": 135,
+      "index": 137,
       "source": "assets/textures/generated/items/basalt.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 16
+      "x": 1,
+      "y": 17
     },
     "bedrock": {
       "generator": "block_item_icon",
@@ -101,11 +101,19 @@
     },
     "black_sand": {
       "generator": "block_item_icon",
-      "index": 140,
+      "index": 142,
       "source": "assets/textures/generated/items/black_sand.png",
       "source_kind": "generated",
-      "x": 4,
+      "x": 6,
       "y": 17
+    },
+    "blast_furnace": {
+      "generator": "block_item_icon",
+      "index": 161,
+      "source": "assets/textures/generated/items/blast_furnace.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 20
     },
     "blastling_spawn_egg": {
       "generator": "item_sprite",
@@ -155,6 +163,14 @@
       "x": 1,
       "y": 5
     },
+    "cauldron": {
+      "generator": "block_item_icon",
+      "index": 160,
+      "source": "assets/textures/generated/items/cauldron.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 20
+    },
     "chest": {
       "generator": "block_item_icon",
       "index": 8,
@@ -181,35 +197,35 @@
     },
     "cloud_bloom": {
       "generator": "block_item_icon",
-      "index": 150,
+      "index": 152,
       "source": "assets/textures/generated/items/cloud_bloom.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 18
+      "x": 0,
+      "y": 19
     },
     "cloudstone": {
       "generator": "block_item_icon",
-      "index": 144,
+      "index": 146,
       "source": "assets/textures/generated/items/cloudstone.png",
       "source_kind": "generated",
-      "x": 0,
+      "x": 2,
       "y": 18
     },
     "cloudstone_slab": {
       "generator": "block_item_icon",
-      "index": 160,
+      "index": 172,
       "source": "assets/textures/generated/items/cloudstone_slab.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 20
+      "x": 4,
+      "y": 21
     },
     "cloudstone_stairs": {
       "generator": "block_item_icon",
-      "index": 161,
+      "index": 173,
       "source": "assets/textures/generated/items/cloudstone_stairs.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 20
+      "x": 5,
+      "y": 21
     },
     "coal": {
       "generator": "item_sprite",
@@ -229,10 +245,10 @@
     },
     "coarse_dirt": {
       "generator": "block_item_icon",
-      "index": 137,
+      "index": 139,
       "source": "assets/textures/generated/items/coarse_dirt.png",
       "source_kind": "generated",
-      "x": 1,
+      "x": 3,
       "y": 17
     },
     "cobblestone": {
@@ -245,18 +261,26 @@
     },
     "cobblestone_slab": {
       "generator": "block_item_icon",
-      "index": 154,
+      "index": 166,
       "source": "assets/textures/generated/items/cobblestone_slab.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 19
+      "x": 6,
+      "y": 20
     },
     "cobblestone_stairs": {
       "generator": "block_item_icon",
-      "index": 155,
+      "index": 167,
       "source": "assets/textures/generated/items/cobblestone_stairs.png",
       "source_kind": "generated",
-      "x": 3,
+      "x": 7,
+      "y": 20
+    },
+    "composter": {
+      "generator": "block_item_icon",
+      "index": 157,
+      "source": "assets/textures/generated/items/composter.png",
+      "source_kind": "generated",
+      "x": 5,
       "y": 19
     },
     "cooked_chicken": {
@@ -314,6 +338,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 5
+    },
+    "deepslate_emerald_ore": {
+      "generator": "block_item_icon",
+      "index": 156,
+      "source": "assets/textures/generated/items/deepslate_emerald_ore.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 19
     },
     "diamond": {
       "generator": "item_sprite",
@@ -411,6 +443,22 @@
       "x": 1,
       "y": 0
     },
+    "emerald": {
+      "generator": "item_sprite",
+      "index": 154,
+      "source": "assets/textures/generated/items/emerald.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 19
+    },
+    "emerald_ore": {
+      "generator": "block_item_icon",
+      "index": 155,
+      "source": "assets/textures/generated/items/emerald_ore.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 19
+    },
     "farmland": {
       "generator": "block_item_icon",
       "index": 86,
@@ -426,6 +474,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 8
+    },
+    "fletching_table": {
+      "generator": "block_item_icon",
+      "index": 158,
+      "source": "assets/textures/generated/items/fletching_table.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 19
     },
     "flint": {
       "generator": "item_sprite",
@@ -461,11 +517,11 @@
     },
     "glowshroom": {
       "generator": "block_item_icon",
-      "index": 151,
+      "index": 153,
       "source": "assets/textures/generated/items/glowshroom.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 18
+      "x": 1,
+      "y": 19
     },
     "gold_ingot": {
       "generator": "item_sprite",
@@ -557,10 +613,10 @@
     },
     "granite": {
       "generator": "block_item_icon",
-      "index": 141,
+      "index": 143,
       "source": "assets/textures/generated/items/granite.png",
       "source_kind": "generated",
-      "x": 5,
+      "x": 7,
       "y": 17
     },
     "grass_block": {
@@ -578,6 +634,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 6
+    },
+    "grindstone": {
+      "generator": "block_item_icon",
+      "index": 163,
+      "source": "assets/textures/generated/items/grindstone.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 20
     },
     "gunpowder": {
       "generator": "item_sprite",
@@ -757,11 +821,19 @@
     },
     "limestone": {
       "generator": "block_item_icon",
-      "index": 134,
+      "index": 136,
       "source": "assets/textures/generated/items/limestone.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 16
+      "x": 0,
+      "y": 17
+    },
+    "loom": {
+      "generator": "block_item_icon",
+      "index": 159,
+      "source": "assets/textures/generated/items/loom.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 19
     },
     "moss": {
       "generator": "block_item_icon",
@@ -773,10 +845,10 @@
     },
     "mud": {
       "generator": "block_item_icon",
-      "index": 138,
+      "index": 140,
       "source": "assets/textures/generated/items/mud.png",
       "source_kind": "generated",
-      "x": 2,
+      "x": 4,
       "y": 17
     },
     "oak_leaves": {
@@ -805,19 +877,19 @@
     },
     "oak_planks_slab": {
       "generator": "block_item_icon",
-      "index": 152,
+      "index": 164,
       "source": "assets/textures/generated/items/oak_planks_slab.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 19
+      "x": 4,
+      "y": 20
     },
     "oak_planks_stairs": {
       "generator": "block_item_icon",
-      "index": 153,
+      "index": 165,
       "source": "assets/textures/generated/items/oak_planks_stairs.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 19
+      "x": 5,
+      "y": 20
     },
     "oak_sapling": {
       "generator": "block_item_icon",
@@ -845,10 +917,10 @@
     },
     "packed_ice": {
       "generator": "block_item_icon",
-      "index": 139,
+      "index": 141,
       "source": "assets/textures/generated/items/packed_ice.png",
       "source_kind": "generated",
-      "x": 3,
+      "x": 5,
       "y": 17
     },
     "pig_spawn_egg": {
@@ -981,19 +1053,27 @@
     },
     "skyroot_leaves": {
       "generator": "block_item_icon",
-      "index": 147,
+      "index": 149,
       "source": "assets/textures/generated/items/skyroot_leaves.png",
       "source_kind": "generated",
-      "x": 3,
+      "x": 5,
       "y": 18
     },
     "skyroot_log": {
       "generator": "block_item_icon",
-      "index": 146,
+      "index": 148,
       "source": "assets/textures/generated/items/skyroot_log.png",
       "source_kind": "generated",
-      "x": 2,
+      "x": 4,
       "y": 18
+    },
+    "smithing_table": {
+      "generator": "block_item_icon",
+      "index": 162,
+      "source": "assets/textures/generated/items/smithing_table.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 20
     },
     "snow": {
       "generator": "block_item_icon",
@@ -1037,18 +1117,18 @@
     },
     "star_crystal": {
       "generator": "block_item_icon",
-      "index": 148,
+      "index": 150,
       "source": "assets/textures/generated/items/star_crystal.png",
       "source_kind": "generated",
-      "x": 4,
+      "x": 6,
       "y": 18
     },
     "starflower": {
       "generator": "block_item_icon",
-      "index": 149,
+      "index": 151,
       "source": "assets/textures/generated/items/starflower.png",
       "source_kind": "generated",
-      "x": 5,
+      "x": 7,
       "y": 18
     },
     "steak": {
@@ -1133,27 +1213,27 @@
     },
     "sunstone": {
       "generator": "block_item_icon",
-      "index": 145,
+      "index": 147,
       "source": "assets/textures/generated/items/sunstone.png",
       "source_kind": "generated",
-      "x": 1,
+      "x": 3,
       "y": 18
     },
     "sunstone_slab": {
       "generator": "block_item_icon",
-      "index": 158,
+      "index": 170,
       "source": "assets/textures/generated/items/sunstone_slab.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 19
+      "x": 2,
+      "y": 21
     },
     "sunstone_stairs": {
       "generator": "block_item_icon",
-      "index": 159,
+      "index": 171,
       "source": "assets/textures/generated/items/sunstone_stairs.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 19
+      "x": 3,
+      "y": 21
     },
     "tall_grass": {
       "generator": "block_item_icon",
@@ -1173,19 +1253,19 @@
     },
     "terracotta_slab": {
       "generator": "block_item_icon",
-      "index": 156,
+      "index": 168,
       "source": "assets/textures/generated/items/terracotta_slab.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 19
+      "x": 0,
+      "y": 21
     },
     "terracotta_stairs": {
       "generator": "block_item_icon",
-      "index": 157,
+      "index": 169,
       "source": "assets/textures/generated/items/terracotta_stairs.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 19
+      "x": 1,
+      "y": 21
     },
     "tnt": {
       "generator": "block_item_icon",
@@ -1205,11 +1285,19 @@
     },
     "tuff": {
       "generator": "block_item_icon",
-      "index": 136,
+      "index": 138,
       "source": "assets/textures/generated/items/tuff.png",
       "source_kind": "generated",
-      "x": 0,
+      "x": 2,
       "y": 17
+    },
+    "villager_spawn_egg": {
+      "generator": "item_sprite",
+      "index": 134,
+      "source": "assets/textures/generated/items/villager_spawn_egg.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 16
     },
     "water": {
       "generator": "block_item_icon",
@@ -1298,6 +1386,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 16
+    },
+    "zombie_villager_spawn_egg": {
+      "generator": "item_sprite",
+      "index": 135,
+      "source": "assets/textures/generated/items/zombie_villager_spawn_egg.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 16
     }
   },
   "priority": [
@@ -1306,7 +1402,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 21,
+  "rows": 22,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

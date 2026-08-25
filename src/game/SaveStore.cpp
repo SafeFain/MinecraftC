@@ -290,6 +290,19 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
     append(payload, entity.behaviorSeed);
     append(payload, entity.flags);
     append(payload, entity.projectileDamage);
+    append(payload, static_cast<uint8_t>(entity.villager.profession));
+    append(payload, entity.villager.level);
+    append(payload, entity.villager.experience);
+    append(payload, entity.villager.offerSeed);
+    for (const uint8_t uses : entity.villager.uses) append(payload, uses);
+    append(payload, entity.villager.claimedBed);
+    append(payload, entity.villager.claimedWorkstation);
+    append(payload, static_cast<uint8_t>(
+        (entity.villager.hasBed ? 1 : 0) |
+        (entity.villager.hasWorkstation ? 2 : 0) |
+        (entity.villager.professionLocked ? 4 : 0)));
+    append(payload, entity.villager.lastRestockDay);
+    append(payload, entity.villager.restocksToday);
 }
 
 WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
@@ -306,9 +319,28 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
         entity.flags = reader.read<uint8_t>();
         entity.projectileDamage = reader.read<float>();
     }
-    // EntityType values are serialized as uint8_t; PrimedTnt is the highest
+    if (version >= 12) {
+        entity.villager.profession = static_cast<VillagerProfession>(
+            reader.read<uint8_t>());
+        entity.villager.level = reader.read<uint8_t>();
+        entity.villager.experience = reader.read<uint16_t>();
+        entity.villager.offerSeed = reader.read<uint32_t>();
+        for (uint8_t& uses : entity.villager.uses) uses = reader.read<uint8_t>();
+        entity.villager.claimedBed = reader.read<glm::ivec3>();
+        entity.villager.claimedWorkstation = reader.read<glm::ivec3>();
+        const uint8_t villagerFlags = reader.read<uint8_t>();
+        entity.villager.hasBed = (villagerFlags & 1) != 0;
+        entity.villager.hasWorkstation = (villagerFlags & 2) != 0;
+        entity.villager.professionLocked = (villagerFlags & 4) != 0;
+        entity.villager.lastRestockDay = reader.read<uint32_t>();
+        entity.villager.restocksToday = reader.read<uint8_t>();
+        if (entity.villager.profession >= VillagerProfession::Count ||
+            entity.villager.level < 1 || entity.villager.level > 5)
+            throw std::runtime_error("Save contains invalid villager data");
+    }
+    // EntityType values are serialized as uint8_t; ZombieVillager is the highest
     // valid value, so reject anything beyond it.
-    if (entity.type > static_cast<uint8_t>(EntityType::PrimedTnt))
+    if (entity.type > static_cast<uint8_t>(EntityType::ZombieVillager))
         throw std::runtime_error("Save contains invalid entity type");
     return entity;
 }
@@ -503,6 +535,12 @@ std::filesystem::path SaveStore::entityPath(int chunkX, int chunkZ) const {
         ("e." + std::to_string(chunkX) + "." + std::to_string(chunkZ) + ".bin");
 }
 
+std::filesystem::path SaveStore::entityPopulationPath(
+    int chunkX, int chunkZ) const {
+    return m_worldDirectory / "entities" /
+        ("p." + std::to_string(chunkX) + "." + std::to_string(chunkZ) + ".bin");
+}
+
 void SaveStore::saveChunkOverrides(
     int chunkX, int chunkZ, const std::vector<BlockOverride>& overrides) const {
     Bytes payload;
@@ -680,4 +718,27 @@ std::vector<WorldMetadata::PersistedEntity> SaveStore::loadChunkEntities(
     for (uint32_t i = 0; i < count; ++i) result.push_back(readEntity(reader, checked.version));
     if (!reader.finished()) throw std::runtime_error("Unexpected chunk entity data");
     return result;
+}
+
+void SaveStore::saveChunkEntityPopulationVersion(
+    int chunkX, int chunkZ, uint32_t version) const {
+    Bytes payload;
+    append(payload, static_cast<int32_t>(chunkX));
+    append(payload, static_cast<int32_t>(chunkZ));
+    append(payload, version);
+    writeAtomic(entityPopulationPath(chunkX, chunkZ), payload);
+}
+
+uint32_t SaveStore::loadChunkEntityPopulationVersion(
+    int chunkX, int chunkZ) const {
+    const auto path = entityPopulationPath(chunkX, chunkZ);
+    if (!std::filesystem::exists(path)) return 0;
+    CheckedBytes checked = readChecked(path);
+    Reader reader(std::move(checked.payload));
+    if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
+        throw std::runtime_error("Entity population coordinate mismatch");
+    const uint32_t version = reader.read<uint32_t>();
+    if (!reader.finished())
+        throw std::runtime_error("Unexpected entity population data");
+    return version;
 }

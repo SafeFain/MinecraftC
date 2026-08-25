@@ -44,12 +44,12 @@ public:
                const glm::vec3& facing, uint32_t behaviorSeed,
                const glm::dvec3& renderOrigin, const glm::vec3& cameraPosition,
                model::ModelRenderer& renderer, const glm::vec3& visualTint,
-               SmoothLightSample light = {});
+               SmoothLightSample light = {}, bool sleeping = false);
     void endFrame();
 
 private:
     Loader m_loader;
-    std::array<EntityModelDefinition, 8> m_definitions;
+    std::array<EntityModelDefinition, 10> m_definitions;
     std::map<std::filesystem::path, std::shared_ptr<const model::ModelAsset>> m_cache;
     std::shared_ptr<const model::ModelAsset> m_placeholder;
     struct InstanceEntry {

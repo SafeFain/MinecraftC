@@ -1,4 +1,5 @@
 #include "game/InventoryModel.h"
+#include "game/VillagerTrade.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,7 +36,8 @@ int main() {
             "weather block geometry or collision properties are invalid");
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
             static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 166 &&
+            static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 175 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -80,7 +82,7 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::CLOUDSTONE_STAIRS,
+            creativeItems.back() == ItemId::ZOMBIE_VILLAGER_SPAWN_EGG,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -101,11 +103,11 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 50 &&
+                CreativeItemCategory::BuildingBlocks)] == 52 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Nature)] == 27 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Functional)] == 7 &&
+                CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Tools)] == 21 &&
             categoryCounts[static_cast<size_t>(
@@ -113,9 +115,9 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Food)] == 10 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Materials)] == 15 &&
+                CreativeItemCategory::Materials)] == 16 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::SpawnEggs)] == 8,
+                CreativeItemCategory::SpawnEggs)] == 10,
             "creative category sizes do not match the tab assignment");
     require(creativeInventoryCategory(ItemId::STONE) ==
                 CreativeItemCategory::BuildingBlocks &&
@@ -193,8 +195,39 @@ int main() {
     require(getItemProps(ItemId::COW_SPAWN_EGG).kind == ItemKind::SpawnEgg &&
             getItemProps(ItemId::COW_SPAWN_EGG).spawnEggMob == SpawnEggMob::Cow &&
             getItemProps(ItemId::BLASTLING_SPAWN_EGG).spawnEggMob ==
-                SpawnEggMob::Blastling,
+                SpawnEggMob::Blastling &&
+            getItemProps(ItemId::VILLAGER_SPAWN_EGG).spawnEggMob ==
+                SpawnEggMob::Villager &&
+            getItemProps(ItemId::ZOMBIE_VILLAGER_SPAWN_EGG).spawnEggMob ==
+                SpawnEggMob::ZombieVillager,
             "spawn eggs are not registered with stable mob mappings");
+
+    require(static_cast<uint16_t>(ItemId::EMERALD) == 163 &&
+            static_cast<uint16_t>(ItemId::ZOMBIE_VILLAGER_SPAWN_EGG) == 174 &&
+            itemForBlock(BlockId::EMERALD_ORE) == ItemId::EMERALD_ORE &&
+            isVillagerWorkstation(BlockId::COMPOSTER) &&
+            professionForWorkstation(BlockId::GRINDSTONE) ==
+                VillagerProfession::Weaponsmith,
+            "villager resources did not append with stable mappings");
+
+    VillagerData farmer;
+    farmer.profession = VillagerProfession::Farmer;
+    farmer.hasWorkstation = true;
+    InventoryModel tradeInventory;
+    require(tradeInventory.add({ItemId::WHEAT, 20, 0}) == 0 &&
+            executeVillagerTrade(farmer, 0, tradeInventory) ==
+                TradeResult::Success &&
+            tradeInventory.count(ItemId::WHEAT) == 0 &&
+            tradeInventory.count(ItemId::EMERALD) == 1 &&
+            farmer.professionLocked && farmer.uses[0] == 1 &&
+            farmer.experience == 2,
+            "farmer trade was not atomic or did not lock the profession");
+    require(executeVillagerTrade(farmer, 1, tradeInventory) ==
+                TradeResult::LockedOffer &&
+            restockVillager(farmer, 7, true) && farmer.uses[0] == 0 &&
+            restockVillager(farmer, 7, true) &&
+            !restockVillager(farmer, 7, true),
+            "trade unlocking or twice-daily restock limit failed");
 
     InventoryModel inventory;
     for (const auto& stack : inventory.storage())

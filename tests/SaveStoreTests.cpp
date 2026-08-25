@@ -77,14 +77,31 @@ int main() {
         source.inventory.offhand() = {ItemId::SHIELD, 1, 4};
         source.entities.push_back({
             5, {-20.0f, 64.0f, 8.0f}, {0.1f, 0.0f, 0.2f},
-            12.0f, 34.0f, {}, 98765
+            12.0f, 34.0f, {}, 98765, 0, 0.0f, {}
         });
         // PrimedTnt (EntityType value 10) must load without tripping the
         // entity-type validation in readEntity().
         source.entities.push_back({
             10, {3.0f, 64.0f, -7.0f}, {0.0f, 0.2f, 0.0f},
-            1.0f, 2.5f, {}, 424242
+            1.0f, 2.5f, {}, 424242, 0, 0.0f, {}
         });
+        WorldMetadata::PersistedEntity villager;
+        villager.type = 11;
+        villager.position = {8.5, 70.0, -4.5};
+        villager.health = 20.0f;
+        villager.villager.profession = VillagerProfession::Toolsmith;
+        villager.villager.level = 4;
+        villager.villager.experience = 188;
+        villager.villager.offerSeed = 998877;
+        villager.villager.uses = {{1, 2, 3, 4, 5}};
+        villager.villager.hasBed = true;
+        villager.villager.claimedBed = {7, 70, -4};
+        villager.villager.hasWorkstation = true;
+        villager.villager.claimedWorkstation = {9, 70, -4};
+        villager.villager.professionLocked = true;
+        villager.villager.lastRestockDay = 12;
+        villager.villager.restocksToday = 2;
+        source.entities.push_back(villager);
         source.activeDimension = DimensionId::Heaven;
         source.overworldDayPhase = 0.37f;
         source.heaven.playerPosition = {12.5, 144.0, -8.5};
@@ -122,11 +139,21 @@ int main() {
         require(loaded.inventory.slot(10).id == ItemId::LIMESTONE &&
                 loaded.inventory.slot(10).count == 23,
                 "appended natural material item round trips");
-        require(loaded.entities.size() == 2 &&
+        require(loaded.entities.size() == 3 &&
                 loaded.entities[0].position == source.entities[0].position &&
                 loaded.entities[1].type == 10 &&
-                loaded.entities[1].position == source.entities[1].position,
+                loaded.entities[1].position == source.entities[1].position &&
+                loaded.entities[2].villager.profession ==
+                    VillagerProfession::Toolsmith &&
+                loaded.entities[2].villager.uses[4] == 5 &&
+                loaded.entities[2].villager.claimedBed == glm::ivec3(7,70,-4) &&
+                loaded.entities[2].villager.professionLocked &&
+                loaded.entities[2].villager.restocksToday == 2,
                 "persistent entities round trip");
+        store.saveChunkEntityPopulationVersion(-3, 9, 1);
+        require(store.loadChunkEntityPopulationVersion(-3, 9) == 1 &&
+                store.loadChunkEntityPopulationVersion(-3, 8) == 0,
+                "chunk entity population version did not round trip safely");
         require(loaded.activeDimension == DimensionId::Heaven &&
                 std::abs(loaded.overworldDayPhase - 0.37f) < 0.0001f &&
                 loaded.heaven.playerPosition == source.heaven.playerPosition &&
@@ -161,7 +188,9 @@ int main() {
         const auto legacyDirectory = root / "legacy-v7";
         std::filesystem::create_directories(legacyDirectory);
         const auto legacyPath = legacyDirectory / "level.bin";
-        std::filesystem::copy_file(metadataPath, legacyPath);
+        WorldMetadata legacySource = source;
+        legacySource.entities.clear();
+        SaveStore(legacyDirectory).saveMetadata(legacySource);
         {
             std::ifstream input(legacyPath, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
@@ -182,7 +211,7 @@ int main() {
         const auto v10Directory = root / "legacy-v10";
         std::filesystem::create_directories(v10Directory);
         const auto v10Path = v10Directory / "level.bin";
-        std::filesystem::copy_file(metadataPath, v10Path);
+        SaveStore(v10Directory).saveMetadata(legacySource);
         {
             std::vector<uint8_t> bytes = readBytes(v10Path);
             require(bytes.size() > 28, "v10 fixture has a food timer tail");

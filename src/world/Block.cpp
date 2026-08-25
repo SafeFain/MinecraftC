@@ -38,7 +38,10 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "coarse_dirt", "mud", "packed_ice", "black_sand", "granite",
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
-    "star_crystal", "starflower", "cloud_bloom", "glowshroom"
+    "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "emerald_ore", "deepslate_emerald_ore", "composter",
+    "fletching_table", "loom", "cauldron", "blast_furnace",
+    "smithing_table", "grindstone"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -284,6 +287,15 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     ARCH_FAMILY(SUNSTONE, "Sunstone", glm::vec3(.88f, .71f, .35f)),
     ARCH_FAMILY(CLOUDSTONE, "Cloudstone", glm::vec3(.70f, .78f, .82f)),
 #undef ARCH_FAMILY
+    {BlockId::EMERALD_ORE, "Emerald Ore", glm::vec3(.18f,.74f,.42f), true, false},
+    {BlockId::DEEPSLATE_EMERALD_ORE, "Deepslate Emerald Ore", glm::vec3(.16f,.58f,.36f), true, false},
+    {BlockId::COMPOSTER, "Composter", glm::vec3(.48f,.31f,.15f), true, false},
+    {BlockId::FLETCHING_TABLE, "Fletching Table", glm::vec3(.66f,.55f,.35f), true, false},
+    {BlockId::LOOM, "Loom", glm::vec3(.67f,.57f,.41f), true, false},
+    {BlockId::CAULDRON, "Cauldron", glm::vec3(.26f,.27f,.28f), true, false},
+    {BlockId::BLAST_FURNACE, "Blast Furnace", glm::vec3(.31f,.32f,.33f), true, false},
+    {BlockId::SMITHING_TABLE, "Smithing Table", glm::vec3(.25f,.34f,.35f), true, false},
+    {BlockId::GRINDSTONE, "Grindstone", glm::vec3(.49f,.48f,.44f), true, false},
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -317,6 +329,9 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::IRON_ORE:      return BlockTexture::IronOre;
         case BlockId::GOLD_ORE:      return BlockTexture::GoldOre;
         case BlockId::DIAMOND_ORE:   return BlockTexture::DiamondOre;
+        case BlockId::EMERALD_ORE:   return BlockTexture::EmeraldOre;
+        case BlockId::DEEPSLATE_EMERALD_ORE:
+            return BlockTexture::DeepslateEmeraldOre;
         case BlockId::LAVA:          return BlockTexture::Lava;
         case BlockId::ICE:           return BlockTexture::Ice;
         case BlockId::GRAVEL:        return BlockTexture::Gravel;
@@ -372,6 +387,13 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::OXEYE_DAISY:   return BlockTexture::OxeyeDaisy;
         case BlockId::SUNFLOWER_BOTTOM: return BlockTexture::SunflowerBottom;
         case BlockId::SUNFLOWER_TOP: return BlockTexture::SunflowerTop;
+        case BlockId::COMPOSTER: return BlockTexture::Composter;
+        case BlockId::FLETCHING_TABLE: return BlockTexture::FletchingTable;
+        case BlockId::LOOM: return BlockTexture::Loom;
+        case BlockId::CAULDRON: return BlockTexture::Cauldron;
+        case BlockId::BLAST_FURNACE: return BlockTexture::BlastFurnace;
+        case BlockId::SMITHING_TABLE: return BlockTexture::SmithingTable;
+        case BlockId::GRINDSTONE: return BlockTexture::Grindstone;
         case BlockId::FLOWING_WATER_1: case BlockId::FLOWING_WATER_2:
         case BlockId::FLOWING_WATER_3: case BlockId::FLOWING_WATER_4:
         case BlockId::FLOWING_WATER_5: case BlockId::FLOWING_WATER_6:
@@ -512,6 +534,10 @@ bool isBed(BlockId id) {
     return id == BlockId::WHITE_BED ||
            (id >= BlockId::WHITE_BED_FOOT_EAST &&
             id <= BlockId::WHITE_BED_HEAD_WEST);
+}
+
+bool isVillagerWorkstation(BlockId id) {
+    return id >= BlockId::COMPOSTER && id <= BlockId::GRINDSTONE;
 }
 
 bool decodeBed(BlockId id, BedPart& part, BedDirection& direction) {
@@ -826,7 +852,8 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
         case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: return 5;
         case BlockId::PLANKS: case BlockId::CRAFTING_TABLE:
-        case BlockId::CHEST: return 5;
+        case BlockId::CHEST: case BlockId::COMPOSTER:
+        case BlockId::FLETCHING_TABLE: case BlockId::LOOM: return 5;
         case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
         case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
         case BlockId::ACACIA_LEAVES: case BlockId::SKYROOT_LEAVES:

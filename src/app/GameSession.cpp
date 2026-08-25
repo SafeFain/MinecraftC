@@ -243,7 +243,8 @@ void GameSession::updatePlaying(
     entities.update(player, dt, dayNightCycle.isDay(), peaceful,
                     player.isSurvival(), !player.isSpectator(),
                     dimension == DimensionId::Overworld && weather.thundering(),
-                    dimension == DimensionId::Overworld && weather.raining());
+                    dimension == DimensionId::Overworld && weather.raining(),
+                    survivalTicks);
     for (const glm::dvec3& explosion : entities.takeExplosionEvents()) {
         particles.emitExplosion(explosion);
         const glm::dvec3 delta = explosion - player.getPosition();

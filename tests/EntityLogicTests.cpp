@@ -14,8 +14,22 @@ int main() {
     require(entityTypeForSpawnEgg(SpawnEggMob::Cow) == EntityType::Cow &&
             entityTypeForSpawnEgg(SpawnEggMob::Chicken) == EntityType::Chicken &&
             entityTypeForSpawnEgg(SpawnEggMob::Zombie) == EntityType::Zombie &&
-            entityTypeForSpawnEgg(SpawnEggMob::Blastling) == EntityType::Blastling,
+            entityTypeForSpawnEgg(SpawnEggMob::Blastling) == EntityType::Blastling &&
+            entityTypeForSpawnEgg(SpawnEggMob::Villager) == EntityType::Villager &&
+            entityTypeForSpawnEgg(SpawnEggMob::ZombieVillager) ==
+                EntityType::ZombieVillager &&
+            static_cast<uint8_t>(EntityType::Villager) == 11 &&
+            static_cast<uint8_t>(EntityType::ZombieVillager) == 12,
             "spawn egg mob mapping diverged from shared entity types");
+    size_t zombieVillagerRolls = 0;
+    for (uint32_t roll = 0; roll < 100; ++roll)
+        if (naturalZombieBecomesVillager(roll)) ++zombieVillagerRolls;
+    require(zombieVillagerRolls == 5 &&
+            !villagerInfectionConverts(Difficulty::Easy, 0) &&
+            villagerInfectionConverts(Difficulty::Normal, 0) &&
+            !villagerInfectionConverts(Difficulty::Normal, 1) &&
+            villagerInfectionConverts(Difficulty::Hard, 1),
+            "zombie-villager natural or difficulty infection rates changed");
     require(selectEntityPlayback(0.0f, false, false) == EntityPlayback::Idle,
             "idle playback selection failed");
     require(selectEntityPlayback(0.2f, false, false) == EntityPlayback::Walk,

@@ -729,6 +729,7 @@ if(BUILD_TESTING)
         tests/InventoryTests.cpp
         src/game/Item.cpp
         src/game/InventoryModel.cpp
+        src/game/VillagerTrade.cpp
         src/world/Block.cpp
     )
     target_include_directories(inventory_tests PRIVATE src)
@@ -963,6 +964,7 @@ if(BUILD_TESTING)
         src/game/SurvivalRules.cpp
         src/game/SurvivalSession.cpp
         src/game/SurvivalStats.cpp
+        src/game/VillagerTrade.cpp
         src/game/Utf8.cpp
         src/game/Weather.cpp
         src/game/WorldCatalog.cpp
@@ -1045,6 +1047,7 @@ if(BUILD_TESTING)
         src/game/SurvivalRules.cpp
         src/game/SurvivalSession.cpp
         src/game/SurvivalStats.cpp
+        src/game/VillagerTrade.cpp
         src/game/Utf8.cpp
         src/game/Weather.cpp
         src/game/WorldCatalog.cpp
@@ -1076,6 +1079,7 @@ if(BUILD_TESTING)
         src/ui/SettingsMenu.cpp
         src/ui/SurvivalInventory.cpp
         src/ui/TouchControls.cpp
+        src/ui/VillagerTradeScreen.cpp
         src/world/BiomeMap.cpp
         src/world/Block.cpp
         src/world/BlockEntityLogic.cpp

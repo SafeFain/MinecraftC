@@ -29,6 +29,10 @@
 //
 class WorldGenerator {
 public:
+    struct VillageSpawnRequest {
+        glm::dvec3 position{0.0};
+        uint32_t seed = 0;
+    };
     enum class HeavenBiome : uint8_t {
         DawnMeadow,
         SkyrootGrove,
@@ -76,6 +80,8 @@ public:
     SurfaceColumn sampleTerrainColumn(int worldX, int worldZ) const;
     std::vector<TreeGenerator::TreePlacement> sampleLodTrees(
         int worldOriginX, int worldOriginZ, int width, int depth) const;
+    std::vector<VillageSpawnRequest> villageSpawnsForChunk(
+        int chunkX, int chunkZ) const;
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }

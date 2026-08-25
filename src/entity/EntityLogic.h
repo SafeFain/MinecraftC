@@ -6,10 +6,11 @@
 #include <glm/glm.hpp>
 
 #include "game/Item.h"
+#include "game/GameRules.h"
 
 enum class EntityType : uint8_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
-    Arrow, PrimedTnt
+    Arrow, PrimedTnt, Villager, ZombieVillager
 };
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };
@@ -24,8 +25,22 @@ inline EntityType entityTypeForSpawnEgg(SpawnEggMob mob) {
         case SpawnEggMob::Skeleton: return EntityType::Skeleton;
         case SpawnEggMob::Spider: return EntityType::Spider;
         case SpawnEggMob::Blastling: return EntityType::Blastling;
+        case SpawnEggMob::Villager: return EntityType::Villager;
+        case SpawnEggMob::ZombieVillager: return EntityType::ZombieVillager;
     }
     return EntityType::Cow;
+}
+
+inline bool naturalZombieBecomesVillager(uint32_t deterministicRoll) {
+    return deterministicRoll % 20u == 0u;
+}
+
+inline bool villagerInfectionConverts(
+    Difficulty difficulty, uint32_t deterministicRoll) {
+    if (difficulty == Difficulty::Hard) return true;
+    if (difficulty == Difficulty::Normal)
+        return (deterministicRoll & 1u) == 0u;
+    return false;
 }
 
 constexpr float ENTITY_WALK_SPEED_THRESHOLD = 0.05f;
