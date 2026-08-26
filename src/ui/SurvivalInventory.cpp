@@ -10,6 +10,15 @@
 #include <algorithm>
 #include <string>
 
+namespace {
+constexpr size_t RECIPES_PER_PAGE = 6;
+}
+
+void SurvivalInventoryScreen::setCraftingTable(bool enabled) {
+    if (m_craftingTable != enabled) m_recipePage = 0;
+    m_craftingTable = enabled;
+}
+
 void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
     constexpr float slot = 44.0f;
     constexpr float gap = 4.0f;
@@ -38,6 +47,15 @@ void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
     }
     m_outputRect = {craftX + craftSize * (slot + gap) + 42.0f,
                     craftY + (craftSize - 1) * 24.0f, slot, slot};
+    const float recipeX = m_outputRect.x + m_outputRect.w + 24.0f;
+    for (size_t i = 0; i < m_recipeRects.size(); ++i) {
+        const int row = static_cast<int>(i / 2);
+        const int column = static_cast<int>(i % 2);
+        m_recipeRects[i] = {recipeX + column * 40.0f,
+                            craftY + (2 - row) * 40.0f, 36.0f, 36.0f};
+    }
+    m_previousRecipePageRect = {recipeX, craftY + 124.0f, 20.0f, 22.0f};
+    m_nextRecipePageRect = {recipeX + 60.0f, craftY + 124.0f, 20.0f, 22.0f};
     for (size_t i = 0; i < m_armorRects.size(); ++i)
         m_armorRects[i] = {originX - 64.0f, originY + (3 - i) * (slot + gap),
                            slot, slot};
@@ -86,9 +104,25 @@ ItemStack SurvivalInventoryScreen::craftingOutput() const {
     return recipe ? recipe->output : ItemStack{};
 }
 
+void SurvivalInventoryScreen::refreshAvailableRecipes() {
+    const uint8_t gridSize = m_craftingTable ? 3 : 2;
+    m_availableRecipes = availableCraftingRecipes(
+        m_inventory, m_crafting, gridSize, gridSize);
+    const size_t pageCount = std::max<size_t>(
+        1, (m_availableRecipes.size() + RECIPES_PER_PAGE - 1) /
+               RECIPES_PER_PAGE);
+    if (m_recipePage >= pageCount) m_recipePage = pageCount - 1;
+}
+
+const CraftingRecipe* SurvivalInventoryScreen::visibleRecipe(size_t slot) const {
+    const size_t index = m_recipePage * RECIPES_PER_PAGE + slot;
+    return index < m_availableRecipes.size() ? m_availableRecipes[index] : nullptr;
+}
+
 void SurvivalInventoryScreen::render(
     UIRenderer& ui, int screenWidth, int screenHeight, int mouseX, int mouseY) {
     layout(screenWidth, screenHeight);
+    refreshAvailableRecipes();
     m_pointerX = mouseX;
     m_pointerY = mouseY;
     if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
@@ -157,13 +191,60 @@ void SurvivalInventoryScreen::render(
         UiTheme::rect(ui, m_outputRect.x + m_outputRect.w - 2.0f, m_outputRect.y,
                       2.0f, m_outputRect.h, UiTheme::GOLD);
     }
+
+    ItemStack recipeTooltip;
+    if (!m_availableRecipes.empty()) {
+        const float panelX = m_recipeRects[0].x - 8.0f;
+        const float panelY = m_recipeRects[4].y - 8.0f;
+        UiTheme::panel(ui, panelX, panelY, 96.0f, 176.0f, UiTheme::PANEL);
+        const std::string recipeLabel =
+            ui.localization().text("inventory.craftable_recipes");
+        UiTheme::textWithShadow(ui, recipeLabel, panelX + 6.0f,
+                                panelY + 160.0f, 0.62f, UiTheme::TEXT_TITLE);
+        const size_t pageCount = std::max<size_t>(
+            1, (m_availableRecipes.size() + RECIPES_PER_PAGE - 1) /
+                   RECIPES_PER_PAGE);
+        if (pageCount > 1) {
+            UiTheme::button(ui, m_previousRecipePageRect.x,
+                            m_previousRecipePageRect.y,
+                            m_previousRecipePageRect.w,
+                            m_previousRecipePageRect.h, "<",
+                            contains(m_previousRecipePageRect, mouseX, mouseY)
+                                ? UiTheme::WidgetState::Hover
+                                : UiTheme::WidgetState::Normal,
+                            false, 0.72f);
+            UiTheme::button(ui, m_nextRecipePageRect.x,
+                            m_nextRecipePageRect.y, m_nextRecipePageRect.w,
+                            m_nextRecipePageRect.h, ">",
+                            contains(m_nextRecipePageRect, mouseX, mouseY)
+                                ? UiTheme::WidgetState::Hover
+                                : UiTheme::WidgetState::Normal,
+                            false, 0.72f);
+            const std::string page = std::to_string(m_recipePage + 1) + "/" +
+                                     std::to_string(pageCount);
+            const auto pageSize = ui.measureText(page, 0.62f);
+            UiTheme::textWithShadow(ui, page,
+                m_previousRecipePageRect.x + 40.0f - pageSize.x * 0.5f,
+                m_previousRecipePageRect.y + 5.0f, 0.62f, UiTheme::TEXT_DIM);
+        }
+        for (size_t i = 0; i < m_recipeRects.size(); ++i) {
+            const CraftingRecipe* recipe = visibleRecipe(i);
+            if (!recipe) continue;
+            const bool hovered = contains(m_recipeRects[i], mouseX, mouseY);
+            drawStack(ui, m_recipeRects[i], recipe->output, hovered);
+            if (hovered) recipeTooltip = recipe->output;
+        }
+    }
     for (size_t i = 0; i < m_armorRects.size(); ++i)
         drawStack(ui, m_armorRects[i], m_inventory.armor()[i],
                   contains(m_armorRects[i], mouseX, mouseY));
     drawStack(ui, m_offhandRect, m_inventory.offhand(),
               contains(m_offhandRect, mouseX, mouseY));
 
-    if (tooltip && !tooltip->empty()) ui.drawTooltip(mouseX + 12.0f, mouseY + 12.0f, *tooltip);
+    if (!recipeTooltip.empty())
+        ui.drawTooltip(mouseX + 12.0f, mouseY + 12.0f, recipeTooltip);
+    else if (tooltip && !tooltip->empty())
+        ui.drawTooltip(mouseX + 12.0f, mouseY + 12.0f, *tooltip);
 
     if (!m_cursor.empty()) {
         Rect cursor{static_cast<float>(mouseX + 8), static_cast<float>(mouseY + 8), 38, 38};
@@ -210,6 +291,31 @@ void SurvivalInventoryScreen::takeCraftingOutput() {
 void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
     if (button != MouseButton::Left && button != MouseButton::Right) return;
     const bool right = button == MouseButton::Right;
+    const size_t pageCount = std::max<size_t>(
+        1, (m_availableRecipes.size() + RECIPES_PER_PAGE - 1) /
+               RECIPES_PER_PAGE);
+    if (!right && pageCount > 1 &&
+        contains(m_previousRecipePageRect, mouseX, mouseY)) {
+        m_recipePage = (m_recipePage + pageCount - 1) % pageCount;
+        return;
+    }
+    if (!right && pageCount > 1 &&
+        contains(m_nextRecipePageRect, mouseX, mouseY)) {
+        m_recipePage = (m_recipePage + 1) % pageCount;
+        return;
+    }
+    for (size_t i = 0; i < m_recipeRects.size(); ++i) {
+        if (!contains(m_recipeRects[i], mouseX, mouseY)) continue;
+        if (!right) {
+            if (const CraftingRecipe* recipe = visibleRecipe(i)) {
+                const uint8_t gridSize = m_craftingTable ? 3 : 2;
+                fillCraftingRecipe(*recipe, m_inventory, m_crafting,
+                                   gridSize, gridSize);
+                refreshAvailableRecipes();
+            }
+        }
+        return;
+    }
     if (contains(m_outputRect, mouseX, mouseY)) {
         if (!right) takeCraftingOutput();
         return;
@@ -329,6 +435,12 @@ void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
     for(size_t i=0;i<craftingCount;++i)rects.push_back(m_craftingRects[i]);
     rects.insert(rects.end(),m_armorRects.begin(),m_armorRects.end());
     rects.push_back(m_offhandRect);rects.push_back(m_outputRect);
+    for(size_t i=0;i<m_recipeRects.size();++i)
+        if(visibleRecipe(i))rects.push_back(m_recipeRects[i]);
+    const size_t pageCount=std::max<size_t>(1,
+        (m_availableRecipes.size()+RECIPES_PER_PAGE-1)/RECIPES_PER_PAGE);
+    if(pageCount>1){rects.push_back(m_previousRecipePageRect);
+                    rects.push_back(m_nextRecipePageRect);}
     if(rects.empty())return;
     if(!m_focusX&&!m_focusY){m_focusX=static_cast<int>(rects[0].x+22);m_focusY=static_cast<int>(rects[0].y+22);}
     float best=1e30f;const Rect* chosen=nullptr;
@@ -402,4 +514,6 @@ void SurvivalInventoryScreen::onClose() {
         if (!stack.empty() && m_inventory.add(stack) == 0) stack.clear();
     }
     if (!m_cursor.empty() && m_inventory.add(m_cursor) == 0) m_cursor.clear();
+    m_availableRecipes.clear();
+    m_recipePage = 0;
 }

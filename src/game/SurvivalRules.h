@@ -39,6 +39,12 @@ float miningSeconds(BlockId block, const ItemStack& tool, bool underwater = fals
 const std::vector<CraftingRecipe>& craftingRecipes();
 const CraftingRecipe* findCraftingRecipe(const std::array<ItemId, 9>& grid,
                                          uint8_t gridWidth, uint8_t gridHeight);
+bool fillCraftingRecipe(const CraftingRecipe& recipe, InventoryModel& inventory,
+                        std::array<ItemStack, 9>& grid, uint8_t gridWidth,
+                        uint8_t gridHeight);
+std::vector<const CraftingRecipe*> availableCraftingRecipes(
+    const InventoryModel& inventory, const std::array<ItemStack, 9>& grid,
+    uint8_t gridWidth, uint8_t gridHeight);
 const SmeltingRecipe* findSmeltingRecipe(ItemId input);
 uint16_t fuelTicks(ItemId fuel);
 

@@ -169,6 +169,7 @@
   "inventory.creative": "크리에이티브 인벤토리",
   "inventory.survival": "서바이벌 인벤토리",
   "inventory.crafting": "제작",
+  "inventory.craftable_recipes": "제작 가능",
   "inventory.help": "스크롤로 탐색  |  클릭하면 선택한 단축바 칸에 배치  |  E로 닫기",
   "inventory.page": "{0}/{1}페이지",
   "inventory.creative_tab": "크리에이티브 아이템",

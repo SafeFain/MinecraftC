@@ -173,6 +173,7 @@
   "inventory.creative": "创造模式物品栏",
   "inventory.survival": "生存模式物品栏",
   "inventory.crafting": "合成",
+  "inventory.craftable_recipes": "可制作配方",
   "inventory.help": "滚轮浏览  |  点击放入选中的快捷栏槽位  |  按 E 关闭",
   "inventory.page": "第 {0}/{1} 页",
   "inventory.creative_tab": "创造物品",

@@ -309,6 +309,48 @@ bool recipeMatches(const CraftingRecipe& recipe, const std::array<ItemId, 9>& gr
     return true;
 }
 
+bool takeIngredient(ItemId item, InventoryModel& inventory,
+                    std::array<ItemStack, 9>& grid) {
+    for (ItemStack& stack : grid) {
+        if (stack.empty() || stack.id != item) continue;
+        if (--stack.count == 0) stack.clear();
+        return true;
+    }
+    return inventory.remove(item, 1);
+}
+
+bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
+                           InventoryModel& inventory,
+                           std::array<ItemStack, 9>& grid,
+                           uint8_t gridWidth, uint8_t gridHeight) {
+    if (gridWidth == 0 || gridHeight == 0 || gridWidth > 3 || gridHeight > 3 ||
+        recipe.width > gridWidth || recipe.height > gridHeight)
+        return false;
+
+    for (uint8_t y = 0; y < recipe.height; ++y)
+        for (uint8_t x = 0; x < recipe.width; ++x) {
+            const ItemId item = recipe.ingredients[y * recipe.width + x];
+            if (item != ItemId::EMPTY && !takeIngredient(item, inventory, grid))
+                return false;
+        }
+
+    // Return everything not consumed before replacing the grid. Callers run
+    // this on copies, so a full inventory is a clean failure, never item loss.
+    for (ItemStack& stack : grid) {
+        if (stack.empty()) continue;
+        if (inventory.add(stack) != 0) return false;
+        stack.clear();
+    }
+
+    for (uint8_t y = 0; y < recipe.height; ++y)
+        for (uint8_t x = 0; x < recipe.width; ++x) {
+            const ItemId item = recipe.ingredients[y * recipe.width + x];
+            if (item != ItemId::EMPTY)
+                grid[y * gridWidth + x] = {item, 1, 0};
+        }
+    return true;
+}
+
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
 const std::array<SmeltingRecipe, 10> SMELTING = {{
@@ -425,6 +467,33 @@ const CraftingRecipe* findCraftingRecipe(
         }
     }
     return nullptr;
+}
+
+bool fillCraftingRecipe(const CraftingRecipe& recipe, InventoryModel& inventory,
+                        std::array<ItemStack, 9>& grid, uint8_t gridWidth,
+                        uint8_t gridHeight) {
+    InventoryModel candidateInventory = inventory;
+    std::array<ItemStack, 9> candidateGrid = grid;
+    if (!tryFillCraftingRecipe(recipe, candidateInventory, candidateGrid,
+                               gridWidth, gridHeight))
+        return false;
+    inventory = std::move(candidateInventory);
+    grid = std::move(candidateGrid);
+    return true;
+}
+
+std::vector<const CraftingRecipe*> availableCraftingRecipes(
+    const InventoryModel& inventory, const std::array<ItemStack, 9>& grid,
+    uint8_t gridWidth, uint8_t gridHeight) {
+    std::vector<const CraftingRecipe*> result;
+    for (const CraftingRecipe& recipe : RECIPES) {
+        InventoryModel candidateInventory = inventory;
+        std::array<ItemStack, 9> candidateGrid = grid;
+        if (tryFillCraftingRecipe(recipe, candidateInventory, candidateGrid,
+                                  gridWidth, gridHeight))
+            result.push_back(&recipe);
+    }
+    return result;
 }
 
 const SmeltingRecipe* findSmeltingRecipe(ItemId input) {

@@ -169,6 +169,7 @@
   "inventory.creative": "INVENTARIO CREATIVO",
   "inventory.survival": "INVENTARIO DE SUPERVIVENCIA",
   "inventory.crafting": "FABRICACIÓN",
+  "inventory.craftable_recipes": "FABRICABLES",
   "inventory.help": "Rueda para explorar  |  Clic para colocar en la ranura seleccionada de la barra  |  E para cerrar",
   "inventory.page": "Página {0}/{1}",
   "inventory.creative_tab": "Objetos creativos",

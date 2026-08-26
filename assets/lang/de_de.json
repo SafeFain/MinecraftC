@@ -169,6 +169,7 @@
   "inventory.creative": "KREATIVINVENTAR",
   "inventory.survival": "ÜBERLEBENSINVENTAR",
   "inventory.crafting": "HANDWERK",
+  "inventory.craftable_recipes": "HERSTELLBAR",
   "inventory.help": "Scrollen zum Stöbern  |  Klick legt in den gewählten Schnellzugriffs-Slot  |  E zum Schließen",
   "inventory.page": "Seite {0}/{1}",
   "inventory.creative_tab": "Kreativgegenstände",

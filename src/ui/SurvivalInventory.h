@@ -7,6 +7,7 @@
 #include "core/InputCodes.h"
 
 class UIRenderer;
+struct CraftingRecipe;
 
 class SurvivalInventoryScreen {
 public:
@@ -23,7 +24,7 @@ public:
     bool swapHoveredWithOffhand();
     ItemStack dropHovered(bool entireStack);
     void onClose();
-    void setCraftingTable(bool enabled) { m_craftingTable = enabled; }
+    void setCraftingTable(bool enabled);
     void setCreativeAccess(bool enabled) { m_creativeAccess = enabled; }
     bool creativeAccess() const { return m_creativeAccess; }
     bool creativeCatalogButtonContains(int x, int y) const;
@@ -40,6 +41,11 @@ private:
     Rect m_offhandRect{};
     Rect m_outputRect{};
     Rect m_creativeCatalogRect{};
+    std::array<Rect, 6> m_recipeRects{};
+    Rect m_previousRecipePageRect{};
+    Rect m_nextRecipePageRect{};
+    std::vector<const CraftingRecipe*> m_availableRecipes;
+    size_t m_recipePage = 0;
     bool m_craftingTable = false;
     bool m_creativeAccess = false;
     bool m_pointerPressed = false;
@@ -59,6 +65,8 @@ private:
     void clickStack(ItemStack& stack, bool rightClick);
     void performClick(int button, int mouseX, int mouseY);
     void quickMove(int mouseX, int mouseY);
+    void refreshAvailableRecipes();
+    const CraftingRecipe* visibleRecipe(size_t slot) const;
     ItemStack* hoveredStack(int mouseX, int mouseY);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,

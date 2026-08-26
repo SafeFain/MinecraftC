@@ -169,6 +169,7 @@
   "inventory.creative": "INVENTAIRE CRÉATIF",
   "inventory.survival": "INVENTAIRE SURVIE",
   "inventory.crafting": "ARTISANAT",
+  "inventory.craftable_recipes": "FABRICABLES",
   "inventory.help": "Molette pour parcourir  |  Clic pour placer dans la case sélectionnée  |  E pour fermer",
   "inventory.page": "Page {0}/{1}",
   "inventory.creative_tab": "Objets créatifs",

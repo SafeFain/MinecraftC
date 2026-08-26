@@ -169,6 +169,7 @@
   "inventory.creative": "ТВОРЧЕСКИЙ ИНВЕНТАРЬ",
   "inventory.survival": "ИНВЕНТАРЬ ВЫЖИВАНИЯ",
   "inventory.crafting": "КРАФТ",
+  "inventory.craftable_recipes": "ДОСТУПНО",
   "inventory.help": "Колесо — прокрутка  |  Клик — положить в выбранный слот панели  |  E — закрыть",
   "inventory.page": "Страница {0}/{1}",
   "inventory.creative_tab": "Творческие предметы",

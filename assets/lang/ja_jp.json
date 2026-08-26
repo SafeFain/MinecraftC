@@ -169,6 +169,7 @@
   "inventory.creative": "クリエイティブインベントリ",
   "inventory.survival": "サバイバルインベントリ",
   "inventory.crafting": "クラフト",
+  "inventory.craftable_recipes": "作成可能",
   "inventory.help": "スクロールで閲覧  |  クリックで選択中のホットバースロットに配置  |  Eで閉じる",
   "inventory.page": "ページ {0}/{1}",
   "inventory.creative_tab": "クリエイティブアイテム",

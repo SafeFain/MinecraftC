@@ -145,6 +145,54 @@ int main() {
     require(pickaxe && pickaxe->output.id == ItemId::WOODEN_PICKAXE,
             "shaped wooden pickaxe recipe matches");
 
+    InventoryModel guidedInventory;
+    guidedInventory.add({ItemId::OAK_PLANKS, 4, 0});
+    std::array<ItemStack, 9> guidedGrid{};
+    const auto guided2x2 = availableCraftingRecipes(
+        guidedInventory, guidedGrid, 2, 2);
+    const auto hasGuidedOutput = [](const auto& recipes, ItemId output) {
+        return std::any_of(recipes.begin(), recipes.end(), [output](const auto* recipe) {
+            return recipe->output.id == output;
+        });
+    };
+    require(hasGuidedOutput(guided2x2, ItemId::CRAFTING_TABLE) &&
+            hasGuidedOutput(guided2x2, ItemId::STICK) &&
+            !hasGuidedOutput(guided2x2, ItemId::WOODEN_PICKAXE),
+            "recipe guide filters by materials and the active grid size");
+    const auto* tableRecipe = *std::find_if(
+        guided2x2.begin(), guided2x2.end(), [](const auto* recipe) {
+            return recipe->output.id == ItemId::CRAFTING_TABLE;
+        });
+    require(fillCraftingRecipe(*tableRecipe, guidedInventory, guidedGrid, 2, 2) &&
+            guidedInventory.count(ItemId::OAK_PLANKS) == 0 &&
+            guidedGrid[0].id == ItemId::OAK_PLANKS &&
+            guidedGrid[1].id == ItemId::OAK_PLANKS &&
+            guidedGrid[2].id == ItemId::OAK_PLANKS &&
+            guidedGrid[3].id == ItemId::OAK_PLANKS,
+            "recipe guide consumes one set and fills the compact crafting grid");
+
+    InventoryModel fullInventory;
+    for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i)
+        fullInventory.slot(i) = {ItemId::WOODEN_PICKAXE, 1,
+                                 static_cast<uint16_t>(i)};
+    std::array<ItemStack, 9> blockedGrid{};
+    blockedGrid[0] = blockedGrid[1] = blockedGrid[3] = blockedGrid[4] =
+        {ItemId::OAK_PLANKS, 1, 0};
+    blockedGrid[8] = {ItemId::COBBLESTONE, 1, 0};
+    const InventoryModel originalFullInventory = fullInventory;
+    const auto originalBlockedGrid = blockedGrid;
+    const auto stacksEqual = [](const auto& left, const auto& right) {
+        return std::equal(left.begin(), left.end(), right.begin(),
+            [](const ItemStack& a, const ItemStack& b) {
+                return a.id == b.id && a.count == b.count &&
+                       a.damage == b.damage;
+            });
+    };
+    require(!fillCraftingRecipe(*tableRecipe, fullInventory, blockedGrid, 3, 3) &&
+            stacksEqual(fullInventory.storage(), originalFullInventory.storage()) &&
+            stacksEqual(blockedGrid, originalBlockedGrid),
+            "recipe guide is atomic when unrelated grid items cannot be returned");
+
     grid.fill(ItemId::EMPTY);
     grid[4] = ItemId::BIRCH_LOG;
     const auto* planks = findCraftingRecipe(grid, 3, 3);

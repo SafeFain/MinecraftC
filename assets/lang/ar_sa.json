@@ -169,6 +169,7 @@
   "inventory.creative": "مخزون الإبداع",
   "inventory.survival": "مخزون البقاء",
   "inventory.crafting": "الصناعة",
+  "inventory.craftable_recipes": "وصفات متاحة",
   "inventory.help": "مرر للتصفح  |  انقر لوضعه في فتحة الشريط المحددة  |  E للإغلاق",
   "inventory.page": "صفحة {0}/{1}",
   "inventory.creative_tab": "عناصر الإبداع",

@@ -756,6 +756,7 @@ if(BUILD_TESTING)
 
     add_executable(survival_rules_tests
         tests/SurvivalRulesTests.cpp
+        src/game/InventoryModel.cpp
         src/game/SurvivalRules.cpp
         src/game/Item.cpp
         src/world/Block.cpp
@@ -1068,6 +1069,7 @@ if(BUILD_TESTING)
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
+        src/renderer/HeldItemMesh.cpp
         src/renderer/HeldItemRenderer.cpp
         src/renderer/ParticleSystem.cpp
         src/renderer/RenderDevice.cpp
@@ -1119,6 +1121,7 @@ if(BUILD_TESTING)
     add_executable(world_orchestration_tests
         tests/WorldOrchestrationTests.cpp
         src/debug/Log.cpp
+        src/game/InventoryModel.cpp
         src/game/Item.cpp
         src/game/SaveStore.cpp
         src/game/SurvivalBlockLogic.cpp
