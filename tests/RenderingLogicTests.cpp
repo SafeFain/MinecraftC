@@ -3,6 +3,7 @@
 #include "renderer/Camera.h"
 #include "renderer/CameraEffects.h"
 #include "renderer/CloudRenderData.h"
+#include "renderer/HeldItemMesh.h"
 #include "model/ModelRenderLogic.h"
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
@@ -121,6 +122,13 @@ int main() {
             firstPersonSwingTransform(1.0f) == glm::mat4(1.0f) &&
             firstPersonSwingTransform(0.5f) != glm::mat4(1.0f),
             "first-person swing curve endpoints or motion are incorrect");
+    const MeshData blockHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, true);
+    const MeshData rawHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, false);
+    require(blockHeldCube.vertices.size() == 24 &&
+                blockHeldCube.vertices[0].position.y < blockHeldCube.vertices[1].position.y &&
+                blockHeldCube.vertices[0].uv.y < blockHeldCube.vertices[1].uv.y &&
+                rawHeldCube.vertices[0].uv.y > rawHeldCube.vertices[1].uv.y,
+            "held block cube did not compensate for per-tile atlas flipping");
 
     Camera sprintCamera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE);
     const glm::mat4 baseProjection = sprintCamera.getProjectionMatrix(16.0f / 9.0f);

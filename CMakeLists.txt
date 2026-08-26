@@ -704,6 +704,7 @@ if(BUILD_TESTING)
         src/renderer/Camera.cpp
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
+        src/renderer/HeldItemMesh.cpp
         src/renderer/RenderDevice.cpp
         src/world/Block.cpp
     )

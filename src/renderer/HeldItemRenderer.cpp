@@ -3,6 +3,7 @@
 #include "core/AssetStore.h"
 #include "player/PlayerVisual.h"
 #include "renderer/GameRenderer.h"
+#include "renderer/HeldItemMesh.h"
 #include "renderer/RenderDevice.h"
 #include "world/Block.h"
 
@@ -46,20 +47,6 @@ void quad(MeshData& mesh, const glm::vec3& a, const glm::vec3& b,
     mesh.vertices.insert(mesh.vertices.end(), {{a,ta},{b,tb},{c,tc},{d,td}});
     mesh.indices.insert(mesh.indices.end(), {base,base+1,base+2,base,base+2,base+3});
 }
-
-MeshData cubeMesh(const std::array<int, 6>& tiles, int side) {
-    MeshData mesh;
-    const glm::vec3 p[]={{-.5f,-.5f,-.5f},{.5f,-.5f,-.5f},{.5f,.5f,-.5f},{-.5f,.5f,-.5f},
-                         {-.5f,-.5f,.5f},{.5f,-.5f,.5f},{.5f,.5f,.5f},{-.5f,.5f,.5f}};
-    const int faces[][4]={{0,3,2,1},{5,6,7,4},{4,7,3,0},{1,2,6,5},{3,7,6,2},{4,0,1,5}};
-    for(int f=0;f<6;++f){
-        const int tile=tiles[static_cast<size_t>(f)];const float s=static_cast<float>(side);
-        const float u0=(tile%side)/s,v0=(tile/side)/s,u1=(tile%side+1)/s,v1=(tile/side+1)/s;
-        quad(mesh,p[faces[f][0]],p[faces[f][1]],p[faces[f][2]],p[faces[f][3]],
-             {u0,v1},{u0,v0},{u1,v0},{u1,v1});
-    }
-    return mesh;
-}
 }
 
 HeldItemRenderer::~HeldItemRenderer() { reset(); }
@@ -90,7 +77,8 @@ void HeldItemRenderer::initialize(IGameRenderer& renderer,
     material.baseColorTexture=m_armTexture;
     m_armMaterial=renderer.createMaterial(material);
     // Limb-primary is tile 12 of the semantic 4x4 player skin.
-    m_armMesh=renderer.createMesh(cubeMesh({12,12,12,12,12,12},4));
+    m_armMesh=renderer.createMesh(buildHeldCubeMesh(
+        {12,12,12,12,12,12},4,false));
     m_blockTiles=static_cast<int>(renderer.blockAtlasTilesPerSide());
 }
 
@@ -115,12 +103,13 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
     MeshData mesh;bool block=false;
     if(props.placedBlock&&getBlockProps(*props.placedBlock).shape==RenderShape::Cube){
         const BlockId b=*props.placedBlock;
-        mesh=cubeMesh({static_cast<int>(getFaceTextureIndex(b,FaceDir::FRONT)),
+        mesh=buildHeldCubeMesh({static_cast<int>(getFaceTextureIndex(b,FaceDir::FRONT)),
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::BACK)),
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::LEFT)),
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::RIGHT)),
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::TOP)),
-                       static_cast<int>(getFaceTextureIndex(b,FaceDir::BOTTOM))},m_blockTiles);
+                       static_cast<int>(getFaceTextureIndex(b,FaceDir::BOTTOM))},
+                       m_blockTiles,true);
         block=true;
     }else{
         const auto found=m_itemIndices.find(itemKey(id));
