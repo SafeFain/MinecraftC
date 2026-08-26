@@ -1,7 +1,7 @@
 # MinecraftC entity models
 
 These ten GLBs are original MinecraftC assets generated deterministically by
-`tools/generate_entity_models.py` version 4 with seed `0x4D43474C`. Embedded
+`tools/generate_entity_models.py` version 5 with seed `0x4D43474C`. Embedded
 skins use texture generator version 2 and the `bright-comfortable` style. They are
 licensed under CC0-1.0. No Minecraft, Mojang, or third-party model or texture
 data was copied or adapted.
@@ -11,7 +11,10 @@ and place the feet/base at local `Y=0`. Each contains an embedded original
 64x64 RGBA semantic skin with nearest filtering, independent head/body faces,
 half-texel-inset UVs, and a genuine multi-joint skin
 containing a root plus rigidly weighted body-part joints. Every vertex uses at
-most four weights and every skin remains below the 64-joint runtime limit. Each
+most four weights and every skin remains below the 64-joint runtime limit.
+Animated limb joints sit at their anatomical attachment points (shoulder, hip,
+wing root, or inner leg root), so movement rotates around the joint rather than
+the cuboid's geometric center. Each
 block-style material is explicitly double-sided so animated entities retain
 their exterior surfaces in the Vulkan projection path. Each
 asset contains seamless `idle`, `walk`, `hurt`, and `death` animation clips.

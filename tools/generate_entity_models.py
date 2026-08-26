@@ -3,7 +3,7 @@
 import argparse, json, pathlib, struct, zlib
 import texture_generator
 
-VERSION = 4
+VERSION = 5
 SEED = 0x4D43474C
 
 # Quaternion components are frozen as decimal constants instead of calling
@@ -150,6 +150,21 @@ def parts_for(name):
             ("leg_fl",(-.22,.27,-.20),(.18,.54,.18)),("leg_fr",(.22,.27,-.20),(.18,.54,.18)),
             ("leg_bl",(-.22,.27,.20),(.18,.54,.18)),("leg_br",(.22,.27,.20),(.18,.54,.18))]
 
+def joint_pivot(name, part, center, dims):
+    """Return the attachment point that animated parts rotate around."""
+    x,y,z=center; dx,dy,dz=(value/2 for value in dims)
+    if part.startswith("leg_") or part.startswith("arm_"):
+        if name == "spider":
+            return (x + dx if part.startswith("leg_l") else x - dx, y, z)
+        return (x, y + dy, z)
+    if part.startswith("wing_"):
+        return (x + dx if part.endswith("_l") else x - dx, y, z)
+    if part == "head":
+        if name in {"cow", "pig", "sheep", "chicken", "spider"}:
+            return (x, y, z + dz)
+        return (x, y - dy, z)
+    return center
+
 def build_v2(name,size,color):
     del size
     parts=parts_for(name);buf=Buffer();vertices=bytearray();indices=[]
@@ -185,12 +200,15 @@ def build_v2(name,size,color):
     attrs={"POSITION":buf.accessor(vv,5126,count,"VEC3",0,minimum,maximum),"NORMAL":buf.accessor(vv,5126,count,"VEC3",12),
            "TEXCOORD_0":buf.accessor(vv,5126,count,"VEC2",24),"JOINTS_0":buf.accessor(vv,5123,count,"VEC4",32),"WEIGHTS_0":buf.accessor(vv,5126,count,"VEC4",48)}
     inds=buf.accessor(iv,5123,len(indices),"SCALAR")
+    pivots=[(0,0,0)]+[joint_pivot(name,part,center,dims)
+                       for part,center,dims in parts]
     matrices=[]
-    for _,center,_ in [("root",(0,0,0),(0,0,0))]+parts:
-        x,y,z=center;matrices += [1,0,0,0,0,1,0,0,0,0,1,0,-x,-y,-z,1]
+    for x,y,z in pivots:
+        matrices += [1,0,0,0,0,1,0,0,0,0,1,0,-x,-y,-z,1]
     ibv=buf.add(struct.pack("<%df"%len(matrices),*matrices));iba=buf.accessor(ibv,5126,len(parts)+1,"MAT4")
     nodes=[{"name":"root","children":list(range(1,len(parts)+1))}]
-    nodes += [{"name":part,"translation":list(center)} for part,center,_ in parts]
+    nodes += [{"name":part,"translation":list(pivots[index])}
+              for index,(part,_,_) in enumerate(parts,1)]
     mesh_node=len(nodes);nodes.append({"name":name,"mesh":0,"skin":0})
     animations=[]
     def animation(clip,duration,channels):

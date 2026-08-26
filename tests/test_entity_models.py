@@ -19,7 +19,7 @@ def document(path):
 def float_accessor(doc, binary, index):
     accessor = doc["accessors"][index]
     view = doc["bufferViews"][accessor["bufferView"]]
-    width = {"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}[accessor["type"]]
+    width = {"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4,"MAT4":16}[accessor["type"]]
     offset = view.get("byteOffset",0) + accessor.get("byteOffset",0)
     return struct.unpack_from("<%df" % (accessor["count"]*width), binary, offset)
 
@@ -43,9 +43,49 @@ def index_accessor(doc,binary,index):
     fmt={5121:"B",5123:"H",5125:"I"}[accessor["componentType"]]
     return struct.unpack_from("<%d%s"%(accessor["count"],fmt),binary,offset)
 
+def u16vec4_accessor(doc,binary,index):
+    accessor=doc["accessors"][index];view=doc["bufferViews"][accessor["bufferView"]]
+    offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    stride=view.get("byteStride",8)
+    return tuple(struct.unpack_from("<4H",binary,offset+i*stride)
+                 for i in range(accessor["count"]))
+
 def png_dimensions(data):
     assert data.startswith(b"\x89PNG\r\n\x1a\n")
     return struct.unpack_from(">II",data,16)
+
+def verify_joint_pivots(doc,binary,name):
+    attributes=doc["meshes"][0]["primitives"][0]["attributes"]
+    positions=vec3_accessor(doc,binary,attributes["POSITION"])
+    vertex_joints=u16vec4_accessor(doc,binary,attributes["JOINTS_0"])
+    skin=doc["skins"][0];nodes=doc["nodes"]
+    inverse_bind=float_accessor(doc,binary,skin["inverseBindMatrices"])
+    for joint_index,node_index in enumerate(skin["joints"]):
+        part=nodes[node_index]["name"]
+        pivot=nodes[node_index].get("translation",[0,0,0])
+        inverse_translation=inverse_bind[joint_index*16+12:joint_index*16+15]
+        assert all(abs(inverse_translation[axis]+pivot[axis])<1e-6 for axis in range(3)), \
+            f"{name} {part} inverse bind matrix does not preserve its joint pivot"
+        if not (part=="head" or part.startswith("arm_") or
+                part.startswith("leg_") or part.startswith("wing_")):
+            continue
+        part_positions=[position for position,joints in zip(positions,vertex_joints)
+                        if joints[0]==joint_index]
+        assert part_positions, f"{name} {part} has no rigidly weighted vertices"
+        if (name=="spider" and part.startswith("leg_")) or part.startswith("wing_"):
+            proximal=max(p[0] for p in part_positions) if "_l" in part else \
+                     min(p[0] for p in part_positions)
+            assert abs(pivot[0]-proximal)<1e-6, \
+                f"{name} {part} does not pivot at its inner attachment"
+        elif part=="head" and name in {"cow","pig","sheep","chicken","spider"}:
+            assert abs(pivot[2]-max(p[2] for p in part_positions))<1e-6, \
+                f"{name} head does not pivot at its neck attachment"
+        elif part=="head":
+            assert abs(pivot[1]-min(p[1] for p in part_positions))<1e-6, \
+                f"{name} head does not pivot at its neck attachment"
+        else:
+            assert abs(pivot[1]-max(p[1] for p in part_positions))<1e-6, \
+                f"{name} {part} does not pivot at its upper joint"
 
 def main():
     vulkan_vertex_shader = (ROOT / "assets/shaders/vulkan/model.vert").read_text()
@@ -108,12 +148,13 @@ def main():
                    for a,b in zip(pair,want)), f"{path.name} body front UV is incorrect"
         assert all(abs(a-b)<1e-6 for pair,want in zip(all_uvs[24:28],expected_tile(0))
                    for a,b in zip(pair,want)), f"{path.name} head front UV is incorrect or vertically flipped"
+        verify_joint_pivots(doc,binary,path.stem)
         graph = json.loads((MODEL_DIR/(path.stem+".anim.json")).read_text())
         assert graph["version"] == 1 and {"idle","walk","hurt","death"} <= set(graph["actions"])
         if path.stem in {"zombie","skeleton","spider","blastling","zombie_villager"}:
             assert "attack" in animations and graph["actions"]["attack"]["events"]
     player_path = PLAYER_DIR / "player.glb"
-    player_doc, _ = document(player_path)
+    player_doc, player_binary = document(player_path)
     player_clips = {animation["name"] for animation in player_doc["animations"]}
     assert {"idle","walk","run","jump","fall","swing","hurt","death"} <= player_clips
     player_nodes = {node["name"] for node in player_doc["nodes"]}
@@ -121,6 +162,7 @@ def main():
     player_graph = json.loads((PLAYER_DIR / "player.anim.json").read_text())
     assert {"run","jump","fall","swing"} <= set(player_graph["actions"])
     assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 64
+    verify_joint_pivots(player_doc,player_binary,"player")
     player_image_view = player_doc["bufferViews"][player_doc["images"][0]["bufferView"]]
     player_data = player_path.read_bytes()
     json_length = struct.unpack_from("<I", player_data, 12)[0]
