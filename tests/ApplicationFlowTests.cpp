@@ -265,6 +265,29 @@ int main() {
     }
 
     {
+        ClientSettings menuSettings;
+        Localization menuLocalization;
+        std::string openedUrl;
+        int openedUrlCount = 0;
+        MenuCallbacks callbacks;
+        callbacks.onOpenUrl = [&](const std::string& url) {
+            openedUrl = url;
+            ++openedUrlCount;
+        };
+        MainMenu menu(callbacks, {}, menuSettings, menuLocalization, nullptr);
+        for (int i = 0; i < 4; ++i) menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter); // Home -> About.
+        menu.onKeyPress(Key::Enter); // Open the project link.
+        require(openedUrl == "https://github.com/SafeFain/MinecraftC" &&
+                    openedUrlCount == 1,
+                "About menu opens the canonical project URL");
+        menu.onKeyPress(Key::Escape); // About -> Home.
+        menu.onKeyPress(Key::Enter); // Home -> world list.
+        require(openedUrlCount == 1,
+                "Escape returns from About without reopening the URL");
+    }
+
+    {
         // Exercise the create-screen selector through the public keyboard
         // path so the menu callback carries the selected terrain preset.
         ClientSettings menuSettings;

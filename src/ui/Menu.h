@@ -36,6 +36,7 @@ struct MenuCallbacks {
     std::function<void()> onQuit;
     std::function<void()> onOpenSettings;
     std::function<void()> onSettingsChanged;
+    std::function<void(const std::string&)> onOpenUrl;
     // Sleep actions use stable integer values so the UI layer remains
     // independent of GameSession's gameplay headers.
     std::function<void(int)> onSleepAction;
@@ -125,7 +126,7 @@ public:
     bool wantsTextInput() const override { return m_page == Page::Create; }
 
 private:
-    enum class Page { Home, Worlds, Create };
+    enum class Page { Home, Worlds, Create, About };
     enum class Field { Name, Seed };
 
     MenuCallbacks m_callbacks;
@@ -153,6 +154,7 @@ private:
     void showHome();
     void showWorlds();
     void showCreate();
+    void showAbout();
     void refreshWorlds();
     void rebuildButtons();
     void selectField(Field field);

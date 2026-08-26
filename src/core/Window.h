@@ -70,6 +70,7 @@ public:
     bool isFullscreen() const;
     void toggleFullscreen();
     void setTextInputEnabled(bool enabled);
+    bool openUrl(const std::string& url) const;
 
     bool isTouchAvailable() const { return m_touchAvailable; }
     bool isMinimized() const {

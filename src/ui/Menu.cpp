@@ -87,6 +87,11 @@ void MainMenu::showCreate() {
     rebuildButtons();
 }
 
+void MainMenu::showAbout() {
+    m_page = Page::About;
+    rebuildButtons();
+}
+
 void MainMenu::refreshWorlds() {
     std::string selectedId;
     if (m_selectedWorld >= 0 &&
@@ -143,6 +148,8 @@ void MainMenu::rebuildButtons() {
             rebuildButtons();
         });
         m_buttons.emplace_back(m_localization.text("menu.home.quit"), m_callbacks.onQuit);
+        m_buttons.emplace_back(m_localization.text("menu.home.about"),
+                               [this]() { showAbout(); });
     } else if (m_page == Page::Worlds) {
         const int visible = 6;
         const int end = std::min(static_cast<int>(m_worlds.size()), m_worldOffset + visible);
@@ -184,7 +191,7 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back(m_localization.text("menu.worlds.create"),
                                [this]() { showCreate(); });
         m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
-    } else {
+    } else if (m_page == Page::Create) {
         m_buttons.emplace_back(fieldLabel(Field::Name, m_worldName.text()),
                                [this]() { selectField(Field::Name); });
         m_buttons.emplace_back(
@@ -220,6 +227,13 @@ void MainMenu::rebuildButtons() {
                 m_createWorldType, m_createCheats);
         });
         m_buttons.emplace_back(m_localization.text("common.cancel"), [this]() { showWorlds(); });
+    } else {
+        m_buttons.emplace_back("SafeFain/MinecraftC", [this]() {
+            if (m_callbacks.onOpenUrl)
+                m_callbacks.onOpenUrl("https://github.com/SafeFain/MinecraftC");
+        });
+        m_buttons.emplace_back(m_localization.text("common.back"),
+                               [this]() { showHome(); });
     }
     m_selectedIdx = 0;
     if (!m_buttons.empty()) m_buttons[0].setSelected(true);
@@ -241,8 +255,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                    screenHeight-36.0f, UiTheme::PANEL);
 
     const std::string title = m_page == Page::Home ? "MINECRAFTC" :
-        m_localization.text(m_page == Page::Worlds
-            ? "menu.worlds.title" : "menu.create.title");
+        m_localization.text(m_page == Page::Worlds ? "menu.worlds.title" :
+            m_page == Page::Create ? "menu.create.title" : "menu.about.title");
     float titleScale = 4.5f;
     auto titleSize = ui.measureText(title, titleScale);
     float titleX = (screenWidth - titleSize.x) * 0.5f;
@@ -252,7 +266,8 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
 
     const std::string subtitle = m_localization.text(
         m_page == Page::Create ? "menu.create.subtitle" :
-        m_page == Page::Worlds ? "menu.worlds.subtitle" : "menu.home.subtitle");
+        m_page == Page::Worlds ? "menu.worlds.subtitle" :
+        m_page == Page::About ? "menu.about.subtitle" : "menu.home.subtitle");
     float subScale = 1.5f;
     auto subSize = ui.measureText(subtitle, subScale);
     float subX = (screenWidth - subSize.x) * 0.5f;
@@ -285,12 +300,26 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     // Buttons
     float buttonStartY = subY - subSize.y - 38.0f - detailsReserve;
     float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
+    const size_t centeredButtonCount =
+        m_page == Page::Home && !m_buttons.empty()
+            ? m_buttons.size() - 1 : m_buttons.size();
     const float buttonHeight = std::clamp(
-        (buttonStartY - 16.0f) / std::max<size_t>(1, m_buttons.size()) - 5.0f,
+        (buttonStartY - 16.0f) / std::max<size_t>(1, centeredButtonCount) - 5.0f,
         22.0f, Config::UI_BUTTON_HEIGHT);
     const float spacing = std::min(Config::UI_BUTTON_SPACING, 7.0f);
 
     for (size_t i = 0; i < m_buttons.size(); ++i) {
+        const bool aboutCornerButton =
+            m_page == Page::Home && i + 1 == m_buttons.size();
+        if (aboutCornerButton) {
+            const float width = std::max(
+                1.0f, std::min(112.0f, static_cast<float>(screenWidth) - 16.0f));
+            m_buttons[i].setPosition(static_cast<float>(screenWidth) - width - 8.0f,
+                                     8.0f);
+            m_buttons[i].setSize(width, 26.0f);
+            m_buttons[i].render(ui);
+            continue;
+        }
         float by = buttonStartY - static_cast<float>(i) * (buttonHeight + spacing);
         const bool worldRow =
             m_page == Page::Worlds && i < m_deleteButtons.size();
@@ -350,7 +379,7 @@ void MainMenu::onKeyPress(int key, int mods) {
     }
     if (key == Key::Escape) {
         if (m_page == Page::Create) showWorlds();
-        else if (m_page == Page::Worlds) showHome();
+        else if (m_page == Page::Worlds || m_page == Page::About) showHome();
         return;
     }
     if (m_page == Page::Worlds && key == Key::Enter && m_selectedWorld >= 0 &&

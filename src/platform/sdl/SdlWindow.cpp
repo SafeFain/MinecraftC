@@ -322,3 +322,9 @@ void Window::setTextInputEnabled(bool enabled) {
     }
     m_textInputEnabled = enabled;
 }
+
+bool Window::openUrl(const std::string& url) const {
+    if (SDL_OpenURL(url.c_str())) return true;
+    LOG_WARN("Could not open URL '" << url << "': " << SDL_GetError());
+    return false;
+}

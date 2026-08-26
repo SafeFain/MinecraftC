@@ -337,6 +337,9 @@ private:
         m_ui.menuCallbacks.onBackToMenu = [this]() { m_flow.backToMainMenu(); };
         m_ui.menuCallbacks.onQuit = [this]() { m_running = false; };
         m_ui.menuCallbacks.onSettingsChanged = [this]() { applyClientSettings(); };
+        m_ui.menuCallbacks.onOpenUrl = [this](const std::string& url) {
+            (void)m_window.openUrl(url);
+        };
         m_ui.menuCallbacks.onSleepAction = [this](int action) {
             if (action < 0 || action > 2) return;
             m_session.chooseSleepAction(
