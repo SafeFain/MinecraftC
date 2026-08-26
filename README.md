@@ -25,9 +25,11 @@ GitHub prereleases; release-channel tags create normal releases.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 162-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 174-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
+- Ten localized interfaces and an About screen linking to the project's source
+  repository.
 
 ## Build and Run
 
@@ -146,7 +148,7 @@ See [ios/README.md](ios/README.md) for device builds, signing, and installation.
 
 Bindings are configurable under Settings > Controls. Controllers use an
 Xbox-style layout by default. Native touch controls are available on Linux,
-Windows, and Android and can be adjusted under Settings > Touch Controls.
+Windows, Android, and iOS and can be adjusted under Settings > Touch Controls.
 Inventory screens support Java-style left/right stack handling, Shift-click
 transfer, double-click gathering, left/right drag distribution, hovered-slot
 `1`-`9`/`F` swaps, and `Q`/`Ctrl+Q` dropping. Creative inventory also supports
@@ -160,6 +162,7 @@ middle-click cloning and middle-button drag filling.
 | macOS | `~/Library/Application Support/MinecraftC/saves` |
 | Linux | `$XDG_DATA_HOME/minecraftc/saves`, or `~/.local/share/minecraftc/saves` |
 | Android | Application-private data directory |
+| iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v12 can read v2-v11 desktop saves. The current world
@@ -211,13 +214,18 @@ third-party components and assets that retain their own licenses.
 | Component or asset | License | Location |
 | --- | --- | --- |
 | SDL 3.4.10 | Zlib | CMake FetchContent build directory |
+| GLM 1.0.1 | MIT | System package or CMake FetchContent build directory |
 | MoltenVK 1.4.1 | Apache-2.0 | macOS bundles and `licenses/` |
 | Vulkan Memory Allocator 3.3.0 | MIT | `external/VulkanMemoryAllocator/` |
+| FastNoiseLite pinned snapshot | MIT | `external/FastNoiseLite/` |
 | cgltf 1.15 | MIT | `external/cgltf/` |
 | nlohmann/json 3.12.0 | MIT | `external/nlohmann/` |
+| stb_image 2.30 | MIT or public domain (MIT used) | `external/stb/stb_image.h` |
 | stb_truetype 1.26 | MIT | `external/stb/stb_truetype.h` |
 | Noto Sans CJK SC Regular | SIL OFL 1.1 | `assets/fonts/noto/` |
+| Noto Naskh Arabic Regular | SIL OFL 1.1 | `assets/fonts/noto/` |
 
-Upstream sources and checksums are recorded in each dependency's `UPSTREAM.md`.
-See [ASSET_SOURCES.md](ASSET_SOURCES.md) and
+Vendored dependency directories retain their upstream, checksum, and license
+records in an `UPSTREAM.md` or dependency README; CMake records pins for fetched
+dependencies. See [ASSET_SOURCES.md](ASSET_SOURCES.md) and
 [assets/textures/LICENSE.md](assets/textures/LICENSE.md) for asset provenance.

@@ -33,13 +33,16 @@ python3 tools/texture_generator.py --generate --validate --build-atlas \
 cmake --build build-local --target texture_generator
 ```
 
-Available switches are `--generate`, `--validate`, `--build-atlas`,
-`--build-items-atlas`, `--build-entity-atlas`, `--seed`,
-`--output`, `--candidate-count`, `--contact-sheet`, `--preview`,
-`--visual-report`, and repeatable
-`--local-seed MATERIAL=SEED`. Operations may be combined. A local seed selects
-one material candidate without perturbing any other material and is recorded
-in atlas metadata.
+Available build switches are `--generate`, `--validate`, `--build-atlas`,
+`--build-items-atlas`, `--build-entity-atlas`, `--build-entity-skins`,
+`--build-ios-icon`, `--build-android-icon`, and `--build-desktop-icons`.
+Generation and review options include `--seed`, `--output`,
+`--candidate-count`, `--contact-sheet`, `--preview`, `--visual-report`,
+the platform-icon output options, item/block definition overrides, and
+repeatable `--local-seed MATERIAL=SEED`. Operations may be combined. Run
+`python3 tools/texture_generator.py --help` for the complete argument list. A
+local seed selects one material candidate without perturbing any other material
+and is recorded in atlas metadata.
 
 Generation uses three structural levels. Irregular radial fields provide a
 soft macro value layout directly on a 16x16 torus; material-specific growers
@@ -111,15 +114,16 @@ dimensions, and this priority. Items absent from the atlas retain the old path.
 
 ## Entity materials
 
-`--build-entity-atlas` deterministically creates nine 16x16 wrapping material
-swatches for the passive animals, hostile mobs, and item fallback. Unlike the
+`--build-entity-atlas` deterministically creates eleven 16x16 wrapping material
+swatches for ten passive/hostile mobs and the item fallback. Unlike the
 legacy portrait sheet, these tiles contain hide, fleece, feather, bone, skin,
-or carapace patterns that remain coherent on every cuboid model part. The 3x3
-atlas and its metadata are written to `generated/entity_atlas.png` and
+robe, or carapace patterns that remain coherent on every cuboid model part. The
+4x4 atlas and its metadata are written to `generated/entity_atlas.png` and
 `generated/entity_atlas.json` with nearest filtering.
 
-`--build-entity-skins` creates nine original 64x64 runtime skins under
-`generated/entity_skins/` plus `generated/entity_skins.json`. Each 4x4 skin
+`--build-entity-skins` creates eleven original 64x64 runtime skins for ten mobs
+and the player under `generated/entity_skins/` plus
+`generated/entity_skins.json`. Each 4x4 skin
 contains named 16x16 regions for all six head faces, all six body faces,
 primary and secondary limbs, detail, and fallback material. Head and body
 backgrounds come from continuous cube-space fields so adjacent faces remain
@@ -128,7 +132,7 @@ drawn as explicit overlays. Output remains nearest-filtered pixel art.
 
 ## Entity models and actions
 
-`tools/generate_entity_models.py` deterministically emits the eight runtime
+`tools/generate_entity_models.py` version 5 deterministically emits the ten runtime
 GLBs and their versioned `.anim.json` action graphs. GLBs hold geometry,
 skins, embedded copies of the generated 64x64 entity skins, per-face UVs, and
 keyframes; action graphs hold runtime layers,
@@ -156,6 +160,6 @@ Minecraft or another game without a compatible license.
 # Entity model generation
 
 Run `python3 tools/generate_entity_models.py --output assets/models/entities`
-to reproduce all eight runtime GLBs. `python3 tests/test_entity_models.py`
+to reproduce all ten runtime GLBs. `python3 tests/test_entity_models.py`
 performs byte-for-byte regeneration plus the skin, animation, vertex semantic,
 embedded PNG, and nearest-sampler contract checks.
