@@ -86,14 +86,20 @@ void EntityManager::syncChunks() {
     for (const Chunk* chunk : m_world.getActiveChunks())
         if (chunk->generated.load()) active.insert({chunk->cx,chunk->cz});
     for (const auto& key : m_loadedChunks) if (!active.count(key)) {
-        std::vector<WorldMetadata::PersistedEntity> saved;
-        for (const auto& entity : m_entities) if (entityChunk(entity.position)==key) {
-            saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
-                entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
-                static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage, entity.villager});
+        // Unchanged or empty chunks already match their on-disk snapshot.
+        // Avoid creating and atomically replacing an empty entity file merely
+        // because movement carried the chunk outside the active radius.
+        if (m_dirtyEntityChunks.count(key) != 0 ||
+            m_pendingEntitySaves.count(key) != 0) {
+            std::vector<WorldMetadata::PersistedEntity> saved;
+            for (const auto& entity : m_entities) if (entityChunk(entity.position)==key) {
+                saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
+                    entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
+                    static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
+                    entity.projectileDamage, entity.villager});
+            }
+            m_saveStore->saveChunkEntities(key.first,key.second,saved);
         }
-        m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_dirtyEntityChunks.erase(key);
         m_pendingEntitySaves.erase(key);
     }
@@ -102,15 +108,20 @@ void EntityManager::syncChunks() {
         return m_loadedChunks.count(key) && !active.count(key);
     }),m_entities.end());
     for (const auto& key : active) if (!m_loadedChunks.count(key)) {
+        uint32_t populationVersion = 0;
         if (auto prefetched = m_world.takePrefetchedChunkEntities(
-                key.first, key.second))
-            loadEntities(std::move(*prefetched));
-        else
+                key.first, key.second)) {
+            loadEntities(prefetched->entities);
+            populationVersion = prefetched->populationVersion;
+        } else {
             loadEntities(m_saveStore->loadChunkEntities(key.first,key.second));
-        if (m_saveStore->loadChunkEntityPopulationVersion(
-                key.first, key.second) < 1u) {
-            for (const auto& request :
-                 m_world.villageSpawnsForChunk(key.first, key.second)) {
+            populationVersion = m_saveStore->loadChunkEntityPopulationVersion(
+                key.first, key.second);
+        }
+        if (populationVersion < 1u) {
+            const auto requests = m_world.villageSpawnsForChunk(
+                key.first, key.second);
+            for (const auto& request : requests) {
                 const bool alreadyMerged = std::any_of(
                     m_entities.begin(), m_entities.end(),
                     [&](const Entity& entity) {
@@ -124,24 +135,28 @@ void EntityManager::syncChunks() {
                 villager.behaviorSeed = request.seed;
                 villager.villager.offerSeed = request.seed;
             }
-            std::vector<WorldMetadata::PersistedEntity> populated;
-            for (const Entity& entity : m_entities) {
-                if (entityChunk(entity.position) != key) continue;
-                populated.push_back({static_cast<uint8_t>(entity.type),
-                    entity.position,entity.velocity,entity.health,
-                    entity.ageSeconds,entity.item,entity.behaviorSeed,
-                    static_cast<uint8_t>((entity.inGround?1:0) |
-                                         (entity.playerOwned?2:0)),
-                    entity.projectileDamage,entity.villager});
+            if (!requests.empty()) {
+                std::vector<WorldMetadata::PersistedEntity> populated;
+                for (const Entity& entity : m_entities) {
+                    if (entityChunk(entity.position) != key) continue;
+                    populated.push_back({static_cast<uint8_t>(entity.type),
+                        entity.position,entity.velocity,entity.health,
+                        entity.ageSeconds,entity.item,entity.behaviorSeed,
+                        static_cast<uint8_t>((entity.inGround?1:0) |
+                                             (entity.playerOwned?2:0)),
+                        entity.projectileDamage,entity.villager});
+                }
+                // Persist the merged entities first. If a crash interrupts this
+                // sequence, the absent revision marker safely retries and merges
+                // the same deterministic requests on the next load.
+                m_saveStore->saveChunkEntities(
+                    key.first, key.second, populated);
+                m_saveStore->saveChunkEntityPopulationVersion(
+                    key.first, key.second, 1u);
             }
-            // Persist the merged entities first. If a crash interrupts this
-            // sequence, the absent revision marker safely retries and merges
-            // the same deterministic requests on the next load.
-            m_saveStore->saveChunkEntities(
-                key.first, key.second, populated);
-            m_saveStore->saveChunkEntityPopulationVersion(
-                key.first, key.second, 1u);
-            m_dirtyEntityChunks.insert(key);
+            // A request-free chunk needs no marker: retrying the empty pure
+            // query is harmless, and a later generation version may add a
+            // deterministic village request at this coordinate.
         }
     }
     m_loadedChunks=std::move(active);

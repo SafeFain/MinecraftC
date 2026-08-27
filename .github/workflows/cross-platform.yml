@@ -738,12 +738,42 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Download platform packages
         uses: actions/download-artifact@v8
         with:
           pattern: minecraftc-*
           path: release-assets
           merge-multiple: true
+      - name: Generate release notes from commits
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
+        run: |
+          previous_tag="$(git describe --tags --abbrev=0 "$RELEASE_TAG^" 2>/dev/null || true)"
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          if [[ -n "$previous_tag" ]]; then
+            commit_range="$previous_tag..$RELEASE_TAG"
+            range_description="Changes since \`$previous_tag\`:"
+          else
+            commit_range="$RELEASE_TAG"
+            range_description="Changes included in \`$RELEASE_TAG\`:"
+          fi
+          {
+            echo "## What's Changed"
+            echo
+            echo "$range_description"
+            echo
+            git log --reverse \
+              --format="- [\`%h\`](https://github.com/$GITHUB_REPOSITORY/commit/%H) %s" \
+              "$commit_range"
+            if [[ -n "$previous_tag" ]]; then
+              echo
+              echo "**Full Changelog:** https://github.com/$GITHUB_REPOSITORY/compare/$previous_tag...$RELEASE_TAG"
+            fi
+          } > "$notes_file"
+          echo "RELEASE_NOTES_FILE=$notes_file" >> "$GITHUB_ENV"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -755,17 +785,18 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" * --repo "$GITHUB_REPOSITORY" --clobber
             if [[ "$PRERELEASE" == true ]]; then
-              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+                --notes-file "$RELEASE_NOTES_FILE" --prerelease
             else
               gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-                --prerelease=false --latest
+                --notes-file "$RELEASE_NOTES_FILE" --prerelease=false --latest
             fi
           elif [[ "$PRERELEASE" == true ]]; then
             gh release create "$RELEASE_TAG" * --repo "$GITHUB_REPOSITORY" \
-              --verify-tag --generate-notes --prerelease \
+              --verify-tag --notes-file "$RELEASE_NOTES_FILE" --prerelease \
               --title "MinecraftC $RELEASE_TAG"
           else
             gh release create "$RELEASE_TAG" * --repo "$GITHUB_REPOSITORY" \
-              --verify-tag --generate-notes --latest \
+              --verify-tag --notes-file "$RELEASE_NOTES_FILE" --latest \
               --title "MinecraftC $RELEASE_TAG"
           fi

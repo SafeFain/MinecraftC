@@ -160,6 +160,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
         m_chunks.withUnique([&](ChunkStore& store) {
             std::vector<std::pair<int,int>> toRemove;
             toRemove.reserve(Config::CHUNK_UNLOADS_PER_FRAME);
+            int warmRetirements = 0;
             bool cleanupRemaining = false;
             store.forEachUniqueUnlocked([&](Chunk* chunk) {
                 const std::pair<int,int> key{chunk->cx, chunk->cz};
@@ -173,11 +174,14 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                     chunk->cacheReadInProgress.load() ||
                     chunk->baseCacheInProgress.load())
                     cleanupRemaining = true;
-                else if (chunk->generated.load() &&
+                else if (const bool warmEligible = chunk->generated.load() &&
                          std::abs(key.first - pcx) <= Config::RENDER_DISTANCE + 2 &&
                          std::abs(key.second - pcz) <= Config::RENDER_DISTANCE + 2 &&
                          static_cast<int>(m_warmChunkOrder.size()) <
-                             Config::CHUNK_WARM_CACHE_LIMIT) {
+                             Config::CHUNK_WARM_CACHE_LIMIT;
+                         warmEligible && warmRetirements +
+                             static_cast<int>(toRemove.size()) <
+                                 Config::CHUNK_UNLOADS_PER_FRAME) {
                     // Keep a small CPU-only hysteresis ring for short
                     // backtracks.  GPU handles are released, and the dirty
                     // flag causes a safe rebuild when the chunk is promoted.
@@ -189,9 +193,13 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                     const uint64_t packed = packedChunkKey(key.first, key.second);
                     m_warmChunkSet.insert(packed);
                     m_warmChunkOrder.push_back(key);
+                    ++warmRetirements;
                     activeChanged = true;
                 }
-                else if (static_cast<int>(toRemove.size()) <
+                else if (warmEligible) {
+                    cleanupRemaining = true;
+                }
+                else if (warmRetirements + static_cast<int>(toRemove.size()) <
                          Config::CHUNK_UNLOADS_PER_FRAME)
                     toRemove.push_back(key);
                 else
@@ -329,6 +337,7 @@ void ChunkStreamer::enqueueCacheReads() {
             std::vector<BlockOverride> overrides;
             std::vector<PersistedBlockEntity> blockEntities;
             std::vector<WorldMetadata::PersistedEntity> entities;
+            uint32_t entityPopulationVersion = 0;
             try {
                 SaveStore loader(directory);
                 ChunkLoadBundle bundle = loader.loadChunkLoadBundle(
@@ -341,6 +350,7 @@ void ChunkStreamer::enqueueCacheReads() {
                 overrides = std::move(bundle.overrides);
                 blockEntities = std::move(bundle.blockEntities);
                 entities = std::move(bundle.entities);
+                entityPopulationVersion = bundle.entityPopulationVersion;
             } catch (...) {
                 // A corrupt cache is equivalent to a miss; deterministic
                 // generation will repair it when the chunk is published.
@@ -350,7 +360,7 @@ void ChunkStreamer::enqueueCacheReads() {
                 streamer->m_cacheCompletions.push_back(
                     {key.first, key.second, epoch, hit, std::move(blocks),
                      std::move(overrides), std::move(blockEntities),
-                     std::move(entities)});
+                     std::move(entities), entityPopulationVersion});
             }
             --streamer->m_cacheReadTasksInFlight;
         });
@@ -372,8 +382,8 @@ void ChunkStreamer::processCacheCompletions() {
             if (chunk == nullptr || !chunk->cacheReadInProgress.load()) continue;
             m_world.m_persistence.installLoadedChunkDataUnlocked(
                 result.cx, result.cz, result.overrides, result.blockEntities);
-            m_prefetchedEntities[{result.cx, result.cz}] =
-                std::move(result.entities);
+            m_prefetchedEntities[{result.cx, result.cz}] = {
+                std::move(result.entities), result.entityPopulationVersion};
             chunk->cacheReadInProgress = false;
             chunk->cacheChecked = true;
             chunk->cacheHit = result.hit;
@@ -986,7 +996,7 @@ void ChunkStreamer::persistGeneratedChunks() {
     drainCacheWrites();
 }
 
-std::optional<std::vector<WorldMetadata::PersistedEntity>>
+std::optional<ChunkEntityLoadData>
 ChunkStreamer::takePrefetchedChunkEntities(int cx, int cz) {
     const auto it = m_prefetchedEntities.find({cx, cz});
     if (it == m_prefetchedEntities.end()) return std::nullopt;

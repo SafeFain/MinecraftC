@@ -68,6 +68,11 @@ struct BlockOverride {
     BlockId block = BlockId::AIR;
 };
 
+struct ChunkEntityLoadData {
+    std::vector<WorldMetadata::PersistedEntity> entities;
+    uint32_t populationVersion = 0;
+};
+
 // One asynchronous read unit for a resident chunk. The generated terrain is
 // optional because a cache miss must fall back to deterministic generation;
 // the remaining vectors may be empty when the corresponding partition has
@@ -77,6 +82,7 @@ struct ChunkLoadBundle {
     std::vector<BlockOverride> overrides;
     std::vector<PersistedBlockEntity> blockEntities;
     std::vector<WorldMetadata::PersistedEntity> entities;
+    uint32_t entityPopulationVersion = 0;
 };
 
 class SaveStore {

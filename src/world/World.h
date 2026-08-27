@@ -168,7 +168,7 @@ public:
         return m_streamer.loadingProgress();
     }
     void persistGeneratedChunks() { m_streamer.persistGeneratedChunks(); }
-    std::optional<std::vector<WorldMetadata::PersistedEntity>>
+    std::optional<ChunkEntityLoadData>
     takePrefetchedChunkEntities(int cx, int cz) {
         return m_streamer.takePrefetchedChunkEntities(cx, cz);
     }

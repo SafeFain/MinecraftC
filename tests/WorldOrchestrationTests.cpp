@@ -346,6 +346,39 @@ void testWarmChunkBacktrack() {
     Config::RENDER_DISTANCE = oldRenderDistance;
 }
 
+void testBudgetedWarmChunkRetirement() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 4;
+    World world;
+    StubRenderer renderer;
+
+    do {
+        world.update({0.5, 64.0, 0.5});
+    } while (!world.streamingTargetReady());
+    for (Chunk* chunk : world.getActiveChunks()) chunk->generated = true;
+    world.processCompletedMeshes(&renderer, 0);
+
+    const int releasesBefore = renderer.releaseCount;
+    world.update({16.5, 64.0, 0.5});
+    const int firstFrameReleases = renderer.releaseCount - releasesBefore;
+    require(firstFrameReleases <= Config::CHUNK_UNLOADS_PER_FRAME,
+            "warm-cache retirement exceeded the per-frame unload budget");
+    require(!world.streamingTargetReady(),
+            "multi-chunk boundary cleanup was not spread across frames");
+
+    int frames = 1;
+    while (!world.streamingTargetReady() && frames < 100) {
+        const int before = renderer.releaseCount;
+        world.update({16.5, 64.0, 0.5});
+        require(renderer.releaseCount - before <=
+                    Config::CHUNK_UNLOADS_PER_FRAME,
+                "continued warm-cache cleanup exceeded its frame budget");
+        ++frames;
+    }
+    require(frames < 100, "budgeted warm-cache cleanup did not finish");
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
 // 4. Small deterministic streaming benchmark. It deliberately reports
 // latency rather than asserting a machine-dependent threshold; CI still
 // exercises cold generation, disk cache revisit, warm promotion and the main
@@ -1120,6 +1153,7 @@ int main() {
     testChunkStreaming();
     testAsyncGeneratedCacheRoundTrip();
     testWarmChunkBacktrack();
+    testBudgetedWarmChunkRetirement();
     testStreamingBenchmark();
     testGenerationHandoff();
     testBulkLightReplacement();

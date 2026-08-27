@@ -139,7 +139,7 @@ public:
     StreamingProgress generationProgress() const;
     StreamingProgress loadingProgress() const;
     void persistGeneratedChunks();
-    std::optional<std::vector<WorldMetadata::PersistedEntity>>
+    std::optional<ChunkEntityLoadData>
     takePrefetchedChunkEntities(int cx, int cz);
     uint64_t streamingRevision() const { return m_streamingRevision; }
     bool streamingTargetReady() const {
@@ -208,6 +208,7 @@ private:
         std::vector<BlockOverride> overrides;
         std::vector<PersistedBlockEntity> blockEntities;
         std::vector<WorldMetadata::PersistedEntity> entities;
+        uint32_t entityPopulationVersion = 0;
     };
     struct CacheWriteCompletion {
         int cx = 0;
@@ -217,8 +218,7 @@ private:
     };
     std::deque<CacheCompletion> m_cacheCompletions;
     std::deque<CacheWriteCompletion> m_cacheWriteCompletions;
-    std::unordered_map<std::pair<int, int>,
-                       std::vector<WorldMetadata::PersistedEntity>, PairHash>
+    std::unordered_map<std::pair<int, int>, ChunkEntityLoadData, PairHash>
         m_prefetchedEntities;
     size_t m_cacheHitCount = 0;
     size_t m_cacheMissCount = 0;

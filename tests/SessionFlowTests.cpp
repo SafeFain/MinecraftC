@@ -3,6 +3,8 @@
 #include "core/RuntimeClock.h"
 #include "game/Command.h"
 #include "game/Localization.h"
+#include "entity/EntityManager.h"
+#include "world/Chunk.h"
 
 #include <glm/glm.hpp>
 
@@ -59,6 +61,28 @@ int main() {
     std::filesystem::create_directories(root);
     Localization localization;
     RuntimeClock clock;
+
+    {
+        const int oldRenderDistance = Config::RENDER_DISTANCE;
+        Config::RENDER_DISTANCE = 0;
+        const auto emptyRoot = root / "empty-entity-stream";
+        SaveStore store(emptyRoot);
+        World world;
+        EntityManager entities(world);
+        entities.setSaveStore(&store);
+        world.update({0.5, 64.0, 0.5}, 1);
+        Chunk* chunk = world.getChunk(0, 0);
+        chunk->generated = true;
+        entities.syncChunks();
+        world.update({16.5, 64.0, 0.5}, 1);
+        entities.syncChunks();
+        require(!std::filesystem::exists(
+                    emptyRoot / "entities" / "e.0.0.bin") &&
+                    !std::filesystem::exists(
+                        emptyRoot / "entities" / "p.0.0.bin"),
+                "empty streamed chunk performed unnecessary entity writes");
+        Config::RENDER_DISTANCE = oldRenderDistance;
+    }
 
     {
         GameSession session(root / "saves");

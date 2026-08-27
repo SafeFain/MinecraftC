@@ -330,14 +330,30 @@ int main() {
     require(cameraEffects.movementBlend() == 0.0f,
             "stationary player produced view bobbing");
     constexpr int walkFrames = 60;
-    for (int i = 1; i <= walkFrames; ++i)
+    float maxHorizontalBob = 0.0f;
+    float maxVerticalBob = 0.0f;
+    float maxWalkPitch = 0.0f;
+    float maxWalkRoll = 0.0f;
+    for (int i = 1; i <= walkFrames; ++i) {
         cameraEffects.update({Config::PLAYER_SPEED *
                                   static_cast<double>(i) / walkFrames,
                               64.0, 0.0},
                              true, false, 0.0f, 0.0f, 1.0f / 60.0f);
+        maxHorizontalBob = std::max(
+            maxHorizontalBob, std::abs(cameraEffects.translation().x));
+        maxVerticalBob = std::max(
+            maxVerticalBob, std::abs(cameraEffects.translation().y));
+        maxWalkPitch = std::max(
+            maxWalkPitch, std::abs(cameraEffects.rotationDegrees().x));
+        maxWalkRoll = std::max(
+            maxWalkRoll, std::abs(cameraEffects.rotationDegrees().z));
+    }
     require(cameraEffects.movementBlend() > 0.8f &&
             glm::length(cameraEffects.translation()) > 0.001f,
             "ground movement did not produce view bobbing");
+    require(maxHorizontalBob > 0.030f && maxVerticalBob > 0.050f &&
+                maxWalkPitch > 0.35f && maxWalkRoll > 0.55f,
+            "walking camera bob is too subtle to remain visibly perceptible");
     require(std::abs(cameraEffects.walkPhase() /
                          (2.0f * 3.14159265358979323846f * Config::PLAYER_SPEED) -
                      0.44f) < 0.001f,

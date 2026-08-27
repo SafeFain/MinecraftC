@@ -154,6 +154,10 @@ int main() {
         require(store.loadChunkEntityPopulationVersion(-3, 9) == 1 &&
                 store.loadChunkEntityPopulationVersion(-3, 8) == 0,
                 "chunk entity population version did not round trip safely");
+        const ChunkLoadBundle populationBundle =
+            store.loadChunkLoadBundle(-3, 9, 12345);
+        require(populationBundle.entityPopulationVersion == 1,
+                "async chunk bundle omitted the entity population version");
         require(loaded.activeDimension == DimensionId::Heaven &&
                 std::abs(loaded.overworldDayPhase - 0.37f) < 0.0001f &&
                 loaded.heaven.playerPosition == source.heaven.playerPosition &&

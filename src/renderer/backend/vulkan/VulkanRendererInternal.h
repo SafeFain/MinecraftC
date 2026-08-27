@@ -666,15 +666,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             if (result.vertexOffset % sizeof(MeshVertex) != 0)
                 throw std::runtime_error("Vulkan Chunk vertex arena is misaligned");
             const VkDeviceSize vertexBase64 = result.vertexOffset / sizeof(MeshVertex);
-            if (vertexBase64 > std::numeric_limits<uint32_t>::max())
-                throw std::overflow_error("Vulkan Chunk vertex base exceeds uint32_t");
-            const uint32_t vertexBase = static_cast<uint32_t>(vertexBase64);
-            for (size_t index = 0; index < mesh.indices.size(); ++index) {
-                const uint32_t rebased = rebaseVulkanIndex(
-                    mesh.indices[index], vertexBase);
-                std::memcpy(indices.bytes.data() + index * sizeof(uint32_t),
-                            &rebased, sizeof(rebased));
-            }
+            if (vertexBase64 > static_cast<VkDeviceSize>(
+                    std::numeric_limits<int32_t>::max()))
+                throw std::overflow_error("Vulkan Chunk vertex base exceeds int32_t");
+            std::memcpy(indices.bytes.data(), mesh.indices.data(),
+                        indices.bytes.size());
             pendingBufferUploads.push_back(std::move(indices));
         } catch (...) {
             destroyGpuMesh(result);
@@ -1431,8 +1427,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                         0,sizeof(constants),&constants);
                     uint32_t first=static_cast<uint32_t>(submission.mesh->shadowCasterIndexOffset);
                     if(arena)first+=static_cast<uint32_t>(mesh.indexOffset/sizeof(uint32_t));
+                    const int32_t vertexBase=arena?static_cast<int32_t>(
+                        mesh.vertexOffset/sizeof(MeshVertex)):0;
                     vkCmdDrawIndexed(command,static_cast<uint32_t>(submission.mesh->shadowCasterIndexCount),
-                                     1,first,0,0);
+                                     1,first,vertexBase,0);
                     ++performance.drawCalls;
                 }
             }
@@ -1572,7 +1570,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 ? static_cast<uint32_t>(mesh.indexOffset / sizeof(uint32_t)) +
                     draw.firstIndex
                 : draw.firstIndex;
-            vkCmdDrawIndexed(command, count, 1, firstIndex, 0, 0);
+            const int32_t vertexBase = arenaMesh
+                ? static_cast<int32_t>(mesh.vertexOffset / sizeof(MeshVertex))
+                : 0;
+            vkCmdDrawIndexed(command, count, 1, firstIndex, vertexBase, 0);
             ++performance.drawCalls;
         }
         };

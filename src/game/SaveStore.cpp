@@ -661,6 +661,12 @@ ChunkLoadBundle SaveStore::loadChunkLoadBundle(
     catch (...) { bundle.blockEntities.clear(); }
     try { bundle.entities = loadChunkEntities(chunkX, chunkZ); }
     catch (...) { bundle.entities.clear(); }
+    try {
+        bundle.entityPopulationVersion =
+            loadChunkEntityPopulationVersion(chunkX, chunkZ);
+    } catch (...) {
+        bundle.entityPopulationVersion = 0;
+    }
     return bundle;
 }
 

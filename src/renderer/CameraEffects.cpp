@@ -9,6 +9,10 @@ namespace {
 constexpr float PI = 3.14159265358979323846f;
 constexpr float FOOTSTEPS_PER_BLOCK = 0.44f;
 constexpr float LANDING_DURATION = 0.40f;
+constexpr float WALK_BOB_HORIZONTAL = 0.035f;
+constexpr float WALK_BOB_VERTICAL = 0.060f;
+constexpr float WALK_BOB_PITCH_DEGREES = 0.40f;
+constexpr float WALK_BOB_ROLL_DEGREES = 0.65f;
 }
 
 void CameraEffects::reset(const glm::dvec3& position) {
@@ -53,9 +57,11 @@ void CameraEffects::update(const glm::dvec3& position, bool grounded,
 
     const float footPlant = 0.5f - 0.5f * std::cos(m_walkPhase);
     const float stride = std::sin(m_walkPhase * 0.5f);
-    const float bobX = stride * 0.018f * m_movementBlend;
-    const float bobY = -footPlant * 0.030f * m_movementBlend;
-    const float bobRoll = stride * 0.25f * m_movementBlend;
+    const float bobX = stride * WALK_BOB_HORIZONTAL * m_movementBlend;
+    const float bobY = -footPlant * WALK_BOB_VERTICAL * m_movementBlend;
+    const float bobPitch = std::cos(m_walkPhase) *
+        WALK_BOB_PITCH_DEGREES * m_movementBlend;
+    const float bobRoll = stride * WALK_BOB_ROLL_DEGREES * m_movementBlend;
 
     const float targetFall = !grounded && !flying
         ? std::clamp((-verticalVelocity - 4.0f) / 14.0f, 0.0f, 1.0f)
@@ -81,7 +87,7 @@ void CameraEffects::update(const glm::dvec3& position, bool grounded,
         0.0f
     };
     m_motionRotationDegrees = {
-        m_fallBlend * 0.65f + landingWave * 1.0f,
+        bobPitch + m_fallBlend * 0.65f + landingWave * 1.0f,
         0.0f,
         bobRoll
     };
