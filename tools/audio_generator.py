@@ -13,6 +13,8 @@ SAMPLE_RATE = 24_000
 TAU = math.tau
 MENU_DURATION = 64.0 * 60.0 / 104.0
 GAMEPLAY_DURATION = 64.0 * 60.0 / 64.0
+MENU_SPARK_DURATION = 64.0 * 60.0 / 112.0
+HEAVEN_DURATION = 64.0 * 60.0 / 56.0
 
 
 def note(midi: int) -> float:
@@ -126,6 +128,93 @@ def gameplay_sample(seconds: float, beat: float) -> tuple[float, float]:
     return left + breath, right + breath * 0.8
 
 
+SPARK_CHORDS = (
+    (62, 66, 69, 73), (59, 62, 66, 69), (55, 59, 62, 66), (57, 61, 64, 69),
+    (62, 66, 69, 74), (54, 59, 62, 66), (55, 59, 62, 67), (57, 61, 64, 69),
+)
+SPARK_MELODY = (
+    78, 81, 85, 83, 81, 78, 76, 73, 74, 78, 81, 86, 85, 81, 78, 76,
+    78, 83, 86, 90, 88, 85, 81, 78, 79, 83, 81, 78, 76, 74, 73, 76,
+)
+SPARK_ARP = (0, 2, 1, 3, 2, 1, 3, 1)
+
+
+def menu_spark_sample(seconds: float, beat: float) -> tuple[float, float]:
+    chord = SPARK_CHORDS[int(beat // 8.0) % len(SPARK_CHORDS)]
+    quarter_step = int(beat * 4.0)
+    quarter_age_beats = beat - quarter_step * 0.25
+    quarter_age = quarter_age_beats * 60.0 / 112.0
+    pluck_midi = chord[SPARK_ARP[quarter_step % len(SPARK_ARP)]] + 12
+    pluck_env = event_envelope(quarter_age_beats, 0.22, 0.012, 0.16)
+    pluck = (bell(note(pluck_midi), quarter_age) * 0.075 +
+             math.sin(TAU * note(pluck_midi + 12) * quarter_age) * 0.018)
+    pluck *= pluck_env
+    pluck_pan = (-0.42, 0.18, 0.42, -0.16)[quarter_step % 4]
+
+    melody_step = int(beat * 0.5)
+    melody_age_beats = beat - melody_step * 2.0
+    melody_age = melody_age_beats * 60.0 / 112.0
+    melody_env = event_envelope(melody_age_beats, 1.55, 0.035, 0.52)
+    melody = bell(note(SPARK_MELODY[melody_step % len(SPARK_MELODY)]),
+                  melody_age) * melody_env * 0.052
+
+    bass_step = int(beat / 4.0)
+    bass_age_beats = beat - bass_step * 4.0
+    bass_age = bass_age_beats * 60.0 / 112.0
+    bass_env = event_envelope(bass_age_beats, 3.5, 0.08, 0.75)
+    bass = warm_tone(note(chord[0] - 12), bass_age) * bass_env * 0.038
+
+    glint = loop_sine(note(chord[1] + 24), seconds, MENU_SPARK_DURATION)
+    glint *= (0.004 + 0.004 * math.sin(TAU * beat / 8.0) ** 2)
+    left = bass + melody + pluck * (1.0 - pluck_pan) + glint
+    right = bass * 0.86 + melody * 0.76 + pluck * (1.0 + pluck_pan) + glint * 0.7
+    return left, right
+
+
+HEAVEN_CHORDS = (
+    (50, 57, 62, 66, 69), (47, 54, 59, 62, 66),
+    (43, 50, 55, 59, 62), (45, 52, 57, 61, 64),
+)
+HEAVEN_MELODY = (81, 86, 83, 78, 79, 83, 88, 85)
+
+
+def heaven_sample(seconds: float, beat: float) -> tuple[float, float]:
+    chord = HEAVEN_CHORDS[int(beat // 16.0) % len(HEAVEN_CHORDS)]
+    chord_age_beats = beat - int(beat // 16.0) * 16.0
+    chord_age = chord_age_beats * 60.0 / 56.0
+    pad_env = event_envelope(chord_age_beats, 16.0, 2.8, 3.2)
+    left = 0.0
+    right = 0.0
+    for index, midi in enumerate(chord):
+        freq = note(midi)
+        phase = TAU * freq * chord_age
+        voice = (math.sin(phase) + 0.12 * math.sin(phase * 2.002) +
+                 0.035 * math.sin(phase * 3.997))
+        voice *= pad_env * (0.026 if index else 0.034)
+        left += voice * (1.0 if index % 2 == 0 else 0.72)
+        right += voice * (0.72 if index % 2 == 0 else 1.0)
+
+    melody_step = int(beat / 8.0)
+    melody_age_beats = beat - melody_step * 8.0
+    melody_age = melody_age_beats * 60.0 / 56.0
+    melody_env = event_envelope(melody_age_beats, 6.4, 0.18, 2.7)
+    melody_freq = note(HEAVEN_MELODY[melody_step % len(HEAVEN_MELODY)])
+    crystal = (math.sin(TAU * melody_freq * melody_age) +
+               0.28 * math.sin(TAU * melody_freq * 2.01 * melody_age) +
+               0.09 * math.sin(TAU * melody_freq * 4.03 * melody_age))
+    crystal *= melody_env * 0.042
+    crystal_pan = math.sin(TAU * melody_step / len(HEAVEN_MELODY)) * 0.36
+
+    high_air = loop_sine(note(chord[3] + 12), seconds, HEAVEN_DURATION)
+    low_air = loop_sine(note(chord[0] - 12), seconds, HEAVEN_DURATION)
+    breathing = 0.5 + 0.5 * math.sin(TAU * beat / 32.0) ** 2
+    high_air *= 0.006 * breathing
+    low_air *= 0.008 * (1.0 - 0.35 * breathing)
+    left += crystal * (1.0 - crystal_pan) + high_air + low_air
+    right += crystal * (1.0 + crystal_pan) + high_air * 0.68 + low_air * 0.82
+    return left, right
+
+
 def write_track(path: Path, bpm: float, beats: int, sampler) -> None:
     duration = beats * 60.0 / bpm
     frames = round(duration * SAMPLE_RATE)
@@ -155,7 +244,9 @@ def main() -> None:
                         default=Path("assets/audio"))
     args = parser.parse_args()
     write_track(args.output / "menu_whimsy.wav", 104.0, 64, menu_sample)
+    write_track(args.output / "menu_spark.wav", 112.0, 64, menu_spark_sample)
     write_track(args.output / "gameplay_calm.wav", 64.0, 64, gameplay_sample)
+    write_track(args.output / "heaven_ether.wav", 56.0, 64, heaven_sample)
 
 
 if __name__ == "__main__":

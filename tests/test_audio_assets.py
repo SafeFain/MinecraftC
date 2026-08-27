@@ -8,7 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "menu_whimsy.wav": (104.0, 64, "76f849f2457d04167917802868c73cde275456767da45e8f01775f6d531c87b7"),
+    "menu_spark.wav": (112.0, 64, "f4dea09da8fec6d30548fb42e0e554e75f1d5ed73613209bf2f82d1188392085"),
     "gameplay_calm.wav": (64.0, 64, "284e126a74342219e9f244112df3dcad5aa4915a336be4931ba6a9f0016d13a1"),
+    "heaven_ether.wav": (56.0, 64, "ed79437f567ef8f11ed1632b07dc298689664d69cba0e8578b839a320add4a64"),
 }
 
 

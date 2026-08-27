@@ -6,7 +6,8 @@ class AssetStore;
 
 enum class AudioMusicMode {
     Menu,
-    Gameplay
+    Overworld,
+    Heaven
 };
 
 enum class CombatSound {

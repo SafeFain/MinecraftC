@@ -330,6 +330,8 @@ int main() {
         harness.flow.startGame(id, true);
         require(harness.flow.state() == GameState::LoadingWorld,
                 "startGame enters the loading state");
+        require(harness.audio.musicMode() == AudioMusicMode::Overworld,
+                "new Overworld loading selects only Overworld music");
         require(harness.ui.hotbar.inventory() == &harness.session.player.inventory(),
                 "hotbar is bound to the player inventory");
 
@@ -348,6 +350,9 @@ int main() {
         require(harness.session.switchDimension(
                     DimensionId::Heaven, harness.clock.now()),
                 "playing world switches into heaven");
+        harness.flow.beginDimensionLoading();
+        require(harness.audio.musicMode() == AudioMusicMode::Heaven,
+                "Heaven loading switches to its exclusive music");
         require(harness.session.player.getPosition() ==
                     harness.session.world.findSafeSpawn(),
                 "heaven switch centers its first stream on the island spawn");
@@ -358,6 +363,9 @@ int main() {
         require(harness.session.switchDimension(
                     DimensionId::Overworld, harness.clock.now()),
                 "heaven switches back to overworld");
+        harness.flow.beginDimensionLoading();
+        require(harness.audio.musicMode() == AudioMusicMode::Overworld,
+                "returning from Heaven restores Overworld-only music");
         require(loadWorld(harness.session, harness.stub, harness.clock),
                 "heaven-to-overworld loading gate completes");
         Config::RENDER_DISTANCE = 2;

@@ -45,9 +45,12 @@ int main(){
         require(!audio.paused(),"audio starts resumed");
         require(audio.musicMode()==AudioMusicMode::Menu,
                 "main-menu music is the default audio mode");
-        audio.setMusicMode(AudioMusicMode::Gameplay);
-        require(audio.musicMode()==AudioMusicMode::Gameplay,
-                "gameplay music mode can be selected");
+        audio.setMusicMode(AudioMusicMode::Overworld);
+        require(audio.musicMode()==AudioMusicMode::Overworld,
+                "overworld music mode can be selected");
+        audio.setMusicMode(AudioMusicMode::Heaven);
+        require(audio.musicMode()==AudioMusicMode::Heaven,
+                "Heaven music mode is separate from Overworld music");
         audio.setPaused(true);
         require(audio.paused(),"audio device pauses with the game");
         audio.setPaused(true);
