@@ -9,6 +9,7 @@
 #include "game/SaveStore.h"
 #include "renderer/GameRenderer.h"
 #include "threading/ThreadPool.h"
+#include "world/Chunk.h"
 #include "world/ChunkStore.h"
 #include "world/FluidLogic.h"
 #include "world/WorldPersistence.h"
@@ -470,7 +471,8 @@ void testStreamingBenchmark() {
               << "ms main(p50/p95/p99)="
               << percentile(cold.frames, .50) << "/"
               << percentile(cold.frames, .95) << "/"
-              << percentile(cold.frames, .99) << "ms\n";
+              << percentile(cold.frames, .99) << "ms max="
+              << percentile(cold.frames, 1.0) << "ms\n";
     std::filesystem::remove_all(root);
     Config::RENDER_DISTANCE = oldRenderDistance;
 }
@@ -499,6 +501,36 @@ void testGenerationHandoff() {
     require(isChunkActive(world, 0, 0) && isChunkActive(world, 1, 1),
             "chunks remain resident inside the render target");
     drainWorkers(world, pool);
+}
+
+void testBulkLightReplacement() {
+    Chunk chunk(2, -3);
+    std::vector<uint8_t> light(
+        static_cast<size_t>(Config::CHUNK_VOLUME), 0);
+    light.front() = 0xa3;
+    light.back() = 0x5c;
+    const uint64_t revision = chunk.dataRevision();
+
+    chunk.replaceRawLight(light);
+
+    require(chunk.dataRevision() == revision + 1,
+            "bulk light replacement did not publish one chunk revision");
+    require(chunk.getPackedLight(0, Config::WORLD_MIN_Y, 0) == 0xa3 &&
+                chunk.getPackedLight(Config::CHUNK_SIZE_X - 1,
+                    Config::WORLD_MAX_Y - 1,
+                    Config::CHUNK_SIZE_Z - 1) == 0x5c,
+            "bulk light replacement did not preserve packed light values");
+
+    bool rejected = false;
+    light.pop_back();
+    try {
+        chunk.replaceRawLight(light);
+    } catch (const std::runtime_error&) {
+        rejected = true;
+    }
+    require(rejected, "bulk light replacement accepted a truncated map");
+    require(chunk.dataRevision() == revision + 1,
+            "rejected light replacement changed the chunk revision");
 }
 
 // A budget cutoff during the final generation handoff must retain the
@@ -1090,6 +1122,7 @@ int main() {
     testWarmChunkBacktrack();
     testStreamingBenchmark();
     testGenerationHandoff();
+    testBulkLightReplacement();
     testBudgetedGenerationHandoff();
     testSeedReset();
     testAutosaveQueue();

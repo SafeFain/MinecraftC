@@ -76,6 +76,14 @@ public:
         blocks.assign(m_blocks.begin(), m_blocks.end());
         light.assign(m_light.begin(), m_light.end());
     }
+    void copyRawBlocks(std::vector<uint8_t>& blocks) const {
+        std::shared_lock lock(m_dataMutex);
+        blocks.assign(m_blocks.begin(), m_blocks.end());
+    }
+    // Lighting rebuilds calculate a complete local light map from an immutable
+    // block snapshot. Publish it under one lock and one data revision instead
+    // of taking the chunk mutex once for every lit voxel.
+    void replaceRawLight(const std::vector<uint8_t>& light);
     void loadRawBlocks(const std::vector<uint8_t>& blocks);
 
     // A base snapshot is captured before player overrides are applied.  It

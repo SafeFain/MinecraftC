@@ -20,6 +20,14 @@ void Chunk::loadRawBlocks(const std::vector<uint8_t>& blocks) {
     m_dirty = true;
 }
 
+void Chunk::replaceRawLight(const std::vector<uint8_t>& light) {
+    if (light.size() != m_light.size())
+        throw std::runtime_error("Chunk light replacement has the wrong size");
+    std::unique_lock lock(m_dataMutex);
+    std::copy(light.begin(), light.end(), m_light.begin());
+    ++m_dataRevision;
+}
+
 BlockId Chunk::getBlock(int x, int y, int z) const {
     if (x < 0 || x >= Config::CHUNK_SIZE_X ||
         !Config::isValidWorldY(y) ||

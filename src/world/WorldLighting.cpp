@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <queue>
+#include <utility>
 #include <unordered_set>
 #include <vector>
 
@@ -26,68 +27,95 @@ void WorldLighting::rebuild() {
             return {chunk,{wx-cx*Config::CHUNK_SIZE_X,y,wz-cz*Config::CHUNK_SIZE_Z}};
         };
 
+        struct InitializedChunk {
+            Chunk* chunk = nullptr;
+            std::vector<uint8_t> directLight;
+        };
+        const auto localIndex = [](int x, int y, int z) {
+            return static_cast<size_t>(x + z * Config::CHUNK_SIZE_X +
+                Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X *
+                    Config::CHUNK_SIZE_Z);
+        };
         bool hasSources = false;
-        std::vector<Chunk*> initialized;
+        std::vector<InitializedChunk> initialized;
         std::unordered_set<Chunk*> lightChanged;
         store.forEachUniqueUnlocked([&](Chunk* chunk) {
             if (!chunk->generated.load()||chunk->lightingInitialized.load()) return;
-            chunk->clearLight();
-            initialized.push_back(chunk);
+            std::vector<uint8_t> blocks;
+            chunk->copyRawBlocks(blocks);
+            std::vector<uint8_t> directLight(
+                static_cast<size_t>(Config::CHUNK_VOLUME), 0);
             lightChanged.insert(chunk);
         for (int z=0;z<Config::CHUNK_SIZE_Z;++z) for(int x=0;x<Config::CHUNK_SIZE_X;++x) {
             uint8_t vertical=15;
             for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y) {
-                const BlockId block=chunk->getBlock(x,y,z);
+                const size_t index=localIndex(x,y,z);
+                const BlockId block=static_cast<BlockId>(blocks[index]);
                 const uint8_t damping=getLightDampening(block);
                 if(damping>=15) vertical=0;
                 else if(vertical>0 && damping>0)
                     vertical=static_cast<uint8_t>(vertical>damping?vertical-damping:0);
-                if(vertical>0) {
-                    chunk->setSkyLight(x,y,z,vertical);
-                }
                 const uint8_t emission=getLightEmission(block);
+                directLight[index]=static_cast<uint8_t>((vertical<<4)|emission);
                 if(emission>0) {
-                    chunk->setBlockLight(x,y,z,emission);
                     blockQueue.push({chunk->worldX()+x,y,chunk->worldZ()+z,emission});
                     hasSources=true;
                 }
             }
         }
+        chunk->replaceRawLight(directLight);
         chunk->lightingInitialized=true;
+        initialized.push_back({chunk,std::move(directLight)});
         });
 
     // Direct columns are already complete.  Seed flood fill only along an
     // exposed horizontal frontier instead of queueing every open-sky voxel.
     constexpr int horizontal[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
-    for(Chunk* chunk:initialized){
+    for(const InitializedChunk& entry:initialized){
+        Chunk* chunk=entry.chunk;
         for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
             for(int z=0;z<Config::CHUNK_SIZE_Z;++z)
                 for(int x=0;x<Config::CHUNK_SIZE_X;++x){
-                    const uint8_t value=chunk->getSkyLight(x,y,z);if(value==0)continue;
+                    const uint8_t value=entry.directLight[localIndex(x,y,z)]>>4;
+                    if(value==0)continue;
                     const int wx=chunk->worldX()+x,wz=chunk->worldZ()+z;
                     bool frontier=false;
-                    for(const auto& d:horizontal){auto [neighbor,p]=findCell(wx+d[0],y,wz+d[1]);
-                        if(neighbor&&neighbor->getSkyLight(p.x,p.y,p.z)<value){frontier=true;break;}}
+                    for(const auto& d:horizontal){
+                        const int nx=x+d[0],nz=z+d[1];
+                        if(nx>=0&&nx<Config::CHUNK_SIZE_X&&
+                           nz>=0&&nz<Config::CHUNK_SIZE_Z){
+                            if((entry.directLight[localIndex(nx,y,nz)]>>4)<value){
+                                frontier=true;break;
+                            }
+                            continue;
+                        }
+                        auto [neighbor,p]=findCell(wx+d[0],y,wz+d[1]);
+                        if(neighbor&&neighbor->getSkyLight(p.x,p.y,p.z)<value){
+                            frontier=true;break;
+                        }
+                    }
                     if(frontier)skyQueue.push({wx,y,wz,value});
                 }
     }
     // Existing neighbor borders are also sources for a newly initialized
     // chunk, and vice versa.
-    for(Chunk* chunk:initialized)for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+    for(const InitializedChunk& entry:initialized)for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
         for(int edge=0;edge<4;++edge)for(int i=0;i<Config::CHUNK_SIZE_X;++i){
+            Chunk* chunk=entry.chunk;
             const int x=edge==0?0:edge==1?Config::CHUNK_SIZE_X-1:i;
             const int z=edge==2?0:edge==3?Config::CHUNK_SIZE_Z-1:i;
             const int wx=chunk->worldX()+x,wz=chunk->worldZ()+z;
             const int nx=wx+(edge==0?-1:edge==1?1:0);
             const int nz=wz+(edge==2?-1:edge==3?1:0);
             auto [neighbor,p]=findCell(nx,y,nz);if(!neighbor)continue;
-            for(const auto& seed:std::array<std::pair<int,int>,2>{{{wx,wz},{nx,nz}}}){
-                auto [source,sp]=findCell(seed.first,y,seed.second);if(!source)continue;
-                const uint8_t sky=source->getSkyLight(sp.x,sp.y,sp.z);
-                const uint8_t block=source->getBlockLight(sp.x,sp.y,sp.z);
-                if(sky)skyQueue.push({seed.first,y,seed.second,sky});
-                if(block)blockQueue.push({seed.first,y,seed.second,block});
-            }
+            const uint8_t local=entry.directLight[localIndex(x,y,z)];
+            const uint8_t localSky=local>>4,localBlock=local&0x0f;
+            if(localSky)skyQueue.push({wx,y,wz,localSky});
+            if(localBlock)blockQueue.push({wx,y,wz,localBlock});
+            const uint8_t adjacent=neighbor->getPackedLight(p.x,p.y,p.z);
+            const uint8_t adjacentSky=adjacent>>4,adjacentBlock=adjacent&0x0f;
+            if(adjacentSky)skyQueue.push({nx,y,nz,adjacentSky});
+            if(adjacentBlock)blockQueue.push({nx,y,nz,adjacentBlock});
         }
 
     constexpr int directions[6][3]={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
