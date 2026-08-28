@@ -15,6 +15,10 @@ MENU_DURATION = 64.0 * 60.0 / 104.0
 GAMEPLAY_DURATION = 64.0 * 60.0 / 64.0
 MENU_SPARK_DURATION = 64.0 * 60.0 / 112.0
 HEAVEN_DURATION = 64.0 * 60.0 / 56.0
+SOLITUDE_DURATION = 64.0 * 60.0 / 60.0
+HORIZON_DURATION = 96.0 * 60.0 / 72.0
+NIGHTFALL_DURATION = 64.0 * 60.0 / 54.0
+SANCTUM_DURATION = 64.0 * 60.0 / 48.0
 
 
 def note(midi: int) -> float:
@@ -215,6 +219,167 @@ def heaven_sample(seconds: float, beat: float) -> tuple[float, float]:
     return left, right
 
 
+SOLITUDE_CHORDS = (
+    (45, 52, 57, 60), (41, 48, 52, 57), (38, 45, 50, 53), (43, 50, 55, 59),
+    (45, 52, 56, 60), (40, 47, 52, 55), (41, 48, 53, 57), (43, 50, 54, 59),
+)
+SOLITUDE_NOTES = (69, -1, 64, 67, -1, 60, 62, -1, 71, 67, -1, 64, 65, -1, 62, 59)
+
+
+def overworld_solitude_sample(seconds: float, beat: float) -> tuple[float, float]:
+    """A close, sparse felt-piano piece with long silences."""
+    chord = SOLITUDE_CHORDS[int(beat // 8.0) % len(SOLITUDE_CHORDS)]
+    chord_age_beats = beat % 8.0
+    chord_age = chord_age_beats * 60.0 / 60.0
+    room_env = event_envelope(chord_age_beats, 7.8, 1.4, 2.5)
+    left = 0.0
+    right = 0.0
+    for index, midi in enumerate(chord):
+        tone = math.sin(TAU * note(midi) * chord_age)
+        tone += 0.09 * math.sin(TAU * note(midi) * 2.003 * chord_age)
+        tone *= room_env * (0.024 if index else 0.034)
+        left += tone * (1.0 if index in (0, 3) else 0.68)
+        right += tone * (0.68 if index in (0, 3) else 1.0)
+
+    phrase = int(beat // 4.0)
+    phrase_age_beats = beat % 4.0
+    midi = SOLITUDE_NOTES[phrase % len(SOLITUDE_NOTES)]
+    if midi >= 0:
+        age = phrase_age_beats * 60.0 / 60.0
+        envelope = event_envelope(phrase_age_beats, 3.15, 0.018, 1.65)
+        # The short upper partial gives the attack a muted, felt-piano edge.
+        piano = (math.sin(TAU * note(midi) * age) +
+                 0.24 * math.sin(TAU * note(midi) * 2.01 * age) +
+                 0.045 * math.sin(TAU * note(midi) * 3.98 * age))
+        piano *= envelope * 0.052
+        pan = (-0.18, 0.12, 0.28, -0.08)[phrase % 4]
+        left += piano * (1.0 - pan)
+        right += piano * (1.0 + pan)
+
+    tape_air = loop_sine(note(chord[2] + 12), seconds, SOLITUDE_DURATION)
+    tape_air *= 0.0045 * (0.55 + 0.45 * math.sin(TAU * beat / 32.0) ** 2)
+    return left + tape_air, right + tape_air * 0.72
+
+
+HORIZON_CHORDS = (
+    (43, 50, 55), (46, 53, 58), (41, 48, 53), (48, 55, 60),
+    (45, 52, 57), (38, 45, 50), (43, 50, 54), (36, 43, 48),
+)
+HORIZON_CALLS = (67, 70, -1, 65, 72, -1, 69, 67, 62, -1, 65, 60, -1, 64, 62, -1)
+
+
+def overworld_horizon_sample(seconds: float, beat: float) -> tuple[float, float]:
+    """Low bowed tones and distant calls suggest a broad, empty horizon."""
+    chord = HORIZON_CHORDS[int(beat // 12.0) % len(HORIZON_CHORDS)]
+    age_beats = beat % 12.0
+    age = age_beats * 60.0 / 72.0
+    swell = event_envelope(age_beats, 12.0, 2.8, 3.4)
+    left = 0.0
+    right = 0.0
+    for index, midi in enumerate(chord):
+        freq = note(midi)
+        bowed = (math.sin(TAU * freq * age) +
+                 0.16 * math.sin(TAU * freq * 2.0 * age) +
+                 0.025 * math.sin(TAU * freq * 5.0 * age))
+        bowed *= swell * (0.036 if index == 0 else 0.027)
+        left += bowed * (0.75 if index == 1 else 1.0)
+        right += bowed * (1.0 if index == 1 else 0.72)
+
+    call_step = int(beat // 6.0)
+    call_age_beats = beat % 6.0
+    midi = HORIZON_CALLS[call_step % len(HORIZON_CALLS)]
+    if midi >= 0:
+        call_age = call_age_beats * 60.0 / 72.0
+        call_env = event_envelope(call_age_beats, 4.7, 0.38, 2.1)
+        call = warm_tone(note(midi), call_age) * call_env * 0.036
+        pan = math.sin(TAU * call_step / len(HORIZON_CALLS)) * 0.38
+        left += call * (1.0 - pan)
+        right += call * (1.0 + pan)
+
+    wind = loop_sine(note(chord[0] - 12), seconds, HORIZON_DURATION)
+    wind *= 0.007 * (0.65 + 0.35 * math.sin(TAU * beat / 48.0) ** 2)
+    return left + wind, right + wind * 0.82
+
+
+NIGHTFALL_CHORDS = (
+    (40, 47, 52, 59), (43, 50, 55, 62), (38, 45, 50, 57), (45, 52, 57, 64),
+)
+NIGHTFALL_LIGHTS = (76, 71, 79, -1, 74, 69, 77, -1)
+
+
+def overworld_nightfall_sample(seconds: float, beat: float) -> tuple[float, float]:
+    """Dark drones and isolated glass notes form a quiet nocturne."""
+    chord = NIGHTFALL_CHORDS[int(beat // 16.0) % len(NIGHTFALL_CHORDS)]
+    age_beats = beat % 16.0
+    age = age_beats * 60.0 / 54.0
+    drone_env = event_envelope(age_beats, 16.0, 3.6, 4.2)
+    left = 0.0
+    right = 0.0
+    for index, midi in enumerate(chord):
+        freq = note(midi)
+        drone = (math.sin(TAU * freq * age) +
+                 0.07 * math.sin(TAU * freq * 1.501 * age))
+        drone *= drone_env * (0.033 if index == 0 else 0.022)
+        left += drone * (1.0 if index % 2 == 0 else 0.62)
+        right += drone * (0.62 if index % 2 == 0 else 1.0)
+
+    light_step = int(beat // 8.0)
+    light_age_beats = beat % 8.0
+    midi = NIGHTFALL_LIGHTS[light_step % len(NIGHTFALL_LIGHTS)]
+    if midi >= 0:
+        light_age = light_age_beats * 60.0 / 54.0
+        light_env = event_envelope(light_age_beats, 5.8, 0.06, 3.0)
+        light = bell(note(midi), light_age) * light_env * 0.034
+        pan = (-0.42, 0.34, 0.12, -0.2)[light_step % 4]
+        left += light * (1.0 - pan)
+        right += light * (1.0 + pan)
+
+    moon_air = loop_sine(note(chord[2] + 12), seconds, NIGHTFALL_DURATION)
+    moon_air *= 0.004 * (0.4 + 0.6 * math.sin(TAU * beat / 32.0) ** 2)
+    return left + moon_air * 0.65, right + moon_air
+
+
+SANCTUM_CHORDS = (
+    (36, 48, 55, 60, 64), (41, 53, 57, 60, 65),
+    (43, 55, 59, 62, 67), (38, 50, 57, 62, 66),
+)
+SANCTUM_CHIMES = (84, 79, 88, 83, 86, 81, 91, 86)
+
+
+def heaven_sanctum_sample(seconds: float, beat: float) -> tuple[float, float]:
+    """A slow pipe-organ chorale suspended beneath distant celestial chimes."""
+    chord = SANCTUM_CHORDS[int(beat // 16.0) % len(SANCTUM_CHORDS)]
+    age_beats = beat % 16.0
+    age = age_beats * 60.0 / 48.0
+    organ_env = event_envelope(age_beats, 16.0, 3.2, 3.8)
+    left = 0.0
+    right = 0.0
+    for index, midi in enumerate(chord):
+        freq = note(midi)
+        # Odd and octave partials evoke gently voiced diapason pipes.
+        organ = (math.sin(TAU * freq * age) +
+                 0.21 * math.sin(TAU * freq * 2.0 * age) +
+                 0.12 * math.sin(TAU * freq * 3.0 * age) +
+                 0.045 * math.sin(TAU * freq * 4.0 * age))
+        organ *= organ_env * (0.032 if index < 2 else 0.022)
+        left += organ * (1.0 if index % 2 == 0 else 0.74)
+        right += organ * (0.74 if index % 2 == 0 else 1.0)
+
+    chime_step = int(beat // 8.0)
+    chime_age_beats = beat % 8.0
+    chime_age = chime_age_beats * 60.0 / 48.0
+    chime_env = event_envelope(chime_age_beats, 6.0, 0.12, 3.4)
+    chime = bell(note(SANCTUM_CHIMES[chime_step % len(SANCTUM_CHIMES)]),
+                 chime_age) * chime_env * 0.025
+    chime_pan = math.sin(TAU * (chime_step + 1) / len(SANCTUM_CHIMES)) * 0.44
+
+    choir = loop_sine(note(chord[3] + 12), seconds, SANCTUM_DURATION)
+    choir *= 0.0055 * (0.55 + 0.45 * math.sin(TAU * beat / 32.0) ** 2)
+    left += chime * (1.0 - chime_pan) + choir
+    right += chime * (1.0 + chime_pan) + choir * 0.7
+    return left, right
+
+
 def write_track(path: Path, bpm: float, beats: int, sampler) -> None:
     duration = beats * 60.0 / bpm
     frames = round(duration * SAMPLE_RATE)
@@ -246,7 +411,15 @@ def main() -> None:
     write_track(args.output / "menu_whimsy.wav", 104.0, 64, menu_sample)
     write_track(args.output / "menu_spark.wav", 112.0, 64, menu_spark_sample)
     write_track(args.output / "gameplay_calm.wav", 64.0, 64, gameplay_sample)
+    write_track(args.output / "overworld_solitude.wav", 60.0, 64,
+                overworld_solitude_sample)
+    write_track(args.output / "overworld_horizon.wav", 72.0, 96,
+                overworld_horizon_sample)
+    write_track(args.output / "overworld_nightfall.wav", 54.0, 64,
+                overworld_nightfall_sample)
     write_track(args.output / "heaven_ether.wav", 56.0, 64, heaven_sample)
+    write_track(args.output / "heaven_sanctum.wav", 48.0, 64,
+                heaven_sanctum_sample)
 
 
 if __name__ == "__main__":

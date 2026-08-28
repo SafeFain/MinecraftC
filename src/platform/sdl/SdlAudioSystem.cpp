@@ -29,12 +29,16 @@ struct AudioSystem::Impl {
         bool available() const { return samples.size() >= 2; }
     };
     std::array<MusicTrack, 2> menuMusic;
-    MusicTrack overworldMusic;
-    MusicTrack heavenMusic;
+    std::array<MusicTrack, 4> overworldMusic;
+    std::array<MusicTrack, 2> heavenMusic;
     std::atomic<AudioMusicMode> musicTarget{AudioMusicMode::Menu};
     AudioMusicMode observedMusicMode = AudioMusicMode::Menu;
     uint64_t menuRandomState = 0x8a5cd789635d2dffULL;
+    uint64_t overworldRandomState = 0xd1b54a32d192ed03ULL;
+    uint64_t heavenRandomState = 0x94d049bb133111ebULL;
     size_t menuTrackIndex = 0;
+    size_t overworldTrackIndex = 0;
+    size_t heavenTrackIndex = 0;
     float menuMusicGain = 0.0f;
     float overworldMusicGain = 0.0f;
     float heavenMusicGain = 0.0f;
@@ -76,12 +80,20 @@ struct AudioSystem::Impl {
         return static_cast<float>((noiseState >> 8) & 0xffffu) / 32767.5f - 1.0f;
     }
 
-    size_t randomMenuTrack() {
-        menuRandomState ^= menuRandomState >> 12;
-        menuRandomState ^= menuRandomState << 25;
-        menuRandomState ^= menuRandomState >> 27;
+    static size_t randomTrack(uint64_t& state, size_t trackCount) {
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
         return static_cast<size_t>(
-            (menuRandomState * 0x2545f4914f6cdd1dULL) % menuMusic.size());
+            (state * 0x2545f4914f6cdd1dULL) % trackCount);
+    }
+
+    template<size_t N>
+    static bool playlistAvailable(const std::array<MusicTrack, N>& playlist) {
+        return std::all_of(playlist.begin(), playlist.end(),
+                           [](const MusicTrack& track) {
+                               return track.available();
+                           });
     }
 
     static MusicTrack loadMusic(const AssetStore& assets, const char* path) {
@@ -171,12 +183,16 @@ struct AudioSystem::Impl {
                 overworldMusicGain = 0.0f;
                 heavenMusicGain = 0.0f;
                 if (requestedMusic == AudioMusicMode::Menu) {
-                    menuTrackIndex = randomMenuTrack();
+                    menuTrackIndex = randomTrack(menuRandomState, menuMusic.size());
                     for (MusicTrack& track : menuMusic) track.outputCursor = 0;
                 } else if (requestedMusic == AudioMusicMode::Overworld) {
-                    overworldMusic.outputCursor = 0;
+                    overworldTrackIndex = randomTrack(
+                        overworldRandomState, overworldMusic.size());
+                    for (MusicTrack& track : overworldMusic) track.outputCursor = 0;
                 } else {
-                    heavenMusic.outputCursor = 0;
+                    heavenTrackIndex = randomTrack(
+                        heavenRandomState, heavenMusic.size());
+                    for (MusicTrack& track : heavenMusic) track.outputCursor = 0;
                 }
             }
             const float menuTarget = requestedMusic == AudioMusicMode::Menu ? 1.0f : 0.0f;
@@ -193,11 +209,17 @@ struct AudioSystem::Impl {
             if (requestedMusic == AudioMusicMode::Menu) {
                 if (mixTrack(menuMusic[menuTrackIndex], menuMusicGain * 0.72f,
                              left, right))
-                    menuTrackIndex = randomMenuTrack();
+                    menuTrackIndex = randomTrack(menuRandomState, menuMusic.size());
             } else if (requestedMusic == AudioMusicMode::Overworld) {
-                mixTrack(overworldMusic, overworldMusicGain * 0.68f, left, right);
+                if (mixTrack(overworldMusic[overworldTrackIndex],
+                             overworldMusicGain * 0.68f, left, right))
+                    overworldTrackIndex = randomTrack(
+                        overworldRandomState, overworldMusic.size());
             } else {
-                mixTrack(heavenMusic, heavenMusicGain * 0.70f, left, right);
+                if (mixTrack(heavenMusic[heavenTrackIndex],
+                             heavenMusicGain * 0.70f, left, right))
+                    heavenTrackIndex = randomTrack(
+                        heavenRandomState, heavenMusic.size());
             }
 
             rainVolume += (rainTarget.load() - rainVolume) * 0.0008f;
@@ -304,10 +326,18 @@ bool AudioSystem::initialize(const AssetStore* assets) {
                 Impl::loadMusic(*assets, "audio/menu_whimsy.wav");
             m_impl->menuMusic[1] =
                 Impl::loadMusic(*assets, "audio/menu_spark.wav");
-            m_impl->overworldMusic =
+            m_impl->overworldMusic[0] =
                 Impl::loadMusic(*assets, "audio/gameplay_calm.wav");
-            m_impl->heavenMusic =
+            m_impl->overworldMusic[1] =
+                Impl::loadMusic(*assets, "audio/overworld_solitude.wav");
+            m_impl->overworldMusic[2] =
+                Impl::loadMusic(*assets, "audio/overworld_horizon.wav");
+            m_impl->overworldMusic[3] =
+                Impl::loadMusic(*assets, "audio/overworld_nightfall.wav");
+            m_impl->heavenMusic[0] =
                 Impl::loadMusic(*assets, "audio/heaven_ether.wav");
+            m_impl->heavenMusic[1] =
+                Impl::loadMusic(*assets, "audio/heaven_sanctum.wav");
         } catch (const std::exception& error) {
             LOG_WARN("Music assets unavailable; continuing without music: " <<
                      error.what());
@@ -316,11 +346,20 @@ bool AudioSystem::initialize(const AssetStore* assets) {
             m_impl->heavenMusic = {};
         }
     }
-    m_impl->menuRandomState = static_cast<uint64_t>(SDL_GetTicksNS()) ^
+    const uint64_t randomSeed = static_cast<uint64_t>(SDL_GetTicksNS()) ^
         (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(m_impl.get())) << 1);
-    if (m_impl->menuRandomState == 0)
-        m_impl->menuRandomState = 0x8a5cd789635d2dffULL;
-    m_impl->menuTrackIndex = m_impl->randomMenuTrack();
+    m_impl->menuRandomState = randomSeed ^ 0x8a5cd789635d2dffULL;
+    m_impl->overworldRandomState = randomSeed ^ 0xd1b54a32d192ed03ULL;
+    m_impl->heavenRandomState = randomSeed ^ 0x94d049bb133111ebULL;
+    if (m_impl->menuRandomState == 0) m_impl->menuRandomState = 1;
+    if (m_impl->overworldRandomState == 0) m_impl->overworldRandomState = 1;
+    if (m_impl->heavenRandomState == 0) m_impl->heavenRandomState = 1;
+    m_impl->menuTrackIndex = Impl::randomTrack(
+        m_impl->menuRandomState, m_impl->menuMusic.size());
+    m_impl->overworldTrackIndex = Impl::randomTrack(
+        m_impl->overworldRandomState, m_impl->overworldMusic.size());
+    m_impl->heavenTrackIndex = Impl::randomTrack(
+        m_impl->heavenRandomState, m_impl->heavenMusic.size());
     const SDL_AudioSpec spec{SDL_AUDIO_F32, Impl::CHANNELS, Impl::SAMPLE_RATE};
     m_impl->stream = SDL_OpenAudioDeviceStream(
         SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, Impl::callback, m_impl.get());
@@ -339,12 +378,13 @@ bool AudioSystem::initialize(const AssetStore* assets) {
     }
     m_impl->initialized = true;
     LOG_INFO("SDL game audio initialized at 48 kHz stereo (menu music=" <<
-             (m_impl->menuMusic[0].available() &&
-                      m_impl->menuMusic[1].available() ? "2/2" : "unavailable") <<
+             (Impl::playlistAvailable(m_impl->menuMusic) ? "2/2" : "unavailable") <<
              ", overworld music=" <<
-             (m_impl->overworldMusic.available() ? "yes" : "no") <<
+             (Impl::playlistAvailable(m_impl->overworldMusic)
+                  ? "4/4" : "unavailable") <<
              ", Heaven music=" <<
-             (m_impl->heavenMusic.available() ? "yes" : "no") << ")");
+             (Impl::playlistAvailable(m_impl->heavenMusic)
+                  ? "2/2" : "unavailable") << ")");
     return true;
 }
 
