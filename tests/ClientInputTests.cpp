@@ -78,12 +78,17 @@ int main(){
             frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
             frameRateSliderFraction(30)==0.0f&&frameRateSliderFraction(200)==1.0f,
             "frame-rate slider continuously maps its full 30-200 range");
-    require(defaultVisualQuality(DesktopPlatform::Android)==VisualQuality::Medium&&
-            defaultVisualQuality(DesktopPlatform::IOS)==VisualQuality::Medium&&
+    require(defaultVisualQuality(DesktopPlatform::Android)==VisualQuality::Low&&
+            defaultVisualQuality(DesktopPlatform::IOS)==VisualQuality::Low&&
             defaultVisualQuality(DesktopPlatform::Linux)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::Windows)==VisualQuality::Medium&&
             defaultVisualQuality(DesktopPlatform::MacOS)==VisualQuality::Medium,
-            "all supported platforms default visual quality to medium");
+            "mobile defaults reduce fill-rate cost without changing desktop quality");
+    require(!defaultLeafTransparency(VisualQuality::Low)&&
+            !defaultLeafTransparency(VisualQuality::Medium)&&
+            defaultLeafTransparency(VisualQuality::High)&&
+            defaultLeafTransparency(VisualQuality::Ultra),
+            "low and medium quality presets disable transparent leaves");
     const WindowSafeArea safe = projectWindowSafeArea(
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,
@@ -134,6 +139,7 @@ int main(){
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
+    settings.transparentLeaves=true;
     settings.attackIndicator=AttackIndicator::Hotbar;
     settings.language=Language::SimplifiedChinese;
     settings.bindings[static_cast<size_t>(InputAction::Inventory)]={InputDevice::Mouse,3};
@@ -173,6 +179,8 @@ int main(){
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
             "visual quality preference round trips");
+    require(loaded.transparentLeaves,
+            "transparent-leaf preference round trips");
     require(loaded.attackIndicator==AttackIndicator::Hotbar,
             "attack indicator preference round trips");
     require(loaded.controlMode==ControlMode::Touch&&loaded.touchSensitivity==1.75f&&
@@ -203,15 +211,23 @@ int main(){
             "v18 settings migrate to the LOD defaults");
     require(legacySettings.renderDistance==8,
             "legacy renderer setting did not prevent other settings from loading");
+    require(!legacySettings.transparentLeaves,
+            "legacy medium-quality settings migrate to opaque leaves");
     require(legacySettings.save(root/"migrated-options.txt"),
             "legacy settings migration save succeeds");
     std::ifstream migratedInput(root/"migrated-options.txt");
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=20\n")!=std::string::npos&&
+    require(migratedText.find("version=21\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
+    {
+        std::ofstream previous(root/"v20-options.txt");
+        previous<<"version=20\nvisual_quality=2\n";
+    }
+    require(ClientSettings::load(root/"v20-options.txt").transparentLeaves,
+            "v20 high-quality settings migrate to transparent leaves");
     {
         std::ofstream invalid(root/"invalid-options.txt");
         invalid<<"version=4\nlanguage=unsupported\n";

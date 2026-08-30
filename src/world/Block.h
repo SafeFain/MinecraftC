@@ -274,6 +274,12 @@ inline const BlockProperties& getBlockProps(BlockId id) {
     return BLOCK_TABLE[static_cast<uint8_t>(id)];
 }
 
+inline bool isLeafBlock(BlockId id) {
+    return id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
+           id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
+           id == BlockId::ACACIA_LEAVES || id == BlockId::SKYROOT_LEAVES;
+}
+
 inline bool isSolid(BlockId id) {
     return getBlockProps(id).solid;
 }

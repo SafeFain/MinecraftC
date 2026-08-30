@@ -32,7 +32,8 @@ layout(location=4) out vec3 worldPosition;
 void main() {
     vec3 position=inPosition;
     vec3 world=inPosition+frame.chunkOrigin.xyz;
-    if(inFace>5.5){
+    float surfaceFace=inFace>=16.0?inFace-16.0:inFace;
+    if(surfaceFace>5.5){
         float rootWeight=clamp(inTileCoord.y,0.0,1.0);
         float phase=dot(world.xz,vec2(0.43,0.71));
         vec2 wind=vec2(sin(environment.weatherParams.x*1.18+phase),

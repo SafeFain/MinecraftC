@@ -18,15 +18,29 @@ GamepadBinding axis(int code, bool positive) {
 }
 
 VisualQuality defaultVisualQuality(DesktopPlatform platform) {
-    (void)platform;
+    if (platform == DesktopPlatform::Android || platform == DesktopPlatform::IOS)
+        return VisualQuality::Low;
     return VisualQuality::Medium;
+}
+
+bool defaultLeafTransparency(VisualQuality quality) {
+    return quality == VisualQuality::High || quality == VisualQuality::Ultra;
 }
 
 ClientSettings::ClientSettings() {
     const DesktopPlatform platform = currentDesktopPlatform();
     visualQuality = defaultVisualQuality(platform);
-    shadowQuality = platform == DesktopPlatform::Android || platform == DesktopPlatform::IOS
-        ? ShadowQuality::Low : ShadowQuality::Medium;
+    transparentLeaves = defaultLeafTransparency(visualQuality);
+    const bool mobile = platform == DesktopPlatform::Android ||
+                        platform == DesktopPlatform::IOS;
+    shadowQuality = mobile ? ShadowQuality::Off : ShadowQuality::Medium;
+    if (mobile) {
+        renderDistance = 6;
+        lodAggressiveness = LodAggressiveness::PowerSaver;
+        lodPrecision = LodPrecision::Low;
+        cloudRenderDistance = 96;
+        frameRateLimit = 60;
+    }
     resetBindings();
     resetGamepadBindings();
 }
@@ -166,6 +180,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
             else if (name == "visual_quality")
                 settings.visualQuality = static_cast<VisualQuality>(std::stoi(value));
+            else if (name == "transparent_leaves")
+                settings.transparentLeaves = std::stoi(value) != 0;
             else if (name == "renderer") { /* v17 compatibility */ }
             else if (name == "gui_scale") settings.guiScale = std::stoi(value);
             else if (name == "frame_rate_limit") settings.frameRateLimit = std::stoi(value);
@@ -219,6 +235,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         if(!gamepadBindingRead[i])settings.gamepadBindings[i]=defaults.gamepadBindings[i];
     if (formatVersion < 8 && std::abs(settings.touchSensitivity - 1.0f) < .001f)
         settings.touchSensitivity = defaults.touchSensitivity;
+    if (formatVersion < 21)
+        settings.transparentLeaves = defaultLeafTransparency(settings.visualQuality);
     settings.validate();
     return settings;
 }
@@ -245,6 +263,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "smooth_lighting=" << smoothLighting << '\n'
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
+           << "transparent_leaves=" << transparentLeaves << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "frame_rate_limit=" << frameRateLimit << '\n'
            << "attack_indicator=" << static_cast<int>(attackIndicator) << '\n'

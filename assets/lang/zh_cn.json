@@ -151,6 +151,7 @@
   "settings.cloud_distance": "云渲染距离：{0} 格",
   "settings.smooth_lighting": "平滑光照：{0}",
   "settings.visual_quality": "画面质量：{0}",
+  "settings.transparent_leaves": "树叶透明：{0}",
   "settings.visual_low": "低",
   "settings.visual_medium": "中",
   "settings.visual_high": "高",

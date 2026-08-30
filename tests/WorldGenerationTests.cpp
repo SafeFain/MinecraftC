@@ -1191,8 +1191,8 @@ int main() {
                 differentSeedDisagreements > 0,
             "emerald attempts lack stone/deepslate variants or seed variation");
 
-    // CPU mesh classification: plants use opaque/cutout cross geometry while
-    // water and leaves occupy the translucent draw range.
+    // CPU mesh classification: plants and leaves use opaque/cutout geometry,
+    // water uses the translucent range, and leaves carry a shader marker.
     std::vector<uint8_t> meshBlocks(Config::CHUNK_VOLUME, 0);
     auto meshIndex = [](int x, int y, int z) {
         return x + z * 16 + Config::worldYToStorageY(y) * 16 * 16;
@@ -1207,6 +1207,11 @@ int main() {
                [](int, int, int) -> LightSample { return {}; });
     require(mesh.opaqueIndexCount >= 24,
             "cross-shaped vegetation was not emitted double-sided");
+    require(std::any_of(mesh.vertices.begin(), mesh.vertices.end(),
+                [](const MeshVertex& vertex) {
+                    return vertex.face >= 16.0f && vertex.face < 22.0f;
+                }),
+            "leaf vertices do not carry the transparency-control marker");
     require(mesh.translucentIndexCount > 0,
             "translucent blocks were not assigned a separate index range");
     require(mesh.translucentIndexOffset == mesh.opaqueIndexCount,

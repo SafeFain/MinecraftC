@@ -40,6 +40,7 @@ public:
     void resumePresentation() override;
     void beginFrame() override;
     void setVisualQuality(VisualQuality quality) override;
+    void setLeafTransparency(bool enabled) override;
     void finishScene(const PostProcessState& state) override;
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
     void renderSky(const RenderEnvironment&, const glm::mat4&, const glm::vec3&,
@@ -108,5 +109,6 @@ private:
     RenderEnvironment m_environment;
     glm::vec3 m_cameraPosition{0.0f};
     VisualQuality m_visualQuality = VisualQuality::Medium;
+    bool m_leafTransparency = false;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
 };

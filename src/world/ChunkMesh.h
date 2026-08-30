@@ -350,7 +350,8 @@ struct ChunkMesh {
                         for (int i = 0; i < 4; ++i)
                             vtx[i] = {0,0,0, 1.0f, 0.0f, 0.0f, alpha, 0, 0,
                                       encodedTile,
-                                      static_cast<float>(f)};
+                                      static_cast<float>(f) +
+                                          (isLeafBlock(bid) ? 16.0f : 0.0f)};
 
                         auto setPos = [&](int vi, float px, float py, float pz) {
                             vtx[vi].px = px; vtx[vi].py = py; vtx[vi].pz = pz;

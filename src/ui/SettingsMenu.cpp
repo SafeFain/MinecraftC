@@ -130,6 +130,14 @@ void SettingsMenu::refreshButtons() {
             [this]{
                 m_settings.visualQuality = static_cast<VisualQuality>(
                     (static_cast<int>(m_settings.visualQuality) + 1) % 4);
+                m_settings.transparentLeaves =
+                    defaultLeafTransparency(m_settings.visualQuality);
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back(m_localization.format("settings.transparent_leaves", {
+            m_localization.text(m_settings.transparentLeaves
+                ? "common.on" : "common.off")}), [this]{
+                m_settings.transparentLeaves = !m_settings.transparentLeaves;
                 m_onChanged(); refreshButtons();
             });
         const char* shadowNames[] = {"common.off", "settings.shadow_low",

@@ -148,6 +148,7 @@
   "settings.cloud_distance": "Distancia de las nubes: {0} bloques",
   "settings.smooth_lighting": "Iluminación suave: {0}",
   "settings.visual_quality": "Calidad visual: {0}",
+  "settings.transparent_leaves": "Hojas transparentes: {0}",
   "settings.visual_low": "Baja",
   "settings.visual_medium": "Media",
   "settings.visual_high": "Alta",

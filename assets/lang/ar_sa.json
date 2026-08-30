@@ -148,6 +148,7 @@
   "settings.cloud_distance": "مسافة السحب: {0} مكعب",
   "settings.smooth_lighting": "الإضاءة الناعمة: {0}",
   "settings.visual_quality": "جودة الرسوميات: {0}",
+  "settings.transparent_leaves": "شفافية الأوراق: {0}",
   "settings.visual_low": "منخفضة",
   "settings.visual_medium": "متوسطة",
   "settings.visual_high": "عالية",

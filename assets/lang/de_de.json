@@ -148,6 +148,7 @@
   "settings.cloud_distance": "Wolkendistanz: {0} Blöcke",
   "settings.smooth_lighting": "Weiche Beleuchtung: {0}",
   "settings.visual_quality": "Grafikqualität: {0}",
+  "settings.transparent_leaves": "Transparente Blätter: {0}",
   "settings.visual_low": "Niedrig",
   "settings.visual_medium": "Mittel",
   "settings.visual_high": "Hoch",

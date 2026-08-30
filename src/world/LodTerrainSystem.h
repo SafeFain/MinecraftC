@@ -64,6 +64,12 @@ struct LodTileData {
     size_t memoryBytes() const;
 };
 
+// Level-zero tiles align exactly with chunks.  Optional neighboring exact
+// tiles provide the one-voxel horizontal ring required by the normal chunk
+// mesher without making LOD tiles own or retain adjacent data.
+using LodExactNeighborTiles =
+    std::array<std::optional<LodTileData>, ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS.size()>;
+
 struct LodRenderSubmission {
     const ChunkMesh* mesh = nullptr;
     glm::mat4 model{1.0f};
@@ -75,12 +81,15 @@ struct LodRenderSubmission {
 
 LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                     const LodTileKey& key);
-LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks,
-                                 int maximumSpans = 24);
+LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks);
+std::vector<uint8_t> encodeLodTilePayload(const LodTileData& tile);
+bool decodeLodTilePayload(const std::vector<uint8_t>& payload,
+                          LodTileData& tile);
 void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
                      int cellSize);
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
-                           int maximumSpans);
+                           int maximumSpans,
+                           const LodExactNeighborTiles* neighbors = nullptr);
 
 class LodTerrainSystem {
 public:
@@ -107,6 +116,9 @@ public:
     size_t residentCpuBytes() const { return m_cpuBytes; }
     size_t residentGpuBytes() const { return m_gpuBytes; }
     int tasksInFlight() const { return m_tasksInFlight.load(); }
+    size_t selectedTileCount() const { return m_desired.size(); }
+    size_t selectedTileCountAtLevel(uint8_t level) const;
+    float selectedMaximumDistance() const;
 
 private:
     struct Request {

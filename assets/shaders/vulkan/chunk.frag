@@ -141,9 +141,24 @@ void main() {
     vec2 dx=dFdx(tileUv)*(15.0/16.0)/tiles;
     vec2 dy=dFdy(tileUv)*(15.0/16.0)/tiles;
     vec4 texel=textureGrad(blockAtlas,uv,dx,dy);
-    vec3 tangentNormal=textureGrad(normalAtlas,uv,dx,dy).xyz*2.0-1.0;
-    vec4 properties=textureGrad(propertyAtlas,uv,dx,dy);
+    bool leafSurface=face>=16.0;
+    float surfaceFace=leafSurface?face-16.0:face;
+    // Low quality sets materialParams.w to zero. Keep this branch uniform for
+    // the whole draw so mobile GPUs can skip two texture fetches and all
+    // tangent-space/specular work instead of merely multiplying it away.
+    bool materialDetail=environment.materialParams.w>0.001;
+    vec3 tangentNormal=vec3(0.0,0.0,1.0);
+    vec4 properties=vec4(0.82,0.0,0.0,1.0);
+    if(materialDetail){
+        tangentNormal=textureGrad(normalAtlas,uv,dx,dy).xyz*2.0-1.0;
+        properties=textureGrad(propertyAtlas,uv,dx,dy);
+    }
     texel.a*=lighting.w;
+    if(leafSurface&&environment.shadowOptions.w<0.5&&
+       texel.a<frame.atlasAndLighting.z){
+        texel.rgb=textureLod(blockAtlas,uv,4.0).rgb;
+        texel.a=1.0;
+    }
     if(texel.a<frame.atlasAndLighting.z)discard;
     float packed=floor(fract(tile)*512.0+0.5);
     vec2 flatLight=vec2(floor(packed/16.0),mod(packed,16.0))/15.0;
@@ -154,11 +169,11 @@ void main() {
     float blockLight=pow(clamp(light.y,0.0,1.0),1.35);
     bool isLava=abs(slot-environment.materialParams.x)<0.25;
     bool isWater=abs(slot-environment.materialParams.y)<0.25;
-    vec3 geometricNormal=faceNormal(face);
-    float detailStrength=face>5.5?0.30:isWater?0.0:isLava?0.46:1.0;
+    vec3 geometricNormal=faceNormal(surfaceFace);
+    float detailStrength=surfaceFace>5.5?0.30:isWater?0.0:isLava?0.46:1.0;
     vec3 normal=detailNormal(geometricNormal,tangentNormal,
                              detailStrength*environment.materialParams.w);
-    if(isWater&&face<0.5){
+    if(isWater&&surfaceFace<0.5){
         float time=environment.weatherParams.x;
         vec2 wave=vec2(sin(worldPosition.x*0.72+time*1.35)+
                        sin(worldPosition.z*1.31-time*0.84),
@@ -166,15 +181,18 @@ void main() {
                        cos(worldPosition.x*1.17+time*0.73));
         normal=normalize(geometricNormal+vec3(wave.x,0.0,wave.y)*0.055);
     }
-    float diffuse=face>5.5?0.32:
+    float diffuse=surfaceFace>5.5?0.32:
         max(dot(normal,normalize(environment.lightDirection.xyz)),0.0);
     float topSurface=max(geometricNormal.y,0.0);
     float wetness=environment.weatherParams.y*skyLight*topSurface;
-    float cloudNoise=valueNoise(worldPosition.xz*0.010+
-        vec2(environment.weatherParams.x*0.004,0.0));
-    cloudNoise=0.58+0.42*cloudNoise;
-    float cloudShadow=mix(1.0,cloudNoise,
-        environment.weatherParams.w*(0.45+0.55*environment.weatherParams.y));
+    float cloudShadow=1.0;
+    if(environment.weatherParams.w>0.001){
+        float cloudNoise=valueNoise(worldPosition.xz*0.010+
+            vec2(environment.weatherParams.x*0.004,0.0));
+        cloudNoise=0.58+0.42*cloudNoise;
+        cloudShadow=mix(1.0,cloudNoise,
+            environment.weatherParams.w*(0.45+0.55*environment.weatherParams.y));
+    }
     float visibility=(isLod?1.0:shadowVisibility(worldPosition,normal))*cloudShadow;
     vec3 illumination=environment.ambientColorIntensity.rgb*
         environment.ambientColorIntensity.a*skyLight*0.72;
@@ -187,9 +205,9 @@ void main() {
         illumination=max(illumination,vec3(2.15,0.72,0.16)*
             max(properties.b,isLava?1.0:0.0));
 
-    float roughness=isWater?0.08:mix(properties.r,0.82,step(5.5,face));
+    float roughness=isWater?0.08:mix(properties.r,0.82,step(5.5,surfaceFace));
     roughness=mix(roughness,0.16,wetness*0.82);
-    if(face<5.5){
+    if(materialDetail&&surfaceFace<5.5){
         vec3 viewDir=normalize(environment.cameraPosition.xyz-worldPosition);
         vec3 halfDir=normalize(viewDir+normalize(environment.lightDirection.xyz));
         float exponent=mix(128.0,10.0,roughness*roughness);

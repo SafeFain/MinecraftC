@@ -122,6 +122,7 @@ public:
     void resumePresentation() override {}
     void beginFrame() override {}
     void setVisualQuality(VisualQuality) override {}
+    void setLeafTransparency(bool) override {}
     void finishScene(const PostProcessState&) override {}
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override {}
     void renderSky(const RenderEnvironment&, const glm::mat4&,

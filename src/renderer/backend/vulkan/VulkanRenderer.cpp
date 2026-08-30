@@ -202,7 +202,8 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->queueViewModel = false;
     m_impl->submittedShadowChunks.clear();
     m_impl->shadowUpdateQueued = false;
-    m_impl->submittedChunkEnvironment.shadowOptions = glm::vec4(0.0f);
+    m_impl->submittedChunkEnvironment.shadowOptions = {
+        0.0f, 0.0f, 0.0f, m_leafTransparency ? 1.0f : 0.0f};
     m_impl->submittedUi.clear();
     m_impl->submittedParticles.clear();
     m_impl->submittedModelOpaque.clear();
@@ -343,6 +344,12 @@ void VulkanRenderer::beginFrame() {
 void VulkanRenderer::setVisualQuality(VisualQuality quality) {
     m_visualQuality = quality;
     if (m_impl) m_impl->configureVisualQuality(quality);
+}
+
+void VulkanRenderer::setLeafTransparency(bool enabled) {
+    m_leafTransparency = enabled;
+    if (m_impl)
+        m_impl->submittedChunkEnvironment.shadowOptions.w = enabled ? 1.0f : 0.0f;
 }
 
 void VulkanRenderer::finishScene(const PostProcessState& state) {
@@ -507,7 +514,8 @@ void VulkanRenderer::renderChunkShadows(
     m_impl->submittedShadowChunks.clear();
     m_impl->shadowUpdateQueued=false;
     ChunkEnvironmentUniforms& environment=m_impl->submittedChunkEnvironment;
-    environment.shadowOptions=glm::vec4(0.0f);
+    environment.shadowOptions={
+        0.0f,0.0f,0.0f,m_leafTransparency?1.0f:0.0f};
     if(quality==ShadowQuality::Off||m_environment.daylight<0.12f||
        m_environment.directIntensity<0.08f||chunks.empty())return;
     const bool qualityChanged=quality!=m_impl->shadow.shadowQuality;
@@ -553,7 +561,8 @@ void VulkanRenderer::renderChunkShadows(
     environment.shadowSplits=m_impl->shadowCascades.splits;
     environment.shadowOptions={static_cast<float>(m_impl->shadowCascades.count),
         static_cast<float>(m_impl->shadowCascades.resolution),
-        m_impl->shadowCascades.count<=1?1.0f:2.0f,0.0f};
+        m_impl->shadowCascades.count<=1?1.0f:2.0f,
+        m_leafTransparency?1.0f:0.0f};
     const auto material=m_impl->materials.find(m_chunkOpaque.value);
     m_impl->shadowAtlasSet=material==m_impl->materials.end()?VK_NULL_HANDLE:
         material->second.descriptorSet;

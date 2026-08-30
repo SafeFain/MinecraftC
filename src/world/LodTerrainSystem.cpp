@@ -21,7 +21,7 @@
 #include <type_traits>
 
 namespace {
-constexpr uint32_t CACHE_REVISION = 2;
+constexpr uint32_t CACHE_REVISION = 3;
 constexpr size_t CPU_LIMIT = 64u * 1024u * 1024u;
 constexpr size_t GPU_LIMIT = 128u * 1024u * 1024u;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
@@ -67,9 +67,8 @@ Bytes encodeTile(const LodTileData& tile) {
     payload.reserve(4096);
     for (const LodColumn& column : tile.columns) {
         append<uint8_t>(payload, static_cast<uint8_t>(column.exact));
-        append<uint8_t>(payload, static_cast<uint8_t>(
-            std::min<size_t>(column.spans.size(), 24)));
-        for (size_t i = 0; i < std::min<size_t>(column.spans.size(), 24); ++i) {
+        append<uint16_t>(payload, static_cast<uint16_t>(column.spans.size()));
+        for (size_t i = 0; i < column.spans.size(); ++i) {
             append<int16_t>(payload, column.spans[i].bottom);
             append<int16_t>(payload, column.spans[i].top);
             append<uint8_t>(payload, static_cast<uint8_t>(column.spans[i].block));
@@ -81,13 +80,15 @@ Bytes encodeTile(const LodTileData& tile) {
 bool decodeTile(const Bytes& payload, LodTileData& tile) {
     size_t cursor = 0;
     for (LodColumn& column : tile.columns) {
-        uint8_t exact = 0, count = 0;
-        if (!read(payload, cursor, exact) || !read(payload, cursor, count) || count > 24)
+        uint8_t exact = 0;
+        uint16_t count = 0;
+        if (!read(payload, cursor, exact) || !read(payload, cursor, count) ||
+            count > Config::WORLD_HEIGHT)
             return false;
         column.exact = exact != 0;
         column.spans.clear();
         column.spans.reserve(count);
-        for (uint8_t i = 0; i < count; ++i) {
+        for (uint16_t i = 0; i < count; ++i) {
             LodSpan span;
             uint8_t block = 0;
             if (!read(payload, cursor, span.bottom) ||
@@ -173,6 +174,21 @@ std::filesystem::path tilePath(const std::filesystem::path& root,
 std::filesystem::path exactPath(const std::filesystem::path& root, int cx, int cz) {
     return root / "exact" /
         ("c_" + std::to_string(cx) + "_" + std::to_string(cz) + ".lod");
+}
+
+LodExactNeighborTiles readExactNeighbors(const std::filesystem::path& root,
+                                         const WorldGenerator& generator,
+                                         int cx, int cz) {
+    LodExactNeighborTiles result;
+    for (size_t i = 0; i < ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS.size(); ++i) {
+        const auto& offset = ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS[i];
+        LodTileData tile;
+        const int nx = cx + offset[0];
+        const int nz = cz + offset[1];
+        if (readTileFile(exactPath(root, nx, nz), {nx, nz, 0}, generator, tile))
+            result[i].emplace(std::move(tile));
+    }
+    return result;
 }
 
 BlockId heavenSurface(WorldGenerator::HeavenBiome biome) {
@@ -317,6 +333,15 @@ size_t LodTileData::memoryBytes() const {
     return bytes;
 }
 
+std::vector<uint8_t> encodeLodTilePayload(const LodTileData& tile) {
+    return encodeTile(tile);
+}
+
+bool decodeLodTilePayload(const std::vector<uint8_t>& payload,
+                          LodTileData& tile) {
+    return decodeTile(payload, tile);
+}
+
 LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                     const LodTileKey& key) {
     LodTileData tile;
@@ -446,8 +471,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     return tile;
 }
 
-LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks,
-                                 int maximumSpans) {
+LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks) {
     LodTileData tile;
     if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME)) return tile;
     auto index = [](int x, int y, int z) {
@@ -462,25 +486,14 @@ LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks,
             while (y < Config::WORLD_MAX_Y) {
                 BlockId block = static_cast<BlockId>(blocks[index(x, y, z)]);
                 if (block == BlockId::AIR) { ++y; continue; }
-                const RenderLayer layer = getBlockProps(block).layer;
                 const int bottom = y;
-                BlockId representative = block;
+                const BlockId runBlock = block;
                 while (++y < Config::WORLD_MAX_Y) {
                     block = static_cast<BlockId>(blocks[index(x, y, z)]);
-                    if (block == BlockId::AIR || getBlockProps(block).layer != layer) break;
-                    representative = block;
+                    if (block != runBlock) break;
                 }
                 column.spans.push_back({static_cast<int16_t>(bottom),
-                    static_cast<int16_t>(y - 1), representative});
-            }
-            if (static_cast<int>(column.spans.size()) > maximumSpans) {
-                std::stable_sort(column.spans.begin(), column.spans.end(),
-                    [](const LodSpan& a, const LodSpan& b) {
-                        return a.top > b.top;
-                    });
-                column.spans.resize(static_cast<size_t>(maximumSpans));
-                std::sort(column.spans.begin(), column.spans.end(),
-                    [](const LodSpan& a, const LodSpan& b) { return a.bottom < b.bottom; });
+                    static_cast<int16_t>(y - 1), runBlock});
             }
         }
     }
@@ -499,8 +512,95 @@ void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
     approximate = exact;
 }
 
+namespace {
+bool isFullyExact(const LodTileData& data) {
+    return std::all_of(data.columns.begin(), data.columns.end(),
+        [](const LodColumn& column) { return column.exact; });
+}
+
+BlockId exactColumnBlock(const LodColumn& column, int y) {
+    for (const LodSpan& span : column.spans) {
+        if (y < span.bottom) break;
+        if (y <= span.top) return span.block;
+    }
+    return BlockId::AIR;
+}
+
+ChunkMesh buildExactLodTileMesh(const LodTileData& data,
+                                const LodExactNeighborTiles* neighbors) {
+    std::vector<uint8_t> blocks(static_cast<size_t>(Config::CHUNK_VOLUME), 0);
+    int columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z];
+    for (auto& column : columnMaxY)
+        std::fill(std::begin(column), std::end(column), Config::WORLD_MIN_Y - 1);
+    auto index = [](int x, int y, int z) {
+        return x + z * Config::CHUNK_SIZE_X +
+            Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+    };
+    for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+            for (const LodSpan& span : data.at(x, z).spans) {
+                const int bottom = std::max<int>(span.bottom, Config::WORLD_MIN_Y);
+                const int top = std::min<int>(span.top, Config::WORLD_MAX_Y - 1);
+                for (int y = bottom; y <= top; ++y)
+                    blocks[static_cast<size_t>(index(x, y, z))] =
+                        static_cast<uint8_t>(span.block);
+                columnMaxY[x][z] = std::max(columnMaxY[x][z], top);
+            }
+        }
+    }
+
+    auto neighborBlock = [&](int x, int y, int z) -> BlockId {
+        if (!Config::isValidWorldY(y)) return BlockId::AIR;
+        if (x >= 0 && x < Config::CHUNK_SIZE_X &&
+            z >= 0 && z < Config::CHUNK_SIZE_Z)
+            return static_cast<BlockId>(blocks[static_cast<size_t>(index(x, y, z))]);
+
+        const int dx = x < 0 ? -1 : (x >= Config::CHUNK_SIZE_X ? 1 : 0);
+        const int dz = z < 0 ? -1 : (z >= Config::CHUNK_SIZE_Z ? 1 : 0);
+        const int localX = x < 0 ? Config::CHUNK_SIZE_X - 1 :
+            (x >= Config::CHUNK_SIZE_X ? 0 : x);
+        const int localZ = z < 0 ? Config::CHUNK_SIZE_Z - 1 :
+            (z >= Config::CHUNK_SIZE_Z ? 0 : z);
+        if (neighbors) {
+            for (size_t i = 0; i < ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS.size(); ++i) {
+                const auto& offset = ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS[i];
+                if (offset[0] == dx && offset[1] == dz && (*neighbors)[i])
+                    return exactColumnBlock((*neighbors)[i]->at(localX, localZ), y);
+            }
+        }
+
+        // Match the prior LOD edge policy when an adjacent exact cache does
+        // not exist: extend fluid at the boundary so a missing tile cannot
+        // create a full-depth ocean wall, while ordinary solids expose a face.
+        const int edgeX = std::clamp(x, 0, Config::CHUNK_SIZE_X - 1);
+        const int edgeZ = std::clamp(z, 0, Config::CHUNK_SIZE_Z - 1);
+        const BlockId edge = static_cast<BlockId>(
+            blocks[static_cast<size_t>(index(edgeX, y, edgeZ))]);
+        return isFluid(edge) ? edge : BlockId::AIR;
+    };
+    auto fixedLodLight = [](int, int, int) -> LightSample { return {15, 0}; };
+
+    ChunkMesh mesh;
+    mesh.build(0, 0, blocks.data(), columnMaxY, neighborBlock, fixedLodLight);
+    // LOD is never submitted to the shadow pass.  The shared builder reuses
+    // opaque vertices for shadow indices, so trimming the unused tail retains
+    // every visible index without changing geometry.
+    const size_t visibleIndices = mesh.translucentIndexOffset +
+        mesh.translucentIndexCount;
+    mesh.indices.resize(visibleIndices);
+    mesh.shadowCasterIndexOffset = 0;
+    mesh.shadowCasterIndexCount = 0;
+    mesh.indexCount = mesh.indices.size();
+    return mesh;
+}
+}
+
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
-                           int maximumSpans) {
+                           int maximumSpans,
+                           const LodExactNeighborTiles* neighbors) {
+    if (cellSize == 1 && isFullyExact(data))
+        return buildExactLodTileMesh(data, neighbors);
+
     ChunkMesh mesh;
     std::vector<unsigned int> opaque, translucent;
     std::vector<std::pair<int, int>> intervals;
@@ -511,6 +611,9 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 ? column.spans.size() - static_cast<size_t>(maximumSpans) : 0;
             for (size_t spanIndex = first; spanIndex < column.spans.size(); ++spanIndex) {
                 const LodSpan& span = column.spans[spanIndex];
+                const BlockProperties& properties = getBlockProps(span.block);
+                if (cellSize > 1 && !properties.solid && !isFluid(span.block))
+                    continue;
                 const float x0 = static_cast<float>(x * cellSize);
                 const float x1 = static_cast<float>((x + 1) * cellSize);
                 const float z0 = static_cast<float>(z * cellSize);
@@ -579,7 +682,7 @@ LodTerrainSystem::~LodTerrainSystem() {
 
 void LodTerrainSystem::setSaveStore(SaveStore* store) {
     m_saveStore = store;
-    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r2" /
+    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r3" /
         ("d_" + std::to_string(static_cast<int>(m_generator
             ? m_generator->dimension() : DimensionId::Overworld)))
         : std::filesystem::path{};
@@ -599,7 +702,7 @@ void LodTerrainSystem::reset(WorldGenerator* generator) {
     m_cpuBytes = m_gpuBytes = 0;
     m_generator = generator;
     if (m_saveStore && m_generator) {
-        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r2" /
+        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r3" /
             ("d_" + std::to_string(static_cast<int>(m_generator->dimension())));
     }
     ++m_epoch;
@@ -688,9 +791,11 @@ void LodTerrainSystem::rebuildSelection() {
     for (int level = 0; level <= maximumLevel; ++level) {
         const int cellSize = 1 << level;
         const int tileSize = LodTileData::SIDE * cellSize;
-        const float minimum = std::max(inner, level == 0 ? inner : cellSize * quality * 0.5f);
-        const float maximum = std::min(outer,
-            level == maximumLevel ? outer : static_cast<float>(cellSize * quality));
+        const float minimum = std::max(
+            inner, level == 0 ? inner : cellSize * quality * 0.5f);
+        const float levelMaximum = level == maximumLevel
+            ? outer : static_cast<float>(cellSize * quality);
+        const float maximum = std::min(outer, levelMaximum);
         if (maximum <= minimum) continue;
         const int minTileX = floorDiv(static_cast<int>(std::floor(
             centerX - maximum - prefetchDistance)), tileSize);
@@ -740,6 +845,20 @@ void LodTerrainSystem::rebuildSelection() {
     m_selectionDirty = false;
 }
 
+size_t LodTerrainSystem::selectedTileCountAtLevel(uint8_t level) const {
+    return static_cast<size_t>(std::count_if(
+        m_desired.begin(), m_desired.end(), [level](const Request& request) {
+            return request.key.level == level;
+        }));
+}
+
+float LodTerrainSystem::selectedMaximumDistance() const {
+    float distance = 0.0f;
+    for (const Request& request : m_desired)
+        distance = std::max(distance, request.maximumDistance);
+    return distance;
+}
+
 void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunks) {
     if (!m_threadPool || !m_generator || m_cacheRoot.empty()) return;
     const LodWorkBudget budget = lodWorkBudget(m_settings.aggressiveness);
@@ -760,7 +879,7 @@ void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunk
         ++m_tasksInFlight;
         m_threadPool->enqueuePriority([this, blocks = std::move(blocks), cx, cz,
                                       revision, epoch, generator, root]() mutable {
-            LodTileData data = extractExactLodChunk(blocks, 24);
+            LodTileData data = extractExactLodChunk(blocks);
             writeTileFile(exactPath(root, cx, cz), {cx, cz, 0}, *generator, data);
             {
                 std::lock_guard lock(m_completionMutex);
@@ -815,7 +934,14 @@ void LodTerrainSystem::enqueueRequests() {
                     writeTileFile(tilePath(root, key), key, *generator, data);
                 }
                 overlayExactChunks(data, key, root, *generator, exact);
-                ChunkMesh mesh = buildLodTileMesh(data, 1 << key.level, spanLimit);
+                LodExactNeighborTiles neighbors;
+                const LodExactNeighborTiles* neighborPointer = nullptr;
+                if (key.level == 0 && isFullyExact(data)) {
+                    neighbors = readExactNeighbors(root, *generator, key.x, key.z);
+                    neighborPointer = &neighbors;
+                }
+                ChunkMesh mesh = buildLodTileMesh(
+                    data, 1 << key.level, spanLimit, neighborPointer);
                 {
                     std::lock_guard lock(m_completionMutex);
                     m_completions.push_back(
@@ -857,11 +983,15 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
 
 void LodTerrainSystem::invalidateTilesForChunk(int cx, int cz) {
     for (auto& [key, tile] : m_tiles) {
+        const bool exactNeighborDependency = key.level == 0 &&
+            std::abs(key.x - cx) <= 1 && std::abs(key.z - cz) <= 1;
         const int chunksPerSide = 1 << key.level;
         const int minimumX = key.x * chunksPerSide;
         const int minimumZ = key.z * chunksPerSide;
-        if (cx < minimumX || cx >= minimumX + chunksPerSide ||
-            cz < minimumZ || cz >= minimumZ + chunksPerSide) continue;
+        const bool containsChunk = cx >= minimumX &&
+            cx < minimumX + chunksPerSide && cz >= minimumZ &&
+            cz < minimumZ + chunksPerSide;
+        if (!containsChunk && !exactNeighborDependency) continue;
         // Stale-while-revalidate: never punch a visible hole while the exact
         // replacement is generated and waiting for its GPU upload budget.
         tile->dirty = true;

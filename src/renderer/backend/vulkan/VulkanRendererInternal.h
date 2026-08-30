@@ -1422,6 +1422,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     ShadowConstants constants;
                     constants.lightMvp=shadowCascades.lightViewProjection[cascade]*submission.model;
                     constants.atlasParams.x=static_cast<float>(submittedShadowAtlasTiles);
+                    constants.atlasParams.y=submittedChunkEnvironment.shadowOptions.w;
                     vkCmdPushConstants(command,shadow.shadowPipelineLayout,
                         VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
                         0,sizeof(constants),&constants);

@@ -177,9 +177,10 @@ void VulkanPipelineFactory::createShadowSet(
              VK_SHADER_STAGE_FRAGMENT_BIT, fragment, "main", nullptr}}};
         const VkVertexInputBindingDescription binding{
             0, sizeof(MeshVertex), VK_VERTEX_INPUT_RATE_VERTEX};
-        const std::array<VkVertexInputAttributeDescription, 2> attributes{{
+        const std::array<VkVertexInputAttributeDescription, 3> attributes{{
             {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(MeshVertex, px)},
-            {2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(MeshVertex, u)}}};
+            {2, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(MeshVertex, u)},
+            {3, 0, VK_FORMAT_R32_SFLOAT, offsetof(MeshVertex, face)}}};
         VkPipelineVertexInputStateCreateInfo input{};
         input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         input.vertexBindingDescriptionCount = 1;
