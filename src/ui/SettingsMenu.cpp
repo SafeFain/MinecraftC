@@ -81,6 +81,7 @@ void SettingsMenu::showPage(SettingsPage page) {
 void SettingsMenu::refreshButtons() {
     m_buttons.clear();
     m_frameRateButton = -1;
+    m_backButton = -1;
     m_frameRateDragging = false;
     if (m_page == SettingsPage::General) {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
@@ -91,6 +92,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.key_bindings"), [this]{
             showPage(SettingsPage::KeyBindings);
         });
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("common.back"), m_onBack);
     } else if (m_page == SettingsPage::Video) {
         m_frameRateButton = static_cast<int>(m_buttons.size());
@@ -101,28 +103,7 @@ void SettingsMenu::refreshButtons() {
             m_onChanged();
             refreshButtons();
         });
-        const char* indicatorNames[] = {
-            "settings.attack_crosshair", "settings.attack_hotbar",
-            "settings.attack_off"};
-        m_buttons.emplace_back(m_localization.format("settings.attack_indicator", {
-            m_localization.text(indicatorNames[
-                static_cast<int>(m_settings.attackIndicator)])}), [this] {
-            m_settings.attackIndicator = static_cast<AttackIndicator>(
-                (static_cast<int>(m_settings.attackIndicator) + 1) % 3);
-            m_onChanged();
-            refreshButtons();
-        });
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
-        m_buttons.emplace_back(m_localization.format("settings.clouds", {
-            m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),
-            [this]{ toggleCloudRendering(); });
-        m_buttons.emplace_back(labelForCloudRenderDist(),
-                               [this]{ cycleCloudRenderDistance(); });
-        m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
-            m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
-                m_settings.smoothLighting = !m_settings.smoothLighting;
-                m_onChanged(); refreshButtons();
-            });
         const char* visualNames[] = {"settings.visual_low", "settings.visual_medium",
             "settings.visual_high", "settings.visual_ultra"};
         m_buttons.emplace_back(m_localization.format("settings.visual_quality", {
@@ -134,10 +115,9 @@ void SettingsMenu::refreshButtons() {
                     defaultLeafTransparency(m_settings.visualQuality);
                 m_onChanged(); refreshButtons();
             });
-        m_buttons.emplace_back(m_localization.format("settings.transparent_leaves", {
-            m_localization.text(m_settings.transparentLeaves
-                ? "common.on" : "common.off")}), [this]{
-                m_settings.transparentLeaves = !m_settings.transparentLeaves;
+        m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
+            m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
+                m_settings.smoothLighting = !m_settings.smoothLighting;
                 m_onChanged(); refreshButtons();
             });
         const char* shadowNames[] = {"common.off", "settings.shadow_low",
@@ -148,6 +128,28 @@ void SettingsMenu::refreshButtons() {
                     (static_cast<int>(m_settings.shadowQuality) + 1) % 4);
                 m_onChanged(); refreshButtons();
             });
+        m_buttons.emplace_back(m_localization.format("settings.transparent_leaves", {
+            m_localization.text(m_settings.transparentLeaves
+                ? "common.on" : "common.off")}), [this]{
+                m_settings.transparentLeaves = !m_settings.transparentLeaves;
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back(m_localization.format("settings.clouds", {
+            m_localization.text(m_settings.renderClouds ? "common.on" : "common.off")}),
+            [this]{ toggleCloudRendering(); });
+        m_buttons.emplace_back(labelForCloudRenderDist(),
+                               [this]{ cycleCloudRenderDistance(); });
+        const char* indicatorNames[] = {
+            "settings.attack_crosshair", "settings.attack_hotbar",
+            "settings.attack_off"};
+        m_buttons.emplace_back(m_localization.format("settings.attack_indicator", {
+            m_localization.text(indicatorNames[
+                static_cast<int>(m_settings.attackIndicator)])}), [this] {
+            m_settings.attackIndicator = static_cast<AttackIndicator>(
+                (static_cast<int>(m_settings.attackIndicator) + 1) % 3);
+            m_onChanged();
+            refreshButtons();
+        });
         m_buttons.emplace_back(m_localization.format("settings.gui_scale", {
             m_settings.guiScale == 0 ? m_localization.text("common.auto") :
             std::to_string(m_settings.guiScale) + "x"}), [this]{
@@ -157,6 +159,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.lod"), [this]{
             showPage(SettingsPage::Lod);
         });
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             showPage(SettingsPage::General);
         });
@@ -204,6 +207,7 @@ void SettingsMenu::refreshButtons() {
                         (static_cast<int>(m_settings.lodPrecision) + 1) % 4);
                     m_onChanged(); refreshButtons();
                 });
+            m_backButton = static_cast<int>(m_buttons.size());
             m_buttons.emplace_back(m_localization.text("settings.lod_back"), [this] {
                 showPage(SettingsPage::Video);
             });
@@ -218,6 +222,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.touch_controls"), [this]{
             showPage(SettingsPage::Touch);
         });
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             showPage(SettingsPage::General);
         });
@@ -246,11 +251,12 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.reset"), [this]{
             m_settings.resetBindings(); m_onChanged(); refreshButtons();
         });
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back_to_bindings"), [this]{
             showPage(SettingsPage::KeyBindings);
         });
     } else if (m_page == SettingsPage::Controller) {
-        constexpr int visible = 7;
+        constexpr int visible = 6;
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
         for (int i = m_controlOffset; i < end; ++i) {
             const InputAction action = static_cast<InputAction>(i);
@@ -297,6 +303,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.controller_reset"), [this] {
             m_settings.resetGamepadBindings(); m_onChanged(); refreshButtons();
         });
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back_to_bindings"), [this] {
             showPage(SettingsPage::KeyBindings);
         });
@@ -316,6 +323,7 @@ void SettingsMenu::refreshButtons() {
             m_settings.touchControlOpacity=values[(it==std::end(values)?0:(it-std::begin(values)+1)%5)];m_onChanged();refreshButtons();});
         m_buttons.emplace_back(m_localization.format("settings.touch_layout",{m_localization.text(m_settings.touchLeftHanded?"settings.touch_left":"settings.touch_right")}),[this]{
             m_settings.touchLeftHanded=!m_settings.touchLeftHanded;m_onChanged();refreshButtons();});
+        m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back_to_bindings"),[this]{showPage(SettingsPage::KeyBindings);});
     }
     m_selectedIdx = std::clamp(m_selectedIdx, 0, std::max(0, static_cast<int>(m_buttons.size()) - 1));
@@ -358,8 +366,11 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
                          m_page == SettingsPage::Controller ||
                          m_page == SettingsPage::Lod;
+    const bool standaloneBack = m_backButton >= 0 &&
+        m_backButton + 1 == static_cast<int>(m_buttons.size());
     const SettingsButtonLayout layout = settingsButtonLayout(
-        titleY, m_buttons.size(), hasHelp);
+        static_cast<float>(width), titleY, m_buttons.size(), hasHelp,
+        standaloneBack);
     if (hasHelp) {
         const std::string help = m_localization.text(
             m_page == SettingsPage::Lod
@@ -372,12 +383,11 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         UiTheme::textWithShadow(ui, help, (width - helpSize.x) * .5f,
                                 layout.helpY, 1.0f, glm::vec3(.72f));
     }
-    const float x = (width - Config::UI_BUTTON_WIDTH) * .5f;
     for (size_t i = 0; i < m_buttons.size(); ++i) {
-        const float y = layout.firstButtonY -
-                        i * (layout.buttonHeight + 5.0f);
-        m_buttons[i].setPosition(x, y);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, layout.buttonHeight);
+        const glm::vec2 position = settingsButtonPosition(
+            layout, i, m_buttons.size(), standaloneBack);
+        m_buttons[i].setPosition(position.x, position.y);
+        m_buttons[i].setSize(layout.buttonWidth, layout.buttonHeight);
         m_buttons[i].render(ui);
     }
     if (m_frameRateButton >= 0 &&
@@ -434,9 +444,20 @@ void SettingsMenu::onKeyPress(int key, int mods) {
         refreshButtons();
         return;
     }
+    const auto selectNeighbor = [this](int columnDelta, int rowDelta) {
+        if (m_buttons.empty()) return;
+        m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(false);
+        m_selectedIdx = settingsGridNeighbor(
+            m_selectedIdx, m_buttons.size(), columnDelta, rowDelta,
+            m_backButton >= 0 &&
+                m_backButton + 1 == static_cast<int>(m_buttons.size()));
+        m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
+    };
     switch (key) {
-        case Key::Up: case Key::W: navigateUp(m_buttons, m_selectedIdx); break;
-        case Key::Down: case Key::S: navigateDown(m_buttons, m_selectedIdx); break;
+        case Key::Up: case Key::W: selectNeighbor(0, -1); break;
+        case Key::Down: case Key::S: selectNeighbor(0, 1); break;
+        case Key::Left: case Key::A: selectNeighbor(-1, 0); break;
+        case Key::Right: case Key::D: selectNeighbor(1, 0); break;
         case Key::Enter: case Key::Space: activateSelected(m_buttons, m_selectedIdx); break;
         case Key::Escape:
             if (m_page != SettingsPage::General)
@@ -558,7 +579,7 @@ void SettingsMenu::onScroll(double yOffset) {
     }
     if (m_page != SettingsPage::KeyboardMouse &&
         m_page != SettingsPage::Controller) return;
-    const int visible = m_page == SettingsPage::Controller ? 7 : 8;
+    const int visible = m_page == SettingsPage::Controller ? 6 : 8;
     const int maximum = std::max(0, static_cast<int>(INPUT_ACTION_COUNT) - visible);
     m_controlOffset = std::clamp(m_controlOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
     refreshButtons();

@@ -37,16 +37,78 @@ struct SettingsButtonLayout {
     float helpY = 0.0f;
     float firstButtonY = 0.0f;
     float buttonHeight = 0.0f;
+    float buttonWidth = 0.0f;
+    float leftX = 0.0f;
+    float columnGap = 0.0f;
+    size_t rowCount = 0;
 };
 
 inline SettingsButtonLayout settingsButtonLayout(
-    float titleY, size_t buttonCount, bool hasHelp) {
+    float screenWidth, float titleY, size_t buttonCount, bool hasHelp,
+    bool standaloneLast = false) {
+    constexpr float horizontalMargin = 14.0f;
+    constexpr float columnGap = 8.0f;
     const float helpY = titleY - 34.0f;
     const float contentTop = hasHelp ? helpY - 10.0f : titleY - 18.0f;
+    const size_t contentCount = buttonCount -
+        (standaloneLast && buttonCount > 0 ? 1 : 0);
+    const size_t contentRows = (contentCount + 1) / 2;
+    const size_t rowCount = std::max<size_t>(
+        1, contentRows + (standaloneLast && buttonCount > 0 ? 1 : 0));
     const float buttonHeight = std::clamp(
-        (contentTop - 14.0f) / std::max<size_t>(1, buttonCount) - 5.0f,
+        (contentTop - 14.0f) / rowCount - 5.0f,
         22.0f, Config::UI_BUTTON_HEIGHT);
-    return {helpY, contentTop - buttonHeight, buttonHeight};
+    const float buttonWidth = std::max(1.0f, std::min(
+        Config::UI_BUTTON_WIDTH,
+        (screenWidth - horizontalMargin * 2.0f - columnGap) * 0.5f));
+    return {helpY, contentTop - buttonHeight, buttonHeight, buttonWidth,
+            (screenWidth - buttonWidth * 2.0f - columnGap) * 0.5f,
+            columnGap, rowCount};
+}
+
+inline glm::vec2 settingsButtonPosition(
+    const SettingsButtonLayout& layout, size_t index, size_t buttonCount,
+    bool standaloneLast = false) {
+    const bool isStandaloneLast = standaloneLast && buttonCount > 0 &&
+        index + 1 == buttonCount;
+    const size_t contentCount = buttonCount - (standaloneLast ? 1 : 0);
+    const size_t row = isStandaloneLast ? (contentCount + 1) / 2 : index / 2;
+    const bool centeredLast = isStandaloneLast ||
+        (buttonCount % 2 == 1 && index + 1 == buttonCount);
+    const float x = centeredLast
+        ? layout.leftX + (layout.buttonWidth + layout.columnGap) * 0.5f
+        : layout.leftX + static_cast<float>(index % 2) *
+            (layout.buttonWidth + layout.columnGap);
+    return {x, layout.firstButtonY - static_cast<float>(row) *
+        (layout.buttonHeight + 5.0f)};
+}
+
+inline int settingsGridNeighbor(int current, size_t buttonCount,
+                                int columnDelta, int rowDelta,
+                                bool standaloneLast = false) {
+    if (buttonCount == 0) return 0;
+    const int count = static_cast<int>(buttonCount);
+    const int contentCount = count - (standaloneLast ? 1 : 0);
+    current = std::clamp(current, 0, count - 1);
+    if (standaloneLast && current == count - 1) {
+        if (columnDelta != 0 || rowDelta == 0) return current;
+        return rowDelta > 0 ? 0 : std::max(0, contentCount - 1);
+    }
+    if (columnDelta != 0) {
+        const int neighbor = current + (columnDelta > 0 ? 1 : -1);
+        return neighbor >= 0 && neighbor < contentCount &&
+            neighbor / 2 == current / 2
+            ? neighbor : current;
+    }
+    if (rowDelta == 0) return current;
+    const int column = current % 2;
+    int neighbor = current + (rowDelta > 0 ? 2 : -2);
+    if (neighbor >= 0 && neighbor < contentCount) return neighbor;
+    if (standaloneLast && neighbor >= contentCount) return count - 1;
+    if (standaloneLast && neighbor < 0) return count - 1;
+    if (rowDelta > 0) return std::min(column, count - 1);
+    const int lastInColumn = ((count - 1 - column) / 2) * 2 + column;
+    return lastInColumn < count ? lastInColumn : std::max(0, lastInColumn - 2);
 }
 
 inline int frameRateFromSlider(float x, float left, float width) {
@@ -115,6 +177,7 @@ private:
     int m_captureAction = -1;
     int m_pressedButton = -1;
     int m_frameRateButton = -1;
+    int m_backButton = -1;
     bool m_frameRateDragging = false;
     TextEditBuffer m_lodDistanceText{{}, 4};
     bool m_lodDistanceEditing = false;

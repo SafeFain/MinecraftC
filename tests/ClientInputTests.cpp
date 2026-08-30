@@ -66,13 +66,47 @@ int main(){
             settingsParentPage(SettingsPage::Video)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Lod)==SettingsPage::Video,
             "top-level settings pages return to general settings");
-    const SettingsButtonLayout bindingLayout = settingsButtonLayout(468.0f,13,true);
+    const SettingsButtonLayout bindingLayout = settingsButtonLayout(620.0f,468.0f,13,true);
     require(bindingLayout.firstButtonY+bindingLayout.buttonHeight<=
                 bindingLayout.helpY-9.9f&&bindingLayout.firstButtonY>=0.0f,
             "binding controls stay below help text in a short window");
-    const SettingsButtonLayout generalLayout=settingsButtonLayout(468.0f,7,false);
+    require(bindingLayout.rowCount==7&&bindingLayout.buttonWidth==280.0f,
+            "settings height is based on two-column row count");
+    const SettingsButtonLayout generalLayout=settingsButtonLayout(480.0f,468.0f,5,false);
     require(generalLayout.firstButtonY+generalLayout.buttonHeight<=450.1f,
             "settings without help retain title clearance");
+    const glm::vec2 firstButton=settingsButtonPosition(generalLayout,0,5);
+    const glm::vec2 secondButton=settingsButtonPosition(generalLayout,1,5);
+    const glm::vec2 lastButton=settingsButtonPosition(generalLayout,4,5);
+    require(firstButton.x>=13.9f&&
+            secondButton.x+generalLayout.buttonWidth<=466.1f&&
+            firstButton.y==secondButton.y&&lastButton.x>firstButton.x&&
+            lastButton.x<secondButton.x,
+            "settings use bounded columns and center an unpaired final action");
+    require(settingsGridNeighbor(0,5,1,0)==1&&
+            settingsGridNeighbor(1,5,0,1)==3&&
+            settingsGridNeighbor(3,5,0,1)==1&&
+            settingsGridNeighbor(2,5,0,1)==4&&
+            settingsGridNeighbor(4,5,0,-1)==2&&
+            settingsGridNeighbor(4,5,1,0)==4,
+            "settings grid navigation follows visible rows and columns");
+    const SettingsButtonLayout backLayout = settingsButtonLayout(
+        620.0f, 468.0f, 6, false, true);
+    const glm::vec2 precedingButton = settingsButtonPosition(
+        backLayout, 4, 6, true);
+    const glm::vec2 backButton = settingsButtonPosition(
+        backLayout, 5, 6, true);
+    require(backLayout.rowCount==4&&backButton.y<precedingButton.y&&
+            backButton.x>backLayout.leftX&&
+            backButton.x<backLayout.leftX+backLayout.buttonWidth+
+                backLayout.columnGap,
+            "an even-count settings page puts Back alone on the bottom row");
+    require(settingsGridNeighbor(3,6,0,1,true)==5&&
+            settingsGridNeighbor(4,6,0,1,true)==5&&
+            settingsGridNeighbor(5,6,0,-1,true)==4&&
+            settingsGridNeighbor(5,6,0,1,true)==0&&
+            settingsGridNeighbor(5,6,1,0,true)==5,
+            "grid navigation treats the standalone Back row as the final row");
     require(frameRateFromSlider(10.0f,10.0f,170.0f)==30&&
             frameRateFromSlider(180.0f,10.0f,170.0f)==200&&
             frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
