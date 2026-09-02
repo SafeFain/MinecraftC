@@ -13,6 +13,7 @@ void Chunk::loadRawBlocks(const std::vector<uint8_t>& blocks) {
         throw std::runtime_error("Generated chunk cache has the wrong size");
     std::unique_lock lock(m_dataMutex);
     std::copy(blocks.begin(), blocks.end(), m_blocks.begin());
+    ++m_blockRevision;
     ++m_dataRevision;
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
@@ -46,6 +47,8 @@ void Chunk::setBlock(int x, int y, int z, BlockId id) {
     }
 
     std::unique_lock lock(m_dataMutex);
+    if (m_blocks[index(x, y, z)] != static_cast<uint8_t>(id))
+        ++m_blockRevision;
     m_blocks[index(x, y, z)] = static_cast<uint8_t>(id);
     ++m_dataRevision;
     m_dirty = true;

@@ -7,6 +7,9 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <memory>
+#include <unordered_map>
+#include "entity/EntityAi.h"
 
 #include <glm/glm.hpp>
 
@@ -20,6 +23,15 @@
 class Player;
 class IGameRenderer;
 class World;
+class Chunk;
+
+struct EntityAiStats {
+    size_t decisions = 0;
+    size_t sightQueries = 0;
+    size_t pathNodes = 0;
+    size_t activeSearches = 0;
+    size_t poiBlocks = 0;
+};
 
 struct Entity {
     uint64_t id = 0;
@@ -45,6 +57,8 @@ struct Entity {
     PlayerPhysics::HurtImmunity hurtImmunity;
     VillagerData villager;
     bool sleeping = false;
+    EntityAiState ai;
+    uint64_t shooterId = 0;
 };
 
 struct DeadEntityRender {
@@ -61,12 +75,13 @@ class EntityManager {
 public:
     explicit EntityManager(World& world) : m_world(world) {}
 
+    const EntityAiStats& aiStats() const { return m_aiStats; }
     void clear();
     void spawnItem(const glm::dvec3& position, ItemStack stack,
                    const glm::vec3& velocity = glm::vec3(0.0f),
                    float pickupDelaySeconds = 0.0f);
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
-                    float damage, bool playerOwned);
+                    float damage, bool playerOwned, uint64_t shooterId = 0);
     bool spawnMob(EntityType type, const glm::dvec3& position);
     void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
                   bool removeBlock = true);
@@ -118,6 +133,49 @@ public:
     }
 
 private:
+    EntityAiStats m_aiStats;
+    double m_aiTime = 0;
+    std::map<std::pair<int,int>,const Chunk*> m_aiChunks;
+    std::unordered_map<uint64_t,size_t> m_aiEntityIndices;
+    std::map<std::tuple<int,int,int>,std::vector<uint64_t>> m_aiBuckets;
+    struct NavigationRequest {
+        glm::dvec3 origin{0};
+        GroundNavigation::Goal goal;
+        NavigationPurpose purpose = NavigationPurpose::Move;
+        double queuedAt = 0;
+        std::unique_ptr<GroundNavigation::Search> search;
+        std::map<std::pair<int,int>,uint64_t> revisions;
+    };
+    std::map<uint64_t,NavigationRequest> m_navigation;
+    uint64_t m_searchCursor = 0;
+    struct AiArrow { glm::dvec3 position; glm::vec3 velocity; float damage; uint64_t shooterId; };
+    struct AiExplosion { glm::dvec3 position; uint32_t seed; };
+    std::vector<AiArrow> m_aiArrows;
+    std::vector<AiExplosion> m_aiExplosions;
+    GroundNavigation::Terrain navigationTerrain(
+        std::map<std::pair<int,int>,uint64_t>* revisions = nullptr) const;
+    void prepareAiFrame(float dt);
+    void scheduleNavigation(const glm::dvec3& playerPosition);
+    void requestNavigation(Entity& entity, const GroundNavigation::Goal& goal,
+                           NavigationPurpose purpose = NavigationPurpose::Move);
+    void cancelNavigation(Entity& entity);
+    bool revisionsCurrent(const std::map<std::pair<int,int>,uint64_t>& revisions) const;
+    Entity* aiEntity(uint64_t id);
+    std::vector<uint64_t> nearbyEntities(const glm::dvec3& position, double radius) const;
+    bool aiClearSight(const glm::dvec3& from, const glm::dvec3& to);
+    void decideBehavior(Entity& entity, Player& player, bool isDay,
+                        bool playerTargetable, uint64_t worldTick, bool thunderstorm);
+    void updateMobAi(Entity& entity, Player& player, float dt, bool isDay,
+                     bool playerTargetable, uint64_t worldTick, bool thunderstorm);
+    void followNavigation(Entity& entity, float dt);
+    void chooseEscape(Entity& entity, const glm::dvec3& danger);
+    void refreshPoiIndex();
+    void requestPoiClaim(Entity& entity);
+    bool interactablePoi(const Entity& entity, const glm::ivec3& poi);
+    std::optional<glm::dvec3> poiStand(const Entity& entity, const glm::ivec3& poi) const;
+    std::optional<GroundNavigation::Goal> poiGoal(const Entity& entity, const glm::ivec3& poi) const;
+    bool poiAvailable(const Entity& entity, const glm::ivec3& poi, bool bed) const;
+
     World& m_world;
     std::vector<Entity> m_entities;
     std::vector<DeadEntityRender> m_deadEntityRenders;
@@ -136,6 +194,8 @@ private:
         uint64_t revision = 0;
         std::vector<glm::ivec3> beds;
         std::vector<glm::ivec3> workstations;
+        size_t cursor = 0;
+        bool complete = false;
     };
     std::map<std::pair<int,int>, PoiChunk> m_poiChunks;
     struct LogicalVillage {
@@ -153,7 +213,9 @@ private:
     bool exposedToSky(const Entity& entity) const;
     bool touchesWater(const Entity& entity) const;
     float damageEntity(Entity& entity, float damage,
-                       const glm::vec3& knockback, bool playerAttack);
+                       const glm::vec3& knockback, bool playerAttack,
+                       std::optional<glm::dvec3> source = std::nullopt,
+                       uint64_t sourceId = 0);
     void updateArrow(Entity& entity, Player& player, float dt);
     void explode(Player& player, const glm::dvec3& center, float power,
                  uint32_t eventSeed);
@@ -162,8 +224,6 @@ private:
     static glm::vec3 renderColor(EntityType type);
     static glm::vec3 renderSize(EntityType type);
     void refreshVillageClaims();
-    bool poiAccessible(const glm::ivec3& position) const;
-    bool groundPathReachable(const glm::dvec3& origin,
-                             const glm::ivec3& poi) const;
+
     void rebuildLogicalVillages();
 };

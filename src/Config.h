@@ -162,6 +162,36 @@ constexpr float WATER_ENTRY_MAX_FALL_SPEED = 3.0f;
 constexpr float PLAYER_HURT_IMMUNITY_SECONDS = 0.5f; // 10 ticks
 inline bool     AUTO_JUMP         = true;
 
+// Entity AI work budgets and behavior timing (runtime state, not world generation).
+constexpr size_t AI_PATH_NODES_PER_FRAME = 512;
+constexpr size_t AI_PATH_NODE_LIMIT = 4096;
+constexpr size_t AI_SEARCH_SLICE_NODES = 32;
+constexpr double AI_DIRECT_PATH_DISTANCE = 8.0;
+constexpr size_t AI_ACTIVE_SEARCH_LIMIT = 8;
+constexpr size_t AI_POI_BLOCKS_PER_FRAME = 8192;
+constexpr double AI_PATH_RADIUS = 48.0;
+constexpr double AI_NEAR_DISTANCE = 32.0;
+constexpr float AI_NEAR_INTERVAL = 0.1f;
+constexpr float AI_FAR_INTERVAL = 0.5f;
+constexpr float AI_TARGET_MEMORY = 3.0f;
+constexpr double AI_SIGHT_DISTANCE = 18.0;
+constexpr double AI_VILLAGER_FEAR_DISTANCE = 8.0;
+constexpr float AI_REPATH_INTERVAL = 0.5f;
+constexpr float AI_STUCK_SECONDS = 0.6f;
+constexpr float AI_RETRY_MIN_SECONDS = 2.0f;
+constexpr float AI_RETRY_MAX_SECONDS = 8.0f;
+constexpr float AI_PANIC_SECONDS = 3.0f;
+constexpr double AI_SKELETON_MIN_DISTANCE = 6.0;
+constexpr double AI_SKELETON_MAX_DISTANCE = 9.0;
+constexpr double AI_STEP_HEIGHT = 0.5;
+constexpr double AI_MAX_JUMP_HEIGHT = 1.0;
+constexpr double AI_MAX_DROP = 2.0;
+constexpr double AI_COLLISION_STEP = 0.15;
+constexpr float AI_GRAVITY = 20.0f;
+constexpr float AI_JUMP_SPEED = 8.0f;
+constexpr float AI_ANIMAL_PANIC_SPEED = 1.8f;
+constexpr float AI_VILLAGER_PANIC_SPEED = 1.6f;
+
 // ── UI ──────────────────────────────────────────────────────────────────
 constexpr float UI_BUTTON_WIDTH      = 280.0f;
 constexpr float UI_BUTTON_HEIGHT     = 44.0f;

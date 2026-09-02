@@ -68,7 +68,7 @@ public:
     const uint8_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
     // Generation owns an unpublished chunk exclusively. It may fill through
     // blockAt(), update column maxima, then publish the whole edit once.
-    void finishBulkBlockEdit() { ++m_dataRevision; m_dirty = true; }
+    void finishBulkBlockEdit() { ++m_blockRevision; ++m_dataRevision; m_dirty = true; }
     const uint8_t* rawBlocks() const { return m_blocks.data(); }
     void copyRawState(std::vector<uint8_t>& blocks,
                       std::vector<uint8_t>& light) const {
@@ -125,6 +125,7 @@ public:
         m_light.fill(0);
         ++m_dataRevision;
     }
+    uint64_t blockRevision() const { return m_blockRevision.load(); }
     uint64_t dataRevision() const { return m_dataRevision.load(); }
 
     // Fluid-derived edits can be visually coalesced without changing the
@@ -212,6 +213,7 @@ private:
 
     bool m_dirty = true;
     std::atomic<uint64_t> m_dataRevision{1};
+    std::atomic<uint64_t> m_blockRevision{1};
     std::atomic<uint64_t> m_fluidRevision{0};
     std::atomic<uint64_t> m_fluidMeshRevision{0};
     std::atomic<uint64_t> m_pendingFluidMeshRevision{0};

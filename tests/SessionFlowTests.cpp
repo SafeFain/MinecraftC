@@ -1,4 +1,6 @@
 #include "app/GameSession.h"
+#include "EntityAiScenarios.h"
+#include "EntityAiIntegration.h"
 #include "Config.h"
 #include "core/RuntimeClock.h"
 #include "game/Command.h"
@@ -54,7 +56,13 @@ std::string Localization::format(
     return std::string(key);
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc > 2 && std::string(argv[1]) == "--ai-demo")
+        return EntityAiScenarios::writeDemo(argv[2]);
+    if (argc > 2 && std::string(argv[1]) == "--ai-tests")
+        return EntityAiScenarios::integration(argv[2]);
+    if (argc > 2 && std::string(argv[1]) == "--ai-benchmark")
+        return EntityAiScenarios::benchmark(argv[2]);
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-session-flow-test";
     std::filesystem::remove_all(root);

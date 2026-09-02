@@ -840,6 +840,15 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME weather_cycle_precipitation_and_commands COMMAND weather_logic_tests)
 
+    add_executable(ground_navigation_tests tests/GroundNavigationTests.cpp
+        src/entity/GroundNavigation.cpp src/world/Block.cpp src/world/Chunk.cpp)
+    target_include_directories(ground_navigation_tests PRIVATE src)
+    target_link_libraries(ground_navigation_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(ground_navigation_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME entity_ground_navigation COMMAND ground_navigation_tests)
+
     add_executable(entity_logic_tests tests/EntityLogicTests.cpp)
     target_include_directories(entity_logic_tests PRIVATE src)
     target_link_libraries(entity_logic_tests PRIVATE glm::glm)
@@ -958,6 +967,10 @@ if(BUILD_TESTING)
         src/core/InputCodes.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityBehavior.cpp
+        src/entity/EntityNavigation.cpp
+        src/entity/EntityVillageAi.cpp
+        src/entity/GroundNavigation.cpp
         src/entity/EntityModelRegistry.cpp
         src/game/InventoryModel.cpp
         src/game/Item.cpp
@@ -1021,6 +1034,8 @@ if(BUILD_TESTING)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(entity_ai_integration PROPERTIES TIMEOUT 120)
     # This test is normally sub-second; a generous ceiling turns a future
     # deadlock into a fast, actionable CTest timeout instead of a stuck job.
     set_tests_properties(game_session_flow PROPERTIES TIMEOUT 120)
@@ -1038,6 +1053,10 @@ if(BUILD_TESTING)
         src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityBehavior.cpp
+        src/entity/EntityNavigation.cpp
+        src/entity/EntityVillageAi.cpp
+        src/entity/GroundNavigation.cpp
         src/entity/EntityModelRegistry.cpp
         src/game/ClientSettings.cpp
         src/game/InventoryInteraction.cpp

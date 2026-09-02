@@ -29,6 +29,15 @@ std::pair<int,int> entityChunk(const glm::dvec3& position) {
 
 void EntityManager::clear() {
     m_entities.clear();
+    m_navigation.clear();
+    m_aiChunks.clear();
+    m_aiBuckets.clear();
+    m_aiEntityIndices.clear();
+    m_aiTime = 0;
+    m_aiArrows.clear();
+    m_aiExplosions.clear();
+    m_searchCursor = 0;
+    m_aiStats = {};
     m_deadEntityRenders.clear();
     m_spawnTimer = 0.0f;
     m_spawnSequence = 0;
@@ -213,7 +222,7 @@ void EntityManager::spawnItem(
 }
 
 void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
-                               float damage, bool playerOwned) {
+                               float damage, bool playerOwned, uint64_t shooterId) {
     Entity entity;
     entity.id = m_nextId++;
     entity.type = EntityType::Arrow;
@@ -223,6 +232,7 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
         entity.facing = glm::normalize(velocity);
     entity.projectileDamage = damage;
     entity.playerOwned = playerOwned;
+    entity.shooterId = shooterId;
     entity.health = 1.0f;
     m_entities.push_back(entity);
     m_dirtyEntityChunks.insert(entityChunk(entity.position));
@@ -371,73 +381,6 @@ bool EntityManager::villagerUsable(
         useRay(origin, direction, reach) == entityId;
 }
 
-bool EntityManager::poiAccessible(const glm::ivec3& position) const {
-    static constexpr glm::ivec3 offsets[] = {
-        {1,0,0},{-1,0,0},{0,0,1},{0,0,-1}
-    };
-    for (const glm::ivec3& offset : offsets) {
-        const glm::ivec3 feet = position + offset;
-        if (m_world.getBlock(feet.x, feet.y, feet.z) == BlockId::AIR &&
-            m_world.getBlock(feet.x, feet.y + 1, feet.z) == BlockId::AIR)
-            return true;
-    }
-    return false;
-}
-
-bool EntityManager::groundPathReachable(
-    const glm::dvec3& origin, const glm::ivec3& poi) const {
-    const glm::ivec3 originBlock(glm::floor(origin));
-    auto walkable = [&](const glm::ivec3& position) {
-        if (!Config::isValidWorldY(position.y) ||
-            !Config::isValidWorldY(position.y + 1)) return false;
-        return blockCollisionBoxes(m_world.getBlock(
-                   position.x, position.y, position.z)).count == 0 &&
-               blockCollisionBoxes(m_world.getBlock(
-                   position.x, position.y + 1, position.z)).count == 0 &&
-               blockCollisionBoxes(m_world.getBlock(
-                   position.x, position.y - 1, position.z)).count != 0;
-    };
-    glm::ivec3 start = originBlock;
-    if (!walkable(start)) {
-        bool found = false;
-        for (int dy = -2; dy <= 2 && !found; ++dy) {
-            const glm::ivec3 candidate = originBlock + glm::ivec3(0,dy,0);
-            if (walkable(candidate)) { start = candidate; found = true; }
-        }
-        if (!found) return false;
-    }
-    std::queue<glm::ivec3> open;
-    std::set<std::tuple<int,int,int>> visited;
-    open.push(start);
-    visited.emplace(start.x,start.y,start.z);
-    constexpr size_t budget = 4096;
-    while (!open.empty() && visited.size() <= budget) {
-        const glm::ivec3 current = open.front();
-        open.pop();
-        if (std::abs(current.x - poi.x) + std::abs(current.z - poi.z) == 1 &&
-            std::abs(current.y - poi.y) <= 1)
-            return true;
-        static constexpr glm::ivec2 directions[] = {
-            {1,0},{-1,0},{0,1},{0,-1}
-        };
-        for (const glm::ivec2& direction : directions) {
-            for (int dy : {0, 1, -1}) {
-                const glm::ivec3 next(current.x + direction.x,
-                                      current.y + dy,
-                                      current.z + direction.y);
-                const glm::dvec3 fromOrigin = glm::dvec3(next) - origin;
-                if (glm::dot(fromOrigin, fromOrigin) > 48.0 * 48.0 ||
-                    !walkable(next)) continue;
-                if (visited.emplace(next.x,next.y,next.z).second) {
-                    open.push(next);
-                    break;
-                }
-            }
-        }
-    }
-    return false;
-}
-
 void EntityManager::rebuildLogicalVillages() {
     m_logicalVillages.clear();
     auto floorSubchunk = [](int coordinate) {
@@ -490,125 +433,6 @@ void EntityManager::rebuildLogicalVillages() {
     }
 }
 
-void EntityManager::refreshVillageClaims() {
-    std::set<std::pair<int,int>> active;
-    for (const Chunk* chunk : m_world.getActiveChunks()) {
-        if (!chunk->generated.load()) continue;
-        const auto key = std::make_pair(chunk->cx, chunk->cz);
-        active.insert(key);
-        PoiChunk& indexed = m_poiChunks[key];
-        if (indexed.revision == chunk->dataRevision()) continue;
-        indexed = {};
-        indexed.revision = chunk->dataRevision();
-        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-            for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-                const int top = chunk->getColumnMaxY(x, z);
-                for (int y = Config::WORLD_MIN_Y; y <= top; ++y) {
-                    const BlockId block = chunk->getBlock(x, y, z);
-                    const glm::ivec3 worldPosition(
-                        chunk->worldX() + x, y, chunk->worldZ() + z);
-                    BedPart part = BedPart::Foot;
-                    BedDirection direction = BedDirection::North;
-                    if (decodeBed(block, part, direction) && part == BedPart::Foot)
-                        indexed.beds.push_back(worldPosition);
-                    else if (isVillagerWorkstation(block))
-                        indexed.workstations.push_back(worldPosition);
-                }
-            }
-        }
-    }
-    for (auto it = m_poiChunks.begin(); it != m_poiChunks.end();) {
-        if (active.count(it->first) == 0) it = m_poiChunks.erase(it);
-        else ++it;
-    }
-    std::set<std::tuple<int,int,int>> usedBeds;
-    std::set<std::tuple<int,int,int>> usedWorkstations;
-    for (Entity& entity : m_entities) {
-        if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
-        VillagerData& data = entity.villager;
-        if (data.hasBed) {
-            const auto valid = m_world.validBedFoot(data.claimedBed);
-            if (!valid || *valid != data.claimedBed || !poiAccessible(data.claimedBed))
-                data.hasBed = false;
-            else if (!usedBeds.emplace(data.claimedBed.x,data.claimedBed.y,
-                                       data.claimedBed.z).second)
-                data.hasBed = false;
-        }
-        if (data.hasWorkstation) {
-            const BlockId block = m_world.getBlock(
-                data.claimedWorkstation.x, data.claimedWorkstation.y,
-                data.claimedWorkstation.z);
-            const VillagerProfession profession = professionForWorkstation(block);
-            if (profession == VillagerProfession::Unemployed ||
-                (data.professionLocked && profession != data.profession) ||
-                !poiAccessible(data.claimedWorkstation)) {
-                data.hasWorkstation = false;
-                if (!data.professionLocked) data.profession = VillagerProfession::Unemployed;
-            } else {
-                if (!data.professionLocked) data.profession = profession;
-                if (!usedWorkstations.emplace(data.claimedWorkstation.x,
-                                               data.claimedWorkstation.y,
-                                               data.claimedWorkstation.z).second) {
-                    data.hasWorkstation = false;
-                    if (!data.professionLocked)
-                        data.profession = VillagerProfession::Unemployed;
-                }
-            }
-        }
-    }
-    auto nearest = [&](const Entity& entity, bool bed,
-                       VillagerProfession required) -> std::optional<glm::ivec3> {
-        double best = 48.0 * 48.0 + 1.0;
-        std::optional<glm::ivec3> result;
-        for (const auto& [key, indexed] : m_poiChunks) {
-            (void)key;
-            const auto& positions = bed ? indexed.beds : indexed.workstations;
-            for (const glm::ivec3& position : positions) {
-                const auto tuple = std::make_tuple(position.x,position.y,position.z);
-                if ((bed ? usedBeds : usedWorkstations).count(tuple) != 0) continue;
-                if (!bed && required != VillagerProfession::Unemployed &&
-                    professionForWorkstation(m_world.getBlock(
-                        position.x,position.y,position.z)) != required) continue;
-                const glm::dvec3 delta = entity.position -
-                    (glm::dvec3(position) + glm::dvec3(.5));
-                const double distance = glm::dot(delta, delta);
-                if (distance > 48.0 * 48.0 || !poiAccessible(position) ||
-                    !groundPathReachable(entity.position, position)) continue;
-                if (!result || distance < best ||
-                    (distance == best && std::tie(position.x,position.y,position.z) <
-                                         std::tie(result->x,result->y,result->z))) {
-                    best = distance;
-                    result = position;
-                }
-            }
-        }
-        return result;
-    };
-    for (Entity& entity : m_entities) {
-        if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
-        VillagerData& data = entity.villager;
-        if (!data.hasBed) {
-            if (const auto bed = nearest(entity, true, VillagerProfession::Unemployed)) {
-                data.claimedBed = *bed;
-                data.hasBed = true;
-                usedBeds.emplace(bed->x,bed->y,bed->z);
-            }
-        }
-        if (!data.hasWorkstation) {
-            const VillagerProfession required = data.professionLocked
-                ? data.profession : VillagerProfession::Unemployed;
-            if (const auto work = nearest(entity, false, required)) {
-                data.claimedWorkstation = *work;
-                data.hasWorkstation = true;
-                data.profession = professionForWorkstation(m_world.getBlock(
-                    work->x,work->y,work->z));
-                usedWorkstations.emplace(work->x,work->y,work->z);
-            }
-        }
-    }
-    rebuildLogicalVillages();
-}
-
 void EntityManager::spawnAroundPlayer(
     const glm::dvec3& playerPosition, bool spawnHostile) {
     const size_t mobCount = static_cast<size_t>(std::count_if(
@@ -649,65 +473,6 @@ void EntityManager::spawnAroundPlayer(
     spawnMob(type, glm::dvec3(x + 0.5, static_cast<double>(surface), z + 0.5));
 }
 
-void EntityManager::moveWithTerrain(
-    Entity& entity, const glm::vec3& horizontal, float dt) {
-    const glm::dvec3 start = entity.position;
-    const double distance = glm::length(horizontal) * dt;
-    const int steps = std::max(1, static_cast<int>(std::ceil(distance / 0.2)));
-    const glm::dvec3 delta = glm::dvec3(horizontal) *
-        (static_cast<double>(dt) / steps);
-    bool movedThisFrame = false;
-    for (int i=0;i<steps;++i) {
-        bool moved = false;
-        glm::dvec3 candidate = entity.position;
-        candidate.x += delta.x;
-        if (!collides(entity,candidate)) { entity.position.x=candidate.x; moved=true; }
-        candidate=entity.position; candidate.z+=delta.z;
-        if (!collides(entity,candidate)) { entity.position.z=candidate.z; moved=true; }
-        if (!moved) {
-            candidate=entity.position+glm::dvec3(delta.x,1.0,delta.z);
-            if (!collides(entity,candidate)) { entity.position=candidate;moved=true; }
-        }
-        candidate=entity.position; candidate.y-=0.25;
-        if (!collides(entity,candidate)) entity.position.y-=0.25;
-        movedThisFrame = movedThisFrame || moved;
-    }
-    entity.stuckSeconds = movedThisFrame ? 0.0f : entity.stuckSeconds + dt;
-    if (dt > 0.0f) {
-        const glm::vec3 displacement(
-            static_cast<float>(entity.position.x - start.x), 0.0f,
-            static_cast<float>(entity.position.z - start.z));
-        entity.locomotionVelocity = autonomousHorizontalVelocity(
-            start, entity.position, dt);
-        if (glm::length(displacement) > 0.00001f)
-            entity.facing = glm::normalize(displacement);
-    }
-}
-
-void EntityManager::integrateVelocity(Entity& entity, float dt) {
-    entity.velocity.y -= 20.0f * dt;
-    const glm::dvec3 total = glm::dvec3(entity.velocity) * static_cast<double>(dt);
-    const int steps = sweptCollisionSteps(glm::length(total), 0.15);
-    const glm::dvec3 step = total / static_cast<double>(steps);
-    for (int i = 0; i < steps; ++i) {
-        glm::dvec3 candidate = entity.position;
-        candidate.x += step.x;
-        if (!collides(entity, candidate)) entity.position.x = candidate.x;
-        else entity.velocity.x = 0.0f;
-        candidate = entity.position;
-        candidate.y += step.y;
-        if (!collides(entity, candidate)) entity.position.y = candidate.y;
-        else entity.velocity.y = 0.0f;
-        candidate = entity.position;
-        candidate.z += step.z;
-        if (!collides(entity, candidate)) entity.position.z = candidate.z;
-        else entity.velocity.z = 0.0f;
-    }
-    const float drag = std::pow(0.12f, dt);
-    entity.velocity.x *= drag;
-    entity.velocity.z *= drag;
-}
-
 bool EntityManager::exposedToSky(const Entity& entity) const {
     const int worldX = static_cast<int>(std::floor(entity.position.x));
     const int worldZ = static_cast<int>(std::floor(entity.position.z));
@@ -717,10 +482,9 @@ bool EntityManager::exposedToSky(const Entity& entity) const {
     const int cz = World::worldToChunkZ(static_cast<double>(worldZ));
     const int lx = worldX - cx * Config::CHUNK_SIZE_X;
     const int lz = worldZ - cz * Config::CHUNK_SIZE_Z;
-    for (const Chunk* chunk : m_world.getActiveChunks()) {
-        if (chunk->cx == cx && chunk->cz == cz && chunk->generated.load())
-            return chunk->getColumnMaxY(lx, lz) <= headTop;
-    }
+    const auto found = m_aiChunks.find({cx,cz});
+    if (found != m_aiChunks.end())
+        return found->second->getColumnMaxY(lx,lz) <= headTop;
     return false;
 }
 
@@ -736,12 +500,27 @@ bool EntityManager::touchesWater(const Entity& entity) const {
 
 float EntityManager::damageEntity(Entity& entity, float damage,
                                   const glm::vec3& knockback,
-                                  bool playerAttack) {
+                                  bool playerAttack,
+                                  std::optional<glm::dvec3> source,
+                                  uint64_t sourceId) {
     if (damage <= 0.0f || entity.health <= 0.0f) return 0.0f;
     const float accepted = PlayerPhysics::damageAfterImmunity(
         entity.hurtImmunity, damage, Config::PLAYER_HURT_IMMUNITY_SECONDS);
     if (accepted <= 0.0f) return 0.0f;
     entity.health -= accepted;
+    entity.ai.nextDecision = m_aiTime;
+    if (source) {
+        entity.ai.danger = *source;
+        if (hostile(entity.type) && (playerAttack || sourceId != 0)) {
+            entity.ai.hasTarget = true;
+            entity.ai.retaliating = true;
+            entity.ai.targetId = playerAttack ? 0 : sourceId;
+            entity.ai.lastSeen = *source;
+            entity.ai.memoryUntil = m_aiTime + Config::AI_TARGET_MEMORY;
+        }
+    } else entity.ai.danger = entity.position - glm::dvec3(knockback);
+    if (!hostile(entity.type))
+        entity.ai.panicUntil = m_aiTime + Config::AI_PANIC_SECONDS;
     entity.hurtFlashSeconds = 0.2f;
     if ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
         entity.type == EntityType::Villager ||
@@ -779,6 +558,8 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
                            bool thunderstorm, bool raining, uint64_t worldTick) {
+    dt = std::max(0.0f, dt);
+    m_aiStats = {};
     for (const auto& entity : m_entities)
         m_dirtyEntityChunks.insert(entityChunk(entity.position));
     for (auto& dead : m_deadEntityRenders) {
@@ -793,8 +574,6 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
 
     for (auto& entity : m_entities)
         PlayerPhysics::tickHurtImmunity(entity.hurtImmunity, dt);
-    struct PendingArrow { glm::dvec3 position; glm::vec3 velocity; float damage; };
-    std::vector<PendingArrow> pendingArrows;
     struct PendingExplosion {
         glm::dvec3 position;
         uint32_t seed;
@@ -811,13 +590,17 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
     } else {
         m_spawnTimer = 0.0f;
     }
+    prepareAiFrame(dt);
+    refreshPoiIndex();
     m_villageRefreshSeconds += dt;
     if (m_villageRefreshSeconds >= 1.0f) {
         refreshVillageClaims();
         m_villageRefreshSeconds = 0.0f;
     }
+    scheduleNavigation(player.getPosition());
 
     for (auto& entity : m_entities) {
+        if (entity.health <= 0) continue;
         if (peaceful && hostile(entity.type)) { entity.health=0.0f; continue; }
         entity.ageSeconds += dt;
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
@@ -866,7 +649,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             continue;
         }
 
-        const glm::vec3 previousLocomotionVelocity = entity.locomotionVelocity;
+        entity.ai.previousLocomotion = entity.locomotionVelocity;
         entity.locomotionVelocity = glm::vec3(0.0f);
         integrateVelocity(entity, dt);
 
@@ -901,253 +684,15 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             if (entity.health <= 0.0f) continue;
         }
 
-        if (entity.type == EntityType::Villager) {
-            VillagerData& villager = entity.villager;
-            const uint32_t tickInDay = static_cast<uint32_t>(worldTick % 24000u);
-            const uint32_t day = static_cast<uint32_t>(worldTick / 24000u);
-            if (villager.lastRestockDay != day) {
-                villager.lastRestockDay = day;
-                villager.restocksToday = 0;
-            }
-            const bool firstWorkWindow = tickInDay >= 2000u && tickInDay < 4000u;
-            const bool secondWorkWindow = tickInDay >= 9000u && tickInDay < 11000u;
-            const bool working = firstWorkWindow || secondWorkWindow;
-            glm::dvec3 destination = entity.position;
-            bool hasDestination = false;
-            if (!isDay && villager.hasBed) {
-                destination = glm::dvec3(villager.claimedBed) +
-                    glm::dvec3(.5, .6, .5);
-                hasDestination = true;
-            } else if (working && villager.hasWorkstation) {
-                destination = glm::dvec3(villager.claimedWorkstation) +
-                    glm::dvec3(.5, 0.0, .5);
-                hasDestination = true;
-            } else if (villager.hasBed && villager.hasWorkstation) {
-                const glm::dvec3 center =
-                    (glm::dvec3(villager.claimedBed) +
-                     glm::dvec3(villager.claimedWorkstation)) * .5 +
-                    glm::dvec3(.5, 0.0, .5);
-                if (glm::distance(entity.position, center) > 12.0) {
-                    destination = center;
-                    hasDestination = true;
-                }
-            }
-            const double destinationDistance =
-                hasDestination ? glm::distance(entity.position, destination) : 0.0;
-            entity.sleeping = !isDay && villager.hasBed &&
-                destinationDistance < 1.25;
-            if (!entity.sleeping) {
-                if (hasDestination && destinationDistance > .65) {
-                    glm::vec3 direction(destination - entity.position);
-                    direction.y = 0.0f;
-                    if (glm::length(direction) > .001f)
-                        moveWithTerrain(entity, glm::normalize(direction) * .75f, dt);
-                } else if (!hasDestination) {
-                    const float angle = static_cast<float>(hash32(
-                        entity.behaviorSeed + static_cast<uint32_t>(
-                            entity.ageSeconds / 3.0f)) % 6283) * .001f;
-                    moveWithTerrain(entity, {std::cos(angle) * .45f, 0.0f,
-                                             std::sin(angle) * .45f}, dt);
-                }
-            }
-            if (working && villager.hasWorkstation && destinationDistance < 1.6 &&
-                ((firstWorkWindow && villager.restocksToday < 1) ||
-                 (secondWorkWindow && villager.restocksToday < 2)))
-                restockVillager(villager, day, true);
-            m_modelRegistry.advance(entity.type, entity.id, dt);
-            m_modelRegistry.setLocomotion(entity.type, entity.id,
-                std::hypot(entity.locomotionVelocity.x,
-                           entity.locomotionVelocity.z));
-            continue;
-        }
-
-        if (entity.type == EntityType::Zombie ||
-            entity.type == EntityType::ZombieVillager) {
-            Entity* villagerTarget = nullptr;
-            double nearest = 18.0;
-            for (Entity& candidate : m_entities) {
-                if (candidate.type != EntityType::Villager ||
-                    candidate.health <= 0.0f) continue;
-                const double distance = glm::distance(
-                    candidate.position, entity.position);
-                if (distance < nearest) {
-                    nearest = distance;
-                    villagerTarget = &candidate;
-                }
-            }
-            if (villagerTarget) {
-                const glm::dvec3 targetCenter = villagerTarget->position +
-                    glm::dvec3(0.0, .9, 0.0);
-                const glm::dvec3 origin = entity.position +
-                    glm::dvec3(0.0, 1.2, 0.0);
-                const glm::dvec3 delta = targetCenter - origin;
-                const float targetDistance = static_cast<float>(glm::length(delta));
-                const glm::vec3 direction = targetDistance > .001f
-                    ? glm::vec3(delta / static_cast<double>(targetDistance))
-                    : glm::vec3(0.0f);
-                const bool clear = targetDistance <= .001f ||
-                    !m_world.raycast(origin, direction, targetDistance).has_value();
-                if (targetDistance > 1.45f) {
-                    glm::vec3 horizontal(direction.x, 0.0f, direction.z);
-                    if (glm::length(horizontal) > .001f)
-                        moveWithTerrain(entity, glm::normalize(horizontal) * 2.0f, dt);
-                } else if (clear && entity.actionCooldown <= 0.0f) {
-                    entity.actionCooldown = 1.0f;
-                    glm::vec3 knockback(direction.x, 0.0f, direction.z);
-                    if (glm::length(knockback) > .001f)
-                        knockback = glm::normalize(knockback) * 3.0f;
-                    knockback.y = 1.5f;
-                    damageEntity(*villagerTarget, 3.0f, knockback, false);
-                    if (villagerTarget->health <= 0.0f) {
-                        const uint32_t roll = hash32(entity.behaviorSeed ^
-                            villagerTarget->behaviorSeed ^
-                            static_cast<uint32_t>(worldTick));
-                        const bool convert = villagerInfectionConverts(
-                            player.difficulty(), roll);
-                        if (convert) {
-                            villagerTarget->type = EntityType::ZombieVillager;
-                            villagerTarget->health = 20.0f;
-                            villagerTarget->villager.hasBed = false;
-                            villagerTarget->villager.hasWorkstation = false;
-                            villagerTarget->sleeping = false;
-                        }
-                    }
-                }
-                m_modelRegistry.advance(entity.type, entity.id, dt);
-                m_modelRegistry.setLocomotion(entity.type, entity.id,
-                    std::hypot(entity.locomotionVelocity.x,
-                               entity.locomotionVelocity.z));
-                continue;
-            }
-        }
-
-        const glm::vec3 delta = glm::vec3(player.getPosition() - entity.position);
-        glm::vec3 horizontal(delta.x, 0.0f, delta.z);
-        const float distance = glm::length(horizontal);
-        const glm::dvec3 attackOrigin = entity.position + glm::dvec3(0,1.2,0);
-        const glm::dvec3 meleeDelta =
-            player.getPosition() + glm::dvec3(0.0, 0.9, 0.0) - attackOrigin;
-        const float meleeDistance = static_cast<float>(glm::length(meleeDelta));
-        const glm::vec3 meleeDirection = meleeDistance > 0.001f
-            ? glm::vec3(meleeDelta / static_cast<double>(meleeDistance))
-            : glm::vec3(0.0f);
-        const bool meleeClearSight = meleeDistance <= 0.001f ||
-            !m_world.raycast(
-                attackOrigin, meleeDirection, meleeDistance).has_value();
-        const glm::dvec3 rangedOrigin =
-            entity.position + glm::dvec3(0.0, 1.45, 0.0);
-        const glm::dvec3 rangedDelta = player.getEyePosition() - rangedOrigin;
-        const float rangedDistance = static_cast<float>(glm::length(rangedDelta));
-        const glm::vec3 rangedDirection = rangedDistance > 0.001f
-            ? glm::vec3(rangedDelta / static_cast<double>(rangedDistance))
-            : glm::vec3(0.0f);
-        const bool rangedClearSight = rangedDistance <= 0.001f ||
-            !m_world.raycast(
-                rangedOrigin, rangedDirection, rangedDistance).has_value();
-        const auto animationEvents = m_modelRegistry.advance(
-            entity.type, entity.id, dt);
-        for (const auto& event : animationEvents) {
-            if (!entity.attackPending) continue;
-            if (event.name == "melee") {
-                if (attackImpactValid(meleeDistance, 1.5f, meleeClearSight)) {
-                    DamageSourceInfo source;
-                    source.amount = 3.0f;
-                    source.cause = DamageCause::Melee;
-                    source.shieldBlockable = true;
-                    source.hasOrigin = true;
-                    source.origin = attackOrigin;
-                    glm::vec3 impulse(meleeDirection.x, 0.0f, meleeDirection.z);
-                    if (glm::length(impulse) > 0.001f)
-                        impulse = glm::normalize(impulse) * 4.0f;
-                    impulse.y = 2.0f;
-                    source.impulse = impulse;
-                    player.takeDamage(source);
-                }
-                entity.attackPending = false;
-            } else if (event.name == "shoot") {
-                if (attackImpactValid(
-                        rangedDistance, 14.0f, rangedClearSight)) {
-                    const glm::vec3 inheritedVelocity =
-                        entity.velocity + previousLocomotionVelocity;
-                    const auto launchVelocity = lowArcBallisticVelocity(
-                        rangedOrigin, player.getEyePosition(),
-                        bowLaunchSpeed(0.9f), inheritedVelocity);
-                    if (launchVelocity) {
-                        const glm::vec3 launchDirection =
-                            glm::normalize(*launchVelocity);
-                        pendingArrows.push_back({rangedOrigin +
-                            glm::dvec3(launchDirection) * 0.75,
-                            *launchVelocity, 2.0f});
-                    }
-                }
-                entity.attackPending = false;
-            } else if (event.name == "explode") {
-                if (attackImpactValid(
-                        meleeDistance, 1.5f, meleeClearSight)) {
-                    pendingExplosions.push_back(
-                        {entity.position, entity.behaviorSeed, 2.5f});
-                    entity.health = 0.0f;
-                }
-                entity.attackPending = false;
-            }
-        }
-        if (entity.attackPending &&
-            !m_modelRegistry.playing(entity.type, entity.id, "attack"))
-            entity.attackPending = false;
-        if (entity.health <= 0.0f) continue;
-        if (entity.type == EntityType::Spider && distance >= 18.0f)
-            entity.spiderProvoked = false;
-        if (hostile(entity.type) && shouldHostileDespawn(distance,entity.ageSeconds,
-            hash32(entity.behaviorSeed + static_cast<uint32_t>(entity.ageSeconds)))) {
-            entity.health = 0.0f;
-            continue;
-        }
-        const bool behaviorTargetsPlayer = entity.type == EntityType::Spider
-            ? spiderTargetsPlayer(isDay && !thunderstorm,
-                                  entity.spiderProvoked, distance)
-            : hostile(entity.type) && distance < 18.0f;
-        const bool targetsPlayer = mobTargetsPlayer(
-            playerTargetable, behaviorTargetsPlayer);
-        if (entity.attackPending) {
-            if (distance > 0.01f) entity.facing = glm::normalize(horizontal);
-        } else if (targetsPlayer) {
-            if (distance > 0.01f) horizontal /= distance;
-            const float speed = entity.type == EntityType::Spider ? 3.0f : 2.0f;
-            if (entity.type == EntityType::Skeleton) {
-                if (distance > 7.0f && distance > 0.01f)
-                    moveWithTerrain(entity, horizontal * speed, dt);
-                if (attackImpactValid(
-                        rangedDistance, 14.0f, rangedClearSight) &&
-                    entity.actionCooldown <= 0.0f) {
-                    entity.actionCooldown = 2.0f;
-                    entity.attackPending = m_modelRegistry.playAction(
-                        entity.type, entity.id, "attack");
-                }
-            } else if (distance > 0.01f) {
-                moveWithTerrain(entity, horizontal * speed, dt);
-            }
-            if (entity.type != EntityType::Skeleton &&
-                attackImpactValid(meleeDistance, 1.5f, meleeClearSight) &&
-                entity.actionCooldown <= 0.0f) {
-                entity.actionCooldown = 1.0f;
-                entity.attackPending = m_modelRegistry.playAction(
-                    entity.type, entity.id, "attack");
-            }
-        } else {
-            const float angle = static_cast<float>(
-                hash32(entity.behaviorSeed + static_cast<uint32_t>(entity.ageSeconds / 3.0f))
-                % 6283) * 0.001f;
-            const float offset=entity.stuckSeconds>0.6f ? 1.5707963f : 0.0f;
-            moveWithTerrain(entity, {std::cos(angle+offset) * 0.65f, 0.0f,
-                                     std::sin(angle+offset) * 0.65f}, dt);
-        }
-        m_modelRegistry.setLocomotion(
-            entity.type, entity.id,
-            std::hypot(entity.locomotionVelocity.x, entity.locomotionVelocity.z));
+        updateMobAi(entity, player, dt, isDay,
+                    playerTargetable, worldTick, thunderstorm);
     }
-
-    for (const auto& arrow : pendingArrows)
-        spawnArrow(arrow.position, arrow.velocity, arrow.damage, false);
+    for (const auto& arrow : m_aiArrows)
+        spawnArrow(arrow.position, arrow.velocity, arrow.damage, false, arrow.shooterId);
+    m_aiArrows.clear();
+    for (const auto& explosion : m_aiExplosions)
+        pendingExplosions.push_back({explosion.position, explosion.seed, 2.5f});
+    m_aiExplosions.clear();
 
     for (const auto& entity : m_entities)
         if (entity.type == EntityType::PrimedTnt && entity.health <= 0.0f)
@@ -1159,8 +704,10 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
         if (entity.health <= 0.0f && entity.type != EntityType::Item &&
-            entity.type != EntityType::PrimedTnt)
+            entity.type != EntityType::PrimedTnt) {
+            m_navigation.erase(entity.id);
             deadMobs.push_back(entity);
+        }
     for (const auto& entity : deadMobs) {
         if (entity.type != EntityType::Arrow) {
             m_modelRegistry.playAction(entity.type, entity.id, "death");
@@ -1186,7 +733,7 @@ void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) 
         if (entity.type == EntityType::Item || entity.type == EntityType::Arrow ||
             entity.health <= 0.0f) continue;
         if (glm::distance(entity.position, center) <= 3.0) {
-            damageEntity(entity, 5.0f, glm::vec3(0.0f, 0.25f, 0.0f), false);
+            damageEntity(entity, 5.0f, glm::vec3(0.0f, 0.25f, 0.0f), false, center);
             entity.burningSeconds = std::max(entity.burningSeconds, 8.0f);
         }
     }
@@ -1294,7 +841,7 @@ MeleeAttackResult EntityManager::attackRay(
             (attack.sprintKnockback ? 6.0f : 4.0f);
     horizontal.y = 2.0f;
     result.primaryDamage = damageEntity(
-        *best, attack.damage, horizontal, true);
+        *best, attack.damage, horizontal, true, origin);
     result.primaryDamaged = result.primaryDamage > 0.0f;
 
     if (!attack.sweeping || !result.primaryDamaged) return result;
@@ -1327,7 +874,7 @@ MeleeAttackResult EntityManager::attackRay(
             sweepKnockback = glm::normalize(sweepKnockback) * 4.0f;
         sweepKnockback.y = 2.0f;
         if (damageEntity(entity, CombatRules::SWEEP_DAMAGE,
-                         sweepKnockback, true) > 0.0f)
+                         sweepKnockback, true, origin) > 0.0f)
             result.sweptPositions.push_back(center);
     }
     return result;
@@ -1398,7 +945,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
             }
         }
         for(auto& target:m_entities) {
-            if(&target==&arrow || target.type==EntityType::Item || target.type==EntityType::Arrow || target.health<=0) continue;
+            if(&target==&arrow || target.id==arrow.shooterId || target.type==EntityType::Item || target.type==EntityType::Arrow || target.health<=0) continue;
             const glm::vec3 size=renderSize(target.type);
             const glm::dvec3 min=target.position+glm::dvec3(-size.x*.5,0,-size.z*.5);
             const glm::dvec3 max=target.position+glm::dvec3(size.x*.5,size.y,size.z*.5);
@@ -1408,7 +955,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
                     knockback = glm::normalize(knockback) * 3.0f;
                 knockback.y = 1.5f;
                 damageEntity(target, arrow.projectileDamage, knockback,
-                             arrow.playerOwned);
+                             arrow.playerOwned, arrow.position, arrow.shooterId);
                 arrow.health=0;return;
             }
         }
@@ -1447,7 +994,7 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
             entity.velocity += direction * impact * 4.0f;
         } else {
             const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);
-            damageEntity(entity, damage, direction * impact * 3.5f, false);
+            damageEntity(entity, damage, direction * impact * 3.5f, false, center);
         }
     }
     if (player.isSurvival()) {
