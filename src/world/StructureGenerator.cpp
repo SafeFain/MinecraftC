@@ -179,6 +179,11 @@ void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz
                   stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
                              BedDirection::West));
         }
+        // Seal the lower roof course over the wall plate.  The stair eaves
+        // alone only occupied the two outer columns, leaving a one-block-high
+        // opening between every wall and the upper roof course.
+        fillBox(write, hx-halfX, base+5, hz-halfZ-1,
+                hx+halfX, base+5, hz+halfZ+1, style.roof);
         fillBox(write, hx-halfX+1, base+6, hz-halfZ-1,
                 hx+halfX-1, base+6, hz+halfZ+1, style.roof);
         const int chimneyX = (variant & 1u) ? hx-halfX+1 : hx+halfX-1;
@@ -361,6 +366,10 @@ void buildHut(const StructurePlacement& placement,
         write(cx+3, base+5, z, stairBlock(ArchitecturalMaterial::Planks,
             BlockHalf::Bottom, BedDirection::West));
     }
+    // The first roof course is also the hut's ceiling.  Without these center
+    // blocks the raised stair eaves left the complete wall plate open.
+    fillBox(write, cx-3, base+4, cz-4, cx+3, base+4, cz+4,
+            BlockId::PLANKS);
     fillBox(write, cx-2, base+5, cz-4, cx+2, base+5, cz+4, BlockId::PLANKS);
     for (int y=base+4; y<=base+7; ++y)
         write(cx+2, y, cz-2, BlockId::COBBLESTONE);
@@ -379,7 +388,9 @@ void buildHut(const StructurePlacement& placement,
         write(cx-4, base+3, z, slabBlock(ArchitecturalMaterial::Planks,
                                         BlockHalf::Bottom));
     write(cx-4, base+1, cz, BlockId::CRAFTING_TABLE);
-    write(cx + ((placement.variant & 1u) ? 3 : -3), base+1, cz+2,
+    // Keep the decorative sapling outside the shell instead of replacing a
+    // lower-course wall block.
+    write(cx + ((placement.variant & 1u) ? 4 : -4), base+1, cz+3,
           BlockId::OAK_SAPLING);
 }
 
@@ -496,7 +507,12 @@ void buildIgloo(const StructurePlacement& placement,
                     break;
                 }
             }
-            if (dist2 >= 9) {
+            const bool outerColumn =
+                (dx - 1) * (dx - 1) + dz * dz > 10 ||
+                (dx + 1) * (dx + 1) + dz * dz > 10 ||
+                dx * dx + (dz - 1) * (dz - 1) > 10 ||
+                dx * dx + (dz + 1) * (dz + 1) > 10;
+            if (outerColumn) {
                 // Outer ring: solid snow wall up to the ring height.
                 for (int dy = 0; dy <= top; ++dy)
                     write(cx + dx, base + 1 + dy, cz + dz, BlockId::SNOW);

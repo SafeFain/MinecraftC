@@ -16,6 +16,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory>
 #include <set>
 #include <tuple>
@@ -990,6 +991,52 @@ int main() {
     require(checkedVillageMaterials && checkedIglooMaterials &&
                 checkedWellMaterials,
             "exploration window did not expose village, igloo, or well");
+
+    // Enclosed overworld blueprints must keep their wall/roof envelopes
+    // intact.  Record the last write at each coordinate because AIR carving
+    // and later furnishings intentionally overwrite earlier shell blocks.
+    const auto finalBlueprint = [](StructureType type, int radius,
+                                   uint64_t variant = 0) {
+        StructurePlacement placement;
+        placement.type = type;
+        placement.baseY = 100;
+        placement.variant = variant;
+        placement.minX = -radius;
+        placement.maxX = radius;
+        placement.minZ = -radius;
+        placement.maxZ = radius;
+        std::map<std::tuple<int, int, int>, BlockId> blocks;
+        StructureGenerator::build(
+            placement, [&](int x, int y, int z, BlockId id) {
+                blocks[{x, y, z}] = id;
+            });
+        return blocks;
+    };
+    const auto finalBlock = [](const auto& blocks, int x, int y, int z) {
+        const auto it = blocks.find({x, y, z});
+        return it == blocks.end() ? BlockId::AIR : it->second;
+    };
+    {
+        const auto village = finalBlueprint(StructureType::Village, 22);
+        require(finalBlock(village, -17, 105, -10) == BlockId::PLANKS,
+                "plains village house has an open wall-to-roof course");
+    }
+    {
+        const auto hut = finalBlueprint(StructureType::TravelerHut, 5);
+        require(finalBlock(hut, 0, 104, 0) == BlockId::PLANKS,
+                "traveler hut has an open wall-to-roof course");
+        require(finalBlock(hut, -3, 101, 2) == BlockId::PLANKS,
+                "traveler hut decoration replaced a wall block");
+    }
+    {
+        const auto igloo = finalBlueprint(StructureType::Igloo, 7);
+        for (const auto& diagonal : std::array<std::pair<int, int>, 4>{{
+                 {-2, -2}, {2, -2}, {2, 2}, {-2, 2}}}) {
+            require(finalBlock(igloo, diagonal.first, 101,
+                               diagonal.second) == BlockId::SNOW,
+                    "igloo diagonal shell has a lower-wall hole");
+        }
+    }
 
     // Every public blueprint honors its advertised horizontal reservation,
     // remains inside the world build range, and derives visible variation only

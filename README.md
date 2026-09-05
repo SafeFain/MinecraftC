@@ -166,14 +166,16 @@ middle-click cloning and middle-button drag filling.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v12 can read v2-v11 desktop saves. The current world
-generation version is v12 (with Heaven structures at v7). Generation v11 adds
+generation version is v13 (with Heaven structures at v7). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
 village variants substantially more common while retaining their biome,
-spacing, terrain-fit, and deterministic placement checks. Older generation
-versions remain on disk and are shown as incompatible rather than migrated or
-blended into v12 terrain.
+spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
+the wall-to-roof courses of village houses and traveler huts, keeps hut
+decorations outside the wall, and closes the igloo's diagonal lower shell.
+Older generation versions remain on disk and are shown as incompatible rather
+than migrated or blended into v13 terrain.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
