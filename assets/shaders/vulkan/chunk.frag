@@ -23,6 +23,7 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 fogColorDistance;
     vec4 materialParams;
     vec4 weatherParams;
+    vec4 visualParams;
     mat4 shadowMatrices[4];
     vec4 shadowSplits;
     vec4 shadowOptions;
@@ -182,7 +183,24 @@ void main() {
                        sin(worldPosition.z*1.31-time*0.84),
                        cos(worldPosition.z*0.67-time*1.08)+
                        cos(worldPosition.x*1.17+time*0.73));
-        normal=normalize(geometricNormal+vec3(wave.x,0.0,wave.y)*0.055);
+        float motion=environment.visualParams.x;
+        if(motion>0.001){
+            wave+=vec2(
+                sin(worldPosition.x*2.17-time*1.91)+
+                cos(worldPosition.z*2.43+time*1.37),
+                cos(worldPosition.z*2.09+time*1.63)+
+                sin(worldPosition.x*2.71-time*1.12))*0.34*motion;
+            float rainRipple=sin((worldPosition.x+worldPosition.z)*5.3+time*8.0)*
+                environment.weatherParams.y*motion;
+            wave+=vec2(rainRipple,-rainRipple)*0.24;
+        }
+        normal=normalize(geometricNormal+vec3(wave.x,0.0,wave.y)*
+            (0.055+0.012*motion));
+    }else if(leafSurface&&environment.visualParams.x>0.001){
+        float leafWave=sin(environment.weatherParams.x*1.07+
+            dot(worldPosition.xz,vec2(0.61,0.83)));
+        normal=normalize(normal+vec3(leafWave,0.0,-leafWave)*
+            0.026*environment.visualParams.x);
     }
     float diffuse=surfaceFace>5.5?0.32:
         max(dot(normal,normalize(environment.lightDirection.xyz)),0.0);
@@ -204,9 +222,14 @@ void main() {
     illumination=max(illumination,vec3(1.0,0.72,0.38)*blockLight*1.15);
     illumination=max(illumination*ao,vec3(0.025));
 
-    if(isLava||properties.b>0.01)
-        illumination=max(illumination,vec3(2.15,0.72,0.16)*
-            max(properties.b,isLava?1.0:0.0));
+    if(isLava||properties.b>0.01){
+        float emission=max(properties.b,isLava?1.0:0.0);
+        if(isLava&&environment.visualParams.x>0.001)
+            emission*=1.0+(0.08+0.04*sin(worldPosition.x*0.73+worldPosition.z*0.61))*
+                sin(environment.weatherParams.x*1.45+worldPosition.y*0.37)*
+                environment.visualParams.x;
+        illumination=max(illumination,vec3(2.15,0.72,0.16)*emission);
+    }
 
     float roughness=isWater?0.08:mix(properties.r,0.82,step(5.5,surfaceFace));
     roughness=mix(roughness,0.16,wetness*0.82);
@@ -220,6 +243,11 @@ void main() {
             mix(0.16,1.0,fresnel)*(1.0-roughness*0.45);
         illumination+=environment.directColorIntensity.rgb*specular*
             skyLight*visibility*(isWater?0.82:0.28);
+        if(isWater&&environment.visualParams.x>0.001){
+            float waterFresnel=pow(1.0-max(dot(normal,viewDir),0.0),3.0);
+            illumination+=environment.fogColorDistance.rgb*waterFresnel*
+                skyLight*0.16*environment.visualParams.x;
+        }
     }
 
     vec3 albedo=texel.rgb*mix(1.0,0.78,wetness);

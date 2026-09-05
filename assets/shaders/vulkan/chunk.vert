@@ -19,6 +19,7 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 fogColorDistance;
     vec4 materialParams;
     vec4 weatherParams;
+    vec4 visualParams;
     mat4 shadowMatrices[4];
     vec4 shadowSplits;
     vec4 shadowOptions;
@@ -38,7 +39,9 @@ void main() {
         float phase=dot(world.xz,vec2(0.43,0.71));
         vec2 wind=vec2(sin(environment.weatherParams.x*1.18+phase),
             cos(environment.weatherParams.x*0.91+phase*1.37));
-        position.xz+=wind*rootWeight*(0.026+environment.weatherParams.y*0.048);
+        float enhancedWind=1.0+environment.visualParams.x*0.65;
+        position.xz+=wind*rootWeight*(0.026+environment.weatherParams.y*0.048)*
+            enhancedWind;
         world=position+frame.chunkOrigin.xyz;
     }
     gl_Position=frame.modelViewProjection*vec4(position,1.0);

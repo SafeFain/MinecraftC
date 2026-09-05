@@ -38,6 +38,7 @@ struct ChunkEnvironmentUniforms {
     glm::vec4 fogColorDistance{0.0f};
     glm::vec4 materialParams{0.0f};
     glm::vec4 weatherParams{0.0f};
+    glm::vec4 visualParams{0.0f};
     std::array<glm::mat4, 4> shadowMatrices{};
     glm::vec4 shadowSplits{0.0f};
     glm::vec4 shadowOptions{0.0f};
@@ -88,6 +89,11 @@ struct PostConstants {
     glm::vec4 effects{0.0f};
     glm::vec4 texelTime{0.0f};
     glm::vec4 environment{0.0f};
+    glm::vec4 celestial{0.0f};
+};
+
+struct BloomConstants {
+    glm::vec4 sourceTexelAndExtract{0.0f};
 };
 
 struct ModelUniforms {
@@ -111,12 +117,14 @@ static_assert(offsetof(SkyUniforms, options) == 160);
 static_assert(sizeof(CloudUniforms) == 112);
 static_assert(sizeof(FrameUniforms) == 128);
 static_assert(offsetof(FrameUniforms, chunkOrigin) == 80);
-static_assert(sizeof(ChunkEnvironmentUniforms) == 400);
+static_assert(sizeof(ChunkEnvironmentUniforms) == 416);
 static_assert(offsetof(ChunkEnvironmentUniforms, materialParams) == 80);
 static_assert(offsetof(ChunkEnvironmentUniforms, weatherParams) == 96);
+static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
-static_assert(sizeof(PostConstants) == 64);
+static_assert(sizeof(PostConstants) == 80);
+static_assert(sizeof(BloomConstants) == 16);
 static_assert(sizeof(ModelUniforms) == 4416);
 
 // ── Factory inputs/outputs ──────────────────────────────────────────────
@@ -127,6 +135,7 @@ struct SwapchainPipelineInputs {
     VkDescriptorSetLayout skyLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout modelLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     VkFormat sceneFormat = VK_FORMAT_UNDEFINED;
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
@@ -135,6 +144,8 @@ struct SwapchainPipelineInputs {
     // Live scene image views used to bind the post-pass descriptors; the
     // caller rebuilds them before invoking createSwapchainSet.
     const std::vector<VkImageView>* sceneImageViews = nullptr;
+    const std::array<std::vector<VkImageView>, 4>* bloomImageViews = nullptr;
+    int bloomLevels = 0;
 };
 
 struct SwapchainPipelineOutputs {
@@ -148,6 +159,10 @@ struct SwapchainPipelineOutputs {
     VkPipelineLayout postPipelineLayout = VK_NULL_HANDLE;
     VkSampler postSampler = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> postDescriptorSets;
+    VkRenderPass bloomRenderPass = VK_NULL_HANDLE;
+    VkPipelineLayout bloomPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline bloomPipeline = VK_NULL_HANDLE;
+    std::array<std::vector<VkDescriptorSet>, 4> bloomDescriptorSets;
     VkPipeline basicPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoCullPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoDepthPipeline = VK_NULL_HANDLE;

@@ -31,6 +31,7 @@ public:
     void resumePresentation() override {}
     void beginFrame() override {}
     void setVisualQuality(VisualQuality) override {}
+    void setEnhancedVisuals(bool) override {}
     void setLeafTransparency(bool) override {}
     void finishScene(const PostProcessState&) override {}
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override {}
@@ -82,4 +83,3 @@ public:
 private:
     Frustum m_frustum;
 };
-

@@ -115,6 +115,12 @@ void SettingsMenu::refreshButtons() {
                     defaultLeafTransparency(m_settings.visualQuality);
                 m_onChanged(); refreshButtons();
             });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_visuals", {
+            m_localization.text(m_settings.enhancedVisuals
+                ? "common.on" : "common.off")}), [this]{
+                m_settings.enhancedVisuals = !m_settings.enhancedVisuals;
+                m_onChanged(); refreshButtons();
+            });
         m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
             m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
                 m_settings.smoothLighting = !m_settings.smoothLighting;

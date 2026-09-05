@@ -46,6 +46,76 @@ int main() {
             highVisual.cirrusClouds && ultraVisual.aoDirections == 8 &&
             ultraVisual.bloomLevels == 6,
             "visual quality presets do not match the rendering contract");
+    const EnhancedVisualConfig enhancedOff = enhancedVisualConfig(
+        VisualQuality::Ultra, false);
+    const EnhancedVisualConfig enhancedLow = enhancedVisualConfig(
+        VisualQuality::Low, true);
+    const EnhancedVisualConfig enhancedMedium = enhancedVisualConfig(
+        VisualQuality::Medium, true);
+    const EnhancedVisualConfig enhancedHigh = enhancedVisualConfig(
+        VisualQuality::High, true);
+    const EnhancedVisualConfig enhancedUltra = enhancedVisualConfig(
+        VisualQuality::Ultra, true);
+    require(enhancedOff.bloomLevels == 0 &&
+                enhancedOff.atmosphereStrength == 0.0f &&
+                enhancedOff.materialMotionStrength == 0.0f &&
+                enhancedOff.ambientParticlesPerSecond == 0.0f &&
+                enhancedLow.bloomLevels == 0 &&
+                enhancedLow.atmosphereStrength == 0.25f &&
+                enhancedLow.materialMotionStrength == 0.25f &&
+                enhancedLow.ambientParticlesPerSecond == 0.0f &&
+                enhancedMedium.bloomLevels == 2 &&
+                enhancedMedium.atmosphereStrength == 0.50f &&
+                enhancedMedium.materialMotionStrength == 0.60f &&
+                enhancedMedium.ambientParticlesPerSecond == 4.0f &&
+                enhancedHigh.bloomLevels == 3 &&
+                enhancedHigh.atmosphereStrength == 0.75f &&
+                enhancedHigh.materialMotionStrength == 0.85f &&
+                enhancedHigh.ambientParticlesPerSecond == 8.0f &&
+                enhancedUltra.bloomLevels == 4 &&
+                enhancedUltra.atmosphereStrength == 1.0f &&
+                enhancedUltra.materialMotionStrength == 1.0f &&
+                enhancedUltra.ambientParticlesPerSecond == 12.0f,
+            "enhanced visual presets do not match their progressive budgets");
+    require(supportsFireflies(Biome::SWAMP) &&
+                supportsFireflies(Biome::FOREST) &&
+                supportsFireflies(Biome::BIRCH_FOREST) &&
+                supportsFireflies(Biome::FLOWER_FOREST) &&
+                supportsFireflies(Biome::JUNGLE) &&
+                supportsFireflies(Biome::KARST_FOREST) &&
+                supportsFireflies(Biome::LUSH_VALLEY) &&
+                !supportsFireflies(Biome::PLAINS) &&
+                !supportsFireflies(Biome::DESERT),
+            "firefly biome allowlist changed unexpectedly");
+    require(selectOverworldAmbient(DimensionId::Overworld, Biome::PLAINS,
+                                   true, true, 1.0f, 0.0f, 4.0f) ==
+                OverworldAmbientKind::Mote &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::DESERT,
+                                       false, true, 1.0f, 0.0f, 4.0f) ==
+                    OverworldAmbientKind::None &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::SWAMP,
+                                       true, true, 0.1f, 0.0f, 8.0f) ==
+                    OverworldAmbientKind::Firefly &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::PLAINS,
+                                       true, true, 0.1f, 0.0f, 8.0f) ==
+                    OverworldAmbientKind::None,
+            "Overworld ambient biome and daylight gates changed unexpectedly");
+    require(selectOverworldAmbient(DimensionId::Heaven, Biome::SWAMP,
+                                   true, true, 0.1f, 0.0f, 12.0f) ==
+                OverworldAmbientKind::None &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::SWAMP,
+                                       true, false, 0.1f, 0.0f, 12.0f) ==
+                    OverworldAmbientKind::None &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::SWAMP,
+                                       true, true, 0.1f, 0.5f, 12.0f) ==
+                    OverworldAmbientKind::None &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::FOREST,
+                                       true, true, 0.3f, 0.0f, 12.0f) ==
+                    OverworldAmbientKind::None &&
+                selectOverworldAmbient(DimensionId::Overworld, Biome::FOREST,
+                                       true, true, 1.0f, 0.0f, 0.0f) ==
+                    OverworldAmbientKind::None,
+            "Overworld ambient dimension, shelter, weather, twilight, or quality gate failed");
     const CloudView heavenCloudView = cloudView(
         {0.0, 128.0, 0.0}, 0.0f, 128, CloudLayerStyle::Heaven);
     require(buildCloudInstances(17, 0, 0, 2, CloudLayerStyle::Heaven).empty() &&
@@ -60,6 +130,9 @@ int main() {
     static_assert(static_cast<int>(ParticleKind::HeavenPollen) == 7 &&
                       static_cast<int>(ParticleKind::HeavenSparkle) == 8,
                   "Heaven ambient kinds append after the mote branch");
+    static_assert(static_cast<int>(ParticleKind::OverworldMote) == 11 &&
+                      static_cast<int>(ParticleKind::Firefly) == 12,
+                  "Overworld ambient kinds must match the weather shader branches");
     static_assert(ParticleSystem::MAX_SKY_MOTES_PER_UPDATE == 8 &&
                       ParticleSystem::MAX_POLLEN_PER_UPDATE == 4 &&
                       ParticleSystem::MAX_SPARKLE_PER_UPDATE == 6 &&

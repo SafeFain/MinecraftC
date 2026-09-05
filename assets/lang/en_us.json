@@ -151,6 +151,7 @@
   "settings.cloud_distance": "Cloud Distance: {0} Blocks",
   "settings.smooth_lighting": "Smooth Lighting: {0}",
   "settings.visual_quality": "Visual Quality: {0}",
+  "settings.enhanced_visuals": "Enhanced Visuals: {0}",
   "settings.transparent_leaves": "Transparent Leaves: {0}",
   "settings.visual_low": "Low",
   "settings.visual_medium": "Medium",

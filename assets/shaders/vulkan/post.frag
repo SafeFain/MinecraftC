@@ -1,6 +1,10 @@
 #version 450
 
 layout(set=0,binding=0) uniform sampler2D sceneColor;
+layout(set=0,binding=1) uniform sampler2D bloomHalf;
+layout(set=0,binding=2) uniform sampler2D bloomQuarter;
+layout(set=0,binding=3) uniform sampler2D bloomEighth;
+layout(set=0,binding=4) uniform sampler2D bloomSixteenth;
 layout(location=0) in vec2 vUv;
 layout(location=0) out vec4 outColor;
 
@@ -9,6 +13,7 @@ layout(push_constant) uniform PostConstants {
     vec4 effects;
     vec4 texelTime;
     vec4 environment;
+    vec4 celestial;
 } post;
 
 vec3 pbrNeutral(vec3 color){
@@ -43,7 +48,14 @@ void main(){
     }
     vec3 hdr=texture(sceneColor,clamp(uv,vec2(0.0),vec2(1.0))).rgb;
     float bloomStrength=post.exposureBloom.y;
-    if(bloomStrength>0.0){
+    int bloomLevels=int(post.texelTime.w+0.5);
+    if(post.effects.w>0.001&&bloomLevels>0){
+        vec3 bloom=texture(bloomHalf,vUv).rgb*0.45;
+        if(bloomLevels>1)bloom+=texture(bloomQuarter,vUv).rgb*0.30;
+        if(bloomLevels>2)bloom+=texture(bloomEighth,vUv).rgb*0.17;
+        if(bloomLevels>3)bloom+=texture(bloomSixteenth,vUv).rgb*0.08;
+        hdr+=bloom*bloomStrength;
+    }else if(bloomStrength>0.0){
         vec2 texel=post.texelTime.xy*post.exposureBloom.z;
         vec3 bloom=brightSample(uv)*0.18;
         const vec2 directions[12]=vec2[12](
@@ -72,7 +84,29 @@ void main(){
     // after this pass.
     float luminance=dot(color,vec3(.2126,.7152,.0722));
     color=mix(color,vec3(luminance),post.environment.x*0.06);
+    float enhanced=post.effects.w;
+    if(enhanced>0.001){
+        float twilight=(1.0-smoothstep(0.08,0.42,abs(post.celestial.y)))*
+            (1.0-post.environment.x);
+        vec3 warm=vec3(1.025,1.005,0.965);
+        vec3 cool=vec3(0.975,1.005,1.030);
+        vec3 grade=mix(vec3(1.0),warm,twilight*0.72);
+        float storm=max(post.environment.x,post.environment.y);
+        grade=mix(grade,cool,(1.0-post.environment.w)*0.32+storm*0.28);
+        grade=mix(grade,vec3(1.015,1.018,1.025),
+            post.environment.z*0.22);
+        grade=mix(grade,vec3(1.018,1.008,0.982),post.celestial.w*0.36);
+        color*=mix(vec3(1.0),grade,enhanced);
+        luminance=dot(color,vec3(.2126,.7152,.0722));
+        float saturation=0.06*enhanced*(1.0-post.environment.x*0.5);
+        color=mix(vec3(luminance),color,1.0+saturation);
+    }
     color=pbrNeutral(max(color,vec3(0.0)));
+    if(enhanced>0.001){
+        float edge=smoothstep(0.34,0.76,length(vUv-0.5));
+        float feedback=max(underwater,hurt);
+        color*=1.0-edge*0.05*enhanced*(1.0-feedback);
+    }
     if(post.effects.z>0.5)color=pow(color,vec3(1.0/2.2));
     outColor=vec4(color,1.0);
 }

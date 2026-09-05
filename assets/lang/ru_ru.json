@@ -148,6 +148,7 @@
   "settings.cloud_distance": "Дальность облаков: {0} блоков",
   "settings.smooth_lighting": "Плавное освещение: {0}",
   "settings.visual_quality": "Качество графики: {0}",
+  "settings.enhanced_visuals": "Улучшенные эффекты: {0}",
   "settings.transparent_leaves": "Прозрачность листвы: {0}",
   "settings.visual_low": "Низкое",
   "settings.visual_medium": "Среднее",

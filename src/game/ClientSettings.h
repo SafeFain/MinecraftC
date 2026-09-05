@@ -14,7 +14,7 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class AttackIndicator : uint8_t { Crosshair, Hotbar, Off };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 21;
+    static constexpr int FORMAT_VERSION = 22;
     static constexpr int MIN_FRAME_RATE = 30;
     static constexpr int MAX_FRAME_RATE = 200;
     static constexpr int MIN_LOD_DISTANCE = 32;
@@ -35,6 +35,7 @@ struct ClientSettings {
     bool smoothLighting = true;
     ShadowQuality shadowQuality = ShadowQuality::Medium;
     VisualQuality visualQuality = VisualQuality::Medium;
+    bool enhancedVisuals = false;
     bool transparentLeaves = false;
     int guiScale = 0; // 0 = Auto
     int frameRateLimit = MAX_FRAME_RATE;

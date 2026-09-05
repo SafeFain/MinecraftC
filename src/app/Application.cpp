@@ -165,7 +165,10 @@ private:
 
         m_renderer->initialize(m_window, m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
+        m_renderer->setEnhancedVisuals(m_clientSettings.enhancedVisuals);
         m_renderer->setLeafTransparency(m_clientSettings.transparentLeaves);
+        m_session.particles.setEnhancedVisuals(
+            m_clientSettings.enhancedVisuals, m_clientSettings.visualQuality);
         m_renderer->resize(m_window.width(), m_window.height());
         m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_scene.initialize(*m_renderer, m_paths.assetRoot);
@@ -383,6 +386,7 @@ private:
         m_scene.resetGraphics();
         m_renderer->reinitialize(m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
+        m_renderer->setEnhancedVisuals(m_clientSettings.enhancedVisuals);
         m_renderer->setLeafTransparency(m_clientSettings.transparentLeaves);
         m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
         m_scene.restoreGraphics(*m_renderer, m_paths.assetRoot);
@@ -406,8 +410,12 @@ private:
             m_clientSettings.lodAggressiveness,
             m_clientSettings.lodPrecision});
         if (m_renderer) m_renderer->setVisualQuality(m_clientSettings.visualQuality);
+        if (m_renderer) m_renderer->setEnhancedVisuals(
+            m_clientSettings.enhancedVisuals);
         if (m_renderer) m_renderer->setLeafTransparency(
             m_clientSettings.transparentLeaves);
+        m_session.particles.setEnhancedVisuals(
+            m_clientSettings.enhancedVisuals, m_clientSettings.visualQuality);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");
         if (m_clientSettings.controlMode == ControlMode::KeyboardMouse)

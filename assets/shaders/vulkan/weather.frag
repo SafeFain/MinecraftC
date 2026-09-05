@@ -97,7 +97,7 @@ void main(){
         float star=(1.0-smoothstep(0.055,0.13,cross))*
             (1.0-smoothstep(0.28,0.49,extent));
         color=vec4(1.0,0.72,0.16,star*(1.0-phase));
-    }else{
+    }else if(kind<10.5){
         // Sweep attack: a broad crescent arc around the primary target.
         vec2 centered=(uv-vec2(0.5))*vec2(2.0,1.35);
         float radius=length(centered);
@@ -105,6 +105,16 @@ void main(){
             (1.0-smoothstep(0.76,0.90,radius));
         arc*=smoothstep(-0.50,0.12,centered.y);
         color=vec4(0.92,0.94,1.0,arc*(1.0-phase));
+    }else if(kind<11.5){
+        vec2 centered=uv-vec2(0.5);
+        float mote=1.0-smoothstep(0.08,0.48,length(centered*vec2(1.4)));
+        float shimmer=0.78+0.22*sin(frame.cameraUpIntensity.w*2.1+phase*6.283);
+        color=vec4(1.0,0.88,0.58,mote*shimmer*0.34);
+    }else{
+        vec2 centered=uv-vec2(0.5);
+        float glow=1.0-smoothstep(0.04,0.52,length(centered*2.0));
+        float pulse=0.55+0.45*sin(frame.cameraUpIntensity.w*3.2+phase*6.283);
+        color=vec4(0.72,1.0,0.30,glow*pulse*0.70);
     }
     if(color.a<0.01)discard;
     if(frame.atlasParams.y>0.5)

@@ -18,7 +18,7 @@ SHADERS = ("basic_cube.vert", "basic_cube.frag", "chunk.vert", "chunk.frag",
            "ui.vert", "ui.frag", "weather.vert", "weather.frag",
            "sky.vert", "sky.frag", "cloud.vert", "cloud.frag",
            "wireframe.vert", "wireframe.frag", "model.vert", "model.frag",
-           "post.vert", "post.frag")
+           "post.vert", "post.frag", "bloom.frag")
 SPIRV_MAGIC = 0x07230203
 SOURCE_MANIFEST = "sources.sha256.json"
 

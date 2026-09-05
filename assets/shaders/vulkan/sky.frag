@@ -70,6 +70,7 @@ void main(){
     float height=smoothstep(-0.08,0.72,ray.y);
     vec3 color=mix(sky.horizonColor.rgb,sky.zenithColor.rgb,height);
     float celestial=1.0-sky.weather.y;
+    float enhanced=sky.options.w;
     float sun=smoothstep(0.99915,0.99972,dot(ray,sky.sunDirection.xyz))*celestial;
     float sunGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),96.0);
     float forwardHaze=pow(max(dot(ray,sky.sunDirection.xyz),0.0),8.0)*
@@ -77,9 +78,20 @@ void main(){
     color+=vec3(1.0,0.55,0.20)*forwardHaze*0.10*celestial;
     color+=vec3(1.0,0.72,0.38)*sunGlow*0.34*celestial;
     color+=vec3(3.2,2.45,1.35)*sun;
+    if(enhanced>0.001){
+        float lowSun=1.0-smoothstep(0.10,0.62,abs(sky.sunDirection.y));
+        float broadGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),3.5)*
+            smoothstep(-0.08,0.24,ray.y)*celestial;
+        float animatedHaze=0.92+0.08*sin(sky.weather.w*0.11+ray.x*4.0);
+        color+=mix(vec3(1.0,0.75,0.42),vec3(0.54,0.72,1.0),
+            1.0-daylight)*broadGlow*(0.035+0.055*lowSun)*
+            enhanced*animatedHaze;
+        color+=vec3(1.0,0.84,0.58)*sunGlow*0.16*enhanced*celestial;
+    }
     float moon=smoothstep(0.99945,0.99978,dot(ray,sky.moonDirection.xyz))*celestial;
     float moonHalo=pow(max(dot(ray,sky.moonDirection.xyz),0.0),180.0)*celestial*sky.weather.x;
     color+=vec3(0.30,0.40,0.72)*moonHalo*0.14;
+    color+=vec3(0.24,0.34,0.68)*moonHalo*0.10*enhanced;
     color=mix(color,vec3(0.72,0.80,1.0),moon*sky.weather.x);
     float starFace=0.0;vec2 starUv=cubeSkyUv(ray,starFace);
     float horizonFade=smoothstep(-0.015,0.20,ray.y);

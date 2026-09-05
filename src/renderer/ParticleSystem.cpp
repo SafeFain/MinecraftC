@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "Config.h"
+#include "world/BiomeMap.h"
 #include "world/World.h"
 
 void ParticleSystem::clear() {
@@ -12,7 +13,19 @@ void ParticleSystem::clear() {
     m_skyMoteEmission = 0.0f;
     m_pollenEmission = 0.0f;
     m_sparkleEmission = 0.0f;
+    m_overworldAmbientEmission = 0.0f;
     m_skyDaylight = 1.0f;
+}
+
+void ParticleSystem::setEnhancedVisuals(bool enabled, VisualQuality quality) {
+    m_enhancedVisual = enhancedVisualConfig(quality, enabled);
+    if (m_enhancedVisual.ambientParticlesPerSecond > 0.0f) return;
+    m_overworldAmbientEmission = 0.0f;
+    m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
+        [](const Particle& particle) {
+            return particle.kind == ParticleKind::OverworldMote ||
+                   particle.kind == ParticleKind::Firefly;
+        }), m_particles.end());
 }
 
 uint64_t ParticleSystem::randomBits() {
@@ -134,6 +147,45 @@ void ParticleSystem::emitHeavenSparkle(const glm::dvec3& viewer, uint64_t seed,
     m_particles.push_back(particle);
 }
 
+void ParticleSystem::emitOverworldAmbient(
+    World& world, const glm::dvec3& viewer, uint64_t seed, bool firefly) {
+    m_randomState ^= seed + (firefly ? 0xC6BC279692B5CC83ULL
+                                    : 0xD1B54A32D192ED03ULL);
+    const double radius = firefly ? 11.0 : 14.0;
+    const double x = viewer.x + (randomFloat() * 2.0 - 1.0) * radius;
+    const double z = viewer.z + (randomFloat() * 2.0 - 1.0) * radius;
+    const int bx = static_cast<int>(std::floor(x));
+    const int bz = static_cast<int>(std::floor(z));
+    const int eyeY = static_cast<int>(std::floor(viewer.y + 1.0));
+    if (!world.hasSkyAccess(bx, eyeY, bz)) return;
+    const Biome biome = world.biomeAt(bx, bz);
+    const BiomeProperties& properties = getBiomeProps(biome);
+    if (firefly) {
+        if (!supportsFireflies(biome)) return;
+    } else if (properties.decorationDensity == 0 &&
+               properties.treeDensity <= 0.04f) {
+        return;
+    }
+
+    Particle particle;
+    particle.kind = firefly ? ParticleKind::Firefly
+                            : ParticleKind::OverworldMote;
+    particle.position = {
+        x, viewer.y + 0.5 + randomFloat() * (firefly ? 3.2 : 7.0), z};
+    particle.velocity = {
+        (randomFloat() - 0.5f) * (firefly ? 0.10f : 0.14f),
+        (randomFloat() - 0.35f) * (firefly ? 0.08f : 0.06f),
+        (randomFloat() - 0.5f) * (firefly ? 0.10f : 0.14f)};
+    particle.lifetime = firefly
+        ? 3.0f + randomFloat() * 3.0f : 4.0f + randomFloat() * 4.0f;
+    particle.phase = randomFloat();
+    particle.size = firefly
+        ? 0.11f + randomFloat() * 0.07f : 0.08f + randomFloat() * 0.08f;
+    particle.rotation = randomFloat() * 6.2831853f;
+    particle.angularVelocity = (randomFloat() - 0.5f) * 0.8f;
+    m_particles.push_back(particle);
+}
+
 void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                             float rainIntensity, uint64_t seed,
                             DimensionId dimension, float daylight) {
@@ -207,6 +259,38 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                        particle.kind == ParticleKind::HeavenPollen ||
                        particle.kind == ParticleKind::HeavenSparkle;
             }), m_particles.end());
+
+        const int viewerX = static_cast<int>(std::floor(viewer.x));
+        const int viewerY = static_cast<int>(std::floor(viewer.y + 1.0));
+        const int viewerZ = static_cast<int>(std::floor(viewer.z));
+        const bool outdoors = world.hasSkyAccess(viewerX, viewerY, viewerZ);
+        const Biome biome = world.biomeAt(viewerX, viewerZ);
+        const BiomeProperties& properties = getBiomeProps(biome);
+        const bool vegetated = properties.decorationDensity > 0 ||
+            properties.treeDensity > 0.04f;
+        const OverworldAmbientKind ambientKind = selectOverworldAmbient(
+            dimension, biome, vegetated, outdoors, m_skyDaylight,
+            rainIntensity, m_enhancedVisual.ambientParticlesPerSecond);
+        if (ambientKind != OverworldAmbientKind::None) {
+            m_overworldAmbientEmission += dt *
+                m_enhancedVisual.ambientParticlesPerSecond;
+            const int count = std::min(
+                4, static_cast<int>(m_overworldAmbientEmission));
+            m_overworldAmbientEmission -= static_cast<float>(count);
+            for (int i = 0; i < count && m_particles.size() < MAX_PARTICLES;
+                 ++i)
+                emitOverworldAmbient(
+                    world, viewer, seed + static_cast<uint64_t>(i) * 59u,
+                    ambientKind == OverworldAmbientKind::Firefly);
+        } else {
+            m_overworldAmbientEmission = 0.0f;
+            m_particles.erase(std::remove_if(
+                m_particles.begin(), m_particles.end(),
+                [](const Particle& particle) {
+                    return particle.kind == ParticleKind::OverworldMote ||
+                           particle.kind == ParticleKind::Firefly;
+                }), m_particles.end());
+        }
     }
 
     for (auto& particle : m_particles) {
@@ -241,6 +325,17 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
             particle.velocity.y += std::cos(
                 particle.age * 2.2f + particle.phase * 3.9f) * dt * 0.015f;
             particle.rotation += particle.angularVelocity * dt;
+        } else if (particle.kind == ParticleKind::OverworldMote ||
+                   particle.kind == ParticleKind::Firefly) {
+            const float drift = particle.kind == ParticleKind::Firefly
+                ? 0.055f : 0.025f;
+            particle.velocity.x += std::sin(
+                particle.age * 1.1f + particle.phase * 6.283f) * dt * drift;
+            particle.velocity.y += std::cos(
+                particle.age * 1.4f + particle.phase * 4.7f) * dt * drift;
+            particle.velocity.z += std::sin(
+                particle.age * 0.9f + particle.phase * 3.1f) * dt * drift;
+            particle.rotation += particle.angularVelocity * dt;
         } else if (particle.kind == ParticleKind::CriticalHit ||
                    particle.kind == ParticleKind::SweepAttack) {
             particle.phase = std::clamp(
@@ -251,6 +346,8 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         if (particle.kind == ParticleKind::SkyMote ||
             particle.kind == ParticleKind::HeavenPollen ||
             particle.kind == ParticleKind::HeavenSparkle ||
+            particle.kind == ParticleKind::OverworldMote ||
+            particle.kind == ParticleKind::Firefly ||
             particle.kind == ParticleKind::CriticalHit ||
             particle.kind == ParticleKind::SweepAttack) {
             particle.position += glm::dvec3(particle.velocity) * static_cast<double>(dt);

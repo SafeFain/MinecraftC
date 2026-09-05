@@ -33,6 +33,7 @@ public:
     virtual void resumePresentation() {}
     virtual void beginFrame() = 0;
     virtual void setVisualQuality(VisualQuality) = 0;
+    virtual void setEnhancedVisuals(bool) = 0;
     virtual void setLeafTransparency(bool) = 0;
     virtual void finishScene(const PostProcessState&) = 0;
     virtual void setEnvironment(const RenderEnvironment&, const glm::vec3&) = 0;

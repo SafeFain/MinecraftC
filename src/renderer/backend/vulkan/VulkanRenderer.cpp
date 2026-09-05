@@ -346,6 +346,11 @@ void VulkanRenderer::setVisualQuality(VisualQuality quality) {
     if (m_impl) m_impl->configureVisualQuality(quality);
 }
 
+void VulkanRenderer::setEnhancedVisuals(bool enabled) {
+    m_enhancedVisuals = enabled;
+    if (m_impl) m_impl->configureEnhancedVisuals(enabled);
+}
+
 void VulkanRenderer::setLeafTransparency(bool enabled) {
     m_leafTransparency = enabled;
     if (m_impl)
@@ -388,6 +393,8 @@ void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
         (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
             Config::CHUNK_SIZE_X);
     const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+    const EnhancedVisualConfig enhanced = enhancedVisualConfig(
+        m_visualQuality, m_enhancedVisuals);
     chunk.materialParams = {
         static_cast<float>(getAtlasTextureIndex(BlockTexture::Lava)),
         static_cast<float>(getAtlasTextureIndex(BlockTexture::Water)),
@@ -399,6 +406,10 @@ void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
             visual.aoDirections * 0.055f) : 0.0f,
         visual.cloudShadowSamples > 0
             ? 0.12f + 0.035f * visual.cloudShadowSamples : 0.0f};
+    chunk.visualParams = {
+        enhanced.materialMotionStrength, enhanced.atmosphereStrength,
+        m_enhancedVisuals ? 1.0f : 0.0f,
+        static_cast<float>(enhanced.bloomLevels)};
 }
 
 void VulkanRenderer::renderSky(const RenderEnvironment& environment,
@@ -420,10 +431,12 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
                    environment.thunderIntensity,
                    static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now()))};
     const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
+    const EnhancedVisualConfig enhanced = enhancedVisualConfig(
+        m_visualQuality, m_enhancedVisuals);
     sky.options = {renderClouds && visual.voxelClouds ? 1.0f : 0.0f,
                    environment.skyStyle == RenderSkyStyle::Heaven ? 1.0f : 0.0f,
                    visual.cirrusClouds ? 1.0f : 0.0f,
-                   static_cast<float>(static_cast<int>(m_visualQuality))};
+                   enhanced.atmosphereStrength};
     m_impl->skyQueued = true;
     m_impl->drawQueued = true;
 }

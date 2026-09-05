@@ -148,6 +148,7 @@
   "settings.cloud_distance": "구름 거리: {0}블록",
   "settings.smooth_lighting": "부드러운 조명: {0}",
   "settings.visual_quality": "그래픽 품질: {0}",
+  "settings.enhanced_visuals": "향상된 시각 효과: {0}",
   "settings.transparent_leaves": "나뭇잎 투명도: {0}",
   "settings.visual_low": "낮음",
   "settings.visual_medium": "중간",

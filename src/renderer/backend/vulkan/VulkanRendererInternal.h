@@ -69,6 +69,7 @@ using vkp::CloudUniforms;
 using vkp::WireUniforms;
 using vkp::UiConstants;
 using vkp::PostConstants;
+using vkp::BloomConstants;
 using vkp::ModelUniforms;
 
 static_assert(sizeof(ParticleRenderData) == 32);
@@ -253,6 +254,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     bool presentationSuspended = false;
     VkSampleCountFlagBits maxSampleCount = VK_SAMPLE_COUNT_1_BIT;
     VkSampleCountFlagBits requestedSampleCount = VK_SAMPLE_COUNT_2_BIT;
+    bool enhancedVisuals = false;
     ShadowCascades shadowCascades{};
     ShadowCascades shadowBaseCascades{};
     std::vector<ShadowChunkSubmission> submittedShadowChunks;
@@ -435,18 +437,31 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void configureVisualQuality(VisualQuality quality) {
+        const int previousBloomLevels = enhancedVisualConfig(
+            visualQuality, enhancedVisuals).bloomLevels;
         visualQuality = quality;
         const int samples = visualQualityConfig(quality).sceneSamples;
         requestedSampleCount = samples >= 4 ? VK_SAMPLE_COUNT_4_BIT :
             samples >= 2 ? VK_SAMPLE_COUNT_2_BIT : VK_SAMPLE_COUNT_1_BIT;
         const VkSampleCountFlagBits effective = maxSampleCount >= requestedSampleCount
             ? requestedSampleCount : maxSampleCount;
-        if (effective == swapchain.sampleCount) return;
+        const bool bloomChanged = previousBloomLevels != enhancedVisualConfig(
+            visualQuality, enhancedVisuals).bloomLevels;
+        if (effective == swapchain.sampleCount && !bloomChanged) return;
         swapchain.sampleCount = effective;
         swapchainDirty = true;
         LOG_INFO("Vulkan visual quality selected " << samples
                  << "x scene MSAA; effective "
                  << static_cast<uint32_t>(swapchain.sampleCount) << "x");
+    }
+
+    void configureEnhancedVisuals(bool enabled) {
+        const int previousBloomLevels = enhancedVisualConfig(
+            visualQuality, enhancedVisuals).bloomLevels;
+        enhancedVisuals = enabled;
+        if (previousBloomLevels != enhancedVisualConfig(
+                visualQuality, enhancedVisuals).bloomLevels)
+            swapchainDirty = true;
     }
 
     void createDevice() {
@@ -848,16 +863,24 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr, &descriptors.modelUniformDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
 
-        VkDescriptorSetLayoutBinding postBinding{};
-        postBinding.binding = 0;
-        postBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        postBinding.descriptorCount = 1;
-        postBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        info.bindingCount = 1;
-        info.pBindings = &postBinding;
+        std::array<VkDescriptorSetLayoutBinding,5> postBindings{};
+        for (uint32_t binding = 0; binding < postBindings.size(); ++binding) {
+            postBindings[binding].binding = binding;
+            postBindings[binding].descriptorType =
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            postBindings[binding].descriptorCount = 1;
+            postBindings[binding].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        }
+        info.bindingCount = postBindings.size();
+        info.pBindings = postBindings.data();
         require(vkCreateDescriptorSetLayout(
                     device, &info, nullptr, &descriptors.postDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(post)");
+        info.bindingCount = 1;
+        info.pBindings = postBindings.data();
+        require(vkCreateDescriptorSetLayout(
+                    device, &info, nullptr, &descriptors.bloomDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout(bloom)");
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
         const VkDeviceSize alignment = std::max<VkDeviceSize>(
@@ -1020,6 +1043,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.skyLayout = descriptors.skyDescriptorSetLayout;
         params.modelLayout = descriptors.modelUniformDescriptorSetLayout;
         params.postLayout = descriptors.postDescriptorSetLayout;
+        params.bloomLayout = descriptors.bloomDescriptorSetLayout;
+        params.bloomLevels = enhancedVisualConfig(
+            visualQuality, enhancedVisuals).bloomLevels;
         params.requestedSampleCount = requestedSampleCount;
         params.maxSampleCount = maxSampleCount;
         params.shaderRoot = assetRoot / "shaders" / "vulkan";
@@ -1314,6 +1340,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         recordUploads(command);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
+        recordBloomPasses(command, imageIndex);
         // The post and UI draws share one present render pass; the pass
         // bracket spans recordPostPass and recordUiPass.
         recordPostPass(command, imageIndex);
@@ -1715,6 +1742,46 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdEndRenderPass(command);
     }
 
+    void recordBloomPasses(VkCommandBuffer command, uint32_t imageIndex) {
+        if (swapchain.bloomLevelCount <= 0) return;
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          swapchain.bloomPipeline);
+        VkExtent2D sourceExtent = swapchain.swapchainExtent;
+        for (int level = 0; level < swapchain.bloomLevelCount; ++level) {
+            const size_t levelIndex = static_cast<size_t>(level);
+            VkRenderPassBeginInfo pass{};
+            pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            pass.renderPass = swapchain.bloomRenderPass;
+            pass.framebuffer = swapchain.bloomFramebuffers[levelIndex][imageIndex];
+            pass.renderArea.extent = swapchain.bloomExtents[levelIndex];
+            vkCmdBeginRenderPass(command, &pass, VK_SUBPASS_CONTENTS_INLINE);
+            const VkExtent2D extent = swapchain.bloomExtents[levelIndex];
+            const VkViewport viewport{0.0f, 0.0f,
+                static_cast<float>(extent.width), static_cast<float>(extent.height),
+                0.0f, 1.0f};
+            const VkRect2D scissor{{0, 0}, extent};
+            vkCmdSetViewport(command, 0, 1, &viewport);
+            vkCmdSetScissor(command, 0, 1, &scissor);
+            const VkDescriptorSet descriptor =
+                swapchain.bloomDescriptorSets[levelIndex][imageIndex];
+            vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                swapchain.bloomPipelineLayout, 0, 1, &descriptor, 0, nullptr);
+            BloomConstants constants;
+            constants.sourceTexelAndExtract = {
+                1.0f / std::max(1u, sourceExtent.width),
+                1.0f / std::max(1u, sourceExtent.height),
+                level == 0 ? 1.0f : 0.0f, 0.0f};
+            vkCmdPushConstants(command, swapchain.bloomPipelineLayout,
+                VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(constants), &constants);
+            vkCmdDraw(command, 3, 1, 0, 0);
+            vkCmdEndRenderPass(command);
+            sourceExtent = extent;
+            ++performance.drawCalls;
+            ++performance.descriptorBinds;
+        }
+        ++performance.pipelineBinds;
+    }
+
     void recordPostPass(VkCommandBuffer command, uint32_t imageIndex) {
         VkClearValue presentClear{};
         presentClear.color.float32[3] = 1.0f;
@@ -1736,28 +1803,43 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
             swapchain.postPipelineLayout, 0, 1, &swapchain.postDescriptorSets[imageIndex], 0, nullptr);
         const VisualQualityConfig visual = visualQualityConfig(visualQuality);
+        const EnhancedVisualConfig enhanced = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
         PostConstants postConstants;
-        postConstants.exposureBloom = {
-            std::clamp(postProcess.exposure, 0.75f, 1.65f),
-            visual.bloomLevels > 0 ? 0.07f + visual.bloomLevels * 0.012f : 0.0f,
-            visual.bloomLevels > 0 ? 1.15f + visual.bloomLevels * 0.18f : 1.0f,
-            visual.bloomLevels <= 0 ? 0.0f :
-                visual.bloomLevels <= 3 ? 4.0f :
-                visual.bloomLevels <= 5 ? 8.0f : 12.0f};
+        if (enhanced.bloomLevels > 0) {
+            postConstants.exposureBloom = {
+                std::clamp(postProcess.exposure, 0.75f, 1.65f),
+                0.13f, 1.0f, 0.0f};
+        } else {
+            postConstants.exposureBloom = {
+                std::clamp(postProcess.exposure, 0.75f, 1.65f),
+                visual.bloomLevels > 0
+                    ? 0.07f + visual.bloomLevels * 0.012f : 0.0f,
+                visual.bloomLevels > 0
+                    ? 1.15f + visual.bloomLevels * 0.18f : 1.0f,
+                visual.bloomLevels <= 0 ? 0.0f :
+                    visual.bloomLevels <= 3 ? 4.0f :
+                    visual.bloomLevels <= 5 ? 8.0f : 12.0f};
+        }
         postConstants.effects = {
             std::clamp(postProcess.underwater, 0.0f, 1.0f),
             std::clamp(postProcess.hurt, 0.0f, 1.0f),
             swapchain.framebufferSrgb ? 0.0f : 1.0f,
-            static_cast<float>(static_cast<int>(visualQuality))};
+            enhanced.atmosphereStrength};
         postConstants.texelTime = {
             1.0f / std::max(1u, swapchain.swapchainExtent.width),
             1.0f / std::max(1u, swapchain.swapchainExtent.height),
-            static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())), 0.0f};
+            static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())),
+            static_cast<float>(enhanced.bloomLevels)};
         postConstants.environment = {
             postProcess.environment.rainIntensity,
             postProcess.environment.thunderIntensity,
             postProcess.environment.lightningFlash,
             postProcess.environment.daylight};
+        postConstants.celestial = {
+            postProcess.environment.sunDirection,
+            postProcess.environment.skyStyle == RenderSkyStyle::Heaven
+                ? 1.0f : 0.0f};
         vkCmdPushConstants(command, swapchain.postPipelineLayout,
             VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(postConstants), &postConstants);
         vkCmdDraw(command, 3, 1, 0, 0);

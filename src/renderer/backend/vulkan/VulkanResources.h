@@ -57,6 +57,7 @@ struct VulkanDescriptorResources {
     VkDescriptorSetLayout chunkDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout modelUniformDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout postDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout bloomDescriptorSetLayout = VK_NULL_HANDLE;
 
     void attach(VkDevice device) { m_device = device; }
     ~VulkanDescriptorResources();
@@ -121,6 +122,8 @@ private:
 // descriptor sets. Rebuild is `bundle = VulkanSwapchainBundle::create(...)`
 // (move assignment destroys the previous bundle first).
 struct VulkanSwapchainBundle {
+    static constexpr size_t MAX_BLOOM_LEVELS = 4;
+
     struct CreateParams {
         VkDevice device = VK_NULL_HANDLE;
         VmaAllocator allocator = VK_NULL_HANDLE;
@@ -138,6 +141,8 @@ struct VulkanSwapchainBundle {
         VkDescriptorSetLayout skyLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout modelLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
+        int bloomLevels = 0;
         VkSampleCountFlagBits requestedSampleCount = VK_SAMPLE_COUNT_1_BIT;
         VkSampleCountFlagBits maxSampleCount = VK_SAMPLE_COUNT_1_BIT;
         std::filesystem::path shaderRoot;
@@ -161,6 +166,13 @@ struct VulkanSwapchainBundle {
     std::vector<VkImage> depthImages;
     std::vector<VmaAllocation> depthAllocations;
     std::vector<VkImageView> depthImageViews;
+    int bloomLevelCount = 0;
+    std::array<VkExtent2D, MAX_BLOOM_LEVELS> bloomExtents{};
+    std::array<std::vector<VkImage>, MAX_BLOOM_LEVELS> bloomImages;
+    std::array<std::vector<VmaAllocation>, MAX_BLOOM_LEVELS> bloomAllocations;
+    std::array<std::vector<VkImageView>, MAX_BLOOM_LEVELS> bloomImageViews;
+    std::array<std::vector<VkFramebuffer>, MAX_BLOOM_LEVELS> bloomFramebuffers;
+    std::array<std::vector<VkDescriptorSet>, MAX_BLOOM_LEVELS> bloomDescriptorSets;
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkRenderPass presentRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
@@ -171,6 +183,9 @@ struct VulkanSwapchainBundle {
     VkPipelineLayout postPipelineLayout = VK_NULL_HANDLE;
     VkSampler postSampler = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> postDescriptorSets;
+    VkRenderPass bloomRenderPass = VK_NULL_HANDLE;
+    VkPipelineLayout bloomPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline bloomPipeline = VK_NULL_HANDLE;
     VkPipeline basicPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoCullPipeline = VK_NULL_HANDLE;
     VkPipeline basicNoDepthPipeline = VK_NULL_HANDLE;

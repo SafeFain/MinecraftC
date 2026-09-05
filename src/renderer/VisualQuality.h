@@ -23,6 +23,25 @@ struct VisualQualityConfig {
     float normalStrength = 0.0f;
 };
 
+struct EnhancedVisualConfig {
+    int bloomLevels = 0;
+    float atmosphereStrength = 0.0f;
+    float materialMotionStrength = 0.0f;
+    float ambientParticlesPerSecond = 0.0f;
+};
+
+inline EnhancedVisualConfig enhancedVisualConfig(VisualQuality quality,
+                                                 bool enabled) {
+    if (!enabled) return {};
+    switch (quality) {
+        case VisualQuality::Low: return {0, 0.25f, 0.25f, 0.0f};
+        case VisualQuality::Medium: return {2, 0.50f, 0.60f, 4.0f};
+        case VisualQuality::High: return {3, 0.75f, 0.85f, 8.0f};
+        case VisualQuality::Ultra: return {4, 1.00f, 1.00f, 12.0f};
+    }
+    return {};
+}
+
 inline VisualQualityConfig visualQualityConfig(VisualQuality quality) {
     switch (quality) {
         case VisualQuality::Low:

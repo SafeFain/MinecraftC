@@ -69,6 +69,7 @@ public:
     void reinitialize(const std::filesystem::path&) override {}
     void beginFrame() override {}
     void setVisualQuality(VisualQuality) override {}
+    void setEnhancedVisuals(bool) override {}
     void setLeafTransparency(bool) override {}
     void finishScene(const PostProcessState&) override {}
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override {}

@@ -32,6 +32,8 @@ VulkanDeviceContext::~VulkanDeviceContext() {
 VulkanDescriptorResources::~VulkanDescriptorResources() {
     if (!m_device) return;
     if (descriptorPool) vkDestroyDescriptorPool(m_device, descriptorPool, nullptr);
+    if (bloomDescriptorSetLayout)
+        vkDestroyDescriptorSetLayout(m_device, bloomDescriptorSetLayout, nullptr);
     if (postDescriptorSetLayout)
         vkDestroyDescriptorSetLayout(m_device, postDescriptorSetLayout, nullptr);
     if (modelUniformDescriptorSetLayout)
@@ -301,6 +303,41 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
                                   &result.sceneImageViews[i]),
                 "vkCreateImageView(scene)");
     }
+    result.bloomLevelCount = std::clamp(
+        params.bloomLevels, 0,
+        static_cast<int>(VulkanSwapchainBundle::MAX_BLOOM_LEVELS));
+    for (int level = 0; level < result.bloomLevelCount; ++level) {
+        const size_t levelIndex = static_cast<size_t>(level);
+        const uint32_t divisor = 1u << static_cast<uint32_t>(level + 1);
+        result.bloomExtents[levelIndex] = {
+            std::max(1u, result.swapchainExtent.width / divisor),
+            std::max(1u, result.swapchainExtent.height / divisor)};
+        auto& images = result.bloomImages[levelIndex];
+        auto& allocations = result.bloomAllocations[levelIndex];
+        auto& views = result.bloomImageViews[levelIndex];
+        images.assign(result.images.size(), VK_NULL_HANDLE);
+        allocations.assign(result.images.size(), VK_NULL_HANDLE);
+        views.assign(result.images.size(), VK_NULL_HANDLE);
+        VkImageCreateInfo bloomInfo = sceneImageInfo;
+        bloomInfo.extent = {result.bloomExtents[levelIndex].width,
+                            result.bloomExtents[levelIndex].height, 1};
+        for (size_t i = 0; i < result.images.size(); ++i) {
+            require(vmaCreateImage(params.allocator, &bloomInfo,
+                                   &allocationInfo, &images[i],
+                                   &allocations[i], nullptr),
+                    "vmaCreateImage(bloom)");
+            VkImageViewCreateInfo view{};
+            view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view.image = images[i];
+            view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view.format = result.sceneFormat;
+            view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            view.subresourceRange.levelCount = 1;
+            view.subresourceRange.layerCount = 1;
+            require(vkCreateImageView(params.device, &view, nullptr, &views[i]),
+                    "vkCreateImageView(bloom)");
+        }
+    }
     result.depthFormat = findDepthFormat(params.physicalDevice);
     result.depthImages.assign(result.images.size(), VK_NULL_HANDLE);
     result.depthAllocations.assign(result.images.size(), VK_NULL_HANDLE);
@@ -380,12 +417,15 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     pipelineInputs.skyLayout = params.skyLayout;
     pipelineInputs.modelLayout = params.modelLayout;
     pipelineInputs.postLayout = params.postLayout;
+    pipelineInputs.bloomLayout = params.bloomLayout;
     pipelineInputs.descriptorPool = params.descriptorPool;
     pipelineInputs.sceneFormat = result.sceneFormat;
     pipelineInputs.depthFormat = result.depthFormat;
     pipelineInputs.swapchainFormat = result.swapchainFormat;
     pipelineInputs.sampleCount = result.sampleCount;
     pipelineInputs.sceneImageViews = &result.sceneImageViews;
+    pipelineInputs.bloomImageViews = &result.bloomImageViews;
+    pipelineInputs.bloomLevels = result.bloomLevelCount;
     SwapchainPipelineOutputs pipelineOutputs;
     pipelineFactory.createSwapchainSet(pipelineInputs, pipelineOutputs);
     result.renderPass = pipelineOutputs.renderPass;
@@ -398,6 +438,11 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     result.postPipelineLayout = pipelineOutputs.postPipelineLayout;
     result.postSampler = pipelineOutputs.postSampler;
     result.postDescriptorSets = std::move(pipelineOutputs.postDescriptorSets);
+    result.bloomRenderPass = pipelineOutputs.bloomRenderPass;
+    result.bloomPipelineLayout = pipelineOutputs.bloomPipelineLayout;
+    result.bloomPipeline = pipelineOutputs.bloomPipeline;
+    result.bloomDescriptorSets = std::move(
+        pipelineOutputs.bloomDescriptorSets);
     result.basicPipeline = pipelineOutputs.basicPipeline;
     result.basicNoCullPipeline = pipelineOutputs.basicNoCullPipeline;
     result.basicNoDepthPipeline = pipelineOutputs.basicNoDepthPipeline;
@@ -451,6 +496,26 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
         require(vkCreateFramebuffer(params.device, &presentInfo, nullptr,
                                     &result.presentFramebuffers[i]),
                 "vkCreateFramebuffer(present)");
+
+        for (int level = 0; level < result.bloomLevelCount; ++level) {
+            const size_t levelIndex = static_cast<size_t>(level);
+            auto& bloomFramebuffers = result.bloomFramebuffers[levelIndex];
+            if (bloomFramebuffers.empty())
+                bloomFramebuffers.assign(result.images.size(), VK_NULL_HANDLE);
+            VkFramebufferCreateInfo bloomFramebuffer{};
+            bloomFramebuffer.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            bloomFramebuffer.renderPass = result.bloomRenderPass;
+            bloomFramebuffer.attachmentCount = 1;
+            bloomFramebuffer.pAttachments =
+                &result.bloomImageViews[levelIndex][i];
+            bloomFramebuffer.width = result.bloomExtents[levelIndex].width;
+            bloomFramebuffer.height = result.bloomExtents[levelIndex].height;
+            bloomFramebuffer.layers = 1;
+            require(vkCreateFramebuffer(
+                        params.device, &bloomFramebuffer, nullptr,
+                        &bloomFramebuffers[i]),
+                    "vkCreateFramebuffer(bloom)");
+        }
     }
     result.commandBuffers.resize(result.images.size());
     VkCommandBufferAllocateInfo allocateInfo{};
@@ -468,6 +533,7 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
              << static_cast<int>(result.swapchainFormat) << ", "
              << (result.framebufferSrgb ? "hardware sRGB"
                                         : "shader gamma fallback")
+             << ", enhanced bloom " << result.bloomLevelCount << " levels"
              << ", surface transform "
              << static_cast<uint32_t>(info.preTransform));
     return result;
@@ -479,6 +545,15 @@ void VulkanSwapchainBundle::destroy() {
         vkFreeCommandBuffers(m_device, m_commandPool, commandBuffers.size(),
                              commandBuffers.data());
     commandBuffers.clear();
+    for (auto& sets : bloomDescriptorSets) {
+        if (!sets.empty() && m_descriptorPool) {
+            require(vkFreeDescriptorSets(
+                        m_device, m_descriptorPool,
+                        static_cast<uint32_t>(sets.size()), sets.data()),
+                    "vkFreeDescriptorSets(bloom)");
+        }
+        sets.clear();
+    }
     if (!postDescriptorSets.empty() && m_descriptorPool) {
         require(vkFreeDescriptorSets(
                     m_device, m_descriptorPool,
@@ -487,6 +562,11 @@ void VulkanSwapchainBundle::destroy() {
                 "vkFreeDescriptorSets(post)");
     }
     postDescriptorSets.clear();
+    for (auto& levelFramebuffers : bloomFramebuffers) {
+        for (VkFramebuffer framebuffer : levelFramebuffers)
+            if (framebuffer) vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+        levelFramebuffers.clear();
+    }
     for (VkFramebuffer framebuffer : presentFramebuffers)
         if (framebuffer) vkDestroyFramebuffer(m_device, framebuffer, nullptr);
     presentFramebuffers.clear();
@@ -498,6 +578,11 @@ void VulkanSwapchainBundle::destroy() {
     if (postPipelineLayout)
         vkDestroyPipelineLayout(m_device, postPipelineLayout, nullptr);
     postPipelineLayout = VK_NULL_HANDLE;
+    if (bloomPipeline) vkDestroyPipeline(m_device, bloomPipeline, nullptr);
+    bloomPipeline = VK_NULL_HANDLE;
+    if (bloomPipelineLayout)
+        vkDestroyPipelineLayout(m_device, bloomPipelineLayout, nullptr);
+    bloomPipelineLayout = VK_NULL_HANDLE;
     if (postSampler) vkDestroySampler(m_device, postSampler, nullptr);
     postSampler = VK_NULL_HANDLE;
     if (pipeline) vkDestroyPipeline(m_device, pipeline, nullptr);
@@ -546,6 +631,9 @@ void VulkanSwapchainBundle::destroy() {
     if (presentRenderPass)
         vkDestroyRenderPass(m_device, presentRenderPass, nullptr);
     presentRenderPass = VK_NULL_HANDLE;
+    if (bloomRenderPass)
+        vkDestroyRenderPass(m_device, bloomRenderPass, nullptr);
+    bloomRenderPass = VK_NULL_HANDLE;
     if (renderPass) vkDestroyRenderPass(m_device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
     for (VkImageView view : depthImageViews)
@@ -559,6 +647,20 @@ void VulkanSwapchainBundle::destroy() {
     }
     depthImages.clear();
     depthAllocations.clear();
+    for (size_t level = 0; level < MAX_BLOOM_LEVELS; ++level) {
+        for (VkImageView view : bloomImageViews[level])
+            if (view) vkDestroyImageView(m_device, view, nullptr);
+        bloomImageViews[level].clear();
+        if (m_allocator) {
+            for (size_t i = 0; i < bloomImages[level].size(); ++i)
+                if (bloomImages[level][i])
+                    vmaDestroyImage(m_allocator, bloomImages[level][i],
+                                    bloomAllocations[level][i]);
+        }
+        bloomImages[level].clear();
+        bloomAllocations[level].clear();
+    }
+    bloomLevelCount = 0;
     for (VkImageView view : colorImageViews)
         if (view) vkDestroyImageView(m_device, view, nullptr);
     colorImageViews.clear();
@@ -610,6 +712,13 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       depthImages(std::move(other.depthImages)),
       depthAllocations(std::move(other.depthAllocations)),
       depthImageViews(std::move(other.depthImageViews)),
+      bloomLevelCount(other.bloomLevelCount),
+      bloomExtents(other.bloomExtents),
+      bloomImages(std::move(other.bloomImages)),
+      bloomAllocations(std::move(other.bloomAllocations)),
+      bloomImageViews(std::move(other.bloomImageViews)),
+      bloomFramebuffers(std::move(other.bloomFramebuffers)),
+      bloomDescriptorSets(std::move(other.bloomDescriptorSets)),
       renderPass(other.renderPass),
       presentRenderPass(other.presentRenderPass),
       pipelineLayout(other.pipelineLayout),
@@ -620,6 +729,9 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       postPipelineLayout(other.postPipelineLayout),
       postSampler(other.postSampler),
       postDescriptorSets(std::move(other.postDescriptorSets)),
+      bloomRenderPass(other.bloomRenderPass),
+      bloomPipelineLayout(other.bloomPipelineLayout),
+      bloomPipeline(other.bloomPipeline),
       basicPipeline(other.basicPipeline),
       basicNoCullPipeline(other.basicNoCullPipeline),
       basicNoDepthPipeline(other.basicNoDepthPipeline),
@@ -674,6 +786,13 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     depthImages = std::move(other.depthImages);
     depthAllocations = std::move(other.depthAllocations);
     depthImageViews = std::move(other.depthImageViews);
+    bloomLevelCount = other.bloomLevelCount;
+    bloomExtents = other.bloomExtents;
+    bloomImages = std::move(other.bloomImages);
+    bloomAllocations = std::move(other.bloomAllocations);
+    bloomImageViews = std::move(other.bloomImageViews);
+    bloomFramebuffers = std::move(other.bloomFramebuffers);
+    bloomDescriptorSets = std::move(other.bloomDescriptorSets);
     renderPass = other.renderPass;
     presentRenderPass = other.presentRenderPass;
     pipelineLayout = other.pipelineLayout;
@@ -684,6 +803,9 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     postPipelineLayout = other.postPipelineLayout;
     postSampler = other.postSampler;
     postDescriptorSets = std::move(other.postDescriptorSets);
+    bloomRenderPass = other.bloomRenderPass;
+    bloomPipelineLayout = other.bloomPipelineLayout;
+    bloomPipeline = other.bloomPipeline;
     basicPipeline = other.basicPipeline;
     basicNoCullPipeline = other.basicNoCullPipeline;
     basicNoDepthPipeline = other.basicNoDepthPipeline;

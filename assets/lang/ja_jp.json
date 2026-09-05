@@ -148,6 +148,7 @@
   "settings.cloud_distance": "雲の距離: {0}ブロック",
   "settings.smooth_lighting": "滑らかなライティング: {0}",
   "settings.visual_quality": "グラフィック品質: {0}",
+  "settings.enhanced_visuals": "強化された視覚効果: {0}",
   "settings.transparent_leaves": "葉の透過: {0}",
   "settings.visual_low": "低",
   "settings.visual_medium": "中",

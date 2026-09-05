@@ -180,6 +180,11 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
             else if (name == "visual_quality")
                 settings.visualQuality = static_cast<VisualQuality>(std::stoi(value));
+            else if (name == "enhanced_visuals") {
+                const int parsed = std::stoi(value);
+                if (parsed == 0 || parsed == 1)
+                    settings.enhancedVisuals = parsed == 1;
+            }
             else if (name == "transparent_leaves")
                 settings.transparentLeaves = std::stoi(value) != 0;
             else if (name == "renderer") { /* v17 compatibility */ }
@@ -263,6 +268,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "smooth_lighting=" << smoothLighting << '\n'
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
+           << "enhanced_visuals=" << enhancedVisuals << '\n'
            << "transparent_leaves=" << transparentLeaves << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "frame_rate_limit=" << frameRateLimit << '\n'

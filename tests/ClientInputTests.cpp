@@ -107,6 +107,18 @@ int main(){
             settingsGridNeighbor(5,6,0,1,true)==0&&
             settingsGridNeighbor(5,6,1,0,true)==5,
             "grid navigation treats the standalone Back row as the final row");
+    const SettingsButtonLayout videoLayout = settingsButtonLayout(
+        620.0f, 468.0f, 13, false, true);
+    const glm::vec2 videoBack = settingsButtonPosition(
+        videoLayout, 12, 13, true);
+    require(videoLayout.rowCount == 7 &&
+                settingsGridNeighbor(10, 13, 0, 1, true) == 12 &&
+                settingsGridNeighbor(11, 13, 0, 1, true) == 12 &&
+                settingsGridNeighbor(12, 13, 0, -1, true) == 11 &&
+                videoBack.x > videoLayout.leftX &&
+                videoBack.x < videoLayout.leftX + videoLayout.buttonWidth +
+                    videoLayout.columnGap,
+            "enhanced-visual button preserves the video grid and standalone Back row");
     require(frameRateFromSlider(10.0f,10.0f,170.0f)==30&&
             frameRateFromSlider(180.0f,10.0f,170.0f)==200&&
             frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
@@ -173,6 +185,7 @@ int main(){
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
+    settings.enhancedVisuals=true;
     settings.transparentLeaves=true;
     settings.attackIndicator=AttackIndicator::Hotbar;
     settings.language=Language::SimplifiedChinese;
@@ -213,6 +226,8 @@ int main(){
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
             "visual quality preference round trips");
+    require(loaded.enhancedVisuals,
+            "enhanced-visual preference round trips");
     require(loaded.transparentLeaves,
             "transparent-leaf preference round trips");
     require(loaded.attackIndicator==AttackIndicator::Hotbar,
@@ -253,7 +268,7 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=21\n")!=std::string::npos&&
+    require(migratedText.find("version=22\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     {
@@ -262,6 +277,14 @@ int main(){
     }
     require(ClientSettings::load(root/"v20-options.txt").transparentLeaves,
             "v20 high-quality settings migrate to transparent leaves");
+    require(!ClientSettings::load(root/"v20-options.txt").enhancedVisuals,
+            "legacy settings keep enhanced visuals disabled");
+    {
+        std::ofstream invalidEnhanced(root/"invalid-enhanced-options.txt");
+        invalidEnhanced << "version=22\nenhanced_visuals=2\n";
+    }
+    require(!ClientSettings::load(root/"invalid-enhanced-options.txt").enhancedVisuals,
+            "invalid enhanced-visual value falls back to disabled");
     {
         std::ofstream invalid(root/"invalid-options.txt");
         invalid<<"version=4\nlanguage=unsupported\n";
