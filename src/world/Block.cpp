@@ -41,7 +41,17 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "star_crystal", "starflower", "cloud_bloom", "glowshroom",
     "emerald_ore", "deepslate_emerald_ore", "composter",
     "fletching_table", "loom", "cauldron", "blast_furnace",
-    "smithing_table", "grindstone"
+    "smithing_table", "grindstone",
+    "birch_log_top", "spruce_log_top", "jungle_log_top", "acacia_log_top",
+    "crafting_table_top", "crafting_table_side", "crafting_table_bottom", "furnace_top",
+    "furnace_side", "furnace_bottom", "chest_top", "chest_side", "chest_bottom",
+    "composter_top", "composter_side", "composter_bottom", "fletching_table_top",
+    "fletching_table_side", "fletching_table_bottom", "loom_top", "loom_side",
+    "loom_bottom", "cauldron_top", "cauldron_side", "cauldron_bottom",
+    "blast_furnace_top", "blast_furnace_side", "blast_furnace_bottom",
+    "smithing_table_top", "smithing_table_side", "smithing_table_bottom",
+    "grindstone_top", "grindstone_side", "grindstone_bottom", "white_bed_top",
+    "white_bed_side", "white_bed_bottom", "tnt_top", "tnt_side", "tnt_bottom"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -307,7 +317,9 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural))
         return getFaceTexture(architecturalBaseBlock(architectural.material), face);
-    if (isBed(id)) return BlockTexture::WhiteBed;
+    if (isBed(id)) return face == FaceDir::TOP ? BlockTexture::WhiteBedTop :
+                          face == FaceDir::BOTTOM ? BlockTexture::WhiteBedBottom :
+                          BlockTexture::WhiteBedSide;
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
     switch (id) {
@@ -343,18 +355,24 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::TALL_GRASS:    return BlockTexture::TallGrass;
         case BlockId::FLOWER:        return BlockTexture::Flower;
         case BlockId::REEDS:         return BlockTexture::Reeds;
-        case BlockId::BIRCH_WOOD:    return top || bottom ? BlockTexture::LogTop : BlockTexture::BirchLog;
+        case BlockId::BIRCH_WOOD:    return top || bottom ? BlockTexture::BirchLogTop : BlockTexture::BirchLog;
         case BlockId::BIRCH_LEAVES:  return BlockTexture::BirchLeaves;
-        case BlockId::SPRUCE_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::SpruceLog;
+        case BlockId::SPRUCE_WOOD:   return top || bottom ? BlockTexture::SpruceLogTop : BlockTexture::SpruceLog;
         case BlockId::SPRUCE_LEAVES: return BlockTexture::SpruceLeaves;
-        case BlockId::JUNGLE_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::JungleLog;
+        case BlockId::JUNGLE_WOOD:   return top || bottom ? BlockTexture::JungleLogTop : BlockTexture::JungleLog;
         case BlockId::JUNGLE_LEAVES: return BlockTexture::JungleLeaves;
-        case BlockId::ACACIA_WOOD:   return top || bottom ? BlockTexture::LogTop : BlockTexture::AcaciaLog;
+        case BlockId::ACACIA_WOOD:   return top || bottom ? BlockTexture::AcaciaLogTop : BlockTexture::AcaciaLog;
         case BlockId::ACACIA_LEAVES: return BlockTexture::AcaciaLeaves;
         case BlockId::COBBLESTONE:   return BlockTexture::Cobblestone;
-        case BlockId::CRAFTING_TABLE:return BlockTexture::CraftingTable;
-        case BlockId::FURNACE:       return BlockTexture::Furnace;
-        case BlockId::CHEST:         return BlockTexture::Chest;
+        case BlockId::CRAFTING_TABLE:return top ? BlockTexture::CraftingTableTop :
+                   bottom ? BlockTexture::CraftingTableBottom :
+                   face == FaceDir::FRONT ? BlockTexture::CraftingTable : BlockTexture::CraftingTableSide;
+        case BlockId::FURNACE:       return top ? BlockTexture::FurnaceTop :
+                   bottom ? BlockTexture::FurnaceBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Furnace : BlockTexture::FurnaceSide;
+        case BlockId::CHEST:         return top ? BlockTexture::ChestTop :
+                   bottom ? BlockTexture::ChestBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Chest : BlockTexture::ChestSide;
         case BlockId::TORCH:         return BlockTexture::Torch;
         case BlockId::WHITE_WOOL:    return BlockTexture::WhiteWool;
         case BlockId::WHITE_BED:     return BlockTexture::WhiteBed;
@@ -379,7 +397,9 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::SNOW_LAYER:    return BlockTexture::SnowLayer;
         case BlockId::FIRE:          return BlockTexture::Fire;
         case BlockId::GLASS:         return BlockTexture::Glass;
-        case BlockId::TNT:           return BlockTexture::Tnt;
+        case BlockId::TNT:           return top ? BlockTexture::TntTop :
+                   bottom ? BlockTexture::TntBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Tnt : BlockTexture::TntSide;
         case BlockId::OBSIDIAN:      return BlockTexture::Obsidian;
         case BlockId::DANDELION:     return BlockTexture::Dandelion;
         case BlockId::BLUE_ORCHID:   return BlockTexture::BlueOrchid;
@@ -387,13 +407,27 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::OXEYE_DAISY:   return BlockTexture::OxeyeDaisy;
         case BlockId::SUNFLOWER_BOTTOM: return BlockTexture::SunflowerBottom;
         case BlockId::SUNFLOWER_TOP: return BlockTexture::SunflowerTop;
-        case BlockId::COMPOSTER: return BlockTexture::Composter;
-        case BlockId::FLETCHING_TABLE: return BlockTexture::FletchingTable;
-        case BlockId::LOOM: return BlockTexture::Loom;
-        case BlockId::CAULDRON: return BlockTexture::Cauldron;
-        case BlockId::BLAST_FURNACE: return BlockTexture::BlastFurnace;
-        case BlockId::SMITHING_TABLE: return BlockTexture::SmithingTable;
-        case BlockId::GRINDSTONE: return BlockTexture::Grindstone;
+        case BlockId::COMPOSTER: return top ? BlockTexture::ComposterTop :
+                   bottom ? BlockTexture::ComposterBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Composter : BlockTexture::ComposterSide;
+        case BlockId::FLETCHING_TABLE: return top ? BlockTexture::FletchingTableTop :
+                   bottom ? BlockTexture::FletchingTableBottom :
+                   face == FaceDir::FRONT ? BlockTexture::FletchingTable : BlockTexture::FletchingTableSide;
+        case BlockId::LOOM: return top ? BlockTexture::LoomTop :
+                   bottom ? BlockTexture::LoomBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Loom : BlockTexture::LoomSide;
+        case BlockId::CAULDRON: return top ? BlockTexture::CauldronTop :
+                   bottom ? BlockTexture::CauldronBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Cauldron : BlockTexture::CauldronSide;
+        case BlockId::BLAST_FURNACE: return top ? BlockTexture::BlastFurnaceTop :
+                   bottom ? BlockTexture::BlastFurnaceBottom :
+                   face == FaceDir::FRONT ? BlockTexture::BlastFurnace : BlockTexture::BlastFurnaceSide;
+        case BlockId::SMITHING_TABLE: return top ? BlockTexture::SmithingTableTop :
+                   bottom ? BlockTexture::SmithingTableBottom :
+                   face == FaceDir::FRONT ? BlockTexture::SmithingTable : BlockTexture::SmithingTableSide;
+        case BlockId::GRINDSTONE: return top ? BlockTexture::GrindstoneTop :
+                   bottom ? BlockTexture::GrindstoneBottom :
+                   face == FaceDir::FRONT ? BlockTexture::Grindstone : BlockTexture::GrindstoneSide;
         case BlockId::FLOWING_WATER_1: case BlockId::FLOWING_WATER_2:
         case BlockId::FLOWING_WATER_3: case BlockId::FLOWING_WATER_4:
         case BlockId::FLOWING_WATER_5: case BlockId::FLOWING_WATER_6:
@@ -503,6 +537,10 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         apply("top", {FaceDir::TOP});
         apply("bottom", {FaceDir::BOTTOM});
         apply("side", {FaceDir::FRONT, FaceDir::BACK, FaceDir::RIGHT, FaceDir::LEFT});
+        apply("front", {FaceDir::FRONT});
+        apply("back", {FaceDir::BACK});
+        apply("left", {FaceDir::LEFT});
+        apply("right", {FaceDir::RIGHT});
     }
     g_definitionFacesReady = true;
     return true;

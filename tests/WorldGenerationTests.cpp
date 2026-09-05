@@ -1287,7 +1287,7 @@ int main() {
         bedMaximumY = std::max(bedMaximumY, vertex.py);
         const uint8_t tile = static_cast<uint8_t>(std::floor(vertex.tile));
         hasFrame = hasFrame || tile == getAtlasTextureIndex(BlockTexture::Planks);
-        hasMattress = hasMattress || tile == getAtlasTextureIndex(BlockTexture::WhiteBed);
+        hasMattress = hasMattress || tile == getAtlasTextureIndex(BlockTexture::WhiteBedTop);
         hasPillow = hasPillow || tile == getAtlasTextureIndex(BlockTexture::WhiteWool);
     }
     require(bedMesh.vertices.size() > 200 && hasFrame && hasMattress && hasPillow,

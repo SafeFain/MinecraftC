@@ -103,7 +103,7 @@
     }
   },
   "filter": "nearest",
-  "generator_version": 2,
+  "generator_version": 3,
   "height": 64,
   "layout": {
     "body_back": 7,

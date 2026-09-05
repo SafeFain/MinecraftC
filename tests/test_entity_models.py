@@ -155,6 +155,10 @@ def main():
             assert "attack" in animations and graph["actions"]["attack"]["events"]
     player_path = PLAYER_DIR / "player.glb"
     player_doc, player_binary = document(player_path)
+    view=player_doc["bufferViews"][player_doc["images"][0]["bufferView"]]
+    embedded=player_binary[view.get("byteOffset",0):view.get("byteOffset",0)+view["byteLength"]]
+    assert embedded==(ROOT/"assets/textures/generated/entity_skins/player.png").read_bytes(), \
+        "player embedded skin differs from the generated skin"
     player_clips = {animation["name"] for animation in player_doc["animations"]}
     assert {"idle","walk","run","jump","fall","swing","hurt","death"} <= player_clips
     player_nodes = {node["name"] for node in player_doc["nodes"]}

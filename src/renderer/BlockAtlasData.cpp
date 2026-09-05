@@ -49,6 +49,44 @@ std::vector<uint8_t> downsampleTiles(const std::vector<uint8_t>& source,
     return target;
 }
 
+void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
+                               const std::vector<uint8_t>& base,
+                               uint32_t tiles, uint32_t size) {
+    // One texel cannot represent both foliage and air. Keep the averaged
+    // terminal mip for distant canopies and the opaque-leaf fallback shader.
+    if (size == 1) return;
+    constexpr std::array<BlockTexture, 6> leaves{{
+        BlockTexture::Leaves, BlockTexture::BirchLeaves,
+        BlockTexture::SpruceLeaves, BlockTexture::JungleLeaves,
+        BlockTexture::AcaciaLeaves, BlockTexture::SkyrootLeaves}};
+    for (BlockTexture texture : leaves) {
+        const uint32_t slot = getAtlasTextureIndex(texture);
+        const uint32_t tx = slot % tiles, ty = slot / tiles;
+        uint32_t holes = 0;
+        for (uint32_t y = 0; y < TILE_SIZE; ++y)
+            for (uint32_t x = 0; x < TILE_SIZE; ++x) {
+                const size_t offset = ((ty * TILE_SIZE + y) * tiles * TILE_SIZE +
+                                       tx * TILE_SIZE + x) * 4u;
+                if (base[offset + 3] == 0) ++holes;
+            }
+        if (!holes) continue;
+        std::vector<size_t> offsets;
+        for (uint32_t y = 0; y < size; ++y)
+            for (uint32_t x = 0; x < size; ++x)
+                offsets.push_back(((ty * size + y) * tiles * size +
+                                    tx * size + x) * 4u + 3u);
+        // The lowest-alpha texels are the actual leaf gaps. Resolve ties by
+        // stable position; never resample adjacent atlas materials.
+        std::stable_sort(offsets.begin(), offsets.end(), [&](size_t a, size_t b) {
+            return mip[a] < mip[b];
+        });
+        const size_t count = std::min(offsets.size() - 1,
+            std::max<size_t>(1, (holes * size * size + 128u) / 256u));
+        for (size_t i = 0; i < offsets.size(); ++i)
+            mip[offsets[i]] = i < count ? 0 : 255;
+    }
+}
+
 std::vector<uint8_t> downsampleLinearTiles(const std::vector<uint8_t>& source,
                                            uint32_t tiles, uint32_t tileSize,
                                            bool normalizeNormals) {
@@ -263,8 +301,14 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     while (tileSize > 1) {
         level = downsampleTiles(level, result.tilesPerSide, tileSize);
         tileSize /= 2;
+        // Keep the unmodified averages as the source of the next mip so
+        // coverage correction never feeds back into color or opacity.
+        auto cutoutLevel = level;
+        preserveLeafCutoutCoverage(cutoutLevel, result.texture.pixels,
+                                   result.tilesPerSide, tileSize);
         result.texture.mipLevels.push_back({result.tilesPerSide * tileSize,
-                                            result.tilesPerSide * tileSize, level});
+                                            result.tilesPerSide * tileSize,
+                                            std::move(cutoutLevel)});
     }
     buildMaterialTextures(result);
     validateTextureData(result.texture);

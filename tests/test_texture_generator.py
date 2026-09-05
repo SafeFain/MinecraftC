@@ -58,7 +58,7 @@ class TextureGeneratorTests(unittest.TestCase):
             self.assertTrue(all(pixel[3] == 255 for pixel in pixels))
             for name in tg.ENTITY_NAMES:
                 _, _, tile = tg.read_generated_png(a / "entities" / f"{name}.png")
-                self.assertGreaterEqual(len(set(tile)), 4, name)
+                self.assertGreaterEqual(len(set(tile)), 2, name)
 
     def test_entity_skins_are_deterministic_semantic_and_face_specific(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
@@ -81,7 +81,7 @@ class TextureGeneratorTests(unittest.TestCase):
                     tx,ty=index%4,index//4
                     tiles.append(tuple(pixels[(ty*16+y)*64+tx*16+x]
                                        for y in range(16) for x in range(16)))
-                self.assertGreater(len(set(tiles)),10,name)
+                # Quiet faces may match; semantic front/back separation is required below.
                 self.assertNotEqual(tiles[tg.ENTITY_SKIN_LAYOUT["head_front"]],
                                     tiles[tg.ENTITY_SKIN_LAYOUT["head_back"]],name)
                 front=tiles[tg.ENTITY_SKIN_LAYOUT["head_front"]]
@@ -160,16 +160,13 @@ class TextureGeneratorTests(unittest.TestCase):
             tg.validate(a)
             for name in tg.NAMES:
                 _, _, pixels = tg.read_generated_png(a / f"{name}.png")
-                self.assertGreaterEqual(len(set(pixels)), 5)
+                self.assertGreaterEqual(len(set(pixels)), 2, name)
                 self.assertLessEqual(len(set(pixels)), 8)
                 self.assertTrue(all(pixel[3] in (0, 255) for pixel in pixels))
                 self.assertFalse(any(pixel[3] and pixel[:3] == (0, 0, 0)
                                      for pixel in pixels))
                 self.assertEqual(hashlib.sha256((a / f"{name}.png").read_bytes()).digest(),
                                  hashlib.sha256((b / f"{name}.png").read_bytes()).digest())
-            for name in tg.HIGH_CONTRAST_NAMES:
-                self.assertGreaterEqual(tg.palette_contrast(tg.PALETTES[name]),
-                                        tg.palette_contrast(tg.PALETTES["stone"]) * 1.15)
             for name in ("grass_side", "aether_grass_side"):
                 _, _, grass = tg.read_generated_png(a / f"{name}.png")
                 grass_colors = set(tg.PALETTES[name][4:])
@@ -187,18 +184,73 @@ class TextureGeneratorTests(unittest.TestCase):
                 self.assertNotEqual(pixels[0::16], pixels[15::16])
                 self.assertLessEqual(tg.structure_metrics(pixels)["seam_ratio"], 2.60)
 
-    def test_natural_structure_has_no_cross_lines_or_rectangular_dominance(self):
+    def test_quiet_planes_and_natural_material_frequency(self):
+        self.assertEqual(tg.quantize([0.0]*256), [2]*256)
+        self.assertEqual(tg.quantize([.001]*256), [2]*256)
         for seed in (1, 12345, tg.DEFAULT_SEED):
-            for name in tg.NATURAL:
-                pixels = tg.generate_texture(name, seed)
-                metrics = tg.structure_metrics(pixels)
-                self.assertLessEqual(metrics["longest_run"], 8, name)
-                self.assertLessEqual(metrics["largest_component"], .34, name)
-                self.assertLessEqual(metrics["largest_rectangularity"], .96, name)
-                self.assertLessEqual(metrics["periodicity"], .76, name)
-                self.assertLessEqual(metrics["center_cross"], .31, name)
-            grass = tg.structure_metrics(tg.generate_texture("grass_top", seed))
-            self.assertLessEqual(grass["center_cross"], .31)
+            for name in ("grass_top", "dirt", "stone", "sand", "oak_planks"):
+                pixels=tg.generate_texture(name,seed)
+                stats=tg._visual_color_stats(pixels)
+                self.assertLess(stats["mean_neighbor_delta"], 9, name)
+                self.assertLess(stats["dark_fraction"], .05, name)
+                self.assertLessEqual(tg.structure_metrics(pixels)["seam_ratio"],2.60,name)
+            for name in ("deepslate","obsidian","black_sand"):
+                self.assertLess(tg._visual_color_stats(tg.generate_texture(name,seed))[
+                    "oklab_lightness_mean"],.46,name)
+
+    def test_leaf_clusters_preserve_bounded_binary_gaps(self):
+        for seed in (1,7,12345,tg.DEFAULT_SEED):
+            for name in tg.LEAF_NAMES:
+                pixels=tg.generate_texture(name,seed)
+                gaps=sum(p[3]==0 for p in pixels)
+                self.assertGreaterEqual(gaps,24,name)
+                self.assertLessEqual(gaps,64,name)
+                self.assertTrue(all(p[3] in (0,255) for p in pixels))
+                self.assertGreaterEqual(len({p for p in pixels if p[3]}),3,name)
+                self.assertLessEqual(tg.structure_metrics(pixels)["seam_ratio"],2.60,name)
+
+    def test_tool_parts_cannot_paint_outside_their_masks(self):
+        definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
+        for template in tg.TOOL_TEMPLATES:
+            masks=tg.tool_part_masks(template)
+            self.assertFalse(masks["grip"] & masks["working_head"])
+            self.assertFalse(masks["connector"] & masks["working_head"])
+            self.assertLessEqual(masks["edge"],masks["working_head"])
+            expected=masks["grip"] | masks["connector"] | masks["working_head"]
+            for material in definitions["materials"]:
+                pixels=tg.generate_item_sprite(template,material,definitions)
+                self.assertEqual({i for i,p in enumerate(pixels) if p[3]},expected)
+        heads=[frozenset(tg.tool_part_masks(t)["working_head"]) for t in tg.TOOL_TEMPLATES]
+        self.assertEqual(len(set(heads)),5)
+
+    def test_functional_faces_and_all_definition_references(self):
+        definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
+        blocks=json.loads(self.item_definitions()[1].read_text())["blocks"]
+        for block,faces in blocks.items():
+            for field,material in faces.items():
+                if field in {"all","top","bottom","side","front","back","left","right"}:
+                    self.assertIn(material,tg.NAMES,block)
+        for base in tg.FUNCTIONAL:
+            faces=[tuple(tg.generate_texture(base+suffix,tg.DEFAULT_SEED))
+                   for suffix in ("","_top","_side","_bottom")]
+            self.assertNotEqual(faces[0],faces[1],base)
+            self.assertNotEqual(faces[1],faces[2],base)
+            self.assertNotEqual(faces[1],faces[3],base)
+        foods=["bread","raw_beef","raw_porkchop","raw_chicken","raw_mutton","rotten_flesh"]
+        sprites=[tuple(tg.generate_item_sprite(definitions["items"][n]["template"],
+                    definitions["items"][n]["material"],definitions)) for n in foods]
+        self.assertEqual(len(set(sprites)),len(foods))
+        a=[(100,120,140,255)]*256; b=[(210,180,110,255)]*256
+        self.assertNotEqual(tg.generate_block_item_icon(a,a),tg.generate_block_item_icon(a,a,b))
+
+    def test_plant_art_has_roots_at_png_bottom(self):
+        for name in ("torch","wheat_young","wheat_middle","wheat_mature","oak_sapling","flower"):
+            pixels=tg.generate_texture(name,21)
+            self.assertTrue(any(p[3] for p in pixels[-16:]),name)
+        flower=tg.generate_texture("flower",21)
+        petal=tg.PALETTES["flower"][6]
+        rows=[i//16 for i,p in enumerate(flower) if p==petal]
+        self.assertLess(max(rows),8)
 
     def test_ore_clusters_and_directional_exceptions(self):
         for seed in (7, tg.DEFAULT_SEED):

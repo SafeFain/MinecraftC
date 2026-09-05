@@ -877,11 +877,17 @@ struct ChunkMesh {
                         const glm::vec3 b = transform(maximum);
                         minimum = glm::min(a, b);
                         maximum = glm::max(a, b);
-                        const float tile = encodeFlatLight(
-                            static_cast<float>(getAtlasTextureIndex(texture)),
-                            static_cast<uint8_t>(std::round(sky * 15.0f)),
-                            static_cast<uint8_t>(std::round(light * 15.0f)));
                         for (int face = 0; face < FACE_COUNT; ++face) {
+                            const auto direction = static_cast<FaceDir>(face);
+                            const BlockTexture faceTexture = texture == BlockTexture::WhiteBed
+                                ? (direction == FaceDir::TOP ? BlockTexture::WhiteBedTop
+                                   : direction == FaceDir::BOTTOM ? BlockTexture::WhiteBedBottom
+                                   : BlockTexture::WhiteBedSide)
+                                : texture;
+                            const float tile = encodeFlatLight(
+                                static_cast<float>(getAtlasTextureIndex(faceTexture)),
+                                static_cast<uint8_t>(std::round(sky * 15.0f)),
+                                static_cast<uint8_t>(std::round(light * 15.0f)));
                             if (paired && touchesSeam &&
                                 face == static_cast<int>(seamFace)) continue;
                             const unsigned int base =

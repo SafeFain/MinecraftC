@@ -594,8 +594,11 @@ if(BUILD_TESTING)
     add_executable(asset_definition_tests
         tests/AssetDefinitionTests.cpp
         src/world/Block.cpp
-        src/game/Item.cpp)
-    target_include_directories(asset_definition_tests PRIVATE src)
+        src/game/Item.cpp
+        src/renderer/BlockAtlasData.cpp
+        src/renderer/RenderDevice.cpp
+        src/renderer/StbImageImpl.cpp)
+    target_include_directories(asset_definition_tests PRIVATE src external/stb)
     target_link_libraries(asset_definition_tests PRIVATE glm::glm)
     target_compile_definitions(asset_definition_tests PRIVATE
         MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -1235,8 +1238,11 @@ if(Python3_Interpreter_FOUND)
                 --generate --validate --build-atlas --build-items-atlas
                 --build-entity-atlas --build-entity-skins
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/generate_entity_models.py
+                --output ${CMAKE_SOURCE_DIR}/assets/models/entities
+                --player-output ${CMAKE_SOURCE_DIR}/assets/models/player
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Generating and validating deterministic voxel textures")
+        COMMENT "Generating deterministic textures and synchronized model skins")
     add_custom_target(texture_preview
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/texture_generator.py
                 --preview --candidate-count 3

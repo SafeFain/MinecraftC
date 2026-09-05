@@ -3,13 +3,13 @@
 MinecraftC separates authored, generated, imported, and declarative assets:
 
 - `assets/textures/source/` contains project-authored or adapted source PNGs.
-- `assets/textures/generated/` contains reproducible output, the unchanged
+- `assets/textures/generated/` contains reproducible output, the
   block `atlas.png`/`atlas.json` pair, and the separate
   `items_atlas.png`/`items_atlas.json` pair.
 - `assets/textures/third_party/` contains imported packs with their licenses.
 - `assets/textures/definitions/` contains JSON block, item, texture, style, and
   entity-material definitions. The default generated style is
-  `bright-comfortable` (generator version 2); it uses dependency-free
+  `bright-comfortable` (generator version 3); it uses dependency-free
   OKLab/OKLCH role palettes and keeps the runtime tile contracts unchanged.
 
 The client loads `atlas.json`, `blocks.json`, and `items.json` before chunk
@@ -26,10 +26,10 @@ From the repository root:
 
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas \
-  --build-items-atlas --build-entity-atlas \
+  --build-items-atlas --build-entity-atlas --build-entity-skins \
   --seed 213785369 --output assets/textures/generated
 
-# Equivalent default-seed CMake target
+# Default-seed CMake target also synchronizes embedded GLB skins
 cmake --build build-local --target texture_generator
 ```
 
@@ -44,25 +44,19 @@ repeatable `--local-seed MATERIAL=SEED`. Operations may be combined. Run
 local seed selects one material candidate without perturbing any other material
 and is recorded in atlas metadata.
 
-Generation uses three structural levels. Irregular radial fields provide a
-soft macro value layout directly on a 16x16 torus; material-specific growers
-create meso-scale soil clods, grass tufts/blades, stone flakes/cracks, sand
-ripples, wood fibers/rings, leaf clusters/holes, and connected ore deposits;
-sparse correlated accents break accidental regular edges. It never enlarges a
-low-resolution control image and never copies opposing borders. The previous
-5x5 interpolated field plus axis-aligned 3x3 grain and 15x15 aliased sampling
-was removed because it caused rectangular chunks, center crossings, shared
-camouflage structure, and a visible 15-pixel repeat.
+Generation combines toroidal low-frequency fields, material-specific connected
+features and sparse accents. Absolute thresholds keep middle tones dominant.
+Soils, turf, stone layers, grains, wood fibers, end grain, foliage and ores use
+separate structures; manufactured surfaces use explicit semantic drawings.
+No enlarged low-resolution noise or aliased 15-pixel domains are used.
 
-Validation rejects non-16x16 files, excess palette colors, non-binary alpha,
-opaque black outlines, and ore outside 2-4 connected clusters. For natural
-materials it reports explicit detected/allowed values for long near-color
-runs, large or rectangular flat connected areas, center-axis bias, 2/4/8-pixel
-autocorrelation, meso-frequency transitions, and toroidal seam discontinuity.
-Wood, bark, farmland, and cactus are declared directional exceptions, while
-their toroidal seams are still checked. Grass-side validation additionally
-requires its green layer in the source image's upper region. PNG output and
-the atlas use nearest-neighbor sampling; no resampling is applied.
+Validation rejects non-16x16 files, undeclared palette colors, non-binary alpha,
+opaque black outlines and ore outside 2-4 connected clusters. Toroidal seam
+variation must remain within 2.60 times interior variation; grass sides check
+horizontal wrapping and an upper turf cap. Large calm planes and limited palette
+occupancy are allowed. Frequency and flat-region statistics are diagnostic
+report fields rather than instructions to add noise. PNG and atlas output use
+nearest-neighbor sampling with no resampling.
 
 For visual review, generate eight deterministic candidates per material:
 
@@ -72,9 +66,10 @@ python3 tools/texture_generator.py --generate --validate --build-atlas \
   --output assets/textures/generated
 ```
 
-`contact_sheet.png` places one material on each row and candidates in columns;
-each cell contains the original tile and an 8x8 repeat. Its companion JSON
-lists candidate and selected local seeds. These two development files are not
+`contact_sheet.png` shows the first candidate in an eight-column grid; each
+cell contains a native tile, a 3x enlargement and a 4x4 repeat. Further candidates
+use numbered sheets. Companion JSON lists pages, candidate and local seeds.
+These development files are not
 part of `atlas.png` or `atlas.json`. `--preview` additionally emits
 `block_preview.png` (tile, repeat, grass/structure board, and noon/dusk/cave
 lighting samples), `items_contact_sheet.png`, `entity_contact_sheet.png`,
@@ -98,12 +93,12 @@ flint. A C++ regression test derives logical names from the live item registry
 and rejects any registered item missing from `items_atlas.json`.
 
 Item sprites have transparent backgrounds and, unlike block textures, are not
-validated for seamless repetition. Tool sprites use discrete outline, handle,
-working-part, and top-left highlight layers. Every icon is 16x16 RGBA, uses
+validated for seamless repetition. Tool sprites use disjoint grip, connector and working-head masks; highlights
+are clipped to their semantic part. Every icon is 16x16 RGBA, uses
 only alpha 0 or 255, has no antialiasing, avoids broad pure-black outlines, and
 is packed without resampling. Metadata and runtime use nearest filtering.
 
-`block_item_icon` samples logical top and side materials from `blocks.json` and
+`block_item_icon` samples logical top, front and side materials from `blocks.json` and
 composes an isometric inventory cube without changing block tiles, seamless
 validation, or the existing block atlas format.
 
@@ -137,7 +132,8 @@ GLBs and their versioned `.anim.json` action graphs. GLBs hold geometry,
 skins, embedded copies of the generated 64x64 entity skins, per-face UVs, and
 keyframes; action graphs hold runtime layers,
 masks, transitions, priorities, queues, and gameplay event times. Regenerate
-and verify them with `python3 tests/test_entity_models.py`.
+with the `texture_generator` CMake target, which also updates embedded skins;
+verify with `python3 tests/test_entity_models.py`.
 
 ## Add a block and material
 
@@ -146,7 +142,9 @@ and verify them with `python3 tests/test_entity_models.py`.
    `tools/texture_generator.py`, or place an authored PNG in `source/` and
    record its provenance in `ASSET_SOURCES.md`.
 3. Reference the logical texture from `definitions/blocks.json`. Use `all`, or
-   `top`/`bottom`/`side` face keys.
+   `top`/`bottom`/`side` face keys, followed by optional
+   `front`/`back`/`left`/`right` overrides. Blocks without orientation state
+   use world -Z as their front.
 4. Add the corresponding item icon reference to `definitions/items.json`.
 5. Regenerate, validate, and build the atlas. Do not add UV coordinates to C++.
 6. Add the semantic C++ material enum/name mapping only when the new block must
@@ -163,3 +161,56 @@ Run `python3 tools/generate_entity_models.py --output assets/models/entities`
 to reproduce all ten runtime GLBs. `python3 tests/test_entity_models.py`
 performs byte-for-byte regeneration plus the skin, animation, vertex semantic,
 embedded PNG, and nearest-sampler contract checks.
+
+## Generator v3: clean natural pixel art
+
+The `bright-comfortable` style keeps its identifier and advances the generator
+revision to 3. Definition format versions and serialized game IDs are unchanged.
+Absolute thresholds from `style.json` preserve middle-color planes; material
+features supply sparse connected accents instead of rank-equalized noise.
+Periodic tiles may be translated as a whole to put the repeat cut at ordinary
+variation, without copying borders or changing the torus topology. The seam
+validator retains its 2.60 ratio limit. Palette membership, alpha, ore separation
+and deterministic output are checked; minimum color occupancy and forced
+fragmentation are no longer aesthetic requirements.
+
+Functional blocks have dedicated front, top, side and bottom art. Tree species
+have separate end grain. Crossed plants use PNG top-left rows, including upright
+inventory sprites. Existing bed geometry selects linen face tiles. Food shapes,
+material-clipped tool parts, species markings, skin-colored hands and player
+hair are original hand-programmed pixel designs. No image service or external
+texture pack is required. Dark volcanic materials keep their dark anchors.
+
+Generate runtime resources and synchronized GLB skins together:
+
+```bash
+cmake --build build-local --target texture_generator
+python3 tools/texture_generator.py --preview --candidate-count 1 \
+  --output build-local/texture-review/current
+python3 tools/texture_review.py --before /path/to/previous/generated \
+  --output build-local/texture-review
+```
+
+The review tool writes native/4x/3x3 repeat comparisons, per-face functional
+sheets, all item/entity sheets, and quantitative lightness, neighbor-difference
+and dark-pixel statistics. Previews do not change runtime resources. Approximated
+lighting previews supplement actual Vulkan checks; they do not simulate the
+complete renderer. No global exposure or lighting change is part of v3.
+
+### Leaf cutout minification
+
+Leaf art uses connected gaps (roughly 15–19% at the default seed) and layered
+leaf clusters. Runtime tile-local mip generation preserves source cutout
+coverage for the six leaf materials at 8x8, 4x4 and 2x2. It retains the lowest
+averaged-alpha texels as gaps, within one texel of source coverage, instead of
+averaging every small hole above the 0.1 cutoff. Color downsampling still uses
+uncorrected alpha-weighted levels; correction does not feed back or cross tile
+borders. The terminal 1x1 mip remains averaged for distant canopies and the
+opaque-leaf setting. When transparency is disabled, the shader fills gaps
+with that species average at 0.55 linear-light intensity, separating shaded
+interior foliage from the visible leaf clusters without adding noise.
+Transparent-mode sampling and scene lighting are unchanged. `asset_definition_tests` checks the actual runtime mip data.
+
+The follow-up art pass restores modest grass/stone/wood/leaf complexity after
+the initial v3 simplification. In-world visual acceptance is performed by the
+user; automated validation views generated material sheets only.

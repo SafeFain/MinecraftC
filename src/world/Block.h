@@ -263,6 +263,14 @@ enum class BlockTexture : uint8_t {
     CloudBloom, Glowshroom,
     EmeraldOre, DeepslateEmeraldOre, Composter, FletchingTable, Loom,
     Cauldron, BlastFurnace, SmithingTable, Grindstone,
+    BirchLogTop, SpruceLogTop, JungleLogTop, AcaciaLogTop, CraftingTableTop,
+    CraftingTableSide, CraftingTableBottom, FurnaceTop, FurnaceSide, FurnaceBottom,
+    ChestTop, ChestSide, ChestBottom, ComposterTop, ComposterSide, ComposterBottom,
+    FletchingTableTop, FletchingTableSide, FletchingTableBottom, LoomTop, LoomSide,
+    LoomBottom, CauldronTop, CauldronSide, CauldronBottom, BlastFurnaceTop,
+    BlastFurnaceSide, BlastFurnaceBottom, SmithingTableTop, SmithingTableSide,
+    SmithingTableBottom, GrindstoneTop, GrindstoneSide, GrindstoneBottom, WhiteBedTop,
+    WhiteBedSide, WhiteBedBottom, TntTop, TntSide, TntBottom,
     Count
 };
 

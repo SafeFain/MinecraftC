@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Deterministic 16x16 voxel texture generator, validator, and atlas builder.
+"""Deterministic pixel materials, semantic sprites, validator and atlas builder.
 
-Design audit (2026-07): the original generator interpolated one 5x5 control
-field for nearly every material, added axis-aligned 3x3 grains and a fixed
-upper-left pixel highlight, then sampled a 15x15 domain into a 16x16 image.
-That combination produced large rectangles, horizontal/vertical crossings,
-shared camouflage-like structure, and a visible 15-pixel repeat.  It also made
-edge equality by aliasing the last row/column instead of constructing features
-on a torus.  The generators below therefore combine irregular toroidal macro
-fields, material-specific meso features, and sparse correlated micro accents.
+V3 uses absolute field thresholds and sparse material features so quiet planes
+stay quiet. Functional blocks have explicit face art, tools have disjoint part
+masks, and entity skins share their source with embedded GLB textures.
 """
 
 import argparse
@@ -21,7 +16,7 @@ from collections import Counter, deque
 from pathlib import Path
 
 SIZE = 16
-GENERATOR_VERSION = 2
+GENERATOR_VERSION = 3
 STYLE_ID = "bright-comfortable"
 # Selected from the deterministic contact-sheet candidates. CMake's asset
 # target relies on this default, so keep it aligned with committed atlas.json.
@@ -88,6 +83,15 @@ NAMES = [
     "loom", "cauldron", "blast_furnace", "smithing_table", "grindstone",
     "copper_ore",
 ]
+
+
+# Existing names retain their atlas positions. Additional faces are appended.
+FUNCTIONAL = ("crafting_table", "furnace", "chest", "composter",
+              "fletching_table", "loom", "cauldron", "blast_furnace",
+              "smithing_table", "grindstone", "white_bed", "tnt")
+EXTRA_LOG_TOPS = ("birch_log_top", "spruce_log_top", "jungle_log_top", "acacia_log_top")
+NAMES += list(EXTRA_LOG_TOPS) + [name + "_" + face for name in FUNCTIONAL
+                               for face in ("top", "side", "bottom")]
 
 
 def _load_texture_families():
@@ -256,13 +260,13 @@ def _role_palette(base, transparent=False, shadow_floor=0.34, chroma_scale=0.92,
     # Keep a useful lightness span even for near-white snow/cloud anchors and
     # near-black volcanic anchors; clipping every role to one endpoint was the
     # reason the previous pass produced only three or four actual colors.
-    low = max(shadow_floor, l - 0.13)
-    high = min(0.96, l + 0.13)
-    if high - low < 0.14:
+    low = max(shadow_floor, l - 0.085)
+    high = min(0.96, l + 0.085)
+    if high - low < 0.09:
         if low <= 0.22:
-            high = min(0.96, low + 0.14)
+            high = min(0.96, low + 0.09)
         else:
-            low = max(0.20, high - 0.14)
+            low = max(0.20, high - 0.09)
     colors = []
     for index in range(levels):
         lightness = low + (high - low) * index / max(1, levels - 1)
@@ -297,11 +301,11 @@ for _name, _base in _ENTITY_BASES.items():
 # Bright-comfortable anchors.  The procedural structure remains seed-driven,
 # while these anchors give each material family a stable, readable identity.
 _BRIGHT_BASES = {
-    "dirt": (112, 78, 48), "stone": (128, 132, 132),
-    "sand": (205, 190, 142), "grass_top": (73, 139, 63),
-    "grass_side": (102, 78, 48), "oak_log": (112, 76, 43),
-    "oak_log_top": (145, 103, 58), "oak_planks": (153, 106, 57),
-    "leaves": (66, 132, 62), "coal_ore": (128, 132, 132),
+    "dirt": (143, 107, 72), "stone": (151, 155, 153),
+    "sand": (225, 210, 163), "grass_top": (102, 161, 76),
+    "grass_side": (102, 78, 48), "oak_log": (135, 100, 62),
+    "oak_log_top": (179, 140, 87), "oak_planks": (181, 140, 88),
+    "leaves": (88, 147, 67), "coal_ore": (128, 132, 132),
     "copper_ore": (128, 132, 132), "iron_ore": (128, 132, 132),
 }
 for _name, _base in _BRIGHT_BASES.items():
@@ -313,6 +317,20 @@ for _name, _base in _BRIGHT_BASES.items():
 for _name, _base in EXTRA_BASES.items():
     PALETTES[_name] = muted_palette(_base, _name in TRANSPARENT or _name.endswith("_leaves"))
 
+# Keep naturally dark materials dark; lift the midtones of ordinary surfaces.
+for _name, _base in EXTRA_BASES.items():
+    if _name not in {"deepslate", "black_sand", "basalt", "mud", "obsidian",
+                     "bedrock", "water", "lava"}:
+        _l, _a, _b = _srgb_to_oklab(_base)
+        PALETTES[_name] = _role_palette(_oklab_to_srgb((min(.88, _l+.055), _a, _b)),
+            _name in TRANSPARENT or _name.endswith("_leaves"))
+for _name, _base in zip(EXTRA_LOG_TOPS,
+                       ((208,183,128), (158,119,77), (185,143,96), (196,126,79))):
+    PALETTES[_name] = _role_palette(_base)
+for _name in FUNCTIONAL:
+    for _face in ("top", "side", "bottom"):
+        PALETTES[_name+"_"+_face] = PALETTES[_name]
+
 # Grass-side tiles need two semantic materials in one six-role palette.  The
 # first four roles are soil; the last two are living turf.  Keeping this
 # explicit also prevents bright soil highlights from being mistaken for grass
@@ -322,8 +340,8 @@ for _side_name, _soil_name, _top_name in (
         ("aether_grass_side", "aether_soil", "aether_grass_top")):
     _soil = PALETTES[_soil_name]
     _turf = PALETTES[_top_name]
-    PALETTES[_side_name] = [_soil[0], _soil[1], _soil[3], _soil[4],
-                            _turf[3], _turf[5]]
+    PALETTES[_side_name] = [_soil[1], _soil[2], _soil[3], _soil[4],
+                            _turf[2], _turf[3]]
 PALETTES["fire"] = [(0,0,0,0),(116,34,17,255),(164,48,17,255),(207,67,17,255),
                     (235,101,20,255),(245,151,35,255),(250,205,76,255)]
 for _name, _ore in {
@@ -337,13 +355,13 @@ for _name, _ore in {
 }.items():
     _ore_palette = _role_palette(_ore[1], shadow_floor=0.26,
                                  chroma_scale=1.12, levels=6)
-    PALETTES[_name] = PALETTES["stone"][:3] + _ore_palette[3:]
-PALETTES["coal_ore"] = PALETTES["stone"][:3] + [
+    PALETTES[_name] = PALETTES["stone"][2:5] + _ore_palette[3:]
+PALETTES["coal_ore"] = PALETTES["stone"][2:5] + [
     (24, 27, 29, 255), (42, 45, 47, 255), (64, 67, 68, 255)]
-PALETTES["copper_ore"] = PALETTES["stone"][:3] + [
+PALETTES["copper_ore"] = PALETTES["stone"][2:5] + [
     (82, 51, 40, 255), (151, 83, 58, 255), (225, 143, 97, 255)]
 
-PALETTES["deepslate_emerald_ore"] = PALETTES["deepslate"][:3] + \
+PALETTES["deepslate_emerald_ore"] = PALETTES["deepslate"][2:5] + \
     PALETTES["deepslate_emerald_ore"][3:]
 HIGH_CONTRAST_NAMES = {"coal_ore","copper_ore","iron_ore","gold_ore","diamond_ore",
                        "emerald_ore","deepslate_emerald_ore","fire"}
@@ -420,16 +438,15 @@ def grow_blob(seed,name,anchor,size,channel=0,elongation=None):
         if len(frontier)>max(4,size//2): frontier.pop(0)
     return cells
 
-def quantize(values,levels=6):
-    # Rank quantization uses every palette entry even when an intentionally
-    # flat plane contains tied values.  The tiny quasiperiodic tie breaker is
-    # correlated across neighbors and is not a per-pixel random-noise layer.
-    ranked=sorted(range(len(values)),key=lambda i:(
-        values[i]+.032*math.sin((i%SIZE)*1.71+(i//SIZE)*.93)
-        +.021*math.sin((i%SIZE)*.47-(i//SIZE)*1.33), i))
-    result=[0]*len(values)
-    for rank,index in enumerate(ranked): result[index]=min(levels-1,rank*levels//len(values))
-    return result
+def quantize(values, levels=6, thresholds=None):
+    """Absolute thresholds preserve quiet planes; never stretch tiny noise."""
+    if thresholds is None:
+        thresholds = tuple(STYLE_DEFINITION.get("quantization", {}).get(
+            "default", (-.65, -.28, .08, .42, .78)))
+    if levels != len(thresholds)+1:
+        raise ValueError("quantizer thresholds must match palette size")
+    return [sum(value > threshold for threshold in thresholds) for value in values]
+
 
 def add_sparse_micro(indices,seed,name,amount=18,low=0,high=5):
     # Accents occur as adjacent pairs/turns, never independent white noise.
@@ -444,15 +461,15 @@ def add_sparse_micro(indices,seed,name,amount=18,low=0,high=5):
 def generate_dirt(name,seed):
     values=macro_field(seed,name,6)
     # Pebbly soil clods: compact irregular components at several scales.
-    for i in range(7):
+    for i in range(6):
         h=sample(seed,name,i,41); blob=grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),3+(h>>16)%7,i)
-        tone=(-0.42,0.30,0.55)[i%3]
+        tone=(-0.30,0.23,0.40)[i%3]
         for x,y in blob: values[y*SIZE+x]+=tone
-    out=quantize(values); add_sparse_micro(out,seed,name,14)
+    out=quantize(values); add_sparse_micro(out,seed,name,6)
     return out
 
 def generate_grass(seed):
-    values=[v*0.35 for v in macro_field(seed,"grass_top",5)]
+    values=[v*0.55 for v in macro_field(seed,"grass_top",6)]
     # 3-6 toroidal tufts, with bent 2-4 pixel blades in varied directions.
     tuft_count=3+sample(seed,"grass_top",4,8)%4
     for i in range(tuft_count):
@@ -460,127 +477,108 @@ def generate_grass(seed):
         blob=grow_blob(seed,"grass_top",anchor,7+(h>>16)%9,i)
         for x,y in blob:
             dx,dy=torus_delta(x,anchor[0]),torus_delta(y,anchor[1])
-            values[y*SIZE+x]+=0.52-0.045*(abs(dx)+abs(dy))+(-0.18 if dx+dy>2 else 0.10)
+            values[y*SIZE+x]+=0.38-0.025*(abs(dx)+abs(dy))+(-0.18 if dx+dy>2 else 0.10)
         direction=((1,-1),(1,0),(-1,-1),(0,-1),(1,1),(-1,0))[i%6]
         length=2+(h>>24)%3; x,y=anchor
         for step in range(length):
             if step==2 and ((h>>29)&1): direction=(direction[0],-direction[1])
             x,y=wrap(x+direction[0]),wrap(y+direction[1])
-            values[y*SIZE+x]+=0.72-0.13*step
-    out=quantize(values); add_sparse_micro(out,seed,"grass_top",10)
+            values[y*SIZE+x]+=0.48-0.07*step
+    out=quantize(values); add_sparse_micro(out,seed,"grass_top",4)
     return out
 
 def generate_stone(name,seed):
-    values=[v*0.35 for v in macro_field(seed,name,4)]
-    # Angular flakes are grown irregularly; short cracks stop after 2-5 steps.
-    for i in range(8):
-        h=sample(seed,name,i,61); anchor=(h%SIZE,(h>>8)%SIZE)
-        blob=grow_blob(seed,name,anchor,5+(h>>16)%10,i)
-        tone=(-0.38,0.24,0.42)[i%3]
-        for x,y in blob: values[y*SIZE+x]+=tone
-        if i%2==0:
-            x,y=anchor; dx,dy=((1,1),(1,-1),(-1,1),(1,0))[i//2%4]
-            for step in range(2+(h>>24)%4):
-                x,y=wrap(x+dx),wrap(y+dy)
-                values[y*SIZE+x]-=0.58
-                if step==1: dy=0 if dy else (1 if (h>>30)&1 else -1)
-    return quantize(values)
+    values=[v*.35 for v in macro_field(seed,name,5)]
+    if name in {"clay", "terracotta", "cloudstone"}:
+        return quantize(values, thresholds=(-.7,-.3,.025,.3,.7))
+    for i in range(6 if name != "gravel" else 9):
+        h=sample(seed,name,i,61)
+        blob=grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),10+(h>>16)%15,i)
+        for x,y in blob:
+            values[y*SIZE+x] += (-.30,.24,.43)[i%3]
+    if name in {"deepslate", "basalt", "limestone"}:
+        for y in range(SIZE):
+            for x in range(SIZE):
+                values[y*SIZE+x] += .15*math.sin(y*math.tau/8 + .4*math.sin(x*math.tau/16))
+    if name == "cobblestone":
+        # Offset masonry cells, with thin mortar instead of random fractures.
+        return [1 if y%8==0 or (x+(y//8)*4)%8==0 else
+                3+(1 if y%8==1 else 0)-(1 if y%8==7 else 0)
+                for y in range(SIZE) for x in range(SIZE)]
+    return quantize(values, thresholds=(-.65,-.26,.025,.34,.72))
+
 
 def generate_sand(name,seed):
-    values=[v*0.18 for v in macro_field(seed,name,7)]
-    for i in range(12):
-        h=sample(seed,name,i,67); x=h%SIZE; y=(h>>8)%SIZE
-        tone=(-0.25,0.22,0.34)[i%3]
-        for step in range(2+(i%3==0)):
-            xx=wrap(x+step); yy=wrap(y+(step//2 if i&1 else -(step//2)))
-            values[yy*SIZE+xx]+=tone
-    out=quantize(values); add_sparse_micro(out,seed,name,6)
+    values=[v*.18 for v in macro_field(seed,name,6)]
+    out=quantize(values, thresholds=(-.6,-.25,.018,.28,.6))
+    add_sparse_micro(out,seed,name,4)
     return out
 
-def break_axis_runs(indices,limit=8):
-    """Bend accidental flat runs without sprinkling independent random pixels."""
-    out=list(indices)
-    for horizontal in (True,False):
-        for fixed in range(SIZE):
-            run_start=0
-            for moving in range(1,SIZE+1):
-                def at(pos): return fixed*SIZE+pos if horizontal else pos*SIZE+fixed
-                if moving<SIZE and out[at(moving)]==out[at(run_start)]: continue
-                if moving-run_start>limit:
-                    for pos in range(run_start+limit,moving,limit):
-                        index=at(pos); out[index]=max(0,min(5,out[index]+(1 if out[index]<5 else -1)))
-                run_start=moving
-    return out
-
-def break_flat_rectangles(indices):
-    """Notch large near-solid boxes so clods retain an organic silhouette."""
-    out=list(indices)
-    for color in range(6):
-        pending={(x,y) for y in range(SIZE) for x in range(SIZE)
-                 if out[y*SIZE+x]==color}
-        while pending:
-            start=pending.pop(); component={start}; queue=[start]
-            while queue:
-                for neighbor in neighbors4(*queue.pop()):
-                    if neighbor in pending:
-                        pending.remove(neighbor); component.add(neighbor); queue.append(neighbor)
-            if len(component)<12: continue
-            xs=[p[0] for p in component]; ys=[p[1] for p in component]
-            width=max(xs)-min(xs)+1; height=max(ys)-min(ys)+1
-            if len(component)/(width*height)<=.96: continue
-            # A single corner notch is a meso-shape correction, not a random
-            # pixel layer. Prefer the lower-right corner to preserve upper-left light.
-            corner=(max(xs),max(ys)); index=corner[1]*SIZE+corner[0]
-            out[index]=color-1 if color>0 else 1
-    return out
 
 def generate_wood_side(name,seed):
-    values=[]
     phase=(sample(seed,name,1,1)%628)/100.0
+    out=[]
     for y in range(SIZE):
         for x in range(SIZE):
-            bend=1.25*math.sin((y+phase)*math.tau/SIZE)+0.55*math.sin((2*y+x/5)*math.tau/SIZE)
-            fiber=math.sin((x+bend)*math.tau/4.7)+0.35*math.sin((x*2-y*.35)*math.tau/5.3)
-            values.append(fiber+macro_field(seed,name,4)[y*SIZE+x]*0.22)
-    out=quantize(values)
-    # Broken bark scars interrupt rather than reinforce the vertical fibers.
-    for i in range(7):
-        h=sample(seed,name,i,71); x=h%SIZE; y=(h>>8)%SIZE
-        for step in range(2+(h>>16)%3): out[wrap(y+step)*SIZE+wrap(x+(step==2))]=i%2
+            bend=.5*math.sin(y*math.tau/SIZE+phase)
+            fiber=math.sin((x+bend)*math.tau/8+phase)
+            out.append(2 if fiber<-.65 else 4 if fiber>.8 else 3)
+    if name == "birch_log":
+        for i in range(4):
+            h=sample(seed,name,i,71); x=h%SIZE; y=(h>>8)%SIZE
+            for step in range(2+(h>>16)%3): out[y*SIZE+wrap(x+step)]=0
+    if name != "birch_log":
+        for i in range(4):
+            h=sample(seed,name,i,73); x=h%SIZE; y=(h>>8)%SIZE
+            for step in range(3+(h>>16)%3):
+                out[wrap(y+step)*SIZE+wrap(x+(step//3))]=2
     return out
 
+
 def generate_log_top(name,seed):
-    h=sample(seed,name,2,4); cx=5.2+(h%50)/10; cy=5.0+((h>>8)%55)/10
-    values=[]
+    h=sample(seed,name,2,4); cx=7+(h%3-1)*.35; cy=7+((h>>8)%3-1)*.35
+    out=[]
     for y in range(SIZE):
         for x in range(SIZE):
-            dx,dy=torus_delta(x,cx),torus_delta(y,cy)
-            radius=math.sqrt((dx*1.08+.12*dy)**2+(dy*.91)**2)
-            wobble=.55*math.sin(math.atan2(dy,dx)*3+(h%31))+.25*math.sin((x+y)*1.7)
-            ring=math.sin((radius+wobble)*2.45)
-            # Ring breaks come from a separate angular signal.
-            if rand01(seed,name,x//2,y//2,5)<.14: ring*=.15
-            values.append(ring-radius*.025)
-    return quantize(values)
+            radius=math.sqrt((x-cx)**2+((y-cy)*.95)**2)
+            if x in (0,15) or y in (0,15): index=1
+            else: index=2 if radius%3<.65 else 4 if radius%3<1.2 else 3
+            out.append(index)
+    return out
+
 
 def generate_planks(name,seed):
-    out=[3]*256
-    seams=(0,5,10)
+    phase=sample(seed,name,0,0)%16
+    out=[]
     for y in range(SIZE):
-        nearest=min(abs(torus_delta(y,s)) for s in seams)
         for x in range(SIZE):
-            wobble=round(.65*math.sin((x+seed%7)*math.tau/11)+.35*math.sin(x*math.tau/5))
-            on_seam=any(y==wrap(s+wobble) and (x+3*s)%13!=0 for s in seams)
-            grain=math.sin((x+.35*y)*math.tau/7)+.4*math.sin((2*x-y)*math.tau/9)
-            out[y*SIZE+x]=0 if on_seam else max(1,min(5,3+round(grain*.75)+(nearest==1)))
+            joint=(x+(8 if y>=8 else 0))%16==4
+            grain=math.sin((x+phase)*math.tau/16 + .5*math.sin(y*math.tau/8))
+            out.append(1 if y%8==4 or joint else 4 if y%8==5 else
+                       2 if grain<-.8 and y%4==3 else 3)
+    for i in range(5):
+        h=sample(seed,name,i,79); x=h%SIZE; y=(h>>8)%SIZE
+        for step in range(3+(h>>16)%4):
+            p=y*SIZE+wrap(x+step)
+            if out[p]==3: out[p]=2 if i%2 else 4
     return out
 
 def generate_leaves(name,seed):
-    values=macro_field(seed,name,7); out=quantize(values,6)
+    # Overlapping leaf groups have lit tips and shaded undersides. Keep the
+    # spaces between them clustered so cutout alpha survives minification.
+    out=[3 if v<.1 else 4 for v in macro_field(seed,name,6)]
+    elongation=(1.8,.65) if name=="spruce_leaves" else (.8,1.2)
+    for i in range(11):
+        h=sample(seed,name,i,81)
+        blob=grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),7+(h>>16)%9,i,elongation)
+        for x,y in blob:
+            upper=(x,wrap(y-1)) not in blob
+            lower=(wrap(x+1),y) not in blob or (x,wrap(y+1)) not in blob
+            out[y*SIZE+x]=4 if upper else 2 if lower else 3
     holes=set()
-    for i in range(5):
-        h=sample(seed,name,i,83); anchor=(h%SIZE,(h>>8)%SIZE)
-        holes |= grow_blob(seed,name,anchor,1+(h>>16)%4,i)
+    for i in range(4):
+        h=sample(seed,name,i,83)
+        holes |= grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),10+(h>>16)%4,i)
     return [0 if (x,y) in holes else 1+out[y*SIZE+x]
             for y in range(SIZE) for x in range(SIZE)]
 
@@ -606,10 +604,10 @@ def generate_ore(name,seed):
     return out
 
 def generate_generic(name,seed):
-    if name in {"dirt","gravel","podzol_top","coarse_dirt","mud"}: return generate_dirt(name,seed)
-    if name=="grass_top" or name=="moss": return generate_grass(seed^sample(seed,name,0,0))
+    if name in {"dirt","podzol_top","coarse_dirt","mud","aether_soil"}: return generate_dirt(name,seed)
+    if name in {"grass_top","moss","aether_grass_top"}: return generate_grass(seed^sample(seed,name,0,0))
     if name in {"stone","bedrock","deepslate","clay","terracotta","cobblestone",
-                "limestone","basalt","tuff","granite"}: return generate_stone(name,seed)
+                "limestone","basalt","tuff","granite","gravel","cloudstone"}: return generate_stone(name,seed)
     if name in {"sand","red_sand","black_sand","snow","snow_layer","packed_ice"}: return generate_sand(name,seed)
     if name.endswith("_ore"): return generate_ore(name,seed)
     if name in LEAF_NAMES: return generate_leaves(name,seed)
@@ -617,7 +615,7 @@ def generate_generic(name,seed):
     if name.endswith("_log_top"): return generate_log_top(name,seed)
     if name.endswith("_planks"): return generate_planks(name,seed)
     field=quantize(macro_field(seed,name,6))
-    add_sparse_micro(field,seed,name,12)
+    add_sparse_micro(field,seed,name,2)
     return field
 
 PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","wheat_mature",
@@ -630,49 +628,28 @@ def generate_special(name,seed,indices):
         soil_name = "dirt" if name == "grass_side" else "aether_soil"
         # Compress the soil generator into the four soil-only palette roles;
         # indices 4/5 are reserved exclusively for the turf cap below.
-        indices=[min(3, value * 4 // 6) for value in generate_dirt(soil_name,seed)]
+        indices=[max(0,min(3,value-1)) for value in generate_dirt(soil_name,seed)]
         # Five solid rows make the grass cap unmistakable at gameplay scale;
         # the lower 1-3 rows form a deterministic, irregular rooted edge.
-        heights=[4+(sample(seed,name,x,1)%4) for x in range(SIZE)]
+        heights=[5+round(math.sin(x*math.tau/16+seed%7)) for x in range(SIZE)]
+        turf=generate_grass(seed)
         for x in range(SIZE):
-            for y in range(heights[x]+1): indices[y*SIZE+x]=4+((x+y+sample(seed,name,x,y))&1)
-    elif name in PLANTS:
-        indices=[0]*256; h=sample(seed,name,1,2); center=6+h%4
-        limit=8 if name=="wheat_young" else 12 if name=="wheat_middle" else 15
-        for y in range(limit):
-            x=wrap(center+round(math.sin((y+h%5)*.65)))
-            indices[y*SIZE+x]=2+y%5
-            if y in (4,7,10,13):
-                for dx in (-2,-1,1,2): indices[y*SIZE+wrap(x+dx)]=1+(y+dx)%6
-        if name in {"flower","dandelion","blue_orchid","allium","oxeye_daisy","sunflower_top"}:
-            flower_y=12 if name=="sunflower_top" else 13
-            for dx,dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)):
-                indices[wrap(flower_y+dy)*SIZE+wrap(center+dx)]=6
-        if name=="sunflower_bottom":
-            for y in range(15):
-                for dx in (-1,0,1): indices[y*SIZE+wrap(center+dx)]=2+(y+dx)%4
+            for y in range(heights[x]+1): indices[y*SIZE+x]=4+(turf[y*SIZE+x]>2)
     elif name=="fire":
         indices=[0]*256
         for y in range(15):
             center=7+round(math.sin((y+seed%9)*.9)); half=max(1,5-y//3)
             for x in range(center-half,center+half+1): indices[y*SIZE+wrap(x)]=1+min(5,y//3)
     elif name in {"water","lava","ice"}:
-        indices=[(y+round(1.4*math.sin((x+seed%7)*math.tau/9))+x//5)%6 for y in range(SIZE) for x in range(SIZE)]
+        indices=quantize([.28*math.sin(y*math.tau/8 + .65*math.sin(x*math.tau/16+seed%7))
+                          for y in range(SIZE) for x in range(SIZE)],
+                         thresholds=(-.8,-.4,-.08,.18,.6))
     elif name in {"farmland","wet_farmland"}:
         base=generate_dirt(name,seed); indices=[0 if (x+round(math.sin(y*.7)))%5==0 else max(1,v) for y in range(SIZE) for x,v in enumerate(base[y*SIZE:(y+1)*SIZE])]
     elif name=="white_wool":
-        indices=[1 if (x+y)%5==0 or (x-y)%7==0 else 2+(sample(seed,name,x//2,y//2)%4) for y in range(SIZE) for x in range(SIZE)]
+        indices=quantize(macro_field(seed,name,5), thresholds=(-.7,-.4,-.05,.4,.7))
     elif name in {"cactus_side","reeds"}:
         indices=[1+((x+round(math.sin(y*.7)))%5) for y in range(SIZE) for x in range(SIZE)]
-    elif name in {"crafting_table","furnace","chest","white_bed","composter",
-                 "fletching_table","loom","cauldron","blast_furnace",
-                 "smithing_table","grindstone"}:
-        indices=[]
-        for y in range(SIZE):
-            for x in range(SIZE):
-                border=(x in (1,14) and 1<=y<=14) or (y in (1,14) and 1<=x<=14)
-                panel=x in (5,10) and 4<=y<=11
-                indices.append(0 if border else 1 if panel else 2+sample(seed,name,x//2,y//2)%4)
     elif name=="glass":
         indices=[]
         for y in range(SIZE):
@@ -680,68 +657,235 @@ def generate_special(name,seed,indices):
                 border=x in (0,15) or y in (0,15)
                 glint=(x-y) in (-1,0,1) and 3<=x<=7
                 indices.append(3+(x+y)%3 if border else 2 if glint else 0)
-    elif name=="tnt":
-        indices=[]
-        for y in range(SIZE):
-            for x in range(SIZE):
-                band=6<=y<=9
-                fuse=(x in (7,8) and y<3)
-                indices.append(5 if fuse else 1 if band else 2+(x+y)%4)
     return indices
+
+def functional_palette(base):
+    wood = base in {"crafting_table","chest","composter","fletching_table","loom"}
+    anchor = (179,137,83) if wood else (142,148,147)
+    if base == "smithing_table": anchor=(100,115,118)
+    if base == "tnt": anchor=(195,76,55)
+    if base == "white_bed": anchor=(214,221,211)
+    palette = _role_palette(anchor)
+    # Palette entries describe structure: cavity, seam, base, light, rim, accent.
+    palette[0] = (65,49,34,255) if wood else (53,61,63,255)
+    palette += [(223,211,176,255), (168,118,55,255)]
+    return palette
+
+
+def generate_functional_texture(name, seed):
+    base = next(base for base in FUNCTIONAL if name == base or name.startswith(base+"_"))
+    face = name[len(base)+1:] if name != base else "front"
+    palette=PALETTES[name]
+    wood=base in {"crafting_table","chest","composter","fletching_table","loom"}
+    tile=[palette[3]]*256
+    def rect(x0,y0,x1,y1,index):
+        _paint_rect(tile,x0,y0,x1,y1,palette[index])
+    def line(x0,y0,x1,y1,index):
+        _line(tile,x0,y0,x1,y1,palette[index])
+    # All outside edges match; semantic marks remain inside a tile.
+    rect(0,0,16,1,2); rect(0,15,16,16,2)
+    rect(0,0,1,16,2); rect(15,0,16,16,2)
+    if face == "bottom":
+        rect(2,2,14,14,2); rect(3,3,13,13,3)
+        if wood: line(7,3,7,12,1)
+        return tile
+    if base == "crafting_table":
+        if face == "top":
+            rect(2,2,14,14,6)
+            for v in (2,6,10,13): line(v,2,v,13,1); line(2,v,13,v,1)
+        else:
+            rect(2,2,14,5,4); rect(2,6,4,14,1); rect(12,6,14,14,1)
+            line(6,7,6,12,7); line(5,7,9,7,0)
+            line(10,9,10,12,7); line(9,8,11,8,5)
+    elif base in {"furnace","blast_furnace"}:
+        if face == "front":
+            rect(2,3,14,7,0); rect(3,3,13,4,1)
+            rect(2,9,14,14,0); rect(3,13,13,14,4)
+            if base == "blast_furnace":
+                for x in (4,7,10): rect(x,3,x+1,7,4); rect(x,9,x+1,13,2)
+            else: rect(4,10,12,11,1)
+        elif face == "top":
+            rect(3,3,13,13,2); rect(4,4,12,12,3)
+            if base == "blast_furnace":
+                for x in (5,8,11): line(x,4,x,11,0)
+        else:
+            line(1,7,14,7,1); line(7,1,7,6,2); line(10,8,10,14,2)
+    elif base == "chest":
+        rect(1,1,15,3,1); rect(1,13,15,15,1)
+        rect(1,3,3,13,1); rect(13,3,15,13,1)
+        if face != "top":
+            line(3,6,12,6,0)
+            if face == "front": rect(7,5,9,10,6); rect(7,7,9,9,7)
+        else: line(7,3,7,12,2)
+    elif base in {"composter","cauldron"}:
+        if face == "top":
+            rect(2,2,14,14,5); rect(4,4,12,12,0); rect(5,5,11,11,1)
+        else:
+            rect(2,2,14,4,5); rect(3,12,13,14,1)
+            if base == "composter":
+                for x in (4,8,12): line(x,4,x,11,1)
+                line(2,9,13,9,7)
+            else: rect(3,4,13,12,2); rect(4,4,6,11,3)
+    elif base == "fletching_table":
+        if face == "top":
+            rect(2,2,14,14,6)
+            line(4,11,11,4,7); line(9,4,12,4,0); line(12,4,12,7,0)
+            line(3,9,5,11,4); line(4,8,6,10,4)
+        else:
+            rect(2,2,14,4,6)
+            for x in (5,10): line(x,6,x,12,7); line(x-1,6,x+1,6,0)
+    elif base == "loom":
+        if face == "top":
+            for x in (3,6,9,12): line(x,2,x,13,6)
+            line(2,5,13,5,1); line(2,11,13,11,1)
+        else:
+            rect(2,2,14,14,1); rect(4,3,12,12,6)
+            for x in (5,7,9,11): line(x,3,x,11,4)
+            rect(4,9,12,12,7); line(2,12,13,12,5)
+    elif base == "smithing_table":
+        if face == "top":
+            rect(2,2,14,14,1); rect(3,3,13,13,2)
+            line(4,5,10,11,5); line(9,4,11,6,4)
+        else:
+            rect(2,3,14,6,0); rect(3,7,13,13,7)
+            line(5,8,5,11,0); line(9,8,11,8,5); line(10,8,10,11,1)
+    elif base == "grindstone":
+        if face == "top":
+            rect(4,1,12,15,2); rect(5,1,7,15,4)
+        else:
+            for y in range(3,13):
+                for x in range(3,13):
+                    r=(x-7.5)**2+(y-7.5)**2
+                    if r<25: tile[y*16+x]=palette[4 if r>14 else 3]
+            rect(7,7,9,9,0); rect(2,12,5,14,7); rect(11,12,14,14,7)
+    elif base == "white_bed":
+        # Pillow is already separate geometry. The mattress is plain linen.
+        if face == "top":
+            line(2,3,2,12,4); line(13,3,13,12,2)
+        else: line(2,5,13,5,4); line(2,11,13,11,2)
+    elif base == "tnt":
+        if face == "top":
+            for x in (3,7,11):
+                rect(x,3,x+2,13,1); rect(x,3,x+1,13,4)
+            rect(7,6,9,9,0); line(8,6,10,4,6)
+        else:
+            for x in (3,7,11): line(x,2,x,13,1)
+            rect(1,5,15,11,6)
+            # Hand-drawn 3x5 TNT label fits the native pixel grid.
+            for ox,letter in ((2,"T"),(6,"N"),(10,"T")):
+                for y,row in enumerate({"T":("111","010","010","010","010"),
+                                        "N":("101","111","111","111","101")}[letter]):
+                    for x,v in enumerate(row):
+                        if v=="1": tile[(5+y)*16+ox+x]=palette[0]
+    return tile
+
+
+def plant_palette(name):
+    palette=[(0,0,0,0),(65,111,44,255),(94,147,57,255),(132,175,77,255),
+             (179,143,65,255),(227,194,101,255),(235,224,184,255),(177,100,77,255)]
+    flower_colors={"flower":(219,102,125),"dandelion":(245,206,72),
+                   "blue_orchid":(104,180,228),"allium":(191,135,214),
+                   "oxeye_daisy":(238,237,220),"starflower":(167,213,239),
+                   "cloud_bloom":(234,225,243),"sunflower_top":(242,195,53),
+                   "glowshroom":(145,210,203)}
+    if name in flower_colors: palette[6]=flower_colors[name]+(255,)
+    return palette
+
+
+for _name in FUNCTIONAL:
+    for _suffix in ("", "_top", "_side", "_bottom"):
+        PALETTES[_name+_suffix]=functional_palette(_name)
+for _name in PLANTS:
+    PALETTES[_name]=plant_palette(_name)
+
+
+def generate_plant_texture(name,seed):
+    palette=PALETTES[name]
+    image=[palette[0]]*256
+    def line(x0,y0,x1,y1,index,width=1): _line(image,x0,y0,x1,y1,palette[index],width)
+    def rect(x0,y0,x1,y1,index): _paint_rect(image,x0,y0,x1,y1,palette[index])
+    # Draw growth bottom-up, then return PNG top-left rows for the atlas loader.
+    if name == "torch":
+        rect(7,0,9,10,4); rect(8,0,9,9,7); rect(6,10,10,14,5); rect(7,11,9,15,6)
+    elif name in {"wheat_young","wheat_middle","wheat_mature"}:
+        height={"wheat_young":5,"wheat_middle":10,"wheat_mature":14}[name]
+        for x in (4,8,12):
+            line(x,0,x-1,height-1,2 if height<14 else 4)
+            for y in range(3,height,3):
+                line(x-1,y,x-3,y+2,3 if height<14 else 5)
+                line(x-1,y,x+1,y+2,2 if height<14 else 6)
+    elif name.endswith("sapling"):
+        line(8,0,8,7,4,2)
+        if name=="spruce_sapling":
+            for y in range(5,15):
+                half=max(0,(15-y)//3); line(8-half,y,8+half,y,2+(y%3==0))
+        else:
+            for cx,cy in ((5,9),(10,10),(8,13)):
+                for x,y in grow_blob(seed,name,(cx,cy),12,cy): image[y*16+x]=palette[2+(y>cy)]
+            line(8,5,5,8,1); line(8,6,11,9,1)
+    elif name in {"flower","dandelion","blue_orchid","allium","oxeye_daisy",
+                   "starflower","cloud_bloom","sunflower_top","glowshroom"}:
+        line(8,0,8,10,2); line(8,3,5,5,3); line(8,5,11,7,2)
+        if name=="glowshroom":
+            rect(7,0,9,8,5); rect(3,7,13,10,6); rect(5,10,11,12,6)
+        else:
+            cx,cy=8,12
+            radius=3 if name in {"sunflower_top","allium","cloud_bloom"} else 2
+            for y in range(cy-radius, min(16,cy+radius+1)):
+                for x in range(cx-radius,cx+radius+1):
+                    if abs(x-cx)+abs(y-cy)<=radius+1: image[y*16+x]=palette[6]
+            rect(7,11,9,13,4 if name=="sunflower_top" else 5)
+    elif name in {"reeds","sunflower_bottom"}:
+        for x in ((4,8,12) if name=="reeds" else (8,)):
+            line(x,0,x,15,2,2)
+            for y in (4,9,14): line(x,y,x+1,y,3)
+        line(8,6,4,9,3); line(8,9,12,12,2)
+    else:
+        for x,height in ((3,8),(6,12),(9,14),(12,10)):
+            line(8,0,x,height,2); line(x,height-3,x-1,height,3)
+    return [image[(15-y)*16+x] for y in range(16) for x in range(16)]
+
 
 def resolve_seed(seed,name,local_seeds=None):
     return int((local_seeds or {}).get(name,seed))
 
+def center_periodic_tile(pixels):
+    """Choose a repeat origin whose boundary has ordinary interior variation.
+
+    A calm field can put its only small cluster on the atlas cut. Translating
+    the complete torus prevents that accidental seam emphasis without adding
+    noise, changing any pixels, or aliasing the last row/column to the first.
+    """
+    cuts_x=[sum(color_distance(pixels[y*16+x],pixels[y*16+wrap(x-1)])
+                for y in range(16)) for x in range(16)]
+    cuts_y=[sum(color_distance(pixels[y*16+x],pixels[wrap(y-1)*16+x])
+                for x in range(16)) for y in range(16)]
+    sx=min(range(16),key=lambda x:abs(cuts_x[x]-sum(cuts_x)/16))
+    sy=min(range(16),key=lambda y:abs(cuts_y[y]-sum(cuts_y)/16))
+    return [pixels[wrap(y+sy)*16+wrap(x+sx)] for y in range(16) for x in range(16)]
+
+
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL
+                                       for face in ("top","side","bottom")):
+        return generate_functional_texture(name,local)
+    if name in PLANTS:
+        return generate_plant_texture(name,local)
     indices=generate_generic(name,local)
     indices=generate_special(name,local,indices)
-    if name in NATURAL:
-        indices=break_flat_rectangles(break_axis_runs(indices))
     palette=PALETTES[name]
-    return [palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
+    pixels=[palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
+    if name in NATURAL | LEAF_NAMES | {"white_wool", "water", "lava", "ice"}:
+        pixels=center_periodic_tile(pixels)
+    return pixels
 
 def generate_entity_texture(name,seed):
     """Generate a wrapping material swatch, not a face portrait."""
     if name not in ENTITY_PALETTES: raise ValueError(f"unknown entity material '{name}'")
-    values=[v*.55 for v in macro_field(seed,name,6)]
-    for i in range(7):
-        h=sample(seed,name,i,131)
-        blob=grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),3+(h>>16)%8,i)
-        tone=(-.55,.38,.66)[i%3]
-        for x,y in blob: values[y*SIZE+x]+=tone
-    indices=quantize(values)
-    if name=="cow":
-        for i in range(3):
-            h=sample(seed,name,i,137)
-            for x,y in grow_blob(seed,name,(h%SIZE,(h>>8)%SIZE),10+(h>>16)%10,20+i):
-                indices[y*SIZE+x]=4+(x+y+i)%2
-    elif name=="sheep":
-        indices=[3+((x+y+indices[y*SIZE+x])%3) for y in range(SIZE) for x in range(SIZE)]
-        for i in range(9):
-            h=sample(seed,name,i,141)
-            indices[((h>>8)%SIZE)*SIZE+h%SIZE]=2
-    elif name=="chicken":
-        indices=[4+(indices[y*SIZE+x]&1) for y in range(SIZE) for x in range(SIZE)]
-        for i in range(8):
-            h=sample(seed,name,i,139); x=h%SIZE; y=(h>>8)%SIZE
-            indices[y*SIZE+x]=i%4
-    elif name=="zombie":
-        for y in range(6,10):
-            for x in range(SIZE):
-                if (x+y)%5: indices[y*SIZE+x]=3+(indices[y*SIZE+x]&1)
-    elif name=="skeleton":
-        for i in range(6):
-            h=sample(seed,name,i,149); x=h%SIZE; y=(h>>8)%SIZE
-            for step in range(2+(h>>16)%3):
-                indices[wrap(y+step)*SIZE+wrap(x+step//2)]=step%2
-    elif name=="spider":
-        indices=[min(3,i) for i in indices]
-        for i in range(5):
-            h=sample(seed,name,i,151)
-            indices[((h>>8)%SIZE)*SIZE+h%SIZE]=4+i%2
-    palette=ENTITY_PALETTES[name]
-    return [palette[max(0,min(5,index))] for index in indices]
+    indices=_entity_wrapping_indices(name,"body",seed)
+    palette=_entity_part_palette(name,"body")
+    return [palette[index] for index in indices]
 
 def _entity_part_palette(name, part):
     base=ENTITY_PALETTES[name]
@@ -767,12 +911,17 @@ def _entity_part_palette(name, part):
         ("chicken","secondary"): ((158,157,145,255),(178,177,164,255),(198,197,184,255),
                                    (216,215,202,255),(233,232,220,255),(247,246,237,255)),
     }
+    if name=="player":
+        anchor = (222,170,126) if part=="head" else (83,128,165) if part in {"body","primary"} else (76,87,116)
+        return tuple(_role_palette(anchor))
     selected = overrides.get((name,part), base)
     lifted=[]
     for color in selected:
         l,a,b=_srgb_to_oklab(color[:3])
-        rgb=_oklab_to_srgb((max(0.30,min(0.93,l+0.035)),a*1.01,b*1.01))
+        rgb=_oklab_to_srgb((max(0.30,min(0.93,(.65*l+.35*_srgb_to_oklab(selected[3][:3])[0])+.055)),a*1.01,b*1.01))
         lifted.append(tuple(max(2,min(248,c)) for c in rgb)+(255,))
+    if name=="cow" and part != "head":
+        lifted[4]=(203,186,157,255); lifted[5]=(216,202,178,255)
     return tuple(lifted)
 
 def _cube_coordinate(face,x,y):
@@ -796,11 +945,11 @@ def _entity_surface_indices(name,part,face,seed):
             # Keep the base material calm; species markings below provide the
             # readable shapes.  The former high-amplitude field made every mob
             # look like it had giant circular camouflage spots.
-            index=max(1,min(4,int(round(2.6+value*.30))))
-            marking=(math.sin((cx+p0)*.46)+math.sin((cy+p1)*.39)+
-                     math.sin((cz+p2)*.52)+.42*math.sin((cx-cy+cz+p0)*.71))
+            index=max(2,min(4,int(round(3.0+value*.20))))
+            marking=(math.sin((cx+p0)*.24)+math.sin((cy+p1)*.21)+
+                     math.sin((cz+p2)*.27))
             if name=="cow" and part in {"body","primary","secondary"}:
-                if marking>1.08: index=4+(int(abs(marking)*7)&1)
+                if marking>1.08: index=4
                 elif marking<-.96: index=1
             elif name=="pig" and part=="body":
                 if cy < -4: index=max(1,index-1)
@@ -831,20 +980,17 @@ def _entity_surface_indices(name,part,face,seed):
     return result
 
 def _entity_wrapping_indices(name,part,seed):
-    values=macro_field(seed,name+"_"+part,7)
-    # Quantize a smoothed field; this avoids the old checkerboard transitions.
+    values=macro_field(seed,name+"_"+part,5)
     indices=quantize(values)
-    result=[max(0,min(5,index)) for index in indices]
     if name=="cow":
-        result=[4 if ((x*3+y*5+seed)%17)>13 else max(1,v)
-                for y in range(SIZE) for x,v in enumerate(result[y*SIZE:(y+1)*SIZE])]
-    elif name=="sheep":
-        result=[max(3,min(5,v+1)) for v in result]
-    elif name=="chicken":
-        result=[max(3,min(5,v+1)) for v in result]
-    elif name=="spider":
-        result=[max(0,min(3,v-1)) for v in result]
-    return result
+        for i in range(3):
+            h=sample(seed,name,i,137)
+            for x,y in grow_blob(seed,name,(h%16,(h>>8)%16),16,20+i): indices[y*16+x]=4
+    elif name in {"sheep","chicken"}:
+        indices=[min(5,max(3,v+1)) for v in indices]
+    elif name=="spider": indices=[max(1,min(3,v-1)) for v in indices]
+    return indices
+
 
 def _paint_rect(tile,x0,y0,x1,y1,color):
     for y in range(max(0,y0),min(SIZE,y1)):
@@ -892,28 +1038,10 @@ def _paint_entity_face(name,tile):
         _paint_rect(tile,6,10,10,11,(128,72,54,255))
 
 def _paint_entity_body(name,tile):
-    if name=="cow":
-        _paint_rect(tile,4,6,12,12,(217,190,151,255))
-        _paint_rect(tile,6,8,10,10,(125,78,47,255))
-        _paint_rect(tile,4,12,7,15,(93,57,38,255))
-        _paint_rect(tile,9,12,12,15,(93,57,38,255))
-    elif name=="pig":
-        _paint_rect(tile,4,7,12,13,(239,164,174,255))
-        _paint_rect(tile,6,11,10,13,(196,91,108,255))
-    elif name=="sheep":
-        _paint_rect(tile,3,5,13,12,(225,223,211,255))
-        _paint_rect(tile,5,12,7,15,(79,72,64,255))
-        _paint_rect(tile,9,12,11,15,(79,72,64,255))
-    elif name=="chicken":
-        _paint_rect(tile,3,6,13,12,(239,236,220,255))
-        _paint_rect(tile,4,8,7,12,(207,199,174,255))
-        _paint_rect(tile,9,8,12,12,(207,199,174,255))
-    elif name=="spider":
-        _paint_rect(tile,4,7,12,9,(172,43,37,255))
-        _paint_rect(tile,6,7,10,8,(232,72,53,255))
-    elif name=="blastling":
-        _paint_rect(tile,5,6,11,12,(42,104,47,255))
-        _paint_rect(tile,7,7,9,10,(117,215,76,255))
+    if name in {"cow","pig","sheep","chicken","spider","blastling"}:
+        # Species patterns already wrap over the cuboid; do not stamp a second
+        # face-like rectangle on the chest.
+        return
     elif name=="skeleton":
         bone=(205,197,171,255); shadow=(82,75,62,255)
         _paint_rect(tile,7,2,9,14,bone)
@@ -921,16 +1049,14 @@ def _paint_entity_body(name,tile):
             _paint_rect(tile,3,y,7,y+1,shadow); _paint_rect(tile,9,y,13,y+1,shadow)
     elif name=="zombie":
         _paint_rect(tile,6,1,10,3,(28,70,72,255))
-    elif name=="villager":
-        _paint_rect(tile,1,1,15,15,(112,70,43,255))
-        _paint_rect(tile,6,1,10,15,(151,101,65,255))
-    elif name=="zombie_villager":
-        _paint_rect(tile,1,1,15,15,(47,83,49,255))
-        _paint_rect(tile,6,1,10,15,(75,119,70,255))
-        _paint_rect(tile,2,10,5,13,(29,49,32,255))
+    elif name in {"villager","zombie_villager"}:
+        palette=_entity_part_palette(name,"body")
+        _paint_rect(tile,7,2,9,15,palette[2])
+        _paint_rect(tile,5,1,11,3,palette[1])
+        _paint_rect(tile,2,12,14,13,palette[3])
     elif name=="player":
-        _paint_rect(tile,1,1,15,15,(42,78,118,255))
-        _paint_rect(tile,1,11,15,15,(31,44,67,255))
+        _paint_rect(tile,6,1,10,3,(188,151,116,255))
+        _paint_rect(tile,2,12,14,14,(73,111,147,255))
 
 def generate_entity_skin(name,seed):
     """Generate one original 64x64 semantic skin atlas for a runtime mob."""
@@ -948,8 +1074,18 @@ def generate_entity_skin(name,seed):
             indices=_entity_surface_indices(name,part,face,seed)
         palette=_entity_part_palette(name,part)
         tile=[palette[i] for i in indices]
+        if name=="player" and part=="head":
+            hair=(89,65,46,255)
+            if face in {"back","top"}: tile=[hair]*256
+            elif face != "bottom": _paint_rect(tile,0,0,16,3,hair)
         if semantic=="head_front": _paint_entity_face(name,tile)
         elif semantic=="body_front": _paint_entity_body(name,tile)
+        if semantic in {"limb_primary","limb_secondary"}:
+            if name in {"cow","sheep","pig"}:
+                _paint_rect(tile,0,14,16,16,(92,76,60,255))
+            elif semantic=="limb_primary" and name in {"player","zombie","zombie_villager"}:
+                hand=_entity_part_palette(name,"head")[3]
+                _paint_rect(tile,0,11,16,16,hand)
         tx,ty=index%4,index//4
         for y in range(SIZE):
             start=(ty*SIZE+y)*ENTITY_SKIN_SIZE+tx*SIZE
@@ -1028,6 +1164,11 @@ def load_item_icon_definitions(path):
         palette = _role_palette(base, shadow_floor=0.30,
                                 chroma_scale=1.02, levels=4)
         data["materials"][material] = [list(color[:3]) for color in palette]
+    for material in data["materials"]:
+        species=material[:-4]
+        if material.endswith("_egg") and species in _ENTITY_BASES:
+            palette=_entity_part_palette(species,"body")
+            data["materials"][material]=[list(palette[i][:3]) for i in (1,2,3,4)]
     data["generator_version"] = GENERATOR_VERSION
     data["style"] = STYLE_ID
     return data
@@ -1045,38 +1186,71 @@ def _line(canvas,x0,y0,x1,y1,color,width=1):
         if twice>=dy: err+=dy; x0+=sx
         if twice<=dx: err+=dx; y0+=sy
 
+TOOL_TEMPLATES = {"sword", "pickaxe", "axe", "shovel", "hoe"}
+
+
+def tool_part_masks(template):
+    """Material-independent coverage; all surface accents are clipped to parts."""
+    def stroke(points, width=1):
+        canvas=[(0,0,0,0)]*256
+        for a,b in zip(points,points[1:]): _line(canvas,*a,*b,(1,1,1,255),width)
+        return {i for i,c in enumerate(canvas) if c[3]}
+    heads={
+        "sword": ((7,8),(8,6),(12,2),(14,1),(14,3),(10,7),(9,9)),
+        "pickaxe": ((4,4),(6,2),(10,2),(13,4),(14,7),(12,6),(10,4),(7,4)),
+        "axe": ((8,3),(11,2),(14,3),(14,6),(12,8),(10,7),(10,5),(8,5)),
+        "shovel": ((9,4),(12,2),(14,3),(14,5),(12,7),(10,7)),
+        "hoe": ((6,3),(10,2),(13,3),(14,6),(12,6),(11,4),(7,5)),
+    }
+    polygon=heads[template]; head=set()
+    # Pixel-center polygon fill, including boundary strokes.
+    for y in range(16):
+        for x in range(16):
+            inside=False
+            for (ax,ay),(bx,by) in zip(polygon,polygon[1:]+polygon[:1]):
+                if (ay>y+.5)!=(by>y+.5) and x+.5 < (bx-ax)*(y+.5-ay)/(by-ay)+ax:
+                    inside=not inside
+            if inside: head.add(y*16+x)
+    head |= stroke(polygon+polygon[:1])
+    grip=stroke(((3,13),(9,7)),2)-head
+    connector=stroke(((6,7),(10,11)),1) if template=="sword" else stroke(((8,7),(10,5)),2)
+    connector -= head
+    grip -= connector
+    edge={i for i in head if i%16==0 or i-1 not in head or i-16 not in head}
+    return {"grip":grip,"connector":connector,"working_head":head,"edge":edge}
+
+
+def generate_tool_sprite(template,material,definitions):
+    masks=tool_part_masks(template)
+    shades=[_rgba(c) for c in definitions["materials"][material]]
+    handle=[_rgba(c) for c in definitions["handle_palette"]]
+    image=[(0,0,0,0)]*256
+    for part in ("grip","connector","working_head"):
+        cells=masks[part]
+        palette=handle if part=="grip" else shades
+        for i in cells:
+            x,y=i%16,i//16
+            lower=i+16 not in cells
+            image[i]=palette[0 if lower else 2]
+            if part=="grip":
+                if i-1 not in cells: image[i]=handle[2]
+            elif i in masks["edge"]: image[i]=palette[3]
+            elif material=="stone" and (x+2*y)%7==0: image[i]=palette[1]
+            elif material=="wood" and (x-y)%5==0: image[i]=palette[1]
+    return image
+
+
 def generate_item_sprite(template,material,definitions):
     """Generate crisp binary-alpha sprites; coordinates use PNG top-left origin."""
     if template not in definitions["templates"]: raise ValueError(f"unknown item template '{template}'")
     if material not in definitions["materials"]: raise ValueError(f"unknown item material '{material}'")
     shades=[_rgba(c) for c in definitions["materials"][material]]
-    outline=(max(24, int(shades[0][0] * 0.52)),
-             max(22, int(shades[0][1] * 0.52)),
-             max(20, int(shades[0][2] * 0.52)), 255)
+    outline=shades[0]
     handle=[_rgba(c) for c in definitions["handle_palette"]]
     image=[(0,0,0,0)]*(SIZE*SIZE)
-    # Each tool is assembled in layer order: outline, handle, working part, highlight.
-    if template in {"sword","pickaxe","axe","shovel","hoe"}:
-        _line(image,4,13,11,6,outline,3); _line(image,4,13,11,6,handle[1],1)
-        _line(image,3,14,6,11,outline,2); _line(image,3,14,5,12,handle[2],1)
-        if template=="sword":
-            _line(image,10,7,14,1,outline,4); _line(image,10,7,14,1,shades[2],2); _line(image,12,4,14,1,shades[3],1)
-            _line(image,7,9,11,9,outline,3); _line(image,8,8,11,8,shades[1],1)
-        elif template=="pickaxe":
-            _line(image,7,5,14,2,outline,3); _line(image,7,5,14,2,shades[2],1); _line(image,8,4,13,2,shades[3],1)
-        elif template=="axe":
-            for y in range(2,7):
-                for x in range(9+(y>4),14-(y==6)): _put(image,x,y,outline)
-            for y in range(3,6):
-                for x in range(10,13): _put(image,x,y,shades[2 if x<12 else 1])
-            _line(image,10,3,12,3,shades[3],1)
-        elif template=="shovel":
-            for x,y in ((12,2),(13,2),(11,3),(12,3),(13,3),(11,4),(12,4)): _put(image,x,y,outline)
-            for x,y in ((12,2),(12,3),(11,3)): _put(image,x,y,shades[2])
-            _put(image,12,2,shades[3])
-        else:
-            _line(image,10,5,14,3,outline,3); _line(image,10,5,14,3,shades[2],1); _put(image,13,3,shades[3])
-    elif template=="stick":
+    if template in TOOL_TEMPLATES:
+        return generate_tool_sprite(template,material,definitions)
+    if template=="stick":
         _line(image,4,13,12,3,outline,3); _line(image,4,13,12,3,handle[1],1); _line(image,9,6,12,3,handle[2],1)
     elif template=="ingot":
         for y,left,right in ((5,6,10),(6,4,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9)):
@@ -1097,11 +1271,14 @@ def generate_item_sprite(template,material,definitions):
     elif template=="torch":
         _line(image,6,13,9,5,outline,4); _line(image,6,13,9,5,handle[1],2)
         for x,y,c in ((8,5,shades[1]),(9,5,shades[2]),(8,4,shades[2]),(9,4,shades[3]),(10,4,shades[2]),(9,3,shades[3])): _put(image,x,y,c)
-    elif template in {"string","bow"}:
-        for y in range(2,14):
-            x=4+abs(7-y)//2
-            _put(image,x,y,shades[2]); _put(image,11,y,shades[3])
-        if template=="bow": _line(image,5,2,11,8,handle[1],2); _line(image,11,8,5,13,handle[1],2)
+    elif template=="string":
+        for points in (((5,4),(10,3),(12,6),(10,10),(5,11),(3,8),(5,5),(9,5),(10,7),(8,9),(6,8)),):
+            for a,b in zip(points,points[1:]): _line(image,*a,*b,shades[2])
+        _line(image,10,10,12,13,shades[3])
+    elif template=="bow":
+        points=((5,2),(8,3),(10,5),(11,8),(10,11),(8,13),(5,14))
+        for a,b in zip(points,points[1:]): _line(image,*a,*b,handle[2],2)
+        _line(image,5,2,5,14,shades[3]); _line(image,11,7,11,9,handle[0],2)
     elif template in {"feather","bone","arrow"}:
         _line(image,3,13,12,3,outline,3); _line(image,3,13,12,3,shades[2],1)
         if template=="feather":
@@ -1115,11 +1292,26 @@ def generate_item_sprite(template,material,definitions):
         for x,y in ((6,11),(9,10),(6,8),(9,7),(7,5)):
             _put(image,x,y,shades[2]); _put(image,x+(1 if x<8 else -1),y-1,shades[3])
         if template=="wheat": _line(image,8,8,11,5,shades[2],1)
-    elif template in {"food","leather"}:
-        rows=((4,6,9),(5,4,11),(6,3,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9),(11,6,8))
+    elif template in {"food","beef","porkchop","drumstick","mutton","bread","rotten_flesh","leather"}:
+        rows={
+            "bread":((5,5,10),(6,3,12),(7,2,13),(8,2,13),(9,3,12),(10,4,11)),
+            "porkchop":((3,7,10),(4,5,12),(5,4,13),(6,4,13),(7,5,12),(8,6,11),(9,5,9),(10,4,7)),
+            "drumstick":((3,9,12),(4,7,13),(5,7,13),(6,7,12),(7,6,11),(8,5,8),(9,4,6),(10,3,5),(11,3,4)),
+            "mutton":((3,5,7),(4,4,9),(5,3,10),(6,3,11),(7,4,12),(8,5,12),(9,6,11),(10,8,10)),
+            "rotten_flesh":((4,4,8),(5,3,10),(6,4,11),(7,3,12),(8,5,12),(9,6,11),(10,5,9),(11,6,8)),
+            "leather":((3,4,6),(3,10,12),(4,4,12),(5,5,11),(6,4,12),(7,3,13),(8,4,12),(9,5,11),(10,4,12),(11,4,6),(11,10,12)),
+        }.get(template, ((4,6,9),(5,4,11),(6,3,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9),(11,6,8)))
         for y,left,right in rows:
-            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[1+(x+y)%2])
-        _line(image,5,5,9,4,shades[3],1)
+            for x in range(left,right+1): _put(image,x,y,outline if x in (left,right) else shades[2 if y<8 else 1])
+        if template=="bread":
+            for x in (5,8,11):
+                for y in (6,7):
+                    if image[y*16+x][3]: _put(image,x,y,shades[3])
+        elif template=="drumstick":
+            _line(image,3,11,5,9,(235,225,192,255),2)
+        else:
+            for x,y in ((6,5),(7,5),(8,5)):
+                if image[y*16+x][3]: _put(image,x,y,shades[3])
     elif template=="spawn_egg":
         rows=((2,7,8),(3,5,10),(4,4,11),(5,3,12),(6,3,12),(7,3,12),
               (8,4,11),(9,4,11),(10,5,10),(11,6,9),(12,7,8))
@@ -1152,27 +1344,11 @@ def generate_item_sprite(template,material,definitions):
         for x,y in ((5,6),(7,5),(9,6),(6,8),(8,8),(10,9),(5,10),(8,11)):
             _put(image,x,y,shades[1+(x+y)%3])
             if (x+y)%2: _put(image,x+1,y,shades[2])
-    # Material-specific microstructure is deliberately applied after the
-    # silhouette pass.  It gives identical tool shapes different construction
-    # language without sacrificing hotbar readability.
-    if template in {"sword", "pickaxe", "axe", "shovel", "hoe"}:
-        if material == "wood":
-            _line(image, 5, 12, 8, 9, handle[2], 1)
-            _put(image, 4, 13, handle[3])
-        elif material == "stone":
-            for point in ((9, 6), (11, 4), (13, 2)):
-                _put(image, point[0], point[1], shades[0])
-        elif material == "iron":
-            _line(image, 10, 7, 13, 3, shades[3], 1)
-        elif material == "gold":
-            _put(image, 11, 5, shades[3]); _put(image, 12, 4, shades[3])
-        elif material == "diamond":
-            for point in ((11, 5), (12, 4), (13, 3)):
-                _put(image, point[0], point[1], shades[3])
     return image
 
-def generate_block_item_icon(top_pixels,side_pixels):
+def generate_block_item_icon(top_pixels,side_pixels,front_pixels=None):
     """Compose a small nearest-neighbor isometric cube from top and side tiles."""
+    front_pixels = front_pixels if front_pixels is not None else side_pixels
     image=[(0,0,0,0)]*(SIZE*SIZE)
     for y in range(4):
         for x in range(8):
@@ -1182,7 +1358,7 @@ def generate_block_item_icon(top_pixels,side_pixels):
     for y in range(8):
         for x in range(6):
             color=side_pixels[min(15,y*2)*SIZE+min(15,x*3)]
-            _put(image,2+x,6+y+x//3,color)
+            _put(image,2+x,6+y+x//3,front_pixels[min(15,y*2)*SIZE+min(15,x*3)])
             # Apply the isometric face shade in linear light.  Multiplying
             # encoded RGB made warm materials disproportionately muddy.
             shade=tuple(_linear_to_srgb(_srgb_to_linear(channel) * 0.76)
@@ -1216,7 +1392,8 @@ def build_items_atlas(output,seed,definitions_path,block_definitions_path,overri
             elif category=="block_item_icon":
                 block=blocks[spec["block"]]; top=block.get("top",block.get("all")); side=block.get("side",block.get("all",top))
                 _,_,top_pixels=read_generated_png(output/f"{top}.png"); _,_,side_pixels=read_generated_png(output/f"{side}.png")
-                pixels=generate_block_item_icon(top_pixels,side_pixels)
+                _,_,front_pixels=read_generated_png(output/f"{block.get('front',side)}.png")
+                pixels=top_pixels if top in PLANTS else generate_block_item_icon(top_pixels,side_pixels,front_pixels)
             else: raise ValueError(f"item '{name}' has invalid generator '{category}'")
             errors=validate_item_sprite(pixels,name)
             if errors: raise ValueError("\n".join(errors))
@@ -1319,11 +1496,15 @@ def validate_texture(path):
     if (width,height)!=(SIZE,SIZE): fail("dimensions",f"{width}x{height}","16x16"); return errors
     colors=set(pixels); palette_limit=len(PALETTES.get(name,[])) or 16
     if len(colors)>palette_limit: fail("palette size",len(colors),f"<= {palette_limit}")
-    if name in PALETTES and not 5<=len(colors)<=8: fail("ordinary palette usage",len(colors),"5..8")
+    if name in PALETTES and not colors.issubset(set(PALETTES[name])):
+        fail("palette membership", "unknown color", "declared colors only")
     if any(c[3] not in (0,255) for c in pixels): fail("alpha values","non-binary","0 or 255")
     if any(c[3] and c[:3]==(0,0,0) for c in pixels): fail("opaque black outline",1,0)
-    if name in HIGH_CONTRAST_NAMES and palette_contrast(PALETTES[name])<palette_contrast(PALETTES["stone"])*1.15:
-        fail("rare-material contrast",round(palette_contrast(PALETTES[name]),2),f">= {palette_contrast(PALETTES['stone'])*1.15:.2f}")
+    if name.endswith("_ore"):
+        background=_srgb_to_oklab(PALETTES[name][1][:3])
+        distances=[math.sqrt(sum((a-b)**2 for a,b in zip(background,_srgb_to_oklab(c[:3]))))
+                   for c in PALETTES[name][3:]]
+        if max(distances)<.10: fail("ore/background perceptual contrast",max(distances),">= .10 OKLab")
     metrics=structure_metrics(pixels)
     if name in {"grass_side", "aether_grass_side"}:
         # A side-face turf cap is intentionally directional: its soil bottom
@@ -1338,13 +1519,8 @@ def validate_texture(path):
             fail("horizontal toroidal seam discontinuity",f"{horizontal_ratio:.2f}","<= 2.60x interior")
     elif metrics["seam_ratio"]>2.60:
         fail("toroidal seam discontinuity",f"{metrics['seam_ratio']:.2f}","<= 2.60x interior")
-    if name in NATURAL:
-        if metrics["longest_run"]>8: fail("near-color straight run",metrics["longest_run"],"<= 8 pixels")
-        if metrics["largest_component"]>.34: fail("largest flat connected area",f"{metrics['largest_component']:.3f}","<= 0.340")
-        if metrics["largest_rectangularity"]>.96: fail("flat-region rectangularity",f"{metrics['largest_rectangularity']:.3f}","<= 0.960")
-        if metrics["periodicity"]>.76: fail("2/4/8-pixel autocorrelation",f"{metrics['periodicity']:.3f}","<= 0.760")
-        if metrics["center_cross"]>.31: fail("center-axis luminance bias",f"{metrics['center_cross']:.3f}","<= 0.310")
-        if not 125<=metrics["transitions"]<=410: fail("meso-frequency transition count",metrics["transitions"],"125..410")
+    # Large calm planes are intentional in v3. Seam and palette checks above
+    # still reject broken boundaries; frequency metrics are reported for review.
     if name in {"grass_side", "aether_grass_side"}:
         grass=set(PALETTES[name][4:]); rows=[y for y in range(SIZE) for x in range(SIZE) if pixels[y*SIZE+x] in grass]
         top_coverage=sum(pixels[y*SIZE+x] in grass for y in range(5) for x in range(SIZE))
@@ -1507,22 +1683,29 @@ def draw_text(canvas,width,x,y,label):
         x+=4
 
 def build_contact_sheet(output,seed,count,local_seeds=None):
-    # Each cell contains the source tile at 2x and an 8x8 repeat at native scale.
-    label_w=72; cell_w=168; cell_h=136; width=label_w+cell_w*count; height=cell_h*len(NAMES)
-    canvas=[(25,27,29,255)]*(width*height)
-    candidate_seeds=[]
-    for col in range(count): candidate_seeds.append(seed if col==0 else mix64(seed+col*0x9e37)&0x7fffffff)
-    for row,name in enumerate(NAMES):
-        y0=row*cell_h; draw_text(canvas,width,3,y0+4,name[:17])
-        for col,candidate in enumerate(candidate_seeds):
-            chosen=(local_seeds or {}).get(name,candidate) if col==0 else candidate
-            pixels=generate_texture(name,chosen); x0=label_w+col*cell_w
-            draw_text(canvas,width,x0,y0+2,str(chosen)); blit(canvas,width,x0,y0+10,pixels,SIZE,SIZE,2)
-            for ty in range(8):
-                for tx in range(8): blit(canvas,width,x0+38+tx*SIZE,y0+8+ty*SIZE,pixels,SIZE,SIZE)
-    write_png(output/"contact_sheet.png",width,height,canvas)
-    (output/"contact_sheet.json").write_text(json.dumps({"base_seed":seed,"candidate_seeds":candidate_seeds,
-        "local_seeds":local_seeds or {},"note":"development preview; excluded from atlas"},indent=2,sort_keys=True)+"\n")
+    # One readable grid per candidate, rather than a many-metre vertical strip.
+    columns=8; cell_w=144; cell_h=100
+    width=columns*cell_w; height=math.ceil(len(NAMES)/columns)*cell_h
+    candidate_seeds=[seed if col==0 else mix64(seed+col*0x9e37)&0x7fffffff
+                     for col in range(count)]
+    pages=[]
+    for candidate_index,candidate in enumerate(candidate_seeds):
+        canvas=[(25,27,29,255)]*(width*height)
+        for index,name in enumerate(NAMES):
+            x=(index%columns)*cell_w; y=(index//columns)*cell_h
+            chosen=(local_seeds or {}).get(name,candidate) if candidate_index==0 else candidate
+            pixels=generate_texture(name,chosen)
+            draw_text(canvas,width,x+3,y+4,name[:34])
+            blit(canvas,width,x+4,y+20,pixels,SIZE,SIZE,3)
+            blit(canvas,width,x+4,y+76,pixels,SIZE,SIZE)
+            for ty in range(4):
+                for tx in range(4):
+                    blit(canvas,width,x+72+tx*SIZE,y+20+ty*SIZE,pixels,SIZE,SIZE)
+        page="contact_sheet.png" if candidate_index==0 else f"contact_sheet_{candidate_index}.png"
+        write_png(output/page,width,height,canvas); pages.append(page)
+    (output/"contact_sheet.json").write_text(json.dumps({"base_seed":seed,
+        "candidate_seeds":candidate_seeds,"pages":pages,"local_seeds":local_seeds or {},
+        "note":"development preview; excluded from atlas"},indent=2,sort_keys=True)+"\n")
 
 
 def _shade_preview(pixels, multiplier, tint=(1.0, 1.0, 1.0)):
@@ -1646,7 +1829,17 @@ def _visual_color_stats(pixels):
     chroma=[math.sqrt(l[1]*l[1]+l[2]*l[2]) for l in labs]
     def percentile(values, fraction):
         return values[min(len(values)-1,max(0,int(round((len(values)-1)*fraction))))]
+    jumps=[]
+    if len(pixels)==256:
+        for y in range(16):
+            for x in range(16):
+                p=pixels[y*16+x]
+                for nx,ny in ((wrap(x+1),y),(x,wrap(y+1))):
+                    q=pixels[ny*16+nx]
+                    if p[3] and q[3]: jumps.append(color_distance(p,q))
     return {
+        "mean_neighbor_delta":round(sum(jumps)/len(jumps),5) if jumps else 0.0,
+        "dark_fraction":round(sum(l<.45 for l in lightness)/len(lightness),5),
         "opaque":len(opaque),
         "alpha_ratio":round(len(opaque)/max(1,len(pixels)),4),
         "oklab_lightness_mean":round(sum(lightness)/len(lightness),5),

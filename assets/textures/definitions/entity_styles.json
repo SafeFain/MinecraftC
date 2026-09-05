@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generator_version": 2,
+  "generator_version": 3,
   "style": "bright-comfortable",
   "parts": ["head", "body", "primary_limb", "secondary_limb", "detail", "fallback"],
   "features": ["eyes", "muzzle_or_beak", "ears_or_crest", "markings", "limb_ends"],

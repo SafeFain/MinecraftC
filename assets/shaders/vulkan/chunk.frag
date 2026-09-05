@@ -156,7 +156,10 @@ void main() {
     texel.a*=lighting.w;
     if(leafSurface&&environment.shadowOptions.w<0.5&&
        texel.a<frame.atlasAndLighting.z){
-        texel.rgb=textureLod(blockAtlas,uv,4.0).rgb;
+        // Closed gaps represent the shaded interior behind the leaf clusters.
+        // The atlas is sRGB: this factor operates on linear light, preserving
+        // each species' hue while separating the fill from the visible leaves.
+        texel.rgb=textureLod(blockAtlas,uv,4.0).rgb*0.55;
         texel.a=1.0;
     }
     if(texel.a<frame.atlasAndLighting.z)discard;
