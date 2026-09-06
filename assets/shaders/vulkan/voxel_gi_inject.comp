@@ -1,0 +1,31 @@
+#version 450
+
+layout(local_size_x=4,local_size_y=4,local_size_z=4) in;
+layout(set=0,binding=0) uniform sampler3D albedoOpacity;
+layout(set=0,binding=1) uniform sampler3D lightValidity;
+layout(set=0,binding=2,rgba16f) uniform writeonly image3D irradiance;
+
+layout(push_constant) uniform InjectConstants {
+    vec4 skyColorDaylight;
+    vec4 blockColorWeather;
+} inject;
+
+void main(){
+    ivec3 voxel=ivec3(gl_GlobalInvocationID);
+    ivec3 size=imageSize(irradiance);
+    if(any(greaterThanEqual(voxel,size)))return;
+    vec4 material=texelFetch(albedoOpacity,voxel,0);
+    vec4 light=texelFetch(lightValidity,voxel,0);
+    if(light.a<0.5){
+        imageStore(irradiance,voxel,vec4(0.0,0.0,0.0,-1.0));
+        return;
+    }
+    vec3 albedo=pow(max(material.rgb,vec3(0.0)),vec3(2.2));
+    float sky=light.r*inject.skyColorDaylight.w*
+        (1.0-inject.blockColorWeather.w*0.48);
+    float local=max(light.g,light.b);
+    vec3 indirect=albedo*(inject.skyColorDaylight.rgb*sky*0.72+
+        inject.blockColorWeather.rgb*local*1.35);
+    indirect+=albedo*light.b*0.65;
+    imageStore(irradiance,voxel,vec4(indirect,material.a));
+}

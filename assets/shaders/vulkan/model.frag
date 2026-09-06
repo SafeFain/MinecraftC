@@ -20,6 +20,7 @@ layout(set=1,binding=0) uniform ModelUniforms {
 } data;
 layout(location=0) out vec4 outColor;
 layout(location=1) out vec4 outSurface;
+layout(location=2) out vec4 outGiSurface;
 
 vec2 encodeNormal(vec3 n){
     n/=abs(n.x)+abs(n.y)+abs(n.z);
@@ -63,4 +64,5 @@ void main() {
     outSurface=vec4(encodeNormal(surfaceNormal),
         length(worldPosition-data.cameraFogStart.xyz),
         data.params.w>0.5?0.0:roughness);
+    outGiSurface=vec4(base.rgb,0.0);
 }

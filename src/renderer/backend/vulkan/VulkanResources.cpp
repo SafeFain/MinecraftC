@@ -37,6 +37,12 @@ VulkanDescriptorResources::~VulkanDescriptorResources() {
     if (screenEffectDescriptorSetLayout)
         vkDestroyDescriptorSetLayout(
             m_device, screenEffectDescriptorSetLayout, nullptr);
+    if (screenEffectGiDescriptorSetLayout)
+        vkDestroyDescriptorSetLayout(
+            m_device, screenEffectGiDescriptorSetLayout, nullptr);
+    if (voxelGiComputeDescriptorSetLayout)
+        vkDestroyDescriptorSetLayout(
+            m_device, voxelGiComputeDescriptorSetLayout, nullptr);
     if (postDescriptorSetLayout)
         vkDestroyDescriptorSetLayout(m_device, postDescriptorSetLayout, nullptr);
     if (modelUniformDescriptorSetLayout)
@@ -382,9 +388,37 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
             std::max(1u, result.swapchainExtent.height / divisor)};
         createImageSet(result.surfaceFormat, result.screenEffectExtent,
             VK_SAMPLE_COUNT_1_BIT,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             result.screenEffectImages, result.screenEffectAllocations,
             result.screenEffectImageViews, "create screen effects");
+        result.voxelGiEnabled = params.voxelGiEnabled &&
+            params.voxelGiImageViews && params.voxelGiUniformBuffer;
+        if (result.voxelGiEnabled) {
+            createImageSet(result.surfaceFormat, result.swapchainExtent,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                result.voxelGiAlbedoImages,
+                result.voxelGiAlbedoAllocations,
+                result.voxelGiAlbedoImageViews, "create voxel GI albedo");
+            if (result.sampleCount != VK_SAMPLE_COUNT_1_BIT) {
+                createImageSet(result.surfaceFormat, result.swapchainExtent,
+                    result.sampleCount,
+                    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                    result.voxelGiAlbedoMsaaImages,
+                    result.voxelGiAlbedoMsaaAllocations,
+                    result.voxelGiAlbedoMsaaImageViews,
+                    "create MSAA voxel GI albedo");
+            }
+            createImageSet(result.surfaceFormat, result.screenEffectExtent,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                result.voxelGiHistoryImages,
+                result.voxelGiHistoryAllocations,
+                result.voxelGiHistoryImageViews, "create voxel GI history");
+            result.voxelGiHistoryInitialized.assign(result.images.size(), false);
+        }
     }
     result.bloomLevelCount = std::clamp(
         params.bloomLevels, 0,
@@ -510,7 +544,13 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     pipelineInputs.surfaceDataEnabled = result.surfaceDataEnabled;
     pipelineInputs.sceneImageViews = &result.sceneImageViews;
     pipelineInputs.surfaceImageViews = &result.surfaceImageViews;
+    pipelineInputs.voxelGiAlbedoImageViews = &result.voxelGiAlbedoImageViews;
     pipelineInputs.screenEffectImageViews = &result.screenEffectImageViews;
+    pipelineInputs.voxelGiHistoryImageViews = &result.voxelGiHistoryImageViews;
+    pipelineInputs.voxelGiImageViews = params.voxelGiImageViews;
+    pipelineInputs.voxelGiUniformBuffer = params.voxelGiUniformBuffer;
+    pipelineInputs.voxelGiEnabled = result.voxelGiEnabled;
+    pipelineInputs.screenEffectGiLayout = params.screenEffectGiLayout;
     pipelineInputs.bloomImageViews = &result.bloomImageViews;
     pipelineInputs.bloomLevels = result.bloomLevelCount;
     pipelineInputs.screenEffectDivisor = params.screenEffectDivisor;
@@ -563,7 +603,7 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     for (size_t i = 0; i < result.imageViews.size(); ++i) {
         const bool multisampled =
             result.sampleCount != VK_SAMPLE_COUNT_1_BIT;
-        const std::array<VkImageView, 5> attachments{
+        std::array<VkImageView, 7> attachments{
             multisampled ? result.colorImageViews[i] : result.sceneImageViews[i],
             result.depthImageViews[i],
             result.surfaceDataEnabled && !multisampled
@@ -573,12 +613,22 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
                                 : result.surfaceImageViews[i])
                 : VK_NULL_HANDLE,
             result.surfaceDataEnabled ? result.surfaceImageViews[i]
-                                      : VK_NULL_HANDLE};
+                                      : VK_NULL_HANDLE,
+            result.voxelGiEnabled
+                ? (multisampled ? result.voxelGiAlbedoMsaaImageViews[i]
+                                : result.voxelGiAlbedoImageViews[i])
+                : VK_NULL_HANDLE,
+            result.voxelGiEnabled ? result.voxelGiAlbedoImageViews[i]
+                                  : VK_NULL_HANDLE};
+        if (result.voxelGiEnabled && !multisampled)
+            attachments[3] = result.voxelGiAlbedoImageViews[i];
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = result.renderPass;
-        framebufferInfo.attachmentCount = result.surfaceDataEnabled
-            ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
+        framebufferInfo.attachmentCount = result.voxelGiEnabled
+            ? (multisampled ? 7u : 4u)
+            : result.surfaceDataEnabled
+                ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
         framebufferInfo.pAttachments = attachments.data();
         framebufferInfo.width = result.swapchainExtent.width;
         framebufferInfo.height = result.swapchainExtent.height;
@@ -807,7 +857,15 @@ void VulkanSwapchainBundle::destroy() {
                     surfaceMsaaImageViews);
     destroyImageSet(screenEffectImages, screenEffectAllocations,
                     screenEffectImageViews);
+    destroyImageSet(voxelGiAlbedoImages, voxelGiAlbedoAllocations,
+                    voxelGiAlbedoImageViews);
+    destroyImageSet(voxelGiAlbedoMsaaImages, voxelGiAlbedoMsaaAllocations,
+                    voxelGiAlbedoMsaaImageViews);
+    destroyImageSet(voxelGiHistoryImages, voxelGiHistoryAllocations,
+                    voxelGiHistoryImageViews);
+    voxelGiHistoryInitialized.clear();
     surfaceDataEnabled = false;
+    voxelGiEnabled = false;
     for (size_t level = 0; level < MAX_BLOOM_LEVELS; ++level) {
         for (VkImageView view : bloomImageViews[level])
             if (view) vkDestroyImageView(m_device, view, nullptr);
@@ -880,12 +938,25 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       surfaceMsaaImages(std::move(other.surfaceMsaaImages)),
       surfaceMsaaAllocations(std::move(other.surfaceMsaaAllocations)),
       surfaceMsaaImageViews(std::move(other.surfaceMsaaImageViews)),
+      voxelGiAlbedoImages(std::move(other.voxelGiAlbedoImages)),
+      voxelGiAlbedoAllocations(std::move(other.voxelGiAlbedoAllocations)),
+      voxelGiAlbedoImageViews(std::move(other.voxelGiAlbedoImageViews)),
+      voxelGiAlbedoMsaaImages(std::move(other.voxelGiAlbedoMsaaImages)),
+      voxelGiAlbedoMsaaAllocations(
+          std::move(other.voxelGiAlbedoMsaaAllocations)),
+      voxelGiAlbedoMsaaImageViews(
+          std::move(other.voxelGiAlbedoMsaaImageViews)),
       screenEffectExtent(other.screenEffectExtent),
       screenEffectImages(std::move(other.screenEffectImages)),
       screenEffectAllocations(std::move(other.screenEffectAllocations)),
       screenEffectImageViews(std::move(other.screenEffectImageViews)),
+      voxelGiHistoryImages(std::move(other.voxelGiHistoryImages)),
+      voxelGiHistoryAllocations(std::move(other.voxelGiHistoryAllocations)),
+      voxelGiHistoryImageViews(std::move(other.voxelGiHistoryImageViews)),
+      voxelGiHistoryInitialized(std::move(other.voxelGiHistoryInitialized)),
       screenEffectFramebuffers(std::move(other.screenEffectFramebuffers)),
       surfaceDataEnabled(other.surfaceDataEnabled),
+      voxelGiEnabled(other.voxelGiEnabled),
       bloomLevelCount(other.bloomLevelCount),
       bloomExtents(other.bloomExtents),
       bloomImages(std::move(other.bloomImages)),
@@ -975,8 +1046,21 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     screenEffectImages = std::move(other.screenEffectImages);
     screenEffectAllocations = std::move(other.screenEffectAllocations);
     screenEffectImageViews = std::move(other.screenEffectImageViews);
+    voxelGiAlbedoImages = std::move(other.voxelGiAlbedoImages);
+    voxelGiAlbedoAllocations = std::move(other.voxelGiAlbedoAllocations);
+    voxelGiAlbedoImageViews = std::move(other.voxelGiAlbedoImageViews);
+    voxelGiAlbedoMsaaImages = std::move(other.voxelGiAlbedoMsaaImages);
+    voxelGiAlbedoMsaaAllocations =
+        std::move(other.voxelGiAlbedoMsaaAllocations);
+    voxelGiAlbedoMsaaImageViews =
+        std::move(other.voxelGiAlbedoMsaaImageViews);
+    voxelGiHistoryImages = std::move(other.voxelGiHistoryImages);
+    voxelGiHistoryAllocations = std::move(other.voxelGiHistoryAllocations);
+    voxelGiHistoryImageViews = std::move(other.voxelGiHistoryImageViews);
+    voxelGiHistoryInitialized = std::move(other.voxelGiHistoryInitialized);
     screenEffectFramebuffers = std::move(other.screenEffectFramebuffers);
     surfaceDataEnabled = other.surfaceDataEnabled;
+    voxelGiEnabled = other.voxelGiEnabled;
     bloomLevelCount = other.bloomLevelCount;
     bloomExtents = other.bloomExtents;
     bloomImages = std::move(other.bloomImages);

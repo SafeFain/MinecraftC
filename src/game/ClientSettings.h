@@ -14,7 +14,7 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class AttackIndicator : uint8_t { Crosshair, Hotbar, Off };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 23;
+    static constexpr int FORMAT_VERSION = 24;
     static constexpr int MIN_FRAME_RATE = 30;
     static constexpr int MAX_FRAME_RATE = 200;
     static constexpr int MIN_LOD_DISTANCE = 32;
@@ -35,6 +35,7 @@ struct ClientSettings {
     bool smoothLighting = true;
     ShadowQuality shadowQuality = ShadowQuality::Medium;
     VisualQuality visualQuality = VisualQuality::Medium;
+    GraphicsPreset graphicsPreset = GraphicsPreset::Medium;
     bool enhancedVisuals = false;
     EnhancedVisualSettings enhancedVisual{};
     bool transparentLeaves = false;
@@ -59,6 +60,9 @@ struct ClientSettings {
     bool save(const std::filesystem::path& path) const;
     void resetBindings();
     void resetGamepadBindings();
+    void applyGraphicsPreset(GraphicsPreset preset);
+    void markGraphicsCustom();
+    GraphicsPreset nextGraphicsPreset() const;
     void validate();
 };
 

@@ -6,6 +6,7 @@
 #include "renderer/RenderEnvironment.h"
 #include "renderer/Shadow.h"
 #include "renderer/VisualQuality.h"
+#include "renderer/VoxelGi.h"
 #include "world/BlockLightLogic.h"
 
 #include <cstdint>
@@ -38,6 +39,10 @@ public:
         setEnhancedVisuals(settings.enabled);
     }
     virtual void setLeafTransparency(bool) = 0;
+    virtual void beginVoxelGiFrame(const glm::dvec3&, uint64_t) {}
+    virtual void submitVoxelGiChunk(const Chunk&) {}
+    virtual void endVoxelGiFrame() {}
+    virtual VoxelGiStatus voxelGiStatus() const { return {}; }
     virtual void finishScene(const PostProcessState&) = 0;
     virtual void setEnvironment(const RenderEnvironment&, const glm::vec3&) = 0;
     virtual void renderSky(const RenderEnvironment&, const glm::mat4&,

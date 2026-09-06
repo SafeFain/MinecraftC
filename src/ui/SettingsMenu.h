@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/Menu.h"
+#include "renderer/VoxelGi.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -149,7 +150,8 @@ inline bool lodDistanceNeedsWarning(int value) {
 class SettingsMenu : public Menu {
 public:
     SettingsMenu(ClientSettings& settings, std::function<void()> onChanged,
-                 std::function<void()> onBack, const Localization& localization);
+                 std::function<void()> onBack, const Localization& localization,
+                 std::function<VoxelGiStatus()> giStatus = {});
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;
@@ -174,6 +176,7 @@ private:
     std::function<void()> m_onChanged;
     ClientSettings& m_settings;
     const Localization& m_localization;
+    std::function<VoxelGiStatus()> m_giStatus;
     SettingsPage m_page = SettingsPage::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;

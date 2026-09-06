@@ -285,7 +285,7 @@ void VulkanPipelineFactory::createSwapchainSet(
     SwapchainPipelineOutputs& outputs) const {
     SwapchainSetGuard guard{outputs, m_device, inputs.descriptorPool};
     // ── Scene render pass (MSAA scene color + depth + resolve) ──────────
-    std::array<VkAttachmentDescription, 5> attachments{};
+    std::array<VkAttachmentDescription, 7> attachments{};
     const bool multisampled = inputs.sampleCount != VK_SAMPLE_COUNT_1_BIT;
     attachments[0].format = inputs.sceneFormat;
     attachments[0].samples = inputs.sampleCount;
@@ -328,16 +328,32 @@ void VulkanPipelineFactory::createSwapchainSet(
             attachments[4].format = VK_FORMAT_R16G16B16A16_SFLOAT;
         }
     }
+    if (inputs.voxelGiEnabled) {
+        const size_t albedoIndex = multisampled ? 5u : 3u;
+        attachments[albedoIndex] = attachments[0];
+        attachments[albedoIndex].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachments[albedoIndex].finalLayout = multisampled
+            ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        if (multisampled) {
+            attachments[6] = attachments[2];
+            attachments[6].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        }
+    }
     const uint32_t surfaceIndex = multisampled ? 3u : 2u;
-    const std::array<VkAttachmentReference, 2> colors{{
+    const uint32_t albedoIndex = multisampled ? 5u : 3u;
+    const std::array<VkAttachmentReference, 3> colors{{
         {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-        {surfaceIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
-    const std::array<VkAttachmentReference, 2> resolves{{
+        {surfaceIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {albedoIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
+    const std::array<VkAttachmentReference, 3> resolves{{
         {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-        {4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
+        {4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {6, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+    subpass.colorAttachmentCount = inputs.voxelGiEnabled ? 3u :
+        inputs.surfaceDataEnabled ? 2u : 1u;
     subpass.pColorAttachments = colors.data();
     subpass.pDepthStencilAttachment = &depth;
     subpass.pResolveAttachments = multisampled ? resolves.data() : nullptr;
@@ -357,8 +373,10 @@ void VulkanPipelineFactory::createSwapchainSet(
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     VkRenderPassCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    info.attachmentCount = inputs.surfaceDataEnabled
-        ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
+    info.attachmentCount = inputs.voxelGiEnabled
+        ? (multisampled ? 7u : 4u)
+        : inputs.surfaceDataEnabled
+            ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
     info.pAttachments = attachments.data();
     info.subpassCount = 1;
     info.pSubpasses = &subpass;
@@ -551,11 +569,13 @@ void VulkanPipelineFactory::createSwapchainSet(
             VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
             VK_COLOR_COMPONENT_A_BIT;
         VkPipelineColorBlendAttachmentState surfaceBlend = blendAttachment;
-        std::array<VkPipelineColorBlendAttachmentState, 2> sceneBlends{
-            blendAttachment, surfaceBlend};
+        const VkPipelineColorBlendAttachmentState giBlend = blendAttachment;
+        std::array<VkPipelineColorBlendAttachmentState, 3> sceneBlends{
+            blendAttachment, surfaceBlend, giBlend};
         VkPipelineColorBlendStateCreateInfo blend{};
         blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+        blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+            inputs.surfaceDataEnabled ? 2u : 1u;
         blend.pAttachments = sceneBlends.data();
         constexpr std::array<VkDynamicState, 2> dynamicStates{
             VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -614,6 +634,7 @@ void VulkanPipelineFactory::createSwapchainSet(
         surfaceBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         surfaceBlend.alphaBlendOp = VK_BLEND_OP_ADD;
         sceneBlends[1] = surfaceBlend;
+        sceneBlends[2] = surfaceBlend;
         require(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &info,
                                           nullptr, &outputs.translucentPipeline),
                 "vkCreateGraphicsPipelines");
@@ -803,7 +824,9 @@ void VulkanPipelineFactory::createSwapchainSet(
         vertex = loadShader(m_shaderRoot / "post.vert.spv");
         fragment = VK_NULL_HANDLE;
         try {
-            fragment = loadShader(m_shaderRoot / "screen_effect.frag.spv");
+            fragment = loadShader(m_shaderRoot /
+                (inputs.voxelGiEnabled ? "screen_effect_gi.frag.spv"
+                                       : "screen_effect.frag.spv"));
             const std::array<VkPipelineShaderStageCreateInfo,2> stages{{
                 {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
                  VK_SHADER_STAGE_VERTEX_BIT, vertex, "main", nullptr},
@@ -849,7 +872,9 @@ void VulkanPipelineFactory::createSwapchainSet(
             VkPipelineLayoutCreateInfo layout{};
             layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layout.setLayoutCount = 1;
-            layout.pSetLayouts = &inputs.screenEffectLayout;
+            const VkDescriptorSetLayout screenLayout = inputs.voxelGiEnabled
+                ? inputs.screenEffectGiLayout : inputs.screenEffectLayout;
+            layout.pSetLayouts = &screenLayout;
             layout.pushConstantRangeCount = 1;
             layout.pPushConstantRanges = &push;
             require(vkCreatePipelineLayout(m_device, &layout, nullptr,
@@ -1016,7 +1041,8 @@ void VulkanPipelineFactory::createSwapchainSet(
     if (inputs.surfaceDataEnabled) {
         outputs.screenEffectDescriptorSets.resize(sceneImageViews.size());
         std::vector<VkDescriptorSetLayout> screenLayouts(
-            sceneImageViews.size(), inputs.screenEffectLayout);
+            sceneImageViews.size(), inputs.voxelGiEnabled
+                ? inputs.screenEffectGiLayout : inputs.screenEffectLayout);
         allocate.descriptorSetCount = screenLayouts.size();
         allocate.pSetLayouts = screenLayouts.data();
         require(vkAllocateDescriptorSets(m_device, &allocate,
@@ -1034,6 +1060,42 @@ void VulkanPipelineFactory::createSwapchainSet(
             write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             write.pImageInfo = &imageInfo;
             vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
+            if (inputs.voxelGiEnabled && inputs.voxelGiHistoryImageViews &&
+                inputs.voxelGiImageViews && inputs.voxelGiAlbedoImageViews &&
+                inputs.voxelGiUniformBuffer) {
+                std::array<VkDescriptorImageInfo, 6> giImages{};
+                giImages[0] = {outputs.postSampler,
+                    (*inputs.voxelGiHistoryImageViews)[i],
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                for (size_t level = 0; level < 4; ++level)
+                    giImages[level + 1] = {outputs.postSampler,
+                        (*inputs.voxelGiImageViews)[level],
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                giImages[5] = {outputs.postSampler,
+                    (*inputs.voxelGiAlbedoImageViews)[i],
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                std::array<VkWriteDescriptorSet, 7> giWrites{};
+                for (uint32_t binding = 1; binding <= 6; ++binding) {
+                    VkWriteDescriptorSet& giWrite = giWrites[binding - 1];
+                    giWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    giWrite.dstSet = outputs.screenEffectDescriptorSets[i];
+                    giWrite.dstBinding = binding;
+                    giWrite.descriptorCount = 1;
+                    giWrite.descriptorType =
+                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    giWrite.pImageInfo = &giImages[binding - 1];
+                }
+                const VkDescriptorBufferInfo uniformInfo{
+                    inputs.voxelGiUniformBuffer, 0, sizeof(VoxelGiScreenUniforms)};
+                giWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                giWrites[6].dstSet = outputs.screenEffectDescriptorSets[i];
+                giWrites[6].dstBinding = 10;
+                giWrites[6].descriptorCount = 1;
+                giWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                giWrites[6].pBufferInfo = &uniformInfo;
+                vkUpdateDescriptorSets(m_device, giWrites.size(),
+                                       giWrites.data(), 0, nullptr);
+            }
         }
     }
     for (int level = 0; level < inputs.bloomLevels; ++level) {
@@ -1133,9 +1195,10 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             VkPipelineColorBlendAttachmentState disabledSurface{};
-            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
-                attachment, disabledSurface};
-            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            const std::array<VkPipelineColorBlendAttachmentState,3> attachments{
+                attachment, disabledSurface, disabledSurface};
+            blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+                inputs.surfaceDataEnabled ? 2u : 1u;
             blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> dynamicStates{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -1213,9 +1276,10 @@ void VulkanPipelineFactory::createSecondaryPipelines(
         VkPipelineColorBlendStateCreateInfo blend{};
         blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         VkPipelineColorBlendAttachmentState disabledSurface{};
-        const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
-            attachment, disabledSurface};
-        blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+        const std::array<VkPipelineColorBlendAttachmentState,3> attachments{
+            attachment, disabledSurface, disabledSurface};
+        blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+            inputs.surfaceDataEnabled ? 2u : 1u;
         blend.pAttachments = attachments.data();
         constexpr std::array<VkDynamicState, 2> dynamicStates{
             VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -1359,9 +1423,10 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             VkPipelineColorBlendAttachmentState disabledSurface{};
-            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
-                attachment, disabledSurface};
-            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            const std::array<VkPipelineColorBlendAttachmentState,3> attachments{
+                attachment, disabledSurface, disabledSurface};
+            blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+                inputs.surfaceDataEnabled ? 2u : 1u;
             blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> dynamicStates{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -1469,9 +1534,10 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             VkPipelineColorBlendAttachmentState disabledSurface = attachment;
-            std::array<VkPipelineColorBlendAttachmentState,2> attachments{
-                attachment, disabledSurface};
-            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            std::array<VkPipelineColorBlendAttachmentState,3> attachments{
+                attachment, disabledSurface, disabledSurface};
+            blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+                inputs.surfaceDataEnabled ? 2u : 1u;
             blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> states{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -1601,9 +1667,10 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             VkPipelineColorBlendAttachmentState disabledSurface{};
-            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
-                attachment, disabledSurface};
-            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            const std::array<VkPipelineColorBlendAttachmentState,3> attachments{
+                attachment, disabledSurface, disabledSurface};
+            blend.attachmentCount = inputs.voxelGiEnabled ? 3u :
+                inputs.surfaceDataEnabled ? 2u : 1u;
             blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> states{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};

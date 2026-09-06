@@ -134,8 +134,59 @@ int main(){
     require(!defaultLeafTransparency(VisualQuality::Low)&&
             !defaultLeafTransparency(VisualQuality::Medium)&&
             defaultLeafTransparency(VisualQuality::High)&&
+            defaultLeafTransparency(VisualQuality::VeryHigh)&&
             defaultLeafTransparency(VisualQuality::Ultra),
             "low and medium quality presets disable transparent leaves");
+    {
+        ClientSettings preset;
+        preset.applyGraphicsPreset(GraphicsPreset::Low);
+        require(preset.visualQuality==VisualQuality::Low&&
+                !preset.smoothLighting&&!preset.renderClouds&&
+                !preset.transparentLeaves&&preset.shadowQuality==ShadowQuality::Off&&
+                !preset.enhancedVisuals&&!preset.enhancedVisual.gi.enabled&&
+                preset.enhancedVisual.gi.distance==32&&
+                preset.enhancedVisual.gi.temporalStability==50,
+                "low graphics preset does not fully apply its controlled settings");
+        preset.applyGraphicsPreset(GraphicsPreset::Medium);
+        require(preset.visualQuality==VisualQuality::Medium&&
+                preset.smoothLighting&&preset.renderClouds&&
+                !preset.transparentLeaves&&preset.shadowQuality==ShadowQuality::Low&&
+                !preset.enhancedVisuals&&!preset.enhancedVisual.gi.enabled&&
+                preset.enhancedVisual.gi.distance==64,
+                "medium graphics preset does not fully apply its controlled settings");
+        preset.applyGraphicsPreset(GraphicsPreset::High);
+        require(preset.visualQuality==VisualQuality::High&&
+                preset.transparentLeaves&&preset.shadowQuality==ShadowQuality::Medium&&
+                preset.enhancedVisuals&&!preset.enhancedVisual.gi.enabled&&
+                preset.enhancedVisual.gi.distance==128,
+                "high graphics preset does not fully apply its controlled settings");
+        preset.applyGraphicsPreset(GraphicsPreset::VeryHigh);
+        require(preset.visualQuality==VisualQuality::VeryHigh&&
+                preset.shadowQuality==ShadowQuality::High&&
+                preset.enhancedVisuals&&preset.enhancedVisual.gi.enabled&&
+                preset.enhancedVisual.gi.distance==128&&
+                preset.enhancedVisual.gi.temporalStability==75,
+                "very-high graphics preset does not enable GI");
+        preset.markGraphicsCustom();
+        preset.renderDistance=16;
+        require(preset.graphicsPreset==GraphicsPreset::Custom&&
+                preset.visualQuality==VisualQuality::VeryHigh&&
+                preset.nextGraphicsPreset()==GraphicsPreset::Ultra,
+                "custom preset does not retain and advance from its source budget");
+        preset.applyGraphicsPreset(preset.nextGraphicsPreset());
+        require(preset.graphicsPreset==GraphicsPreset::Ultra&&
+                preset.visualQuality==VisualQuality::Ultra&&
+                preset.enhancedVisual.gi.enabled&&
+                preset.enhancedVisual.gi.distance==256&&
+                preset.enhancedVisual.gi.temporalStability==100,
+                "ultra graphics preset does not fully overwrite controlled settings");
+        const GraphicsPreset unchanged=preset.graphicsPreset;
+        preset.frameRateLimit=60;preset.renderDistance=6;preset.cloudRenderDistance=96;
+        preset.lodEnabled=false;preset.guiScale=3;
+        preset.attackIndicator=AttackIndicator::Off;
+        require(preset.graphicsPreset==unchanged,
+                "settings excluded from presets changed the graphics preset");
+    }
     const WindowSafeArea safe = projectWindowSafeArea(
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,
@@ -186,6 +237,7 @@ int main(){
     settings.cloudRenderDistance=1024;settings.smoothLighting=false;
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
+    settings.graphicsPreset=GraphicsPreset::Custom;
     settings.enhancedVisuals=true;
     settings.enhancedVisual.custom=true;
     settings.enhancedVisual.bloom=false;
@@ -195,6 +247,10 @@ int main(){
     settings.enhancedVisual.atmosphereStrength=75;
     settings.enhancedVisual.materialMotionStrength=50;
     settings.enhancedVisual.ambientParticleStrength=25;
+    settings.enhancedVisual.gi.enabled=true;
+    settings.enhancedVisual.gi.strength=75;
+    settings.enhancedVisual.gi.distance=256;
+    settings.enhancedVisual.gi.temporalStability=100;
     settings.transparentLeaves=true;
     settings.attackIndicator=AttackIndicator::Hotbar;
     settings.language=Language::SimplifiedChinese;
@@ -235,6 +291,8 @@ int main(){
             "shadow quality preference round trips");
     require(loaded.visualQuality==VisualQuality::Ultra,
             "visual quality preference round trips");
+    require(loaded.graphicsPreset==GraphicsPreset::Custom,
+            "named graphics preset round trips");
     require(loaded.enhancedVisuals,
             "enhanced-visual preference round trips");
     require(loaded.enhancedVisual.custom && !loaded.enhancedVisual.bloom &&
@@ -243,7 +301,11 @@ int main(){
                 loaded.enhancedVisual.reflectionStrength == 25 &&
                 loaded.enhancedVisual.atmosphereStrength == 75 &&
                 loaded.enhancedVisual.materialMotionStrength == 50 &&
-                loaded.enhancedVisual.ambientParticleStrength == 25,
+                loaded.enhancedVisual.ambientParticleStrength == 25 &&
+                loaded.enhancedVisual.gi.enabled &&
+                loaded.enhancedVisual.gi.strength == 75 &&
+                loaded.enhancedVisual.gi.distance == 256 &&
+                loaded.enhancedVisual.gi.temporalStability == 100,
             "custom enhanced-visual settings round trip");
     require(loaded.transparentLeaves,
             "transparent-leaf preference round trips");
@@ -285,9 +347,12 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=23\n")!=std::string::npos&&
+    require(migratedText.find("version=24\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
+    require(legacySettings.graphicsPreset==GraphicsPreset::Custom&&
+            !legacySettings.enhancedVisual.gi.enabled,
+            "legacy settings preserve their combination as a custom preset");
     {
         std::ofstream previous(root/"v20-options.txt");
         previous<<"version=20\nvisual_quality=2\n";

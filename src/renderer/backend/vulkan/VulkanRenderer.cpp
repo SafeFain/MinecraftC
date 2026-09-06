@@ -365,6 +365,24 @@ void VulkanRenderer::setLeafTransparency(bool enabled) {
         m_impl->submittedChunkEnvironment.shadowOptions.w = enabled ? 1.0f : 0.0f;
 }
 
+void VulkanRenderer::beginVoxelGiFrame(const glm::dvec3& camera,
+                                       uint64_t sceneId) {
+    if (m_impl) m_impl->beginVoxelGiFrame(camera, sceneId);
+}
+
+void VulkanRenderer::submitVoxelGiChunk(const Chunk& chunk) {
+    if (m_impl) m_impl->submitVoxelGiChunk(chunk);
+}
+
+void VulkanRenderer::endVoxelGiFrame() {
+    if (m_impl) m_impl->endVoxelGiFrame();
+}
+
+VoxelGiStatus VulkanRenderer::voxelGiStatus() const {
+    if (!m_impl) return {};
+    return m_impl->voxelGiRuntime;
+}
+
 void VulkanRenderer::finishScene(const PostProcessState& state) {
     if (!m_impl || !m_impl->frameBegun)
         throw std::logic_error("Vulkan scene composition requires an active frame");

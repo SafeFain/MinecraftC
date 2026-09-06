@@ -24,16 +24,15 @@ VisualQuality defaultVisualQuality(DesktopPlatform platform) {
 }
 
 bool defaultLeafTransparency(VisualQuality quality) {
-    return quality == VisualQuality::High || quality == VisualQuality::Ultra;
+    return quality == VisualQuality::High || quality == VisualQuality::VeryHigh ||
+           quality == VisualQuality::Ultra;
 }
 
 ClientSettings::ClientSettings() {
     const DesktopPlatform platform = currentDesktopPlatform();
-    visualQuality = defaultVisualQuality(platform);
-    transparentLeaves = defaultLeafTransparency(visualQuality);
     const bool mobile = platform == DesktopPlatform::Android ||
                         platform == DesktopPlatform::IOS;
-    shadowQuality = mobile ? ShadowQuality::Off : ShadowQuality::Medium;
+    applyGraphicsPreset(mobile ? GraphicsPreset::Low : GraphicsPreset::Medium);
     if (mobile) {
         renderDistance = 6;
         lodAggressiveness = LodAggressiveness::PowerSaver;
@@ -43,6 +42,77 @@ ClientSettings::ClientSettings() {
     }
     resetBindings();
     resetGamepadBindings();
+}
+
+void ClientSettings::applyGraphicsPreset(GraphicsPreset preset) {
+    if (preset == GraphicsPreset::Custom) {
+        markGraphicsCustom();
+        return;
+    }
+    graphicsPreset = preset;
+    visualQuality = visualQualityForPreset(preset);
+    smoothLighting = preset != GraphicsPreset::Low;
+    renderClouds = preset != GraphicsPreset::Low;
+    transparentLeaves = preset == GraphicsPreset::High ||
+        preset == GraphicsPreset::VeryHigh || preset == GraphicsPreset::Ultra;
+    switch (preset) {
+        case GraphicsPreset::Low: shadowQuality = ShadowQuality::Off; break;
+        case GraphicsPreset::Medium: shadowQuality = ShadowQuality::Low; break;
+        case GraphicsPreset::High: shadowQuality = ShadowQuality::Medium; break;
+        case GraphicsPreset::VeryHigh:
+        case GraphicsPreset::Ultra: shadowQuality = ShadowQuality::High; break;
+        case GraphicsPreset::Custom: break;
+    }
+    enhancedVisuals = preset == GraphicsPreset::High ||
+        preset == GraphicsPreset::VeryHigh || preset == GraphicsPreset::Ultra;
+    enhancedVisual.enabled = enhancedVisuals;
+    enhancedVisual.custom = false;
+    enhancedVisual.bloom = true;
+    enhancedVisual.ambientOcclusion = true;
+    enhancedVisual.lightShafts = true;
+    enhancedVisual.reflections = true;
+    enhancedVisual.atmosphere = true;
+    enhancedVisual.materialMotion = true;
+    enhancedVisual.ambientParticles = true;
+    enhancedVisual.bloomStrength = 100;
+    enhancedVisual.ambientOcclusionStrength = 100;
+    enhancedVisual.lightShaftStrength = 100;
+    enhancedVisual.reflectionStrength = 100;
+    enhancedVisual.atmosphereStrength = 100;
+    enhancedVisual.materialMotionStrength = 100;
+    enhancedVisual.ambientParticleStrength = 100;
+    enhancedVisual.gi.enabled = preset == GraphicsPreset::VeryHigh ||
+                                preset == GraphicsPreset::Ultra;
+    enhancedVisual.gi.strength = 100;
+    switch (preset) {
+        case GraphicsPreset::Low:
+            enhancedVisual.gi.distance = 32;
+            enhancedVisual.gi.temporalStability = 50;
+            break;
+        case GraphicsPreset::Medium:
+            enhancedVisual.gi.distance = 64;
+            enhancedVisual.gi.temporalStability = 75;
+            break;
+        case GraphicsPreset::High:
+        case GraphicsPreset::VeryHigh:
+            enhancedVisual.gi.distance = 128;
+            enhancedVisual.gi.temporalStability = 75;
+            break;
+        case GraphicsPreset::Ultra:
+            enhancedVisual.gi.distance = 256;
+            enhancedVisual.gi.temporalStability = 100;
+            break;
+        case GraphicsPreset::Custom: break;
+    }
+}
+
+void ClientSettings::markGraphicsCustom() {
+    graphicsPreset = GraphicsPreset::Custom;
+    enhancedVisual.custom = true;
+}
+
+GraphicsPreset ClientSettings::nextGraphicsPreset() const {
+    return presetForVisualQuality(nextVisualQuality(visualQuality));
 }
 
 void ClientSettings::resetBindings() {
@@ -86,6 +156,12 @@ void ClientSettings::validate() {
     clampPercent(enhancedVisual.atmosphereStrength);
     clampPercent(enhancedVisual.materialMotionStrength);
     clampPercent(enhancedVisual.ambientParticleStrength);
+    clampPercent(enhancedVisual.gi.strength);
+    clampPercent(enhancedVisual.gi.temporalStability);
+    constexpr uint16_t giDistances[] = {32, 64, 128, 256};
+    if (std::find(std::begin(giDistances), std::end(giDistances),
+                  enhancedVisual.gi.distance) == std::end(giDistances))
+        enhancedVisual.gi.distance = 64;
     constexpr int distances[] = {2,4,6,8,10,12,16};
     if (std::find(std::begin(distances), std::end(distances), renderDistance) == std::end(distances))
         renderDistance = 8;
@@ -110,9 +186,19 @@ void ClientSettings::validate() {
     if (static_cast<int>(shadowQuality) < static_cast<int>(ShadowQuality::Off) ||
         static_cast<int>(shadowQuality) > static_cast<int>(ShadowQuality::High))
         shadowQuality = ShadowQuality::Medium;
-    if (static_cast<int>(visualQuality) < static_cast<int>(VisualQuality::Low) ||
-        static_cast<int>(visualQuality) > static_cast<int>(VisualQuality::Ultra))
+    if (visualQuality != VisualQuality::Low &&
+         visualQuality != VisualQuality::Medium &&
+         visualQuality != VisualQuality::High &&
+         visualQuality != VisualQuality::VeryHigh &&
+         visualQuality != VisualQuality::Ultra)
         visualQuality = defaultVisualQuality(currentDesktopPlatform());
+    if (graphicsPreset != GraphicsPreset::Low &&
+        graphicsPreset != GraphicsPreset::Medium &&
+        graphicsPreset != GraphicsPreset::High &&
+        graphicsPreset != GraphicsPreset::VeryHigh &&
+        graphicsPreset != GraphicsPreset::Ultra &&
+        graphicsPreset != GraphicsPreset::Custom)
+        graphicsPreset = GraphicsPreset::Custom;
     if (static_cast<int>(controlMode) < static_cast<int>(ControlMode::Auto) ||
         static_cast<int>(controlMode) > static_cast<int>(ControlMode::Touch))
         controlMode = ControlMode::Auto;
@@ -191,6 +277,8 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.shadowQuality = static_cast<ShadowQuality>(std::stoi(value));
             else if (name == "visual_quality")
                 settings.visualQuality = static_cast<VisualQuality>(std::stoi(value));
+            else if (name == "graphics_preset")
+                settings.graphicsPreset = static_cast<GraphicsPreset>(std::stoi(value));
             else if (name == "enhanced_visuals") {
                 const int parsed = std::stoi(value);
                 if (parsed == 0 || parsed == 1)
@@ -211,6 +299,10 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "enhanced_atmosphere_strength") settings.enhancedVisual.atmosphereStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
             else if (name == "enhanced_material_strength") settings.enhancedVisual.materialMotionStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
             else if (name == "enhanced_particle_strength") settings.enhancedVisual.ambientParticleStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "gi_enabled") settings.enhancedVisual.gi.enabled = std::stoi(value) != 0;
+            else if (name == "gi_strength") settings.enhancedVisual.gi.strength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "gi_distance") settings.enhancedVisual.gi.distance = static_cast<uint16_t>(std::stoi(value));
+            else if (name == "gi_temporal_stability") settings.enhancedVisual.gi.temporalStability = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
             else if (name == "transparent_leaves")
                 settings.transparentLeaves = std::stoi(value) != 0;
             else if (name == "renderer") { /* v17 compatibility */ }
@@ -268,6 +360,18 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
         settings.touchSensitivity = defaults.touchSensitivity;
     if (formatVersion < 21)
         settings.transparentLeaves = defaultLeafTransparency(settings.visualQuality);
+    if (formatVersion < 24) {
+        settings.graphicsPreset = GraphicsPreset::Custom;
+        settings.enhancedVisual.custom = true;
+        settings.enhancedVisual.gi.enabled = false;
+        switch (settings.visualQuality) {
+            case VisualQuality::Low: settings.enhancedVisual.gi.distance = 32; break;
+            case VisualQuality::Medium: settings.enhancedVisual.gi.distance = 64; break;
+            case VisualQuality::High: settings.enhancedVisual.gi.distance = 128; break;
+            case VisualQuality::VeryHigh: settings.enhancedVisual.gi.distance = 128; break;
+            case VisualQuality::Ultra: settings.enhancedVisual.gi.distance = 256; break;
+        }
+    }
     settings.validate();
     return settings;
 }
@@ -294,6 +398,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "smooth_lighting=" << smoothLighting << '\n'
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
+           << "graphics_preset=" << static_cast<int>(graphicsPreset) << '\n'
            << "enhanced_visuals=" << enhancedVisuals << '\n'
            << "enhanced_custom=" << enhancedVisual.custom << '\n'
            << "enhanced_bloom=" << enhancedVisual.bloom << '\n'
@@ -310,6 +415,10 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "enhanced_atmosphere_strength=" << static_cast<int>(enhancedVisual.atmosphereStrength) << '\n'
            << "enhanced_material_strength=" << static_cast<int>(enhancedVisual.materialMotionStrength) << '\n'
            << "enhanced_particle_strength=" << static_cast<int>(enhancedVisual.ambientParticleStrength) << '\n'
+           << "gi_enabled=" << enhancedVisual.gi.enabled << '\n'
+           << "gi_strength=" << static_cast<int>(enhancedVisual.gi.strength) << '\n'
+           << "gi_distance=" << enhancedVisual.gi.distance << '\n'
+           << "gi_temporal_stability=" << static_cast<int>(enhancedVisual.gi.temporalStability) << '\n'
            << "transparent_leaves=" << transparentLeaves << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "frame_rate_limit=" << frameRateLimit << '\n'

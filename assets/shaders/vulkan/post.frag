@@ -131,12 +131,19 @@ void main(){
         hdr=mix(refracted*vec3(0.82,0.94,0.97),reflected,
                 clamp(fresnel*post.reflection.w,0.0,0.88));
     }
-    if(post.screenQuality.w>0.5){
-        vec2 screen=texture(screenEffects,vUv).rg;
-        if(surface.z>0.01&&surface.w<1.9)
-            hdr*=mix(1.0,screen.x,0.82*post.exposureBloom.w);
-        float shafts=screen.y*(1.0-post.environment.x*0.62);
-        hdr+=vec3(1.0,0.74,0.42)*shafts*0.20*post.sunScreen.w;
+    if(abs(post.screenQuality.w)>0.5){
+        vec4 screen=texture(screenEffects,vUv);
+        if(post.screenQuality.w<0.0){
+            if(surface.z>0.01&&surface.w<1.9){
+                hdr*=mix(1.0,screen.a,0.82*post.exposureBloom.w);
+                hdr+=screen.rgb;
+            }
+        }else{
+            if(surface.z>0.01&&surface.w<1.9)
+                hdr*=mix(1.0,screen.r,0.82*post.exposureBloom.w);
+            float shafts=screen.g*(1.0-post.environment.x*0.62);
+            hdr+=vec3(1.0,0.74,0.42)*shafts*0.20*post.sunScreen.w;
+        }
     }
     float bloomStrength=post.exposureBloom.y;
     int bloomLevels=int(post.texelTime.w+0.5);

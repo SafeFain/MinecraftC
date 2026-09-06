@@ -95,6 +95,22 @@ struct PostConstants {
     glm::vec4 sunScreen{0.0f};
 };
 
+struct VoxelGiScreenUniforms {
+    glm::mat4 inverseViewProjection{1.0f};
+    glm::mat4 previousViewProjection{1.0f};
+    glm::vec4 cameraWorld{0.0f};
+    glm::vec4 currentWorldOrigin{0.0f};
+    glm::vec4 previousWorldOrigin{0.0f};
+    std::array<glm::vec4, 4> minimumCellAndSize{};
+    glm::vec4 config{0.0f};
+    glm::vec4 temporal{0.0f};
+};
+
+struct VoxelGiInjectConstants {
+    glm::vec4 skyColorDaylight{0.0f};
+    glm::vec4 blockColorWeather{0.0f};
+};
+
 struct BloomConstants {
     glm::vec4 sourceTexelAndExtract{0.0f};
 };
@@ -127,6 +143,8 @@ static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
 static_assert(sizeof(PostConstants) == 128);
+static_assert(sizeof(VoxelGiScreenUniforms) == 272);
+static_assert(sizeof(VoxelGiInjectConstants) == 32);
 static_assert(sizeof(BloomConstants) == 16);
 static_assert(sizeof(ModelUniforms) == 4416);
 
@@ -140,6 +158,7 @@ struct SwapchainPipelineInputs {
     VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout screenEffectLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout screenEffectGiLayout = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     VkFormat sceneFormat = VK_FORMAT_UNDEFINED;
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
@@ -150,7 +169,12 @@ struct SwapchainPipelineInputs {
     // caller rebuilds them before invoking createSwapchainSet.
     const std::vector<VkImageView>* sceneImageViews = nullptr;
     const std::vector<VkImageView>* surfaceImageViews = nullptr;
+    const std::vector<VkImageView>* voxelGiAlbedoImageViews = nullptr;
     const std::vector<VkImageView>* screenEffectImageViews = nullptr;
+    const std::vector<VkImageView>* voxelGiHistoryImageViews = nullptr;
+    const std::array<VkImageView, 4>* voxelGiImageViews = nullptr;
+    VkBuffer voxelGiUniformBuffer = VK_NULL_HANDLE;
+    bool voxelGiEnabled = false;
     const std::array<std::vector<VkImageView>, 4>* bloomImageViews = nullptr;
     int bloomLevels = 0;
     int screenEffectDivisor = 0;

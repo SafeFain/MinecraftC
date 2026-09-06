@@ -43,6 +43,10 @@ public:
     void setEnhancedVisuals(bool enabled) override;
     void setEnhancedVisualSettings(const EnhancedVisualSettings& settings) override;
     void setLeafTransparency(bool enabled) override;
+    void beginVoxelGiFrame(const glm::dvec3&, uint64_t) override;
+    void submitVoxelGiChunk(const Chunk&) override;
+    void endVoxelGiFrame() override;
+    VoxelGiStatus voxelGiStatus() const override;
     void finishScene(const PostProcessState& state) override;
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
     void renderSky(const RenderEnvironment&, const glm::mat4&, const glm::vec3&,

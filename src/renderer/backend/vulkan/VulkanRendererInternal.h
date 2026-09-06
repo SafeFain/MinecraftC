@@ -70,6 +70,8 @@ using vkp::WireUniforms;
 using vkp::UiConstants;
 using vkp::PostConstants;
 using vkp::BloomConstants;
+using vkp::VoxelGiScreenUniforms;
+using vkp::VoxelGiInjectConstants;
 using vkp::ModelUniforms;
 
 static_assert(sizeof(ParticleRenderData) == 32);
@@ -111,6 +113,33 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VkImageView view = VK_NULL_HANDLE;
         VkSampler sampler = VK_NULL_HANDLE;
     };
+    struct VoxelGiImage {
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+        VkImageView view = VK_NULL_HANDLE;
+        VkImageView baseView = VK_NULL_HANDLE;
+        bool initialized = false;
+    };
+    struct VoxelGiGpuLevel {
+        VoxelGiImage albedoOpacity;
+        VoxelGiImage lightValidity;
+        VoxelGiImage irradiance;
+        VkDescriptorSet computeSet = VK_NULL_HANDLE;
+        bool dirty = false;
+        std::vector<uint8_t> albedoBytes;
+        std::vector<uint8_t> lightBytes;
+    };
+    struct VoxelGiGpuResources {
+        std::array<VoxelGiGpuLevel, 4> levels{};
+        std::array<VkImageView, 4> irradianceViews{};
+        std::array<Buffer, FRAMES_IN_FLIGHT> uniforms{};
+        VkSampler sampler = VK_NULL_HANDLE;
+        VkPipelineLayout computePipelineLayout = VK_NULL_HANDLE;
+        VkPipeline computePipeline = VK_NULL_HANDLE;
+        int resolution = 0;
+        int levelCount = 0;
+        uint32_t mipLevels = 1;
+    } voxelGiGpu;
     struct GpuMaterial {
         MaterialDesc desc{};
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
@@ -187,11 +216,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         uint32_t mipLevels = 1;
         std::vector<uint8_t> bytes;
         std::vector<VkBufferImageCopy> regions;
+        VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     };
     struct PreparedImageCopy {
         VkImage destination = VK_NULL_HANDLE;
         uint32_t mipLevels = 1;
         std::vector<VkBufferImageCopy> regions;
+        VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     };
     struct UploadFrameBuffer {
         Buffer staging;
@@ -331,6 +364,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     bool drawQueued = false;
     VisualQuality visualQuality = VisualQuality::Medium;
     PostProcessState postProcess{};
+    VoxelGiSceneCache voxelGiCache;
+    VoxelGiStatus voxelGiRuntime{};
+    std::vector<VoxelGiSliceUpdate> voxelGiUpdates;
+    bool voxelGiHistoryValid = false;
+    std::vector<glm::mat4> voxelGiPreviousViewProjection;
+    std::vector<glm::dvec3> voxelGiPreviousWorldOrigin;
+    uint64_t voxelGiLastSceneId = std::numeric_limits<uint64_t>::max();
+    glm::dvec3 voxelGiLastCamera{0.0};
+    glm::vec4 voxelGiLastInjection{-1.0f};
     bool sceneFinished = false;
     RendererPerformanceStats performance{};
 
@@ -422,6 +464,42 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             presentFamily = *queues.present;
             VkPhysicalDeviceProperties properties{};
             vkGetPhysicalDeviceProperties(candidate, &properties);
+            VkFormatProperties attributeFormat{};
+            VkFormatProperties irradianceFormat{};
+            vkGetPhysicalDeviceFormatProperties(
+                candidate, VK_FORMAT_R8G8B8A8_UNORM, &attributeFormat);
+            vkGetPhysicalDeviceFormatProperties(
+                candidate, VK_FORMAT_R16G16B16A16_SFLOAT, &irradianceFormat);
+            const VkFormatFeatureFlags attributeRequired =
+                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+            const VkFormatFeatureFlags irradianceRequired =
+                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+                VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT |
+                VK_FORMAT_FEATURE_BLIT_SRC_BIT |
+                VK_FORMAT_FEATURE_BLIT_DST_BIT;
+            VoxelGiDeviceSupport giSupport;
+            giSupport.maximum3dDimension = properties.limits.maxImageDimension3D;
+            giSupport.sampledImagesPerStage =
+                properties.limits.maxPerStageDescriptorSampledImages;
+            giSupport.sampledImagesPerSet =
+                properties.limits.maxDescriptorSetSampledImages;
+            giSupport.storageImagesPerStage =
+                properties.limits.maxPerStageDescriptorStorageImages;
+            giSupport.storageImagesPerSet =
+                properties.limits.maxDescriptorSetStorageImages;
+            giSupport.attributeSampling =
+                (attributeFormat.optimalTilingFeatures & attributeRequired) ==
+                    attributeRequired;
+            giSupport.irradianceSampling =
+                (irradianceFormat.optimalTilingFeatures &
+                    VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+            giSupport.irradianceStorage =
+                (irradianceFormat.optimalTilingFeatures &
+                    VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+            giSupport.irradianceBlit =
+                (irradianceFormat.optimalTilingFeatures & irradianceRequired) ==
+                    irradianceRequired;
+            voxelGiRuntime.availability = voxelGiAvailability(giSupport);
             const VkSampleCountFlags counts =
                 properties.limits.framebufferColorSampleCounts &
                 properties.limits.framebufferDepthSampleCounts;
@@ -440,7 +518,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     void configureVisualQuality(VisualQuality quality) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         visualQuality = quality;
+        voxelGiCache.reset();
+        voxelGiHistoryValid = false;
         const int samples = visualQualityConfig(quality).sceneSamples;
         requestedSampleCount = samples >= 4 ? VK_SAMPLE_COUNT_4_BIT :
             samples >= 2 ? VK_SAMPLE_COUNT_2_BIT : VK_SAMPLE_COUNT_1_BIT;
@@ -448,8 +530,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ? requestedSampleCount : maxSampleCount;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         const bool resourcesChanged = previous.bloomLevels != current.bloomLevels ||
-            previous.screenEffectDivisor != current.screenEffectDivisor;
+            previous.screenEffectDivisor != current.screenEffectDivisor ||
+            previousGi.enabled != currentGi.enabled ||
+            previousGi.clipmapResolution != currentGi.clipmapResolution ||
+            previousGi.clipmapLevels != currentGi.clipmapLevels;
         if (effective == swapchain.sampleCount && !resourcesChanged) return;
         swapchain.sampleCount = effective;
         swapchainDirty = true;
@@ -461,25 +548,74 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     void configureEnhancedVisuals(bool enabled) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         enhancedVisuals = enabled;
         enhancedVisualSettings.enabled = enabled;
+        voxelGiCache.reset();
+        voxelGiHistoryValid = false;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         if (previous.bloomLevels != current.bloomLevels ||
-            previous.screenEffectDivisor != current.screenEffectDivisor)
+            previous.screenEffectDivisor != current.screenEffectDivisor ||
+            previousGi.enabled != currentGi.enabled)
             swapchainDirty = true;
     }
 
     void configureEnhancedVisualSettings(const EnhancedVisualSettings& settings) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         enhancedVisualSettings = settings;
+        voxelGiCache.reset();
+        voxelGiHistoryValid = false;
         enhancedVisuals = settings.enabled;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
         if (previous.bloomLevels != current.bloomLevels ||
-            previous.screenEffectDivisor != current.screenEffectDivisor)
+            previous.screenEffectDivisor != current.screenEffectDivisor ||
+            previousGi.enabled != currentGi.enabled ||
+            previousGi.clipmapResolution != currentGi.clipmapResolution ||
+            previousGi.clipmapLevels != currentGi.clipmapLevels)
             swapchainDirty = true;
+    }
+
+    void beginVoxelGiFrame(const glm::dvec3& camera, uint64_t sceneId) {
+        const VoxelGiConfig config = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
+        voxelGiRuntime.requested = config.enabled;
+        voxelGiRuntime.active = config.enabled &&
+            voxelGiRuntime.availability == VoxelGiAvailability::Available;
+        if (!voxelGiRuntime.active) return;
+        if (sceneId != voxelGiLastSceneId ||
+            glm::distance(camera, voxelGiLastCamera) > 12.0) {
+            voxelGiHistoryValid = false;
+            std::fill(swapchain.voxelGiHistoryInitialized.begin(),
+                      swapchain.voxelGiHistoryInitialized.end(), false);
+        }
+        voxelGiLastSceneId = sceneId;
+        voxelGiLastCamera = camera;
+        voxelGiCache.configure(config);
+        voxelGiCache.beginFrame(camera, sceneId);
+    }
+
+    void submitVoxelGiChunk(const Chunk& chunk) {
+        if (voxelGiRuntime.active) voxelGiCache.submit(chunk);
+    }
+
+    void endVoxelGiFrame() {
+        if (!voxelGiRuntime.active) {
+            voxelGiUpdates.clear();
+            return;
+        }
+        voxelGiCache.endFrame();
+        const VoxelGiConfig& config = voxelGiCache.config();
+        voxelGiUpdates = voxelGiCache.takeUpdates(config.updateSlicesPerFrame);
     }
 
     void createDevice() {
@@ -564,6 +700,227 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         }
         if (buffer.handle) vmaDestroyBuffer(allocator, buffer.handle, buffer.allocation);
         buffer = {};
+    }
+
+    VkShaderModule loadVoxelGiShader(const std::string& name) {
+        const std::vector<uint8_t> bytes = AssetStore(assetRoot).readBinary(
+            "shaders/vulkan/" + name);
+        if (bytes.empty() || bytes.size() % sizeof(uint32_t) != 0)
+            throw std::runtime_error("Invalid voxel GI SPIR-V: " + name);
+        VkShaderModuleCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        info.codeSize = bytes.size();
+        info.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
+        VkShaderModule module = VK_NULL_HANDLE;
+        require(vkCreateShaderModule(device, &info, nullptr, &module),
+                "vkCreateShaderModule(voxel GI)");
+        return module;
+    }
+
+    VoxelGiImage createVoxelGiImage(VkFormat format, uint32_t resolution,
+                                    uint32_t mipLevels,
+                                    VkImageUsageFlags usage) {
+        VoxelGiImage result;
+        VkImageCreateInfo image{};
+        image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        image.imageType = VK_IMAGE_TYPE_3D;
+        image.extent = {resolution, resolution, resolution};
+        image.mipLevels = mipLevels;
+        image.arrayLayers = 1;
+        image.format = format;
+        image.tiling = VK_IMAGE_TILING_OPTIMAL;
+        image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        image.usage = usage;
+        image.samples = VK_SAMPLE_COUNT_1_BIT;
+        image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VmaAllocationCreateInfo allocation{};
+        allocation.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        require(vmaCreateImage(allocator, &image, &allocation, &result.image,
+                               &result.allocation, nullptr),
+                "vmaCreateImage(voxel GI)");
+        VkImageViewCreateInfo view{};
+        view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view.image = result.image;
+        view.viewType = VK_IMAGE_VIEW_TYPE_3D;
+        view.format = format;
+        view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        view.subresourceRange.levelCount = mipLevels;
+        view.subresourceRange.layerCount = 1;
+        require(vkCreateImageView(device, &view, nullptr, &result.view),
+                "vkCreateImageView(voxel GI)");
+        if (mipLevels > 1) {
+            view.subresourceRange.levelCount = 1;
+            require(vkCreateImageView(device, &view, nullptr, &result.baseView),
+                    "vkCreateImageView(voxel GI base)");
+        } else {
+            result.baseView = result.view;
+        }
+        return result;
+    }
+
+    void destroyVoxelGiImage(VoxelGiImage& image) {
+        pendingImageUploads.erase(std::remove_if(
+            pendingImageUploads.begin(), pendingImageUploads.end(),
+            [&](const PendingImageUpload& upload) {
+                return upload.destination == image.image;
+            }), pendingImageUploads.end());
+        if (image.baseView && image.baseView != image.view)
+            vkDestroyImageView(device, image.baseView, nullptr);
+        if (image.view) vkDestroyImageView(device, image.view, nullptr);
+        if (image.image)
+            vmaDestroyImage(allocator, image.image, image.allocation);
+        image = {};
+    }
+
+    void destroyVoxelGiResources() {
+        if (!device || !allocator) return;
+        for (VoxelGiGpuLevel& level : voxelGiGpu.levels) {
+            if (level.computeSet && descriptors.descriptorPool)
+                vkFreeDescriptorSets(device, descriptors.descriptorPool, 1,
+                                     &level.computeSet);
+            level.computeSet = VK_NULL_HANDLE;
+            destroyVoxelGiImage(level.irradiance);
+            destroyVoxelGiImage(level.lightValidity);
+            destroyVoxelGiImage(level.albedoOpacity);
+            level.albedoBytes.clear();
+            level.lightBytes.clear();
+            level.dirty = false;
+        }
+        for (Buffer& uniform : voxelGiGpu.uniforms) destroyBuffer(uniform);
+        if (voxelGiGpu.computePipeline)
+            vkDestroyPipeline(device, voxelGiGpu.computePipeline, nullptr);
+        if (voxelGiGpu.computePipelineLayout)
+            vkDestroyPipelineLayout(device, voxelGiGpu.computePipelineLayout, nullptr);
+        if (voxelGiGpu.sampler)
+            vkDestroySampler(device, voxelGiGpu.sampler, nullptr);
+        voxelGiGpu = {};
+        voxelGiHistoryValid = false;
+    }
+
+    void ensureVoxelGiResources(const VoxelGiConfig& config) {
+        if (!config.enabled ||
+            voxelGiRuntime.availability != VoxelGiAvailability::Available) {
+            if (voxelGiGpu.levelCount > 0) destroyVoxelGiResources();
+            voxelGiRuntime.active = false;
+            return;
+        }
+        if (voxelGiGpu.resolution == config.clipmapResolution &&
+            voxelGiGpu.levelCount == config.clipmapLevels) {
+            voxelGiRuntime.active = true;
+            return;
+        }
+        if (voxelGiGpu.levelCount > 0) destroyVoxelGiResources();
+        try {
+            voxelGiGpu.resolution = config.clipmapResolution;
+            voxelGiGpu.levelCount = config.clipmapLevels;
+            uint32_t size = static_cast<uint32_t>(config.clipmapResolution);
+            voxelGiGpu.mipLevels = 1;
+            while (size > 1) { size >>= 1; ++voxelGiGpu.mipLevels; }
+            VkSamplerCreateInfo sampler{};
+            sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            sampler.magFilter = VK_FILTER_LINEAR;
+            sampler.minFilter = VK_FILTER_LINEAR;
+            sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            sampler.maxLod = static_cast<float>(voxelGiGpu.mipLevels - 1);
+            require(vkCreateSampler(device, &sampler, nullptr,
+                                    &voxelGiGpu.sampler),
+                    "vkCreateSampler(voxel GI)");
+            for (Buffer& uniform : voxelGiGpu.uniforms)
+                uniform = createBuffer(sizeof(VoxelGiScreenUniforms),
+                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
+                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                        VMA_ALLOCATION_CREATE_MAPPED_BIT);
+            VkPushConstantRange push{};
+            push.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            push.size = sizeof(VoxelGiInjectConstants);
+            VkPipelineLayoutCreateInfo layout{};
+            layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layout.setLayoutCount = 1;
+            layout.pSetLayouts = &descriptors.voxelGiComputeDescriptorSetLayout;
+            layout.pushConstantRangeCount = 1;
+            layout.pPushConstantRanges = &push;
+            require(vkCreatePipelineLayout(device, &layout, nullptr,
+                        &voxelGiGpu.computePipelineLayout),
+                    "vkCreatePipelineLayout(voxel GI)");
+            VkShaderModule shader = loadVoxelGiShader("voxel_gi_inject.comp.spv");
+            VkComputePipelineCreateInfo pipeline{};
+            pipeline.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+            pipeline.stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                nullptr, 0, VK_SHADER_STAGE_COMPUTE_BIT, shader, "main", nullptr};
+            pipeline.layout = voxelGiGpu.computePipelineLayout;
+            const VkResult pipelineResult = vkCreateComputePipelines(
+                device, VK_NULL_HANDLE, 1, &pipeline, nullptr,
+                &voxelGiGpu.computePipeline);
+            vkDestroyShaderModule(device, shader, nullptr);
+            require(pipelineResult, "vkCreateComputePipelines(voxel GI)");
+            const size_t voxelCount = static_cast<size_t>(
+                config.clipmapResolution) * config.clipmapResolution *
+                config.clipmapResolution;
+            for (int index = 0; index < config.clipmapLevels; ++index) {
+                VoxelGiGpuLevel& level = voxelGiGpu.levels[
+                    static_cast<size_t>(index)];
+                level.albedoOpacity = createVoxelGiImage(
+                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution, 1,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+                level.lightValidity = createVoxelGiImage(
+                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution, 1,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+                level.irradiance = createVoxelGiImage(
+                    VK_FORMAT_R16G16B16A16_SFLOAT, config.clipmapResolution,
+                    voxelGiGpu.mipLevels, VK_IMAGE_USAGE_STORAGE_BIT |
+                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+                level.albedoBytes.assign(voxelCount * 4, 0);
+                level.lightBytes.assign(voxelCount * 4, 0);
+                voxelGiGpu.irradianceViews[static_cast<size_t>(index)] =
+                    level.irradiance.view;
+                VkDescriptorSetAllocateInfo allocate{};
+                allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+                allocate.descriptorPool = descriptors.descriptorPool;
+                allocate.descriptorSetCount = 1;
+                allocate.pSetLayouts = &descriptors.voxelGiComputeDescriptorSetLayout;
+                require(vkAllocateDescriptorSets(device, &allocate,
+                                                  &level.computeSet),
+                        "vkAllocateDescriptorSets(voxel GI)");
+                std::array<VkDescriptorImageInfo, 3> images{{
+                    {voxelGiGpu.sampler, level.albedoOpacity.view,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                    {voxelGiGpu.sampler, level.lightValidity.view,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                    {VK_NULL_HANDLE, level.irradiance.baseView,
+                     VK_IMAGE_LAYOUT_GENERAL}}};
+                std::array<VkWriteDescriptorSet, 3> writes{};
+                for (uint32_t binding = 0; binding < writes.size(); ++binding) {
+                    writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    writes[binding].dstSet = level.computeSet;
+                    writes[binding].dstBinding = binding;
+                    writes[binding].descriptorCount = 1;
+                    writes[binding].descriptorType = binding == 2
+                        ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                        : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    writes[binding].pImageInfo = &images[binding];
+                }
+                vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
+            }
+            for (int index = config.clipmapLevels; index < 4; ++index)
+                voxelGiGpu.irradianceViews[static_cast<size_t>(index)] =
+                    voxelGiGpu.irradianceViews[static_cast<size_t>(
+                        config.clipmapLevels - 1)];
+            voxelGiCache.reset();
+            voxelGiHistoryValid = false;
+            voxelGiRuntime.active = true;
+            LOG_INFO("Voxel GI allocated " << config.clipmapResolution << "^3 x "
+                     << config.clipmapLevels << " clipmaps");
+        } catch (const std::exception& error) {
+            LOG_WARN("Voxel GI allocation failed; continuing without GI: "
+                     << error.what());
+            destroyVoxelGiResources();
+            voxelGiRuntime.availability = VoxelGiAvailability::AllocationFailed;
+            voxelGiRuntime.active = false;
+        }
     }
 
     template<typename T>
@@ -907,6 +1264,40 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr,
                     &descriptors.screenEffectDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(screen effect)");
+        std::array<VkDescriptorSetLayoutBinding, 11> giScreenBindings{};
+        for (uint32_t binding = 0; binding < 10; ++binding) {
+            giScreenBindings[binding].binding = binding;
+            giScreenBindings[binding].descriptorType =
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            giScreenBindings[binding].descriptorCount = 1;
+            giScreenBindings[binding].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        }
+        giScreenBindings[10].binding = 10;
+        giScreenBindings[10].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        giScreenBindings[10].descriptorCount = 1;
+        giScreenBindings[10].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        info.bindingCount = giScreenBindings.size();
+        info.pBindings = giScreenBindings.data();
+        require(vkCreateDescriptorSetLayout(device, &info, nullptr,
+                    &descriptors.screenEffectGiDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout(voxel GI screen effect)");
+        std::array<VkDescriptorSetLayoutBinding, 3> giComputeBindings{};
+        for (uint32_t binding = 0; binding < 2; ++binding) {
+            giComputeBindings[binding].binding = binding;
+            giComputeBindings[binding].descriptorType =
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            giComputeBindings[binding].descriptorCount = 1;
+            giComputeBindings[binding].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        }
+        giComputeBindings[2].binding = 2;
+        giComputeBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        giComputeBindings[2].descriptorCount = 1;
+        giComputeBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        info.bindingCount = giComputeBindings.size();
+        info.pBindings = giComputeBindings.data();
+        require(vkCreateDescriptorSetLayout(device, &info, nullptr,
+                    &descriptors.voxelGiComputeDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout(voxel GI injection)");
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
         const VkDeviceSize alignment = std::max<VkDeviceSize>(
@@ -915,12 +1306,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void createDescriptorPool() {
-        const std::array<VkDescriptorPoolSize, 3> poolSizes{{
+        const std::array<VkDescriptorPoolSize, 4> poolSizes{{
             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 12288},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-             static_cast<uint32_t>(FRAMES_IN_FLIGHT * 2)},
+             static_cast<uint32_t>(FRAMES_IN_FLIGHT * 2 + 32)},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-             static_cast<uint32_t>(FRAMES_IN_FLIGHT)}}};
+             static_cast<uint32_t>(FRAMES_IN_FLIGHT)},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16}}};
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -1052,6 +1444,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void createSwapchain() {
+        const VoxelGiConfig giConfig = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
+        voxelGiRuntime.requested = giConfig.enabled;
+        ensureVoxelGiResources(giConfig);
         vkp::VulkanSwapchainBundle::CreateParams params;
         params.device = device;
         params.allocator = allocator;
@@ -1071,6 +1467,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.postLayout = descriptors.postDescriptorSetLayout;
         params.bloomLayout = descriptors.bloomDescriptorSetLayout;
         params.screenEffectLayout = descriptors.screenEffectDescriptorSetLayout;
+        params.screenEffectGiLayout =
+            descriptors.screenEffectGiDescriptorSetLayout;
+        params.voxelGiEnabled = voxelGiRuntime.active;
+        params.voxelGiImageViews = voxelGiRuntime.active
+            ? &voxelGiGpu.irradianceViews : nullptr;
+        params.voxelGiUniformBuffer = voxelGiRuntime.active
+            ? voxelGiGpu.uniforms[0].handle : VK_NULL_HANDLE;
         const EnhancedVisualConfig enhanced = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
         params.bloomLevels = enhanced.bloomLevels;
@@ -1078,7 +1481,26 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.requestedSampleCount = requestedSampleCount;
         params.maxSampleCount = maxSampleCount;
         params.shaderRoot = assetRoot / "shaders" / "vulkan";
-        swapchain = vkp::VulkanSwapchainBundle::create(params);
+        try {
+            swapchain = vkp::VulkanSwapchainBundle::create(params);
+        } catch (const std::exception& error) {
+            if (!params.voxelGiEnabled) throw;
+            LOG_WARN("Voxel GI swapchain resources failed; retrying without GI: "
+                     << error.what());
+            destroyVoxelGiResources();
+            voxelGiRuntime.availability =
+                VoxelGiAvailability::AllocationFailed;
+            voxelGiRuntime.active = false;
+            params.voxelGiEnabled = false;
+            params.voxelGiImageViews = nullptr;
+            params.voxelGiUniformBuffer = VK_NULL_HANDLE;
+            swapchain = vkp::VulkanSwapchainBundle::create(params);
+        }
+        voxelGiPreviousViewProjection.assign(
+            swapchain.images.size(), glm::mat4(1.0f));
+        voxelGiPreviousWorldOrigin.assign(
+            swapchain.images.size(), glm::dvec3(0.0));
+        voxelGiHistoryValid = false;
         swapchainDirty = false;
     }
 
@@ -1126,6 +1548,153 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     indexCount*sizeof(uint32_t)),"vmaFlushAllocation");
     }
 
+    void prepareVoxelGiUploads() {
+        if (!voxelGiRuntime.active || voxelGiGpu.levelCount <= 0) return;
+        const int resolution = voxelGiGpu.resolution;
+        const size_t sliceBytes = static_cast<size_t>(resolution) * resolution * 4;
+        std::array<std::vector<int>, 4> changedLayers;
+        for (const VoxelGiSliceUpdate& update : voxelGiUpdates) {
+            if (update.level < 0 || update.level >= voxelGiGpu.levelCount ||
+                update.voxels.size() != static_cast<size_t>(resolution * resolution))
+                continue;
+            VoxelGiGpuLevel& level = voxelGiGpu.levels[
+                static_cast<size_t>(update.level)];
+            const int layer = voxelGiPositiveMod(update.zLayer, resolution);
+            uint8_t* albedo = level.albedoBytes.data() +
+                static_cast<size_t>(layer) * sliceBytes;
+            uint8_t* light = level.lightBytes.data() +
+                static_cast<size_t>(layer) * sliceBytes;
+            for (size_t index = 0; index < update.voxels.size(); ++index) {
+                const VoxelGiPacked& voxel = update.voxels[index];
+                albedo[index * 4 + 0] = voxel.red;
+                albedo[index * 4 + 1] = voxel.green;
+                albedo[index * 4 + 2] = voxel.blue;
+                albedo[index * 4 + 3] = voxel.opacity;
+                light[index * 4 + 0] = voxel.skyLight;
+                light[index * 4 + 1] = voxel.blockLight;
+                light[index * 4 + 2] = voxel.emission;
+                light[index * 4 + 3] = voxel.valid;
+            }
+            auto& layers = changedLayers[static_cast<size_t>(update.level)];
+            if (std::find(layers.begin(), layers.end(), layer) == layers.end())
+                layers.push_back(layer);
+            level.dirty = true;
+        }
+        voxelGiUpdates.clear();
+        for (int levelIndex = 0; levelIndex < voxelGiGpu.levelCount; ++levelIndex) {
+            VoxelGiGpuLevel& level = voxelGiGpu.levels[
+                static_cast<size_t>(levelIndex)];
+            auto& layers = changedLayers[static_cast<size_t>(levelIndex)];
+            const bool fullUpload = !level.albedoOpacity.initialized ||
+                                    !level.lightValidity.initialized;
+            if (layers.empty() && !fullUpload) continue;
+            level.dirty = true;
+            auto queue = [&](VoxelGiImage& image,
+                             const std::vector<uint8_t>& source) {
+                PendingImageUpload upload;
+                upload.destination = image.image;
+                upload.oldLayout = image.initialized
+                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    : VK_IMAGE_LAYOUT_UNDEFINED;
+                upload.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                if (fullUpload) {
+                    upload.bytes = source;
+                    VkBufferImageCopy region{};
+                    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    region.imageSubresource.layerCount = 1;
+                    region.imageExtent = {static_cast<uint32_t>(resolution),
+                        static_cast<uint32_t>(resolution),
+                        static_cast<uint32_t>(resolution)};
+                    upload.regions.push_back(region);
+                } else {
+                    upload.bytes.resize(sliceBytes * layers.size());
+                    for (size_t index = 0; index < layers.size(); ++index) {
+                        const int layer = layers[index];
+                        std::memcpy(upload.bytes.data() + index * sliceBytes,
+                            source.data() + static_cast<size_t>(layer) * sliceBytes,
+                            sliceBytes);
+                        VkBufferImageCopy region{};
+                        region.bufferOffset = index * sliceBytes;
+                        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                        region.imageSubresource.layerCount = 1;
+                        region.imageOffset.z = layer;
+                        region.imageExtent = {static_cast<uint32_t>(resolution),
+                            static_cast<uint32_t>(resolution), 1};
+                        upload.regions.push_back(region);
+                    }
+                }
+                pendingImageUploads.push_back(std::move(upload));
+                image.initialized = true;
+            };
+            queue(level.albedoOpacity, level.albedoBytes);
+            queue(level.lightValidity, level.lightBytes);
+        }
+    }
+
+    void prepareVoxelGiUniform(uint32_t imageIndex) {
+        if (!swapchain.voxelGiEnabled || imageIndex >= swapchain.images.size())
+            return;
+        if (voxelGiPreviousViewProjection.size() != swapchain.images.size()) {
+            voxelGiPreviousViewProjection.assign(
+                swapchain.images.size(), glm::mat4(1.0f));
+            voxelGiPreviousWorldOrigin.assign(
+                swapchain.images.size(), glm::dvec3(0.0));
+        }
+        const glm::mat4 viewProjection = glm::inverse(
+            postProcess.inverseViewProjection);
+        const glm::mat4 correctedViewProjection =
+            clipSpaceCorrection() * viewProjection;
+        VoxelGiScreenUniforms uniforms;
+        uniforms.inverseViewProjection = glm::inverse(correctedViewProjection);
+        uniforms.previousViewProjection =
+            voxelGiPreviousViewProjection[imageIndex];
+        uniforms.cameraWorld = glm::vec4(
+            glm::vec3(postProcess.worldOrigin) + postProcess.cameraPosition, 1.0f);
+        uniforms.currentWorldOrigin = glm::vec4(
+            glm::vec3(postProcess.worldOrigin), 0.0f);
+        uniforms.previousWorldOrigin = glm::vec4(
+            glm::vec3(voxelGiPreviousWorldOrigin[imageIndex]), 0.0f);
+        const VoxelGiConfig config = voxelGiConfig(
+            visualQuality, enhancedVisualSettings);
+        for (int level = 0; level < config.clipmapLevels; ++level) {
+            const VoxelGiLevelMapping mapping = voxelGiCache.levelMapping(level);
+            uniforms.minimumCellAndSize[static_cast<size_t>(level)] = glm::vec4(
+                mapping.minimumCell, static_cast<float>(mapping.cellSize));
+        }
+        uniforms.config = {static_cast<float>(config.clipmapResolution),
+            static_cast<float>(config.clipmapLevels),
+            static_cast<float>(config.coneCount),
+            static_cast<float>(config.coneSteps)};
+        float rotationDelta = 0.0f;
+        for (int column = 0; column < 3; ++column)
+            for (int row = 0; row < 3; ++row)
+                rotationDelta = std::max(rotationDelta, std::abs(
+                    correctedViewProjection[column][row] -
+                    voxelGiPreviousViewProjection[imageIndex][column][row]));
+        const bool historyAvailable = voxelGiHistoryValid &&
+            swapchain.voxelGiHistoryInitialized[imageIndex] &&
+            postProcess.sceneId == voxelGiLastSceneId && rotationDelta < 0.45f;
+        uniforms.temporal = {config.strength, historyAvailable ? 1.0f : 0.0f,
+                             config.historyWeight, config.distance};
+        Buffer& buffer = voxelGiGpu.uniforms[currentFrame];
+        std::memcpy(buffer.mapped, &uniforms, sizeof(uniforms));
+        require(vmaFlushAllocation(allocator, buffer.allocation, 0,
+                                   sizeof(uniforms)),
+                "vmaFlushAllocation(voxel GI uniforms)");
+        const VkDescriptorBufferInfo bufferInfo{
+            buffer.handle, 0, sizeof(VoxelGiScreenUniforms)};
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = swapchain.screenEffectDescriptorSets[imageIndex];
+        write.dstBinding = 10;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &bufferInfo;
+        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+        voxelGiPreviousViewProjection[imageIndex] = correctedViewProjection;
+        voxelGiPreviousWorldOrigin[imageIndex] = postProcess.worldOrigin;
+    }
+
     void prepareBufferUploads() {
         preparedBufferCopies.clear();
         preparedImageCopies.clear();
@@ -1168,6 +1737,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             prepared.destination = upload.destination;
             prepared.mipLevels = upload.mipLevels;
             prepared.regions = upload.regions;
+            prepared.oldLayout = upload.oldLayout;
+            prepared.finalLayout = upload.finalLayout;
             for (VkBufferImageCopy& region : prepared.regions)
                 region.bufferOffset += offset;
             preparedImageCopies.push_back(std::move(prepared));
@@ -1369,6 +1940,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         require(vkBeginCommandBuffer(command, &begin), "vkBeginCommandBuffer");
         recordUploads(command);
+        recordVoxelGiInjection(command);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
         recordScreenEffectPass(command, imageIndex);
@@ -1388,7 +1960,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             for (const PreparedImageCopy& copy : preparedImageCopies) {
                 VkImageMemoryBarrier barrier{};
                 barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                barrier.oldLayout = copy.oldLayout;
                 barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
                 barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                 barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1396,11 +1968,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 barrier.subresourceRange.levelCount = copy.mipLevels;
                 barrier.subresourceRange.layerCount = 1;
+                barrier.srcAccessMask = copy.oldLayout == VK_IMAGE_LAYOUT_UNDEFINED
+                    ? 0 : VK_ACCESS_SHADER_READ_BIT;
                 barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                 imageBarriers.push_back(barrier);
             }
             if (!imageBarriers.empty())
-                vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
                     static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data());
             for (const PreparedBufferCopy& copy : preparedBufferCopies) {
@@ -1428,15 +2002,167 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             if (!imageBarriers.empty()) {
                 for (VkImageMemoryBarrier& barrier : imageBarriers) {
                     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    const size_t index = static_cast<size_t>(
+                        &barrier - imageBarriers.data());
+                    barrier.newLayout = preparedImageCopies[index].finalLayout;
                     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
                 }
                 vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
                     0, nullptr, static_cast<uint32_t>(imageBarriers.size()),
                     imageBarriers.data());
             }
+        }
+    }
+
+    void recordVoxelGiInjection(VkCommandBuffer command) {
+        if (!voxelGiRuntime.active || !voxelGiGpu.computePipeline) return;
+        const glm::vec4 injectionState{
+            postProcess.environment.daylight,
+            postProcess.environment.rainIntensity,
+            postProcess.environment.thunderIntensity,
+            postProcess.environment.lightningFlash};
+        if (glm::any(glm::greaterThan(glm::abs(
+                injectionState - voxelGiLastInjection), glm::vec4(0.01f)))) {
+            for (int level = 0; level < voxelGiGpu.levelCount; ++level)
+                if (voxelGiGpu.levels[static_cast<size_t>(level)].
+                        albedoOpacity.initialized)
+                    voxelGiGpu.levels[static_cast<size_t>(level)].dirty = true;
+            voxelGiLastInjection = injectionState;
+        }
+        const uint32_t resolution = static_cast<uint32_t>(voxelGiGpu.resolution);
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          voxelGiGpu.computePipeline);
+        VoxelGiInjectConstants constants;
+        constants.skyColorDaylight = glm::vec4(
+            postProcess.environment.ambientColor,
+            postProcess.environment.daylight);
+        constants.blockColorWeather = glm::vec4(
+            glm::vec3(1.0f, 0.56f, 0.25f),
+            std::clamp(postProcess.environment.rainIntensity * 0.6f +
+                postProcess.environment.thunderIntensity * 0.4f, 0.0f, 1.0f));
+        for (int levelIndex = 0; levelIndex < voxelGiGpu.levelCount; ++levelIndex) {
+            VoxelGiGpuLevel& level = voxelGiGpu.levels[
+                static_cast<size_t>(levelIndex)];
+            if (!level.dirty || !level.albedoOpacity.initialized ||
+                !level.lightValidity.initialized) continue;
+            VkImageMemoryBarrier toGeneral{};
+            toGeneral.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            toGeneral.oldLayout = level.irradiance.initialized
+                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                : VK_IMAGE_LAYOUT_UNDEFINED;
+            toGeneral.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            toGeneral.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toGeneral.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toGeneral.image = level.irradiance.image;
+            toGeneral.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            toGeneral.subresourceRange.levelCount = voxelGiGpu.mipLevels;
+            toGeneral.subresourceRange.layerCount = 1;
+            toGeneral.srcAccessMask = level.irradiance.initialized
+                ? VK_ACCESS_SHADER_READ_BIT : 0;
+            toGeneral.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            vkCmdPipelineBarrier(command, level.irradiance.initialized
+                    ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                    : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                1, &toGeneral);
+            vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
+                voxelGiGpu.computePipelineLayout, 0, 1, &level.computeSet,
+                0, nullptr);
+            vkCmdPushConstants(command, voxelGiGpu.computePipelineLayout,
+                VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(constants), &constants);
+            const uint32_t groups = (resolution + 3u) / 4u;
+            vkCmdDispatch(command, groups, groups, groups);
+
+            std::vector<VkImageMemoryBarrier> mipBarriers;
+            mipBarriers.reserve(voxelGiGpu.mipLevels);
+            for (uint32_t mip = 0; mip < voxelGiGpu.mipLevels; ++mip) {
+                VkImageMemoryBarrier barrier{};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+                barrier.newLayout = mip == 0
+                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                    : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.image = level.irradiance.image;
+                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barrier.subresourceRange.baseMipLevel = mip;
+                barrier.subresourceRange.levelCount = 1;
+                barrier.subresourceRange.layerCount = 1;
+                barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                barrier.dstAccessMask = mip == 0
+                    ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT;
+                mipBarriers.push_back(barrier);
+            }
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                static_cast<uint32_t>(mipBarriers.size()), mipBarriers.data());
+            int sourceSize = voxelGiGpu.resolution;
+            for (uint32_t mip = 1; mip < voxelGiGpu.mipLevels; ++mip) {
+                const int destinationSize = std::max(1, sourceSize / 2);
+                VkImageBlit blit{};
+                blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                blit.srcSubresource.mipLevel = mip - 1;
+                blit.srcSubresource.layerCount = 1;
+                blit.srcOffsets[1] = {sourceSize, sourceSize, sourceSize};
+                blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                blit.dstSubresource.mipLevel = mip;
+                blit.dstSubresource.layerCount = 1;
+                blit.dstOffsets[1] = {destinationSize, destinationSize,
+                                      destinationSize};
+                vkCmdBlitImage(command, level.irradiance.image,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    level.irradiance.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1, &blit, VK_FILTER_NEAREST);
+                if (mip + 1 < voxelGiGpu.mipLevels) {
+                    VkImageMemoryBarrier next{};
+                    next.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    next.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    next.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    next.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    next.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    next.image = level.irradiance.image;
+                    next.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    next.subresourceRange.baseMipLevel = mip;
+                    next.subresourceRange.levelCount = 1;
+                    next.subresourceRange.layerCount = 1;
+                    next.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                    next.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+                    vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                        1, &next);
+                }
+                sourceSize = destinationSize;
+            }
+            std::vector<VkImageMemoryBarrier> readable;
+            readable.reserve(voxelGiGpu.mipLevels);
+            for (uint32_t mip = 0; mip < voxelGiGpu.mipLevels; ++mip) {
+                VkImageMemoryBarrier barrier{};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.oldLayout = mip + 1 < voxelGiGpu.mipLevels
+                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                    : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.image = level.irradiance.image;
+                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barrier.subresourceRange.baseMipLevel = mip;
+                barrier.subresourceRange.levelCount = 1;
+                barrier.subresourceRange.layerCount = 1;
+                barrier.srcAccessMask = mip + 1 < voxelGiGpu.mipLevels
+                    ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                readable.push_back(barrier);
+            }
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                static_cast<uint32_t>(readable.size()), readable.data());
+            level.irradiance.initialized = true;
+            level.dirty = false;
         }
     }
 
@@ -1499,7 +2225,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void recordScenePass(VkCommandBuffer command, uint32_t imageIndex) {
-        std::array<VkClearValue, 5> clear{};
+        std::array<VkClearValue, 7> clear{};
         clear[0].color.float32[0] = submittedFrame.clearColor.r;
         clear[0].color.float32[1] = submittedFrame.clearColor.g;
         clear[0].color.float32[2] = submittedFrame.clearColor.b;
@@ -1512,8 +2238,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         render.renderArea.extent = swapchain.swapchainExtent;
         const bool multisampled =
             swapchain.sampleCount != VK_SAMPLE_COUNT_1_BIT;
-        render.clearValueCount = swapchain.surfaceDataEnabled
-            ? (multisampled ? 4u : 3u) : (multisampled ? 3u : 2u);
+        render.clearValueCount = swapchain.voxelGiEnabled
+            ? (multisampled ? 6u : 4u)
+            : swapchain.surfaceDataEnabled
+                ? (multisampled ? 4u : 3u) : (multisampled ? 3u : 2u);
         render.pClearValues = clear.data();
         vkCmdBeginRenderPass(command, &render, VK_SUBPASS_CONTENTS_INLINE);
         VkPipeline boundPipeline = VK_NULL_HANDLE;
@@ -1826,7 +2554,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 static_cast<float>(enhanced.aoDirections),
                 static_cast<float>(enhanced.aoSteps),
                 static_cast<float>(enhanced.lightShaftSamples),
-                static_cast<float>(enhanced.screenEffectDivisor)};
+                static_cast<float>(enhanced.screenEffectDivisor) *
+                    (swapchain.voxelGiEnabled ? -1.0f : 1.0f)};
             result.reflection = {
                 static_cast<float>(enhanced.reflectionSteps),
                 static_cast<float>(enhanced.reflectionRefineSteps),
@@ -1851,6 +2580,36 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     void recordScreenEffectPass(VkCommandBuffer command, uint32_t imageIndex) {
         if (!swapchain.surfaceDataEnabled) return;
+        if (swapchain.voxelGiEnabled &&
+            !swapchain.voxelGiHistoryInitialized[imageIndex]) {
+            VkImageMemoryBarrier initialize{};
+            initialize.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            initialize.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            initialize.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            initialize.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initialize.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initialize.image = swapchain.voxelGiHistoryImages[imageIndex];
+            initialize.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            initialize.subresourceRange.levelCount = 1;
+            initialize.subresourceRange.layerCount = 1;
+            initialize.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                1, &initialize);
+            const VkClearColorValue zero{{0.0f, 0.0f, 0.0f, 1.0f}};
+            const VkImageSubresourceRange range{
+                VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdClearColorImage(command,
+                swapchain.voxelGiHistoryImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+            initialize.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            initialize.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            initialize.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            initialize.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                1, &initialize);
+        }
         VkClearValue clear{};
         clear.color.float32[0] = 1.0f;
         VkRenderPassBeginInfo pass{};
@@ -1878,6 +2637,56 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(constants), &constants);
         vkCmdDraw(command, 3, 1, 0, 0);
         vkCmdEndRenderPass(command);
+        if (swapchain.voxelGiEnabled) {
+            std::array<VkImageMemoryBarrier, 2> copyBarriers{};
+            copyBarriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            copyBarriers[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            copyBarriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            copyBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            copyBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            copyBarriers[0].image = swapchain.screenEffectImages[imageIndex];
+            copyBarriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copyBarriers[0].subresourceRange.levelCount = 1;
+            copyBarriers[0].subresourceRange.layerCount = 1;
+            copyBarriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT |
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            copyBarriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            copyBarriers[1] = copyBarriers[0];
+            copyBarriers[1].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            copyBarriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            copyBarriers[1].image = swapchain.voxelGiHistoryImages[imageIndex];
+            copyBarriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            copyBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            vkCmdPipelineBarrier(command,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                copyBarriers.size(), copyBarriers.data());
+            VkImageCopy copy{};
+            copy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.srcSubresource.layerCount = 1;
+            copy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.dstSubresource.layerCount = 1;
+            copy.extent = {swapchain.screenEffectExtent.width,
+                           swapchain.screenEffectExtent.height, 1};
+            vkCmdCopyImage(command, swapchain.screenEffectImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                swapchain.voxelGiHistoryImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            copyBarriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            copyBarriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            copyBarriers[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            copyBarriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            copyBarriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            copyBarriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            copyBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            copyBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                copyBarriers.size(), copyBarriers.data());
+            swapchain.voxelGiHistoryInitialized[imageIndex] = true;
+            voxelGiHistoryValid = true;
+        }
         ++performance.drawCalls;
         ++performance.pipelineBinds;
         ++performance.descriptorBinds;
@@ -2023,7 +2832,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         prepareParticleBuffer();
         prepareModelBuffer();
         prepareUiBuffers();
+        prepareVoxelGiUploads();
         prepareBufferUploads();
+        prepareVoxelGiUniform(imageIndex);
         performance.cpuPrepareMs = RuntimeClock::seconds(
             RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
         mark = clock.now();
@@ -2124,6 +2935,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     void cleanup() {
         if (device) vkDeviceWaitIdle(device);
         if (allocator) {
+            destroyVoxelGiResources();
             for (auto& [id, mesh] : meshes) {
                 (void)id;
                 destroyGpuMesh(mesh);

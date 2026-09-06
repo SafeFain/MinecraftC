@@ -10,9 +10,11 @@
 SettingsMenu::SettingsMenu(ClientSettings& settings,
                            std::function<void()> onChanged,
                            std::function<void()> onBack,
-                           const Localization& localization)
+                           const Localization& localization,
+                           std::function<VoxelGiStatus()> giStatus)
     : m_onBack(std::move(onBack)), m_onChanged(std::move(onChanged)),
-      m_settings(settings), m_localization(localization) { refreshButtons(); }
+      m_settings(settings), m_localization(localization),
+      m_giStatus(std::move(giStatus)) { refreshButtons(); }
 
 std::string SettingsMenu::labelForRenderDist() const {
     return m_localization.format(
@@ -46,6 +48,7 @@ void SettingsMenu::cycleRenderDistance() {
 }
 void SettingsMenu::toggleCloudRendering() {
     m_settings.renderClouds = !m_settings.renderClouds;
+    m_settings.markGraphicsCustom();
     m_onChanged(); refreshButtons();
 }
 void SettingsMenu::cycleCloudRenderDistance() {
@@ -104,15 +107,19 @@ void SettingsMenu::refreshButtons() {
             refreshButtons();
         });
         m_buttons.emplace_back(labelForRenderDist(), [this]{ cycleRenderDistance(); });
-        const char* visualNames[] = {"settings.visual_low", "settings.visual_medium",
-            "settings.visual_high", "settings.visual_ultra"};
+        const char* visualName = "settings.visual_custom";
+        switch (m_settings.graphicsPreset) {
+            case GraphicsPreset::Low: visualName = "settings.visual_low"; break;
+            case GraphicsPreset::Medium: visualName = "settings.visual_medium"; break;
+            case GraphicsPreset::High: visualName = "settings.visual_high"; break;
+            case GraphicsPreset::VeryHigh: visualName = "settings.visual_very_high"; break;
+            case GraphicsPreset::Ultra: visualName = "settings.visual_ultra"; break;
+            case GraphicsPreset::Custom: break;
+        }
         m_buttons.emplace_back(m_localization.format("settings.visual_quality", {
-            m_localization.text(visualNames[static_cast<int>(m_settings.visualQuality)])}),
+            m_localization.text(visualName)}),
             [this]{
-                m_settings.visualQuality = static_cast<VisualQuality>(
-                    (static_cast<int>(m_settings.visualQuality) + 1) % 4);
-                m_settings.transparentLeaves =
-                    defaultLeafTransparency(m_settings.visualQuality);
+                m_settings.applyGraphicsPreset(m_settings.nextGraphicsPreset());
                 m_onChanged(); refreshButtons();
             });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_visuals", {
@@ -120,6 +127,7 @@ void SettingsMenu::refreshButtons() {
                 ? "common.on" : "common.off")}), [this]{
                 m_settings.enhancedVisuals = !m_settings.enhancedVisuals;
                 m_settings.enhancedVisual.enabled = m_settings.enhancedVisuals;
+                m_settings.markGraphicsCustom();
                 m_onChanged(); refreshButtons();
             });
         m_buttons.emplace_back(m_localization.text("settings.enhanced_details"), [this]{
@@ -128,6 +136,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
             m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
                 m_settings.smoothLighting = !m_settings.smoothLighting;
+                m_settings.markGraphicsCustom();
                 m_onChanged(); refreshButtons();
             });
         const char* shadowNames[] = {"common.off", "settings.shadow_low",
@@ -136,12 +145,14 @@ void SettingsMenu::refreshButtons() {
             m_localization.text(shadowNames[static_cast<int>(m_settings.shadowQuality)])}), [this]{
                 m_settings.shadowQuality = static_cast<ShadowQuality>(
                     (static_cast<int>(m_settings.shadowQuality) + 1) % 4);
+                m_settings.markGraphicsCustom();
                 m_onChanged(); refreshButtons();
             });
         m_buttons.emplace_back(m_localization.format("settings.transparent_leaves", {
             m_localization.text(m_settings.transparentLeaves
                 ? "common.on" : "common.off")}), [this]{
                 m_settings.transparentLeaves = !m_settings.transparentLeaves;
+                m_settings.markGraphicsCustom();
                 m_onChanged(); refreshButtons();
             });
         m_buttons.emplace_back(m_localization.format("settings.clouds", {
@@ -182,51 +193,76 @@ void SettingsMenu::refreshButtons() {
             return std::to_string(static_cast<int>(value)) + "%";
         };
         const auto cycle = [this](uint8_t& value) {
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             value = static_cast<uint8_t>(value >= 100 ? 0 : value + 25);
             m_onChanged(); refreshButtons();
         };
-        m_buttons.emplace_back(m_localization.format("settings.enhanced_mode", {
-            m_localization.text(settings.custom ? "settings.enhanced_custom" :
-                                                  "settings.enhanced_preset")}), [this]{
-            m_settings.enhancedVisual.custom = !m_settings.enhancedVisual.custom;
-            m_onChanged(); refreshButtons();
-        });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_bloom", {onOff(settings.bloom)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.bloom = !m_settings.enhancedVisual.bloom; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_bloom_strength", {percent(settings.bloomStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.bloomStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_ao", {onOff(settings.ambientOcclusion)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.ambientOcclusion = !m_settings.enhancedVisual.ambientOcclusion; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_ao_strength", {percent(settings.ambientOcclusionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.ambientOcclusionStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_shafts", {onOff(settings.lightShafts)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.lightShafts = !m_settings.enhancedVisual.lightShafts; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_shaft_strength", {percent(settings.lightShaftStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.lightShaftStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_reflections", {onOff(settings.reflections)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.reflections = !m_settings.enhancedVisual.reflections; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_reflection_strength", {percent(settings.reflectionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.reflectionStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_atmosphere", {onOff(settings.atmosphere)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.atmosphere = !m_settings.enhancedVisual.atmosphere; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_atmosphere_strength", {percent(settings.atmosphereStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.atmosphereStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_material", {onOff(settings.materialMotion)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.materialMotion = !m_settings.enhancedVisual.materialMotion; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_material_strength", {percent(settings.materialMotionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.materialMotionStrength); });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_particles", {onOff(settings.ambientParticles)}), [this]{
-            m_settings.enhancedVisual.custom = true;
+            m_settings.markGraphicsCustom();
             m_settings.enhancedVisual.ambientParticles = !m_settings.enhancedVisual.ambientParticles; m_onChanged(); refreshButtons();
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_particle_strength", {percent(settings.ambientParticleStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.ambientParticleStrength); });
+        const VoxelGiStatus giRuntime = m_giStatus ? m_giStatus() : VoxelGiStatus{};
+        const std::string giValue = settings.gi.enabled &&
+            giRuntime.availability != VoxelGiAvailability::Available
+            ? m_localization.text("settings.gi_unavailable")
+            : onOff(settings.gi.enabled);
+        m_buttons.emplace_back(m_localization.format("settings.gi_enabled", {
+            giValue}), [this]{
+                m_settings.markGraphicsCustom();
+                m_settings.enhancedVisual.gi.enabled =
+                    !m_settings.enhancedVisual.gi.enabled;
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back(m_localization.format("settings.gi_strength", {
+            percent(settings.gi.strength)}), [this, cycle]{
+                cycle(m_settings.enhancedVisual.gi.strength);
+            });
+        m_buttons.emplace_back(m_localization.format("settings.gi_distance", {
+            std::to_string(settings.gi.distance)}), [this]{
+                constexpr uint16_t distances[] = {32, 64, 128, 256};
+                const auto found = std::find(std::begin(distances),
+                    std::end(distances), m_settings.enhancedVisual.gi.distance);
+                const size_t index = found == std::end(distances) ? 0u :
+                    (static_cast<size_t>(found - std::begin(distances)) + 1u) % 4u;
+                m_settings.enhancedVisual.gi.distance = distances[index];
+                m_settings.markGraphicsCustom();
+                m_onChanged(); refreshButtons();
+            });
+        m_buttons.emplace_back(m_localization.format("settings.gi_temporal", {
+            percent(settings.gi.temporalStability)}), [this, cycle]{
+                cycle(m_settings.enhancedVisual.gi.temporalStability);
+            });
         m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{ showPage(SettingsPage::Video); });
     } else if (m_page == SettingsPage::Lod) {

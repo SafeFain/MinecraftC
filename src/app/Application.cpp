@@ -365,7 +365,9 @@ private:
                 } else {
                     m_flow.showMainMenu();
                 }
-            }, m_ui.localization);
+            }, m_ui.localization, [this]() {
+                return m_renderer->voxelGiStatus();
+            });
         };
 
         // ── Input callbacks ───────────────────────────────────────────

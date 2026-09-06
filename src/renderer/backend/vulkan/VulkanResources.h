@@ -59,6 +59,8 @@ struct VulkanDescriptorResources {
     VkDescriptorSetLayout postDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout bloomDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout screenEffectDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout screenEffectGiDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout voxelGiComputeDescriptorSetLayout = VK_NULL_HANDLE;
 
     void attach(VkDevice device) { m_device = device; }
     ~VulkanDescriptorResources();
@@ -144,6 +146,10 @@ struct VulkanSwapchainBundle {
         VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout screenEffectLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout screenEffectGiLayout = VK_NULL_HANDLE;
+        bool voxelGiEnabled = false;
+        const std::array<VkImageView, 4>* voxelGiImageViews = nullptr;
+        VkBuffer voxelGiUniformBuffer = VK_NULL_HANDLE;
         int bloomLevels = 0;
         int screenEffectDivisor = 0;
         VkSampleCountFlagBits requestedSampleCount = VK_SAMPLE_COUNT_1_BIT;
@@ -176,12 +182,23 @@ struct VulkanSwapchainBundle {
     std::vector<VkImage> surfaceMsaaImages;
     std::vector<VmaAllocation> surfaceMsaaAllocations;
     std::vector<VkImageView> surfaceMsaaImageViews;
+    std::vector<VkImage> voxelGiAlbedoImages;
+    std::vector<VmaAllocation> voxelGiAlbedoAllocations;
+    std::vector<VkImageView> voxelGiAlbedoImageViews;
+    std::vector<VkImage> voxelGiAlbedoMsaaImages;
+    std::vector<VmaAllocation> voxelGiAlbedoMsaaAllocations;
+    std::vector<VkImageView> voxelGiAlbedoMsaaImageViews;
     VkExtent2D screenEffectExtent{};
     std::vector<VkImage> screenEffectImages;
     std::vector<VmaAllocation> screenEffectAllocations;
     std::vector<VkImageView> screenEffectImageViews;
+    std::vector<VkImage> voxelGiHistoryImages;
+    std::vector<VmaAllocation> voxelGiHistoryAllocations;
+    std::vector<VkImageView> voxelGiHistoryImageViews;
+    std::vector<bool> voxelGiHistoryInitialized;
     std::vector<VkFramebuffer> screenEffectFramebuffers;
     bool surfaceDataEnabled = false;
+    bool voxelGiEnabled = false;
     int bloomLevelCount = 0;
     std::array<VkExtent2D, MAX_BLOOM_LEVELS> bloomExtents{};
     std::array<std::vector<VkImage>, MAX_BLOOM_LEVELS> bloomImages;

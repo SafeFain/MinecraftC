@@ -718,6 +718,17 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME rendering_day_cycle_and_environment COMMAND rendering_logic_tests)
 
+    add_executable(voxel_gi_tests
+        tests/VoxelGiTests.cpp
+        src/world/Block.cpp
+        src/world/Chunk.cpp)
+    target_include_directories(voxel_gi_tests PRIVATE src)
+    target_link_libraries(voxel_gi_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(voxel_gi_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME voxel_gi_clipmap_and_temporal COMMAND voxel_gi_tests)
+
     add_executable(player_physics_tests
         tests/PlayerPhysicsTests.cpp
         src/world/Block.cpp

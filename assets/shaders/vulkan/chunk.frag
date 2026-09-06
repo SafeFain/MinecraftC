@@ -31,6 +31,7 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
 layout(set=1,binding=1) uniform sampler2D shadowMap;
 layout(location=0) out vec4 outColor;
 layout(location=1) out vec4 outSurface;
+layout(location=2) out vec4 outGiSurface;
 
 vec2 encodeNormal(vec3 n){
     n/=abs(n.x)+abs(n.y)+abs(n.z);
@@ -343,4 +344,6 @@ void main() {
     outSurface=vec4(encodeNormal(normal),signedDistance,
         surfaceCoverage>0.5?(isWater?1.0:
             clamp(roughness,0.0,1.0)+emissiveMarker):0.0);
+    outGiSurface=vec4(albedo*frame.tint.rgb,
+        emissiveMarker>0.0?1.0:0.0);
 }

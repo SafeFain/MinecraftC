@@ -54,6 +54,13 @@ void GameScenePresenter::render(
         const glm::dvec3 playerPosition = session.player.getPosition();
         const glm::dvec3 renderOrigin(
             playerPosition.x, 0.0, playerPosition.z);
+        const uint64_t giSceneId = session.worldMetadata.seed ^
+            (session.world.isHeaven() ? 0x9e3779b97f4a7c15ull : 0ull);
+        renderer.beginVoxelGiFrame(
+            renderOrigin + glm::dvec3(camera.m_position), giSceneId);
+        for (const Chunk* chunk : session.world.getActiveChunks())
+            renderer.submitVoxelGiChunk(*chunk);
+        renderer.endVoxelGiFrame();
         if (settings.renderClouds) {
             renderer.renderClouds(
                 playerPosition, vp, session.worldMetadata.seed,
@@ -206,6 +213,8 @@ void GameScenePresenter::render(
         postProcess.environment = environment;
         postProcess.inverseViewProjection = glm::inverse(vp);
         postProcess.cameraPosition = camera.m_position;
+        postProcess.worldOrigin = renderOrigin;
+        postProcess.sceneId = giSceneId;
         postProcess.exposure = visualExposure.update(
             eyeLight.sky, eyeLight.block, environment, dt);
         postProcess.underwater = session.player.underwater() ? 1.0f : 0.0f;

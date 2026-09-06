@@ -37,15 +37,25 @@ int main() {
     const VisualQualityConfig lowVisual = visualQualityConfig(VisualQuality::Low);
     const VisualQualityConfig mediumVisual = visualQualityConfig(VisualQuality::Medium);
     const VisualQualityConfig highVisual = visualQualityConfig(VisualQuality::High);
+    const VisualQualityConfig veryHighVisual = visualQualityConfig(VisualQuality::VeryHigh);
     const VisualQualityConfig ultraVisual = visualQualityConfig(VisualQuality::Ultra);
     require(lowVisual.sceneSamples == 1 && lowVisual.bloomLevels == 0 &&
             lowVisual.aoDirections == 0 && !lowVisual.materialNormals &&
             mediumVisual.sceneSamples == 2 && mediumVisual.bloomLevels == 3 &&
             mediumVisual.materialNormals && mediumVisual.voxelClouds &&
             highVisual.sceneSamples == 4 && highVisual.aoDirections == 6 &&
-            highVisual.cirrusClouds && ultraVisual.aoDirections == 8 &&
+            highVisual.cirrusClouds && veryHighVisual.aoDirections == 7 &&
+            veryHighVisual.bloomLevels == 6 && ultraVisual.aoDirections == 8 &&
             ultraVisual.bloomLevels == 6,
             "visual quality presets do not match the rendering contract");
+    require(nextVisualQuality(VisualQuality::Low)==VisualQuality::Medium&&
+            nextVisualQuality(VisualQuality::Medium)==VisualQuality::High&&
+            nextVisualQuality(VisualQuality::High)==VisualQuality::VeryHigh&&
+            nextVisualQuality(VisualQuality::VeryHigh)==VisualQuality::Ultra&&
+            nextVisualQuality(VisualQuality::Ultra)==VisualQuality::Low&&
+            static_cast<int>(VisualQuality::Ultra)==3&&
+            static_cast<int>(VisualQuality::VeryHigh)==4,
+            "explicit visual-quality ordering changed legacy persisted values");
     const EnhancedVisualConfig enhancedOff = enhancedVisualConfig(
         VisualQuality::Ultra, false);
     const EnhancedVisualConfig enhancedLow = enhancedVisualConfig(
@@ -127,6 +137,29 @@ int main() {
     custom.reflections = false;
     require(!enhancedVisualConfig(VisualQuality::Ultra, custom).usesSurfaceData(),
             "disabling every screen effect still allocates surface resources");
+    EnhancedVisualSettings gi;
+    gi.enabled=true;
+    gi.gi.enabled=true;
+    gi.gi.strength=100;
+    gi.gi.distance=128;
+    gi.gi.temporalStability=100;
+    const VoxelGiConfig lowGi=voxelGiConfig(VisualQuality::Low,gi);
+    const VoxelGiConfig mediumGi=voxelGiConfig(VisualQuality::Medium,gi);
+    const VoxelGiConfig highGi=voxelGiConfig(VisualQuality::High,gi);
+    const VoxelGiConfig veryHighGi=voxelGiConfig(VisualQuality::VeryHigh,gi);
+    const VoxelGiConfig ultraGi=voxelGiConfig(VisualQuality::Ultra,gi);
+    require(lowGi.clipmapResolution==32&&lowGi.clipmapLevels==2&&
+            lowGi.screenDivisor==4&&lowGi.coneCount==2&&lowGi.coneSteps==4&&
+            mediumGi.clipmapResolution==32&&mediumGi.clipmapLevels==3&&
+            mediumGi.coneCount==3&&mediumGi.coneSteps==5&&
+            highGi.clipmapResolution==48&&highGi.clipmapLevels==3&&
+            highGi.screenDivisor==2&&highGi.coneCount==4&&highGi.coneSteps==6&&
+            veryHighGi.clipmapResolution==64&&veryHighGi.clipmapLevels==3&&
+            veryHighGi.coneCount==5&&veryHighGi.coneSteps==7&&
+            ultraGi.clipmapResolution==64&&ultraGi.clipmapLevels==4&&
+            ultraGi.coneCount==6&&ultraGi.coneSteps==8&&
+            std::abs(ultraGi.historyWeight-0.95f)<0.0001f,
+            "GI tier budgets or temporal freeze guard changed");
     require(supportsFireflies(Biome::SWAMP) &&
                 supportsFireflies(Biome::FOREST) &&
                 supportsFireflies(Biome::BIRCH_FOREST) &&
