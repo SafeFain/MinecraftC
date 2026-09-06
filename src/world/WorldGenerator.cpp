@@ -347,6 +347,118 @@ WorldGenerator::sampleHeavenLayers(int worldX, int worldZ) const {
     return layers;
 }
 
+std::vector<WorldGenerator::HeavenLodFeature>
+WorldGenerator::sampleHeavenLodFeatures(int worldX, int worldZ) const {
+    std::vector<HeavenLodFeature> features;
+    if (!isHeaven()) return features;
+
+    const auto layers = sampleHeavenLayers(worldX, worldZ);
+    const HeavenIslandColumn& mainIsland = layers[2];
+    if (mainIsland.present && mainIsland.biome == HeavenBiome::SkyrootGrove &&
+        hashPercent(m_seed ^ HEAVEN_DECOR_DOMAIN, worldX, 17, worldZ) < 10) {
+        const int trunkHeight = 5 + hashPercent(
+            m_seed ^ HEAVEN_DECOR_DOMAIN, worldX, 23, worldZ) % 4;
+        features.push_back({2, 1, trunkHeight - 2, BlockId::SKYROOT_WOOD, false});
+        features.push_back({2, trunkHeight - 1, trunkHeight,
+                            BlockId::SKYROOT_LEAVES, false});
+    }
+
+    for (int layer = 0; layer < HEAVEN_LAYER_COUNT; ++layer) {
+        const HeavenIslandColumn& island = layers[static_cast<size_t>(layer)];
+        if (!island.present || island.top + 1 >= Config::WORLD_MAX_Y) continue;
+        const int roll = hashPercent(
+            m_seed ^ HEAVEN_DECOR_DOMAIN, worldX, 31 + layer * 7, worldZ);
+        if (layer == HEAVEN_LAYER_COUNT - 1) {
+            if (roll < 60)
+                features.push_back({layer, 1, 1, BlockId::STAR_CRYSTAL, false});
+            continue;
+        }
+        const float layerScale = layer == 2 ? 1.0f : 0.6f;
+        const auto rollUnder = [&](int salt, int threshold) {
+            return hashPercent(m_seed ^ HEAVEN_DECOR_DOMAIN,
+                               worldX, salt + layer * 11, worldZ) <
+                   static_cast<int>(threshold * layerScale);
+        };
+        const auto add = [&](BlockId block, int bottom = 1, int top = 1) {
+            features.push_back({layer, bottom, top, block, false});
+        };
+        const auto replaceSurface = [&](BlockId block) {
+            features.push_back({layer, 0, 0, block, true});
+        };
+        switch (island.biome) {
+            case HeavenBiome::DawnMeadow:
+                if (rollUnder(41, 4)) add(BlockId::STARFLOWER);
+                else if (rollUnder(53, 9)) replaceSurface(BlockId::MOSS);
+                else if (rollUnder(61, 2)) {
+                    add(BlockId::SKYROOT_WOOD, 1, 1);
+                    add(BlockId::SKYROOT_LEAVES, 2, 2);
+                } else if (roll < static_cast<int>(20 * layerScale))
+                    add(BlockId::STARFLOWER);
+                break;
+            case HeavenBiome::SunstoneHeights:
+                if (rollUnder(41, 5)) {
+                    const int height = 1 + hashPercent(
+                        m_seed ^ HEAVEN_DECOR_DOMAIN,
+                        worldX, 71 + layer * 11, worldZ) % 3;
+                    add(BlockId::SUNSTONE, 1, height);
+                } else if (rollUnder(53, 8)) add(BlockId::SUNSTONE, 1, 2);
+                else if (rollUnder(61, 10)) add(BlockId::STAR_CRYSTAL);
+                break;
+            case HeavenBiome::StarCrystalGarden:
+                if (rollUnder(41, 3)) {
+                    const int height = 2 + hashPercent(
+                        m_seed ^ HEAVEN_DECOR_DOMAIN,
+                        worldX, 71 + layer * 11, worldZ) % 2;
+                    add(BlockId::STAR_CRYSTAL, 1, height);
+                } else if (rollUnder(53, 6)) add(BlockId::MOSS, 1, 2);
+                else if (rollUnder(61, 14)) add(BlockId::STARFLOWER);
+                else if (roll < static_cast<int>(9 * layerScale))
+                    add(BlockId::STAR_CRYSTAL);
+                else if (roll < static_cast<int>(20 * layerScale))
+                    add(BlockId::STARFLOWER);
+                break;
+            case HeavenBiome::CloudbloomFields:
+                if (rollUnder(41, 5)) add(BlockId::CLOUDSTONE);
+                else if (rollUnder(53, 8)) replaceSurface(BlockId::MOSS);
+                else if (roll < static_cast<int>(22 * layerScale))
+                    add(BlockId::CLOUD_BLOOM);
+                break;
+            case HeavenBiome::SkystoneBarrens:
+                if (rollUnder(41, 7)) {
+                    const int height = 2 + hashPercent(
+                        m_seed ^ HEAVEN_DECOR_DOMAIN,
+                        worldX, 71 + layer * 11, worldZ) % 3;
+                    add(BlockId::SUNSTONE, 1, height);
+                } else if (rollUnder(53, 5)) add(BlockId::CLOUDSTONE);
+                else if (rollUnder(61, 6)) replaceSurface(BlockId::AETHER_SOIL);
+                else if (roll < static_cast<int>(9 * layerScale))
+                    add(BlockId::STAR_CRYSTAL);
+                break;
+            case HeavenBiome::GlimmerFen:
+                if (rollUnder(41, 3)) add(BlockId::GLOWSHROOM);
+                else if (rollUnder(53, 6)) add(BlockId::MOSS, 1, 2);
+                else if (rollUnder(61, 12)) add(BlockId::STAR_CRYSTAL);
+                else if (roll < static_cast<int>(12 * layerScale))
+                    add(BlockId::GLOWSHROOM);
+                break;
+            case HeavenBiome::MoonpearlTerrace:
+                if (rollUnder(41, 2)) add(BlockId::STAR_CRYSTAL);
+                else if (rollUnder(53, 8)) add(BlockId::STARFLOWER);
+                else if (rollUnder(61, 6)) replaceSurface(BlockId::AETHER_SOIL);
+                else if (roll < static_cast<int>(11 * layerScale))
+                    add(BlockId::STARFLOWER);
+                else if (roll < static_cast<int>(16 * layerScale))
+                    add(BlockId::STAR_CRYSTAL);
+                break;
+            case HeavenBiome::SkyrootGrove:
+                break;
+        }
+    }
+    for (HeavenLodFeature& feature : features)
+        feature.biome = layers[static_cast<size_t>(feature.layer)].biome;
+    return features;
+}
+
 WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
     int worldX, int worldZ) const {
     // The main layer (L3) drives spawn, trees, and landmark anchoring.

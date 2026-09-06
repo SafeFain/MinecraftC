@@ -52,6 +52,14 @@ public:
         int top = Config::WORLD_MIN_Y - 1;
         int bottom = Config::WORLD_MIN_Y;
     };
+    struct HeavenLodFeature {
+        int layer = 0;
+        int bottomOffset = 1;
+        int topOffset = 1;
+        BlockId block = BlockId::AIR;
+        bool replacesSurface = false;
+        HeavenBiome biome = HeavenBiome::DawnMeadow;
+    };
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
     // Callback for structure blocks outside the current chunk.  Unlike
@@ -87,6 +95,8 @@ public:
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }
     HeavenBiome heavenBiomeAt(int worldX, int worldZ) const;
     std::array<HeavenIslandColumn, HEAVEN_LAYER_COUNT> sampleHeavenLayers(
+        int worldX, int worldZ) const;
+    std::vector<HeavenLodFeature> sampleHeavenLodFeatures(
         int worldX, int worldZ) const;
     std::optional<LocatedStructure> locateNearestHeavenStructure(
         StructureType type, int worldX, int worldZ,

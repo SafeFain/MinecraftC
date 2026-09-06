@@ -21,7 +21,7 @@
 #include <type_traits>
 
 namespace {
-constexpr uint32_t CACHE_REVISION = 3;
+constexpr uint32_t CACHE_REVISION = 4;
 constexpr size_t CPU_LIMIT = 64u * 1024u * 1024u;
 constexpr size_t GPU_LIMIT = 128u * 1024u * 1024u;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
@@ -217,10 +217,26 @@ BlockId lodTreeFoliage(TreeType type) {
     }
 }
 
+BlockId lodTreeTrunk(TreeType type) {
+    switch (type) {
+        case TreeType::BIRCH: return BlockId::BIRCH_WOOD;
+        case TreeType::SPRUCE: return BlockId::SPRUCE_WOOD;
+        case TreeType::JUNGLE: return BlockId::JUNGLE_WOOD;
+        case TreeType::ACACIA: return BlockId::ACACIA_WOOD;
+        default: return BlockId::WOOD;
+    }
+}
+
 bool isLodTreeFoliage(BlockId block) {
     return block == BlockId::LEAVES || block == BlockId::BIRCH_LEAVES ||
            block == BlockId::SPRUCE_LEAVES || block == BlockId::JUNGLE_LEAVES ||
-           block == BlockId::ACACIA_LEAVES || block == BlockId::CACTUS_BLOCK;
+           block == BlockId::ACACIA_LEAVES || block == BlockId::SKYROOT_LEAVES ||
+           block == BlockId::CACTUS_BLOCK;
+}
+
+bool isFineHeavenDecoration(BlockId block) {
+    return block == BlockId::STARFLOWER || block == BlockId::CLOUD_BLOOM ||
+           block == BlockId::GLOWSHROOM;
 }
 
 int lodTreeRadius(TreeType type) {
@@ -415,6 +431,78 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
         }
     }
 
+    // Fine Heaven tiles retain representative, generation-matched surface
+    // features. Four samples per axis bound the work independently of the
+    // cell size while making narrow trees, crystals and flowers visible.
+    if (generator.isHeaven() && cellSize <= 8) {
+        const int sampleCount = std::min(cellSize, 4);
+        for (int z = 0; z < LodTileData::SIDE; ++z) {
+            for (int x = 0; x < LodTileData::SIDE; ++x) {
+                const int centerX = originX + x * cellSize + cellSize / 2;
+                const int centerZ = originZ + z * cellSize + cellSize / 2;
+                const auto centerLayers = generator.sampleHeavenLayers(centerX, centerZ);
+                std::array<std::vector<WorldGenerator::HeavenLodFeature>,
+                           WorldGenerator::HEAVEN_LAYER_COUNT> selected;
+                for (int sampleZ = 0; sampleZ < sampleCount; ++sampleZ) {
+                    for (int sampleX = 0; sampleX < sampleCount; ++sampleX) {
+                        const int wx = originX + x * cellSize +
+                            (sampleX * cellSize + cellSize / 2) / sampleCount;
+                        const int wz = originZ + z * cellSize +
+                            (sampleZ * cellSize + cellSize / 2) / sampleCount;
+                        std::array<std::vector<WorldGenerator::HeavenLodFeature>,
+                                   WorldGenerator::HEAVEN_LAYER_COUNT> sampled;
+                        for (const auto& feature :
+                             generator.sampleHeavenLodFeatures(wx, wz)) {
+                            const auto& centerLayer = centerLayers[
+                                static_cast<size_t>(feature.layer)];
+                            if (centerLayer.biome == feature.biome)
+                                sampled[static_cast<size_t>(feature.layer)].push_back(
+                                    feature);
+                        }
+                        for (int layer = 0;
+                             layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
+                            if (!centerLayers[static_cast<size_t>(layer)].present ||
+                                !selected[static_cast<size_t>(layer)].empty() ||
+                                sampled[static_cast<size_t>(layer)].empty())
+                                continue;
+                            selected[static_cast<size_t>(layer)] =
+                                std::move(sampled[static_cast<size_t>(layer)]);
+                        }
+                    }
+                }
+
+                LodColumn& column = tile.at(x, z);
+                for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT;
+                     ++layer) {
+                    const auto& features = selected[static_cast<size_t>(layer)];
+                    if (features.empty()) continue;
+                    const int surfaceTop = centerLayers[static_cast<size_t>(layer)].top;
+                    for (const auto& feature : features) {
+                        if (feature.replacesSurface) {
+                            const auto found = std::find_if(
+                                column.spans.begin(), column.spans.end(),
+                                [surfaceTop](const LodSpan& span) {
+                                    return span.top == surfaceTop;
+                                });
+                            if (found != column.spans.end()) found->block = feature.block;
+                            continue;
+                        }
+                        const int bottom = surfaceTop + feature.bottomOffset;
+                        const int top = std::min(Config::WORLD_MAX_Y - 1,
+                            surfaceTop + feature.topOffset);
+                        if (bottom <= top)
+                            column.spans.push_back({static_cast<int16_t>(bottom),
+                                static_cast<int16_t>(top), feature.block});
+                    }
+                }
+                std::sort(column.spans.begin(), column.spans.end(),
+                    [](const LodSpan& a, const LodSpan& b) {
+                        return a.bottom < b.bottom;
+                    });
+            }
+        }
+    }
+
     // Preserve deterministic tree silhouettes in the two finest approximate
     // levels. Individual trees are intentionally omitted once a cell exceeds
     // eight blocks so a canopy can never become a giant distant cube.
@@ -444,6 +532,17 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             const int bottom = tree.baseY + (cactus ? 1 :
                 std::max(2, tree.trunkHeight - 2));
             const int top = tree.baseY + tree.trunkHeight + (cactus ? 0 : 2);
+            if (!cactus) {
+                const int trunkX = floorDiv(treeX, cellSize);
+                const int trunkZ = floorDiv(treeZ, cellSize);
+                if (trunkX >= 0 && trunkX < LodTileData::SIDE &&
+                    trunkZ >= 0 && trunkZ < LodTileData::SIDE) {
+                    LodColumn& trunkColumn = tile.at(trunkX, trunkZ);
+                    trunkColumn.spans.push_back({
+                        static_cast<int16_t>(tree.baseY + 1),
+                        static_cast<int16_t>(bottom - 1), lodTreeTrunk(tree.type)});
+                }
+            }
             for (int z = minimumZ; z <= maximumZ; ++z) {
                 for (int x = minimumX; x <= maximumX; ++x) {
                     TreeOverlay& overlay = overlays[static_cast<size_t>(
@@ -612,7 +711,8 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
             for (size_t spanIndex = first; spanIndex < column.spans.size(); ++spanIndex) {
                 const LodSpan& span = column.spans[spanIndex];
                 const BlockProperties& properties = getBlockProps(span.block);
-                if (cellSize > 1 && !properties.solid && !isFluid(span.block))
+                if (cellSize > 1 && !properties.solid && !isFluid(span.block) &&
+                    !(cellSize <= 2 && isFineHeavenDecoration(span.block)))
                     continue;
                 const float x0 = static_cast<float>(x * cellSize);
                 const float x1 = static_cast<float>((x + 1) * cellSize);
@@ -682,7 +782,7 @@ LodTerrainSystem::~LodTerrainSystem() {
 
 void LodTerrainSystem::setSaveStore(SaveStore* store) {
     m_saveStore = store;
-    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r3" /
+    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r4" /
         ("d_" + std::to_string(static_cast<int>(m_generator
             ? m_generator->dimension() : DimensionId::Overworld)))
         : std::filesystem::path{};
@@ -702,7 +802,7 @@ void LodTerrainSystem::reset(WorldGenerator* generator) {
     m_cpuBytes = m_gpuBytes = 0;
     m_generator = generator;
     if (m_saveStore && m_generator) {
-        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r3" /
+        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r4" /
             ("d_" + std::to_string(static_cast<int>(m_generator->dimension())));
     }
     ++m_epoch;

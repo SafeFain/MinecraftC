@@ -38,6 +38,18 @@ bool isLodTreeBlock(BlockId block) {
            block == BlockId::ACACIA_LEAVES || block == BlockId::CACTUS_BLOCK;
 }
 
+bool isLodTreeTrunk(BlockId block) {
+    return block == BlockId::WOOD || block == BlockId::BIRCH_WOOD ||
+           block == BlockId::SPRUCE_WOOD || block == BlockId::JUNGLE_WOOD ||
+           block == BlockId::ACACIA_WOOD;
+}
+
+bool isHeavenSurfaceFeature(BlockId block) {
+    return block == BlockId::SKYROOT_WOOD || block == BlockId::SKYROOT_LEAVES ||
+           block == BlockId::STAR_CRYSTAL || block == BlockId::STARFLOWER ||
+           block == BlockId::CLOUD_BLOOM || block == BlockId::GLOWSHROOM;
+}
+
 int blockIndex(int x, int y, int z) {
     return x + z * Config::CHUNK_SIZE_X +
         Config::worldYToStorageY(y) * Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
@@ -77,9 +89,13 @@ int main() {
             "LOD approximation varies with the world seed");
 
     bool foundTree = false;
+    bool foundTreeTrunk = false;
+    bool foundCompleteTreeColumn = false;
     bool foundSubCellWater = false;
-    for (int tz = -3; tz <= 3 && (!foundTree || !foundSubCellWater); ++tz) {
-        for (int tx = -3; tx <= 3 && (!foundTree || !foundSubCellWater); ++tx) {
+    for (int tz = -3; tz <= 3 &&
+         (!foundCompleteTreeColumn || !foundSubCellWater); ++tz) {
+        for (int tx = -3; tx <= 3 &&
+             (!foundCompleteTreeColumn || !foundSubCellWater); ++tx) {
             constexpr int level = 2;
             constexpr int cellSize = 1 << level;
             const LodTileKey key{tx, tz, level};
@@ -89,10 +105,17 @@ int main() {
             for (int z = 0; z < LodTileData::SIDE; ++z) {
                 for (int x = 0; x < LodTileData::SIDE; ++x) {
                     bool hasWater = false;
+                    bool hasFoliage = false;
+                    bool hasTrunk = false;
                     for (const LodSpan& span : tile.at(x, z).spans) {
                         foundTree = foundTree || isLodTreeBlock(span.block);
+                        foundTreeTrunk = foundTreeTrunk || isLodTreeTrunk(span.block);
+                        hasFoliage = hasFoliage || isLodTreeBlock(span.block);
+                        hasTrunk = hasTrunk || isLodTreeTrunk(span.block);
                         hasWater = hasWater || isWater(span.block);
                     }
+                    foundCompleteTreeColumn = foundCompleteTreeColumn ||
+                        (hasFoliage && hasTrunk);
                     const SurfaceColumn center = normal.sampleTerrainColumn(
                         originX + x * cellSize + cellSize / 2,
                         originZ + z * cellSize + cellSize / 2);
@@ -104,6 +127,8 @@ int main() {
     }
     require(foundTree,
             "fine approximate LOD retains deterministic tree silhouettes");
+    require(foundTreeTrunk && foundCompleteTreeColumn,
+            "fine approximate LOD retains visible tree trunks");
     require(foundSubCellWater,
             "fine approximate LOD retains water missed by its center sample");
     LodColumn recoveredWater;
@@ -136,16 +161,58 @@ int main() {
 
     WorldGenerator heaven(77, WorldType::Normal, DimensionId::Heaven);
     int maximumHeavenLayers = 0;
-    for (int tz = -4; tz <= 4; ++tz) {
-        for (int tx = -4; tx <= 4; ++tx) {
+    bool foundSkyrootWood = false;
+    bool foundSkyrootLeaves = false;
+    bool foundStarCrystal = false;
+    bool foundStarflower = false;
+    bool foundCloudBloom = false;
+    bool foundGlowshroom = false;
+    bool foundAetherSoil = false;
+    for (int tz = -8; tz <= 8; ++tz) {
+        for (int tx = -8; tx <= 8; ++tx) {
             const LodTileData tile = buildApproximateLodTile(heaven, {tx, tz, 1});
-            for (const LodColumn& column : tile.columns)
+            for (const LodColumn& column : tile.columns) {
                 maximumHeavenLayers = std::max(
                     maximumHeavenLayers, static_cast<int>(column.spans.size()));
+                for (const LodSpan& span : column.spans) {
+                    foundSkyrootWood = foundSkyrootWood ||
+                        span.block == BlockId::SKYROOT_WOOD;
+                    foundSkyrootLeaves = foundSkyrootLeaves ||
+                        span.block == BlockId::SKYROOT_LEAVES;
+                    foundStarCrystal = foundStarCrystal ||
+                        span.block == BlockId::STAR_CRYSTAL;
+                    foundStarflower = foundStarflower ||
+                        span.block == BlockId::STARFLOWER;
+                    foundCloudBloom = foundCloudBloom ||
+                        span.block == BlockId::CLOUD_BLOOM;
+                    foundGlowshroom = foundGlowshroom ||
+                        span.block == BlockId::GLOWSHROOM;
+                    foundAetherSoil = foundAetherSoil ||
+                        span.block == BlockId::AETHER_SOIL;
+                }
+            }
         }
     }
-    require(maximumHeavenLayers >= 2 && maximumHeavenLayers <= 5,
+    require(maximumHeavenLayers >= 2,
             "Heaven LOD preserves multiple independently sampled island layers");
+    require(foundSkyrootWood && foundSkyrootLeaves && foundStarCrystal &&
+                foundStarflower && foundCloudBloom && foundGlowshroom &&
+                foundAetherSoil,
+            "fine Heaven LOD omits representative surface blocks");
+    const ChunkMesh heavenPlantMesh = singleBlockLodMesh(BlockId::STARFLOWER);
+    LodTileData approximateHeavenPlant;
+    approximateHeavenPlant.at(0, 0).spans.push_back(
+        {200, 200, BlockId::STARFLOWER});
+    require(!buildLodTileMesh(approximateHeavenPlant, 2, 24).empty() &&
+                buildLodTileMesh(approximateHeavenPlant, 4, 24).empty(),
+            "Heaven plants must remain visible only in the finest approximate LOD");
+    require(!heavenPlantMesh.empty(),
+            "exact Heaven plant geometry is missing");
+    const LodTileData coarseHeaven = buildApproximateLodTile(heaven, {0, 0, 4});
+    for (const LodColumn& column : coarseHeaven.columns)
+        for (const LodSpan& span : column.spans)
+            require(!isHeavenSurfaceFeature(span.block),
+                    "coarse Heaven LOD magnifies a surface feature");
 
     std::vector<uint8_t> blocks(Config::CHUNK_VOLUME, 0);
     for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
@@ -208,7 +275,7 @@ int main() {
     require(decodeLodTilePayload(allBlockPayload, decodedAllBlocks) &&
             sameTile(allBlockTile, decodedAllBlocks) &&
             decodedAllBlocks.at(8, 8).spans.size() > 24,
-            "r3 LOD payload does not round-trip columns beyond 24 runs");
+            "r4 LOD payload does not round-trip columns beyond 24 runs");
     const ChunkMesh allBlockMesh = buildLodTileMesh(decodedAllBlocks, 1, 24);
     require(allBlockMesh.opaqueIndexCount > 0 &&
             allBlockMesh.translucentIndexCount > 0 &&
@@ -341,7 +408,7 @@ int main() {
                 "asynchronous LOD completion publishes bounded CPU data");
     }
     bool cacheFound = false;
-    const auto tileDirectory = root / "lod" / "r3" / "d_0" / "tiles";
+    const auto tileDirectory = root / "lod" / "r4" / "d_0" / "tiles";
     for (const auto& entry : std::filesystem::directory_iterator(tileDirectory)) {
         cacheFound = entry.is_regular_file();
         if (cacheFound) {
