@@ -289,6 +289,10 @@ int main() {
                     getBlockProps(leaf).alpha == 1.0f,
                 "leaf blocks must use opaque cutout rendering");
     }
+    require(blockFaceRenderData(BlockId::JUNGLE_LEAVES, FaceDir::TOP) == 32.0f &&
+                blockFaceRenderData(BlockId::LEAVES, FaceDir::TOP) == 16.0f &&
+                blockFaceRenderData(BlockId::JUNGLE_WOOD, FaceDir::TOP) == 0.0f,
+            "jungle foliage must preserve cutout while other leaf settings remain optional");
 
     static_assert(sizeof(MeshVertex) == 44);
     static_assert(offsetof(MeshVertex, px) == 0);

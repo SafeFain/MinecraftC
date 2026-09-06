@@ -209,6 +209,35 @@ class TextureGeneratorTests(unittest.TestCase):
                 self.assertGreaterEqual(len({p for p in pixels if p[3]}),3,name)
                 self.assertLessEqual(tg.structure_metrics(pixels)["seam_ratio"],2.60,name)
 
+    def test_overworld_leaf_species_are_distinct_from_grass_and_jungle_bark(self):
+        def mean_rgb(name):
+            opaque = [pixel for pixel in tg.generate_texture(name, tg.DEFAULT_SEED)
+                      if pixel[3]]
+            return tuple(sum(pixel[channel] for pixel in opaque) / len(opaque)
+                         for channel in range(3))
+
+        def mean_oklab(name):
+            return tg._srgb_to_oklab(mean_rgb(name))
+
+        def distance(left, right):
+            return sum((a - b) ** 2 for a, b in zip(left, right)) ** .5
+
+        grass = mean_oklab("grass_top")
+        oak = mean_oklab("leaves")
+        birch = mean_oklab("birch_leaves")
+        jungle = mean_oklab("jungle_leaves")
+        jungle_log = mean_oklab("jungle_log")
+        self.assertGreater(distance(oak, grass), .075)
+        self.assertGreater(distance(birch, grass), .075)
+        self.assertGreater(distance(jungle, grass), .075)
+        self.assertGreater(distance(jungle, jungle_log), .16)
+        # Birch stays green, but its warm olive anchor carries more red than
+        # blue relative to oak instead of becoming a second grass-green tile.
+        birch_rgb = mean_rgb("birch_leaves")
+        oak_rgb = mean_rgb("leaves")
+        self.assertGreater(birch_rgb[0] - birch_rgb[2],
+                           oak_rgb[0] - oak_rgb[2])
+
     def test_tool_parts_cannot_paint_outside_their_masks(self):
         definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
         for template in tg.TOOL_TEMPLATES:

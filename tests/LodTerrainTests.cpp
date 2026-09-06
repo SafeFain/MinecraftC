@@ -232,13 +232,19 @@ int main() {
     const ChunkMesh slabMesh = singleBlockLodMesh(BlockId::PLANKS_SLAB_BOTTOM);
     const ChunkMesh stairMesh = singleBlockLodMesh(BlockId::PLANKS_STAIRS_BOTTOM_NORTH);
     const ChunkMesh flowingMesh = singleBlockLodMesh(BlockId::FLOWING_WATER_7);
+    const ChunkMesh jungleLeavesMesh = singleBlockLodMesh(BlockId::JUNGLE_LEAVES);
     require(crossMesh.opaqueIndexCount >= 24 &&
             std::abs(meshMaximumY(snowMesh) - meshMinimumY(snowMesh) - 0.125f) < 0.001f &&
             meshMaximumY(bedMesh) - meshMinimumY(bedMesh) <= 9.0f / 16.0f + 0.001f &&
             std::abs(meshMaximumY(slabMesh) - meshMinimumY(slabMesh) - 0.5f) < 0.001f &&
             stairMesh.vertices.size() > slabMesh.vertices.size() &&
             flowingMesh.translucentIndexCount > 0 &&
-            meshMaximumY(flowingMesh) - meshMinimumY(flowingMesh) < 1.0f,
+            meshMaximumY(flowingMesh) - meshMinimumY(flowingMesh) < 1.0f &&
+            std::all_of(jungleLeavesMesh.vertices.begin(),
+                        jungleLeavesMesh.vertices.end(),
+                        [](const MeshVertex& vertex) {
+                            return vertex.face >= 32.0f && vertex.face < 38.0f;
+                        }),
             "exact LOD does not preserve registered special block geometry");
 
     LodTileData coarseDecoration;

@@ -305,22 +305,34 @@ _BRIGHT_BASES = {
     "sand": (225, 210, 163), "grass_top": (102, 161, 76),
     "grass_side": (102, 78, 48), "oak_log": (135, 100, 62),
     "oak_log_top": (179, 140, 87), "oak_planks": (181, 140, 88),
-    "leaves": (88, 147, 67), "coal_ore": (128, 132, 132),
+    # Species anchors deliberately stay away from the grass-top green. Oak is
+    # a deeper forest green, birch keeps a warm olive/brown undertone, and
+    # jungle foliage is the most saturated tropical green.
+    "leaves": (54, 126, 55), "birch_leaves": (79, 112, 53),
+    "jungle_leaves": (20, 175, 62), "coal_ore": (128, 132, 132),
     "copper_ore": (128, 132, 132), "iron_ore": (128, 132, 132),
 }
 for _name, _base in _BRIGHT_BASES.items():
-    _floor = 0.30 if _name in {"coal_ore", "oak_log"} else 0.36
-    _shift = 0.04 if _name in {"grass_top", "leaves"} else 0.0
-    PALETTES[_name] = _role_palette(_base, _name == "leaves",
-                                    shadow_floor=_floor, hue_shift=_shift)
+    _floor = 0.30 if _name in {"coal_ore", "oak_log"} else 0.34 \
+        if _name in {"leaves", "birch_leaves"} else 0.36
+    _shift = 0.04 if _name in {"grass_top", "leaves"} else -0.035 \
+        if _name == "birch_leaves" else 0.015 if _name == "jungle_leaves" else 0.0
+    _chroma = 1.00 if _name == "jungle_leaves" else 0.96 \
+        if _name == "birch_leaves" else 0.92
+    PALETTES[_name] = _role_palette(
+        _base, _name == "leaves" or _name.endswith("_leaves"), shadow_floor=_floor,
+        chroma_scale=_chroma, hue_shift=_shift)
 
 for _name, _base in EXTRA_BASES.items():
+    if _name in _BRIGHT_BASES:
+        continue
     PALETTES[_name] = muted_palette(_base, _name in TRANSPARENT or _name.endswith("_leaves"))
 
 # Keep naturally dark materials dark; lift the midtones of ordinary surfaces.
 for _name, _base in EXTRA_BASES.items():
-    if _name not in {"deepslate", "black_sand", "basalt", "mud", "obsidian",
-                     "bedrock", "water", "lava"}:
+    if _name not in _BRIGHT_BASES and _name not in {
+            "deepslate", "black_sand", "basalt", "mud", "obsidian",
+            "bedrock", "water", "lava"}:
         _l, _a, _b = _srgb_to_oklab(_base)
         PALETTES[_name] = _role_palette(_oklab_to_srgb((min(.88, _l+.055), _a, _b)),
             _name in TRANSPARENT or _name.endswith("_leaves"))

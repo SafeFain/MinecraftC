@@ -319,7 +319,7 @@ void emitFace(ChunkMesh& mesh, std::vector<unsigned int>& opaque,
             localIndex = static_cast<int>(mesh.vertices.size() - base);
             mesh.vertices.push_back({position.x, position.y, position.z,
                 1.0f, 1.0f, 0.0f, properties.alpha, u, v, tile,
-                static_cast<float>(face)});
+                blockFaceRenderData(block, face)});
         }
         indices.push_back(base + static_cast<unsigned int>(localIndex));
     }

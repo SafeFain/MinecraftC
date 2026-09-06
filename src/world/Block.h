@@ -288,6 +288,16 @@ inline bool isLeafBlock(BlockId id) {
            id == BlockId::ACACIA_LEAVES || id == BlockId::SKYROOT_LEAVES;
 }
 
+// Face data uses additive bands so shaders can retain leaf lighting while
+// distinguishing foliage that must preserve its authored cutout silhouette.
+inline float blockFaceRenderData(BlockId id, FaceDir face) {
+    constexpr float LEAF_FACE_OFFSET = 16.0f;
+    constexpr float ALWAYS_CUTOUT_LEAF_FACE_OFFSET = 32.0f;
+    if (id == BlockId::JUNGLE_LEAVES)
+        return static_cast<float>(face) + ALWAYS_CUTOUT_LEAF_FACE_OFFSET;
+    return static_cast<float>(face) + (isLeafBlock(id) ? LEAF_FACE_OFFSET : 0.0f);
+}
+
 inline bool isSolid(BlockId id) {
     return getBlockProps(id).solid;
 }

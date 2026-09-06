@@ -80,10 +80,35 @@ int main() {
         require(getFaceTexture(BlockId::BIRCH_WOOD, FaceDir::TOP) == BlockTexture::BirchLogTop &&
                 getFaceTexture(BlockId::ACACIA_WOOD, FaceDir::BOTTOM) == BlockTexture::AcaciaLogTop,
                 "tree species must use their own end grain");
+        require(getFaceTexture(BlockId::JUNGLE_LEAVES, FaceDir::TOP) ==
+                    BlockTexture::JungleLeaves &&
+                getFaceTexture(BlockId::JUNGLE_LEAVES, FaceDir::FRONT) ==
+                    BlockTexture::JungleLeaves &&
+                getAtlasTextureIndex(BlockTexture::JungleLog) == 34 &&
+                getAtlasTextureIndex(BlockTexture::JungleLeaves) == 35 &&
+                getAtlasTextureIndex(BlockTexture::JungleLeaves) !=
+                    getAtlasTextureIndex(BlockTexture::JungleLog),
+                "jungle foliage must cross the atlas row boundary after bark");
         require(getFaceTexture(BlockId::WHITE_BED, FaceDir::TOP) == BlockTexture::WhiteBedTop,
                 "bed must use linen top");
     };
     checkFaces();
+    const auto readText = [](const std::string& path) {
+        std::ifstream input(path);
+        return std::string(std::istreambuf_iterator<char>(input),
+                           std::istreambuf_iterator<char>());
+    };
+    const std::string chunkShader = readText(
+        root + "/assets/shaders/vulkan/chunk.frag");
+    const std::string shadowShader = readText(
+        root + "/assets/shaders/vulkan/shadow.vert");
+    require(chunkShader.find("int slotIndex=max(int(floor(tile)),0);") !=
+                std::string::npos &&
+            chunkShader.find("slotIndex%tileCount") != std::string::npos &&
+            shadowShader.find("int tileIndex=max(int(floor(tileData.z)),0);") !=
+                std::string::npos &&
+            shadowShader.find("tileIndex%tileCount") != std::string::npos,
+            "world atlas lookup must use integer row-boundary addressing");
     require(!loadTextureAssetDefinitions("missing-atlas.json", "missing-blocks.json",
                                          "missing-items.json"),
             "missing definitions did not activate compatibility fallback");

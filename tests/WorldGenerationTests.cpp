@@ -1247,6 +1247,7 @@ int main() {
     meshBlocks[meshIndex(1, 42, 1)] = static_cast<uint8_t>(BlockId::TALL_GRASS);
     meshBlocks[meshIndex(2, 40, 2)] = static_cast<uint8_t>(BlockId::WATER);
     meshBlocks[meshIndex(3, 44, 3)] = static_cast<uint8_t>(BlockId::BIRCH_LEAVES);
+    meshBlocks[meshIndex(4, 46, 4)] = static_cast<uint8_t>(BlockId::JUNGLE_LEAVES);
     int maxY[16][16]{};
     ChunkMesh mesh;
     mesh.build(0, 0, meshBlocks.data(), maxY,
@@ -1259,6 +1260,14 @@ int main() {
                     return vertex.face >= 16.0f && vertex.face < 22.0f;
                 }),
             "leaf vertices do not carry the transparency-control marker");
+    require(std::any_of(mesh.vertices.begin(), mesh.vertices.end(),
+                [](const MeshVertex& vertex) {
+                    return vertex.face >= 32.0f && vertex.face < 38.0f &&
+                        static_cast<int>(std::floor(vertex.tile)) ==
+                            getFaceTextureIndex(BlockId::JUNGLE_LEAVES,
+                                                FaceDir::TOP);
+                }),
+            "world jungle-leaf vertices lost their forced-cutout material marker");
     require(mesh.translucentIndexCount > 0,
             "translucent blocks were not assigned a separate index range");
     require(mesh.translucentIndexOffset == mesh.opaqueIndexCount,

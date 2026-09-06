@@ -174,16 +174,25 @@ void main() {
         // Their union is complete instead of both discarding the same pixels.
         if(dither>innerCoverage||dither<outerProgress)discard;
     }
-    float tiles=frame.atlasAndLighting.x;
-    float slot=floor(tile+0.5);
-    vec2 origin=vec2(mod(slot,tiles),floor(slot/tiles));
+    int tileCount=max(int(frame.atlasAndLighting.x+0.5),1);
+    // `tile` stores flat-light data in its positive fractional bits. Decode
+    // the material with integer row-major addressing: foliage slot 35 is the
+    // first tile after the 35-wide atlas row boundary, immediately following
+    // jungle-log slot 34.
+    int slotIndex=max(int(floor(tile)),0);
+    float slot=float(slotIndex);
+    ivec2 tileOrigin=ivec2(slotIndex%tileCount,slotIndex/tileCount);
+    float tiles=float(tileCount);
+    vec2 origin=vec2(tileOrigin);
     vec2 localPixel=mix(vec2(0.5),vec2(15.5),fract(tileUv));
     vec2 uv=(origin+localPixel/16.0)/tiles;
     vec2 dx=dFdx(tileUv)*(15.0/16.0)/tiles;
     vec2 dy=dFdy(tileUv)*(15.0/16.0)/tiles;
     vec4 texel=textureGrad(blockAtlas,uv,dx,dy);
+    bool alwaysCutoutLeaf=face>=32.0;
     bool leafSurface=face>=16.0;
-    float surfaceFace=leafSurface?face-16.0:face;
+    float surfaceFace=alwaysCutoutLeaf?face-32.0:
+        leafSurface?face-16.0:face;
     // Low quality sets materialParams.w to zero. Keep this branch uniform for
     // the whole draw so mobile GPUs can skip two texture fetches and all
     // tangent-space/specular work instead of merely multiplying it away.
@@ -195,7 +204,7 @@ void main() {
         properties=textureGrad(propertyAtlas,uv,dx,dy);
     }
     texel.a*=lighting.w;
-    if(leafSurface&&environment.shadowOptions.w<0.5&&
+    if(leafSurface&&!alwaysCutoutLeaf&&environment.shadowOptions.w<0.5&&
        texel.a<frame.atlasAndLighting.z){
         // Closed gaps represent the shaded interior behind the leaf clusters.
         // The atlas is sRGB: this factor operates on linear light, preserving
