@@ -437,17 +437,19 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void configureVisualQuality(VisualQuality quality) {
-        const int previousBloomLevels = enhancedVisualConfig(
-            visualQuality, enhancedVisuals).bloomLevels;
+        const EnhancedVisualConfig previous = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
         visualQuality = quality;
         const int samples = visualQualityConfig(quality).sceneSamples;
         requestedSampleCount = samples >= 4 ? VK_SAMPLE_COUNT_4_BIT :
             samples >= 2 ? VK_SAMPLE_COUNT_2_BIT : VK_SAMPLE_COUNT_1_BIT;
         const VkSampleCountFlagBits effective = maxSampleCount >= requestedSampleCount
             ? requestedSampleCount : maxSampleCount;
-        const bool bloomChanged = previousBloomLevels != enhancedVisualConfig(
-            visualQuality, enhancedVisuals).bloomLevels;
-        if (effective == swapchain.sampleCount && !bloomChanged) return;
+        const EnhancedVisualConfig current = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
+        const bool resourcesChanged = previous.bloomLevels != current.bloomLevels ||
+            previous.screenEffectDivisor != current.screenEffectDivisor;
+        if (effective == swapchain.sampleCount && !resourcesChanged) return;
         swapchain.sampleCount = effective;
         swapchainDirty = true;
         LOG_INFO("Vulkan visual quality selected " << samples
@@ -456,11 +458,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void configureEnhancedVisuals(bool enabled) {
-        const int previousBloomLevels = enhancedVisualConfig(
-            visualQuality, enhancedVisuals).bloomLevels;
+        const EnhancedVisualConfig previous = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
         enhancedVisuals = enabled;
-        if (previousBloomLevels != enhancedVisualConfig(
-                visualQuality, enhancedVisuals).bloomLevels)
+        const EnhancedVisualConfig current = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
+        if (previous.bloomLevels != current.bloomLevels ||
+            previous.screenEffectDivisor != current.screenEffectDivisor)
             swapchainDirty = true;
     }
 
@@ -863,7 +867,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr, &descriptors.modelUniformDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
 
-        std::array<VkDescriptorSetLayoutBinding,5> postBindings{};
+        std::array<VkDescriptorSetLayoutBinding,7> postBindings{};
         for (uint32_t binding = 0; binding < postBindings.size(); ++binding) {
             postBindings[binding].binding = binding;
             postBindings[binding].descriptorType =
@@ -881,6 +885,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         require(vkCreateDescriptorSetLayout(
                     device, &info, nullptr, &descriptors.bloomDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(bloom)");
+        VkDescriptorSetLayoutBinding screenEffectBinding = postBindings[5];
+        screenEffectBinding.binding = 0;
+        info.bindingCount = 1;
+        info.pBindings = &screenEffectBinding;
+        require(vkCreateDescriptorSetLayout(
+                    device, &info, nullptr,
+                    &descriptors.screenEffectDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout(screen effect)");
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
         const VkDeviceSize alignment = std::max<VkDeviceSize>(
@@ -1044,8 +1056,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.modelLayout = descriptors.modelUniformDescriptorSetLayout;
         params.postLayout = descriptors.postDescriptorSetLayout;
         params.bloomLayout = descriptors.bloomDescriptorSetLayout;
-        params.bloomLevels = enhancedVisualConfig(
-            visualQuality, enhancedVisuals).bloomLevels;
+        params.screenEffectLayout = descriptors.screenEffectDescriptorSetLayout;
+        const EnhancedVisualConfig enhanced = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
+        params.bloomLevels = enhanced.bloomLevels;
+        params.screenEffectDivisor = enhanced.screenEffectDivisor;
         params.requestedSampleCount = requestedSampleCount;
         params.maxSampleCount = maxSampleCount;
         params.shaderRoot = assetRoot / "shaders" / "vulkan";
@@ -1264,7 +1279,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             uniforms.baseColor = material.baseColor * submission.draw.tint;
             uniforms.params = {material.alphaMode == model::AlphaMode::Mask
                 ? material.alphaCutoff : 0.0f, textured ? 1.0f : 0.0f,
-                0.0f, 0.0f};
+                0.0f, material.alphaMode == model::AlphaMode::Blend ? 1.0f : 0.0f};
             uniforms.cameraFogStart = glm::vec4(
                 submission.cameraPosition, submission.fogStart);
             uniforms.fogColorEnd = glm::vec4(
@@ -1277,6 +1292,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             uniforms.ambientColor = glm::vec4(
                 submission.environment.ambientColor * submission.environment.ambientIntensity,
                 0.0f);
+            uniforms.options.x = enhancedVisualConfig(
+                visualQuality, enhancedVisuals).atmosphereStrength;
             std::memcpy(static_cast<uint8_t*>(frame.uniform.mapped) +
                         index * modelUniformStride, &uniforms, sizeof(uniforms));
             ++index;
@@ -1340,6 +1357,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         recordUploads(command);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
+        recordScreenEffectPass(command, imageIndex);
         recordBloomPasses(command, imageIndex);
         // The post and UI draws share one present render pass; the pass
         // bracket spans recordPostPass and recordUiPass.
@@ -1467,7 +1485,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void recordScenePass(VkCommandBuffer command, uint32_t imageIndex) {
-        std::array<VkClearValue, 3> clear{};
+        std::array<VkClearValue, 5> clear{};
         clear[0].color.float32[0] = submittedFrame.clearColor.r;
         clear[0].color.float32[1] = submittedFrame.clearColor.g;
         clear[0].color.float32[2] = submittedFrame.clearColor.b;
@@ -1478,7 +1496,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         render.renderPass = swapchain.renderPass;
         render.framebuffer = swapchain.framebuffers[imageIndex];
         render.renderArea.extent = swapchain.swapchainExtent;
-        render.clearValueCount = swapchain.sampleCount != VK_SAMPLE_COUNT_1_BIT ? 3u : 2u;
+        const bool multisampled =
+            swapchain.sampleCount != VK_SAMPLE_COUNT_1_BIT;
+        render.clearValueCount = swapchain.surfaceDataEnabled
+            ? (multisampled ? 4u : 3u) : (multisampled ? 3u : 2u);
         render.pClearValues = clear.data();
         vkCmdBeginRenderPass(command, &render, VK_SUBPASS_CONTENTS_INLINE);
         VkPipeline boundPipeline = VK_NULL_HANDLE;
@@ -1507,7 +1528,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
             const CloudUniforms constants{
                 clipSpaceCorrection() * cloudViewProjection,
-                glm::vec4(cloudOrigin, 0.0f), glm::vec4(cloudColor, 0.0f),
+                glm::vec4(cloudOrigin, enhancedVisualConfig(
+                    visualQuality, enhancedVisuals).atmosphereStrength),
+                glm::vec4(cloudColor, 0.0f),
                 glm::vec4(glm::normalize(submittedFrame.lightDirection),
                           postProcess.environment.rainIntensity)};
             vkCmdPushConstants(command, swapchain.cloudPipelineLayout,
@@ -1742,6 +1765,106 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdEndRenderPass(command);
     }
 
+    PostConstants buildPostConstants() const {
+        const VisualQualityConfig visual = visualQualityConfig(visualQuality);
+        const EnhancedVisualConfig enhanced = enhancedVisualConfig(
+            visualQuality, enhancedVisuals);
+        PostConstants result;
+        if (enhanced.bloomLevels > 0) {
+            result.exposureBloom = {
+                std::clamp(postProcess.exposure, 0.75f, 1.65f),
+                0.13f, 1.0f, 0.0f};
+        } else {
+            result.exposureBloom = {
+                std::clamp(postProcess.exposure, 0.75f, 1.65f),
+                visual.bloomLevels > 0
+                    ? 0.07f + visual.bloomLevels * 0.012f : 0.0f,
+                visual.bloomLevels > 0
+                    ? 1.15f + visual.bloomLevels * 0.18f : 1.0f,
+                visual.bloomLevels <= 0 ? 0.0f :
+                    visual.bloomLevels <= 3 ? 4.0f :
+                    visual.bloomLevels <= 5 ? 8.0f : 12.0f};
+        }
+        result.effects = {
+            std::clamp(postProcess.underwater, 0.0f, 1.0f),
+            std::clamp(postProcess.hurt, 0.0f, 1.0f),
+            swapchain.framebufferSrgb ? 0.0f : 1.0f,
+            enhanced.atmosphereStrength};
+        result.texelTime = {
+            1.0f / std::max(1u, swapchain.swapchainExtent.width),
+            1.0f / std::max(1u, swapchain.swapchainExtent.height),
+            static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())),
+            static_cast<float>(enhanced.bloomLevels)};
+        result.environment = {
+            postProcess.environment.rainIntensity,
+            postProcess.environment.thunderIntensity,
+            postProcess.environment.lightningFlash,
+            postProcess.environment.daylight};
+        result.celestial = {
+            postProcess.environment.sunDirection,
+            postProcess.environment.skyStyle == RenderSkyStyle::Heaven
+                ? 1.0f : 0.0f};
+        if (swapchain.surfaceDataEnabled) {
+            result.screenQuality = {
+                static_cast<float>(enhanced.aoDirections),
+                static_cast<float>(enhanced.aoSteps),
+                static_cast<float>(enhanced.lightShaftSamples),
+                static_cast<float>(enhanced.screenEffectDivisor)};
+            result.reflection = {
+                static_cast<float>(enhanced.reflectionSteps),
+                static_cast<float>(enhanced.reflectionRefineSteps),
+                enhanced.reflectionDistance,
+                enhanced.materialMotionStrength};
+        }
+        const glm::mat4 viewProjection = glm::inverse(
+            postProcess.inverseViewProjection);
+        const glm::vec3 sunPoint = postProcess.cameraPosition +
+            postProcess.environment.sunDirection * 1000.0f;
+        const glm::vec4 sunClip = clipSpaceCorrection() * viewProjection *
+            glm::vec4(sunPoint, 1.0f);
+        const bool sunVisible = sunClip.w > 0.0f &&
+            postProcess.environment.sunDirection.y > -0.03f;
+        const glm::vec2 sunNdc = sunVisible
+            ? glm::vec2(sunClip) / sunClip.w : glm::vec2(-4.0f);
+        result.sunScreen = {sunNdc * 0.5f + 0.5f,
+                            sunVisible ? 1.0f : 0.0f, 0.0f};
+        return result;
+    }
+
+    void recordScreenEffectPass(VkCommandBuffer command, uint32_t imageIndex) {
+        if (!swapchain.surfaceDataEnabled) return;
+        VkClearValue clear{};
+        clear.color.float32[0] = 1.0f;
+        VkRenderPassBeginInfo pass{};
+        pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        pass.renderPass = swapchain.screenEffectRenderPass;
+        pass.framebuffer = swapchain.screenEffectFramebuffers[imageIndex];
+        pass.renderArea.extent = swapchain.screenEffectExtent;
+        pass.clearValueCount = 1;
+        pass.pClearValues = &clear;
+        vkCmdBeginRenderPass(command, &pass, VK_SUBPASS_CONTENTS_INLINE);
+        const VkViewport viewport{0.0f, 0.0f,
+            static_cast<float>(swapchain.screenEffectExtent.width),
+            static_cast<float>(swapchain.screenEffectExtent.height), 0.0f, 1.0f};
+        const VkRect2D scissor{{0, 0}, swapchain.screenEffectExtent};
+        vkCmdSetViewport(command, 0, 1, &viewport);
+        vkCmdSetScissor(command, 0, 1, &scissor);
+        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          swapchain.screenEffectPipeline);
+        const VkDescriptorSet descriptor =
+            swapchain.screenEffectDescriptorSets[imageIndex];
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            swapchain.screenEffectPipelineLayout, 0, 1, &descriptor, 0, nullptr);
+        const PostConstants constants = buildPostConstants();
+        vkCmdPushConstants(command, swapchain.screenEffectPipelineLayout,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(constants), &constants);
+        vkCmdDraw(command, 3, 1, 0, 0);
+        vkCmdEndRenderPass(command);
+        ++performance.drawCalls;
+        ++performance.pipelineBinds;
+        ++performance.descriptorBinds;
+    }
+
     void recordBloomPasses(VkCommandBuffer command, uint32_t imageIndex) {
         if (swapchain.bloomLevelCount <= 0) return;
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1802,44 +1925,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, swapchain.postPipeline);
         vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
             swapchain.postPipelineLayout, 0, 1, &swapchain.postDescriptorSets[imageIndex], 0, nullptr);
-        const VisualQualityConfig visual = visualQualityConfig(visualQuality);
-        const EnhancedVisualConfig enhanced = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
-        PostConstants postConstants;
-        if (enhanced.bloomLevels > 0) {
-            postConstants.exposureBloom = {
-                std::clamp(postProcess.exposure, 0.75f, 1.65f),
-                0.13f, 1.0f, 0.0f};
-        } else {
-            postConstants.exposureBloom = {
-                std::clamp(postProcess.exposure, 0.75f, 1.65f),
-                visual.bloomLevels > 0
-                    ? 0.07f + visual.bloomLevels * 0.012f : 0.0f,
-                visual.bloomLevels > 0
-                    ? 1.15f + visual.bloomLevels * 0.18f : 1.0f,
-                visual.bloomLevels <= 0 ? 0.0f :
-                    visual.bloomLevels <= 3 ? 4.0f :
-                    visual.bloomLevels <= 5 ? 8.0f : 12.0f};
-        }
-        postConstants.effects = {
-            std::clamp(postProcess.underwater, 0.0f, 1.0f),
-            std::clamp(postProcess.hurt, 0.0f, 1.0f),
-            swapchain.framebufferSrgb ? 0.0f : 1.0f,
-            enhanced.atmosphereStrength};
-        postConstants.texelTime = {
-            1.0f / std::max(1u, swapchain.swapchainExtent.width),
-            1.0f / std::max(1u, swapchain.swapchainExtent.height),
-            static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now())),
-            static_cast<float>(enhanced.bloomLevels)};
-        postConstants.environment = {
-            postProcess.environment.rainIntensity,
-            postProcess.environment.thunderIntensity,
-            postProcess.environment.lightningFlash,
-            postProcess.environment.daylight};
-        postConstants.celestial = {
-            postProcess.environment.sunDirection,
-            postProcess.environment.skyStyle == RenderSkyStyle::Heaven
-                ? 1.0f : 0.0f};
+        const PostConstants postConstants = buildPostConstants();
         vkCmdPushConstants(command, swapchain.postPipelineLayout,
             VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(postConstants), &postConstants);
         vkCmdDraw(command, 3, 1, 0, 0);

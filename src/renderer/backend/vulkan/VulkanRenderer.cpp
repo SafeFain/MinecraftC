@@ -408,8 +408,8 @@ void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
             ? 0.12f + 0.035f * visual.cloudShadowSamples : 0.0f};
     chunk.visualParams = {
         enhanced.materialMotionStrength, enhanced.atmosphereStrength,
-        m_enhancedVisuals ? 1.0f : 0.0f,
-        static_cast<float>(enhanced.bloomLevels)};
+        static_cast<float>(enhanced.shadowBlockerSamples),
+        static_cast<float>(enhanced.shadowFilterSamples)};
 }
 
 void VulkanRenderer::renderSky(const RenderEnvironment& environment,

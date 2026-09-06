@@ -71,6 +71,20 @@ void main(){
     vec3 color=mix(sky.horizonColor.rgb,sky.zenithColor.rgb,height);
     float celestial=1.0-sky.weather.y;
     float enhanced=sky.options.w;
+    if(enhanced>0.001&&heaven<0.5){
+        float mu=dot(ray,normalize(sky.sunDirection.xyz));
+        float rayleigh=0.75*(1.0+mu*mu);
+        float g=0.76;
+        float mie=(1.0-g*g)/pow(max(1.0+g*g-2.0*g*mu,0.025),1.5);
+        float airMass=1.0/max(ray.y+0.12,0.10);
+        vec3 extinction=exp(-airMass*vec3(0.055,0.105,0.205));
+        vec3 scatter=(vec3(0.16,0.32,0.72)*rayleigh*0.11+
+            vec3(1.0,0.63,0.30)*mie*0.012)*celestial;
+        float dusk=1.0-smoothstep(0.04,0.46,abs(sky.sunDirection.y));
+        scatter+=vec3(1.0,0.23,0.055)*dusk*
+            pow(max(1.0-abs(ray.y),0.0),5.0)*0.17*celestial;
+        color=mix(color,color*extinction+scatter,enhanced*0.58);
+    }
     float sun=smoothstep(0.99915,0.99972,dot(ray,sky.sunDirection.xyz))*celestial;
     float sunGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),96.0);
     float forwardHaze=pow(max(dot(ray,sky.sunDirection.xyz),0.0),8.0)*

@@ -58,6 +58,7 @@ struct VulkanDescriptorResources {
     VkDescriptorSetLayout modelUniformDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout postDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout bloomDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout screenEffectDescriptorSetLayout = VK_NULL_HANDLE;
 
     void attach(VkDevice device) { m_device = device; }
     ~VulkanDescriptorResources();
@@ -142,7 +143,9 @@ struct VulkanSwapchainBundle {
         VkDescriptorSetLayout modelLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
         VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout screenEffectLayout = VK_NULL_HANDLE;
         int bloomLevels = 0;
+        int screenEffectDivisor = 0;
         VkSampleCountFlagBits requestedSampleCount = VK_SAMPLE_COUNT_1_BIT;
         VkSampleCountFlagBits maxSampleCount = VK_SAMPLE_COUNT_1_BIT;
         std::filesystem::path shaderRoot;
@@ -151,6 +154,7 @@ struct VulkanSwapchainBundle {
     VkSwapchainKHR handle = VK_NULL_HANDLE;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
     VkFormat sceneFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    VkFormat surfaceFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
     bool framebufferSrgb = true;
     VkExtent2D swapchainExtent{};
@@ -166,6 +170,18 @@ struct VulkanSwapchainBundle {
     std::vector<VkImage> depthImages;
     std::vector<VmaAllocation> depthAllocations;
     std::vector<VkImageView> depthImageViews;
+    std::vector<VkImage> surfaceImages;
+    std::vector<VmaAllocation> surfaceAllocations;
+    std::vector<VkImageView> surfaceImageViews;
+    std::vector<VkImage> surfaceMsaaImages;
+    std::vector<VmaAllocation> surfaceMsaaAllocations;
+    std::vector<VkImageView> surfaceMsaaImageViews;
+    VkExtent2D screenEffectExtent{};
+    std::vector<VkImage> screenEffectImages;
+    std::vector<VmaAllocation> screenEffectAllocations;
+    std::vector<VkImageView> screenEffectImageViews;
+    std::vector<VkFramebuffer> screenEffectFramebuffers;
+    bool surfaceDataEnabled = false;
     int bloomLevelCount = 0;
     std::array<VkExtent2D, MAX_BLOOM_LEVELS> bloomExtents{};
     std::array<std::vector<VkImage>, MAX_BLOOM_LEVELS> bloomImages;
@@ -183,6 +199,10 @@ struct VulkanSwapchainBundle {
     VkPipelineLayout postPipelineLayout = VK_NULL_HANDLE;
     VkSampler postSampler = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> postDescriptorSets;
+    VkRenderPass screenEffectRenderPass = VK_NULL_HANDLE;
+    VkPipelineLayout screenEffectPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline screenEffectPipeline = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> screenEffectDescriptorSets;
     VkRenderPass bloomRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout bloomPipelineLayout = VK_NULL_HANDLE;
     VkPipeline bloomPipeline = VK_NULL_HANDLE;

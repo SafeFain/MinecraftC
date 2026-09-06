@@ -90,6 +90,9 @@ struct PostConstants {
     glm::vec4 texelTime{0.0f};
     glm::vec4 environment{0.0f};
     glm::vec4 celestial{0.0f};
+    glm::vec4 screenQuality{0.0f};
+    glm::vec4 reflection{0.0f};
+    glm::vec4 sunScreen{0.0f};
 };
 
 struct BloomConstants {
@@ -123,7 +126,7 @@ static_assert(offsetof(ChunkEnvironmentUniforms, weatherParams) == 96);
 static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
-static_assert(sizeof(PostConstants) == 80);
+static_assert(sizeof(PostConstants) == 128);
 static_assert(sizeof(BloomConstants) == 16);
 static_assert(sizeof(ModelUniforms) == 4416);
 
@@ -136,16 +139,21 @@ struct SwapchainPipelineInputs {
     VkDescriptorSetLayout modelLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout postLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout bloomLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout screenEffectLayout = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     VkFormat sceneFormat = VK_FORMAT_UNDEFINED;
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
     VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+    bool surfaceDataEnabled = false;
     // Live scene image views used to bind the post-pass descriptors; the
     // caller rebuilds them before invoking createSwapchainSet.
     const std::vector<VkImageView>* sceneImageViews = nullptr;
+    const std::vector<VkImageView>* surfaceImageViews = nullptr;
+    const std::vector<VkImageView>* screenEffectImageViews = nullptr;
     const std::array<std::vector<VkImageView>, 4>* bloomImageViews = nullptr;
     int bloomLevels = 0;
+    int screenEffectDivisor = 0;
 };
 
 struct SwapchainPipelineOutputs {
@@ -159,6 +167,10 @@ struct SwapchainPipelineOutputs {
     VkPipelineLayout postPipelineLayout = VK_NULL_HANDLE;
     VkSampler postSampler = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> postDescriptorSets;
+    VkRenderPass screenEffectRenderPass = VK_NULL_HANDLE;
+    VkPipelineLayout screenEffectPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline screenEffectPipeline = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> screenEffectDescriptorSets;
     VkRenderPass bloomRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout bloomPipelineLayout = VK_NULL_HANDLE;
     VkPipeline bloomPipeline = VK_NULL_HANDLE;

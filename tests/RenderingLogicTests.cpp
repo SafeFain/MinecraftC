@@ -60,22 +60,48 @@ int main() {
                 enhancedOff.atmosphereStrength == 0.0f &&
                 enhancedOff.materialMotionStrength == 0.0f &&
                 enhancedOff.ambientParticlesPerSecond == 0.0f &&
+                !enhancedOff.usesSurfaceData() &&
+                !enhancedOff.usesScreenSpaceReflections() &&
                 enhancedLow.bloomLevels == 0 &&
                 enhancedLow.atmosphereStrength == 0.25f &&
                 enhancedLow.materialMotionStrength == 0.25f &&
                 enhancedLow.ambientParticlesPerSecond == 0.0f &&
+                enhancedLow.screenEffectDivisor == 0 &&
+                enhancedLow.shadowFilterSamples == 1 &&
                 enhancedMedium.bloomLevels == 2 &&
                 enhancedMedium.atmosphereStrength == 0.50f &&
                 enhancedMedium.materialMotionStrength == 0.60f &&
                 enhancedMedium.ambientParticlesPerSecond == 4.0f &&
+                enhancedMedium.usesSurfaceData() &&
+                enhancedMedium.screenEffectDivisor == 4 &&
+                enhancedMedium.aoDirections == 4 &&
+                enhancedMedium.aoSteps == 2 &&
+                enhancedMedium.lightShaftSamples == 8 &&
+                !enhancedMedium.usesScreenSpaceReflections() &&
+                enhancedMedium.shadowFilterSamples == 4 &&
                 enhancedHigh.bloomLevels == 3 &&
                 enhancedHigh.atmosphereStrength == 0.75f &&
                 enhancedHigh.materialMotionStrength == 0.85f &&
                 enhancedHigh.ambientParticlesPerSecond == 8.0f &&
+                enhancedHigh.screenEffectDivisor == 4 &&
+                enhancedHigh.reflectionSteps == 12 &&
+                enhancedHigh.reflectionRefineSteps == 2 &&
+                enhancedHigh.reflectionDistance == 64.0f &&
+                enhancedHigh.shadowBlockerSamples == 4 &&
+                enhancedHigh.shadowFilterSamples == 8 &&
                 enhancedUltra.bloomLevels == 4 &&
                 enhancedUltra.atmosphereStrength == 1.0f &&
                 enhancedUltra.materialMotionStrength == 1.0f &&
-                enhancedUltra.ambientParticlesPerSecond == 12.0f,
+                enhancedUltra.ambientParticlesPerSecond == 12.0f &&
+                enhancedUltra.screenEffectDivisor == 2 &&
+                enhancedUltra.aoDirections == 8 &&
+                enhancedUltra.aoSteps == 4 &&
+                enhancedUltra.lightShaftSamples == 16 &&
+                enhancedUltra.reflectionSteps == 24 &&
+                enhancedUltra.reflectionRefineSteps == 4 &&
+                enhancedUltra.reflectionDistance == 96.0f &&
+                enhancedUltra.shadowBlockerSamples == 6 &&
+                enhancedUltra.shadowFilterSamples == 12,
             "enhanced visual presets do not match their progressive budgets");
     require(supportsFireflies(Biome::SWAMP) &&
                 supportsFireflies(Biome::FOREST) &&

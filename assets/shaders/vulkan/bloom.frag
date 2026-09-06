@@ -21,7 +21,10 @@ void main(){
             texture(sourceColor,vUv+vec2(-texel.x,texel.y)).rgb)*0.06;
     if(bloom.sourceTexelAndExtract.z>0.5){
         float peak=max(color.r,max(color.g,color.b));
-        color*=smoothstep(0.78,1.35,peak);
+        float soft=clamp((peak-0.68)/0.42,0.0,1.0);
+        soft=soft*soft*(3.0-2.0*soft);
+        float contribution=max(peak-0.88,0.0)+soft*0.24;
+        color*=contribution/max(peak,0.0001);
     }
     outColor=vec4(color,1.0);
 }

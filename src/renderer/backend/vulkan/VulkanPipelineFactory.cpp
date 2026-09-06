@@ -54,10 +54,19 @@ struct SwapchainSetGuard {
                                  static_cast<uint32_t>(
                                      out.postDescriptorSets.size()),
                                  out.postDescriptorSets.data());
+        if (!out.screenEffectDescriptorSets.empty() && pool)
+            vkFreeDescriptorSets(device, pool,
+                static_cast<uint32_t>(out.screenEffectDescriptorSets.size()),
+                out.screenEffectDescriptorSets.data());
         if (out.postSampler) vkDestroySampler(device, out.postSampler, nullptr);
         if (out.postPipeline) vkDestroyPipeline(device, out.postPipeline, nullptr);
         if (out.postPipelineLayout)
             vkDestroyPipelineLayout(device, out.postPipelineLayout, nullptr);
+        if (out.screenEffectPipeline)
+            vkDestroyPipeline(device, out.screenEffectPipeline, nullptr);
+        if (out.screenEffectPipelineLayout)
+            vkDestroyPipelineLayout(
+                device, out.screenEffectPipelineLayout, nullptr);
         if (out.bloomPipeline)
             vkDestroyPipeline(device, out.bloomPipeline, nullptr);
         if (out.bloomPipelineLayout)
@@ -94,6 +103,8 @@ struct SwapchainSetGuard {
             vkDestroyRenderPass(device, out.presentRenderPass, nullptr);
         if (out.bloomRenderPass)
             vkDestroyRenderPass(device, out.bloomRenderPass, nullptr);
+        if (out.screenEffectRenderPass)
+            vkDestroyRenderPass(device, out.screenEffectRenderPass, nullptr);
         if (out.renderPass) vkDestroyRenderPass(device, out.renderPass, nullptr);
     }
 };
@@ -274,7 +285,7 @@ void VulkanPipelineFactory::createSwapchainSet(
     SwapchainPipelineOutputs& outputs) const {
     SwapchainSetGuard guard{outputs, m_device, inputs.descriptorPool};
     // ── Scene render pass (MSAA scene color + depth + resolve) ──────────
-    std::array<VkAttachmentDescription, 3> attachments{};
+    std::array<VkAttachmentDescription, 5> attachments{};
     const bool multisampled = inputs.sampleCount != VK_SAMPLE_COUNT_1_BIT;
     attachments[0].format = inputs.sceneFormat;
     attachments[0].samples = inputs.sampleCount;
@@ -295,12 +306,8 @@ void VulkanPipelineFactory::createSwapchainSet(
     attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    const VkAttachmentReference color{
-        0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
     const VkAttachmentReference depth{
         1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    const VkAttachmentReference resolve{
-        2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
     attachments[2].format = inputs.sceneFormat;
     attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -309,12 +316,31 @@ void VulkanPipelineFactory::createSwapchainSet(
     attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (inputs.surfaceDataEnabled) {
+        const size_t surfaceIndex = multisampled ? 3u : 2u;
+        attachments[surfaceIndex] = attachments[0];
+        attachments[surfaceIndex].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachments[surfaceIndex].finalLayout = multisampled
+            ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        if (multisampled) {
+            attachments[4] = attachments[2];
+            attachments[4].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        }
+    }
+    const uint32_t surfaceIndex = multisampled ? 3u : 2u;
+    const std::array<VkAttachmentReference, 2> colors{{
+        {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {surfaceIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
+    const std::array<VkAttachmentReference, 2> resolves{{
+        {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}}};
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color;
+    subpass.colorAttachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+    subpass.pColorAttachments = colors.data();
     subpass.pDepthStencilAttachment = &depth;
-    subpass.pResolveAttachments = multisampled ? &resolve : nullptr;
+    subpass.pResolveAttachments = multisampled ? resolves.data() : nullptr;
     std::array<VkSubpassDependency, 2> dependencies{};
     dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     dependencies[0].dstSubpass = 0;
@@ -331,7 +357,8 @@ void VulkanPipelineFactory::createSwapchainSet(
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     VkRenderPassCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    info.attachmentCount = multisampled ? 3u : 2u;
+    info.attachmentCount = inputs.surfaceDataEnabled
+        ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
     info.pAttachments = attachments.data();
     info.subpassCount = 1;
     info.pSubpasses = &subpass;
@@ -425,6 +452,49 @@ void VulkanPipelineFactory::createSwapchainSet(
                                    &outputs.bloomRenderPass),
                 "vkCreateRenderPass(bloom)");
     }
+    if (inputs.surfaceDataEnabled) {
+        VkAttachmentDescription attachment{};
+        attachment.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        const VkAttachmentReference color{
+            0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &color;
+        std::array<VkSubpassDependency,2> dependencies{};
+        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[0].dstSubpass = 0;
+        dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[0].dstStageMask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependencies[1].srcSubpass = 0;
+        dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[1].srcStageMask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        VkRenderPassCreateInfo pass{};
+        pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        pass.attachmentCount = 1;
+        pass.pAttachments = &attachment;
+        pass.subpassCount = 1;
+        pass.pSubpasses = &subpass;
+        pass.dependencyCount = dependencies.size();
+        pass.pDependencies = dependencies.data();
+        require(vkCreateRenderPass(m_device, &pass, nullptr,
+                                   &outputs.screenEffectRenderPass),
+                "vkCreateRenderPass(screen effect)");
+    }
 
     // ── Chunk and UI pipelines ──────────────────────────────────────────
     VkShaderModule vertex = loadShader(m_shaderRoot / "chunk.vert.spv");
@@ -480,10 +550,13 @@ void VulkanPipelineFactory::createSwapchainSet(
         blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
             VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
             VK_COLOR_COMPONENT_A_BIT;
+        VkPipelineColorBlendAttachmentState surfaceBlend = blendAttachment;
+        std::array<VkPipelineColorBlendAttachmentState, 2> sceneBlends{
+            blendAttachment, surfaceBlend};
         VkPipelineColorBlendStateCreateInfo blend{};
         blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        blend.attachmentCount = 1;
-        blend.pAttachments = &blendAttachment;
+        blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+        blend.pAttachments = sceneBlends.data();
         constexpr std::array<VkDynamicState, 2> dynamicStates{
             VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
         VkPipelineDynamicStateCreateInfo dynamic{};
@@ -532,6 +605,15 @@ void VulkanPipelineFactory::createSwapchainSet(
         blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        sceneBlends[0] = blendAttachment;
+        surfaceBlend.blendEnable = VK_TRUE;
+        surfaceBlend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        surfaceBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        surfaceBlend.colorBlendOp = VK_BLEND_OP_ADD;
+        surfaceBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        surfaceBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        surfaceBlend.alphaBlendOp = VK_BLEND_OP_ADD;
+        sceneBlends[1] = surfaceBlend;
         require(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &info,
                                           nullptr, &outputs.translucentPipeline),
                 "vkCreateGraphicsPipelines");
@@ -717,6 +799,88 @@ void VulkanPipelineFactory::createSwapchainSet(
         vkDestroyShaderModule(m_device, vertex, nullptr);
     }
 
+    if (inputs.surfaceDataEnabled) {
+        vertex = loadShader(m_shaderRoot / "post.vert.spv");
+        fragment = VK_NULL_HANDLE;
+        try {
+            fragment = loadShader(m_shaderRoot / "screen_effect.frag.spv");
+            const std::array<VkPipelineShaderStageCreateInfo,2> stages{{
+                {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
+                 VK_SHADER_STAGE_VERTEX_BIT, vertex, "main", nullptr},
+                {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
+                 VK_SHADER_STAGE_FRAGMENT_BIT, fragment, "main", nullptr}}};
+            VkPipelineVertexInputStateCreateInfo vertexInput{};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            VkPipelineInputAssemblyStateCreateInfo assembly{};
+            assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            VkPipelineViewportStateCreateInfo viewport{};
+            viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewport.viewportCount = 1;
+            viewport.scissorCount = 1;
+            VkPipelineRasterizationStateCreateInfo raster{};
+            raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            raster.polygonMode = VK_POLYGON_MODE_FILL;
+            raster.cullMode = VK_CULL_MODE_NONE;
+            raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            raster.lineWidth = 1.0f;
+            VkPipelineMultisampleStateCreateInfo multisample{};
+            multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+            VkPipelineDepthStencilStateCreateInfo depth{};
+            depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            VkPipelineColorBlendAttachmentState attachment{};
+            attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+                VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                VK_COLOR_COMPONENT_A_BIT;
+            VkPipelineColorBlendStateCreateInfo blend{};
+            blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            blend.attachmentCount = 1;
+            blend.pAttachments = &attachment;
+            constexpr std::array<VkDynamicState,2> states{
+                VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+            VkPipelineDynamicStateCreateInfo dynamic{};
+            dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dynamic.dynamicStateCount = states.size();
+            dynamic.pDynamicStates = states.data();
+            VkPushConstantRange push{};
+            push.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            push.size = sizeof(PostConstants);
+            VkPipelineLayoutCreateInfo layout{};
+            layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            layout.setLayoutCount = 1;
+            layout.pSetLayouts = &inputs.screenEffectLayout;
+            layout.pushConstantRangeCount = 1;
+            layout.pPushConstantRanges = &push;
+            require(vkCreatePipelineLayout(m_device, &layout, nullptr,
+                        &outputs.screenEffectPipelineLayout),
+                    "vkCreatePipelineLayout(screen effect)");
+            VkGraphicsPipelineCreateInfo pipeline{};
+            pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipeline.stageCount = stages.size();
+            pipeline.pStages = stages.data();
+            pipeline.pVertexInputState = &vertexInput;
+            pipeline.pInputAssemblyState = &assembly;
+            pipeline.pViewportState = &viewport;
+            pipeline.pRasterizationState = &raster;
+            pipeline.pMultisampleState = &multisample;
+            pipeline.pDepthStencilState = &depth;
+            pipeline.pColorBlendState = &blend;
+            pipeline.pDynamicState = &dynamic;
+            pipeline.layout = outputs.screenEffectPipelineLayout;
+            pipeline.renderPass = outputs.screenEffectRenderPass;
+            require(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1,
+                        &pipeline, nullptr, &outputs.screenEffectPipeline),
+                    "vkCreateGraphicsPipelines(screen effect)");
+        } catch (...) {
+            if (fragment) vkDestroyShaderModule(m_device, fragment, nullptr);
+            vkDestroyShaderModule(m_device, vertex, nullptr);
+            throw;
+        }
+        vkDestroyShaderModule(m_device, fragment, nullptr);
+        vkDestroyShaderModule(m_device, vertex, nullptr);
+    }
+
     // ── Post pipeline and scene descriptors ─────────────────────────────
     vertex = loadShader(m_shaderRoot / "post.vert.spv");
     fragment = VK_NULL_HANDLE;
@@ -824,13 +988,19 @@ void VulkanPipelineFactory::createSwapchainSet(
                                      outputs.postDescriptorSets.data()),
             "vkAllocateDescriptorSets(post)");
     for (size_t i = 0; i < outputs.postDescriptorSets.size(); ++i) {
-        std::array<VkDescriptorImageInfo,5> imageInfos{};
-        std::array<VkWriteDescriptorSet,5> writes{};
+        std::array<VkDescriptorImageInfo,7> imageInfos{};
+        std::array<VkWriteDescriptorSet,7> writes{};
         for (uint32_t binding = 0; binding < writes.size(); ++binding) {
             VkImageView view = sceneImageViews[i];
             if (binding > 0 && inputs.bloomImageViews &&
                 static_cast<int>(binding) <= inputs.bloomLevels)
                 view = (*inputs.bloomImageViews)[binding - 1][i];
+            if (binding == 5 && inputs.surfaceDataEnabled &&
+                inputs.surfaceImageViews)
+                view = (*inputs.surfaceImageViews)[i];
+            if (binding == 6 && inputs.surfaceDataEnabled &&
+                inputs.screenEffectImageViews)
+                view = (*inputs.screenEffectImageViews)[i];
             imageInfos[binding] = {outputs.postSampler, view,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
             writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -842,6 +1012,29 @@ void VulkanPipelineFactory::createSwapchainSet(
             writes[binding].pImageInfo = &imageInfos[binding];
         }
         vkUpdateDescriptorSets(m_device, writes.size(), writes.data(), 0, nullptr);
+    }
+    if (inputs.surfaceDataEnabled) {
+        outputs.screenEffectDescriptorSets.resize(sceneImageViews.size());
+        std::vector<VkDescriptorSetLayout> screenLayouts(
+            sceneImageViews.size(), inputs.screenEffectLayout);
+        allocate.descriptorSetCount = screenLayouts.size();
+        allocate.pSetLayouts = screenLayouts.data();
+        require(vkAllocateDescriptorSets(m_device, &allocate,
+                    outputs.screenEffectDescriptorSets.data()),
+                "vkAllocateDescriptorSets(screen effect)");
+        for (size_t i = 0; i < sceneImageViews.size(); ++i) {
+            const VkDescriptorImageInfo imageInfo{outputs.postSampler,
+                (*inputs.surfaceImageViews)[i],
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+            VkWriteDescriptorSet write{};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = outputs.screenEffectDescriptorSets[i];
+            write.dstBinding = 0;
+            write.descriptorCount = 1;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.pImageInfo = &imageInfo;
+            vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
+        }
     }
     for (int level = 0; level < inputs.bloomLevels; ++level) {
         auto& sets = outputs.bloomDescriptorSets[static_cast<size_t>(level)];
@@ -939,8 +1132,11 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             VkPipelineColorBlendStateCreateInfo blend{};
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            blend.attachmentCount = 1;
-            blend.pAttachments = &attachment;
+            VkPipelineColorBlendAttachmentState disabledSurface{};
+            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
+                attachment, disabledSurface};
+            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> dynamicStates{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
             VkPipelineDynamicStateCreateInfo dynamic{};
@@ -1016,8 +1212,11 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             VK_COLOR_COMPONENT_A_BIT;
         VkPipelineColorBlendStateCreateInfo blend{};
         blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        blend.attachmentCount = 1;
-        blend.pAttachments = &attachment;
+        VkPipelineColorBlendAttachmentState disabledSurface{};
+        const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
+            attachment, disabledSurface};
+        blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+        blend.pAttachments = attachments.data();
         constexpr std::array<VkDynamicState, 2> dynamicStates{
             VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
         VkPipelineDynamicStateCreateInfo dynamic{};
@@ -1159,8 +1358,11 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             VkPipelineColorBlendStateCreateInfo blend{};
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            blend.attachmentCount = 1;
-            blend.pAttachments = &attachment;
+            VkPipelineColorBlendAttachmentState disabledSurface{};
+            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
+                attachment, disabledSurface};
+            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> dynamicStates{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
             VkPipelineDynamicStateCreateInfo dynamic{};
@@ -1266,8 +1468,11 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             VkPipelineColorBlendStateCreateInfo blend{};
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            blend.attachmentCount = 1;
-            blend.pAttachments = &attachment;
+            VkPipelineColorBlendAttachmentState disabledSurface = attachment;
+            std::array<VkPipelineColorBlendAttachmentState,2> attachments{
+                attachment, disabledSurface};
+            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> states{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
             VkPipelineDynamicStateCreateInfo dynamic{};
@@ -1315,6 +1520,17 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
             attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+            attachments[0] = attachment;
+            disabledSurface.blendEnable = VK_TRUE;
+            disabledSurface.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            disabledSurface.dstColorBlendFactor =
+                VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            disabledSurface.colorBlendOp = VK_BLEND_OP_ADD;
+            disabledSurface.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            disabledSurface.dstAlphaBlendFactor =
+                VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            disabledSurface.alphaBlendOp = VK_BLEND_OP_ADD;
+            attachments[1] = disabledSurface;
             raster.cullMode = VK_CULL_MODE_BACK_BIT;
             create(outputs.modelBlendPipeline);
             raster.cullMode = VK_CULL_MODE_NONE;
@@ -1384,8 +1600,11 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             VkPipelineColorBlendStateCreateInfo blend{};
             blend.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            blend.attachmentCount = 1;
-            blend.pAttachments = &attachment;
+            VkPipelineColorBlendAttachmentState disabledSurface{};
+            const std::array<VkPipelineColorBlendAttachmentState,2> attachments{
+                attachment, disabledSurface};
+            blend.attachmentCount = inputs.surfaceDataEnabled ? 2u : 1u;
+            blend.pAttachments = attachments.data();
             constexpr std::array<VkDynamicState, 2> states{
                 VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
             VkPipelineDynamicStateCreateInfo dynamic{};

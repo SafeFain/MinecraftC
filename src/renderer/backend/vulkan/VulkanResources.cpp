@@ -34,6 +34,9 @@ VulkanDescriptorResources::~VulkanDescriptorResources() {
     if (descriptorPool) vkDestroyDescriptorPool(m_device, descriptorPool, nullptr);
     if (bloomDescriptorSetLayout)
         vkDestroyDescriptorSetLayout(m_device, bloomDescriptorSetLayout, nullptr);
+    if (screenEffectDescriptorSetLayout)
+        vkDestroyDescriptorSetLayout(
+            m_device, screenEffectDescriptorSetLayout, nullptr);
     if (postDescriptorSetLayout)
         vkDestroyDescriptorSetLayout(m_device, postDescriptorSetLayout, nullptr);
     if (modelUniformDescriptorSetLayout)
@@ -244,6 +247,21 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
         result.sceneFormat = candidate;
         break;
     }
+    result.surfaceDataEnabled = params.screenEffectDivisor > 0;
+    if (result.surfaceDataEnabled) {
+        VkFormatProperties surfaceProperties{};
+        vkGetPhysicalDeviceFormatProperties(params.physicalDevice,
+            result.surfaceFormat, &surfaceProperties);
+        const VkFormatFeatureFlags required =
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
+            VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+        if ((surfaceProperties.optimalTilingFeatures & required) != required) {
+            result.surfaceDataEnabled = false;
+            LOG_WARN("RGBA16F surface data is unavailable; disabling BSL "
+                     "screen-space effects");
+        }
+    }
     VkSampleCountFlagBits desired = params.maxSampleCount >=
             params.requestedSampleCount
         ? params.requestedSampleCount : params.maxSampleCount;
@@ -255,7 +273,18 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
             0, &imageProperties);
-        if (supported == VK_SUCCESS &&
+        bool surfaceSupported = true;
+        if (result.surfaceDataEnabled) {
+            VkImageFormatProperties surfaceImageProperties{};
+            surfaceSupported = vkGetPhysicalDeviceImageFormatProperties(
+                params.physicalDevice, result.surfaceFormat,
+                VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                0, &surfaceImageProperties) == VK_SUCCESS &&
+                (surfaceImageProperties.sampleCounts & desired) != 0;
+        }
+        if (supported == VK_SUCCESS && surfaceSupported &&
             (imageProperties.sampleCounts & desired) != 0)
             break;
         desired = desired == VK_SAMPLE_COUNT_4_BIT
@@ -302,6 +331,60 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
         require(vkCreateImageView(params.device, &view, nullptr,
                                   &result.sceneImageViews[i]),
                 "vkCreateImageView(scene)");
+    }
+    if (result.surfaceDataEnabled) {
+        const auto createImageSet = [&](VkFormat format, VkExtent2D imageExtent,
+                VkSampleCountFlagBits samples, VkImageUsageFlags usage,
+                std::vector<VkImage>& images,
+                std::vector<VmaAllocation>& allocations,
+                std::vector<VkImageView>& views, const char* label) {
+            images.assign(result.images.size(), VK_NULL_HANDLE);
+            allocations.assign(result.images.size(), VK_NULL_HANDLE);
+            views.assign(result.images.size(), VK_NULL_HANDLE);
+            VkImageCreateInfo imageInfo = sceneImageInfo;
+            imageInfo.format = format;
+            imageInfo.extent = {imageExtent.width, imageExtent.height, 1};
+            imageInfo.samples = samples;
+            imageInfo.usage = usage;
+            for (size_t i = 0; i < result.images.size(); ++i) {
+                require(vmaCreateImage(params.allocator, &imageInfo,
+                                       &allocationInfo, &images[i],
+                                       &allocations[i], nullptr), label);
+                VkImageViewCreateInfo view{};
+                view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                view.image = images[i];
+                view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                view.format = format;
+                view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                view.subresourceRange.levelCount = 1;
+                view.subresourceRange.layerCount = 1;
+                require(vkCreateImageView(params.device, &view, nullptr, &views[i]),
+                        label);
+            }
+        };
+        createImageSet(result.surfaceFormat, result.swapchainExtent,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            result.surfaceImages, result.surfaceAllocations,
+            result.surfaceImageViews, "create surface data");
+        if (result.sampleCount != VK_SAMPLE_COUNT_1_BIT) {
+            createImageSet(result.surfaceFormat, result.swapchainExtent,
+                result.sampleCount,
+                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                result.surfaceMsaaImages, result.surfaceMsaaAllocations,
+                result.surfaceMsaaImageViews, "create MSAA surface data");
+        }
+        const uint32_t divisor = static_cast<uint32_t>(
+            std::max(1, params.screenEffectDivisor));
+        result.screenEffectExtent = {
+            std::max(1u, result.swapchainExtent.width / divisor),
+            std::max(1u, result.swapchainExtent.height / divisor)};
+        createImageSet(result.surfaceFormat, result.screenEffectExtent,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            result.screenEffectImages, result.screenEffectAllocations,
+            result.screenEffectImageViews, "create screen effects");
     }
     result.bloomLevelCount = std::clamp(
         params.bloomLevels, 0,
@@ -418,14 +501,19 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     pipelineInputs.modelLayout = params.modelLayout;
     pipelineInputs.postLayout = params.postLayout;
     pipelineInputs.bloomLayout = params.bloomLayout;
+    pipelineInputs.screenEffectLayout = params.screenEffectLayout;
     pipelineInputs.descriptorPool = params.descriptorPool;
     pipelineInputs.sceneFormat = result.sceneFormat;
     pipelineInputs.depthFormat = result.depthFormat;
     pipelineInputs.swapchainFormat = result.swapchainFormat;
     pipelineInputs.sampleCount = result.sampleCount;
+    pipelineInputs.surfaceDataEnabled = result.surfaceDataEnabled;
     pipelineInputs.sceneImageViews = &result.sceneImageViews;
+    pipelineInputs.surfaceImageViews = &result.surfaceImageViews;
+    pipelineInputs.screenEffectImageViews = &result.screenEffectImageViews;
     pipelineInputs.bloomImageViews = &result.bloomImageViews;
     pipelineInputs.bloomLevels = result.bloomLevelCount;
+    pipelineInputs.screenEffectDivisor = params.screenEffectDivisor;
     SwapchainPipelineOutputs pipelineOutputs;
     pipelineFactory.createSwapchainSet(pipelineInputs, pipelineOutputs);
     result.renderPass = pipelineOutputs.renderPass;
@@ -438,6 +526,11 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     result.postPipelineLayout = pipelineOutputs.postPipelineLayout;
     result.postSampler = pipelineOutputs.postSampler;
     result.postDescriptorSets = std::move(pipelineOutputs.postDescriptorSets);
+    result.screenEffectRenderPass = pipelineOutputs.screenEffectRenderPass;
+    result.screenEffectPipelineLayout = pipelineOutputs.screenEffectPipelineLayout;
+    result.screenEffectPipeline = pipelineOutputs.screenEffectPipeline;
+    result.screenEffectDescriptorSets = std::move(
+        pipelineOutputs.screenEffectDescriptorSets);
     result.bloomRenderPass = pipelineOutputs.bloomRenderPass;
     result.bloomPipelineLayout = pipelineOutputs.bloomPipelineLayout;
     result.bloomPipeline = pipelineOutputs.bloomPipeline;
@@ -470,13 +563,22 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     for (size_t i = 0; i < result.imageViews.size(); ++i) {
         const bool multisampled =
             result.sampleCount != VK_SAMPLE_COUNT_1_BIT;
-        const std::array<VkImageView, 3> attachments{
+        const std::array<VkImageView, 5> attachments{
             multisampled ? result.colorImageViews[i] : result.sceneImageViews[i],
-            result.depthImageViews[i], result.sceneImageViews[i]};
+            result.depthImageViews[i],
+            result.surfaceDataEnabled && !multisampled
+                ? result.surfaceImageViews[i] : result.sceneImageViews[i],
+            result.surfaceDataEnabled
+                ? (multisampled ? result.surfaceMsaaImageViews[i]
+                                : result.surfaceImageViews[i])
+                : VK_NULL_HANDLE,
+            result.surfaceDataEnabled ? result.surfaceImageViews[i]
+                                      : VK_NULL_HANDLE};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = result.renderPass;
-        framebufferInfo.attachmentCount = multisampled ? 3u : 2u;
+        framebufferInfo.attachmentCount = result.surfaceDataEnabled
+            ? (multisampled ? 5u : 3u) : (multisampled ? 3u : 2u);
         framebufferInfo.pAttachments = attachments.data();
         framebufferInfo.width = result.swapchainExtent.width;
         framebufferInfo.height = result.swapchainExtent.height;
@@ -496,6 +598,23 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
         require(vkCreateFramebuffer(params.device, &presentInfo, nullptr,
                                     &result.presentFramebuffers[i]),
                 "vkCreateFramebuffer(present)");
+
+        if (result.surfaceDataEnabled) {
+            if (result.screenEffectFramebuffers.empty())
+                result.screenEffectFramebuffers.assign(
+                    result.images.size(), VK_NULL_HANDLE);
+            VkFramebufferCreateInfo screenFramebuffer{};
+            screenFramebuffer.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            screenFramebuffer.renderPass = result.screenEffectRenderPass;
+            screenFramebuffer.attachmentCount = 1;
+            screenFramebuffer.pAttachments = &result.screenEffectImageViews[i];
+            screenFramebuffer.width = result.screenEffectExtent.width;
+            screenFramebuffer.height = result.screenEffectExtent.height;
+            screenFramebuffer.layers = 1;
+            require(vkCreateFramebuffer(params.device, &screenFramebuffer,
+                        nullptr, &result.screenEffectFramebuffers[i]),
+                    "vkCreateFramebuffer(screen effect)");
+        }
 
         for (int level = 0; level < result.bloomLevelCount; ++level) {
             const size_t levelIndex = static_cast<size_t>(level);
@@ -534,6 +653,8 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
              << (result.framebufferSrgb ? "hardware sRGB"
                                         : "shader gamma fallback")
              << ", enhanced bloom " << result.bloomLevelCount << " levels"
+             << ", BSL screen effects "
+             << (result.surfaceDataEnabled ? "on" : "off")
              << ", surface transform "
              << static_cast<uint32_t>(info.preTransform));
     return result;
@@ -554,6 +675,13 @@ void VulkanSwapchainBundle::destroy() {
         }
         sets.clear();
     }
+    if (!screenEffectDescriptorSets.empty() && m_descriptorPool) {
+        require(vkFreeDescriptorSets(m_device, m_descriptorPool,
+                    static_cast<uint32_t>(screenEffectDescriptorSets.size()),
+                    screenEffectDescriptorSets.data()),
+                "vkFreeDescriptorSets(screen effect)");
+    }
+    screenEffectDescriptorSets.clear();
     if (!postDescriptorSets.empty() && m_descriptorPool) {
         require(vkFreeDescriptorSets(
                     m_device, m_descriptorPool,
@@ -567,6 +695,9 @@ void VulkanSwapchainBundle::destroy() {
             if (framebuffer) vkDestroyFramebuffer(m_device, framebuffer, nullptr);
         levelFramebuffers.clear();
     }
+    for (VkFramebuffer framebuffer : screenEffectFramebuffers)
+        if (framebuffer) vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    screenEffectFramebuffers.clear();
     for (VkFramebuffer framebuffer : presentFramebuffers)
         if (framebuffer) vkDestroyFramebuffer(m_device, framebuffer, nullptr);
     presentFramebuffers.clear();
@@ -578,6 +709,13 @@ void VulkanSwapchainBundle::destroy() {
     if (postPipelineLayout)
         vkDestroyPipelineLayout(m_device, postPipelineLayout, nullptr);
     postPipelineLayout = VK_NULL_HANDLE;
+    if (screenEffectPipeline)
+        vkDestroyPipeline(m_device, screenEffectPipeline, nullptr);
+    screenEffectPipeline = VK_NULL_HANDLE;
+    if (screenEffectPipelineLayout)
+        vkDestroyPipelineLayout(
+            m_device, screenEffectPipelineLayout, nullptr);
+    screenEffectPipelineLayout = VK_NULL_HANDLE;
     if (bloomPipeline) vkDestroyPipeline(m_device, bloomPipeline, nullptr);
     bloomPipeline = VK_NULL_HANDLE;
     if (bloomPipelineLayout)
@@ -634,6 +772,9 @@ void VulkanSwapchainBundle::destroy() {
     if (bloomRenderPass)
         vkDestroyRenderPass(m_device, bloomRenderPass, nullptr);
     bloomRenderPass = VK_NULL_HANDLE;
+    if (screenEffectRenderPass)
+        vkDestroyRenderPass(m_device, screenEffectRenderPass, nullptr);
+    screenEffectRenderPass = VK_NULL_HANDLE;
     if (renderPass) vkDestroyRenderPass(m_device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
     for (VkImageView view : depthImageViews)
@@ -647,6 +788,26 @@ void VulkanSwapchainBundle::destroy() {
     }
     depthImages.clear();
     depthAllocations.clear();
+    const auto destroyImageSet = [&](std::vector<VkImage>& images,
+            std::vector<VmaAllocation>& allocations,
+            std::vector<VkImageView>& views) {
+        for (VkImageView view : views)
+            if (view) vkDestroyImageView(m_device, view, nullptr);
+        views.clear();
+        if (m_allocator) {
+            for (size_t i = 0; i < images.size(); ++i)
+                if (images[i])
+                    vmaDestroyImage(m_allocator, images[i], allocations[i]);
+        }
+        images.clear();
+        allocations.clear();
+    };
+    destroyImageSet(surfaceImages, surfaceAllocations, surfaceImageViews);
+    destroyImageSet(surfaceMsaaImages, surfaceMsaaAllocations,
+                    surfaceMsaaImageViews);
+    destroyImageSet(screenEffectImages, screenEffectAllocations,
+                    screenEffectImageViews);
+    surfaceDataEnabled = false;
     for (size_t level = 0; level < MAX_BLOOM_LEVELS; ++level) {
         for (VkImageView view : bloomImageViews[level])
             if (view) vkDestroyImageView(m_device, view, nullptr);
@@ -697,6 +858,7 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
     : handle(other.handle),
       swapchainFormat(other.swapchainFormat),
       sceneFormat(other.sceneFormat),
+      surfaceFormat(other.surfaceFormat),
       depthFormat(other.depthFormat),
       framebufferSrgb(other.framebufferSrgb),
       swapchainExtent(other.swapchainExtent),
@@ -712,6 +874,18 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       depthImages(std::move(other.depthImages)),
       depthAllocations(std::move(other.depthAllocations)),
       depthImageViews(std::move(other.depthImageViews)),
+      surfaceImages(std::move(other.surfaceImages)),
+      surfaceAllocations(std::move(other.surfaceAllocations)),
+      surfaceImageViews(std::move(other.surfaceImageViews)),
+      surfaceMsaaImages(std::move(other.surfaceMsaaImages)),
+      surfaceMsaaAllocations(std::move(other.surfaceMsaaAllocations)),
+      surfaceMsaaImageViews(std::move(other.surfaceMsaaImageViews)),
+      screenEffectExtent(other.screenEffectExtent),
+      screenEffectImages(std::move(other.screenEffectImages)),
+      screenEffectAllocations(std::move(other.screenEffectAllocations)),
+      screenEffectImageViews(std::move(other.screenEffectImageViews)),
+      screenEffectFramebuffers(std::move(other.screenEffectFramebuffers)),
+      surfaceDataEnabled(other.surfaceDataEnabled),
       bloomLevelCount(other.bloomLevelCount),
       bloomExtents(other.bloomExtents),
       bloomImages(std::move(other.bloomImages)),
@@ -729,6 +903,10 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       postPipelineLayout(other.postPipelineLayout),
       postSampler(other.postSampler),
       postDescriptorSets(std::move(other.postDescriptorSets)),
+      screenEffectRenderPass(other.screenEffectRenderPass),
+      screenEffectPipelineLayout(other.screenEffectPipelineLayout),
+      screenEffectPipeline(other.screenEffectPipeline),
+      screenEffectDescriptorSets(std::move(other.screenEffectDescriptorSets)),
       bloomRenderPass(other.bloomRenderPass),
       bloomPipelineLayout(other.bloomPipelineLayout),
       bloomPipeline(other.bloomPipeline),
@@ -771,6 +949,7 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     handle = other.handle;
     swapchainFormat = other.swapchainFormat;
     sceneFormat = other.sceneFormat;
+    surfaceFormat = other.surfaceFormat;
     depthFormat = other.depthFormat;
     framebufferSrgb = other.framebufferSrgb;
     swapchainExtent = other.swapchainExtent;
@@ -786,6 +965,18 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     depthImages = std::move(other.depthImages);
     depthAllocations = std::move(other.depthAllocations);
     depthImageViews = std::move(other.depthImageViews);
+    surfaceImages = std::move(other.surfaceImages);
+    surfaceAllocations = std::move(other.surfaceAllocations);
+    surfaceImageViews = std::move(other.surfaceImageViews);
+    surfaceMsaaImages = std::move(other.surfaceMsaaImages);
+    surfaceMsaaAllocations = std::move(other.surfaceMsaaAllocations);
+    surfaceMsaaImageViews = std::move(other.surfaceMsaaImageViews);
+    screenEffectExtent = other.screenEffectExtent;
+    screenEffectImages = std::move(other.screenEffectImages);
+    screenEffectAllocations = std::move(other.screenEffectAllocations);
+    screenEffectImageViews = std::move(other.screenEffectImageViews);
+    screenEffectFramebuffers = std::move(other.screenEffectFramebuffers);
+    surfaceDataEnabled = other.surfaceDataEnabled;
     bloomLevelCount = other.bloomLevelCount;
     bloomExtents = other.bloomExtents;
     bloomImages = std::move(other.bloomImages);
@@ -803,6 +994,10 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     postPipelineLayout = other.postPipelineLayout;
     postSampler = other.postSampler;
     postDescriptorSets = std::move(other.postDescriptorSets);
+    screenEffectRenderPass = other.screenEffectRenderPass;
+    screenEffectPipelineLayout = other.screenEffectPipelineLayout;
+    screenEffectPipeline = other.screenEffectPipeline;
+    screenEffectDescriptorSets = std::move(other.screenEffectDescriptorSets);
     bloomRenderPass = other.bloomRenderPass;
     bloomPipelineLayout = other.bloomPipelineLayout;
     bloomPipeline = other.bloomPipeline;

@@ -30,6 +30,14 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
 } environment;
 layout(set=1,binding=1) uniform sampler2D shadowMap;
 layout(location=0) out vec4 outColor;
+layout(location=1) out vec4 outSurface;
+
+vec2 encodeNormal(vec3 n){
+    n/=abs(n.x)+abs(n.y)+abs(n.z);
+    vec2 encoded=n.xy;
+    if(n.z<0.0)encoded=(1.0-abs(encoded.yx))*sign(encoded.xy);
+    return encoded*0.5+0.5;
+}
 
 float sampleShadowCascade(vec3 position,vec3 normal,int cascade,int count){
     vec4 clip=environment.shadowMatrices[cascade]*vec4(position,1.0);
@@ -46,17 +54,49 @@ float sampleShadowCascade(vec3 position,vec3 normal,int cascade,int count){
     vec2 texel=1.0/(resolution*atlasSize);
     float bias=0.0008+0.002*(1.0-max(dot(normal,
         normalize(environment.lightDirection.xyz)),0.0));
-    int taps=count==3?(cascade<2?4:1):count==2&&cascade==0?4:1;
+    int taps=int(environment.visualParams.w+0.5);
+    if(taps<=0)taps=count==3?(cascade<2?4:1):count==2&&cascade==0?4:1;
     float visible=0.0;
     if(taps==1)visible=projected.z-bias<=texture(shadowMap,uv).r?1.0:0.0;
-    else if(taps==4){
+    else if(taps==4&&environment.visualParams.z<0.5){
         for(int y=-1;y<=1;y+=2)for(int x=-1;x<=1;x+=2)
             visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel*0.5).r?1.0:0.0;
         visible*=0.25;
-    }else{
+    }else if(environment.visualParams.w<4.5){
         for(int y=-1;y<=1;++y)for(int x=-1;x<=1;++x)
             visible+=projected.z-bias<=texture(shadowMap,uv+vec2(x,y)*texel).r?1.0:0.0;
         visible/=9.0;
+    }else{
+        const vec2 poisson[12]=vec2[12](
+            vec2(-.326,-.406),vec2(-.840,-.074),vec2(-.696,.457),
+            vec2(-.203,.621),vec2(.962,-.195),vec2(.473,-.480),
+            vec2(.519,.767),vec2(.185,-.893),vec2(.507,.064),
+            vec2(.896,.412),vec2(-.322,-.933),vec2(-.792,-.598));
+        int blockerSamples=int(environment.visualParams.z+0.5);
+        float blockerDepth=0.0,blockerCount=0.0;
+        for(int i=0;i<6;++i){
+            if(i>=blockerSamples)break;
+            float depthValue=texture(shadowMap,uv+poisson[i]*texel*2.0).r;
+            if(depthValue<projected.z-bias){
+                blockerDepth+=depthValue;
+                blockerCount+=1.0;
+            }
+        }
+        float radius=1.15;
+        if(blockerCount>0.0){
+            blockerDepth/=blockerCount;
+            radius=clamp(1.0+(projected.z-blockerDepth)*180.0,1.15,3.4);
+        }
+        float angle=fract(sin(dot(position.xz,vec2(12.9898,78.233)))*
+            43758.5453)*6.2831853;
+        mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
+        for(int i=0;i<12;++i){
+            if(i>=taps)break;
+            float depthValue=texture(shadowMap,
+                uv+rotation*poisson[i]*texel*radius).r;
+            visible+=projected.z-bias<=depthValue?1.0:0.0;
+        }
+        visible/=max(float(taps),1.0);
     }
     return mix(0.35,1.0,visible);
 }
@@ -219,6 +259,12 @@ void main() {
         environment.ambientColorIntensity.a*skyLight*0.72;
     illumination+=environment.directColorIntensity.rgb*
         environment.directColorIntensity.a*diffuse*skyLight*0.52*visibility;
+    if(leafSurface&&environment.visualParams.y>0.001){
+        float backLight=pow(max(dot(-normal,
+            normalize(environment.lightDirection.xyz)),0.0),2.0);
+        illumination+=environment.directColorIntensity.rgb*backLight*skyLight*
+            (0.08+0.10*environment.visualParams.y)*visibility;
+    }
     illumination=max(illumination,vec3(1.0,0.72,0.38)*blockLight*1.15);
     illumination=max(illumination*ao,vec3(0.025));
 
@@ -232,17 +278,35 @@ void main() {
     }
 
     float roughness=isWater?0.08:mix(properties.r,0.82,step(5.5,surfaceFace));
-    roughness=mix(roughness,0.16,wetness*0.82);
+    float puddle=valueNoise(worldPosition.xz*0.075+vec2(17.0,31.0));
+    puddle=smoothstep(0.58,0.76,puddle)*topSurface*
+        environment.weatherParams.y*environment.visualParams.y;
+    float wetRoughness=mix(0.16,0.11,environment.visualParams.y);
+    roughness=mix(roughness,wetRoughness,max(wetness*0.82,puddle));
     if(materialDetail&&surfaceFace<5.5){
         vec3 viewDir=normalize(environment.cameraPosition.xyz-worldPosition);
         vec3 halfDir=normalize(viewDir+normalize(environment.lightDirection.xyz));
-        float exponent=mix(128.0,10.0,roughness*roughness);
+        float noV=max(dot(normal,viewDir),0.001);
+        float noL=max(dot(normal,normalize(environment.lightDirection.xyz)),0.001);
+        float noH=max(dot(normal,halfDir),0.001);
+        float voH=max(dot(viewDir,halfDir),0.001);
+        float alpha=max(roughness*roughness,0.035);
+        float alpha2=alpha*alpha;
+        float denominator=noH*noH*(alpha2-1.0)+1.0;
+        float distribution=alpha2/(3.14159265*denominator*denominator);
+        float k=(roughness+1.0)*(roughness+1.0)*0.125;
+        float geometry=(noV/(noV*(1.0-k)+k))*(noL/(noL*(1.0-k)+k));
         float fresnel=0.04+(1.0-0.04)*pow(1.0-
-            max(dot(normal,viewDir),0.0),5.0);
-        float specular=pow(max(dot(normal,halfDir),0.0),exponent)*
-            mix(0.16,1.0,fresnel)*(1.0-roughness*0.45);
+            voH,5.0);
+        float pbrSpecular=distribution*geometry*fresnel/max(4.0*noV*noL,0.01);
+        float legacyExponent=mix(128.0,10.0,roughness*roughness);
+        float legacyFresnel=0.04+0.96*pow(1.0-noV,5.0);
+        float legacySpecular=pow(noH,legacyExponent)*
+            mix(0.16,1.0,legacyFresnel)*(1.0-roughness*0.45);
+        float specular=mix(legacySpecular,pbrSpecular,
+            environment.visualParams.y);
         illumination+=environment.directColorIntensity.rgb*specular*
-            skyLight*visibility*(isWater?0.82:0.28);
+            skyLight*visibility*(isWater?0.82:0.34);
         if(isWater&&environment.visualParams.x>0.001){
             float waterFresnel=pow(1.0-max(dot(normal,viewDir),0.0),3.0);
             illumination+=environment.fogColorDistance.rgb*waterFresnel*
@@ -263,4 +327,11 @@ void main() {
         environment.fogColorDistance.rgb,skyLight);
     color=mix(color,localFog,fog);
     outColor=vec4(color,texel.a*frame.tint.a);
+    float signedDistance=isWater?-distanceToCamera:distanceToCamera;
+    float emissiveMarker=(isLava||properties.b>0.01)?2.0:0.0;
+    float surfaceCoverage=isWater?1.0:
+        step(0.995,texel.a*frame.tint.a);
+    outSurface=vec4(encodeNormal(normal),signedDistance,
+        surfaceCoverage>0.5?(isWater?1.0:
+            clamp(roughness,0.0,1.0)+emissiveMarker):0.0);
 }

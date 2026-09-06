@@ -28,16 +28,36 @@ struct EnhancedVisualConfig {
     float atmosphereStrength = 0.0f;
     float materialMotionStrength = 0.0f;
     float ambientParticlesPerSecond = 0.0f;
+    int screenEffectDivisor = 0;
+    int aoDirections = 0;
+    int aoSteps = 0;
+    int lightShaftSamples = 0;
+    int reflectionSteps = 0;
+    int reflectionRefineSteps = 0;
+    float reflectionDistance = 0.0f;
+    int shadowBlockerSamples = 0;
+    int shadowFilterSamples = 0;
+
+    bool usesSurfaceData() const { return screenEffectDivisor > 0; }
+    bool usesScreenSpaceReflections() const { return reflectionSteps > 0; }
 };
 
 inline EnhancedVisualConfig enhancedVisualConfig(VisualQuality quality,
                                                  bool enabled) {
     if (!enabled) return {};
     switch (quality) {
-        case VisualQuality::Low: return {0, 0.25f, 0.25f, 0.0f};
-        case VisualQuality::Medium: return {2, 0.50f, 0.60f, 4.0f};
-        case VisualQuality::High: return {3, 0.75f, 0.85f, 8.0f};
-        case VisualQuality::Ultra: return {4, 1.00f, 1.00f, 12.0f};
+        case VisualQuality::Low:
+            return {0, 0.25f, 0.25f, 0.0f,
+                    0, 0, 0, 0, 0, 0, 0.0f, 0, 1};
+        case VisualQuality::Medium:
+            return {2, 0.50f, 0.60f, 4.0f,
+                    4, 4, 2, 8, 0, 0, 0.0f, 0, 4};
+        case VisualQuality::High:
+            return {3, 0.75f, 0.85f, 8.0f,
+                    4, 6, 3, 12, 12, 2, 64.0f, 4, 8};
+        case VisualQuality::Ultra:
+            return {4, 1.00f, 1.00f, 12.0f,
+                    2, 8, 4, 16, 24, 4, 96.0f, 6, 12};
     }
     return {};
 }
