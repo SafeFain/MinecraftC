@@ -103,6 +103,30 @@ int main() {
                 enhancedUltra.shadowBlockerSamples == 6 &&
                 enhancedUltra.shadowFilterSamples == 12,
             "enhanced visual presets do not match their progressive budgets");
+    EnhancedVisualSettings custom{};
+    custom.enabled = true;
+    custom.custom = true;
+    custom.bloom = false;
+    custom.lightShafts = false;
+    custom.reflectionStrength = 50;
+    custom.atmosphereStrength = 25;
+    custom.materialMotionStrength = 0;
+    custom.ambientParticleStrength = 50;
+    const EnhancedVisualConfig customized = enhancedVisualConfig(
+        VisualQuality::Ultra, custom);
+    require(customized.bloomLevels == 0 &&
+                customized.aoDirections == 8 &&
+                customized.lightShaftSamples == 0 &&
+                customized.reflectionSteps == 24 &&
+                customized.reflectionStrength == 0.5f &&
+                customized.atmosphereStrength == 0.25f &&
+                customized.materialMotionStrength == 0.0f &&
+                customized.ambientParticlesPerSecond == 6.0f,
+            "custom enhanced-visual controls do not scale the quality budget");
+    custom.ambientOcclusion = false;
+    custom.reflections = false;
+    require(!enhancedVisualConfig(VisualQuality::Ultra, custom).usesSurfaceData(),
+            "disabling every screen effect still allocates surface resources");
     require(supportsFireflies(Biome::SWAMP) &&
                 supportsFireflies(Biome::FOREST) &&
                 supportsFireflies(Biome::BIRCH_FOREST) &&

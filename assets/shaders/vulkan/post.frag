@@ -116,7 +116,7 @@ void main(){
     }
     vec3 hdr=texture(sceneColor,clamp(uv,vec2(0.0),vec2(1.0))).rgb;
     vec4 surface=texture(surfaceData,vUv);
-    if(post.effects.w>0.001&&surface.z< -0.01){
+    if(post.effects.w>0.001&&post.reflection.w>0.001&&surface.z< -0.01){
         vec3 normal=decodeNormal(surface.xy);
         vec2 distortion=vec2(normal.x,-normal.z)*post.texelTime.xy*8.0*
             post.reflection.w;
@@ -129,14 +129,14 @@ void main(){
         reflected=mix(skyReflection(vUv,normal),reflected,confidence);
         float fresnel=0.10+0.78*pow(1.0-clamp(normal.y,0.0,1.0),3.0);
         hdr=mix(refracted*vec3(0.82,0.94,0.97),reflected,
-                clamp(fresnel,0.12,0.88));
+                clamp(fresnel*post.reflection.w,0.0,0.88));
     }
     if(post.screenQuality.w>0.5){
         vec2 screen=texture(screenEffects,vUv).rg;
         if(surface.z>0.01&&surface.w<1.9)
-            hdr*=mix(1.0,screen.x,0.82*post.effects.w);
+            hdr*=mix(1.0,screen.x,0.82*post.exposureBloom.w);
         float shafts=screen.y*(1.0-post.environment.x*0.62);
-        hdr+=vec3(1.0,0.74,0.42)*shafts*0.20;
+        hdr+=vec3(1.0,0.74,0.42)*shafts*0.20*post.sunScreen.w;
     }
     float bloomStrength=post.exposureBloom.y;
     int bloomLevels=int(post.texelTime.w+0.5);
@@ -175,7 +175,7 @@ void main(){
     // after this pass.
     float luminance=dot(color,vec3(.2126,.7152,.0722));
     color=mix(color,vec3(luminance),post.environment.x*0.06);
-    float enhanced=post.effects.w;
+    float enhanced=post.exposureBloom.z;
     if(enhanced>0.001){
         float twilight=(1.0-smoothstep(0.08,0.42,abs(post.celestial.y)))*
             (1.0-post.environment.x);

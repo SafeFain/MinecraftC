@@ -255,6 +255,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     VkSampleCountFlagBits maxSampleCount = VK_SAMPLE_COUNT_1_BIT;
     VkSampleCountFlagBits requestedSampleCount = VK_SAMPLE_COUNT_2_BIT;
     bool enhancedVisuals = false;
+    EnhancedVisualSettings enhancedVisualSettings{};
     ShadowCascades shadowCascades{};
     ShadowCascades shadowBaseCascades{};
     std::vector<ShadowChunkSubmission> submittedShadowChunks;
@@ -438,7 +439,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     void configureVisualQuality(VisualQuality quality) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
         visualQuality = quality;
         const int samples = visualQualityConfig(quality).sceneSamples;
         requestedSampleCount = samples >= 4 ? VK_SAMPLE_COUNT_4_BIT :
@@ -446,7 +447,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const VkSampleCountFlagBits effective = maxSampleCount >= requestedSampleCount
             ? requestedSampleCount : maxSampleCount;
         const EnhancedVisualConfig current = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
         const bool resourcesChanged = previous.bloomLevels != current.bloomLevels ||
             previous.screenEffectDivisor != current.screenEffectDivisor;
         if (effective == swapchain.sampleCount && !resourcesChanged) return;
@@ -459,10 +460,23 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     void configureEnhancedVisuals(bool enabled) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
         enhancedVisuals = enabled;
+        enhancedVisualSettings.enabled = enabled;
         const EnhancedVisualConfig current = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
+        if (previous.bloomLevels != current.bloomLevels ||
+            previous.screenEffectDivisor != current.screenEffectDivisor)
+            swapchainDirty = true;
+    }
+
+    void configureEnhancedVisualSettings(const EnhancedVisualSettings& settings) {
+        const EnhancedVisualConfig previous = enhancedVisualConfig(
+            visualQuality, enhancedVisualSettings);
+        enhancedVisualSettings = settings;
+        enhancedVisuals = settings.enabled;
+        const EnhancedVisualConfig current = enhancedVisualConfig(
+            visualQuality, enhancedVisualSettings);
         if (previous.bloomLevels != current.bloomLevels ||
             previous.screenEffectDivisor != current.screenEffectDivisor)
             swapchainDirty = true;
@@ -1058,7 +1072,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.bloomLayout = descriptors.bloomDescriptorSetLayout;
         params.screenEffectLayout = descriptors.screenEffectDescriptorSetLayout;
         const EnhancedVisualConfig enhanced = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
         params.bloomLevels = enhanced.bloomLevels;
         params.screenEffectDivisor = enhanced.screenEffectDivisor;
         params.requestedSampleCount = requestedSampleCount;
@@ -1293,7 +1307,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 submission.environment.ambientColor * submission.environment.ambientIntensity,
                 0.0f);
             uniforms.options.x = enhancedVisualConfig(
-                visualQuality, enhancedVisuals).atmosphereStrength;
+                visualQuality, enhancedVisualSettings).atmosphereStrength;
             std::memcpy(static_cast<uint8_t*>(frame.uniform.mapped) +
                         index * modelUniformStride, &uniforms, sizeof(uniforms));
             ++index;
@@ -1529,7 +1543,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             const CloudUniforms constants{
                 clipSpaceCorrection() * cloudViewProjection,
                 glm::vec4(cloudOrigin, enhancedVisualConfig(
-                    visualQuality, enhancedVisuals).atmosphereStrength),
+                    visualQuality, enhancedVisualSettings).atmosphereStrength),
                 glm::vec4(cloudColor, 0.0f),
                 glm::vec4(glm::normalize(submittedFrame.lightDirection),
                           postProcess.environment.rainIntensity)};
@@ -1768,12 +1782,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     PostConstants buildPostConstants() const {
         const VisualQualityConfig visual = visualQualityConfig(visualQuality);
         const EnhancedVisualConfig enhanced = enhancedVisualConfig(
-            visualQuality, enhancedVisuals);
+            visualQuality, enhancedVisualSettings);
         PostConstants result;
-        if (enhanced.bloomLevels > 0) {
+        if (enhancedVisuals) {
             result.exposureBloom = {
                 std::clamp(postProcess.exposure, 0.75f, 1.65f),
-                0.13f, 1.0f, 0.0f};
+                enhanced.bloomLevels > 0
+                    ? 0.13f * enhanced.bloomStrength : 0.0f,
+                enhanced.atmosphereStrength,
+                enhanced.ambientOcclusionStrength};
         } else {
             result.exposureBloom = {
                 std::clamp(postProcess.exposure, 0.75f, 1.65f),
@@ -1789,7 +1806,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             std::clamp(postProcess.underwater, 0.0f, 1.0f),
             std::clamp(postProcess.hurt, 0.0f, 1.0f),
             swapchain.framebufferSrgb ? 0.0f : 1.0f,
-            enhanced.atmosphereStrength};
+            enhancedVisuals ? 1.0f : 0.0f};
         result.texelTime = {
             1.0f / std::max(1u, swapchain.swapchainExtent.width),
             1.0f / std::max(1u, swapchain.swapchainExtent.height),
@@ -1814,7 +1831,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 static_cast<float>(enhanced.reflectionSteps),
                 static_cast<float>(enhanced.reflectionRefineSteps),
                 enhanced.reflectionDistance,
-                enhanced.materialMotionStrength};
+                enhanced.reflectionStrength};
         }
         const glm::mat4 viewProjection = glm::inverse(
             postProcess.inverseViewProjection);
@@ -1827,7 +1844,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const glm::vec2 sunNdc = sunVisible
             ? glm::vec2(sunClip) / sunClip.w : glm::vec2(-4.0f);
         result.sunScreen = {sunNdc * 0.5f + 0.5f,
-                            sunVisible ? 1.0f : 0.0f, 0.0f};
+                            sunVisible ? 1.0f : 0.0f,
+                            enhanced.lightShaftStrength};
         return result;
     }
 

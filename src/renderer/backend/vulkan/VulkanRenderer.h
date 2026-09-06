@@ -41,6 +41,7 @@ public:
     void beginFrame() override;
     void setVisualQuality(VisualQuality quality) override;
     void setEnhancedVisuals(bool enabled) override;
+    void setEnhancedVisualSettings(const EnhancedVisualSettings& settings) override;
     void setLeafTransparency(bool enabled) override;
     void finishScene(const PostProcessState& state) override;
     void setEnvironment(const RenderEnvironment&, const glm::vec3&) override;
@@ -111,6 +112,7 @@ private:
     glm::vec3 m_cameraPosition{0.0f};
     VisualQuality m_visualQuality = VisualQuality::Medium;
     bool m_enhancedVisuals = false;
+    EnhancedVisualSettings m_enhancedVisualSettings{};
     bool m_leafTransparency = false;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
 };

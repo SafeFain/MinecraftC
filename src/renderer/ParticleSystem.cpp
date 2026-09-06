@@ -28,6 +28,18 @@ void ParticleSystem::setEnhancedVisuals(bool enabled, VisualQuality quality) {
         }), m_particles.end());
 }
 
+void ParticleSystem::setEnhancedVisuals(
+    const EnhancedVisualSettings& settings, VisualQuality quality) {
+    m_enhancedVisual = enhancedVisualConfig(quality, settings);
+    if (m_enhancedVisual.ambientParticlesPerSecond > 0.0f) return;
+    m_overworldAmbientEmission = 0.0f;
+    m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
+        [](const Particle& particle) {
+            return particle.kind == ParticleKind::OverworldMote ||
+                   particle.kind == ParticleKind::Firefly;
+        }), m_particles.end());
+}
+
 uint64_t ParticleSystem::randomBits() {
     m_randomState += 0x9e3779b97f4a7c15ULL;
     uint64_t value = m_randomState;

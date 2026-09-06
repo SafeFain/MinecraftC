@@ -119,8 +119,12 @@ void SettingsMenu::refreshButtons() {
             m_localization.text(m_settings.enhancedVisuals
                 ? "common.on" : "common.off")}), [this]{
                 m_settings.enhancedVisuals = !m_settings.enhancedVisuals;
+                m_settings.enhancedVisual.enabled = m_settings.enhancedVisuals;
                 m_onChanged(); refreshButtons();
             });
+        m_buttons.emplace_back(m_localization.text("settings.enhanced_details"), [this]{
+            showPage(SettingsPage::EnhancedVisuals);
+        });
         m_buttons.emplace_back(m_localization.format("settings.smooth_lighting", {
             m_localization.text(m_settings.smoothLighting ? "common.on" : "common.off")}), [this]{
                 m_settings.smoothLighting = !m_settings.smoothLighting;
@@ -169,6 +173,62 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             showPage(SettingsPage::General);
         });
+    } else if (m_page == SettingsPage::EnhancedVisuals) {
+        auto& settings = m_settings.enhancedVisual;
+        const auto onOff = [this](bool value) {
+            return m_localization.text(value ? "common.on" : "common.off");
+        };
+        const auto percent = [](uint8_t value) {
+            return std::to_string(static_cast<int>(value)) + "%";
+        };
+        const auto cycle = [this](uint8_t& value) {
+            m_settings.enhancedVisual.custom = true;
+            value = static_cast<uint8_t>(value >= 100 ? 0 : value + 25);
+            m_onChanged(); refreshButtons();
+        };
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_mode", {
+            m_localization.text(settings.custom ? "settings.enhanced_custom" :
+                                                  "settings.enhanced_preset")}), [this]{
+            m_settings.enhancedVisual.custom = !m_settings.enhancedVisual.custom;
+            m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_bloom", {onOff(settings.bloom)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.bloom = !m_settings.enhancedVisual.bloom; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_bloom_strength", {percent(settings.bloomStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.bloomStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_ao", {onOff(settings.ambientOcclusion)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.ambientOcclusion = !m_settings.enhancedVisual.ambientOcclusion; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_ao_strength", {percent(settings.ambientOcclusionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.ambientOcclusionStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_shafts", {onOff(settings.lightShafts)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.lightShafts = !m_settings.enhancedVisual.lightShafts; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_shaft_strength", {percent(settings.lightShaftStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.lightShaftStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_reflections", {onOff(settings.reflections)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.reflections = !m_settings.enhancedVisual.reflections; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_reflection_strength", {percent(settings.reflectionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.reflectionStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_atmosphere", {onOff(settings.atmosphere)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.atmosphere = !m_settings.enhancedVisual.atmosphere; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_atmosphere_strength", {percent(settings.atmosphereStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.atmosphereStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_material", {onOff(settings.materialMotion)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.materialMotion = !m_settings.enhancedVisual.materialMotion; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_material_strength", {percent(settings.materialMotionStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.materialMotionStrength); });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_particles", {onOff(settings.ambientParticles)}), [this]{
+            m_settings.enhancedVisual.custom = true;
+            m_settings.enhancedVisual.ambientParticles = !m_settings.enhancedVisual.ambientParticles; m_onChanged(); refreshButtons();
+        });
+        m_buttons.emplace_back(m_localization.format("settings.enhanced_particle_strength", {percent(settings.ambientParticleStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.ambientParticleStrength); });
+        m_backButton = static_cast<int>(m_buttons.size());
+        m_buttons.emplace_back(m_localization.text("settings.back"), [this]{ showPage(SettingsPage::Video); });
     } else if (m_page == SettingsPage::Lod) {
         if (m_lodWarningPending) {
             m_buttons.emplace_back(m_localization.text("settings.lod_warning_apply"), [this] {
@@ -362,6 +422,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         m_page == SettingsPage::KeyboardMouse ? "settings.keyboard_mouse_title" :
         m_page == SettingsPage::Controller ? "settings.controller_title" :
         m_page == SettingsPage::Lod ? "settings.lod_title" :
+        m_page == SettingsPage::EnhancedVisuals ? "settings.enhanced_title" :
         m_page == SettingsPage::Video ? "settings.video_title" :
         m_page == SettingsPage::KeyBindings ? "settings.key_bindings_title" :
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");

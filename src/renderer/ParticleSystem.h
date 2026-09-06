@@ -58,6 +58,8 @@ public:
     static constexpr size_t MAX_SPARKLE_PER_UPDATE = 6;
 
     void setEnhancedVisuals(bool enabled, VisualQuality quality);
+    void setEnhancedVisuals(const EnhancedVisualSettings& settings,
+                            VisualQuality quality);
 
     void clear();
     void update(World& world, const glm::dvec3& viewer, float dt,

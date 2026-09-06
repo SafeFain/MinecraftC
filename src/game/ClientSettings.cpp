@@ -75,6 +75,17 @@ void ClientSettings::resetGamepadBindings() {
 }
 
 void ClientSettings::validate() {
+    enhancedVisual.enabled = enhancedVisuals;
+    auto clampPercent = [](uint8_t& value) {
+        value = static_cast<uint8_t>(std::min<int>(value, 100));
+    };
+    clampPercent(enhancedVisual.bloomStrength);
+    clampPercent(enhancedVisual.ambientOcclusionStrength);
+    clampPercent(enhancedVisual.lightShaftStrength);
+    clampPercent(enhancedVisual.reflectionStrength);
+    clampPercent(enhancedVisual.atmosphereStrength);
+    clampPercent(enhancedVisual.materialMotionStrength);
+    clampPercent(enhancedVisual.ambientParticleStrength);
     constexpr int distances[] = {2,4,6,8,10,12,16};
     if (std::find(std::begin(distances), std::end(distances), renderDistance) == std::end(distances))
         renderDistance = 8;
@@ -185,6 +196,21 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 if (parsed == 0 || parsed == 1)
                     settings.enhancedVisuals = parsed == 1;
             }
+            else if (name == "enhanced_custom") settings.enhancedVisual.custom = std::stoi(value) != 0;
+            else if (name == "enhanced_bloom") settings.enhancedVisual.bloom = std::stoi(value) != 0;
+            else if (name == "enhanced_ao") settings.enhancedVisual.ambientOcclusion = std::stoi(value) != 0;
+            else if (name == "enhanced_shafts") settings.enhancedVisual.lightShafts = std::stoi(value) != 0;
+            else if (name == "enhanced_reflections") settings.enhancedVisual.reflections = std::stoi(value) != 0;
+            else if (name == "enhanced_atmosphere") settings.enhancedVisual.atmosphere = std::stoi(value) != 0;
+            else if (name == "enhanced_material_motion") settings.enhancedVisual.materialMotion = std::stoi(value) != 0;
+            else if (name == "enhanced_particles") settings.enhancedVisual.ambientParticles = std::stoi(value) != 0;
+            else if (name == "enhanced_bloom_strength") settings.enhancedVisual.bloomStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_ao_strength") settings.enhancedVisual.ambientOcclusionStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_shaft_strength") settings.enhancedVisual.lightShaftStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_reflection_strength") settings.enhancedVisual.reflectionStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_atmosphere_strength") settings.enhancedVisual.atmosphereStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_material_strength") settings.enhancedVisual.materialMotionStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "enhanced_particle_strength") settings.enhancedVisual.ambientParticleStrength = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
             else if (name == "transparent_leaves")
                 settings.transparentLeaves = std::stoi(value) != 0;
             else if (name == "renderer") { /* v17 compatibility */ }
@@ -269,6 +295,21 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "shadow_quality=" << static_cast<int>(shadowQuality) << '\n'
            << "visual_quality=" << static_cast<int>(visualQuality) << '\n'
            << "enhanced_visuals=" << enhancedVisuals << '\n'
+           << "enhanced_custom=" << enhancedVisual.custom << '\n'
+           << "enhanced_bloom=" << enhancedVisual.bloom << '\n'
+           << "enhanced_ao=" << enhancedVisual.ambientOcclusion << '\n'
+           << "enhanced_shafts=" << enhancedVisual.lightShafts << '\n'
+           << "enhanced_reflections=" << enhancedVisual.reflections << '\n'
+           << "enhanced_atmosphere=" << enhancedVisual.atmosphere << '\n'
+           << "enhanced_material_motion=" << enhancedVisual.materialMotion << '\n'
+           << "enhanced_particles=" << enhancedVisual.ambientParticles << '\n'
+           << "enhanced_bloom_strength=" << static_cast<int>(enhancedVisual.bloomStrength) << '\n'
+           << "enhanced_ao_strength=" << static_cast<int>(enhancedVisual.ambientOcclusionStrength) << '\n'
+           << "enhanced_shaft_strength=" << static_cast<int>(enhancedVisual.lightShaftStrength) << '\n'
+           << "enhanced_reflection_strength=" << static_cast<int>(enhancedVisual.reflectionStrength) << '\n'
+           << "enhanced_atmosphere_strength=" << static_cast<int>(enhancedVisual.atmosphereStrength) << '\n'
+           << "enhanced_material_strength=" << static_cast<int>(enhancedVisual.materialMotionStrength) << '\n'
+           << "enhanced_particle_strength=" << static_cast<int>(enhancedVisual.ambientParticleStrength) << '\n'
            << "transparent_leaves=" << transparentLeaves << '\n'
            << "gui_scale=" << guiScale << '\n'
            << "frame_rate_limit=" << frameRateLimit << '\n'

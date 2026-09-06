@@ -64,7 +64,8 @@ int main(){
             "input device settings return to the key bindings hub");
     require(settingsParentPage(SettingsPage::KeyBindings)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Video)==SettingsPage::General&&
-            settingsParentPage(SettingsPage::Lod)==SettingsPage::Video,
+            settingsParentPage(SettingsPage::Lod)==SettingsPage::Video&&
+            settingsParentPage(SettingsPage::EnhancedVisuals)==SettingsPage::Video,
             "top-level settings pages return to general settings");
     const SettingsButtonLayout bindingLayout = settingsButtonLayout(620.0f,468.0f,13,true);
     require(bindingLayout.firstButtonY+bindingLayout.buttonHeight<=
@@ -186,6 +187,14 @@ int main(){
     settings.shadowQuality=ShadowQuality::High;
     settings.visualQuality=VisualQuality::Ultra;
     settings.enhancedVisuals=true;
+    settings.enhancedVisual.custom=true;
+    settings.enhancedVisual.bloom=false;
+    settings.enhancedVisual.ambientOcclusionStrength=75;
+    settings.enhancedVisual.lightShaftStrength=50;
+    settings.enhancedVisual.reflectionStrength=25;
+    settings.enhancedVisual.atmosphereStrength=75;
+    settings.enhancedVisual.materialMotionStrength=50;
+    settings.enhancedVisual.ambientParticleStrength=25;
     settings.transparentLeaves=true;
     settings.attackIndicator=AttackIndicator::Hotbar;
     settings.language=Language::SimplifiedChinese;
@@ -228,6 +237,14 @@ int main(){
             "visual quality preference round trips");
     require(loaded.enhancedVisuals,
             "enhanced-visual preference round trips");
+    require(loaded.enhancedVisual.custom && !loaded.enhancedVisual.bloom &&
+                loaded.enhancedVisual.ambientOcclusionStrength == 75 &&
+                loaded.enhancedVisual.lightShaftStrength == 50 &&
+                loaded.enhancedVisual.reflectionStrength == 25 &&
+                loaded.enhancedVisual.atmosphereStrength == 75 &&
+                loaded.enhancedVisual.materialMotionStrength == 50 &&
+                loaded.enhancedVisual.ambientParticleStrength == 25,
+            "custom enhanced-visual settings round trip");
     require(loaded.transparentLeaves,
             "transparent-leaf preference round trips");
     require(loaded.attackIndicator==AttackIndicator::Hotbar,
@@ -268,7 +285,7 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=22\n")!=std::string::npos&&
+    require(migratedText.find("version=23\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     {

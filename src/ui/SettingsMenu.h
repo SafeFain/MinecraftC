@@ -9,6 +9,7 @@
 enum class SettingsPage {
     General,
     Video,
+    EnhancedVisuals,
     Lod,
     KeyBindings,
     KeyboardMouse,
@@ -25,6 +26,7 @@ inline SettingsPage settingsParentPage(SettingsPage page) {
         case SettingsPage::Video:
             return SettingsPage::General;
         case SettingsPage::Lod:
+        case SettingsPage::EnhancedVisuals:
             return SettingsPage::Video;
         case SettingsPage::KeyBindings:
         case SettingsPage::General:

@@ -348,7 +348,15 @@ void VulkanRenderer::setVisualQuality(VisualQuality quality) {
 
 void VulkanRenderer::setEnhancedVisuals(bool enabled) {
     m_enhancedVisuals = enabled;
+    m_enhancedVisualSettings.enabled = enabled;
     if (m_impl) m_impl->configureEnhancedVisuals(enabled);
+}
+
+void VulkanRenderer::setEnhancedVisualSettings(
+    const EnhancedVisualSettings& settings) {
+    m_enhancedVisuals = settings.enabled;
+    m_enhancedVisualSettings = settings;
+    if (m_impl) m_impl->configureEnhancedVisualSettings(settings);
 }
 
 void VulkanRenderer::setLeafTransparency(bool enabled) {
@@ -394,7 +402,7 @@ void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
             Config::CHUNK_SIZE_X);
     const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
     const EnhancedVisualConfig enhanced = enhancedVisualConfig(
-        m_visualQuality, m_enhancedVisuals);
+        m_visualQuality, m_enhancedVisualSettings);
     chunk.materialParams = {
         static_cast<float>(getAtlasTextureIndex(BlockTexture::Lava)),
         static_cast<float>(getAtlasTextureIndex(BlockTexture::Water)),
@@ -432,7 +440,7 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
                    static_cast<float>(RuntimeClock::seconds(RuntimeClock{}.now()))};
     const VisualQualityConfig visual = visualQualityConfig(m_visualQuality);
     const EnhancedVisualConfig enhanced = enhancedVisualConfig(
-        m_visualQuality, m_enhancedVisuals);
+        m_visualQuality, m_enhancedVisualSettings);
     sky.options = {renderClouds && visual.voxelClouds ? 1.0f : 0.0f,
                    environment.skyStyle == RenderSkyStyle::Heaven ? 1.0f : 0.0f,
                    visual.cirrusClouds ? 1.0f : 0.0f,
