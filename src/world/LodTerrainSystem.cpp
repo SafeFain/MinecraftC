@@ -718,17 +718,27 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 const float x1 = static_cast<float>((x + 1) * cellSize);
                 const float z0 = static_cast<float>(z * cellSize);
                 const float z1 = static_cast<float>((z + 1) * cellSize);
+                // Match the shared fluid mesher's source height. LOD used to
+                // cap water at a full block while exact chunks cap a source at
+                // 8/9, leaving a raised shelf wherever the two paths meet.
+                const float spanTop = isFluid(span.block)
+                    ? static_cast<float>(span.top) +
+                        fluidSurfaceHeight(span.block) - 0.001f
+                    : static_cast<float>(span.top + 1);
                 emitFace(mesh, opaque, translucent, FaceDir::TOP,
-                    {x0, span.top + 1.0f, z0}, {x1, span.top + 1.0f, z1}, span.block);
+                    {x0, spanTop, z0}, {x1, spanTop, z1}, span.block);
                 // A single approximate ground span has no visible underside.
                 // Exact columns and floating multi-span terrain still retain
-                // bottoms for caves, overhangs, and Heaven islands.
+                // bottoms for caves, overhangs, and Heaven islands. Fluids
+                // never have a bottom face in the exact mesher: emitting one
+                // here makes it coplanar with the seabed top and causes the
+                // sand/water pattern to flicker as the camera moves.
                 const bool hasTreeOverlay = !column.exact &&
                     !column.spans.empty() &&
                     isLodTreeFoliage(column.spans.back().block);
-                if (column.exact ||
+                if (!isFluid(span.block) && (column.exact ||
                     (column.spans.size() > 1 &&
-                     (!hasTreeOverlay || spanIndex + 1 == column.spans.size()))) {
+                     (!hasTreeOverlay || spanIndex + 1 == column.spans.size())))) {
                     emitFace(mesh, opaque, translucent, FaceDir::BOTTOM,
                         {x0, static_cast<float>(span.bottom), z0},
                         {x1, static_cast<float>(span.bottom), z1}, span.block);
@@ -750,6 +760,8 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                     for (const auto& interval : intervals) {
                         glm::vec3 minimum{x0, static_cast<float>(interval.first), z0};
                         glm::vec3 maximum{x1, static_cast<float>(interval.second + 1), z1};
+                        if (isFluid(span.block) && interval.second == span.top)
+                            maximum.y = spanTop;
                         if (side.face == FaceDir::FRONT) maximum.z = minimum.z;
                         else if (side.face == FaceDir::BACK) minimum.z = maximum.z;
                         else if (side.face == FaceDir::RIGHT) minimum.x = maximum.x;

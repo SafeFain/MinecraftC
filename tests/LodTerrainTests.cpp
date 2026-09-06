@@ -366,8 +366,24 @@ int main() {
     const ChunkMesh oceanMesh = buildLodTileMesh(ocean, 8, 24);
     require(oceanMesh.opaqueIndexCount == 0 &&
             oceanMesh.translucentIndexCount ==
-                LodTileData::SIDE * LodTileData::SIDE * 6,
-            "LOD oceans omit artificial full-depth walls at tile boundaries");
+                LodTileData::SIDE * LodTileData::SIDE * 6 &&
+            std::abs(meshMaximumY(oceanMesh) -
+                (62.0f + fluidSurfaceHeight(BlockId::WATER) - 0.001f)) < 0.001f,
+            "LOD oceans match exact fluid height and omit tile-boundary walls");
+
+    LodTileData shallowOcean;
+    shallowOcean.at(8, 8).spans.push_back({58, 61, BlockId::SAND});
+    shallowOcean.at(8, 8).spans.push_back({62, 62, BlockId::WATER});
+    const ChunkMesh shallowOceanMesh = buildLodTileMesh(shallowOcean, 4, 24);
+    const int waterTile = getAtlasTextureIndex(BlockTexture::Water);
+    require(std::none_of(shallowOceanMesh.vertices.begin(),
+                         shallowOceanMesh.vertices.end(),
+                         [waterTile](const MeshVertex& vertex) {
+                             return static_cast<int>(std::floor(vertex.tile)) == waterTile &&
+                                    std::abs(vertex.face -
+                                        static_cast<float>(FaceDir::BOTTOM)) < 0.01f;
+                         }),
+            "LOD water emits a coplanar bottom face over the seabed");
 
     require(lodHorizontalQuality(LodPrecision::Low) == 64 &&
             lodHorizontalQuality(LodPrecision::Ultra) == 144 &&
