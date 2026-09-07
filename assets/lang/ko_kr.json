@@ -113,6 +113,7 @@
   "settings.auto_jump": "자동 점프: {0}",
   "settings.sensitivity": "마우스 감도: {0}",
   "settings.invert_y": "마우스 Y축 반전: {0}",
+  "settings.toggle_sneak": "웅크리기 전환: {0}",
   "settings.video": "비디오 설정...",
   "settings.key_bindings": "키 설정...",
   "settings.keyboard_mouse": "키보드 및 마우스...",

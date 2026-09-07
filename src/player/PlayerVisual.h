@@ -5,6 +5,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "player/PlayerPhysics.h"
 
 class World;
 
@@ -23,11 +24,21 @@ struct PlayerVisualState {
     bool sleeping = false;
     float sleepProgress = 0.0f;
     float attackStrength = 1.0f;
+    PlayerPhysics::Pose pose = PlayerPhysics::Pose::Standing;
 };
 
-enum class PlayerLocomotion : uint8_t { Idle, Walk, Run, Jump, Fall };
+enum class PlayerLocomotion : uint8_t {
+    Idle, Walk, Run, Jump, Fall, SneakIdle, SneakWalk, Swim, Crawl
+};
 
 inline PlayerLocomotion playerLocomotion(const PlayerVisualState& state) {
+    if (state.pose == PlayerPhysics::Pose::Swimming)
+        return PlayerLocomotion::Swim;
+    if (state.pose == PlayerPhysics::Pose::Crawling)
+        return PlayerLocomotion::Crawl;
+    if (state.pose == PlayerPhysics::Pose::Crouching)
+        return std::hypot(state.velocity.x, state.velocity.z) < 0.08f
+            ? PlayerLocomotion::SneakIdle : PlayerLocomotion::SneakWalk;
     if (!state.grounded)
         return state.velocity.y >= 0.0f
             ? PlayerLocomotion::Jump : PlayerLocomotion::Fall;
@@ -40,6 +51,8 @@ inline bool sprintViewEffectActive(const PlayerVisualState& state,
                                    CameraPerspective perspective,
                                    bool flying) {
     return perspective == CameraPerspective::FirstPerson && !flying &&
+        state.pose != PlayerPhysics::Pose::Crouching &&
+        state.pose != PlayerPhysics::Pose::Crawling &&
         state.sprinting && std::hypot(state.velocity.x, state.velocity.z) >= 0.08f;
 }
 

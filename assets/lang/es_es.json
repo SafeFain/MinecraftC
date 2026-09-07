@@ -113,6 +113,7 @@
   "settings.auto_jump": "Salto automático: {0}",
   "settings.sensitivity": "Sensibilidad del ratón: {0}",
   "settings.invert_y": "Invertir eje Y del ratón: {0}",
+  "settings.toggle_sneak": "Alternar agacharse: {0}",
   "settings.video": "Ajustes de vídeo...",
   "settings.key_bindings": "Teclas...",
   "settings.keyboard_mouse": "Teclado y ratón...",

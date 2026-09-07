@@ -269,6 +269,7 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.cloudRenderDistance = std::stoi(value);
             else if (name == "day_cycle") settings.dayCycleMinutes = std::stoi(value);
             else if (name == "auto_jump") settings.autoJump = std::stoi(value) != 0;
+            else if (name == "toggle_sneak") settings.toggleSneak = std::stoi(value) != 0;
             else if (name == "mouse_sensitivity") settings.mouseSensitivity = std::stof(value);
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
             else if (name == "raw_mouse_input") { /* v5 compatibility */ }
@@ -393,6 +394,7 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "cloud_render_distance=" << cloudRenderDistance << '\n'
            << "day_cycle=" << dayCycleMinutes << '\n'
            << "auto_jump=" << autoJump << '\n'
+           << "toggle_sneak=" << toggleSneak << '\n'
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'

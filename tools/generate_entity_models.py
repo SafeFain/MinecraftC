@@ -43,6 +43,7 @@ _QUAT_HALF = {
     1.35: (0.6248973167276999, 0.7807069511324468),
     -1.35: (-0.6248973167276999, 0.7807069511324468),
     _HALF_PI: (0.7071067811865475, 0.7071067811865476),
+    -_HALF_PI: (-0.7071067811865475, 0.7071067811865476),
 }
 MODELS = {
     "cow": ((0.90,1.20,1.30),(112,72,48,255)),
@@ -263,6 +264,34 @@ def build_v2(name,size,color):
         animation("fall",.45,[(node["leg_l"],"rotation",(qx(-.55),qx(.15),qx(.15))),
                                (node["leg_r"],"rotation",(qx(.25),qx(-.25),qx(-.25))),
                                (node["arm_l"],"rotation",(qx(-.35),qx(.2),qx(.2)))])
+        sneak_pose=[
+            (0,"translation",((0,0,0),(0,.02,0),(0,0,0))),
+            (node["body"],"translation",((0,.81,.08),(0,.81,.10),(0,.81,.08))),
+            (node["head"],"translation",((0,1.10,.08),(0,1.10,.10),(0,1.10,.08))),
+            (node["arm_l"],"translation",((-.36,1.17,.08),(-.36,1.17,.10),(-.36,1.17,.08))),
+            (node["arm_r"],"translation",((.36,1.17,.08),(.36,1.17,.10),(.36,1.17,.08))),
+            (node["body"],"rotation",(qx(.35),qx(.38),qx(.35))),
+            (node["head"],"rotation",(qx(-.20),qx(-.20),qx(-.20))),
+            (node["leg_l"],"rotation",(qx(-.48),qx(-.42),qx(-.48))),
+            (node["leg_r"],"rotation",(qx(-.42),qx(-.48),qx(-.42)))]
+        animation("sneak_idle",1.6,sneak_pose)
+        sneak_walk=sneak_pose[:7]+[
+            (node["leg_l"],"rotation",(qx(.25),qx(-.55),qx(.25))),
+            (node["leg_r"],"rotation",(qx(-.55),qx(.25),qx(-.55))),
+            (node["arm_l"],"rotation",(qx(-.25),qx(.25),qx(-.25))),
+            (node["arm_r"],"rotation",(qx(.25),qx(-.25),qx(.25)))]
+        animation("sneak_walk",1.15,sneak_walk)
+        prone=[
+            (0,"translation",((0,.60,.48),(0,.62,.52),(0,.60,.48))),
+            (0,"rotation",(qx(-_HALF_PI),qx(-_HALF_PI),qx(-_HALF_PI))),
+            (node["leg_l"],"rotation",(qx(.25),qx(-.25),qx(.25))),
+            (node["leg_r"],"rotation",(qx(-.25),qx(.25),qx(-.25)))]
+        animation("crawl",1.0,prone+[
+            (node["arm_l"],"rotation",(qx(-.48),qx(.48),qx(-.48))),
+            (node["arm_r"],"rotation",(qx(.48),qx(-.48),qx(.48)))])
+        animation("swim",.9,prone+[
+            (node["arm_l"],"rotation",(qx(-1.05),qx(.15),qx(-1.05))),
+            (node["arm_r"],"rotation",(qx(.15),qx(-1.05),qx(.15)))])
         animation("swing",.32,[(node["arm_r"],"rotation",(qx(0),qx(-1.35),qx(0)))])
     animation("hurt",.35,[(0,"translation",((0,0,0),(0,.12,.10),(0,0,0)))])
     animation("death",1.0,[(0,"rotation",(qz(0),qz(_HALF_PI),qz(_HALF_PI)))])
@@ -315,6 +344,10 @@ def write_action_graph(path,name):
             "run":{"clip":"run","layer":"base","loop":True,"fade_in":.10,"fade_out":.10},
             "jump":{"clip":"jump","layer":"base","loop":True,"fade_in":.08,"fade_out":.10},
             "fall":{"clip":"fall","layer":"base","loop":True,"fade_in":.08,"fade_out":.10},
+            "sneak_idle":{"clip":"sneak_idle","layer":"base","loop":True,"fade_in":.12,"fade_out":.12},
+            "sneak_walk":{"clip":"sneak_walk","layer":"base","loop":True,"fade_in":.12,"fade_out":.12},
+            "swim":{"clip":"swim","layer":"base","loop":True,"fade_in":.10,"fade_out":.10},
+            "crawl":{"clip":"crawl","layer":"base","loop":True,"fade_in":.10,"fade_out":.10},
             "swing":{"clip":"swing","layer":"action","loop":False,"priority":100,"fade_in":.03,"fade_out":.06},
         })
     attack={

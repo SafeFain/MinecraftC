@@ -16,6 +16,44 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const auto standing = PlayerPhysics::dimensions(PlayerPhysics::Pose::Standing);
+    const auto crouching = PlayerPhysics::dimensions(PlayerPhysics::Pose::Crouching);
+    const auto swimming = PlayerPhysics::dimensions(PlayerPhysics::Pose::Swimming);
+    const auto crawling = PlayerPhysics::dimensions(PlayerPhysics::Pose::Crawling);
+    require(standing.height == 1.8f && standing.eyeHeight == 1.62f &&
+                crouching.height == 1.5f && crouching.eyeHeight == 1.27f &&
+                swimming.height == 0.6f && swimming.eyeHeight == 0.4f &&
+                crawling.height == swimming.height &&
+                crawling.eyeHeight == swimming.eyeHeight,
+            "Java 26.2 pose dimensions or eye heights changed");
+    require(PlayerPhysics::resolvePose(PlayerPhysics::Pose::Standing,
+                true, true) == PlayerPhysics::Pose::Standing &&
+            PlayerPhysics::resolvePose(PlayerPhysics::Pose::Standing,
+                false, true) == PlayerPhysics::Pose::Crouching &&
+            PlayerPhysics::resolvePose(PlayerPhysics::Pose::Standing,
+                false, false) == PlayerPhysics::Pose::Crawling &&
+            PlayerPhysics::resolvePose(PlayerPhysics::Pose::Swimming,
+                true, false) == PlayerPhysics::Pose::Swimming,
+            "pose clearance fallback no longer matches Java's selection order");
+    const float firstCrouchEye = PlayerPhysics::approachEyeHeight(
+        Config::EYE_HEIGHT, Config::PLAYER_CROUCH_EYE_HEIGHT, 0.05f);
+    require(std::abs(firstCrouchEye - 1.445f) < 0.0001f &&
+                PlayerPhysics::approachEyeHeight(firstCrouchEye,
+                    Config::PLAYER_CROUCH_EYE_HEIGHT, 0.05f) < firstCrouchEye,
+            "eye-height interpolation no longer converges by half per Java tick");
+    const glm::vec2 sneakCardinal =
+        PlayerPhysics::javaMovementInput({0.0f, 1.0f}, true);
+    const glm::vec2 sneakDiagonal =
+        PlayerPhysics::javaMovementInput({1.0f, 1.0f}, true);
+    require(std::abs(sneakCardinal.y - 0.3f) < 0.0001f &&
+                std::abs(sneakDiagonal.x - 0.3f) < 0.0001f &&
+                std::abs(sneakDiagonal.y - 0.3f) < 0.0001f,
+            "Java keyboard input shaping lost sneak cardinal or diagonal speed");
+    const glm::vec2 edgeBackoff = PlayerPhysics::backOffFromEdge(
+        {0.23f, 0.0f}, 0.6f,
+        [](float x, float, float) { return x <= 0.11f; });
+    require(edgeBackoff.x > 0.079f && edgeBackoff.x < 0.081f,
+            "sneak edge backoff did not use Java's 0.05-block increments");
     require(std::abs(Config::PLAYER_SPEED - 4.3f) < 0.0001f &&
                 std::abs(Config::SPRINT_SPEED - 6.72f) < 0.0001f,
             "ground movement speeds do not match the classic survival pace");
@@ -125,15 +163,11 @@ int main() {
             "movement larger than the collision bound was not split");
     require(PlayerPhysics::movementSubsteps(-0.61f) == 4,
             "falling movement did not use absolute distance");
-    require(PlayerPhysics::waterVerticalVelocity(0.0f, true, false, 0.1f) ==
-                Config::WATER_RISE_SPEED,
-            "water rise input did not select swim speed");
-    require(PlayerPhysics::waterVerticalVelocity(0.0f, false, true, 0.1f) ==
-                -Config::WATER_DIVE_SPEED,
-            "water dive input did not select dive speed");
-    const float sinking = PlayerPhysics::waterVerticalVelocity(0.0f, false, false, 0.1f);
-    require(sinking < 0.0f && sinking > -Config::WATER_SINK_SPEED,
-            "neutral water movement did not approach gentle sinking");
+    require(Config::WATER_DRAG == 0.8f && Config::WATER_SPRINT_DRAG == 0.9f &&
+                Config::WATER_VERTICAL_DRAG == 0.8f &&
+                Config::WATER_CONTROL_ACCELERATION_PER_TICK == 0.8f &&
+                Config::WATER_WALL_EXIT_SPEED == 6.0f,
+            "Java 26.2 water travel constants changed");
 
     std::cout << "player physics logic passed\n";
 }

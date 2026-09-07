@@ -406,6 +406,7 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
+        m_session.player.setToggleSneak(m_clientSettings.toggleSneak);
         m_session.world.configureLod({
             m_clientSettings.lodEnabled,
             m_clientSettings.lodDistanceChunks,

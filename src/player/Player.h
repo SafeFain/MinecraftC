@@ -105,6 +105,15 @@ public:
     bool underwater() const { return m_airTicks < 300; }
     bool onGround() const { return m_onGround; }
     bool isSprinting() const { return m_isSprinting; }
+    PlayerPhysics::Pose pose() const { return m_pose; }
+    bool isSneaking() const { return m_pose == PlayerPhysics::Pose::Crouching; }
+    bool isSwimming() const { return m_pose == PlayerPhysics::Pose::Swimming; }
+    bool isCrawling() const { return m_pose == PlayerPhysics::Pose::Crawling; }
+    float currentHeight() const { return PlayerPhysics::dimensions(m_pose).height; }
+    void setToggleSneak(bool enabled) {
+        if (m_toggleSneak != enabled) m_sneakLatched = false;
+        m_toggleSneak = enabled;
+    }
     float landingSpeed() const { return m_landingSpeed; }
     void applyImpulse(const glm::vec3& impulse) { m_velocity += impulse; }
     bool bowCharging() const { return m_bowCharging; }
@@ -126,6 +135,11 @@ public:
             m_velocity = glm::vec3(0.0f);
             m_onGround = true;
             m_isSprinting = false;
+            m_swimming = false;
+            m_sneakLatched = false;
+            m_sneakInput = false;
+            m_pose = PlayerPhysics::Pose::Standing;
+            m_eyeHeight = Config::EYE_HEIGHT;
             m_mining = false;
             m_miningTarget.reset();
             m_miningProgress = 0.0f;
@@ -158,6 +172,7 @@ private:
     // View angles
     float m_yaw = 0.0f;
     float m_pitch = 0.0f;
+    float m_eyeHeight = Config::EYE_HEIGHT;
 
     // Direction vectors
     glm::vec3 m_forward{0.0f, 0.0f, 1.0f};
@@ -168,6 +183,11 @@ private:
     bool m_isSprinting = false;
     bool m_mouseLocked = true;
     bool m_flying = false;
+    PlayerPhysics::Pose m_pose = PlayerPhysics::Pose::Standing;
+    bool m_swimming = false;
+    bool m_sneakLatched = false;
+    bool m_toggleSneak = false;
+    bool m_sneakInput = false;
     bool m_spaceWasDown = false;
     float m_lastSpaceReleaseTime = 1.0f;  // time since last SPACE release (for double-tap detection)
 
@@ -210,8 +230,14 @@ private:
     void moveAndCollide(const glm::vec3& delta);
     void moveFlyingAndCollide(const glm::vec3& delta);
     bool checkCollision(double px, double py, double pz) const;
+    bool checkCollision(double px, double py, double pz, float height) const;
     float findGround() const;
     bool isInWater() const;
+    bool isEyeInWater() const;
+    bool isFeetInWater() const;
+    bool pointInWater(double x, double y, double z) const;
+    void updatePose();
+    bool canStandAtOffset(double dx, double dz, double drop) const;
     void applyPhysics(float dt);
     void updateHighlight();
     void updateMining(float dt);

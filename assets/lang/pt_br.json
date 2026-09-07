@@ -113,6 +113,7 @@
   "settings.auto_jump": "Pulo automático: {0}",
   "settings.sensitivity": "Sensibilidade do mouse: {0}",
   "settings.invert_y": "Inverter eixo Y do mouse: {0}",
+  "settings.toggle_sneak": "Alternar agachar: {0}",
   "settings.video": "Configurações de vídeo...",
   "settings.key_bindings": "Teclas...",
   "settings.keyboard_mouse": "Teclado e mouse...",

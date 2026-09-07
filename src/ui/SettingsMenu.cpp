@@ -341,6 +341,11 @@ void SettingsMenu::refreshButtons() {
             m_localization.text(m_settings.invertMouseY ? "common.on" : "common.off")}), [this]{
                 m_settings.invertMouseY = !m_settings.invertMouseY; m_onChanged(); refreshButtons();
             });
+        m_buttons.emplace_back(m_localization.format("settings.toggle_sneak", {
+            m_localization.text(m_settings.toggleSneak ? "common.on" : "common.off")}), [this]{
+                m_settings.toggleSneak = !m_settings.toggleSneak;
+                m_onChanged(); refreshButtons();
+            });
         constexpr int visible = 8;
         const int end = std::min<int>(INPUT_ACTION_COUNT, m_controlOffset + visible);
         for (int i = m_controlOffset; i < end; ++i) {

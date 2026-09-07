@@ -255,6 +255,21 @@ int main() {
     visualState.velocity.x = 0.0f;
     require(!sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, false),
             "stationary sprint input enabled dynamic FOV");
+    visualState.pose = PlayerPhysics::Pose::Crouching;
+    require(playerLocomotion(visualState) == PlayerLocomotion::SneakIdle,
+            "stationary crouching player did not select sneak idle");
+    visualState.velocity.x = Config::PLAYER_SPEED * Config::SNEAK_INPUT_FACTOR;
+    require(playerLocomotion(visualState) == PlayerLocomotion::SneakWalk &&
+                !sprintViewEffectActive(visualState, CameraPerspective::FirstPerson, false),
+            "moving crouch did not select sneak walk or incorrectly enabled sprint FOV");
+    visualState.pose = PlayerPhysics::Pose::Swimming;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Swim,
+            "swimming pose did not select swim animation");
+    visualState.pose = PlayerPhysics::Pose::Crawling;
+    require(playerLocomotion(visualState) == PlayerLocomotion::Crawl,
+            "crawl pose did not select crawl animation");
+    visualState.pose = PlayerPhysics::Pose::Standing;
+    visualState.velocity.x = 0.0f;
     visualState.sprinting = false;
     require(std::abs(dynamicViewFov(
                 Config::FOV, Config::SPRINT_FOV_BOOST,

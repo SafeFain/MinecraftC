@@ -160,11 +160,13 @@ def main():
     assert embedded==(ROOT/"assets/textures/generated/entity_skins/player.png").read_bytes(), \
         "player embedded skin differs from the generated skin"
     player_clips = {animation["name"] for animation in player_doc["animations"]}
-    assert {"idle","walk","run","jump","fall","swing","hurt","death"} <= player_clips
+    assert {"idle","walk","run","jump","fall","sneak_idle","sneak_walk",
+            "swim","crawl","swing","hurt","death"} <= player_clips
     player_nodes = {node["name"] for node in player_doc["nodes"]}
     assert {"head","arm_r","arm_l","leg_r","leg_l"} <= player_nodes
     player_graph = json.loads((PLAYER_DIR / "player.anim.json").read_text())
-    assert {"run","jump","fall","swing"} <= set(player_graph["actions"])
+    assert {"run","jump","fall","sneak_idle","sneak_walk","swim","crawl",
+            "swing"} <= set(player_graph["actions"])
     assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 64
     verify_joint_pivots(player_doc,player_binary,"player")
     player_image_view = player_doc["bufferViews"][player_doc["images"][0]["bufferView"]]

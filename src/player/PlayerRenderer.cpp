@@ -35,6 +35,8 @@ void PlayerRenderer::initialize(const std::filesystem::path& root,
 void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
     if (!m_asset || !m_graph) return;
     m_sleeping = state.sleeping;
+    m_prone = state.pose == PlayerPhysics::Pose::Swimming ||
+              state.pose == PlayerPhysics::Pose::Crawling;
     if (state.sleeping) {
         if (m_locomotion != "idle") {
             m_mixer.play(m_graph->actionFor("idle"), model::PlayPolicy::Replace);
@@ -58,11 +60,28 @@ void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
             locomotion = "walk";
             speed = std::max(.65f, horizontal / Config::PLAYER_SPEED);
             break;
+        case PlayerLocomotion::SneakIdle: locomotion = "sneak_idle"; break;
+        case PlayerLocomotion::SneakWalk:
+            locomotion = "sneak_walk";
+            speed = std::max(.65f, horizontal /
+                (Config::PLAYER_SPEED * Config::SNEAK_INPUT_FACTOR));
+            break;
+        case PlayerLocomotion::Swim:
+            locomotion = "swim";
+            speed = std::max(.65f, horizontal / Config::PLAYER_SPEED);
+            break;
+        case PlayerLocomotion::Crawl:
+            locomotion = "crawl";
+            speed = std::max(.65f, horizontal /
+                (Config::PLAYER_SPEED * Config::SNEAK_INPUT_FACTOR));
+            break;
     }
     if (locomotion != m_locomotion) {
         m_mixer.play(m_graph->actionFor(locomotion), model::PlayPolicy::Replace, speed);
         m_locomotion = locomotion;
-    } else if (locomotion == "walk" || locomotion == "run")
+    } else if (locomotion == "walk" || locomotion == "run" ||
+               locomotion == "sneak_walk" || locomotion == "swim" ||
+               locomotion == "crawl")
         m_mixer.play(m_graph->actionFor(locomotion), model::PlayPolicy::Replace, speed);
     if (state.swingSequence != m_lastSwingSequence) {
         m_lastSwingSequence = state.swingSequence;
@@ -96,6 +115,9 @@ glm::mat4 PlayerRenderer::renderThirdPerson(
     glm::mat4 world = glm::translate(glm::mat4(1), local) *
         glm::rotate(glm::mat4(1), glm::radians(facingYaw + 180.0f),
                     glm::vec3(0, 1, 0));
+    if (m_prone)
+        world *= glm::rotate(glm::mat4(1), glm::radians(-pitchDegrees),
+                             glm::vec3(1, 0, 0));
     if (m_sleeping) {
         world = glm::translate(glm::mat4(1), local + glm::vec3(0.0f, 0.42f, 0.0f)) *
             glm::rotate(glm::mat4(1), glm::radians(facingYaw + 180.0f),

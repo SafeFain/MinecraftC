@@ -229,7 +229,7 @@ int main(){
         require(missing,"missing title assets report failure");}
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.frameRateLimit=137;
-    settings.invertMouseY=true;
+    settings.invertMouseY=true;settings.toggleSneak=true;
     settings.renderDistance=8;settings.renderClouds=false;
     settings.lodEnabled=false;settings.lodDistanceChunks=640;
     settings.lodAggressiveness=LodAggressiveness::Fast;
@@ -262,7 +262,7 @@ int main(){
     require(settings.save(root/"options.txt"),"settings save succeeds");
     const auto loaded=ClientSettings::load(root/"options.txt");
     require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&
-            loaded.frameRateLimit==137&&loaded.invertMouseY&&
+            loaded.frameRateLimit==137&&loaded.invertMouseY&&loaded.toggleSneak&&
             loaded.renderDistance==8&&!loaded.renderClouds&&
             !loaded.lodEnabled&&loaded.lodDistanceChunks==640&&
             loaded.lodAggressiveness==LodAggressiveness::Fast&&
@@ -347,7 +347,7 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=24\n")!=std::string::npos&&
+    require(migratedText.find("version=25\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     require(legacySettings.graphicsPreset==GraphicsPreset::Custom&&

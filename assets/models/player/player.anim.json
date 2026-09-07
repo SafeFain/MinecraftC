@@ -1,5 +1,12 @@
 {
   "actions": {
+    "crawl": {
+      "clip": "crawl",
+      "fade_in": 0.1,
+      "fade_out": 0.1,
+      "layer": "base",
+      "loop": true
+    },
     "death": {
       "clip": "death",
       "fade_in": 0.08,
@@ -44,6 +51,27 @@
       "layer": "base",
       "loop": true
     },
+    "sneak_idle": {
+      "clip": "sneak_idle",
+      "fade_in": 0.12,
+      "fade_out": 0.12,
+      "layer": "base",
+      "loop": true
+    },
+    "sneak_walk": {
+      "clip": "sneak_walk",
+      "fade_in": 0.12,
+      "fade_out": 0.12,
+      "layer": "base",
+      "loop": true
+    },
+    "swim": {
+      "clip": "swim",
+      "fade_in": 0.1,
+      "fade_out": 0.1,
+      "layer": "base",
+      "loop": true
+    },
     "swing": {
       "clip": "swing",
       "fade_in": 0.03,
@@ -61,12 +89,16 @@
     }
   },
   "bindings": {
+    "crawl": "crawl",
     "death": "death",
     "fall": "fall",
     "hurt": "hurt",
     "idle": "idle",
     "jump": "jump",
     "run": "run",
+    "sneak_idle": "sneak_idle",
+    "sneak_walk": "sneak_walk",
+    "swim": "swim",
     "swing": "swing",
     "walk": "walk"
   },

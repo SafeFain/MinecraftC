@@ -14,7 +14,7 @@ enum class ControlMode : uint8_t { Auto, KeyboardMouse, Touch };
 enum class AttackIndicator : uint8_t { Crosshair, Hotbar, Off };
 
 struct ClientSettings {
-    static constexpr int FORMAT_VERSION = 24;
+    static constexpr int FORMAT_VERSION = 25;
     static constexpr int MIN_FRAME_RATE = 30;
     static constexpr int MAX_FRAME_RATE = 200;
     static constexpr int MIN_LOD_DISTANCE = 32;
@@ -30,6 +30,7 @@ struct ClientSettings {
     int cloudRenderDistance = 192;
     int dayCycleMinutes = 20;
     bool autoJump = true;
+    bool toggleSneak = false;
     float mouseSensitivity = 0.15f;
     bool invertMouseY = false;
     bool smoothLighting = true;

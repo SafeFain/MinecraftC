@@ -113,6 +113,7 @@
   "settings.auto_jump": "自動ジャンプ: {0}",
   "settings.sensitivity": "マウス感度: {0}",
   "settings.invert_y": "マウスY軸を反転: {0}",
+  "settings.toggle_sneak": "スニーク切替: {0}",
   "settings.video": "ビデオ設定...",
   "settings.key_bindings": "キー割り当て...",
   "settings.keyboard_mouse": "キーボードとマウス...",

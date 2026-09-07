@@ -35,4 +35,5 @@ private:
     int m_headNode = -1;
     int m_rightArmNode = -1;
     bool m_sleeping = false;
+    bool m_prone = false;
 };

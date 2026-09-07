@@ -7,7 +7,8 @@ No Minecraft, Mojang, or third-party model or skin data was copied or adapted.
 
 The Y-up glTF model uses meters, local forward `-Z`, a genuine rigid-weighted
 skeleton, and nearest-filtered face-specific skin regions. It includes idle,
-walk, run, jump, fall, swing, hurt, and death clips. Regenerate it with:
+walk, run, jump, fall, sneak-idle, sneak-walk, swim, crawl, swing, hurt,
+and death clips. Regenerate it with:
 
 ```bash
 python3 tools/generate_entity_models.py \

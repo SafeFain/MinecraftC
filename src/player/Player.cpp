@@ -21,6 +21,9 @@ void Player::teleport(const glm::dvec3& pos) {
     m_landingSpeed = 0.0f;
     m_onGround = false;
     m_fallDistance = 0.0f;
+    m_swimming = false;
+    m_pose = PlayerPhysics::Pose::Standing;
+    m_eyeHeight = Config::EYE_HEIGHT;
 }
 
 void Player::configureRules(GameMode mode, Difficulty difficulty) {
@@ -32,6 +35,11 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
     m_mining = false;
     m_miningTarget.reset();
     m_miningProgress = 0.0f;
+    m_swimming = false;
+    m_sneakLatched = false;
+    m_sneakInput = false;
+    m_pose = PlayerPhysics::Pose::Standing;
+    m_eyeHeight = Config::EYE_HEIGHT;
     resetDamageImmunity();
     if (mode == GameMode::Spectator) {
         m_flying = true;
@@ -122,6 +130,11 @@ void Player::handleMouseDelta(float dx, float dy, float sensitivity, bool invert
 void Player::handleMovement(const InputState& input, float dt) {
     if (!m_mouseLocked) return;
 
+    if (m_toggleSneak && input.pressed(InputAction::Sneak))
+        m_sneakLatched = !m_sneakLatched;
+    m_sneakInput = m_toggleSneak ? m_sneakLatched
+                                 : input.held(InputAction::Sneak);
+
     // ── Double-tap SPACE to toggle flight ──────────────────────────
     bool spaceDown = input.held(InputAction::Jump);
 
@@ -144,21 +157,35 @@ void Player::handleMovement(const InputState& input, float dt) {
 
     m_spaceWasDown = spaceDown;
 
-    m_isSprinting = input.held(InputAction::Sprint);
+    m_isSprinting = input.held(InputAction::Sprint) &&
+        input.value(InputAction::MoveForward) > 0.00001f;
     if (m_gameMode == GameMode::Survival && !m_survivalStats.canSprint())
         m_isSprinting = false;
-    float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
-    const bool inWater = m_gameMode == GameMode::Survival && isInWater();
-    if (inWater) speed *= Config::WATER_HORIZONTAL_FACTOR;
+    const bool touchingWater = m_gameMode != GameMode::Spectator && isInWater();
+    const bool eyeInWater = isEyeInWater();
+    if (m_flying) m_swimming = false;
+    else if (m_swimming)
+        m_swimming = m_isSprinting && touchingWater;
+    else
+        m_swimming = m_isSprinting && touchingWater && eyeInWater && isFeetInWater();
+    if (m_sneakInput && !eyeInWater) m_isSprinting = false;
+    updatePose();
 
+    float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
+    const bool inWater = touchingWater && !m_flying;
+
+    const bool movingSlowly = m_pose == PlayerPhysics::Pose::Crouching ||
+                              m_pose == PlayerPhysics::Pose::Crawling;
+    const glm::vec2 shaped = PlayerPhysics::javaMovementInput({
+        input.value(InputAction::MoveLeft) - input.value(InputAction::MoveRight),
+        input.value(InputAction::MoveForward) - input.value(InputAction::MoveBackward)},
+        movingSlowly);
     glm::vec3 moveDir(0.0f);
     glm::vec3 planarForward(m_forward.x, 0.0f, m_forward.z);
     if (glm::length(planarForward) > 0.0f)
         planarForward = glm::normalize(planarForward);
-    moveDir += planarForward * input.value(InputAction::MoveForward);
-    moveDir -= planarForward * input.value(InputAction::MoveBackward);
-    moveDir += m_right * input.value(InputAction::MoveLeft);
-    moveDir -= m_right * input.value(InputAction::MoveRight);
+    moveDir += planarForward * shaped.y;
+    moveDir += m_right * shaped.x;
 
     if (m_flying) {
         // Creative flight uses camera yaw for horizontal travel. Vertical
@@ -171,7 +198,7 @@ void Player::handleMovement(const InputState& input, float dt) {
             : Config::CREATIVE_FLY_SPEED;
         float vertical = 0.0f;
         if (input.held(InputAction::Jump)) vertical += 1.0f;
-        if (input.held(InputAction::Sneak))
+        if (m_sneakInput)
             vertical -= 1.0f;
         const glm::vec3 flightDelta =
             horizontal * flySpeed * dt +
@@ -183,28 +210,74 @@ void Player::handleMovement(const InputState& input, float dt) {
             moveFlyingAndCollide(flightDelta);
         m_velocity.y = 0.0f;
     } else {
-        // Normal movement
+        // Java-style water travel keeps momentum and applies its drag once per
+        // 20 Hz game tick. Fractional tick exponents keep the result stable at
+        // different render frame rates.
         glm::vec3 horizontal(moveDir.x, 0.0f, moveDir.z);
         float hLen = glm::length(horizontal);
-        if (hLen > 0.0f) {
+        if (inWater) {
+            if (hLen > 1.0f) horizontal /= hLen;
+            const float ticks = std::max(0.0f, dt * 20.0f);
+            m_velocity.x += horizontal.x * Config::WATER_ACCELERATION_PER_TICK * ticks;
+            m_velocity.z += horizontal.z * Config::WATER_ACCELERATION_PER_TICK * ticks;
+            if (m_swimming) {
+                const float convergence = m_forward.y < -0.2f ? 0.085f : 0.06f;
+                const float blend = 1.0f - std::pow(1.0f - convergence, ticks);
+                m_velocity.y += (m_forward.y * 20.0f - m_velocity.y) * blend;
+            }
+            if (input.held(InputAction::Jump))
+                m_velocity.y += Config::WATER_CONTROL_ACCELERATION_PER_TICK * ticks;
+            if (m_sneakInput)
+                m_velocity.y -= Config::WATER_CONTROL_ACCELERATION_PER_TICK * ticks;
+            const float drag = std::pow(m_isSprinting
+                ? Config::WATER_SPRINT_DRAG : Config::WATER_DRAG, ticks);
+            m_velocity.x *= drag;
+            m_velocity.z *= drag;
+            m_velocity.y *= std::pow(Config::WATER_VERTICAL_DRAG, ticks);
+            const glm::dvec2 before(m_position.x, m_position.z);
+            const glm::vec2 requested(m_velocity.x * dt, m_velocity.z * dt);
+            moveAndCollide(glm::vec3(requested.x, 0.0f, requested.y));
+            const glm::dvec2 actual(m_position.x - before.x,
+                                    m_position.z - before.y);
+            const bool horizontalCollision =
+                glm::length(glm::vec2(actual) - requested) > 0.001f;
+            if (horizontalCollision &&
+                !checkCollision(m_position.x, m_position.y + 0.6,
+                                m_position.z))
+                m_velocity.y = Config::WATER_WALL_EXIT_SPEED;
+            if (m_gameMode == GameMode::Survival) {
+                const float moved = static_cast<float>(glm::distance(
+                    before, glm::dvec2(m_position.x, m_position.z)));
+                m_survivalStats.addExhaustion(moved * 0.01f);
+            }
+        } else if (hLen > 0.0f) {
+            m_velocity.x = m_velocity.z = 0.0f;
             if (hLen > 1.0f) { horizontal /= hLen; hLen = 1.0f; }
             horizontal *= speed * dt;
+            if (m_sneakInput && m_onGround) {
+                const glm::vec2 backed = PlayerPhysics::backOffFromEdge(
+                    glm::vec2(horizontal.x, horizontal.z), 0.6f,
+                    [this](float x, float z, float drop) {
+                        return canStandAtOffset(x, z, drop);
+                    });
+                horizontal.x = backed.x;
+                horizontal.z = backed.y;
+            }
             const glm::dvec2 before(m_position.x, m_position.z);
             moveAndCollide(horizontal);
             if (m_gameMode == GameMode::Survival) {
                 const float moved = static_cast<float>(glm::distance(
                     before, glm::dvec2(m_position.x, m_position.z)));
-                const float rate = inWater ? 0.01f :
-                    (m_isSprinting ? 0.1f : 0.0f);
+                const float rate = m_isSprinting ? 0.1f : 0.0f;
                 m_survivalStats.addExhaustion(moved * rate);
             }
+        } else if (!inWater) {
+            m_velocity.x = m_velocity.z = 0.0f;
         }
 
-        // Jump
+        // Liquid controls were integrated above. Vertical collision and
+        // gravity are applied once during update(), after input routing.
         if (inWater) {
-            m_velocity.y = PlayerPhysics::waterVerticalVelocity(
-                m_velocity.y, input.held(InputAction::Jump),
-                input.held(InputAction::Sneak), dt);
             m_onGround = false;
             m_fallDistance = 0.0f;
         } else if (input.held(InputAction::Jump) && m_onGround) {
@@ -379,6 +452,8 @@ void Player::update(float dt) {
 
     updateDirectionVectors();
     applyPhysics(dt);
+    m_eyeHeight = PlayerPhysics::approachEyeHeight(
+        m_eyeHeight, PlayerPhysics::dimensions(m_pose).eyeHeight, dt);
     updateHighlight();
     updateMining(dt);
     if (m_gameMode == GameMode::Survival) {
@@ -441,7 +516,7 @@ PlayerVisualState Player::visualState() const {
     return {{m_visualHorizontalVelocity.x, m_velocity.y,
              m_visualHorizontalVelocity.y}, m_onGround, m_isSprinting,
             m_swingSequence, m_swingProgress, m_sleeping, m_sleepProgress,
-            attackStrength()};
+            attackStrength(), m_pose};
 }
 
 float Player::attackStrength() const {
@@ -480,7 +555,7 @@ void Player::updateDirectionVectors() {
 }
 
 glm::dvec3 Player::getEyePosition() const {
-    return m_position + glm::dvec3(0.0, Config::EYE_HEIGHT, 0.0);
+    return m_position + glm::dvec3(0.0, m_eyeHeight, 0.0);
 }
 
 // ── Movement & Collision ──────────────────────────────────────────────
@@ -532,7 +607,7 @@ void Player::moveAndCollide(const glm::vec3& delta) {
         (!blockedX || !checkCollision(blockedTargetX, raisedY, m_position.z)) &&
         (!blockedZ || !checkCollision(m_position.x, raisedY, blockedTargetZ));
     if (PlayerPhysics::shouldAutoJump(
-            Config::AUTO_JUMP, m_onGround, movementBlocked,
+            Config::AUTO_JUMP && !m_sneakInput, m_onGround, movementBlocked,
             currentHeadroomClear, targetHeadroomClear)) {
         m_velocity.y = Config::JUMP_SPEED;
         m_onGround = false;
@@ -571,13 +646,17 @@ void Player::moveFlyingAndCollide(const glm::vec3& delta) {
 }
 
 bool Player::checkCollision(double px, double py, double pz) const {
+    return checkCollision(px, py, pz, PlayerPhysics::dimensions(m_pose).height);
+}
+
+bool Player::checkCollision(double px, double py, double pz, float height) const {
     const double halfW = Config::PLAYER_WIDTH / 2.0;
     const double margin = 0.001;
 
     int minX = static_cast<int>(std::floor(px - halfW + margin));
     int maxX = static_cast<int>(std::floor(px + halfW - margin));
     int minY = static_cast<int>(std::floor(py - margin));
-    int maxY = static_cast<int>(std::floor(py + Config::PLAYER_HEIGHT - margin));
+    int maxY = static_cast<int>(std::floor(py + height - margin));
     int minZ = static_cast<int>(std::floor(pz - halfW + margin));
     int maxZ = static_cast<int>(std::floor(pz + halfW - margin));
 
@@ -597,7 +676,7 @@ bool Player::checkCollision(double px, double py, double pz) const {
                     if (px - halfW < bx + box.max.x &&
                         px + halfW > bx + box.min.x &&
                         py < by + box.max.y &&
-                        py + Config::PLAYER_HEIGHT > by + box.min.y &&
+                        py + height > by + box.min.y &&
                         pz - halfW < bz + box.max.z &&
                         pz + halfW > bz + box.min.z) return true;
                 }
@@ -614,28 +693,75 @@ float Player::findGround() const {
 }
 
 bool Player::isInWater() const {
-    const glm::dvec3 eye = getEyePosition();
     const double half = Config::PLAYER_WIDTH * 0.5 - 0.001;
     const int minX = static_cast<int>(std::floor(m_position.x - half));
     const int maxX = static_cast<int>(std::floor(m_position.x + half));
     const int minZ = static_cast<int>(std::floor(m_position.z - half));
     const int maxZ = static_cast<int>(std::floor(m_position.z + half));
-    const int feetY = static_cast<int>(std::floor(m_position.y + 0.1));
-    const int eyeY = static_cast<int>(std::floor(eye.y));
+    const float height = PlayerPhysics::dimensions(m_pose).height;
+    const int minY = static_cast<int>(std::floor(m_position.y));
+    const int maxY = static_cast<int>(std::floor(m_position.y + height));
     for (int x = minX; x <= maxX; ++x)
         for (int z = minZ; z <= maxZ; ++z)
-            if (isWater(m_world.getBlock(x, feetY, z)) ||
-                isWater(m_world.getBlock(x, eyeY, z))) return true;
+            for (int y = minY; y <= maxY; ++y) {
+                const BlockId block = m_world.getBlock(x, y, z);
+                if (isWater(block) && m_position.y < y + fluidSurfaceHeight(block) &&
+                    m_position.y + height > y) return true;
+            }
     return false;
+}
+
+bool Player::pointInWater(double x, double y, double z) const {
+    const int bx = static_cast<int>(std::floor(x));
+    const int by = static_cast<int>(std::floor(y));
+    const int bz = static_cast<int>(std::floor(z));
+    const BlockId block = m_world.getBlock(bx, by, bz);
+    return isWater(block) && y < by + fluidSurfaceHeight(block);
+}
+
+bool Player::isEyeInWater() const {
+    const glm::dvec3 eye = getEyePosition();
+    return pointInWater(eye.x, eye.y, eye.z);
+}
+
+bool Player::isFeetInWater() const {
+    return pointInWater(m_position.x, m_position.y + 0.01,
+                        m_position.z);
+}
+
+void Player::updatePose() {
+    PlayerPhysics::Pose desired = PlayerPhysics::Pose::Standing;
+    if (m_swimming) desired = PlayerPhysics::Pose::Swimming;
+    else if (m_sneakInput && !m_flying) desired = PlayerPhysics::Pose::Crouching;
+    if (m_gameMode == GameMode::Spectator) {
+        m_pose = desired;
+        return;
+    }
+    const auto fits = [this](PlayerPhysics::Pose pose) {
+        return !checkCollision(m_position.x, m_position.y, m_position.z,
+                               PlayerPhysics::dimensions(pose).height);
+    };
+    const bool desiredFits = fits(desired);
+    m_pose = PlayerPhysics::resolvePose(desired, desiredFits,
+        desiredFits || fits(PlayerPhysics::Pose::Crouching));
+}
+
+bool Player::canStandAtOffset(double dx, double dz, double drop) const {
+    return checkCollision(m_position.x + dx, m_position.y - drop,
+                          m_position.z + dz,
+                          PlayerPhysics::dimensions(m_pose).height);
 }
 
 void Player::applyPhysics(float dt) {
     if (m_flying) return; // no physics in flight mode
 
-    const bool inWater = m_gameMode == GameMode::Survival && isInWater();
+    const bool inWater = m_gameMode != GameMode::Spectator && isInWater();
     float dy = 0.0f;
     if (inWater) {
         m_fallDistance = 0.0f;
+        if (!m_swimming)
+            m_velocity.y -= Config::WATER_GRAVITY_PER_TICK *
+                            std::max(0.0f, dt * 20.0f);
         m_velocity.y = std::max(m_velocity.y, -Config::WATER_ENTRY_MAX_FALL_SPEED);
         dy = m_velocity.y * dt;
     } else {
@@ -687,8 +813,9 @@ void Player::applyPhysics(float dt) {
             m_onGround = true;
         }
     }
-    if (m_position.y > Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT) {
-        m_position.y = Config::WORLD_MAX_Y - Config::PLAYER_HEIGHT;
+    const float height = PlayerPhysics::dimensions(m_pose).height;
+    if (m_position.y > Config::WORLD_MAX_Y - height) {
+        m_position.y = Config::WORLD_MAX_Y - height;
     }
 }
 
@@ -1035,7 +1162,7 @@ bool Player::collidesWithPlayer(const glm::ivec3& blockPos, BlockId block) const
     for (uint8_t i = 0; i < boxes.count; ++i) {
         const BlockCollisionBox& box = boxes.boxes[i];
         if (bx + box.min.x < px + halfW && bx + box.max.x > px - halfW &&
-            by + box.min.y < py + Config::PLAYER_HEIGHT &&
+            by + box.min.y < py + PlayerPhysics::dimensions(m_pose).height &&
             by + box.max.y > py &&
             bz + box.min.z < pz + halfW && bz + box.max.z > pz - halfW)
             return true;
