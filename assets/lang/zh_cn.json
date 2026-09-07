@@ -88,6 +88,12 @@
   "sleep.travel_heaven": "前往天境",
 
   "settings.title": "设置",
+  "settings.audio_title": "音乐和声音",
+  "settings.audio": "音乐和声音…",
+  "settings.master_volume": "主音量：{0}%",
+  "settings.music_volume": "音乐：{0}%",
+  "settings.weather_volume": "天气：{0}%",
+  "settings.sound_effects_volume": "音效：{0}%",
   "settings.video_title": "视频设置",
   "settings.lod_title": "远景地形 LOD",
   "settings.lod": "远景地形 LOD…",

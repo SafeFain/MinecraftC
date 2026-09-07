@@ -32,6 +32,10 @@ struct AudioSystem::Impl {
     std::array<MusicTrack, 4> overworldMusic;
     std::array<MusicTrack, 2> heavenMusic;
     std::atomic<AudioMusicMode> musicTarget{AudioMusicMode::Menu};
+    std::atomic<float> masterVolume{1.0f};
+    std::atomic<float> musicVolume{1.0f};
+    std::atomic<float> weatherVolume{1.0f};
+    std::atomic<float> soundEffectsVolume{1.0f};
     AudioMusicMode observedMusicMode = AudioMusicMode::Menu;
     uint64_t menuRandomState = 0x8a5cd789635d2dffULL;
     uint64_t overworldRandomState = 0xd1b54a32d192ed03ULL;
@@ -139,6 +143,10 @@ struct AudioSystem::Impl {
     }
 
     void render(float* samples, size_t frameCount) {
+        const float masterGain = masterVolume.load();
+        const float musicGain = musicVolume.load();
+        const float weatherGain = weatherVolume.load();
+        const float soundEffectsGain = soundEffectsVolume.load();
         if (rainReset.exchange(false)) {
             rainVolume = 0.0f;
             rainLowLeft = rainLowRight = 0.0f;
@@ -207,17 +215,18 @@ struct AudioSystem::Impl {
             float left = 0.0f;
             float right = 0.0f;
             if (requestedMusic == AudioMusicMode::Menu) {
-                if (mixTrack(menuMusic[menuTrackIndex], menuMusicGain * 0.72f,
+                if (mixTrack(menuMusic[menuTrackIndex],
+                             menuMusicGain * 0.72f * musicGain,
                              left, right))
                     menuTrackIndex = randomTrack(menuRandomState, menuMusic.size());
             } else if (requestedMusic == AudioMusicMode::Overworld) {
                 if (mixTrack(overworldMusic[overworldTrackIndex],
-                             overworldMusicGain * 0.68f, left, right))
+                             overworldMusicGain * 0.68f * musicGain, left, right))
                     overworldTrackIndex = randomTrack(
                         overworldRandomState, overworldMusic.size());
             } else {
                 if (mixTrack(heavenMusic[heavenTrackIndex],
-                             heavenMusicGain * 0.70f, left, right))
+                             heavenMusicGain * 0.70f * musicGain, left, right))
                     heavenTrackIndex = randomTrack(
                         heavenRandomState, heavenMusic.size());
             }
@@ -279,13 +288,15 @@ struct AudioSystem::Impl {
                                   noise() * combatNoiseMix) * combatEnvelope;
             combatEnvelope *= combatDecay;
             if (combatEnvelope < .0001f) combatEnvelope = 0.0f;
-            samples[frame * 2] = std::clamp(
-                left + rainLeft + thunder * leftPan + explosion * explosionLeft +
-                    combat * .707f,
+            samples[frame * 2] = std::clamp(masterGain * (
+                left + (rainLeft + thunder * leftPan) * weatherGain +
+                    (explosion * explosionLeft + combat * .707f) * soundEffectsGain),
                 -1.0f, 1.0f);
             samples[frame * 2 + 1] =
-                std::clamp(right + rainRight + thunder * rightPan +
-                               explosion * explosionRight + combat * .707f,
+                std::clamp(masterGain * (right +
+                               (rainRight + thunder * rightPan) * weatherGain +
+                               (explosion * explosionRight + combat * .707f) *
+                                   soundEffectsGain),
                            -1.0f, 1.0f);
         }
     }
@@ -417,6 +428,21 @@ void AudioSystem::setMusicMode(AudioMusicMode mode) {
 
 AudioMusicMode AudioSystem::musicMode() const {
     return m_impl->musicTarget.load();
+}
+
+void AudioSystem::setVolumes(float master, float music, float weather,
+                             float soundEffects) {
+    m_impl->masterVolume = std::clamp(master, 0.0f, 1.0f);
+    m_impl->musicVolume = std::clamp(music, 0.0f, 1.0f);
+    m_impl->weatherVolume = std::clamp(weather, 0.0f, 1.0f);
+    m_impl->soundEffectsVolume = std::clamp(soundEffects, 0.0f, 1.0f);
+}
+
+float AudioSystem::masterVolume() const { return m_impl->masterVolume.load(); }
+float AudioSystem::musicVolume() const { return m_impl->musicVolume.load(); }
+float AudioSystem::weatherVolume() const { return m_impl->weatherVolume.load(); }
+float AudioSystem::soundEffectsVolume() const {
+    return m_impl->soundEffectsVolume.load();
 }
 
 void AudioSystem::setRainVolume(float volume) {

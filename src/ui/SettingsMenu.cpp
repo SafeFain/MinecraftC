@@ -84,19 +84,35 @@ void SettingsMenu::showPage(SettingsPage page) {
 void SettingsMenu::refreshButtons() {
     m_buttons.clear();
     m_frameRateButton = -1;
+    m_volumeButtons.fill(-1);
     m_backButton = -1;
     m_frameRateDragging = false;
+    m_volumeDragging = -1;
     if (m_page == SettingsPage::General) {
         m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
         m_buttons.emplace_back(m_localization.text("settings.video"), [this]{
             showPage(SettingsPage::Video);
         });
+        m_buttons.emplace_back(m_localization.text("settings.audio"), [this]{
+            showPage(SettingsPage::Audio);
+        });
         m_buttons.emplace_back(m_localization.text("settings.key_bindings"), [this]{
             showPage(SettingsPage::KeyBindings);
         });
         m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("common.back"), m_onBack);
+    } else if (m_page == SettingsPage::Audio) {
+        for (size_t index = 0; index < m_volumeButtons.size(); ++index) {
+            m_volumeButtons[index] = static_cast<int>(m_buttons.size());
+            m_buttons.emplace_back(volumeLabel(index), [this, index] {
+                adjustVolume(index, 10);
+            });
+        }
+        m_backButton = static_cast<int>(m_buttons.size());
+        m_buttons.emplace_back(m_localization.text("settings.back"), [this] {
+            showPage(SettingsPage::General);
+        });
     } else if (m_page == SettingsPage::Video) {
         m_frameRateButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(frameRateLabel(), [this] {
@@ -464,6 +480,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         m_page == SettingsPage::Controller ? "settings.controller_title" :
         m_page == SettingsPage::Lod ? "settings.lod_title" :
         m_page == SettingsPage::EnhancedVisuals ? "settings.enhanced_title" :
+        m_page == SettingsPage::Audio ? "settings.audio_title" :
         m_page == SettingsPage::Video ? "settings.video_title" :
         m_page == SettingsPage::KeyBindings ? "settings.key_bindings_title" :
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");
@@ -511,6 +528,25 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         UiTheme::beveledBody(ui, left + filled - 3.0f, trackY - 2.0f, 8.0f,
                              12.0f, UiTheme::BUTTON_HOVER, false);
     }
+    for (size_t index = 0; index < m_volumeButtons.size(); ++index) {
+        const int buttonIndex = m_volumeButtons[index];
+        if (buttonIndex < 0 || buttonIndex >= static_cast<int>(m_buttons.size()))
+            continue;
+        const Button& slider = m_buttons[static_cast<size_t>(buttonIndex)];
+        const float left = slider.x() + 12.0f;
+        const float width = std::max(1.0f, slider.width() - 24.0f);
+        const float trackY = slider.y() + 3.0f;
+        const float fraction = volumeSliderFraction(
+            index == 0 ? m_settings.masterVolume :
+            index == 1 ? m_settings.musicVolume :
+            index == 2 ? m_settings.weatherVolume :
+                         m_settings.soundEffectsVolume);
+        UiTheme::progressBar(ui, left, trackY, width, 8.0f, fraction,
+                             UiTheme::GOLD);
+        UiTheme::beveledBody(ui, left + width * fraction - 3.0f,
+                             trackY - 2.0f, 8.0f, 12.0f,
+                             UiTheme::BUTTON_HOVER, false);
+    }
 }
 
 void SettingsMenu::onKeyPress(int key, int mods) {
@@ -551,6 +587,16 @@ void SettingsMenu::onKeyPress(int key, int mods) {
         m_onChanged();
         refreshButtons();
         return;
+    }
+    if (m_page == SettingsPage::Audio &&
+        (key == Key::Left || key == Key::Right)) {
+        const auto found = std::find(m_volumeButtons.begin(), m_volumeButtons.end(),
+                                     m_selectedIdx);
+        if (found != m_volumeButtons.end()) {
+            adjustVolume(static_cast<size_t>(found - m_volumeButtons.begin()),
+                         key == Key::Right ? 1 : -1);
+            return;
+        }
     }
     const auto selectNeighbor = [this](int columnDelta, int rowDelta) {
         if (m_buttons.empty()) return;
@@ -616,6 +662,8 @@ void SettingsMenu::commitLodDistanceEdit() {
 
 void SettingsMenu::onMouseMove(double x, double y) {
     if (m_frameRateDragging) setFrameRateFromPointer(x);
+    if (m_volumeDragging >= 0)
+        setVolumeFromPointer(static_cast<size_t>(m_volumeDragging), x);
     for (auto& button : m_buttons)
         button.setHovered(button.containsPoint(static_cast<float>(x), static_cast<float>(y)));
 }
@@ -627,6 +675,27 @@ void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, doub
         return;
     }
     if (button != MouseButton::Left) return;
+    for (size_t index = 0; index < m_volumeButtons.size(); ++index) {
+        const int buttonIndex = m_volumeButtons[index];
+        if (buttonIndex < 0 || buttonIndex >= static_cast<int>(m_buttons.size()))
+            continue;
+        Button& slider = m_buttons[static_cast<size_t>(buttonIndex)];
+        if (action == ButtonAction::Press && slider.containsPoint(
+                static_cast<float>(x), static_cast<float>(y))) {
+            m_pressedButton = -1;
+            m_volumeDragging = static_cast<int>(index);
+            slider.setPressed(true);
+            setVolumeFromPointer(index, x);
+            return;
+        }
+        if (action == ButtonAction::Release &&
+            m_volumeDragging == static_cast<int>(index)) {
+            setVolumeFromPointer(index, x);
+            slider.setPressed(false);
+            m_volumeDragging = -1;
+            return;
+        }
+    }
     if (m_frameRateButton >= 0 &&
         m_frameRateButton < static_cast<int>(m_buttons.size())) {
         Button& slider = m_buttons[static_cast<size_t>(m_frameRateButton)];
@@ -662,6 +731,11 @@ void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, doub
 }
 
 bool SettingsMenu::capturesPointerDrag(double x, double y) const {
+    if (m_volumeDragging >= 0) return true;
+    for (const int buttonIndex : m_volumeButtons)
+        if (buttonIndex >= 0 && buttonIndex < static_cast<int>(m_buttons.size()) &&
+            m_buttons[static_cast<size_t>(buttonIndex)].containsPoint(
+                static_cast<float>(x), static_cast<float>(y))) return true;
     return m_frameRateButton >= 0 &&
         m_frameRateButton < static_cast<int>(m_buttons.size()) &&
         m_buttons[static_cast<size_t>(m_frameRateButton)].containsPoint(
@@ -677,6 +751,49 @@ void SettingsMenu::setFrameRateFromPointer(double x) {
         static_cast<float>(x), slider.x() + inset,
         std::max(1.0f, slider.width() - inset * 2.0f));
     slider.setLabel(frameRateLabel());
+}
+
+uint8_t& SettingsMenu::volumeSetting(size_t index) {
+    switch (index) {
+        case 0: return m_settings.masterVolume;
+        case 1: return m_settings.musicVolume;
+        case 2: return m_settings.weatherVolume;
+        default: return m_settings.soundEffectsVolume;
+    }
+}
+
+std::string SettingsMenu::volumeLabel(size_t index) const {
+    static constexpr const char* keys[] = {
+        "settings.master_volume", "settings.music_volume",
+        "settings.weather_volume", "settings.sound_effects_volume"};
+    const uint8_t value = index == 0 ? m_settings.masterVolume :
+        index == 1 ? m_settings.musicVolume :
+        index == 2 ? m_settings.weatherVolume : m_settings.soundEffectsVolume;
+    return m_localization.format(keys[std::min<size_t>(index, 3)], {
+        std::to_string(static_cast<int>(value))});
+}
+
+void SettingsMenu::adjustVolume(size_t index, int delta) {
+    uint8_t& value = volumeSetting(index);
+    value = static_cast<uint8_t>(std::clamp(static_cast<int>(value) + delta,
+                                            0, 100));
+    m_onChanged();
+    refreshButtons();
+}
+
+void SettingsMenu::setVolumeFromPointer(size_t index, double x) {
+    if (index >= m_volumeButtons.size()) return;
+    const int buttonIndex = m_volumeButtons[index];
+    if (buttonIndex < 0 || buttonIndex >= static_cast<int>(m_buttons.size())) return;
+    Button& slider = m_buttons[static_cast<size_t>(buttonIndex)];
+    constexpr float inset = 12.0f;
+    uint8_t& value = volumeSetting(index);
+    const uint8_t next = volumeFromSlider(static_cast<float>(x),
+        slider.x() + inset, std::max(1.0f, slider.width() - inset * 2.0f));
+    if (value == next) return;
+    value = next;
+    slider.setLabel(volumeLabel(index));
+    m_onChanged();
 }
 
 void SettingsMenu::onScroll(double yOffset) {

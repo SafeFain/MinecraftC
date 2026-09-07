@@ -63,6 +63,15 @@ int main() {
             localization.hasTranslation(
                 Language::SimplifiedChinese, "settings.frame_rate"),
             "frame-rate setting is translated");
+    constexpr const char* audioSettingsKeys[] = {
+        "settings.audio", "settings.audio_title", "settings.master_volume",
+        "settings.music_volume", "settings.weather_volume",
+        "settings.sound_effects_volume"
+    };
+    for (const Language language : languagesByEnglishName())
+        for (const char* key : audioSettingsKeys)
+            require(localization.hasTranslation(language, key),
+                    "every audio setting is translated");
     constexpr const char* combatKeys[] = {
         "settings.attack_indicator", "settings.attack_crosshair",
         "settings.attack_hotbar", "settings.attack_off",

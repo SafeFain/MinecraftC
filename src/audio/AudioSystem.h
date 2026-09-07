@@ -27,6 +27,11 @@ public:
     bool paused() const;
     void setMusicMode(AudioMusicMode mode);
     AudioMusicMode musicMode() const;
+    void setVolumes(float master, float music, float weather, float soundEffects);
+    float masterVolume() const;
+    float musicVolume() const;
+    float weatherVolume() const;
+    float soundEffectsVolume() const;
     void setRainVolume(float volume);
     void stopRain();
     void playThunder(float pan, float volume);

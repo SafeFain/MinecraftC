@@ -9,6 +9,7 @@
 
 enum class SettingsPage {
     General,
+    Audio,
     Video,
     EnhancedVisuals,
     Lod,
@@ -25,6 +26,7 @@ inline SettingsPage settingsParentPage(SettingsPage page) {
         case SettingsPage::Touch:
             return SettingsPage::KeyBindings;
         case SettingsPage::Video:
+        case SettingsPage::Audio:
             return SettingsPage::General;
         case SettingsPage::Lod:
         case SettingsPage::EnhancedVisuals:
@@ -128,6 +130,16 @@ inline float frameRateSliderFraction(int frameRate) {
         static_cast<float>(ClientSettings::MAX_FRAME_RATE - ClientSettings::MIN_FRAME_RATE);
 }
 
+inline uint8_t volumeFromSlider(float x, float left, float width) {
+    if (width <= 0.0f) return 0;
+    return static_cast<uint8_t>(std::lround(
+        std::clamp((x - left) / width, 0.0f, 1.0f) * 100.0f));
+}
+
+inline float volumeSliderFraction(uint8_t volume) {
+    return static_cast<float>(std::min<int>(volume, 100)) / 100.0f;
+}
+
 inline std::optional<int> parseLodDistance(const std::string& text) {
     if (text.empty() || !std::all_of(text.begin(), text.end(),
             [](unsigned char character) { return character >= '0' && character <= '9'; }))
@@ -182,8 +194,10 @@ private:
     int m_captureAction = -1;
     int m_pressedButton = -1;
     int m_frameRateButton = -1;
+    std::array<int, 4> m_volumeButtons{{-1, -1, -1, -1}};
     int m_backButton = -1;
     bool m_frameRateDragging = false;
+    int m_volumeDragging = -1;
     TextEditBuffer m_lodDistanceText{{}, 4};
     bool m_lodDistanceEditing = false;
     bool m_lodDistanceInvalid = false;
@@ -205,6 +219,10 @@ private:
     void assignGamepadBinding(GamepadBinding binding);
     std::string frameRateLabel() const;
     void setFrameRateFromPointer(double x);
+    uint8_t& volumeSetting(size_t index);
+    std::string volumeLabel(size_t index) const;
+    void adjustVolume(size_t index, int delta);
+    void setVolumeFromPointer(size_t index, double x);
     void beginLodDistanceEdit();
     void commitLodDistanceEdit();
 };

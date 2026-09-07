@@ -158,6 +158,10 @@ void ClientSettings::validate() {
     clampPercent(enhancedVisual.ambientParticleStrength);
     clampPercent(enhancedVisual.gi.strength);
     clampPercent(enhancedVisual.gi.temporalStability);
+    clampPercent(masterVolume);
+    clampPercent(musicVolume);
+    clampPercent(weatherVolume);
+    clampPercent(soundEffectsVolume);
     constexpr uint16_t giDistances[] = {32, 64, 128, 256};
     if (std::find(std::begin(giDistances), std::end(giDistances),
                   enhancedVisual.gi.distance) == std::end(giDistances))
@@ -270,6 +274,14 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
             else if (name == "day_cycle") settings.dayCycleMinutes = std::stoi(value);
             else if (name == "auto_jump") settings.autoJump = std::stoi(value) != 0;
             else if (name == "toggle_sneak") settings.toggleSneak = std::stoi(value) != 0;
+            else if (name == "master_volume")
+                settings.masterVolume = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "music_volume")
+                settings.musicVolume = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "weather_volume")
+                settings.weatherVolume = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
+            else if (name == "sound_effects_volume")
+                settings.soundEffectsVolume = static_cast<uint8_t>(std::clamp(std::stoi(value), 0, 100));
             else if (name == "mouse_sensitivity") settings.mouseSensitivity = std::stof(value);
             else if (name == "invert_mouse_y") settings.invertMouseY = std::stoi(value) != 0;
             else if (name == "raw_mouse_input") { /* v5 compatibility */ }
@@ -395,6 +407,10 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "day_cycle=" << dayCycleMinutes << '\n'
            << "auto_jump=" << autoJump << '\n'
            << "toggle_sneak=" << toggleSneak << '\n'
+           << "master_volume=" << static_cast<int>(masterVolume) << '\n'
+           << "music_volume=" << static_cast<int>(musicVolume) << '\n'
+           << "weather_volume=" << static_cast<int>(weatherVolume) << '\n'
+           << "sound_effects_volume=" << static_cast<int>(soundEffectsVolume) << '\n'
            << "mouse_sensitivity=" << mouseSensitivity << '\n'
            << "invert_mouse_y=" << invertMouseY << '\n'
            << "smooth_lighting=" << smoothLighting << '\n'

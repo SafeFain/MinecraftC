@@ -419,6 +419,11 @@ private:
             m_clientSettings.transparentLeaves);
         m_session.particles.setEnhancedVisuals(
             m_clientSettings.enhancedVisual, m_clientSettings.visualQuality);
+        m_audio.setVolumes(
+            m_clientSettings.masterVolume / 100.0f,
+            m_clientSettings.musicVolume / 100.0f,
+            m_clientSettings.weatherVolume / 100.0f,
+            m_clientSettings.soundEffectsVolume / 100.0f);
         if (persist && !m_clientSettings.save(m_paths.settingsFile()))
             LOG_WARN("Could not save client settings");
         if (m_clientSettings.controlMode == ControlMode::KeyboardMouse)

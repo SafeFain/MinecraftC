@@ -51,6 +51,10 @@ int main(){
         audio.setMusicMode(AudioMusicMode::Heaven);
         require(audio.musicMode()==AudioMusicMode::Heaven,
                 "Heaven music mode is separate from Overworld music");
+        audio.setVolumes(.75f,.5f,.25f,1.5f);
+        require(audio.masterVolume()==.75f&&audio.musicVolume()==.5f&&
+                audio.weatherVolume()==.25f&&audio.soundEffectsVolume()==1.0f,
+                "audio category volumes apply independently and clamp safely");
         audio.setPaused(true);
         require(audio.paused(),"audio device pauses with the game");
         audio.setPaused(true);
@@ -64,6 +68,7 @@ int main(){
             "input device settings return to the key bindings hub");
     require(settingsParentPage(SettingsPage::KeyBindings)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Video)==SettingsPage::General&&
+            settingsParentPage(SettingsPage::Audio)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Lod)==SettingsPage::Video&&
             settingsParentPage(SettingsPage::EnhancedVisuals)==SettingsPage::Video,
             "top-level settings pages return to general settings");
@@ -125,6 +130,11 @@ int main(){
             frameRateFromSlider(95.0f,10.0f,170.0f)==115&&
             frameRateSliderFraction(30)==0.0f&&frameRateSliderFraction(200)==1.0f,
             "frame-rate slider continuously maps its full 30-200 range");
+    require(volumeFromSlider(10.0f,10.0f,200.0f)==0&&
+            volumeFromSlider(110.0f,10.0f,200.0f)==50&&
+            volumeFromSlider(210.0f,10.0f,200.0f)==100&&
+            volumeSliderFraction(0)==0.0f&&volumeSliderFraction(100)==1.0f,
+            "volume sliders continuously map their full 0-100 percent range");
     require(defaultVisualQuality(DesktopPlatform::Android)==VisualQuality::Low&&
             defaultVisualQuality(DesktopPlatform::IOS)==VisualQuality::Low&&
             defaultVisualQuality(DesktopPlatform::Linux)==VisualQuality::Medium&&
@@ -230,6 +240,8 @@ int main(){
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.frameRateLimit=137;
     settings.invertMouseY=true;settings.toggleSneak=true;
+    settings.masterVolume=82;settings.musicVolume=61;
+    settings.weatherVolume=43;settings.soundEffectsVolume=24;
     settings.renderDistance=8;settings.renderClouds=false;
     settings.lodEnabled=false;settings.lodDistanceChunks=640;
     settings.lodAggressiveness=LodAggressiveness::Fast;
@@ -263,6 +275,8 @@ int main(){
     const auto loaded=ClientSettings::load(root/"options.txt");
     require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&
             loaded.frameRateLimit==137&&loaded.invertMouseY&&loaded.toggleSneak&&
+            loaded.masterVolume==82&&loaded.musicVolume==61&&
+            loaded.weatherVolume==43&&loaded.soundEffectsVolume==24&&
             loaded.renderDistance==8&&!loaded.renderClouds&&
             !loaded.lodEnabled&&loaded.lodDistanceChunks==640&&
             loaded.lodAggressiveness==LodAggressiveness::Fast&&
@@ -347,12 +361,26 @@ int main(){
     const std::string migratedText(
         (std::istreambuf_iterator<char>(migratedInput)), {});
     migratedInput.close();
-    require(migratedText.find("version=25\n")!=std::string::npos&&
+    require(migratedText.find("version=26\n")!=std::string::npos&&
             migratedText.find("renderer=")==std::string::npos,
             "legacy renderer setting was not removed during migration");
     require(legacySettings.graphicsPreset==GraphicsPreset::Custom&&
             !legacySettings.enhancedVisual.gi.enabled,
             "legacy settings preserve their combination as a custom preset");
+    require(legacySettings.masterVolume==100&&legacySettings.musicVolume==100&&
+            legacySettings.weatherVolume==100&&
+            legacySettings.soundEffectsVolume==100,
+            "legacy settings migrate to full volume in every category");
+    {
+        std::ofstream invalidVolumes(root/"invalid-volumes.txt");
+        invalidVolumes<<"version=26\nmaster_volume=200\nmusic_volume=-20\n"
+                      <<"weather_volume=37\nsound_effects_volume=101\n";
+    }
+    const auto volumeSettings=ClientSettings::load(root/"invalid-volumes.txt");
+    require(volumeSettings.masterVolume==100&&volumeSettings.musicVolume==0&&
+            volumeSettings.weatherVolume==37&&
+            volumeSettings.soundEffectsVolume==100,
+            "persisted volume percentages clamp to their valid range");
     {
         std::ofstream previous(root/"v20-options.txt");
         previous<<"version=20\nvisual_quality=2\n";

@@ -88,6 +88,12 @@
   "sleep.travel_heaven": "Travel to Heaven",
 
   "settings.title": "SETTINGS",
+  "settings.audio_title": "MUSIC & SOUNDS",
+  "settings.audio": "Music & Sounds...",
+  "settings.master_volume": "Master Volume: {0}%",
+  "settings.music_volume": "Music: {0}%",
+  "settings.weather_volume": "Weather: {0}%",
+  "settings.sound_effects_volume": "Sound Effects: {0}%",
   "settings.video_title": "VIDEO SETTINGS",
   "settings.lod_title": "DISTANT TERRAIN LOD",
   "settings.lod": "Distant Terrain LOD...",
