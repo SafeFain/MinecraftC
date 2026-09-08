@@ -99,6 +99,7 @@ struct VoxelGiScreenUniforms {
     glm::mat4 inverseViewProjection{1.0f};
     glm::mat4 previousViewProjection{1.0f};
     glm::vec4 cameraWorld{0.0f};
+    glm::vec4 previousCameraWorld{0.0f};
     glm::vec4 currentWorldOrigin{0.0f};
     glm::vec4 previousWorldOrigin{0.0f};
     std::array<glm::vec4, 4> minimumCellAndSize{};
@@ -143,7 +144,7 @@ static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
 static_assert(sizeof(PostConstants) == 128);
-static_assert(sizeof(VoxelGiScreenUniforms) == 272);
+static_assert(sizeof(VoxelGiScreenUniforms) == 288);
 static_assert(sizeof(VoxelGiInjectConstants) == 32);
 static_assert(sizeof(BloomConstants) == 16);
 static_assert(sizeof(ModelUniforms) == 4416);
@@ -172,6 +173,7 @@ struct SwapchainPipelineInputs {
     const std::vector<VkImageView>* voxelGiAlbedoImageViews = nullptr;
     const std::vector<VkImageView>* screenEffectImageViews = nullptr;
     const std::vector<VkImageView>* voxelGiHistoryImageViews = nullptr;
+    const std::vector<VkImageView>* voxelGiSurfaceHistoryImageViews = nullptr;
     const std::array<VkImageView, 4>* voxelGiImageViews = nullptr;
     VkBuffer voxelGiUniformBuffer = VK_NULL_HANDLE;
     bool voxelGiEnabled = false;

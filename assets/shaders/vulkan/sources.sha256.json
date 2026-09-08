@@ -11,7 +11,7 @@
   "post.frag": "e12296d34ad017817e89e54760a8c895c6a873207ef04865595f49357b35c847",
   "post.vert": "6ce898efffbc42ad87239b6f27473834912d09e3fce814ec5ca1326ddc9c7b87",
   "screen_effect.frag": "f5a1a372baf990113408787a19dece9449f22ee73d71d4dc7798b67605d853ab",
-  "screen_effect_gi.frag": "cb61d5e64694f0e45cf8aadb191cfcf72269228932230e9295442dc4bdaf35ae",
+  "screen_effect_gi.frag": "ecab12c408d23858b4de2d7eb115e091585f0f46ad13bd37847fd2658f86c6c3",
   "shadow.frag": "63e02cfa15a621633acb0c9a08bcff4f48d9825fcb73e8a6441f9f71657f328b",
   "shadow.vert": "3cf1ff2b61ab5be7de0f099cd45754e7bb53f60d7febe5a0bf930ba15593d3c8",
   "sky.frag": "1dfaba6eb375251f191bce50236f1a17c1d51da9a5fbdccd0825d4f73c10caa2",

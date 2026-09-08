@@ -195,6 +195,9 @@ struct VulkanSwapchainBundle {
     std::vector<VkImage> voxelGiHistoryImages;
     std::vector<VmaAllocation> voxelGiHistoryAllocations;
     std::vector<VkImageView> voxelGiHistoryImageViews;
+    std::vector<VkImage> voxelGiSurfaceHistoryImages;
+    std::vector<VmaAllocation> voxelGiSurfaceHistoryAllocations;
+    std::vector<VkImageView> voxelGiSurfaceHistoryImageViews;
     std::vector<bool> voxelGiHistoryInitialized;
     std::vector<VkFramebuffer> screenEffectFramebuffers;
     bool surfaceDataEnabled = false;

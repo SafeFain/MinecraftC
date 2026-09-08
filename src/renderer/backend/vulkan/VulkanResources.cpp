@@ -370,7 +370,8 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
         };
         createImageSet(result.surfaceFormat, result.swapchainExtent,
             VK_SAMPLE_COUNT_1_BIT,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             result.surfaceImages, result.surfaceAllocations,
             result.surfaceImageViews, "create surface data");
         if (result.sampleCount != VK_SAMPLE_COUNT_1_BIT) {
@@ -417,6 +418,13 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
                 result.voxelGiHistoryImages,
                 result.voxelGiHistoryAllocations,
                 result.voxelGiHistoryImageViews, "create voxel GI history");
+            createImageSet(result.surfaceFormat, result.screenEffectExtent,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                result.voxelGiSurfaceHistoryImages,
+                result.voxelGiSurfaceHistoryAllocations,
+                result.voxelGiSurfaceHistoryImageViews,
+                "create voxel GI surface history");
             result.voxelGiHistoryInitialized.assign(result.images.size(), false);
         }
     }
@@ -547,6 +555,8 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     pipelineInputs.voxelGiAlbedoImageViews = &result.voxelGiAlbedoImageViews;
     pipelineInputs.screenEffectImageViews = &result.screenEffectImageViews;
     pipelineInputs.voxelGiHistoryImageViews = &result.voxelGiHistoryImageViews;
+    pipelineInputs.voxelGiSurfaceHistoryImageViews =
+        &result.voxelGiSurfaceHistoryImageViews;
     pipelineInputs.voxelGiImageViews = params.voxelGiImageViews;
     pipelineInputs.voxelGiUniformBuffer = params.voxelGiUniformBuffer;
     pipelineInputs.voxelGiEnabled = result.voxelGiEnabled;
@@ -863,6 +873,9 @@ void VulkanSwapchainBundle::destroy() {
                     voxelGiAlbedoMsaaImageViews);
     destroyImageSet(voxelGiHistoryImages, voxelGiHistoryAllocations,
                     voxelGiHistoryImageViews);
+    destroyImageSet(voxelGiSurfaceHistoryImages,
+                    voxelGiSurfaceHistoryAllocations,
+                    voxelGiSurfaceHistoryImageViews);
     voxelGiHistoryInitialized.clear();
     surfaceDataEnabled = false;
     voxelGiEnabled = false;
@@ -953,6 +966,12 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       voxelGiHistoryImages(std::move(other.voxelGiHistoryImages)),
       voxelGiHistoryAllocations(std::move(other.voxelGiHistoryAllocations)),
       voxelGiHistoryImageViews(std::move(other.voxelGiHistoryImageViews)),
+      voxelGiSurfaceHistoryImages(
+          std::move(other.voxelGiSurfaceHistoryImages)),
+      voxelGiSurfaceHistoryAllocations(
+          std::move(other.voxelGiSurfaceHistoryAllocations)),
+      voxelGiSurfaceHistoryImageViews(
+          std::move(other.voxelGiSurfaceHistoryImageViews)),
       voxelGiHistoryInitialized(std::move(other.voxelGiHistoryInitialized)),
       screenEffectFramebuffers(std::move(other.screenEffectFramebuffers)),
       surfaceDataEnabled(other.surfaceDataEnabled),
@@ -1057,6 +1076,12 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     voxelGiHistoryImages = std::move(other.voxelGiHistoryImages);
     voxelGiHistoryAllocations = std::move(other.voxelGiHistoryAllocations);
     voxelGiHistoryImageViews = std::move(other.voxelGiHistoryImageViews);
+    voxelGiSurfaceHistoryImages =
+        std::move(other.voxelGiSurfaceHistoryImages);
+    voxelGiSurfaceHistoryAllocations =
+        std::move(other.voxelGiSurfaceHistoryAllocations);
+    voxelGiSurfaceHistoryImageViews =
+        std::move(other.voxelGiSurfaceHistoryImageViews);
     voxelGiHistoryInitialized = std::move(other.voxelGiHistoryInitialized);
     screenEffectFramebuffers = std::move(other.screenEffectFramebuffers);
     surfaceDataEnabled = other.surfaceDataEnabled;

@@ -1061,9 +1061,10 @@ void VulkanPipelineFactory::createSwapchainSet(
             write.pImageInfo = &imageInfo;
             vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
             if (inputs.voxelGiEnabled && inputs.voxelGiHistoryImageViews &&
+                inputs.voxelGiSurfaceHistoryImageViews &&
                 inputs.voxelGiImageViews && inputs.voxelGiAlbedoImageViews &&
                 inputs.voxelGiUniformBuffer) {
-                std::array<VkDescriptorImageInfo, 6> giImages{};
+                std::array<VkDescriptorImageInfo, 7> giImages{};
                 giImages[0] = {outputs.postSampler,
                     (*inputs.voxelGiHistoryImageViews)[i],
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
@@ -1074,8 +1075,11 @@ void VulkanPipelineFactory::createSwapchainSet(
                 giImages[5] = {outputs.postSampler,
                     (*inputs.voxelGiAlbedoImageViews)[i],
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-                std::array<VkWriteDescriptorSet, 7> giWrites{};
-                for (uint32_t binding = 1; binding <= 6; ++binding) {
+                giImages[6] = {outputs.postSampler,
+                    (*inputs.voxelGiSurfaceHistoryImageViews)[i],
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                std::array<VkWriteDescriptorSet, 8> giWrites{};
+                for (uint32_t binding = 1; binding <= 7; ++binding) {
                     VkWriteDescriptorSet& giWrite = giWrites[binding - 1];
                     giWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     giWrite.dstSet = outputs.screenEffectDescriptorSets[i];
@@ -1087,12 +1091,12 @@ void VulkanPipelineFactory::createSwapchainSet(
                 }
                 const VkDescriptorBufferInfo uniformInfo{
                     inputs.voxelGiUniformBuffer, 0, sizeof(VoxelGiScreenUniforms)};
-                giWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                giWrites[6].dstSet = outputs.screenEffectDescriptorSets[i];
-                giWrites[6].dstBinding = 10;
-                giWrites[6].descriptorCount = 1;
-                giWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                giWrites[6].pBufferInfo = &uniformInfo;
+                giWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                giWrites[7].dstSet = outputs.screenEffectDescriptorSets[i];
+                giWrites[7].dstBinding = 10;
+                giWrites[7].descriptorCount = 1;
+                giWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                giWrites[7].pBufferInfo = &uniformInfo;
                 vkUpdateDescriptorSets(m_device, giWrites.size(),
                                        giWrites.data(), 0, nullptr);
             }

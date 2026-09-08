@@ -369,6 +369,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     std::vector<VoxelGiSliceUpdate> voxelGiUpdates;
     bool voxelGiHistoryValid = false;
     std::vector<glm::mat4> voxelGiPreviousViewProjection;
+    std::vector<glm::dvec3> voxelGiPreviousCameraWorld;
     std::vector<glm::dvec3> voxelGiPreviousWorldOrigin;
     uint64_t voxelGiLastSceneId = std::numeric_limits<uint64_t>::max();
     glm::dvec3 voxelGiLastCamera{0.0};
@@ -1498,6 +1499,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         }
         voxelGiPreviousViewProjection.assign(
             swapchain.images.size(), glm::mat4(1.0f));
+        voxelGiPreviousCameraWorld.assign(
+            swapchain.images.size(), glm::dvec3(0.0));
         voxelGiPreviousWorldOrigin.assign(
             swapchain.images.size(), glm::dvec3(0.0));
         voxelGiHistoryValid = false;
@@ -1637,6 +1640,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (voxelGiPreviousViewProjection.size() != swapchain.images.size()) {
             voxelGiPreviousViewProjection.assign(
                 swapchain.images.size(), glm::mat4(1.0f));
+            voxelGiPreviousCameraWorld.assign(
+                swapchain.images.size(), glm::dvec3(0.0));
             voxelGiPreviousWorldOrigin.assign(
                 swapchain.images.size(), glm::dvec3(0.0));
         }
@@ -1650,6 +1655,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             voxelGiPreviousViewProjection[imageIndex];
         uniforms.cameraWorld = glm::vec4(
             glm::vec3(postProcess.worldOrigin) + postProcess.cameraPosition, 1.0f);
+        uniforms.previousCameraWorld = glm::vec4(
+            glm::vec3(voxelGiPreviousCameraWorld[imageIndex]), 1.0f);
         uniforms.currentWorldOrigin = glm::vec4(
             glm::vec3(postProcess.worldOrigin), 0.0f);
         uniforms.previousWorldOrigin = glm::vec4(
@@ -1692,6 +1699,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         write.pBufferInfo = &bufferInfo;
         vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
         voxelGiPreviousViewProjection[imageIndex] = correctedViewProjection;
+        voxelGiPreviousCameraWorld[imageIndex] =
+            postProcess.worldOrigin + glm::dvec3(postProcess.cameraPosition);
         voxelGiPreviousWorldOrigin[imageIndex] = postProcess.worldOrigin;
     }
 
@@ -2582,33 +2591,42 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (!swapchain.surfaceDataEnabled) return;
         if (swapchain.voxelGiEnabled &&
             !swapchain.voxelGiHistoryInitialized[imageIndex]) {
-            VkImageMemoryBarrier initialize{};
-            initialize.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            initialize.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            initialize.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            initialize.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            initialize.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            initialize.image = swapchain.voxelGiHistoryImages[imageIndex];
-            initialize.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            initialize.subresourceRange.levelCount = 1;
-            initialize.subresourceRange.layerCount = 1;
-            initialize.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            std::array<VkImageMemoryBarrier, 2> initialize{};
+            for (VkImageMemoryBarrier& barrier : initialize) {
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                barrier.subresourceRange.levelCount = 1;
+                barrier.subresourceRange.layerCount = 1;
+                barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            }
+            initialize[0].image = swapchain.voxelGiHistoryImages[imageIndex];
+            initialize[1].image =
+                swapchain.voxelGiSurfaceHistoryImages[imageIndex];
             vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                1, &initialize);
+                static_cast<uint32_t>(initialize.size()), initialize.data());
             const VkClearColorValue zero{{0.0f, 0.0f, 0.0f, 1.0f}};
             const VkImageSubresourceRange range{
                 VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             vkCmdClearColorImage(command,
                 swapchain.voxelGiHistoryImages[imageIndex],
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
-            initialize.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            initialize.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            initialize.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            initialize.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdClearColorImage(command,
+                swapchain.voxelGiSurfaceHistoryImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+            for (VkImageMemoryBarrier& barrier : initialize) {
+                barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            }
             vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                1, &initialize);
+                static_cast<uint32_t>(initialize.size()), initialize.data());
         }
         VkClearValue clear{};
         clear.color.float32[0] = 1.0f;
@@ -2638,7 +2656,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdDraw(command, 3, 1, 0, 0);
         vkCmdEndRenderPass(command);
         if (swapchain.voxelGiEnabled) {
-            std::array<VkImageMemoryBarrier, 2> copyBarriers{};
+            std::array<VkImageMemoryBarrier, 4> copyBarriers{};
             copyBarriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             copyBarriers[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             copyBarriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -2657,6 +2675,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             copyBarriers[1].image = swapchain.voxelGiHistoryImages[imageIndex];
             copyBarriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
             copyBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            copyBarriers[2] = copyBarriers[0];
+            copyBarriers[2].image = swapchain.surfaceImages[imageIndex];
+            copyBarriers[3] = copyBarriers[1];
+            copyBarriers[3].image =
+                swapchain.voxelGiSurfaceHistoryImages[imageIndex];
             vkCmdPipelineBarrier(command,
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -2673,6 +2696,22 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 swapchain.voxelGiHistoryImages[imageIndex],
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            VkImageBlit surfaceBlit{};
+            surfaceBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            surfaceBlit.srcSubresource.layerCount = 1;
+            surfaceBlit.srcOffsets[1] = {
+                static_cast<int32_t>(swapchain.swapchainExtent.width),
+                static_cast<int32_t>(swapchain.swapchainExtent.height), 1};
+            surfaceBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            surfaceBlit.dstSubresource.layerCount = 1;
+            surfaceBlit.dstOffsets[1] = {
+                static_cast<int32_t>(swapchain.screenEffectExtent.width),
+                static_cast<int32_t>(swapchain.screenEffectExtent.height), 1};
+            vkCmdBlitImage(command, swapchain.surfaceImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                swapchain.voxelGiSurfaceHistoryImages[imageIndex],
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &surfaceBlit,
+                VK_FILTER_NEAREST);
             copyBarriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             copyBarriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             copyBarriers[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -2681,6 +2720,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             copyBarriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             copyBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             copyBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            copyBarriers[2] = copyBarriers[0];
+            copyBarriers[2].image = swapchain.surfaceImages[imageIndex];
+            copyBarriers[3] = copyBarriers[1];
+            copyBarriers[3].image =
+                swapchain.voxelGiSurfaceHistoryImages[imageIndex];
             vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
                 copyBarriers.size(), copyBarriers.data());

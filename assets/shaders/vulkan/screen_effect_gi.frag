@@ -7,10 +7,12 @@ layout(set=0,binding=3) uniform sampler3D irradiance1;
 layout(set=0,binding=4) uniform sampler3D irradiance2;
 layout(set=0,binding=5) uniform sampler3D irradiance3;
 layout(set=0,binding=6) uniform sampler2D receiverAlbedo;
+layout(set=0,binding=7) uniform sampler2D previousSurfaceData;
 layout(set=0,binding=10) uniform GiScreenUniforms {
     mat4 inverseViewProjection;
     mat4 previousViewProjection;
     vec4 cameraWorld;
+    vec4 previousCameraWorld;
     vec4 currentWorldOrigin;
     vec4 previousWorldOrigin;
     vec4 minimumCellAndSize[4];
@@ -156,10 +158,11 @@ void main(){
     float weight=0.0;
     vec3 history=current;
     if(inside&&gi.temporal.y>0.5&&coverage>0.05){
-        vec4 previousSurface=texture(surfaceData,previousUv);
+        vec4 previousSurface=texture(previousSurfaceData,previousUv);
         vec3 previousNormal=decodeNormal(previousSurface.xy);
-        float depthTolerance=max(0.18,abs(surface.z)*0.018);
-        bool reject=abs(abs(previousSurface.z)-abs(surface.z))>depthTolerance||
+        float previousDistance=length(world-gi.previousCameraWorld.xyz);
+        float depthTolerance=max(0.18,previousDistance*0.018);
+        bool reject=abs(abs(previousSurface.z)-previousDistance)>depthTolerance||
             dot(normal,previousNormal)<0.82;
         if(!reject){
             history=texture(previousHistory,previousUv).rgb;
