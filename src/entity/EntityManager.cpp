@@ -434,7 +434,7 @@ void EntityManager::rebuildLogicalVillages() {
 }
 
 void EntityManager::spawnAroundPlayer(
-    const glm::dvec3& playerPosition, bool spawnHostile) {
+    const glm::dvec3& playerPosition, bool spawnHostile, bool underground) {
     const size_t mobCount = static_cast<size_t>(std::count_if(
         m_entities.begin(), m_entities.end(),
         [spawnHostile](const Entity& entity) {
@@ -444,19 +444,33 @@ void EntityManager::spawnAroundPlayer(
     if (mobCount >= (spawnHostile ? 24u : 16u)) return;
     const uint32_t random = hash32(++m_spawnSequence);
     const float angle = static_cast<float>(random % 6283) * 0.001f;
-    const float distance = 18.0f + static_cast<float>((random >> 16) % 14);
+    const float distance = 18.0f + static_cast<float>((random >> 16) % 15);
     const int x = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
     const int z = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
     int surface = -1;
-    for (int y = Config::WORLD_MAX_Y - 1; y >= Config::WORLD_MIN_Y; --y) {
+    const int scanTop = underground
+        ? std::min(Config::WORLD_MAX_Y - 2,
+                   static_cast<int>(std::floor(playerPosition.y)) + 7)
+        : Config::WORLD_MAX_Y - 1;
+    const int scanBottom = underground
+        ? std::max(Config::WORLD_MIN_Y,
+                   static_cast<int>(std::floor(playerPosition.y)) - 25)
+        : Config::WORLD_MIN_Y;
+    for (int y = scanTop; y >= scanBottom; --y) {
         if (isSolid(m_world.getBlock(x, y, z))) {
-            surface = y + 1;
-            break;
+            const int candidate = y + 1;
+            if (candidate + 1 < Config::WORLD_MAX_Y &&
+                m_world.getBlock(x, candidate, z) == BlockId::AIR &&
+                m_world.getBlock(x, candidate + 1, z) == BlockId::AIR) {
+                surface = candidate;
+                break;
+            }
         }
     }
     if (!Config::isValidWorldY(surface) || surface + 1 >= Config::WORLD_MAX_Y ||
         m_world.getBlock(x, surface, z) != BlockId::AIR ||
         m_world.getBlock(x, surface + 1, z) != BlockId::AIR) return;
+    if (underground && m_world.hasSkyAccess(x, surface, z)) return;
     if (spawnHostile && !hostileSpawnLightValid(m_world.getBlockLight(x, surface, z))) return;
     const EntityType passiveTypes[] = {
         EntityType::Cow, EntityType::Pig, EntityType::Sheep, EntityType::Chicken
@@ -466,7 +480,10 @@ void EntityManager::spawnAroundPlayer(
         EntityType::Blastling
     };
     EntityType type = spawnHostile
-        ? hostileTypes[random % 4] : passiveTypes[random % 4];
+        ? (underground ? caveHostileFor(
+              m_world.caveBiomeAt(x, surface, z), random)
+                       : hostileTypes[random % 4])
+        : passiveTypes[random % 4];
     if (type == EntityType::Zombie &&
         naturalZombieBecomesVillager(hash32(random ^ 0x5a17u)))
         type = EntityType::ZombieVillager;
@@ -583,8 +600,16 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
     if (m_naturalSpawningEnabled) {
         m_spawnTimer += dt;
         if (m_spawnTimer >= 4.0f) {
-            spawnAroundPlayer(
-                player.getPosition(), (!isDay || thunderstorm) && !peaceful);
+            const glm::dvec3 playerPosition = player.getPosition();
+            const int px = static_cast<int>(std::floor(playerPosition.x));
+            const int py = static_cast<int>(std::floor(playerPosition.y + 1.0));
+            const int pz = static_cast<int>(std::floor(playerPosition.z));
+            const bool underground = !m_world.hasSkyAccess(px, py, pz);
+            if (!underground || !peaceful)
+                spawnAroundPlayer(playerPosition,
+                    shouldAttemptHostileSpawn(underground, isDay,
+                                              thunderstorm, peaceful),
+                    underground);
             m_spawnTimer = 0.0f;
         }
     } else {

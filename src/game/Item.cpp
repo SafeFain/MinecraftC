@@ -292,6 +292,25 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, villagerBlocks[i].second});
     }
 
+    const std::array<std::pair<ItemId, BlockId>, 7> caveBlocks{{
+        {ItemId::DRIPSTONE_BLOCK, BlockId::DRIPSTONE_BLOCK},
+        {ItemId::POINTED_DRIPSTONE, BlockId::POINTED_DRIPSTONE_UP},
+        {ItemId::CALCITE, BlockId::CALCITE},
+        {ItemId::HANGING_ROOTS, BlockId::HANGING_ROOTS},
+        {ItemId::GLOW_FERN, BlockId::GLOW_FERN},
+        {ItemId::RESONANT_CRYSTAL, BlockId::RESONANT_CRYSTAL},
+        {ItemId::SULFUR_CRUST, BlockId::SULFUR_CRUST},
+    }};
+    const std::array<const char*, 7> caveBlockNames{{
+        "Dripstone Block", "Pointed Dripstone", "Calcite", "Hanging Roots",
+        "Glow Fern", "Resonant Crystal", "Sulfur Crust"
+    }};
+    for (size_t i = 0; i < caveBlocks.size(); ++i) {
+        set(caveBlocks[i].first,
+            {caveBlockNames[i], ItemKind::Block, 64, 0, ToolKind::None,
+             ToolTier::None, 0, 0, 0, 0, caveBlocks[i].second});
+    }
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -326,6 +345,8 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::SUNSTONE_SLAB: case ItemId::SUNSTONE_STAIRS:
         case ItemId::CLOUDSTONE_SLAB: case ItemId::CLOUDSTONE_STAIRS:
         case ItemId::EMERALD_ORE: case ItemId::DEEPSLATE_EMERALD_ORE:
+        case ItemId::DRIPSTONE_BLOCK: case ItemId::CALCITE:
+        case ItemId::SULFUR_CRUST:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -341,6 +362,8 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::OXEYE_DAISY: case ItemId::SUNFLOWER:
         case ItemId::SKYROOT_LEAVES: case ItemId::STARFLOWER:
         case ItemId::CLOUD_BLOOM: case ItemId::GLOWSHROOM:
+        case ItemId::POINTED_DRIPSTONE: case ItemId::HANGING_ROOTS:
+        case ItemId::GLOW_FERN: case ItemId::RESONANT_CRYSTAL:
             return CreativeItemCategory::Nature;
 
         // ── Functional Blocks ───────────────────────────────────────────
@@ -561,6 +584,15 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::STARFLOWER): return ItemId::STARFLOWER;
         case static_cast<uint16_t>(BlockId::CLOUD_BLOOM): return ItemId::CLOUD_BLOOM;
         case static_cast<uint16_t>(BlockId::GLOWSHROOM): return ItemId::GLOWSHROOM;
+        case static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK): return ItemId::DRIPSTONE_BLOCK;
+        case static_cast<uint16_t>(BlockId::POINTED_DRIPSTONE_UP):
+        case static_cast<uint16_t>(BlockId::POINTED_DRIPSTONE_DOWN):
+            return ItemId::POINTED_DRIPSTONE;
+        case static_cast<uint16_t>(BlockId::CALCITE): return ItemId::CALCITE;
+        case static_cast<uint16_t>(BlockId::HANGING_ROOTS): return ItemId::HANGING_ROOTS;
+        case static_cast<uint16_t>(BlockId::GLOW_FERN): return ItemId::GLOW_FERN;
+        case static_cast<uint16_t>(BlockId::RESONANT_CRYSTAL): return ItemId::RESONANT_CRYSTAL;
+        case static_cast<uint16_t>(BlockId::SULFUR_CRUST): return ItemId::SULFUR_CRUST;
         default: return ItemId::EMPTY;
     }
 }

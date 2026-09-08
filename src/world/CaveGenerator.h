@@ -3,9 +3,18 @@
 #include <cstdint>
 #include <vector>
 
-class Noise;
+#include "world/Noise.h"
+
+class Chunk;
 
 enum class CaveCell : uint8_t { Solid = 0, Air, Water, Lava };
+enum class CaveBiome : uint8_t {
+    Neutral = 0,
+    VerdantGrotto,
+    DripstoneKarst,
+    CrystalHollow,
+    VolcanicDepths
+};
 
 struct CaveColumnInfo {
     int surfaceY = 0;
@@ -25,10 +34,13 @@ public:
     bool contains(int worldX, int y, int worldZ) const;
     CaveCell get(int worldX, int y, int worldZ) const;
     void set(int worldX, int y, int worldZ, CaveCell cell);
+    CaveBiome biome(int worldX, int y, int worldZ) const;
+    void setBiome(int worldX, int y, int worldZ, CaveBiome biome);
 
 private:
     int m_minX = 0, m_minZ = 0, m_width = 0, m_depth = 0;
     std::vector<CaveCell> m_cells;
+    std::vector<CaveBiome> m_biomes;
     size_t index(int worldX, int y, int worldZ) const;
 };
 
@@ -41,12 +53,15 @@ public:
     // columns is row-major [z * width + x] and describes the same XZ bounds.
     CaveVolume generateVolume(int minX, int minZ, int width, int depth,
                               const std::vector<CaveColumnInfo>& columns) const;
+    CaveBiome biomeAt(int worldX, int y, int worldZ) const;
+    void decorateChunk(Chunk& chunk, const CaveVolume& volume) const;
 
 private:
     struct Segment { float ax, ay, az, bx, by, bz, radius, verticalScale; };
     struct Room { float x, y, z, radius, verticalScale; };
 
     const Noise& m_noise;
+    Noise m_biomeNoise;
     uint64_t m_seed;
 
     static uint64_t hashCell(int x, int z, uint64_t seed);

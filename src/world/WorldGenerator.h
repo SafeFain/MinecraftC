@@ -85,6 +85,11 @@ public:
     // ── Queries ──────────────────────────────────────────────────────────
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
+    CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const {
+        return isHeaven() || m_worldType == WorldType::Superflat
+            ? CaveBiome::Neutral
+            : m_caveGenerator.biomeAt(worldX, worldY, worldZ);
+    }
     SurfaceColumn sampleTerrainColumn(int worldX, int worldZ) const;
     std::vector<TreeGenerator::TreePlacement> sampleLodTrees(
         int worldOriginX, int worldOriginZ, int width, int depth) const;

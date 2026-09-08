@@ -83,7 +83,8 @@ public:
         FaceDir face = FaceDir::TOP;
         if(block==BlockId::WOOD||block==BlockId::BIRCH_WOOD||
            block==BlockId::SPRUCE_WOOD||block==BlockId::JUNGLE_WOOD||
-           block==BlockId::ACACIA_WOOD||getBlockProps(block).shape==RenderShape::Cross)
+           block==BlockId::ACACIA_WOOD||getBlockProps(block).shape==RenderShape::Cross||
+           getBlockProps(block).shape==RenderShape::CeilingCross)
             face=FaceDir::FRONT;
         const int tile=static_cast<int>(getFaceTextureIndex(block,face));
         const int side=m_blockAtlasTilesPerSide;const float s=static_cast<float>(side);

@@ -1,5 +1,10 @@
 #include "world/CaveGenerator.h"
 #include "world/Noise.h"
+#include "world/WorldGenContext.h"
+#ifndef MINECRAFTC_CAVEGEN_NO_DECORATOR
+#include "world/Chunk.h"
+#include "world/Block.h"
+#endif
 #include "Config.h"
 
 #include <algorithm>
@@ -13,7 +18,9 @@ constexpr float PI = 3.14159265358979323846f;
 CaveVolume::CaveVolume(int minX, int minZ, int width, int depth)
     : m_minX(minX), m_minZ(minZ), m_width(width), m_depth(depth),
       m_cells(static_cast<size_t>(width) * Config::WORLD_HEIGHT * depth,
-              CaveCell::Solid) {}
+              CaveCell::Solid),
+      m_biomes(static_cast<size_t>(width) * Config::WORLD_HEIGHT * depth,
+               CaveBiome::Neutral) {}
 
 size_t CaveVolume::index(int wx, int y, int wz) const {
     return (static_cast<size_t>(wz - m_minZ) * Config::WORLD_HEIGHT +
@@ -34,8 +41,42 @@ void CaveVolume::set(int wx, int y, int wz, CaveCell cell) {
     if (contains(wx, y, wz)) m_cells[index(wx, y, wz)] = cell;
 }
 
+CaveBiome CaveVolume::biome(int wx, int y, int wz) const {
+    return contains(wx, y, wz) ? m_biomes[index(wx, y, wz)]
+                               : CaveBiome::Neutral;
+}
+
+void CaveVolume::setBiome(int wx, int y, int wz, CaveBiome caveBiome) {
+    if (contains(wx, y, wz)) m_biomes[index(wx, y, wz)] = caveBiome;
+}
+
 CaveGenerator::CaveGenerator(const Noise& noise, uint64_t seed)
-    : m_noise(noise), m_seed(seed) {}
+    : m_noise(noise),
+      m_biomeNoise(WorldGenContext(seed).derive(0x434156455F42494FULL)),
+      m_seed(seed) {}
+
+CaveBiome CaveGenerator::biomeAt(int x, int y, int z) const {
+    if (!Config::isValidWorldY(y)) return CaveBiome::Neutral;
+    const float thermal = m_biomeNoise.octave3D(
+        x * 0.0075f + 1421.0f, y * 0.011f - 317.0f,
+        z * 0.0075f + 883.0f, 2);
+    const float crystal = m_biomeNoise.octave3D(
+        x * 0.0090f - 947.0f, y * 0.014f + 613.0f,
+        z * 0.0090f - 1291.0f, 2);
+    const float moisture = m_biomeNoise.octave3D(
+        x * 0.0065f + 271.0f, y * 0.010f + 1019.0f,
+        z * 0.0065f - 557.0f, 2);
+    const float karst = m_biomeNoise.octave3D(
+        x * 0.0080f - 1871.0f, y * 0.012f + 229.0f,
+        z * 0.0080f + 1543.0f, 2);
+
+    if (y <= -24 && thermal > 0.20f) return CaveBiome::VolcanicDepths;
+    if (y <= 32 && crystal > 0.38f) return CaveBiome::CrystalHollow;
+    if (y >= -16 && moisture > 0.24f) return CaveBiome::VerdantGrotto;
+    if (y >= -32 && y <= 112 && karst > -0.04f)
+        return CaveBiome::DripstoneKarst;
+    return CaveBiome::Neutral;
+}
 
 uint64_t CaveGenerator::hashCell(int x, int z, uint64_t seed) {
     uint64_t h = static_cast<uint64_t>(static_cast<int64_t>(x)) * 0x9E3779B97F4A7C15ULL;
@@ -126,10 +167,21 @@ void CaveGenerator::generateCarverCell(int cellX, int cellZ,
     float z = cellZ * Config::CAVE_CARVER_CELL_SIZE + randomRange(state, 0.0f, static_cast<float>(Config::CAVE_CARVER_CELL_SIZE));
     float y = -52.0f + std::min(random01(state), random01(state)) * 180.0f;
     bool hasRoom = random01(state) < 0.25f;
+    const bool cathedral = hasRoom && random01(state) < 0.18f;
+    const bool verticalRift = random01(state) < 0.12f;
     int trunks = hasRoom ? 1 + static_cast<int>(next64(state) % 4) : 1;
     float baseRadius = randomRange(state, 1.8f, 4.2f);
-    if (hasRoom) rooms.push_back({x, y, z, randomRange(state, 4.0f, 8.0f),
-                                  randomRange(state, 0.55f, 0.78f)});
+    if (hasRoom) rooms.push_back({x, y, z,
+        cathedral ? randomRange(state, 10.0f, 18.0f)
+                  : randomRange(state, 4.0f, 8.0f),
+        cathedral ? randomRange(state, 0.72f, 1.18f)
+                  : randomRange(state, 0.55f, 0.78f)});
+    if (verticalRift)
+        rooms.push_back({x + randomRange(state, -8.0f, 8.0f),
+                         std::clamp(y, -34.0f, 126.0f),
+                         z + randomRange(state, -8.0f, 8.0f),
+                         randomRange(state, 4.5f, 7.5f),
+                         randomRange(state, 1.8f, 2.7f)});
     for (int i = 0; i < trunks; ++i) {
         float yaw = randomRange(state, -PI, PI);
         float pitch = randomRange(state, -0.18f, 0.18f);
@@ -200,5 +252,108 @@ CaveVolume CaveGenerator::generateVolume(int minX, int minZ, int width, int dept
     for(int cz=cz0;cz<=cz1;++cz) for(int cx=cx0;cx<=cx1;++cx) generateCarverCell(cx,cz,segments,rooms);
     for(const auto& room:rooms) rasterizeRoom(room,volume,columns);
     for(const auto& segment:segments) rasterizeSegment(segment,volume,columns);
+    for (int z = minZ; z < minZ + depth; ++z)
+        for (int x = minX; x < minX + width; ++x)
+            for (int y = Config::CAVE_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
+                if (volume.get(x, y, z) != CaveCell::Solid)
+                    volume.setBiome(x, y, z, biomeAt(x, y, z));
     return volume;
 }
+
+#ifndef MINECRAFTC_CAVEGEN_NO_DECORATOR
+void CaveGenerator::decorateChunk(Chunk& chunk, const CaveVolume& volume) const {
+    const auto rock = [](BlockId id) {
+        return id == BlockId::STONE || id == BlockId::DEEPSLATE ||
+               id == BlockId::GRANITE || id == BlockId::TUFF ||
+               id == BlockId::LIMESTONE || id == BlockId::BASALT;
+    };
+    const auto chooseSurface = [](CaveBiome biome, uint64_t hash) {
+        switch (biome) {
+            case CaveBiome::VerdantGrotto:
+                return hash % 10u < 7u ? BlockId::MOSS
+                     : hash % 2u == 0u ? BlockId::CLAY : BlockId::MUD;
+            case CaveBiome::DripstoneKarst:
+                return hash % 10u < 6u ? BlockId::DRIPSTONE_BLOCK
+                                       : BlockId::LIMESTONE;
+            case CaveBiome::CrystalHollow:
+                return hash % 10u < 7u ? BlockId::CALCITE : BlockId::TUFF;
+            case CaveBiome::VolcanicDepths:
+                return hash % 20u == 0u ? BlockId::OBSIDIAN
+                     : hash % 10u < 5u ? BlockId::BASALT
+                     : hash % 10u < 8u ? BlockId::TUFF
+                                       : BlockId::SULFUR_CRUST;
+            case CaveBiome::Neutral: return BlockId::AIR;
+        }
+        return BlockId::AIR;
+    };
+
+    const int baseX = chunk.worldX();
+    const int baseZ = chunk.worldZ();
+    for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+        for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+            const int wx = baseX + x;
+            const int wz = baseZ + z;
+            int y = Config::CAVE_MIN_Y;
+            while (y < Config::WORLD_MAX_Y - 1) {
+                if (volume.get(wx, y, wz) == CaveCell::Solid) { ++y; continue; }
+                const int runBottom = y;
+                bool dry = true;
+                while (y < Config::WORLD_MAX_Y - 1 &&
+                       volume.get(wx, y, wz) != CaveCell::Solid) {
+                    dry = dry && volume.get(wx, y, wz) == CaveCell::Air;
+                    ++y;
+                }
+                const int runTop = y - 1;
+                const int clearance = runTop - runBottom + 1;
+                if (!dry || clearance < 1 || runBottom <= Config::WORLD_MIN_Y ||
+                    runTop + 1 >= Config::WORLD_MAX_Y) continue;
+                const int sampleY = runBottom + clearance / 2;
+                const CaveBiome caveBiome = volume.biome(wx, sampleY, wz);
+                if (caveBiome == CaveBiome::Neutral) continue;
+                const uint64_t hash = WorldGenContext::hashPosition(
+                    m_seed ^ 0x434156455F444543ULL, wx, runBottom, wz);
+                const BlockId surface = chooseSurface(caveBiome, hash);
+                if (surface != BlockId::AIR) {
+                    if (rock(chunk.getBlock(x, runBottom - 1, z)))
+                        chunk.setBlock(x, runBottom - 1, z, surface);
+                    if (rock(chunk.getBlock(x, runTop + 1, z)))
+                        chunk.setBlock(x, runTop + 1, z, surface);
+                }
+
+                bool clear = true;
+                for (int fy = runBottom; fy <= runTop; ++fy)
+                    clear = clear && chunk.getBlock(x, fy, z) == BlockId::AIR;
+                if (!clear) continue;
+
+                if (caveBiome == CaveBiome::VerdantGrotto) {
+                    if (clearance >= 2 && (hash >> 8) % 100u < 22u)
+                        chunk.setBlock(x, runBottom, z, BlockId::GLOW_FERN);
+                    if (clearance >= 2 && (hash >> 16) % 100u < 16u)
+                        chunk.setBlock(x, runTop, z, BlockId::HANGING_ROOTS);
+                } else if (caveBiome == CaveBiome::DripstoneKarst) {
+                    const bool column = clearance <= 6 && (hash >> 24) % 100u < 8u;
+                    if (column) {
+                        for (int fy = runBottom; fy <= runTop; ++fy)
+                            chunk.setBlock(x, fy, z, BlockId::DRIPSTONE_BLOCK);
+                    } else {
+                        int up = (hash >> 12) % 100u < 24u
+                            ? std::min(clearance, 1 + static_cast<int>((hash >> 32) % 6u)) : 0;
+                        int down = (hash >> 20) % 100u < 24u
+                            ? std::min(clearance - up,
+                                1 + static_cast<int>((hash >> 40) % 6u)) : 0;
+                        for (int i = 0; i < up; ++i)
+                            chunk.setBlock(x, runBottom + i, z,
+                                           BlockId::POINTED_DRIPSTONE_UP);
+                        for (int i = 0; i < down; ++i)
+                            chunk.setBlock(x, runTop - i, z,
+                                           BlockId::POINTED_DRIPSTONE_DOWN);
+                    }
+                } else if (caveBiome == CaveBiome::CrystalHollow &&
+                           clearance >= 2 && (hash >> 18) % 100u < 14u) {
+                    chunk.setBlock(x, runBottom, z, BlockId::RESONANT_CRYSTAL);
+                }
+            }
+        }
+    }
+}
+#endif

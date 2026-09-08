@@ -607,6 +607,22 @@ int main() {
         regionGenerator.generateRegion(originCX, originCZ, 3,
                                        Config::REGION_PADDING, regionChunks,
                                        regionPending);
+        std::vector<CaveColumnInfo> caveColumns(48 * 48);
+        const int caveOriginX = originCX * Config::CHUNK_SIZE_X;
+        const int caveOriginZ = originCZ * Config::CHUNK_SIZE_Z;
+        for (int z = 0; z < 48; ++z) {
+            for (int x = 0; x < 48; ++x) {
+                const SurfaceColumn column =
+                    regionWorld.sampleTerrainColumn(caveOriginX + x,
+                                                    caveOriginZ + z);
+                caveColumns[static_cast<size_t>(z) * 48 + x] = {
+                    column.height, column.waterLevel,
+                    column.river || column.height < column.waterLevel};
+            }
+        }
+        const CaveVolume unmodifiedCaves =
+            regionWorld.getCaveGenerator().generateVolume(
+                caveOriginX, caveOriginZ, 48, 48, caveColumns);
 
         WorldGenerator singletonWorld(equivalenceSeed);
         std::vector<std::unique_ptr<Chunk>> singletonOwned;
@@ -654,11 +670,14 @@ int main() {
                 chunk.setBlock(lx, block.worldY, lz, block.id);
             }
         }
+        size_t caveDecorationCount = 0;
+        size_t preservedOreCount = 0;
         for (size_t i = 0; i < regionChunks.size(); ++i) {
             for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
                 for (int z = 0; z < 16; ++z) {
                     for (int x = 0; x < 16; ++x) {
-                        if (regionChunks[i]->getBlock(x, y, z) !=
+                        const BlockId block = regionChunks[i]->getBlock(x, y, z);
+                        if (block !=
                             singletonOwned[i]->getBlock(x, y, z)) {
                             std::cerr << "mismatch seed=" << equivalenceSeed
                                       << " chunk=" << i << " x=" << x
@@ -668,10 +687,48 @@ int main() {
                                       << '\n';
                             require(false, "region and singleton full block output differ");
                         }
+                        const uint8_t raw = static_cast<uint8_t>(block);
+                        if (raw >= static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) &&
+                            raw <= static_cast<uint8_t>(BlockId::SULFUR_CRUST)) {
+                            ++caveDecorationCount;
+                            require(y > Config::WORLD_MIN_Y,
+                                    "cave decoration overwrote the bedrock floor");
+                        }
+                        if (block == BlockId::COAL_ORE ||
+                            block == BlockId::IRON_ORE ||
+                            block == BlockId::GOLD_ORE ||
+                            block == BlockId::DIAMOND_ORE ||
+                            block == BlockId::EMERALD_ORE ||
+                            block == BlockId::DEEPSLATE_EMERALD_ORE)
+                            ++preservedOreCount;
+                        const bool caveFeature =
+                            block == BlockId::POINTED_DRIPSTONE_UP ||
+                            block == BlockId::POINTED_DRIPSTONE_DOWN ||
+                            block == BlockId::HANGING_ROOTS ||
+                            block == BlockId::GLOW_FERN ||
+                            block == BlockId::RESONANT_CRYSTAL;
+                        if (!caveFeature) continue;
+                        const int wx = regionChunks[i]->worldX() + x;
+                        const int wz = regionChunks[i]->worldZ() + z;
+                        require(unmodifiedCaves.get(wx, y, wz) == CaveCell::Air,
+                                "cave feature replaced an aquifer or lava cell");
+                        if (block == BlockId::POINTED_DRIPSTONE_UP ||
+                            block == BlockId::GLOW_FERN ||
+                            block == BlockId::RESONANT_CRYSTAL)
+                            require(isSolid(regionChunks[i]->getBlock(x, y - 1, z)),
+                                    "floor cave feature lacks solid support");
+                        if (block == BlockId::POINTED_DRIPSTONE_DOWN ||
+                            block == BlockId::HANGING_ROOTS)
+                            require(isSolid(regionChunks[i]->getBlock(x, y + 1, z)),
+                                    "ceiling cave feature lacks solid support");
                     }
                 }
             }
         }
+        require(caveDecorationCount > 0,
+                "full generation sample contained no v14 cave decoration");
+        require(preservedOreCount > 0,
+                "cave decoration phase removed every ore from the sample");
     };
     verifyFullEquivalence(seed, 0, 0);
 

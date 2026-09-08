@@ -37,7 +37,9 @@ int main() {
     require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
             static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
             static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 175 &&
+            static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
+            static_cast<uint8_t>(BlockId::SULFUR_CRUST) == 182 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 183 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -82,7 +84,7 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::ZOMBIE_VILLAGER_SPAWN_EGG,
+            creativeItems.back() == ItemId::SULFUR_CRUST,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -103,9 +105,9 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 52 &&
+                CreativeItemCategory::BuildingBlocks)] == 55 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 27 &&
+                CreativeItemCategory::Nature)] == 31 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(
@@ -163,6 +165,26 @@ int main() {
                 getLightEmission(BlockId::CLOUD_BLOOM) == 4 &&
                 getLightEmission(BlockId::GLOWSHROOM) == 6,
             "Heaven materials lack inventory, atlas, or light mappings");
+    require(static_cast<uint16_t>(ItemId::DRIPSTONE_BLOCK) == 175 &&
+                static_cast<uint16_t>(ItemId::SULFUR_CRUST) == 181 &&
+                itemForBlock(BlockId::POINTED_DRIPSTONE_UP) ==
+                    ItemId::POINTED_DRIPSTONE &&
+                itemForBlock(BlockId::POINTED_DRIPSTONE_DOWN) ==
+                    ItemId::POINTED_DRIPSTONE &&
+                getBlockProps(BlockId::POINTED_DRIPSTONE_UP).shape ==
+                    RenderShape::Spike &&
+                getBlockProps(BlockId::HANGING_ROOTS).shape ==
+                    RenderShape::CeilingCross &&
+                getLightEmission(BlockId::GLOW_FERN) == 4 &&
+                getLightEmission(BlockId::RESONANT_CRYSTAL) == 8 &&
+                blockCollisionBoxes(BlockId::POINTED_DRIPSTONE_UP).count == 1 &&
+                blockCollisionBoxes(BlockId::HANGING_ROOTS).count == 0 &&
+                pointedDripstoneForPlacementFace(1) ==
+                    BlockId::POINTED_DRIPSTONE_UP &&
+                pointedDripstoneForPlacementFace(-1) ==
+                    BlockId::POINTED_DRIPSTONE_DOWN &&
+                pointedDripstoneForPlacementFace(0) == BlockId::AIR,
+            "v14 cave blocks lack stable ids, mappings, shapes, or light");
     for (uint8_t material=0;
          material<static_cast<uint8_t>(ArchitecturalMaterial::Count);++material) {
         for (BlockHalf half : {BlockHalf::Bottom,BlockHalf::Top}) {

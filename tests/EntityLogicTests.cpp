@@ -66,6 +66,24 @@ int main() {
     require(hostileSpawnLightValid(0), "darkness permits hostile spawning");
     require(!hostileSpawnLightValid(1) && !hostileSpawnLightValid(14),
             "any block light prevents hostile spawning");
+    require(shouldAttemptHostileSpawn(true, true, false, false) &&
+                !shouldAttemptHostileSpawn(false, true, false, false) &&
+                shouldAttemptHostileSpawn(false, false, false, false) &&
+                shouldAttemptHostileSpawn(false, true, true, false) &&
+                !shouldAttemptHostileSpawn(true, false, true, true),
+            "underground, daylight, thunder, or peaceful spawn gates failed");
+    require(caveHostileFor(CaveBiome::VerdantGrotto, 0) == EntityType::Spider &&
+                caveHostileFor(CaveBiome::DripstoneKarst, 0) ==
+                    EntityType::Skeleton &&
+                caveHostileFor(CaveBiome::CrystalHollow, 0) ==
+                    EntityType::Zombie &&
+                caveHostileFor(CaveBiome::VolcanicDepths, 0) ==
+                    EntityType::Blastling &&
+                caveHostileFor(CaveBiome::VerdantGrotto, 99) ==
+                    EntityType::Blastling &&
+                caveHostileFor(CaveBiome::VolcanicDepths, 99) ==
+                    EntityType::Spider,
+            "cave-biome hostile weighting changed unexpectedly");
     require(shouldHostileDespawn(129.0f, 0.0f, 1),
             "hostiles beyond the hard radius despawn immediately");
     require(!shouldHostileDespawn(31.0f, 100.0f, 0),

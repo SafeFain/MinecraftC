@@ -206,7 +206,8 @@ private:
     std::vector<LogicalVillage> m_logicalVillages;
     float m_villageRefreshSeconds = 0.0f;
 
-    void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile);
+    void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile,
+                           bool underground);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
     void integrateVelocity(Entity& entity, float dt);
     bool collides(const Entity& entity, const glm::dvec3& position) const;

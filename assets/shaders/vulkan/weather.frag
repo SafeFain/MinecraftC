@@ -110,11 +110,24 @@ void main(){
         float mote=1.0-smoothstep(0.08,0.48,length(centered*vec2(1.4)));
         float shimmer=0.78+0.22*sin(frame.cameraUpIntensity.w*2.1+phase*6.283);
         color=vec4(1.0,0.88,0.58,mote*shimmer*0.34);
-    }else{
+    }else if(kind<12.5){
         vec2 centered=uv-vec2(0.5);
         float glow=1.0-smoothstep(0.04,0.52,length(centered*2.0));
         float pulse=0.55+0.45*sin(frame.cameraUpIntensity.w*3.2+phase*6.283);
         color=vec4(0.72,1.0,0.30,glow*pulse*0.70);
+    }else if(kind<13.5){
+        vec2 centered=uv-vec2(0.5);
+        float spore=1.0-smoothstep(0.08,0.48,length(centered*1.8));
+        color=vec4(0.38,0.92,0.58,spore*0.42);
+    }else if(kind<14.5){
+        vec2 centered=uv-vec2(0.5);
+        float dust=1.0-smoothstep(0.06,0.42,length(centered*1.6));
+        color=vec4(0.74,0.78,0.82,dust*0.30);
+    }else{
+        vec2 centered=uv-vec2(0.5);
+        float ember=1.0-smoothstep(0.03,0.46,length(centered*2.0));
+        float pulse=0.65+0.35*sin(frame.cameraUpIntensity.w*5.0+phase*6.283);
+        color=vec4(1.0,0.42,0.08,ember*pulse*0.74);
     }
     if(color.a<0.01)discard;
     if(frame.atlasParams.y>0.5)

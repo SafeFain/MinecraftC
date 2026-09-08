@@ -199,6 +199,28 @@ int main() {
                                        true, true, 1.0f, 0.0f, 0.0f) ==
                     OverworldAmbientKind::None,
             "Overworld ambient dimension, shelter, weather, twilight, or quality gate failed");
+    require(selectCaveAmbient(DimensionId::Overworld,
+                              CaveBiome::VerdantGrotto, true, 4.0f) ==
+                CaveAmbientKind::Spore &&
+                selectCaveAmbient(DimensionId::Overworld,
+                                  CaveBiome::DripstoneKarst, true, 4.0f) ==
+                    CaveAmbientKind::Dust &&
+                selectCaveAmbient(DimensionId::Overworld,
+                                  CaveBiome::CrystalHollow, true, 4.0f) ==
+                    CaveAmbientKind::Dust &&
+                selectCaveAmbient(DimensionId::Overworld,
+                                  CaveBiome::VolcanicDepths, true, 4.0f) ==
+                    CaveAmbientKind::Ember &&
+                selectCaveAmbient(DimensionId::Heaven,
+                                  CaveBiome::VerdantGrotto, true, 4.0f) ==
+                    CaveAmbientKind::None &&
+                selectCaveAmbient(DimensionId::Overworld,
+                                  CaveBiome::VerdantGrotto, false, 4.0f) ==
+                    CaveAmbientKind::None &&
+                selectCaveAmbient(DimensionId::Overworld,
+                                  CaveBiome::VerdantGrotto, true, 0.0f) ==
+                    CaveAmbientKind::None,
+            "cave ambient biome, dimension, shelter, or quality gate failed");
     const CloudView heavenCloudView = cloudView(
         {0.0, 128.0, 0.0}, 0.0f, 128, CloudLayerStyle::Heaven);
     require(buildCloudInstances(17, 0, 0, 2, CloudLayerStyle::Heaven).empty() &&
@@ -216,6 +238,10 @@ int main() {
     static_assert(static_cast<int>(ParticleKind::OverworldMote) == 11 &&
                       static_cast<int>(ParticleKind::Firefly) == 12,
                   "Overworld ambient kinds must match the weather shader branches");
+    static_assert(static_cast<int>(ParticleKind::CaveSpore) == 13 &&
+                      static_cast<int>(ParticleKind::CaveDust) == 14 &&
+                      static_cast<int>(ParticleKind::CaveEmber) == 15,
+                  "cave ambient kinds must match the weather shader branches");
     static_assert(ParticleSystem::MAX_SKY_MOTES_PER_UPDATE == 8 &&
                       ParticleSystem::MAX_POLLEN_PER_UPDATE == 4 &&
                       ParticleSystem::MAX_SPARKLE_PER_UPDATE == 6 &&

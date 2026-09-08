@@ -295,6 +295,8 @@
   "item.166": "Composteira", "item.167": "Mesa de flechas", "item.168": "Tear", "item.169": "Caldeirão",
   "item.170": "Alto-forno", "item.171": "Bancada de ferraria", "item.172": "Rebolo",
   "item.173": "Ovo gerador de aldeão", "item.174": "Ovo gerador de aldeão zumbi",
+  "item.175": "Bloco de espeleotema", "item.176": "Espeleotema pontiagudo", "item.177": "Calcita",
+  "item.178": "Raízes suspensas", "item.179": "Samambaia luminosa", "item.180": "Cristal ressonante", "item.181": "Crosta de enxofre",
   "entity.villager": "Aldeão", "entity.zombie_villager": "Aldeão zumbi", "trade.title": "NEGOCIAÇÃO",
   "message.autosave_log": "Falha no salvamento automático; veja minecraftc.log",
   "message.autosave_retry": "Falha no salvamento automático; será tentado novamente",

@@ -7,6 +7,7 @@
 
 #include "game/Item.h"
 #include "game/GameRules.h"
+#include "world/CaveGenerator.h"
 
 enum class EntityType : uint8_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
@@ -82,6 +83,31 @@ inline float advanceDeathPresentation(float elapsed, float dt) {
 }
 
 inline bool hostileSpawnLightValid(uint8_t blockLight) { return blockLight == 0; }
+inline bool shouldAttemptHostileSpawn(bool underground, bool isDay,
+                                      bool thunderstorm, bool peaceful) {
+    return !peaceful && (underground || !isDay || thunderstorm);
+}
+inline EntityType caveHostileFor(CaveBiome biome, uint32_t roll) {
+    const uint32_t value = roll % 100u;
+    switch (biome) {
+        case CaveBiome::VerdantGrotto:
+            return value < 45 ? EntityType::Spider : value < 70 ? EntityType::Zombie
+                 : value < 90 ? EntityType::Skeleton : EntityType::Blastling;
+        case CaveBiome::DripstoneKarst:
+            return value < 40 ? EntityType::Skeleton : value < 65 ? EntityType::Spider
+                 : value < 90 ? EntityType::Zombie : EntityType::Blastling;
+        case CaveBiome::CrystalHollow:
+            return value < 35 ? EntityType::Zombie : value < 65 ? EntityType::Skeleton
+                 : value < 85 ? EntityType::Spider : EntityType::Blastling;
+        case CaveBiome::VolcanicDepths:
+            return value < 45 ? EntityType::Blastling : value < 70 ? EntityType::Skeleton
+                 : value < 90 ? EntityType::Zombie : EntityType::Spider;
+        case CaveBiome::Neutral:
+            return value < 25 ? EntityType::Zombie : value < 50 ? EntityType::Skeleton
+                 : value < 75 ? EntityType::Spider : EntityType::Blastling;
+    }
+    return EntityType::Zombie;
+}
 inline bool shouldHostileDespawn(float distance, float simulatedAge, uint32_t roll) {
     return distance > 128.0f ||
         (distance > 32.0f && simulatedAge > 30.0f && roll % 600 == 0);

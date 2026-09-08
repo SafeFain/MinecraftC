@@ -226,6 +226,10 @@ Biome World::biomeAt(int worldX, int worldZ) const {
     return m_generator.queryHeightBiome(worldX, worldZ).biome;
 }
 
+CaveBiome World::caveBiomeAt(int worldX, int worldY, int worldZ) const {
+    return m_generator.caveBiomeAt(worldX, worldY, worldZ);
+}
+
 int World::heavenBiomePaletteIndex(int worldX, int worldZ) const {
     if (!m_generator.isHeaven()) return 0;
     return static_cast<int>(m_generator.heavenBiomeAt(worldX, worldZ));
@@ -491,7 +495,8 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
                 hasPreciseHit = true;
                 return true;
             }
-            return props.shape == RenderShape::Cross;
+            return props.shape == RenderShape::Cross ||
+                   props.shape == RenderShape::CeilingCross;
         });
     if (!hit) return std::nullopt;
     const double distance = hasPreciseHit ? preciseDistance : hit->distance;

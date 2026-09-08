@@ -24,7 +24,10 @@ void ParticleSystem::setEnhancedVisuals(bool enabled, VisualQuality quality) {
     m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
         [](const Particle& particle) {
             return particle.kind == ParticleKind::OverworldMote ||
-                   particle.kind == ParticleKind::Firefly;
+                   particle.kind == ParticleKind::Firefly ||
+                   particle.kind == ParticleKind::CaveSpore ||
+                   particle.kind == ParticleKind::CaveDust ||
+                   particle.kind == ParticleKind::CaveEmber;
         }), m_particles.end());
 }
 
@@ -36,7 +39,10 @@ void ParticleSystem::setEnhancedVisuals(
     m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(),
         [](const Particle& particle) {
             return particle.kind == ParticleKind::OverworldMote ||
-                   particle.kind == ParticleKind::Firefly;
+                   particle.kind == ParticleKind::Firefly ||
+                   particle.kind == ParticleKind::CaveSpore ||
+                   particle.kind == ParticleKind::CaveDust ||
+                   particle.kind == ParticleKind::CaveEmber;
         }), m_particles.end());
 }
 
@@ -198,6 +204,37 @@ void ParticleSystem::emitOverworldAmbient(
     m_particles.push_back(particle);
 }
 
+void ParticleSystem::emitCaveAmbient(
+    World& world, const glm::dvec3& viewer, uint64_t seed,
+    CaveAmbientKind ambient) {
+    m_randomState ^= seed + 0x7A1B4C9D2E6F8031ULL;
+    Particle particle;
+    particle.kind = ambient == CaveAmbientKind::Spore ? ParticleKind::CaveSpore
+                  : ambient == CaveAmbientKind::Ember ? ParticleKind::CaveEmber
+                                                      : ParticleKind::CaveDust;
+    particle.position = {
+        viewer.x + (randomFloat() * 2.0 - 1.0) * 10.0,
+        viewer.y + (randomFloat() * 2.0 - 0.6) * 6.0,
+        viewer.z + (randomFloat() * 2.0 - 1.0) * 10.0};
+    const int x = static_cast<int>(std::floor(particle.position.x));
+    const int y = static_cast<int>(std::floor(particle.position.y));
+    const int z = static_cast<int>(std::floor(particle.position.z));
+    if (!Config::isValidWorldY(y) || world.getBlock(x, y, z) != BlockId::AIR ||
+        world.hasSkyAccess(x, y, z)) return;
+    const float lift = ambient == CaveAmbientKind::Ember ? 0.16f : 0.035f;
+    particle.velocity = {(randomFloat() - 0.5f) * 0.09f,
+                         lift + (randomFloat() - 0.5f) * 0.05f,
+                         (randomFloat() - 0.5f) * 0.09f};
+    particle.lifetime = 3.5f + randomFloat() * 3.5f;
+    particle.phase = randomFloat();
+    particle.size = ambient == CaveAmbientKind::Dust
+        ? 0.07f + randomFloat() * 0.07f
+        : 0.10f + randomFloat() * 0.08f;
+    particle.rotation = randomFloat() * 6.2831853f;
+    particle.angularVelocity = (randomFloat() - 0.5f) * 0.7f;
+    m_particles.push_back(particle);
+}
+
 void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                             float rainIntensity, uint64_t seed,
                             DimensionId dimension, float daylight) {
@@ -295,6 +332,24 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
                     world, viewer, seed + static_cast<uint64_t>(i) * 59u,
                     ambientKind == OverworldAmbientKind::Firefly);
         } else {
+            const CaveAmbientKind caveAmbient = selectCaveAmbient(
+                dimension, world.caveBiomeAt(viewerX, viewerY, viewerZ),
+                !outdoors, m_enhancedVisual.ambientParticlesPerSecond);
+            if (caveAmbient != CaveAmbientKind::None) {
+                m_overworldAmbientEmission += dt *
+                    m_enhancedVisual.ambientParticlesPerSecond * 0.65f;
+                const int count = std::min(
+                    3, static_cast<int>(m_overworldAmbientEmission));
+                m_overworldAmbientEmission -= static_cast<float>(count);
+                for (int i = 0; i < count && m_particles.size() < MAX_PARTICLES;
+                     ++i)
+                    emitCaveAmbient(world, viewer,
+                        seed + static_cast<uint64_t>(i) * 71u, caveAmbient);
+            } else {
+                m_overworldAmbientEmission = 0.0f;
+            }
+        }
+        if (ambientKind == OverworldAmbientKind::None && outdoors) {
             m_overworldAmbientEmission = 0.0f;
             m_particles.erase(std::remove_if(
                 m_particles.begin(), m_particles.end(),
@@ -358,8 +413,11 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         if (particle.kind == ParticleKind::SkyMote ||
             particle.kind == ParticleKind::HeavenPollen ||
             particle.kind == ParticleKind::HeavenSparkle ||
-            particle.kind == ParticleKind::OverworldMote ||
-            particle.kind == ParticleKind::Firefly ||
+                   particle.kind == ParticleKind::OverworldMote ||
+                   particle.kind == ParticleKind::Firefly ||
+                   particle.kind == ParticleKind::CaveSpore ||
+                   particle.kind == ParticleKind::CaveDust ||
+                   particle.kind == ParticleKind::CaveEmber ||
             particle.kind == ParticleKind::CriticalHit ||
             particle.kind == ParticleKind::SweepAttack) {
             particle.position += glm::dvec3(particle.velocity) * static_cast<double>(dt);

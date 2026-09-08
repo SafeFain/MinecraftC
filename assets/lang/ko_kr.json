@@ -295,6 +295,8 @@
   "item.166": "퇴비통", "item.167": "화살 작업대", "item.168": "베틀", "item.169": "가마솥",
   "item.170": "용광로", "item.171": "대장장이 작업대", "item.172": "숫돌",
   "item.173": "주민 생성 알", "item.174": "좀비 주민 생성 알",
+  "item.175": "종유석 블록", "item.176": "뾰족한 종유석", "item.177": "방해석",
+  "item.178": "늘어진 뿌리", "item.179": "빛나는 양치식물", "item.180": "공명 수정", "item.181": "유황 껍질",
   "entity.villager": "주민", "entity.zombie_villager": "좀비 주민", "trade.title": "거래",
   "message.autosave_log": "자동 저장 실패; minecraftc.log 참고",
   "message.autosave_retry": "자동 저장 실패; 다시 시도합니다",

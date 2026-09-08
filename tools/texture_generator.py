@@ -79,6 +79,8 @@ NAMES = [
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
     "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "dripstone_block", "pointed_dripstone", "calcite", "hanging_roots",
+    "glow_fern", "resonant_crystal", "sulfur_crust",
     "emerald_ore", "deepslate_emerald_ore", "composter", "fletching_table",
     "loom", "cauldron", "blast_furnace", "smithing_table", "grindstone",
     "copper_ore",
@@ -205,12 +207,17 @@ EXTRA_BASES = {
     "skyroot_log_top":(171,132,76), "skyroot_leaves":(90,164,82),
     "star_crystal":(65,184,222), "starflower":(150,117,226),
     "cloud_bloom":(235,240,250), "glowshroom":(128,224,199),
+    "dripstone_block":(123,87,59), "pointed_dripstone":(134,96,66),
+    "calcite":(210,209,194), "hanging_roots":(101,72,43),
+    "glow_fern":(75,190,133), "resonant_crystal":(80,177,226),
+    "sulfur_crust":(199,177,46),
 }
 TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle",
                "wheat_mature","oak_sapling","birch_sapling","spruce_sapling",
                "jungle_sapling","acacia_sapling","fire","glass","dandelion",
                "blue_orchid","allium","oxeye_daisy","sunflower_bottom",
-               "sunflower_top", "starflower", "cloud_bloom", "glowshroom"}
+               "sunflower_top", "starflower", "cloud_bloom", "glowshroom",
+               "hanging_roots", "glow_fern", "resonant_crystal"}
 
 def _srgb_to_linear(value):
     value = value / 255.0
@@ -382,7 +389,8 @@ NATURAL = {"dirt","grass_top","stone","sand","bedrock","deepslate","gravel","cla
            "cloud","limestone","basalt","tuff","coarse_dirt","mud",
            "packed_ice","black_sand","granite", "aether_grass_top",
            "aether_soil", "cloudstone", "sunstone",
-           "skyroot_log", "star_crystal"}
+           "skyroot_log", "star_crystal", "dripstone_block",
+           "pointed_dripstone", "calcite", "sulfur_crust"}
 DIRECTIONAL = {"oak_planks","oak_log","birch_log","spruce_log","jungle_log","acacia_log",
                "skyroot_log",
                "farmland","wet_farmland","cactus_side","reeds",
@@ -619,7 +627,8 @@ def generate_generic(name,seed):
     if name in {"dirt","podzol_top","coarse_dirt","mud","aether_soil"}: return generate_dirt(name,seed)
     if name in {"grass_top","moss","aether_grass_top"}: return generate_grass(seed^sample(seed,name,0,0))
     if name in {"stone","bedrock","deepslate","clay","terracotta","cobblestone",
-                "limestone","basalt","tuff","granite","gravel","cloudstone"}: return generate_stone(name,seed)
+                "limestone","basalt","tuff","granite","gravel","cloudstone",
+                "dripstone_block","pointed_dripstone","calcite","sulfur_crust"}: return generate_stone(name,seed)
     if name in {"sand","red_sand","black_sand","snow","snow_layer","packed_ice"}: return generate_sand(name,seed)
     if name.endswith("_ore"): return generate_ore(name,seed)
     if name in LEAF_NAMES: return generate_leaves(name,seed)
@@ -633,7 +642,8 @@ def generate_generic(name,seed):
 PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","wheat_mature",
         "oak_sapling","birch_sapling","spruce_sapling","jungle_sapling","acacia_sapling",
         "dandelion","blue_orchid","allium","oxeye_daisy","sunflower_bottom","sunflower_top",
-        "starflower","cloud_bloom","glowshroom"}
+        "starflower","cloud_bloom","glowshroom","hanging_roots",
+        "glow_fern","resonant_crystal"}
 
 def generate_special(name,seed,indices):
     if name in {"grass_side", "aether_grass_side"}:
@@ -836,7 +846,8 @@ def generate_plant_texture(name,seed):
                 for x,y in grow_blob(seed,name,(cx,cy),12,cy): image[y*16+x]=palette[2+(y>cy)]
             line(8,5,5,8,1); line(8,6,11,9,1)
     elif name in {"flower","dandelion","blue_orchid","allium","oxeye_daisy",
-                   "starflower","cloud_bloom","sunflower_top","glowshroom"}:
+                   "starflower","cloud_bloom","sunflower_top","glowshroom",
+                   "glow_fern","resonant_crystal"}:
         line(8,0,8,10,2); line(8,3,5,5,3); line(8,5,11,7,2)
         if name=="glowshroom":
             rect(7,0,9,8,5); rect(3,7,13,10,6); rect(5,10,11,12,6)

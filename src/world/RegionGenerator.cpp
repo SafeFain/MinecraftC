@@ -456,18 +456,35 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 BlockId existing = chunk.getBlock(x, y, z);
                 bool carveable = existing == BlockId::STONE || existing == BlockId::DEEPSLATE ||
                                  existing == BlockId::DIRT || existing == BlockId::SAND ||
-                                 existing == BlockId::GRASS || existing == BlockId::SNOW;
+                                 existing == BlockId::GRASS || existing == BlockId::SNOW ||
+                                 existing == BlockId::GRANITE || existing == BlockId::TUFF ||
+                                 existing == BlockId::LIMESTONE || existing == BlockId::BASALT;
                 if (!carveable) continue;
                 BlockId replacement = cell == CaveCell::Water ? BlockId::WATER :
                                       cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR;
                 chunk.setBlock(x, y, z, replacement);
             }
+        }
+    }
 
+    // Cave ecology paints only exposed host rock and places supported
+    // formations. Ores run afterwards so decorative rock never erases them.
+    m_caveGenerator.decorateChunk(chunk, m_regionData.caves);
+
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            const int wx = wxBase + x, wz = wzBase + z;
+            const auto& surfaceColumn = m_regionData.col(
+                pad + localCX * Config::CHUNK_SIZE_X + x,
+                pad + localCZ * Config::CHUNK_SIZE_Z + z);
             // Ores only replace rock that remains after carving.
             for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId existing = chunk.getBlock(x, y, z);
                 if (existing != BlockId::STONE && existing != BlockId::DEEPSLATE &&
-                    existing != BlockId::GRANITE && existing != BlockId::TUFF) continue;
+                    existing != BlockId::GRANITE && existing != BlockId::TUFF &&
+                    existing != BlockId::LIMESTONE && existing != BlockId::BASALT &&
+                    existing != BlockId::DRIPSTONE_BLOCK &&
+                    existing != BlockId::CALCITE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
                     static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
                     existing, surfaceColumn.biome);

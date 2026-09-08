@@ -10,7 +10,8 @@
     "stone": "stone", "bedrock": "stone", "deepslate": "stone",
     "gravel": "stone", "clay": "stone", "cobblestone": "stone",
     "limestone": "stone", "basalt": "stone", "tuff": "stone", "granite": "stone",
-    "cloudstone": "stone", "obsidian": "stone",
+    "cloudstone": "stone", "obsidian": "stone", "dripstone_block": "stone",
+    "pointed_dripstone": "stone", "calcite": "stone", "sulfur_crust": "stone",
     "coal_ore": "ore", "copper_ore": "ore", "iron_ore": "ore",
     "gold_ore": "ore", "diamond_ore": "ore", "emerald_ore": "ore",
     "deepslate_emerald_ore": "ore",
@@ -25,6 +26,8 @@
     "torch": "fluid_emissive", "glass": "fluid_emissive", "star_crystal": "fluid_emissive",
     "starflower": "fluid_emissive", "sunstone": "fluid_emissive",
     "cloud_bloom": "fluid_emissive", "glowshroom": "fluid_emissive",
+    "glow_fern": "fluid_emissive", "resonant_crystal": "fluid_emissive",
+    "hanging_roots": "foliage",
     "crafting_table": "constructed", "furnace": "constructed", "chest": "constructed",
     "white_wool": "constructed", "white_bed": "constructed", "tnt": "constructed",
     "composter": "constructed", "fletching_table": "constructed", "loom": "constructed",
@@ -94,7 +97,8 @@
     "tall_grass", "flower", "reeds", "torch", "wheat_young", "wheat_middle", "wheat_mature",
     "oak_sapling", "birch_sapling", "spruce_sapling", "jungle_sapling", "acacia_sapling",
     "fire", "glass", "dandelion", "blue_orchid", "allium", "oxeye_daisy", "sunflower_bottom",
-    "sunflower_top", "starflower", "cloud_bloom", "glowshroom"
+    "sunflower_top", "starflower", "cloud_bloom", "glowshroom",
+    "hanging_roots", "glow_fern", "resonant_crystal"
   ],
   "generated": [
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
@@ -115,6 +119,8 @@
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
     "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "dripstone_block", "pointed_dripstone", "calcite", "hanging_roots",
+    "glow_fern", "resonant_crystal", "sulfur_crust",
     "emerald_ore", "deepslate_emerald_ore", "composter", "fletching_table",
     "loom", "cauldron", "blast_furnace", "smithing_table", "grindstone",
     "copper_ore"

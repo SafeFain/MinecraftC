@@ -8,6 +8,7 @@
 #include "game/GameRules.h"
 #include "world/Block.h"
 #include "world/Biome.h"
+#include "world/CaveGenerator.h"
 #include "renderer/VisualQuality.h"
 
 class World;
@@ -15,7 +16,7 @@ class World;
 enum class ParticleKind : uint8_t {
     Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
     HeavenPollen, HeavenSparkle, CriticalHit, SweepAttack, OverworldMote,
-    Firefly
+    Firefly, CaveSpore, CaveDust, CaveEmber
 };
 
 inline bool supportsFireflies(Biome biome) {
@@ -26,6 +27,22 @@ inline bool supportsFireflies(Biome biome) {
 }
 
 enum class OverworldAmbientKind : uint8_t { None, Mote, Firefly };
+enum class CaveAmbientKind : uint8_t { None, Spore, Dust, Ember };
+
+inline CaveAmbientKind selectCaveAmbient(
+    DimensionId dimension, CaveBiome biome, bool underground,
+    float particlesPerSecond) {
+    if (dimension != DimensionId::Overworld || !underground ||
+        particlesPerSecond <= 0.0f) return CaveAmbientKind::None;
+    switch (biome) {
+        case CaveBiome::VerdantGrotto: return CaveAmbientKind::Spore;
+        case CaveBiome::DripstoneKarst:
+        case CaveBiome::CrystalHollow: return CaveAmbientKind::Dust;
+        case CaveBiome::VolcanicDepths: return CaveAmbientKind::Ember;
+        case CaveBiome::Neutral: return CaveAmbientKind::None;
+    }
+    return CaveAmbientKind::None;
+}
 
 inline OverworldAmbientKind selectOverworldAmbient(
     DimensionId dimension, Biome biome, bool vegetated, bool outdoors,
@@ -114,4 +131,6 @@ private:
                               int paletteIndex);
     void emitOverworldAmbient(World& world, const glm::dvec3& viewer,
                               uint64_t seed, bool firefly);
+    void emitCaveAmbient(World& world, const glm::dvec3& viewer,
+                         uint64_t seed, CaveAmbientKind kind);
 };

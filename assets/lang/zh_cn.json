@@ -301,6 +301,8 @@
   "item.166": "堆肥桶", "item.167": "制箭台", "item.168": "织布机",
   "item.169": "炼药锅", "item.170": "高炉", "item.171": "锻造台", "item.172": "砂轮",
   "item.173": "村民刷怪蛋", "item.174": "僵尸村民刷怪蛋",
+  "item.175": "滴水石块", "item.176": "滴水石锥", "item.177": "方解石",
+  "item.178": "垂根", "item.179": "微光蕨", "item.180": "共鸣晶簇", "item.181": "硫磺壳",
   "entity.villager": "村民", "entity.zombie_villager": "僵尸村民", "trade.title": "村民交易",
   "message.autosave_log": "自动保存失败；请查看 minecraftc.log",
   "message.autosave_retry": "自动保存失败；稍后将重试更改",

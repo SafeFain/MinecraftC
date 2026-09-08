@@ -108,6 +108,7 @@ public:
     bool hasSkyAccess(int worldX, int worldY, int worldZ) const;
     PrecipitationType precipitationAt(int worldX, int worldY, int worldZ) const;
     Biome biomeAt(int worldX, int worldZ) const;
+    CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const;
     // 0..7 palette index of the exclusive Heaven biome at a column, for the
     // ambient particle tinting; returns 0 outside the Heaven dimension.
     int heavenBiomePaletteIndex(int worldX, int worldZ) const;

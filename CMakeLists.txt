@@ -615,6 +615,8 @@ if(BUILD_TESTING)
     )
     target_include_directories(cavegen_tests PRIVATE src external/FastNoiseLite)
     target_link_libraries(cavegen_tests PRIVATE glm::glm)
+    target_compile_definitions(cavegen_tests PRIVATE
+        MINECRAFTC_CAVEGEN_NO_DECORATOR=1)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(cavegen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

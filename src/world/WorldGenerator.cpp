@@ -1229,15 +1229,28 @@ void WorldGenerator::generate(Chunk& chunk,
                 BlockId current = chunk.getBlock(x, y, z);
                 bool carveable = current == BlockId::STONE || current == BlockId::DEEPSLATE ||
                                  current == BlockId::DIRT || current == BlockId::SAND ||
-                                 current == BlockId::GRASS || current == BlockId::SNOW;
+                                 current == BlockId::GRASS || current == BlockId::SNOW ||
+                                 current == BlockId::GRANITE || current == BlockId::TUFF ||
+                                 current == BlockId::LIMESTONE || current == BlockId::BASALT;
                 if (!carveable) continue;
                 chunk.setBlock(x, y, z, cell == CaveCell::Water ? BlockId::WATER :
                     cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR);
             }
+        }
+    }
+
+    m_caveGenerator.decorateChunk(chunk, caveVolume);
+
+    for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            const int wx = wxBase + x, wz = wzBase + z;
             for (int y = Config::BEDROCK_LEVEL + 1; y < Config::WORLD_MAX_Y; ++y) {
                 BlockId current = chunk.getBlock(x, y, z);
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE &&
-                    current != BlockId::GRANITE && current != BlockId::TUFF) continue;
+                    current != BlockId::GRANITE && current != BlockId::TUFF &&
+                    current != BlockId::LIMESTONE && current != BlockId::BASALT &&
+                    current != BlockId::DRIPSTONE_BLOCK &&
+                    current != BlockId::CALCITE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
                     static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
                     current, biomeMap[x][z]);

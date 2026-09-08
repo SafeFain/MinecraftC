@@ -39,6 +39,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "aether_grass_top", "aether_grass_side", "aether_soil", "cloudstone",
     "sunstone", "skyroot_log", "skyroot_log_top", "skyroot_leaves",
     "star_crystal", "starflower", "cloud_bloom", "glowshroom",
+    "dripstone_block", "pointed_dripstone", "calcite", "hanging_roots",
+    "glow_fern", "resonant_crystal", "sulfur_crust",
     "emerald_ore", "deepslate_emerald_ore", "composter",
     "fletching_table", "loom", "cauldron", "blast_furnace",
     "smithing_table", "grindstone",
@@ -306,6 +308,19 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::BLAST_FURNACE, "Blast Furnace", glm::vec3(.31f,.32f,.33f), true, false},
     {BlockId::SMITHING_TABLE, "Smithing Table", glm::vec3(.25f,.34f,.35f), true, false},
     {BlockId::GRINDSTONE, "Grindstone", glm::vec3(.49f,.48f,.44f), true, false},
+    {BlockId::DRIPSTONE_BLOCK, "Dripstone Block", glm::vec3(.48f,.34f,.23f), true, false},
+    {BlockId::POINTED_DRIPSTONE_UP, "Pointed Dripstone Up", glm::vec3(.52f,.37f,.25f), true, true,
+     RenderShape::Spike, RenderLayer::Opaque, 1.0f},
+    {BlockId::POINTED_DRIPSTONE_DOWN, "Pointed Dripstone Down", glm::vec3(.52f,.37f,.25f), true, true,
+     RenderShape::Spike, RenderLayer::Opaque, 1.0f},
+    {BlockId::CALCITE, "Calcite", glm::vec3(.82f,.82f,.76f), true, false},
+    {BlockId::HANGING_ROOTS, "Hanging Roots", glm::vec3(.39f,.27f,.16f), false, true,
+     RenderShape::CeilingCross, RenderLayer::Cutout, 1.0f},
+    {BlockId::GLOW_FERN, "Glow Fern", glm::vec3(.30f,.76f,.52f), false, true,
+     RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::RESONANT_CRYSTAL, "Resonant Crystal", glm::vec3(.35f,.72f,.92f), false, true,
+     RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::SULFUR_CRUST, "Sulfur Crust", glm::vec3(.78f,.69f,.18f), true, false},
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -459,6 +474,14 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::STARFLOWER:      return BlockTexture::Starflower;
         case BlockId::CLOUD_BLOOM:     return BlockTexture::CloudBloom;
         case BlockId::GLOWSHROOM:      return BlockTexture::Glowshroom;
+        case BlockId::DRIPSTONE_BLOCK: return BlockTexture::DripstoneBlock;
+        case BlockId::POINTED_DRIPSTONE_UP:
+        case BlockId::POINTED_DRIPSTONE_DOWN: return BlockTexture::PointedDripstone;
+        case BlockId::CALCITE: return BlockTexture::Calcite;
+        case BlockId::HANGING_ROOTS: return BlockTexture::HangingRoots;
+        case BlockId::GLOW_FERN: return BlockTexture::GlowFern;
+        case BlockId::RESONANT_CRYSTAL: return BlockTexture::ResonantCrystal;
+        case BlockId::SULFUR_CRUST: return BlockTexture::SulfurCrust;
         default:                     return BlockTexture::Dirt;
     }
 }
@@ -700,6 +723,12 @@ BlockCollisionBoxes blockCollisionBoxes(BlockId id) {
     BlockCollisionBoxes result;
     const BlockProperties& props = getBlockProps(id);
     if (!props.solid) return result;
+    if (id == BlockId::POINTED_DRIPSTONE_UP ||
+        id == BlockId::POINTED_DRIPSTONE_DOWN) {
+        result.count = 1;
+        result.boxes[0] = {{.25f, 0.0f, .25f}, {.75f, 1.0f, .75f}};
+        return result;
+    }
     ArchitecturalBlockState state;
     if (decodeArchitecturalBlock(id, state)) {
         if (state.shape == RenderShape::Slab) {
@@ -777,6 +806,8 @@ uint8_t getLightEmission(BlockId id) {
     if (id == BlockId::STARFLOWER) return 5;
     if (id == BlockId::CLOUD_BLOOM) return 4;
     if (id == BlockId::GLOWSHROOM) return 6;
+    if (id == BlockId::GLOW_FERN) return 4;
+    if (id == BlockId::RESONANT_CRYSTAL) return 8;
     return id == BlockId::FIRE || isLava(id) ? 15 : 0;
 }
 
@@ -784,7 +815,9 @@ uint8_t getLightDampening(BlockId id) {
     if (id == BlockId::AIR || id == BlockId::GLASS || isBed(id) ||
         getBlockProps(id).shape == RenderShape::Cross ||
         getBlockProps(id).shape == RenderShape::Slab ||
-        getBlockProps(id).shape == RenderShape::Stair) return 0;
+        getBlockProps(id).shape == RenderShape::Stair ||
+        getBlockProps(id).shape == RenderShape::Spike ||
+        getBlockProps(id).shape == RenderShape::CeilingCross) return 0;
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
         id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
@@ -866,6 +899,8 @@ bool isFlower(BlockId id) {
            id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
            id == BlockId::OXEYE_DAISY || id == BlockId::STARFLOWER ||
            id == BlockId::CLOUD_BLOOM || id == BlockId::GLOWSHROOM ||
+           id == BlockId::GLOW_FERN || id == BlockId::RESONANT_CRYSTAL ||
+           id == BlockId::HANGING_ROOTS ||
            isSunflower(id);
 }
 
@@ -907,7 +942,8 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::BLUE_ORCHID: case BlockId::ALLIUM:
         case BlockId::OXEYE_DAISY: case BlockId::SUNFLOWER_BOTTOM:
         case BlockId::SUNFLOWER_TOP: case BlockId::STARFLOWER:
-        case BlockId::CLOUD_BLOOM: case BlockId::GLOWSHROOM: return 60;
+        case BlockId::CLOUD_BLOOM: case BlockId::GLOWSHROOM:
+        case BlockId::GLOW_FERN: case BlockId::HANGING_ROOTS: return 60;
         case BlockId::TNT: return 100;
         default: return 0;
     }

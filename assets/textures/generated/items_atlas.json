@@ -109,11 +109,11 @@
     },
     "blast_furnace": {
       "generator": "block_item_icon",
-      "index": 161,
+      "index": 168,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/blast_furnace.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 20
+      "x": 0,
+      "y": 21
     },
     "blastling_spawn_egg": {
       "generator": "item_sprite",
@@ -163,12 +163,20 @@
       "x": 1,
       "y": 5
     },
+    "calcite": {
+      "generator": "block_item_icon",
+      "index": 156,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/calcite.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 19
+    },
     "cauldron": {
       "generator": "block_item_icon",
-      "index": 160,
+      "index": 167,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cauldron.png",
       "source_kind": "generated",
-      "x": 0,
+      "x": 7,
       "y": 20
     },
     "chest": {
@@ -213,19 +221,19 @@
     },
     "cloudstone_slab": {
       "generator": "block_item_icon",
-      "index": 172,
+      "index": 179,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cloudstone_slab.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 21
+      "x": 3,
+      "y": 22
     },
     "cloudstone_stairs": {
       "generator": "block_item_icon",
-      "index": 173,
+      "index": 180,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cloudstone_stairs.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 21
+      "x": 4,
+      "y": 22
     },
     "coal": {
       "generator": "item_sprite",
@@ -261,27 +269,27 @@
     },
     "cobblestone_slab": {
       "generator": "block_item_icon",
-      "index": 166,
+      "index": 173,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cobblestone_slab.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 20
+      "x": 5,
+      "y": 21
     },
     "cobblestone_stairs": {
       "generator": "block_item_icon",
-      "index": 167,
+      "index": 174,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/cobblestone_stairs.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 20
+      "x": 6,
+      "y": 21
     },
     "composter": {
       "generator": "block_item_icon",
-      "index": 157,
+      "index": 164,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/composter.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 19
+      "x": 4,
+      "y": 20
     },
     "cooked_chicken": {
       "generator": "item_sprite",
@@ -341,11 +349,11 @@
     },
     "deepslate_emerald_ore": {
       "generator": "block_item_icon",
-      "index": 156,
+      "index": 163,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/deepslate_emerald_ore.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 19
+      "x": 3,
+      "y": 20
     },
     "diamond": {
       "generator": "item_sprite",
@@ -443,21 +451,29 @@
       "x": 1,
       "y": 0
     },
-    "emerald": {
-      "generator": "item_sprite",
+    "dripstone_block": {
+      "generator": "block_item_icon",
       "index": 154,
-      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/emerald.png",
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/dripstone_block.png",
       "source_kind": "generated",
       "x": 2,
       "y": 19
     },
+    "emerald": {
+      "generator": "item_sprite",
+      "index": 161,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/emerald.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 20
+    },
     "emerald_ore": {
       "generator": "block_item_icon",
-      "index": 155,
+      "index": 162,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/emerald_ore.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 19
+      "x": 2,
+      "y": 20
     },
     "farmland": {
       "generator": "block_item_icon",
@@ -477,11 +493,11 @@
     },
     "fletching_table": {
       "generator": "block_item_icon",
-      "index": 158,
+      "index": 165,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/fletching_table.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 19
+      "x": 5,
+      "y": 20
     },
     "flint": {
       "generator": "item_sprite",
@@ -514,6 +530,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 14
+    },
+    "glow_fern": {
+      "generator": "block_item_icon",
+      "index": 158,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/glow_fern.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 19
     },
     "glowshroom": {
       "generator": "block_item_icon",
@@ -637,11 +661,11 @@
     },
     "grindstone": {
       "generator": "block_item_icon",
-      "index": 163,
+      "index": 170,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/grindstone.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 20
+      "x": 2,
+      "y": 21
     },
     "gunpowder": {
       "generator": "item_sprite",
@@ -650,6 +674,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 15
+    },
+    "hanging_roots": {
+      "generator": "block_item_icon",
+      "index": 157,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/hanging_roots.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 19
     },
     "ice": {
       "generator": "block_item_icon",
@@ -829,11 +861,11 @@
     },
     "loom": {
       "generator": "block_item_icon",
-      "index": 159,
+      "index": 166,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/loom.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 19
+      "x": 6,
+      "y": 20
     },
     "moss": {
       "generator": "block_item_icon",
@@ -877,19 +909,19 @@
     },
     "oak_planks_slab": {
       "generator": "block_item_icon",
-      "index": 164,
+      "index": 171,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_planks_slab.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 20
+      "x": 3,
+      "y": 21
     },
     "oak_planks_stairs": {
       "generator": "block_item_icon",
-      "index": 165,
+      "index": 172,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/oak_planks_stairs.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 20
+      "x": 4,
+      "y": 21
     },
     "oak_sapling": {
       "generator": "block_item_icon",
@@ -938,6 +970,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 6
+    },
+    "pointed_dripstone": {
+      "generator": "block_item_icon",
+      "index": 155,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/pointed_dripstone.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 19
     },
     "poppy": {
       "generator": "block_item_icon",
@@ -1011,6 +1051,14 @@
       "x": 0,
       "y": 7
     },
+    "resonant_crystal": {
+      "generator": "block_item_icon",
+      "index": 159,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/resonant_crystal.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 19
+    },
     "rotten_flesh": {
       "generator": "item_sprite",
       "index": 83,
@@ -1069,11 +1117,11 @@
     },
     "smithing_table": {
       "generator": "block_item_icon",
-      "index": 162,
+      "index": 169,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/smithing_table.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 20
+      "x": 1,
+      "y": 21
     },
     "snow": {
       "generator": "block_item_icon",
@@ -1203,6 +1251,14 @@
       "x": 3,
       "y": 8
     },
+    "sulfur_crust": {
+      "generator": "block_item_icon",
+      "index": 160,
+      "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sulfur_crust.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 20
+    },
     "sunflower": {
       "generator": "block_item_icon",
       "index": 123,
@@ -1221,19 +1277,19 @@
     },
     "sunstone_slab": {
       "generator": "block_item_icon",
-      "index": 170,
+      "index": 177,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sunstone_slab.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 21
+      "x": 1,
+      "y": 22
     },
     "sunstone_stairs": {
       "generator": "block_item_icon",
-      "index": 171,
+      "index": 178,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/sunstone_stairs.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 21
+      "x": 2,
+      "y": 22
     },
     "tall_grass": {
       "generator": "block_item_icon",
@@ -1253,19 +1309,19 @@
     },
     "terracotta_slab": {
       "generator": "block_item_icon",
-      "index": 168,
+      "index": 175,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/terracotta_slab.png",
       "source_kind": "generated",
-      "x": 0,
+      "x": 7,
       "y": 21
     },
     "terracotta_stairs": {
       "generator": "block_item_icon",
-      "index": 169,
+      "index": 176,
       "source": "/home/evan/Coding/MinecraftC/assets/textures/generated/items/terracotta_stairs.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 21
+      "x": 0,
+      "y": 22
     },
     "tnt": {
       "generator": "block_item_icon",
@@ -1402,7 +1458,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 22,
+  "rows": 23,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

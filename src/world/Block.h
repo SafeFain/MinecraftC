@@ -169,7 +169,17 @@ enum class BlockId : uint8_t {
     BLAST_FURNACE,
     SMITHING_TABLE,
     GRINDSTONE,
-    COUNT        = 175,
+    // Cave-ecology blocks are appended for generation v14. Existing numeric
+    // values remain stable for saves and chunk memory.
+    DRIPSTONE_BLOCK = 175,
+    POINTED_DRIPSTONE_UP,
+    POINTED_DRIPSTONE_DOWN,
+    CALCITE,
+    HANGING_ROOTS,
+    GLOW_FERN,
+    RESONANT_CRYSTAL,
+    SULFUR_CRUST,
+    COUNT        = 183,
     POPPY        = FLOWER
 };
 
@@ -195,7 +205,9 @@ enum class RenderShape : uint8_t {
     Fluid,
     Bed,
     Slab,
-    Stair
+    Stair,
+    Spike,
+    CeilingCross
 };
 
 enum class BedPart : uint8_t { Foot, Head };
@@ -261,6 +273,8 @@ enum class BlockTexture : uint8_t {
     AetherGrassTop, AetherGrassSide, AetherSoil, Cloudstone, Sunstone,
     SkyrootLog, SkyrootLogTop, SkyrootLeaves, StarCrystal, Starflower,
     CloudBloom, Glowshroom,
+    DripstoneBlock, PointedDripstone, Calcite, HangingRoots, GlowFern,
+    ResonantCrystal, SulfurCrust,
     EmeraldOre, DeepslateEmeraldOre, Composter, FletchingTable, Loom,
     Cauldron, BlastFurnace, SmithingTable, Grindstone,
     BirchLogTop, SpruceLogTop, JungleLogTop, AcaciaLogTop, CraftingTableTop,
@@ -303,6 +317,10 @@ inline bool isSolid(BlockId id) {
 }
 
 bool isBed(BlockId id);
+inline BlockId pointedDripstoneForPlacementFace(int faceY) {
+    return faceY < 0 ? BlockId::POINTED_DRIPSTONE_DOWN
+         : faceY > 0 ? BlockId::POINTED_DRIPSTONE_UP : BlockId::AIR;
+}
 bool isVillagerWorkstation(BlockId id);
 bool decodeBed(BlockId id, BedPart& part, BedDirection& direction);
 BlockId bedBlock(BedPart part, BedDirection direction);

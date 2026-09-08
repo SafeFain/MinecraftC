@@ -6,9 +6,10 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 13;
+    static constexpr uint32_t GENERATION_VERSION = 14;
     // Base chunk caches may be invalidated without changing the user-visible
-    // generation version. v13 seals village-house, traveler-hut, and igloo
+    // generation version. v14 adds deterministic cave biomes, formations,
+    // and cave-surface ecology. v13 seals village-house, traveler-hut, and igloo
     // wall/roof envelopes. v12 increases plains/desert village placement
     // density. v11 added emerald attempts plus deterministic
     // village furnishing/population while retaining the v10 terrain and

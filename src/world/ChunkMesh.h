@@ -131,7 +131,8 @@ struct ChunkMesh {
             if (id == BlockId::AIR) return BlockId::AIR;
 
             const BlockProperties& props = getBlockProps(id);
-            if (props.shape == RenderShape::Cross) return BlockId::AIR;
+            if (props.shape == RenderShape::Cross ||
+                props.shape == RenderShape::CeilingCross) return BlockId::AIR;
 
             const glm::ivec3& off = FACE_OFFSETS[static_cast<int>(face)];
             int nx = chunkWorldX + x + off.x;
@@ -453,7 +454,7 @@ struct ChunkMesh {
             }
         }
 
-        // Architectural slabs and stairs are emitted as their collision-box
+        // Architectural slabs, stairs, and narrow cave spikes are emitted as their collision-box
         // decomposition. They deliberately stay out of greedy cube masks:
         // partial faces must retain their half-block dimensions and state.
         for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
@@ -461,7 +462,8 @@ struct ChunkMesh {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                     const BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
                     const RenderShape shape = getBlockProps(id).shape;
-                    if (shape != RenderShape::Slab && shape != RenderShape::Stair)
+                    if (shape != RenderShape::Slab && shape != RenderShape::Stair &&
+                        shape != RenderShape::Spike)
                         continue;
                     const BlockCollisionBoxes geometry = blockCollisionBoxes(id);
                     ArchitecturalBlockState architecture;
@@ -550,6 +552,61 @@ struct ChunkMesh {
                         }
                         return true;
                     };
+                    if (shape == RenderShape::Spike) {
+                        const bool pointsUp = id == BlockId::POINTED_DRIPSTONE_UP;
+                        const float bottomRadius = pointsUp ? .25f : .04f;
+                        const float topRadius = pointsUp ? .04f : .25f;
+                        const float xb0 = x + .5f - bottomRadius;
+                        const float xb1 = x + .5f + bottomRadius;
+                        const float zb0 = z + .5f - bottomRadius;
+                        const float zb1 = z + .5f + bottomRadius;
+                        const float xt0 = x + .5f - topRadius;
+                        const float xt1 = x + .5f + topRadius;
+                        const float zt0 = z + .5f - topRadius;
+                        const float zt1 = z + .5f + topRadius;
+                        const float y0 = static_cast<float>(y);
+                        const float y1 = static_cast<float>(y + 1);
+                        auto emitSpikeFace = [&](FaceDir face,
+                                                 const glm::vec3 (&p)[4]) {
+                            const float tile = encodeFlatLight(
+                                static_cast<float>(getFaceTextureIndex(id, face)),
+                                static_cast<uint8_t>(std::round(sampled.x * 15.0f)),
+                                static_cast<uint8_t>(std::round(sampled.y * 15.0f)));
+                            const unsigned int base =
+                                static_cast<unsigned int>(vertices.size());
+                            const glm::vec2 uv[4]={{1,1},{1,0},{0,0},{0,1}};
+                            for (int i = 0; i < 4; ++i)
+                                vertices.push_back({p[i].x,p[i].y,p[i].z,1.0f,
+                                    sampled.x,sampled.y,1.0f,uv[i].x,uv[i].y,tile,
+                                    static_cast<float>(face)});
+                            for (unsigned int index : {0u,1u,2u,0u,2u,3u}) {
+                                opaqueIndices.push_back(base + index);
+                                shadowIndices.push_back(base + index);
+                            }
+                        };
+                        const glm::vec3 front[4]={{xt1,y1,zt0},{xb1,y0,zb0},
+                                                  {xb0,y0,zb0},{xt0,y1,zt0}};
+                        const glm::vec3 back[4]={{xt0,y1,zt1},{xb0,y0,zb1},
+                                                 {xb1,y0,zb1},{xt1,y1,zt1}};
+                        const glm::vec3 right[4]={{xt1,y1,zt1},{xb1,y0,zb1},
+                                                  {xb1,y0,zb0},{xt1,y1,zt0}};
+                        const glm::vec3 left[4]={{xt0,y1,zt0},{xb0,y0,zb0},
+                                                 {xb0,y0,zb1},{xt0,y1,zt1}};
+                        emitSpikeFace(FaceDir::FRONT, front);
+                        emitSpikeFace(FaceDir::BACK, back);
+                        emitSpikeFace(FaceDir::RIGHT, right);
+                        emitSpikeFace(FaceDir::LEFT, left);
+                        if (pointsUp) {
+                            const glm::vec3 tip[4]={{xt1,y1,zt1},{xt1,y1,zt0},
+                                                    {xt0,y1,zt0},{xt0,y1,zt1}};
+                            emitSpikeFace(FaceDir::TOP, tip);
+                        } else {
+                            const glm::vec3 tip[4]={{xb0,y0,zb1},{xb0,y0,zb0},
+                                                    {xb1,y0,zb0},{xb1,y0,zb1}};
+                            emitSpikeFace(FaceDir::BOTTOM, tip);
+                        }
+                        continue;
+                    }
                     auto emitBoxFace = [&](uint8_t boxIndex, FaceDir face) {
                         BlockCollisionBox box=geometry.boxes[boxIndex];
                         if (shape==RenderShape::Stair) {
@@ -764,7 +821,8 @@ struct ChunkMesh {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                     BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
                     const BlockProperties& props = getBlockProps(id);
-                    if (props.shape != RenderShape::Cross) continue;
+                    if (props.shape != RenderShape::Cross &&
+                        props.shape != RenderShape::CeilingCross) continue;
                     float fx = static_cast<float>(x);
                     float fy = static_cast<float>(y);
                     float fz = static_cast<float>(z);

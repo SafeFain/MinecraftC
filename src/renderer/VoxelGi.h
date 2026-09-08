@@ -80,9 +80,11 @@ inline VoxelGiPacked packVoxelGi(BlockId id, uint8_t packedLight) {
     float opacity = properties.layer == RenderLayer::Opaque ? 1.0f :
         properties.layer == RenderLayer::Cutout ? 0.42f :
         isFluid(id) ? 0.16f : 0.28f;
-    if (properties.shape == RenderShape::Cross) opacity *= 0.25f;
+    if (properties.shape == RenderShape::Cross ||
+        properties.shape == RenderShape::CeilingCross) opacity *= 0.25f;
     if (properties.shape == RenderShape::SnowLayer) opacity *= 0.18f;
     if (properties.shape == RenderShape::Slab) opacity *= 0.5f;
+    if (properties.shape == RenderShape::Spike) opacity *= 0.35f;
     result.opacity = static_cast<uint8_t>(std::lround(opacity * 255.0f));
     return result;
 }

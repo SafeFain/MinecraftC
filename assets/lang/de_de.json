@@ -295,6 +295,8 @@
   "item.166": "Komposter", "item.167": "Bognertisch", "item.168": "Webstuhl", "item.169": "Kessel",
   "item.170": "Schmelzofen", "item.171": "Schmiedetisch", "item.172": "Schleifstein",
   "item.173": "Dorfbewohner-Spawn-Ei", "item.174": "Zombiedorfbewohner-Spawn-Ei",
+  "item.175": "Tropfsteinblock", "item.176": "Spitzer Tropfstein", "item.177": "Kalzit",
+  "item.178": "Hängende Wurzeln", "item.179": "Leuchtfarn", "item.180": "Resonanzkristall", "item.181": "Schwefelkruste",
   "entity.villager": "Dorfbewohner", "entity.zombie_villager": "Zombiedorfbewohner", "trade.title": "HANDEL",
   "message.autosave_log": "Automatisches Speichern fehlgeschlagen; siehe minecraftc.log",
   "message.autosave_retry": "Automatisches Speichern fehlgeschlagen; wird erneut versucht",

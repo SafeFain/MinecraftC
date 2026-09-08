@@ -295,6 +295,8 @@
   "item.166": "Composteur", "item.167": "Table d'archerie", "item.168": "Métier à tisser", "item.169": "Chaudron",
   "item.170": "Haut fourneau", "item.171": "Table de forge", "item.172": "Meule",
   "item.173": "Œuf d'apparition de villageois", "item.174": "Œuf d'apparition de zombie-villageois",
+  "item.175": "Bloc de spéléothème", "item.176": "Spéléothème pointu", "item.177": "Calcite",
+  "item.178": "Racines suspendues", "item.179": "Fougère lumineuse", "item.180": "Cristal résonant", "item.181": "Croûte de soufre",
   "entity.villager": "Villageois", "entity.zombie_villager": "Zombie-villageois", "trade.title": "COMMERCE",
   "message.autosave_log": "Échec de la sauvegarde automatique ; voir minecraftc.log",
   "message.autosave_retry": "Échec de la sauvegarde automatique ; nouvelle tentative prévue",

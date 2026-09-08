@@ -1074,6 +1074,15 @@ bool Player::placeBlock() {
     }
 
     ArchitecturalBlockState selectedArchitecture;
+    if (activeItem == ItemId::POINTED_DRIPSTONE) {
+        if (hit->faceNormal.y == 0) return false;
+        placed = pointedDripstoneForPlacementFace(hit->faceNormal.y);
+    }
+    if (placed == BlockId::HANGING_ROOTS && hit->faceNormal.y >= 0)
+        return false;
+    if ((placed == BlockId::GLOW_FERN ||
+         placed == BlockId::RESONANT_CRYSTAL) && hit->faceNormal.y <= 0)
+        return false;
     if (decodeArchitecturalBlock(placed, selectedArchitecture)) {
         ArchitecturalBlockState targetedArchitecture;
         const double localHitY = hit->hitPosition.y -

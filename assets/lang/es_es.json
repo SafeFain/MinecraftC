@@ -295,6 +295,8 @@
   "item.166": "Compostador", "item.167": "Mesa de flechas", "item.168": "Telar", "item.169": "Caldero",
   "item.170": "Alto horno", "item.171": "Mesa de herrería", "item.172": "Afiladora",
   "item.173": "Huevo generador de aldeano", "item.174": "Huevo generador de aldeano zombi",
+  "item.175": "Bloque de espeleotema", "item.176": "Espeleotema puntiagudo", "item.177": "Calcita",
+  "item.178": "Raíces colgantes", "item.179": "Helecho luminoso", "item.180": "Cristal resonante", "item.181": "Costra de azufre",
   "entity.villager": "Aldeano", "entity.zombie_villager": "Aldeano zombi", "trade.title": "COMERCIO",
   "message.autosave_log": "Fallo en el autoguardado; mira minecraftc.log",
   "message.autosave_retry": "Fallo en el autoguardado; se volverá a intentar",

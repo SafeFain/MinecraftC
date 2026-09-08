@@ -117,6 +117,16 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::STARFLOWER, 0.0f);
     set(BlockId::CLOUD_BLOOM, 0.0f);
     set(BlockId::GLOWSHROOM, 0.0f);
+    for (BlockId id : {BlockId::DRIPSTONE_BLOCK, BlockId::CALCITE,
+                       BlockId::SULFUR_CRUST})
+        set(id, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::POINTED_DRIPSTONE_UP, 0.8f, ToolKind::Pickaxe,
+        ToolTier::Wood);
+    set(BlockId::POINTED_DRIPSTONE_DOWN, 0.8f, ToolKind::Pickaxe,
+        ToolTier::Wood);
+    for (BlockId id : {BlockId::HANGING_ROOTS, BlockId::GLOW_FERN})
+        set(id, 0.0f);
+    set(BlockId::RESONANT_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
     for (uint8_t raw=static_cast<uint8_t>(BlockId::PLANKS_SLAB_BOTTOM);
          raw<static_cast<uint8_t>(BlockId::COUNT);++raw) {
         const BlockId id=static_cast<BlockId>(raw);
@@ -221,6 +231,12 @@ std::vector<CraftingRecipe> buildRecipes() {
                              {ItemId::SHIELD, 1, 0}, false));
     recipes.push_back(shaped(2, 1, {ItemId::FLINT, ItemId::IRON_INGOT},
                              {ItemId::FLINT_AND_STEEL, 1, 0}));
+    recipes.push_back(shaped(2, 2, {
+        ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE,
+        ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE},
+        {ItemId::DRIPSTONE_BLOCK, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::DRIPSTONE_BLOCK},
+        {ItemId::POINTED_DRIPSTONE, 4, 0}, false));
     recipes.push_back(shaped(3, 3, {
         ItemId::GUNPOWDER, ItemId::SAND, ItemId::GUNPOWDER,
         ItemId::SAND, ItemId::GUNPOWDER, ItemId::SAND,

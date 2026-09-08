@@ -32,6 +32,9 @@ int main() {
     static_assert(static_cast<uint16_t>(ItemId::STARFLOWER) == 150);
     static_assert(static_cast<uint16_t>(ItemId::CLOUD_BLOOM) == 151);
     static_assert(static_cast<uint16_t>(ItemId::GLOWSHROOM) == 152);
+    static_assert(static_cast<uint16_t>(ItemId::DRIPSTONE_BLOCK) == 175);
+    static_assert(static_cast<uint16_t>(ItemId::POINTED_DRIPSTONE) == 176);
+    static_assert(static_cast<uint16_t>(ItemId::SULFUR_CRUST) == 181);
     for (const auto& mapping : {
              std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
              std::pair{BlockId::BASALT, ItemId::BASALT},
@@ -47,6 +50,24 @@ int main() {
             mapping.first, {ItemId::WOODEN_PICKAXE, 1, 0}, 0);
         require(drops.size() == 1 && drops.front().id == mapping.second,
                 "v7 natural block did not drop itself");
+    }
+    for (const auto& mapping : {
+             std::pair{BlockId::DRIPSTONE_BLOCK, ItemId::DRIPSTONE_BLOCK},
+             std::pair{BlockId::POINTED_DRIPSTONE_UP,
+                       ItemId::POINTED_DRIPSTONE},
+             std::pair{BlockId::POINTED_DRIPSTONE_DOWN,
+                       ItemId::POINTED_DRIPSTONE},
+             std::pair{BlockId::CALCITE, ItemId::CALCITE},
+             std::pair{BlockId::HANGING_ROOTS, ItemId::HANGING_ROOTS},
+             std::pair{BlockId::GLOW_FERN, ItemId::GLOW_FERN},
+             std::pair{BlockId::RESONANT_CRYSTAL, ItemId::RESONANT_CRYSTAL},
+             std::pair{BlockId::SULFUR_CRUST, ItemId::SULFUR_CRUST}}) {
+        require(itemForBlock(mapping.first) == mapping.second,
+                "v14 cave block did not map to its shared item");
+        const auto drops = getBlockDrops(
+            mapping.first, {ItemId::WOODEN_PICKAXE, 1, 0}, 0);
+        require(drops.size() == 1 && drops.front().id == mapping.second,
+                "v14 cave block did not drop its expected item");
     }
     const ItemStack hand{};
     const ItemStack woodenShovel{ItemId::WOODEN_SHOVEL, 1, 0};
@@ -216,6 +237,20 @@ int main() {
     const auto* igniter = findCraftingRecipe(grid, 2, 1);
     require(igniter && igniter->output.id == ItemId::FLINT_AND_STEEL,
             "flint and iron craft flint and steel");
+    grid.fill(ItemId::EMPTY);
+    grid[0] = grid[1] = grid[2] = grid[3] = ItemId::POINTED_DRIPSTONE;
+    const auto* dripstoneBlock = findCraftingRecipe(grid, 2, 2);
+    require(dripstoneBlock &&
+                dripstoneBlock->output.id == ItemId::DRIPSTONE_BLOCK &&
+                dripstoneBlock->output.count == 1,
+            "four pointed dripstones do not craft a dripstone block");
+    grid.fill(ItemId::EMPTY);
+    grid[0] = ItemId::DRIPSTONE_BLOCK;
+    const auto* pointedDripstone = findCraftingRecipe(grid, 1, 1);
+    require(pointedDripstone &&
+                pointedDripstone->output.id == ItemId::POINTED_DRIPSTONE &&
+                pointedDripstone->output.count == 4,
+            "dripstone block does not unpack into four pointed dripstones");
     struct ArchitecturalRecipeCase {
         ItemId material;
         ItemId slab;
