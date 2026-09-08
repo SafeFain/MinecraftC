@@ -400,10 +400,14 @@ int main() {
                          LodPrecision::Medium});
     selection.update({0.5, 80.0, 0.5}, 8, {});
     require(selection.selectedMaximumDistance() == 128.0f *
-                Config::CHUNK_SIZE_X &&
-            selection.selectedTileCountAtLevel(0) == 0 &&
-            selection.selectedTileCount() < 800,
-            "LOD selection spends its distance budget on a forced fine ring");
+                Config::CHUNK_SIZE_X,
+            "LOD selection does not reach its configured outer distance");
+    require(selection.selectedTileCountAtLevel(0) > 0 &&
+                selection.selectedMinimumDistanceAtLevel(0) ==
+                    8.0f * Config::CHUNK_SIZE_X,
+            "LOD selection does not start with a fine ring outside real terrain");
+    require(selection.selectedTileCount() < 1100,
+            "LOD selection exceeds its bounded tile budget");
 
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-lod-terrain-tests";

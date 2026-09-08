@@ -160,20 +160,17 @@ float valueNoise(vec2 point) {
 void main() {
     bool isLod=frame.atlasAndLighting.w>0.0;
     if(isLod){
-        float lodDistance=length(worldPosition.xz);
+        // Near chunks are streamed as a square Chebyshev radius. Matching
+        // that footprint prevents LOD from surviving beneath the large corner
+        // regions of the real chunk square.
+        float lodDistance=max(abs(worldPosition.x),abs(worldPosition.z));
         float inner=frame.atlasAndLighting.w;
         float outer=frame.chunkOrigin.w;
-        float innerFade=max(16.0,inner*0.04);
-        float outerFade=max(16.0,outer*0.04);
-        float innerCoverage=smoothstep(inner-innerFade,inner+innerFade,lodDistance);
-        float outerProgress=smoothstep(outer-outerFade,outer+outerFade,lodDistance);
-        vec2 localPosition=worldPosition.xz-frame.chunkOrigin.xz;
-        vec2 stableWorldPosition=localPosition+frame.lodWorldOrigin.xz;
-        float dither=fract(sin(dot(floor(stableWorldPosition),
-            vec2(12.9898,78.233)))*43758.5453);
-        // Adjacent rings use opposite halves of the same stable threshold.
-        // Their union is complete instead of both discarding the same pixels.
-        if(dither>innerCoverage||dither<outerProgress)discard;
+        // Exactly one LOD level owns a world-space distance. Dithered overlap
+        // mixes incompatible shoreline samples (water in one level and sand
+        // in the other) into a noisy pattern that changes as the ring follows
+        // the player. A half-open hard boundary keeps materials coherent.
+        if(lodDistance<inner||lodDistance>=outer)discard;
     }
     int tileCount=max(int(frame.atlasAndLighting.x+0.5),1);
     // `tile` stores flat-light data in its positive fractional bits. Decode

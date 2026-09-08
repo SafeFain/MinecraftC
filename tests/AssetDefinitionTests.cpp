@@ -109,6 +109,15 @@ int main() {
                 std::string::npos &&
             shadowShader.find("tileIndex%tileCount") != std::string::npos,
             "world atlas lookup must use integer row-boundary addressing");
+    require(chunkShader.find(
+                "if(lodDistance<inner||lodDistance>=outer)discard;") !=
+                std::string::npos &&
+            chunkShader.find(
+                "lodDistance=max(abs(worldPosition.x),abs(worldPosition.z))") !=
+                std::string::npos &&
+            chunkShader.find("innerCoverage") == std::string::npos &&
+            chunkShader.find("outerProgress") == std::string::npos,
+            "LOD rings must select one coherent material level per distance");
     require(!loadTextureAssetDefinitions("missing-atlas.json", "missing-blocks.json",
                                          "missing-items.json"),
             "missing definitions did not activate compatibility fallback");

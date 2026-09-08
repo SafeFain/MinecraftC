@@ -70,8 +70,9 @@ void GameScenePresenter::render(
 
         if (session.world.lodEnabled() &&
             !session.world.lodSubmissions().empty()) {
-            // The LOD pass intentionally extends underneath the last two near
-            // rings, so its projection must not clip that safety overlap.
+            // Fragment distance selection excludes the real chunk area. Keep
+            // a permissive projection near plane because radial distance and
+            // camera-space depth are not equivalent near the view edges.
             const float lodNear = 8.0f;
             const float lodFar = session.world.lodDistanceChunks() *
                 Config::CHUNK_SIZE_X + 64.0f;

@@ -118,6 +118,7 @@ public:
     int tasksInFlight() const { return m_tasksInFlight.load(); }
     size_t selectedTileCount() const { return m_desired.size(); }
     size_t selectedTileCountAtLevel(uint8_t level) const;
+    float selectedMinimumDistanceAtLevel(uint8_t level) const;
     float selectedMaximumDistance() const;
 
 private:

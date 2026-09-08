@@ -885,10 +885,11 @@ void LodTerrainSystem::rebuildSelection() {
     m_desired.clear();
     if (!m_settings.enabled || !m_generator) return;
     const int quality = lodHorizontalQuality(m_settings.precision);
-    // Keep LOD underneath the outer two full-chunk rings. The near pass clears
-    // depth and overwrites it, while an asynchronously missing near mesh still
-    // has stable terrain behind it instead of revealing the sky.
-    const float inner = static_cast<float>(std::max(1, m_nearDistanceChunks - 2) *
+    // Do not retain LOD color underneath the real chunk area. Opaque near
+    // terrain normally replaces it after the LOD depth clear, but a view ray
+    // through translucent water can leave the earlier coarse water or seabed
+    // in the color buffer and expose a moving sand/water boundary.
+    const float inner = static_cast<float>(std::max(1, m_nearDistanceChunks) *
         Config::CHUNK_SIZE_X);
     const float outer = static_cast<float>(m_settings.distanceChunks * Config::CHUNK_SIZE_X);
     const float centerX = static_cast<float>(m_centerChunkX * Config::CHUNK_SIZE_X + 8);
@@ -900,39 +901,50 @@ void LodTerrainSystem::rebuildSelection() {
     // At normal movement speeds this gives the worker lane multiple frames to
     // generate and upload it instead of exposing sky at the moving frontier.
     constexpr float prefetchDistance = 2.0f * Config::CHUNK_SIZE_X;
+    // Always hand the real terrain to a one-block LOD grid before coarsening.
+    // Without this band a large near render distance can skip level zero and
+    // meet a two- or four-block ocean mesh directly at the visible boundary.
+    constexpr float fineBoundaryBand = Config::CHUNK_SIZE_X;
+    float previousMaximum = inner;
     for (int level = 0; level <= maximumLevel; ++level) {
         const int cellSize = 1 << level;
         const int tileSize = LodTileData::SIDE * cellSize;
-        const float minimum = std::max(
-            inner, level == 0 ? inner : cellSize * quality * 0.5f);
-        const float levelMaximum = level == maximumLevel
+        // One chunk of lookahead is enough for the fine boundary ring; coarser
+        // far-frontier tiles retain the full two-chunk guard band.
+        const float selectionPadding = level == 0
+            ? fineBoundaryBand : prefetchDistance;
+        const float nominalMinimum = level == 0
+            ? inner : cellSize * quality * 0.5f;
+        const float minimum = std::max(previousMaximum, nominalMinimum);
+        float levelMaximum = level == maximumLevel
             ? outer : static_cast<float>(cellSize * quality);
+        if (level == 0)
+            levelMaximum = std::max(levelMaximum, inner + fineBoundaryBand);
         const float maximum = std::min(outer, levelMaximum);
         if (maximum <= minimum) continue;
         const int minTileX = floorDiv(static_cast<int>(std::floor(
-            centerX - maximum - prefetchDistance)), tileSize);
+            centerX - maximum - selectionPadding)), tileSize);
         const int maxTileX = floorDiv(static_cast<int>(std::floor(
-            centerX + maximum + prefetchDistance)), tileSize);
+            centerX + maximum + selectionPadding)), tileSize);
         const int minTileZ = floorDiv(static_cast<int>(std::floor(
-            centerZ - maximum - prefetchDistance)), tileSize);
+            centerZ - maximum - selectionPadding)), tileSize);
         const int maxTileZ = floorDiv(static_cast<int>(std::floor(
-            centerZ + maximum + prefetchDistance)), tileSize);
+            centerZ + maximum + selectionPadding)), tileSize);
         for (int tz = minTileZ; tz <= maxTileZ; ++tz) {
             for (int tx = minTileX; tx <= maxTileX; ++tx) {
                 const float tileCenterX = (tx + 0.5f) * tileSize;
                 const float tileCenterZ = (tz + 0.5f) * tileSize;
                 const float dx = tileCenterX - centerX;
                 const float dz = tileCenterZ - centerZ;
-                const float distance = std::sqrt(dx * dx + dz * dz);
-                const float margin = tileSize * 0.72f;
-                if (distance + margin + prefetchDistance < minimum ||
-                    distance - margin - prefetchDistance > maximum) continue;
-                const float shaderMinimum = minimum <= inner + 0.5f
-                    ? 8.0f : minimum;
+                const float distance = std::max(std::abs(dx), std::abs(dz));
+                const float margin = tileSize * 0.5f;
+                if (distance + margin + selectionPadding < minimum ||
+                    distance - margin - selectionPadding > maximum) continue;
                 m_desired.push_back({{tx, tz, static_cast<uint8_t>(level)},
-                    shaderMinimum, maximum, dx * dx + dz * dz});
+                    minimum, maximum, dx * dx + dz * dz});
             }
         }
+        previousMaximum = maximum;
     }
     std::sort(m_desired.begin(), m_desired.end(),
         [](const Request& a, const Request& b) { return a.distance2 < b.distance2; });
@@ -962,6 +974,15 @@ size_t LodTerrainSystem::selectedTileCountAtLevel(uint8_t level) const {
         m_desired.begin(), m_desired.end(), [level](const Request& request) {
             return request.key.level == level;
         }));
+}
+
+float LodTerrainSystem::selectedMinimumDistanceAtLevel(uint8_t level) const {
+    float distance = std::numeric_limits<float>::max();
+    for (const Request& request : m_desired) {
+        if (request.key.level == level)
+            distance = std::min(distance, request.minimumDistance);
+    }
+    return distance;
 }
 
 float LodTerrainSystem::selectedMaximumDistance() const {
