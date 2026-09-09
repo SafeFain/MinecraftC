@@ -885,12 +885,11 @@ void LodTerrainSystem::rebuildSelection() {
     m_desired.clear();
     if (!m_settings.enabled || !m_generator) return;
     const int quality = lodHorizontalQuality(m_settings.precision);
-    // Do not retain LOD color underneath the real chunk area. Opaque near
-    // terrain normally replaces it after the LOD depth clear, but a view ray
-    // through translucent water can leave the earlier coarse water or seabed
-    // in the color buffer and expose a moving sand/water boundary.
-    const float inner = static_cast<float>(std::max(1, m_nearDistanceChunks) *
-        Config::CHUNK_SIZE_X);
+    // Keep two full chunk rings of overlap so an asynchronously missing near
+    // mesh still has stable terrain behind it. Unlike the former fixed
+    // eight-block cutoff, this follows the player's render-distance setting.
+    const float inner = static_cast<float>(
+        std::max(0, m_nearDistanceChunks - 2) * Config::CHUNK_SIZE_X);
     const float outer = static_cast<float>(m_settings.distanceChunks * Config::CHUNK_SIZE_X);
     const float centerX = static_cast<float>(m_centerChunkX * Config::CHUNK_SIZE_X + 8);
     const float centerZ = static_cast<float>(m_centerChunkZ * Config::CHUNK_SIZE_Z + 8);
@@ -936,8 +935,8 @@ void LodTerrainSystem::rebuildSelection() {
                 const float tileCenterZ = (tz + 0.5f) * tileSize;
                 const float dx = tileCenterX - centerX;
                 const float dz = tileCenterZ - centerZ;
-                const float distance = std::max(std::abs(dx), std::abs(dz));
-                const float margin = tileSize * 0.5f;
+                const float distance = std::sqrt(dx * dx + dz * dz);
+                const float margin = tileSize * 0.72f;
                 if (distance + margin + selectionPadding < minimum ||
                     distance - margin - selectionPadding > maximum) continue;
                 m_desired.push_back({{tx, tz, static_cast<uint8_t>(level)},

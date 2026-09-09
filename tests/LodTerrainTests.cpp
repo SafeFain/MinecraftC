@@ -404,10 +404,13 @@ int main() {
             "LOD selection does not reach its configured outer distance");
     require(selection.selectedTileCountAtLevel(0) > 0 &&
                 selection.selectedMinimumDistanceAtLevel(0) ==
-                    8.0f * Config::CHUNK_SIZE_X,
-            "LOD selection does not start with a fine ring outside real terrain");
+                    6.0f * Config::CHUNK_SIZE_X,
+            "LOD selection does not start two chunks inside real terrain");
     require(selection.selectedTileCount() < 1100,
             "LOD selection exceeds its bounded tile budget");
+    selection.update({0.5, 80.0, 0.5}, 2, {});
+    require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
+            "minimum render distance does not permit a zero-distance LOD overlap");
 
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-lod-terrain-tests";

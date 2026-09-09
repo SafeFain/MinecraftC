@@ -112,8 +112,9 @@ int main() {
     require(chunkShader.find(
                 "if(lodDistance<inner||lodDistance>=outer)discard;") !=
                 std::string::npos &&
-            chunkShader.find(
-                "lodDistance=max(abs(worldPosition.x),abs(worldPosition.z))") !=
+            chunkShader.find("bool isLod=frame.chunkOrigin.w>0.0;") !=
+                std::string::npos &&
+            chunkShader.find("float lodDistance=length(worldPosition.xz);") !=
                 std::string::npos &&
             chunkShader.find("innerCoverage") == std::string::npos &&
             chunkShader.find("outerProgress") == std::string::npos,

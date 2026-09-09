@@ -158,12 +158,12 @@ float valueNoise(vec2 point) {
 }
 
 void main() {
-    bool isLod=frame.atlasAndLighting.w>0.0;
+    // The minimum distance can legitimately be zero when the near render
+    // distance is two chunks, so identify LOD draws by their positive outer
+    // boundary instead of using the minimum as an implicit flag.
+    bool isLod=frame.chunkOrigin.w>0.0;
     if(isLod){
-        // Near chunks are streamed as a square Chebyshev radius. Matching
-        // that footprint prevents LOD from surviving beneath the large corner
-        // regions of the real chunk square.
-        float lodDistance=max(abs(worldPosition.x),abs(worldPosition.z));
+        float lodDistance=length(worldPosition.xz);
         float inner=frame.atlasAndLighting.w;
         float outer=frame.chunkOrigin.w;
         // Exactly one LOD level owns a world-space distance. Dithered overlap
