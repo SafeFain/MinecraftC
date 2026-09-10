@@ -207,6 +207,8 @@ enum class ItemId : uint16_t {
     RESONANT_CRYSTAL,
     SULFUR_CRUST,
 
+    STARSTEP_SCEPTER,
+
     COUNT,
     POPPY = FLOWER
 };

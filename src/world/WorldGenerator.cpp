@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 namespace {
 
@@ -17,6 +18,9 @@ constexpr uint64_t HEAVEN_LAYER1_DOMAIN = 0x4845564C41594531ULL;
 constexpr uint64_t HEAVEN_LAYER2_DOMAIN = 0x4845564C41594532ULL;
 constexpr uint64_t HEAVEN_LAYER4_DOMAIN = 0x4845564C41594534ULL;
 constexpr uint64_t HEAVEN_LAYER5_DOMAIN = 0x4845564C41594535ULL;
+constexpr uint64_t HEAVEN_SKYWAY_DOMAIN = 0x534B595741595631ULL;
+constexpr int HEAVEN_SKYWAY_CELL = 256;
+constexpr std::array<int, 5> HEAVEN_SKYWAY_OFFSETS{{-88, -44, 0, 44, 88}};
 constexpr uint64_t HEAVEN_GEODE_DOMAIN = 0x48455647454F4445ULL;
 constexpr uint64_t HEAVEN_SPIRE_DOMAIN = 0x4845565350495245ULL;
 constexpr int HEAVEN_LANDMARK_CELL = 192;
@@ -137,7 +141,159 @@ WorldGenerator::WorldGenerator(
     , m_treeGenerator(m_seed)
     , m_oreGenerator(m_noise, m_seed)
     , m_structureGenerator(m_seed, m_heightPipeline)
-{}
+{
+    if (isHeaven()) {
+        m_heavenSpawnBlock = findHeavenSpawnBlock();
+        m_originSkyway = findOriginSkyway();
+    }
+}
+
+glm::ivec3 WorldGenerator::findHeavenSpawnBlock(int maximumRadius) const {
+    glm::ivec2 best{0};
+    glm::ivec2 fallback{0};
+    bool hasFallback = false;
+    int bestScore = std::numeric_limits<int>::max();
+    constexpr int step = 8;
+    for (int radius = 0; radius <= maximumRadius; radius += step) {
+        for (int z = -radius; z <= radius; z += step) {
+            for (int x = -radius; x <= radius; x += step) {
+                if (radius > 0 && std::abs(x) != radius && std::abs(z) != radius)
+                    continue;
+                const HeavenIslandColumn center = sampleHeavenLayer(x, z, 2);
+                if (!center.present || center.top >= Config::WORLD_MAX_Y - 8)
+                    continue;
+                bool broadIsland = true;
+                for (int dz = -6; dz <= 6 && broadIsland; dz += 3) {
+                    for (int dx = -6; dx <= 6; dx += 3) {
+                        const HeavenIslandColumn neighbor =
+                            sampleHeavenLayer(x + dx, z + dz, 2);
+                        if (!neighbor.present ||
+                            std::abs(neighbor.top - center.top) > 8) {
+                            broadIsland = false;
+                            break;
+                        }
+                    }
+                }
+                if (!broadIsland) continue;
+                if (!hasFallback) {
+                    fallback = {x, z};
+                    hasFallback = true;
+                }
+                int relief = 0;
+                for (const glm::ivec2 offset : {glm::ivec2{-2, 0}, {2, 0},
+                                                {0, -2}, {0, 2}}) {
+                    const HeavenIslandColumn neighbor =
+                        sampleHeavenLayer(x + offset.x, z + offset.y, 2);
+                    if (!neighbor.present) {
+                        relief = 99;
+                        break;
+                    }
+                    relief = std::max(relief,
+                        std::abs(neighbor.top - center.top));
+                }
+                const int score = relief * 100 + radius;
+                if (relief <= 2 && score < bestScore) {
+                    best = {x, z};
+                    bestScore = score;
+                }
+            }
+        }
+        if (bestScore != std::numeric_limits<int>::max()) break;
+    }
+    if (bestScore == std::numeric_limits<int>::max() && hasFallback)
+        best = fallback;
+    const HeavenIslandColumn chosen = sampleHeavenLayer(best.x, best.y, 2);
+    return {best.x, chosen.present ? chosen.top : 200, best.y};
+}
+
+WorldGenerator::HeavenSkyway WorldGenerator::findOriginSkyway() const {
+    for (int radius = 5; radius <= 32; ++radius) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                if (std::abs(dx) != radius && std::abs(dz) != radius) continue;
+                const int x = m_heavenSpawnBlock.x + dx;
+                const int z = m_heavenSpawnBlock.z + dz;
+                const HeavenIslandColumn center = sampleHeavenLayer(x, z, 2);
+                if (!center.present ||
+                    std::abs(center.top - m_heavenSpawnBlock.y) > 2)
+                    continue;
+                bool supported = true;
+                for (int oz = -3; oz <= 3 && supported; oz += 3) {
+                    for (int ox = -3; ox <= 3; ox += 3) {
+                        const HeavenIslandColumn column =
+                            sampleHeavenLayer(x + ox, z + oz, 2);
+                        if (!column.present ||
+                            std::abs(column.top - center.top) > 2) {
+                            supported = false;
+                            break;
+                        }
+                    }
+                }
+                if (supported) return HeavenSkyway{x, z, center.top, true};
+            }
+        }
+    }
+    return HeavenSkyway{m_heavenSpawnBlock.x + 5, m_heavenSpawnBlock.z,
+                        m_heavenSpawnBlock.y, true};
+}
+
+std::optional<WorldGenerator::HeavenSkyway>
+WorldGenerator::heavenSkywayForCell(int cellX, int cellZ) const {
+    if (!isHeaven()) return {};
+    const uint64_t cellSeed = WorldGenContext::hashPosition(
+        m_seed ^ HEAVEN_SKYWAY_DOMAIN, cellX, 0, cellZ);
+    for (int attempt = 0; attempt < 64; ++attempt) {
+        const uint64_t h = WorldGenContext::hashPosition(
+            cellSeed, attempt, 31, -attempt);
+        const int x = cellX * HEAVEN_SKYWAY_CELL + 12 +
+            static_cast<int>((h >> 8) % (HEAVEN_SKYWAY_CELL - 24));
+        const int z = cellZ * HEAVEN_SKYWAY_CELL + 12 +
+            static_cast<int>((h >> 32) % (HEAVEN_SKYWAY_CELL - 24));
+        const HeavenIslandColumn center = sampleHeavenLayer(x, z, 2);
+        if (!center.present) continue;
+        bool supported = true;
+        for (int dz = -3; dz <= 3 && supported; dz += 3) {
+            for (int dx = -3; dx <= 3; dx += 3) {
+                const HeavenIslandColumn column =
+                    sampleHeavenLayer(x + dx, z + dz, 2);
+                if (!column.present || std::abs(column.top - center.top) > 2) {
+                    supported = false;
+                    break;
+                }
+            }
+        }
+        if (supported) return HeavenSkyway{x, z, center.top, false};
+    }
+    return {};
+}
+
+std::optional<glm::dvec3> WorldGenerator::heavenSkywayDestination(
+    const glm::ivec3& core, bool upward) const {
+    if (!isHeaven()) return {};
+    std::optional<HeavenSkyway> skyway;
+    if (core.x == m_originSkyway.worldX && core.z == m_originSkyway.worldZ)
+        skyway = m_originSkyway;
+    if (!skyway) {
+        const int cellX = floorDiv(core.x, HEAVEN_SKYWAY_CELL);
+        const int cellZ = floorDiv(core.z, HEAVEN_SKYWAY_CELL);
+        skyway = heavenSkywayForCell(cellX, cellZ);
+        if (!skyway || skyway->worldX != core.x || skyway->worldZ != core.z)
+            return {};
+    }
+    int layer = -1;
+    for (int i = 0; i < HEAVEN_LAYER_COUNT; ++i) {
+        if (core.y == skyway->mainFloorY + HEAVEN_SKYWAY_OFFSETS[i] + 1) {
+            layer = i;
+            break;
+        }
+    }
+    if (layer < 0) return {};
+    const int targetLayer = layer + (upward ? 1 : -1);
+    if (targetLayer < 0 || targetLayer >= HEAVEN_LAYER_COUNT) return {};
+    const int floorY = skyway->mainFloorY + HEAVEN_SKYWAY_OFFSETS[targetLayer];
+    return glm::dvec3(skyway->worldX + 1.5, floorY + 1.01,
+                      skyway->worldZ + 0.5);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Height query (for spawn placement etc.)
@@ -468,6 +624,12 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenIsland(
 std::optional<LocatedStructure> WorldGenerator::heavenStructureForCell(
     StructureType type, int cellX, int cellZ) const {
     if (!isHeaven() || !isHeavenStructure(type)) return {};
+    if (type == StructureType::SkywayShrine) {
+        const auto skyway = heavenSkywayForCell(cellX, cellZ);
+        if (!skyway) return {};
+        return LocatedStructure{skyway->worldX, skyway->mainFloorY,
+                                skyway->worldZ, type};
+    }
 
     int cellSize = 0;
     int margin = 0;
@@ -573,7 +735,9 @@ std::optional<LocatedStructure> WorldGenerator::locateNearestHeavenStructure(
         return {};
 
     const int cellSize = type == StructureType::XiguangRuin
-        ? HEAVEN_LANDMARK_CELL : HEAVEN_GEODE_CELL;
+        ? HEAVEN_LANDMARK_CELL
+        : type == StructureType::SkywayShrine
+            ? HEAVEN_SKYWAY_CELL : HEAVEN_GEODE_CELL;
     const int originCellX = floorDiv(worldX, cellSize);
     const int originCellZ = floorDiv(worldZ, cellSize);
     const int maximumRing = maximumDistance / cellSize + 2;
@@ -581,6 +745,18 @@ std::optional<LocatedStructure> WorldGenerator::locateNearestHeavenStructure(
         static_cast<int64_t>(maximumDistance) * maximumDistance;
     int64_t bestDistanceSquared = maximumDistanceSquared + 1;
     std::optional<LocatedStructure> best;
+
+    if (type == StructureType::SkywayShrine) {
+        const int64_t dx = static_cast<int64_t>(m_originSkyway.worldX) - worldX;
+        const int64_t dz = static_cast<int64_t>(m_originSkyway.worldZ) - worldZ;
+        const int64_t distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared <= maximumDistanceSquared) {
+            bestDistanceSquared = distanceSquared;
+            best = LocatedStructure{m_originSkyway.worldX,
+                                    m_originSkyway.mainFloorY,
+                                    m_originSkyway.worldZ, type};
+        }
+    }
 
     const auto inspect = [&](int offsetX, int offsetZ) {
         const auto candidate = heavenStructureForCell(
@@ -1028,6 +1204,80 @@ void WorldGenerator::populateHeaven(
                 ax-6,ax+6,az-6,az+6});
         }
     }
+
+    // Skyway shrines keep all five destinations in one X/Z column, so the
+    // destination chunk is already resident when the player changes height.
+    // The main platform is anchored to a broad L3 island; the other four are
+    // deliberately constructed safe landings in the otherwise empty bands.
+    const auto placeSkyway = [&](const HeavenSkyway& skyway) {
+        const uint64_t lootSeed = WorldGenContext::hashPosition(
+            generator.m_seed ^ HEAVEN_SKYWAY_DOMAIN,
+            skyway.worldX, skyway.mainFloorY, skyway.worldZ);
+        for (int layer = 0; layer < HEAVEN_LAYER_COUNT; ++layer) {
+            const int floorY = skyway.mainFloorY +
+                HEAVEN_SKYWAY_OFFSETS[static_cast<size_t>(layer)];
+            for (int dz = -3; dz <= 3; ++dz) {
+                for (int dx = -3; dx <= 3; ++dx) {
+                    setLocal(skyway.worldX + dx, floorY,
+                             skyway.worldZ + dz,
+                             ((std::abs(dx) + std::abs(dz) + layer) & 1)
+                                 ? BlockId::CLOUDSTONE : BlockId::SUNSTONE);
+                    if (std::abs(dx) < 3 && std::abs(dz) < 3) {
+                        setLocal(skyway.worldX + dx, floorY + 1,
+                                 skyway.worldZ + dz, BlockId::AIR);
+                        setLocal(skyway.worldX + dx, floorY + 2,
+                                 skyway.worldZ + dz, BlockId::AIR);
+                    }
+                    const bool edge = std::abs(dx) == 3 || std::abs(dz) == 3;
+                    const bool doorway = (dx == 0 && std::abs(dz) == 3) ||
+                                         (dz == 0 && std::abs(dx) == 3);
+                    if (edge && !doorway)
+                        setLocal(skyway.worldX + dx, floorY + 1,
+                                 skyway.worldZ + dz, BlockId::CLOUDSTONE);
+                }
+            }
+            setLocal(skyway.worldX, floorY + 1, skyway.worldZ,
+                     BlockId::STAR_CRYSTAL);
+            if (layer == 2) {
+                const int chestX = skyway.worldX + 2;
+                const int chestZ = skyway.worldZ;
+                setLocal(chestX, floorY + 1, chestZ, BlockId::CHEST);
+                if (structureSetter &&
+                    inChunk(chestX, chestZ, baseX, baseZ)) {
+                    structureSetter(chestX, floorY + 1, chestZ, BlockId::CHEST,
+                        skyway.origin
+                            ? StructureLootProfile::OriginSkywayShrine
+                            : StructureLootProfile::SkywayShrine,
+                        lootSeed);
+                }
+            }
+        }
+    };
+
+    const HeavenSkyway originSkyway = generator.m_originSkyway;
+    placeSkyway(originSkyway);
+    const int firstSkywayCellX = floorDiv(baseX - 4, HEAVEN_SKYWAY_CELL);
+    const int lastSkywayCellX = floorDiv(baseX + 19, HEAVEN_SKYWAY_CELL);
+    const int firstSkywayCellZ = floorDiv(baseZ - 4, HEAVEN_SKYWAY_CELL);
+    const int lastSkywayCellZ = floorDiv(baseZ + 19, HEAVEN_SKYWAY_CELL);
+    for (int cellX = firstSkywayCellX; cellX <= lastSkywayCellX; ++cellX) {
+        for (int cellZ = firstSkywayCellZ; cellZ <= lastSkywayCellZ; ++cellZ) {
+            const auto skyway = generator.heavenSkywayForCell(cellX, cellZ);
+            if (!skyway) continue;
+            const int dx = skyway->worldX - originSkyway.worldX;
+            const int dz = skyway->worldZ - originSkyway.worldZ;
+            if (dx * dx + dz * dz < 24 * 24) continue;
+            placeSkyway(*skyway);
+        }
+    }
+    // The spawn selector operates on terrain columns before decoration.
+    // Reserve its standing volume after every decorative/structure pass.
+    setLocal(generator.m_heavenSpawnBlock.x,
+             generator.m_heavenSpawnBlock.y + 1,
+             generator.m_heavenSpawnBlock.z, BlockId::AIR);
+    setLocal(generator.m_heavenSpawnBlock.x,
+             generator.m_heavenSpawnBlock.y + 2,
+             generator.m_heavenSpawnBlock.z, BlockId::AIR);
 
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {

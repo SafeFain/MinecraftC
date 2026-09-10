@@ -21,6 +21,6 @@
   "voxel_gi_inject.comp": "b8f94c35bc50aec1669d8fb09ed3de2ef558021ad4668528a9d363cb3f556151",
   "weather.frag": "c608eecf51d008ad8e55c1de01d9282cb9af1e01d6696ca9c6634487a45f130e",
   "weather.vert": "d92448b533a5d4631ea7a137e15a5f28c8894da09dc294772233984190cabe23",
-  "wireframe.frag": "1b5dba621f46eacd0d1d515bf4f29fa23c838f32759fce1433a8c89cd35af508",
+  "wireframe.frag": "36d617b55cf5c5be2d1b87c82895577067bef5bcbd7874545337fc921cacf32d",
   "wireframe.vert": "89d32b8ce6efb4ec447a292c17c8f4d69b0e7371ae673999ea0e12331338877a"
 }

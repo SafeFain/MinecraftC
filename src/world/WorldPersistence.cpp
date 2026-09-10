@@ -61,6 +61,12 @@ std::vector<LootEntry> lootEntries(StructureLootProfile profile) {
         case P::CloudspireTower: return {{ItemId::CLOUDSTONE,2,6,100},
             {ItemId::SUNSTONE,1,4,70},{ItemId::STAR_CRYSTAL,1,2,35},
             {ItemId::CLOUD_BLOOM,1,3,45}};
+        case P::SkywayShrine: return {{ItemId::STARSTEP_SCEPTER,1,1,25},
+            {ItemId::STAR_CRYSTAL,2,5,100},{ItemId::SUNSTONE,2,6,90},
+            {ItemId::CLOUDSTONE,3,8,100}};
+        case P::OriginSkywayShrine: return {{ItemId::STARSTEP_SCEPTER,1,1,100},
+            {ItemId::STAR_CRYSTAL,2,5,100},{ItemId::SUNSTONE,2,6,100},
+            {ItemId::CLOUDSTONE,3,8,100}};
         default:return{};
     }
 }

@@ -311,6 +311,9 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, caveBlocks[i].second});
     }
 
+    set(ItemId::STARSTEP_SCEPTER,
+        {"Starstep Scepter", ItemKind::Tool, 1, 192});
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -388,6 +391,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::DIAMOND_PICKAXE: case ItemId::DIAMOND_AXE:
         case ItemId::DIAMOND_SHOVEL: case ItemId::DIAMOND_HOE:
         case ItemId::FLINT_AND_STEEL:
+        case ItemId::STARSTEP_SCEPTER:
             return CreativeItemCategory::Tools;
 
         // ── Combat ──────────────────────────────────────────────────────

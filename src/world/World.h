@@ -222,6 +222,12 @@ public:
     std::optional<RaycastHit> raycast(const glm::dvec3& origin,
                                       const glm::vec3& direction,
                                       float maxDistance) const;
+    std::optional<glm::dvec3> heavenSkywayDestination(
+        const glm::ivec3& core, bool upward) const;
+    bool isHeavenSkywayCore(const glm::ivec3& core) const;
+    std::optional<glm::dvec3> starstepDestination(
+        const glm::dvec3& origin, const glm::vec3& direction,
+        float maxDistance = 96.0f) const;
 
     // ── Rendering ────────────────────────────────────────────────────
     const std::vector<Chunk*>& getActiveChunks() const {

@@ -121,6 +121,8 @@ public:
         return m_bowCharging ? bowChargeStrength(m_bowChargeSeconds) : 0.0f;
     }
     std::optional<ProjectileLaunch> bowLaunchPreview() const;
+    std::optional<glm::dvec3> starstepTarget() const;
+    float starstepCooldown() const { return m_starstepCooldown; }
     float attackStrength() const;
     bool hasChargedAttackTarget() const;
     void cancelBowCharge() { m_bowCharging = false; m_bowChargeSeconds = 0.0f; }
@@ -168,6 +170,7 @@ private:
     glm::vec2 m_visualHorizontalVelocity{0.0f};
     bool m_visualPositionInitialized = false;
     float m_landingSpeed = 0.0f;
+    float m_starstepCooldown = 0.0f;
 
     // View angles
     float m_yaw = 0.0f;
@@ -245,6 +248,7 @@ private:
 
     bool breakBlock();
     bool placeBlock();
+    bool useStarstepScepter();
     void beginBowCharge();
     void releaseBow();
     void startSwing();

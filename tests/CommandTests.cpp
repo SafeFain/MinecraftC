@@ -87,6 +87,14 @@ int main() {
     require(heavenStructureSuggestions.size() == 1 &&
                 heavenStructureSuggestions[0].text == "cloudspire_tower",
             "Heaven structure argument completion is missing");
+    const std::string skywayPrefix = "/locate structure sky";
+    const auto skywaySuggestions = commandSuggestions(
+        skywayPrefix, skywayPrefix.size());
+    require(skywaySuggestions.size() == 1 &&
+                skywaySuggestions[0].text == "skyway_shrine" &&
+                parseStructureCommandName("minecraftc:skyway_shrine") ==
+                    StructureType::SkywayShrine,
+            "Skyway Shrine parsing or completion is missing");
     const std::string middleInput = "/locate structure ruined_x extra";
     const size_t middleCursor = middleInput.find("_x");
     const auto middleSuggestions = commandSuggestions(middleInput, middleCursor);

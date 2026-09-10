@@ -25,7 +25,7 @@ GitHub prereleases; release-channel tags create normal releases.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 181-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 182-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen linking to the project's source
@@ -182,7 +182,9 @@ transition cave ecology with larger chambers and rifts.
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
 supports the current dimension's Overworld structures plus Heaven's
-`xiguang_ruin`, `star_crystal_geode`, and `cloudspire_tower`. Command arguments
+`xiguang_ruin`, `star_crystal_geode`, `cloudspire_tower`, and `skyway_shrine`.
+Skyway Shrines link all five altitude bands, while the Heaven-only Starstep
+Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 Run `./build-local/minecraftc --version` to print the version without opening a

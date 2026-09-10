@@ -1098,8 +1098,8 @@ int main() {
     // Every public blueprint honors its advertised horizontal reservation,
     // remains inside the world build range, and derives visible variation only
     // from the stable placement variant.
-    const std::array<int, 11> blueprintRadii{
-        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6};
+    const std::array<int, 12> blueprintRadii{
+        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6, 3};
     for (size_t typeIndex = 0; typeIndex < STRUCTURE_TYPES.size(); ++typeIndex) {
         const StructureType type = STRUCTURE_TYPES[typeIndex];
         auto makePlacement = [&](uint64_t variant) {
@@ -1732,6 +1732,74 @@ int main() {
                 heaven.generationVersion() != WorldGenContext::GENERATION_VERSION &&
                 heaven.generationVersion() == WorldGenerator::HEAVEN_GENERATION_VERSION,
             "Heaven v7 cache and generation versions share the overworld key");
+
+    const glm::ivec3 heavenSpawn = heaven.heavenSpawnBlock();
+    const auto originSkyway = heaven.originHeavenSkyway();
+    require(heavenSpawn == heavenRepeat.heavenSpawnBlock() &&
+                originSkyway.worldX ==
+                    heavenRepeat.originHeavenSkyway().worldX &&
+                originSkyway.worldZ ==
+                    heavenRepeat.originHeavenSkyway().worldZ &&
+                heaven.sampleHeavenLayers(heavenSpawn.x, heavenSpawn.z)[2].present &&
+                std::hypot(originSkyway.worldX - heavenSpawn.x,
+                           originSkyway.worldZ - heavenSpawn.z) <= 32.0,
+            "Heaven spawn and origin skyway anchor are not deterministic");
+    const glm::ivec3 originCore(originSkyway.worldX,
+                                originSkyway.mainFloorY + 1,
+                                originSkyway.worldZ);
+    const auto skywayUp = heaven.heavenSkywayDestination(originCore, true);
+    const auto skywayDown = heaven.heavenSkywayDestination(originCore, false);
+    require(skywayUp && skywayDown &&
+                std::abs(skywayUp->y -
+                    (originSkyway.mainFloorY + 45.01)) < 0.001 &&
+                std::abs(skywayDown->y -
+                    (originSkyway.mainFloorY - 42.99)) < 0.001,
+            "origin skyway does not link adjacent altitude platforms");
+    int regularSkyways = 0;
+    for (int cellZ = -2; cellZ <= 2; ++cellZ) {
+        for (int cellX = -2; cellX <= 2; ++cellX) {
+            const auto first = heaven.heavenSkywayForCell(cellX, cellZ);
+            const auto repeat = heavenRepeat.heavenSkywayForCell(cellX, cellZ);
+            require(first.has_value() == repeat.has_value() &&
+                        (!first || (first->worldX == repeat->worldX &&
+                                    first->worldZ == repeat->worldZ &&
+                                    first->mainFloorY == repeat->mainFloorY)),
+                    "regular skyway cell query is not deterministic");
+            if (first) ++regularSkyways;
+        }
+    }
+    require(regularSkyways >= 12,
+            "skyway network is too sparse for survival traversal");
+    const auto floorDivChunk = [](int value) {
+        return value >= 0 ? value / Config::CHUNK_SIZE_X
+                          : (value - Config::CHUNK_SIZE_X + 1) /
+                                Config::CHUNK_SIZE_X;
+    };
+    Chunk spawnSkywayChunk(floorDivChunk(originSkyway.worldX),
+                           floorDivChunk(originSkyway.worldZ));
+    heaven.generate(spawnSkywayChunk);
+    const int spawnLocalX = originSkyway.worldX - spawnSkywayChunk.worldX();
+    const int spawnLocalZ = originSkyway.worldZ - spawnSkywayChunk.worldZ();
+    for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
+        const int floorY = originSkyway.mainFloorY + (layer - 2) * 44;
+        const BlockId floor = spawnSkywayChunk.getBlock(
+            spawnLocalX, floorY, spawnLocalZ);
+        require((floor == BlockId::SUNSTONE || floor == BlockId::CLOUDSTONE) &&
+                    spawnSkywayChunk.getBlock(spawnLocalX, floorY + 1,
+                                               spawnLocalZ) ==
+                        BlockId::STAR_CRYSTAL,
+                "origin skyway chunk is missing a floor or travel core");
+    }
+    Chunk heavenSpawnChunk(floorDivChunk(heavenSpawn.x),
+                           floorDivChunk(heavenSpawn.z));
+    heaven.generate(heavenSpawnChunk);
+    const int safeLocalX = heavenSpawn.x - heavenSpawnChunk.worldX();
+    const int safeLocalZ = heavenSpawn.z - heavenSpawnChunk.worldZ();
+    require(heavenSpawnChunk.getBlock(safeLocalX, heavenSpawn.y + 1,
+                                      safeLocalZ) == BlockId::AIR &&
+                heavenSpawnChunk.getBlock(safeLocalX, heavenSpawn.y + 2,
+                                           safeLocalZ) == BlockId::AIR,
+            "origin skyway obstructed the deterministic Heaven spawn");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
     std::vector<Chunk*> heavenRegionChunks;

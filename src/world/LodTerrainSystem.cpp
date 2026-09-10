@@ -809,10 +809,12 @@ void LodTerrainSystem::reset(WorldGenerator* generator) {
     m_desired.clear();
     m_submissions.clear();
     m_exactRevisions.clear();
+    m_nearFallbackChunks.clear();
     m_completions.clear();
     m_exactCompletions.clear();
     m_cpuBytes = m_gpuBytes = 0;
     m_generator = generator;
+    m_nextRequestLevel = 0;
     if (m_saveStore && m_generator) {
         m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r4" /
             ("d_" + std::to_string(static_cast<int>(m_generator->dimension())));
@@ -945,6 +947,43 @@ void LodTerrainSystem::rebuildSelection() {
         }
         previousMaximum = maximum;
     }
+
+    // The configured inner boundary assumes every near chunk already has a
+    // GPU mesh. During fast movement that is temporarily false: retiring the
+    // level-zero tile first exposes sky until generation, meshing and upload
+    // catch up. Retain/request only the missing chunks as a transient backing
+    // layer. The normal chunks are drawn after the LOD depth clear, so each
+    // fallback disappears cleanly as soon as its replacement becomes ready.
+    if (inner > 0.0f) {
+        for (uint64_t packed : m_nearFallbackChunks) {
+            const int chunkX = static_cast<int>(
+                static_cast<int32_t>(packed >> 32));
+            const int chunkZ = static_cast<int>(
+                static_cast<int32_t>(packed & 0xffffffffu));
+            const float tileCenterX =
+                static_cast<float>(chunkX * Config::CHUNK_SIZE_X + 8);
+            const float tileCenterZ =
+                static_cast<float>(chunkZ * Config::CHUNK_SIZE_Z + 8);
+            const float dx = tileCenterX - centerX;
+            const float dz = tileCenterZ - centerZ;
+            const float distance2 = dx * dx + dz * dz;
+            constexpr float tileRadius = Config::CHUNK_SIZE_X * 0.72f;
+            if (std::sqrt(distance2) - tileRadius >= inner) continue;
+
+            const LodTileKey key{chunkX, chunkZ, 0};
+            const auto existing = std::find_if(
+                m_desired.begin(), m_desired.end(),
+                [&key](const Request& request) { return request.key == key; });
+            if (existing != m_desired.end()) {
+                existing->minimumDistance = 0.0f;
+                existing->maximumDistance =
+                    std::max(existing->maximumDistance, inner);
+                existing->distance2 = distance2;
+            } else {
+                m_desired.push_back({key, 0.0f, inner, distance2});
+            }
+        }
+    }
     std::sort(m_desired.begin(), m_desired.end(),
         [](const Request& a, const Request& b) { return a.distance2 < b.distance2; });
 
@@ -972,6 +1011,20 @@ size_t LodTerrainSystem::selectedTileCountAtLevel(uint8_t level) const {
     return static_cast<size_t>(std::count_if(
         m_desired.begin(), m_desired.end(), [level](const Request& request) {
             return request.key.level == level;
+        }));
+}
+
+size_t LodTerrainSystem::residentTileCount() const {
+    return static_cast<size_t>(std::count_if(
+        m_tiles.begin(), m_tiles.end(), [](const auto& entry) {
+            return entry.second->resident;
+        }));
+}
+
+size_t LodTerrainSystem::residentTileCountAtLevel(uint8_t level) const {
+    return static_cast<size_t>(std::count_if(
+        m_tiles.begin(), m_tiles.end(), [level](const auto& entry) {
+            return entry.first.level == level && entry.second->resident;
         }));
 }
 
@@ -1027,64 +1080,84 @@ void LodTerrainSystem::enqueueRequests() {
     if (!m_threadPool || !m_generator || m_cacheRoot.empty()) return;
     const LodWorkBudget budget = lodWorkBudget(m_settings.aggressiveness);
     auto enqueuePass = [&](bool replacements) {
-        for (const Request& request : m_desired) {
-            if (m_tasksInFlight.load() >= budget.maxInFlight) return;
-            auto found = m_tiles.find(request.key);
-            if (found != m_tiles.end() && (found->second->queued ||
-                found->second->pendingMesh || (!found->second->dirty &&
-                (found->second->mesh.gpuReady || !found->second->mesh.empty())))) {
-                found->second->minimumDistance = request.minimumDistance;
-                found->second->maximumDistance = request.maximumDistance;
-                found->second->distance2 = request.distance2;
-                continue;
+        constexpr uint8_t levelCount = 13;
+        while (m_tasksInFlight.load() < budget.maxInFlight) {
+            bool enqueued = false;
+            for (uint8_t offset = 0; offset < levelCount && !enqueued; ++offset) {
+                const uint8_t level = static_cast<uint8_t>(
+                    (m_nextRequestLevel + offset) % levelCount);
+                for (const Request& request : m_desired) {
+                    if (request.key.level != level) continue;
+                    auto found = m_tiles.find(request.key);
+                    if (found != m_tiles.end()) {
+                        found->second->minimumDistance = request.minimumDistance;
+                        found->second->maximumDistance = request.maximumDistance;
+                        found->second->distance2 = request.distance2;
+                        if (found->second->queued || found->second->pendingMesh ||
+                            (!found->second->dirty && found->second->resident))
+                            continue;
+                    }
+                    const bool hasRenderableMesh = found != m_tiles.end() &&
+                        (found->second->mesh.gpuReady ||
+                         !found->second->mesh.empty());
+                    if (hasRenderableMesh != replacements) continue;
+                    if (found == m_tiles.end()) {
+                        auto tile = std::make_unique<Tile>();
+                        tile->key = request.key;
+                        found = m_tiles.emplace(request.key, std::move(tile)).first;
+                    }
+                    found->second->queued = true;
+                    found->second->dirty = false;
+                    found->second->minimumDistance = request.minimumDistance;
+                    found->second->maximumDistance = request.maximumDistance;
+                    found->second->distance2 = request.distance2;
+                    const uint64_t epoch = m_epoch;
+                    const int spanLimit = lodVerticalSpanLimit(m_settings.precision);
+                    WorldGenerator* generator = m_generator;
+                    const auto root = m_cacheRoot;
+                    const auto exact = exactChunksForTile(request.key);
+                    const LodTileKey key = request.key;
+                    ++m_tasksInFlight;
+                    m_threadPool->enqueuePriority(
+                        [this, key, epoch, spanLimit, generator, root, exact]() {
+                            LodTileData data;
+                            if (!readTileFile(tilePath(root, key), key,
+                                              *generator, data)) {
+                                data = buildApproximateLodTile(*generator, key);
+                                writeTileFile(tilePath(root, key), key,
+                                              *generator, data);
+                            }
+                            overlayExactChunks(data, key, root, *generator, exact);
+                            LodExactNeighborTiles neighbors;
+                            const LodExactNeighborTiles* neighborPointer = nullptr;
+                            if (key.level == 0 && isFullyExact(data)) {
+                                neighbors = readExactNeighbors(
+                                    root, *generator, key.x, key.z);
+                                neighborPointer = &neighbors;
+                            }
+                            ChunkMesh mesh = buildLodTileMesh(
+                                data, 1 << key.level, spanLimit, neighborPointer);
+                            {
+                                std::lock_guard lock(m_completionMutex);
+                                m_completions.push_back({key, epoch,
+                                    std::move(data), std::move(mesh)});
+                            }
+                            --m_tasksInFlight;
+                        }, 100 - static_cast<int>(
+                            std::min(request.distance2, 1000000.0f)));
+                    m_nextRequestLevel = static_cast<uint8_t>(
+                        (level + 1) % levelCount);
+                    enqueued = true;
+                    break;
+                }
             }
-            const bool hasRenderableMesh = found != m_tiles.end() &&
-                (found->second->mesh.gpuReady || !found->second->mesh.empty());
-            if (hasRenderableMesh != replacements) continue;
-            if (found == m_tiles.end()) {
-                auto tile = std::make_unique<Tile>();
-                tile->key = request.key;
-                found = m_tiles.emplace(request.key, std::move(tile)).first;
-            }
-            found->second->queued = true;
-            found->second->dirty = false;
-            found->second->minimumDistance = request.minimumDistance;
-            found->second->maximumDistance = request.maximumDistance;
-            found->second->distance2 = request.distance2;
-            const uint64_t epoch = m_epoch;
-            const int spanLimit = lodVerticalSpanLimit(m_settings.precision);
-            WorldGenerator* generator = m_generator;
-            const auto root = m_cacheRoot;
-            const auto exact = exactChunksForTile(request.key);
-            const LodTileKey key = request.key;
-            ++m_tasksInFlight;
-            m_threadPool->enqueuePriority([this, key, epoch, spanLimit, generator,
-                                          root, exact]() {
-                LodTileData data;
-                if (!readTileFile(tilePath(root, key), key, *generator, data)) {
-                    data = buildApproximateLodTile(*generator, key);
-                    writeTileFile(tilePath(root, key), key, *generator, data);
-                }
-                overlayExactChunks(data, key, root, *generator, exact);
-                LodExactNeighborTiles neighbors;
-                const LodExactNeighborTiles* neighborPointer = nullptr;
-                if (key.level == 0 && isFullyExact(data)) {
-                    neighbors = readExactNeighbors(root, *generator, key.x, key.z);
-                    neighborPointer = &neighbors;
-                }
-                ChunkMesh mesh = buildLodTileMesh(
-                    data, 1 << key.level, spanLimit, neighborPointer);
-                {
-                    std::lock_guard lock(m_completionMutex);
-                    m_completions.push_back(
-                        {key, epoch, std::move(data), std::move(mesh)});
-                }
-                --m_tasksInFlight;
-            }, 100 - static_cast<int>(std::min(request.distance2, 1000000.0f)));
+            if (!enqueued) return;
         }
     };
-    // Missing coverage is correctness-critical. Stale exact refinements keep
-    // their old GPU mesh and must never starve a newly visible tile.
+    // Missing coverage is correctness-critical. Cycle across active levels so
+    // dense fine rings cannot postpone all outer Heaven bands; requests within
+    // each level retain their near-to-far ordering. Stale exact refinements
+    // keep their old GPU mesh and must never starve a newly visible tile.
     enqueuePass(false);
     enqueuePass(true);
 }
@@ -1103,6 +1176,25 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
         m_centerChunkX = cx;
         m_centerChunkZ = cz;
         m_nearDistanceChunks = nearDistanceChunks;
+        m_selectionDirty = true;
+    }
+    std::unordered_set<uint64_t> nearFallbackChunks;
+    const int64_t nearDistance2 = static_cast<int64_t>(nearDistanceChunks) *
+        nearDistanceChunks;
+    for (const Chunk* chunk : activeChunks) {
+        if (!chunk) continue;
+        const int64_t dx = static_cast<int64_t>(chunk->cx) - cx;
+        const int64_t dz = static_cast<int64_t>(chunk->cz) - cz;
+        if (dx * dx + dz * dz > nearDistance2) continue;
+        const ChunkMesh& mesh = chunk->getMesh();
+        const bool renderable =
+            chunk->lifecycle.load() == Chunk::LifecycleState::Renderable &&
+            (mesh.indexCount == 0 || mesh.gpuReady);
+        if (!renderable)
+            nearFallbackChunks.insert(packedChunkKey(chunk->cx, chunk->cz));
+    }
+    if (nearFallbackChunks != m_nearFallbackChunks) {
+        m_nearFallbackChunks = std::move(nearFallbackChunks);
         m_selectionDirty = true;
     }
     if (m_selectionDirty) rebuildSelection();
@@ -1171,6 +1263,7 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
             continue;
         }
         m_cpuBytes += completion.data.memoryBytes() + completion.mesh.uploadBytes();
+        tile.resident = true;
         if (tile.mesh.gpuReady || !tile.mesh.empty()) {
             if (tile.pendingData) {
                 m_cpuBytes -= std::min(m_cpuBytes,

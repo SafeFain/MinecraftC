@@ -1294,6 +1294,12 @@ def generate_item_sprite(template,material,definitions):
     elif template=="torch":
         _line(image,6,13,9,5,outline,4); _line(image,6,13,9,5,handle[1],2)
         for x,y,c in ((8,5,shades[1]),(9,5,shades[2]),(8,4,shades[2]),(9,4,shades[3]),(10,4,shades[2]),(9,3,shades[3])): _put(image,x,y,c)
+    elif template=="scepter":
+        _line(image,3,14,10,5,outline,4); _line(image,3,14,10,5,handle[1],2)
+        for x,y,c in ((9,5,shades[1]),(10,4,shades[2]),(11,3,shades[3]),
+                      (12,4,shades[2]),(11,5,shades[1]),(10,3,shades[3])):
+            _put(image,x,y,c)
+        _put(image,4,13,handle[3]); _put(image,6,10,shades[2])
     elif template=="string":
         for points in (((5,4),(10,3),(12,6),(10,10),(5,11),(3,8),(5,5),(9,5),(10,7),(8,9),(6,8)),):
             for a,b in zip(points,points[1:]): _line(image,*a,*b,shades[2])

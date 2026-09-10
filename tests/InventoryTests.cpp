@@ -84,7 +84,7 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::SULFUR_CRUST,
+            creativeItems.back() == ItemId::STARSTEP_SCEPTER,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -111,7 +111,7 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Tools)] == 21 &&
+                CreativeItemCategory::Tools)] == 22 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Combat)] == 24 &&
             categoryCounts[static_cast<size_t>(
@@ -136,7 +136,10 @@ int main() {
             creativeInventoryCategory(ItemId::DIAMOND) ==
                 CreativeItemCategory::Materials &&
             creativeInventoryCategory(ItemId::IRON_PICKAXE) ==
-                CreativeItemCategory::Tools,
+                CreativeItemCategory::Tools &&
+            creativeInventoryCategory(ItemId::STARSTEP_SCEPTER) ==
+                CreativeItemCategory::Tools &&
+            getItemProps(ItemId::STARSTEP_SCEPTER).maxDurability == 192,
             "representative items map to their Minecraft-style tabs");
     for (size_t index = 0;
          index < static_cast<size_t>(CreativeItemCategory::Count); ++index) {
@@ -167,6 +170,7 @@ int main() {
             "Heaven materials lack inventory, atlas, or light mappings");
     require(static_cast<uint16_t>(ItemId::DRIPSTONE_BLOCK) == 175 &&
                 static_cast<uint16_t>(ItemId::SULFUR_CRUST) == 181 &&
+                static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER) == 182 &&
                 itemForBlock(BlockId::POINTED_DRIPSTONE_UP) ==
                     ItemId::POINTED_DRIPSTONE &&
                 itemForBlock(BlockId::POINTED_DRIPSTONE_DOWN) ==

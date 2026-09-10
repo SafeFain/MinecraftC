@@ -767,6 +767,23 @@ void buildCloudspireTower(const StructurePlacement& placement,
     write(cx+1,base+1,cz+1,BlockId::CHEST);
 }
 
+void buildSkywayShrine(const StructurePlacement& placement,
+                       const StructureGenerator::StructureWriter& write) {
+    const int cx = (placement.minX + placement.maxX) / 2;
+    const int cz = (placement.minZ + placement.maxZ) / 2;
+    const int base = placement.baseY;
+    for (int dz = -3; dz <= 3; ++dz) {
+        for (int dx = -3; dx <= 3; ++dx) {
+            const bool alternate = ((dx + dz +
+                static_cast<int>(placement.variant & 1u)) & 1) != 0;
+            write(cx + dx, base, cz + dz,
+                  alternate ? BlockId::CLOUDSTONE : BlockId::SUNSTONE);
+        }
+    }
+    write(cx, base + 1, cz, BlockId::STAR_CRYSTAL);
+    write(cx + 2, base + 1, cz, BlockId::CHEST);
+}
+
 } // namespace
 
 StructureGenerator::StructureGenerator(uint64_t seed,
@@ -1181,6 +1198,9 @@ void StructureGenerator::build(const StructurePlacement& placement,
             break;
         case StructureType::CloudspireTower:
             buildCloudspireTower(placement, transformedWrite);
+            break;
+        case StructureType::SkywayShrine:
+            buildSkywayShrine(placement, transformedWrite);
             break;
         default:
             break;

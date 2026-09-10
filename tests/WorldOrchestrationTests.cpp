@@ -94,7 +94,7 @@ public:
     void bindBlockShader() const override {}
     void unbindBlockShader() const override {}
     void renderWireframe(const glm::vec3&, const glm::vec3&,
-                         const glm::mat4&) override {}
+                         const glm::mat4&, const glm::vec3&) override {}
     void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&,
                       int, const glm::mat4&) override {}
     void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,
@@ -1149,6 +1149,43 @@ void testGeneratedStructureWorkBlocks() {
     std::filesystem::remove_all(root);
 }
 
+void testHeavenStarstepResolution() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 2;
+    ThreadPool pool(2);
+    World world;
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(0x123456789ULL, WorldType::Normal,
+                          DimensionId::Heaven);
+    loadTarget(world);
+    generateTarget(world, pool);
+
+    for (int x = 1; x <= 6; ++x)
+        for (int y = 188; y <= 198; ++y)
+            world.setBlock(x, y, 0, BlockId::AIR);
+    for (int y = 188; y <= 192; ++y)
+        world.setBlock(5, y, 0, BlockId::CLOUDSTONE);
+    const auto destination = world.starstepDestination(
+        {0.5, 190.5, 0.5}, {1.0f, 0.0f, 0.0f});
+    require(destination && std::abs(destination->x - 5.5) < 0.001 &&
+                std::abs(destination->y - 193.01) < 0.001,
+            "starstep did not resolve the visible column's safe top");
+
+    for (int y = 188; y <= 191; ++y)
+        world.setBlock(2, y, 0, BlockId::SUNSTONE);
+    const auto blocked = world.starstepDestination(
+        {0.5, 190.5, 0.5}, {1.0f, 0.0f, 0.0f});
+    require(blocked && std::abs(blocked->x - 2.5) < 0.001,
+            "starstep passed through the first solid obstruction");
+    drainWorkers(world, pool);
+    Config::RENDER_DISTANCE = oldRenderDistance;
+
+    World overworld;
+    require(!overworld.starstepDestination(
+                {0.5, 80.0, 0.5}, {1.0f, 0.0f, 0.0f}),
+            "starstep remained active outside Heaven");
+}
+
 }  // namespace
 
 int main() {
@@ -1169,6 +1206,7 @@ int main() {
     testBedLifecycle();
     testGeneratedBlockEntityRegistration();
     testGeneratedStructureWorkBlocks();
+    testHeavenStarstepResolution();
     std::cout << "World orchestration tests passed\n";
     return 0;
 }

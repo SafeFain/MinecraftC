@@ -343,6 +343,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     int cloudCacheRadius = -1;
     bool cloudsQueued = false;
     glm::mat4 wireModelViewProjection{1.0f};
+    glm::vec3 wireColor{0.0f};
     bool wireQueued = false;
     glm::mat4 particleViewProjection{1.0f};
     glm::vec3 particleCameraRight{1.0f,0.0f,0.0f};
@@ -2492,9 +2493,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               swapchain.wirePipeline);
             const WireUniforms constants{wireModelViewProjection,
-                {0.0f, 0.0f, 0.0f, 0.0f}};
+                {0.0f, wireColor.r, wireColor.g, wireColor.b}};
             vkCmdPushConstants(command, swapchain.wirePipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT, 0,
+                               VK_SHADER_STAGE_VERTEX_BIT |
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(constants), &constants);
             vkCmdDraw(command, 24, 1, 0, 0);
         }

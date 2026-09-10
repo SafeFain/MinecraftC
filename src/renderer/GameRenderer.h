@@ -63,7 +63,8 @@ public:
     virtual void bindBlockShader() const = 0;
     virtual void unbindBlockShader() const = 0;
     virtual void renderWireframe(const glm::vec3&, const glm::vec3&,
-                                 const glm::mat4&) = 0;
+                                 const glm::mat4&,
+                                 const glm::vec3& color = glm::vec3(0.0f)) = 0;
     virtual void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&,
                               int, const glm::mat4&) = 0;
     virtual void renderCompatibilityEntityCube(

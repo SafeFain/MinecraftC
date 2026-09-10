@@ -195,6 +195,8 @@ std::vector<CraftingRecipe> buildRecipes() {
     for (ItemId log : {ItemId::OAK_LOG, ItemId::BIRCH_LOG, ItemId::SPRUCE_LOG,
                        ItemId::JUNGLE_LOG, ItemId::ACACIA_LOG})
         recipes.push_back(shaped(1, 1, {log}, {ItemId::OAK_PLANKS, 4, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::SKYROOT_LOG},
+                             {ItemId::OAK_PLANKS, 4, 0}, false));
     recipes.push_back(shaped(1, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
                              {ItemId::STICK, 4, 0}, false));
     recipes.push_back(shaped(2, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
@@ -231,6 +233,11 @@ std::vector<CraftingRecipe> buildRecipes() {
                              {ItemId::SHIELD, 1, 0}, false));
     recipes.push_back(shaped(2, 1, {ItemId::FLINT, ItemId::IRON_INGOT},
                              {ItemId::FLINT_AND_STEEL, 1, 0}));
+    recipes.push_back(shaped(3, 3, {
+        E, ItemId::STAR_CRYSTAL, E,
+        ItemId::STAR_CRYSTAL, ItemId::SUNSTONE, ItemId::STAR_CRYSTAL,
+        E, ItemId::CLOUDSTONE, E},
+        {ItemId::STARSTEP_SCEPTER, 1, 0}, false));
     recipes.push_back(shaped(2, 2, {
         ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE,
         ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE},

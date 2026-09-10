@@ -60,6 +60,12 @@ public:
         bool replacesSurface = false;
         HeavenBiome biome = HeavenBiome::DawnMeadow;
     };
+    struct HeavenSkyway {
+        int worldX = 0;
+        int worldZ = 0;
+        int mainFloorY = 0;
+        bool origin = false;
+    };
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
     // Callback for structure blocks outside the current chunk.  Unlike
@@ -106,6 +112,12 @@ public:
     std::optional<LocatedStructure> locateNearestHeavenStructure(
         StructureType type, int worldX, int worldZ,
         int maximumDistance = 8192) const;
+    glm::ivec3 heavenSpawnBlock() const { return m_heavenSpawnBlock; }
+    HeavenSkyway originHeavenSkyway() const { return m_originSkyway; }
+    std::optional<HeavenSkyway> heavenSkywayForCell(
+        int cellX, int cellZ) const;
+    std::optional<glm::dvec3> heavenSkywayDestination(
+        const glm::ivec3& core, bool upward) const;
     uint32_t generationVersion() const {
         return isHeaven() ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
@@ -115,7 +127,7 @@ public:
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
-    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 7;
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 8;
     static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
         (HEAVEN_GENERATION_VERSION << 16) | 1u;
 
@@ -140,6 +152,8 @@ private:
     TreeGenerator  m_treeGenerator;
     OreGenerator   m_oreGenerator;
     StructureGenerator m_structureGenerator;
+    glm::ivec3 m_heavenSpawnBlock{0, 200, 0};
+    HeavenSkyway m_originSkyway{5, 0, 200, true};
 
     // Tree placement helper — handles all tree types
     void placeTree(Chunk& chunk, int localX, int baseY, int localZ,
@@ -159,6 +173,8 @@ private:
         int worldX, int worldZ, int layer) const;
     std::optional<LocatedStructure> heavenStructureForCell(
         StructureType type, int cellX, int cellZ) const;
+    glm::ivec3 findHeavenSpawnBlock(int maximumRadius = 512) const;
+    HeavenSkyway findOriginSkyway() const;
     static void populateHeaven(Chunk& chunk, WorldGenerator& generator,
                                const StructureSetter& structureSetter = {});
 };

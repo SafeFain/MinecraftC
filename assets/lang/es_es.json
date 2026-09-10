@@ -255,7 +255,7 @@
   "message.chat_self": "<Jugador> {0}",
   "message.help_header": "Comandos disponibles:",
   "message.help_biomes": "Biomas: ocean, beach, plain, forest, desert, mountains, hills, swamp, taiga, snow_tundra, jungle, savanna, deep_ocean, river, stony_shore, meadow, birch_forest, badlands, flower_forest, sunflower_plains, glacial_peaks, alpine_tundra, rocky_steppe, limestone_highlands, karst_forest, volcanic_highlands, black_sand_coast, red_canyon, lush_valley, dry_woodland",
-  "message.help_structures": "Estructuras: village, desert_village, traveler_hut, abandoned_camp, desert_well, igloo, ruined_tower, lumber_camp; Cielo: xiguang_ruin, star_crystal_geode, cloudspire_tower",
+  "message.help_structures": "Estructuras: village, desert_village, traveler_hut, abandoned_camp, desert_well, igloo, ruined_tower, lumber_camp; Cielo: xiguang_ruin, star_crystal_geode, cloudspire_tower, skyway_shrine",
   "message.command_unknown": "Comando desconocido en la columna {0}",
   "message.command_error": "Error de sintaxis en la columna {0}: se esperaba {1}",
   "message.locate_found": "{0} más cercano: {1}, {2} (a {3} bloques)",
@@ -463,5 +463,6 @@
   "item.159": "Losa de piedra solar",
   "item.160": "Escaleras de piedra solar",
   "item.161": "Losa de piedra de nube",
-  "item.162": "Escaleras de piedra de nube"
+  "item.162": "Escaleras de piedra de nube",
+  "item.182": "Cetro de paso estelar"
 }

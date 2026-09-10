@@ -10,6 +10,7 @@
     "string": {}, "feather": {}, "leather": {}, "bone": {}, "arrow": {},
     "seeds": {}, "wheat": {}, "food": {}, "bow": {}, "shield": {},
     "helmet": {}, "chestplate": {}, "leggings": {}, "boots": {}, "flint": {},
+    "scepter": {},
     "flint_and_steel": {}, "gunpowder": {}, "spawn_egg": {},
     "beef": {},
     "porkchop": {},
@@ -270,6 +271,7 @@
     "sunstone_slab": {"generator": "block_item_icon", "block": "sunstone"},
     "sunstone_stairs": {"generator": "block_item_icon", "block": "sunstone"},
     "cloudstone_slab": {"generator": "block_item_icon", "block": "cloudstone"},
-    "cloudstone_stairs": {"generator": "block_item_icon", "block": "cloudstone"}
+    "cloudstone_stairs": {"generator": "block_item_icon", "block": "cloudstone"},
+    "starstep_scepter": {"generator": "item_sprite", "template": "scepter", "material": "diamond"}
   }
 }

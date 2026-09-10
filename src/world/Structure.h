@@ -18,6 +18,7 @@ enum class StructureType : uint8_t {
     XiguangRuin,
     StarCrystalGeode,
     CloudspireTower,
+    SkywayShrine,
     Count
 };
 
@@ -31,7 +32,9 @@ enum class StructureLootProfile : uint8_t {
     LumberCamp,
     XiguangRuin,
     StarCrystalGeode,
-    CloudspireTower
+    CloudspireTower,
+    SkywayShrine,
+    OriginSkywayShrine
 };
 
 inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
@@ -46,6 +49,7 @@ inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
         case StructureType::XiguangRuin: return StructureLootProfile::XiguangRuin;
         case StructureType::StarCrystalGeode: return StructureLootProfile::StarCrystalGeode;
         case StructureType::CloudspireTower: return StructureLootProfile::CloudspireTower;
+        case StructureType::SkywayShrine: return StructureLootProfile::SkywayShrine;
         default: return StructureLootProfile::None;
     }
 }
@@ -61,13 +65,14 @@ inline constexpr std::array<StructureType, 8> OVERWORLD_STRUCTURE_TYPES{
     StructureType::LumberCamp,
 };
 
-inline constexpr std::array<StructureType, 3> HEAVEN_STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 4> HEAVEN_STRUCTURE_TYPES{
     StructureType::XiguangRuin,
     StructureType::StarCrystalGeode,
     StructureType::CloudspireTower,
+    StructureType::SkywayShrine,
 };
 
-inline constexpr std::array<StructureType, 11> STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 12> STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -79,6 +84,7 @@ inline constexpr std::array<StructureType, 11> STRUCTURE_TYPES{
     StructureType::XiguangRuin,
     StructureType::StarCrystalGeode,
     StructureType::CloudspireTower,
+    StructureType::SkywayShrine,
 };
 
 inline constexpr bool isOverworldStructure(StructureType type) {
@@ -106,6 +112,7 @@ inline constexpr std::string_view structureCommandName(StructureType type) {
         case StructureType::XiguangRuin: return "xiguang_ruin";
         case StructureType::StarCrystalGeode: return "star_crystal_geode";
         case StructureType::CloudspireTower: return "cloudspire_tower";
+        case StructureType::SkywayShrine: return "skyway_shrine";
         default: return "none";
     }
 }

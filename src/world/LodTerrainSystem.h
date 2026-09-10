@@ -115,6 +115,8 @@ public:
     int distanceChunks() const { return m_settings.distanceChunks; }
     size_t residentCpuBytes() const { return m_cpuBytes; }
     size_t residentGpuBytes() const { return m_gpuBytes; }
+    size_t residentTileCount() const;
+    size_t residentTileCountAtLevel(uint8_t level) const;
     int tasksInFlight() const { return m_tasksInFlight.load(); }
     size_t selectedTileCount() const { return m_desired.size(); }
     size_t selectedTileCountAtLevel(uint8_t level) const;
@@ -134,6 +136,9 @@ private:
         ChunkMesh mesh;
         std::optional<LodTileData> pendingData;
         std::optional<ChunkMesh> pendingMesh;
+        // A generated tile may legitimately contain no geometry (notably a
+        // Heaven void tile), so mesh.empty() cannot represent completion.
+        bool resident = false;
         bool queued = false;
         bool dirty = false;
         size_t gpuBytes = 0;
@@ -166,6 +171,9 @@ private:
     std::vector<LodRenderSubmission> m_submissions;
     std::unordered_map<uint64_t, uint64_t> m_exactRevisions;
     std::unordered_set<uint64_t> m_exactChunks;
+    // Level-zero LOD remains behind near chunks until their replacement mesh
+    // is actually renderable. This set tracks only that transient fallback.
+    std::unordered_set<uint64_t> m_nearFallbackChunks;
     std::deque<Completion> m_completions;
     std::deque<ExactCompletion> m_exactCompletions;
     std::mutex m_completionMutex;
@@ -176,6 +184,7 @@ private:
     int m_nearDistanceChunks = 8;
     glm::dvec3 m_playerPosition{0.0};
     bool m_selectionDirty = true;
+    uint8_t m_nextRequestLevel = 0;
     size_t m_cpuBytes = 0;
     size_t m_gpuBytes = 0;
 

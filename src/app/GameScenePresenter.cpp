@@ -198,6 +198,26 @@ void GameScenePresenter::render(
                 }
             }
         }
+        if (const auto target = session.player.starstepTarget()) {
+            const glm::vec3 marker(
+                static_cast<float>(target->x - 0.4 - renderOrigin.x),
+                static_cast<float>(target->y - 0.01),
+                static_cast<float>(target->z - 0.4 - renderOrigin.z));
+            renderer.renderWireframe(marker, glm::vec3(0.8f, 0.08f, 0.8f), vp,
+                                     glm::vec3(0.15f, 0.9f, 0.95f));
+        } else if (session.player.activeItem().id == ItemId::STARSTEP_SCEPTER &&
+                   session.player.starstepCooldown() <= 0.0f) {
+            const auto invalid = session.world.raycast(
+                session.player.getEyePosition(), session.player.getForward(), 96.0f);
+            if (invalid) {
+                const glm::vec3 marker(
+                    static_cast<float>(invalid->blockPos.x - renderOrigin.x),
+                    static_cast<float>(invalid->blockPos.y),
+                    static_cast<float>(invalid->blockPos.z - renderOrigin.z));
+                renderer.renderWireframe(marker, glm::vec3(1.0f), vp,
+                                         glm::vec3(0.95f, 0.2f, 0.2f));
+            }
+        }
 
         if (perspective == CameraPerspective::FirstPerson &&
             showFirstPersonItem && !session.player.isSpectator() &&

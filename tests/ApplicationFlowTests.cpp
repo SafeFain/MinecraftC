@@ -144,7 +144,7 @@ public:
     void bindBlockShader() const override {}
     void unbindBlockShader() const override {}
     void renderWireframe(const glm::vec3&, const glm::vec3&,
-                         const glm::mat4&) override {}
+                         const glm::mat4&, const glm::vec3&) override {}
     void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&,
                       int, const glm::mat4&) override {}
     void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,

@@ -1,5 +1,6 @@
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
+#include "world/Chunk.h"
 #include "world/LodSettings.h"
 #include "world/LodTerrainSystem.h"
 #include "world/WorldGenerator.h"
@@ -408,6 +409,17 @@ int main() {
             "LOD selection does not start two chunks inside real terrain");
     require(selection.selectedTileCount() < 1100,
             "LOD selection exceeds its bounded tile budget");
+
+    Chunk pendingNearChunk(0, 0);
+    selection.update({0.5, 80.0, 0.5}, 8, {&pendingNearChunk});
+    require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
+            "a non-renderable near chunk does not retain level-zero LOD backing");
+    pendingNearChunk.lifecycle = Chunk::LifecycleState::Renderable;
+    selection.update({0.5, 80.0, 0.5}, 8, {&pendingNearChunk});
+    require(selection.selectedMinimumDistanceAtLevel(0) ==
+                6.0f * Config::CHUNK_SIZE_X,
+            "level-zero LOD backing remains after the near chunk is renderable");
+
     selection.update({0.5, 80.0, 0.5}, 2, {});
     require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
             "minimum render distance does not permit a zero-distance LOD overlap");
@@ -454,6 +466,29 @@ int main() {
         recovered.processCompleted(nullptr);
         require(recovered.residentCpuBytes() > 0,
                 "corrupt LOD cache data is ignored and regenerated");
+    }
+
+    const auto heavenRoot = root / "heaven";
+    SaveStore heavenStore(heavenRoot);
+    {
+        ThreadPool pool(1);
+        LodTerrainSystem heavenSystem;
+        heavenSystem.setThreadPool(&pool);
+        heavenSystem.setSaveStore(&heavenStore);
+        heavenSystem.reset(&heaven);
+        heavenSystem.configure({true, 32, LodAggressiveness::PowerSaver,
+                                LodPrecision::Low});
+        heavenSystem.update({0.5, 200.0, 0.5}, 8, {});
+        for (int batch = 0; batch < 12; ++batch) {
+            pool.waitIdle();
+            heavenSystem.processCompleted(nullptr);
+        }
+        require(heavenSystem.residentTileCount() >= 8,
+                "completed Heaven LOD tiles did not advance the request queue");
+        require(heavenSystem.residentTileCountAtLevel(0) > 0 &&
+                    heavenSystem.residentTileCountAtLevel(1) > 0 &&
+                    heavenSystem.residentTileCountAtLevel(2) > 0,
+                "dense inner Heaven rings starved outer LOD levels");
     }
     std::filesystem::remove_all(root);
 

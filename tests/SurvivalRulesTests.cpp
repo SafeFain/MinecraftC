@@ -35,6 +35,7 @@ int main() {
     static_assert(static_cast<uint16_t>(ItemId::DRIPSTONE_BLOCK) == 175);
     static_assert(static_cast<uint16_t>(ItemId::POINTED_DRIPSTONE) == 176);
     static_assert(static_cast<uint16_t>(ItemId::SULFUR_CRUST) == 181);
+    static_assert(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER) == 182);
     for (const auto& mapping : {
              std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
              std::pair{BlockId::BASALT, ItemId::BASALT},
@@ -251,6 +252,22 @@ int main() {
                 pointedDripstone->output.id == ItemId::POINTED_DRIPSTONE &&
                 pointedDripstone->output.count == 4,
             "dripstone block does not unpack into four pointed dripstones");
+    grid.fill(ItemId::EMPTY);
+    grid[1] = ItemId::STAR_CRYSTAL;
+    grid[3] = ItemId::STAR_CRYSTAL;
+    grid[4] = ItemId::SUNSTONE;
+    grid[5] = ItemId::STAR_CRYSTAL;
+    grid[7] = ItemId::CLOUDSTONE;
+    const auto* starstep = findCraftingRecipe(grid, 3, 3);
+    require(starstep && starstep->output.id == ItemId::STARSTEP_SCEPTER &&
+                starstep->output.count == 1,
+            "starstep scepter Heaven-material recipe is missing");
+    grid.fill(ItemId::EMPTY);
+    grid[0] = ItemId::SKYROOT_LOG;
+    const auto* skyrootPlanks = findCraftingRecipe(grid, 1, 1);
+    require(skyrootPlanks && skyrootPlanks->output.id == ItemId::OAK_PLANKS &&
+                skyrootPlanks->output.count == 4,
+            "skyroot logs do not provide Heaven-local crafting progression");
     struct ArchitecturalRecipeCase {
         ItemId material;
         ItemId slab;

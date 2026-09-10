@@ -294,6 +294,11 @@ void Player::handleMouseButton(int button, ButtonAction action) {
     if (m_gameMode == GameMode::Spectator) return;
     const ItemStack& selected =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+    if (button == MouseButton::Right && action == ButtonAction::Press &&
+        selected.id == ItemId::STARSTEP_SCEPTER) {
+        useStarstepScepter();
+        return;
+    }
     if (button == MouseButton::Right && selected.id == ItemId::BOW) {
         if (action == ButtonAction::Press) beginBowCharge();
         else if (action == ButtonAction::Release) releaseBow();
@@ -435,6 +440,8 @@ void Player::update(float dt) {
     if (m_actionCooldown > 0.0f) {
         m_actionCooldown -= dt;
     }
+    if (m_starstepCooldown > 0.0f)
+        m_starstepCooldown = std::max(0.0f, m_starstepCooldown - dt);
     if (m_swingProgress < 1.0f)
         m_swingProgress = std::min(1.0f, m_swingProgress + dt / 0.32f);
     if (m_bowCharging) {
@@ -484,6 +491,35 @@ std::optional<ProjectileLaunch> Player::bowLaunchPreview() const {
         projectileLaunchVelocity(
             m_forward, bowLaunchSpeed(strength), inherited),
         bowLaunchDamage(strength)};
+}
+
+std::optional<glm::dvec3> Player::starstepTarget() const {
+    if (activeItem().id != ItemId::STARSTEP_SCEPTER ||
+        m_starstepCooldown > 0.0f)
+        return std::nullopt;
+    const auto destination = m_world.starstepDestination(
+        getEyePosition(), m_forward);
+    if (!destination || checkCollision(destination->x, destination->y,
+                                       destination->z))
+        return std::nullopt;
+    return destination;
+}
+
+bool Player::useStarstepScepter() {
+    if (m_starstepCooldown > 0.0f || m_actionCooldown > 0.0f)
+        return false;
+    const auto destination = starstepTarget();
+    if (!destination) return false;
+    teleport(*destination);
+    if (m_gameMode == GameMode::Survival) {
+        auto& scepter = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+        if (++scepter.damage >= getItemProps(scepter.id).maxDurability)
+            scepter.clear();
+    }
+    startSwing();
+    m_actionCooldown = 0.15f;
+    m_starstepCooldown = 3.0f;
+    return true;
 }
 
 void Player::beginBowCharge() {
@@ -1001,6 +1037,14 @@ bool Player::placeBlock() {
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
     const BlockId targetedBlock = m_world.getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+    if (m_world.isHeavenSkywayCore(hit->blockPos)) {
+        const auto destination = m_world.heavenSkywayDestination(
+            hit->blockPos, !m_sneakInput);
+        if (destination && !checkCollision(destination->x, destination->y,
+                                           destination->z))
+            teleport(*destination);
+        return true;
+    }
     if (isBed(targetedBlock)) {
         const auto foot = m_world.validBedFoot(hit->blockPos);
         if (!foot) return false;
