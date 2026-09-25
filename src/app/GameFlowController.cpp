@@ -163,6 +163,12 @@ void GameFlowController::executeCommand() {
     }
     for (const std::string& message : execution.messages)
         showCommandMessage(message);
+    if (execution.teleported) {
+        m_session.worldLoadingStarted = m_clock.now();
+        m_state = GameState::LoadingWorld;
+        m_window.setCursorLocked(false);
+        m_scene.resetForWorld(m_session.player.getPosition());
+    }
 }
 
 void GameFlowController::openPlayerInventoryView() {

@@ -33,8 +33,9 @@ layout(location=4) out vec3 worldPosition;
 void main() {
     vec3 position=inPosition;
     vec3 world=inPosition+frame.chunkOrigin.xyz;
-    float surfaceFace=inFace>=32.0?inFace-32.0:
-        inFace>=16.0?inFace-16.0:inFace;
+    float encodedFace=inFace>=64.0?inFace-64.0:inFace;
+    float surfaceFace=encodedFace>=32.0?encodedFace-32.0:
+        encodedFace>=16.0?encodedFace-16.0:encodedFace;
     if(surfaceFace>5.5){
         float rootWeight=clamp(inTileCoord.y,0.0,1.0);
         float phase=dot(world.xz,vec2(0.43,0.71));

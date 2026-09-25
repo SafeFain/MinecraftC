@@ -1,3 +1,4 @@
+#include "EntityAiTestRenderer.h"
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"
@@ -366,6 +367,23 @@ int main() {
         edgeCenter, 1, 24, &edgeNeighbors);
     require(openEdgeMesh.opaqueIndexCount == joinedEdgeMesh.opaqueIndexCount + 6,
             "neighboring exact LOD tiles retain their shared solid face");
+    const ChunkMesh transitionEdgeMesh = buildLodTileMesh(
+        edgeCenter, 1, 24, &edgeNeighbors, nullptr, true);
+    require(transitionEdgeMesh.opaqueIndexCount > joinedEdgeMesh.opaqueIndexCount,
+            "an exact tile has no solid wall at a precision transition");
+
+    LodTileData flatEdge;
+    flatEdge.at(15, 8).spans.push_back(
+        {Config::WORLD_MIN_Y, 64, BlockId::STONE});
+    LodNeighborEdges equalHeightEdges;
+    equalHeightEdges[2][8].spans.push_back(
+        {Config::WORLD_MIN_Y, 64, BlockId::STONE});
+    const ChunkMesh ordinaryEdgeMesh = buildLodTileMesh(
+        flatEdge, 4, 24, nullptr, &equalHeightEdges);
+    const ChunkMesh sealedEdgeMesh = buildLodTileMesh(
+        flatEdge, 4, 24, nullptr, &equalHeightEdges, true);
+    require(sealedEdgeMesh.opaqueIndexCount > ordinaryEdgeMesh.opaqueIndexCount,
+            "an approximate tile has no solid wall at a precision transition");
 
     edgeCenterBlocks.assign(Config::CHUNK_VOLUME, 0);
     edgeCenterBlocks[blockIndex(15, 64, 8)] = static_cast<uint8_t>(BlockId::WATER);
@@ -413,6 +431,20 @@ int main() {
                 .translucentIndexCount > oceanMesh.translucentIndexCount,
             "shore tile boundary omits the exposed water side");
 
+    LodTileData submergedBank;
+    submergedBank.at(7, 8).spans.push_back(
+        {Config::WORLD_MIN_Y, 64, BlockId::STONE});
+    submergedBank.at(8, 8).spans.push_back(
+        {Config::WORLD_MIN_Y, 58, BlockId::SAND});
+    submergedBank.at(8, 8).spans.push_back({59, 62, BlockId::WATER});
+    const ChunkMesh bankMesh = buildLodTileMesh(submergedBank, 4, 24);
+    require(std::any_of(bankMesh.vertices.begin(), bankMesh.vertices.end(),
+                        [](const MeshVertex& vertex) {
+                            return vertex.face == static_cast<float>(FaceDir::RIGHT) &&
+                                   vertex.px == 32.0f && vertex.py == 59.0f;
+                        }),
+            "translucent water hides the opaque bank side behind it");
+
     LodTileData shallowOcean;
     shallowOcean.at(8, 8).spans.push_back({58, 61, BlockId::SAND});
     shallowOcean.at(8, 8).spans.push_back({62, 62, BlockId::WATER});
@@ -426,6 +458,59 @@ int main() {
                                         static_cast<float>(FaceDir::BOTTOM)) < 0.01f;
                          }),
             "LOD water emits a coplanar bottom face over the seabed");
+
+    LodTileData fluidBoundary;
+    fluidBoundary.at(7, 8).spans.push_back({62, 62, BlockId::WATER});
+    fluidBoundary.at(8, 8).spans.push_back({62, 62, BlockId::LAVA});
+    const ChunkMesh fluidBoundaryMesh = buildLodTileMesh(fluidBoundary, 4, 24);
+    const float boundaryX = 8.0f * 4.0f;
+    require(std::any_of(fluidBoundaryMesh.vertices.begin(),
+                        fluidBoundaryMesh.vertices.end(),
+                        [boundaryX, waterTile](const MeshVertex& vertex) {
+                            return vertex.px == boundaryX &&
+                                static_cast<int>(std::floor(vertex.tile)) == waterTile &&
+                                static_cast<int>(vertex.face) ==
+                                    static_cast<int>(FaceDir::RIGHT);
+                        }),
+            "water/lava interface omits the water side face");
+
+    LodTileData sealedWater;
+    sealedWater.at(15, 8).spans.push_back({58, 62, BlockId::WATER});
+    LodNeighborEdges matchingWaterEdges{};
+    matchingWaterEdges[2][8].spans.push_back({58, 62, BlockId::WATER});
+    const ChunkMesh sealedWaterMesh = buildLodTileMesh(
+        sealedWater, 4, 24, nullptr, &matchingWaterEdges, true);
+    require(std::any_of(sealedWaterMesh.vertices.begin(),
+                        sealedWaterMesh.vertices.end(),
+                        [](const MeshVertex& vertex) {
+                            return vertex.px == 64.0f && vertex.face >= 64.0f;
+                        }),
+            "water tile edge lacks a precision-transition side skirt");
+
+    LodTileData exactWater;
+    for (LodColumn& column : exactWater.columns) column.exact = true;
+    exactWater.at(15, 8).spans.push_back({58, 62, BlockId::WATER});
+    LodExactNeighborTiles exactWaterNeighbors{};
+    exactWaterNeighbors[4].emplace();
+    exactWaterNeighbors[4]->at(0, 8).spans.push_back(
+        {58, 62, BlockId::WATER});
+    const ChunkMesh exactWaterMesh = buildLodTileMesh(
+        exactWater, 1, 24, &exactWaterNeighbors, nullptr, true);
+    require(std::any_of(exactWaterMesh.vertices.begin(),
+                        exactWaterMesh.vertices.end(),
+                        [](const MeshVertex& vertex) {
+                            return vertex.px == 16.0f && vertex.face >= 64.0f;
+                        }),
+            "exact water tile edge lacks a precision-transition side skirt");
+
+    LodTileData stackedIslands;
+    for (int island = 0; island < 8; ++island)
+        stackedIslands.at(8, 8).spans.push_back(
+            {static_cast<int16_t>(island * 20),
+             static_cast<int16_t>(island * 20 + 2), BlockId::STONE});
+    const ChunkMesh stackedMesh = buildLodTileMesh(stackedIslands, 4, 6);
+    require(meshMinimumY(stackedMesh) == 0.0f,
+            "vertical span budget removes a lower floating island");
 
     require(lodHorizontalQuality(LodPrecision::Low) == 64 &&
             lodHorizontalQuality(LodPrecision::Ultra) == 144 &&
@@ -461,6 +546,39 @@ int main() {
             "LOD selection does not start two chunks inside real terrain");
     require(selection.selectedTileCount() < 1100,
             "LOD selection exceeds its bounded tile budget");
+    // Level zero ends at 112 blocks and level one begins there. Both classify
+    // complete 32-block tiles, including those at negative world coordinates.
+    for (int coarseZ = -7; coarseZ <= 7; ++coarseZ) {
+        for (int coarseX = -7; coarseX <= 7; ++coarseX) {
+            const float coarseCenterX = (coarseX + 0.5f) * 32.0f;
+            const float coarseCenterZ = (coarseZ + 0.5f) * 32.0f;
+            const float coarseDistance = std::hypot(
+                coarseCenterX - 8.0f, coarseCenterZ - 8.0f);
+            if (coarseDistance < 112.0f) {
+                for (int childZ = coarseZ * 2; childZ < coarseZ * 2 + 2; ++childZ) {
+                    for (int childX = coarseX * 2; childX < coarseX * 2 + 2;
+                         ++childX) {
+                        const float fineDistance = std::hypot(
+                            (childX + 0.5f) * 16.0f - 8.0f,
+                            (childZ + 0.5f) * 16.0f - 8.0f);
+                        if (fineDistance + 16.0f < 96.0f) continue;
+                        require(selection.isTileSelected({childX, childZ, 0}),
+                                "fine LOD tile missing at a precision boundary");
+                    }
+                }
+            } else {
+                const float parentCenterX =
+                    (std::floor(coarseX / 2.0f) + 0.5f) * 64.0f;
+                const float parentCenterZ =
+                    (std::floor(coarseZ / 2.0f) + 0.5f) * 64.0f;
+                if (std::hypot(parentCenterX - 8.0f,
+                               parentCenterZ - 8.0f) >= 192.0f)
+                    continue;
+                require(selection.isTileSelected({coarseX, coarseZ, 1}),
+                        "coarse LOD tile missing at a precision boundary");
+            }
+        }
+    }
 
     const size_t readySelectionCount = selection.selectedTileCount();
     auto missing = std::find_if(activeChunks.begin(), activeChunks.end(),
@@ -560,6 +678,123 @@ int main() {
                     heavenSystem.residentTileCountAtLevel(1) > 0 &&
                     heavenSystem.residentTileCountAtLevel(2) > 0,
                 "dense inner Heaven rings starved outer LOD levels");
+    }
+    {
+        SaveStore coverageStore(root / "coverage");
+        ThreadPool pool(4);
+        EntityAiTestRenderer renderer;
+        LodTerrainSystem coverage;
+        coverage.setThreadPool(&pool);
+        coverage.setSaveStore(&coverageStore);
+        coverage.reset(&normal);
+        coverage.configure({true, 16, LodAggressiveness::Fast,
+                            LodPrecision::Low});
+        const glm::dvec3 position{-96.5, 80.0, -32.5};
+        coverage.update(position, 8, {});
+        require(!coverage.coverageReady(),
+                "loading accepts an unpopulated LOD selection");
+        for (int batch = 0; batch < 400 && !coverage.coverageReady(); ++batch) {
+            pool.waitIdle();
+            coverage.processCompleted(&renderer);
+            coverage.update(position, 8, {});
+        }
+        require(coverage.coverageReady() && !coverage.submissions().empty(),
+                "LOD loading never reaches GPU-ready coverage");
+        for (const LodRenderSubmission& submission : coverage.submissions()) {
+            const float grid = std::max(submission.worldOriginAndGrids.y,
+                                        submission.worldOriginAndGrids.w);
+            require(submission.mesh->gpuReady &&
+                    submission.worldOriginAndGrids.x >= 0.0f &&
+                    submission.worldOriginAndGrids.z >= 0.0f &&
+                    (grid == 0.0f ||
+                     (submission.worldOriginAndGrids.x < grid &&
+                      submission.worldOriginAndGrids.z < grid)),
+                    "negative-coordinate LOD submission lost its exact grid phase");
+        }
+        const LodRenderSubmission* parent = nullptr;
+        for (const LodRenderSubmission& coarse : coverage.submissions()) {
+            if (coarse.tileSize != 32) continue;
+            const bool hasFineChild = std::any_of(
+                coverage.submissions().begin(), coverage.submissions().end(),
+                [&coarse](const LodRenderSubmission& fine) {
+                    return fine.tileSize == 16 &&
+                        fine.model[3].x >= coarse.model[3].x &&
+                        fine.model[3].x < coarse.model[3].x + 32.0f &&
+                        fine.model[3].z >= coarse.model[3].z &&
+                        fine.model[3].z < coarse.model[3].z + 32.0f;
+                });
+            if (hasFineChild) { parent = &coarse; break; }
+        }
+        require(parent != nullptr,
+                "test scene lacks adjacent fine/coarse LOD tiles");
+        const float parentX = parent->model[3].x;
+        const float parentZ = parent->model[3].z;
+        const float parentMaximum = parent->maximumDistance;
+        ChunkMesh* parentMesh = const_cast<ChunkMesh*>(parent->mesh);
+        parentMesh->gpuReady = false;
+        coverage.processCompleted(&renderer);
+        require(std::any_of(coverage.submissions().begin(),
+                            coverage.submissions().end(),
+                            [parentX, parentZ, parentMaximum](
+                                const LodRenderSubmission& fine) {
+                                return fine.tileSize == 16 &&
+                                    fine.model[3].x >= parentX &&
+                                    fine.model[3].x < parentX + 32.0f &&
+                                    fine.model[3].z >= parentZ &&
+                                    fine.model[3].z < parentZ + 32.0f &&
+                                    fine.maximumDistance == parentMaximum;
+                            }),
+                "fine LOD released a transition before its parent was GPU-ready");
+        parentMesh->gpuReady = true;
+        const auto fineChild = std::find_if(coverage.submissions().begin(),
+            coverage.submissions().end(), [parentX, parentZ](
+                const LodRenderSubmission& fine) {
+                return fine.tileSize == 16 &&
+                    fine.model[3].x >= parentX &&
+                    fine.model[3].x < parentX + 32.0f &&
+                    fine.model[3].z >= parentZ &&
+                    fine.model[3].z < parentZ + 32.0f;
+            });
+        require(fineChild != coverage.submissions().end(),
+                "test scene lost its fine transition child");
+        ChunkMesh* fineMesh = const_cast<ChunkMesh*>(fineChild->mesh);
+        fineMesh->gpuReady = false;
+        coverage.processCompleted(&renderer);
+        require(std::any_of(coverage.submissions().begin(),
+                            coverage.submissions().end(),
+                            [parentX, parentZ](const LodRenderSubmission& coarse) {
+                                return coarse.tileSize == 32 &&
+                                    coarse.model[3].x == parentX &&
+                                    coarse.model[3].z == parentZ &&
+                                    coarse.minimumDistance == 0.0f;
+                            }),
+                "coarse LOD did not cover a missing fine transition child");
+        fineMesh->gpuReady = true;
+        coverage.configure({true, 16, LodAggressiveness::Fast,
+                            LodPrecision::Medium});
+        require(!coverage.submissions().empty(),
+                "precision edit discarded all GPU-ready LOD meshes");
+    }
+    {
+        SaveStore epochStore(root / "epoch");
+        ThreadPool pool(1);
+        LodTerrainSystem exactSystem;
+        exactSystem.setThreadPool(&pool);
+        exactSystem.setSaveStore(&epochStore);
+        exactSystem.reset(&normal);
+        exactSystem.configure({true, 0, LodAggressiveness::PowerSaver,
+                               LodPrecision::Low});
+        Chunk live(0, 0);
+        live.setBlock(8, 64, 8, BlockId::STONE);
+        live.generated = true;
+        live.lifecycle = Chunk::LifecycleState::Renderable;
+        exactSystem.update({0.5, 80.0, 0.5}, 0, {&live});
+        exactSystem.configure({true, 16, LodAggressiveness::PowerSaver,
+                               LodPrecision::Low});
+        pool.waitIdle();
+        exactSystem.processCompleted(nullptr);
+        require(exactSystem.hasExactChunk(0, 0),
+                "a selection epoch change discarded completed exact terrain");
     }
     std::filesystem::remove_all(root);
 

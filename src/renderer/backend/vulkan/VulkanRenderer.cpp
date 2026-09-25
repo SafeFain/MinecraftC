@@ -519,7 +519,7 @@ void VulkanRenderer::renderChunk(const ChunkMesh& mesh,
 void VulkanRenderer::renderLod(const ChunkMesh& mesh,
                                const glm::mat4& model,
                                const glm::mat4& viewProjection,
-                               const glm::vec2& worldOffset,
+                               const glm::vec4& worldOriginAndGrids,
                                float minimumDistance,
                                float maximumDistance,
                                bool translucent) {
@@ -539,7 +539,7 @@ void VulkanRenderer::renderLod(const ChunkMesh& mesh,
     command.lod = true;
     command.lodMinimumDistance = minimumDistance;
     command.lodMaximumDistance = maximumDistance;
-    command.lodWorldOffset = worldOffset;
+    command.lodWorldOriginAndGrids = worldOriginAndGrids;
     m_impl->submittedChunkEnvironment.fogColorDistance.a = std::max(
         m_impl->submittedChunkEnvironment.fogColorDistance.a,
         maximumDistance + Config::CHUNK_SIZE_X);

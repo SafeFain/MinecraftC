@@ -156,7 +156,9 @@ void GameUiController::render(
             static_cast<float>(progress.completed) /
             static_cast<float>(progress.total);
         const float fraction = session.loadingGenerationComplete
-            ? 0.75f + phaseFraction * 0.25f : phaseFraction * 0.75f;
+            ? 0.75f + phaseFraction * 0.15f +
+                session.world.lodCoverageFraction() * 0.10f
+            : phaseFraction * 0.75f;
         renderer.beginUIFrame(uiWidth, uiHeight);
         UiTheme::dirtBackground(renderer, static_cast<float>(uiWidth),
                                 static_cast<float>(uiHeight));

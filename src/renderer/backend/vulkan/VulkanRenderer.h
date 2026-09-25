@@ -54,7 +54,7 @@ public:
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool translucent = false) override;
     void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
-                   const glm::vec2& worldOffset,
+                   const glm::vec4& worldOriginAndGrids,
                    float minimumDistance, float maximumDistance,
                    bool translucent = false) override;
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,

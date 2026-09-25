@@ -395,7 +395,7 @@ private:
         m_ui.renderer.initialize(*m_renderer,
             m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
         m_ui.renderer.setLocalization(m_ui.localization);
-        m_session.world.restoreGpuMeshes();
+        m_session.world.restoreGpuMeshes(m_renderer.get());
         m_renderer->resize(m_window.width(), m_window.height());
         LOG_INFO("Graphics resources restored after device reset");
     }

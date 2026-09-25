@@ -40,14 +40,14 @@ public:
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool) override {}
     void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
-                   const glm::vec2&,
+                   const glm::vec4&,
                    float, float, bool) override {}
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
                             const glm::dvec3&,
                             const std::vector<ShadowChunkSubmission>&) override {
     }
-    void uploadChunkMesh(ChunkMesh&) override {}
-    void releaseChunkMesh(ChunkMesh&) override {}
+    void uploadChunkMesh(ChunkMesh& mesh) override { mesh.gpuReady = true; }
+    void releaseChunkMesh(ChunkMesh& mesh) override { mesh.abandonGpuResources(); }
     void beginTranslucent() override {}
     void endTranslucent() override {}
     void bindBlockShader() const override {}

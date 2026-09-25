@@ -9,8 +9,10 @@
 #include <deque>
 #include <filesystem>
 #include <memory>
+#include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -74,7 +76,9 @@ using LodNeighborEdges = std::array<std::array<LodColumn, LodTileData::SIDE>, 4>
 struct LodRenderSubmission {
     const ChunkMesh* mesh = nullptr;
     glm::mat4 model{1.0f};
-    glm::vec2 worldOffset{0.0f};
+    // xz: tile origin modulo the largest transition grid; y/w: grid sizes.
+    glm::vec4 worldOriginAndGrids{0.0f};
+    int tileSize = 16;
     float minimumDistance = 0.0f;
     float maximumDistance = 0.0f;
     float distance2 = 0.0f;
@@ -91,7 +95,8 @@ void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
                            const LodExactNeighborTiles* neighbors = nullptr,
-                           const LodNeighborEdges* edges = nullptr);
+                           const LodNeighborEdges* edges = nullptr,
+                           bool sealTileEdges = false);
 
 class LodTerrainSystem {
 public:
@@ -118,10 +123,14 @@ public:
     size_t residentCpuBytes() const { return m_cpuBytes; }
     size_t residentGpuBytes() const { return m_gpuBytes; }
     size_t residentTileCount() const;
+    bool coverageReady() const;
+    float coverageFraction() const;
     size_t residentTileCountAtLevel(uint8_t level) const;
     int tasksInFlight() const { return m_tasksInFlight.load(); }
     size_t selectedTileCount() const { return m_desired.size(); }
     size_t selectedTileCountAtLevel(uint8_t level) const;
+    bool isTileSelected(const LodTileKey& key) const;
+    bool hasExactChunk(int cx, int cz) const;
     float selectedMinimumDistanceAtLevel(uint8_t level) const;
     float selectedMaximumDistance() const;
 
@@ -131,6 +140,8 @@ private:
         float minimumDistance = 0.0f;
         float maximumDistance = 0.0f;
         float distance2 = 0.0f;
+        float minimumGrid = 0.0f;
+        float maximumGrid = 0.0f;
     };
     struct Tile {
         LodTileKey key;
@@ -153,13 +164,13 @@ private:
         uint64_t epoch = 0;
         LodTileData data;
         ChunkMesh mesh;
+        bool success = true;
     };
     struct ExactCompletion {
         int cx = 0;
         int cz = 0;
         uint64_t revision = 0;
-        uint64_t epoch = 0;
-        LodTileData data;
+        bool persisted = false;
     };
 
     LodSettings m_settings;
@@ -172,7 +183,8 @@ private:
     std::vector<Request> m_desired;
     std::vector<LodRenderSubmission> m_submissions;
     std::unordered_map<uint64_t, uint64_t> m_exactRevisions;
-    std::unordered_set<uint64_t> m_exactChunks;
+    std::map<int, std::set<int>> m_exactColumnsByX;
+    std::filesystem::path m_scannedCacheRoot;
     // Level-zero LOD remains behind near chunks until their replacement mesh
     // is actually renderable. This set tracks only that transient fallback.
     std::unordered_set<uint64_t> m_nearFallbackChunks;

@@ -166,11 +166,59 @@ void main() {
         float lodDistance=length(worldPosition.xz);
         float inner=frame.atlasAndLighting.w;
         float outer=frame.chunkOrigin.w;
-        // Exactly one LOD level owns a world-space distance. Dithered overlap
-        // mixes incompatible shoreline samples (water in one level and sand
-        // in the other) into a noisy pattern that changes as the ring follows
-        // the player. A half-open hard boundary keeps materials coherent.
-        if(lodDistance<inner||lodDistance>=outer)discard;
+        float innerDistance=lodDistance;
+        float outerDistance=lodDistance;
+        // A radial cut can pass through two unequal-height LOD cells and
+        // leave a horizontal strip with no connecting wall. Both levels use
+        // the coarser tile grid at their shared boundary, so the cut follows
+        // tile edges where the mesh has solid side faces.
+        if(frame.lodWorldOrigin.y>0.0||frame.lodWorldOrigin.w>0.0){
+            // The CPU supplies the exact grid phase. Reconstructing absolute
+            // coordinates in float would lose whole blocks far from origin.
+            float tileSize=frame.lodWorldOrigin.y>0.0
+                ? frame.lodWorldOrigin.y:16.0;
+            vec2 localPosition=clamp(worldPosition.xz-frame.chunkOrigin.xz-
+                faceNormal(mod(face,16.0)).xz*0.25,
+                vec2(0.001),vec2(tileSize-0.001));
+            vec2 phasedPosition=localPosition+frame.lodWorldOrigin.xz;
+            // A side face lies exactly on a tile edge. Classify it using the
+            // owning tile's interior, including at negative world coordinates.
+            if(frame.lodWorldOrigin.y>0.0){
+                float grid=frame.lodWorldOrigin.y;
+                vec2 tileCenter=frame.chunkOrigin.xz+
+                    (floor(phasedPosition/grid)+0.5)*grid-frame.lodWorldOrigin.xz;
+                innerDistance=length(tileCenter);
+            }
+            if(frame.lodWorldOrigin.w>0.0){
+                float grid=frame.lodWorldOrigin.w;
+                vec2 tileCenter=frame.chunkOrigin.xz+
+                    (floor(phasedPosition/grid)+0.5)*grid-frame.lodWorldOrigin.xz;
+                outerDistance=length(tileCenter);
+            }
+        }
+        if(innerDistance<inner||outerDistance>=outer)discard;
+        if(face>=64.0){
+            vec2 neighborLocal=worldPosition.xz-frame.chunkOrigin.xz+
+                faceNormal(mod(face,16.0)).xz*0.25;
+            vec2 neighborPhased=neighborLocal+frame.lodWorldOrigin.xz;
+            float neighborInner=length(frame.chunkOrigin.xz+neighborLocal);
+            float neighborOuter=neighborInner;
+            if(frame.lodWorldOrigin.y>0.0){
+                float grid=frame.lodWorldOrigin.y;
+                vec2 center=frame.chunkOrigin.xz+
+                    (floor(neighborPhased/grid)+0.5)*grid-
+                    frame.lodWorldOrigin.xz;
+                neighborInner=length(center);
+            }
+            if(frame.lodWorldOrigin.w>0.0){
+                float grid=frame.lodWorldOrigin.w;
+                vec2 center=frame.chunkOrigin.xz+
+                    (floor(neighborPhased/grid)+0.5)*grid-
+                    frame.lodWorldOrigin.xz;
+                neighborOuter=length(center);
+            }
+            if(neighborInner>=inner&&neighborOuter<outer)discard;
+        }
     }
     int tileCount=max(int(frame.atlasAndLighting.x+0.5),1);
     // `tile` stores flat-light data in its positive fractional bits. Decode
@@ -187,10 +235,11 @@ void main() {
     vec2 dx=dFdx(tileUv)*(15.0/16.0)/tiles;
     vec2 dy=dFdy(tileUv)*(15.0/16.0)/tiles;
     vec4 texel=textureGrad(blockAtlas,uv,dx,dy);
-    bool alwaysCutoutLeaf=face>=32.0;
-    bool leafSurface=face>=16.0;
-    float surfaceFace=alwaysCutoutLeaf?face-32.0:
-        leafSurface?face-16.0:face;
+    float encodedFace=face>=64.0?face-64.0:face;
+    bool alwaysCutoutLeaf=encodedFace>=32.0;
+    bool leafSurface=encodedFace>=16.0;
+    float surfaceFace=alwaysCutoutLeaf?encodedFace-32.0:
+        leafSurface?encodedFace-16.0:encodedFace;
     // Low quality sets materialParams.w to zero. Keep this branch uniform for
     // the whole draw so mobile GPUs can skip two texture fetches and all
     // tangent-space/specular work instead of merely multiplying it away.
@@ -261,7 +310,7 @@ void main() {
         cloudShadow=mix(1.0,cloudNoise,
             environment.weatherParams.w*(0.45+0.55*environment.weatherParams.y));
     }
-    float visibility=(isLod?1.0:shadowVisibility(worldPosition,normal))*cloudShadow;
+    float visibility=shadowVisibility(worldPosition,normal)*cloudShadow;
     vec3 illumination=environment.ambientColorIntensity.rgb*
         environment.ambientColorIntensity.a*skyLight*0.72;
     illumination+=environment.directColorIntensity.rgb*

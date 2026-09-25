@@ -61,39 +61,50 @@ void GameScenePresenter::render(
         for (const Chunk* chunk : session.world.getActiveChunks())
             renderer.submitVoxelGiChunk(*chunk);
         renderer.endVoxelGiFrame();
+        const bool hasLod = session.world.lodEnabled() &&
+            !session.world.lodSubmissions().empty();
+        glm::mat4 lodVp = vp;
+        Frustum lodFrustum;
+        std::vector<const LodRenderSubmission*> visibleLod;
+        if (hasLod) {
+            const float lodFar = session.world.lodDistanceChunks() *
+                Config::CHUNK_SIZE_X + 64.0f;
+            lodVp = glm::perspective(
+                glm::radians(camera.fovDeg()), window.aspectRatio(),
+                8.0f, lodFar) * view;
+            lodFrustum.extractFromVP(lodVp);
+            visibleLod.reserve(session.world.lodSubmissions().size());
+            for (const auto& lod : session.world.lodSubmissions()) {
+                const glm::vec3 minimum(lod.model[3].x,
+                    static_cast<float>(Config::WORLD_MIN_Y), lod.model[3].z);
+                const glm::vec3 maximum(minimum.x + lod.tileSize,
+                    static_cast<float>(Config::WORLD_MAX_Y),
+                    minimum.z + lod.tileSize);
+                if (lodFrustum.intersectsAABB(minimum, maximum))
+                    visibleLod.push_back(&lod);
+            }
+        }
         if (settings.renderClouds) {
             renderer.renderClouds(
-                playerPosition, vp, session.worldMetadata.seed,
+                playerPosition, visibleLod.empty() ? vp : lodVp,
+                session.worldMetadata.seed,
                 static_cast<float>(RuntimeClock::seconds(now)),
                 settings.cloudRenderDistance);
         }
 
-        if (session.world.lodEnabled() &&
-            !session.world.lodSubmissions().empty()) {
-            // Fragment distance selection excludes the real chunk area. Keep
-            // a permissive projection near plane because radial distance and
-            // camera-space depth are not equivalent near the view edges.
-            const float lodNear = 8.0f;
-            const float lodFar = session.world.lodDistanceChunks() *
-                Config::CHUNK_SIZE_X + 64.0f;
-            const glm::mat4 lodProjection = glm::perspective(
-                glm::radians(camera.fovDeg()), window.aspectRatio(),
-                lodNear, lodFar);
-            const glm::mat4 lodVp = lodProjection * view;
-            for (const auto& lod : session.world.lodSubmissions()) {
-                renderer.renderLod(*lod.mesh, lod.model, lodVp, lod.worldOffset,
-                    lod.minimumDistance, lod.maximumDistance, false);
-            }
-            std::vector<const LodRenderSubmission*> translucentLod;
-            translucentLod.reserve(session.world.lodSubmissions().size());
-            for (const auto& lod : session.world.lodSubmissions())
-                translucentLod.push_back(&lod);
+        if (!visibleLod.empty()) {
+            for (const LodRenderSubmission* lod : visibleLod)
+                renderer.renderLod(*lod->mesh, lod->model, lodVp,
+                    lod->worldOriginAndGrids, lod->minimumDistance,
+                    lod->maximumDistance, false);
+            std::vector<const LodRenderSubmission*> translucentLod =
+                std::move(visibleLod);
             std::sort(translucentLod.begin(), translucentLod.end(),
                 [](const LodRenderSubmission* a, const LodRenderSubmission* b) {
                     return a->distance2 > b->distance2;
                 });
             for (const LodRenderSubmission* lod : translucentLod) {
-                renderer.renderLod(*lod->mesh, lod->model, lodVp, lod->worldOffset,
+                renderer.renderLod(*lod->mesh, lod->model, lodVp, lod->worldOriginAndGrids,
                     lod->minimumDistance, lod->maximumDistance, true);
             }
         }

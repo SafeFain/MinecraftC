@@ -196,13 +196,18 @@ public:
         m_meshes.invalidateGpuMeshes();
         m_lod.releaseGpuMeshes(true);
     }
-    void restoreGpuMeshes() { m_meshes.restoreGpuMeshes(); }
+    void restoreGpuMeshes(IGameRenderer* renderer = nullptr) {
+        m_meshes.restoreGpuMeshes();
+        m_lod.processCompleted(renderer);
+    }
 
     void configureLod(const LodSettings& settings) { m_lod.configure(settings); }
     void updateLod(const glm::dvec3& playerPosition) {
         m_lod.update(playerPosition, Config::RENDER_DISTANCE,
                      m_chunks.activeChunks());
     }
+    bool lodCoverageReady() const { return m_lod.coverageReady(); }
+    float lodCoverageFraction() const { return m_lod.coverageFraction(); }
     void processCompletedLod(IGameRenderer* renderer) {
         m_lod.processCompleted(renderer);
     }

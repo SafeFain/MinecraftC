@@ -2364,8 +2364,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                  draw.lod ? draw.lodMinimumDistance : 0.0f},
                 glm::vec4(glm::vec3(draw.model[3]),
                           draw.lod ? draw.lodMaximumDistance : 0.0f), draw.tint,
-                glm::vec4(draw.lodWorldOffset.x, 0.0f,
-                          draw.lodWorldOffset.y, 0.0f)};
+                draw.lodWorldOriginAndGrids};
             vkCmdPushConstants(command, swapchain.pipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0, sizeof(constants), &constants);
@@ -2382,13 +2381,28 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         };
         drawBasicSubmissions(submittedLodDraws);
         if (!submittedLodDraws.empty()) {
-            VkClearAttachment depthClear{};
-            depthClear.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-            depthClear.clearValue.depthStencil = {1.0f, 0};
+            std::array<VkClearAttachment, 3> clears{};
+            uint32_t clearCount = 1;
+            clears[0].aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            clears[0].clearValue.depthStencil = {1.0f, 0};
+            // Near terrain uses another projection. Its depth clear must also
+            // retire LOD surface data, or post effects pair stale far normals
+            // and GI albedo with the new near depth buffer.
+            if (swapchain.surfaceDataEnabled) {
+                clears[clearCount].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                clears[clearCount].colorAttachment = 1;
+                ++clearCount;
+            }
+            if (swapchain.voxelGiEnabled) {
+                clears[clearCount].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                clears[clearCount].colorAttachment = 2;
+                ++clearCount;
+            }
             VkClearRect clearRect{};
             clearRect.rect = scissor;
             clearRect.layerCount = 1;
-            vkCmdClearAttachments(command, 1, &depthClear, 1, &clearRect);
+            vkCmdClearAttachments(command, clearCount, clears.data(), 1,
+                                  &clearRect);
             boundPipeline = VK_NULL_HANDLE;
             boundMaterialSet = VK_NULL_HANDLE;
             boundChunkSet = VK_NULL_HANDLE;

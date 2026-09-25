@@ -131,14 +131,14 @@ public:
     void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
                      bool) override {}
     void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
-                   const glm::vec2&,
+                   const glm::vec4&,
                    float, float, bool) override {}
     void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
                             const glm::dvec3&,
                             const std::vector<ShadowChunkSubmission>&) override {
     }
-    void uploadChunkMesh(ChunkMesh&) override {}
-    void releaseChunkMesh(ChunkMesh&) override {}
+    void uploadChunkMesh(ChunkMesh& mesh) override { mesh.gpuReady = true; }
+    void releaseChunkMesh(ChunkMesh& mesh) override { mesh.abandonGpuResources(); }
     void beginTranslucent() override {}
     void endTranslucent() override {}
     void bindBlockShader() const override {}
@@ -207,6 +207,8 @@ struct Harness {
           ui(session.player, clipboard),
           flow(session, ui, scene, audio, window, clock, settings, clipboard),
           router(window, ui, session, inputs, scene, settings, flow, clock) {
+        session.world.configureLod(
+            {true, 16, LodAggressiveness::Fast, LodPrecision::Low});
     }
 
     // Wires the minimal callbacks the application's initialize() sets up.
@@ -410,6 +412,15 @@ int main() {
         require(harness.ui.hotbar.inventory() ==
                     &harness.session.player.inventory(),
                 "hotbar remains bound after the gamemode command");
+
+        harness.flow.openCommandInput();
+        harness.ui.commandInput.setText("/tp 144 200 0");
+        harness.flow.executeCommand();
+        require(harness.flow.state() == GameState::LoadingWorld,
+                "teleport did not wait for the new render target");
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "teleport loading did not complete with LOD coverage");
+        harness.flow.completeLoading();
 
         // Command errors surface messages without changing state.
         harness.flow.openCommandInput();

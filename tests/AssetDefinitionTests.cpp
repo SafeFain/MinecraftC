@@ -110,11 +110,15 @@ int main() {
             shadowShader.find("tileIndex%tileCount") != std::string::npos,
             "world atlas lookup must use integer row-boundary addressing");
     require(chunkShader.find(
-                "if(lodDistance<inner||lodDistance>=outer)discard;") !=
+                "if(innerDistance<inner||outerDistance>=outer)discard;") !=
                 std::string::npos &&
             chunkShader.find("bool isLod=frame.chunkOrigin.w>0.0;") !=
                 std::string::npos &&
             chunkShader.find("float lodDistance=length(worldPosition.xz);") !=
+                std::string::npos &&
+            chunkShader.find("floor(phasedPosition/grid)") !=
+                std::string::npos &&
+            chunkShader.find("neighborInner>=inner&&neighborOuter<outer") !=
                 std::string::npos &&
             chunkShader.find("innerCoverage") == std::string::npos &&
             chunkShader.find("outerProgress") == std::string::npos,

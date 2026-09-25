@@ -187,11 +187,13 @@ bool GameSession::advanceLoading(
         world.processCompletedMeshes(
             renderer, Config::LOADING_MESH_UPLOADS_PER_FRAME,
             Config::LOADING_MESH_UPLOAD_BYTES_PER_FRAME);
+        world.updateLod(player.getPosition());
+        world.processCompletedLod(renderer);
     }
     const auto progress = world.loadingProgress();
     if (!loadingGenerationComplete || !world.streamingTargetReady() ||
         progress.total == 0 || progress.completed != progress.total ||
-        !threadPool.idle())
+        !threadPool.idle() || !world.lodCoverageReady())
         return false;
 
     terrainGenerated = true;
@@ -355,6 +357,7 @@ GameSession::CommandResult GameSession::executeCommand(
         player.teleport({target.x, target.y, target.z});
         world.update(player.getPosition());
         world.enqueueGeneration();
+        result.teleported = true;
         message(localization.format("message.teleported", {
             std::to_string(target.x), std::to_string(target.y),
             std::to_string(target.z)}));

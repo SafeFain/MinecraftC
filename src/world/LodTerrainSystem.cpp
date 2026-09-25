@@ -22,8 +22,6 @@
 
 namespace {
 constexpr uint32_t CACHE_REVISION = 4;
-constexpr size_t CPU_LIMIT = 64u * 1024u * 1024u;
-constexpr size_t GPU_LIMIT = 128u * 1024u * 1024u;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
 
 using Bytes = std::vector<uint8_t>;
@@ -265,14 +263,16 @@ void overlayExactChunks(LodTileData& tile, const LodTileKey& key,
         LodTileData exact;
         if (!readTileFile(exactPath(root, cx, cz), {cx, cz, 0}, generator, exact))
             continue;
-        for (int z = 0; z < LodTileData::SIDE; ++z) {
-            for (int x = 0; x < LodTileData::SIDE; ++x) {
-                const int wx = cx * Config::CHUNK_SIZE_X + x;
-                const int wz = cz * Config::CHUNK_SIZE_Z + z;
-                const int tx = floorDiv(wx - originX, cellSize);
-                const int tz = floorDiv(wz - originZ, cellSize);
-                if (tx < 0 || tx >= LodTileData::SIDE ||
-                    tz < 0 || tz >= LodTileData::SIDE) continue;
+        const int chunkX = cx * Config::CHUNK_SIZE_X;
+        const int chunkZ = cz * Config::CHUNK_SIZE_Z;
+        const int firstX = std::max(0, floorDiv(chunkX - originX, cellSize));
+        const int lastX = std::min(LodTileData::SIDE - 1,
+            floorDiv(chunkX + Config::CHUNK_SIZE_X - 1 - originX, cellSize));
+        const int firstZ = std::max(0, floorDiv(chunkZ - originZ, cellSize));
+        const int lastZ = std::min(LodTileData::SIDE - 1,
+            floorDiv(chunkZ + Config::CHUNK_SIZE_Z - 1 - originZ, cellSize));
+        for (int tz = firstZ; tz <= lastZ; ++tz) {
+            for (int tx = firstX; tx <= lastX; ++tx) {
                 // Approximate cells are sampled at their world-space center.
                 // Use the exact column at that same representative point;
                 // selecting the highest column anywhere in the footprint
@@ -280,19 +280,35 @@ void overlayExactChunks(LodTileData& tile, const LodTileKey& key,
                 // coarse cell and produces large checkerboard patches.
                 const int sampleX = originX + tx * cellSize + cellSize / 2;
                 const int sampleZ = originZ + tz * cellSize + cellSize / 2;
-                if (wx == sampleX && wz == sampleZ)
-                    refineLodColumn(tile.at(tx, tz), exact.at(x, z), cellSize);
+                const int localX = sampleX - chunkX;
+                const int localZ = sampleZ - chunkZ;
+                if (localX >= 0 && localX < Config::CHUNK_SIZE_X &&
+                    localZ >= 0 && localZ < Config::CHUNK_SIZE_Z)
+                    refineLodColumn(tile.at(tx, tz),
+                        exact.at(localX, localZ), cellSize);
             }
         }
     }
 }
 
-void appendVisibleIntervals(int bottom, int top, const LodColumn* neighbor,
+bool lodSideOccluded(BlockId source, BlockId cover) {
+    if (isFluid(source)) {
+        return (isWater(source) && isWater(cover)) ||
+            (isLava(source) && isLava(cover)) || isSolid(cover);
+    }
+    return !shouldRenderCubeFace(source, cover);
+}
+
+void appendVisibleIntervals(const LodSpan& source, const LodColumn* neighbor,
                             std::vector<std::pair<int, int>>& result) {
     result.clear();
-    result.push_back({bottom, top});
+    result.push_back({source.bottom, source.top});
     if (!neighbor) return;
     for (const LodSpan& cover : neighbor->spans) {
+        // Water is translucent: it cannot hide the opaque bank behind it.
+        // Match the exact chunk mesher's cube/fluid face rules instead of
+        // treating every neighboring span as an opaque occluder.
+        if (!lodSideOccluded(source.block, cover.block)) continue;
         std::vector<std::pair<int, int>> next;
         for (const auto& interval : result) {
             if (cover.top < interval.first || cover.bottom > interval.second) {
@@ -312,7 +328,7 @@ void appendVisibleIntervals(int bottom, int top, const LodColumn* neighbor,
 void emitFace(ChunkMesh& mesh, std::vector<unsigned int>& opaque,
               std::vector<unsigned int>& translucent, FaceDir face,
               const glm::vec3& minimum, const glm::vec3& maximum,
-              BlockId block) {
+              BlockId block, float faceOffset = 0.0f) {
     const BlockProperties& properties = getBlockProps(block);
     const BlockTexture texture = getFaceTexture(block, face);
     const float tile = static_cast<float>(getAtlasTextureIndex(texture)) + 15.0f / 512.0f;
@@ -335,7 +351,7 @@ void emitFace(ChunkMesh& mesh, std::vector<unsigned int>& opaque,
             localIndex = static_cast<int>(mesh.vertices.size() - base);
             mesh.vertices.push_back({position.x, position.y, position.z,
                 1.0f, 1.0f, 0.0f, properties.alpha, u, v, tile,
-                blockFaceRenderData(block, face)});
+                blockFaceRenderData(block, face) + faceOffset});
         }
         indices.push_back(base + static_cast<unsigned int>(localIndex));
     }
@@ -716,7 +732,8 @@ BlockId exactColumnBlock(const LodColumn& column, int y) {
 }
 
 ChunkMesh buildExactLodTileMesh(const LodTileData& data,
-                                const LodExactNeighborTiles* neighbors) {
+                                const LodExactNeighborTiles* neighbors,
+                                bool sealTileEdges) {
     std::vector<uint8_t> blocks(static_cast<size_t>(Config::CHUNK_VOLUME), 0);
     int columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z];
     for (auto& column : columnMaxY)
@@ -777,6 +794,66 @@ ChunkMesh buildExactLodTileMesh(const LodTileData& data,
     const size_t visibleIndices = mesh.translucentIndexOffset +
         mesh.translucentIndexCount;
     mesh.indices.resize(visibleIndices);
+    if (sealTileEdges) {
+        std::vector<unsigned int> opaque(
+            mesh.indices.begin(), mesh.indices.begin() +
+                static_cast<std::ptrdiff_t>(mesh.opaqueIndexCount));
+        std::vector<unsigned int> translucent(
+            mesh.indices.begin() +
+                static_cast<std::ptrdiff_t>(mesh.translucentIndexOffset),
+            mesh.indices.end());
+        constexpr FaceDir faces[] = {FaceDir::FRONT, FaceDir::BACK,
+                                     FaceDir::RIGHT, FaceDir::LEFT};
+        for (int side = 0; side < 4; ++side) {
+            for (int i = 0; i < Config::CHUNK_SIZE_X; ++i) {
+                const int x = side == 2 ? Config::CHUNK_SIZE_X - 1 :
+                    side == 3 ? 0 : i;
+                const int z = side == 0 ? 0 :
+                    side == 1 ? Config::CHUNK_SIZE_Z - 1 : i;
+                const int neighborX = side == 2 ? Config::CHUNK_SIZE_X :
+                    side == 3 ? -1 : i;
+                const int neighborZ = side == 0 ? -1 :
+                    side == 1 ? Config::CHUNK_SIZE_Z : i;
+                auto hiddenBlock = [&](int y) {
+                    if (!Config::isValidWorldY(y)) return BlockId::AIR;
+                    const BlockId block = static_cast<BlockId>(
+                        blocks[static_cast<size_t>(index(x, y, z))]);
+                    if (getBlockProps(block).shape != RenderShape::Cube &&
+                        !isFluid(block))
+                        return BlockId::AIR;
+                    const BlockId cover = neighborBlock(neighborX, y, neighborZ);
+                    return lodSideOccluded(block, cover)
+                        ? block : BlockId::AIR;
+                };
+                for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y;) {
+                    const BlockId block = hiddenBlock(y);
+                    if (block == BlockId::AIR) { ++y; continue; }
+                    const int bottom = y;
+                    while (y + 1 < Config::WORLD_MAX_Y &&
+                           hiddenBlock(y + 1) == block) ++y;
+                    const float top = isFluid(block)
+                        ? static_cast<float>(y) + fluidSurfaceHeight(block) - 0.001f
+                        : static_cast<float>(y + 1);
+                    glm::vec3 minimum(static_cast<float>(x),
+                        static_cast<float>(bottom), static_cast<float>(z));
+                    glm::vec3 maximum(minimum.x + 1.0f, top, minimum.z + 1.0f);
+                    if (side == 0) maximum.z = minimum.z;
+                    else if (side == 1) minimum.z = maximum.z;
+                    else if (side == 2) minimum.x = maximum.x;
+                    else maximum.x = minimum.x;
+                    emitFace(mesh, opaque, translucent, faces[side],
+                        minimum, maximum, block, 64.0f);
+                    ++y;
+                }
+            }
+        }
+        mesh.indices = std::move(opaque);
+        mesh.opaqueIndexCount = mesh.indices.size();
+        mesh.translucentIndexOffset = mesh.indices.size();
+        mesh.indices.insert(mesh.indices.end(), translucent.begin(),
+                            translucent.end());
+        mesh.translucentIndexCount = translucent.size();
+    }
     mesh.shadowCasterIndexOffset = 0;
     mesh.shadowCasterIndexCount = 0;
     mesh.indexCount = mesh.indices.size();
@@ -787,9 +864,10 @@ ChunkMesh buildExactLodTileMesh(const LodTileData& data,
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
                            const LodExactNeighborTiles* neighbors,
-                           const LodNeighborEdges* edges) {
+                           const LodNeighborEdges* edges,
+                           bool sealTileEdges) {
     if (cellSize == 1 && isFullyExact(data))
-        return buildExactLodTileMesh(data, neighbors);
+        return buildExactLodTileMesh(data, neighbors, sealTileEdges);
 
     ChunkMesh mesh;
     std::vector<unsigned int> opaque, translucent;
@@ -797,11 +875,15 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
     for (int z = 0; z < LodTileData::SIDE; ++z) {
         for (int x = 0; x < LodTileData::SIDE; ++x) {
             const LodColumn& column = data.at(x, z);
+            // The precision budget may simplify decoration, but dropping a
+            // lower solid span removes an entire floating Heaven island.
             const size_t first = column.spans.size() > static_cast<size_t>(maximumSpans)
                 ? column.spans.size() - static_cast<size_t>(maximumSpans) : 0;
-            for (size_t spanIndex = first; spanIndex < column.spans.size(); ++spanIndex) {
+            for (size_t spanIndex = 0; spanIndex < column.spans.size(); ++spanIndex) {
                 const LodSpan& span = column.spans[spanIndex];
                 const BlockProperties& properties = getBlockProps(span.block);
+                if (spanIndex < first && !properties.solid &&
+                    !isFluid(span.block)) continue;
                 if (cellSize > 1 && !properties.solid && !isFluid(span.block) &&
                     !(cellSize <= 2 && isFineHeavenDecoration(span.block)))
                     continue;
@@ -827,9 +909,13 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 const bool hasTreeOverlay = !column.exact &&
                     !column.spans.empty() &&
                     isLodTreeFoliage(column.spans.back().block);
+                const bool coveredBelow = spanIndex > 0 &&
+                    column.spans[spanIndex - 1].top + 1 >= span.bottom &&
+                    getBlockProps(column.spans[spanIndex - 1].block).solid;
                 if (!isFluid(span.block) && (column.exact ||
                     (column.spans.size() > 1 &&
-                     (!hasTreeOverlay || spanIndex + 1 == column.spans.size())))) {
+                     (!hasTreeOverlay || spanIndex + 1 == column.spans.size()))) &&
+                    !coveredBelow) {
                     emitFace(mesh, opaque, translucent, FaceDir::BOTTOM,
                         {x0, static_cast<float>(span.bottom), z0},
                         {x1, static_cast<float>(span.bottom), z1}, span.block);
@@ -848,9 +934,12 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                     // Direct mesh callers may omit edge samples. In that case
                     // an unknown fluid neighbor must not create a full-depth
                     // square wall across an otherwise continuous ocean.
-                    if (!neighbor && isFluid(span.block)) continue;
-                    appendVisibleIntervals(span.bottom, span.top, neighbor, intervals);
-                    for (const auto& interval : intervals) {
+                    const bool tileEdge = nx < 0 || nx >= LodTileData::SIDE ||
+                        nz < 0 || nz >= LodTileData::SIDE;
+                    if (!neighbor && isFluid(span.block)) intervals.clear();
+                    else appendVisibleIntervals(span, neighbor, intervals);
+                    auto emitInterval = [&](const std::pair<int, int>& interval,
+                                            float faceOffset) {
                         glm::vec3 minimum{x0, static_cast<float>(interval.first), z0};
                         glm::vec3 maximum{x1, static_cast<float>(interval.second + 1), z1};
                         if (isFluid(span.block) && interval.second == span.top)
@@ -860,7 +949,22 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                         else if (side.face == FaceDir::RIGHT) minimum.x = maximum.x;
                         else maximum.x = minimum.x;
                         emitFace(mesh, opaque, translucent, side.face,
-                                 minimum, maximum, span.block);
+                                 minimum, maximum, span.block, faceOffset);
+                    };
+                    for (const auto& interval : intervals)
+                        emitInterval(interval, 0.0f);
+                    if (sealTileEdges && tileEdge) {
+                        // Keep the portions hidden by a same-level neighbor as
+                        // transition skirts. The fragment shader displays them
+                        // only where the next tile belongs to another ring.
+                        int next = span.bottom;
+                        for (const auto& interval : intervals) {
+                            if (next < interval.first)
+                                emitInterval({next, interval.first - 1}, 64.0f);
+                            next = interval.second + 1;
+                        }
+                        if (next <= span.top)
+                            emitInterval({next, span.top}, 64.0f);
                     }
                 }
             }
@@ -891,7 +995,8 @@ void LodTerrainSystem::setSaveStore(SaveStore* store) {
         ("d_" + std::to_string(static_cast<int>(m_generator
             ? m_generator->dimension() : DimensionId::Overworld)))
         : std::filesystem::path{};
-    m_exactChunks.clear();
+    m_exactColumnsByX.clear();
+    m_scannedCacheRoot.clear();
     if (store) scanExactCache();
 }
 
@@ -906,6 +1011,7 @@ void LodTerrainSystem::reset(WorldGenerator* generator) {
     m_completions.clear();
     m_exactCompletions.clear();
     m_cpuBytes = m_gpuBytes = 0;
+    m_tasksInFlight = 0;
     m_generator = generator;
     m_nextRequestLevel = 0;
     if (m_saveStore && m_generator) {
@@ -928,9 +1034,13 @@ void LodTerrainSystem::configure(const LodSettings& settings) {
         ++m_epoch;
         m_selectionDirty = true;
         if (geometryChanged) {
-            releaseGpuMeshes();
-            m_tiles.clear();
-            m_cpuBytes = m_gpuBytes = 0;
+            // Existing meshes remain valid approximations while the new span
+            // budget rebuilds them. Keep them visible until replacements have
+            // crossed the GPU upload boundary.
+            for (auto& [key, tile] : m_tiles) {
+                (void)key;
+                tile->dirty = true;
+            }
         }
     }
     if (!m_settings.enabled) {
@@ -947,7 +1057,9 @@ void LodTerrainSystem::configure(const LodSettings& settings) {
 }
 
 void LodTerrainSystem::scanExactCache() {
-    m_exactChunks.clear();
+    if (m_cacheRoot == m_scannedCacheRoot) return;
+    m_exactColumnsByX.clear();
+    m_scannedCacheRoot = m_cacheRoot;
     std::error_code error;
     const auto directory = m_cacheRoot / "exact";
     if (!std::filesystem::is_directory(directory, error)) return;
@@ -955,7 +1067,7 @@ void LodTerrainSystem::scanExactCache() {
         if (error || !entry.is_regular_file()) continue;
         int cx = 0, cz = 0;
         if (std::sscanf(entry.path().filename().string().c_str(), "c_%d_%d.lod", &cx, &cz) == 2)
-            m_exactChunks.insert(packedChunkKey(cx, cz));
+            m_exactColumnsByX[cx].insert(cz);
     }
 }
 
@@ -967,11 +1079,11 @@ std::vector<std::pair<int, int>> LodTerrainSystem::exactChunksForTile(
     const int minimumZ = key.z * chunksPerSide;
     const int maximumX = minimumX + chunksPerSide;
     const int maximumZ = minimumZ + chunksPerSide;
-    for (uint64_t packed : m_exactChunks) {
-        const int cx = static_cast<int>(static_cast<int32_t>(packed >> 32));
-        const int cz = static_cast<int>(static_cast<int32_t>(packed & 0xffffffffu));
-        if (cx >= minimumX && cx < maximumX && cz >= minimumZ && cz < maximumZ)
-            result.push_back({cx, cz});
+    for (auto x = m_exactColumnsByX.lower_bound(minimumX);
+         x != m_exactColumnsByX.end() && x->first < maximumX; ++x) {
+        for (auto z = x->second.lower_bound(minimumZ);
+             z != x->second.end() && *z < maximumZ; ++z)
+            result.push_back({x->first, *z});
     }
     return result;
 }
@@ -999,14 +1111,17 @@ void LodTerrainSystem::rebuildSelection() {
     // Without this band a large near render distance can skip level zero and
     // meet a two- or four-block ocean mesh directly at the visible boundary.
     constexpr float fineBoundaryBand = Config::CHUNK_SIZE_X;
+    struct Band {
+        int level;
+        int tileSize;
+        float minimum;
+        float maximum;
+    };
+    std::vector<Band> bands;
     float previousMaximum = inner;
     for (int level = 0; level <= maximumLevel; ++level) {
         const int cellSize = 1 << level;
         const int tileSize = LodTileData::SIDE * cellSize;
-        // One chunk of lookahead is enough for the fine boundary ring; coarser
-        // far-frontier tiles retain the full two-chunk guard band.
-        const float selectionPadding = level == 0
-            ? fineBoundaryBand : prefetchDistance;
         const float nominalMinimum = level == 0
             ? inner : cellSize * quality * 0.5f;
         const float minimum = std::max(previousMaximum, nominalMinimum);
@@ -1016,14 +1131,33 @@ void LodTerrainSystem::rebuildSelection() {
             levelMaximum = std::max(levelMaximum, inner + fineBoundaryBand);
         const float maximum = std::min(outer, levelMaximum);
         if (maximum <= minimum) continue;
+        bands.push_back({level, tileSize, minimum, maximum});
+        previousMaximum = maximum;
+    }
+    for (size_t bandIndex = 0; bandIndex < bands.size(); ++bandIndex) {
+        const Band& band = bands[bandIndex];
+        const int level = band.level;
+        const int tileSize = band.tileSize;
+        const float minimum = band.minimum;
+        const float maximum = band.maximum;
+        // Both sides of a precision transition classify the same complete
+        // coarse tile. Keep every fine tile in that coarse footprint resident.
+        const float minimumGrid = bandIndex == 0 ? 0.0f :
+            static_cast<float>(tileSize);
+        const float maximumGrid = bandIndex + 1 == bands.size() ? 0.0f :
+            static_cast<float>(bands[bandIndex + 1].tileSize);
+        const float selectionPadding = level == 0
+            ? fineBoundaryBand : prefetchDistance;
+        const float boundsPadding = selectionPadding +
+            (maximumGrid > 0.0f ? maximumGrid : 0.0f);
         const int minTileX = floorDiv(static_cast<int>(std::floor(
-            centerX - maximum - selectionPadding)), tileSize);
+            centerX - maximum - boundsPadding)), tileSize);
         const int maxTileX = floorDiv(static_cast<int>(std::floor(
-            centerX + maximum + selectionPadding)), tileSize);
+            centerX + maximum + boundsPadding)), tileSize);
         const int minTileZ = floorDiv(static_cast<int>(std::floor(
-            centerZ - maximum - selectionPadding)), tileSize);
+            centerZ - maximum - boundsPadding)), tileSize);
         const int maxTileZ = floorDiv(static_cast<int>(std::floor(
-            centerZ + maximum + selectionPadding)), tileSize);
+            centerZ + maximum + boundsPadding)), tileSize);
         for (int tz = minTileZ; tz <= maxTileZ; ++tz) {
             for (int tx = minTileX; tx <= maxTileX; ++tx) {
                 const float tileCenterX = (tx + 0.5f) * tileSize;
@@ -1032,13 +1166,29 @@ void LodTerrainSystem::rebuildSelection() {
                 const float dz = tileCenterZ - centerZ;
                 const float distance = std::sqrt(dx * dx + dz * dz);
                 const float margin = tileSize * 0.72f;
-                if (distance + margin + selectionPadding < minimum ||
-                    distance - margin - selectionPadding > maximum) continue;
+                if (minimumGrid > 0.0f
+                        ? distance + selectionPadding < minimum
+                        : distance + margin + selectionPadding < minimum)
+                    continue;
+                if (maximumGrid > 0.0f) {
+                    const int grid = static_cast<int>(maximumGrid);
+                    const float parentX =
+                        (floorDiv(tx * tileSize, grid) + 0.5f) * grid;
+                    const float parentZ =
+                        (floorDiv(tz * tileSize, grid) + 0.5f) * grid;
+                    const float parentDx = parentX - centerX;
+                    const float parentDz = parentZ - centerZ;
+                    if (std::sqrt(parentDx * parentDx + parentDz * parentDz)
+                        >= maximum + selectionPadding)
+                        continue;
+                } else if (distance - margin - selectionPadding > maximum) {
+                    continue;
+                }
                 m_desired.push_back({{tx, tz, static_cast<uint8_t>(level)},
-                    minimum, maximum, dx * dx + dz * dz});
+                    minimum, maximum, dx * dx + dz * dz,
+                    minimumGrid, maximumGrid});
             }
         }
-        previousMaximum = maximum;
     }
 
     // The configured inner boundary assumes every near chunk already has a
@@ -1107,11 +1257,49 @@ size_t LodTerrainSystem::selectedTileCountAtLevel(uint8_t level) const {
         }));
 }
 
+bool LodTerrainSystem::isTileSelected(const LodTileKey& key) const {
+    return std::any_of(m_desired.begin(), m_desired.end(),
+        [&key](const Request& request) { return request.key == key; });
+}
+
+bool LodTerrainSystem::hasExactChunk(int cx, int cz) const {
+    const auto found = m_exactColumnsByX.find(cx);
+    return found != m_exactColumnsByX.end() &&
+        found->second.count(cz) != 0;
+}
+
 size_t LodTerrainSystem::residentTileCount() const {
     return static_cast<size_t>(std::count_if(
         m_tiles.begin(), m_tiles.end(), [](const auto& entry) {
             return entry.second->resident;
         }));
+}
+
+bool LodTerrainSystem::coverageReady() const {
+    if (!m_settings.enabled) return true;
+    if (m_selectionDirty) return false;
+    return std::all_of(m_desired.begin(), m_desired.end(), [this](const Request& request) {
+        const auto found = m_tiles.find(request.key);
+        return found != m_tiles.end() && found->second->resident &&
+            (found->second->mesh.gpuReady ||
+             (found->second->mesh.indexCount == 0 &&
+              !found->second->pendingMesh));
+    });
+}
+
+float LodTerrainSystem::coverageFraction() const {
+    if (!m_settings.enabled || (!m_selectionDirty && m_desired.empty()))
+        return 1.0f;
+    if (m_selectionDirty || m_desired.empty()) return 0.0f;
+    const size_t ready = static_cast<size_t>(std::count_if(
+        m_desired.begin(), m_desired.end(), [this](const Request& request) {
+            const auto found = m_tiles.find(request.key);
+            return found != m_tiles.end() && found->second->resident &&
+                (found->second->mesh.gpuReady ||
+                 (found->second->mesh.indexCount == 0 &&
+                  !found->second->pendingMesh));
+        }));
+    return static_cast<float>(ready) / static_cast<float>(m_desired.size());
 }
 
 size_t LodTerrainSystem::residentTileCountAtLevel(uint8_t level) const {
@@ -1151,20 +1339,35 @@ void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunk
         chunk->copyRawState(blocks, light);
         m_exactRevisions[packed] = revision;
         const int cx = chunk->cx, cz = chunk->cz;
-        const uint64_t epoch = m_epoch;
         WorldGenerator* generator = m_generator;
         const auto root = m_cacheRoot;
         ++m_tasksInFlight;
-        m_threadPool->enqueuePriority([this, blocks = std::move(blocks), cx, cz,
-                                      revision, epoch, generator, root]() mutable {
-            LodTileData data = extractExactLodChunk(blocks);
-            writeTileFile(exactPath(root, cx, cz), {cx, cz, 0}, *generator, data);
-            {
+        auto task = [this, blocks = std::move(blocks), cx, cz,
+                     revision, generator, root]() mutable {
+            struct CompletionGuard {
+                std::atomic<int>& count;
+                ~CompletionGuard() { --count; }
+            } guard{m_tasksInFlight};
+            try {
+                LodTileData data = extractExactLodChunk(blocks);
+                const bool persisted = writeTileFile(
+                    exactPath(root, cx, cz), {cx, cz, 0}, *generator, data);
                 std::lock_guard lock(m_completionMutex);
-                m_exactCompletions.push_back({cx, cz, revision, epoch, std::move(data)});
+                m_exactCompletions.push_back(
+                    {cx, cz, revision, persisted});
+            } catch (...) {
+                std::lock_guard lock(m_completionMutex);
+                m_exactCompletions.push_back({cx, cz, revision, false});
+                throw;
             }
+        };
+        try {
+            m_threadPool->enqueuePriority(std::move(task), 1000);
+        } catch (...) {
             --m_tasksInFlight;
-        }, 1000);
+            m_exactRevisions.erase(packed);
+            throw;
+        }
         break;
     }
 }
@@ -1211,8 +1414,13 @@ void LodTerrainSystem::enqueueRequests() {
                     const auto exact = exactChunksForTile(request.key);
                     const LodTileKey key = request.key;
                     ++m_tasksInFlight;
-                    m_threadPool->enqueuePriority(
-                        [this, key, epoch, spanLimit, generator, root, exact]() {
+                    auto task = [this, key, epoch, spanLimit, generator,
+                                 root, exact]() {
+                        struct CompletionGuard {
+                            std::atomic<int>& count;
+                            ~CompletionGuard() { --count; }
+                        } guard{m_tasksInFlight};
+                        try {
                             LodTileData data;
                             if (!readTileFile(tilePath(root, key), key,
                                               *generator, data)) {
@@ -1246,15 +1454,28 @@ void LodTerrainSystem::enqueueRequests() {
                             }
                             ChunkMesh mesh = buildLodTileMesh(
                                 data, 1 << key.level, spanLimit, neighborPointer,
-                                edgePointer);
+                                edgePointer, true);
                             {
                                 std::lock_guard lock(m_completionMutex);
                                 m_completions.push_back({key, epoch,
                                     std::move(data), std::move(mesh)});
                             }
-                            --m_tasksInFlight;
-                        }, 100 - static_cast<int>(
-                            std::min(request.distance2, 1000000.0f)));
+                        } catch (...) {
+                            std::lock_guard lock(m_completionMutex);
+                            m_completions.push_back({key, epoch, {}, {}, false});
+                            throw;
+                        }
+                    };
+                    try {
+                        m_threadPool->enqueuePriority(std::move(task),
+                            100 - static_cast<int>(
+                                std::min(request.distance2, 1000000.0f)));
+                    } catch (...) {
+                        --m_tasksInFlight;
+                        found->second->queued = false;
+                        found->second->dirty = true;
+                        throw;
+                    }
                     m_nextRequestLevel = static_cast<uint8_t>(
                         (level + 1) % levelCount);
                     enqueued = true;
@@ -1279,10 +1500,14 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
     m_playerPosition = playerPosition;
     const int cx = static_cast<int>(std::floor(playerPosition.x / Config::CHUNK_SIZE_X));
     const int cz = static_cast<int>(std::floor(playerPosition.z / Config::CHUNK_SIZE_Z));
+    bool jumped = false;
     if (cx != m_centerChunkX || cz != m_centerChunkZ ||
         nearDistanceChunks != m_nearDistanceChunks) {
-        if (std::abs(cx - m_centerChunkX) > 8 || std::abs(cz - m_centerChunkZ) > 8)
+        if (std::abs(cx - m_centerChunkX) > 8 ||
+            std::abs(cz - m_centerChunkZ) > 8) {
             ++m_epoch;
+            jumped = true;
+        }
         m_centerChunkX = cx;
         m_centerChunkZ = cz;
         m_nearDistanceChunks = nearDistanceChunks;
@@ -1318,6 +1543,15 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
         m_selectionDirty = true;
     }
     if (m_selectionDirty) rebuildSelection();
+    if (jumped && !m_desired.empty()) {
+        // Put one far silhouette tile into the bounded worker window first;
+        // the normal round-robin then resumes its near-to-far work per level.
+        m_nextRequestLevel = std::max_element(
+            m_desired.begin(), m_desired.end(),
+            [](const Request& a, const Request& b) {
+                return a.key.level < b.key.level;
+            })->key.level;
+    }
     enqueueRequests();
     // Exact extraction is a refinement lane. Fill only capacity left after
     // missing/dirty LOD requests so exploration cannot permanently starve the
@@ -1369,8 +1603,17 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
         }
         if (!hasExact && !hasCompletion) break;
         if (hasExact) {
-            if (exact.epoch != m_epoch) continue;
-            m_exactChunks.insert(packedChunkKey(exact.cx, exact.cz));
+            const uint64_t packed = packedChunkKey(exact.cx, exact.cz);
+            const auto revision = m_exactRevisions.find(packed);
+            if (revision == m_exactRevisions.end() ||
+                revision->second != exact.revision) continue;
+            if (!exact.persisted) {
+                m_exactRevisions.erase(revision);
+                continue;
+            }
+            // Selection epochs change on movement and settings edits, but an
+            // exact chunk remains valid for the same generator and revision.
+            m_exactColumnsByX[exact.cx].insert(exact.cz);
             invalidateTilesForChunk(exact.cx, exact.cz);
             continue;
         }
@@ -1378,6 +1621,10 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
         if (found == m_tiles.end()) continue;
         Tile& tile = *found->second;
         tile.queued = false;
+        if (!completion.success) {
+            tile.dirty = true;
+            continue;
+        }
         if (completion.epoch != m_epoch) {
             tile.dirty = true;
             continue;
@@ -1407,9 +1654,7 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
             if (candidate->empty() || (!tile.pendingMesh && candidate->gpuReady))
                 continue;
             const size_t bytes = candidate->uploadBytes();
-            const size_t replacedGpuBytes = tile.pendingMesh ? tile.gpuBytes : 0;
-            if (uploadBytes + bytes > budget.uploadBytesPerFrame ||
-                m_gpuBytes - std::min(m_gpuBytes, replacedGpuBytes) + bytes > GPU_LIMIT)
+            if (uploads > 0 && uploadBytes + bytes > budget.uploadBytesPerFrame)
                 continue;
             if (tile.pendingMesh) {
                 const size_t oldCpuBytes = tile.data.memoryBytes() +
@@ -1436,15 +1681,8 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
             m_cpuBytes -= std::min(m_cpuBytes, bytes);
         }
     }
-    if (m_cpuBytes > CPU_LIMIT) {
-        for (auto it = m_tiles.begin(); it != m_tiles.end() && m_cpuBytes > CPU_LIMIT;) {
-            if (it->second->mesh.gpuReady || it->second->queued ||
-                it->second->pendingMesh) { ++it; continue; }
-            m_cpuBytes -= std::min(m_cpuBytes, it->second->data.memoryBytes() +
-                it->second->mesh.uploadBytes());
-            it = m_tiles.erase(it);
-        }
-    }
+    // Selection bounds resident memory. Evicting a selected, unfinished tile
+    // here would immediately request it again and can prevent coverage forever.
     enqueueRequests();
     rebuildSubmissions();
 }
@@ -1453,18 +1691,63 @@ void LodTerrainSystem::rebuildSubmissions() {
     m_submissions.clear();
     const double originX = m_playerPosition.x;
     const double originZ = m_playerPosition.z;
+    std::unordered_map<LodTileKey, const Request*, LodTileKeyHash> requests;
+    requests.reserve(m_desired.size());
+    for (const Request& request : m_desired)
+        requests.emplace(request.key, &request);
+    auto ready = [this](const LodTileKey& key) {
+        const auto found = m_tiles.find(key);
+        return found != m_tiles.end() && found->second->resident &&
+            (found->second->mesh.gpuReady ||
+             (found->second->mesh.indexCount == 0 &&
+              !found->second->pendingMesh));
+    };
+    auto parentKey = [](const Request& request) {
+        const int tileSize = LodTileData::SIDE << request.key.level;
+        const int parentSize = static_cast<int>(request.maximumGrid);
+        const int ratio = parentSize / tileSize;
+        uint8_t level = request.key.level;
+        for (int step = ratio; step > 1; step >>= 1) ++level;
+        return LodTileKey{floorDiv(request.key.x, ratio),
+                          floorDiv(request.key.z, ratio), level};
+    };
+    std::unordered_set<LodTileKey, LodTileKeyHash> missingFineParents;
+    for (const Request& request : m_desired) {
+        if (request.maximumGrid > 0.0f && !ready(request.key))
+            missingFineParents.insert(parentKey(request));
+    }
     for (const Request& request : m_desired) {
         const auto found = m_tiles.find(request.key);
         if (found == m_tiles.end() || !found->second->mesh.gpuReady) continue;
+        float minimumDistance = request.minimumDistance;
+        float maximumDistance = request.maximumDistance;
+        if (missingFineParents.count(request.key) != 0)
+            minimumDistance = 0.0f;
+        if (request.maximumGrid > 0.0f) {
+            const LodTileKey parent = parentKey(request);
+            const auto parentRequest = requests.find(parent);
+            if (parentRequest != requests.end() && !ready(parent))
+                maximumDistance = parentRequest->second->maximumDistance;
+        }
         const int cellSize = 1 << request.key.level;
-        const double worldX = static_cast<double>(request.key.x * LodTileData::SIDE * cellSize);
-        const double worldZ = static_cast<double>(request.key.z * LodTileData::SIDE * cellSize);
+        const int64_t worldX = static_cast<int64_t>(request.key.x) *
+            LodTileData::SIDE * cellSize;
+        const int64_t worldZ = static_cast<int64_t>(request.key.z) *
+            LodTileData::SIDE * cellSize;
+        const int tileSize = LodTileData::SIDE * cellSize;
+        const int grid = static_cast<int>(std::max(
+            request.minimumGrid, request.maximumGrid));
+        const auto phase = [grid](int64_t coordinate) {
+            return grid > 0 ? static_cast<float>(
+                (coordinate % grid + grid) % grid) : 0.0f;
+        };
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(
-            static_cast<float>(worldX - originX), 0.0f,
-            static_cast<float>(worldZ - originZ)));
+            static_cast<float>(static_cast<double>(worldX) - originX), 0.0f,
+            static_cast<float>(static_cast<double>(worldZ) - originZ)));
         m_submissions.push_back({&found->second->mesh, model,
-            glm::vec2(static_cast<float>(worldX), static_cast<float>(worldZ)),
-            request.minimumDistance, request.maximumDistance, request.distance2});
+            glm::vec4(phase(worldX), request.minimumGrid,
+                      phase(worldZ), request.maximumGrid),
+            tileSize, minimumDistance, maximumDistance, request.distance2});
     }
 }
 
@@ -1488,9 +1771,28 @@ void LodTerrainSystem::releaseGpuMeshes(bool retainCpuGeometry) {
         m_cpuBytes = 0;
         const int spanLimit = lodVerticalSpanLimit(m_settings.precision);
         for (auto& [key, tile] : m_tiles) {
-            if (tile->mesh.empty())
-                tile->mesh = buildLodTileMesh(tile->data, 1 << key.level, spanLimit);
+            if (tile->mesh.empty()) {
+                LodExactNeighborTiles neighbors;
+                const LodExactNeighborTiles* neighborPointer = nullptr;
+                if (m_generator && key.level == 0 && isFullyExact(tile->data)) {
+                    neighbors = readExactNeighbors(
+                        m_cacheRoot, *m_generator, key.x, key.z);
+                    neighborPointer = &neighbors;
+                }
+                LodNeighborEdges edges;
+                const LodNeighborEdges* edgePointer = nullptr;
+                if (m_generator && (key.level > 0 ||
+                                    !isFullyExact(tile->data))) {
+                    edges = sampleNeighborEdges(*m_generator, key);
+                    edgePointer = &edges;
+                }
+                tile->mesh = buildLodTileMesh(tile->data, 1 << key.level,
+                    spanLimit, neighborPointer, edgePointer, true);
+            }
             m_cpuBytes += tile->data.memoryBytes() + tile->mesh.uploadBytes();
+            if (tile->pendingData && tile->pendingMesh)
+                m_cpuBytes += tile->pendingData->memoryBytes() +
+                    tile->pendingMesh->uploadBytes();
         }
     }
 }

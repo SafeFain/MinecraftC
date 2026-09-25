@@ -59,6 +59,7 @@ public:
     struct CommandResult {
         std::vector<std::string> messages;
         std::optional<GameMode> gameModeChanged;
+        bool teleported = false;
     };
     struct LightningEvent {
         glm::dvec3 position{0.0};
