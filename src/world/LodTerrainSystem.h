@@ -69,6 +69,7 @@ struct LodTileData {
 // mesher without making LOD tiles own or retain adjacent data.
 using LodExactNeighborTiles =
     std::array<std::optional<LodTileData>, ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS.size()>;
+using LodNeighborEdges = std::array<std::array<LodColumn, LodTileData::SIDE>, 4>;
 
 struct LodRenderSubmission {
     const ChunkMesh* mesh = nullptr;
@@ -89,7 +90,8 @@ void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
                      int cellSize);
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
-                           const LodExactNeighborTiles* neighbors = nullptr);
+                           const LodExactNeighborTiles* neighbors = nullptr,
+                           const LodNeighborEdges* edges = nullptr);
 
 class LodTerrainSystem {
 public:

@@ -79,6 +79,10 @@ int main() {
     WorldGenerator normal(123456789ULL, WorldType::Normal, DimensionId::Overworld);
     const LodTileKey negative{-3, 2, 2};
     const LodTileData first = buildApproximateLodTile(normal, negative);
+    for (const LodColumn& column : first.columns)
+        require(!column.spans.empty() &&
+                column.spans.front().bottom == Config::WORLD_MIN_Y,
+                "approximate Overworld columns leave a floating ground slab");
     const ChunkMesh compactApproximate = buildLodTileMesh(first, 4, 24);
     require(compactApproximate.uploadBytes() < 160u * 1024u,
             "ordinary LOD tiles retain enough GPU budget for outer rings");
@@ -146,6 +150,32 @@ int main() {
     require(recoveredWater.exact && recoveredWater.spans.size() == 1 &&
             recoveredWater.spans.front().block == BlockId::SAND,
             "one-block LOD accepts exact dry terrain refinement");
+    LodColumn grounded;
+    grounded.spans.push_back({Config::WORLD_MIN_Y, 100, BlockId::GRASS});
+    LodColumn caveAndTree;
+    caveAndTree.exact = true;
+    caveAndTree.spans = {
+        {Config::WORLD_MIN_Y, 25, BlockId::STONE},
+        {40, 70, BlockId::STONE},
+        {78, 98, BlockId::DIRT},
+        {99, 100, BlockId::GRASS},
+        {101, 102, BlockId::WOOD},
+        {103, 104, BlockId::LEAVES},
+        {105, 106, BlockId::LEAVES}
+    };
+    refineLodColumn(grounded, caveAndTree, 4);
+    require(grounded.exact && grounded.spans.front().bottom ==
+                Config::WORLD_MIN_Y && grounded.spans.front().top == 100 &&
+                grounded.spans.front().block == BlockId::GRASS &&
+                grounded.spans.back().top == 106,
+            "coarse exact refinement removed continuous ground beneath caves");
+    LodTileData cliff;
+    cliff.at(7, 8).spans.push_back({Config::WORLD_MIN_Y, 55, BlockId::SAND});
+    cliff.at(8, 8).spans.push_back({Config::WORLD_MIN_Y, 110, BlockId::STONE});
+    const ChunkMesh cliffMesh = buildLodTileMesh(cliff, 4, 6);
+    require(meshMinimumY(cliffMesh) == Config::WORLD_MIN_Y &&
+                meshMaximumY(cliffMesh) == 111.0f,
+            "large LOD height differences expose the bottom of a terrain slab");
     const LodTileData coarseTrees = buildApproximateLodTile(normal, {0, 0, 4});
     for (const LodColumn& column : coarseTrees.columns) {
         for (const LodSpan& span : column.spans)
@@ -371,6 +401,17 @@ int main() {
             std::abs(meshMaximumY(oceanMesh) -
                 (62.0f + fluidSurfaceHeight(BlockId::WATER) - 0.001f)) < 0.001f,
             "LOD oceans match exact fluid height and omit tile-boundary walls");
+    LodNeighborEdges oceanEdges;
+    for (auto& side : oceanEdges)
+        for (LodColumn& column : side)
+            column.spans.push_back({40, 62, BlockId::WATER});
+    require(buildLodTileMesh(ocean, 8, 24, nullptr, &oceanEdges)
+                .translucentIndexCount == oceanMesh.translucentIndexCount,
+            "adjacent ocean tiles create a visible water boundary wall");
+    oceanEdges[2][8].spans = {{Config::WORLD_MIN_Y, 50, BlockId::STONE}};
+    require(buildLodTileMesh(ocean, 8, 24, nullptr, &oceanEdges)
+                .translucentIndexCount > oceanMesh.translucentIndexCount,
+            "shore tile boundary omits the exposed water side");
 
     LodTileData shallowOcean;
     shallowOcean.at(8, 8).spans.push_back({58, 61, BlockId::SAND});
@@ -399,7 +440,18 @@ int main() {
     selection.reset(&normal);
     selection.configure({true, 128, LodAggressiveness::Balanced,
                          LodPrecision::Medium});
-    selection.update({0.5, 80.0, 0.5}, 8, {});
+    std::vector<std::unique_ptr<Chunk>> readyChunks;
+    std::vector<Chunk*> activeChunks;
+    for (int z = -8; z <= 8; ++z) {
+        for (int x = -8; x <= 8; ++x) {
+            if (x * x + z * z > 64) continue;
+            auto chunk = std::make_unique<Chunk>(x, z);
+            chunk->lifecycle = Chunk::LifecycleState::Renderable;
+            activeChunks.push_back(chunk.get());
+            readyChunks.push_back(std::move(chunk));
+        }
+    }
+    selection.update({0.5, 80.0, 0.5}, 8, activeChunks);
     require(selection.selectedMaximumDistance() == 128.0f *
                 Config::CHUNK_SIZE_X,
             "LOD selection does not reach its configured outer distance");
@@ -410,15 +462,34 @@ int main() {
     require(selection.selectedTileCount() < 1100,
             "LOD selection exceeds its bounded tile budget");
 
-    Chunk pendingNearChunk(0, 0);
-    selection.update({0.5, 80.0, 0.5}, 8, {&pendingNearChunk});
+    const size_t readySelectionCount = selection.selectedTileCount();
+    auto missing = std::find_if(activeChunks.begin(), activeChunks.end(),
+        [](const Chunk* chunk) { return chunk->cx == -1 && chunk->cz == -1; });
+    Chunk* pendingNearChunk = *missing;
+    activeChunks.erase(missing);
+    selection.update({0.5, 80.0, 0.5}, 8, activeChunks);
+    require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f &&
+                selection.selectedTileCount() == readySelectionCount + 1,
+            "an unallocated negative-coordinate near chunk has no LOD backing");
+    pendingNearChunk->lifecycle = Chunk::LifecycleState::Requested;
+    activeChunks.push_back(pendingNearChunk);
+    selection.update({0.5, 80.0, 0.5}, 8, activeChunks);
     require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
             "a non-renderable near chunk does not retain level-zero LOD backing");
-    pendingNearChunk.lifecycle = Chunk::LifecycleState::Renderable;
-    selection.update({0.5, 80.0, 0.5}, 8, {&pendingNearChunk});
+    pendingNearChunk->lifecycle = Chunk::LifecycleState::Renderable;
+    pendingNearChunk->getMesh().indexCount = 6;
+    selection.update({0.5, 80.0, 0.5}, 8, activeChunks);
+    require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
+            "LOD backing retires before the near mesh reaches the GPU");
+    pendingNearChunk->getMesh().gpuReady = true;
+    selection.update({0.5, 80.0, 0.5}, 8, activeChunks);
     require(selection.selectedMinimumDistanceAtLevel(0) ==
                 6.0f * Config::CHUNK_SIZE_X,
             "level-zero LOD backing remains after the near chunk is renderable");
+
+    selection.update({91.0, 180.0, -10.0}, 12, {});
+    require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
+            "moving to an unallocated near region leaves the LOD inner hole");
 
     selection.update({0.5, 80.0, 0.5}, 2, {});
     require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,

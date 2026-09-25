@@ -420,9 +420,10 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             context.river = sample.river;
             const SurfaceProfile surface = SurfaceRules::profile(
                 generator.getSeed(), wx, wz, context);
-            const int depth = std::max(8, cellSize * 2);
-            column.spans.push_back({static_cast<int16_t>(std::max(
-                Config::WORLD_MIN_Y, sample.height - depth)),
+            // The surface is a coarse height field, not a floating slab.
+            // A short underground span exposes sky below tall neighboring
+            // columns and at LOD ring cuts where the two samples disagree.
+            column.spans.push_back({static_cast<int16_t>(Config::WORLD_MIN_Y),
                 static_cast<int16_t>(sample.height), surface.top});
             if (sample.waterLevel > sample.height) {
                 column.spans.push_back({static_cast<int16_t>(sample.height + 1),
@@ -608,6 +609,42 @@ void refineLodColumn(LodColumn& approximate, const LodColumn& exact,
     // is already a one-block exact match and should always accept refinement.
     if (cellSize > 1 && hasFluidSpan(approximate) && !hasFluidSpan(exact))
         return;
+    if (cellSize > 1 && !approximate.spans.empty() &&
+        approximate.spans.front().bottom == Config::WORLD_MIN_Y) {
+        // Coarse Overworld cells represent the surface. Copying an entire
+        // exact column can replace that continuous base with a cave, a tree,
+        // or only the last few runs allowed by the vertical span budget.
+        const int surfaceY = approximate.spans.front().top;
+        for (const LodSpan& span : exact.spans) {
+            if (span.bottom <= surfaceY && span.top >= surfaceY &&
+                getBlockProps(span.block).solid) {
+                approximate.spans.front().block = span.block;
+                break;
+            }
+        }
+        approximate.spans.erase(std::remove_if(approximate.spans.begin(),
+            approximate.spans.end(), [surfaceY](const LodSpan& span) {
+                return span.bottom > surfaceY && !isFluid(span.block);
+            }), approximate.spans.end());
+        std::vector<LodSpan> aboveSurface;
+        for (const LodSpan& span : exact.spans) {
+            if (span.bottom > surfaceY && !isFluid(span.block))
+                aboveSurface.push_back(span);
+        }
+        // Low precision retains six spans. Reserve two for ground and water.
+        constexpr size_t maxOverlays = 4;
+        const size_t firstOverlay = aboveSurface.size() > maxOverlays
+            ? aboveSurface.size() - maxOverlays : 0;
+        approximate.spans.insert(approximate.spans.end(),
+            aboveSurface.begin() + static_cast<std::ptrdiff_t>(firstOverlay),
+            aboveSurface.end());
+        std::sort(approximate.spans.begin(), approximate.spans.end(),
+            [](const LodSpan& a, const LodSpan& b) {
+                return a.bottom < b.bottom;
+            });
+        approximate.exact = true;
+        return;
+    }
     approximate = exact;
 }
 
@@ -615,6 +652,59 @@ namespace {
 bool isFullyExact(const LodTileData& data) {
     return std::all_of(data.columns.begin(), data.columns.end(),
         [](const LodColumn& column) { return column.exact; });
+}
+
+LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
+                                     const LodTileKey& key) {
+    LodNeighborEdges edges;
+    const int cellSize = 1 << key.level;
+    const int originX = key.x * LodTileData::SIDE * cellSize;
+    const int originZ = key.z * LodTileData::SIDE * cellSize;
+    for (int i = 0; i < LodTileData::SIDE; ++i) {
+        for (int side = 0; side < 4; ++side) {
+            const int cellX = side == 2 ? LodTileData::SIDE :
+                side == 3 ? -1 : i;
+            const int cellZ = side == 0 ? -1 :
+                side == 1 ? LodTileData::SIDE : i;
+            const int wx = originX + cellX * cellSize + cellSize / 2;
+            const int wz = originZ + cellZ * cellSize + cellSize / 2;
+            LodColumn& column = edges[static_cast<size_t>(side)][static_cast<size_t>(i)];
+            if (generator.isHeaven()) {
+                for (const auto& island : generator.sampleHeavenLayers(wx, wz)) {
+                    if (island.present)
+                        column.spans.push_back({static_cast<int16_t>(island.bottom),
+                            static_cast<int16_t>(island.top),
+                            heavenSurface(island.biome)});
+                }
+            } else {
+                SurfaceColumn sample = generator.sampleTerrainColumn(wx, wz);
+                if (cellSize > 1 && cellSize <= 16 &&
+                    sample.waterLevel <= sample.height) {
+                    const int low = cellSize / 4;
+                    const int high = cellSize - 1 - low;
+                    for (int offsetZ : {low, high}) {
+                        for (int offsetX : {low, high}) {
+                            const SurfaceColumn candidate =
+                                generator.sampleTerrainColumn(
+                                    originX + cellX * cellSize + offsetX,
+                                    originZ + cellZ * cellSize + offsetZ);
+                            if (candidate.waterLevel > candidate.height) {
+                                sample = candidate;
+                                break;
+                            }
+                        }
+                        if (sample.waterLevel > sample.height) break;
+                    }
+                }
+                column.spans.push_back({static_cast<int16_t>(Config::WORLD_MIN_Y),
+                    static_cast<int16_t>(sample.height), BlockId::STONE});
+                if (sample.waterLevel > sample.height)
+                    column.spans.push_back({static_cast<int16_t>(sample.height + 1),
+                        static_cast<int16_t>(sample.waterLevel), BlockId::WATER});
+            }
+        }
+    }
+    return edges;
 }
 
 BlockId exactColumnBlock(const LodColumn& column, int y) {
@@ -696,7 +786,8 @@ ChunkMesh buildExactLodTileMesh(const LodTileData& data,
 
 ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
-                           const LodExactNeighborTiles* neighbors) {
+                           const LodExactNeighborTiles* neighbors,
+                           const LodNeighborEdges* edges) {
     if (cellSize == 1 && isFullyExact(data))
         return buildExactLodTileMesh(data, neighbors);
 
@@ -746,15 +837,17 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 struct Side { int dx, dz; FaceDir face; };
                 constexpr Side sides[] = {{0,-1,FaceDir::FRONT}, {0,1,FaceDir::BACK},
                     {1,0,FaceDir::RIGHT}, {-1,0,FaceDir::LEFT}};
-                for (const Side& side : sides) {
+                for (size_t sideIndex = 0; sideIndex < std::size(sides); ++sideIndex) {
+                    const Side& side = sides[sideIndex];
                     const int nx = x + side.dx, nz = z + side.dz;
                     const LodColumn* neighbor = nx >= 0 && nx < LodTileData::SIDE &&
                         nz >= 0 && nz < LodTileData::SIDE ? &data.at(nx, nz) : nullptr;
-                    // A missing neighbor here means only that it belongs to a
-                    // separately meshed tile. Emitting a full-depth fluid wall
-                    // at every such edge outlines oceans as giant squares.
-                    // The adjoining tile supplies its own top surface; omit the
-                    // unknowable fluid side until neighbor-aware meshing exists.
+                    if (!neighbor && edges)
+                        neighbor = &(*edges)[sideIndex][static_cast<size_t>(
+                            side.dx == 0 ? x : z)];
+                    // Direct mesh callers may omit edge samples. In that case
+                    // an unknown fluid neighbor must not create a full-depth
+                    // square wall across an otherwise continuous ocean.
                     if (!neighbor && isFluid(span.block)) continue;
                     appendVisibleIntervals(span.bottom, span.top, neighbor, intervals);
                     for (const auto& interval : intervals) {
@@ -1127,6 +1220,16 @@ void LodTerrainSystem::enqueueRequests() {
                                 writeTileFile(tilePath(root, key), key,
                                               *generator, data);
                             }
+                            // Older r4 approximate tiles stored only a short
+                            // surface slab. Repair them in memory as well so
+                            // existing worlds get continuous coverage.
+                            if (!generator->isHeaven()) {
+                                for (LodColumn& column : data.columns) {
+                                    if (!column.exact && !column.spans.empty())
+                                        column.spans.front().bottom =
+                                            Config::WORLD_MIN_Y;
+                                }
+                            }
                             overlayExactChunks(data, key, root, *generator, exact);
                             LodExactNeighborTiles neighbors;
                             const LodExactNeighborTiles* neighborPointer = nullptr;
@@ -1135,8 +1238,15 @@ void LodTerrainSystem::enqueueRequests() {
                                     root, *generator, key.x, key.z);
                                 neighborPointer = &neighbors;
                             }
+                            LodNeighborEdges edges;
+                            const LodNeighborEdges* edgePointer = nullptr;
+                            if (key.level > 0 || !isFullyExact(data)) {
+                                edges = sampleNeighborEdges(*generator, key);
+                                edgePointer = &edges;
+                            }
                             ChunkMesh mesh = buildLodTileMesh(
-                                data, 1 << key.level, spanLimit, neighborPointer);
+                                data, 1 << key.level, spanLimit, neighborPointer,
+                                edgePointer);
                             {
                                 std::lock_guard lock(m_completionMutex);
                                 m_completions.push_back({key, epoch,
@@ -1181,6 +1291,16 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
     std::unordered_set<uint64_t> nearFallbackChunks;
     const int64_t nearDistance2 = static_cast<int64_t>(nearDistanceChunks) *
         nearDistanceChunks;
+    // ChunkStreamer allocates only a bounded number of chunks each frame.
+    // Start with the complete target, including coordinates not allocated yet,
+    // then remove the chunks whose replacement geometry is available.
+    for (int dz = -nearDistanceChunks; dz <= nearDistanceChunks; ++dz) {
+        for (int dx = -nearDistanceChunks; dx <= nearDistanceChunks; ++dx) {
+            if (static_cast<int64_t>(dx) * dx +
+                static_cast<int64_t>(dz) * dz <= nearDistance2)
+                nearFallbackChunks.insert(packedChunkKey(cx + dx, cz + dz));
+        }
+    }
     for (const Chunk* chunk : activeChunks) {
         if (!chunk) continue;
         const int64_t dx = static_cast<int64_t>(chunk->cx) - cx;
@@ -1190,8 +1310,8 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
         const bool renderable =
             chunk->lifecycle.load() == Chunk::LifecycleState::Renderable &&
             (mesh.indexCount == 0 || mesh.gpuReady);
-        if (!renderable)
-            nearFallbackChunks.insert(packedChunkKey(chunk->cx, chunk->cz));
+        if (renderable)
+            nearFallbackChunks.erase(packedChunkKey(chunk->cx, chunk->cz));
     }
     if (nearFallbackChunks != m_nearFallbackChunks) {
         m_nearFallbackChunks = std::move(nearFallbackChunks);

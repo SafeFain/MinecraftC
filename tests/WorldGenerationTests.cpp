@@ -1544,10 +1544,10 @@ int main() {
         }
     }
 
-    Chunk flatSingleton(-1, -1);
-    flatOtherSeed.generate(flatSingleton);
+    auto flatSingleton = std::make_unique<Chunk>(-1, -1);
+    flatOtherSeed.generate(*flatSingleton);
     for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
-        require(flatSingleton.getBlock(3, y, 11) ==
+        require(flatSingleton->getBlock(3, y, 11) ==
                     flatRegionChunks.front()->getBlock(3, y, 11),
                 "superflat singleton differs from region output");
 
@@ -1775,30 +1775,31 @@ int main() {
                           : (value - Config::CHUNK_SIZE_X + 1) /
                                 Config::CHUNK_SIZE_X;
     };
-    Chunk spawnSkywayChunk(floorDivChunk(originSkyway.worldX),
-                           floorDivChunk(originSkyway.worldZ));
-    heaven.generate(spawnSkywayChunk);
-    const int spawnLocalX = originSkyway.worldX - spawnSkywayChunk.worldX();
-    const int spawnLocalZ = originSkyway.worldZ - spawnSkywayChunk.worldZ();
+    auto spawnSkywayChunk = std::make_unique<Chunk>(
+        floorDivChunk(originSkyway.worldX),
+        floorDivChunk(originSkyway.worldZ));
+    heaven.generate(*spawnSkywayChunk);
+    const int spawnLocalX = originSkyway.worldX - spawnSkywayChunk->worldX();
+    const int spawnLocalZ = originSkyway.worldZ - spawnSkywayChunk->worldZ();
     for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
         const int floorY = originSkyway.mainFloorY + (layer - 2) * 44;
-        const BlockId floor = spawnSkywayChunk.getBlock(
+        const BlockId floor = spawnSkywayChunk->getBlock(
             spawnLocalX, floorY, spawnLocalZ);
         require((floor == BlockId::SUNSTONE || floor == BlockId::CLOUDSTONE) &&
-                    spawnSkywayChunk.getBlock(spawnLocalX, floorY + 1,
-                                               spawnLocalZ) ==
+                    spawnSkywayChunk->getBlock(spawnLocalX, floorY + 1,
+                                                spawnLocalZ) ==
                         BlockId::STAR_CRYSTAL,
                 "origin skyway chunk is missing a floor or travel core");
     }
-    Chunk heavenSpawnChunk(floorDivChunk(heavenSpawn.x),
-                           floorDivChunk(heavenSpawn.z));
-    heaven.generate(heavenSpawnChunk);
-    const int safeLocalX = heavenSpawn.x - heavenSpawnChunk.worldX();
-    const int safeLocalZ = heavenSpawn.z - heavenSpawnChunk.worldZ();
-    require(heavenSpawnChunk.getBlock(safeLocalX, heavenSpawn.y + 1,
-                                      safeLocalZ) == BlockId::AIR &&
-                heavenSpawnChunk.getBlock(safeLocalX, heavenSpawn.y + 2,
-                                           safeLocalZ) == BlockId::AIR,
+    auto heavenSpawnChunk = std::make_unique<Chunk>(
+        floorDivChunk(heavenSpawn.x), floorDivChunk(heavenSpawn.z));
+    heaven.generate(*heavenSpawnChunk);
+    const int safeLocalX = heavenSpawn.x - heavenSpawnChunk->worldX();
+    const int safeLocalZ = heavenSpawn.z - heavenSpawnChunk->worldZ();
+    require(heavenSpawnChunk->getBlock(safeLocalX, heavenSpawn.y + 1,
+                                       safeLocalZ) == BlockId::AIR &&
+                heavenSpawnChunk->getBlock(safeLocalX, heavenSpawn.y + 2,
+                                            safeLocalZ) == BlockId::AIR,
             "origin skyway obstructed the deterministic Heaven spawn");
 
     std::vector<std::unique_ptr<Chunk>> heavenRegionOwned;
@@ -1813,12 +1814,12 @@ int main() {
     heaven.generateRegion(-1, -1, 3, Config::REGION_PADDING,
                           heavenRegionChunks, heavenPending);
     require(heavenPending.empty(), "heaven generation has no boundary work");
-    Chunk heavenSingleton(-1, -1);
-    heaven.generate(heavenSingleton);
+    auto heavenSingleton = std::make_unique<Chunk>(-1, -1);
+    heaven.generate(*heavenSingleton);
     for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z)
             for (int x = 0; x < Config::CHUNK_SIZE_X; ++x)
-                require(heavenSingleton.getBlock(x, y, z) ==
+                require(heavenSingleton->getBlock(x, y, z) ==
                             heavenRegionChunks.front()->getBlock(x, y, z),
                         "heaven singleton differs from region output");
     for (const Chunk* chunk : heavenRegionChunks) {
