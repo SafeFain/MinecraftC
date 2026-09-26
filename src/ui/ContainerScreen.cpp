@@ -4,20 +4,21 @@
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "game/InventoryInteraction.h"
-#include "world/World.h"
+#include "game/SessionAccess.h"
+#include "world/BlockEntity.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
 #include <algorithm>
 
-bool ContainerScreen::open(World& world, const glm::ivec3& position) {
-    m_world = &world;
+bool ContainerScreen::open(IContainerAccess& access, const glm::ivec3& position) {
+    m_access = &access;
     m_position = position;
     return valid();
 }
 
 bool ContainerScreen::valid() const {
-    return m_world && m_world->getBlockEntity(m_position) != nullptr;
+    return m_access && m_access->blockEntityAt(m_position) != nullptr;
 }
 
 bool ContainerScreen::contains(const Rect& r, int x, int y) {
@@ -35,7 +36,7 @@ void ContainerScreen::layout(int width, int height) {
         m_inventoryRects[i] = {x0 + col * (slot + gap), invY + visual * (slot + gap), slot, slot};
     }
     for (auto& rect : m_containerRects) rect = {};
-    const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
+    const BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     if (entity->type == BlockEntityType::Chest) {
         const float y0 = invY + 235.0f;
@@ -69,7 +70,7 @@ void ContainerScreen::moveStack(ItemStack& cursor, ItemStack& slot, bool right) 
 }
 
 void ContainerScreen::quickMove(int x,int y) {
-    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(!entity)return;
+    BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(!entity)return;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){
         auto& source=m_inventory.slot(i);std::vector<ItemStack*> targets;
         if(entity->type==BlockEntityType::Chest)for(auto& slot:entity->chest)targets.push_back(&slot);
@@ -90,7 +91,7 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     layout(width, height);
     m_pointerX=mx;m_pointerY=my;
     if(m_focusX||m_focusY){mx=m_focusX;my=m_focusY;}
-    const BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
+    const BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
     constexpr float slot = 44.0f, gap = 4.0f;
@@ -157,7 +158,7 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
 }
 
 void ContainerScreen::click(int button, int x, int y) {
-    BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
+    BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     const bool right = button == MouseButton::Right;
     for (size_t i=0;i<m_inventoryRects.size();++i) if (contains(m_inventoryRects[i],x,y)) {
@@ -188,7 +189,7 @@ void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,i
     if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty())InventoryInteraction::distribute(m_cursor,m_dragTargets,button==MouseButton::Right);
     else if(!dragged&&button==MouseButton::Left&&!m_cursor.empty()&&m_lastClickSeconds>=0&&now-m_lastClickSeconds<=.30){
         std::vector<ItemStack*> sources;for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
-        BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(entity){if(entity->type==BlockEntityType::Chest)for(auto& slot:entity->chest)sources.push_back(&slot);
+        BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(entity){if(entity->type==BlockEntityType::Chest)for(auto& slot:entity->chest)sources.push_back(&slot);
             else{sources.push_back(&entity->input);sources.push_back(&entity->fuel);sources.push_back(&entity->output);}}
         InventoryInteraction::gather(m_cursor,sources);
     } else if (dragged) { click(button,m_pressX,m_pressY);click(button,x,y); } else click(button,x,y);
@@ -198,13 +199,13 @@ void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,i
 
 void ContainerScreen::onMouseMove(int x,int y){m_pointerX=x;m_pointerY=y;if(!m_pressed||!m_cursorHeldAtPress)return;ItemStack* target=nullptr;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
-    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;if(!target&&entity&&entity->type==BlockEntityType::Chest)
+    BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(!target&&entity&&entity->type==BlockEntityType::Chest)
         for(int i=0;i<27;++i)if(contains(m_containerRects[i],x,y)){target=&entity->chest[i];break;}
     if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);}
 
 void ContainerScreen::onGamepadNavigate(int dx,int dy) {
     std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
-    const BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    const BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
     const int count=entity?(entity->type==BlockEntityType::Chest?27:3):0;
     for(int i=0;i<count;++i)rects.push_back(m_containerRects[static_cast<size_t>(i)]);
     if(rects.empty())return;
@@ -225,7 +226,7 @@ void ContainerScreen::onGamepadAction(int action) {
 ItemStack* ContainerScreen::hoveredStack(int x, int y) {
     for (size_t i = 0; i < m_inventoryRects.size(); ++i)
         if (contains(m_inventoryRects[i], x, y)) return &m_inventory.slot(i);
-    BlockEntity* entity = m_world ? m_world->getBlockEntity(m_position) : nullptr;
+    BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return nullptr;
     const int count = entity->type == BlockEntityType::Chest ? 27 : 3;
     for (int i = 0; i < count; ++i) {
@@ -243,7 +244,7 @@ bool ContainerScreen::swapHoveredWithHotbar(int hotbarSlot) {
     if (!hovered) return false;
     ItemStack& hotbar = m_inventory.slot(static_cast<size_t>(hotbarSlot));
     if (hovered == &hotbar) return true;
-    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
     if(entity&&entity->type==BlockEntityType::Furnace){
         if(hovered==&entity->input&&!hotbar.empty()&&!findSmeltingRecipe(hotbar.id))return false;
         if(hovered==&entity->fuel&&!hotbar.empty()&&!fuelTicks(hotbar.id))return false;
@@ -258,7 +259,7 @@ bool ContainerScreen::swapHoveredWithOffhand() {
     if (!hovered) return false;
     ItemStack& offhand = m_inventory.offhand();
     if (hovered == &offhand) return true;
-    BlockEntity* entity=m_world?m_world->getBlockEntity(m_position):nullptr;
+    BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
     if(entity&&entity->type==BlockEntityType::Furnace){
         if(hovered==&entity->input&&!offhand.empty()&&!findSmeltingRecipe(offhand.id))return false;
         if(hovered==&entity->fuel&&!offhand.empty()&&!fuelTicks(offhand.id))return false;
@@ -283,5 +284,5 @@ void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
         if (remaining) { m_cursor.count=static_cast<uint8_t>(remaining);drop(m_cursor); }
         m_cursor.clear();
     }
-    m_world=nullptr;m_pressed=false;m_button=-1;
+    m_access=nullptr;m_pressed=false;m_button=-1;
 }

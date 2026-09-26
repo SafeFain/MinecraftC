@@ -17,7 +17,7 @@
 #include <cmath>
 
 void GameScenePresenter::render(
-    GameSession& session, IGameRenderer& renderer,
+    const GameSession& session, IGameRenderer& renderer,
     const ClientSettings& settings, Window& window,
     const Localization& localization, GameState state,
     bool showFirstPersonItem, float dt, RuntimeClock::Tick now) {
@@ -34,13 +34,13 @@ void GameScenePresenter::render(
         Frustum frustum;
         frustum.extractFromVP(vp);
         float lightningFlash = 0.0f;
-        for (const auto& event : session.lightningEvents)
+        for (const auto& event : session.lightningState())
             lightningFlash = std::max(
                 lightningFlash, std::clamp(event.seconds / 0.2f, 0.0f, 1.0f));
         RenderEnvironment environment = applyWeather(
-            session.dayNightCycle.evaluate(), session.weather.rainGradient(),
-            session.weather.thunderGradient(), lightningFlash);
-        if (session.world.isHeaven())
+            session.daylightState().evaluate(), session.weatherState().rainGradient(),
+            session.weatherState().thunderGradient(), lightningFlash);
+        if (session.worldState().isHeaven())
             environment = applyHeavenEnvironment(environment);
 
         renderer.beginFrame();
@@ -51,30 +51,30 @@ void GameScenePresenter::render(
         renderer.setViewProjection(vp);
         renderer.setFrustum(frustum);
 
-        const glm::dvec3 playerPosition = session.player.getPosition();
+        const glm::dvec3 playerPosition = session.playerState().getPosition();
         const glm::dvec3 renderOrigin(
             playerPosition.x, 0.0, playerPosition.z);
-        const uint64_t giSceneId = session.worldMetadata.seed ^
-            (session.world.isHeaven() ? 0x9e3779b97f4a7c15ull : 0ull);
+        const uint64_t giSceneId = session.metadata().seed ^
+            (session.worldState().isHeaven() ? 0x9e3779b97f4a7c15ull : 0ull);
         renderer.beginVoxelGiFrame(
             renderOrigin + glm::dvec3(camera.m_position), giSceneId);
-        for (const Chunk* chunk : session.world.getActiveChunks())
+        for (const Chunk* chunk : session.worldState().getActiveChunks())
             renderer.submitVoxelGiChunk(*chunk);
         renderer.endVoxelGiFrame();
-        const bool hasLod = session.world.lodEnabled() &&
-            !session.world.lodSubmissions().empty();
+        const bool hasLod = session.worldState().lodEnabled() &&
+            !session.worldState().lodSubmissions().empty();
         glm::mat4 lodVp = vp;
         Frustum lodFrustum;
         std::vector<const LodRenderSubmission*> visibleLod;
         if (hasLod) {
-            const float lodFar = session.world.lodDistanceChunks() *
+            const float lodFar = session.worldState().lodDistanceChunks() *
                 Config::CHUNK_SIZE_X + 64.0f;
             lodVp = glm::perspective(
                 glm::radians(camera.fovDeg()), window.aspectRatio(),
                 8.0f, lodFar) * view;
             lodFrustum.extractFromVP(lodVp);
-            visibleLod.reserve(session.world.lodSubmissions().size());
-            for (const auto& lod : session.world.lodSubmissions()) {
+            visibleLod.reserve(session.worldState().lodSubmissions().size());
+            for (const auto& lod : session.worldState().lodSubmissions()) {
                 const glm::vec3 minimum(lod.model[3].x,
                     static_cast<float>(Config::WORLD_MIN_Y), lod.model[3].z);
                 const glm::vec3 maximum(minimum.x + lod.tileSize,
@@ -87,7 +87,7 @@ void GameScenePresenter::render(
         if (settings.renderClouds) {
             renderer.renderClouds(
                 playerPosition, visibleLod.empty() ? vp : lodVp,
-                session.worldMetadata.seed,
+                session.metadata().seed,
                 static_cast<float>(RuntimeClock::seconds(now)),
                 settings.cloudRenderDistance);
         }
@@ -112,10 +112,10 @@ void GameScenePresenter::render(
         visibleChunks.clear();
         std::vector<ShadowChunkSubmission> shadowChunks;
         const float shadowDistance = shadowConfig(settings.shadowQuality).distance;
-        if (visibleChunks.capacity() < session.world.getActiveChunks().size())
-            visibleChunks.reserve(session.world.getActiveChunks().size());
+        if (visibleChunks.capacity() < session.worldState().getActiveChunks().size())
+            visibleChunks.reserve(session.worldState().getActiveChunks().size());
         int rendered = 0;
-        for (const auto* chunk : session.world.getActiveChunks()) {
+        for (const auto* chunk : session.worldState().getActiveChunks()) {
             const ChunkMesh& mesh = chunk->getMesh();
             if (!mesh.gpuReady || mesh.indexCount == 0) continue;
 
@@ -167,22 +167,22 @@ void GameScenePresenter::render(
         }
         renderer.endTranslucent();
 
-        session.entities.render(renderer, vp, renderOrigin);
+        session.entityState().render(renderer, vp, renderOrigin);
         if (perspective != CameraPerspective::FirstPerson &&
-            !session.player.isSpectator()) {
+            !session.playerState().isSpectator()) {
             const glm::mat4 hand = playerRenderer.renderThirdPerson(
-                renderer, session.player.getPosition(), renderOrigin,
-                session.player.getYaw(), session.player.getPitch(), vp,
-                session.world.sampleLight(session.player.getEyePosition()),
+                renderer, session.playerState().getPosition(), renderOrigin,
+                session.playerState().getYaw(), session.playerState().getPitch(), vp,
+                session.worldState().sampleLight(session.playerState().getEyePosition()),
                 session.sleepFacing());
             if (!session.isSleeping())
                 heldItemRenderer.renderThirdPerson(
-                    session.player.activeItem(), vp, hand);
+                    session.playerState().activeItem(), vp, hand);
         }
-        session.particles.buildRenderData(renderOrigin, particleRenderData);
+        session.particleState().buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
-        const float particleIntensity = session.world.isHeaven()
-            ? 0.80f : session.weather.rainGradient();
+        const float particleIntensity = session.worldState().isHeaven()
+            ? 0.80f : session.weatherState().rainGradient();
         renderer.renderParticles(
             particleRenderData, vp,
             camera.right,
@@ -190,13 +190,13 @@ void GameScenePresenter::render(
             particleIntensity);
 
         // Wireframe highlight
-        auto highlighted = session.player.getHighlightedBlock();
+        auto highlighted = session.playerState().getHighlightedBlock();
         if (highlighted) {
             glm::vec3 pos(
                 static_cast<float>(highlighted->x - renderOrigin.x),
                 static_cast<float>(highlighted->y),
                 static_cast<float>(highlighted->z - renderOrigin.z));
-            const BlockId highlightedBlock = session.world.getBlock(
+            const BlockId highlightedBlock = session.worldState().getBlock(
                 highlighted->x, highlighted->y, highlighted->z);
             const BlockCollisionBoxes boxes = blockCollisionBoxes(highlightedBlock);
             if (boxes.count == 0) {
@@ -209,17 +209,17 @@ void GameScenePresenter::render(
                 }
             }
         }
-        if (const auto target = session.player.starstepTarget()) {
+        if (const auto target = session.playerState().starstepTarget()) {
             const glm::vec3 marker(
                 static_cast<float>(target->x - 0.4 - renderOrigin.x),
                 static_cast<float>(target->y - 0.01),
                 static_cast<float>(target->z - 0.4 - renderOrigin.z));
             renderer.renderWireframe(marker, glm::vec3(0.8f, 0.08f, 0.8f), vp,
                                      glm::vec3(0.15f, 0.9f, 0.95f));
-        } else if (session.player.activeItem().id == ItemId::STARSTEP_SCEPTER &&
-                   session.player.starstepCooldown() <= 0.0f) {
-            const auto invalid = session.world.raycast(
-                session.player.getEyePosition(), session.player.getForward(), 96.0f);
+        } else if (session.playerState().activeItem().id == ItemId::STARSTEP_SCEPTER &&
+                   session.playerState().starstepCooldown() <= 0.0f) {
+            const auto invalid = session.worldState().raycast(
+                session.playerState().getEyePosition(), session.playerState().getForward(), 96.0f);
             if (invalid) {
                 const glm::vec3 marker(
                     static_cast<float>(invalid->blockPos.x - renderOrigin.x),
@@ -231,16 +231,16 @@ void GameScenePresenter::render(
         }
 
         if (perspective == CameraPerspective::FirstPerson &&
-            showFirstPersonItem && !session.player.isSpectator() &&
-            !session.playerDead && !session.isSleeping())
+            showFirstPersonItem && !session.playerState().isSpectator() &&
+            !session.isPlayerDead() && !session.isSleeping())
             heldItemRenderer.renderFirstPerson(
-                session.player.activeItem(), session.player.visualState().swingProgress,
-                session.player.attackStrength(),
+                session.playerState().activeItem(), session.playerState().visualState().swingProgress,
+                session.playerState().attackStrength(),
                 window.aspectRatio(),
                 cameraEffects.viewModelTransform());
 
         const SmoothLightSample eyeLight =
-            session.world.sampleLight(session.player.getEyePosition());
+            session.worldState().sampleLight(session.playerState().getEyePosition());
         PostProcessState postProcess;
         postProcess.environment = environment;
         postProcess.inverseViewProjection = glm::inverse(vp);
@@ -249,7 +249,7 @@ void GameScenePresenter::render(
         postProcess.sceneId = giSceneId;
         postProcess.exposure = visualExposure.update(
             eyeLight.sky, eyeLight.block, environment, dt);
-        postProcess.underwater = session.player.underwater() ? 1.0f : 0.0f;
+        postProcess.underwater = session.playerState().underwater() ? 1.0f : 0.0f;
         postProcess.hurt = cameraEffects.trauma();
         renderer.finishScene(postProcess);
 
@@ -260,15 +260,15 @@ void GameScenePresenter::render(
                 titleUpdateSeconds = 0.0f;
                 int fps = dt > 0.0f ? static_cast<int>(1.0f / dt) : 999;
                 window.setTitle(
-                    "MinecraftC" + (session.player.isFlying()
+                    "MinecraftC" + (session.playerState().isFlying()
                         ? " [" + localization.text("window.fly") + "]" : "") +
                     " | FPS: " + std::to_string(fps) +
-                    " | XYZ: " + std::to_string(static_cast<int>(std::floor(session.player.getPosition().x))) +
-                    "," + std::to_string(static_cast<int>(std::floor(session.player.getPosition().y))) +
-                    "," + std::to_string(static_cast<int>(std::floor(session.player.getPosition().z))) +
+                    " | XYZ: " + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().x))) +
+                    "," + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().y))) +
+                    "," + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().z))) +
                     " | " + localization.text("window.chunks") + ": " +
                     std::to_string(rendered) +
-                    "/" + std::to_string(session.world.getActiveChunks().size())
+                    "/" + std::to_string(session.worldState().getActiveChunks().size())
                 );
             }
         } else {
@@ -283,8 +283,8 @@ void GameScenePresenter::render(
 }
 
 void GameScenePresenter::appendBowTrajectory(
-    GameSession& session, const glm::dvec3& renderOrigin) {
-    const auto launch = session.player.bowLaunchPreview();
+    const GameSession& session, const glm::dvec3& renderOrigin) {
+    const auto launch = session.playerState().bowLaunchPreview();
     if (!launch) return;
     constexpr double stepSeconds = 0.10;
     constexpr int pointCount = 32;
@@ -295,7 +295,7 @@ void GameScenePresenter::appendBowTrajectory(
         const glm::dvec3 segment = current - previous;
         const float segmentLength = static_cast<float>(glm::length(segment));
         if (segmentLength <= 0.0001f) break;
-        if (session.world.raycast(
+        if (session.worldState().raycast(
                 previous, glm::normalize(glm::vec3(segment)), segmentLength))
             break;
         if (particleRenderData.size() >= ParticleSystem::MAX_PARTICLES) break;

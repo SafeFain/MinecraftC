@@ -12,9 +12,50 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <thread>
+
+struct GameSessionTestAccess {
+    static void processCompletedGenerations(GameSession& session) {
+        session.world.processCompletedGenerations();
+    }
+    static bool backgroundWorkIdle(const GameSession& session) {
+        return session.threadPool.idle();
+    }
+    static bool terrainReady(const GameSession& session) {
+        return session.terrainGenerated;
+    }
+    static bool newWorldLoading(const GameSession& session) {
+        return session.loadingNewWorld;
+    }
+    static bool hasDimensionStore(const GameSession& session) {
+        return session.dimensionSaveStore != nullptr;
+    }
+    static void markTerrainReady(GameSession& session) {
+        session.terrainGenerated = true;
+    }
+    static void setPlayerPosition(GameSession& session, const glm::dvec3& position) {
+        session.player.setPosition(position);
+    }
+    static void safeSpawn(GameSession& session) { session.safeSpawn(); }
+    static void beginAutosave(GameSession& session,
+                              const std::function<void()>& onError) {
+        session.beginAutosave(onError);
+    }
+    static void processAutosave(GameSession& session,
+                                const std::function<void()>& onError) {
+        session.processAutosave(onError);
+    }
+    static void setDay(GameSession& session) { session.dayNightCycle.setDay(); }
+    static void setNight(GameSession& session) { session.dayNightCycle.setNight(); }
+    static void setHeavenSafePosition(GameSession& session,
+                                      const glm::ivec3& position) {
+        session.worldMetadata.heaven.safePosition = position;
+        session.worldMetadata.heaven.hasSafePosition = true;
+    }
+};
 
 namespace {
 void require(bool condition, const char* message) {
@@ -37,8 +78,8 @@ GameSession::CommandResult runCommand(GameSession& session,
 // the session is destroyed; drain them the same way the loading gate does.
 void drainGeneration(GameSession& session) {
     for (int i = 0; i < 4000; ++i) {
-        session.world.processCompletedGenerations();
-        if (session.threadPool.idle()) return;
+        GameSessionTestAccess::processCompletedGenerations(session);
+        if (GameSessionTestAccess::backgroundWorkIdle(session)) return;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     require(false, "generation drains before session teardown");
@@ -94,7 +135,7 @@ int main(int argc, char** argv) {
 
     {
         GameSession session(root / "saves");
-        const std::string id = session.worldCatalog.create(
+        const std::string id = session.createWorld(
             "Flow Test", 42, GameMode::Survival, Difficulty::Normal, true);
         require(!id.empty(), "world creation returns an id");
         require(std::filesystem::exists(root / "saves" / id),
@@ -104,14 +145,14 @@ int main(int argc, char** argv) {
         const GameMode mode = session.startWorld(id, true, clock.now());
         require(mode == GameMode::Survival,
                 "new world starts in survival mode");
-        require(session.loadingNewWorld && !session.terrainGenerated,
+        require(GameSessionTestAccess::newWorldLoading(session) && !GameSessionTestAccess::terrainReady(session),
                 "new world enters the loading state");
-        require(session.worldMetadata.seed == 42,
+        require(session.metadata().seed == 42,
                 "metadata carries the requested seed");
-        require(session.player.gameMode() == GameMode::Survival,
+        require(session.playerState().gameMode() == GameMode::Survival,
                 "player rules match the world mode");
-        const glm::dvec3 routedSpawn = session.world.findSafeSpawn();
-        require(session.player.getPosition() == routedSpawn &&
+        const glm::dvec3 routedSpawn = session.worldState().findSafeSpawn();
+        require(session.playerState().getPosition() == routedSpawn &&
                     routedSpawn.y > Config::SEA_LEVEL,
                 "new world loading is centered on a dry routed spawn");
 
@@ -126,21 +167,21 @@ int main(int argc, char** argv) {
         result = runCommand(session, localization, "/gamemode 1");
         require(result.gameModeChanged == GameMode::Creative,
                 "gamemode reports the creative change");
-        require(session.player.gameMode() == GameMode::Creative &&
-                    session.worldMetadata.gameMode == GameMode::Creative,
+        require(session.playerState().gameMode() == GameMode::Creative &&
+                    session.metadata().gameMode == GameMode::Creative,
                 "player and metadata switch to creative together");
         result = runCommand(session, localization, "/gamemode 3");
         require(result.gameModeChanged == GameMode::Spectator &&
-                    session.player.gameMode() == GameMode::Spectator,
+                    session.playerState().gameMode() == GameMode::Spectator,
                 "player switches to spectator");
         result = runCommand(session, localization, "/gamemode 0");
         require(result.gameModeChanged == GameMode::Survival &&
-                    session.player.gameMode() == GameMode::Survival,
+                    session.playerState().gameMode() == GameMode::Survival,
                 "player switches back to survival");
 
         // Teleport moves the player exactly and reports a message.
         result = runCommand(session, localization, "/tp 100 64 -200");
-        const glm::dvec3 position = session.player.getPosition();
+        const glm::dvec3 position = session.playerState().getPosition();
         require(position.x == 100.0 && position.y == 64.0 &&
                     position.z == -200.0,
                 "teleport moves the player exactly");
@@ -150,15 +191,15 @@ int main(int argc, char** argv) {
 
         // Time presets drive the day/night cycle.
         runCommand(session, localization, "/time set night");
-        require(session.dayNightCycle.isNight(), "night preset applies");
+        require(session.daylightState().isNight(), "night preset applies");
         runCommand(session, localization, "/time set day");
-        require(!session.dayNightCycle.isNight(), "day preset applies");
+        require(!session.daylightState().isNight(), "day preset applies");
 
         // Weather presets drive the weather state.
         runCommand(session, localization, "/weather thunder");
-        require(session.weather.thundering(), "thunder preset applies");
+        require(session.weatherState().thundering(), "thunder preset applies");
         runCommand(session, localization, "/weather clear");
-        require(!session.weather.raining() && !session.weather.thundering(),
+        require(!session.weatherState().raining() && !session.weatherState().thundering(),
                 "clear weather preset applies");
 
         // Biome locate routes to a message without requiring generation.
@@ -186,30 +227,32 @@ int main(int argc, char** argv) {
                 "short teleport reports an expected-argument error");
 
         // Safe spawn on untouched terrain falls back to a platform.
-        session.player.setPosition({100000.0, 64.0, 100000.0});
-        session.safeSpawn();
-        require(session.player.getPosition().y ==
+        GameSessionTestAccess::setPlayerPosition(session, {100000.0, 64.0, 100000.0});
+        GameSessionTestAccess::safeSpawn(session);
+        require(session.playerState().getPosition().y ==
                     Config::SEA_LEVEL + 1.01f,
                 "safe spawn creates a platform without ground");
 
         // Autosave begin/process round trips without error.
         bool autosaveError = false;
-        session.beginAutosave([&autosaveError] { autosaveError = true; });
+        GameSessionTestAccess::beginAutosave(session,
+            [&autosaveError] { autosaveError = true; });
         require(!autosaveError, "autosave begins without error");
-        session.processAutosave([&autosaveError] { autosaveError = true; });
+        GameSessionTestAccess::processAutosave(session,
+            [&autosaveError] { autosaveError = true; });
         require(!autosaveError, "autosave processes without error");
 
         // Explicit save persists session metadata.
         bool saveError = false;
-        session.terrainGenerated = true;
+        GameSessionTestAccess::markTerrainReady(session);
         session.saveNow([&saveError] { saveError = true; });
         require(!saveError, "save completes without error");
-        require(session.worldMetadata.playerPosition ==
-                    session.player.getPosition(),
+        require(session.metadata().playerPosition ==
+                    session.playerState().getPosition(),
                 "metadata reflects the current player position");
 
         // The catalog sees the persisted world.
-        const auto worlds = session.worldCatalog.list();
+        const auto worlds = session.listWorlds();
         require(worlds.size() == 1 && worlds[0].id == id &&
                     worlds[0].seed == 42,
                 "catalog lists the saved world with its seed");
@@ -217,22 +260,22 @@ int main(int argc, char** argv) {
                 "catalog preserves the saved game mode");
 
         session.leaveWorld();
-        require(!session.saveStore, "leaving the world detaches the store");
+        require(!session.hasWorldStore(), "leaving the world detaches the store");
         drainGeneration(session);
     }
 
     {
         // Reopening the world restores its mode and saved position.
         GameSession reopened(root / "saves");
-        const auto worlds = reopened.worldCatalog.list();
+        const auto worlds = reopened.listWorlds();
         require(worlds.size() == 1, "reopened catalog lists the world");
         const GameMode mode =
             reopened.startWorld(worlds[0].id, false, clock.now());
         require(mode == GameMode::Survival,
                 "existing world restores its saved mode");
-        require(!reopened.loadingNewWorld,
+        require(!GameSessionTestAccess::newWorldLoading(reopened),
                 "existing world loads without the new-world flag");
-        const glm::dvec3 position = reopened.player.getPosition();
+        const glm::dvec3 position = reopened.playerState().getPosition();
         require(position.x == 100000.0 && position.z == 100000.0 &&
                     position.y == Config::SEA_LEVEL + 1.01f,
                 "existing world restores the saved player position");
@@ -241,13 +284,13 @@ int main(int argc, char** argv) {
 
     {
         GameSession flat(root / "flat-saves");
-        const std::string id = flat.worldCatalog.create(
+        const std::string id = flat.createWorld(
             "Flat Test", 123, GameMode::Creative, Difficulty::Normal,
             false, WorldType::Superflat);
         flat.startWorld(id, true, clock.now());
-        require(flat.worldMetadata.worldType == WorldType::Superflat,
+        require(flat.metadata().worldType == WorldType::Superflat,
                 "session carries the superflat type into world metadata");
-        require(flat.player.getPosition().y ==
+        require(flat.playerState().getPosition().y ==
                     static_cast<double>(Config::WORLD_MIN_Y + 3) + 1.01,
                 "superflat spawn is directly above the grass layer");
         drainGeneration(flat);
@@ -256,20 +299,20 @@ int main(int argc, char** argv) {
 
     {
         GameSession dimensions(root / "dimension-saves");
-        const std::string id = dimensions.worldCatalog.create(
+        const std::string id = dimensions.createWorld(
             "Dimension Test", 999, GameMode::Creative, Difficulty::Normal,
             true);
         dimensions.startWorld(id, true, clock.now());
-        dimensions.terrainGenerated = true;
-        dimensions.dayNightCycle.setNight();
+        GameSessionTestAccess::markTerrainReady(dimensions);
+        GameSessionTestAccess::setNight(dimensions);
         require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
                 "session switches into heaven");
         require(dimensions.activeDimension() == DimensionId::Heaven &&
-                    dimensions.world.isHeaven() && dimensions.dimensionSaveStore,
+                    dimensions.worldState().isHeaven() && GameSessionTestAccess::hasDimensionStore(dimensions),
                 "heaven switch installs its generator and data store");
-        require(!dimensions.dayNightCycle.isNight(),
+        require(!dimensions.daylightState().isNight(),
                 "heaven starts with its independent day phase");
-        require(dimensions.entities.entities().empty(),
+        require(dimensions.entityState().entities().empty(),
                 "heaven starts without natural entities");
         auto locateResult = runCommand(
             dimensions, localization, "/locate structure xiguang_ruin");
@@ -282,23 +325,22 @@ int main(int argc, char** argv) {
                     locateResult.messages[0] ==
                         "message.locate_structure_not_found",
                 "Heaven locate rejects an overworld-only structure");
-        dimensions.terrainGenerated = true;
-        dimensions.dayNightCycle.setDay();
-        dimensions.worldMetadata.heaven.safePosition = {8, 128, -4};
-        dimensions.worldMetadata.heaven.hasSafePosition = true;
-        dimensions.player.setPosition(
+        GameSessionTestAccess::markTerrainReady(dimensions);
+        GameSessionTestAccess::setDay(dimensions);
+        GameSessionTestAccess::setHeavenSafePosition(dimensions, {8, 128, -4});
+        GameSessionTestAccess::setPlayerPosition(dimensions,
             {24.5, static_cast<double>(Config::WORLD_MIN_Y - 3), 24.5});
         require(dimensions.handleVoidFall(clock.now(), {}),
                 "heaven void fall switches back to overworld");
         require(dimensions.activeDimension() == DimensionId::Overworld &&
-                    !dimensions.world.isHeaven() && dimensions.dayNightCycle.isNight(),
+                    !dimensions.worldState().isHeaven() && dimensions.daylightState().isNight(),
                 "return switch restores the overworld generator");
-        require(dimensions.worldMetadata.heaven.playerPosition ==
+        require(dimensions.metadata().heaven.playerPosition ==
                     glm::dvec3(8.5, 128.01, -3.5),
                 "void return preserves the last grounded heaven position");
         require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
                 "session can return to heaven after a void fall");
-        require(dimensions.player.getPosition() ==
+        require(dimensions.playerState().getPosition() ==
                     glm::dvec3(8.5, 128.01, -3.5),
                 "heaven re-entry does not restore the void position");
         dimensions.leaveWorld();

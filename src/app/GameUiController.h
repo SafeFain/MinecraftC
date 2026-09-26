@@ -21,12 +21,13 @@ class ApplicationInputController;
 struct ClientSettings;
 class GameSession;
 class Player;
+class InventoryModel;
 class Window;
 namespace platform { class Clipboard; }
 
 class GameUiController {
 public:
-    GameUiController(Player& player, platform::Clipboard& clipboard);
+    GameUiController(InventoryModel& inventory, platform::Clipboard& clipboard);
 
     void tick(float dt);
     void showMessage(const std::string& message);
@@ -42,7 +43,7 @@ public:
     // guiScale, so the conversion lives here with the state it writes.
     void updateMouseScreenPosition(Window& window);
     glm::vec2 touchToUi(Window& window, double x, double y) const;
-    void render(GameSession& session, const ClientSettings& settings,
+    void render(const GameSession& session, const ClientSettings& settings,
                 ApplicationInputController& inputs, Window& window,
                 GameState state, bool showCrosshair);
 

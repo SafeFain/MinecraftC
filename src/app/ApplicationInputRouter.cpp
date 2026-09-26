@@ -51,15 +51,15 @@ void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
         m_inputs.state.pressed(InputAction::Perspective))
         cyclePerspective();
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.isPlayerDead() &&
         m_inputs.state.pressed(InputAction::DropItem))
         m_flow.dropSelectedItem();
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.isPlayerDead() &&
         m_inputs.state.pressed(InputAction::PickBlock))
         m_flow.pickBlock();
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.playerDead &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.isPlayerDead() &&
         m_inputs.state.pressed(InputAction::SwapOffhand))
         m_flow.swapOffhand();
     updateGamepadUi(now);
@@ -71,16 +71,16 @@ void ApplicationInputRouter::handleFrameInput(float dt) {
         !m_ui.commandOpen && !m_ui.activeMenu) {
         double dx, dy;
         m_window.getCursorDelta(dx, dy);
-        m_session.player.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy),
+        m_session.handleMouseDelta(static_cast<float>(dx), static_cast<float>(dy),
             m_settings.mouseSensitivity, m_settings.invertMouseY);
         const float padLookX = normalizeGamepadAxis(m_inputs.gamepadAxes[2], m_settings.gamepadDeadzone);
         float padLookY = normalizeGamepadAxis(m_inputs.gamepadAxes[3], m_settings.gamepadDeadzone);
         if (m_settings.invertGamepadY) padLookY = -padLookY;
-        m_session.player.handleMouseDelta(padLookX, padLookY,
+        m_session.handleMouseDelta(padLookX, padLookY,
             4.0f * m_settings.gamepadLookSensitivity * dt * 60.0f, false);
         const glm::vec2 touchLook = m_inputs.touchControls.consumeLookDelta();
-        m_session.player.handleMouseDelta(touchLook.x, -touchLook.y, .15f, false);
-        if (!m_session.playerDead) m_session.player.handleMovement(m_inputs.state, dt);
+        m_session.handleMouseDelta(touchLook.x, -touchLook.y, .15f, false);
+        m_session.handleMovement(m_inputs.state, dt);
     }
 
     // Track mouse position (always, for inventory/menu hover)
@@ -101,7 +101,7 @@ void ApplicationInputRouter::handleFrameInput(float dt) {
                 static_cast<int>(m_ui.mouseScreenY));
             if (m_ui.containerOpen) m_ui.containerScreen.onMouseMove(
                 static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY));
-            else if (m_ui.playerInventoryViewOpen(m_session.player)) m_ui.survivalInventory.onMouseMove(
+            else if (m_ui.playerInventoryViewOpen(m_session.playerState())) m_ui.survivalInventory.onMouseMove(
                 static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY));
         }
 
@@ -198,14 +198,14 @@ void ApplicationInputRouter::handleKeyEvent(
 
     if (action == ButtonAction::Press && keyBound(InputAction::Command) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-        !m_ui.inventoryOpen && !m_session.playerDead) {
+        !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
         m_flow.openCommandInput();
         return;
     }
 
     if (action == ButtonAction::Press && keyBound(InputAction::DirectCommand) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-        !m_ui.inventoryOpen && !m_session.playerDead) {
+        !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
         m_flow.openCommandInput("/");
         return;
     }
@@ -213,7 +213,7 @@ void ApplicationInputRouter::handleKeyEvent(
     // E key — toggle creative inventory (Playing only, no menu active)
     if (action == ButtonAction::Press && keyBound(InputAction::Inventory)) {
         if (m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-            !m_session.player.isSpectator()) {
+            !m_session.playerState().isSpectator()) {
             if (m_ui.inventoryOpen) {
                 m_flow.closeInventory();
             } else {
@@ -235,7 +235,7 @@ void ApplicationInputRouter::handleKeyEvent(
 
     if (action == ButtonAction::Press && keyBound(InputAction::DropItem) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-        !m_ui.inventoryOpen && !m_ui.commandOpen && !m_session.playerDead) {
+        !m_ui.inventoryOpen && !m_ui.commandOpen && !m_session.isPlayerDead()) {
         m_flow.dropSelectedItem((mods & KeyModifier::Control) != 0);
         return;
     }
@@ -246,9 +246,9 @@ void ApplicationInputRouter::handleKeyEvent(
             if (!keyBound(static_cast<InputAction>(
                     static_cast<int>(InputAction::Hotbar1) + slot))) continue;
             if (m_ui.containerOpen) m_ui.containerScreen.swapHoveredWithHotbar(slot);
-            else if (m_ui.playerInventoryViewOpen(m_session.player))
+            else if (m_ui.playerInventoryViewOpen(m_session.playerState()))
                 m_ui.survivalInventory.swapHoveredWithHotbar(slot);
-            else if (m_session.player.gameMode() == GameMode::Creative) {
+            else if (m_session.playerState().gameMode() == GameMode::Creative) {
                 const ItemId item = m_ui.inventory.hoveredItem();
                 if (item != ItemId::EMPTY) m_flow.giveCreativeItem(item, slot);
             }
@@ -256,7 +256,7 @@ void ApplicationInputRouter::handleKeyEvent(
         }
         if (keyBound(InputAction::SwapOffhand)) {
             if (m_ui.containerOpen) m_ui.containerScreen.swapHoveredWithOffhand();
-            else if (m_ui.playerInventoryViewOpen(m_session.player))
+            else if (m_ui.playerInventoryViewOpen(m_session.playerState()))
                 m_ui.survivalInventory.swapHoveredWithOffhand();
             return;
         }
@@ -264,7 +264,7 @@ void ApplicationInputRouter::handleKeyEvent(
             ItemStack dropped;
             const bool entire = (mods & KeyModifier::Control) != 0;
             if (m_ui.containerOpen) dropped = m_ui.containerScreen.dropHovered(entire);
-            else if (m_ui.playerInventoryViewOpen(m_session.player))
+            else if (m_ui.playerInventoryViewOpen(m_session.playerState()))
                 dropped = m_ui.survivalInventory.dropHovered(entire);
             m_flow.dropInventoryItem(dropped);
             return;
@@ -273,14 +273,14 @@ void ApplicationInputRouter::handleKeyEvent(
 
     if (action == ButtonAction::Press && keyBound(InputAction::PickBlock) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-        !m_ui.inventoryOpen && !m_session.playerDead) {
+        !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
         m_flow.pickBlock();
         return;
     }
 
     if (action == ButtonAction::Press && keyBound(InputAction::SwapOffhand) &&
         m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
-        !m_ui.inventoryOpen && !m_session.playerDead) {
+        !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
         m_flow.swapOffhand();
         return;
     }
@@ -292,7 +292,7 @@ void ApplicationInputRouter::handleKeyEvent(
         if (m_flow.state() == GameState::Playing && !m_ui.activeMenu &&
             !m_ui.inventoryOpen && !m_ui.commandOpen) {
             m_ui.hotbar.selectSlot(slot);
-            m_session.player.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
+            m_session.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
         }
         break;
     }
@@ -324,7 +324,7 @@ void ApplicationInputRouter::handleKeyEvent(
         return;
     }
 
-    if (m_session.playerDead && action == ButtonAction::Press &&
+    if (m_session.isPlayerDead() && action == ButtonAction::Press &&
         (key == Key::Enter || key == Key::Space)) {
         m_flow.respawnPlayer();
         return;
@@ -362,35 +362,35 @@ void ApplicationInputRouter::handleMouseButtonEvent(
         }
     }
     if (action == ButtonAction::Press && m_flow.state() == GameState::Playing && !m_ui.activeMenu) {
-        if (mouseBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (mouseBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.openCommandInput(); return;
         }
-        if (mouseBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (mouseBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.openCommandInput("/"); return;
         }
-        if (mouseBound(InputAction::Inventory) && !m_ui.commandOpen && !m_session.player.isSpectator()) {
+        if (mouseBound(InputAction::Inventory) && !m_ui.commandOpen && !m_session.playerState().isSpectator()) {
             if (m_ui.inventoryOpen) m_flow.closeInventory(); else m_flow.openInventory(); return;
         }
         if (mouseBound(InputAction::Perspective) && !m_ui.inventoryOpen && !m_ui.commandOpen) {
             cyclePerspective(); return;
         }
         if (mouseBound(InputAction::DropItem) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
-            !m_session.playerDead) { m_flow.dropSelectedItem(); return; }
+            !m_session.isPlayerDead()) { m_flow.dropSelectedItem(); return; }
         if (mouseBound(InputAction::PickBlock) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
-            !m_session.playerDead) { m_flow.pickBlock(); return; }
+            !m_session.isPlayerDead()) { m_flow.pickBlock(); return; }
         if (mouseBound(InputAction::SwapOffhand) && !m_ui.inventoryOpen && !m_ui.commandOpen &&
-            !m_session.playerDead) { m_flow.swapOffhand(); return; }
+            !m_session.isPlayerDead()) { m_flow.swapOffhand(); return; }
         for (int slot = 0; slot < 9; ++slot) if (mouseBound(static_cast<InputAction>(
             static_cast<int>(InputAction::Hotbar1) + slot))) {
             m_ui.hotbar.selectSlot(slot);
-            m_session.player.setSelectedSlot(slot);
+            m_session.setSelectedSlot(slot);
         }
     }
     if (m_ui.inventoryOpen && (m_ui.tradeOpen ||
-        m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen) &&
+        m_ui.playerInventoryViewOpen(m_session.playerState()) || m_ui.containerOpen) &&
         (action == ButtonAction::Press || action == ButtonAction::Release)) {
         if (!m_ui.containerOpen && !m_ui.tradeOpen &&
-            m_session.player.gameMode() == GameMode::Creative &&
+            m_session.playerState().gameMode() == GameMode::Creative &&
             action == ButtonAction::Press &&
             m_ui.survivalInventory.creativeCatalogButtonContains(
                 static_cast<int>(m_ui.mouseScreenX), static_cast<int>(m_ui.mouseScreenY))) {
@@ -415,7 +415,7 @@ void ApplicationInputRouter::handleMouseButtonEvent(
     }
     if (action == ButtonAction::Press || action == ButtonAction::Release) {
         if (m_ui.inventoryOpen) {
-            if (m_session.player.gameMode() == GameMode::Creative &&
+            if (m_session.playerState().gameMode() == GameMode::Creative &&
                 m_ui.creativeCatalogOpen && action == ButtonAction::Press) {
                 m_ui.inventory.onMouseClick(button,
                     static_cast<int>(m_ui.mouseScreenX),
@@ -433,7 +433,7 @@ void ApplicationInputRouter::handleMouseButtonEvent(
 
 void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
     if (m_ui.activeMenu) { m_ui.activeMenu->onScroll(yoffset); return; }
-    if (m_ui.inventoryOpen && m_session.player.gameMode() == GameMode::Creative &&
+    if (m_ui.inventoryOpen && m_session.playerState().gameMode() == GameMode::Creative &&
         m_ui.creativeCatalogOpen && !m_ui.containerOpen && !m_ui.tradeOpen) {
         m_ui.inventory.onScroll(yoffset);
         return;
@@ -444,23 +444,23 @@ void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
     };
     if (m_flow.state() == GameState::Playing && !m_ui.commandOpen) {
         if (wheelBound(InputAction::Fullscreen)) { m_window.toggleFullscreen(); return; }
-        if (wheelBound(InputAction::Inventory) && !m_session.player.isSpectator()) {
+        if (wheelBound(InputAction::Inventory) && !m_session.playerState().isSpectator()) {
             if (m_ui.inventoryOpen) m_flow.closeInventory(); else m_flow.openInventory(); return;
         }
-        if (wheelBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (wheelBound(InputAction::Command) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.openCommandInput(); return;
         }
-        if (wheelBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (wheelBound(InputAction::DirectCommand) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.openCommandInput("/"); return;
         }
         if (wheelBound(InputAction::Perspective) && !m_ui.inventoryOpen) { cyclePerspective(); return; }
-        if (wheelBound(InputAction::DropItem) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (wheelBound(InputAction::DropItem) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.dropSelectedItem(); return;
         }
-        if (wheelBound(InputAction::PickBlock) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (wheelBound(InputAction::PickBlock) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.pickBlock(); return;
         }
-        if (wheelBound(InputAction::SwapOffhand) && !m_ui.inventoryOpen && !m_session.playerDead) {
+        if (wheelBound(InputAction::SwapOffhand) && !m_ui.inventoryOpen && !m_session.isPlayerDead()) {
             m_flow.swapOffhand(); return;
         }
         for (int slot = 0; slot < 9; ++slot)
@@ -481,7 +481,7 @@ void ApplicationInputRouter::handleScrollEvent(double, double yoffset) {
         !m_ui.inventoryOpen && !m_ui.commandOpen) {
         if (m_inputs.state.pressed(InputAction::PreviousSlot)) m_ui.hotbar.onScroll(1.0);
         if (m_inputs.state.pressed(InputAction::NextSlot)) m_ui.hotbar.onScroll(-1.0);
-        m_session.player.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
+        m_session.setSelectedSlot(m_ui.hotbar.getSelectedSlot());
     }
 }
 
@@ -495,7 +495,7 @@ void ApplicationInputRouter::dispatchTouchCommands(
             case TouchCommand::UsePress: handleGameplayAction(true, ButtonAction::Press); break;
             case TouchCommand::UseRelease: handleGameplayAction(true, ButtonAction::Release); break;
             case TouchCommand::OpenInventory:
-                if (!m_session.player.isSpectator()) {
+                if (!m_session.playerState().isSpectator()) {
                     handleGameplayAction(false, ButtonAction::Release);
                     handleGameplayAction(true, ButtonAction::Release);
                     m_inputs.touchControls.cancelAll();
@@ -503,7 +503,7 @@ void ApplicationInputRouter::dispatchTouchCommands(
                 }
                 break;
             case TouchCommand::OpenCommand:
-                if (!m_session.playerDead) {
+                if (!m_session.isPlayerDead()) {
                     handleGameplayAction(false, ButtonAction::Release);
                     handleGameplayAction(true, ButtonAction::Release);
                     m_inputs.touchControls.cancelAll();
@@ -519,7 +519,7 @@ void ApplicationInputRouter::dispatchTouchCommands(
             case TouchCommand::ChangePerspective: cyclePerspective(); break;
             case TouchCommand::SelectHotbar:
                 m_ui.hotbar.selectSlot(command.value);
-                m_session.player.setSelectedSlot(command.value);
+                m_session.setSelectedSlot(command.value);
                 break;
         }
     }
@@ -529,9 +529,9 @@ void ApplicationInputRouter::dispatchUiTouchButton(
     int button, ButtonAction action, const glm::vec2& position) {
     const int x = static_cast<int>(position.x), y = static_cast<int>(position.y);
     if (m_ui.inventoryOpen && (m_ui.tradeOpen ||
-        m_ui.playerInventoryViewOpen(m_session.player) || m_ui.containerOpen)) {
+        m_ui.playerInventoryViewOpen(m_session.playerState()) || m_ui.containerOpen)) {
         if (!m_ui.containerOpen && !m_ui.tradeOpen &&
-            m_session.player.gameMode() == GameMode::Creative &&
+            m_session.playerState().gameMode() == GameMode::Creative &&
             action == ButtonAction::Press &&
             m_ui.survivalInventory.creativeCatalogButtonContains(x, y)) {
             m_ui.openCreativeCatalog(); return;
@@ -544,7 +544,7 @@ void ApplicationInputRouter::dispatchUiTouchButton(
             [this](ItemId id) { m_flow.giveCreativeItem(id); },
             [this]() { m_flow.openPlayerInventoryView(); });
     } else if (m_ui.activeMenu) m_ui.activeMenu->onMouseButton(button, action, position.x, position.y);
-    else if (m_session.playerDead && action == ButtonAction::Release) m_flow.respawnPlayer();
+    else if (m_session.isPlayerDead() && action == ButtonAction::Release) m_flow.respawnPlayer();
 }
 
 void ApplicationInputRouter::dispatchUiTouchMove(const glm::vec2& position) {
@@ -552,7 +552,7 @@ void ApplicationInputRouter::dispatchUiTouchMove(const glm::vec2& position) {
     if (m_ui.inventoryOpen) {
         m_ui.inventory.onMouseMove(x, y);
         if (m_ui.containerOpen) m_ui.containerScreen.onMouseMove(x, y);
-        else if (m_ui.playerInventoryViewOpen(m_session.player)) m_ui.survivalInventory.onMouseMove(x, y);
+        else if (m_ui.playerInventoryViewOpen(m_session.playerState())) m_ui.survivalInventory.onMouseMove(x, y);
     }
     if (m_ui.activeMenu) m_ui.activeMenu->onMouseMove(position.x, position.y);
 }
@@ -576,7 +576,7 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
         m_inputs.uiTouch.position = position;
         const glm::vec2 delta = position - m_inputs.uiTouch.origin;
         const bool scrollSurface = m_ui.activeMenu || (m_ui.inventoryOpen &&
-            m_session.player.gameMode() == GameMode::Creative &&
+            m_session.playerState().gameMode() == GameMode::Creative &&
             m_ui.creativeCatalogOpen && !m_ui.containerOpen && !m_ui.tradeOpen);
         if (scrollSurface && !m_inputs.uiTouch.buttonDown && std::abs(delta.y) > 24.0f) {
             const double scroll = delta.y > 0.0f ? -1.0 : 1.0;
@@ -603,7 +603,7 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
 void ApplicationInputRouter::updateLongPress() {
     if (!m_inputs.uiTouch.active || m_inputs.uiTouch.buttonDown || m_inputs.uiTouch.scrolling ||
         !m_ui.inventoryOpen || (!m_ui.tradeOpen &&
-        !m_ui.playerInventoryViewOpen(m_session.player) && !m_ui.containerOpen))
+        !m_ui.playerInventoryViewOpen(m_session.playerState()) && !m_ui.containerOpen))
         return;
     if (RuntimeClock::seconds(RuntimeClock::elapsed(m_inputs.uiTouch.started, m_clock.now())) < .45)
         return;
@@ -644,7 +644,7 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
     bool gameplay = false;
     if (event.phase == TouchPhase::Begin) {
         gameplay = m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
-            !m_ui.activeMenu && !m_ui.commandOpen && !m_session.playerDead &&
+            !m_ui.activeMenu && !m_ui.commandOpen && !m_session.isPlayerDead() &&
             m_settings.controlMode != ControlMode::KeyboardMouse;
         m_inputs.touchGameplay[event.id] = gameplay;
     } else {
@@ -667,11 +667,9 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
 void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action) {
     if (m_ui.activeMenu) return;
     const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
-    if (action == ButtonAction::Press && use && !m_session.player.isSpectator()) {
-        if (const auto villager = m_session.entities.useRay(
-                m_session.player.getEyePosition(),
-                m_session.player.getForward(), 3.0f)) {
-            if (m_ui.tradeScreen.open(m_session.entities, *villager)) {
+    if (action == ButtonAction::Press && use && !m_session.playerState().isSpectator()) {
+        if (const auto villager = m_session.useVillagerRay(3.0f)) {
+            if (m_ui.tradeScreen.open(m_session, *villager)) {
                 m_ui.containerOpen = false;
                 m_ui.tradeOpen = true;
                 m_ui.inventoryOpen = true;
@@ -679,18 +677,18 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
                 return;
             }
         }
-        auto hit = m_session.world.raycast(m_session.player.getEyePosition(), m_session.player.getForward(),
+        auto hit = m_session.worldState().raycast(m_session.playerState().getEyePosition(), m_session.playerState().getForward(),
                                    Config::REACH_DISTANCE);
         if (hit) {
-            const BlockId target = m_session.world.getBlock(
+            const BlockId target = m_session.worldState().getBlock(
                 hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
-            if (target == BlockId::CRAFTING_TABLE && m_session.player.isSurvival()) {
+            if (target == BlockId::CRAFTING_TABLE && m_session.playerState().isSurvival()) {
                 m_flow.openInventory();
                 m_ui.survivalInventory.setCraftingTable(true);
                 return;
             }
             if (target == BlockId::CHEST || target == BlockId::FURNACE) {
-                if (m_ui.containerScreen.open(m_session.world, hit->blockPos)) {
+                if (m_ui.containerScreen.open(m_session, hit->blockPos)) {
                     m_ui.tradeOpen = false;
                     m_ui.containerOpen = true;
                     m_ui.inventoryOpen = true;
@@ -700,7 +698,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
             }
         }
     }
-    m_session.player.handleMouseButton(logicalButton, action);
+    m_session.handleMouseButton(logicalButton, action);
 }
 
 void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
@@ -747,7 +745,7 @@ void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
         if (navigate) {
             if (m_ui.tradeOpen) m_ui.tradeScreen.onGamepadNavigate(navX, -navY);
             else if (m_ui.containerOpen) m_ui.containerScreen.onGamepadNavigate(navX, -navY);
-            else if (m_ui.playerInventoryViewOpen(m_session.player)) m_ui.survivalInventory.onGamepadNavigate(navX, -navY);
+            else if (m_ui.playerInventoryViewOpen(m_session.playerState())) m_ui.survivalInventory.onGamepadNavigate(navX, -navY);
             else m_ui.inventory.onGamepadNavigate(navX, navY);
         }
         if (m_ui.tradeOpen) {
@@ -756,10 +754,10 @@ void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
             if (pressA) m_ui.containerScreen.onGamepadAction(0);
             if (pressX) m_ui.containerScreen.onGamepadAction(1);
             if (pressY) m_ui.containerScreen.onGamepadAction(2);
-        } else if (m_ui.playerInventoryViewOpen(m_session.player)) {
+        } else if (m_ui.playerInventoryViewOpen(m_session.playerState())) {
             if (pressA) m_ui.survivalInventory.onGamepadAction(0);
             if (pressY) m_ui.survivalInventory.onGamepadAction(2);
-            if (pressX && m_session.player.gameMode() == GameMode::Creative) { m_ui.openCreativeCatalog(); }
+            if (pressX && m_session.playerState().gameMode() == GameMode::Creative) { m_ui.openCreativeCatalog(); }
             else if (pressX) m_ui.survivalInventory.onGamepadAction(1);
         } else {
             if (pressA) m_ui.inventory.onGamepadAction(true, [this](ItemId id) { m_flow.giveCreativeItem(id); });

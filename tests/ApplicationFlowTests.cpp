@@ -42,6 +42,19 @@
 #include <string>
 #include <thread>
 
+struct GameSessionTestAccess {
+    static void markPlayerDead(GameSession& session) {
+        session.playerDead = true;
+    }
+    static void setPlayerPosition(GameSession& session,
+                                  const glm::dvec3& position) {
+        session.player.setPosition(position);
+    }
+    static void setBlock(GameSession& session, int x, int y, int z, BlockId block) {
+        session.world.setBlock(x, y, z, block);
+    }
+};
+
 // UIRenderer is a graphics-backed facade; the flow tests never render, so these
 // inert definitions keep the target free of the Vulkan backend (same pattern
 // as InputRoutingTests).
@@ -204,10 +217,10 @@ struct Harness {
     explicit Harness(const std::filesystem::path& testRoot, Window& window)
         : root(testRoot),
           session(root / "saves"),
-          ui(session.player, clipboard),
+          ui(session.inventory(), clipboard),
           flow(session, ui, scene, audio, window, clock, settings, clipboard),
           router(window, ui, session, inputs, scene, settings, flow, clock) {
-        session.world.configureLod(
+        session.configureLod(
             {true, 16, LodAggressiveness::Fast, LodPrecision::Low});
     }
 
@@ -326,7 +339,7 @@ int main() {
 
         const int oldRenderDistance = Config::RENDER_DISTANCE;
         Config::RENDER_DISTANCE = 2;
-        const std::string id = harness.session.worldCatalog.create(
+        const std::string id = harness.session.createWorld(
             "Flow Test", 42, GameMode::Survival, Difficulty::Normal, true);
         require(!id.empty(), "world creation returns an id");
 
@@ -336,7 +349,7 @@ int main() {
                 "startGame enters the loading state");
         require(harness.audio.musicMode() == AudioMusicMode::Overworld,
                 "new Overworld loading selects only Overworld music");
-        require(harness.ui.hotbar.inventory() == &harness.session.player.inventory(),
+        require(harness.ui.hotbar.inventory() == &harness.session.playerState().inventory(),
                 "hotbar is bound to the player inventory");
 
         // The loading gate completes and hands control to Playing.
@@ -357,8 +370,8 @@ int main() {
         harness.flow.beginDimensionLoading();
         require(harness.audio.musicMode() == AudioMusicMode::Heaven,
                 "Heaven loading switches to its exclusive music");
-        require(harness.session.player.getPosition() ==
-                    harness.session.world.findSafeSpawn(),
+        require(harness.session.playerState().getPosition() ==
+                    harness.session.worldState().findSafeSpawn(),
                 "heaven switch centers its first stream on the island spawn");
         require(loadWorld(harness.session, harness.stub, harness.clock),
                 "overworld-to-heaven loading gate completes");
@@ -405,12 +418,12 @@ int main() {
         harness.flow.executeCommand();
         require(!harness.ui.commandOpen,
                 "executing a command closes the console");
-        require(harness.session.player.gameMode() == GameMode::Creative,
+        require(harness.session.playerState().gameMode() == GameMode::Creative,
                 "gamemode command switches the player to creative");
         require(harness.ui.survivalInventory.creativeAccess(),
                 "creative access follows the gamemode command");
         require(harness.ui.hotbar.inventory() ==
-                    &harness.session.player.inventory(),
+                    &harness.session.playerState().inventory(),
                 "hotbar remains bound after the gamemode command");
 
         harness.flow.openCommandInput();
@@ -430,9 +443,9 @@ int main() {
                 "an unknown command reports a message");
 
         // Respawn from the death screen.
-        harness.session.playerDead = true;
+        GameSessionTestAccess::markPlayerDead(harness.session);
         harness.flow.respawnPlayer();
-        require(!harness.session.playerDead,
+        require(!harness.session.isPlayerDead(),
                 "respawn clears the dead state");
 
         // Explicit save writes the world metadata to disk.
@@ -447,7 +460,7 @@ int main() {
                 "backToMainMenu returns to the main menu");
         require(harness.ui.activeMenu != nullptr,
                 "backToMainMenu shows the main menu");
-        require(harness.session.saveStore == nullptr,
+        require(!harness.session.hasWorldStore(),
                 "backToMainMenu leaves the world");
 
         Config::RENDER_DISTANCE = oldRenderDistance;
@@ -463,7 +476,7 @@ int main() {
         harness.wireCallbacks();
         harness.bindKeys();
 
-        const std::string id = harness.session.worldCatalog.create(
+        const std::string id = harness.session.createWorld(
             "Router Test", 7, GameMode::Survival, Difficulty::Normal, true);
         require(!id.empty(), "router world creation returns an id");
         harness.play(id);
@@ -563,9 +576,9 @@ int main() {
         harness.settings.controlMode = ControlMode::Auto;
 
         // A dead player respawns through Enter/Space routing.
-        harness.session.playerDead = true;
+        GameSessionTestAccess::markPlayerDead(harness.session);
         harness.router.handleKeyEvent(Key::Enter, 0, ButtonAction::Press, 0);
-        require(!harness.session.playerDead,
+        require(!harness.session.isPlayerDead(),
                 "Enter on the death screen respawns the player");
 
         // The drop-item key on a filled hotbar spawns a dropped item entity.
@@ -575,41 +588,41 @@ int main() {
         harness.flow.giveCreativeItem(ItemId::STONE);
         harness.router.handleKeyEvent(Key::Q, 0, ButtonAction::Press, 0);
         size_t itemEntities = 0;
-        for (const Entity& entity : harness.session.entities.entities())
+        for (const Entity& entity : harness.session.entityState().entities())
             if (entity.type == EntityType::Item && !entity.item.empty())
                 ++itemEntities;
         require(itemEntities == 1,
                 "the drop-item key spawns one dropped item");
-        require(harness.session.player.inventory().slot(0).count == 63,
+        require(harness.session.playerState().inventory().slot(0).count == 63,
                 "plain drop removes one item from the selected stack");
 
         harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
-        require(harness.session.player.inventory().slot(0).empty() &&
-                    harness.session.player.inventory().offhand().count == 63,
+        require(harness.session.playerState().inventory().slot(0).empty() &&
+                    harness.session.playerState().inventory().offhand().count == 63,
                 "the swap-offhand binding exchanges the selected and offhand stacks");
         harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
         harness.router.handleKeyEvent(
             Key::Q, 0, ButtonAction::Press, KeyModifier::Control);
         itemEntities = 0;
-        for (const Entity& entity : harness.session.entities.entities())
+        for (const Entity& entity : harness.session.entityState().entities())
             if (entity.type == EntityType::Item && !entity.item.empty())
                 ++itemEntities;
         require(itemEntities == 2 &&
-                    harness.session.player.inventory().slot(0).empty(),
+                    harness.session.playerState().inventory().slot(0).empty(),
                 "Ctrl plus drop removes and spawns the entire selected stack");
 
-        harness.session.player.setPosition({0.5, 200.0, 0.5});
-        harness.session.world.setBlock(0, 201, 2, BlockId::STONE);
+        GameSessionTestAccess::setPlayerPosition(harness.session, {0.5, 200.0, 0.5});
+        GameSessionTestAccess::setBlock(harness.session, 0, 201, 2, BlockId::STONE);
         harness.flow.pickBlock();
-        require(harness.session.player.inventory().slot(0).id == ItemId::STONE &&
-                    harness.session.player.inventory().slot(0).count == 64,
+        require(harness.session.playerState().inventory().slot(0).id == ItemId::STONE &&
+                    harness.session.playerState().inventory().slot(0).count == 64,
                 "creative pick block supplies the targeted block as a full stack");
-        harness.session.world.setBlock(0, 201, 2, BlockId::AIR);
+        GameSessionTestAccess::setBlock(harness.session, 0, 201, 2, BlockId::AIR);
 
         // Java inventory shortcuts act on the hovered slot: number keys swap
         // with that hotbar slot, F swaps with offhand, and Q/Ctrl+Q drops.
         harness.flow.giveCreativeItem(ItemId::STONE, 0);
-        harness.session.player.inventory().slot(9) = {ItemId::DIRT, 8, 0};
+        harness.session.inventory().slot(9) = {ItemId::DIRT, 8, 0};
         harness.flow.openInventory();
         harness.flow.openPlayerInventoryView();
         UIRenderer inertUi;
@@ -618,17 +631,17 @@ int main() {
         harness.ui.survivalInventory.render(inertUi, 640, 480, 128, 257);
         harness.ui.survivalInventory.onMouseMove(128, 257);
         harness.router.handleKeyEvent(Key::Num1, 0, ButtonAction::Press, 0);
-        require(harness.session.player.inventory().slot(0).id == ItemId::DIRT &&
-                    harness.session.player.inventory().slot(9).id == ItemId::STONE,
+        require(harness.session.playerState().inventory().slot(0).id == ItemId::DIRT &&
+                    harness.session.playerState().inventory().slot(9).id == ItemId::STONE,
                 "an inventory number shortcut swaps the hovered stack with its hotbar slot");
         harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
-        require(harness.session.player.inventory().slot(9).empty() &&
-                    harness.session.player.inventory().offhand().id == ItemId::STONE,
+        require(harness.session.playerState().inventory().slot(9).empty() &&
+                    harness.session.playerState().inventory().offhand().id == ItemId::STONE,
                 "inventory F swaps the hovered stack with the offhand slot");
         harness.router.handleKeyEvent(Key::F, 0, ButtonAction::Press, 0);
         harness.router.handleKeyEvent(
             Key::Q, 0, ButtonAction::Press, KeyModifier::Control);
-        require(harness.session.player.inventory().slot(9).empty(),
+        require(harness.session.playerState().inventory().slot(9).empty(),
                 "inventory Ctrl+Q drops the complete hovered stack");
         harness.flow.closeInventory();
 

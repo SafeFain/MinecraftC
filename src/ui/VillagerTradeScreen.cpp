@@ -1,18 +1,19 @@
 #include "ui/VillagerTradeScreen.h"
 
 #include "entity/EntityManager.h"
+#include "game/SessionAccess.h"
 #include "game/VillagerTrade.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 
 #include <algorithm>
 
-bool VillagerTradeScreen::open(EntityManager& entities, uint64_t entityId) {
-    const Entity* entity = entities.entityById(entityId);
+bool VillagerTradeScreen::open(ITradeAccess& access, uint64_t entityId) {
+    const Entity* entity = access.tradeEntity(entityId);
     if (!entity || entity->type != EntityType::Villager ||
         entity->villager.profession == VillagerProfession::Unemployed)
         return false;
-    m_entities = &entities;
+    m_access = &access;
     m_entityId = entityId;
     m_selected = 0;
     return true;
@@ -20,12 +21,12 @@ bool VillagerTradeScreen::open(EntityManager& entities, uint64_t entityId) {
 
 bool VillagerTradeScreen::valid(
     const glm::dvec3& eye, const glm::vec3& direction) const {
-    return m_entities &&
-        m_entities->villagerUsable(m_entityId, eye, direction, 3.0f);
+    return m_access &&
+        m_access->tradeUsable(m_entityId, eye, direction, 3.0f);
 }
 
 void VillagerTradeScreen::close() {
-    m_entities = nullptr;
+    m_access = nullptr;
     m_entityId = 0;
 }
 
@@ -61,7 +62,7 @@ void VillagerTradeScreen::drawStack(
 void VillagerTradeScreen::render(
     UIRenderer& ui, int width, int height, int mouseX, int mouseY) {
     layout(width, height);
-    const Entity* entity = m_entities ? m_entities->entityById(m_entityId) : nullptr;
+    const Entity* entity = m_access ? m_access->tradeEntity(m_entityId) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
                 {0, 0, 0, .62f});
@@ -100,8 +101,8 @@ void VillagerTradeScreen::render(
 }
 
 void VillagerTradeScreen::executeSelected() {
-    if (m_entities)
-        m_entities->tradeWith(m_entityId, m_selected, m_inventory);
+    if (m_access)
+        m_access->executeTrade(m_entityId, m_selected, m_inventory);
 }
 
 void VillagerTradeScreen::onMouseButton(

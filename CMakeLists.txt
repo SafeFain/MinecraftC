@@ -988,6 +988,7 @@ if(BUILD_TESTING)
         src/entity/EntityVillageAi.cpp
         src/entity/GroundNavigation.cpp
         src/entity/EntityModelRegistry.cpp
+        src/game/InventoryInteraction.cpp
         src/game/InventoryModel.cpp
         src/game/Item.cpp
         src/game/SaveStore.cpp

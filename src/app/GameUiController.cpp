@@ -15,7 +15,7 @@
 #include <cmath>
 
 void GameUiController::render(
-    GameSession& session, const ClientSettings& settings,
+    const GameSession& session, const ClientSettings& settings,
     ApplicationInputController& inputs, Window& window, GameState state,
     bool showCrosshair) {
     // ── UI Rendering ──────────────────────────────────────────
@@ -40,7 +40,7 @@ void GameUiController::render(
             containerScreen.render(
                 renderer, uiWidth, uiHeight, static_cast<int>(mouseScreenX),
                 static_cast<int>(mouseScreenY));
-        } else if (playerInventoryViewOpen(session.player)) {
+        } else if (playerInventoryViewOpen(session.playerState())) {
             survivalInventory.render(renderer, uiWidth, uiHeight,
                 static_cast<int>(mouseScreenX), static_cast<int>(mouseScreenY));
         } else {
@@ -63,14 +63,14 @@ void GameUiController::render(
     // Phase 2: Hotbar HUD (Playing, no inventory, no menu)
     if (state == GameState::Playing && !inventoryOpen && !activeMenu) {
         renderer.beginUIFrame(uiWidth, uiHeight);
-        if (!session.player.isSpectator()) {
+        if (!session.playerState().isSpectator()) {
             hotbar.render(renderer, uiWidth, uiHeight);
-            if (session.player.isSurvival()) renderSurvivalHud(session.player, uiWidth);
+            if (session.playerState().isSurvival()) renderSurvivalHud(session.playerState(), uiWidth);
             if (showCrosshair)
-                renderCrosshairAndMiningProgress(session.player, uiWidth, uiHeight);
-            renderAttackIndicator(session.player, settings.attackIndicator,
+                renderCrosshairAndMiningProgress(session.playerState(), uiWidth, uiHeight);
+            renderAttackIndicator(session.playerState(), settings.attackIndicator,
                                   uiWidth, uiHeight);
-            if (itemNameSeconds > 0.0f) renderSelectedItemName(session.player, uiWidth);
+            if (itemNameSeconds > 0.0f) renderSelectedItemName(session.playerState(), uiWidth);
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible)))
             inputs.touchControls.render(renderer);
@@ -150,27 +150,21 @@ void GameUiController::render(
     }
 
     if (state == GameState::LoadingWorld) {
-        const auto progress = session.loadingGenerationComplete
-            ? session.world.loadingProgress() : session.world.generationProgress();
-        const float phaseFraction = progress.total == 0 ? 0.0f :
-            static_cast<float>(progress.completed) /
-            static_cast<float>(progress.total);
-        const float fraction = session.loadingGenerationComplete
-            ? 0.75f + phaseFraction * 0.15f +
-                session.world.lodCoverageFraction() * 0.10f
-            : phaseFraction * 0.75f;
+        const auto loading = session.loadingSnapshot();
+        const auto& progress = loading.progress;
+        const float fraction = loading.fraction;
         renderer.beginUIFrame(uiWidth, uiHeight);
         UiTheme::dirtBackground(renderer, static_cast<float>(uiWidth),
                                 static_cast<float>(uiHeight));
         const char* loadingTitleKey = "loading.title";
-        if (session.loadingReason == GameSession::LoadingReason::EnteringHeaven)
+        if (loading.reason == GameSession::LoadingReason::EnteringHeaven)
             loadingTitleKey = "loading.enter_heaven";
-        else if (session.loadingReason == GameSession::LoadingReason::ReturningOverworld)
+        else if (loading.reason == GameSession::LoadingReason::ReturningOverworld)
             loadingTitleKey = "loading.return_overworld";
         const std::string title = localization.text(loadingTitleKey);
         const std::string status = localization.format(
-            session.loadingGenerationComplete ? "loading.preparing" :
-            (session.loadingNewWorld ? "loading.generating"
+            loading.preparing ? "loading.preparing" :
+            (loading.newWorld ? "loading.generating"
                                : "loading.cached"), {
             std::to_string(progress.completed), std::to_string(progress.total)});
         const float barWidth = std::min(420.0f, uiWidth - 80.0f);
@@ -195,7 +189,7 @@ void GameUiController::render(
         renderer.endUIFrame();
     }
 
-    if (session.playerDead) {
+    if (session.isPlayerDead()) {
         renderer.beginUIFrame(uiWidth, uiHeight);
         renderer.drawRect(0, 0, static_cast<float>(uiWidth),
                               static_cast<float>(uiHeight),
@@ -219,10 +213,10 @@ void GameUiController::render(
 
 
 GameUiController::GameUiController(
-    Player& player, platform::Clipboard& clipboard)
-    : survivalInventory(player.inventory()),
-      containerScreen(player.inventory()),
-      tradeScreen(player.inventory()),
+    InventoryModel& inventory, platform::Clipboard& clipboard)
+    : survivalInventory(inventory),
+      containerScreen(inventory),
+      tradeScreen(inventory),
       commandInput({}, 80, &clipboard) {}
 
 void GameUiController::tick(float dt) {

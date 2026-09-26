@@ -45,7 +45,7 @@ public:
                       const glm::ivec3& sleepBed = glm::ivec3(0),
                       const glm::vec3& sleepFacing = glm::vec3(0.0f, 0.0f, -1.0f),
                       float sleepProgress = 0.0f);
-    void render(GameSession& session, IGameRenderer& renderer,
+    void render(const GameSession& session, IGameRenderer& renderer,
                 const ClientSettings& settings, Window& window,
                 const Localization& localization, GameState state,
                 bool showFirstPersonItem, float dt,
@@ -65,6 +65,6 @@ public:
     float titleUpdateSeconds = 0.0f;
 
 private:
-    void appendBowTrajectory(GameSession& session,
+    void appendBowTrajectory(const GameSession& session,
                              const glm::dvec3& renderOrigin);
 };

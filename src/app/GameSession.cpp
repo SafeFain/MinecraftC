@@ -3,6 +3,8 @@
 #include "Config.h"
 #include "debug/Log.h"
 #include "game/SurvivalSession.h"
+#include "game/InventoryInteraction.h"
+#include "game/Item.h"
 #include "game/Command.h"
 #include "game/Localization.h"
 #include "renderer/GameRenderer.h"
@@ -18,6 +20,189 @@ GameSession::GameSession(const std::filesystem::path& savesDirectory)
     : player(world), entities(world), worldCatalog(savesDirectory) {
     world.setThreadPool(&threadPool);
     player.setEntityManager(&entities);
+}
+
+GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
+    const StreamingProgress progress = loadingGenerationComplete
+        ? world.loadingProgress() : world.generationProgress();
+    const float phaseFraction = progress.total == 0 ? 0.0f :
+        static_cast<float>(progress.completed) /
+        static_cast<float>(progress.total);
+    return {progress,
+        loadingGenerationComplete
+            ? 0.75f + phaseFraction * 0.15f +
+                  world.lodCoverageFraction() * 0.10f
+            : phaseFraction * 0.75f,
+        loadingGenerationComplete, loadingNewWorld, loadingReason};
+}
+
+std::vector<WorldSummary> GameSession::listWorlds() const {
+    return worldCatalog.list();
+}
+
+std::string GameSession::createWorld(const std::string& name, uint64_t seed,
+                                     GameMode mode, Difficulty difficulty,
+                                     bool cheats, WorldType type) {
+    return worldCatalog.create(name, seed, mode, difficulty, cheats, type);
+}
+
+bool GameSession::deleteWorld(const std::string& id) {
+    return worldCatalog.deleteWorld(id);
+}
+
+void GameSession::setOverworldBedSpawn(const glm::ivec3& bed) {
+    if (dimension == DimensionId::Overworld) worldMetadata.bedSpawn = bed;
+}
+
+void GameSession::updateDaylight(float dt, float minutes, bool playing) {
+    dayNightCycle.update(dt, minutes, playing);
+}
+
+void GameSession::configureVisuals(
+    const EnhancedVisualSettings& visuals, VisualQuality quality) {
+    particles.setEnhancedVisuals(visuals, quality);
+}
+
+void GameSession::configureLod(const LodSettings& settings) {
+    world.configureLod(settings);
+}
+
+void GameSession::setToggleSneak(bool enabled) { player.setToggleSneak(enabled); }
+
+void GameSession::initializeEntityModels(
+    const std::filesystem::path& assetRoot, IGameRenderer& renderer) {
+    entities.initializeModels(assetRoot, renderer);
+}
+
+void GameSession::invalidateGpuMeshes() { world.invalidateGpuMeshes(); }
+void GameSession::restoreGpuMeshes(IGameRenderer* renderer) {
+    world.restoreGpuMeshes(renderer);
+}
+void GameSession::emitBlockBreak(const glm::ivec3& position, BlockId block) {
+    particles.emitBlockBreak(position, block);
+}
+void GameSession::emitCriticalHit(const glm::dvec3& position) {
+    particles.emitCriticalHit(position);
+}
+void GameSession::emitSweepAttack(const glm::dvec3& position) {
+    particles.emitSweepAttack(position);
+}
+void GameSession::setBlockBreakCallback(
+    std::function<void(const glm::ivec3&, BlockId)> callback) {
+    player.setBlockBreakCallback(std::move(callback));
+}
+void GameSession::setDamageCallback(std::function<void(float)> callback) {
+    player.setDamageCallback(std::move(callback));
+}
+void GameSession::setCombatCallback(
+    std::function<void(const CombatFeedback&)> callback) {
+    player.setCombatCallback(std::move(callback));
+}
+void GameSession::setDefenseCallback(
+    std::function<void(const DamageOutcome&)> callback) {
+    player.setDefenseCallback(std::move(callback));
+}
+void GameSession::setBedCallback(
+    std::function<void(const glm::ivec3&)> callback) {
+    player.setBedCallback(std::move(callback));
+}
+void GameSession::cancelBowCharge() { player.cancelBowCharge(); }
+void GameSession::handleMouseDelta(
+    float dx, float dy, float sensitivity, bool invertY) {
+    player.handleMouseDelta(dx, dy, sensitivity, invertY);
+}
+void GameSession::handleMovement(const InputState& input, float dt) {
+    if (!playerDead) player.handleMovement(input, dt);
+}
+void GameSession::handleMouseButton(int button, ButtonAction action) {
+    player.handleMouseButton(button, action);
+}
+void GameSession::setSelectedSlot(int slot) { player.setSelectedSlot(slot); }
+std::optional<uint64_t> GameSession::useVillagerRay(float reach) {
+    return entities.useRay(player.getEyePosition(), player.getForward(), reach);
+}
+BlockEntity* GameSession::blockEntityAt(const glm::ivec3& position) {
+    return world.getBlockEntity(position);
+}
+const Entity* GameSession::tradeEntity(uint64_t entityId) const {
+    return entities.entityById(entityId);
+}
+bool GameSession::tradeUsable(uint64_t entityId, const glm::dvec3& eye,
+                              const glm::vec3& direction, float reach) const {
+    return entities.villagerUsable(entityId, eye, direction, reach);
+}
+void GameSession::executeTrade(uint64_t entityId, uint8_t offerIndex,
+                               InventoryModel& inventory) {
+    (void)entities.tradeWith(entityId, offerIndex, inventory);
+}
+void GameSession::giveCreativeItem(ItemId item, int hotbarSlot) {
+    if (hotbarSlot < 0 ||
+        hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
+    InventoryInteraction::setCreativeItem(
+        player.inventory().slot(static_cast<size_t>(hotbarSlot)), item);
+}
+
+void GameSession::dropSelectedItem(int hotbarSlot, bool entireStack) {
+    if (player.isSpectator() || hotbarSlot < 0 ||
+        hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
+    auto& slot = player.inventory().slot(static_cast<size_t>(hotbarSlot));
+    ItemStack dropped = slot;
+    if (!entireStack) dropped = InventoryInteraction::takeOne(slot);
+    else slot.clear();
+    dropInventoryItem(dropped);
+}
+
+void GameSession::dropInventoryItem(ItemStack stack) {
+    if (stack.empty()) return;
+    const glm::vec3 forward = glm::normalize(player.getForward());
+    entities.spawnItem(
+        player.getEyePosition() + glm::dvec3(forward) * 0.65,
+        stack, forward * 4.5f + glm::vec3(0.0f, 1.5f, 0.0f), 0.8f);
+}
+
+std::optional<GameSession::PickBlockResult> GameSession::pickBlock(
+    int selectedSlot) {
+    if (player.isSpectator() || selectedSlot < 0 ||
+        selectedSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
+        return std::nullopt;
+    const auto hit = world.raycast(
+        player.getEyePosition(), player.getForward(), Config::REACH_DISTANCE);
+    if (!hit) return std::nullopt;
+    const ItemId item = itemForBlock(world.getBlock(
+        hit->blockPos.x, hit->blockPos.y, hit->blockPos.z));
+    if (item == ItemId::EMPTY) return std::nullopt;
+
+    auto& items = player.inventory();
+    int source = -1;
+    for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) {
+        if (items.slot(i).id == item) { source = static_cast<int>(i); break; }
+    }
+    if (source >= 0 && source < static_cast<int>(InventoryModel::HOTBAR_SIZE)) {
+        player.setSelectedSlot(source);
+        return PickBlockResult{source, false};
+    }
+    if (player.gameMode() == GameMode::Creative) {
+        InventoryInteraction::setCreativeItem(
+            items.slot(static_cast<size_t>(selectedSlot)), item);
+    } else if (source >= 0) {
+        std::swap(items.slot(static_cast<size_t>(selectedSlot)),
+                  items.slot(static_cast<size_t>(source)));
+    }
+    player.setSelectedSlot(selectedSlot);
+    return PickBlockResult{selectedSlot, true};
+}
+
+void GameSession::swapOffhand(int hotbarSlot) {
+    if (player.isSpectator() || hotbarSlot < 0 ||
+        hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
+    auto& items = player.inventory();
+    std::swap(items.slot(static_cast<size_t>(hotbarSlot)), items.offhand());
+    player.cancelBowCharge();
+}
+
+void GameSession::dropContainerRemainder(ItemStack stack) {
+    if (!stack.empty()) entities.spawnItem(
+        player.getPosition() + glm::dvec3(0.0, 0.5, 0.0), stack);
 }
 
 SaveStore* GameSession::activeDataStore() const {
@@ -319,7 +504,8 @@ void GameSession::updatePlaying(
 }
 
 GameSession::CommandResult GameSession::executeCommand(
-    const ParsedCommand& command, const Localization& localization) {
+    const ParsedCommand& command, const Localization& localization,
+    RuntimeClock::Tick now) {
     CommandResult result;
     auto message = [&](std::string value) {
         result.messages.push_back(std::move(value));
@@ -357,6 +543,7 @@ GameSession::CommandResult GameSession::executeCommand(
         player.teleport({target.x, target.y, target.z});
         world.update(player.getPosition());
         world.enqueueGeneration();
+        worldLoadingStarted = now;
         result.teleported = true;
         message(localization.format("message.teleported", {
             std::to_string(target.x), std::to_string(target.y),

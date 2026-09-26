@@ -6,8 +6,6 @@
 #include "core/Window.h"
 #include "game/ClientSettings.h"
 #include "game/Command.h"
-#include "game/InventoryInteraction.h"
-#include "game/Item.h"
 #include "platform/Clipboard.h"
 #include "player/Player.h"
 #include "ui/Menu.h"
@@ -39,10 +37,10 @@ void GameFlowController::startGame(const std::string& worldId, bool newWorld) {
 
     m_state = GameState::LoadingWorld;
     m_ui.hotbar.setInventory(mode == GameMode::Spectator
-        ? nullptr : &m_session.player.inventory());
+        ? nullptr : &m_session.inventory());
     m_ui.survivalInventory.setCreativeAccess(mode == GameMode::Creative);
     m_audio.stopRain();
-    m_scene.resetForWorld(m_session.player.getPosition());
+    m_scene.resetForWorld(m_session.playerState().getPosition());
     m_window.setCursorLocked(false);
     m_ui.activeMenu.reset();
     m_ui.commandOpen = false;
@@ -66,7 +64,7 @@ void GameFlowController::beginDimensionLoading() {
     m_ui.activeMenu.reset();
     m_ui.commandOpen = false;
     m_ui.commandInput.setText({});
-    m_scene.resetForWorld(m_session.player.getPosition());
+    m_scene.resetForWorld(m_session.playerState().getPosition());
     m_audio.stopRain();
 }
 
@@ -99,17 +97,17 @@ void GameFlowController::respawnPlayer() {
     const bool wasHeaven = m_session.activeDimension() == DimensionId::Heaven;
     m_session.respawn(m_clock.now());
     if (wasHeaven) beginDimensionLoading();
-    m_scene.resetPlayerFeedback(m_session.player.getPosition());
+    m_scene.resetPlayerFeedback(m_session.playerState().getPosition());
     if (!wasHeaven) m_window.setCursorLocked(true);
 }
 
 void GameFlowController::openInventory() {
-    if (m_session.player.isSpectator()) return;
-    m_session.player.cancelBowCharge();
-    if (m_session.player.isSurvival() && !m_ui.inventoryOpen)
+    if (m_session.playerState().isSpectator()) return;
+    m_session.cancelBowCharge();
+    if (m_session.playerState().isSurvival() && !m_ui.inventoryOpen)
         m_ui.survivalInventory.setCraftingTable(false);
     m_ui.openInventory(
-        m_session.player.gameMode() == GameMode::Creative);
+        m_session.playerState().gameMode() == GameMode::Creative);
     m_window.setCursorLocked(false);
 }
 
@@ -118,7 +116,7 @@ void GameFlowController::closeInventory() {
         m_ui.tradeScreen.close();
     } else if (m_ui.containerOpen) {
         m_ui.containerScreen.close([this](ItemStack stack) {
-            m_session.entities.spawnItem(m_session.player.getPosition() + glm::dvec3(0.0, 0.5, 0.0), stack);
+            m_session.dropContainerRemainder(stack);
         });
     } else if (playerInventoryViewOpen()) m_ui.survivalInventory.onClose();
     m_ui.containerOpen = false;
@@ -153,100 +151,59 @@ void GameFlowController::executeCommand() {
         return;
     }
     const GameSession::CommandResult execution =
-        m_session.executeCommand(*result.command, m_ui.localization);
+        m_session.executeCommand(*result.command, m_ui.localization,
+                                 m_clock.now());
     if (execution.gameModeChanged) {
         const GameMode mode = *execution.gameModeChanged;
         m_ui.hotbar.setInventory(mode == GameMode::Spectator
-            ? nullptr : &m_session.player.inventory());
+            ? nullptr : &m_session.inventory());
         m_ui.survivalInventory.setCreativeAccess(
             mode == GameMode::Creative);
     }
     for (const std::string& message : execution.messages)
         showCommandMessage(message);
     if (execution.teleported) {
-        m_session.worldLoadingStarted = m_clock.now();
         m_state = GameState::LoadingWorld;
         m_window.setCursorLocked(false);
-        m_scene.resetForWorld(m_session.player.getPosition());
+        m_scene.resetForWorld(m_session.playerState().getPosition());
     }
 }
 
 void GameFlowController::openPlayerInventoryView() {
-    if (m_session.player.gameMode() != GameMode::Creative) return;
+    if (m_session.playerState().gameMode() != GameMode::Creative) return;
     m_ui.openPlayerInventoryTab();
 }
 
 void GameFlowController::giveCreativeItem(ItemId id, int hotbarSlot) {
     if (hotbarSlot < 0 || hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
         hotbarSlot = m_ui.hotbar.getSelectedSlot();
-    auto& slot = m_session.player.inventory().slot(
-        static_cast<size_t>(hotbarSlot));
-    InventoryInteraction::setCreativeItem(slot, id);
+    m_session.giveCreativeItem(id, hotbarSlot);
     m_ui.itemNameSeconds = 2.0f;
 }
 
 void GameFlowController::dropSelectedItem(bool entireStack) {
-    if (m_session.player.isSpectator()) return;
-    auto& slot = m_session.player.inventory().slot(
-        static_cast<size_t>(m_ui.hotbar.getSelectedSlot()));
-    ItemStack dropped = slot;
-    if (!entireStack) dropped = InventoryInteraction::takeOne(slot);
-    else slot.clear();
-    dropInventoryItem(dropped);
+    m_session.dropSelectedItem(m_ui.hotbar.getSelectedSlot(), entireStack);
 }
 
 void GameFlowController::dropInventoryItem(ItemStack dropped) {
-    if (dropped.empty()) return;
-    const glm::vec3 forward = glm::normalize(m_session.player.getForward());
-    m_session.entities.spawnItem(
-        m_session.player.getEyePosition() + glm::dvec3(forward) * 0.65,
-        dropped, forward * 4.5f + glm::vec3(0.0f, 1.5f, 0.0f), 0.8f);
+    m_session.dropInventoryItem(dropped);
 }
 
 void GameFlowController::pickBlock() {
-    if (m_session.player.isSpectator()) return;
-    const auto hit = m_session.world.raycast(
-        m_session.player.getEyePosition(), m_session.player.getForward(),
-        Config::REACH_DISTANCE);
-    if (!hit) return;
-    const ItemId item = itemForBlock(m_session.world.getBlock(
-        hit->blockPos.x, hit->blockPos.y, hit->blockPos.z));
-    if (item == ItemId::EMPTY) return;
-
-    auto& inventory = m_session.player.inventory();
-    int source = -1;
-    for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) {
-        if (inventory.slot(i).id == item) { source = static_cast<int>(i); break; }
-    }
-    if (source >= 0 && source < static_cast<int>(InventoryModel::HOTBAR_SIZE)) {
-        m_ui.hotbar.selectSlot(source);
-        m_session.player.setSelectedSlot(source);
-        return;
-    }
-
-    const int selected = m_ui.hotbar.getSelectedSlot();
-    if (m_session.player.gameMode() == GameMode::Creative) {
-        InventoryInteraction::setCreativeItem(
-            inventory.slot(static_cast<size_t>(selected)), item);
-    } else if (source >= 0) {
-        std::swap(inventory.slot(static_cast<size_t>(selected)),
-                  inventory.slot(static_cast<size_t>(source)));
-    }
-    m_session.player.setSelectedSlot(selected);
-    m_ui.itemNameSeconds = 2.0f;
+    const auto result = m_session.pickBlock(m_ui.hotbar.getSelectedSlot());
+    if (!result) return;
+    m_ui.hotbar.selectSlot(result->slot);
+    if (result->itemChanged) m_ui.itemNameSeconds = 2.0f;
 }
 
 void GameFlowController::swapOffhand() {
-    if (m_session.player.isSpectator()) return;
-    auto& inventory = m_session.player.inventory();
-    std::swap(inventory.slot(static_cast<size_t>(m_ui.hotbar.getSelectedSlot())),
-              inventory.offhand());
-    m_session.player.cancelBowCharge();
+    if (m_session.playerState().isSpectator()) return;
+    m_session.swapOffhand(m_ui.hotbar.getSelectedSlot());
     m_ui.itemNameSeconds = 2.0f;
 }
 
 bool GameFlowController::playerInventoryViewOpen() const {
-    return m_ui.playerInventoryViewOpen(m_session.player);
+    return m_ui.playerInventoryViewOpen(m_session.playerState());
 }
 
 void GameFlowController::showCommandMessage(const std::string& message) {
@@ -272,6 +229,6 @@ void GameFlowController::saveCurrentWorld() {
 void GameFlowController::showMainMenu() {
     m_audio.setMusicMode(AudioMusicMode::Menu);
     m_ui.activeMenu = std::make_unique<MainMenu>(
-        m_ui.menuCallbacks, m_session.worldCatalog.list(), m_settings,
+        m_ui.menuCallbacks, m_session.listWorlds(), m_settings,
         m_ui.localization, &m_clipboard);
 }

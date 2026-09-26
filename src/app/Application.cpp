@@ -76,7 +76,7 @@ public:
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"),
           m_renderer(std::make_unique<VulkanRenderer>()),
           m_session(m_paths.savesDirectory()),
-          m_ui(m_session.player, m_clipboard),
+          m_ui(m_session.inventory(), m_clipboard),
           m_flow(m_session, m_ui, m_scene, m_audio, m_window, m_runtimeClock,
                  m_clientSettings, m_clipboard),
           m_router(m_window, m_ui, m_session, m_inputs, m_scene,
@@ -167,10 +167,10 @@ private:
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_renderer->setEnhancedVisualSettings(m_clientSettings.enhancedVisual);
         m_renderer->setLeafTransparency(m_clientSettings.transparentLeaves);
-        m_session.particles.setEnhancedVisuals(
+        m_session.configureVisuals(
             m_clientSettings.enhancedVisual, m_clientSettings.visualQuality);
         m_renderer->resize(m_window.width(), m_window.height());
-        m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
+        m_session.initializeEntityModels(m_paths.assetRoot, *m_renderer);
         m_scene.initialize(*m_renderer, m_paths.assetRoot);
         m_audio.initialize(&m_assets);
         m_ui.renderer.initialize(*m_renderer,
@@ -184,12 +184,12 @@ private:
         m_window.setCursorLocked(false);
 
         // Set up thread pool for async mesh building
-        m_session.player.setBlockBreakCallback(
+        m_session.setBlockBreakCallback(
             [this](const glm::ivec3& position, BlockId block) {
-                m_session.particles.emitBlockBreak(position, block);
+                m_session.emitBlockBreak(position, block);
                 m_window.gamepads().rumble(.18f, 70, m_clientSettings.gamepadRumble);
             });
-        m_session.player.setDamageCallback(
+        m_session.setDamageCallback(
             [this](float amount) {
                 if (m_session.isSleeping())
                     m_session.cancelSleep(m_sessionFeedback);
@@ -197,7 +197,7 @@ private:
                 m_window.gamepads().rumble(std::min(1.0f, .2f + amount * .08f),
                                            140, m_clientSettings.gamepadRumble);
             });
-        m_session.player.setCombatCallback(
+        m_session.setCombatCallback(
             [this](const CombatFeedback& feedback) {
                 CombatSound sound = CombatSound::Miss;
                 switch (feedback.kind) {
@@ -205,13 +205,13 @@ private:
                     case AttackKind::Strong: sound = CombatSound::Strong; break;
                     case AttackKind::Critical:
                         sound = CombatSound::Critical;
-                        m_session.particles.emitCriticalHit(feedback.position);
+                        m_session.emitCriticalHit(feedback.position);
                         break;
                     case AttackKind::Sweep:
                         sound = CombatSound::Sweep;
-                        m_session.particles.emitSweepAttack(feedback.position);
+                        m_session.emitSweepAttack(feedback.position);
                         for (const auto& position : feedback.sweptPositions)
-                            m_session.particles.emitSweepAttack(position);
+                            m_session.emitSweepAttack(position);
                         break;
                     case AttackKind::Miss: break;
                 }
@@ -222,7 +222,7 @@ private:
                     strength, feedback.damage > 0.0f ? 85 : 40,
                     m_clientSettings.gamepadRumble);
             });
-        m_session.player.setDefenseCallback(
+        m_session.setDefenseCallback(
             [this](const DamageOutcome& outcome) {
                 if (!outcome.blocked) return;
                 m_audio.playCombat(outcome.shieldBroken
@@ -272,10 +272,10 @@ private:
         m_sessionFeedback.autosaveFlushError = [this] {
             m_flow.showCommandMessage(m_ui.localization.text("message.autosave_retry"));
         };
-        m_session.player.setBedCallback([this](const glm::ivec3& bed) {
-            if (!m_session.dayNightCycle.isNight()) {
+        m_session.setBedCallback([this](const glm::ivec3& bed) {
+            if (!m_session.isNight()) {
                 if (m_session.activeDimension() == DimensionId::Overworld)
-                    m_session.worldMetadata.bedSpawn = bed;
+                    m_session.setOverworldBedSpawn(bed);
                 m_flow.showCommandMessage(m_ui.localization.text(
                     m_session.activeDimension() == DimensionId::Overworld
                         ? "message.respawn_set" : "message.heaven_bed_day"));
@@ -283,7 +283,7 @@ private:
             }
             if (m_session.beginSleepAtBed(bed)) {
                 if (m_session.activeDimension() == DimensionId::Overworld)
-                    m_session.worldMetadata.bedSpawn = bed;
+                    m_session.setOverworldBedSpawn(bed);
                 if (m_sessionFeedback.sleepStarted) m_sessionFeedback.sleepStarted();
             } else if (m_sessionFeedback.sleepBlocked) {
                 m_sessionFeedback.sleepBlocked();
@@ -295,11 +295,11 @@ private:
             m_flow.startGame(id, false);
         };
         m_ui.menuCallbacks.onRefreshWorlds = [this]() {
-            return m_session.worldCatalog.list();
+            return m_session.listWorlds();
         };
         m_ui.menuCallbacks.onDeleteWorld = [this](const std::string& id) {
             try {
-                return m_session.worldCatalog.deleteWorld(id);
+                return m_session.deleteWorld(id);
             } catch (const std::exception& error) {
                 LOG_ERROR("Could not delete world '" << id << "': "
                           << error.what());
@@ -332,7 +332,7 @@ private:
                     if (consumed != seedText.size())
                         LOG_WARN("Seed contained unused characters: " << seedText);
                 }
-                const std::string id = m_session.worldCatalog.create(
+                const std::string id = m_session.createWorld(
                     name.empty() ? m_ui.localization.text("menu.create.default_name") : name,
                     seed, mode, Difficulty::Normal, cheatsEnabled, worldType);
                 m_flow.startGame(id, true);
@@ -383,19 +383,19 @@ private:
 
     void restoreGraphics() {
         m_graphicsResetPending = false;
-        m_session.world.invalidateGpuMeshes();
+        m_session.invalidateGpuMeshes();
         m_ui.renderer.resetGraphics();
         m_scene.resetGraphics();
         m_renderer->reinitialize(m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_renderer->setEnhancedVisualSettings(m_clientSettings.enhancedVisual);
         m_renderer->setLeafTransparency(m_clientSettings.transparentLeaves);
-        m_session.entities.initializeModels(m_paths.assetRoot, *m_renderer);
+        m_session.initializeEntityModels(m_paths.assetRoot, *m_renderer);
         m_scene.restoreGraphics(*m_renderer, m_paths.assetRoot);
         m_ui.renderer.initialize(*m_renderer,
             m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
         m_ui.renderer.setLocalization(m_ui.localization);
-        m_session.world.restoreGpuMeshes(m_renderer.get());
+        m_session.restoreGpuMeshes(m_renderer.get());
         m_renderer->resize(m_window.width(), m_window.height());
         LOG_INFO("Graphics resources restored after device reset");
     }
@@ -406,8 +406,8 @@ private:
         Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
-        m_session.player.setToggleSneak(m_clientSettings.toggleSneak);
-        m_session.world.configureLod({
+        m_session.setToggleSneak(m_clientSettings.toggleSneak);
+        m_session.configureLod({
             m_clientSettings.lodEnabled,
             m_clientSettings.lodDistanceChunks,
             m_clientSettings.lodAggressiveness,
@@ -417,7 +417,7 @@ private:
             m_clientSettings.enhancedVisual);
         if (m_renderer) m_renderer->setLeafTransparency(
             m_clientSettings.transparentLeaves);
-        m_session.particles.setEnhancedVisuals(
+        m_session.configureVisuals(
             m_clientSettings.enhancedVisual, m_clientSettings.visualQuality);
         m_audio.setVolumes(
             m_clientSettings.masterVolume / 100.0f,
@@ -452,22 +452,22 @@ private:
 
     void updateFrameState(float dt, RuntimeClock::Tick now) {
         // ── Update ────────────────────────────────────────────────
-        m_session.dayNightCycle.update(
+        m_session.updateDaylight(
             dt, Config::DAY_CYCLE_MINUTES, m_flow.state() == GameState::Playing);
         if (m_flow.state() != GameState::Playing || m_ui.inventoryOpen ||
-            m_ui.commandOpen || m_session.playerDead)
-            m_session.player.cancelBowCharge();
+            m_ui.commandOpen || m_session.isPlayerDead())
+            m_session.cancelBowCharge();
         if (m_flow.state() == GameState::Playing) {
             if (m_ui.containerOpen && (!m_ui.containerScreen.valid())) m_flow.closeInventory();
             if (m_ui.tradeOpen && !m_ui.tradeScreen.valid(
-                    m_session.player.getEyePosition(),
-                    m_session.player.getForward()))
+                    m_session.playerState().getEyePosition(),
+                    m_session.playerState().getForward()))
                 m_flow.closeInventory();
             m_session.updatePlaying(
                 dt, m_renderer.get(), m_sessionFeedback);
             if (m_session.handleVoidFall(now, m_sessionFeedback)) return;
             m_scene.updateCamera(
-                m_session.world, m_session.player, dt, m_session.playerDead,
+                m_session.worldState(), m_session.playerState(), dt, m_session.isPlayerDead(),
                 m_session.isSleeping(), m_session.sleepingBed(),
                 m_session.sleepFacing(), m_session.sleepAnimationProgress());
         } else if (m_flow.state() == GameState::LoadingWorld) {
