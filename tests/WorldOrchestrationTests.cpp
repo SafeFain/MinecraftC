@@ -318,41 +318,82 @@ void testAsyncGeneratedCacheRoundTrip() {
 void testWarmChunkBacktrack() {
     const int oldRenderDistance = Config::RENDER_DISTANCE;
     Config::RENDER_DISTANCE = 0;
-    ThreadPool pool(2);
-    World world;
-    world.setThreadPool(&pool);
-    world.resetForNewSeed(919191);
+    const auto root = std::filesystem::temp_directory_path() /
+                      "minecraftc-world-orch-warm-retirement";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    {
+        SaveStore store(root);
+        ThreadPool pool(2);
+        StubRenderer renderer;
+        World world;
+        world.setThreadPool(&pool);
+        world.setSaveStore(&store);
+        world.resetForNewSeed(919191);
 
-    world.update({0.5, 64.0, 0.5}, 1);
-    world.enqueueGeneration();
-    generateTarget(world, pool);
-    Chunk* origin = world.getChunk(0, 0);
-    require(origin != nullptr && origin->generated.load(),
-            "origin chunk is generated before warm-cache turn");
+        world.update({0.5, 64.0, 0.5}, 1);
+        world.enqueueGeneration();
+        generateTarget(world, pool);
+        Chunk* origin = world.getChunk(0, 0);
+        require(origin != nullptr && origin->generated.load(),
+                "origin chunk is generated before warm-cache turn");
+        world.buildMeshesSync(&renderer, 1);
+        require(renderer.uploadCount == 1,
+                "origin mesh is uploaded before warm retirement");
+        const int surface = world.getSurfaceY(0, 0);
+        world.setBlock(0, surface + 1, 0, BlockId::CHEST);
+        BlockEntity* chest = world.getBlockEntity({0, surface + 1, 0});
+        require(chest != nullptr, "edited chest has a block entity");
+        chest->chest[0] = {ItemId::BREAD, 3, 0};
 
-    world.update({16.5, 64.0, 0.5}, 1);
-    world.enqueueGeneration();
-    world.processCompletedGenerations(false);
-    require(origin->lifecycle.load() == Chunk::LifecycleState::Warm,
-            "nearby explored chunk enters the CPU warm cache");
+        for (int i = 0; i < 400 &&
+                        origin->lifecycle.load() != Chunk::LifecycleState::Warm;
+             ++i) {
+            world.update({16.5, 64.0, 0.5}, 1);
+            world.enqueueGeneration();
+            world.processCompletedGenerations(false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        require(origin->lifecycle.load() == Chunk::LifecycleState::Warm,
+                "nearby explored chunk enters the CPU warm cache");
+        require(renderer.releaseCount == 1,
+                "warm retirement releases the chunk GPU mesh once");
+        require(!store.loadChunkOverrides(0, 0).empty() &&
+                    !store.loadBlockEntities(0, 0).empty(),
+                "warm retirement saves edits and block entities");
 
-    world.update({0.5, 64.0, 0.5}, 1);
-    world.enqueueGeneration();
-    world.processCompletedGenerations(false);
-    Chunk* returned = world.getChunk(0, 0);
-    require(returned == origin && returned->generated.load() &&
-                !returned->cacheReadInProgress.load() &&
-                returned->cacheChecked.load(),
-            "warm-cache promotion reuses the existing chunk without disk I/O");
-    drainWorkers(world, pool);
+        world.update({0.5, 64.0, 0.5}, 1);
+        world.enqueueGeneration();
+        world.processCompletedGenerations(false);
+        Chunk* returned = world.getChunk(0, 0);
+        require(returned == origin && returned->generated.load() &&
+                    !returned->cacheReadInProgress.load() &&
+                    returned->cacheChecked.load(),
+                "warm-cache promotion reuses the existing chunk without disk I/O");
+        require(world.getBlock(0, surface + 1, 0) == BlockId::CHEST,
+                "warm promotion retains the edited block");
+        chest = world.getBlockEntity({0, surface + 1, 0});
+        require(chest != nullptr && chest->chest[0].count == 3,
+                "warm promotion retains chest contents");
+        chest->chest[1] = {ItemId::BREAD, 2, 0};
+
+        world.update({100000.0, 64.0, 100000.0}, 1);
+        require(!isChunkActive(world, 0, 0),
+                "distant chunk is fully retired after warm promotion");
+        const auto persisted = store.loadBlockEntities(0, 0);
+        require(!persisted.empty() && persisted.front().value.chest[1].count == 2,
+                "cold retirement saves later chest edits");
+        drainWorkers(world, pool);
+    }
+    std::filesystem::remove_all(root);
     Config::RENDER_DISTANCE = oldRenderDistance;
 }
 
 void testBudgetedWarmChunkRetirement() {
     const int oldRenderDistance = Config::RENDER_DISTANCE;
     Config::RENDER_DISTANCE = 4;
-    World world;
     StubRenderer renderer;
+    World world;
 
     do {
         world.update({0.5, 64.0, 0.5});

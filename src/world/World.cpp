@@ -147,6 +147,65 @@ World::~World() {
     m_lod.releaseGpuMeshes();
 }
 
+void World::retireChunkUnlocked(Chunk& chunk, bool keepWarm) {
+    const int cx = chunk.cx;
+    const int cz = chunk.cz;
+    // The streamer holds the chunk-store lock. Persist the live chunk before
+    // releasing its GPU mesh or erasing any in-memory save bookkeeping.
+    m_persistence.saveOverrides(cx, cz);
+    m_persistence.saveBlockEntities(cx, cz);
+    m_meshes.releaseChunkMesh(&chunk);
+    if (keepWarm) {
+        chunk.markDirty();
+        chunk.lifecycle = Chunk::LifecycleState::Warm;
+        return;
+    }
+    m_chunks.eraseUnlocked(cx, cz);
+    m_persistence.eraseOverridesApplied(cx, cz);
+    m_persistence.eraseBlockEntities(cx, cz);
+    m_persistence.eraseBlockEntitiesApplied(cx, cz);
+}
+
+void World::installLoadedChunkDataUnlocked(
+    int cx, int cz, const std::vector<BlockOverride>& overrides,
+    const std::vector<PersistedBlockEntity>& entities) {
+    m_persistence.installLoadedChunkDataUnlocked(cx, cz, overrides, entities);
+}
+
+void World::forEachOverrideInChunkUnlocked(
+    int cx, int cz,
+    const std::function<void(uint32_t, BlockId)>& visitor) const {
+    m_persistence.forEachOverrideInChunkUnlocked(cx, cz, visitor);
+}
+
+bool World::overridesAppliedUnlocked(int cx, int cz) const {
+    return m_persistence.isOverridesApplied(cx, cz);
+}
+
+void World::applySavedChunkDataUnlocked(int cx, int cz) {
+    m_persistence.applySavedOverridesUnlocked(cx, cz);
+    m_persistence.loadBlockEntities(cx, cz);
+}
+
+void World::registerGeneratedBlockEntityUnlocked(
+    int cx, int cz, uint32_t localIndex, BlockId id,
+    StructureLootProfile lootProfile, uint64_t lootSeed) {
+    m_persistence.registerGeneratedBlockEntityUnlocked(
+        cx, cz, localIndex, id, lootProfile, lootSeed);
+}
+
+void World::markStreamingLightDirty() {
+    m_lighting.markDirty();
+}
+
+void World::scheduleStreamingFluid(const glm::ivec3& position) {
+    m_fluids.scheduleAround(position);
+}
+
+void World::rebuildStreamingLightingIfDirty() {
+    if (m_lighting.dirty()) m_lighting.rebuild();
+}
+
 // ── Block queries ─────────────────────────────────────────────────────
 
 BlockId World::getBlock(int worldX, int worldY, int worldZ) const {

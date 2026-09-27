@@ -33,7 +33,7 @@ class IGameRenderer;
 class ThreadPool;
 class SaveStore;
 
-class World {
+class World : private IChunkStreamingWorld {
 public:
     World();
     ~World();
@@ -255,13 +255,13 @@ public:
 
 private:
     friend class ChunkMeshPipeline;
-    friend class ChunkStreamer;
     friend class FluidScheduler;
     ChunkStore m_chunks;
     WorldPersistence m_persistence{m_chunks};
     FluidScheduler m_fluids{*this};
     ChunkMeshPipeline m_meshes{*this, m_chunks};
-    ChunkStreamer m_streamer{*this, m_chunks};
+    WorldGenerator m_generator;
+    ChunkStreamer m_streamer{*this, m_chunks, m_generator};
     LodTerrainSystem m_lod;
     WorldLighting m_lighting{m_chunks};
     WorldSimulation m_simulation{*this, m_persistence, m_chunks};
@@ -272,13 +272,24 @@ private:
     int centerChunkZ() const { return m_streamer.centerChunkZ(); }
     int meshChunksPerFrame() const { return m_streamer.meshChunksPerFrame(); }
 
-    // ChunkStreamer drives generation and requests lighting work.
-    WorldGenerator& generator() { return m_generator; }
-    bool lightDirty() const { return m_lighting.dirty(); }
-    void markLightDirty() { m_lighting.markDirty(); }
-    void rebuildLightingNow() { m_lighting.rebuild(); }
+    // ChunkStreamer can request these operations only through its streaming
+    // interface; it cannot access persistence, mesh or lighting owners directly.
+    void retireChunkUnlocked(Chunk& chunk, bool keepWarm) override;
+    void installLoadedChunkDataUnlocked(
+        int cx, int cz, const std::vector<BlockOverride>& overrides,
+        const std::vector<PersistedBlockEntity>& entities) override;
+    void forEachOverrideInChunkUnlocked(
+        int cx, int cz,
+        const std::function<void(uint32_t, BlockId)>& visitor) const override;
+    bool overridesAppliedUnlocked(int cx, int cz) const override;
+    void applySavedChunkDataUnlocked(int cx, int cz) override;
+    void registerGeneratedBlockEntityUnlocked(
+        int cx, int cz, uint32_t localIndex, BlockId id,
+        StructureLootProfile lootProfile, uint64_t lootSeed) override;
+    void markStreamingLightDirty() override;
+    void scheduleStreamingFluid(const glm::ivec3& position) override;
+    void rebuildStreamingLightingIfDirty() override;
 
-    WorldGenerator m_generator;
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
 

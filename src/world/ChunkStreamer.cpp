@@ -7,16 +7,19 @@
 #include "world/ChunkMesh.h"
 #include "world/ChunkStore.h"
 #include "world/FluidLogic.h"
-#include "world/FluidScheduler.h"
-#include "world/World.h"
 #include "world/WorldGenContext.h"
 #include "world/WorldGenerator.h"
-#include "world/WorldPersistence.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <thread>
+
+namespace {
+int worldToChunk(double coordinate, int chunkSize) {
+    return static_cast<int>(std::floor(coordinate / chunkSize));
+}
+}
 
 ChunkStreamer::~ChunkStreamer() {
     // Cache writes contain only deterministic, recoverable terrain, but a
@@ -87,8 +90,8 @@ void ChunkStreamer::queueGenerationCompletion(int cx, int cz) {
 
 void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                            const glm::dvec3& playerVelocity) {
-    int pcx = World::worldToChunkX(playerPos.x);
-    int pcz = World::worldToChunkZ(playerPos.z);
+    int pcx = worldToChunk(playerPos.x, Config::CHUNK_SIZE_X);
+    int pcz = worldToChunk(playerPos.z, Config::CHUNK_SIZE_Z);
     m_centerChunkX = pcx;
     m_centerChunkZ = pcz;
 
@@ -185,11 +188,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                     // Keep a small CPU-only hysteresis ring for short
                     // backtracks.  GPU handles are released, and the dirty
                     // flag causes a safe rebuild when the chunk is promoted.
-                    m_world.m_persistence.saveOverrides(key.first, key.second);
-                    m_world.m_persistence.saveBlockEntities(key.first, key.second);
-                    m_world.m_meshes.releaseChunkMesh(chunk);
-                    chunk->markDirty();
-                    chunk->lifecycle = Chunk::LifecycleState::Warm;
+                    m_world.retireChunkUnlocked(*chunk, true);
                     const uint64_t packed = packedChunkKey(key.first, key.second);
                     m_warmChunkSet.insert(packed);
                     m_warmChunkOrder.push_back(key);
@@ -212,15 +211,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                 // out-of-range neighbor does not change world blocks, and
                 // invalidating the boundary strip here caused a synchronous
                 // relight whenever the player crossed a 16-block boundary.
-                m_world.m_persistence.saveOverrides(key.first, key.second);
-                m_world.m_persistence.saveBlockEntities(key.first, key.second);
-                m_world.m_meshes.releaseChunkMesh(chunk);
-                store.eraseUnlocked(key.first, key.second);
-                m_world.m_persistence.eraseOverridesApplied(
-                    key.first, key.second);
-                m_world.m_persistence.eraseBlockEntities(key.first, key.second);
-                m_world.m_persistence.eraseBlockEntitiesApplied(
-                    key.first, key.second);
+                m_world.retireChunkUnlocked(*chunk, false);
                 m_prefetchedEntities.erase(key);
                 m_boundaryLightingChunks.erase(
                     packedChunkKey(key.first, key.second));
@@ -233,13 +224,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                 m_warmChunkSet.erase(packedChunkKey(key.first, key.second));
                 Chunk* chunk = store.findUnlocked(key.first, key.second);
                 if (chunk == nullptr) continue;
-                m_world.m_persistence.saveOverrides(key.first, key.second);
-                m_world.m_persistence.saveBlockEntities(key.first, key.second);
-                m_world.m_meshes.releaseChunkMesh(chunk);
-                store.eraseUnlocked(key.first, key.second);
-                m_world.m_persistence.eraseOverridesApplied(key.first, key.second);
-                m_world.m_persistence.eraseBlockEntities(key.first, key.second);
-                m_world.m_persistence.eraseBlockEntitiesApplied(key.first, key.second);
+                m_world.retireChunkUnlocked(*chunk, false);
                 m_prefetchedEntities.erase(key);
                 m_boundaryLightingChunks.erase(
                     packedChunkKey(key.first, key.second));
@@ -258,7 +243,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
     while (m_streamCursor < m_desiredChunks.size() && loaded < loadBudget) {
         const auto key = m_desiredChunks[m_streamCursor++];
         if (!m_chunks.contains(key.first, key.second)) {
-            m_world.getChunk(key.first, key.second);
+            m_chunks.get(key.first, key.second);
             ++loaded;
             activeChanged = true;
         } else if (m_warmChunkSet.erase(packedChunkKey(key.first, key.second)) != 0) {
@@ -316,7 +301,7 @@ void ChunkStreamer::enqueueCacheReads() {
     }
 
     const auto directory = m_saveStore->worldDirectory();
-    const uint32_t cacheVersion = m_world.generator().chunkCacheVersion();
+    const uint32_t cacheVersion = m_generator.chunkCacheVersion();
     const uint64_t epoch = m_streamEpoch;
     for (const auto& key : candidates) {
         bool claimed = false;
@@ -380,7 +365,7 @@ void ChunkStreamer::processCacheCompletions() {
         for (auto& result : completed) {
             Chunk* chunk = store.findUnlocked(result.cx, result.cz);
             if (chunk == nullptr || !chunk->cacheReadInProgress.load()) continue;
-            m_world.m_persistence.installLoadedChunkDataUnlocked(
+            m_world.installLoadedChunkDataUnlocked(
                 result.cx, result.cz, result.overrides, result.blockEntities);
             m_prefetchedEntities[{result.cx, result.cz}] = {
                 std::move(result.entities), result.entityPopulationVersion};
@@ -456,7 +441,7 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
         return;
     }
     const auto directory = m_saveStore->worldDirectory();
-    const uint32_t cacheVersion = m_world.generator().chunkCacheVersion();
+    const uint32_t cacheVersion = m_generator.chunkCacheVersion();
     const int cx = chunk->cx;
     const int cz = chunk->cz;
     const uint64_t epoch = m_streamEpoch;
@@ -576,7 +561,7 @@ void ChunkStreamer::enqueueGeneration() {
     // Enqueue region tasks
     for (auto& reg : regions) {
         ChunkStreamer* streamerPtr = this;
-        WorldGenerator* genPtr = &m_world.generator();
+        WorldGenerator* genPtr = &m_generator;
         int regionDistance2 = std::numeric_limits<int>::max();
         for (const Chunk* chunk : reg.chunks) {
             const int dx = chunk->cx - m_centerChunkX;
@@ -600,8 +585,8 @@ void ChunkStreamer::enqueueGeneration() {
             // Store pending blocks under the chunk mutex
             streamerPtr->m_chunks.withUnique([&](ChunkStore&) {
                 for (auto& pb : pendingOut) {
-                    int tcx = World::worldToChunkX(static_cast<double>(pb.worldX));
-                    int tcz = World::worldToChunkZ(static_cast<double>(pb.worldZ));
+                    int tcx = worldToChunk(static_cast<double>(pb.worldX), Config::CHUNK_SIZE_X);
+                    int tcz = worldToChunk(static_cast<double>(pb.worldZ), Config::CHUNK_SIZE_Z);
                     streamerPtr->m_pendingBlocks[{tcx, tcz}].push_back(pb);
                 }
             });
@@ -615,10 +600,8 @@ void ChunkStreamer::enqueueGeneration() {
             // resident chunks every frame.
             std::unordered_set<uint64_t> pendingTargets;
             for (const auto& pb : pendingOut) {
-                const int tcx = World::worldToChunkX(
-                    static_cast<double>(pb.worldX));
-                const int tcz = World::worldToChunkZ(
-                    static_cast<double>(pb.worldZ));
+                const int tcx = worldToChunk(static_cast<double>(pb.worldX), Config::CHUNK_SIZE_X);
+                const int tcz = worldToChunk(static_cast<double>(pb.worldZ), Config::CHUNK_SIZE_Z);
                 pendingTargets.insert(streamerPtr->packedChunkKey(tcx, tcz));
             }
             for (const uint64_t packed : pendingTargets) {
@@ -645,12 +628,12 @@ void ChunkStreamer::enqueueGeneration() {
             chunkPtr->lifecycle = Chunk::LifecycleState::Generating;
             visited.insert(key);
 
-            WorldGenerator* genPtr = &m_world.generator();
+            WorldGenerator* genPtr = &m_generator;
 
             // Legacy neighborQuery for singleton chunks
             auto neighborQuery = [this, genPtr](int wx, int wz) -> std::optional<HeightBiome> {
-                int ncx = World::worldToChunkX(static_cast<double>(wx));
-                int ncz = World::worldToChunkZ(static_cast<double>(wz));
+                int ncx = worldToChunk(static_cast<double>(wx), Config::CHUNK_SIZE_X);
+                int ncz = worldToChunk(static_cast<double>(wz), Config::CHUNK_SIZE_Z);
                 bool available = false;
                 m_chunks.withShared([&](ChunkStore& store) {
                     const Chunk* neighbor = store.findUnlocked(ncx, ncz);
@@ -662,8 +645,8 @@ void ChunkStreamer::enqueueGeneration() {
 
             auto blockSetter = [this](int wx, int wy, int wz, BlockId id) {
                 if (!Config::isValidWorldY(wy)) return;
-                int bsx = World::worldToChunkX(static_cast<double>(wx));
-                int bsz = World::worldToChunkZ(static_cast<double>(wz));
+                int bsx = worldToChunk(static_cast<double>(wx), Config::CHUNK_SIZE_X);
+                int bsz = worldToChunk(static_cast<double>(wz), Config::CHUNK_SIZE_Z);
                 int lx = wx - bsx * Config::CHUNK_SIZE_X;
                 int lz = wz - bsz * Config::CHUNK_SIZE_Z;
                 if (lx < 0) { bsx -= 1; lx += Config::CHUNK_SIZE_X; }
@@ -689,8 +672,8 @@ void ChunkStreamer::enqueueGeneration() {
                                            StructureLootProfile lootProfile,
                                            uint64_t lootSeed) {
                 if (!Config::isValidWorldY(wy)) return;
-                int bsx = World::worldToChunkX(static_cast<double>(wx));
-                int bsz = World::worldToChunkZ(static_cast<double>(wz));
+                int bsx = worldToChunk(static_cast<double>(wx), Config::CHUNK_SIZE_X);
+                int bsz = worldToChunk(static_cast<double>(wz), Config::CHUNK_SIZE_Z);
                 const bool needsEntity =
                     id == BlockId::CHEST || id == BlockId::FURNACE;
                 m_chunks.withUnique([&](ChunkStore&) {
@@ -755,7 +738,7 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
         auto collectFluidSeeds = [&](int cx, int cz, int edgeX, int edgeZ) {
             const Chunk* source = store.findUnlocked(cx, cz);
             if (source == nullptr || !source->generated.load()) return;
-            m_world.m_persistence.forEachOverrideInChunkUnlocked(
+            m_world.forEachOverrideInChunkUnlocked(
                 cx, cz, [&](uint32_t index, BlockId block) {
                     int x = 0, z = 0, y = 0;
                     decodeChunkIndex(index, x, z, y);
@@ -837,7 +820,7 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
             if (chunk == nullptr) continue;
             if (!chunk->generated.load()) continue;
             const bool firstApply =
-                !m_world.m_persistence.isOverridesApplied(key.first, key.second);
+                !m_world.overridesAppliedUnlocked(key.first, key.second);
             const bool pendingChanged = applyPendingBlocksUnlocked(
                 key.first, key.second, store);
             if (!firstApply && !pendingChanged) continue;
@@ -846,13 +829,11 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
             if (chunk->hasBaseSnapshot())
                 queueBaseCacheWriteUnlocked(chunk);
             if (firstApply) {
-                m_world.m_persistence.applySavedOverridesUnlocked(
-                    key.first, key.second);
-                m_world.m_persistence.loadBlockEntities(key.first, key.second);
+                m_world.applySavedChunkDataUnlocked(key.first, key.second);
             }
             if (firstApply) {
                 generationStateChanged = true;
-                m_world.markLightDirty();
+                m_world.markStreamingLightDirty();
                 // Existing meshes may have sampled this not-yet-generated
                 // chunk as air with zero light.  Invalidate the complete
                 // one-voxel dependency footprint, including diagonals used by
@@ -888,7 +869,7 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
                 collectGeneratedFluidSeeds(key.first, key.second + 1, -1, 0);
             } else if (pendingChanged) {
                 generationStateChanged = true;
-                m_world.markLightDirty();
+                m_world.markStreamingLightDirty();
                 for (const auto& offset :
                      ChunkMesh::NEIGHBOR_DEPENDENCY_OFFSETS) {
                     Chunk* neighbor = store.findUnlocked(
@@ -912,9 +893,9 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
     }
     if (generationStateChanged) ++m_streamingRevision;
     for (const glm::ivec3& position : fluidSeeds)
-        m_world.m_fluids.scheduleAround(position);
-    if (rebuildLightingNow && !budgetExhausted && m_world.lightDirty())
-        m_world.rebuildLightingNow();
+        m_world.scheduleStreamingFluid(position);
+    if (rebuildLightingNow && !budgetExhausted)
+        m_world.rebuildStreamingLightingIfDirty();
     if (rebuildLightingNow && !budgetExhausted) {
         m_chunks.withUnique([&](ChunkStore& store) {
             for (const uint64_t packed : m_boundaryLightingChunks) {
@@ -1098,7 +1079,7 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
                     lx + lz * Config::CHUNK_SIZE_X +
                     Config::worldYToStorageY(pb.worldY) *
                         Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
-                m_world.m_persistence.registerGeneratedBlockEntityUnlocked(
+                m_world.registerGeneratedBlockEntityUnlocked(
                     cx, cz, localIndex, pb.id, pb.lootProfile, pb.lootSeed);
             }
         }

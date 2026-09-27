@@ -24,7 +24,29 @@ class Chunk;
 class ChunkStore;
 class SaveStore;
 class ThreadPool;
-class World;
+class WorldGenerator;
+
+// Main-thread side effects of streaming. Methods ending in Unlocked require
+// the ChunkStore's unique lock, which ChunkStreamer holds during handoff.
+class IChunkStreamingWorld {
+public:
+    virtual ~IChunkStreamingWorld() = default;
+    virtual void retireChunkUnlocked(Chunk& chunk, bool keepWarm) = 0;
+    virtual void installLoadedChunkDataUnlocked(
+        int cx, int cz, const std::vector<BlockOverride>& overrides,
+        const std::vector<PersistedBlockEntity>& entities) = 0;
+    virtual void forEachOverrideInChunkUnlocked(
+        int cx, int cz,
+        const std::function<void(uint32_t, BlockId)>& visitor) const = 0;
+    virtual bool overridesAppliedUnlocked(int cx, int cz) const = 0;
+    virtual void applySavedChunkDataUnlocked(int cx, int cz) = 0;
+    virtual void registerGeneratedBlockEntityUnlocked(
+        int cx, int cz, uint32_t localIndex, BlockId id,
+        StructureLootProfile lootProfile, uint64_t lootSeed) = 0;
+    virtual void markStreamingLightDirty() = 0;
+    virtual void scheduleStreamingFluid(const glm::ivec3& position) = 0;
+    virtual void rebuildStreamingLightingIfDirty() = 0;
+};
 
 // Streaming/generation progress counters. World exposes this as
 // World::GenerationProgress (a using alias) so existing callers keep working.
@@ -111,8 +133,9 @@ private:
 // ChunkStore's, taken per pass.
 class ChunkStreamer {
 public:
-    ChunkStreamer(World& world, ChunkStore& chunks)
-        : m_world(world), m_chunks(chunks) {}
+    ChunkStreamer(IChunkStreamingWorld& world, ChunkStore& chunks,
+                  WorldGenerator& generator)
+        : m_world(world), m_chunks(chunks), m_generator(generator) {}
     ~ChunkStreamer();
 
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
@@ -168,8 +191,9 @@ private:
         }
     };
 
-    World& m_world;
+    IChunkStreamingWorld& m_world;
     ChunkStore& m_chunks;
+    WorldGenerator& m_generator;
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
 
