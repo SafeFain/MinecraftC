@@ -26,6 +26,8 @@ copies the five root context files, current/staged Git differences, HEAD/branch,
 the caller-supplied instruction and a SHA-256 manifest into an immutable dated
 directory under `docs/tasks/evidence/task-slug/`. It performs only Git reads.
 The quote must be checked against the conversation; the tool does not authenticate it.
+Use repeated `--file path/within/workspace` options to preserve task artifacts,
+especially new untracked source/tool files that are absent from Git's diff.
 
 ## At meaningful milestones
 
@@ -41,7 +43,7 @@ obtaining key validation results, or preparing to switch/compact sessions:
 
 ```bash
 python3 tools/task_state.py checkpoint --task task-slug --stage verified \
-  --log /tmp/task-build.log --log /tmp/task-ctest.log
+  --log /tmp/task-build.log --log /tmp/task-ctest.log --file path/to/new-source.cpp
 python3 tools/task_state.py check
 ```
 

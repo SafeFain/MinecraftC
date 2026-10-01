@@ -45,7 +45,7 @@ void verifyCloudLodSurfaces(const std::vector<CloudInstance>& clouds,
     std::vector<uint8_t> occupancy(area, 0);
     std::array<std::vector<uint8_t>, 12> faces;
     for (auto& face : faces) face.resize(area, 0);
-    const auto index = [](int x, int z) {
+    const auto index = [=](int x, int z) {
         return static_cast<size_t>(x + extent + (z + extent) * diameter);
     };
     bool foundCoarse = false;
@@ -116,7 +116,8 @@ void verifyCloudLodSurfaces(const std::vector<CloudInstance>& clouds,
                     filled && !occupied(x, z, layer + 1),
                     filled && !occupied(x, z, layer - 1)};
                 for (int face = 0; face < 6; ++face)
-                    require(faces[layer * 6 + face][index(x, z)] == expected[face],
+                    require(faces[layer * 6 + face][index(x, z)] ==
+                                static_cast<uint8_t>(expected[face]),
                             "Cloud LOD has missing, duplicate or interior faces");
             }
         }

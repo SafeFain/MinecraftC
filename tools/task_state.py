@@ -96,7 +96,7 @@ def git_output(root: Path, *args: str) -> bytes:
 
 
 def checkpoint(root: Path, task: str, stage: str, authorization: str,
-               logs: list[Path]) -> Path:
+               logs: list[Path], files: list[Path]) -> Path:
     for value in (task, stage):
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value):
             raise ValueError("task and stage must use lowercase letters, digits, hyphens or underscores")
@@ -104,6 +104,10 @@ def checkpoint(root: Path, task: str, stage: str, authorization: str,
     target = root / "docs/tasks/evidence" / task / f"{now:%Y%m%dT%H%M%S%fZ}-{stage}"
     # Resolve all inputs and Git evidence before creating the checkpoint.
     sources = [(name, root / name) for name in CONTEXT]
+    for path in files:
+        source = (root / path).resolve()
+        relative = source.relative_to(root)
+        sources.append((f"files/{relative.as_posix()}", source))
     sources += [(f"logs/{i}-{path.name}", path.resolve()) for i, path in enumerate(logs)]
     contents = {name: path.read_bytes() for name, path in sources}
     contents["git-status.txt"] = git_output(root, "status", "--short")
@@ -137,11 +141,13 @@ def main() -> int:
     save.add_argument("--stage", required=True)
     save.add_argument("--authorization", default="")
     save.add_argument("--log", action="append", type=Path, default=[])
+    save.add_argument("--file", action="append", type=Path, default=[],
+                      help="include an existing workspace file, e.g. an untracked validation scene")
     args = parser.parse_args()
     root = args.root.resolve()
     try:
         if args.command == "checkpoint":
-            print(checkpoint(root, args.task, args.stage, args.authorization, args.log))
+            print(checkpoint(root, args.task, args.stage, args.authorization, args.log, args.file))
             return 0
         errors = check(root)
         if errors:
