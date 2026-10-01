@@ -41,6 +41,8 @@ vec3 decodeNormal(vec2 encoded){
     return normalize(n);
 }
 
+#include "gi_surface_filter.glsl"
+
 // Validity stays discrete at mip zero. Never interpolate the -1 sentinel
 // with opacity, or wrap a filter footprint across a world-space clipmap edge.
 vec4 fetchCell(int level,ivec3 cell){
@@ -115,7 +117,7 @@ vec3 traceGi(vec3 world,vec3 normal,out float validCoverage){
         float travel=0.02;
         float transmittance=1.0;
         vec3 accumulated=vec3(0.0);
-        bool known=false;
+        float knownDistance=0.0;
         for(int stepIndex=0;stepIndex<256;++stepIndex){
             if(stepIndex>=budget||travel>maximumDistance||transmittance<0.02)break;
             vec3 position=origin+direction*travel;
@@ -124,7 +126,6 @@ vec3 traceGi(vec3 world,vec3 normal,out float validCoverage){
             // Try the coarser valid levels first; unknown space then ends the ray.
             // It neither spends radiance samples nor creates a fictitious occluder.
             if(level<0)break;
-            known=true;
             float cellSize=gi.minimumCellAndSize[level].w;
             float opacity=clamp(value.a,0.0,1.0);
             if(opacity>0.0){
@@ -141,9 +142,12 @@ vec3 traceGi(vec3 world,vec3 normal,out float validCoverage){
                 if(abs(direction[axis])>0.00001)
                     crossing[axis]=(boundary[axis]-position[axis])/direction[axis];
             travel+=max(min(crossing.x,min(crossing.y,crossing.z)),0.0)+0.001;
+            knownDistance=min(travel,maximumDistance);
         }
         total+=accumulated;
-        validCoverage+=known?1.0:0.0;
+        // A fully occluded ray is trustworthy even when short. An open ray
+        // ending in unknown space or at its step budget has partial coverage.
+        validCoverage+=1.0-transmittance*(1.0-knownDistance/maximumDistance);
     }
     validCoverage/=max(float(cones),1.0);
     return total/max(float(cones),1.0)*gi.temporal.x;
@@ -152,17 +156,20 @@ vec3 traceGi(vec3 world,vec3 normal,out float validCoverage){
 #include "screen_effect_common.glsl"
 
 void main(){
-    vec4 surface=texture(surfaceData,vUv);
+    ivec2 surfaceSize=textureSize(surfaceData,0);
+    ivec2 surfacePixel=clamp(ivec2(vUv*vec2(surfaceSize)),ivec2(0),surfaceSize-1);
+    vec2 receiverUv=(vec2(surfacePixel)+0.5)/vec2(surfaceSize);
+    vec4 surface=texelFetch(surfaceData,surfacePixel,0);
     vec3 normal=decodeNormal(surface.xy);
     float ao=screenAo(surface,normal);
     if(surface.z<=0.01||surface.w>=1.9){outEffects=vec4(0.0,0.0,0.0,ao);return;}
-    vec2 ndc=vUv*2.0-1.0;
+    vec2 ndc=receiverUv*2.0-1.0;
     vec4 farPoint=gi.inverseViewProjection*vec4(ndc,1.0,1.0);
     vec3 ray=normalize(farPoint.xyz/farPoint.w-
         (gi.cameraWorld.xyz-gi.currentWorldOrigin.xyz));
     vec3 world=gi.cameraWorld.xyz+ray*abs(surface.z);
     float coverage=0.0;
-    vec4 receiver=texture(receiverAlbedo,vUv);
+    vec4 receiver=texelFetch(receiverAlbedo,surfacePixel,0);
     vec3 current=traceGi(world,normal,coverage)*receiver.rgb;
     if(receiver.a>0.5)current=vec3(0.0);
     vec3 localPrevious=world-gi.previousWorldOrigin.xyz;
@@ -173,19 +180,32 @@ void main(){
     float weight=0.0;
     vec3 history=current;
     if(inside&&gi.temporal.y>0.5&&coverage>0.05){
-        vec4 previousSurface=texture(previousSurfaceData,previousUv);
-        vec3 previousNormal=decodeNormal(previousSurface.xy);
         float previousDistance=length(world-gi.previousCameraWorld.xyz);
-        float depthTolerance=max(0.18,previousDistance*0.018);
-        bool reject=abs(abs(previousSurface.z)-previousDistance)>depthTolerance||
-            dot(normal,previousNormal)<0.82;
-        if(!reject){
-            history=texture(previousHistory,previousUv).rgb;
+        ivec2 size=textureSize(previousHistory,0);
+        vec2 pixel=previousUv*vec2(size)-0.5;
+        ivec2 base=ivec2(floor(pixel));
+        vec2 fraction=fract(pixel);
+        vec3 sum=vec3(0);
+        float accepted=0.0;
+        for(int y=0;y<2;++y)for(int x=0;x<2;++x){
+            ivec2 tap=base+ivec2(x,y);
+            if(any(lessThan(tap,ivec2(0)))||any(greaterThanEqual(tap,size)))continue;
+            vec4 previousSurface=texelFetch(previousSurfaceData,tap,0);
+            vec2 spatial=mix(vec2(1)-fraction,fraction,vec2(x,y));
+            float w=spatial.x*spatial.y*
+                giSurfaceWeight(surface,previousSurface,previousDistance,0.018);
+            sum+=texelFetch(previousHistory,tap,0).rgb*w;
+            accepted+=w;
+        }
+        if(accepted>0.01){
+            history=sum/accepted;
+            float change=length(history-current)/max(length(current)+0.03,0.03);
             vec3 extent=max(vec3(0.03),abs(current)*0.45+vec3(0.04));
             history=clamp(history,current-extent,current+extent);
-            weight=gi.temporal.z*coverage;
+            weight=gi.temporal.z*coverage*min(accepted,1.0)*
+                (1.0-smoothstep(0.15,0.60,change));
         }
     }
-    vec3 result=mix(current,history,clamp(weight,0.0,0.95));
+    vec3 result=mix(current,history,clamp(weight,0.0,0.999));
     outEffects=vec4(max(result,vec3(0.0)),ao);
 }

@@ -20,7 +20,7 @@ SHADERS = ("basic_cube.vert", "basic_cube.frag", "chunk.vert", "chunk.frag",
            "wireframe.vert", "wireframe.frag", "model.vert", "model.frag",
            "post.vert", "post.frag", "bloom.frag", "screen_effect.frag",
            "screen_effect_gi.frag", "voxel_gi_inject.comp")
-INCLUDES = ("screen_effect_common.glsl",)
+INCLUDES = ("screen_effect_common.glsl", "gi_surface_filter.glsl")
 SPIRV_MAGIC = 0x07230203
 SOURCE_MANIFEST = "sources.sha256.json"
 

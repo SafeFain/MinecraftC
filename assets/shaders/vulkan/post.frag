@@ -61,6 +61,27 @@ vec3 decodeNormal(vec2 encoded){
 }
 
 #include "screen_effect_common.glsl"
+#include "gi_surface_filter.glsl"
+
+vec4 guidedGi(vec2 uv,vec4 surface){
+    if(!giReceiver(surface))return vec4(0,0,0,1);
+    ivec2 size=textureSize(screenEffects,0);
+    vec2 pixel=uv*vec2(size)-0.5;
+    ivec2 base=ivec2(floor(pixel));
+    vec2 fraction=fract(pixel);
+    vec4 sum=vec4(0);
+    float accepted=0.0;
+    for(int y=0;y<2;++y)for(int x=0;x<2;++x){
+        ivec2 tap=base+ivec2(x,y);
+        if(any(lessThan(tap,ivec2(0)))||any(greaterThanEqual(tap,size)))continue;
+        vec4 guide=texelFetch(surfaceData,giSurfacePixel(tap,size),0);
+        vec2 spatial=mix(vec2(1)-fraction,fraction,vec2(x,y));
+        float w=spatial.x*spatial.y*giSurfaceWeight(surface,guide,surface.z,0.008);
+        sum+=texelFetch(screenEffects,tap,0)*w;
+        accepted+=w;
+    }
+    return accepted>0.0001?sum/accepted:vec4(0,0,0,1);
+}
 
 vec3 skyReflection(vec2 uv,vec3 normal){
     float horizon=clamp(0.48+normal.y*0.30-(uv.y-0.5)*0.18,0.0,1.0);
@@ -118,7 +139,10 @@ void main(){
         uv+=wave*post.texelTime.xy*2.2*underwater;
     }
     vec3 hdr=texture(sceneColor,clamp(uv,vec2(0.0),vec2(1.0))).rgb;
-    vec4 surface=texture(surfaceData,vUv);
+    ivec2 surfaceSize=textureSize(surfaceData,0);
+    vec4 surface=post.screenQuality.w<0.0?
+        texelFetch(surfaceData,clamp(ivec2(vUv*vec2(surfaceSize)),ivec2(0),surfaceSize-1),0):
+        texture(surfaceData,vUv);
     if(post.effects.w>0.001&&post.reflection.w>0.001&&surface.z< -0.01){
         vec3 normal=decodeNormal(surface.xy);
         vec2 distortion=vec2(normal.x,-normal.z)*post.texelTime.xy*8.0*
@@ -135,7 +159,7 @@ void main(){
                 clamp(fresnel*post.reflection.w,0.0,0.88));
     }
     if(abs(post.screenQuality.w)>0.5){
-        vec4 screen=texture(screenEffects,vUv);
+        vec4 screen=post.screenQuality.w<0.0?guidedGi(vUv,surface):texture(screenEffects,vUv);
         if(post.screenQuality.w<0.0){
             if(surface.z>0.01&&surface.w<1.9)
                 hdr*=mix(1.0,screen.a,0.82*post.exposureBloom.w);

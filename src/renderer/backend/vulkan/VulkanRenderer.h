@@ -96,6 +96,7 @@ public:
 
 private:
     friend class model::VulkanModelBackend;
+    friend class VulkanGiSmokeProbe;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
     Window* m_window = nullptr;

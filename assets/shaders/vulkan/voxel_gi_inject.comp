@@ -8,10 +8,14 @@ layout(set=0,binding=2,rgba16f) uniform writeonly image3D irradiance;
 layout(push_constant) uniform InjectConstants {
     vec4 skyColorDaylight;
     vec4 blockColorWeather;
+    ivec4 regionOffset;
+    ivec4 regionExtent;
 } inject;
 
 void main(){
-    ivec3 voxel=ivec3(gl_GlobalInvocationID);
+    ivec3 localVoxel=ivec3(gl_GlobalInvocationID);
+    if(any(greaterThanEqual(localVoxel,inject.regionExtent.xyz)))return;
+    ivec3 voxel=localVoxel+inject.regionOffset.xyz;
     ivec3 size=imageSize(irradiance);
     if(any(greaterThanEqual(voxel,size)))return;
     vec4 material=texelFetch(albedoOpacity,voxel,0);

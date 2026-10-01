@@ -12,9 +12,106 @@ void require(bool condition, const char* message) {
         std::exit(1);
     }
 }
+
+void checkUpdatePolicyAndRegions() {
+    EnhancedVisualSettings settings;
+    settings.enabled = true;
+    settings.gi.enabled = true;
+    settings.gi.distance = 128;
+    const auto original = voxelGiConfig(VisualQuality::VeryHigh, settings);
+    settings.bloomStrength = 25;
+    settings.gi.temporalStability = 100;
+    auto change = voxelGiConfigChange(original, voxelGiConfig(VisualQuality::VeryHigh, settings));
+    require(!change.resetCache && !change.resetHistory && !change.rebuildResources,
+            "unrelated effects or stability rebuilt spatial GI");
+    settings.gi.strength = 50;
+    change = voxelGiConfigChange(original, voxelGiConfig(VisualQuality::VeryHigh, settings));
+    require(!change.resetCache && change.resetHistory && !change.rebuildResources,
+            "strength change rebuilt geometry or retained old-scale history");
+    settings.gi.distance = 256;
+    change = voxelGiConfigChange(original, voxelGiConfig(VisualQuality::VeryHigh, settings));
+    require(change.resetCache && change.resetHistory && !change.rebuildResources,
+            "distance change did not invalidate spatial mapping");
+    settings.gi.strength = 0;
+    require(voxelGiConfigChange(original, voxelGiConfig(VisualQuality::VeryHigh, settings)).
+                rebuildResources, "zero strength did not retire GI resources");
+
+    // Retention over the same wall time must not depend on frame rate or the
+    // number of swapchain images between uses of one history image.
+    for (int rate : {30, 60, 120}) for (int images : {1, 2, 3}) {
+        const float weight = voxelGiHistoryWeight(0.95f, double(images) / rate);
+        const double retained = std::pow(weight, double(rate) / images);
+        require(std::abs(retained - std::pow(0.95, 60.0)) < 0.00001,
+                "GI history response depends on FPS or swapchain image count");
+    }
+    require(voxelGiHistoryWeight(0.95f, 1.0) == 0 &&
+            voxelGiHistoryWeight(0.95f, 0.0) == 0 &&
+            voxelGiHistoryWeight(0.0f, 0.02) == 0,
+            "paused, uninitialized or disabled history accumulated stale GI");
+
+    for (int resolution : {32, 48, 64}) {
+        const size_t volume = static_cast<size_t>(resolution) * resolution * resolution;
+        std::vector<uint8_t> source(volume * 4);
+        for (size_t i = 0; i < source.size(); ++i)
+            source[i] = static_cast<uint8_t>((i * 37 + i / 251) % 255);
+        for (int fixture = 0; fixture < 12; ++fixture) {
+            VoxelGiDirtyRegions dirty;
+            std::array<std::array<bool, 64>, 3> selected{};
+            for (int axis = 0; axis < 3; ++axis) {
+                if (fixture < 3 && fixture != axis) continue;
+                for (int i = 0; i < (fixture < 3 ? 1 : fixture - 1); ++i) {
+                    const int layer = (i * 13 + fixture * 7 + axis * 3) % resolution;
+                    dirty.mark(axis, layer);
+                    selected[axis][layer] = true;
+                }
+            }
+            const auto regions = dirty.regions(resolution);
+            std::vector<uint8_t> output(volume * 4, 255);
+            std::vector<bool> touched(volume);
+            size_t bytes = 0;
+            for (const auto& box : regions) {
+                std::vector<uint8_t> packed;
+                packVoxelGiRegion(source, resolution, box, packed);
+                bytes += packed.size();
+                size_t read = 0;
+                for (int z = 0; z < box.extent.z; ++z)
+                    for (int y = 0; y < box.extent.y; ++y)
+                        for (int x = 0; x < box.extent.x; ++x) {
+                            const size_t index = static_cast<size_t>(box.offset.x + x + resolution *
+                                (box.offset.y + y + resolution * (box.offset.z + z)));
+                            require(!touched[index], "partial injection boxes overlap");
+                            touched[index] = true;
+                            std::copy_n(packed.data() + read, 4, output.data() + index * 4);
+                            read += 4;
+                        }
+            }
+            const bool full = regions.size() == 1 && regions[0].voxelCount() == volume;
+            for (int z = 0; z < resolution; ++z)
+                for (int y = 0; y < resolution; ++y)
+                    for (int x = 0; x < resolution; ++x) {
+                        const size_t index = x + resolution * (y + resolution * z);
+                        const bool expected = full || selected[0][x] || selected[1][y] || selected[2][z];
+                        require(touched[index] == expected,
+                                "plane union missed dirty cells or expanded across an unrelated axis");
+                        if (expected) for (int channel = 0; channel < 4; ++channel)
+                            require(output[index * 4 + channel] == source[index * 4 + channel],
+                                    "packed GPU region has incorrect axis/row/depth order");
+                    }
+            if (fixture < 3) require(bytes * 2 == static_cast<size_t>(resolution) * resolution * 8,
+                                    "single-axis upload is not two actual attribute planes");
+        }
+        VoxelGiDirtyRegions empty;
+        require(empty.regions(resolution).empty(), "unchanged volume has GPU work");
+        empty.markFull();
+        require(empty.regions(resolution).size() == 1 &&
+                empty.regions(resolution)[0].voxelCount() == volume,
+                "full initialization or relighting missed volume cells");
+    }
+}
 }
 
 int main() {
+    checkUpdatePolicyAndRegions();
     VoxelGiDeviceSupport supported{64, 8, 8, 1, 1, true, true, true};
     require(voxelGiAvailability(supported) == VoxelGiAvailability::Available,
             "valid Vulkan 1.0 GI capability profile was rejected");

@@ -13,6 +13,7 @@
 #include <limits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 enum class VoxelGiAvailability : uint8_t {
@@ -30,7 +31,98 @@ struct VoxelGiStatus {
     size_t pendingSlices = 0;
     size_t sourceChunks = 0;
     float validVoxelFraction = 0.0f;
+    size_t uploadedBytes = 0;
+    size_t injectedVoxels = 0;
 };
+
+struct VoxelGiConfigChange {
+    bool resetCache = false;
+    bool resetHistory = false;
+    bool rebuildResources = false;
+};
+
+inline VoxelGiConfigChange voxelGiConfigChange(
+        const VoxelGiConfig& before, const VoxelGiConfig& after) {
+    const bool resources = before.enabled != after.enabled ||
+        before.clipmapResolution != after.clipmapResolution ||
+        before.clipmapLevels != after.clipmapLevels;
+    const bool spatial = resources || before.distance != after.distance;
+    return {spatial, spatial || before.strength != after.strength ||
+        before.coneCount != after.coneCount || before.coneSteps != after.coneSteps,
+        resources};
+}
+
+// The setting is a 60 Hz reference weight, not a weight per swapchain reuse.
+inline float voxelGiHistoryWeight(float referenceWeight, double elapsedSeconds) {
+    if (!(elapsedSeconds > 0.0) || elapsedSeconds > 0.5) return 0.0f;
+    return static_cast<float>(std::pow(std::clamp(referenceWeight, 0.0f, 0.95f),
+                                      elapsedSeconds * 60.0));
+}
+
+struct VoxelGiRegion {
+    glm::ivec3 offset{0};
+    glm::ivec3 extent{0};
+    size_t voxelCount() const {
+        return static_cast<size_t>(extent.x) * extent.y * extent.z;
+    }
+};
+
+// A union of dirty planes partitioned into disjoint boxes. Z owns crossings,
+// then Y, then X: neither transfers nor compute dispatches overlap.
+class VoxelGiDirtyRegions {
+public:
+    void mark(int axis, int layer) { m_planes[axis][layer] = true; }
+    void markFull() { m_full = true; }
+    void clear() { *this = {}; }
+    std::vector<VoxelGiRegion> regions(int resolution) const {
+        if (m_full) return {{{0, 0, 0}, glm::ivec3(resolution)}};
+        const auto runs = [&](int axis, bool selected) {
+            std::vector<std::pair<int, int>> result;
+            for (int i = 0; i < resolution;) {
+                if (m_planes[axis][i] != selected) { ++i; continue; }
+                const int first = i++;
+                while (i < resolution && m_planes[axis][i] == selected) ++i;
+                result.emplace_back(first, i - first);
+            }
+            return result;
+        };
+        std::vector<VoxelGiRegion> result;
+        for (const auto& z : runs(2, true))
+            result.push_back({{0, 0, z.first}, {resolution, resolution, z.second}});
+        for (const auto& z : runs(2, false)) {
+            for (const auto& y : runs(1, true))
+                result.push_back({{0, y.first, z.first}, {resolution, y.second, z.second}});
+            for (const auto& y : runs(1, false))
+                for (const auto& x : runs(0, true)) {
+                    result.push_back({{x.first, y.first, z.first},
+                                      {x.second, y.second, z.second}});
+                    // Highly fragmented edits are cheaper as one full transfer.
+                    if (result.size() > 128)
+                        return {{{0, 0, 0}, glm::ivec3(resolution)}};
+                }
+        }
+        if (result.size() > 128) return {{{0, 0, 0}, glm::ivec3(resolution)}};
+        return result;
+    }
+private:
+    std::array<std::array<bool, 64>, 3> m_planes{};
+    bool m_full = false;
+};
+
+inline void packVoxelGiRegion(const std::vector<uint8_t>& source, int resolution,
+                             const VoxelGiRegion& region, std::vector<uint8_t>& output) {
+    const size_t first = output.size();
+    output.resize(first + region.voxelCount() * 4);
+    size_t destination = first;
+    for (int z = 0; z < region.extent.z; ++z)
+        for (int y = 0; y < region.extent.y; ++y) {
+            const size_t offset = static_cast<size_t>(region.offset.x + resolution *
+                (region.offset.y + y + resolution * (region.offset.z + z))) * 4;
+            const size_t bytes = static_cast<size_t>(region.extent.x) * 4;
+            std::copy_n(source.data() + offset, bytes, output.data() + destination);
+            destination += bytes;
+        }
+}
 
 struct VoxelGiDeviceSupport {
     uint32_t maximum3dDimension = 0;
@@ -169,6 +261,7 @@ public:
         chunk.copyRawState(snapshot.blocks, snapshot.light);
         buildCoarseCells(snapshot);
         m_chunks[key] = std::move(snapshot);
+        ++m_contentRevision;
         --m_chunkCopiesRemaining;
         markChunkDirty(chunk.cx, chunk.cz);
         return true;
@@ -180,6 +273,7 @@ public:
                 !intersectsClipmaps(it->second.cx, it->second.cz)) {
                 markChunkDirty(it->second.cx, it->second.cz);
                 it = m_chunks.erase(it);
+                ++m_contentRevision;
             } else ++it;
         }
     }
@@ -213,6 +307,7 @@ public:
 
     size_t pendingSlices() const { return m_dirty.size(); }
     size_t cachedChunks() const { return m_chunks.size(); }
+    uint64_t contentRevision() const { return m_contentRevision; }
     const VoxelGiConfig& config() const { return m_config; }
     VoxelGiLevelMapping levelMapping(int level) const {
         if (level < 0 || level >= static_cast<int>(m_levels.size())) return {};
@@ -250,6 +345,7 @@ private:
     glm::dvec3 m_camera{0.0};
     uint64_t m_sceneId = std::numeric_limits<uint64_t>::max();
     uint64_t m_frame = 0;
+    uint64_t m_contentRevision = 0;
     int m_chunkCopiesRemaining = 0;
     std::unordered_map<int64_t, CachedChunk> m_chunks;
     std::vector<Level> m_levels;

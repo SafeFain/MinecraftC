@@ -26,10 +26,14 @@ class ShaderAssetsTest(unittest.TestCase):
 
     def test_source_and_include_changes_are_detected(self):
         shaders.validate_source_manifest(self.directory)
-        include = self.directory / shaders.INCLUDES[0]
-        include.write_bytes(include.read_bytes() + b"\n// changed shared effect\n")
-        with self.assertRaises(RuntimeError):
-            shaders.validate_source_manifest(self.directory)
+        for name in shaders.INCLUDES:
+            with self.subTest(include=name):
+                include = self.directory / name
+                original = include.read_bytes()
+                include.write_bytes(original + b"\n// changed shared effect\n")
+                with self.assertRaises(RuntimeError):
+                    shaders.validate_source_manifest(self.directory)
+                include.write_bytes(original)
 
     def test_valid_magic_does_not_hide_changed_binary(self):
         binary = self.directory / (shaders.SHADERS[0] + ".spv")
