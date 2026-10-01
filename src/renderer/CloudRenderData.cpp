@@ -130,3 +130,119 @@ std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
     appendLayer(1, 195.0f, 2.0f);
     return instances;
 }
+
+std::vector<CloudInstance> buildCloudLodInstances(uint64_t worldSeed,
+    int centerX, int centerZ, int radius, CloudLayerStyle style) {
+    if (radius < 1 || radius > MAX_CLOUD_RADIUS)
+        throw std::invalid_argument("Cloud radius is outside the supported range");
+    if (style == CloudLayerStyle::Heaven) return {};
+
+    struct Cell { int x, z, size; uint8_t layers; };
+    std::vector<Cell> cells;
+    constexpr int diameter = CLOUD_LOD_RADIUS * 2 + 1;
+    std::vector<uint8_t> coverage(static_cast<size_t>(diameter * diameter), 0);
+    const int minX = centerX - CLOUD_LOD_RADIUS;
+    const int minZ = centerZ - CLOUD_LOD_RADIUS;
+    const int maxX = centerX + CLOUD_LOD_RADIUS + 1;
+    const int maxZ = centerZ + CLOUD_LOD_RADIUS + 1;
+    const auto buildCell = [&](const auto& self, int x, int z, int size) -> void {
+        if (x >= maxX || z >= maxZ || x + size <= minX || z + size <= minZ)
+            return;
+        const int nearestX = std::clamp(centerX, x, x + size - 1);
+        const int nearestZ = std::clamp(centerZ, z, z + size - 1);
+        const int distance = std::max(std::abs(nearestX - centerX),
+                                      std::abs(nearestZ - centerZ));
+        const int scale = distance <= radius ? 1 :
+            distance <= std::max(radius * 2, 32) ? 2 :
+            distance <= std::max(radius * 4, 64) ? 4 :
+            Config::CLOUD_LOD_MAX_CELL_SCALE;
+        // Subdivide crossing cells instead of snapping the near boundary to a
+        // coarse grid. This preserves every exact near cell, even at negatives.
+        if (size > 1 && (size > scale || x < minX || z < minZ ||
+                         x + size > maxX || z + size > maxZ)) {
+            const int half = size / 2;
+            self(self, x, z, half);
+            self(self, x + half, z, half);
+            self(self, x, z + half, half);
+            self(self, x + half, z + half, half);
+            return;
+        }
+        const float density = cloudDensity(worldSeed, x + size / 2, z + size / 2);
+        const uint8_t layers = density >= 0.68f ? 3 : density >= 0.53f ? 1 : 0;
+        if (!layers) return;
+        cells.push_back({x, z, size, layers});
+        for (int dz = 0; dz < size; ++dz)
+            for (int dx = 0; dx < size; ++dx)
+                coverage[static_cast<size_t>(x + dx - minX +
+                    (z + dz - minZ) * diameter)] = layers;
+    };
+    constexpr int maxScale = Config::CLOUD_LOD_MAX_CELL_SCALE;
+    static_assert(maxScale == 8, "Cloud LOD subdivision requires the 1/2/4/8 tiers");
+    for (int z = floorDiv(minZ, maxScale) * maxScale; z < maxZ; z += maxScale)
+        for (int x = floorDiv(minX, maxScale) * maxScale; x < maxX; x += maxScale)
+            buildCell(buildCell, x, z, maxScale);
+
+    const auto occupied = [&](int x, int z, uint8_t layer) {
+        return x >= minX && z >= minZ && x < maxX && z < maxZ &&
+            (coverage[static_cast<size_t>(x - minX + (z - minZ) * diameter)] & layer);
+    };
+    std::vector<CloudInstance> instances;
+    instances.reserve(cells.size() * 2);
+    for (const Cell& cell : cells) {
+        for (int layer = 0; layer < 2; ++layer) {
+            const uint8_t bit = static_cast<uint8_t>(1u << layer);
+            if (!(cell.layers & bit)) continue;
+            CloudInstance box{
+                static_cast<float>((cell.x - centerX) * CLOUD_CELL_SIZE),
+                layer == 0 ? 192.0f : 195.0f,
+                static_cast<float>((cell.z - centerZ) * CLOUD_CELL_SIZE),
+                static_cast<float>(cell.size * CLOUD_CELL_SIZE),
+                static_cast<float>(cell.size * CLOUD_CELL_SIZE),
+                layer == 0 ? 3.0f : 2.0f,
+                layer == 0 ? CloudNegativeY : CloudPositiveY};
+            if (layer == 0 && !(cell.layers & 2)) box.visibleFaces |= CloudPositiveY;
+            const auto addSide = [&](uint32_t face, bool alongZ, int nx, int nz) {
+                int start = -1;
+                for (int i = 0; i <= cell.size; ++i) {
+                    const bool exposed = i < cell.size && !occupied(
+                        nx + (alongZ ? 0 : i), nz + (alongZ ? i : 0), bit);
+                    if (exposed && start < 0) start = i;
+                    if (exposed || start < 0) continue;
+                    if (start == 0 && i == cell.size) {
+                        box.visibleFaces |= face;
+                    } else {
+                        // A coarse side may touch both occupied and empty fine
+                        // neighbors. Emit only its exposed runs, never an inner wall.
+                        CloudInstance side = box;
+                        side.visibleFaces = face;
+                        if (alongZ) {
+                            side.z += start * CLOUD_CELL_SIZE;
+                            side.depth = static_cast<float>((i - start) * CLOUD_CELL_SIZE);
+                        } else {
+                            side.x += start * CLOUD_CELL_SIZE;
+                            side.width = static_cast<float>((i - start) * CLOUD_CELL_SIZE);
+                        }
+                        instances.push_back(side);
+                    }
+                    start = -1;
+                }
+            };
+            addSide(CloudNegativeX, true, cell.x - 1, cell.z);
+            addSide(CloudPositiveX, true, cell.x + cell.size, cell.z);
+            addSide(CloudNegativeZ, false, cell.x, cell.z - 1);
+            addSide(CloudPositiveZ, false, cell.x, cell.z + cell.size);
+            instances.push_back(box);
+        }
+    }
+    return instances;
+}
+
+glm::vec4 cloudNearRegion(const glm::dvec3& playerPosition, int distanceChunks) {
+    const double chunkX = std::floor(playerPosition.x / Config::CHUNK_SIZE_X);
+    const double chunkZ = std::floor(playerPosition.z / Config::CHUNK_SIZE_Z);
+    return {
+        static_cast<float>(chunkX * Config::CHUNK_SIZE_X - playerPosition.x),
+        static_cast<float>(chunkZ * Config::CHUNK_SIZE_Z - playerPosition.z),
+        static_cast<float>(distanceChunks * distanceChunks),
+        static_cast<float>(Config::CHUNK_SIZE_X)};
+}

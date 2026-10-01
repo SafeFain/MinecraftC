@@ -335,6 +335,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     glm::vec3 cloudOrigin{0.0f};
     glm::vec3 cloudColor{1.0f};
     glm::mat4 cloudViewProjection{1.0f};
+    glm::vec4 cloudNearRegion{0.0f};
     uint64_t cloudRevision = 0;
     uint64_t cloudCacheSeed = 0;
     int cloudCacheCenterX = 0;
@@ -2218,18 +2219,20 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ++performance.pipelineBinds;
             ++performance.descriptorBinds;
         }
-        if (cloudsQueued && !cloudInstances.empty()) {
+        const auto drawClouds = [&](const glm::mat4& viewProjection,
+                                    const glm::vec4& nearRegion) {
+            if (!cloudsQueued || cloudInstances.empty()) return;
             vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               swapchain.cloudPipeline);
             const VkBuffer buffer = cloudBuffers[currentFrame].instance.handle;
             vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
             const CloudUniforms constants{
-                clipSpaceCorrection() * cloudViewProjection,
+                clipSpaceCorrection() * viewProjection,
                 glm::vec4(cloudOrigin, enhancedVisualConfig(
                     visualQuality, enhancedVisualSettings).atmosphereStrength),
                 glm::vec4(cloudColor, 0.0f),
                 glm::vec4(glm::normalize(submittedFrame.lightDirection),
-                          postProcess.environment.rainIntensity)};
+                          postProcess.environment.rainIntensity), nearRegion};
             vkCmdPushConstants(command, swapchain.cloudPipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0, sizeof(constants), &constants);
@@ -2238,7 +2241,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ++performance.drawCalls;
             ++performance.pipelineBinds;
             ++performance.vertexBufferBinds;
-        }
+        };
+        drawClouds(cloudViewProjection, glm::vec4(0.0f));
         VkDescriptorSet boundMaterialSet = VK_NULL_HANDLE;
         VkDescriptorSet boundChunkSet = VK_NULL_HANDLE;
         VkBuffer boundVertexBuffer = VK_NULL_HANDLE;
@@ -2325,12 +2329,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         }
         };
         drawBasicSubmissions(submittedLodDraws);
-        if (!submittedLodDraws.empty()) {
+        if (!submittedLodDraws.empty() || cloudsQueued) {
             std::array<VkClearAttachment, 3> clears{};
             uint32_t clearCount = 1;
             clears[0].aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             clears[0].clearValue.depthStencil = {1.0f, 0};
-            // Near terrain uses another projection. Its depth clear must also
+            // Near terrain/clouds use another projection. The depth clear must also
             // retire LOD surface data, or post effects pair stale far normals
             // and GI albedo with the new near depth buffer.
             if (swapchain.surfaceDataEnabled) {
@@ -2354,6 +2358,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             boundVertexBuffer = VK_NULL_HANDLE;
             boundIndexBuffer = VK_NULL_HANDLE;
         }
+        // Reproject the cloud geometry visible in the near camera after the far
+        // depth clear. Near terrain can then occlude it with matching depths,
+        // including when the player flies through or above the cloud layer.
+        drawClouds(submittedFrame.projection * submittedFrame.view, cloudNearRegion);
+        if (cloudsQueued) boundPipeline = VK_NULL_HANDLE;
         drawBasicSubmissions(submittedDraws);
         uint32_t modelUniformIndex = 0;
         VkPipeline boundModelPipeline = VK_NULL_HANDLE;

@@ -733,7 +733,7 @@ void VulkanRenderer::renderClouds(const glm::dvec3& playerPosition,
         m_impl->cloudCacheCenterZ != view.centerZ ||
         m_impl->cloudCacheSeed != worldSeed;
     if (rebuild) {
-        m_impl->cloudInstances = buildCloudInstances(
+        m_impl->cloudInstances = buildCloudLodInstances(
             worldSeed, view.centerX, view.centerZ, view.radius);
         m_impl->cloudCacheRadius = view.radius;
         m_impl->cloudCacheCenterX = view.centerX;
@@ -745,6 +745,7 @@ void VulkanRenderer::renderClouds(const glm::dvec3& playerPosition,
     m_impl->cloudOrigin = view.origin;
     m_impl->cloudColor = cloudColorForEnvironment(m_environment);
     m_impl->cloudViewProjection = viewProjection;
+    m_impl->cloudNearRegion = cloudNearRegion(playerPosition, Config::RENDER_DISTANCE);
     m_impl->cloudsQueued = true;
     m_impl->drawQueued = true;
 }

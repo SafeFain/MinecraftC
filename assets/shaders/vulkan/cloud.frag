@@ -5,12 +5,20 @@ layout(push_constant) uniform CloudUniforms {
     vec4 origin;
     vec4 color;
     vec4 lighting;
+    vec4 nearRegion;
 } cloud;
 layout(location=0) flat in vec3 faceNormal;
 layout(location=1) flat in uint faceVisible;
+layout(location=2) in vec2 relativePosition;
 layout(location=0) out vec4 outColor;
 void main(){
     if(faceVisible==0u)discard;
+    // Match the chunk streamer's circular region after the far depth clear.
+    // Outside it, retain the far terrain's occlusion of the background clouds.
+    if(cloud.nearRegion.w>0.0){
+        vec2 chunk=floor((relativePosition-cloud.nearRegion.xy)/cloud.nearRegion.w);
+        if(dot(chunk,chunk)>cloud.nearRegion.z)discard;
+    }
     float direct=max(dot(faceNormal,normalize(cloud.lighting.xyz)),0.0);
     float upward=faceNormal.y*0.5+0.5;
     float weather=cloud.lighting.w;

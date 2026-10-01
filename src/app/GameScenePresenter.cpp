@@ -67,8 +67,9 @@ void GameScenePresenter::render(
         Frustum lodFrustum;
         std::vector<const LodRenderSubmission*> visibleLod;
         if (hasLod) {
-            const float lodFar = session.worldState().lodDistanceChunks() *
-                Config::CHUNK_SIZE_X + 64.0f;
+            const float lodFar = std::max(
+                session.worldState().lodDistanceChunks() * Config::CHUNK_SIZE_X + 64.0f,
+                settings.renderClouds ? Config::CLOUD_LOD_DISTANCE * 1.5f : 0.0f);
             lodVp = glm::perspective(
                 glm::radians(camera.fovDeg()), window.aspectRatio(),
                 8.0f, lodFar) * view;
@@ -85,8 +86,13 @@ void GameScenePresenter::render(
             }
         }
         if (settings.renderClouds) {
+            // Clouds extend to their own horizon even without terrain LOD. Use
+            // the far-terrain projection when present so their depths agree.
+            const glm::mat4 cloudVp = visibleLod.empty() ? glm::perspective(
+                glm::radians(camera.fovDeg()), window.aspectRatio(), 8.0f,
+                Config::CLOUD_LOD_DISTANCE * 1.5f) * view : lodVp;
             renderer.renderClouds(
-                playerPosition, visibleLod.empty() ? vp : lodVp,
+                playerPosition, cloudVp,
                 session.metadata().seed,
                 static_cast<float>(RuntimeClock::seconds(now)),
                 settings.cloudRenderDistance);

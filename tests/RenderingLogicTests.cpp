@@ -12,10 +12,13 @@
 #include "player/PlayerVisual.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <stdexcept>
+#include <tuple>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -30,6 +33,94 @@ bool nearMatrix(const glm::mat4& a, const glm::mat4& b, float epsilon = 0.0001f)
         for (int row = 0; row < 4; ++row)
             if (std::abs(a[column][row] - b[column][row]) > epsilon) return false;
     return true;
+}
+
+// Rasterize emitted surfaces at the exact-cell resolution. This checks every
+// mixed-resolution seam, including partial coarse sides and both vertical layers.
+void verifyCloudLodSurfaces(const std::vector<CloudInstance>& clouds,
+                           const std::vector<CloudInstance>& exact, int radius) {
+    constexpr int extent = CLOUD_LOD_RADIUS;
+    constexpr int diameter = extent * 2 + 1;
+    constexpr size_t area = static_cast<size_t>(diameter * diameter);
+    std::vector<uint8_t> occupancy(area, 0);
+    std::array<std::vector<uint8_t>, 12> faces;
+    for (auto& face : faces) face.resize(area, 0);
+    const auto index = [](int x, int z) {
+        return static_cast<size_t>(x + extent + (z + extent) * diameter);
+    };
+    bool foundCoarse = false;
+    bool foundFar = false;
+    for (const auto& cloud : clouds) {
+        const int x = static_cast<int>(cloud.x) / CLOUD_CELL_SIZE;
+        const int z = static_cast<int>(cloud.z) / CLOUD_CELL_SIZE;
+        const int w = static_cast<int>(cloud.width) / CLOUD_CELL_SIZE;
+        const int d = static_cast<int>(cloud.depth) / CLOUD_CELL_SIZE;
+        const int layer = cloud.y == 192.0f ? 0 : 1;
+        require((cloud.y == 192.0f && cloud.height == 3.0f) ||
+                    (cloud.y == 195.0f && cloud.height == 2.0f),
+                "LOD cloud layer heights changed");
+        require(w >= 1 && d >= 1 && w <= Config::CLOUD_LOD_MAX_CELL_SCALE &&
+                    d <= Config::CLOUD_LOD_MAX_CELL_SCALE &&
+                    cloud.width == w * CLOUD_CELL_SIZE &&
+                    cloud.depth == d * CLOUD_CELL_SIZE &&
+                    x >= -extent && z >= -extent && x + w <= extent + 1 &&
+                    z + d <= extent + 1 && cloud.visibleFaces != 0 &&
+                    !(cloud.visibleFaces & ~CLOUD_ALL_FACES),
+                "LOD cloud dimensions, extent or face mask invalid");
+        if (cloud.visibleFaces & (CloudPositiveY | CloudNegativeY)) {
+            foundCoarse = foundCoarse || w > 1;
+            foundFar = foundFar || std::max(std::abs(x), std::abs(z)) > radius;
+            for (int dz = 0; dz < d; ++dz)
+                for (int dx = 0; dx < w; ++dx) {
+                    auto& covered = occupancy[index(x + dx, z + dz)];
+                    require(!(covered & (1u << layer)), "LOD cloud boxes overlap");
+                    covered |= static_cast<uint8_t>(1u << layer);
+                    if (std::abs(x + dx) <= radius && std::abs(z + dz) <= radius)
+                        require(w == 1 && d == 1, "LOD replaced an exact near cloud cell");
+                }
+        }
+        for (int face = 0; face < 6; ++face) {
+            if (!(cloud.visibleFaces & (1u << face))) continue;
+            const auto add = [&](int fx, int fz) { ++faces[layer * 6 + face][index(fx, fz)]; };
+            if (face < 2)
+                for (int dx = 0; dx < w; ++dx) add(x + dx, face == 0 ? z : z + d - 1);
+            else if (face < 4)
+                for (int dz = 0; dz < d; ++dz) add(face == 2 ? x : x + w - 1, z + dz);
+            else
+                for (int dz = 0; dz < d; ++dz)
+                    for (int dx = 0; dx < w; ++dx) add(x + dx, z + dz);
+        }
+    }
+    require(foundCoarse && foundFar, "Cloud LOD did not extend and simplify the near layer");
+    const auto occupied = [&](int x, int z, int layer) {
+        return x >= -extent && z >= -extent && x <= extent && z <= extent &&
+            layer >= 0 && layer < 2 && (occupancy[index(x, z)] & (1u << layer));
+    };
+    std::vector<uint8_t> exactOccupancy(area, 0);
+    for (const auto& cloud : exact)
+        exactOccupancy[index(static_cast<int>(cloud.x) / CLOUD_CELL_SIZE,
+                             static_cast<int>(cloud.z) / CLOUD_CELL_SIZE)] |=
+            cloud.y == 192.0f ? 1 : 2;
+    for (int z = -extent; z <= extent; ++z) {
+        for (int x = -extent; x <= extent; ++x) {
+            if (std::abs(x) <= radius && std::abs(z) <= radius)
+                require(occupancy[index(x, z)] == exactOccupancy[index(x, z)],
+                        "Cloud LOD changed seeded near cloud occupancy");
+            for (int layer = 0; layer < 2; ++layer) {
+                const bool filled = occupied(x, z, layer);
+                const std::array<bool, 6> expected{
+                    filled && !occupied(x, z - 1, layer),
+                    filled && !occupied(x, z + 1, layer),
+                    filled && !occupied(x - 1, z, layer),
+                    filled && !occupied(x + 1, z, layer),
+                    filled && !occupied(x, z, layer + 1),
+                    filled && !occupied(x, z, layer - 1)};
+                for (int face = 0; face < 6; ++face)
+                    require(faces[layer * 6 + face][index(x, z)] == expected[face],
+                            "Cloud LOD has missing, duplicate or interior faces");
+            }
+        }
+    }
 }
 }
 
@@ -442,6 +533,61 @@ int main() {
         require(((cloud.visibleFaces & verticalFace) != 0) == !verticalNeighbor,
                 "cloud shared vertical face was not culled");
     }
+    const auto lodClouds = buildCloudLodInstances(0x123456789abcdef0ULL, -7, 11, 12);
+    require(sameClouds(lodClouds,
+                buildCloudLodInstances(0x123456789abcdef0ULL, -7, 11, 12)),
+            "Cloud LOD is not deterministic");
+    require(!sameClouds(lodClouds,
+                buildCloudLodInstances(0xfedcba9876543210ULL, -7, 11, 12)),
+            "Cloud LOD ignores the world seed");
+    verifyCloudLodSurfaces(lodClouds, cloudsA, 12);
+    for (int radius : {1, 6, 32, MAX_CLOUD_RADIUS}) {
+        const auto lod = buildCloudLodInstances(77, -17, -31, radius);
+        require(lod.size() < 65536 && lod.size() <= MAX_CLOUD_INSTANCES,
+                "Cloud LOD exceeded its bounded instance budget");
+        verifyCloudLodSurfaces(lod, buildCloudInstances(77, -17, -31, radius), radius);
+    }
+    require(buildCloudLodInstances(77, 0, 0, 12, CloudLayerStyle::Heaven).empty(),
+            "Cloud LOD leaked ordinary clouds into Heaven");
+    for (int radius : {0, MAX_CLOUD_RADIUS + 1}) {
+        bool rejected = false;
+        try { buildCloudLodInstances(77, 0, 0, radius); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        require(rejected, "Cloud LOD accepted an invalid near radius");
+    }
+    // Drift follows the same world grid; negative coordinates must not truncate.
+    const auto drifting = cloudView({-0.5, 64.0, -0.5}, 20.0f, 192);
+    require(drifting.centerX == -2 && drifting.centerZ == -1 &&
+                std::abs(drifting.origin.x - negativeCloud.origin.x) < 0.0001f,
+            "Cloud LOD drift lost its camera-relative negative-coordinate origin");
+    const auto nearCloudRegion = cloudNearRegion({-0.5, 64.0, -0.5}, 8);
+    require(nearCloudRegion == glm::vec4(-15.5f, -15.5f, 64.0f, 16.0f),
+            "Near cloud pass does not match the negative-coordinate streaming circle");
+    const auto nearChunk = [&](const glm::vec2& p) {
+        return glm::floor((p - glm::vec2(nearCloudRegion)) / nearCloudRegion.w);
+    };
+    require(glm::dot(nearChunk({-15.0f, -15.0f}), nearChunk({-15.0f, -15.0f})) == 0.0f &&
+                glm::dot(nearChunk({113.0f, -15.0f}), nearChunk({113.0f, -15.0f})) == 64.0f &&
+                glm::dot(nearChunk({113.0f, 113.0f}), nearChunk({113.0f, 113.0f})) > 64.0f,
+            "Near cloud pass includes unloaded corner chunks or excludes the circle edge");
+    using CloudKey = std::tuple<int, int, int, int, int>;
+    std::map<CloudKey, bool> stableCells;
+    const auto key = [](const CloudInstance& cloud, int centerX, int centerZ) {
+        return CloudKey{static_cast<int>(cloud.x) / CLOUD_CELL_SIZE + centerX,
+                        static_cast<int>(cloud.z) / CLOUD_CELL_SIZE + centerZ,
+                        static_cast<int>(cloud.y), static_cast<int>(cloud.width),
+                        static_cast<int>(cloud.depth)};
+    };
+    for (const auto& cloud : lodClouds)
+        if (cloud.width > CLOUD_CELL_SIZE &&
+            (cloud.visibleFaces & (CloudPositiveY | CloudNegativeY)))
+            stableCells.emplace(key(cloud, -7, 11), true);
+    size_t stableCount = 0;
+    for (const auto& cloud : buildCloudLodInstances(0x123456789abcdef0ULL, -6, 12, 12))
+        if ((cloud.visibleFaces & (CloudPositiveY | CloudNegativeY)) &&
+            stableCells.count(key(cloud, -6, 12))) ++stableCount;
+    require(stableCount > stableCells.size() * 9 / 10,
+            "Moving the cloud window resampled stable far cloud cells");
     MeshData validMesh;
     validMesh.vertices = {{{0, 0, 0}, {0, 0}}, {{1, 0, 0}, {1, 0}},
                           {{0, 1, 0}, {0, 1}}};

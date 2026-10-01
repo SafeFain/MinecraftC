@@ -76,6 +76,8 @@ constexpr int   DAY_CYCLE_OPTIONS[] = {0, 10, 20, 40}; // 0 = static noon
 constexpr int   DAY_CYCLE_OPTION_COUNT = 4;
 constexpr float NIGHT_AMBIENT_MIN = 0.20f;
 constexpr float FOG_START_FRACTION = 0.65f;
+constexpr int CLOUD_LOD_DISTANCE = 4096;
+constexpr int CLOUD_LOD_MAX_CELL_SCALE = 8;
 
 // ── Region Generation ────────────────────────────────────────────────────
 // Chunks are generated in N×N "regions" to ensure perfect continuity

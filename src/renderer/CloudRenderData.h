@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include "Config.h"
 
 enum CloudFace : uint32_t {
     CloudNegativeZ = 1u << 0,
@@ -40,7 +41,10 @@ struct CloudView {
 
 constexpr int CLOUD_CELL_SIZE = 16;
 constexpr int MAX_CLOUD_RADIUS = 1024 / CLOUD_CELL_SIZE;
-constexpr size_t MAX_CLOUD_INSTANCES = 2u * 129u * 129u;
+constexpr int CLOUD_LOD_RADIUS = Config::CLOUD_LOD_DISTANCE / CLOUD_CELL_SIZE;
+// Conservative bound including split side faces at mixed-resolution edges.
+constexpr size_t MAX_CLOUD_INSTANCES =
+    10u * (2u * CLOUD_LOD_RADIUS + 1u) * (2u * CLOUD_LOD_RADIUS + 1u);
 
 CloudView cloudView(const glm::dvec3& playerPosition, float timeSeconds,
                     int renderDistanceBlocks,
@@ -50,3 +54,9 @@ std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
                                                int radius,
                                                CloudLayerStyle style =
                                                    CloudLayerStyle::Overworld);
+// Exact cells inside radius, progressively coarser world-aligned cells outside.
+std::vector<CloudInstance> buildCloudLodInstances(uint64_t worldSeed,
+    int centerX, int centerZ, int radius,
+    CloudLayerStyle style = CloudLayerStyle::Overworld);
+// Camera-relative central chunk origin, squared streaming radius and chunk size.
+glm::vec4 cloudNearRegion(const glm::dvec3& playerPosition, int distanceChunks);

@@ -8,9 +8,11 @@ layout(push_constant) uniform CloudUniforms {
     vec4 origin;
     vec4 color;
     vec4 lighting;
+    vec4 nearRegion;
 } cloud;
 layout(location=0) flat out vec3 faceNormal;
 layout(location=1) flat out uint faceVisible;
+layout(location=2) out vec2 relativePosition;
 
 const vec3 positions[36]=vec3[36](
     vec3(0,0,0),vec3(1,0,0),vec3(1,1,0),vec3(0,0,0),vec3(1,1,0),vec3(0,1,0),
@@ -29,5 +31,6 @@ void main(){
     vec3 world=cloud.origin.xyz+inPositionAndWidth.xyz+positions[gl_VertexIndex]*size;
     faceNormal=normals[face];
     faceVisible=(inVisibleFaces>>uint(face))&1u;
+    relativePosition=world.xz;
     gl_Position=cloud.viewProjection*vec4(world,1.0);
 }

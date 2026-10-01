@@ -72,6 +72,7 @@ struct CloudUniforms {
     glm::vec4 origin{0.0f};
     glm::vec4 color{1.0f};
     glm::vec4 lighting{0.0f, 1.0f, 0.0f, 0.0f};
+    glm::vec4 nearRegion{0.0f};
 };
 
 struct WireUniforms {
@@ -134,7 +135,8 @@ struct ModelUniforms {
 static_assert(sizeof(SkyUniforms) == 176);
 static_assert(offsetof(SkyUniforms, weather) == 144);
 static_assert(offsetof(SkyUniforms, options) == 160);
-static_assert(sizeof(CloudUniforms) == 112);
+static_assert(sizeof(CloudUniforms) == 128);
+static_assert(offsetof(CloudUniforms, nearRegion) == 112);
 static_assert(sizeof(FrameUniforms) == 128);
 static_assert(offsetof(FrameUniforms, chunkOrigin) == 80);
 static_assert(sizeof(ChunkEnvironmentUniforms) == 416);

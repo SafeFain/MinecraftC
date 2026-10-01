@@ -16,7 +16,9 @@ GitHub prereleases; release-channel tags create normal releases.
 - Deterministic terrain, biomes, caves, ores, vegetation, and trees across
   Y=-64..319.
 - 30 biomes, 15 blended macro terrain archetypes, drainage-basin rivers, seven
-  vegetation and tree forms, fluids, farming, fire, TNT, and moving voxel clouds.
+  vegetation and tree forms, fluids, farming, fire, TNT, and moving voxel clouds
+  with progressively coarser clouds beyond the selected exact-cloud range,
+  extending out to 4096 blocks independently of terrain LOD.
 - Distance-prioritized generation, greedy meshing, ambient occlusion, dual-channel
   lighting, configurable cascaded shadows, transparent materials, and persistent
   spawn caches.
