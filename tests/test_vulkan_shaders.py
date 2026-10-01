@@ -41,10 +41,19 @@ class ShaderAssetsTest(unittest.TestCase):
             shaders.validate_source_manifest(self.directory)
 
     def test_windows_line_endings_preserve_source_identity(self):
-        for name in shaders.SHADERS + shaders.INCLUDES:
-            source = self.directory / name
-            source.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
-        shaders.validate_source_manifest(self.directory)
+        for checkout_newline in (b"\n", b"\r\n"):
+            with self.subTest(checkout_newline=checkout_newline):
+                for name in shaders.SHADERS + shaders.INCLUDES:
+                    source = self.directory / name
+                    normalized = source.read_bytes().replace(b"\r\n", b"\n")
+                    source.write_bytes(normalized.replace(b"\n", checkout_newline))
+                shaders.validate_source_manifest(self.directory)
+                for name in shaders.SHADERS + shaders.INCLUDES:
+                    source = self.directory / name
+                    # Normalize first so an existing CRLF checkout stays CRLF.
+                    normalized = source.read_bytes().replace(b"\r\n", b"\n")
+                    source.write_bytes(normalized.replace(b"\n", b"\r\n"))
+                shaders.validate_source_manifest(self.directory)
 
     @unittest.skipUnless(shutil.which("glslc"), "glslc is unavailable")
     def test_rehashed_source_with_stale_binary_is_rejected(self):
