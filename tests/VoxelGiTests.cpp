@@ -128,7 +128,10 @@ void checkDirectionalAttributes() {
     config.distance = 128; config.updateSlicesPerFrame = 128;
     for (int axis = 0; axis < 3; ++axis) {
         VoxelGiSceneCache cache; cache.configure(config);
-        Chunk source(0,0);
+        // Large chunk fixtures must fit within Windows' default 1 MiB stack
+        // together with the caller's frame; keep their storage on the heap.
+        auto sourceStorage = std::make_unique<Chunk>(0, 0);
+        Chunk& source = *sourceStorage;
         for (int v = 0; v < 8; ++v) for (int u = 0; u < 8; ++u) {
             if (u >= 2 && u < 4 && v >= 2 && v < 4) continue;
             glm::ivec3 p;
@@ -155,7 +158,10 @@ void checkDirectionalAttributes() {
     // the receiver chunk's own revision. Missing neighbors are conservative.
     config.clipmapLevels = 2; config.distance = 32;
     VoxelGiSceneCache cache; cache.configure(config);
-    Chunk receiver(-1,0),neighbor(0,0);
+    auto receiverStorage = std::make_unique<Chunk>(-1, 0);
+    auto neighborStorage = std::make_unique<Chunk>(0, 0);
+    Chunk& receiver = *receiverStorage;
+    Chunk& neighbor = *neighborStorage;
     receiver.setBlock(15,64,4,BlockId::STONE);
     const auto frame = [&](bool loaded) {
         cache.beginFrame({-0.5,64.5,4.5},2); cache.submit(receiver);
@@ -233,7 +239,8 @@ int main() {
     config.updateSlicesPerFrame = 128;
     VoxelGiSceneCache cache;
     cache.configure(config);
-    Chunk chunk(-1, -1);
+    auto chunkStorage = std::make_unique<Chunk>(-1, -1);
+    Chunk& chunk = *chunkStorage;
     chunk.setBlock(15, 64, 15, BlockId::TORCH);
     chunk.setBlockLight(15, 64, 15, 15);
     cache.beginFrame(glm::dvec3(-0.5, 64.0, -0.5), 7);
@@ -417,7 +424,8 @@ int main() {
     require(cache.levelMapping(config.clipmapLevels - 1).minimumCell ==
                 coarseBefore.minimumCell && cache.pendingSlices() == 0,
             "coarse rings move within a world cell");
-    Chunk unrelated(100, -1);
+    auto unrelatedStorage = std::make_unique<Chunk>(100, -1);
+    Chunk& unrelated = *unrelatedStorage;
     require(!cache.submit(unrelated) && cache.pendingSlices() == 0,
             "unrelated X chunk consumed snapshot budget or dirtied Z planes");
     // Large positive/negative moves cancel obsolete pending work and invalidate
