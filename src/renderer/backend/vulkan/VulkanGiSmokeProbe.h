@@ -6,6 +6,117 @@
 
 class VulkanGiSmokeProbe {
 public:
+    struct Ray {
+        glm::vec4 origin{0.0f};
+        glm::vec4 direction{0.0f};
+        glm::vec4 result{0.0f};
+    };
+    static_assert(sizeof(Ray) == 48 && offsetof(Ray,result) == 32);
+
+    // Simulate missing finer coverage by moving only this diagnostic uniform's
+    // fine windows away. Production volume contents and frame state stay intact.
+    static std::vector<Ray> traceRays(VulkanRenderer& renderer,
+                                     std::vector<Ray> rays,int firstLevel=0) {
+        if (rays.empty()) return rays;
+        renderer.waitIdle();
+        auto& impl = *renderer.m_impl;
+        auto uniforms = lastUniforms(renderer);
+        for (int i = 0; i < firstLevel; ++i)
+            uniforms.minimumCellAndSize[i] = glm::vec4(100000,100000,100000,
+                uniforms.minimumCellAndSize[i].w);
+        auto uniform = impl.createBuffer(sizeof(uniforms),VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VMA_MEMORY_USAGE_AUTO,VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        decltype(uniform) output{};
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pipeline = VK_NULL_HANDLE;
+        VkShaderModule shader = VK_NULL_HANDLE;
+        VkCommandBuffer command = VK_NULL_HANDLE;
+        const auto cleanup = [&] {
+            if(command)vkFreeCommandBuffers(impl.device,impl.commandPool,1,&command);
+            if(pipeline)vkDestroyPipeline(impl.device,pipeline,nullptr);
+            if(shader)vkDestroyShaderModule(impl.device,shader,nullptr);
+            if(pipelineLayout)vkDestroyPipelineLayout(impl.device,pipelineLayout,nullptr);
+            if(pool)vkDestroyDescriptorPool(impl.device,pool,nullptr);
+            if(layout)vkDestroyDescriptorSetLayout(impl.device,layout,nullptr);
+            impl.destroyBuffer(output); impl.destroyBuffer(uniform);
+        };
+        try {
+            output = impl.createBuffer(rays.size()*sizeof(Ray),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_MEMORY_USAGE_AUTO,VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+                    VMA_ALLOCATION_CREATE_MAPPED_BIT);
+            std::memcpy(uniform.mapped,&uniforms,sizeof(uniforms));
+            std::memcpy(output.mapped,rays.data(),rays.size()*sizeof(Ray));
+            vkhelp::require(vmaFlushAllocation(impl.allocator,uniform.allocation,0,VK_WHOLE_SIZE),"flush probe uniform");
+            vkhelp::require(vmaFlushAllocation(impl.allocator,output.allocation,0,VK_WHOLE_SIZE),"flush probe rays");
+            std::array<VkDescriptorSetLayoutBinding,10> bindings{};
+            for(uint32_t i=0;i<4;++i)bindings[i]={2+i,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_COMPUTE_BIT,nullptr};
+            bindings[4]={10,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1,VK_SHADER_STAGE_COMPUTE_BIT,nullptr};
+            for(uint32_t i=0;i<5;++i)bindings[5+i]={11+i,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,VK_SHADER_STAGE_COMPUTE_BIT,nullptr};
+            VkDescriptorSetLayoutCreateInfo li{}; li.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            li.bindingCount=bindings.size(); li.pBindings=bindings.data();
+            vkhelp::require(vkCreateDescriptorSetLayout(impl.device,&li,nullptr,&layout),"probe descriptor layout");
+            const std::array<VkDescriptorPoolSize,3> sizes{{{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,4},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1},{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,5}}};
+            VkDescriptorPoolCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+            pi.maxSets=1; pi.poolSizeCount=sizes.size(); pi.pPoolSizes=sizes.data();
+            vkhelp::require(vkCreateDescriptorPool(impl.device,&pi,nullptr,&pool),"probe descriptor pool");
+            VkDescriptorSet set=VK_NULL_HANDLE;
+            VkDescriptorSetAllocateInfo ai{}; ai.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            ai.descriptorPool=pool; ai.descriptorSetCount=1; ai.pSetLayouts=&layout;
+            vkhelp::require(vkAllocateDescriptorSets(impl.device,&ai,&set),"probe descriptor set");
+            std::array<VkDescriptorImageInfo,4> images{};
+            std::array<VkWriteDescriptorSet,10> writes{};
+            const VkDescriptorBufferInfo uniformInfo{uniform.handle,0,sizeof(uniforms)};
+            const VkDescriptorBufferInfo outputInfo{output.handle,0,rays.size()*sizeof(Ray)};
+            for(uint32_t i=0;i<10;++i){
+                auto& w=writes[i]; w.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                w.dstSet=set; w.dstBinding=bindings[i].binding; w.descriptorCount=1;
+                w.descriptorType=bindings[i].descriptorType;
+                if(i<4){images[i]={impl.voxelGiGpu.sampler,impl.voxelGiGpu.irradianceViews[i],VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}; w.pImageInfo=&images[i];}
+                else w.pBufferInfo=i==4?&uniformInfo:i==9?&outputInfo:&impl.voxelGiGpu.auxiliaryInfos[i-5];
+            }
+            vkUpdateDescriptorSets(impl.device,writes.size(),writes.data(),0,nullptr);
+            VkPushConstantRange push{VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(uint32_t)};
+            VkPipelineLayoutCreateInfo pli{}; pli.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            pli.setLayoutCount=1; pli.pSetLayouts=&layout; pli.pushConstantRangeCount=1; pli.pPushConstantRanges=&push;
+            vkhelp::require(vkCreatePipelineLayout(impl.device,&pli,nullptr,&pipelineLayout),"probe pipeline layout");
+            shader=impl.loadVoxelGiShader("voxel_gi_probe.comp.spv");
+            VkComputePipelineCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+            ci.stage={VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,nullptr,0,VK_SHADER_STAGE_COMPUTE_BIT,shader,"main",nullptr};
+            ci.layout=pipelineLayout;
+            vkhelp::require(vkCreateComputePipelines(impl.device,VK_NULL_HANDLE,1,&ci,nullptr,&pipeline),"probe pipeline");
+            VkCommandBufferAllocateInfo ca{}; ca.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            ca.commandPool=impl.commandPool; ca.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY; ca.commandBufferCount=1;
+            vkhelp::require(vkAllocateCommandBuffers(impl.device,&ca,&command),"probe command");
+            VkCommandBufferBeginInfo begin{}; begin.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            vkhelp::require(vkBeginCommandBuffer(command,&begin),"begin probe");
+            VkMemoryBarrier before{VK_STRUCTURE_TYPE_MEMORY_BARRIER,nullptr,VK_ACCESS_SHADER_WRITE_BIT |
+                VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT};
+            vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                0,1,&before,0,nullptr,0,nullptr);
+            vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_COMPUTE,pipeline);
+            vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_COMPUTE,pipelineLayout,0,1,&set,0,nullptr);
+            const auto count=static_cast<uint32_t>(rays.size());
+            vkCmdPushConstants(command,pipelineLayout,VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(count),&count);
+            vkCmdDispatch(command,count,1,1);
+            VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER,nullptr,VK_ACCESS_SHADER_WRITE_BIT,VK_ACCESS_HOST_READ_BIT};
+            vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_PIPELINE_STAGE_HOST_BIT,
+                0,1,&host,0,nullptr,0,nullptr);
+            vkhelp::require(vkEndCommandBuffer(command),"end probe");
+            VkSubmitInfo submit{}; submit.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO; submit.commandBufferCount=1; submit.pCommandBuffers=&command;
+            vkhelp::require(vkQueueSubmit(impl.graphicsQueue,1,&submit,VK_NULL_HANDLE),"submit probe");
+            vkhelp::require(vkQueueWaitIdle(impl.graphicsQueue),"wait probe");
+            vkhelp::require(vmaInvalidateAllocation(impl.allocator,output.allocation,0,VK_WHOLE_SIZE),"invalidate probe");
+            std::memcpy(rays.data(),output.mapped,rays.size()*sizeof(Ray));
+            for(const auto& ray:rays)for(int c=0;c<4;++c)
+                if(!std::isfinite(ray.result[c]))throw std::runtime_error("nonfinite production GI ray");
+            cleanup(); return rays;
+        } catch(...) { cleanup(); throw; }
+    }
     static void forceFullUpdate(VulkanRenderer& renderer) {
         renderer.waitIdle();
         auto& impl = *renderer.m_impl;

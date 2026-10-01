@@ -1108,6 +1108,18 @@ if(BUILD_TESTING)
     # deadlock into a fast, actionable CTest timeout instead of a stuck job.
     set_tests_properties(game_session_flow PROPERTIES TIMEOUT 120)
 
+    find_package(Threads REQUIRED)
+    add_executable(chunk_io_queue_tests tests/ChunkIoQueueTests.cpp)
+    target_include_directories(chunk_io_queue_tests PRIVATE src)
+    target_link_libraries(chunk_io_queue_tests PRIVATE glm::glm Threads::Threads)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(chunk_io_queue_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(chunk_io_queue_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME chunk_io_queue_startup_drain_and_shutdown COMMAND chunk_io_queue_tests)
+    set_tests_properties(chunk_io_queue_startup_drain_and_shutdown PROPERTIES TIMEOUT 30)
+
     add_executable(application_flow_tests
         tests/ApplicationFlowTests.cpp
         src/app/ApplicationInputController.cpp

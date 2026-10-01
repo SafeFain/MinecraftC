@@ -257,6 +257,7 @@ void VulkanRenderer::initialize(Window& window,
     m_assetRoot = assetRoot;
     m_impl = std::make_unique<Impl>(window, assetRoot);
     const BlockAtlasData atlas = buildBlockAtlasData(assetRoot);
+    m_impl->voxelGiCache.setMaterials(buildVoxelGiMaterials(atlas));
     m_blockAtlasTilesPerSide = atlas.tilesPerSide;
     TextureSamplerDesc sampler;
     sampler.minFilter = TextureFilter::NearestMipmapLinear;

@@ -1062,7 +1062,7 @@ void VulkanPipelineFactory::createSwapchainSet(
             vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
             if (inputs.voxelGiEnabled && inputs.voxelGiHistoryImageViews &&
                 inputs.voxelGiSurfaceHistoryImageViews &&
-                inputs.voxelGiImageViews && inputs.voxelGiAlbedoImageViews &&
+                inputs.voxelGiImageViews && inputs.voxelGiAuxBuffers && inputs.voxelGiAlbedoImageViews &&
                 inputs.voxelGiUniformBuffer) {
                 std::array<VkDescriptorImageInfo, 7> giImages{};
                 giImages[0] = {outputs.postSampler,
@@ -1078,7 +1078,7 @@ void VulkanPipelineFactory::createSwapchainSet(
                 giImages[6] = {outputs.postSampler,
                     (*inputs.voxelGiSurfaceHistoryImageViews)[i],
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-                std::array<VkWriteDescriptorSet, 8> giWrites{};
+                std::array<VkWriteDescriptorSet, 12> giWrites{};
                 for (uint32_t binding = 1; binding <= 7; ++binding) {
                     VkWriteDescriptorSet& giWrite = giWrites[binding - 1];
                     giWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1097,6 +1097,15 @@ void VulkanPipelineFactory::createSwapchainSet(
                 giWrites[7].descriptorCount = 1;
                 giWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 giWrites[7].pBufferInfo = &uniformInfo;
+                for (uint32_t level = 0; level < 4; ++level) {
+                    auto& write = giWrites[8 + level];
+                    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    write.dstSet = outputs.screenEffectDescriptorSets[i];
+                    write.dstBinding = 11 + level;
+                    write.descriptorCount = 1;
+                    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    write.pBufferInfo = &(*inputs.voxelGiAuxBuffers)[level];
+                }
                 vkUpdateDescriptorSets(m_device, giWrites.size(),
                                        giWrites.data(), 0, nullptr);
             }

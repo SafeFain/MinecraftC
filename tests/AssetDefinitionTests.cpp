@@ -23,6 +23,32 @@ int main() {
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");
+    const auto materials = buildVoxelGiMaterials(atlas);
+    require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
+            "non-emissive atlas material generated a light source");
+    require(materials[size_t(BlockId::STAR_CRYSTAL)].emission !=
+            materials[size_t(BlockId::TORCH)].emission,
+            "different emissive atlas materials share a fixed warm color");
+    BlockAtlasData fixture = atlas;
+    const auto fillTile = [&](BlockTexture texture) {
+        const auto slot = getAtlasTextureIndex(texture);
+        for (uint32_t y = 0; y < 16; ++y) for (uint32_t x = 0; x < 16; ++x) {
+            const size_t offset = (size_t(slot/atlas.tilesPerSide*16+y)*atlas.texture.width+
+                slot%atlas.tilesPerSide*16+x)*4;
+            for (int c = 0; c < 3; ++c) fixture.texture.pixels[offset+c] = x%2 ? 255 : 128;
+            fixture.texture.pixels[offset+3] = x%2 ? 0 : 255;
+        }
+    };
+    fillTile(BlockTexture::Stone);
+    const auto fixtureMaterials = buildVoxelGiMaterials(fixture);
+    const float gray = voxelGiSrgbToLinear(128.0f/255.0f);
+    require(std::abs(fixtureMaterials[size_t(BlockId::STONE)].reflectance[0].r-gray)<0.00001f,
+            "transparent atlas pixels contaminated linear reflectance");
+    for (const auto& material : materials) for (const auto& face : material.reflectance)
+        require(glm::all(glm::lessThanEqual(face,glm::vec3(0.9f))) &&
+                glm::all(glm::greaterThanEqual(face,glm::vec3(0))),
+                "material reflectance exceeded bounded energy");
+
     const auto holesIn = [&](const std::vector<uint8_t>& pixels,
                              uint32_t tileSize, BlockTexture texture) {
         const uint32_t slot = getAtlasTextureIndex(texture);

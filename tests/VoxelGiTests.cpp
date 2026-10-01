@@ -108,13 +108,92 @@ void checkUpdatePolicyAndRegions() {
                 "full initialization or relighting missed volume cells");
     }
 }
+VoxelGiPacked drainVoxel(VoxelGiSceneCache& cache,int level,const glm::ivec3& world) {
+    const auto mapping = cache.levelMapping(level);
+    glm::ivec3 ring;
+    for (int a = 0; a < 3; ++a) ring[a] = voxelGiPositiveMod(voxelGiFloorDiv(world[a],mapping.cellSize),cache.config().clipmapResolution);
+    VoxelGiPacked result;
+    for (const auto& update : cache.takeUpdates(10000)) {
+        if (update.level != level || update.layer != ring[update.axis]) continue;
+        if (update.voxels.empty()) { result = {}; continue; }
+        const int u = update.axis == 0 ? 1 : 0, v = update.axis == 2 ? 1 : 2;
+        result = update.voxels[size_t(ring[u]+cache.config().clipmapResolution*ring[v])];
+    }
+    return result;
+}
+
+void checkDirectionalAttributes() {
+    VoxelGiConfig config;
+    config.enabled = true; config.clipmapResolution = 32; config.clipmapLevels = 4;
+    config.distance = 128; config.updateSlicesPerFrame = 128;
+    for (int axis = 0; axis < 3; ++axis) {
+        VoxelGiSceneCache cache; cache.configure(config);
+        Chunk source(0,0);
+        for (int v = 0; v < 8; ++v) for (int u = 0; u < 8; ++u) {
+            if (u >= 2 && u < 4 && v >= 2 && v < 4) continue;
+            glm::ivec3 p;
+            p[axis] = 3; p[(axis+1)%3] = u; p[(axis+2)%3] = v;
+            source.setBlock(p.x,p.y+64,p.z,BlockId::STONE);
+        }
+        source.setBlock(7,71,7,BlockId::STAR_CRYSTAL);
+        cache.beginFrame({8,68,8},1); cache.submit(source); cache.endFrame();
+        const auto value = drainVoxel(cache,3,{4,68,4});
+        require(value.valid == 255 && value.opacity == 255,"coarse thin wall lost conservative opacity");
+        for (int z = 0; z < 4; ++z) for (int y = 0; y < 4; ++y) for (int x = 0; x < 4; ++x) {
+            bool expected = false;
+            for (int dz = 0; dz < 2; ++dz) for (int dy = 0; dy < 2; ++dy) for (int dx = 0; dx < 2; ++dx)
+                expected |= source.getBlock(x*2+dx,64+y*2+dy,z*2+dz) != BlockId::AIR;
+            require(voxelGiOccupied(value.aux,x+4*(y+4*z)) == expected,
+                    "subcell mask filled an aperture or dropped a thin wall");
+        }
+        const auto expectedEmission = packVoxelGi(BlockId::STAR_CRYSTAL,0).aux.emission;
+        require(value.aux.emission == expectedEmission,"non-emissive material diluted emission chromaticity/strength");
+        require(((value.aux.coverage >> (axis*8)) & 255) < 255,
+                "directional projection closed the resolvable aperture");
+    }
+    // Border visibility must respond to loading, edits and retirement, not just
+    // the receiver chunk's own revision. Missing neighbors are conservative.
+    config.clipmapLevels = 2; config.distance = 32;
+    VoxelGiSceneCache cache; cache.configure(config);
+    Chunk receiver(-1,0),neighbor(0,0);
+    receiver.setBlock(15,64,4,BlockId::STONE);
+    const auto frame = [&](bool loaded) {
+        cache.beginFrame({-0.5,64.5,4.5},2); cache.submit(receiver);
+        if (loaded) cache.submit(neighbor);
+        cache.endFrame();
+        return drainVoxel(cache,0,{-1,64,4});
+    };
+    auto value = frame(false);
+    require(voxelGiExposure(value.aux,4) == 0,"unknown neighbor became an exposed surface");
+    value = frame(true);
+    require(voxelGiExposure(value.aux,4) == 255,"loaded air neighbor did not expose the cached border");
+    neighbor.setBlock(0,64,4,BlockId::STONE);
+    value = frame(true);
+    require(voxelGiExposure(value.aux,4) == 0,"neighbor edit left stale border exposure");
+    neighbor.setBlock(0,64,4,BlockId::AIR); frame(true);
+    frame(false); frame(false); value = frame(false);
+    require(voxelGiExposure(value.aux,4) == 0,"neighbor retirement retained old exposure");
+    require(sizeof(VoxelGiAux) == 24 && std::abs(voxelGiSrgbToLinear(0.5f)-0.214041f)<0.00001f,
+            "GI layout or standard sRGB conversion changed");
+}
+
 }
 
 int main() {
     checkUpdatePolicyAndRegions();
-    VoxelGiDeviceSupport supported{64, 8, 8, 1, 1, true, true, true};
+    checkDirectionalAttributes();
+    VoxelGiDeviceSupport supported{64, 8, 8, 1, 1, true, true, true,
+        4,4,64u*64u*64u*sizeof(VoxelGiAux)};
     require(voxelGiAvailability(supported) == VoxelGiAvailability::Available,
             "valid Vulkan 1.0 GI capability profile was rejected");
+    supported.storageBuffersPerStage = 3;
+    require(voxelGiAvailability(supported) == VoxelGiAvailability::UnsupportedLimits,
+            "three storage buffers accepted four clipmaps");
+    supported.storageBuffersPerStage = 4;
+    --supported.maximumStorageBufferRange;
+    require(voxelGiAvailability(supported) == VoxelGiAvailability::UnsupportedLimits,
+            "short storage-buffer range accepted auxiliary volume");
+    ++supported.maximumStorageBufferRange;
     supported.maximum3dDimension = 32;
     require(voxelGiAvailability(supported) ==
                 VoxelGiAvailability::UnsupportedLimits,

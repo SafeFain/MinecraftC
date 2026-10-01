@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/RenderDevice.h"
+#include "renderer/VoxelGiMaterial.h"
 
 #include <filesystem>
 
@@ -15,3 +16,5 @@ struct BlockAtlasData {
 // Loads the generated logical-material atlas and constructs every mip by
 // downsampling each tile independently, so filtering cannot bleed across slots.
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot);
+
+VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas);

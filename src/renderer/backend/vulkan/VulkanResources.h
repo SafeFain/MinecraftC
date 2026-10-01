@@ -149,6 +149,7 @@ struct VulkanSwapchainBundle {
         VkDescriptorSetLayout screenEffectGiLayout = VK_NULL_HANDLE;
         bool voxelGiEnabled = false;
         const std::array<VkImageView, 4>* voxelGiImageViews = nullptr;
+        const std::array<VkDescriptorBufferInfo, 4>* voxelGiAuxBuffers = nullptr;
         VkBuffer voxelGiUniformBuffer = VK_NULL_HANDLE;
         int bloomLevels = 0;
         int screenEffectDivisor = 0;

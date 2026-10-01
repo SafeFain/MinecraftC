@@ -123,6 +123,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VoxelGiImage albedoOpacity;
         VoxelGiImage lightValidity;
         VoxelGiImage irradiance;
+        Buffer auxiliary;
+        std::vector<uint8_t> auxiliaryBytes;
         VkDescriptorSet computeSet = VK_NULL_HANDLE;
         VoxelGiDirtyRegions dirty;
         size_t validVoxels = 0;
@@ -132,6 +134,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     struct VoxelGiGpuResources {
         std::array<VoxelGiGpuLevel, 4> levels{};
         std::array<VkImageView, 4> irradianceViews{};
+        std::array<VkDescriptorBufferInfo, 4> auxiliaryInfos{};
         std::array<Buffer, FRAMES_IN_FLIGHT> uniforms{};
         VkSampler sampler = VK_NULL_HANDLE;
         VkPipelineLayout computePipelineLayout = VK_NULL_HANDLE;
@@ -203,12 +206,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VkBuffer destination = VK_NULL_HANDLE;
         VkDeviceSize destinationOffset = 0;
         std::vector<uint8_t> bytes;
+        std::vector<VkBufferCopy> regions;
     };
     struct PreparedBufferCopy {
         VkBuffer destination = VK_NULL_HANDLE;
         VkDeviceSize sourceOffset = 0;
         VkDeviceSize destinationOffset = 0;
         VkDeviceSize size = 0;
+        std::vector<VkBufferCopy> regions;
     };
     struct PendingImageUpload {
         VkImage destination = VK_NULL_HANDLE;
@@ -377,6 +382,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     glm::dvec3 voxelGiLastCamera{0.0};
     glm::vec4 voxelGiLastSkyInjection{-1.0f};
     glm::vec4 voxelGiLastBlockInjection{-1.0f};
+    glm::vec4 voxelGiLastDirectInjection{-1.0f};
+    glm::vec4 voxelGiLastDirectionInjection{-1.0f};
     uint64_t voxelGiHistoryRevision = 1;
     uint64_t voxelGiSourceRevision = 0;
     bool voxelGiContentUpdating = false;
@@ -512,6 +519,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0 &&
                 supportsVolume(VK_FORMAT_R16G16B16A16_SFLOAT,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+            giSupport.storageBuffersPerStage = properties.limits.maxPerStageDescriptorStorageBuffers;
+            giSupport.storageBuffersPerSet = properties.limits.maxDescriptorSetStorageBuffers;
+            giSupport.maximumStorageBufferRange = properties.limits.maxStorageBufferRange;
             voxelGiRuntime.availability = voxelGiAvailability(giSupport);
             const VkSampleCountFlags counts =
                 properties.limits.framebufferColorSampleCounts &
@@ -807,6 +817,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 vkFreeDescriptorSets(device, descriptors.descriptorPool, 1,
                                      &level.computeSet);
             level.computeSet = VK_NULL_HANDLE;
+            destroyBuffer(level.auxiliary);
+            level.auxiliaryBytes.clear();
             destroyVoxelGiImage(level.irradiance);
             destroyVoxelGiImage(level.lightValidity);
             destroyVoxelGiImage(level.albedoOpacity);
@@ -901,6 +913,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 level.irradiance = createVoxelGiImage(
                     VK_FORMAT_R16G16B16A16_SFLOAT, config.clipmapResolution,
                     VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+                level.auxiliary = createBuffer(voxelCount * sizeof(VoxelGiAux),
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+                level.auxiliaryBytes.assign(voxelCount * sizeof(VoxelGiAux),0);
+                voxelGiGpu.auxiliaryInfos[static_cast<size_t>(index)] =
+                    {level.auxiliary.handle,0,voxelCount * sizeof(VoxelGiAux)};
                 level.albedoBytes.assign(voxelCount * 4, 0);
                 level.lightBytes.assign(voxelCount * 4, 0);
                 voxelGiGpu.irradianceViews[static_cast<size_t>(index)] =
@@ -920,8 +938,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
                     {VK_NULL_HANDLE, level.irradiance.view,
                      VK_IMAGE_LAYOUT_GENERAL}}};
-                std::array<VkWriteDescriptorSet, 3> writes{};
-                for (uint32_t binding = 0; binding < writes.size(); ++binding) {
+                std::array<VkWriteDescriptorSet, 4> writes{};
+                for (uint32_t binding = 0; binding < 3; ++binding) {
                     writes[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     writes[binding].dstSet = level.computeSet;
                     writes[binding].dstBinding = binding;
@@ -931,12 +949,19 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                         : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                     writes[binding].pImageInfo = &images[binding];
                 }
+                writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writes[3].dstSet = level.computeSet; writes[3].dstBinding = 3;
+                writes[3].descriptorCount = 1; writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                writes[3].pBufferInfo = &voxelGiGpu.auxiliaryInfos[static_cast<size_t>(index)];
                 vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
             }
-            for (int index = config.clipmapLevels; index < 4; ++index)
+            for (int index = config.clipmapLevels; index < 4; ++index) {
+                voxelGiGpu.auxiliaryInfos[static_cast<size_t>(index)] =
+                    voxelGiGpu.auxiliaryInfos[static_cast<size_t>(config.clipmapLevels-1)];
                 voxelGiGpu.irradianceViews[static_cast<size_t>(index)] =
                     voxelGiGpu.irradianceViews[static_cast<size_t>(
                         config.clipmapLevels - 1)];
+            }
             voxelGiCache.reset();
             voxelGiUpdates.clear();
             voxelGiHistoryValid = false;
@@ -1294,7 +1319,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr,
                     &descriptors.screenEffectDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(screen effect)");
-        std::array<VkDescriptorSetLayoutBinding, 9> giScreenBindings{};
+        std::array<VkDescriptorSetLayoutBinding, 13> giScreenBindings{};
         for (uint32_t binding = 0; binding < 8; ++binding) {
             giScreenBindings[binding].binding = binding;
             giScreenBindings[binding].descriptorType =
@@ -1306,12 +1331,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         giScreenBindings[8].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         giScreenBindings[8].descriptorCount = 1;
         giScreenBindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        for (uint32_t i = 0; i < 4; ++i)
+            giScreenBindings[9+i] = {11+i,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,
+                                     VK_SHADER_STAGE_FRAGMENT_BIT,nullptr};
         info.bindingCount = giScreenBindings.size();
         info.pBindings = giScreenBindings.data();
         require(vkCreateDescriptorSetLayout(device, &info, nullptr,
                     &descriptors.screenEffectGiDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(voxel GI screen effect)");
-        std::array<VkDescriptorSetLayoutBinding, 3> giComputeBindings{};
+        std::array<VkDescriptorSetLayoutBinding, 4> giComputeBindings{};
         for (uint32_t binding = 0; binding < 2; ++binding) {
             giComputeBindings[binding].binding = binding;
             giComputeBindings[binding].descriptorType =
@@ -1323,6 +1351,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         giComputeBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         giComputeBindings[2].descriptorCount = 1;
         giComputeBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        giComputeBindings[3] = {3,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,
+                                VK_SHADER_STAGE_COMPUTE_BIT,nullptr};
         info.bindingCount = giComputeBindings.size();
         info.pBindings = giComputeBindings.data();
         require(vkCreateDescriptorSetLayout(device, &info, nullptr,
@@ -1336,13 +1366,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void createDescriptorPool() {
-        const std::array<VkDescriptorPoolSize, 4> poolSizes{{
+        const std::array<VkDescriptorPoolSize, 5> poolSizes{{
             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 12288},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
              static_cast<uint32_t>(FRAMES_IN_FLIGHT * 2 + 32)},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
              static_cast<uint32_t>(FRAMES_IN_FLIGHT)},
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16}}};
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,256}}};
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -1504,6 +1535,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         params.voxelGiEnabled = voxelGiRuntime.active;
         params.voxelGiImageViews = voxelGiRuntime.active
             ? &voxelGiGpu.irradianceViews : nullptr;
+        params.voxelGiAuxBuffers = voxelGiRuntime.active ? &voxelGiGpu.auxiliaryInfos : nullptr;
         params.voxelGiUniformBuffer = voxelGiRuntime.active
             ? voxelGiGpu.uniforms[0].handle : VK_NULL_HANDLE;
         const EnhancedVisualConfig enhanced = enhancedVisualConfig(
@@ -1526,6 +1558,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             voxelGiRuntime.active = false;
             params.voxelGiEnabled = false;
             params.voxelGiImageViews = nullptr;
+            params.voxelGiAuxBuffers = nullptr;
             params.voxelGiUniformBuffer = VK_NULL_HANDLE;
             swapchain = vkp::VulkanSwapchainBundle::create(params);
         }
@@ -1587,11 +1620,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     VoxelGiInjectConstants voxelGiInjectionConstants() const {
         VoxelGiInjectConstants result;
-        result.skyColorDaylight = glm::vec4(postProcess.environment.ambientColor,
+        result.skyColorDaylight = glm::vec4(postProcess.environment.ambientColor *
+            postProcess.environment.ambientIntensity,
                                             postProcess.environment.daylight);
         result.blockColorWeather = glm::vec4(glm::vec3(1.0f, 0.56f, 0.25f),
             std::clamp(postProcess.environment.rainIntensity * 0.6f +
                 postProcess.environment.thunderIntensity * 0.4f, 0.0f, 1.0f));
+        result.directColorIntensity = glm::vec4(postProcess.environment.directColor,
+            postProcess.environment.directIntensity);
+        result.lightDirection = glm::vec4(postProcess.environment.lightDirection,0.0f);
         return result;
     }
 
@@ -1603,11 +1640,17 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (glm::any(glm::greaterThan(glm::abs(lighting.skyColorDaylight -
                 voxelGiLastSkyInjection), glm::vec4(0.01f))) ||
             glm::any(glm::greaterThan(glm::abs(lighting.blockColorWeather -
-                voxelGiLastBlockInjection), glm::vec4(0.01f)))) {
+                voxelGiLastBlockInjection), glm::vec4(0.01f))) ||
+            glm::any(glm::greaterThan(glm::abs(lighting.directColorIntensity -
+                voxelGiLastDirectInjection), glm::vec4(0.01f))) ||
+            glm::any(glm::greaterThan(glm::abs(lighting.lightDirection -
+                voxelGiLastDirectionInjection), glm::vec4(0.01f)))) {
             for (int level = 0; level < voxelGiGpu.levelCount; ++level)
                 voxelGiGpu.levels[static_cast<size_t>(level)].dirty.markFull();
             voxelGiLastSkyInjection = lighting.skyColorDaylight;
             voxelGiLastBlockInjection = lighting.blockColorWeather;
+            voxelGiLastDirectInjection = lighting.directColorIntensity;
+            voxelGiLastDirectionInjection = lighting.lightDirection;
             ++voxelGiHistoryRevision;
         }
         const int resolution = voxelGiGpu.resolution;
@@ -1631,6 +1674,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                         cell.x + resolution * (cell.y + resolution * cell.z)) * 4;
                     const VoxelGiPacked voxel = update.voxels.empty() ? VoxelGiPacked{}
                         : update.voxels[static_cast<size_t>(u + v * resolution)];
+                    std::memcpy(level.auxiliaryBytes.data() + index/4*sizeof(VoxelGiAux),
+                                &voxel.aux,sizeof(VoxelGiAux));
                     level.albedoBytes[index] = voxel.red;
                     level.albedoBytes[index + 1] = voxel.green;
                     level.albedoBytes[index + 2] = voxel.blue;
@@ -1684,6 +1729,25 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             };
             queue(level.albedoOpacity, level.albedoBytes);
             queue(level.lightValidity, level.lightBytes);
+            PendingBufferUpload auxiliary;
+            auxiliary.destination = level.auxiliary.handle;
+            for (const auto& box : regions)
+                for (int z = 0; z < box.extent.z; ++z)
+                    for (int y = 0; y < box.extent.y; ++y) {
+                        const size_t destination = size_t(box.offset.x + resolution *
+                            (box.offset.y+y + resolution*(box.offset.z+z))) * sizeof(VoxelGiAux);
+                        const size_t bytes = size_t(box.extent.x)*sizeof(VoxelGiAux);
+                        const size_t source = auxiliary.bytes.size();
+                        auxiliary.bytes.insert(auxiliary.bytes.end(),
+                            level.auxiliaryBytes.begin()+destination,
+                            level.auxiliaryBytes.begin()+destination+bytes);
+                        if (!auxiliary.regions.empty() &&
+                            auxiliary.regions.back().dstOffset+auxiliary.regions.back().size == destination)
+                            auxiliary.regions.back().size += bytes;
+                        else auxiliary.regions.push_back({source,destination,bytes});
+                    }
+            voxelGiRuntime.uploadedBytes += auxiliary.bytes.size();
+            pendingBufferUploads.push_back(std::move(auxiliary));
         }
         size_t valid = 0;
         for (int level = 0; level < voxelGiGpu.levelCount; ++level)
@@ -1799,7 +1863,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                         upload.bytes.data(), upload.bytes.size());
             preparedBufferCopies.push_back({upload.destination, offset,
                 upload.destinationOffset,
-                static_cast<VkDeviceSize>(upload.bytes.size())});
+                static_cast<VkDeviceSize>(upload.bytes.size()),upload.regions});
+            for (auto& region : preparedBufferCopies.back().regions) region.srcOffset += offset;
             offset += upload.bytes.size();
         }
         for (const PendingImageUpload& upload : pendingImageUploads) {
@@ -2050,10 +2115,19 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
                     static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data());
+            if (!preparedBufferCopies.empty()) {
+                VkMemoryBarrier before{VK_STRUCTURE_TYPE_MEMORY_BARRIER,nullptr,
+                    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                        VK_ACCESS_INDEX_READ_BIT,VK_ACCESS_TRANSFER_WRITE_BIT};
+                vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&before,0,nullptr,0,nullptr);
+            }
             for (const PreparedBufferCopy& copy : preparedBufferCopies) {
                 const VkBufferCopy region{copy.sourceOffset,
                                           copy.destinationOffset, copy.size};
-                vkCmdCopyBuffer(command, staging, copy.destination, 1, &region);
+                vkCmdCopyBuffer(command, staging, copy.destination,
+                    copy.regions.empty() ? 1 : static_cast<uint32_t>(copy.regions.size()),
+                    copy.regions.empty() ? &region : copy.regions.data());
             }
             for (const PreparedImageCopy& copy : preparedImageCopies)
                 vkCmdCopyBufferToImage(command, staging, copy.destination,
@@ -2065,7 +2139,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
                 barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
                                         VK_ACCESS_INDEX_READ_BIT |
-                                        VK_ACCESS_UNIFORM_READ_BIT;
+                                        VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
                 vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
                     VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |

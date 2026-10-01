@@ -558,6 +558,7 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     pipelineInputs.voxelGiSurfaceHistoryImageViews =
         &result.voxelGiSurfaceHistoryImageViews;
     pipelineInputs.voxelGiImageViews = params.voxelGiImageViews;
+    pipelineInputs.voxelGiAuxBuffers = params.voxelGiAuxBuffers;
     pipelineInputs.voxelGiUniformBuffer = params.voxelGiUniformBuffer;
     pipelineInputs.voxelGiEnabled = result.voxelGiEnabled;
     pipelineInputs.screenEffectGiLayout = params.screenEffectGiLayout;

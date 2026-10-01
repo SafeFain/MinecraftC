@@ -314,3 +314,37 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     validateTextureData(result.texture);
     return result;
 }
+
+VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
+    std::array<glm::vec3, static_cast<size_t>(BlockTexture::Count)> colors{};
+    for (size_t t = 0; t < colors.size(); ++t) {
+        const uint32_t slot = getAtlasTextureIndex(static_cast<BlockTexture>(t));
+        glm::vec3 sum(0.0f);
+        float weight = 0.0f;
+        for (uint32_t y = 0; y < atlas.tileSize; ++y)
+            for (uint32_t x = 0; x < atlas.tileSize; ++x) {
+                const size_t pixel = (size_t(slot / atlas.tilesPerSide * atlas.tileSize + y) *
+                    atlas.texture.width + slot % atlas.tilesPerSide * atlas.tileSize + x) * 4;
+                const float alpha = atlas.texture.pixels[pixel + 3] / 255.0f;
+                for (int c = 0; c < 3; ++c)
+                    sum[c] += voxelGiSrgbToLinear(atlas.texture.pixels[pixel + c] / 255.0f) * alpha;
+                weight += alpha;
+            }
+        colors[t] = weight > 0.0f ? sum / weight : glm::vec3(0.0f);
+    }
+    VoxelGiMaterialTable result{};
+    for (size_t b = 1; b < result.size(); ++b) {
+        const auto id = static_cast<BlockId>(b);
+        glm::vec3 emissionColor(0.0f);
+        for (int f = 0; f < 6; ++f) {
+            const auto color = colors[static_cast<size_t>(getFaceTexture(id, static_cast<FaceDir>(f)))];
+            result[b].reflectance[f] = glm::min(color, glm::vec3(0.9f));
+            emissionColor += color / 6.0f;
+        }
+        // Chromaticity is independent of reflectance; strength remains the world rule.
+        const float peak = std::max({emissionColor.r, emissionColor.g, emissionColor.b});
+        if (peak > 0.0f)
+            result[b].emission = emissionColor / peak * (getLightEmission(id) / 15.0f);
+    }
+    return result;
+}

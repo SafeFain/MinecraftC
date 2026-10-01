@@ -14,8 +14,10 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   shafts, tiered water reflections, soft-shadow filtering, material motion, and
   budgeted Overworld ambience by visual-quality tier. Very High and Ultra add
   voxel-irradiance GI with camera-centered clipmaps, bounded cone-direction
-  traversal, conservative coarse opacity, local radiance filtering, partial GPU
-  volume updates, time-based temporal accumulation and surface-guided upsampling
+  traversal, conservative subcell occupancy, directional coverage and footprint-based
+  radiance filtering, linear atlas reflectance, independent colored emission and
+  sun/moon direction injection, partial GPU volume updates, time-based temporal
+  accumulation and surface-guided upsampling
   while preserving the legacy path when disabled. GI caches survive unrelated
   settings changes. It deliberately retains voxel and flat cirrus
   clouds instead of adding volumetric clouds. The basic page owns five complete

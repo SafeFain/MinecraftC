@@ -1,0 +1,22 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+// Only the explicit Vulkan regression dispatches this entry point. All tracing
+// and filtering are shared verbatim with the production screen GI shader.
+#include "voxel_gi_trace.glsl"
+layout(local_size_x=1) in;
+struct ProbeRay { vec4 origin; vec4 direction; vec4 result; };
+layout(set=0,binding=15,std430) buffer Rays { ProbeRay rays[]; } probe;
+layout(push_constant) uniform Count { uint count; } request;
+void main(){
+    uint index=gl_GlobalInvocationID.x;
+    if(index>=request.count)return;
+    float coverage;
+    vec3 result;
+    if(probe.rays[index].direction.w>0.0){
+        coverage=1.0;
+        result=filteredRadiance(int(probe.rays[index].origin.w),probe.rays[index].origin.xyz,
+            probe.rays[index].direction.w,normalize(probe.rays[index].direction.xyz));
+    }else result=traceCone(probe.rays[index].origin.xyz,
+                         normalize(probe.rays[index].direction.xyz),coverage);
+    probe.rays[index].result=vec4(result,coverage);
+}

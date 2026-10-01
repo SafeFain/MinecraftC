@@ -119,9 +119,11 @@ private:
     std::condition_variable m_wake;
     std::condition_variable m_done;
     std::deque<std::function<void()>> m_tasks;
-    std::thread m_worker;
     size_t m_active = 0;
     bool m_stopping = false;
+    // Declaration order is initialization order: run() must see initialized
+    // queue state as soon as the worker starts, even during construction.
+    std::thread m_worker;
 };
 
 // Owns the chunk streaming and generation pipeline: the desired-chunk set

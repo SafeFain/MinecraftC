@@ -111,6 +111,8 @@ struct VoxelGiScreenUniforms {
 struct VoxelGiInjectConstants {
     glm::vec4 skyColorDaylight{0.0f};
     glm::vec4 blockColorWeather{0.0f};
+    glm::vec4 directColorIntensity{0.0f};
+    glm::vec4 lightDirection{0.0f};
     glm::ivec4 regionOffset{0};
     glm::ivec4 regionExtent{0};
 };
@@ -149,9 +151,9 @@ static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
 static_assert(sizeof(PostConstants) == 128);
 static_assert(sizeof(VoxelGiScreenUniforms) == 288);
-static_assert(sizeof(VoxelGiInjectConstants) == 64);
-static_assert(offsetof(VoxelGiInjectConstants, regionOffset) == 32);
-static_assert(offsetof(VoxelGiInjectConstants, regionExtent) == 48);
+static_assert(sizeof(VoxelGiInjectConstants) == 96);
+static_assert(offsetof(VoxelGiInjectConstants, regionOffset) == 64);
+static_assert(offsetof(VoxelGiInjectConstants, regionExtent) == 80);
 static_assert(sizeof(BloomConstants) == 16);
 static_assert(sizeof(ModelUniforms) == 4416);
 
@@ -181,6 +183,7 @@ struct SwapchainPipelineInputs {
     const std::vector<VkImageView>* voxelGiHistoryImageViews = nullptr;
     const std::vector<VkImageView>* voxelGiSurfaceHistoryImageViews = nullptr;
     const std::array<VkImageView, 4>* voxelGiImageViews = nullptr;
+    const std::array<VkDescriptorBufferInfo, 4>* voxelGiAuxBuffers = nullptr;
     VkBuffer voxelGiUniformBuffer = VK_NULL_HANDLE;
     bool voxelGiEnabled = false;
     const std::array<std::vector<VkImageView>, 4>* bloomImageViews = nullptr;
