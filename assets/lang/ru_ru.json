@@ -180,6 +180,7 @@
   "settings.gi_distance": "Дальность GI: {0} блоков",
   "settings.gi_temporal": "Временная стабильность: {0}",
   "settings.gi_unavailable": "Недоступно",
+  "settings.gi_inactive": "Неактивно",
   "settings.transparent_leaves": "Прозрачность листвы: {0}",
   "settings.visual_low": "Низкое",
   "settings.visual_medium": "Среднее",

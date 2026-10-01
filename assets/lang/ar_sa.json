@@ -180,6 +180,7 @@
   "settings.gi_distance": "مسافة GI: {0} كتلة",
   "settings.gi_temporal": "الثبات الزمني: {0}",
   "settings.gi_unavailable": "غير متاح",
+  "settings.gi_inactive": "غير نشط",
   "settings.transparent_leaves": "شفافية الأوراق: {0}",
   "settings.visual_low": "منخفضة",
   "settings.visual_medium": "متوسطة",

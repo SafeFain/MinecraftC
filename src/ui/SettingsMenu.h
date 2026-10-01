@@ -189,6 +189,7 @@ private:
     ClientSettings& m_settings;
     const Localization& m_localization;
     std::function<VoxelGiStatus()> m_giStatus;
+    VoxelGiStatus m_displayedGiStatus{};
     SettingsPage m_page = SettingsPage::General;
     int m_controlOffset = 0;
     int m_captureAction = -1;

@@ -180,6 +180,7 @@
   "settings.gi_distance": "GI距離: {0}ブロック",
   "settings.gi_temporal": "時間的安定性: {0}",
   "settings.gi_unavailable": "利用不可",
+  "settings.gi_inactive": "停止中",
   "settings.transparent_leaves": "葉の透過: {0}",
   "settings.visual_low": "低",
   "settings.visual_medium": "中",

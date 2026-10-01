@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout(set=0,binding=0) uniform sampler2D sceneColor;
 layout(set=0,binding=1) uniform sampler2D bloomHalf;
@@ -58,6 +59,8 @@ vec3 decodeNormal(vec2 encoded){
     if(n.z<0.0)n.xy=(1.0-abs(n.yx))*sign(n.xy);
     return normalize(n);
 }
+
+#include "screen_effect_common.glsl"
 
 vec3 skyReflection(vec2 uv,vec3 normal){
     float horizon=clamp(0.48+normal.y*0.30-(uv.y-0.5)*0.18,0.0,1.0);
@@ -134,10 +137,13 @@ void main(){
     if(abs(post.screenQuality.w)>0.5){
         vec4 screen=texture(screenEffects,vUv);
         if(post.screenQuality.w<0.0){
-            if(surface.z>0.01&&surface.w<1.9){
+            if(surface.z>0.01&&surface.w<1.9)
                 hdr*=mix(1.0,screen.a,0.82*post.exposureBloom.w);
-                hdr+=screen.rgb;
-            }
+            hdr+=screen.rgb;
+            // Keep shafts out of irradiance history; moving sun/occlusion must
+            // not accumulate as indirect light on the receiver surface.
+            float shafts=screenShafts()*(1.0-post.environment.x*0.62);
+            hdr+=vec3(1.0,0.74,0.42)*shafts*0.20*post.sunScreen.w;
         }else{
             if(surface.z>0.01&&surface.w<1.9)
                 hdr*=mix(1.0,screen.r,0.82*post.exposureBloom.w);

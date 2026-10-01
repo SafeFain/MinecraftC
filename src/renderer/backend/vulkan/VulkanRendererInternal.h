@@ -117,7 +117,6 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VkImage image = VK_NULL_HANDLE;
         VmaAllocation allocation = VK_NULL_HANDLE;
         VkImageView view = VK_NULL_HANDLE;
-        VkImageView baseView = VK_NULL_HANDLE;
         bool initialized = false;
     };
     struct VoxelGiGpuLevel {
@@ -126,6 +125,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VoxelGiImage irradiance;
         VkDescriptorSet computeSet = VK_NULL_HANDLE;
         bool dirty = false;
+        size_t validVoxels = 0;
         std::vector<uint8_t> albedoBytes;
         std::vector<uint8_t> lightBytes;
     };
@@ -138,7 +138,6 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VkPipeline computePipeline = VK_NULL_HANDLE;
         int resolution = 0;
         int levelCount = 0;
-        uint32_t mipLevels = 1;
     } voxelGiGpu;
     struct GpuMaterial {
         MaterialDesc desc{};
@@ -367,6 +366,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     PostProcessState postProcess{};
     VoxelGiSceneCache voxelGiCache;
     VoxelGiStatus voxelGiRuntime{};
+    RuntimeClock::Tick voxelGiRetryAt{};
     std::vector<VoxelGiSliceUpdate> voxelGiUpdates;
     bool voxelGiHistoryValid = false;
     std::vector<glm::mat4> voxelGiPreviousViewProjection;
@@ -474,11 +474,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 candidate, VK_FORMAT_R16G16B16A16_SFLOAT, &irradianceFormat);
             const VkFormatFeatureFlags attributeRequired =
                 VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-            const VkFormatFeatureFlags irradianceRequired =
-                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-                VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT |
-                VK_FORMAT_FEATURE_BLIT_SRC_BIT |
-                VK_FORMAT_FEATURE_BLIT_DST_BIT;
+            const auto supportsVolume = [&](VkFormat format, VkImageUsageFlags usage) {
+                VkImageFormatProperties imageProperties{};
+                return vkGetPhysicalDeviceImageFormatProperties(candidate, format,
+                    VK_IMAGE_TYPE_3D, VK_IMAGE_TILING_OPTIMAL, usage, 0,
+                    &imageProperties) == VK_SUCCESS &&
+                    imageProperties.maxExtent.width >= 64 &&
+                    imageProperties.maxExtent.height >= 64 &&
+                    imageProperties.maxExtent.depth >= 64;
+            };
             VoxelGiDeviceSupport giSupport;
             giSupport.maximum3dDimension = properties.limits.maxImageDimension3D;
             giSupport.sampledImagesPerStage =
@@ -491,16 +495,16 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 properties.limits.maxDescriptorSetStorageImages;
             giSupport.attributeSampling =
                 (attributeFormat.optimalTilingFeatures & attributeRequired) ==
-                    attributeRequired;
+                    attributeRequired && supportsVolume(VK_FORMAT_R8G8B8A8_UNORM,
+                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
             giSupport.irradianceSampling =
                 (irradianceFormat.optimalTilingFeatures &
                     VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
             giSupport.irradianceStorage =
                 (irradianceFormat.optimalTilingFeatures &
-                    VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
-            giSupport.irradianceBlit =
-                (irradianceFormat.optimalTilingFeatures & irradianceRequired) ==
-                    irradianceRequired;
+                    VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0 &&
+                supportsVolume(VK_FORMAT_R16G16B16A16_SFLOAT,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
             voxelGiRuntime.availability = voxelGiAvailability(giSupport);
             const VkSampleCountFlags counts =
                 properties.limits.framebufferColorSampleCounts &
@@ -591,7 +595,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const VoxelGiConfig config = voxelGiConfig(
             visualQuality, enhancedVisualSettings);
         voxelGiRuntime.requested = config.enabled;
-        voxelGiRuntime.active = config.enabled &&
+        voxelGiRuntime.active = config.enabled && swapchain.voxelGiEnabled &&
+            voxelGiGpu.levelCount > 0 &&
             voxelGiRuntime.availability == VoxelGiAvailability::Available;
         if (!voxelGiRuntime.active) return;
         if (sceneId != voxelGiLastSceneId ||
@@ -618,6 +623,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         voxelGiCache.endFrame();
         const VoxelGiConfig& config = voxelGiCache.config();
         voxelGiUpdates = voxelGiCache.takeUpdates(config.updateSlicesPerFrame);
+        voxelGiRuntime.pendingSlices = voxelGiCache.pendingSlices();
+        voxelGiRuntime.sourceChunks = voxelGiCache.cachedChunks();
     }
 
     void createDevice() {
@@ -720,14 +727,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     VoxelGiImage createVoxelGiImage(VkFormat format, uint32_t resolution,
-                                    uint32_t mipLevels,
                                     VkImageUsageFlags usage) {
         VoxelGiImage result;
         VkImageCreateInfo image{};
         image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         image.imageType = VK_IMAGE_TYPE_3D;
         image.extent = {resolution, resolution, resolution};
-        image.mipLevels = mipLevels;
+        image.mipLevels = 1;
         image.arrayLayers = 1;
         image.format = format;
         image.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -746,16 +752,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         view.viewType = VK_IMAGE_VIEW_TYPE_3D;
         view.format = format;
         view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        view.subresourceRange.levelCount = mipLevels;
+        view.subresourceRange.levelCount = 1;
         view.subresourceRange.layerCount = 1;
-        require(vkCreateImageView(device, &view, nullptr, &result.view),
-                "vkCreateImageView(voxel GI)");
-        if (mipLevels > 1) {
-            view.subresourceRange.levelCount = 1;
-            require(vkCreateImageView(device, &view, nullptr, &result.baseView),
-                    "vkCreateImageView(voxel GI base)");
-        } else {
-            result.baseView = result.view;
+        const VkResult viewResult = vkCreateImageView(device, &view, nullptr, &result.view);
+        if (viewResult != VK_SUCCESS) {
+            vmaDestroyImage(allocator, result.image, result.allocation);
+            require(viewResult, "vkCreateImageView(voxel GI)");
         }
         return result;
     }
@@ -766,8 +768,6 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             [&](const PendingImageUpload& upload) {
                 return upload.destination == image.image;
             }), pendingImageUploads.end());
-        if (image.baseView && image.baseView != image.view)
-            vkDestroyImageView(device, image.baseView, nullptr);
         if (image.view) vkDestroyImageView(device, image.view, nullptr);
         if (image.image)
             vmaDestroyImage(allocator, image.image, image.allocation);
@@ -796,6 +796,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (voxelGiGpu.sampler)
             vkDestroySampler(device, voxelGiGpu.sampler, nullptr);
         voxelGiGpu = {};
+        voxelGiRuntime.validVoxelFraction = 0.0f;
+        voxelGiRuntime.pendingSlices = 0;
+        voxelGiRuntime.sourceChunks = 0;
         voxelGiHistoryValid = false;
     }
 
@@ -815,18 +818,17 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         try {
             voxelGiGpu.resolution = config.clipmapResolution;
             voxelGiGpu.levelCount = config.clipmapLevels;
-            uint32_t size = static_cast<uint32_t>(config.clipmapResolution);
-            voxelGiGpu.mipLevels = 1;
-            while (size > 1) { size >>= 1; ++voxelGiGpu.mipLevels; }
             VkSamplerCreateInfo sampler{};
             sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            sampler.magFilter = VK_FILTER_LINEAR;
-            sampler.minFilter = VK_FILTER_LINEAR;
-            sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            // GI uses validity-aware texelFetch filtering, with no filtered
+            // format or blit capability requirement and no toroidal mip seams.
+            sampler.magFilter = VK_FILTER_NEAREST;
+            sampler.minFilter = VK_FILTER_NEAREST;
+            sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
             sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
             sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
             sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            sampler.maxLod = static_cast<float>(voxelGiGpu.mipLevels - 1);
+            sampler.maxLod = 0.0f;
             require(vkCreateSampler(device, &sampler, nullptr,
                                     &voxelGiGpu.sampler),
                     "vkCreateSampler(voxel GI)");
@@ -865,16 +867,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 VoxelGiGpuLevel& level = voxelGiGpu.levels[
                     static_cast<size_t>(index)];
                 level.albedoOpacity = createVoxelGiImage(
-                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution, 1,
+                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
                 level.lightValidity = createVoxelGiImage(
-                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution, 1,
+                    VK_FORMAT_R8G8B8A8_UNORM, config.clipmapResolution,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
                 level.irradiance = createVoxelGiImage(
                     VK_FORMAT_R16G16B16A16_SFLOAT, config.clipmapResolution,
-                    voxelGiGpu.mipLevels, VK_IMAGE_USAGE_STORAGE_BIT |
-                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
                 level.albedoBytes.assign(voxelCount * 4, 0);
                 level.lightBytes.assign(voxelCount * 4, 0);
                 voxelGiGpu.irradianceViews[static_cast<size_t>(index)] =
@@ -892,7 +892,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
                     {voxelGiGpu.sampler, level.lightValidity.view,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-                    {VK_NULL_HANDLE, level.irradiance.baseView,
+                    {VK_NULL_HANDLE, level.irradiance.view,
                      VK_IMAGE_LAYOUT_GENERAL}}};
                 std::array<VkWriteDescriptorSet, 3> writes{};
                 for (uint32_t binding = 0; binding < writes.size(); ++binding) {
@@ -912,6 +912,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     voxelGiGpu.irradianceViews[static_cast<size_t>(
                         config.clipmapLevels - 1)];
             voxelGiCache.reset();
+            voxelGiUpdates.clear();
             voxelGiHistoryValid = false;
             voxelGiRuntime.active = true;
             LOG_INFO("Voxel GI allocated " << config.clipmapResolution << "^3 x "
@@ -921,6 +922,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                      << error.what());
             destroyVoxelGiResources();
             voxelGiRuntime.availability = VoxelGiAvailability::AllocationFailed;
+            voxelGiRetryAt = RuntimeClock{}.now();
             voxelGiRuntime.active = false;
         }
     }
@@ -1266,18 +1268,18 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr,
                     &descriptors.screenEffectDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout(screen effect)");
-        std::array<VkDescriptorSetLayoutBinding, 11> giScreenBindings{};
-        for (uint32_t binding = 0; binding < 10; ++binding) {
+        std::array<VkDescriptorSetLayoutBinding, 9> giScreenBindings{};
+        for (uint32_t binding = 0; binding < 8; ++binding) {
             giScreenBindings[binding].binding = binding;
             giScreenBindings[binding].descriptorType =
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             giScreenBindings[binding].descriptorCount = 1;
             giScreenBindings[binding].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         }
-        giScreenBindings[10].binding = 10;
-        giScreenBindings[10].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        giScreenBindings[10].descriptorCount = 1;
-        giScreenBindings[10].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        giScreenBindings[8].binding = 10;
+        giScreenBindings[8].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        giScreenBindings[8].descriptorCount = 1;
+        giScreenBindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         info.bindingCount = giScreenBindings.size();
         info.pBindings = giScreenBindings.data();
         require(vkCreateDescriptorSetLayout(device, &info, nullptr,
@@ -1449,6 +1451,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const VoxelGiConfig giConfig = voxelGiConfig(
             visualQuality, enhancedVisualSettings);
         voxelGiRuntime.requested = giConfig.enabled;
+        if (voxelGiRuntime.availability == VoxelGiAvailability::AllocationFailed)
+            voxelGiRuntime.availability = VoxelGiAvailability::Available;
         ensureVoxelGiResources(giConfig);
         vkp::VulkanSwapchainBundle::CreateParams params;
         params.device = device;
@@ -1492,6 +1496,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             destroyVoxelGiResources();
             voxelGiRuntime.availability =
                 VoxelGiAvailability::AllocationFailed;
+            voxelGiRetryAt = RuntimeClock{}.now();
             voxelGiRuntime.active = false;
             params.voxelGiEnabled = false;
             params.voxelGiImageViews = nullptr;
@@ -1557,34 +1562,46 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const int resolution = voxelGiGpu.resolution;
         const size_t sliceBytes = static_cast<size_t>(resolution) * resolution * 4;
         std::array<std::vector<int>, 4> changedLayers;
+        std::array<std::array<bool, 64>, 4> changed{};
         for (const VoxelGiSliceUpdate& update : voxelGiUpdates) {
             if (update.level < 0 || update.level >= voxelGiGpu.levelCount ||
-                update.voxels.size() != static_cast<size_t>(resolution * resolution))
-                continue;
-            VoxelGiGpuLevel& level = voxelGiGpu.levels[
-                static_cast<size_t>(update.level)];
-            const int layer = voxelGiPositiveMod(update.zLayer, resolution);
-            uint8_t* albedo = level.albedoBytes.data() +
-                static_cast<size_t>(layer) * sliceBytes;
-            uint8_t* light = level.lightBytes.data() +
-                static_cast<size_t>(layer) * sliceBytes;
-            for (size_t index = 0; index < update.voxels.size(); ++index) {
-                const VoxelGiPacked& voxel = update.voxels[index];
-                albedo[index * 4 + 0] = voxel.red;
-                albedo[index * 4 + 1] = voxel.green;
-                albedo[index * 4 + 2] = voxel.blue;
-                albedo[index * 4 + 3] = voxel.opacity;
-                light[index * 4 + 0] = voxel.skyLight;
-                light[index * 4 + 1] = voxel.blockLight;
-                light[index * 4 + 2] = voxel.emission;
-                light[index * 4 + 3] = voxel.valid;
+                update.axis < 0 || update.axis > 2 ||
+                (!update.voxels.empty() && update.voxels.size() !=
+                    static_cast<size_t>(resolution * resolution))) continue;
+            VoxelGiGpuLevel& level = voxelGiGpu.levels[static_cast<size_t>(update.level)];
+            const int layer = voxelGiPositiveMod(update.layer, resolution);
+            const int firstAxis = update.axis == 0 ? 1 : 0;
+            const int secondAxis = update.axis == 2 ? 1 : 2;
+            for (int v = 0; v < resolution; ++v) {
+                for (int u = 0; u < resolution; ++u) {
+                    glm::ivec3 cell(0);
+                    cell[update.axis] = layer;
+                    cell[firstAxis] = u;
+                    cell[secondAxis] = v;
+                    const size_t index = static_cast<size_t>(
+                        cell.x + resolution * (cell.y + resolution * cell.z)) * 4;
+                    const VoxelGiPacked voxel = update.voxels.empty() ? VoxelGiPacked{}
+                        : update.voxels[static_cast<size_t>(u + v * resolution)];
+                    level.albedoBytes[index] = voxel.red;
+                    level.albedoBytes[index + 1] = voxel.green;
+                    level.albedoBytes[index + 2] = voxel.blue;
+                    level.albedoBytes[index + 3] = voxel.opacity;
+                    level.lightBytes[index] = voxel.skyLight;
+                    level.lightBytes[index + 1] = voxel.blockLight;
+                    level.lightBytes[index + 2] = voxel.emission;
+                    if (level.lightBytes[index + 3]) --level.validVoxels;
+                    level.lightBytes[index + 3] = voxel.valid;
+                    if (voxel.valid) ++level.validVoxels;
+                    changed[static_cast<size_t>(update.level)][cell.z] = true;
+                }
             }
-            auto& layers = changedLayers[static_cast<size_t>(update.level)];
-            if (std::find(layers.begin(), layers.end(), layer) == layers.end())
-                layers.push_back(layer);
             level.dirty = true;
         }
-        voxelGiUpdates.clear();
+        for (int level = 0; level < voxelGiGpu.levelCount; ++level)
+            for (int z = 0; z < resolution; ++z)
+                if (changed[static_cast<size_t>(level)][z])
+                    changedLayers[static_cast<size_t>(level)].push_back(z);
+        voxelGiCache.recycleUpdates(voxelGiUpdates);
         for (int levelIndex = 0; levelIndex < voxelGiGpu.levelCount; ++levelIndex) {
             VoxelGiGpuLevel& level = voxelGiGpu.levels[
                 static_cast<size_t>(levelIndex)];
@@ -1633,6 +1650,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             queue(level.albedoOpacity, level.albedoBytes);
             queue(level.lightValidity, level.lightBytes);
         }
+        size_t valid = 0;
+        for (int level = 0; level < voxelGiGpu.levelCount; ++level)
+            valid += voxelGiGpu.levels[static_cast<size_t>(level)].validVoxels;
+        voxelGiRuntime.validVoxelFraction = static_cast<float>(valid) /
+            static_cast<float>(resolution * resolution * resolution * voxelGiGpu.levelCount);
     }
 
     void prepareVoxelGiUniform(uint32_t imageIndex) {
@@ -2068,7 +2090,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             toGeneral.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             toGeneral.image = level.irradiance.image;
             toGeneral.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            toGeneral.subresourceRange.levelCount = voxelGiGpu.mipLevels;
+            toGeneral.subresourceRange.levelCount = 1;
             toGeneral.subresourceRange.layerCount = 1;
             toGeneral.srcAccessMask = level.irradiance.initialized
                 ? VK_ACCESS_SHADER_READ_BIT : 0;
@@ -2086,91 +2108,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             const uint32_t groups = (resolution + 3u) / 4u;
             vkCmdDispatch(command, groups, groups, groups);
 
-            std::vector<VkImageMemoryBarrier> mipBarriers;
-            mipBarriers.reserve(voxelGiGpu.mipLevels);
-            for (uint32_t mip = 0; mip < voxelGiGpu.mipLevels; ++mip) {
-                VkImageMemoryBarrier barrier{};
-                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-                barrier.newLayout = mip == 0
-                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                    : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                barrier.image = level.irradiance.image;
-                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                barrier.subresourceRange.baseMipLevel = mip;
-                barrier.subresourceRange.levelCount = 1;
-                barrier.subresourceRange.layerCount = 1;
-                barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-                barrier.dstAccessMask = mip == 0
-                    ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT;
-                mipBarriers.push_back(barrier);
-            }
+            VkImageMemoryBarrier readable = toGeneral;
+            readable.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+            readable.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            readable.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            readable.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                static_cast<uint32_t>(mipBarriers.size()), mipBarriers.data());
-            int sourceSize = voxelGiGpu.resolution;
-            for (uint32_t mip = 1; mip < voxelGiGpu.mipLevels; ++mip) {
-                const int destinationSize = std::max(1, sourceSize / 2);
-                VkImageBlit blit{};
-                blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                blit.srcSubresource.mipLevel = mip - 1;
-                blit.srcSubresource.layerCount = 1;
-                blit.srcOffsets[1] = {sourceSize, sourceSize, sourceSize};
-                blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                blit.dstSubresource.mipLevel = mip;
-                blit.dstSubresource.layerCount = 1;
-                blit.dstOffsets[1] = {destinationSize, destinationSize,
-                                      destinationSize};
-                vkCmdBlitImage(command, level.irradiance.image,
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    level.irradiance.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    1, &blit, VK_FILTER_NEAREST);
-                if (mip + 1 < voxelGiGpu.mipLevels) {
-                    VkImageMemoryBarrier next{};
-                    next.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                    next.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    next.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                    next.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                    next.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                    next.image = level.irradiance.image;
-                    next.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                    next.subresourceRange.baseMipLevel = mip;
-                    next.subresourceRange.levelCount = 1;
-                    next.subresourceRange.layerCount = 1;
-                    next.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                    next.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-                    vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                        1, &next);
-                }
-                sourceSize = destinationSize;
-            }
-            std::vector<VkImageMemoryBarrier> readable;
-            readable.reserve(voxelGiGpu.mipLevels);
-            for (uint32_t mip = 0; mip < voxelGiGpu.mipLevels; ++mip) {
-                VkImageMemoryBarrier barrier{};
-                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                barrier.oldLayout = mip + 1 < voxelGiGpu.mipLevels
-                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                    : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                barrier.image = level.irradiance.image;
-                barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                barrier.subresourceRange.baseMipLevel = mip;
-                barrier.subresourceRange.levelCount = 1;
-                barrier.subresourceRange.layerCount = 1;
-                barrier.srcAccessMask = mip + 1 < voxelGiGpu.mipLevels
-                    ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT;
-                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-                readable.push_back(barrier);
-            }
-            vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                static_cast<uint32_t>(readable.size()), readable.data());
+                1, &readable);
             level.irradiance.initialized = true;
             level.dirty = false;
         }
@@ -2852,6 +2797,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             return;
         if (presentationSuspended) resumePresentation();
         if (presentationSuspended || !swapchain.handle) return;
+        if (voxelGiRuntime.availability == VoxelGiAvailability::AllocationFailed &&
+            voxelGiConfig(visualQuality, enhancedVisualSettings).enabled &&
+            RuntimeClock::seconds(RuntimeClock::elapsed(voxelGiRetryAt,
+                RuntimeClock{}.now())) >= 5.0)
+            swapchainDirty = true;
         if (swapchainDirty) recreateSwapchain();
         performance = {};
         RuntimeClock clock;

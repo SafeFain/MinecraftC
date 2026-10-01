@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout(set=0,binding=0) uniform sampler2D surfaceData;
 layout(set=0,binding=1) uniform sampler2D previousHistory;
@@ -40,32 +41,55 @@ vec3 decodeNormal(vec2 encoded){
     return normalize(n);
 }
 
-vec4 sampleLevel(int level,vec3 world,float lod){
-    vec4 mapping=gi.minimumCellAndSize[level];
-    vec3 cell=world/mapping.w;
-    vec3 local=cell-mapping.xyz;
-    if(any(lessThan(local,vec3(0.5)))||
-       any(greaterThan(local,vec3(gi.config.x-0.5))))return vec4(0.0,0.0,0.0,-1.0);
-    vec3 uv=(mod(floor(cell),gi.config.x)+0.5)/gi.config.x;
-    if(level==0)return textureLod(irradiance0,uv,lod);
-    if(level==1)return textureLod(irradiance1,uv,lod);
-    if(level==2)return textureLod(irradiance2,uv,lod);
-    return textureLod(irradiance3,uv,lod);
+// Validity stays discrete at mip zero. Never interpolate the -1 sentinel
+// with opacity, or wrap a filter footprint across a world-space clipmap edge.
+vec4 fetchCell(int level,ivec3 cell){
+    ivec3 minimum=ivec3(gi.minimumCellAndSize[level].xyz);
+    int resolution=int(gi.config.x);
+    if(any(lessThan(cell,minimum))||
+       any(greaterThanEqual(cell,minimum+ivec3(resolution))))return vec4(0,0,0,-1);
+    ivec3 ring=ivec3(mod(vec3(cell),gi.config.x));
+    if(level==0)return texelFetch(irradiance0,ring,0);
+    if(level==1)return texelFetch(irradiance1,ring,0);
+    if(level==2)return texelFetch(irradiance2,ring,0);
+    return texelFetch(irradiance3,ring,0);
 }
 
-vec4 sampleClipmap(vec3 world,float diameter){
+vec4 sampleClipmap(vec3 world,out int selectedLevel){
     int count=int(gi.config.y+0.5);
+    selectedLevel=-1;
     for(int level=0;level<4;++level){
         if(level>=count)break;
-        vec4 mapping=gi.minimumCellAndSize[level];
-        vec3 local=world/mapping.w-mapping.xyz;
-        if(all(greaterThanEqual(local,vec3(1.0)))&&
-           all(lessThan(local,vec3(gi.config.x-1.0)))){
-            float lod=max(0.0,log2(max(diameter/mapping.w,1.0)));
-            return sampleLevel(level,world,lod);
-        }
+        ivec3 cell=ivec3(floor(world/gi.minimumCellAndSize[level].w));
+        vec4 value=fetchCell(level,cell);
+        if(value.a>=0.0){selectedLevel=level;return value;}
     }
-    return vec4(0.0,0.0,0.0,-1.0);
+    return vec4(0,0,0,-1);
+}
+
+vec3 filteredRadiance(int level,vec3 world,float diameter,vec3 direction){
+    float cellSize=gi.minimumCellAndSize[level].w;
+    vec3 cell=world/cellSize-0.5;
+    ivec3 base=ivec3(floor(cell));
+    // A bounded local footprint replaces coarse toroidal mip sampling.
+    // Wider cones soften the local lobe without importing remote ring cells.
+    vec3 fraction=mix(fract(cell),vec3(0.5),
+        clamp(diameter/cellSize-1.0,0.0,1.0));
+    vec3 sum=vec3(0);
+    float weight=0.0;
+    for(int z=0;z<2;++z)for(int y=0;y<2;++y)for(int x=0;x<2;++x){
+        ivec3 offset=ivec3(x,y,z);
+        vec3 factors=mix(vec3(1.0)-fraction,fraction,vec3(offset));
+        float w=factors.x*factors.y*factors.z;
+        vec4 value=fetchCell(level,base+offset);
+        // The forward half-space can lie behind the first opaque intersection.
+        vec3 delta=(vec3(base+offset)+0.5)*cellSize-world;
+        bool currentCell=all(equal(base+offset,ivec3(floor(world/cellSize))));
+        if(value.a<0.0||(!currentCell&&dot(delta,direction)>cellSize*0.01))continue;
+        sum+=value.rgb*w;
+        weight+=w;
+    }
+    return sum/max(weight,0.0001);
 }
 
 vec3 coneDirection(vec3 normal,int index,int count,float rotation){
@@ -78,63 +102,54 @@ vec3 coneDirection(vec3 normal,int index,int count,float rotation){
 
 vec3 traceGi(vec3 world,vec3 normal,out float validCoverage){
     int cones=int(gi.config.z+0.5);
-    int steps=int(gi.config.w+0.5);
-    float rotation=fract(sin(dot(floor(gl_FragCoord.xy),vec2(12.9898,78.233))+
-        post.texelTime.z)*43758.5453);
+    int budget=int(gi.config.w+0.5)*32;
+    float maximumDistance=gi.temporal.w;
+    // Stable world-space sampling avoids time-driven flicker on static surfaces.
+    float rotation=fract(sin(dot(floor(world),vec3(12.9898,78.233,37.719)))*43758.5453);
     vec3 total=vec3(0.0);
     validCoverage=0.0;
     for(int cone=0;cone<6;++cone){
         if(cone>=cones)break;
         vec3 direction=coneDirection(normal,cone,cones,rotation);
-        float travel=1.25;
+        vec3 origin=world+normal*0.08;
+        float travel=0.02;
         float transmittance=1.0;
         vec3 accumulated=vec3(0.0);
-        float coverage=0.0;
-        for(int stepIndex=0;stepIndex<8;++stepIndex){
-            if(stepIndex>=steps)break;
-            float diameter=max(1.0,travel*0.58);
-            vec4 sampleValue=sampleClipmap(
-                world+normal*0.45+direction*travel,diameter);
-            if(sampleValue.a<0.0){travel+=diameter;continue;}
-            float opacity=clamp(sampleValue.a,0.0,1.0);
-            accumulated+=sampleValue.rgb*transmittance*(0.22+opacity*0.78);
-            transmittance*=1.0-opacity*0.72;
-            coverage+=1.0;
-            travel+=diameter;
+        bool known=false;
+        for(int stepIndex=0;stepIndex<256;++stepIndex){
+            if(stepIndex>=budget||travel>maximumDistance||transmittance<0.02)break;
+            vec3 position=origin+direction*travel;
+            int level;
+            vec4 value=sampleClipmap(position,level);
+            // Try the coarser valid levels first; unknown space then ends the ray.
+            // It neither spends radiance samples nor creates a fictitious occluder.
+            if(level<0)break;
+            known=true;
+            float cellSize=gi.minimumCellAndSize[level].w;
+            float opacity=clamp(value.a,0.0,1.0);
+            if(opacity>0.0){
+                float diameter=max(cellSize,travel*0.58);
+                accumulated+=filteredRadiance(level,position,diameter,direction)*
+                    transmittance*opacity;
+                transmittance*=1.0-opacity;
+            }
+            // Visit each intersected cell instead of exponentially jumping over walls.
+            vec3 cell=floor(position/cellSize);
+            vec3 boundary=(cell+step(vec3(0.0),direction))*cellSize;
+            vec3 crossing=vec3(1e20);
+            for(int axis=0;axis<3;++axis)
+                if(abs(direction[axis])>0.00001)
+                    crossing[axis]=(boundary[axis]-position[axis])/direction[axis];
+            travel+=max(min(crossing.x,min(crossing.y,crossing.z)),0.0)+0.001;
         }
         total+=accumulated;
-        validCoverage+=coverage/max(float(steps),1.0);
+        validCoverage+=known?1.0:0.0;
     }
     validCoverage/=max(float(cones),1.0);
     return total/max(float(cones),1.0)*gi.temporal.x;
 }
 
-float screenAo(vec4 center,vec3 normal){
-    float centerDistance=abs(center.z);
-    int directions=int(post.screenQuality.x+0.5);
-    int steps=int(post.screenQuality.y+0.5);
-    float occlusion=0.0,samples=0.0;
-    if(center.z>0.01&&center.w<1.9){
-        for(int direction=0;direction<8;++direction){
-            if(direction>=directions)break;
-            float angle=6.2831853*(float(direction)+0.37)/max(float(directions),1.0);
-            vec2 axis=vec2(cos(angle),sin(angle));
-            for(int stepIndex=1;stepIndex<=4;++stepIndex){
-                if(stepIndex>steps)break;
-                float radius=(2.0+float(stepIndex)*3.0)*
-                    (1.0+min(centerDistance,96.0)*0.012);
-                vec4 neighbor=texture(surfaceData,clamp(vUv+axis*post.texelTime.xy*radius,
-                    vec2(0.0),vec2(1.0)));
-                float closer=smoothstep(0.18,1.8,centerDistance-abs(neighbor.z)-
-                    float(stepIndex)*0.08);
-                occlusion+=closer*(0.55+0.45*max(dot(normal,
-                    decodeNormal(neighbor.xy)),0.0));
-                samples+=1.0;
-            }
-        }
-    }
-    return 1.0-clamp(occlusion/max(samples,1.0),0.0,1.0)*0.30;
-}
+#include "screen_effect_common.glsl"
 
 void main(){
     vec4 surface=texture(surfaceData,vUv);
@@ -172,11 +187,5 @@ void main(){
         }
     }
     vec3 result=mix(current,history,clamp(weight,0.0,0.95));
-    int shaftSamples=int(post.screenQuality.z+0.5);
-    if(shaftSamples>0&&post.sunScreen.z>0.5){
-        vec2 toSun=post.sunScreen.xy-vUv;
-        float radial=1.0-smoothstep(0.08,1.15,length(toSun));
-        result+=vec3(1.0,0.74,0.42)*radial*post.sunScreen.w*0.035;
-    }
     outEffects=vec4(max(result,vec3(0.0)),ao);
 }

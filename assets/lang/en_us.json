@@ -183,6 +183,7 @@
   "settings.gi_distance": "GI Distance: {0} blocks",
   "settings.gi_temporal": "Temporal Stability: {0}",
   "settings.gi_unavailable": "Unavailable",
+  "settings.gi_inactive": "Inactive",
   "settings.transparent_leaves": "Transparent Leaves: {0}",
   "settings.visual_low": "Low",
   "settings.visual_medium": "Medium",

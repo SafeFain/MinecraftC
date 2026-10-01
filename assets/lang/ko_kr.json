@@ -180,6 +180,7 @@
   "settings.gi_distance": "GI 거리: {0} 블록",
   "settings.gi_temporal": "시간 안정성: {0}",
   "settings.gi_unavailable": "사용 불가",
+  "settings.gi_inactive": "비활성",
   "settings.transparent_leaves": "나뭇잎 투명도: {0}",
   "settings.visual_low": "낮음",
   "settings.visual_medium": "중간",

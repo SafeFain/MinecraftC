@@ -27,6 +27,9 @@ struct VoxelGiStatus {
     VoxelGiAvailability availability = VoxelGiAvailability::Disabled;
     bool requested = false;
     bool active = false;
+    size_t pendingSlices = 0;
+    size_t sourceChunks = 0;
+    float validVoxelFraction = 0.0f;
 };
 
 struct VoxelGiDeviceSupport {
@@ -38,17 +41,16 @@ struct VoxelGiDeviceSupport {
     bool attributeSampling = false;
     bool irradianceSampling = false;
     bool irradianceStorage = false;
-    bool irradianceBlit = false;
 };
 
 inline VoxelGiAvailability voxelGiAvailability(
         const VoxelGiDeviceSupport& support) {
     if (support.maximum3dDimension < 64 ||
-        support.sampledImagesPerStage < 7 || support.sampledImagesPerSet < 7 ||
+        support.sampledImagesPerStage < 8 || support.sampledImagesPerSet < 8 ||
         support.storageImagesPerStage < 1 || support.storageImagesPerSet < 1)
         return VoxelGiAvailability::UnsupportedLimits;
     if (!support.attributeSampling || !support.irradianceSampling ||
-        !support.irradianceStorage || !support.irradianceBlit)
+        !support.irradianceStorage)
         return VoxelGiAvailability::UnsupportedFormat;
     return VoxelGiAvailability::Available;
 }
@@ -113,7 +115,9 @@ inline int voxelGiCellSize(const VoxelGiConfig& config, int level) {
 
 struct VoxelGiSliceUpdate {
     int level = 0;
-    int zLayer = 0;
+    int axis = 2;
+    int layer = 0;
+    // Empty voxels invalidate an exposed plane before bounded resampling.
     std::vector<VoxelGiPacked> voxels;
 };
 
@@ -122,27 +126,9 @@ struct VoxelGiLevelMapping {
     int cellSize = 1;
 };
 
-inline bool voxelGiRejectHistory(float currentDepth, float previousDepth,
-                                 const glm::vec3& currentNormal,
-                                 const glm::vec3& previousNormal,
-                                 bool insideScreen, bool clipmapValid) {
-    if (!insideScreen || !clipmapValid || currentDepth <= 0.0f ||
-        previousDepth <= 0.0f) return true;
-    const float tolerance = std::max(0.18f, currentDepth * 0.018f);
-    return std::abs(currentDepth - previousDepth) > tolerance ||
-        glm::dot(glm::normalize(currentNormal),
-                 glm::normalize(previousNormal)) < 0.82f;
-}
-
-inline glm::vec3 voxelGiNeighborhoodClamp(const glm::vec3& history,
-                                          const glm::vec3& minimum,
-                                          const glm::vec3& maximum) {
-    return glm::clamp(history, minimum, maximum);
-}
-
 // CPU-side source cache and toroidal clipmap scheduler. It owns snapshots only
 // for chunks accepted within the current bounded frame budget. Vulkan consumes
-// completed Z slices immediately and never retains Chunk pointers.
+// completed axis-aligned planes immediately and never retains Chunk pointers.
 class VoxelGiSceneCache {
 public:
     void configure(const VoxelGiConfig& config) {
@@ -155,7 +141,7 @@ public:
 
     void beginFrame(const glm::dvec3& camera, uint64_t sceneId) {
         ++m_frame;
-        m_chunkCopiesRemaining = std::max(1, m_config.updateSlicesPerFrame / 2);
+        m_chunkCopiesRemaining = std::max(1, m_config.updateSlicesPerFrame * 2);
         if (sceneId != m_sceneId) {
             reset();
             m_sceneId = sceneId;
@@ -167,6 +153,7 @@ public:
     }
 
     bool submit(const Chunk& chunk) {
+        if (!intersectsClipmaps(chunk.cx, chunk.cz)) return false;
         const int64_t key = chunkKey(chunk.cx, chunk.cz);
         auto found = m_chunks.find(key);
         if (found != m_chunks.end()) found->second.lastSeen = m_frame;
@@ -180,6 +167,7 @@ public:
         snapshot.revision = revision;
         snapshot.lastSeen = m_frame;
         chunk.copyRawState(snapshot.blocks, snapshot.light);
+        buildCoarseCells(snapshot);
         m_chunks[key] = std::move(snapshot);
         --m_chunkCopiesRemaining;
         markChunkDirty(chunk.cx, chunk.cz);
@@ -188,28 +176,43 @@ public:
 
     void endFrame() {
         for (auto it = m_chunks.begin(); it != m_chunks.end();) {
-            if (m_frame - it->second.lastSeen > 2) it = m_chunks.erase(it);
-            else ++it;
+            if (m_frame - it->second.lastSeen > 2 ||
+                !intersectsClipmaps(it->second.cx, it->second.cz)) {
+                markChunkDirty(it->second.cx, it->second.cz);
+                it = m_chunks.erase(it);
+            } else ++it;
         }
     }
 
     std::vector<VoxelGiSliceUpdate> takeUpdates(int maximum) {
-        std::vector<VoxelGiSliceUpdate> result;
+        std::vector<VoxelGiSliceUpdate> result = std::move(m_invalidations);
+        m_invalidations.clear();
         maximum = std::max(0, maximum);
-        while (!m_dirty.empty() && static_cast<int>(result.size()) < maximum) {
+        int built = 0;
+        while (!m_dirty.empty() && built < maximum) {
             const DirtySlice dirty = m_dirty.front();
             m_dirty.pop_front();
-            m_dirtySet.erase((static_cast<uint64_t>(
-                static_cast<uint32_t>(dirty.level)) << 32) |
-                static_cast<uint32_t>(dirty.worldZ));
-            if (dirty.level < 0 || dirty.level >= static_cast<int>(m_levels.size()))
-                continue;
-            result.push_back(buildSlice(dirty.level, dirty.worldZ));
+            m_dirtySet.erase(sliceKey(dirty.level, dirty.axis, dirty.worldCell));
+            const Level& state = m_levels[static_cast<size_t>(dirty.level)];
+            if (dirty.worldCell < state.minimumCell[dirty.axis] ||
+                dirty.worldCell >= state.minimumCell[dirty.axis] +
+                    m_config.clipmapResolution) continue;
+            result.push_back(buildSlice(dirty.level, dirty.axis, dirty.worldCell));
+            ++built;
         }
         return result;
     }
 
+    void recycleUpdates(std::vector<VoxelGiSliceUpdate>& updates) {
+        for (auto& update : updates)
+            if (!update.voxels.empty() && m_sliceBuffers.size() <
+                    static_cast<size_t>(m_config.updateSlicesPerFrame))
+                m_sliceBuffers.push_back(std::move(update.voxels));
+        updates.clear();
+    }
+
     size_t pendingSlices() const { return m_dirty.size(); }
+    size_t cachedChunks() const { return m_chunks.size(); }
     const VoxelGiConfig& config() const { return m_config; }
     VoxelGiLevelMapping levelMapping(int level) const {
         if (level < 0 || level >= static_cast<int>(m_levels.size())) return {};
@@ -222,6 +225,8 @@ public:
         m_levels.clear();
         m_dirty.clear();
         m_dirtySet.clear();
+        m_invalidations.clear();
+        m_sliceBuffers.clear();
         m_sceneId = std::numeric_limits<uint64_t>::max();
     }
 
@@ -233,12 +238,13 @@ private:
         uint64_t lastSeen = 0;
         std::vector<uint8_t> blocks;
         std::vector<uint8_t> light;
+        std::array<std::vector<VoxelGiPacked>, 4> coarse;
     };
     struct Level {
         glm::ivec3 minimumCell{0};
         bool initialized = false;
     };
-    struct DirtySlice { int level = 0; int worldZ = 0; };
+    struct DirtySlice { int level = 0; int axis = 2; int worldCell = 0; };
 
     VoxelGiConfig m_config{};
     glm::dvec3 m_camera{0.0};
@@ -249,6 +255,8 @@ private:
     std::vector<Level> m_levels;
     std::deque<DirtySlice> m_dirty;
     std::unordered_set<uint64_t> m_dirtySet;
+    std::vector<VoxelGiSliceUpdate> m_invalidations;
+    std::vector<std::vector<VoxelGiPacked>> m_sliceBuffers;
 
     static int64_t chunkKey(int cx, int cz) {
         return static_cast<int64_t>(
@@ -261,23 +269,56 @@ private:
             m_levels.assign(static_cast<size_t>(m_config.clipmapLevels), {});
     }
 
-    void queueFullLevel(int level) {
-        const Level& state = m_levels[static_cast<size_t>(level)];
-        for (int z = 0; z < m_config.clipmapResolution; ++z)
-            queueSlice(level, state.minimumCell.z + z);
+    uint64_t sliceKey(int level, int axis, int worldCell) const {
+        return (static_cast<uint64_t>(level * 3 + axis) << 32) |
+            static_cast<uint32_t>(worldCell);
     }
 
-    void queueSlice(int level, int worldZ) {
-        const uint64_t key = (static_cast<uint64_t>(
-            static_cast<uint32_t>(level)) << 32) |
-            static_cast<uint32_t>(worldZ);
-        if (m_dirtySet.insert(key).second) m_dirty.push_back({level, worldZ});
+    bool intersectsLevel(int cx, int cz, int level) const {
+        const auto mapping = levelMapping(level);
+        const int minX = mapping.minimumCell.x * mapping.cellSize;
+        const int minZ = mapping.minimumCell.z * mapping.cellSize;
+        const int extent = m_config.clipmapResolution * mapping.cellSize;
+        return cx * Config::CHUNK_SIZE_X < minX + extent &&
+            (cx + 1) * Config::CHUNK_SIZE_X > minX &&
+            cz * Config::CHUNK_SIZE_Z < minZ + extent &&
+            (cz + 1) * Config::CHUNK_SIZE_Z > minZ;
+    }
+
+    bool intersectsClipmaps(int cx, int cz) const {
+        for (int level = 0; level < static_cast<int>(m_levels.size()); ++level)
+            if (intersectsLevel(cx, cz, level)) return true;
+        return false;
+    }
+
+    void queueFullLevel(int level) {
+        const Level& state = m_levels[static_cast<size_t>(level)];
+        const int half = m_config.clipmapResolution / 2;
+        for (int offset = 0; offset < m_config.clipmapResolution; ++offset) {
+            const int z = offset % 2 ? half - (offset + 1) / 2 : half + offset / 2;
+            invalidatePlane(level, 2, state.minimumCell.z + z);
+        }
+    }
+
+    void queueSlice(int level, int axis, int worldCell) {
+        if (m_dirtySet.insert(sliceKey(level, axis, worldCell)).second)
+            m_dirty.push_back({level, axis, worldCell});
+    }
+
+    void invalidatePlane(int level, int axis, int worldCell) {
+        VoxelGiSliceUpdate update;
+        update.level = level;
+        update.axis = axis;
+        update.layer = voxelGiPositiveMod(worldCell, m_config.clipmapResolution);
+        m_invalidations.push_back(std::move(update));
+        queueSlice(level, axis, worldCell);
     }
 
     void updateLevelOrigin(int levelIndex) {
         Level& state = m_levels[static_cast<size_t>(levelIndex)];
         const int cellSize = voxelGiCellSize(m_config, levelIndex);
-        const int half = m_config.clipmapResolution / 2;
+        const int resolution = m_config.clipmapResolution;
+        const int half = resolution / 2;
         const glm::ivec3 next(
             voxelGiFloorDiv(static_cast<int>(std::floor(m_camera.x)), cellSize) - half,
             voxelGiFloorDiv(static_cast<int>(std::floor(m_camera.y)), cellSize) - half,
@@ -289,29 +330,36 @@ private:
             return;
         }
         const glm::ivec3 previous = state.minimumCell;
-        const int deltaZ = next.z - previous.z;
         state.minimumCell = next;
-        if (std::abs(deltaZ) >= m_config.clipmapResolution) {
-            queueFullLevel(levelIndex);
+        // Discard planes that have left the volume; rapid movement cannot grow
+        // the queue without bound or upload obsolete ring coordinates.
+        for (auto it = m_dirty.begin(); it != m_dirty.end();) {
+            if (it->level == levelIndex &&
+                (it->worldCell < next[it->axis] ||
+                 it->worldCell >= next[it->axis] + resolution)) {
+                m_dirtySet.erase(sliceKey(it->level, it->axis, it->worldCell));
+                it = m_dirty.erase(it);
+            } else ++it;
+        }
+        const glm::ivec3 delta = next - previous;
+        if (glm::any(glm::greaterThanEqual(glm::abs(delta), glm::ivec3(resolution)))) {
+            for (int z = 0; z < resolution; ++z)
+                invalidatePlane(levelIndex, 2, next.z + z);
             return;
         }
-        if (deltaZ > 0)
-            for (int z = m_config.clipmapResolution - deltaZ;
-                 z < m_config.clipmapResolution; ++z)
-                queueSlice(levelIndex, next.z + z);
-        else if (deltaZ < 0)
-            for (int z = 0; z < -deltaZ; ++z)
-                queueSlice(levelIndex, next.z + z);
-        // X/Y movement changes the contents of every Z plane. Re-queue them
-        // gradually; this remains bounded and avoids a synchronous rebuild.
-        if (next.x != previous.x || next.y != previous.y)
-            queueFullLevel(levelIndex);
+        for (int axis = 0; axis < 3; ++axis) {
+            const int first = delta[axis] > 0 ? resolution - delta[axis] : 0;
+            const int last = delta[axis] > 0 ? resolution : -delta[axis];
+            for (int cell = first; cell < last; ++cell)
+                invalidatePlane(levelIndex, axis, next[axis] + cell);
+        }
     }
 
     void markChunkDirty(int cx, int cz) {
         const int worldMinZ = cz * Config::CHUNK_SIZE_Z;
         const int worldMaxZ = worldMinZ + Config::CHUNK_SIZE_Z - 1;
         for (int level = 0; level < static_cast<int>(m_levels.size()); ++level) {
+            if (!intersectsLevel(cx, cz, level)) continue;
             const int cellSize = voxelGiCellSize(m_config, level);
             const int minCell = voxelGiFloorDiv(worldMinZ, cellSize);
             const int maxCell = voxelGiFloorDiv(worldMaxZ, cellSize);
@@ -319,12 +367,59 @@ private:
             for (int z = std::max(minCell, state.minimumCell.z);
                  z <= std::min(maxCell, state.minimumCell.z +
                     m_config.clipmapResolution - 1); ++z)
-                queueSlice(level, z);
+                queueSlice(level, 2, z);
         }
-        (void)cx;
     }
 
-    VoxelGiPacked sample(int worldX, int worldY, int worldZ) const {
+    void buildCoarseCells(CachedChunk& chunk) const {
+        const int maximumCellSize = voxelGiCellSize(m_config, m_config.clipmapLevels - 1);
+        // All cell sizes are powers of two up to 16 and align with chunk bounds.
+        // Average surface colour/light while retaining maximum opacity/emission;
+        // a one-block wall must not disappear between coarse representative points.
+        for (int mip = 0, size = 2; mip < 4 && size <= maximumCellSize; ++mip, size *= 2) {
+            const int width = Config::CHUNK_SIZE_X / size;
+            const int height = Config::CHUNK_SIZE_Y / size;
+            auto& output = chunk.coarse[static_cast<size_t>(mip)];
+            output.resize(static_cast<size_t>(width * width * height));
+            for (int y = 0; y < height; ++y)
+                for (int z = 0; z < width; ++z)
+                    for (int x = 0; x < width; ++x) {
+                        VoxelGiPacked aggregate;
+                        unsigned red = 0, green = 0, blue = 0, weight = 0;
+                        unsigned sky = 0, block = 0;
+                        for (int dy = 0; dy < 2; ++dy)
+                            for (int dz = 0; dz < 2; ++dz)
+                                for (int dx = 0; dx < 2; ++dx) {
+                                    const int px = x * 2 + dx, py = y * 2 + dy, pz = z * 2 + dz;
+                                    const int previousWidth = width * 2;
+                                    const size_t index = static_cast<size_t>(px +
+                                        previousWidth * (pz + previousWidth * py));
+                                    const VoxelGiPacked value = mip == 0
+                                        ? packVoxelGi(static_cast<BlockId>(chunk.blocks[index]), chunk.light[index])
+                                        : chunk.coarse[static_cast<size_t>(mip - 1)][index];
+                                    aggregate.opacity = std::max(aggregate.opacity, value.opacity);
+                                    aggregate.emission = std::max(aggregate.emission, value.emission);
+                                    aggregate.valid = 255;
+                                    red += value.red * value.opacity;
+                                    green += value.green * value.opacity;
+                                    blue += value.blue * value.opacity;
+                                    weight += value.opacity;
+                                    sky += value.skyLight * value.opacity;
+                                    block += value.blockLight * value.opacity;
+                                }
+                        if (weight) {
+                            aggregate.red = static_cast<uint8_t>(red / weight);
+                            aggregate.green = static_cast<uint8_t>(green / weight);
+                            aggregate.blue = static_cast<uint8_t>(blue / weight);
+                            aggregate.skyLight = static_cast<uint8_t>(sky / weight);
+                            aggregate.blockLight = static_cast<uint8_t>(block / weight);
+                        }
+                        output[static_cast<size_t>(x + width * (z + width * y))] = aggregate;
+                    }
+        }
+    }
+
+    VoxelGiPacked sample(int worldX, int worldY, int worldZ, int cellSize) const {
         if (!Config::isValidWorldY(worldY)) return {};
         const int cx = voxelGiFloorDiv(worldX, Config::CHUNK_SIZE_X);
         const int cz = voxelGiFloorDiv(worldZ, Config::CHUNK_SIZE_Z);
@@ -332,6 +427,15 @@ private:
         if (found == m_chunks.end()) return {};
         const int x = voxelGiPositiveMod(worldX, Config::CHUNK_SIZE_X);
         const int z = voxelGiPositiveMod(worldZ, Config::CHUNK_SIZE_Z);
+        if (cellSize > 1) {
+            int mip = 0;
+            for (int size = 2; size < cellSize; size *= 2) ++mip;
+            const int width = Config::CHUNK_SIZE_X / cellSize;
+            const size_t index = static_cast<size_t>(x / cellSize + width *
+                (z / cellSize + width * (Config::worldYToStorageY(worldY) / cellSize)));
+            const auto& coarse = found->second.coarse[static_cast<size_t>(mip)];
+            return index < coarse.size() ? coarse[index] : VoxelGiPacked{};
+        }
         const size_t index = static_cast<size_t>(x + z * Config::CHUNK_SIZE_X +
             Config::worldYToStorageY(worldY) * Config::CHUNK_SIZE_X *
                 Config::CHUNK_SIZE_Z);
@@ -341,26 +445,33 @@ private:
                            found->second.light[index]);
     }
 
-    VoxelGiSliceUpdate buildSlice(int levelIndex, int worldCellZ) const {
+    VoxelGiSliceUpdate buildSlice(int levelIndex, int axis, int worldCell) {
         VoxelGiSliceUpdate update;
         update.level = levelIndex;
-        update.zLayer = voxelGiPositiveMod(
-            worldCellZ, m_config.clipmapResolution);
+        update.axis = axis;
+        update.layer = voxelGiPositiveMod(worldCell, m_config.clipmapResolution);
         const int resolution = m_config.clipmapResolution;
+        if (!m_sliceBuffers.empty()) {
+            update.voxels = std::move(m_sliceBuffers.back());
+            m_sliceBuffers.pop_back();
+        }
         update.voxels.resize(static_cast<size_t>(resolution * resolution));
         const Level& level = m_levels[static_cast<size_t>(levelIndex)];
         const int cellSize = voxelGiCellSize(m_config, levelIndex);
-        for (int y = 0; y < resolution; ++y) {
-            for (int x = 0; x < resolution; ++x) {
-                const int worldCellX = level.minimumCell.x + x;
-                const int worldCellY = level.minimumCell.y + y;
-                const int worldX = worldCellX * cellSize + cellSize / 2;
-                const int worldY = worldCellY * cellSize + cellSize / 2;
-                const int worldZ = worldCellZ * cellSize + cellSize / 2;
-                const int ringX = voxelGiPositiveMod(worldCellX, resolution);
-                const int ringY = voxelGiPositiveMod(worldCellY, resolution);
-                update.voxels[static_cast<size_t>(ringX + ringY * resolution)] =
-                    sample(worldX, worldY, worldZ);
+        // Vulkan tightly packed plane order: Y/Z for X, X/Z for Y, X/Y for Z.
+        const int firstAxis = axis == 0 ? 1 : 0;
+        const int secondAxis = axis == 2 ? 1 : 2;
+        for (int v = 0; v < resolution; ++v) {
+            for (int u = 0; u < resolution; ++u) {
+                glm::ivec3 cell = level.minimumCell;
+                cell[axis] = worldCell;
+                cell[firstAxis] += u;
+                cell[secondAxis] += v;
+                const glm::ivec3 world = cell * cellSize + glm::ivec3(cellSize / 2);
+                const int ringU = voxelGiPositiveMod(cell[firstAxis], resolution);
+                const int ringV = voxelGiPositiveMod(cell[secondAxis], resolution);
+                update.voxels[static_cast<size_t>(ringU + ringV * resolution)] =
+                    sample(world.x, world.y, world.z, cellSize);
             }
         }
         return update;

@@ -249,10 +249,13 @@ void SettingsMenu::refreshButtons() {
         });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_particle_strength", {percent(settings.ambientParticleStrength)}), [this, cycle]{ cycle(m_settings.enhancedVisual.ambientParticleStrength); });
         const VoxelGiStatus giRuntime = m_giStatus ? m_giStatus() : VoxelGiStatus{};
+        m_displayedGiStatus = giRuntime;
         const std::string giValue = settings.gi.enabled &&
             giRuntime.availability != VoxelGiAvailability::Available
             ? m_localization.text("settings.gi_unavailable")
-            : onOff(settings.gi.enabled);
+            : settings.gi.enabled && (!giRuntime.active || settings.gi.strength == 0)
+                ? m_localization.text("settings.gi_inactive")
+                : onOff(settings.gi.enabled);
         m_buttons.emplace_back(m_localization.format("settings.gi_enabled", {
             giValue}), [this]{
                 m_settings.markGraphicsCustom();
@@ -473,6 +476,12 @@ void SettingsMenu::onGamepadBinding(GamepadBinding binding) {
 }
 
 void SettingsMenu::render(UIRenderer& ui, int width, int height) {
+    if (m_page == SettingsPage::EnhancedVisuals && m_giStatus) {
+        const auto status = m_giStatus();
+        if (status.availability != m_displayedGiStatus.availability ||
+            status.active != m_displayedGiStatus.active)
+            refreshButtons();
+    }
     UiTheme::dirtBackground(ui, static_cast<float>(width),
                             static_cast<float>(height));
     const std::string title = m_localization.text(

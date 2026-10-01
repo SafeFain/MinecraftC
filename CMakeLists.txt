@@ -521,6 +521,10 @@ if(BUILD_TESTING)
                 ${CMAKE_SOURCE_DIR}/tools/vulkan_shaders.py
                 --root ${CMAKE_SOURCE_DIR})
 
+    add_test(NAME vulkan_shader_provenance
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/test_vulkan_shaders.py)
+
     add_executable(vulkan_index_rebase_tests
         tests/VulkanIndexRebaseTests.cpp)
     target_include_directories(vulkan_index_rebase_tests PRIVATE src)

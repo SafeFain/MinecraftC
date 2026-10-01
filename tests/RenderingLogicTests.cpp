@@ -149,11 +149,11 @@ int main() {
     const VoxelGiConfig veryHighGi=voxelGiConfig(VisualQuality::VeryHigh,gi);
     const VoxelGiConfig ultraGi=voxelGiConfig(VisualQuality::Ultra,gi);
     require(lowGi.clipmapResolution==32&&lowGi.clipmapLevels==2&&
-            lowGi.screenDivisor==4&&lowGi.coneCount==2&&lowGi.coneSteps==4&&
+            lowGi.coneCount==2&&lowGi.coneSteps==4&&
             mediumGi.clipmapResolution==32&&mediumGi.clipmapLevels==3&&
             mediumGi.coneCount==3&&mediumGi.coneSteps==5&&
             highGi.clipmapResolution==48&&highGi.clipmapLevels==3&&
-            highGi.screenDivisor==2&&highGi.coneCount==4&&highGi.coneSteps==6&&
+            highGi.coneCount==4&&highGi.coneSteps==6&&
             veryHighGi.clipmapResolution==64&&veryHighGi.clipmapLevels==3&&
             veryHighGi.coneCount==5&&veryHighGi.coneSteps==7&&
             ultraGi.clipmapResolution==64&&ultraGi.clipmapLevels==4&&

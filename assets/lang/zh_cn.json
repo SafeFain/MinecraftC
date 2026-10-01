@@ -183,6 +183,7 @@
   "settings.gi_distance": "GI 距离：{0} 格",
   "settings.gi_temporal": "时序稳定度：{0}",
   "settings.gi_unavailable": "不可用",
+  "settings.gi_inactive": "未生效",
   "settings.transparent_leaves": "树叶透明：{0}",
   "settings.visual_low": "低",
   "settings.visual_medium": "中",

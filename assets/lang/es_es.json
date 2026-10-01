@@ -180,6 +180,7 @@
   "settings.gi_distance": "Distancia GI: {0} bloques",
   "settings.gi_temporal": "Estabilidad temporal: {0}",
   "settings.gi_unavailable": "No disponible",
+  "settings.gi_inactive": "Inactivo",
   "settings.transparent_leaves": "Hojas transparentes: {0}",
   "settings.visual_low": "Baja",
   "settings.visual_medium": "Media",

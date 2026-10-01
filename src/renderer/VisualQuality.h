@@ -88,7 +88,6 @@ struct VoxelGiConfig {
     bool enabled = false;
     int clipmapResolution = 32;
     int clipmapLevels = 2;
-    int screenDivisor = 4;
     int coneCount = 2;
     int coneSteps = 4;
     int updateSlicesPerFrame = 4;
@@ -201,22 +200,22 @@ inline EnhancedVisualConfig enhancedVisualConfig(
 inline VoxelGiConfig voxelGiConfig(
     VisualQuality quality, const EnhancedVisualSettings& settings) {
     VoxelGiConfig result;
-    result.enabled = settings.enabled && settings.gi.enabled;
+    result.enabled = settings.enabled && settings.gi.enabled && settings.gi.strength > 0;
     switch (quality) {
         case VisualQuality::Low:
-            result = {result.enabled, 32, 2, 4, 2, 4, 4};
+            result = {result.enabled, 32, 2, 2, 4, 4};
             break;
         case VisualQuality::Medium:
-            result = {result.enabled, 32, 3, 4, 3, 5, 6};
+            result = {result.enabled, 32, 3, 3, 5, 6};
             break;
         case VisualQuality::High:
-            result = {result.enabled, 48, 3, 2, 4, 6, 8};
+            result = {result.enabled, 48, 3, 4, 6, 8};
             break;
         case VisualQuality::VeryHigh:
-            result = {result.enabled, 64, 3, 2, 5, 7, 12};
+            result = {result.enabled, 64, 3, 5, 7, 12};
             break;
         case VisualQuality::Ultra:
-            result = {result.enabled, 64, 4, 2, 6, 8, 16};
+            result = {result.enabled, 64, 4, 6, 8, 16};
             break;
     }
     result.strength = std::clamp(

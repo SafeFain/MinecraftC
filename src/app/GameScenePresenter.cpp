@@ -259,6 +259,12 @@ void GameScenePresenter::render(
             if (titleUpdateSeconds >= 0.25f) {
                 titleUpdateSeconds = 0.0f;
                 int fps = dt > 0.0f ? static_cast<int>(1.0f / dt) : 999;
+                const VoxelGiStatus gi = renderer.voxelGiStatus();
+                const std::string giInfo = !gi.requested ? "" : !gi.active
+                    ? " | GI: " + localization.text("settings.gi_inactive")
+                    : " | GI: " + std::to_string(static_cast<int>(gi.validVoxelFraction * 100)) +
+                        "% | GI queue: " + std::to_string(gi.pendingSlices) +
+                        " | GI chunks: " + std::to_string(gi.sourceChunks);
                 window.setTitle(
                     "MinecraftC" + (session.playerState().isFlying()
                         ? " [" + localization.text("window.fly") + "]" : "") +
@@ -268,7 +274,7 @@ void GameScenePresenter::render(
                     "," + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().z))) +
                     " | " + localization.text("window.chunks") + ": " +
                     std::to_string(rendered) +
-                    "/" + std::to_string(session.worldState().getActiveChunks().size())
+                    "/" + std::to_string(session.worldState().getActiveChunks().size()) + giInfo
                 );
             }
         } else {

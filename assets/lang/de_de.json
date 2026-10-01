@@ -180,6 +180,7 @@
   "settings.gi_distance": "GI-Reichweite: {0} Blöcke",
   "settings.gi_temporal": "Zeitliche Stabilität: {0}",
   "settings.gi_unavailable": "Nicht verfügbar",
+  "settings.gi_inactive": "Inaktiv",
   "settings.transparent_leaves": "Transparente Blätter: {0}",
   "settings.visual_low": "Niedrig",
   "settings.visual_medium": "Mittel",

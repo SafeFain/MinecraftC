@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -14,7 +15,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
-    VoxelGiDeviceSupport supported{64, 7, 7, 1, 1, true, true, true, true};
+    VoxelGiDeviceSupport supported{64, 8, 8, 1, 1, true, true, true};
     require(voxelGiAvailability(supported) == VoxelGiAvailability::Available,
             "valid Vulkan 1.0 GI capability profile was rejected");
     supported.maximum3dDimension = 32;
@@ -26,6 +27,10 @@ int main() {
     require(voxelGiAvailability(supported) ==
                 VoxelGiAvailability::UnsupportedFormat,
             "missing storage-image format support did not disable GI locally");
+    supported.irradianceStorage = true;
+    supported.sampledImagesPerSet = 7;
+    require(voxelGiAvailability(supported) == VoxelGiAvailability::UnsupportedLimits,
+            "seven samplers accepted an eight-sampler GI screen shader");
     require(voxelGiFloorDiv(-1, 16) == -1 &&
             voxelGiFloorDiv(-16, 16) == -1 &&
             voxelGiFloorDiv(-17, 16) == -2 &&
@@ -67,7 +72,7 @@ int main() {
     bool foundTorch = false;
     bool foundInvalid = false;
     for (const VoxelGiSliceUpdate& update : initial) {
-        if (update.level != 0 || update.zLayer != 31) continue;
+        if (update.level != 0 || update.axis != 2 || update.layer != 31 || update.voxels.empty()) continue;
         const VoxelGiPacked& voxel = update.voxels[31];
         foundTorch = voxel.emission > 0 && voxel.valid == 255;
         foundInvalid = update.voxels.front().valid == 0;
@@ -93,14 +98,176 @@ int main() {
                 config.clipmapResolution * config.clipmapLevels),
             "world or dimension change did not invalidate GI clipmaps");
 
-    const glm::vec3 normal(0.0f, 1.0f, 0.0f);
-    require(!voxelGiRejectHistory(10.0f, 10.1f, normal, normal, true, true) &&
-            voxelGiRejectHistory(10.0f, 12.0f, normal, normal, true, true) &&
-            voxelGiRejectHistory(10.0f, 10.0f, normal, -normal, true, true) &&
-            voxelGiRejectHistory(10.0f, 10.0f, normal, normal, false, true) &&
-            voxelGiNeighborhoodClamp(glm::vec3(2.0f, -1.0f, 0.5f),
-                glm::vec3(0.0f), glm::vec3(1.0f)) == glm::vec3(1.0f, 0.0f, 0.5f),
-            "temporal rejection or neighborhood clamping contract changed");
+    // A source set larger than a single frame's copy budget must converge,
+    // retain unchanged snapshots, and make the full 3D domain valid.
+    settings.gi.distance = 32;
+    config = voxelGiConfig(VisualQuality::Low, settings);
+    cache.configure(config);
+    std::vector<std::unique_ptr<Chunk>> sources;
+    for (int z = -2; z <= 2; ++z)
+        for (int x = -2; x <= 2; ++x)
+            sources.push_back(std::make_unique<Chunk>(x, z));
+    for (int frame = 0; frame < 32; ++frame) {
+        cache.beginFrame(glm::dvec3(0.5, 64.0, 0.5), 12);
+        int accepted = 0;
+        for (const auto& source : sources) if (cache.submit(*source)) ++accepted;
+        require(accepted <= config.updateSlicesPerFrame * 2,
+                "source snapshots exceeded their bounded copy budget");
+        if (frame > 3) require(accepted == 0, "unchanged active chunks were evicted and recopied");
+        cache.endFrame();
+        auto updates = cache.takeUpdates(config.updateSlicesPerFrame);
+        cache.recycleUpdates(updates);
+    }
+    require(cache.cachedChunks() > 8 && cache.pendingSlices() == 0,
+            "multi-frame source submission did not converge");
+    const auto mappingBefore = cache.levelMapping(0);
+    cache.beginFrame(glm::dvec3(0.5, 65.0, 0.5), 12);
+    for (const auto& source : sources) cache.submit(*source);
+    cache.endFrame();
+    for (const auto& update : cache.takeUpdates(16)) {
+        if (update.voxels.empty()) continue;
+        require(update.axis == 1 && update.voxels.size() == 32 * 32,
+                "vertical movement did not return its exposed XY plane");
+        for (const auto& voxel : update.voxels)
+            require(voxel.valid == 255 && voxel.opacity == 0,
+                    "complete loaded XY plane left invalid voxels");
+    }
+    require(cache.levelMapping(0).minimumCell.y == mappingBefore.minimumCell.y + 1,
+            "camera Y movement did not advance the three-dimensional origin");
+
+    // Coverage is at least twice the requested radius for every quality/distance.
+    for (VisualQuality quality : VISUAL_QUALITY_ORDER) {
+        for (uint16_t distance : {32, 64, 128, 256}) {
+            settings.gi.distance = distance;
+            const auto tier = voxelGiConfig(quality, settings);
+            const int coarse = voxelGiCellSize(tier, tier.clipmapLevels - 1);
+            require(coarse * tier.clipmapResolution >= distance * 2 &&
+                    coarse * tier.clipmapResolution < distance * 4,
+                    "coarse clipmap does not cover its requested radius");
+            for (int level = 1; level < tier.clipmapLevels; ++level)
+                require(voxelGiCellSize(tier, level) >= voxelGiCellSize(tier, level - 1),
+                        "clipmap cell sizes do not increase toward coarse levels");
+        }
+    }
+    settings.gi.strength = 0;
+    require(!voxelGiConfig(VisualQuality::Ultra, settings).enabled,
+            "zero GI strength still requests GPU work");
+    settings.gi.strength = 100;
+    settings.gi.distance = 128;
+    config = voxelGiConfig(VisualQuality::High, settings); // non-power-of-two 48³
+    config.updateSlicesPerFrame = 128;
+    cache.configure(config);
+    std::array<std::vector<VoxelGiPacked>, 4> volumes;
+    for (auto& volume : volumes)
+        volume.resize(static_cast<size_t>(config.clipmapResolution *
+            config.clipmapResolution * config.clipmapResolution));
+    const auto apply = [&](const std::vector<VoxelGiSliceUpdate>& updates) {
+        const int resolution = config.clipmapResolution;
+        for (const auto& update : updates) {
+            const int first = update.axis == 0 ? 1 : 0;
+            const int second = update.axis == 2 ? 1 : 2;
+            for (int v = 0; v < resolution; ++v)
+                for (int u = 0; u < resolution; ++u) {
+                    glm::ivec3 ring(0);
+                    ring[update.axis] = update.layer;
+                    ring[first] = u;
+                    ring[second] = v;
+                    volumes[update.level][static_cast<size_t>(ring.x + resolution *
+                        (ring.y + resolution * ring.z))] = update.voxels.empty()
+                        ? VoxelGiPacked{} : update.voxels[u + v * resolution];
+                }
+        }
+    };
+    const auto verify = [&] {
+        const int resolution = config.clipmapResolution;
+        for (int level = 0; level < config.clipmapLevels; ++level) {
+            const auto map = cache.levelMapping(level);
+            for (int z = 0; z < resolution; ++z)
+                for (int y = 0; y < resolution; ++y)
+                    for (int x = 0; x < resolution; ++x) {
+                        const glm::ivec3 cell = map.minimumCell + glm::ivec3(x, y, z);
+                        const glm::ivec3 world = cell * map.cellSize +
+                            glm::ivec3(map.cellSize / 2);
+                        glm::ivec3 ring;
+                        for (int axis = 0; axis < 3; ++axis)
+                            ring[axis] = voxelGiPositiveMod(cell[axis], resolution);
+                        const auto& actual = volumes[level][static_cast<size_t>(ring.x +
+                            resolution * (ring.y + resolution * ring.z))];
+                        const bool loaded = Config::isValidWorldY(world.y) &&
+                            voxelGiFloorDiv(world.x, 16) == chunk.cx &&
+                            voxelGiFloorDiv(world.z, 16) == chunk.cz;
+                        VoxelGiPacked expected;
+                        if (loaded) {
+                            expected = packVoxelGi(BlockId::AIR, 0);
+                            // The fixture contains a single stone block. Conservative
+                            // coarse occupancy must keep it even away from the center.
+                            const glm::ivec3 minimum = cell * map.cellSize;
+                            if (minimum.x <= -1 && minimum.x + map.cellSize > -1 &&
+                                minimum.z <= -1 && minimum.z + map.cellSize > -1 &&
+                                minimum.y <= 64 && minimum.y + map.cellSize > 64)
+                                expected = packVoxelGi(BlockId::STONE, 0);
+                        }
+                        require(actual.valid == expected.valid &&
+                                actual.opacity == expected.opacity &&
+                                actual.red == expected.red,
+                                "three-dimensional ring contents differ from world sampling");
+                    }
+        }
+    };
+    chunk.setBlock(15, 64, 15, BlockId::STONE);
+    glm::dvec3 camera(-0.5, 64.0, -0.5);
+    cache.beginFrame(camera, 9);
+    cache.submit(chunk);
+    cache.endFrame();
+    apply(cache.takeUpdates(1024));
+    verify();
+    // All three axes update only the entering plane and preserve the overlap.
+    for (int axis = 0; axis < 3; ++axis) {
+        camera[axis] += 1.0;
+        cache.beginFrame(camera, 9);
+        cache.submit(chunk);
+        cache.endFrame();
+        require(cache.pendingSlices() <= static_cast<size_t>(config.clipmapLevels),
+                "one-cell X/Y/Z movement rebuilt complete volumes");
+        apply(cache.takeUpdates(1024));
+        verify();
+    }
+    // Sub-cell motion in coarse levels must not move their ring mapping.
+    const auto coarseBefore = cache.levelMapping(config.clipmapLevels - 1);
+    camera.z += 0.1;
+    cache.beginFrame(camera, 9);
+    cache.submit(chunk);
+    cache.endFrame();
+    require(cache.levelMapping(config.clipmapLevels - 1).minimumCell ==
+                coarseBefore.minimumCell && cache.pendingSlices() == 0,
+            "coarse rings move within a world cell");
+    Chunk unrelated(100, -1);
+    require(!cache.submit(unrelated) && cache.pendingSlices() == 0,
+            "unrelated X chunk consumed snapshot budget or dirtied Z planes");
+    // Large positive/negative moves cancel obsolete pending work and invalidate
+    // stale ring contents even when the resampling budget is exhausted.
+    for (int frame = 0; frame < 100; ++frame) {
+        camera.x = frame % 2 ? -10.5 : 500.5;
+        camera.y = frame % 2 ? 100.0 : -20.0;
+        cache.beginFrame(camera, 9);
+        cache.submit(chunk);
+        cache.endFrame();
+        apply(cache.takeUpdates(1));
+        require(cache.pendingSlices() <= static_cast<size_t>(
+                    3 * config.clipmapResolution * config.clipmapLevels),
+                "rapid movement accumulated obsolete clipmap work");
+    }
+    apply(cache.takeUpdates(1024));
+    verify();
+    for (int frame = 0; frame < 4; ++frame) {
+        cache.beginFrame(camera, 9);
+        cache.endFrame(); // chunk disappeared from the active set
+        apply(cache.takeUpdates(1024));
+    }
+    require(cache.cachedChunks() == 0, "retired source chunk remained cached");
+    for (const auto& volume : volumes)
+        for (const auto& voxel : volume)
+            require(voxel.valid == 0, "retired chunk left stale valid irradiance input");
 
     std::cout << "Voxel GI tests passed\n";
     return 0;
