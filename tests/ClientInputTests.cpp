@@ -31,6 +31,9 @@ public:
 // TouchControls::render is linked into this logic test, but no graphics-backed
 // renderer is constructed. These three inert definitions keep the test focused
 // on touch capture and input output.
+void UIRenderer::drawRoundedRect(float,float,float,float,float,const glm::vec4&) {}
+void UIRenderer::renderTextAlpha(const std::string&,float,float,float,const glm::vec3&,float) {}
+void UIRenderer::setOpacity(float) {}
 void UIRenderer::drawRect(float,float,float,float,const glm::vec4&) {}
 void UIRenderer::renderText(const std::string&,float,float,float,const glm::vec3&) {}
 glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
@@ -510,7 +513,7 @@ int main(){
             "runtime clock conversions saturate backwards elapsed time");
 
     TouchControls touch;TouchControlConfig config;touch.configure(1000,600,config);
-    auto commands=touch.onTouch({{0,1},TouchPhase::Begin,76,176});
+    auto commands=touch.onTouch({{0,1},TouchPhase::Begin,76,192});
     require(commands.empty(),"joystick capture emits no discrete command");
     input.beginFrame();input.clearVirtual();touch.applyTo(input);input.update(loaded.bindings);
     require(input.value(InputAction::MoveForward)>.99f&&input.held(InputAction::Sprint),
@@ -545,7 +548,7 @@ int main(){
     require(!input.held(InputAction::MoveForward)&&input.released(InputAction::MoveForward),
             "touch cancellation releases virtual movement");
     config.leftHanded=true;touch.configure(1000,600,config);
-    touch.onTouch({{0,4},TouchPhase::Begin,924,176});
+    touch.onTouch({{0,4},TouchPhase::Begin,924,192});
     input.beginFrame();input.clearVirtual();touch.applyTo(input);input.update(loaded.bindings);
     require(input.value(InputAction::MoveForward)>.99f,
             "left-handed layout mirrors the movement joystick");

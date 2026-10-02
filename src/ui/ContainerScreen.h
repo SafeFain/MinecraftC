@@ -44,6 +44,8 @@ private:
     int m_focusX = 0, m_focusY = 0;
     int m_pointerX = 0, m_pointerY = 0;
 
+    float m_layoutScale = 1.0f;
+    Rect m_panelRect{};
     void layout(int width, int height);
     void click(int button, int x, int y);
     void quickMove(int x, int y);

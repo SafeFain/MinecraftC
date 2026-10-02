@@ -35,14 +35,16 @@ void CreativeInventory::updateTabHover() {
 }
 
 void CreativeInventory::layoutSlots(int width,int height) {
-    constexpr float slot=44.0f,gap=5.0f,padding=14.0f,header=52.0f,footer=34.0f;
+    constexpr float gap=5.0f,padding=14.0f,header=52.0f,footer=34.0f;
     constexpr float tabBarH=26.0f,tabGapY=14.0f,tabGapX=2.0f;
     constexpr float tabExtra=tabBarH+tabGapY;
-    m_columns=std::clamp(static_cast<int>((width-80.0f)/(slot+gap)),5,10);
+    m_columns=std::clamp(static_cast<int>((width-48.0f)/49.0f),3,10);
+    m_slotSize=std::max(1.0f,std::min(44.0f,(width-40.0f-gap*(m_columns-1))/m_columns));
+    const float slot=m_slotSize;
     m_totalRows=m_slots.empty()?0:
         static_cast<int>((m_slots.size()+static_cast<size_t>(m_columns)-1)/m_columns);
     m_visibleRows=std::clamp(
-        static_cast<int>((height-(150.0f+tabExtra))/(slot+gap)),2,7);
+        static_cast<int>((height-(150.0f+tabExtra))/(slot+gap)),1,7);
     m_visibleRows=std::min(m_visibleRows,m_totalRows);
     m_scrollRow=std::clamp(m_scrollRow,0,std::max(0,m_totalRows-m_visibleRows));
     const float gridW=m_columns*slot+(m_columns-1)*gap;
@@ -72,11 +74,7 @@ void CreativeInventory::layoutSlots(int width,int height) {
     const float availableW=std::max(0.0f,m_panelW-padding*2.0f);
     float tabW=(availableW-tabGapX*(tabCount-1.0f))/tabCount;
     float tabX=m_panelX+padding;
-    if(tabW<20.0f){
-        tabW=20.0f;
-        const float total=tabW*tabCount+tabGapX*(tabCount-1.0f);
-        tabX=m_panelX+(m_panelW-total)*.5f;
-    }
+    tabW=std::max(1.0f,tabW);
     const float tabY=m_panelY+m_panelH-header-tabBarH;
     for(size_t i=0;i<m_tabs.size();++i){
         auto& tab=m_tabs[i];
@@ -87,7 +85,8 @@ void CreativeInventory::layoutSlots(int width,int height) {
 
 void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,int mouseY) {
     layoutSlots(width,height);
-    constexpr float slot=44.0f,footer=34.0f,tabGapY=14.0f;
+    const float slot=m_slotSize;
+    constexpr float footer=34.0f,tabGapY=14.0f;
     ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),
                 glm::vec4(0.0f,0.0f,0.0f,.58f));
     const std::string title = ui.localization().text("inventory.creative");
@@ -114,26 +113,27 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
             :tab.hovered?UiTheme::WidgetState::Hover:UiTheme::WidgetState::Normal;
         UiTheme::button(ui,tab.x,tab.y,tab.w,tab.h,{},state,false,0.0f);
         const auto& info=creativeCategoryInfo(static_cast<CreativeItemCategory>(i));
-        const float iconSize=std::min({20.0f,tab.h-6.0f,tab.w-4.0f});
+        const float iconSize=std::max(1.0f,std::min({20.0f,tab.h-6.0f,tab.w-4.0f}));
         ui.drawItemIcon(tab.x+(tab.w-iconSize)*.5f,tab.y+(tab.h-iconSize)*.5f,
                         iconSize,iconSize,{info.icon,1,0});
         if(tab.hovered)hoveredTab=static_cast<int>(i);
     }
     const auto& activeInfo=creativeCategoryInfo(m_activeCategory);
     const std::string categoryName=ui.localization().text(activeInfo.localizationKey);
-    const auto categorySize=ui.measureText(categoryName,.55f);
+    const float categoryScale=UiTheme::fittedScale(ui,categoryName,.85f,m_panelW-40);
+    const auto categorySize=ui.measureText(categoryName,categoryScale);
     const float tabBarBottom=m_panelY+m_panelH-52.0f-26.0f;
     UiTheme::textWithShadow(ui,categoryName,
         m_panelX+(m_panelW-categorySize.x)*.5f,
-        tabBarBottom-(tabGapY+categorySize.y)*.5f,.55f,UiTheme::TEXT_DIM);
+        tabBarBottom-(tabGapY+categorySize.y)*.5f,categoryScale,UiTheme::TEXT_DIM);
 
     const Slot* hovered=nullptr;
     for(const auto& item:m_slots){
         if(!item.visible) continue;
         const auto& props=getItemProps(item.id);
         const glm::vec3 background = props.placedBlock
-            ? getBlockProps(*props.placedBlock).color * .28f
-            : glm::vec3(.10f,.09f,.08f);
+            ? glm::mix(glm::vec3(UiTheme::SLOT),getBlockProps(*props.placedBlock).color,.12f)
+            : glm::vec3(UiTheme::SLOT);
         const UiTheme::WidgetState state = item.id==m_selected
             ? UiTheme::WidgetState::Selected
             : item.hovered ? UiTheme::WidgetState::Hover
@@ -161,7 +161,7 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
 }
 
 void CreativeInventory::onMouseMove(int x,int y){
-    constexpr float slot=44.0f;
+    const float slot=m_slotSize;
     for(auto& item:m_slots)item.hovered=item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot;
     for(auto& tab:m_tabs)tab.hovered=x>=tab.x&&x<=tab.x+tab.w&&y>=tab.y&&y<=tab.y+tab.h;
 }
@@ -182,7 +182,7 @@ void CreativeInventory::onMouseClick(int button,int x,int y,
         if(openPlayerInventory)openPlayerInventory();
         return;
     }
-    constexpr float slot=44.0f;
+    const float slot=m_slotSize;
     for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
         m_selected=item.id;if(select)select(item.id);return;}
 }

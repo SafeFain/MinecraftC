@@ -33,6 +33,8 @@ private:
     std::array<Rect, 5> m_rows{};
     std::array<Rect, 5> m_outputs{};
 
+    float m_layoutScale = 1.0f;
+    Rect m_panelRect{};
     void layout(int width, int height);
     void executeSelected();
     static bool contains(const Rect& rect, int x, int y);

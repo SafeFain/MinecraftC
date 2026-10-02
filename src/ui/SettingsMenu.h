@@ -46,6 +46,8 @@ struct SettingsButtonLayout {
     float leftX = 0.0f;
     float columnGap = 0.0f;
     size_t rowCount = 0;
+    int columns = 2;
+    size_t visibleRows = 0;
 };
 
 inline SettingsButtonLayout settingsButtonLayout(
@@ -57,42 +59,50 @@ inline SettingsButtonLayout settingsButtonLayout(
     const float contentTop = hasHelp ? helpY - 10.0f : titleY - 18.0f;
     const size_t contentCount = buttonCount -
         (standaloneLast && buttonCount > 0 ? 1 : 0);
-    const size_t contentRows = (contentCount + 1) / 2;
+    const int columns=screenWidth<440.0f?1:2;
+    const size_t contentRows=(contentCount+columns-1)/columns;
     const size_t rowCount = std::max<size_t>(
         1, contentRows + (standaloneLast && buttonCount > 0 ? 1 : 0));
+    const size_t visibleRows=std::min(rowCount,static_cast<size_t>(
+        std::max(1.0f,std::floor((contentTop-14.0f)/35.0f))));
     const float buttonHeight = std::clamp(
-        (contentTop - 14.0f) / rowCount - 5.0f,
-        22.0f, Config::UI_BUTTON_HEIGHT);
+        (contentTop - 14.0f) / visibleRows - 5.0f,
+        30.0f, Config::UI_BUTTON_HEIGHT);
     const float buttonWidth = std::max(1.0f, std::min(
         Config::UI_BUTTON_WIDTH,
-        (screenWidth - horizontalMargin * 2.0f - columnGap) * 0.5f));
+        (screenWidth-horizontalMargin*2-columnGap*(columns-1))/columns));
     return {helpY, contentTop - buttonHeight, buttonHeight, buttonWidth,
-            (screenWidth - buttonWidth * 2.0f - columnGap) * 0.5f,
-            columnGap, rowCount};
+            (screenWidth-buttonWidth*columns-columnGap*(columns-1))*.5f,
+            columnGap,rowCount,columns,visibleRows};
 }
 
 inline glm::vec2 settingsButtonPosition(
     const SettingsButtonLayout& layout, size_t index, size_t buttonCount,
-    bool standaloneLast = false) {
+    bool standaloneLast = false,int rowOffset = 0) {
     const bool isStandaloneLast = standaloneLast && buttonCount > 0 &&
         index + 1 == buttonCount;
     const size_t contentCount = buttonCount - (standaloneLast ? 1 : 0);
-    const size_t row = isStandaloneLast ? (contentCount + 1) / 2 : index / 2;
+    const size_t row = isStandaloneLast ? (contentCount+layout.columns-1)/layout.columns
+        : index/layout.columns;
     const bool centeredLast = isStandaloneLast ||
-        (buttonCount % 2 == 1 && index + 1 == buttonCount);
-    const float x = centeredLast
+        (layout.columns==2 && buttonCount%2==1 && index+1==buttonCount);
+    const float x = centeredLast && layout.columns==2
         ? layout.leftX + (layout.buttonWidth + layout.columnGap) * 0.5f
-        : layout.leftX + static_cast<float>(index % 2) *
+        : layout.leftX + static_cast<float>(index % layout.columns) *
             (layout.buttonWidth + layout.columnGap);
-    return {x, layout.firstButtonY - static_cast<float>(row) *
+    return {x, layout.firstButtonY - (static_cast<float>(row)-rowOffset) *
         (layout.buttonHeight + 5.0f)};
 }
 
 inline int settingsGridNeighbor(int current, size_t buttonCount,
                                 int columnDelta, int rowDelta,
-                                bool standaloneLast = false) {
+                                bool standaloneLast = false,int columns = 2) {
     if (buttonCount == 0) return 0;
     const int count = static_cast<int>(buttonCount);
+    if (columns==1) {
+        if (columnDelta!=0 || rowDelta==0) return std::clamp(current,0,count-1);
+        return (current+(rowDelta>0?1:-1)+count)%count;
+    }
     const int contentCount = count - (standaloneLast ? 1 : 0);
     current = std::clamp(current, 0, count - 1);
     if (standaloneLast && current == count - 1) {
@@ -184,6 +194,11 @@ public:
 private:
     std::vector<Button> m_buttons;
     int m_selectedIdx = 0;
+    int m_layoutSelection = -1;
+    int m_rowOffset = 0;
+    int m_layoutColumns = 2;
+    int m_totalRows = 0;
+    int m_visibleRows = 0;
     std::function<void()> m_onBack;
     std::function<void()> m_onChanged;
     ClientSettings& m_settings;

@@ -45,7 +45,7 @@ Button::Button(const std::string& label, std::function<void()> onClick)
     : m_label(label), m_onClick(std::move(onClick)) {}
 
 bool Button::containsPoint(float px, float py) const {
-    return px >= m_x && px <= m_x + m_w &&
+    return m_w>0 && m_h>0 && px >= m_x && px <= m_x + m_w &&
            py >= m_y && py <= m_y + m_h;
 }
 
@@ -54,24 +54,30 @@ void Button::render(UIRenderer& ui) const {
     if (m_pressed) state = UiTheme::WidgetState::Pressed;
     else if (m_selected) state = UiTheme::WidgetState::Selected;
     else if (m_hovered) state = UiTheme::WidgetState::Hover;
+    if (m_animationFrame != ui.frameSerial()) {
+        m_animationFrame=ui.frameSerial();
+        m_hoverTransition.tick(ui.frameDelta(),m_hovered||m_selected,0.10f);
+        m_pressTransition.tick(ui.frameDelta(),m_pressed,0.08f);
+    }
+    const float alpha=m_enabled?1.0f:.45f;
     if (m_detail.empty()) {
-        UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger);
+        UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger,0,alpha,m_hoverTransition.value,m_pressTransition.value,m_primary,m_bottomInset);
         return;
     }
-    UiTheme::button(ui, m_x, m_y, m_w, m_h, "", state, m_danger);
+    UiTheme::button(ui, m_x, m_y, m_w, m_h, "", state, m_danger,0,alpha,m_hoverTransition.value,m_pressTransition.value,m_primary,m_bottomInset);
     const float padding = std::min(5.0f, m_h * 0.12f);
     const float scale = std::min(1.4f, (m_h - 2.0f * padding - 2.0f) / 28.0f);
     const auto color = m_hovered || m_selected ? UiTheme::TEXT_HOVER : UiTheme::TEXT;
     const float labelScale = fittedTextScale(ui, m_label, scale, m_w - 20.0f);
     const float detailScale = fittedTextScale(ui, m_detail, scale * 0.85f, m_w - 20.0f);
     UiTheme::textWithShadow(ui, m_label, m_x + 10.0f, m_y + m_h * 0.5f + 1.0f,
-                            labelScale, color);
+                            labelScale,color,alpha);
     UiTheme::textWithShadow(ui, m_detail, m_x + 10.0f, m_y + padding,
-                            detailScale, UiTheme::TEXT_DIM);
+                            detailScale,UiTheme::TEXT_DIM,alpha);
 }
 
 void Button::activate() {
-    if (m_onClick) m_onClick();
+    if (m_enabled && m_onClick) m_onClick();
 }
 
 // ── Menu base ─────────────────────────────────────────────────────────────
@@ -112,17 +118,21 @@ MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> wor
 }
 
 void MainMenu::showHome() {
+    resetTransition();
     m_page = Page::Home;
     rebuildButtons();
 }
 
 void MainMenu::showWorlds() {
+    resetTransition();
     m_page = Page::Worlds;
     rebuildButtons();
 }
 
 void MainMenu::showCreate() {
+    resetTransition();
     m_page = Page::Create;
+    m_formOffset=0;m_formSelection=-1;
     m_worldName.setText(m_localization.text("menu.create.default_name"));
     m_seedText.setText({});
     m_createMode = GameMode::Survival;
@@ -133,6 +143,7 @@ void MainMenu::showCreate() {
 }
 
 void MainMenu::showAbout() {
+    resetTransition();
     m_page = Page::About;
     m_aboutPage = 0;
     rebuildButtons();
@@ -163,26 +174,17 @@ void MainMenu::refreshWorlds() {
         if (selected != m_worlds.end())
             m_selectedWorld = static_cast<int>(selected - m_worlds.begin());
     }
-    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - 6);
+    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - m_visibleWorlds);
     m_worldOffset = std::clamp(m_worldOffset, 0, maximum);
     if (m_selectedWorld >= 0) {
         if (m_selectedWorld < m_worldOffset) m_worldOffset = m_selectedWorld;
-        if (m_selectedWorld >= m_worldOffset + 6)
-            m_worldOffset = m_selectedWorld - 5;
+        if (m_selectedWorld >= m_worldOffset + m_visibleWorlds)
+            m_worldOffset = m_selectedWorld-m_visibleWorlds+1;
     }
     m_pendingDeleteWorldId.clear();
     m_lastWorldClick = -1.0;
     m_lastWorldIndex = -1;
     rebuildButtons();
-}
-
-std::string MainMenu::fieldLabel(Field field, const std::string& value) const {
-    const bool active = field == m_field;
-    const std::string name = m_localization.text(
-        field == Field::Name ? "menu.create.world_name" : "menu.create.seed");
-    return std::string(active ? "> " : "") + name + ": " +
-           (value.empty() && field == Field::Seed
-                ? m_localization.text("menu.create.random") : value);
 }
 
 void MainMenu::rebuildButtons() {
@@ -205,20 +207,20 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back(m_localization.text("menu.home.about"),
                                [this]() { showAbout(); });
     } else if (m_page == Page::Worlds) {
-        const int visible = 6;
+        const int visible=m_visibleWorlds;
         const int end = std::min(static_cast<int>(m_worlds.size()), m_worldOffset + visible);
         for (int index = m_worldOffset; index < end; ++index) {
             const auto& world = m_worlds[static_cast<size_t>(index)];
             const std::string mode = m_localization.text(
                 world.mode == GameMode::Survival ? "common.survival" :
                 world.mode == GameMode::Creative ? "common.creative" : "common.spectator");
-            m_buttons.emplace_back((index == m_selectedWorld ? "> " : "") +
-                world.displayName + " [" + (world.compatible ? mode :
-                    m_localization.format("menu.worlds.incompatible", {
-                        std::to_string(world.generationVersion)})) + "]", [this, index]() {
+            m_buttons.emplace_back(world.displayName, [this, index]() {
                     m_selectedWorld = index;
                     rebuildButtons();
                 });
+            m_buttons.back().setDetail(world.compatible ? mode + "  ·  " +
+                std::to_string(world.seed) : m_localization.format("menu.worlds.incompatible", {
+                    std::to_string(world.generationVersion)}));
             const std::string worldId = world.id;
             m_deleteButtons.emplace_back(
                 m_localization.text(m_pendingDeleteWorldId == worldId
@@ -242,12 +244,16 @@ void MainMenu::rebuildButtons() {
                 m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
                 m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
         });
+        m_buttons.back().setEnabled(m_selectedWorld>=0 &&
+            m_selectedWorld<static_cast<int>(m_worlds.size()) &&
+            m_worlds[static_cast<size_t>(m_selectedWorld)].compatible);
         m_buttons.emplace_back(m_localization.text("menu.worlds.create"),
                                [this]() { showCreate(); });
         m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
     } else if (m_page == Page::Create) {
-        m_buttons.emplace_back(fieldLabel(Field::Name, m_worldName.text()),
+        m_buttons.emplace_back(m_localization.text("menu.create.world_name"),
                                [this]() { selectField(Field::Name); });
+        m_buttons.back().setDetail(m_worldName.text());
         m_buttons.emplace_back(
             m_localization.format("menu.create.game_mode", {m_localization.text(
                 m_createMode == GameMode::Survival
@@ -266,8 +272,10 @@ void MainMenu::rebuildButtons() {
                     ? WorldType::Superflat : WorldType::Normal;
                 rebuildButtons();
             });
-        m_buttons.emplace_back(fieldLabel(Field::Seed, m_seedText.text()),
+        m_buttons.emplace_back(m_localization.text("menu.create.seed"),
                                [this]() { selectField(Field::Seed); });
+        m_buttons.back().setDetail(m_seedText.text().empty()?
+            m_localization.text("menu.create.random"):m_seedText.text());
         m_buttons.emplace_back(
             m_localization.format("menu.create.cheats", {m_localization.text(
                 m_createCheats ? "common.on" : "common.off")}),
@@ -303,8 +311,14 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back(m_localization.text("common.back"),
                                [this]() { showHome(); });
     }
-    m_selectedIdx = 0;
-    if (!m_buttons.empty()) m_buttons[0].setSelected(true);
+    m_selectedIdx=m_page==Page::Worlds && m_selectedWorld>=m_worldOffset &&
+        m_selectedWorld<m_worldOffset+m_visibleWorlds?m_selectedWorld-m_worldOffset:0;
+    if (!m_buttons.empty()) {
+        m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
+        if (m_page==Page::Home) m_buttons[0].setPrimary(true);
+        if (m_page==Page::Create) m_buttons[5].setPrimary(true);
+        if (m_page==Page::Worlds) m_buttons[m_deleteButtons.size()+1].setPrimary(true);
+    }
 }
 
 void MainMenu::selectField(Field field) {
@@ -315,103 +329,121 @@ void MainMenu::selectField(Field field) {
     m_buttons[m_selectedIdx].setSelected(true);
 }
 
-void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    UiTheme::menuBackground(ui, static_cast<float>(screenWidth),
-                            static_cast<float>(screenHeight));
-    if (m_page == Page::About) {
-        renderAbout(ui, screenWidth, screenHeight);
-        return;
+void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
+    const float w=static_cast<float>(screenWidth),h=static_cast<float>(screenHeight);
+    if (m_page==Page::Worlds) {
+        const int visible=std::clamp(static_cast<int>((h-192)/46),1,6);
+        if (visible!=m_visibleWorlds) {
+            const int oldCards=static_cast<int>(m_deleteButtons.size()),oldFocus=m_selectedIdx;
+            m_visibleWorlds=visible;
+            m_worldOffset=std::clamp(m_worldOffset,0,std::max(0,static_cast<int>(m_worlds.size())-visible));
+            if (m_selectedWorld>=m_worldOffset+visible) m_worldOffset=m_selectedWorld-visible+1;
+            rebuildButtons();
+            m_buttons[0].setSelected(false);
+            m_selectedIdx=std::clamp(oldFocus>=oldCards?
+                static_cast<int>(m_deleteButtons.size())+oldFocus-oldCards:oldFocus,
+                0,static_cast<int>(m_buttons.size())-1);
+            m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
+        }
     }
-    const float panelW = std::min(520.0f, screenWidth - 24.0f);
-    UiTheme::panel(ui, (screenWidth-panelW)*.5f, 18.0f, panelW,
-                   screenHeight-36.0f, UiTheme::PANEL);
-
-    const std::string title = m_page == Page::Home ? "MINECRAFTC" :
-        m_localization.text(m_page == Page::Worlds ? "menu.worlds.title" :
-            m_page == Page::Create ? "menu.create.title" : "menu.about.title");
-    float titleScale = 4.5f;
-    auto titleSize = ui.measureText(title, titleScale);
-    float titleX = (screenWidth - titleSize.x) * 0.5f;
-    float titleY = screenHeight * 0.68f;
-    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
-                            UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
-
-    const std::string subtitle = m_localization.text(
-        m_page == Page::Create ? "menu.create.subtitle" :
-        m_page == Page::Worlds ? "menu.worlds.subtitle" :
-        m_page == Page::About ? "menu.about.subtitle" : "menu.home.subtitle");
-    float subScale = 1.5f;
-    auto subSize = ui.measureText(subtitle, subScale);
-    float subX = (screenWidth - subSize.x) * 0.5f;
-    float subY = titleY - titleSize.y - 20.0f;
-    UiTheme::textWithShadow(ui, subtitle, subX, subY, subScale,
-                            UiTheme::TEXT_DIM);
-    // Gold divider above the button list.
-    const float dividerY = subY - subSize.y - 12.0f;
-    UiTheme::rect(ui, (screenWidth - panelW) * 0.5f + 20.0f, dividerY,
-                  panelW - 40.0f, 2.0f, UiTheme::GOLD_DIM);
-
-    float detailsReserve = 0.0f;
-    if (m_page == Page::Worlds && m_selectedWorld >= 0 &&
-        m_selectedWorld < static_cast<int>(m_worlds.size())) {
-        const auto& world = m_worlds[static_cast<size_t>(m_selectedWorld)];
-        const std::string worldType = m_localization.text(
-            world.worldType == WorldType::Normal
-                ? "common.normal" : "common.superflat");
-        const std::string details = world.compatible
-            ? m_localization.format("menu.worlds.details", {
-                std::to_string(world.seed),
-                std::to_string(world.worldTicks / 1200), worldType})
-            : m_localization.text("menu.worlds.unsupported");
-        const auto size = ui.measureText(details, 1.0f);
-        UiTheme::textWithShadow(ui, details, (screenWidth - size.x) * 0.5f,
-                                subY - 24.0f, 1.0f, glm::vec3(0.78f));
-        detailsReserve = size.y + 14.0f;
-    }
-
-    // Buttons
-    float buttonStartY = subY - subSize.y - 38.0f - detailsReserve;
-    float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
-    const size_t centeredButtonCount =
-        m_page == Page::Home && !m_buttons.empty()
-            ? m_buttons.size() - 1 : m_buttons.size();
-    const float buttonHeight = std::clamp(
-        (buttonStartY - 16.0f) / std::max<size_t>(1, centeredButtonCount) - 5.0f,
-        22.0f, Config::UI_BUTTON_HEIGHT);
-    const float spacing = std::min(Config::UI_BUTTON_SPACING, 7.0f);
-
-    for (size_t i = 0; i < m_buttons.size(); ++i) {
-        const bool aboutCornerButton =
-            m_page == Page::Home && i + 1 == m_buttons.size();
-        if (aboutCornerButton) {
-            const float width = std::max(
-                1.0f, std::min(112.0f, static_cast<float>(screenWidth) - 16.0f));
-            m_buttons[i].setPosition(static_cast<float>(screenWidth) - width - 8.0f,
-                                     8.0f);
-            m_buttons[i].setSize(width, 26.0f);
+    UiTheme::menuBackground(ui,w,h);
+    if (m_page==Page::About) { renderAbout(ui,screenWidth,screenHeight);return; }
+    const bool home=m_page==Page::Home;
+    const bool wideHome=home&&w>=800;
+    const float panelW=std::min(home?400.0f:600.0f,w-32);
+    const float panelX=wideHome?w-panelW-48:(w-panelW)*.5f;
+    const float panelH=home?std::min(h-32,wideHome?280.0f:400.0f):h-32;
+    const float panelY=(h-panelH)*.5f;
+    UiTheme::panel(ui,panelX,panelY,panelW,panelH,UiTheme::PANEL);
+    const std::string title=home?"MINECRAFTC":m_localization.text(
+        m_page==Page::Worlds?"menu.worlds.title":"menu.create.title");
+    const std::string subtitle=m_localization.text(home?"menu.home.subtitle":
+        m_page==Page::Worlds?"menu.worlds.subtitle":"menu.create.subtitle");
+    const float titleW=wideHome?panelX-64:panelW-40;
+    const float titleScale=fittedTextScale(ui,title,h<400?2.0f:home?3.4f:2.4f,titleW);
+    const float titleX=wideHome?40:panelX+20;
+    const float titleY=wideHome?h*.60f:panelY+panelH-(h<400?20:32)-ui.measureText(title,titleScale).y;
+    UiTheme::textWithShadow(ui,title,titleX,titleY,titleScale,UiTheme::TEXT);
+    const float subScale=fittedTextScale(ui,subtitle,1.0f,titleW);
+    const float subY=titleY-ui.measureText(subtitle,subScale).y-(h<400?8:12);
+    UiTheme::textWithShadow(ui,subtitle,titleX,subY,subScale,UiTheme::TEXT_DIM);
+    const float contentTop=wideHome?panelY+panelH-20:subY-(h<400?12:24);
+    const float contentBottom=panelY+20;
+    const float contentW=panelW-40;
+    const float contentX=panelX+20;
+    if (home) {
+        const float gap=h<400?4:8;
+        const float buttonH=std::min(48.0f,(contentTop-contentBottom-gap*3)/4);
+        for (size_t i=0;i<m_buttons.size();++i) {
+            if (i==4) {
+                m_buttons[i].setPosition(w-116,4);m_buttons[i].setSize(100,24);
+            } else {
+                m_buttons[i].setPosition(contentX,contentTop-buttonH-i*(buttonH+gap));
+                m_buttons[i].setSize(contentW,buttonH);
+            }
             m_buttons[i].render(ui);
-            continue;
         }
-        float by = buttonStartY - static_cast<float>(i) * (buttonHeight + spacing);
-        const bool worldRow =
-            m_page == Page::Worlds && i < m_deleteButtons.size();
-        constexpr float deleteWidth = 84.0f;
-        constexpr float deleteGap = 8.0f;
-        const float rowX = (screenWidth -
-            (Config::UI_BUTTON_WIDTH + deleteGap + deleteWidth)) * 0.5f;
-        m_buttons[i].setPosition(worldRow ? rowX : buttonX, by);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, buttonHeight);
-        m_buttons[i].render(ui);
-        if (worldRow) {
-            m_deleteButtons[i].setPosition(
-                rowX + Config::UI_BUTTON_WIDTH + deleteGap, by);
-            m_deleteButtons[i].setSize(deleteWidth, buttonHeight);
-            m_deleteButtons[i].render(ui);
+    } else if (m_page==Page::Create) {
+        const bool twoColumns=w>=440;
+        const int rows=twoColumns?5:7;
+        const float gap=8;
+        if (m_formRows!=rows) m_formSelection=-1;
+        m_formRows=rows;
+        m_formVisibleRows=std::min(rows,std::max(1,static_cast<int>((contentTop-contentBottom+gap)/40)));
+        const auto formRow=[&](int index){return twoColumns?(index==0?0:index<=2?1:index==3?2:index==4?3:4):index;};
+        if (m_formSelection!=m_selectedIdx) {
+            const int selectedRow=formRow(m_selectedIdx);
+            if (selectedRow<m_formOffset) m_formOffset=selectedRow;
+            if (selectedRow>=m_formOffset+m_formVisibleRows)
+                m_formOffset=selectedRow-m_formVisibleRows+1;
+            m_formSelection=m_selectedIdx;
+        }
+        m_formOffset=std::clamp(m_formOffset,0,rows-m_formVisibleRows);
+        const float rowH=std::min(54.0f,(contentTop-contentBottom-gap*(m_formVisibleRows-1))/m_formVisibleRows);
+        for (size_t i=0;i<m_buttons.size();++i) {
+            const int row=formRow(static_cast<int>(i))-m_formOffset;
+            if (row<0 || row>=m_formVisibleRows) {
+                m_buttons[i].setPosition(-10000,-10000);m_buttons[i].setSize(0,0);continue;
+            }
+            const bool half=twoColumns&&(i==1||i==2||i>=5);
+            const float bw=half?(contentW-gap)*.5f:contentW;
+            const bool right=i==2||i==6;
+            m_buttons[i].setPosition(contentX+(half&&right?bw+gap:0),
+                                     contentTop-rowH-row*(rowH+gap));
+            m_buttons[i].setSize(bw,rowH);m_buttons[i].render(ui);
+        }
+        if (rows>m_formVisibleRows) UiTheme::scrollBar(ui,panelX+panelW-10,contentBottom,4,
+            contentTop-contentBottom,m_formOffset,m_formVisibleRows,rows);
+    } else {
+        const size_t cards=m_deleteButtons.size();
+        const float gap=6;
+        const float rowH=std::min(54.0f,
+            (contentTop-contentBottom-gap*(cards+1))/(cards+2));
+        const float deleteW=std::min(92.0f,contentW*.28f);
+        for (size_t i=0;i<cards;++i) {
+            const float y=contentTop-rowH-i*(rowH+gap);
+            m_buttons[i].setPosition(contentX,y);
+            m_buttons[i].setSize(contentW-deleteW-gap,rowH);
+            m_buttons[i].render(ui);
+            if (m_worldOffset+static_cast<int>(i)==m_selectedWorld)
+                UiTheme::rounded(ui,contentX+4,y+6,2,std::max(1.0f,rowH-12),1,UiTheme::ACCENT);
+            m_deleteButtons[i].setPosition(contentX+contentW-deleteW,y);
+            m_deleteButtons[i].setSize(deleteW,rowH);m_deleteButtons[i].render(ui);
+        }
+        if (cards==0) {
+            const std::string empty=m_localization.text("menu.worlds.subtitle");
+            UiTheme::textWithShadow(ui,empty,contentX,contentTop-24,
+                fittedTextScale(ui,empty,1,contentW),UiTheme::TEXT_DIM);
+        }
+        const float bw=(contentW-gap)*.5f;
+        for (size_t i=cards;i<m_buttons.size();++i) {
+            const size_t action=i-cards;
+            m_buttons[i].setPosition(contentX+(action%2)*(bw+gap),
+                                    contentBottom+(1-action/2)*(rowH+gap));
+            m_buttons[i].setSize(bw,rowH);m_buttons[i].render(ui);
         }
     }
-
-    UiTheme::textWithShadow(ui, Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
-                            glm::vec3(0.62f, 0.62f, 0.66f));
+    UiTheme::textWithShadow(ui,Config::GAME_VERSION,16,8,.85f,UiTheme::TEXT_DIM);
 }
 
 void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
@@ -445,7 +477,7 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
     const auto headingSize = ui.measureText(heading, headingScale);
     const float headingY = projectY - headingSize.y - 12.0f * layoutScale;
     UiTheme::textWithShadow(ui, heading, contentX, headingY, headingScale, UiTheme::TEXT);
-    UiTheme::rect(ui, contentX, headingY - 8.0f * layoutScale, contentW, 2.0f, UiTheme::GOLD_DIM);
+    UiTheme::rect(ui, contentX, headingY - 8.0f * layoutScale, contentW, 2.0f, UiTheme::ACCENT_DIM);
 
     const float navigationY = 24.0f;
     const float navigationH = 30.0f * layoutScale;
@@ -514,6 +546,9 @@ void MainMenu::onKeyPress(int key, int mods) {
         if (m_page == Page::Create) showWorlds();
         else if (m_page == Page::Worlds || m_page == Page::About) showHome();
         return;
+    }
+    if (m_page==Page::Worlds && (key==Key::Right || key==Key::Left)) {
+        onScroll(key==Key::Right?-1:1);return;
     }
     if (m_page == Page::Worlds && key == Key::Enter && m_selectedWorld >= 0 &&
         m_selectedIdx == m_selectedWorld - m_worldOffset) {
@@ -600,13 +635,14 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
         m_buttons[static_cast<size_t>(captured)].setPressed(false);
         if (m_buttons[static_cast<size_t>(captured)].containsPoint(
                 static_cast<float>(x), static_cast<float>(y))) {
-            const int visibleWorlds = std::min(6, static_cast<int>(m_worlds.size()) - m_worldOffset);
+            const int visibleWorlds = std::min(m_visibleWorlds, static_cast<int>(m_worlds.size()) - m_worldOffset);
             if (m_page == Page::Worlds && captured < visibleWorlds) {
                 const int worldIndex = m_worldOffset + captured;
                 const double now = RuntimeClock::seconds(RuntimeClock{}.now());
                 if (m_lastWorldIndex == worldIndex && m_lastWorldClick >= 0.0 &&
                     now - m_lastWorldClick <= 0.35) {
-                    m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
+                    if (m_worlds[static_cast<size_t>(worldIndex)].compatible)
+                        m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
                     return;
                 }
                 m_lastWorldIndex = worldIndex;
@@ -622,10 +658,32 @@ void MainMenu::onScroll(double yOffset) {
         if (yOffset != 0.0) changeAboutPage(yOffset < 0.0 ? 1 : -1);
         return;
     }
-    if (m_page != Page::Worlds || m_worlds.size() <= 6) return;
-    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - 6);
+    if (m_page==Page::Create && yOffset!=0) {
+        m_formOffset=std::clamp(m_formOffset+(yOffset<0?1:-1),0,m_formRows-m_formVisibleRows);
+        return;
+    }
+    if (m_page != Page::Worlds || m_worlds.size() <= static_cast<size_t>(m_visibleWorlds)) return;
+    const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - m_visibleWorlds);
     m_worldOffset = std::clamp(m_worldOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
     rebuildButtons();
+}
+
+namespace {
+void renderActionMenu(UIRenderer& ui,int width,int height,const std::string& title,
+                      std::vector<Button>& buttons) {
+    const float w=std::min(360.0f,width-32.0f);
+    const float gap=8;
+    const float bh=std::min(44.0f,(height-120.0f)/std::max<size_t>(1,buttons.size())-gap);
+    const float ph=80+buttons.size()*(bh+gap);
+    const float px=(width-w)*.5f,py=(height-ph)*.5f;
+    UiTheme::panel(ui,px,py,w,ph);
+    const float scale=fittedTextScale(ui,title,2.4f,w-40);
+    UiTheme::textWithShadow(ui,title,px+20,py+ph-48,scale,UiTheme::TEXT);
+    for (size_t i=0;i<buttons.size();++i) {
+        buttons[i].setPosition(px+20,py+ph-72-bh-i*(bh+gap));
+        buttons[i].setSize(w-40,bh);buttons[i].setPrimary(i==0);buttons[i].render(ui);
+    }
+}
 }
 
 // ── Pause Menu ────────────────────────────────────────────────────────────
@@ -642,34 +700,10 @@ PauseMenu::PauseMenu(
     }
 }
 
-void PauseMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    // Semi-transparent overlay over the frozen world, with a pixel vignette.
-    ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
-                static_cast<float>(screenHeight),
-                glm::vec4(0.0f, 0.0f, 0.0f, 0.55f));
-    UiTheme::vignette(ui, static_cast<float>(screenWidth),
-                      static_cast<float>(screenHeight),
-                      glm::vec4(0.0f, 0.0f, 0.0f, 0.45f));
-
-    // "PAUSED" title
-    const std::string title = ui.localization().text("menu.pause.title");
-    float titleScale = 3.0f;
-    auto titleSize = ui.measureText(title, titleScale);
-    float titleX = (screenWidth - titleSize.x) * 0.5f;
-    float titleY = screenHeight * 0.62f;
-    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
-                            UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
-
-    // Buttons
-    float buttonStartY = titleY - titleSize.y - 40.0f;
-    float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
-
-    for (size_t i = 0; i < m_buttons.size(); ++i) {
-        float by = buttonStartY - static_cast<float>(i) * (Config::UI_BUTTON_HEIGHT + Config::UI_BUTTON_SPACING);
-        m_buttons[i].setPosition(buttonX, by);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, Config::UI_BUTTON_HEIGHT);
-        m_buttons[i].render(ui);
-    }
+void PauseMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
+    ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
+    renderActionMenu(ui,screenWidth,screenHeight,
+                     ui.localization().text("menu.pause.title"),m_buttons);
 }
 
 void PauseMenu::onKeyPress(int key, int) {
@@ -741,29 +775,10 @@ SleepMenu::SleepMenu(
     if (!m_buttons.empty()) m_buttons[0].setSelected(true);
 }
 
-void SleepMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
-    ui.drawRect(0.0f, 0.0f, static_cast<float>(screenWidth),
-                static_cast<float>(screenHeight),
-                glm::vec4(0.0f, 0.0f, 0.02f, 0.38f));
-    UiTheme::vignette(ui, static_cast<float>(screenWidth),
-                      static_cast<float>(screenHeight),
-                      glm::vec4(0.0f, 0.0f, 0.05f, 0.55f));
-    const std::string title = ui.localization().text("sleep.title");
-    constexpr float titleScale = 3.0f;
-    const auto titleSize = ui.measureText(title, titleScale);
-    const float titleX = (screenWidth - titleSize.x) * 0.5f;
-    const float titleY = screenHeight * 0.62f;
-    UiTheme::textWithShadow(ui, title, titleX, titleY, titleScale,
-                            glm::vec3(1.0f, 0.88f, 0.42f), 1.0f, 2.0f, -2.0f);
-    const float startY = titleY - titleSize.y - 40.0f;
-    const float buttonX = (screenWidth - Config::UI_BUTTON_WIDTH) * 0.5f;
-    for (size_t i = 0; i < m_buttons.size(); ++i) {
-        const float y = startY - static_cast<float>(i) *
-            (Config::UI_BUTTON_HEIGHT + Config::UI_BUTTON_SPACING);
-        m_buttons[i].setPosition(buttonX, y);
-        m_buttons[i].setSize(Config::UI_BUTTON_WIDTH, Config::UI_BUTTON_HEIGHT);
-        m_buttons[i].render(ui);
-    }
+void SleepMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
+    ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
+    renderActionMenu(ui,screenWidth,screenHeight,
+                     ui.localization().text("sleep.title"),m_buttons);
 }
 
 void SleepMenu::onKeyPress(int key, int) {

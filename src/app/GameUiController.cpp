@@ -42,7 +42,9 @@ void GameUiController::updateTextInputArea(
     const bool touchTabVisible = settings.controlMode == ControlMode::Touch ||
         (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible);
     const auto lines = commandInputLines(uiWidth, touchTabVisible);
-    float height = 11.0f + commandLineHeight * static_cast<float>(lines.size());
+    const int capacity=std::max(1,uiTextLineCapacity(safe.height/guiScale,
+        commandBottom+12,commandLineHeight));
+    float height=11.0f+commandLineHeight*std::min(static_cast<int>(lines.size()),capacity);
     if (touchTabVisible) {
         const TouchRect tab = touchCommandTabRect(uiWidth, safe.height / guiScale);
         height = std::max(height, tab.y + tab.h - commandBottom);
@@ -77,6 +79,7 @@ void GameUiController::render(
     // Phase 1: Inventory overlay (on top of 3D world)
     if (inventoryOpen) {
         renderer.beginUIFrame(uiWidth, uiHeight);
+        renderer.setOpacity(inventoryFade.value);
         if (tradeOpen) {
             tradeScreen.render(renderer, uiWidth, uiHeight,
                 static_cast<int>(mouseScreenX), static_cast<int>(mouseScreenY));
@@ -94,15 +97,13 @@ void GameUiController::render(
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible))) {
             const TouchRect close = touchInventoryCloseRect(uiWidth,uiHeight);
-            renderer.drawRect(close.x,close.y,close.w,close.h,
-                                  glm::vec4(.08f,.09f,.12f,.88f));
-            const std::string label=localization.text("touch.close");
-            const glm::vec2 labelSize=renderer.measureText(label,.8f);
-            renderer.renderText(label,close.x+(close.w-labelSize.x)*.5f,
-                close.y+(close.h-labelSize.y)*.5f,.8f,glm::vec3(1.0f));
+            UiTheme::button(renderer,close.x,close.y,close.w,close.h,
+                localization.text("touch.close"),UiTheme::WidgetState::Normal,false,.9f);
         }
         renderer.endUIFrame();
     }
+
+    renderer.setOpacity(1.0f);
 
     // Phase 2: Hotbar HUD (Playing, no inventory, no menu)
     if (state == GameState::Playing && !inventoryOpen && !activeMenu) {
@@ -139,16 +140,22 @@ void GameUiController::render(
                  inputs.touchHudVisible);
             inputLines = commandInputLines(uiWidth, touchTabVisible);
         }
+        const size_t inputCapacity=static_cast<size_t>(std::max(1,
+            uiTextLineCapacity(uiHeight,commandBottom+12,lineHeight)));
+        if (inputLines.size()>inputCapacity)
+            inputLines.erase(inputLines.begin(),inputLines.end()-static_cast<std::ptrdiff_t>(inputCapacity));
         const float inputHeight = commandOpen
             ? 11.0f + lineHeight * static_cast<float>(inputLines.size()) : 0.0f;
 
+        const size_t historyCapacity=static_cast<size_t>(std::min(8,
+            uiTextLineCapacity(uiHeight,commandBottom+inputHeight+8,lineHeight)));
         std::vector<std::string> visibleHistory;
         for (auto message = chatHistory.rbegin();
-             message != chatHistory.rend() && visibleHistory.size() < 8;
+             message != chatHistory.rend() && visibleHistory.size() < historyCapacity;
              ++message) {
             const auto lines = wrap(*message, 1.0f, textWidth);
             for (auto line = lines.rbegin();
-                 line != lines.rend() && visibleHistory.size() < 8; ++line)
+                 line != lines.rend() && visibleHistory.size() < historyCapacity; ++line)
                 visibleHistory.push_back(*line);
         }
         if (!visibleHistory.empty()) {
@@ -185,7 +192,9 @@ void GameUiController::render(
     // Phase 3: Active menu (overlays everything)
     if (activeMenu) {
         renderer.beginUIFrame(uiWidth, uiHeight);
+        renderer.setOpacity(activeMenu->opacity());
         activeMenu->render(renderer, uiWidth, uiHeight);
+        renderer.setOpacity(1.0f);
         renderer.endUIFrame();
     }
 
@@ -207,25 +216,27 @@ void GameUiController::render(
             (loading.newWorld ? "loading.generating"
                                : "loading.cached"), {
             std::to_string(progress.completed), std::to_string(progress.total)});
-        const float barWidth = std::min(420.0f, uiWidth - 80.0f);
+        const float barWidth=std::max(1.0f,std::min(420.0f,uiWidth-80.0f));
         const float panelW = barWidth + 64.0f;
         const float panelX = (uiWidth - panelW) * 0.5f;
-        const float panelY = std::max(20.0f, uiHeight * 0.38f);
+        const float panelY=std::max(8.0f,(uiHeight-150.0f)*.5f);
         const float panelH = 150.0f;
         UiTheme::panel(renderer, panelX, panelY, panelW, panelH,
                        UiTheme::PANEL, {}, 1.0f);
-        const auto titleSize = renderer.measureText(title, 3.0f);
+        const float titleScale=UiTheme::fittedScale(renderer,title,2.4f,panelW-40);
+        const auto titleSize=renderer.measureText(title,titleScale);
         UiTheme::textWithShadow(renderer, title,
-            (uiWidth - titleSize.x) * 0.5f, panelY + panelH - 44.0f, 3.0f,
+            (uiWidth - titleSize.x) * 0.5f, panelY + panelH - 48.0f,titleScale,
             UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
-        const auto statusSize = renderer.measureText(status, 1.25f);
+        const float statusScale=UiTheme::fittedScale(renderer,status,1.1f,panelW-40);
+        const auto statusSize=renderer.measureText(status,statusScale);
         UiTheme::textWithShadow(renderer, status,
-            (uiWidth - statusSize.x) * 0.5f, panelY + 60.0f, 1.25f,
+            (uiWidth - statusSize.x) * 0.5f, panelY + 60.0f,statusScale,
             glm::vec3(0.82f));
         const float barX = panelX + 32.0f;
         const float barY = panelY + 26.0f;
         UiTheme::progressBar(renderer, barX, barY, barWidth, 16.0f, fraction,
-                             glm::vec4(0.36f, 0.72f, 0.30f, 1.0f));
+                             UiTheme::ACCENT);
         renderer.endUIFrame();
     }
 
@@ -238,14 +249,16 @@ void GameUiController::render(
                           static_cast<float>(uiHeight),
                           glm::vec4(0.40f, 0.0f, 0.0f, 0.55f));
         const std::string title = localization.text("death.title");
-        auto titleSize = renderer.measureText(title, 4.0f);
+        const float titleScale=UiTheme::fittedScale(renderer,title,3.4f,uiWidth-40.0f);
+        auto titleSize=renderer.measureText(title,titleScale);
         UiTheme::textWithShadow(renderer, title,
-            (uiWidth - titleSize.x) * 0.5f, uiHeight * 0.58f, 4.0f,
+            (uiWidth - titleSize.x) * 0.5f, uiHeight * 0.58f,titleScale,
             glm::vec3(1.0f, 0.82f, 0.82f), 1.0f, 2.0f, -2.0f);
         const std::string prompt = localization.text("death.respawn");
-        auto promptSize = renderer.measureText(prompt, 1.5f);
+        const float promptScale=UiTheme::fittedScale(renderer,prompt,1.2f,uiWidth-40.0f);
+        auto promptSize=renderer.measureText(prompt,promptScale);
         UiTheme::textWithShadow(renderer, prompt,
-            (uiWidth - promptSize.x) * 0.5f, uiHeight * 0.46f, 1.5f,
+            (uiWidth - promptSize.x) * 0.5f, uiHeight * 0.46f,promptScale,
             glm::vec3(1.0f));
         renderer.endUIFrame();
     }
@@ -260,6 +273,10 @@ GameUiController::GameUiController(
       commandInput({}, 80, &clipboard) {}
 
 void GameUiController::tick(float dt) {
+    renderer.advanceTime(dt);
+    if (activeMenu) activeMenu->tick(dt);
+    if (inventoryOpen) inventoryFade.tick(dt,true,0.16f);
+    else inventoryFade.value=0;
     hudTime += std::max(0.0f, dt);
     if (chatVisibleSeconds > 0.0f)
         chatVisibleSeconds = std::max(0.0f, chatVisibleSeconds - dt);
@@ -288,16 +305,19 @@ void GameUiController::openInventory(bool creativeCatalog) {
     containerOpen = false;
     tradeOpen = false;
     creativeCatalogOpen = creativeCatalog;
+    inventoryFade.value=0;
     inventoryOpen = true;
 }
 
 void GameUiController::openCreativeCatalog() {
     survivalInventory.onClose();
     creativeCatalogOpen = true;
+    inventoryFade.value=0;
 }
 
 void GameUiController::openPlayerInventoryTab() {
     creativeCatalogOpen = false;
+    inventoryFade.value=0;
     survivalInventory.setCraftingTable(false);
 }
 
@@ -346,14 +366,14 @@ bool GameUiController::playerInventoryViewOpen(const Player& player) const {
 
 void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) {
     const auto& stats = player.survivalStats();
-    constexpr float unitW = 12.0f;
-    constexpr float unitH = 10.0f;
-    constexpr float gap = 2.0f;
-    constexpr float y = 76.0f;
+    const UiHotbarLayout bar(screenWidth);
+    const float s=bar.scale;
+    const float unitW=12*s,gap=2*s;
+    const float y=bar.y+bar.height+12*s;
     const float groupW = 10.0f * unitW + 9.0f * gap;
-    const float leftX = screenWidth * 0.5f - groupW - 10.0f;
-    const float rightX = screenWidth * 0.5f + 10.0f;
-    constexpr float px = 1.5f;  // pixel size for the icon sprites
+    const float leftX = screenWidth * 0.5f - groupW - 10.0f*s;
+    const float rightX = screenWidth * 0.5f + 10.0f*s;
+    const float px=1.5f*s;  // pixel size for the icon sprites
     for (int i = 0; i < 10; ++i) {
         const float healthFill = std::clamp(stats.health() - i * 2.0f, 0.0f, 2.0f) * 0.5f;
         const float hungerFill = std::clamp(
@@ -391,12 +411,16 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
     }
     const int armor = totalArmorPoints(player.inventory());
     if (armor > 0) {
-        constexpr float armorY = y + 14.0f;
+        const float armorY=y+16*s;
         for (int i = 0; i < 10; ++i) {
             const float fill = std::clamp((armor - i * 2) * 0.5f, 0.0f, 1.0f);
             const float x = leftX + i * (unitW + gap);
-            UiTheme::progressBar(renderer, x, armorY, unitW, unitH, fill,
-                                 glm::vec4(0.62f, 0.72f, 0.82f, 1.0f));
+            if (fill>=1)
+                UiTheme::sprite(renderer,x,armorY,px,UiTheme::ARMOR_FULL,UiTheme::ARMOR_PALETTE);
+            else if (fill>0)
+                UiTheme::sprite(renderer,x,armorY,px,UiTheme::ARMOR_HALF,UiTheme::ARMOR_PALETTE);
+            else
+                UiTheme::sprite(renderer,x,armorY,px,UiTheme::ARMOR_EMPTY,UiTheme::ARMOR_PALETTE);
         }
     }
     if (player.underwater()) {
@@ -404,10 +428,10 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
         for (int i=0;i<10;++i) {
             const float x = rightX + (9-i)*(unitW+gap);
             if (i < bubbles)
-                UiTheme::sprite(renderer, x+1.0f, y+14.0f, px,
+                UiTheme::sprite(renderer, x+s,y+16*s, px,
                                 UiTheme::BUBBLE_FULL, UiTheme::BUBBLE_PALETTE);
             else
-                UiTheme::sprite(renderer, x+1.0f, y+14.0f, px,
+                UiTheme::sprite(renderer, x+s,y+16*s, px,
                                 UiTheme::BUBBLE_EMPTY, UiTheme::BUBBLE_PALETTE);
         }
     }
@@ -419,10 +443,14 @@ void GameUiController::renderSelectedItemName(const Player& player, int screenWi
         static_cast<size_t>(hotbar.getSelectedSlot()));
     if (!stack.empty()) name = localization.itemName(stack.id);
     if (name.empty()) return;
-    const auto size = renderer.measureText(name, 1.0f);
-    const float x = (screenWidth - size.x) * .5f;
-    UiTheme::textWithShadow(renderer, name, x, 67.0f, 1.0f,
-                            glm::vec3(0.95f, 0.95f, 0.95f));
+    const UiHotbarLayout bar(screenWidth);
+    const float scale=UiTheme::fittedScale(renderer,name,1.0f,screenWidth-40.0f);
+    const auto size=renderer.measureText(name,scale);
+    const float x=(screenWidth-size.x)*.5f,y=bar.y+bar.height+48*bar.scale;
+    const float alpha=std::min(1.0f,itemNameSeconds/.25f);
+    UiTheme::rounded(renderer,x-8,y-4,size.x+16,size.y+8,4,
+                     UiTheme::withAlpha(UiTheme::PANEL_DEEP,.85f*alpha));
+    UiTheme::textWithShadow(renderer,name,x,y,scale,UiTheme::TEXT,alpha);
 }
 
 void GameUiController::renderCrosshairAndMiningProgress(const Player& player, int screenWidth, int screenHeight) {
@@ -454,7 +482,7 @@ void GameUiController::renderCrosshairAndMiningProgress(const Player& player, in
     const float barX = centerX - barWidth * 0.5f;
     const float barY = centerY - 42.0f;
     UiTheme::progressBar(renderer, barX, barY, barWidth, barHeight, progress,
-                         UiTheme::GOLD);
+                         UiTheme::ACCENT);
 }
 
 void GameUiController::renderAttackIndicator(
@@ -486,18 +514,16 @@ void GameUiController::renderAttackIndicator(
         return;
     }
 
-    const float hotbarWidth = InventoryModel::HOTBAR_SIZE * Config::HOTBAR_SLOT_SIZE +
-        (InventoryModel::HOTBAR_SIZE - 1) * Config::HOTBAR_GAP +
-        Config::HOTBAR_PAD_X * 2.0f;
-    constexpr float width = 6.0f;
-    const float height = Config::HOTBAR_SLOT_SIZE;
-    const float x = (screenWidth - hotbarWidth) * 0.5f - 13.0f;
-    const float y = 4.0f + Config::HOTBAR_PAD_Y;
-    renderer.drawRect(x - 1.0f, y - 1.0f, width + 2.0f, height + 2.0f,
-                      UiTheme::INK);
-    renderer.drawRect(x, y, width, height, background);
-    const float filled = std::floor(height * strength);
-    renderer.drawRect(x, y, width, filled, fill);
+    const UiHotbarLayout bar(screenWidth);
+    const float width=6,height=bar.slot;
+    if (bar.x<16) {
+        UiTheme::progressBar(renderer,bar.x+bar.width-36,bar.y+bar.height+3,
+                             28,4,strength,readyTarget?UiTheme::ACCENT:fill);
+    } else {
+        const float x=bar.x-12,y=bar.y+bar.padY;
+        UiTheme::rounded(renderer,x,y,width,height,3,background);
+        UiTheme::rounded(renderer,x,y,width,height*strength,3,readyTarget?UiTheme::ACCENT:fill);
+    }
 }
 
 void GameUiController::updateMouseScreenPosition(Window& window) {

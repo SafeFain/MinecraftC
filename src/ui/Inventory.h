@@ -39,6 +39,7 @@ private:
     CreativeItemCategory m_activeCategory = CreativeItemCategory::BuildingBlocks;
     int m_tabFocus = 0;
     bool m_tabMode = false;
+    float m_slotSize = 44;
     int m_columns = 5;
     int m_visibleRows = 4;
     int m_scrollRow = 0;

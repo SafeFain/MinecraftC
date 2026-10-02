@@ -727,6 +727,39 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME rendering_day_cycle_and_environment COMMAND rendering_logic_tests)
 
+    add_executable(ui_style_tests tests/UiStyleTests.cpp)
+    target_include_directories(ui_style_tests PRIVATE src)
+    target_link_libraries(ui_style_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(ui_style_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
+
+    add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
+        tests/VulkanUiSmoke.cpp
+        src/core/Input.cpp src/core/InputCodes.cpp src/core/TextEditBuffer.cpp
+        src/debug/Log.cpp
+        src/game/ArabicShaper.cpp src/game/ClientSettings.cpp
+        src/game/InventoryInteraction.cpp src/game/InventoryModel.cpp
+        src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
+        src/game/SurvivalRules.cpp src/game/SurvivalStats.cpp
+        src/game/Utf8.cpp src/game/VillagerTrade.cpp
+        src/model/ModelRenderer.cpp
+        src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
+        src/ui/ContainerScreen.cpp src/ui/Hotbar.cpp src/ui/Inventory.cpp
+        src/ui/Menu.cpp src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
+        src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
+        src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
+    target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann)
+    target_compile_definitions(vulkan_ui_smoke PRIVATE
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(vulkan_ui_smoke PRIVATE glm::glm
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_ui_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
     add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
         tests/VulkanDecorationSmoke.cpp

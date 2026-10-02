@@ -72,6 +72,8 @@ void SettingsMenu::toggleAutoJump() {
 
 void SettingsMenu::showPage(SettingsPage page) {
     m_page = page;
+    resetTransition();
+    m_rowOffset=0;m_layoutSelection=-1;
     m_selectedIdx = 0;
     m_controlOffset = 0;
     m_captureAction = -1;
@@ -493,10 +495,18 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         m_page == SettingsPage::Video ? "settings.video_title" :
         m_page == SettingsPage::KeyBindings ? "settings.key_bindings_title" :
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");
-    const auto titleSize = ui.measureText(title, 3.0f);
-    const float titleY = height * 0.78f;
+    const int columns=width<440?1:2;
+    const size_t contentCount=m_buttons.size()-(m_backButton>=0?1:0);
+    const int rows=static_cast<int>((contentCount+columns-1)/columns)+(m_backButton>=0?1:0);
+    const float panelW=std::min(640.0f,width-16.0f);
+    const float panelH=std::min(height-12.0f,rows*49.0f+110.0f);
+    const float panelY=(height-panelH)*.5f;
+    UiTheme::panel(ui,(width-panelW)*.5f,panelY,panelW,panelH);
+    const float titleScale=UiTheme::fittedScale(ui,title,2.4f,width-48.0f);
+    const auto titleSize = ui.measureText(title,titleScale);
+    const float titleY=panelY+panelH-54.0f;
     UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f, titleY,
-                            3.0f, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
+                            titleScale, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
     const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
                          m_page == SettingsPage::Controller ||
                          m_page == SettingsPage::Lod;
@@ -513,19 +523,43 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
                                           "settings.lod_help")
                 : m_page == SettingsPage::Controller
                     ? "settings.controller_help" : "settings.controls_help");
-        const auto helpSize = ui.measureText(help, 1.0f);
+        const float helpScale=UiTheme::fittedScale(ui,help,1.0f,width-40.0f);
+        const auto helpSize = ui.measureText(help, helpScale);
         UiTheme::textWithShadow(ui, help, (width - helpSize.x) * .5f,
-                                layout.helpY, 1.0f, glm::vec3(.72f));
+                                layout.helpY,helpScale,UiTheme::TEXT_DIM);
     }
-    for (size_t i = 0; i < m_buttons.size(); ++i) {
-        const glm::vec2 position = settingsButtonPosition(
-            layout, i, m_buttons.size(), standaloneBack);
-        m_buttons[i].setPosition(position.x, position.y);
-        m_buttons[i].setSize(layout.buttonWidth, layout.buttonHeight);
-        m_buttons[i].render(ui);
+    if (m_layoutColumns!=layout.columns || m_visibleRows!=static_cast<int>(layout.visibleRows))
+        m_layoutSelection=-1;
+    m_layoutColumns=layout.columns;
+    m_totalRows=static_cast<int>(layout.rowCount);
+    m_visibleRows=static_cast<int>(layout.visibleRows);
+    if (m_layoutSelection!=m_selectedIdx) {
+        const int selectedRow=standaloneBack&&m_selectedIdx+1==static_cast<int>(m_buttons.size())?
+            static_cast<int>(layout.rowCount)-1:m_selectedIdx/layout.columns;
+        if (selectedRow<m_rowOffset) m_rowOffset=selectedRow;
+        if (selectedRow>=m_rowOffset+m_visibleRows)
+            m_rowOffset=selectedRow-m_visibleRows+1;
+        m_layoutSelection=m_selectedIdx;
     }
+    m_rowOffset=std::clamp(m_rowOffset,0,std::max(0,m_totalRows-m_visibleRows));
+    for (size_t i=0;i<m_buttons.size();++i) {
+        const glm::vec2 position=settingsButtonPosition(layout,i,m_buttons.size(),
+                                                        standaloneBack,m_rowOffset);
+        const bool visible=position.y>=10 &&
+            position.y+layout.buttonHeight<=layout.firstButtonY+layout.buttonHeight+.1f;
+        m_buttons[i].setPosition(visible?position.x:-10000,visible?position.y:-10000);
+        m_buttons[i].setSize(visible?layout.buttonWidth:0,visible?layout.buttonHeight:0);
+        const bool slider=static_cast<int>(i)==m_frameRateButton||
+            std::find(m_volumeButtons.begin(),m_volumeButtons.end(),static_cast<int>(i))!=m_volumeButtons.end();
+        m_buttons[i].setBottomInset(slider?10.0f:0.0f);
+        if (visible) m_buttons[i].render(ui);
+    }
+    if (m_totalRows>m_visibleRows)
+        UiTheme::scrollBar(ui,width-10.0f,14,4,
+            layout.firstButtonY+layout.buttonHeight-14,m_rowOffset,m_visibleRows,m_totalRows);
     if (m_frameRateButton >= 0 &&
-        m_frameRateButton < static_cast<int>(m_buttons.size())) {
+        m_frameRateButton < static_cast<int>(m_buttons.size()) &&
+        m_buttons[static_cast<size_t>(m_frameRateButton)].height()>0) {
         const Button& slider = m_buttons[static_cast<size_t>(m_frameRateButton)];
         const float left = slider.x() + 12.0f;
         const float width = std::max(1.0f, slider.width() - 24.0f);
@@ -533,7 +567,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         const float filled = width * frameRateSliderFraction(m_settings.frameRateLimit);
         UiTheme::progressBar(ui, left, trackY, width, 8.0f,
                              frameRateSliderFraction(m_settings.frameRateLimit),
-                             UiTheme::GOLD);
+                             UiTheme::ACCENT);
         UiTheme::beveledBody(ui, left + filled - 3.0f, trackY - 2.0f, 8.0f,
                              12.0f, UiTheme::BUTTON_HOVER, false);
     }
@@ -542,6 +576,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         if (buttonIndex < 0 || buttonIndex >= static_cast<int>(m_buttons.size()))
             continue;
         const Button& slider = m_buttons[static_cast<size_t>(buttonIndex)];
+        if (slider.height()<=0) continue;
         const float left = slider.x() + 12.0f;
         const float width = std::max(1.0f, slider.width() - 24.0f);
         const float trackY = slider.y() + 3.0f;
@@ -551,7 +586,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
             index == 2 ? m_settings.weatherVolume :
                          m_settings.soundEffectsVolume);
         UiTheme::progressBar(ui, left, trackY, width, 8.0f, fraction,
-                             UiTheme::GOLD);
+                             UiTheme::ACCENT);
         UiTheme::beveledBody(ui, left + width * fraction - 3.0f,
                              trackY - 2.0f, 8.0f, 12.0f,
                              UiTheme::BUTTON_HOVER, false);
@@ -613,7 +648,7 @@ void SettingsMenu::onKeyPress(int key, int mods) {
         m_selectedIdx = settingsGridNeighbor(
             m_selectedIdx, m_buttons.size(), columnDelta, rowDelta,
             m_backButton >= 0 &&
-                m_backButton + 1 == static_cast<int>(m_buttons.size()));
+                m_backButton + 1 == static_cast<int>(m_buttons.size()),m_layoutColumns);
         m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
     };
     switch (key) {
@@ -810,6 +845,11 @@ void SettingsMenu::onScroll(double yOffset) {
         if (m_page == SettingsPage::KeyboardMouse)
             assignBinding({InputDevice::Wheel, yOffset > 0 ? 1 : -1});
         return;
+    }
+    if (yOffset==0) return;
+    if (m_totalRows>m_visibleRows) {
+        const int next=std::clamp(m_rowOffset+(yOffset<0?1:-1),0,m_totalRows-m_visibleRows);
+        if (next!=m_rowOffset) { m_rowOffset=next;return; }
     }
     if (m_page != SettingsPage::KeyboardMouse &&
         m_page != SettingsPage::Controller) return;

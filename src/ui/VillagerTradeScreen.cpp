@@ -5,6 +5,7 @@
 #include "game/VillagerTrade.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UILayout.h"
 
 #include <algorithm>
 
@@ -38,13 +39,17 @@ bool VillagerTradeScreen::contains(const Rect& rect, int x, int y) {
 void VillagerTradeScreen::layout(int width, int height) {
     constexpr float rowWidth = 310.0f;
     constexpr float rowHeight = 52.0f;
-    const float x = (width - rowWidth) * .5f;
-    const float baseY = height * .5f - 132.0f;
+    const UiCanvasFit fit(width,height,360,400);
+    m_layoutScale=fit.scale;m_panelRect=fit.transform(Rect{0,0,360,400});
+    const float x=25,baseY=32;
     for (size_t i = 0; i < m_rows.size(); ++i) {
         m_rows[i] = {x, baseY + (4 - static_cast<int>(i)) * 58.0f,
                      rowWidth, rowHeight};
         m_outputs[i] = {x + 250.0f, m_rows[i].y + 4.0f, 44.0f, 44.0f};
     }
+    for (auto& r:m_rows) r=fit.transform(r);
+    for (auto& r:m_outputs) r=fit.transform(r);
+
 }
 
 void VillagerTradeScreen::drawStack(
@@ -53,10 +58,11 @@ void VillagerTradeScreen::drawStack(
         highlighted ? UiTheme::WidgetState::Hover
                     : UiTheme::WidgetState::Normal, UiTheme::SLOT);
     if (stack.empty()) return;
-    ui.drawItemIcon(rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, stack);
+    const float s=rect.w/44;
+    ui.drawItemIcon(rect.x+4*s,rect.y+4*s,rect.w-8*s,rect.h-8*s,stack);
     if (stack.count > 1)
         UiTheme::textWithShadow(ui, std::to_string(stack.count),
-            rect.x + rect.w - 16, rect.y + 2, .9f, glm::vec3(1.0f));
+            rect.x+rect.w-16*s,rect.y+2*s,.9f*s, glm::vec3(1.0f));
 }
 
 void VillagerTradeScreen::render(
@@ -66,14 +72,11 @@ void VillagerTradeScreen::render(
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height),
                 {0, 0, 0, .62f});
-    UiTheme::panel(ui, m_rows[0].x - 14.0f, m_rows[4].y - 14.0f,
-                   m_rows[0].w + 28.0f,
-                   m_rows[0].y + m_rows[0].h - m_rows[4].y + 28.0f,
-                   UiTheme::PANEL);
-    const std::string title = ui.localization().text("trade.title");
-    const glm::vec2 titleSize = ui.measureText(title, 2.0f);
-    UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f,
-        m_rows[0].y + 72.0f, 2.0f, UiTheme::TEXT_TITLE);
+    const float scale=m_layoutScale;
+    UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
+    const std::string title=ui.localization().text("trade.title");
+    UiTheme::textWithShadow(ui,title,m_panelRect.x+24*scale,m_panelRect.y+352*scale,
+        UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-48*scale),UiTheme::TEXT);
     const auto& offers = villagerOffers(entity->villager.profession);
     const uint8_t unlocked = unlockedTradeCount(entity->villager);
     for (uint8_t i = 0; i < 5; ++i) {
@@ -81,21 +84,20 @@ void VillagerTradeScreen::render(
             entity->villager.uses[i] < offers[i].maximumUses;
         const bool selected = i == m_selected;
         const bool hovered = contains(m_rows[i], mouseX, mouseY);
-        ui.drawRect(m_rows[i].x, m_rows[i].y, m_rows[i].w, m_rows[i].h,
-            selected ? glm::vec4(.24f,.43f,.22f,.95f) :
-            hovered ? glm::vec4(.25f,.25f,.28f,.95f) :
-                      glm::vec4(.15f,.15f,.17f,.92f));
-        Rect input{m_rows[i].x + 8.0f, m_rows[i].y + 4.0f, 44.0f, 44.0f};
+        UiTheme::button(ui,m_rows[i].x,m_rows[i].y,m_rows[i].w,m_rows[i].h,{},
+            selected?UiTheme::WidgetState::Selected:hovered?UiTheme::WidgetState::Hover:
+                UiTheme::WidgetState::Normal,false,0,enabled?1.0f:.55f);
+        Rect input{m_rows[i].x+8*scale,m_rows[i].y+4*scale,44*scale,44*scale};
         drawStack(ui, input, offers[i].input, false);
-        UiTheme::sprite(ui, m_rows[i].x + 118.0f, m_rows[i].y + 16.0f,
-                        2.0f, UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE,
+        UiTheme::sprite(ui, m_rows[i].x+118*scale,m_rows[i].y+16*scale,
+                        2*scale, UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE,
                         enabled ? 1.0f : .35f);
         drawStack(ui, m_outputs[i], offers[i].output,
                   enabled && contains(m_outputs[i], mouseX, mouseY));
         UiTheme::textWithShadow(ui,
             std::to_string(entity->villager.uses[i]) + "/" +
             std::to_string(offers[i].maximumUses),
-            m_rows[i].x + 170.0f, m_rows[i].y + 18.0f, .8f,
+            m_rows[i].x+170*scale,m_rows[i].y+18*scale,.8f*scale,
             enabled ? glm::vec3(.85f) : glm::vec3(.45f));
     }
 }

@@ -1,12 +1,12 @@
 #pragma once
 
-// ── Pixel UI theme ─────────────────────────────────────────────────────────
+// ── Modern block UI theme ─────────────────────────────────────────────────────────
 //
 // Shared, backend-neutral visual theme for every menu, inventory, container
-// and HUD surface.  All decorations are composed from plain colored quads
-// (drawRect) and text so all UI elements share identical output without
+// and HUD surface.  Surfaces use rounded colored geometry
+// and smooth text so all UI elements share identical output without
 // any new texture assets.  Every helper is a template over any object that
-// exposes drawRect/renderText/measureText (UIRenderer and both UI backends).
+// exposes drawRect/drawRoundedRect/renderTextAlpha/measureText (UIRenderer and its backend).
 
 #include <glm/glm.hpp>
 #include <glm/common.hpp>
@@ -20,55 +20,37 @@
 
 #include "game/Item.h"
 #include "game/Localization.h"
+#include "game/TextWrap.h"
 
 namespace UiTheme {
 
-// ── Palette ────────────────────────────────────────────────────────────────
-
-inline constexpr glm::vec4 INK(0.10f, 0.085f, 0.08f, 1.0f);
-inline constexpr glm::vec4 BEVEL_DARK(0.10f, 0.09f, 0.08f, 1.0f);
-inline constexpr glm::vec4 BEVEL_LIGHT(0.42f, 0.38f, 0.34f, 1.0f);
-inline constexpr glm::vec4 BEVEL_LIGHTEST(0.62f, 0.56f, 0.49f, 1.0f);
-
-inline constexpr glm::vec4 PANEL(0.18f, 0.165f, 0.15f, 0.98f);
-inline constexpr glm::vec4 PANEL_DEEP(0.13f, 0.12f, 0.11f, 0.98f);
-
-inline constexpr glm::vec4 BUTTON(0.24f, 0.22f, 0.19f, 1.0f);
-inline constexpr glm::vec4 BUTTON_HOVER(0.31f, 0.28f, 0.24f, 1.0f);
-inline constexpr glm::vec4 BUTTON_SELECTED(0.36f, 0.33f, 0.27f, 1.0f);
-inline constexpr glm::vec4 BUTTON_PRESSED(0.17f, 0.16f, 0.14f, 1.0f);
-inline constexpr glm::vec4 BUTTON_DANGER(0.36f, 0.18f, 0.14f, 1.0f);
-inline constexpr glm::vec4 BUTTON_DANGER_HOVER(0.46f, 0.23f, 0.17f, 1.0f);
-
-inline constexpr glm::vec4 GOLD(0.95f, 0.76f, 0.31f, 1.0f);
-inline constexpr glm::vec4 GOLD_DIM(0.70f, 0.55f, 0.22f, 1.0f);
-
-inline constexpr glm::vec4 SLOT(0.13f, 0.12f, 0.10f, 1.0f);
-inline constexpr glm::vec4 SLOT_HOVER(0.21f, 0.19f, 0.16f, 1.0f);
-
-inline constexpr glm::vec3 TEXT(0.95f, 0.93f, 0.86f);
-inline constexpr glm::vec3 TEXT_DIM(0.66f, 0.62f, 0.56f);
-inline constexpr glm::vec3 TEXT_TITLE(0.98f, 0.83f, 0.38f);
-inline constexpr glm::vec3 TEXT_HOVER(1.0f, 0.95f, 0.65f);
-inline constexpr glm::vec3 TEXT_SHADOW(0.05f, 0.04f, 0.03f);
-
-inline constexpr glm::vec4 OVERLAY(0.0f, 0.0f, 0.0f, 0.55f);
-inline constexpr glm::vec4 TOOLTIP_FILL(0.12f, 0.08f, 0.06f, 0.97f);
-
-inline constexpr glm::vec4 DIRT_A(0.24f, 0.19f, 0.14f, 1.0f);
-inline constexpr glm::vec4 DIRT_B(0.20f, 0.16f, 0.12f, 1.0f);
-inline constexpr glm::vec4 DIRT_C(0.28f, 0.22f, 0.16f, 1.0f);
-inline constexpr glm::vec4 GRASS(0.30f, 0.48f, 0.24f, 1.0f);
-inline constexpr glm::vec4 GRASS_LIGHT(0.42f, 0.62f, 0.33f, 1.0f);
-inline constexpr glm::vec4 GRASS_DARK(0.15f, 0.27f, 0.12f, 1.0f);
-
-inline constexpr glm::vec4 SKY_TOP(0.10f, 0.17f, 0.30f, 1.0f);
-inline constexpr glm::vec4 SKY_HORIZON(0.48f, 0.68f, 0.82f, 1.0f);
-inline constexpr glm::vec4 MOUNTAIN_FAR(0.25f, 0.31f, 0.42f, 1.0f);
-inline constexpr glm::vec4 MOUNTAIN_NEAR(0.16f, 0.20f, 0.28f, 1.0f);
-inline constexpr glm::vec4 SNOW(0.86f, 0.90f, 0.95f, 1.0f);
-inline constexpr glm::vec4 CLOUD(0.92f, 0.92f, 0.96f, 0.9f);
-inline constexpr glm::vec4 CLOUD_SHADE(0.66f, 0.70f, 0.82f, 0.9f);
+// Shared logical-pixel design tokens. Item/status sprites remain pixel art.
+inline constexpr float PANEL_RADIUS = 10.0f;
+inline constexpr float BUTTON_RADIUS = 6.0f;
+inline constexpr float SLOT_RADIUS = 4.0f;
+inline constexpr float BODY_SCALE = 1.15f;
+inline constexpr float TITLE_SCALE = 2.4f;
+inline constexpr float CAPTION_SCALE = 0.9f;
+inline constexpr glm::vec4 INK(0.055f,0.071f,0.086f,1);
+inline constexpr glm::vec4 BORDER(0.23f,0.29f,0.34f,1);
+inline constexpr glm::vec4 PANEL(0.133f,0.169f,0.20f,0.98f);
+inline constexpr glm::vec4 PANEL_DEEP(0.09f,0.114f,0.137f,0.98f);
+inline constexpr glm::vec4 BUTTON(0.18f,0.224f,0.263f,1);
+inline constexpr glm::vec4 BUTTON_HOVER(0.235f,0.294f,0.333f,1);
+inline constexpr glm::vec4 BUTTON_SELECTED(0.20f,0.32f,0.29f,1);
+inline constexpr glm::vec4 BUTTON_PRESSED(0.115f,0.169f,0.165f,1);
+inline constexpr glm::vec4 BUTTON_DANGER(0.36f,0.18f,0.20f,1);
+inline constexpr glm::vec4 BUTTON_DANGER_HOVER(0.48f,0.22f,0.24f,1);
+inline constexpr glm::vec4 ACCENT(0.396f,0.788f,0.569f,1);
+inline constexpr glm::vec4 ACCENT_DIM(0.23f,0.46f,0.35f,1);
+inline constexpr glm::vec4 SLOT(0.09f,0.122f,0.145f,1);
+inline constexpr glm::vec4 SLOT_HOVER(0.18f,0.25f,0.27f,1);
+inline constexpr glm::vec3 TEXT(0.929f,0.949f,0.961f);
+inline constexpr glm::vec3 TEXT_DIM(0.655f,0.702f,0.745f);
+inline constexpr glm::vec3 TEXT_TITLE = TEXT;
+inline constexpr glm::vec3 TEXT_HOVER(0.91f,1.0f,0.95f);
+inline constexpr glm::vec4 OVERLAY(0.025f,0.04f,0.05f,0.64f);
+inline constexpr glm::vec4 TOOLTIP_FILL(0.075f,0.102f,0.122f,0.98f);
 
 // ── Widget states ──────────────────────────────────────────────────────────
 
@@ -83,7 +65,7 @@ inline constexpr glm::vec4 PX_TRANSPARENT(0.0f, 0.0f, 0.0f, 0.0f);
 
 inline constexpr std::array<glm::vec4, 10> ARROW_PALETTE{{
     PX_TRANSPARENT,
-    GOLD,                                    // 1 arrow body
+    ACCENT,                                    // 1 arrow body
     INK,                                     // 2 arrow outline
     PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT,
     PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT}};
@@ -112,182 +94,102 @@ inline void rect(T& ui, float x, float y, float w, float h,
 template <class T>
 inline void textWithShadow(T& ui, const std::string& text, float x, float y,
                            float scale, const glm::vec3& color,
-                           float alpha = 1.0f, float dx = 1.0f,
-                           float dy = -1.0f) {
-    if (text.empty()) return;
-    ui.renderText(text, x + dx, y + dy, scale, TEXT_SHADOW * alpha);
-    ui.renderText(text, x, y, scale, color * alpha);
-}
-
-// One ink border + 1 px raised/lowered bevel + interior fill.  Small controls
-// degrade to a plain 1 px ink frame so they never overflow tiny layouts.
-template <class T>
-inline void beveledBody(T& ui, float x, float y, float w, float h,
-                        const glm::vec4& fill, bool pressed, float alpha = 1.0f) {
-    rect(ui, x, y, w, h, withAlpha(INK, alpha));
-    if (w < 6.0f || h < 6.0f) {
-        rect(ui, x + 1, y + 1, w - 2, h - 2, withAlpha(fill, alpha));
-        return;
-    }
-    rect(ui, x + 1, y + 1, w - 2, h - 2,
-         withAlpha(pressed ? BEVEL_DARK : BEVEL_LIGHT, alpha));
-    rect(ui, x + 1, y + 1, w - 2, 1,
-         withAlpha(pressed ? INK : BEVEL_LIGHTEST, alpha));
-    rect(ui, x + 1, y + 1, 1, h - 2,
-         withAlpha(pressed ? INK : BEVEL_LIGHTEST, alpha));
-    rect(ui, x + 1, y + h - 2, w - 2, 1,
-         withAlpha(pressed ? BEVEL_LIGHT : BEVEL_DARK, alpha));
-    rect(ui, x + w - 2, y + 1, 1, h - 2,
-         withAlpha(pressed ? BEVEL_LIGHT : BEVEL_DARK, alpha));
-    rect(ui, x + 2, y + 2, w - 4, h - 4, withAlpha(fill, alpha));
-}
-
-// ── Composite widgets ──────────────────────────────────────────────────────
-
-template <class T>
-inline void panel(T& ui, float x, float y, float w, float h,
-                  const glm::vec4& fill = PANEL, const std::string& title = {},
-                  float titleScale = 1.6f, float alpha = 1.0f) {
-    beveledBody(ui, x, y, w, h, fill, false, alpha);
-    if (title.empty() || h < 34.0f) return;
-    const float headH = std::min(26.0f, h * 0.28f);
-    rect(ui, x + 2, y + h - 2 - headH, w - 4, headH, withAlpha(PANEL_DEEP, alpha));
-    rect(ui, x + 2, y + h - 2 - headH, w - 4, 1, withAlpha(INK, alpha));
-    textWithShadow(ui, title,
-                   x + (w - ui.measureText(title, titleScale).x) * 0.5f,
-                   y + h - 2 - headH + (headH - 14.0f * titleScale) * 0.5f,
-                   titleScale, TEXT_TITLE, alpha);
+                           float alpha = 1.0f, float = 1.0f, float = -1.0f) {
+    if (!text.empty()) ui.renderTextAlpha(text,x,y,scale,color,alpha);
 }
 
 template <class T>
-inline void button(T& ui, float x, float y, float w, float h,
-                   const std::string& label, WidgetState state,
-                   bool danger = false, float textScale = 0.0f,
-                   float alpha = 1.0f) {
-    glm::vec4 fill = danger ? BUTTON_DANGER : BUTTON;
-    if (state == WidgetState::Hover)
-        fill = danger ? BUTTON_DANGER_HOVER : BUTTON_HOVER;
-    else if (state == WidgetState::Selected)
-        fill = danger ? BUTTON_DANGER_HOVER : BUTTON_SELECTED;
-    else if (state == WidgetState::Pressed)
-        fill = danger ? BUTTON_DANGER : BUTTON_PRESSED;
-    beveledBody(ui, x, y, w, h, fill, state == WidgetState::Pressed, alpha);
-    if (state == WidgetState::Selected) {
-        rect(ui, x, y, w, 2, withAlpha(GOLD, alpha));
-        rect(ui, x, y + h - 2, w, 2, withAlpha(GOLD, alpha));
-        rect(ui, x, y, 2, h, withAlpha(GOLD, alpha));
-        rect(ui, x + w - 2, y, 2, h, withAlpha(GOLD, alpha));
-    }
-    if (textScale <= 0.0f)
-        textScale = std::clamp((h - 8.0f) / 14.0f, 0.9f, 1.8f);
-    const auto size = ui.measureText(label, textScale);
-    const glm::vec3 color =
-        (state == WidgetState::Hover || state == WidgetState::Selected)
-            ? TEXT_HOVER : TEXT;
-    textWithShadow(ui, label, x + (w - size.x) * 0.5f,
-                   y + (h - size.y) * 0.5f, textScale, color, alpha);
-}
-
-// Recessed inventory-style slot.  fill may carry a per-item tint.
-template <class T>
-inline void slot(T& ui, float x, float y, float w, float h, WidgetState state,
-                 const glm::vec4& fill = SLOT, float alpha = 1.0f) {
-    rect(ui, x, y, w, h, withAlpha(INK, alpha));
-    if (w < 6.0f || h < 6.0f) {
-        rect(ui, x + 1, y + 1, w - 2, h - 2, withAlpha(fill, alpha));
-    } else {
-        rect(ui, x + 1, y + 1, w - 2, h - 2, withAlpha(BEVEL_DARK, alpha));
-        rect(ui, x + 1, y + 1, w - 2, 1, withAlpha(INK, alpha));
-        rect(ui, x + 1, y + 1, 1, h - 2, withAlpha(INK, alpha));
-        rect(ui, x + 1, y + h - 2, w - 2, 1, withAlpha(BEVEL_LIGHT, alpha));
-        rect(ui, x + w - 2, y + 1, 1, h - 2, withAlpha(BEVEL_LIGHT, alpha));
-        rect(ui, x + 2, y + 2, w - 4, h - 4,
-             withAlpha(state == WidgetState::Hover ? SLOT_HOVER : fill, alpha));
-        if (state == WidgetState::Hover)
-            rect(ui, x + 2, y + 2, w - 4, h - 4,
-                 glm::vec4(1.0f, 1.0f, 1.0f, 0.08f * alpha));
-    }
-    if (state == WidgetState::Selected) {
-        rect(ui, x, y, w, 2, withAlpha(GOLD, alpha));
-        rect(ui, x, y + h - 2, w, 2, withAlpha(GOLD, alpha));
-        rect(ui, x, y, 2, h, withAlpha(GOLD, alpha));
-        rect(ui, x + w - 2, y, 2, h, withAlpha(GOLD, alpha));
-    }
+inline float fittedScale(T& ui,const std::string& label,float scale,float width) {
+    const float measured=ui.measureText(label,scale).x;
+    return measured>width && measured>0 ? scale*std::max(0.0f,width)/measured : scale;
 }
 
 template <class T>
-inline void progressBar(T& ui, float x, float y, float w, float h,
-                        float fraction, const glm::vec4& fillColor,
-                        float alpha = 1.0f) {
-    fraction = std::clamp(fraction, 0.0f, 1.0f);
-    rect(ui, x, y, w, h, withAlpha(INK, alpha));
-    if (w >= 6.0f && h >= 6.0f) {
-        rect(ui, x + 1, y + 1, w - 2, h - 2, withAlpha(BEVEL_DARK, alpha));
-        rect(ui, x + 1, y + 1, w - 2, 1, withAlpha(INK, alpha));
-        rect(ui, x + 1, y + 1, 1, h - 2, withAlpha(INK, alpha));
-        rect(ui, x + 1, y + h - 2, w - 2, 1, withAlpha(BEVEL_LIGHT, alpha));
-        rect(ui, x + w - 2, y + 1, 1, h - 2, withAlpha(BEVEL_LIGHT, alpha));
-    }
-    const float fw = std::max(0.0f, (w - 4.0f) * fraction);
-    const float fh = std::max(0.0f, h - 4.0f);
-    if (fw > 0.5f && fh > 0.0f) {
-        rect(ui, x + 2, y + 2, fw, fh, withAlpha(fillColor, alpha));
-        if (fh > 2.0f) {
-            rect(ui, x + 2, y + 2, fw, 1,
-                 withAlpha(glm::vec4(std::min(1.0f, fillColor.r * 1.25f),
-                                     std::min(1.0f, fillColor.g * 1.25f),
-                                     std::min(1.0f, fillColor.b * 1.25f), 1.0f),
-                           alpha));
-            rect(ui, x + 2, y + 2 + fh - 1, fw, 1,
-                 withAlpha(glm::vec4(fillColor.r * 0.72f, fillColor.g * 0.72f,
-                                     fillColor.b * 0.72f, 1.0f), alpha));
-        }
-    }
+inline void rounded(T& ui,float x,float y,float w,float h,float radius,
+                    const glm::vec4& color) {
+    if (w>0 && h>0) ui.drawRoundedRect(x,y,w,h,radius,color);
 }
 
-// Forward declarations: scrollBar needs the sprite helpers defined below.
 template <class T>
-inline void spriteRows(T& ui, float x, float y, float px,
-                       const char* const* rows, size_t rowCount,
-                       const std::array<glm::vec4, 10>& palette, float alpha);
+inline void outline(T& ui,float x,float y,float w,float h,float radius,
+                    const glm::vec4& fill,const glm::vec4& border,float thickness=1) {
+    rounded(ui,x,y,w,h,radius,border);
+    rounded(ui,x+thickness,y+thickness,w-2*thickness,h-2*thickness,
+            std::max(0.0f,radius-thickness),fill);
+}
 
-template <class T, size_t N>
-inline void sprite(T& ui, float x, float y, float px,
-                   const char* const (&rows)[N],
-                   const std::array<glm::vec4, 10>& palette,
-                   float alpha = 1.0f);
-
+// Retained helper name for existing slider handles; now a flat rounded surface.
 template <class T>
-inline void sprite(T& ui, float x, float y, float px,
-                   std::initializer_list<const char*> rows,
-                   const std::array<glm::vec4, 10>& palette,
-                   float alpha = 1.0f);
+inline void beveledBody(T& ui,float x,float y,float w,float h,
+                        const glm::vec4& fill,bool pressed,float alpha=1) {
+    outline(ui,x,y,w,h,BUTTON_RADIUS,withAlpha(fill,alpha),
+            withAlpha(pressed?ACCENT_DIM:BORDER,alpha));
+}
 
 template <class T>
-inline void scrollBar(T& ui, float x, float y, float w, float h,
-                      int offset, int visible, int total) {
-    rect(ui, x, y, w, h, INK);
-    rect(ui, x + 1, y + 1, w - 2, h - 2, BEVEL_DARK);
-    const float arrowH = std::min(14.0f, std::max(8.0f, h * 0.08f));
-    // Arrows: ink outline behind the gold glyph for crisp pixel contrast.
-    sprite(ui, x + w * 0.5f - 2.5f, y + h - arrowH + 1.0f, 1.0f,
-           {"..2..", ".222.", "22222"}, ARROW_PALETTE);
-    sprite(ui, x + w * 0.5f - 2.5f - 1.0f, y + h - arrowH + 2.0f, 1.0f,
-           {"..1..", ".111.", "11111"}, ARROW_PALETTE);
-    sprite(ui, x + w * 0.5f - 2.5f, y + 1.0f, 1.0f,
-           {"22222", ".222.", "..2.."}, ARROW_PALETTE);
-    sprite(ui, x + w * 0.5f - 2.5f - 1.0f, y + 2.0f, 1.0f,
-           {"11111", ".111.", "..1.."}, ARROW_PALETTE);
-    const int maximum = std::max(0, total - visible);
-    const float trackTop = y + arrowH + 2.0f;
-    const float trackBottom = y + h - arrowH - 2.0f;
-    const float trackH = std::max(0.0f, trackBottom - trackTop);
-    const float thumbH = std::max(10.0f,
-        trackH * static_cast<float>(visible) / static_cast<float>(std::max(1, total)));
-    const float fraction = maximum == 0
-        ? 0.0f : static_cast<float>(offset) / static_cast<float>(maximum);
-    const float thumbY = trackTop + (trackH - thumbH) * (1.0f - fraction);
-    beveledBody(ui, x, thumbY, w, thumbH, BUTTON, false, 1.0f);
+inline void panel(T& ui,float x,float y,float w,float h,
+                  const glm::vec4& fill=PANEL,const std::string& title={},
+                  float titleScale=1.6f,float alpha=1) {
+    rounded(ui,x,y-3,w,h,PANEL_RADIUS+1,glm::vec4(0,0,0,.16f*alpha));
+    outline(ui,x,y,w,h,PANEL_RADIUS,withAlpha(fill,alpha),withAlpha(BORDER,alpha*.7f));
+    if (title.empty() || h<34) return;
+    const float headH=std::min(38.0f,h*.28f);
+    titleScale=fittedScale(ui,title,titleScale,w-32);
+    const auto size=ui.measureText(title,titleScale);
+    textWithShadow(ui,title,x+16,y+h-headH+(headH-size.y)*.5f,titleScale,TEXT,alpha);
+    rect(ui,x+16,y+h-headH,w-32,1,withAlpha(BORDER,alpha*.65f));
+}
+
+template <class T>
+inline void button(T& ui,float x,float y,float w,float h,
+                   const std::string& label,WidgetState state,bool danger=false,
+                   float textScale=0,float alpha=1,float hoverBlend=-1,
+                   float pressBlend=-1,bool primary=false,float bottomInset=0) {
+    const float hover=hoverBlend<0?(state==WidgetState::Hover||state==WidgetState::Selected?1:0):hoverBlend;
+    const float press=pressBlend<0?(state==WidgetState::Pressed?1:0):pressBlend;
+    const auto normal=danger?BUTTON_DANGER:primary?ACCENT_DIM:BUTTON;
+    const auto lit=danger?BUTTON_DANGER_HOVER:primary?glm::vec4(.28f,.58f,.43f,1):BUTTON_HOVER;
+    glm::vec4 fill=glm::mix(normal,lit,hover);
+    fill=glm::mix(fill,danger?BUTTON_DANGER:BUTTON_PRESSED,press);
+    const auto border=state==WidgetState::Selected?ACCENT:
+        state==WidgetState::Pressed?ACCENT_DIM:BORDER;
+    outline(ui,x,y,w,h,BUTTON_RADIUS,withAlpha(fill,alpha),withAlpha(border,alpha),
+            state==WidgetState::Selected?2.0f:1.0f);
+    if (textScale<=0) textScale=std::clamp((h-bottomInset-12)/14,0.85f,1.35f);
+    textScale=fittedScale(ui,label,textScale,w-24);
+    const auto size=ui.measureText(label,textScale);
+    textWithShadow(ui,label,x+(w-size.x)*.5f,y+(h-size.y+bottomInset)*.5f-press,
+                   textScale,hover>.5f?TEXT_HOVER:TEXT,alpha);
+}
+
+template <class T>
+inline void slot(T& ui,float x,float y,float w,float h,WidgetState state,
+                 const glm::vec4& fill=SLOT,float alpha=1) {
+    outline(ui,x,y,w,h,SLOT_RADIUS,
+            withAlpha(state==WidgetState::Hover?SLOT_HOVER:fill,alpha),
+            withAlpha(state==WidgetState::Selected?ACCENT:BORDER,alpha),
+            state==WidgetState::Selected?2.0f:1.0f);
+}
+
+template <class T>
+inline void progressBar(T& ui,float x,float y,float w,float h,float fraction,
+                        const glm::vec4& color,float alpha=1) {
+    if (w<=0 || h<=0) return;
+    fraction=std::clamp(fraction,0.0f,1.0f);
+    rounded(ui,x,y,w,h,std::min(4.0f,h*.5f),withAlpha(SLOT,alpha));
+    const float filled=(w-2)*fraction;
+    if (filled>0 && h>2)
+        rounded(ui,x+1,y+1,filled,h-2,std::min(3.0f,(h-2)*.5f),withAlpha(color,alpha));
+}
+
+template <class T>
+inline void scrollBar(T& ui,float x,float y,float w,float h,
+                      int offset,int visible,int total) {
+    if (h<=0 || total<=visible) return;
+    rounded(ui,x,y,w,h,w*.5f,SLOT);
+    const float thumbH=std::min(h,std::max(12.0f,h*std::max(0,visible)/std::max(1,total)));
+    const float fraction=std::clamp(static_cast<float>(offset)/std::max(1,total-visible),0.0f,1.0f);
+    rounded(ui,x,y+(h-thumbH)*(1-fraction),w,thumbH,w*.5f,ACCENT_DIM);
 }
 
 // ── Pixel sprites ──────────────────────────────────────────────────────────
@@ -320,7 +222,7 @@ template <class T, size_t N>
 inline void sprite(T& ui, float x, float y, float px,
                    const char* const (&rows)[N],
                    const std::array<glm::vec4, 10>& palette,
-                   float alpha) {
+                   float alpha = 1.0f) {
     spriteRows(ui, x, y, px, rows, N, palette, alpha);
 }
 
@@ -328,7 +230,7 @@ template <class T>
 inline void sprite(T& ui, float x, float y, float px,
                    std::initializer_list<const char*> rows,
                    const std::array<glm::vec4, 10>& palette,
-                   float alpha) {
+                   float alpha = 1.0f) {
     spriteRows(ui, x, y, px, rows.begin(), rows.size(), palette, alpha);
 }
 
@@ -527,91 +429,30 @@ inline constexpr const char* DISC_16[] = {
 // ── Scenic backgrounds ─────────────────────────────────────────────────────
 
 // Pixel dirt with a grass lip on top and deterministic pebbles.  Used by
-// settings, loading and death screens.
+// Quiet block landscape with bounded decoration independent of resolution.
 template <class T>
-inline void dirtBackground(T& ui, float w, float h) {
-    rect(ui, 0.0f, 0.0f, w, h, DIRT_B);
-    constexpr float tile = 32.0f;
-    for (float y = 0.0f; y < h; y += tile) {
-        for (float x = 0.0f; x < w; x += tile) {
-            const int ix = static_cast<int>(x / tile);
-            const int iy = static_cast<int>(y / tile);
-            rect(ui, x, y, tile, tile, (ix + iy) % 2 ? DIRT_A : DIRT_B);
-            rect(ui, x + 2, y + 2, tile - 4, tile - 4, DIRT_C);
-            const int hash = (ix * 31 + iy * 17) & 7;
-            if (hash == 0)
-                rect(ui, x + 8 + (hash % 3) * 6, y + 10, 6, 4,
-                     withAlpha(INK, 0.25f));
-            else if (hash == 1)
-                rect(ui, x + 12, y + 6, 4, 3, withAlpha(INK, 0.2f));
+inline void menuBackground(T& ui,float w,float h) {
+    rect(ui,0,0,w,h,PANEL_DEEP);
+    constexpr int bands=32;
+    for (int i=0;i<bands;++i) {
+        const float t=static_cast<float>(i)/bands;
+        rect(ui,0,h*t,w,h/bands+1,
+             glm::mix(glm::vec4(.14f,.23f,.25f,1),glm::vec4(.065f,.10f,.14f,1),t));
+    }
+    for (int layer=0;layer<3;++layer) {
+        const glm::vec4 color=glm::mix(glm::vec4(.15f,.25f,.26f,1),PANEL_DEEP,layer*.38f);
+        for (int i=0;i<32;++i) {
+            const float t=static_cast<float>(i)/32;
+            const float wave=.5f+.3f*std::sin(t*13+layer*2)+.2f*std::sin(t*29+layer);
+            const float top=h*(.10f+(2-layer)*.075f+wave*.12f);
+            rect(ui,w*t,0,w/32+1,top,color);
         }
     }
-    rect(ui, 0.0f, h - 18.0f, w, 18.0f, GRASS);
-    rect(ui, 0.0f, h - 18.0f, w, 4.0f, GRASS_LIGHT);
-    for (float x = 0.0f; x < w; x += 8.0f) {
-        const int ix = static_cast<int>(x / 8.0f);
-        rect(ui, x + (ix % 2) * 4.0f, h - 22.0f, 4.0f, 4.0f, GRASS_DARK);
-    }
+    rect(ui,0,0,w,h,glm::vec4(.025f,.04f,.05f,.25f));
 }
 
-// Layered pixel sky with a sun, deterministic block clouds, stepped mountain
-// silhouettes and a dirt ground, used behind the main/pause menus.
 template <class T>
-inline void menuBackground(T& ui, float w, float h) {
-    const float horizon = h * 0.42f;
-    constexpr float band = 8.0f;
-    const int bands = std::max(1, static_cast<int>((h - horizon) / band));
-    for (int i = 0; i < bands; ++i) {
-        const float t = static_cast<float>(i) /
-            static_cast<float>(std::max(1, bands - 1));
-        const glm::vec4 color = SKY_HORIZON * (1.0f - t) + SKY_TOP * t;
-        rect(ui, 0.0f, horizon + i * band, w, band + 1.0f, color);
-    }
-    // Pixel sun with a two-ring glow.
-    sprite(ui, w * 0.68f, h * 0.60f, 3.0f, DISC_16,
-           {{PX_TRANSPARENT, glm::vec4(1.0f, 0.90f, 0.55f, 0.5f),
-             PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT,
-             PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT}});
-    sprite(ui, w * 0.68f + 6.0f, h * 0.60f + 6.0f, 3.0f, DISC_16,
-           {{PX_TRANSPARENT, glm::vec4(1.0f, 0.84f, 0.42f, 1.0f),
-             PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT,
-             PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT, PX_TRANSPARENT}});
-    // Deterministic blocky clouds (16×8 blocks per cell).
-    const auto cloud = [&](float cx, float cy, float s) {
-        const auto blk = [&](float bx, float by, bool shade) {
-            rect(ui, cx + bx * 16.0f * s, cy + by * 8.0f * s, 16.0f * s,
-                 8.0f * s, shade ? CLOUD_SHADE : CLOUD);
-        };
-        blk(1, 2, false); blk(2, 2, false);
-        blk(0, 1, false); blk(1, 1, false); blk(2, 1, false);
-        blk(3, 1, false); blk(4, 1, false);
-        blk(0, 0, true); blk(1, 0, true); blk(2, 0, true);
-        blk(3, 0, true); blk(4, 0, true);
-    };
-    cloud(w * 0.12f, h * 0.66f, 0.9f);
-    cloud(w * 0.55f, h * 0.74f, 1.1f);
-    cloud(w * 0.30f, h * 0.82f, 0.7f);
-    // Stepped mountains with snow caps.
-    const auto mountain = [&](float apexX, float width, float height,
-                              const glm::vec4& color) {
-        constexpr float step = 8.0f;
-        const int steps = std::max(1, static_cast<int>(height / step));
-        for (int i = 0; i < steps; ++i) {
-            const float t = static_cast<float>(i + 1) / steps;
-            const float half = width * 0.5f * t;
-            rect(ui, apexX - half, horizon + i * step, half * 2.0f, step + 1.0f,
-                 color);
-        }
-        const float capH = std::min(2.0f * step, height);
-        const float capHalf = width * 0.5f * (capH / height) * 0.7f;
-        rect(ui, apexX - capHalf, horizon + height - capH, capHalf * 2.0f,
-             capH, SNOW);
-    };
-    mountain(w * 0.18f, w * 0.30f, h * 0.14f, MOUNTAIN_NEAR);
-    mountain(w * 0.52f, w * 0.46f, h * 0.24f, MOUNTAIN_NEAR);
-    mountain(w * 0.86f, w * 0.36f, h * 0.17f, MOUNTAIN_NEAR);
-    dirtBackground(ui, w, horizon + 2.0f);
-}
+inline void dirtBackground(T& ui,float w,float h) { menuBackground(ui,w,h); }
 
 // Rounded-corner darkening for dramatic screens (death, sleeping).
 template <class T>
@@ -679,10 +520,21 @@ template <class T>
 inline void tooltip(T& ui, float x, float y, const std::string& text,
                     float scale = 0.9f) {
     if (text.empty()) return;
-    const auto size = ui.measureText(text, scale);
-    panel(ui, x, y, size.x + 14.0f, size.y + 12.0f, TOOLTIP_FILL);
-    textWithShadow(ui, text, x + 7.0f, y + 6.0f, scale,
-                   glm::vec3(0.95f, 0.90f, 1.0f));
+    const float width=std::max(1.0f,ui.canvasWidth()-32.0f);
+    const auto lines=wrapTextPixels(text,width,[&](const std::string& value){
+        return ui.measureText(value,scale).x;
+    });
+    std::string wrapped;
+    for (const auto& line:lines) { if (!wrapped.empty()) wrapped+='\n';wrapped+=line; }
+    auto size=ui.measureText(wrapped,scale);
+    if (size.y+16>ui.canvasHeight()-8) {
+        scale*=std::max(1.0f,ui.canvasHeight()-24.0f)/std::max(1.0f,size.y);
+        size=ui.measureText(wrapped,scale);
+    }
+    x=std::clamp(x,4.0f,std::max(4.0f,ui.canvasWidth()-size.x-20));
+    y=std::clamp(y,4.0f,std::max(4.0f,ui.canvasHeight()-size.y-20));
+    panel(ui,x,y,size.x+16,size.y+16,TOOLTIP_FILL);
+    textWithShadow(ui,wrapped,x+8,y+8,scale,TEXT);
 }
 
 } // namespace UiTheme

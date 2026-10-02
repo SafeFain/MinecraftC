@@ -102,6 +102,11 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - Survival hunger uses hidden saturation and exhaustion, saturation-funded fast
   regeneration, ordinary regeneration, starvation floors, and activity-based
   exhaustion measured from actual movement.
+- Modern block UI uses charcoal rounded surfaces, green action/focus accents,
+  smooth baseline-aligned Noto text and short interaction/opening transitions.
+  Menus, inventories, containers, trades, chat, HUD and touch share one theme;
+  narrow settings/forms scroll, world cards paginate, and portrait equipment
+  moves above the nine-column backpack. Item and survival icons retain pixel art.
 - Ten UI languages (Arabic, Simplified Chinese, English, French, German, Japanese,
   Korean, Portuguese, Russian, Spanish) selectable from the main menu in
   English-name order; Arabic strings are shaped (joined forms, lam-alef

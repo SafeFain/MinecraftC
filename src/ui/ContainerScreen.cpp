@@ -3,6 +3,7 @@
 #include "game/SurvivalRules.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UILayout.h"
 #include "game/InventoryInteraction.h"
 #include "game/SessionAccess.h"
 #include "world/BlockEntity.h"
@@ -27,8 +28,9 @@ bool ContainerScreen::contains(const Rect& r, int x, int y) {
 
 void ContainerScreen::layout(int width, int height) {
     constexpr float slot = 44, gap = 4;
-    const float x0 = (width - (9 * slot + 8 * gap)) * 0.5f;
-    const float invY = height * 0.5f - 190.0f;
+    const UiCanvasFit fit(width,height,460,480);
+    m_layoutScale=fit.scale;m_panelRect=fit.transform(Rect{0,0,460,480});
+    const float x0=16,invY=32;
     for (size_t i = 0; i < m_inventoryRects.size(); ++i) {
         const int row = i < 9 ? 0 : 1 + static_cast<int>((i - 9) / 9);
         const int col = i < 9 ? static_cast<int>(i) : static_cast<int>((i - 9) % 9);
@@ -44,11 +46,14 @@ void ContainerScreen::layout(int width, int height) {
             m_containerRects[i] = {x0 + (i % 9) * (slot + gap),
                 y0 + (2 - i / 9) * (slot + gap), slot, slot};
     } else {
-        const float cx = width * 0.5f, cy = invY + 285.0f;
+        const float cx=230,cy=invY+285;
         m_containerRects[0] = {cx - 120, cy + 36, slot, slot};
         m_containerRects[1] = {cx - 120, cy - 24, slot, slot};
         m_containerRects[2] = {cx + 76, cy + 6, slot, slot};
     }
+    for (auto& r:m_inventoryRects) r=fit.transform(r);
+    for (auto& r:m_containerRects) r=fit.transform(r);
+
 }
 
 void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
@@ -58,11 +63,12 @@ void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
                           : UiTheme::WidgetState::Normal,
                   UiTheme::SLOT);
     if (stack.empty()) return;
-    ui.drawItemIcon(r.x+4,r.y+4,r.w-8,r.h-8,stack);
-    ui.drawDurability(r.x+3,r.y+2,r.w-6,stack);
+    const float s=r.w/44;
+    ui.drawItemIcon(r.x+4*s,r.y+4*s,r.w-8*s,r.h-8*s,stack);
+    ui.drawDurability(r.x+3*s,r.y+2*s,r.w-6*s,stack);
     if (stack.count > 1)
         UiTheme::textWithShadow(ui, std::to_string(stack.count),
-                                r.x+r.w-16, r.y+2, .9f, glm::vec3(1));
+                                r.x+r.w-16*s,r.y+2*s,.9f*s, glm::vec3(1));
 }
 
 void ContainerScreen::moveStack(ItemStack& cursor, ItemStack& slot, bool right) {
@@ -94,26 +100,14 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     const BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
-    constexpr float slot = 44.0f, gap = 4.0f;
-    const float x0 = m_inventoryRects[0].x;
-    const float invY = m_inventoryRects[0].y;
-    const float gridW = 9.0f * slot + 8.0f * gap + 20.0f;
-    const float invH = 4.0f * slot + 3.0f * gap + 24.0f;
-    const float cx = width * 0.5f, cy = invY + 285.0f;
-    UiTheme::panel(ui, x0 - 10.0f, invY - 10.0f, gridW, invH, UiTheme::PANEL);
-    if (entity->type == BlockEntityType::Chest) {
-        UiTheme::panel(ui, x0 - 10.0f, invY + 235.0f - 10.0f, gridW,
-                       3.0f * slot + 2.0f * gap + 24.0f, UiTheme::PANEL);
-    } else {
-        UiTheme::panel(ui, cx - 130.0f, cy - 34.0f, 260.0f, 124.0f,
-                       UiTheme::PANEL);
-    }
-    const std::string title = ui.localization().text(
-        entity->type == BlockEntityType::Chest
-            ? "container.chest" : "container.furnace");
-    const auto titleSize = ui.measureText(title, 2.0f);
-    UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f,
-                  height*.78f, 2, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
+    const float scale=m_layoutScale;
+    UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
+    UiTheme::rect(ui,m_panelRect.x+16*scale,m_panelRect.y+242*scale,
+                  m_panelRect.w-32*scale,1,UiTheme::BORDER);
+    const std::string title=ui.localization().text(
+        entity->type==BlockEntityType::Chest?"container.chest":"container.furnace");
+    UiTheme::textWithShadow(ui,title,m_panelRect.x+16*scale,m_panelRect.y+432*scale,
+        UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-32*scale),UiTheme::TEXT);
     for (size_t i=0;i<m_inventoryRects.size();++i)
         drawStack(ui,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
     if (entity->type == BlockEntityType::Chest) {
@@ -126,8 +120,8 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
             const float burn = std::clamp(
                 static_cast<float>(entity->burnRemaining) /
                 static_cast<float>(entity->burnTotal), 0.0f, 1.0f);
-            UiTheme::sprite(ui, m_containerRects[1].x + 48.0f,
-                            m_containerRects[1].y + 6.0f, 1.5f,
+            UiTheme::sprite(ui, m_containerRects[1].x + 48.0f*scale,
+                            m_containerRects[1].y + 6.0f*scale, 1.5f*scale,
                             UiTheme::FLAME, UiTheme::FLAME_PALETTE,
                             0.55f + 0.45f * burn);
         }
@@ -135,11 +129,11 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
             const float cook = std::clamp(
                 static_cast<float>(entity->cookProgress) /
                 static_cast<float>(entity->cookTotal), 0.0f, 1.0f);
-            UiTheme::progressBar(ui, m_containerRects[0].x + 55.0f,
-                                 m_containerRects[0].y + 16.0f, 100.0f, 12.0f,
-                                 cook, glm::vec4(0.78f, 0.78f, 0.78f, 1.0f));
-            UiTheme::sprite(ui, m_containerRects[0].x + 157.0f,
-                            m_containerRects[0].y + 17.0f, 2.0f,
+            UiTheme::progressBar(ui, m_containerRects[0].x + 55.0f*scale,
+                                 m_containerRects[0].y + 16.0f*scale, 100.0f*scale, 12.0f*scale,
+                                 cook, UiTheme::ACCENT);
+            UiTheme::sprite(ui, m_containerRects[0].x + 157.0f*scale,
+                            m_containerRects[0].y + 17.0f*scale, 2.0f*scale,
                             UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE);
         }
     }

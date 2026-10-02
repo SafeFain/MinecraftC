@@ -1,6 +1,7 @@
 #include "ui/TouchControls.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UILayout.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -8,20 +9,24 @@
 
 void TouchControls::configure(int width, int height, const TouchControlConfig& config) {
     m_width = std::max(1, width); m_height = std::max(1, height); m_config = config;
-    const float scale = std::clamp(config.size, .75f, 1.5f);
+    const UiHotbarLayout hotbar(m_width);
+    const float scale=std::min(
+        std::clamp(config.size,.75f,1.5f)*std::min({1.0f,m_width/480.0f,m_height/300.0f}),
+        std::max(.1f,(m_height-hotbar.y-hotbar.height-20)/170));
     const float button = 52.0f * scale, gap = 10.0f * scale, margin = 18.0f * scale;
     m_moveRadius = 58.0f * scale;
+    const float actionBottom=std::max(margin+42,hotbar.y+hotbar.height+12);
     const bool left = !config.leftHanded;
     m_moveCenter = {left ? margin + m_moveRadius : m_width - margin - m_moveRadius,
-                    margin + m_moveRadius + 42.0f};
+                    actionBottom+m_moveRadius};
     m_moveArea = {m_moveCenter.x - m_moveRadius, m_moveCenter.y - m_moveRadius,
                   m_moveRadius * 2.0f, m_moveRadius * 2.0f};
     const float actionX = left ? m_width - margin - button : margin;
-    m_jump = {actionX, margin + button + gap + 42.0f, button, button};
-    m_sneak = {actionX, margin + 42.0f, button, button};
+    m_jump = {actionX, actionBottom+button+gap, button, button};
+    m_sneak = {actionX, actionBottom, button, button};
     m_attack = {actionX - (left ? button + gap : -(button + gap)),
-                margin + button + gap + 42.0f, button, button};
-    m_use = {m_attack.x, margin + 42.0f, button, button};
+                actionBottom+button+gap, button, button};
+    m_use = {m_attack.x, actionBottom, button, button};
     m_inventory = {margin, m_height - margin - button * .72f, button * 1.25f, button * .72f};
     m_perspective = {(m_width - button * 1.10f) * .5f,
                  m_height - margin - button * .72f, button * 1.10f, button * .72f};
@@ -30,11 +35,10 @@ void TouchControls::configure(int width, int height, const TouchControlConfig& c
     m_pause = {m_width - margin - button * 1.25f, m_height - margin - button * .72f,
                button * 1.25f, button * .72f};
 
-    const float slot = Config::HOTBAR_SLOT_SIZE, hotbarGap = Config::HOTBAR_GAP;
-    const float total = 9.0f * slot + 8.0f * hotbarGap;
-    const float start = (m_width - total) * .5f;
-    for (int i = 0; i < 9; ++i)
-        m_hotbar[static_cast<size_t>(i)] = {start + i * (slot + hotbarGap), 0, slot, slot + 14};
+    for (int i=0;i<9;++i)
+        m_hotbar[static_cast<size_t>(i)]={hotbar.x+hotbar.padX+i*(hotbar.slot+hotbar.gap),
+            hotbar.y+hotbar.padY,hotbar.slot,hotbar.slot};
+
 }
 
 TouchControls::Target TouchControls::targetAt(float x, float y, int& slot) const {
@@ -131,19 +135,18 @@ void TouchControls::render(UIRenderer& ui) const {
                                 : UiTheme::WidgetState::Normal,
                         false,0.0f,alpha);
     };
-    // Pixel joystick ring and knob sprites (16×16 maps).
-    const float ringPx=m_moveRadius*2.0f/16.0f;
-    UiTheme::sprite(ui,m_moveCenter.x-m_moveRadius,m_moveCenter.y-m_moveRadius,
-                    ringPx,UiTheme::RING_16,UiTheme::JOY_PALETTE,
-                    alpha*0.8f);
+    UiTheme::rounded(ui,m_moveCenter.x-m_moveRadius,m_moveCenter.y-m_moveRadius,
+        m_moveRadius*2,m_moveRadius*2,m_moveRadius,UiTheme::withAlpha(UiTheme::BORDER,alpha*.6f));
+    UiTheme::rounded(ui,m_moveCenter.x-m_moveRadius+2,m_moveCenter.y-m_moveRadius+2,
+        m_moveRadius*2-4,m_moveRadius*2-4,m_moveRadius-2,UiTheme::withAlpha(UiTheme::PANEL_DEEP,alpha*.7f));
     const glm::vec2 knob=m_moveCenter+m_move*m_moveRadius;
-    const float knobR=22.0f;
-    UiTheme::sprite(ui,knob.x-knobR,knob.y-knobR,knobR*2.0f/16.0f,
-                    UiTheme::DISC_16,UiTheme::JOY_PALETTE,alpha);
+    const float knobR=m_moveRadius*.36f;
+    UiTheme::rounded(ui,knob.x-knobR,knob.y-knobR,knobR*2,knobR*2,knobR,
+        UiTheme::withAlpha(glm::length(m_move)>.01f?UiTheme::ACCENT:UiTheme::BUTTON_HOVER,alpha));
     draw(m_jump,ui.localization().text("touch.jump"),m_jumpHeld);
     draw(m_sneak,ui.localization().text("touch.sneak"),m_sneakHeld);
-    draw(m_attack,ui.localization().text("touch.attack"),false);
-    draw(m_use,ui.localization().text("touch.use"),false);
+    draw(m_attack,ui.localization().text("touch.attack"),std::any_of(m_touches.begin(),m_touches.end(),[](const auto& t){return t.second.target==Target::Attack;}));
+    draw(m_use,ui.localization().text("touch.use"),std::any_of(m_touches.begin(),m_touches.end(),[](const auto& t){return t.second.target==Target::Use;}));
     draw(m_inventory,ui.localization().text("touch.inventory"),false);
     draw(m_command,ui.localization().text("touch.command"),false);
     draw(m_perspective,ui.localization().text("touch.perspective"),false);

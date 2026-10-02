@@ -58,13 +58,20 @@ struct GameSessionTestAccess {
 // UIRenderer is a graphics-backed facade; the flow tests never render, so these
 // inert definitions keep the target free of the Vulkan backend (same pattern
 // as InputRoutingTests).
+namespace { glm::vec2 drawnShortcutSlot{-1,-1}; }
+
 UIRenderer::~UIRenderer() = default;
 void UIRenderer::beginUIFrame(int, int) {}
 void UIRenderer::setCanvas(float, float, float, float) {}
 void UIRenderer::endUIFrame() {}
+void UIRenderer::drawRoundedRect(float,float,float,float,float,const glm::vec4&) {}
+void UIRenderer::renderTextAlpha(const std::string&,float,float,float,const glm::vec3&,float) {}
+void UIRenderer::setOpacity(float) {}
 void UIRenderer::drawRect(float, float, float, float, const glm::vec4&) {}
 void UIRenderer::drawBlockIcon(float, float, float, float, BlockId) {}
-void UIRenderer::drawItemIcon(float, float, float, float, const ItemStack&) {}
+void UIRenderer::drawItemIcon(float x,float y,float w,float h,const ItemStack& stack) {
+    if (stack.id==ItemId::DIRT && stack.count==8) drawnShortcutSlot={x+w*.5f,y+h*.5f};
+}
 void UIRenderer::drawDurability(float, float, float, const ItemStack&) {}
 void UIRenderer::drawPanel(float, float, float, float, const glm::vec4&) {}
 void UIRenderer::drawTooltip(float, float, const ItemStack&) {}
@@ -279,6 +286,23 @@ int main() {
             std::cerr << "FAILED: no SDL video driver can create a window\n";
             return 1;
         }
+    }
+
+    {
+        ClientSettings settings;Localization localization;
+        int opened=0;
+        MenuCallbacks callbacks;
+        callbacks.onOpenWorld=[&](const std::string&){++opened;};
+        WorldSummary supported; supported.id="supported";supported.compatible=true;
+        WorldSummary incompatible; incompatible.id="old";incompatible.compatible=false;
+        MainMenu menu(callbacks,{supported,incompatible},settings,localization,nullptr);
+        menu.onKeyPress(Key::Enter); // World list, focus first card.
+        menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter); // Select incompatible.
+        menu.onKeyPress(Key::Enter);
+        require(opened==0,"incompatible world selection cannot activate loading");
+        menu.onKeyPress(Key::Up);menu.onKeyPress(Key::Enter); // Select supported.
+        menu.onKeyPress(Key::Enter);
+        require(opened==1,"selected world remains focused after rebuilding its card");
     }
 
     {
@@ -705,8 +729,16 @@ int main() {
         UIRenderer inertUi;
         Localization inertLocalization;
         inertUi.setLocalization(inertLocalization);
-        harness.ui.survivalInventory.render(inertUi, 640, 480, 128, 257);
-        harness.ui.survivalInventory.onMouseMove(128, 257);
+        for (auto dimensions:{glm::ivec2(640,480),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+            harness.session.inventory().slot(0)={ItemId::STONE,64,0};
+            harness.session.inventory().slot(9)={ItemId::DIRT,8,0};
+        // Find the actual rendered item center, independent of theme/layout.
+        drawnShortcutSlot={-1,-1};
+        harness.ui.survivalInventory.render(inertUi,dimensions.x,dimensions.y,0,0);
+        require(drawnShortcutSlot.x>=0&&drawnShortcutSlot.y>=0,
+                "inventory shortcut target is visibly rendered");
+        harness.ui.survivalInventory.onMouseMove(static_cast<int>(drawnShortcutSlot.x),
+                                               static_cast<int>(drawnShortcutSlot.y));
         harness.router.handleKeyEvent(Key::Num1, 0, ButtonAction::Press, 0);
         require(harness.session.playerState().inventory().slot(0).id == ItemId::DIRT &&
                     harness.session.playerState().inventory().slot(9).id == ItemId::STONE,
@@ -720,6 +752,7 @@ int main() {
             Key::Q, 0, ButtonAction::Press, KeyModifier::Control);
         require(harness.session.playerState().inventory().slot(9).empty(),
                 "inventory Ctrl+Q drops the complete hovered stack");
+        }
         harness.flow.closeInventory();
 
         // Leave the store attached here.  Harness destruction covers the

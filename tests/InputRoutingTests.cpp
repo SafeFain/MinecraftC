@@ -47,6 +47,9 @@ SDL_Event mouseButtonEvent(SDL_EventType type, Uint8 button) {
 // TouchControls::render is linked into this logic test, but no graphics-backed
 // renderer is constructed. These inert definitions keep the test focused on
 // input capture and routing (same pattern as ClientInputTests).
+void UIRenderer::drawRoundedRect(float,float,float,float,float,const glm::vec4&) {}
+void UIRenderer::renderTextAlpha(const std::string&,float,float,float,const glm::vec3&,float) {}
+void UIRenderer::setOpacity(float) {}
 void UIRenderer::drawRect(float, float, float, float, const glm::vec4&) {}
 void UIRenderer::renderText(const std::string&, float, float, float,
                             const glm::vec3&) {}

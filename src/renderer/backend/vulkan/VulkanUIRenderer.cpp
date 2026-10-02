@@ -1,5 +1,7 @@
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UIGeometry.h"
+#include "ui/UIColor.h"
 
 #include "core/AssetStore.h"
 #include "game/Language.h"
@@ -31,7 +33,7 @@ TextureData decodeTexture(const std::filesystem::path& path) {
 
 class VulkanUIBackend final:public IUIRenderBackend{
     static constexpr float FONT_LINE_HEIGHT = 14.0f;
-    static constexpr float FONT_RASTER_HEIGHT = 24.0f;
+    static constexpr float FONT_RASTER_HEIGHT = 36.0f;
     static constexpr float FONT_RENDER_SCALE =
         FONT_LINE_HEIGHT / FONT_RASTER_HEIGHT;
     struct Batch{std::vector<UiMeshVertex> vertices;std::vector<uint32_t> indices;
@@ -61,15 +63,22 @@ public:
         if(m_whiteTexture)m_renderer.destroyTexture(m_whiteTexture);
     }
     void beginUIFrame(int width,int height)override{
-        m_batches.clear();
+        m_batches.clear();m_uiWidth=width;m_uiHeight=height;
         const float fullW=m_canvasSize.x>0?m_canvasSize.x:static_cast<float>(width);
         const float fullH=m_canvasSize.y>0?m_canvasSize.y:static_cast<float>(height);
         m_projection=clipSpaceCorrection()*glm::ortho(
             -m_canvasOrigin.x,fullW-m_canvasOrigin.x,-m_canvasOrigin.y,
             fullH-m_canvasOrigin.y);
     }
+    int canvasWidth() const { return m_uiWidth; }
+    int canvasHeight() const { return m_uiHeight; }
     void setCanvas(float x,float y,float w,float h)override{
         m_canvasOrigin={x,y};m_canvasSize={w,h};
+    }
+    UiFrameStats frameStats() const override {
+        UiFrameStats stats;stats.batches=m_batches.size();
+        for (const auto& b:m_batches) { stats.vertices+=b.vertices.size();stats.indices+=b.indices.size(); }
+        return stats;
     }
     void endUIFrame()override{
         for(const Batch& batch:m_batches)
@@ -77,6 +86,13 @@ public:
     }
     void drawRect(float x,float y,float w,float h,const glm::vec4& color)override{
         quad(x,y,w,h,{0,0,1,1},color,m_whiteMaterial);
+    }
+    void setOpacity(float opacity) override { m_opacity = std::clamp(opacity, 0.0f, 1.0f); }
+    void drawRoundedRect(float x,float y,float w,float h,float radius,
+                         const glm::vec4& color) override {
+        Batch& b = batch(m_whiteMaterial);
+        const glm::vec4 tinted=uiLinearColor(color,m_opacity);
+        appendRoundedRect(b.vertices,b.indices,x,y,w,h,radius,tinted);
     }
     void drawBlockIcon(float x,float y,float w,float h,BlockId block)override{
         if (block == BlockId::AIR) return;
@@ -120,9 +136,7 @@ public:
         UiTheme::rect(*this,x+1,y+1,(w-2)*value,2,{1-value,value,.08f,1});
     }
     void drawPanel(float x,float y,float w,float h,const glm::vec4& fill)override{
-        drawRect(x,y,w,h,{.02f,.02f,.025f,fill.a});
-        drawRect(x+2,y+2,w-4,h-4,{.48f,.48f,.52f,fill.a});
-        drawRect(x+4,y+4,w-8,h-8,fill);
+        UiTheme::panel(*this,x,y,w,h,fill);
     }
     void drawTooltip(float x,float y,const ItemStack& stack)override{
         if (stack.empty()) return;
@@ -130,6 +144,10 @@ public:
     }
     void renderText(const std::string& text,float x,float y,float scale,
                     const glm::vec3& color)override{
+        renderTextAlpha(text,x,y,scale,color,1.0f);
+    }
+    void renderTextAlpha(const std::string& text,float x,float y,float scale,
+                         const glm::vec3& color,float alpha) override {
         float cursor=x;for(uint32_t cp:decodeUtf8(text)){
             if(cp=='\n'){cursor=x;y-=FONT_LINE_HEIGHT*scale;continue;}
             const auto found=m_glyphs.find(cp);if(found==m_glyphs.end())continue;
@@ -137,10 +155,10 @@ public:
             const float renderedHeight = g.height * FONT_RENDER_SCALE;
             if(g.width>0&&g.height>0)quad(
                 cursor + g.xoff * FONT_RENDER_SCALE * scale,
-                y + (FONT_LINE_HEIGHT - renderedHeight) * 0.5f * scale,
+                y + (3.0f + (g.yoff-g.height) * FONT_RENDER_SCALE) * scale,
                 g.width * FONT_RENDER_SCALE * scale,
                 renderedHeight * scale,{g.u0,g.v0,g.u1,g.v1},
-                glm::vec4(color,1),m_fontMaterial);
+                glm::vec4(color,std::clamp(alpha,0.0f,1.0f)),m_fontMaterial);
             cursor+=g.advance*FONT_RENDER_SCALE*scale;
         }
     }
@@ -156,6 +174,8 @@ private:
     VulkanRenderer& m_renderer;const Localization* m_localization=nullptr;
     glm::vec2 m_canvasOrigin{0},m_canvasSize{0};glm::mat4 m_projection{1};
     std::vector<Batch> m_batches;
+    float m_opacity = 1.0f;
+    int m_uiWidth=1,m_uiHeight=1;
     RenderTextureHandle m_whiteTexture{},m_itemTexture{},m_fontTexture{};
     RenderMaterialHandle m_whiteMaterial{},m_blockMaterial{},m_itemMaterial{},m_fontMaterial{};
     int m_blockAtlasTilesPerSide=0,m_itemColumns=0,m_itemRows=0;
@@ -170,10 +190,12 @@ private:
     }
     void quad(float x,float y,float w,float h,const glm::vec4& uv,
               const glm::vec4& color,RenderMaterialHandle materialHandle){
+        if (!(w>0 && h>0) || color.a<=0) return;
+        const glm::vec4 tinted=uiLinearColor(color,m_opacity);
         Batch& b=batch(materialHandle);const uint32_t base=static_cast<uint32_t>(b.vertices.size());
-        b.vertices.insert(b.vertices.end(),{{{x,y},{uv.x,uv.y},color},
-            {{x+w,y},{uv.z,uv.y},color},{{x+w,y+h},{uv.z,uv.w},color},
-            {{x,y+h},{uv.x,uv.w},color}});
+        b.vertices.insert(b.vertices.end(),{{{x,y},{uv.x,uv.y},tinted},
+            {{x+w,y},{uv.z,uv.y},tinted},{{x+w,y+h},{uv.z,uv.w},tinted},
+            {{x,y+h},{uv.x,uv.w},tinted}});
         b.indices.insert(b.indices.end(),{base,base+1,base+2,base,base+2,base+3});
     }
     void loadItems(const std::filesystem::path& root){
@@ -224,7 +246,7 @@ private:
         for(uint32_t cp=0xFB50;cp<=0xFDFF;++cp)codepoints.insert(cp);
         for(uint32_t cp=0xFE70;cp<=0xFEFF;++cp)codepoints.insert(cp);
         const float cjkScale=stbtt_ScaleForPixelHeight(&font,pixelHeight);
-        const float arabicScale=stbtt_ScaleForPixelHeight(&arabicFont,pixelHeight);
+        const float arabicScale=hasArabic?stbtt_ScaleForPixelHeight(&arabicFont,pixelHeight):0.0f;
         std::vector<uint8_t> pixels(static_cast<size_t>(atlasSize)*atlasSize*4u,0);
         int shelfX=1,shelfY=1,shelfHeight=0;
         for(uint32_t cp:codepoints){
@@ -235,23 +257,22 @@ private:
             int x0=0,y0=0,x1=0,y1=0;stbtt_GetCodepointBitmapBox(face,static_cast<int>(cp),
                 fontScale,fontScale,&x0,&y0,&x1,&y1);const int w=std::max(0,x1-x0),h=std::max(0,y1-y0);
             if(shelfX+w+2>=atlasSize){shelfX=1;shelfY+=shelfHeight+2;shelfHeight=0;}
-            if(shelfY+h+2>=atlasSize)break;
+            if(shelfY+h+2>=atlasSize)throw std::runtime_error("UI font atlas capacity exceeded");
             if(w&&h){std::vector<uint8_t> bitmap(static_cast<size_t>(w)*h);
                 stbtt_MakeCodepointBitmap(face,bitmap.data(),w,h,w,fontScale,fontScale,static_cast<int>(cp));
                 for(int py=0;py<h;++py)for(int px=0;px<w;++px){const uint8_t a=bitmap[py*w+px];
                     const size_t dst=(static_cast<size_t>(shelfY+py)*atlasSize+shelfX+px)*4u;
                     pixels[dst]=pixels[dst+1]=pixels[dst+2]=255;
-                    // Hard-threshold alpha keeps CJK glyphs as crisp, chunky
-                    // pixels matching the 8×14 bitmap ASCII font.
-                    pixels[dst+3]=a>=120?255:0;}}
+                    pixels[dst+3]=a;}}
             m_glyphs[cp]={shelfX/static_cast<float>(atlasSize),(shelfY+h)/static_cast<float>(atlasSize),
                 (shelfX+w)/static_cast<float>(atlasSize),shelfY/static_cast<float>(atlasSize),
                 static_cast<float>(w),static_cast<float>(h),static_cast<float>(x0),
                 static_cast<float>(-y0),advance*fontScale};
             shelfX+=w+2;shelfHeight=std::max(shelfHeight,h);
         }
-        TextureData data;data.width=data.height=atlasSize;data.pixels=std::move(pixels);
+        TextureData data;data.format=TextureFormat::Rgba8Unorm;data.width=data.height=atlasSize;data.pixels=std::move(pixels);
         TextureSamplerDesc sampler;sampler.addressU=sampler.addressV=TextureAddressMode::ClampToEdge;
+        sampler.minFilter=sampler.magFilter=TextureFilter::Linear;
         m_fontTexture=m_renderer.createTexture(data,sampler);m_fontMaterial=material(m_fontTexture);
     }
 };

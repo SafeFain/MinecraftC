@@ -81,6 +81,7 @@ private:
         bool active = false;
     };
 
+    UiTransition inventoryFade;
     CommandCompletionState commandCompletion;
     std::vector<std::string> commandInputLines(int uiWidth, bool touchTabVisible);
     void renderSurvivalHud(const Player& player, int screenWidth);

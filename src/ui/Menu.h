@@ -6,6 +6,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "Config.h"
+#include "ui/UILayout.h"
 #include "core/TextEditBuffer.h"
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
@@ -44,14 +45,6 @@ struct MenuCallbacks {
 
 // ── Button ────────────────────────────────────────────────────────────────
 
-struct ButtonColors {
-    glm::vec4 normal{0.24f, 0.22f, 0.19f, 0.85f};
-    glm::vec4 hover{0.31f, 0.28f, 0.24f, 0.90f};
-    glm::vec4 selected{0.36f, 0.33f, 0.27f, 0.90f};
-    glm::vec3 textNormal{0.95f, 0.93f, 0.86f};
-    glm::vec3 textHover{1.0f, 0.95f, 0.65f};
-};
-
 class Button {
 public:
     Button(const std::string& label, std::function<void()> onClick);
@@ -66,6 +59,9 @@ public:
     void setLabel(std::string label) { m_label = std::move(label); }
     void setDetail(std::string detail) { m_detail = std::move(detail); }
     void setDanger(bool danger) { m_danger = danger; }
+    void setPrimary(bool primary) { m_primary = primary; }
+    void setEnabled(bool enabled) { m_enabled = enabled; }
+    void setBottomInset(float inset) { m_bottomInset = inset; }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
 
@@ -83,11 +79,15 @@ private:
     std::string m_detail;
     std::function<void()> m_onClick;
     float m_x = 0, m_y = 0, m_w = Config::UI_BUTTON_WIDTH, m_h = Config::UI_BUTTON_HEIGHT;
-    ButtonColors m_colors;
     bool m_hovered = false;
     bool m_selected = false;
     bool m_pressed = false;
     bool m_danger = false;
+    bool m_primary = false;
+    bool m_enabled = true;
+    float m_bottomInset = 0;
+    mutable UiTransition m_hoverTransition, m_pressTransition;
+    mutable uint64_t m_animationFrame = UINT64_MAX;
 };
 
 // ── Menu base class ───────────────────────────────────────────────────────
@@ -95,6 +95,9 @@ private:
 class Menu {
 public:
     virtual ~Menu() = default;
+    void tick(float dt) { m_fade.tick(dt,true,0.16f); }
+    float opacity() const { return m_fade.value; }
+    void resetTransition() { m_fade.value=0; }
 
     virtual void render(UIRenderer& ui, int screenWidth, int screenHeight) = 0;
     virtual void onKeyPress(int key, int mods = 0) = 0;
@@ -104,6 +107,9 @@ public:
     virtual void onChar(unsigned int) {}
     virtual bool wantsTextInput() const { return false; }
     virtual bool capturesPointerDrag(double, double) const { return false; }
+
+private:
+    UiTransition m_fade;
 
 protected:
     void navigateUp(std::vector<Button>& buttons, int& selectedIdx);
@@ -146,6 +152,11 @@ private:
     WorldType m_createWorldType = WorldType::Normal;
     bool m_createCheats = false;
     int m_worldOffset = 0;
+    int m_visibleWorlds = 6;
+    int m_formOffset = 0;
+    int m_formVisibleRows = 7;
+    int m_formRows = 7;
+    int m_formSelection = -1;
     int m_aboutPage = 0;
     int m_selectedWorld = -1;
     int m_pressedButton = -1;
@@ -163,7 +174,6 @@ private:
     void refreshWorlds();
     void rebuildButtons();
     void selectField(Field field);
-    std::string fieldLabel(Field field, const std::string& value) const;
 };
 
 // ── Pause Menu ────────────────────────────────────────────────────────────

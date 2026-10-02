@@ -1,6 +1,7 @@
 #include "ui/Hotbar.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UILayout.h"
 #include "Config.h"
 
 #include <algorithm>
@@ -28,18 +29,10 @@ void Hotbar::onKeyPress(int key) {
 }
 
 void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
-    const float slotSize = Config::HOTBAR_SLOT_SIZE;
-    const float gap     = Config::HOTBAR_GAP;
-    const float padX    = Config::HOTBAR_PAD_X;
-    const float padY    = Config::HOTBAR_PAD_Y;
-    constexpr int numSlots = static_cast<int>(InventoryModel::HOTBAR_SIZE);
-
-    const float totalW = numSlots * slotSize + (numSlots - 1) * gap + padX * 2.0f;
-    const float totalH = slotSize + padY * 2.0f;
-
-    const float barX = (static_cast<float>(screenWidth) - totalW) * 0.5f;
-    const float barY = 4.0f;
-
+    const UiHotbarLayout layout(screenWidth);
+    const float slotSize=layout.slot,gap=layout.gap,padX=layout.padX,padY=layout.padY;
+    constexpr int numSlots=static_cast<int>(InventoryModel::HOTBAR_SIZE);
+    const float totalW=layout.width,totalH=layout.height,barX=layout.x,barY=layout.y;
     // Bar background: raised pixel panel with an ink frame.
     UiTheme::panel(ui, barX, barY, totalW, totalH, UiTheme::PANEL, {}, 1.0f,
                    0.94f);
@@ -57,7 +50,7 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
             ? &getItemProps(shownStack->id) : nullptr;
         if (itemProps && itemProps->placedBlock) id = *itemProps->placedBlock;
         const glm::vec3 slotColor = id == BlockId::AIR
-            ? glm::vec3(.16f, .15f, .13f) : getBlockProps(id).color * .35f;
+            ? glm::vec3(UiTheme::SLOT) : glm::mix(glm::vec3(UiTheme::SLOT),getBlockProps(id).color,.12f);
 
         // Recessed slot with a per-block ambient tint.
         UiTheme::slot(ui, sx, sy, slotSize, slotSize,
@@ -66,7 +59,7 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
                       glm::vec4(slotColor, 0.95f));
 
         // Material thumbnail from the same atlas used by world rendering.
-        float innerMargin = 4.0f;
+        float innerMargin = 6.0f*layout.scale;
         if (!shownStack->empty()) {
             ui.drawItemIcon(sx + innerMargin, sy + innerMargin,
                             slotSize - innerMargin * 2.0f,
@@ -75,22 +68,22 @@ void Hotbar::render(UIRenderer& ui, int screenWidth, int /*screenHeight*/) {
 
         // Slot number
         std::string numLabel = std::to_string(i + 1);
-        float labelScale = 1.0f;
+        float labelScale = .65f*layout.scale;
         auto labelSize = ui.measureText(numLabel, labelScale);
         UiTheme::textWithShadow(ui, numLabel,
-                      sx + (slotSize - labelSize.x) * 0.5f,
-                      sy - labelSize.y - 1.0f,
+                      sx+4*layout.scale,
+                      sy+slotSize-labelSize.y-2*layout.scale,
                       labelScale,
                       glm::vec3(0.7f, 0.7f, 0.7f));
 
-        ui.drawDurability(sx + 4.0f, sy + 3.0f,
-                          slotSize - 8.0f, *shownStack);
+        ui.drawDurability(sx+4*layout.scale,sy+3*layout.scale,
+                          slotSize-8*layout.scale, *shownStack);
         if (shownStack->count > 1) {
             const std::string countLabel = std::to_string(shownStack->count);
-            auto countSize = ui.measureText(countLabel, 1.0f);
+            auto countSize = ui.measureText(countLabel,layout.scale);
             UiTheme::textWithShadow(ui, countLabel,
                           sx + slotSize - countSize.x - 3.0f,
-                          sy + 3.0f, 1.0f, glm::vec3(1.0f));
+                          sy+3*layout.scale,layout.scale, glm::vec3(1.0f));
         }
     }
 }

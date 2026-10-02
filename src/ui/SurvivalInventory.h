@@ -59,6 +59,9 @@ private:
     int m_focusX = 0, m_focusY = 0;
     int m_pointerX = 0, m_pointerY = 0;
 
+    float m_layoutScale = 1.0f;
+    bool m_portraitLayout = false;
+    Rect m_panelRect{};
     void layout(int screenWidth, int screenHeight);
     ItemStack craftingOutput() const;
     void takeCraftingOutput();
@@ -70,6 +73,6 @@ private:
     ItemStack* hoveredStack(int mouseX, int mouseY);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,
-                          const ItemStack& stack, bool hovered);
+                          const ItemStack& stack, bool hovered, bool selected = false);
     static bool acceptsArmor(size_t slot, ItemId item);
 };

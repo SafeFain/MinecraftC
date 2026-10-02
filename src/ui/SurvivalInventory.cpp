@@ -4,6 +4,7 @@
 #include "game/InventoryInteraction.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/UILayout.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
@@ -23,8 +24,13 @@ void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
     constexpr float slot = 44.0f;
     constexpr float gap = 4.0f;
     const float width = 9 * slot + 8 * gap;
-    const float originX = (screenWidth - width) * 0.5f;
-    const float originY = (screenHeight - (4 * slot + 3 * gap)) * 0.5f - 55.0f;
+    m_portraitLayout=screenWidth<600 && screenHeight>screenWidth;
+    const float designW=m_portraitLayout?460.0f:600.0f;
+    const float designH=m_portraitLayout?560.0f:470.0f;
+    const UiCanvasFit fit(screenWidth,screenHeight,designW,designH);
+    m_layoutScale=fit.scale;
+    m_panelRect=fit.transform(Rect{0,0,designW,designH});
+    const float originX=m_portraitLayout?16.0f:84.0f,originY=40;
 
     for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) {
         const int row = i < 9 ? 0 : 1 + static_cast<int>((i - 9) / 9);
@@ -36,8 +42,8 @@ void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
         };
     }
     const int craftSize = m_craftingTable ? 3 : 2;
-    const float craftX = screenWidth * 0.5f - (m_craftingTable ? 150.0f : 118.0f);
-    const float craftY = originY + 4 * (slot + gap) + 28.0f;
+    const float craftX=originX;
+    const float craftY=m_portraitLayout?322.0f:264.0f;
     for (auto& rect : m_craftingRects) rect = {};
     for (int i = 0; i < craftSize * craftSize; ++i) {
         m_craftingRects[i] = {
@@ -57,12 +63,23 @@ void SurvivalInventoryScreen::layout(int screenWidth, int screenHeight) {
     m_previousRecipePageRect = {recipeX, craftY + 124.0f, 20.0f, 22.0f};
     m_nextRecipePageRect = {recipeX + 60.0f, craftY + 124.0f, 20.0f, 22.0f};
     for (size_t i = 0; i < m_armorRects.size(); ++i)
-        m_armorRects[i] = {originX - 64.0f, originY + (3 - i) * (slot + gap),
-                           slot, slot};
-    m_offhandRect = {originX + width + 20.0f, originY, slot, slot};
+        m_armorRects[i]=m_portraitLayout?
+            Rect{originX+i*(slot+gap),252,slot,slot}:
+            Rect{originX-64,originY+(3-i)*(slot+gap),slot,slot};
+    m_offhandRect=m_portraitLayout?Rect{originX+240,252,slot,slot}:
+        Rect{originX+width+20,originY,slot,slot};
     m_creativeCatalogRect = m_creativeAccess
-        ? Rect{12.0f,static_cast<float>(screenHeight)-42.0f,150.0f,28.0f}
+        ? Rect{m_portraitLayout?296.0f:436.0f,m_portraitLayout?520.0f:432.0f,148,24}
         : Rect{};
+    for (auto& r:m_inventoryRects) r=fit.transform(r);
+    for (auto& r:m_craftingRects) r=fit.transform(r);
+    for (auto& r:m_armorRects) r=fit.transform(r);
+    for (auto& r:m_recipeRects) r=fit.transform(r);
+    m_outputRect=fit.transform(m_outputRect);m_offhandRect=fit.transform(m_offhandRect);
+    m_previousRecipePageRect=fit.transform(m_previousRecipePageRect);
+    m_nextRecipePageRect=fit.transform(m_nextRecipePageRect);
+    if (m_creativeAccess) m_creativeCatalogRect=fit.transform(m_creativeCatalogRect);
+
 }
 
 bool SurvivalInventoryScreen::contains(const Rect& rect, int x, int y) {
@@ -75,20 +92,21 @@ bool SurvivalInventoryScreen::creativeCatalogButtonContains(int x,int y) const {
 }
 
 void SurvivalInventoryScreen::drawStack(
-    UIRenderer& ui, const Rect& rect, const ItemStack& stack, bool hovered) {
+    UIRenderer& ui, const Rect& rect, const ItemStack& stack, bool hovered, bool selected) {
     UiTheme::slot(ui, rect.x, rect.y, rect.w, rect.h,
+                  selected?UiTheme::WidgetState::Selected:
                   hovered ? UiTheme::WidgetState::Hover
                           : UiTheme::WidgetState::Normal,
                   UiTheme::SLOT);
     if (stack.empty()) return;
-    ui.drawItemIcon(rect.x + 4.0f, rect.y + 4.0f,
-                    rect.w - 8.0f, rect.h - 8.0f, stack);
-    ui.drawDurability(rect.x + 3.0f, rect.y + 2.0f, rect.w - 6.0f, stack);
+    const float s=rect.w/44.0f;
+    ui.drawItemIcon(rect.x+4*s,rect.y+4*s,rect.w-8*s,rect.h-8*s,stack);
+    ui.drawDurability(rect.x + 3.0f*s, rect.y + 2.0f*s, rect.w - 6.0f*s, stack);
     if (stack.count > 1) {
         const std::string text = std::to_string(stack.count);
-        const auto size = ui.measureText(text, 0.9f);
+        const auto size = ui.measureText(text,0.9f*s);
         UiTheme::textWithShadow(ui, text,
-            rect.x + rect.w - size.x - 2.0f, rect.y + 2.0f, 0.9f,
+            rect.x+rect.w-size.x-2*s,rect.y+2*s,0.9f*s,
             glm::vec3(1.0f));
     }
 }
@@ -128,45 +146,25 @@ void SurvivalInventoryScreen::render(
     if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
-    constexpr float slot = 44.0f;
-    constexpr float gap = 4.0f;
-    const float originX = m_inventoryRects[0].x;
-    const float originY = m_inventoryRects[0].y;
-    // Pixel panels behind the inventory grid, armor column and crafting grid.
-    UiTheme::panel(ui, originX - 10.0f, originY - 10.0f,
-                   9.0f * slot + 8.0f * gap + 20.0f,
-                   4.0f * slot + 3.0f * gap + 24.0f, UiTheme::PANEL);
-    UiTheme::panel(ui, originX - 64.0f - 10.0f, originY - 10.0f, 64.0f,
-                   4.0f * slot + 3.0f * gap + 24.0f, UiTheme::PANEL);
-    const int craftSize = m_craftingTable ? 3 : 2;
-    const float craftX = m_craftingRects[0].x;
-    const float craftY = m_craftingRects[craftSize * craftSize - 1].y;
-    const float craftGridH = craftSize * slot + (craftSize - 1) * gap;
-    const std::string craftLabel = ui.localization().text("inventory.crafting");
-    // The crafting label and grid sit between the inventory panel and the
-    // title, so anchor the title above the label instead of a fixed height.
-    const float craftLabelY = craftY + craftGridH + 4.0f;
-    const float craftLabelH = ui.measureText(craftLabel, 1.1f).y;
-    const float craftPanelTop = craftLabelY + craftLabelH + 6.0f;
-    UiTheme::panel(ui, craftX - 10.0f, craftY - 10.0f,
-                   craftGridH + 20.0f,
-                   craftPanelTop - (craftY - 10.0f),
-                   UiTheme::PANEL);
-    const std::string title = ui.localization().text(
+    const float scale=m_layoutScale;
+    UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
+    const int craftSize=m_craftingTable?3:2;
+    const float craftX=m_craftingRects[0].x;
+    const float craftY=m_craftingRects[craftSize*craftSize-1].y;
+    const std::string title=ui.localization().text(
         m_creativeAccess?"inventory.player_tab":"inventory.survival");
-    const auto titleSize = ui.measureText(title, 2.0f);
-    const float titleY = std::max(screenHeight * 0.78f, craftPanelTop + 8.0f);
-    UiTheme::textWithShadow(ui, title, (screenWidth - titleSize.x) * 0.5f,
-                  titleY, 2.0f, UiTheme::TEXT_TITLE, 1.0f,
-                  2.0f, -2.0f);
-    if(m_creativeAccess){
-        const std::string label=ui.localization().text("inventory.creative_tab");
-        UiTheme::button(ui, m_creativeCatalogRect.x, m_creativeCatalogRect.y,
-                        m_creativeCatalogRect.w, m_creativeCatalogRect.h,
-                        label, UiTheme::WidgetState::Normal, false, 0.72f);
+    UiTheme::textWithShadow(ui,title,m_panelRect.x+20*scale,m_panelRect.y+(m_portraitLayout?520:432)*scale,
+        UiTheme::fittedScale(ui,title,2*scale,(m_creativeAccess?280:m_portraitLayout?420:560)*scale),UiTheme::TEXT);
+    UiTheme::rect(ui,m_panelRect.x+20*scale,m_panelRect.y+248*scale,
+                  m_panelRect.w-40*scale,1,UiTheme::BORDER);
+    if (m_creativeAccess) {
+        UiTheme::button(ui,m_creativeCatalogRect.x,m_creativeCatalogRect.y,
+            m_creativeCatalogRect.w,m_creativeCatalogRect.h,
+            ui.localization().text("inventory.creative_tab"),UiTheme::WidgetState::Normal,false,.9f*scale);
     }
-    UiTheme::textWithShadow(ui, craftLabel, craftX, craftLabelY, 1.1f,
-                            glm::vec3(0.85f));
+    const std::string craftLabel=ui.localization().text("inventory.crafting");
+    UiTheme::textWithShadow(ui,craftLabel,craftX,craftY+(craftSize*48+4)*scale,
+                           1.1f*scale,UiTheme::TEXT_DIM);
 
     const ItemStack* tooltip = nullptr;
     for (size_t i = 0; i < m_inventoryRects.size(); ++i) {
@@ -180,27 +178,20 @@ void SurvivalInventoryScreen::render(
                   contains(m_craftingRects[i], mouseX, mouseY));
     const bool outputReady = !craftingOutput().empty();
     drawStack(ui, m_outputRect, craftingOutput(),
-              contains(m_outputRect, mouseX, mouseY));
-    if (outputReady) {
-        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y, m_outputRect.w, 2.0f,
-                      UiTheme::GOLD);
-        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y + m_outputRect.h - 2.0f,
-                      m_outputRect.w, 2.0f, UiTheme::GOLD);
-        UiTheme::rect(ui, m_outputRect.x, m_outputRect.y, 2.0f, m_outputRect.h,
-                      UiTheme::GOLD);
-        UiTheme::rect(ui, m_outputRect.x + m_outputRect.w - 2.0f, m_outputRect.y,
-                      2.0f, m_outputRect.h, UiTheme::GOLD);
-    }
+              contains(m_outputRect, mouseX, mouseY),outputReady);
 
     ItemStack recipeTooltip;
     if (!m_availableRecipes.empty()) {
-        const float panelX = m_recipeRects[0].x - 8.0f;
-        const float panelY = m_recipeRects[4].y - 8.0f;
-        UiTheme::panel(ui, panelX, panelY, 96.0f, 176.0f, UiTheme::PANEL);
+        const float panelX = m_recipeRects[0].x - 8.0f*scale;
+        const float panelY = m_recipeRects[4].y - 8.0f*scale;
+        UiTheme::panel(ui, panelX, panelY, 96.0f*scale, 188.0f*scale, UiTheme::PANEL);
         const std::string recipeLabel =
             ui.localization().text("inventory.craftable_recipes");
-        UiTheme::textWithShadow(ui, recipeLabel, panelX + 6.0f,
-                                panelY + 160.0f, 0.62f, UiTheme::TEXT_TITLE);
+        const auto headingLines=wrapTextPixels(recipeLabel,84*scale,
+            [&](const std::string& text){return ui.measureText(text,.85f*scale).x;});
+        for (size_t i=0;i<std::min<size_t>(2,headingLines.size());++i)
+            UiTheme::textWithShadow(ui,headingLines[i],panelX+6*scale,
+                panelY+(170-i*12)*scale,.85f*scale,UiTheme::TEXT_DIM);
         const size_t pageCount = std::max<size_t>(
             1, (m_availableRecipes.size() + RECIPES_PER_PAGE - 1) /
                    RECIPES_PER_PAGE);
@@ -212,20 +203,20 @@ void SurvivalInventoryScreen::render(
                             contains(m_previousRecipePageRect, mouseX, mouseY)
                                 ? UiTheme::WidgetState::Hover
                                 : UiTheme::WidgetState::Normal,
-                            false, 0.72f);
+                            false, 0.72f*scale);
             UiTheme::button(ui, m_nextRecipePageRect.x,
                             m_nextRecipePageRect.y, m_nextRecipePageRect.w,
                             m_nextRecipePageRect.h, ">",
                             contains(m_nextRecipePageRect, mouseX, mouseY)
                                 ? UiTheme::WidgetState::Hover
                                 : UiTheme::WidgetState::Normal,
-                            false, 0.72f);
+                            false, 0.72f*scale);
             const std::string page = std::to_string(m_recipePage + 1) + "/" +
                                      std::to_string(pageCount);
-            const auto pageSize = ui.measureText(page, 0.62f);
+            const auto pageSize = ui.measureText(page,0.62f*scale);
             UiTheme::textWithShadow(ui, page,
-                m_previousRecipePageRect.x + 40.0f - pageSize.x * 0.5f,
-                m_previousRecipePageRect.y + 5.0f, 0.62f, UiTheme::TEXT_DIM);
+                m_previousRecipePageRect.x + 40.0f*scale - pageSize.x * 0.5f,
+                m_previousRecipePageRect.y + 5.0f*scale,0.62f*scale, UiTheme::TEXT_DIM);
         }
         for (size_t i = 0; i < m_recipeRects.size(); ++i) {
             const CraftingRecipe* recipe = visibleRecipe(i);
