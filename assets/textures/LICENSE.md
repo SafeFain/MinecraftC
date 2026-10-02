@@ -103,3 +103,14 @@ matching item icons are original MinecraftC procedural pixel art. They use
 bright-comfortable style and generated-asset license. No external art was
 imported. Existing material indices and independent texture files are retained.
 Use the reproduction command above to regenerate and validate the assets.
+
+# Generator v4 semantic material upgrade
+
+The 2026-10-02 v4 output, including regenerated block/item/entity art, compact
+atlases and height/normal/property maps, is original deterministic procedural
+MinecraftC artwork under the existing CC0-1.0 asset terms. No external image
+service, new texture pack or third-party artwork was used. The default seed
+remains 213785369; names use full stable hash domains and material/style JSON
+parameters. Reproduce runtime textures and GLB skins together with
+`cmake --build build-local --target texture_generator`. World generation and
+serialized block IDs are unchanged. Earlier provenance entries remain historical.

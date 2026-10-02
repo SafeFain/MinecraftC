@@ -1,10 +1,11 @@
 {
   "base_seed": 213785369,
   "candidate_seeds": [
-    213785369,
-    1648569181,
-    754634575
+    213785369
   ],
   "local_seeds": {},
-  "note": "development preview; excluded from atlas"
+  "note": "development preview; excluded from atlas",
+  "pages": [
+    "contact_sheet.png"
+  ]
 }

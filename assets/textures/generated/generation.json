@@ -1,0 +1,758 @@
+{
+  "generator_version": 4,
+  "materials": {
+    "acacia_leaves": {
+      "effective_seed": 213785369,
+      "sha256": "2b3c9df65b00b2423ec7f9fc337346ca6e78e333c2f33d27b85ac0c386f08e28"
+    },
+    "acacia_log": {
+      "effective_seed": 213785369,
+      "sha256": "e6dc653d0c398a2d52ca20dbd84868baf91fb3b55319c54bfcd52d610f0ec83b"
+    },
+    "acacia_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "afb55f1132421911bde94f04baa7f4be4e8870adbadbc41f2e43eff08594658f"
+    },
+    "acacia_sapling": {
+      "effective_seed": 213785369,
+      "sha256": "f7e57e0f5025635275f8fa75f61934096b62c0e44647f832f8163b971f8732a5"
+    },
+    "aether_grass_side": {
+      "effective_seed": 213785369,
+      "sha256": "b401504c5610ef3e60a69ecd01a730840709c4dd5d0e655a2e18852129c1f26b"
+    },
+    "aether_grass_top": {
+      "effective_seed": 213785369,
+      "sha256": "9ed15f96fcb5a6b984a0eebfac673f96e42783a24c545b418c3674763469d280"
+    },
+    "aether_soil": {
+      "effective_seed": 213785369,
+      "sha256": "86c42eb8aab5e0bb06ab8d1df89e12f4e4870818ab674f4e613f6018a2940e6c"
+    },
+    "allium": {
+      "effective_seed": 213785369,
+      "sha256": "4e760f802caeb108fc7c755f9db384091f6b1c70f4c798a8e878e25199c3028c"
+    },
+    "alpine_flower": {
+      "effective_seed": 213785369,
+      "sha256": "d739e2e07282920d8363cef383e42c7fd22ba3f40832df260d674140e4de768d"
+    },
+    "basalt": {
+      "effective_seed": 213785369,
+      "sha256": "b2bd14d8c846a11b12fd3a53d8aad334fde470ac31aaba0b81f453398e694369"
+    },
+    "beach_grass": {
+      "effective_seed": 213785369,
+      "sha256": "04e262f1dcd9a55e26a9e1a3e1ceddf3e6306114e9dd2063803e78eca438889e"
+    },
+    "bedrock": {
+      "effective_seed": 213785369,
+      "sha256": "b54022166017c262c066a9ed801b4bf561ba4d63244d4f427892074e1173622c"
+    },
+    "bellflower": {
+      "effective_seed": 213785369,
+      "sha256": "48234039a048b73638ac2839f61ddddfb228a10a33d4eb369e96d374795e2c5b"
+    },
+    "birch_leaves": {
+      "effective_seed": 213785369,
+      "sha256": "e9e7e0a31cf99c15ecc068ba953118c9365a1a4542e4c36b8566bd984a35d231"
+    },
+    "birch_log": {
+      "effective_seed": 213785369,
+      "sha256": "0942159ae1622db26e6d0efc43649c33b3904e164c70fd880daaa0517175de46"
+    },
+    "birch_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "7888ece06fc27897cbf7c2da0a9a78b4aa782b8bfdbbd324c90a8670569a2789"
+    },
+    "birch_sapling": {
+      "effective_seed": 213785369,
+      "sha256": "6bc2a43770be6ad10581178e5e768a528ce6e7948603cb746c4c711401e3dbf5"
+    },
+    "black_sand": {
+      "effective_seed": 213785369,
+      "sha256": "739dda138f4a9ddf7e62bb2540ee98e7b3f5b84f816a816f9909696e3df8671a"
+    },
+    "black_wool": {
+      "effective_seed": 213785369,
+      "sha256": "6894dca78d2823c0f0e4586134721781e21cde69fbd779f681f32051263de9c0"
+    },
+    "blast_furnace": {
+      "effective_seed": 213785369,
+      "sha256": "5200f5f798b5ae90176814b3b21be3474a4cb3c76a25f064f5f4b92edd48819b"
+    },
+    "blast_furnace_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "09d23026b9168bce74e8e569516ece19627e13556a8d42b2341474a4b0ee6adf"
+    },
+    "blast_furnace_side": {
+      "effective_seed": 213785369,
+      "sha256": "7dac0bd80e60a259b4fb3e5221ab1e6ac9b8812f43e319d16d187d54e678dac7"
+    },
+    "blast_furnace_top": {
+      "effective_seed": 213785369,
+      "sha256": "a0f432cd42c2196c50d9e66dc714037d89f42486a8b5b0374788d9cd43af3a78"
+    },
+    "blue_ice": {
+      "effective_seed": 213785369,
+      "sha256": "202f061e5cb71e3e54f0e99ed70d5a56fda925b8ad29f687bb64c3ab550f32b1"
+    },
+    "blue_orchid": {
+      "effective_seed": 213785369,
+      "sha256": "aa07296bcfd9390cfe1498ae92ee5c8dd3b106ff53c76bad92376f4d8cbf7328"
+    },
+    "blue_wool": {
+      "effective_seed": 213785369,
+      "sha256": "db84c281c8848ba2a7dce4526bfd3701e6ee56e6c84d5d67936f94d5640b40ab"
+    },
+    "bricks": {
+      "effective_seed": 213785369,
+      "sha256": "f4c4365982f679dca5330f8da2b9be395ceda5c4b3cc1c9e92235dc6251e7c2c"
+    },
+    "brown_mushroom": {
+      "effective_seed": 213785369,
+      "sha256": "619136dbcfafde4f35cd76b033dc0b3dde820787e79f425876fd02c57149c81a"
+    },
+    "cactus_side": {
+      "effective_seed": 213785369,
+      "sha256": "fff3e9899c99d4a97b4c32520381ad78686ffc631ac888ed1d5b5848839f44b3"
+    },
+    "cactus_top": {
+      "effective_seed": 213785369,
+      "sha256": "5806877f19be582c9c7dd83621172cb560c833636b9f0ccce26222cbd6592ceb"
+    },
+    "calcite": {
+      "effective_seed": 213785369,
+      "sha256": "a075ceec95945ebf8b27f96a58a5b0ea0a8a825ed73af0d4708c877e9cfa6adc"
+    },
+    "cattail": {
+      "effective_seed": 213785369,
+      "sha256": "5a8b76441b3378765712790adbc05a7047735063c6505d5a887cfc42e00823c5"
+    },
+    "cauldron": {
+      "effective_seed": 213785369,
+      "sha256": "b7e3791e9172a27624547806f34a240daddb477a30e6eb96f9af5a896671f4f7"
+    },
+    "cauldron_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "09d23026b9168bce74e8e569516ece19627e13556a8d42b2341474a4b0ee6adf"
+    },
+    "cauldron_side": {
+      "effective_seed": 213785369,
+      "sha256": "b7e3791e9172a27624547806f34a240daddb477a30e6eb96f9af5a896671f4f7"
+    },
+    "cauldron_top": {
+      "effective_seed": 213785369,
+      "sha256": "164f12e143a57c6e41d8781cabe81926649567ac59f9c41e9beab54a59aff9a0"
+    },
+    "chest": {
+      "effective_seed": 213785369,
+      "sha256": "7e0903cbc3ba4f3aefe197fa06c0e6d53bbe16b1e5779dcf1099994a1e8fe3e9"
+    },
+    "chest_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "b26f0232196612d26558ee2fd23234921b4e84133ce3c116763d8784398238c2"
+    },
+    "chest_side": {
+      "effective_seed": 213785369,
+      "sha256": "2eee3abdbae8b81fac02bb306cff88f07dfca03a3ccaa686594067c16e7bc4a2"
+    },
+    "chest_top": {
+      "effective_seed": 213785369,
+      "sha256": "485e3bec370add7729af5f586d2eb5818bf4e53a0e86681001131b029145c270"
+    },
+    "chiseled_stone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "2c405c2caeb80e1bd297ad8263a7a6c6cb37a7dab999ed5ce62d14d1a283fc20"
+    },
+    "clay": {
+      "effective_seed": 213785369,
+      "sha256": "1db84d0c1dda4d6986b1d036846fc8ad185452e03373d5df6816bdbfb873bb12"
+    },
+    "cloud": {
+      "effective_seed": 213785369,
+      "sha256": "9698c8fd710307eebbfc6a128ececc4d5011852df6f75b9196a1e7197f32b7d4"
+    },
+    "cloud_bloom": {
+      "effective_seed": 213785369,
+      "sha256": "f29b5bd40b39824644960dd1566e36b4b9732fdcf5321486943237a7ec9143e1"
+    },
+    "cloudstone": {
+      "effective_seed": 213785369,
+      "sha256": "1f15cf40382f1546619714995330a59b54827c1bcc88b38ed3cccf00c54d92b6"
+    },
+    "coal_ore": {
+      "effective_seed": 213785369,
+      "sha256": "c8ce8a42446272d27e8c170f1e740b7a142d99a8336cf715b949b2fe941c1af4"
+    },
+    "coarse_dirt": {
+      "effective_seed": 213785369,
+      "sha256": "12fcab3b852c9546dc60522e281f14f21a526d1f39ba8e1790ea25dab1e9bdc3"
+    },
+    "cobblestone": {
+      "effective_seed": 213785369,
+      "sha256": "2f746aa6b4e7923e547c30482f30aa4cf56aa7511d6153b93af5ec78ffe2ba87"
+    },
+    "composter": {
+      "effective_seed": 213785369,
+      "sha256": "9c28848323e268f8875c08436db40a5f368e10946450941288fef9e59d9ad7be"
+    },
+    "composter_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "b26f0232196612d26558ee2fd23234921b4e84133ce3c116763d8784398238c2"
+    },
+    "composter_side": {
+      "effective_seed": 213785369,
+      "sha256": "9c28848323e268f8875c08436db40a5f368e10946450941288fef9e59d9ad7be"
+    },
+    "composter_top": {
+      "effective_seed": 213785369,
+      "sha256": "c379c50d8352a819068d023395f4541a276c6bd0cae2200e10ebd27dee446aec"
+    },
+    "copper_ore": {
+      "effective_seed": 213785369,
+      "sha256": "ef34cdba6629407a32e56ed24b707824f56e079254e2af64a4e5f994645e44e3"
+    },
+    "coral_rock": {
+      "effective_seed": 213785369,
+      "sha256": "e51c4993bf8c673a29e474b52025633a453a7ff4caddd6c8778fd0fd9038ee54"
+    },
+    "cracked_stone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "dad9d820af980b0824cd8d6c6541a5e73114cb9926ea5209641e0bc0d9dc0d21"
+    },
+    "crafting_table": {
+      "effective_seed": 213785369,
+      "sha256": "d6370f124615f5072360f91360365da3c900514364d9612b25843cb0d4a03621"
+    },
+    "crafting_table_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "b26f0232196612d26558ee2fd23234921b4e84133ce3c116763d8784398238c2"
+    },
+    "crafting_table_side": {
+      "effective_seed": 213785369,
+      "sha256": "d6370f124615f5072360f91360365da3c900514364d9612b25843cb0d4a03621"
+    },
+    "crafting_table_top": {
+      "effective_seed": 213785369,
+      "sha256": "52161e2e874e1d19c0fcce427ce8bdf014b12613d89d1f55dcd449d85aa489be"
+    },
+    "cut_sandstone": {
+      "effective_seed": 213785369,
+      "sha256": "5bdfbf0369711c24fe7de3ed3e62e0c3938600bbebd8eed25ec21d0964654cf2"
+    },
+    "dandelion": {
+      "effective_seed": 213785369,
+      "sha256": "94a903260d446a94eb105b5c90434aef073327b0a6e9733ef557c84da594a03b"
+    },
+    "dead_bush": {
+      "effective_seed": 213785369,
+      "sha256": "c38624c08b699a2ea5725bf1a71101654d50f261c63c9c288ce0ec298117f30d"
+    },
+    "deepslate": {
+      "effective_seed": 213785369,
+      "sha256": "1a24935a511c81166cd9ad80d487af029da76cdbf5d70d468394d814d05092dc"
+    },
+    "deepslate_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "f05437b1fb5c25681725b01c8df87e864523b718ccb60f77efcf9c6c9830403a"
+    },
+    "deepslate_emerald_ore": {
+      "effective_seed": 213785369,
+      "sha256": "2503532d1e24ffe62926929fdb2807336c93ac84332f51ff41b441765a00234d"
+    },
+    "diamond_ore": {
+      "effective_seed": 213785369,
+      "sha256": "36d2ea76f2f4751c9918e8ebaa766c1ded8f7ce21055fb3294d44152572736be"
+    },
+    "dirt": {
+      "effective_seed": 213785369,
+      "sha256": "7b3e8fd9b4c6d56ad4ad8e186f9bdb4b784a4f48cb01261422ff6d9ebea2c05f"
+    },
+    "dripstone_block": {
+      "effective_seed": 213785369,
+      "sha256": "c2f7b126887f0ea7c8e08539830175b8a440246008786c6d796b72639307a32b"
+    },
+    "dry_grass": {
+      "effective_seed": 213785369,
+      "sha256": "4632e64d141f378b7ef5e2cf2aa90694059e3dffe356c3ceb2f2495b780661b7"
+    },
+    "dry_grass_block": {
+      "effective_seed": 213785369,
+      "sha256": "6fd2a56870da51d1b8119e45c5a6d40fde616d8e624cc09aead2b5a3b2f740df"
+    },
+    "dry_grass_side": {
+      "effective_seed": 213785369,
+      "sha256": "d81843925e89df0e9f074d6941e9cf2c60161ea6529a27be22642040c018b70c"
+    },
+    "emerald_ore": {
+      "effective_seed": 213785369,
+      "sha256": "dafa7806a175ca951e91f305035e5c27b6e908d2432e6c2de79c6c804780e682"
+    },
+    "farmland": {
+      "effective_seed": 213785369,
+      "sha256": "8c8c8d5fa86133cf67019fb4e9c2ca0e8fb41526ce0f3f36b0f4f7d946143fd1"
+    },
+    "fern": {
+      "effective_seed": 213785369,
+      "sha256": "5b86f44afe261c6f84676c5534c490886e67c35c0f26a07956d8181c414a2a62"
+    },
+    "fire": {
+      "effective_seed": 213785369,
+      "sha256": "67d5d365d46f85cad303ed092619d885a8fb8808747fe2c0f5d86d17a48a2060"
+    },
+    "fletching_table": {
+      "effective_seed": 213785369,
+      "sha256": "e47638b8b5095d13ac359e4208d6ce0cb619cb501e225624227e5dec7c95efd4"
+    },
+    "fletching_table_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "b26f0232196612d26558ee2fd23234921b4e84133ce3c116763d8784398238c2"
+    },
+    "fletching_table_side": {
+      "effective_seed": 213785369,
+      "sha256": "e47638b8b5095d13ac359e4208d6ce0cb619cb501e225624227e5dec7c95efd4"
+    },
+    "fletching_table_top": {
+      "effective_seed": 213785369,
+      "sha256": "47313cc5fc1e926baa3885c480b0f4ad967bf47b48bb3007c33d298d1c445a60"
+    },
+    "flower": {
+      "effective_seed": 213785369,
+      "sha256": "58ece9d75368cae43278b53f598bd33fdfa2525d9e7d17c0a795e6593c1a5a41"
+    },
+    "furnace": {
+      "effective_seed": 213785369,
+      "sha256": "63b2a5128a4bc61e148a4038e7c0424976ebd5d6f0fd84d5632f9bf4b36f15a6"
+    },
+    "furnace_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "09d23026b9168bce74e8e569516ece19627e13556a8d42b2341474a4b0ee6adf"
+    },
+    "furnace_side": {
+      "effective_seed": 213785369,
+      "sha256": "7dac0bd80e60a259b4fb3e5221ab1e6ac9b8812f43e319d16d187d54e678dac7"
+    },
+    "furnace_top": {
+      "effective_seed": 213785369,
+      "sha256": "fe4d4b7ed53753ca75a8344888f5fcf629bc735fb7e81e5cfe6e3388f58871d4"
+    },
+    "glass": {
+      "effective_seed": 213785369,
+      "sha256": "dce1a61245c4898714b2ad4cd822e9ab0aaddc483fdd1049b714dd2ab2a5362e"
+    },
+    "glow_fern": {
+      "effective_seed": 213785369,
+      "sha256": "9b648ebd1f9177a456f8dc1f002bc97889ebaa14fb98e704964db2f4097c5094"
+    },
+    "glowshroom": {
+      "effective_seed": 213785369,
+      "sha256": "34a27d5b270210d0d31bcbd6be4fe1647a7a97b75bc3c59a632947c6015222f2"
+    },
+    "gold_ore": {
+      "effective_seed": 213785369,
+      "sha256": "e512181829ceb33578873e4f361bc29f4dafe02e5bf8fb55bf66f1cd40d75729"
+    },
+    "granite": {
+      "effective_seed": 213785369,
+      "sha256": "d3e834a452695a3143ea0823f5c4afe1b06e1589458965f3bc8ca47b69b9c520"
+    },
+    "grass_side": {
+      "effective_seed": 213785369,
+      "sha256": "965103d5c4f8d95731158bbcf98b7709f7c40e01b6ade82e0264912165da89b7"
+    },
+    "grass_top": {
+      "effective_seed": 213785369,
+      "sha256": "3c8696fbc0bf4e6cf57e59d2fb0922def0b0c732f0c959d072af466e494a390b"
+    },
+    "gravel": {
+      "effective_seed": 213785369,
+      "sha256": "cee04fc8c2a1c1a4f709ce269df6a0596cd949a786cb6189bc00442a6d115644"
+    },
+    "green_wool": {
+      "effective_seed": 213785369,
+      "sha256": "bc4cb8c0496a1b471bdb5c14d361fc2b6d6fb1d04079ab6ee26227bcfa8943d3"
+    },
+    "grindstone": {
+      "effective_seed": 213785369,
+      "sha256": "56151cb99a1cc812232d3319945e86aedfa965e569ee8a45cc5fb3dec13bb22b"
+    },
+    "grindstone_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "09d23026b9168bce74e8e569516ece19627e13556a8d42b2341474a4b0ee6adf"
+    },
+    "grindstone_side": {
+      "effective_seed": 213785369,
+      "sha256": "56151cb99a1cc812232d3319945e86aedfa965e569ee8a45cc5fb3dec13bb22b"
+    },
+    "grindstone_top": {
+      "effective_seed": 213785369,
+      "sha256": "82168ec73ba6f998377051afdf84b3d696bc8ef918fcdf49857cb075a96755b1"
+    },
+    "hanging_roots": {
+      "effective_seed": 213785369,
+      "sha256": "565d4c069ee700cab6a4f44dcdafbe5b8275e4f66fa915dc8d890e9095baaf80"
+    },
+    "ice": {
+      "effective_seed": 213785369,
+      "sha256": "c49b99c00038357be4ff5de4b5e76d7745fd72c0a112d21ff671aff8a9843b4a"
+    },
+    "iron_ore": {
+      "effective_seed": 213785369,
+      "sha256": "e88bdc2ab86d54a048a673b80fa22c60f4236416216f6fcca2c12939eeb8434d"
+    },
+    "jungle_leaves": {
+      "effective_seed": 213785369,
+      "sha256": "3604605c5427fedcaec9f1afff984752be817d92e5a2fff322332b316a0dcdbd"
+    },
+    "jungle_log": {
+      "effective_seed": 213785369,
+      "sha256": "fdd90a5dc0cc8a976eb326e8f365346edf9a825f0325ef3eb03fafd548e2e97c"
+    },
+    "jungle_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "5de3a7e9aba930782de176cece8384a587adb2a47908b88a66fd58f18be5ab4f"
+    },
+    "jungle_sapling": {
+      "effective_seed": 213785369,
+      "sha256": "6c41280a496c609133145070476391535cf78ed0ea79df82f7074c3673cdc4df"
+    },
+    "lava": {
+      "effective_seed": 213785369,
+      "sha256": "a13520176ce0ddab28e6d3f5d3b1c8a9b2756c9ce1e78171eaee6d87f4443967"
+    },
+    "lavender": {
+      "effective_seed": 213785369,
+      "sha256": "43d87082b8d22177539442b686163f95b6300a25384d7e82a5232c9121107537"
+    },
+    "leaf_litter_side": {
+      "effective_seed": 213785369,
+      "sha256": "01f9fbd73265d9d2de389942268b95a1cb3b73295e5202e5deda15e4bb291cde"
+    },
+    "leaf_litter_soil": {
+      "effective_seed": 213785369,
+      "sha256": "d76b98010ef2fb6b0dd35c62a31dde5a0096287f1854ed51c48d663fe29d54c5"
+    },
+    "leaves": {
+      "effective_seed": 213785369,
+      "sha256": "5ae9aaf1e4a7575b98f81d9ed42debbbb0844bd0f3e204a14626c50e5cbd23fb"
+    },
+    "limestone": {
+      "effective_seed": 213785369,
+      "sha256": "4254febee4d73be5836d5f4aa337cc760713f187ee2090d71da3b945f1a78102"
+    },
+    "loom": {
+      "effective_seed": 213785369,
+      "sha256": "5aa455b461c25e39575c99af929bee82b72f43124aa79f82c43315fc1e120980"
+    },
+    "loom_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "b26f0232196612d26558ee2fd23234921b4e84133ce3c116763d8784398238c2"
+    },
+    "loom_side": {
+      "effective_seed": 213785369,
+      "sha256": "5aa455b461c25e39575c99af929bee82b72f43124aa79f82c43315fc1e120980"
+    },
+    "loom_top": {
+      "effective_seed": 213785369,
+      "sha256": "cc600cc9d126e10fa630ed49318dd64e361e4f63e48affc2346d28e46262829e"
+    },
+    "moss": {
+      "effective_seed": 213785369,
+      "sha256": "199f5a17d99c7e9aa3e0b264c0b58073ba35abdd3cb5006a43ea8c12db8efed1"
+    },
+    "mossy_stone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "145c6d534acf74695b233748fa9c19becfc5fe0b7299572d0939894f7de7634d"
+    },
+    "mud": {
+      "effective_seed": 213785369,
+      "sha256": "7415b6a75afa8c39de4992c891d90d2e817949583046b297597eb2d0778e9230"
+    },
+    "oak_log": {
+      "effective_seed": 213785369,
+      "sha256": "a200bbcd2934d8b237528d15b9ca3864f08f49ad746bcfc331bbb4873f27b23d"
+    },
+    "oak_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "01d7143474387239fad0ab7ef995c0f8ae5ea3114e71358e622ed955b4770ea7"
+    },
+    "oak_planks": {
+      "effective_seed": 213785369,
+      "sha256": "841e6c09216e2e129a30e84c38f799fa1318de90d752e04d12ba1300f292279e"
+    },
+    "oak_sapling": {
+      "effective_seed": 213785369,
+      "sha256": "363fb4586e9b213a84a64e5f177d6d58876dba496639eba3223797367e985764"
+    },
+    "obsidian": {
+      "effective_seed": 213785369,
+      "sha256": "1a5e50b351d2ca1d43dac1f226eacbdb9155d8200a4ff87b5a9d03a165bdad55"
+    },
+    "ochre_terracotta": {
+      "effective_seed": 213785369,
+      "sha256": "18ea80bbcfa187dc4c5cea436c96125105a75fd662fbf4504737e427ebb413f4"
+    },
+    "oxeye_daisy": {
+      "effective_seed": 213785369,
+      "sha256": "7d470848a2da56ac90a245d8e0a9a774bdfd051874a6c65f838a1db24a4f895c"
+    },
+    "packed_ice": {
+      "effective_seed": 213785369,
+      "sha256": "0a2720e07102d957ee9725e5d945b3c473db178b3f748a536c3b713c49332965"
+    },
+    "peat": {
+      "effective_seed": 213785369,
+      "sha256": "de472951ee506d61a6ae3a60e4c259714f3f7b50d791b051269a8a9f501c596f"
+    },
+    "permafrost": {
+      "effective_seed": 213785369,
+      "sha256": "2fd61d2c5fe1ccd2d5684e76427cc67772cd02b8c47520e9d6d5900129e12da4"
+    },
+    "podzol_top": {
+      "effective_seed": 213785369,
+      "sha256": "2ab6b444fd52d24892f49a5fdeb78e6a29c3a5509b1b8abdce47c7db67e070cd"
+    },
+    "pointed_dripstone": {
+      "effective_seed": 213785369,
+      "sha256": "17ebbd2d4624bdc84c9a296ea626e980bce1b3b870ba37d8e02540bbc1056f14"
+    },
+    "polished_basalt": {
+      "effective_seed": 213785369,
+      "sha256": "7686aebea4706ffde49b5eb4e12c989e8f38838fb3e3390756fc0b2b68577fe0"
+    },
+    "polished_granite": {
+      "effective_seed": 213785369,
+      "sha256": "960530a6fa2f794b89c0add0016f996cd55596579897dfe08aa373c83d6327fe"
+    },
+    "polished_limestone": {
+      "effective_seed": 213785369,
+      "sha256": "ba31dd304b2215e8f72edc9d0a58738a469a864de9da1db0a07013089681ad46"
+    },
+    "polished_tuff": {
+      "effective_seed": 213785369,
+      "sha256": "a0ccc2e8d64a992f9ad69a2fac7697264347caff39f491ac1e8b9b55d3d8469a"
+    },
+    "red_mushroom": {
+      "effective_seed": 213785369,
+      "sha256": "0610ecce29bf3d55ef4f5ec760f77e966fd1a3629c65a47e96d9ddf64f3fa5ab"
+    },
+    "red_sand": {
+      "effective_seed": 213785369,
+      "sha256": "4db3507389a4dd1ce5031495a9388832e75d570ea7936e8679ff0481b4c6ff72"
+    },
+    "red_sandstone": {
+      "effective_seed": 213785369,
+      "sha256": "e36ce43dc343e0c9c2f322085a29953b3dd342d109f54088c9288b9b07589504"
+    },
+    "red_wool": {
+      "effective_seed": 213785369,
+      "sha256": "8a4d91daf31fc89999f4f4cb2e4bb2dcb63bc8800fcd5a883de162d814c77cdf"
+    },
+    "reeds": {
+      "effective_seed": 213785369,
+      "sha256": "40c6f46a4cbdbb8a5036ccf7a52833d04fe5efc230f9dd5b30f8fd41d05143c3"
+    },
+    "resonant_crystal": {
+      "effective_seed": 213785369,
+      "sha256": "9b648ebd1f9177a456f8dc1f002bc97889ebaa14fb98e704964db2f4097c5094"
+    },
+    "rooted_dirt": {
+      "effective_seed": 213785369,
+      "sha256": "cc9a7d8f75fcbf8ec58f355dda06791b04eea4d0643a6e61399c9102b91bb364"
+    },
+    "sand": {
+      "effective_seed": 213785369,
+      "sha256": "7f42773627254f8f60b6eacac609af8b645070d4abe0a66383dab76d4a33ce2b"
+    },
+    "sandstone": {
+      "effective_seed": 213785369,
+      "sha256": "976edadb4488f9ba510aca2eb3daebdf0090554af2b8252a1120f8e6e01f2ba1"
+    },
+    "shale": {
+      "effective_seed": 213785369,
+      "sha256": "a0c2f73bb2bd87dd5fac9d1284818117011f03a4009114db28c31d74e4f1eaeb"
+    },
+    "silt": {
+      "effective_seed": 213785369,
+      "sha256": "61e8bb91a166a21704154f903035598488147042018c51254e4b380f7e5bc19c"
+    },
+    "skyroot_leaves": {
+      "effective_seed": 213785369,
+      "sha256": "b5b17573e36b9c84ccd8feb715f7d3f81afcd4c87fac94dacd7a1c46c4ba27a1"
+    },
+    "skyroot_log": {
+      "effective_seed": 213785369,
+      "sha256": "4fde18d850b5df95c5e09e14a625ed6e0ece7e2bf237104a63d596141fc436d1"
+    },
+    "skyroot_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "e058388699263d2b43f57198f2ba85bfce937e8a49d84ce94e19083b1655b36c"
+    },
+    "smithing_table": {
+      "effective_seed": 213785369,
+      "sha256": "50da50358f7e01b9fbdd486c8bfe2cd855a352636b4cda5c8d4dcc1fab9be11a"
+    },
+    "smithing_table_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "f4dafed606ed399f8fbd0687bf1423e27a7202d363932e6deb4489697c2cbbc5"
+    },
+    "smithing_table_side": {
+      "effective_seed": 213785369,
+      "sha256": "50da50358f7e01b9fbdd486c8bfe2cd855a352636b4cda5c8d4dcc1fab9be11a"
+    },
+    "smithing_table_top": {
+      "effective_seed": 213785369,
+      "sha256": "a95ce21f2ae04b61252572197debca280eddec3781d7ed6e087e2a8633680741"
+    },
+    "smooth_sandstone": {
+      "effective_seed": 213785369,
+      "sha256": "1af115534948c5793b0ba110002ea46ad4cdf4f77120758ecf702ee9c191ea5f"
+    },
+    "snow": {
+      "effective_seed": 213785369,
+      "sha256": "e11aa18fde61dadd405492a74d0c2df048de75eac73de361bd9994a21ea0be56"
+    },
+    "snow_layer": {
+      "effective_seed": 213785369,
+      "sha256": "be944d89d13c98ab240fc4272bd2d350925a83b9c114b8ad115627d0d07adfea"
+    },
+    "spruce_leaves": {
+      "effective_seed": 213785369,
+      "sha256": "5f2e21f1f4a03cb87a98c896cf14af35a726a3c15effa5cb36934dea9d57f87b"
+    },
+    "spruce_log": {
+      "effective_seed": 213785369,
+      "sha256": "d9345b63266535ddf9ddedca15f5a77ca19631aded4b98a27665d1d19638192e"
+    },
+    "spruce_log_top": {
+      "effective_seed": 213785369,
+      "sha256": "ee3e5296af8ae028ffc41766f1f9821e9f692112374050de6ac06af73ed4ed4a"
+    },
+    "spruce_sapling": {
+      "effective_seed": 213785369,
+      "sha256": "090d8e76f14e31ec0e5f4f326cb6efbb14d7a3ab995d58060a6a7542ec72bee8"
+    },
+    "star_crystal": {
+      "effective_seed": 213785369,
+      "sha256": "04757a555332b09d1c53b8ff27933fde5d20e79480fc9672f39106afc2f656a3"
+    },
+    "starflower": {
+      "effective_seed": 213785369,
+      "sha256": "d4853a02df291fad417900433ae06b33826834669c2012bf3654728f90afcbe0"
+    },
+    "stone": {
+      "effective_seed": 213785369,
+      "sha256": "f19d8e93f10d6a642296dd124a4e9188b80ee95c3195ac7531b5d22f8062e7d9"
+    },
+    "stone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "74bdbca06633e922711aeddf4be068ce424ad55ae07d17f68607c687ad35e13e"
+    },
+    "sulfur_crust": {
+      "effective_seed": 213785369,
+      "sha256": "b9782949ed9b8d16be645d6dda700f6f9ac2140317aa1c5298632fde0856a44a"
+    },
+    "sunflower_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "54a1c3f9f512ded94f72552b0d1515360e2c6ba6bfb33044f729bc4372756a95"
+    },
+    "sunflower_top": {
+      "effective_seed": 213785369,
+      "sha256": "260d5b3b2decb15cbda831264c4b538cbba65bcc40065824e781ed19eb38490e"
+    },
+    "sunstone": {
+      "effective_seed": 213785369,
+      "sha256": "75f588dde27d78b67716eefde6e870ba5858bf2a1bdfbcd6b74565f648caac6e"
+    },
+    "tall_grass": {
+      "effective_seed": 213785369,
+      "sha256": "565d4c069ee700cab6a4f44dcdafbe5b8275e4f66fa915dc8d890e9095baaf80"
+    },
+    "terracotta": {
+      "effective_seed": 213785369,
+      "sha256": "3401020b3d3f554bfb4f5f4659e761313b1b358fd58f7f1a320a06c22ff3a424"
+    },
+    "tnt": {
+      "effective_seed": 213785369,
+      "sha256": "af7aa2bc1918b04e30188196d2bb11ea6840120c027fc9176db4d4bcb53dbc89"
+    },
+    "tnt_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "fa384dbb67483572ef633e2d022b476edb2e6148e00a6f7c6ac82aa5ea847e87"
+    },
+    "tnt_side": {
+      "effective_seed": 213785369,
+      "sha256": "af7aa2bc1918b04e30188196d2bb11ea6840120c027fc9176db4d4bcb53dbc89"
+    },
+    "tnt_top": {
+      "effective_seed": 213785369,
+      "sha256": "ec93caf77bbf637f10090ee3f08e4c0833ef113ab8a23eaa251cdc48cd048fe3"
+    },
+    "torch": {
+      "effective_seed": 213785369,
+      "sha256": "7499f32f3c61e00010356afaddb1ac9d54b0cb80ac5e0c53e6d73c3136ac9f68"
+    },
+    "tropical_flower": {
+      "effective_seed": 213785369,
+      "sha256": "86e21e3f02f2ce8e66fc60645e93317fdb0b62b84d8e38390b689df40d414ba6"
+    },
+    "tuff": {
+      "effective_seed": 213785369,
+      "sha256": "553fb6ed76b66c1279ca7a4e75d0c44133e6b28695aeae73fb56c0e3c5e63463"
+    },
+    "volcanic_ash": {
+      "effective_seed": 213785369,
+      "sha256": "83020f992df2c209e44c73ee9ebc8f0c4df373e67574764b2f30edebf7d2df09"
+    },
+    "water": {
+      "effective_seed": 213785369,
+      "sha256": "c81ffdebb86e5dec9790df823c3951831c8f9e11b1f0e6e73174d7c40188a78a"
+    },
+    "wet_farmland": {
+      "effective_seed": 213785369,
+      "sha256": "92f3370c01ef9fbb81367b8e5701750b00b04b182f5309d3eff8d5d451e7d6e6"
+    },
+    "wheat_mature": {
+      "effective_seed": 213785369,
+      "sha256": "93f11fb3867fd8a2b20944b5c81a35632fdb3785d0595fec309895b4f54ffe4f"
+    },
+    "wheat_middle": {
+      "effective_seed": 213785369,
+      "sha256": "950c83437b3e91fec71de91100283f99494ce0670f19b10c437cf054de6db899"
+    },
+    "wheat_young": {
+      "effective_seed": 213785369,
+      "sha256": "a7a4b52d36e38ea5c8891a321415b6f753b342b247a4d2fadf834d496ec88785"
+    },
+    "white_bed": {
+      "effective_seed": 213785369,
+      "sha256": "49430b629cc721f800996d165e235aab331758b5ef6de833366de9771b97cb7b"
+    },
+    "white_bed_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "9ea890a366043ea5f2577bc55ff4350e4bcdd0c9686eab9eae15b59685419f94"
+    },
+    "white_bed_side": {
+      "effective_seed": 213785369,
+      "sha256": "49430b629cc721f800996d165e235aab331758b5ef6de833366de9771b97cb7b"
+    },
+    "white_bed_top": {
+      "effective_seed": 213785369,
+      "sha256": "a1250d15a4bfc2533fb299df1a7afdd6d9737ffe83d7687ae80fd818ffb52ad1"
+    },
+    "white_terracotta": {
+      "effective_seed": 213785369,
+      "sha256": "55b43e4427fa4f7985e623344c5c8203b6bd6085f5a95d60e916e7f4fcd280dc"
+    },
+    "white_wool": {
+      "effective_seed": 213785369,
+      "sha256": "f55673ff9fa82effb89ba79781a9d885573f112c9fec535aa437e74c62c46cf6"
+    },
+    "yellow_wool": {
+      "effective_seed": 213785369,
+      "sha256": "07af9c5a90334b9dfef5282db513fe4a7fef82009136a26a63e9889052015339"
+    }
+  },
+  "seed": 213785369
+}

@@ -1,12 +1,14 @@
 {
   "columns": 8,
+  "fallback_enabled": false,
   "filter": "nearest",
-  "generator_version": 3,
+  "generation_failures": {},
+  "generator_version": 4,
   "items": {
     "acacia_leaves": {
       "generator": "block_item_icon",
       "index": 64,
-      "source": "assets/textures/generated/items/acacia_leaves.png",
+      "source": "items/acacia_leaves.png",
       "source_kind": "generated",
       "x": 0,
       "y": 8
@@ -14,7 +16,7 @@
     "acacia_log": {
       "generator": "block_item_icon",
       "index": 63,
-      "source": "assets/textures/generated/items/acacia_log.png",
+      "source": "items/acacia_log.png",
       "source_kind": "generated",
       "x": 7,
       "y": 7
@@ -22,7 +24,7 @@
     "acacia_sapling": {
       "generator": "block_item_icon",
       "index": 115,
-      "source": "assets/textures/generated/items/acacia_sapling.png",
+      "source": "items/acacia_sapling.png",
       "source_kind": "generated",
       "x": 3,
       "y": 14
@@ -30,7 +32,7 @@
     "aether_grass": {
       "generator": "block_item_icon",
       "index": 144,
-      "source": "assets/textures/generated/items/aether_grass.png",
+      "source": "items/aether_grass.png",
       "source_kind": "generated",
       "x": 0,
       "y": 18
@@ -38,7 +40,7 @@
     "aether_soil": {
       "generator": "block_item_icon",
       "index": 145,
-      "source": "assets/textures/generated/items/aether_soil.png",
+      "source": "items/aether_soil.png",
       "source_kind": "generated",
       "x": 1,
       "y": 18
@@ -46,7 +48,7 @@
     "allium": {
       "generator": "block_item_icon",
       "index": 121,
-      "source": "assets/textures/generated/items/allium.png",
+      "source": "items/allium.png",
       "source_kind": "generated",
       "x": 1,
       "y": 15
@@ -54,7 +56,7 @@
     "alpine_flower": {
       "generator": "block_item_icon",
       "index": 228,
-      "source": "assets/textures/generated/items/alpine_flower.png",
+      "source": "items/alpine_flower.png",
       "source_kind": "generated",
       "x": 4,
       "y": 28
@@ -62,7 +64,7 @@
     "arrow": {
       "generator": "item_sprite",
       "index": 71,
-      "source": "assets/textures/generated/items/arrow.png",
+      "source": "items/arrow.png",
       "source_kind": "generated",
       "x": 7,
       "y": 8
@@ -70,7 +72,7 @@
     "basalt": {
       "generator": "block_item_icon",
       "index": 137,
-      "source": "assets/textures/generated/items/basalt.png",
+      "source": "items/basalt.png",
       "source_kind": "generated",
       "x": 1,
       "y": 17
@@ -78,7 +80,7 @@
     "beach_grass": {
       "generator": "block_item_icon",
       "index": 231,
-      "source": "assets/textures/generated/items/beach_grass.png",
+      "source": "items/beach_grass.png",
       "source_kind": "generated",
       "x": 7,
       "y": 28
@@ -86,7 +88,7 @@
     "bedrock": {
       "generator": "block_item_icon",
       "index": 37,
-      "source": "assets/textures/generated/items/bedrock.png",
+      "source": "items/bedrock.png",
       "source_kind": "generated",
       "x": 5,
       "y": 4
@@ -94,7 +96,7 @@
     "bellflower": {
       "generator": "block_item_icon",
       "index": 227,
-      "source": "assets/textures/generated/items/bellflower.png",
+      "source": "items/bellflower.png",
       "source_kind": "generated",
       "x": 3,
       "y": 28
@@ -102,7 +104,7 @@
     "birch_leaves": {
       "generator": "block_item_icon",
       "index": 58,
-      "source": "assets/textures/generated/items/birch_leaves.png",
+      "source": "items/birch_leaves.png",
       "source_kind": "generated",
       "x": 2,
       "y": 7
@@ -110,7 +112,7 @@
     "birch_log": {
       "generator": "block_item_icon",
       "index": 57,
-      "source": "assets/textures/generated/items/birch_log.png",
+      "source": "items/birch_log.png",
       "source_kind": "generated",
       "x": 1,
       "y": 7
@@ -118,7 +120,7 @@
     "birch_sapling": {
       "generator": "block_item_icon",
       "index": 112,
-      "source": "assets/textures/generated/items/birch_sapling.png",
+      "source": "items/birch_sapling.png",
       "source_kind": "generated",
       "x": 0,
       "y": 14
@@ -126,7 +128,7 @@
     "black_dye": {
       "generator": "item_sprite",
       "index": 206,
-      "source": "assets/textures/generated/items/black_dye.png",
+      "source": "items/black_dye.png",
       "source_kind": "generated",
       "x": 6,
       "y": 25
@@ -134,7 +136,7 @@
     "black_sand": {
       "generator": "block_item_icon",
       "index": 142,
-      "source": "assets/textures/generated/items/black_sand.png",
+      "source": "items/black_sand.png",
       "source_kind": "generated",
       "x": 6,
       "y": 17
@@ -142,7 +144,7 @@
     "black_wool": {
       "generator": "block_item_icon",
       "index": 199,
-      "source": "assets/textures/generated/items/black_wool.png",
+      "source": "items/black_wool.png",
       "source_kind": "generated",
       "x": 7,
       "y": 24
@@ -150,7 +152,7 @@
     "blast_furnace": {
       "generator": "block_item_icon",
       "index": 168,
-      "source": "assets/textures/generated/items/blast_furnace.png",
+      "source": "items/blast_furnace.png",
       "source_kind": "generated",
       "x": 0,
       "y": 21
@@ -158,7 +160,7 @@
     "blastling_spawn_egg": {
       "generator": "item_sprite",
       "index": 133,
-      "source": "assets/textures/generated/items/blastling_spawn_egg.png",
+      "source": "items/blastling_spawn_egg.png",
       "source_kind": "generated",
       "x": 5,
       "y": 16
@@ -166,7 +168,7 @@
     "blue_dye": {
       "generator": "item_sprite",
       "index": 204,
-      "source": "assets/textures/generated/items/blue_dye.png",
+      "source": "items/blue_dye.png",
       "source_kind": "generated",
       "x": 4,
       "y": 25
@@ -174,7 +176,7 @@
     "blue_ice": {
       "generator": "block_item_icon",
       "index": 214,
-      "source": "assets/textures/generated/items/blue_ice.png",
+      "source": "items/blue_ice.png",
       "source_kind": "generated",
       "x": 6,
       "y": 26
@@ -182,7 +184,7 @@
     "blue_orchid": {
       "generator": "block_item_icon",
       "index": 120,
-      "source": "assets/textures/generated/items/blue_orchid.png",
+      "source": "items/blue_orchid.png",
       "source_kind": "generated",
       "x": 0,
       "y": 15
@@ -190,7 +192,7 @@
     "blue_wool": {
       "generator": "block_item_icon",
       "index": 197,
-      "source": "assets/textures/generated/items/blue_wool.png",
+      "source": "items/blue_wool.png",
       "source_kind": "generated",
       "x": 5,
       "y": 24
@@ -198,7 +200,7 @@
     "bone": {
       "generator": "item_sprite",
       "index": 70,
-      "source": "assets/textures/generated/items/bone.png",
+      "source": "items/bone.png",
       "source_kind": "generated",
       "x": 6,
       "y": 8
@@ -206,7 +208,7 @@
     "bone_meal": {
       "generator": "item_sprite",
       "index": 207,
-      "source": "assets/textures/generated/items/bone_meal.png",
+      "source": "items/bone_meal.png",
       "source_kind": "generated",
       "x": 7,
       "y": 25
@@ -214,7 +216,7 @@
     "bow": {
       "generator": "item_sprite",
       "index": 92,
-      "source": "assets/textures/generated/items/bow.png",
+      "source": "items/bow.png",
       "source_kind": "generated",
       "x": 4,
       "y": 11
@@ -222,7 +224,7 @@
     "bread": {
       "generator": "item_sprite",
       "index": 74,
-      "source": "assets/textures/generated/items/bread.png",
+      "source": "items/bread.png",
       "source_kind": "generated",
       "x": 2,
       "y": 9
@@ -230,7 +232,7 @@
     "brick": {
       "generator": "item_sprite",
       "index": 201,
-      "source": "assets/textures/generated/items/brick.png",
+      "source": "items/brick.png",
       "source_kind": "generated",
       "x": 1,
       "y": 25
@@ -238,7 +240,7 @@
     "bricks": {
       "generator": "block_item_icon",
       "index": 186,
-      "source": "assets/textures/generated/items/bricks.png",
+      "source": "items/bricks.png",
       "source_kind": "generated",
       "x": 2,
       "y": 23
@@ -246,7 +248,7 @@
     "brown_mushroom": {
       "generator": "block_item_icon",
       "index": 224,
-      "source": "assets/textures/generated/items/brown_mushroom.png",
+      "source": "items/brown_mushroom.png",
       "source_kind": "generated",
       "x": 0,
       "y": 28
@@ -254,7 +256,7 @@
     "cactus": {
       "generator": "block_item_icon",
       "index": 41,
-      "source": "assets/textures/generated/items/cactus.png",
+      "source": "items/cactus.png",
       "source_kind": "generated",
       "x": 1,
       "y": 5
@@ -262,7 +264,7 @@
     "calcite": {
       "generator": "block_item_icon",
       "index": 156,
-      "source": "assets/textures/generated/items/calcite.png",
+      "source": "items/calcite.png",
       "source_kind": "generated",
       "x": 4,
       "y": 19
@@ -270,7 +272,7 @@
     "cattail": {
       "generator": "block_item_icon",
       "index": 230,
-      "source": "assets/textures/generated/items/cattail.png",
+      "source": "items/cattail.png",
       "source_kind": "generated",
       "x": 6,
       "y": 28
@@ -278,7 +280,7 @@
     "cauldron": {
       "generator": "block_item_icon",
       "index": 167,
-      "source": "assets/textures/generated/items/cauldron.png",
+      "source": "items/cauldron.png",
       "source_kind": "generated",
       "x": 7,
       "y": 20
@@ -286,7 +288,7 @@
     "chest": {
       "generator": "block_item_icon",
       "index": 8,
-      "source": "assets/textures/generated/items/chest.png",
+      "source": "items/chest.png",
       "source_kind": "generated",
       "x": 0,
       "y": 1
@@ -294,7 +296,7 @@
     "chicken_spawn_egg": {
       "generator": "item_sprite",
       "index": 129,
-      "source": "assets/textures/generated/items/chicken_spawn_egg.png",
+      "source": "items/chicken_spawn_egg.png",
       "source_kind": "generated",
       "x": 1,
       "y": 16
@@ -302,7 +304,7 @@
     "chiseled_stone_bricks": {
       "generator": "block_item_icon",
       "index": 185,
-      "source": "assets/textures/generated/items/chiseled_stone_bricks.png",
+      "source": "items/chiseled_stone_bricks.png",
       "source_kind": "generated",
       "x": 1,
       "y": 23
@@ -310,7 +312,7 @@
     "clay": {
       "generator": "block_item_icon",
       "index": 49,
-      "source": "assets/textures/generated/items/clay.png",
+      "source": "items/clay.png",
       "source_kind": "generated",
       "x": 1,
       "y": 6
@@ -318,7 +320,7 @@
     "clay_ball": {
       "generator": "item_sprite",
       "index": 200,
-      "source": "assets/textures/generated/items/clay_ball.png",
+      "source": "items/clay_ball.png",
       "source_kind": "generated",
       "x": 0,
       "y": 25
@@ -326,7 +328,7 @@
     "cloud_bloom": {
       "generator": "block_item_icon",
       "index": 152,
-      "source": "assets/textures/generated/items/cloud_bloom.png",
+      "source": "items/cloud_bloom.png",
       "source_kind": "generated",
       "x": 0,
       "y": 19
@@ -334,7 +336,7 @@
     "cloudstone": {
       "generator": "block_item_icon",
       "index": 146,
-      "source": "assets/textures/generated/items/cloudstone.png",
+      "source": "items/cloudstone.png",
       "source_kind": "generated",
       "x": 2,
       "y": 18
@@ -342,7 +344,7 @@
     "cloudstone_slab": {
       "generator": "block_item_icon",
       "index": 179,
-      "source": "assets/textures/generated/items/cloudstone_slab.png",
+      "source": "items/cloudstone_slab.png",
       "source_kind": "generated",
       "x": 3,
       "y": 22
@@ -350,7 +352,7 @@
     "cloudstone_stairs": {
       "generator": "block_item_icon",
       "index": 180,
-      "source": "assets/textures/generated/items/cloudstone_stairs.png",
+      "source": "items/cloudstone_stairs.png",
       "source_kind": "generated",
       "x": 4,
       "y": 22
@@ -358,7 +360,7 @@
     "coal": {
       "generator": "item_sprite",
       "index": 10,
-      "source": "assets/textures/generated/items/coal.png",
+      "source": "items/coal.png",
       "source_kind": "generated",
       "x": 2,
       "y": 1
@@ -366,7 +368,7 @@
     "coal_ore": {
       "generator": "block_item_icon",
       "index": 42,
-      "source": "assets/textures/generated/items/coal_ore.png",
+      "source": "items/coal_ore.png",
       "source_kind": "generated",
       "x": 2,
       "y": 5
@@ -374,7 +376,7 @@
     "coarse_dirt": {
       "generator": "block_item_icon",
       "index": 139,
-      "source": "assets/textures/generated/items/coarse_dirt.png",
+      "source": "items/coarse_dirt.png",
       "source_kind": "generated",
       "x": 3,
       "y": 17
@@ -382,7 +384,7 @@
     "cobblestone": {
       "generator": "block_item_icon",
       "index": 5,
-      "source": "assets/textures/generated/items/cobblestone.png",
+      "source": "items/cobblestone.png",
       "source_kind": "generated",
       "x": 5,
       "y": 0
@@ -390,7 +392,7 @@
     "cobblestone_slab": {
       "generator": "block_item_icon",
       "index": 173,
-      "source": "assets/textures/generated/items/cobblestone_slab.png",
+      "source": "items/cobblestone_slab.png",
       "source_kind": "generated",
       "x": 5,
       "y": 21
@@ -398,7 +400,7 @@
     "cobblestone_stairs": {
       "generator": "block_item_icon",
       "index": 174,
-      "source": "assets/textures/generated/items/cobblestone_stairs.png",
+      "source": "items/cobblestone_stairs.png",
       "source_kind": "generated",
       "x": 6,
       "y": 21
@@ -406,7 +408,7 @@
     "composter": {
       "generator": "block_item_icon",
       "index": 164,
-      "source": "assets/textures/generated/items/composter.png",
+      "source": "items/composter.png",
       "source_kind": "generated",
       "x": 4,
       "y": 20
@@ -414,7 +416,7 @@
     "cooked_chicken": {
       "generator": "item_sprite",
       "index": 80,
-      "source": "assets/textures/generated/items/cooked_chicken.png",
+      "source": "items/cooked_chicken.png",
       "source_kind": "generated",
       "x": 0,
       "y": 10
@@ -422,7 +424,7 @@
     "cooked_mutton": {
       "generator": "item_sprite",
       "index": 82,
-      "source": "assets/textures/generated/items/cooked_mutton.png",
+      "source": "items/cooked_mutton.png",
       "source_kind": "generated",
       "x": 2,
       "y": 10
@@ -430,7 +432,7 @@
     "cooked_porkchop": {
       "generator": "item_sprite",
       "index": 78,
-      "source": "assets/textures/generated/items/cooked_porkchop.png",
+      "source": "items/cooked_porkchop.png",
       "source_kind": "generated",
       "x": 6,
       "y": 9
@@ -438,7 +440,7 @@
     "coral_rock": {
       "generator": "block_item_icon",
       "index": 220,
-      "source": "assets/textures/generated/items/coral_rock.png",
+      "source": "items/coral_rock.png",
       "source_kind": "generated",
       "x": 4,
       "y": 27
@@ -446,7 +448,7 @@
     "cow_spawn_egg": {
       "generator": "item_sprite",
       "index": 126,
-      "source": "assets/textures/generated/items/cow_spawn_egg.png",
+      "source": "items/cow_spawn_egg.png",
       "source_kind": "generated",
       "x": 6,
       "y": 15
@@ -454,7 +456,7 @@
     "cracked_stone_bricks": {
       "generator": "block_item_icon",
       "index": 184,
-      "source": "assets/textures/generated/items/cracked_stone_bricks.png",
+      "source": "items/cracked_stone_bricks.png",
       "source_kind": "generated",
       "x": 0,
       "y": 23
@@ -462,7 +464,7 @@
     "crafting_table": {
       "generator": "block_item_icon",
       "index": 6,
-      "source": "assets/textures/generated/items/crafting_table.png",
+      "source": "items/crafting_table.png",
       "source_kind": "generated",
       "x": 6,
       "y": 0
@@ -470,7 +472,7 @@
     "cut_sandstone": {
       "generator": "block_item_icon",
       "index": 193,
-      "source": "assets/textures/generated/items/cut_sandstone.png",
+      "source": "items/cut_sandstone.png",
       "source_kind": "generated",
       "x": 1,
       "y": 24
@@ -478,7 +480,7 @@
     "dandelion": {
       "generator": "block_item_icon",
       "index": 119,
-      "source": "assets/textures/generated/items/dandelion.png",
+      "source": "items/dandelion.png",
       "source_kind": "generated",
       "x": 7,
       "y": 14
@@ -486,7 +488,7 @@
     "dead_bush": {
       "generator": "block_item_icon",
       "index": 222,
-      "source": "assets/textures/generated/items/dead_bush.png",
+      "source": "items/dead_bush.png",
       "source_kind": "generated",
       "x": 6,
       "y": 27
@@ -494,7 +496,7 @@
     "deepslate": {
       "generator": "block_item_icon",
       "index": 40,
-      "source": "assets/textures/generated/items/deepslate.png",
+      "source": "items/deepslate.png",
       "source_kind": "generated",
       "x": 0,
       "y": 5
@@ -502,7 +504,7 @@
     "deepslate_bricks": {
       "generator": "block_item_icon",
       "index": 191,
-      "source": "assets/textures/generated/items/deepslate_bricks.png",
+      "source": "items/deepslate_bricks.png",
       "source_kind": "generated",
       "x": 7,
       "y": 23
@@ -510,7 +512,7 @@
     "deepslate_emerald_ore": {
       "generator": "block_item_icon",
       "index": 163,
-      "source": "assets/textures/generated/items/deepslate_emerald_ore.png",
+      "source": "items/deepslate_emerald_ore.png",
       "source_kind": "generated",
       "x": 3,
       "y": 20
@@ -518,7 +520,7 @@
     "diamond": {
       "generator": "item_sprite",
       "index": 13,
-      "source": "assets/textures/generated/items/diamond.png",
+      "source": "items/diamond.png",
       "source_kind": "generated",
       "x": 5,
       "y": 1
@@ -526,7 +528,7 @@
     "diamond_axe": {
       "generator": "item_sprite",
       "index": 88,
-      "source": "assets/textures/generated/items/diamond_axe.png",
+      "source": "items/diamond_axe.png",
       "source_kind": "generated",
       "x": 0,
       "y": 11
@@ -534,7 +536,7 @@
     "diamond_boots": {
       "generator": "item_sprite",
       "index": 109,
-      "source": "assets/textures/generated/items/diamond_boots.png",
+      "source": "items/diamond_boots.png",
       "source_kind": "generated",
       "x": 5,
       "y": 13
@@ -542,7 +544,7 @@
     "diamond_chestplate": {
       "generator": "item_sprite",
       "index": 107,
-      "source": "assets/textures/generated/items/diamond_chestplate.png",
+      "source": "items/diamond_chestplate.png",
       "source_kind": "generated",
       "x": 3,
       "y": 13
@@ -550,7 +552,7 @@
     "diamond_helmet": {
       "generator": "item_sprite",
       "index": 106,
-      "source": "assets/textures/generated/items/diamond_helmet.png",
+      "source": "items/diamond_helmet.png",
       "source_kind": "generated",
       "x": 2,
       "y": 13
@@ -558,7 +560,7 @@
     "diamond_hoe": {
       "generator": "item_sprite",
       "index": 90,
-      "source": "assets/textures/generated/items/diamond_hoe.png",
+      "source": "items/diamond_hoe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 11
@@ -566,7 +568,7 @@
     "diamond_leggings": {
       "generator": "item_sprite",
       "index": 108,
-      "source": "assets/textures/generated/items/diamond_leggings.png",
+      "source": "items/diamond_leggings.png",
       "source_kind": "generated",
       "x": 4,
       "y": 13
@@ -574,7 +576,7 @@
     "diamond_ore": {
       "generator": "block_item_icon",
       "index": 45,
-      "source": "assets/textures/generated/items/diamond_ore.png",
+      "source": "items/diamond_ore.png",
       "source_kind": "generated",
       "x": 5,
       "y": 5
@@ -582,7 +584,7 @@
     "diamond_pickaxe": {
       "generator": "item_sprite",
       "index": 87,
-      "source": "assets/textures/generated/items/diamond_pickaxe.png",
+      "source": "items/diamond_pickaxe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 10
@@ -590,7 +592,7 @@
     "diamond_shovel": {
       "generator": "item_sprite",
       "index": 89,
-      "source": "assets/textures/generated/items/diamond_shovel.png",
+      "source": "items/diamond_shovel.png",
       "source_kind": "generated",
       "x": 1,
       "y": 11
@@ -598,7 +600,7 @@
     "diamond_sword": {
       "generator": "item_sprite",
       "index": 91,
-      "source": "assets/textures/generated/items/diamond_sword.png",
+      "source": "items/diamond_sword.png",
       "source_kind": "generated",
       "x": 3,
       "y": 11
@@ -606,7 +608,7 @@
     "dirt": {
       "generator": "block_item_icon",
       "index": 1,
-      "source": "assets/textures/generated/items/dirt.png",
+      "source": "items/dirt.png",
       "source_kind": "generated",
       "x": 1,
       "y": 0
@@ -614,7 +616,7 @@
     "dripstone_block": {
       "generator": "block_item_icon",
       "index": 154,
-      "source": "assets/textures/generated/items/dripstone_block.png",
+      "source": "items/dripstone_block.png",
       "source_kind": "generated",
       "x": 2,
       "y": 19
@@ -622,7 +624,7 @@
     "dry_grass": {
       "generator": "block_item_icon",
       "index": 223,
-      "source": "assets/textures/generated/items/dry_grass.png",
+      "source": "items/dry_grass.png",
       "source_kind": "generated",
       "x": 7,
       "y": 27
@@ -630,7 +632,7 @@
     "dry_grass_block": {
       "generator": "block_item_icon",
       "index": 212,
-      "source": "assets/textures/generated/items/dry_grass_block.png",
+      "source": "items/dry_grass_block.png",
       "source_kind": "generated",
       "x": 4,
       "y": 26
@@ -638,7 +640,7 @@
     "emerald": {
       "generator": "item_sprite",
       "index": 161,
-      "source": "assets/textures/generated/items/emerald.png",
+      "source": "items/emerald.png",
       "source_kind": "generated",
       "x": 1,
       "y": 20
@@ -646,7 +648,7 @@
     "emerald_ore": {
       "generator": "block_item_icon",
       "index": 162,
-      "source": "assets/textures/generated/items/emerald_ore.png",
+      "source": "items/emerald_ore.png",
       "source_kind": "generated",
       "x": 2,
       "y": 20
@@ -654,7 +656,7 @@
     "farmland": {
       "generator": "block_item_icon",
       "index": 86,
-      "source": "assets/textures/generated/items/farmland.png",
+      "source": "items/farmland.png",
       "source_kind": "generated",
       "x": 6,
       "y": 10
@@ -662,7 +664,7 @@
     "feather": {
       "generator": "item_sprite",
       "index": 68,
-      "source": "assets/textures/generated/items/feather.png",
+      "source": "items/feather.png",
       "source_kind": "generated",
       "x": 4,
       "y": 8
@@ -670,7 +672,7 @@
     "fern": {
       "generator": "block_item_icon",
       "index": 221,
-      "source": "assets/textures/generated/items/fern.png",
+      "source": "items/fern.png",
       "source_kind": "generated",
       "x": 5,
       "y": 27
@@ -678,7 +680,7 @@
     "fletching_table": {
       "generator": "block_item_icon",
       "index": 165,
-      "source": "assets/textures/generated/items/fletching_table.png",
+      "source": "items/fletching_table.png",
       "source_kind": "generated",
       "x": 5,
       "y": 20
@@ -686,7 +688,7 @@
     "flint": {
       "generator": "item_sprite",
       "index": 110,
-      "source": "assets/textures/generated/items/flint.png",
+      "source": "items/flint.png",
       "source_kind": "generated",
       "x": 6,
       "y": 13
@@ -694,7 +696,7 @@
     "flint_and_steel": {
       "generator": "item_sprite",
       "index": 124,
-      "source": "assets/textures/generated/items/flint_and_steel.png",
+      "source": "items/flint_and_steel.png",
       "source_kind": "generated",
       "x": 4,
       "y": 15
@@ -702,7 +704,7 @@
     "furnace": {
       "generator": "block_item_icon",
       "index": 7,
-      "source": "assets/textures/generated/items/furnace.png",
+      "source": "items/furnace.png",
       "source_kind": "generated",
       "x": 7,
       "y": 0
@@ -710,7 +712,7 @@
     "glass": {
       "generator": "block_item_icon",
       "index": 116,
-      "source": "assets/textures/generated/items/glass.png",
+      "source": "items/glass.png",
       "source_kind": "generated",
       "x": 4,
       "y": 14
@@ -718,7 +720,7 @@
     "glow_fern": {
       "generator": "block_item_icon",
       "index": 158,
-      "source": "assets/textures/generated/items/glow_fern.png",
+      "source": "items/glow_fern.png",
       "source_kind": "generated",
       "x": 6,
       "y": 19
@@ -726,7 +728,7 @@
     "glowshroom": {
       "generator": "block_item_icon",
       "index": 153,
-      "source": "assets/textures/generated/items/glowshroom.png",
+      "source": "items/glowshroom.png",
       "source_kind": "generated",
       "x": 1,
       "y": 19
@@ -734,7 +736,7 @@
     "gold_ingot": {
       "generator": "item_sprite",
       "index": 12,
-      "source": "assets/textures/generated/items/gold_ingot.png",
+      "source": "items/gold_ingot.png",
       "source_kind": "generated",
       "x": 4,
       "y": 1
@@ -742,7 +744,7 @@
     "gold_ore": {
       "generator": "block_item_icon",
       "index": 44,
-      "source": "assets/textures/generated/items/gold_ore.png",
+      "source": "items/gold_ore.png",
       "source_kind": "generated",
       "x": 4,
       "y": 5
@@ -750,7 +752,7 @@
     "golden_axe": {
       "generator": "item_sprite",
       "index": 31,
-      "source": "assets/textures/generated/items/golden_axe.png",
+      "source": "items/golden_axe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 3
@@ -758,7 +760,7 @@
     "golden_boots": {
       "generator": "item_sprite",
       "index": 105,
-      "source": "assets/textures/generated/items/golden_boots.png",
+      "source": "items/golden_boots.png",
       "source_kind": "generated",
       "x": 1,
       "y": 13
@@ -766,7 +768,7 @@
     "golden_chestplate": {
       "generator": "item_sprite",
       "index": 103,
-      "source": "assets/textures/generated/items/golden_chestplate.png",
+      "source": "items/golden_chestplate.png",
       "source_kind": "generated",
       "x": 7,
       "y": 12
@@ -774,7 +776,7 @@
     "golden_helmet": {
       "generator": "item_sprite",
       "index": 102,
-      "source": "assets/textures/generated/items/golden_helmet.png",
+      "source": "items/golden_helmet.png",
       "source_kind": "generated",
       "x": 6,
       "y": 12
@@ -782,7 +784,7 @@
     "golden_hoe": {
       "generator": "item_sprite",
       "index": 33,
-      "source": "assets/textures/generated/items/golden_hoe.png",
+      "source": "items/golden_hoe.png",
       "source_kind": "generated",
       "x": 1,
       "y": 4
@@ -790,7 +792,7 @@
     "golden_leggings": {
       "generator": "item_sprite",
       "index": 104,
-      "source": "assets/textures/generated/items/golden_leggings.png",
+      "source": "items/golden_leggings.png",
       "source_kind": "generated",
       "x": 0,
       "y": 13
@@ -798,7 +800,7 @@
     "golden_pickaxe": {
       "generator": "item_sprite",
       "index": 30,
-      "source": "assets/textures/generated/items/golden_pickaxe.png",
+      "source": "items/golden_pickaxe.png",
       "source_kind": "generated",
       "x": 6,
       "y": 3
@@ -806,7 +808,7 @@
     "golden_shovel": {
       "generator": "item_sprite",
       "index": 32,
-      "source": "assets/textures/generated/items/golden_shovel.png",
+      "source": "items/golden_shovel.png",
       "source_kind": "generated",
       "x": 0,
       "y": 4
@@ -814,7 +816,7 @@
     "golden_sword": {
       "generator": "item_sprite",
       "index": 34,
-      "source": "assets/textures/generated/items/golden_sword.png",
+      "source": "items/golden_sword.png",
       "source_kind": "generated",
       "x": 2,
       "y": 4
@@ -822,7 +824,7 @@
     "granite": {
       "generator": "block_item_icon",
       "index": 143,
-      "source": "assets/textures/generated/items/granite.png",
+      "source": "items/granite.png",
       "source_kind": "generated",
       "x": 7,
       "y": 17
@@ -830,7 +832,7 @@
     "grass_block": {
       "generator": "block_item_icon",
       "index": 0,
-      "source": "assets/textures/generated/items/grass_block.png",
+      "source": "items/grass_block.png",
       "source_kind": "generated",
       "x": 0,
       "y": 0
@@ -838,7 +840,7 @@
     "gravel": {
       "generator": "block_item_icon",
       "index": 48,
-      "source": "assets/textures/generated/items/gravel.png",
+      "source": "items/gravel.png",
       "source_kind": "generated",
       "x": 0,
       "y": 6
@@ -846,7 +848,7 @@
     "green_dye": {
       "generator": "item_sprite",
       "index": 205,
-      "source": "assets/textures/generated/items/green_dye.png",
+      "source": "items/green_dye.png",
       "source_kind": "generated",
       "x": 5,
       "y": 25
@@ -854,7 +856,7 @@
     "green_wool": {
       "generator": "block_item_icon",
       "index": 198,
-      "source": "assets/textures/generated/items/green_wool.png",
+      "source": "items/green_wool.png",
       "source_kind": "generated",
       "x": 6,
       "y": 24
@@ -862,7 +864,7 @@
     "grindstone": {
       "generator": "block_item_icon",
       "index": 170,
-      "source": "assets/textures/generated/items/grindstone.png",
+      "source": "items/grindstone.png",
       "source_kind": "generated",
       "x": 2,
       "y": 21
@@ -870,7 +872,7 @@
     "gunpowder": {
       "generator": "item_sprite",
       "index": 125,
-      "source": "assets/textures/generated/items/gunpowder.png",
+      "source": "items/gunpowder.png",
       "source_kind": "generated",
       "x": 5,
       "y": 15
@@ -878,7 +880,7 @@
     "hanging_roots": {
       "generator": "block_item_icon",
       "index": 157,
-      "source": "assets/textures/generated/items/hanging_roots.png",
+      "source": "items/hanging_roots.png",
       "source_kind": "generated",
       "x": 5,
       "y": 19
@@ -886,7 +888,7 @@
     "ice": {
       "generator": "block_item_icon",
       "index": 47,
-      "source": "assets/textures/generated/items/ice.png",
+      "source": "items/ice.png",
       "source_kind": "generated",
       "x": 7,
       "y": 5
@@ -894,7 +896,7 @@
     "iron_axe": {
       "generator": "item_sprite",
       "index": 26,
-      "source": "assets/textures/generated/items/iron_axe.png",
+      "source": "items/iron_axe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 3
@@ -902,7 +904,7 @@
     "iron_boots": {
       "generator": "item_sprite",
       "index": 101,
-      "source": "assets/textures/generated/items/iron_boots.png",
+      "source": "items/iron_boots.png",
       "source_kind": "generated",
       "x": 5,
       "y": 12
@@ -910,7 +912,7 @@
     "iron_chestplate": {
       "generator": "item_sprite",
       "index": 99,
-      "source": "assets/textures/generated/items/iron_chestplate.png",
+      "source": "items/iron_chestplate.png",
       "source_kind": "generated",
       "x": 3,
       "y": 12
@@ -918,7 +920,7 @@
     "iron_helmet": {
       "generator": "item_sprite",
       "index": 98,
-      "source": "assets/textures/generated/items/iron_helmet.png",
+      "source": "items/iron_helmet.png",
       "source_kind": "generated",
       "x": 2,
       "y": 12
@@ -926,7 +928,7 @@
     "iron_hoe": {
       "generator": "item_sprite",
       "index": 28,
-      "source": "assets/textures/generated/items/iron_hoe.png",
+      "source": "items/iron_hoe.png",
       "source_kind": "generated",
       "x": 4,
       "y": 3
@@ -934,7 +936,7 @@
     "iron_ingot": {
       "generator": "item_sprite",
       "index": 11,
-      "source": "assets/textures/generated/items/iron_ingot.png",
+      "source": "items/iron_ingot.png",
       "source_kind": "generated",
       "x": 3,
       "y": 1
@@ -942,7 +944,7 @@
     "iron_leggings": {
       "generator": "item_sprite",
       "index": 100,
-      "source": "assets/textures/generated/items/iron_leggings.png",
+      "source": "items/iron_leggings.png",
       "source_kind": "generated",
       "x": 4,
       "y": 12
@@ -950,7 +952,7 @@
     "iron_ore": {
       "generator": "block_item_icon",
       "index": 43,
-      "source": "assets/textures/generated/items/iron_ore.png",
+      "source": "items/iron_ore.png",
       "source_kind": "generated",
       "x": 3,
       "y": 5
@@ -958,7 +960,7 @@
     "iron_pickaxe": {
       "generator": "item_sprite",
       "index": 25,
-      "source": "assets/textures/generated/items/iron_pickaxe.png",
+      "source": "items/iron_pickaxe.png",
       "source_kind": "generated",
       "x": 1,
       "y": 3
@@ -966,7 +968,7 @@
     "iron_shovel": {
       "generator": "item_sprite",
       "index": 27,
-      "source": "assets/textures/generated/items/iron_shovel.png",
+      "source": "items/iron_shovel.png",
       "source_kind": "generated",
       "x": 3,
       "y": 3
@@ -974,7 +976,7 @@
     "iron_sword": {
       "generator": "item_sprite",
       "index": 29,
-      "source": "assets/textures/generated/items/iron_sword.png",
+      "source": "items/iron_sword.png",
       "source_kind": "generated",
       "x": 5,
       "y": 3
@@ -982,7 +984,7 @@
     "jungle_leaves": {
       "generator": "block_item_icon",
       "index": 62,
-      "source": "assets/textures/generated/items/jungle_leaves.png",
+      "source": "items/jungle_leaves.png",
       "source_kind": "generated",
       "x": 6,
       "y": 7
@@ -990,7 +992,7 @@
     "jungle_log": {
       "generator": "block_item_icon",
       "index": 61,
-      "source": "assets/textures/generated/items/jungle_log.png",
+      "source": "items/jungle_log.png",
       "source_kind": "generated",
       "x": 5,
       "y": 7
@@ -998,7 +1000,7 @@
     "jungle_sapling": {
       "generator": "block_item_icon",
       "index": 114,
-      "source": "assets/textures/generated/items/jungle_sapling.png",
+      "source": "items/jungle_sapling.png",
       "source_kind": "generated",
       "x": 2,
       "y": 14
@@ -1006,7 +1008,7 @@
     "lava": {
       "generator": "block_item_icon",
       "index": 46,
-      "source": "assets/textures/generated/items/lava.png",
+      "source": "items/lava.png",
       "source_kind": "generated",
       "x": 6,
       "y": 5
@@ -1014,7 +1016,7 @@
     "lavender": {
       "generator": "block_item_icon",
       "index": 226,
-      "source": "assets/textures/generated/items/lavender.png",
+      "source": "items/lavender.png",
       "source_kind": "generated",
       "x": 2,
       "y": 28
@@ -1022,7 +1024,7 @@
     "leaf_litter_soil": {
       "generator": "block_item_icon",
       "index": 209,
-      "source": "assets/textures/generated/items/leaf_litter_soil.png",
+      "source": "items/leaf_litter_soil.png",
       "source_kind": "generated",
       "x": 1,
       "y": 26
@@ -1030,7 +1032,7 @@
     "leather": {
       "generator": "item_sprite",
       "index": 69,
-      "source": "assets/textures/generated/items/leather.png",
+      "source": "items/leather.png",
       "source_kind": "generated",
       "x": 5,
       "y": 8
@@ -1038,7 +1040,7 @@
     "leather_boots": {
       "generator": "item_sprite",
       "index": 97,
-      "source": "assets/textures/generated/items/leather_boots.png",
+      "source": "items/leather_boots.png",
       "source_kind": "generated",
       "x": 1,
       "y": 12
@@ -1046,7 +1048,7 @@
     "leather_chestplate": {
       "generator": "item_sprite",
       "index": 95,
-      "source": "assets/textures/generated/items/leather_chestplate.png",
+      "source": "items/leather_chestplate.png",
       "source_kind": "generated",
       "x": 7,
       "y": 11
@@ -1054,7 +1056,7 @@
     "leather_helmet": {
       "generator": "item_sprite",
       "index": 94,
-      "source": "assets/textures/generated/items/leather_helmet.png",
+      "source": "items/leather_helmet.png",
       "source_kind": "generated",
       "x": 6,
       "y": 11
@@ -1062,7 +1064,7 @@
     "leather_leggings": {
       "generator": "item_sprite",
       "index": 96,
-      "source": "assets/textures/generated/items/leather_leggings.png",
+      "source": "items/leather_leggings.png",
       "source_kind": "generated",
       "x": 0,
       "y": 12
@@ -1070,7 +1072,7 @@
     "limestone": {
       "generator": "block_item_icon",
       "index": 136,
-      "source": "assets/textures/generated/items/limestone.png",
+      "source": "items/limestone.png",
       "source_kind": "generated",
       "x": 0,
       "y": 17
@@ -1078,7 +1080,7 @@
     "loom": {
       "generator": "block_item_icon",
       "index": 166,
-      "source": "assets/textures/generated/items/loom.png",
+      "source": "items/loom.png",
       "source_kind": "generated",
       "x": 6,
       "y": 20
@@ -1086,7 +1088,7 @@
     "moss": {
       "generator": "block_item_icon",
       "index": 53,
-      "source": "assets/textures/generated/items/moss.png",
+      "source": "items/moss.png",
       "source_kind": "generated",
       "x": 5,
       "y": 6
@@ -1094,7 +1096,7 @@
     "mossy_stone_bricks": {
       "generator": "block_item_icon",
       "index": 183,
-      "source": "assets/textures/generated/items/mossy_stone_bricks.png",
+      "source": "items/mossy_stone_bricks.png",
       "source_kind": "generated",
       "x": 7,
       "y": 22
@@ -1102,7 +1104,7 @@
     "mud": {
       "generator": "block_item_icon",
       "index": 140,
-      "source": "assets/textures/generated/items/mud.png",
+      "source": "items/mud.png",
       "source_kind": "generated",
       "x": 4,
       "y": 17
@@ -1110,7 +1112,7 @@
     "oak_leaves": {
       "generator": "block_item_icon",
       "index": 35,
-      "source": "assets/textures/generated/items/oak_leaves.png",
+      "source": "items/oak_leaves.png",
       "source_kind": "generated",
       "x": 3,
       "y": 4
@@ -1118,7 +1120,7 @@
     "oak_log": {
       "generator": "block_item_icon",
       "index": 3,
-      "source": "assets/textures/generated/items/oak_log.png",
+      "source": "items/oak_log.png",
       "source_kind": "generated",
       "x": 3,
       "y": 0
@@ -1126,7 +1128,7 @@
     "oak_planks": {
       "generator": "block_item_icon",
       "index": 4,
-      "source": "assets/textures/generated/items/oak_planks.png",
+      "source": "items/oak_planks.png",
       "source_kind": "generated",
       "x": 4,
       "y": 0
@@ -1134,7 +1136,7 @@
     "oak_planks_slab": {
       "generator": "block_item_icon",
       "index": 171,
-      "source": "assets/textures/generated/items/oak_planks_slab.png",
+      "source": "items/oak_planks_slab.png",
       "source_kind": "generated",
       "x": 3,
       "y": 21
@@ -1142,7 +1144,7 @@
     "oak_planks_stairs": {
       "generator": "block_item_icon",
       "index": 172,
-      "source": "assets/textures/generated/items/oak_planks_stairs.png",
+      "source": "items/oak_planks_stairs.png",
       "source_kind": "generated",
       "x": 4,
       "y": 21
@@ -1150,7 +1152,7 @@
     "oak_sapling": {
       "generator": "block_item_icon",
       "index": 111,
-      "source": "assets/textures/generated/items/oak_sapling.png",
+      "source": "items/oak_sapling.png",
       "source_kind": "generated",
       "x": 7,
       "y": 13
@@ -1158,7 +1160,7 @@
     "obsidian": {
       "generator": "block_item_icon",
       "index": 118,
-      "source": "assets/textures/generated/items/obsidian.png",
+      "source": "items/obsidian.png",
       "source_kind": "generated",
       "x": 6,
       "y": 14
@@ -1166,7 +1168,7 @@
     "ochre_terracotta": {
       "generator": "block_item_icon",
       "index": 217,
-      "source": "assets/textures/generated/items/ochre_terracotta.png",
+      "source": "items/ochre_terracotta.png",
       "source_kind": "generated",
       "x": 1,
       "y": 27
@@ -1174,7 +1176,7 @@
     "oxeye_daisy": {
       "generator": "block_item_icon",
       "index": 122,
-      "source": "assets/textures/generated/items/oxeye_daisy.png",
+      "source": "items/oxeye_daisy.png",
       "source_kind": "generated",
       "x": 2,
       "y": 15
@@ -1182,7 +1184,7 @@
     "packed_ice": {
       "generator": "block_item_icon",
       "index": 141,
-      "source": "assets/textures/generated/items/packed_ice.png",
+      "source": "items/packed_ice.png",
       "source_kind": "generated",
       "x": 5,
       "y": 17
@@ -1190,7 +1192,7 @@
     "peat": {
       "generator": "block_item_icon",
       "index": 210,
-      "source": "assets/textures/generated/items/peat.png",
+      "source": "items/peat.png",
       "source_kind": "generated",
       "x": 2,
       "y": 26
@@ -1198,7 +1200,7 @@
     "permafrost": {
       "generator": "block_item_icon",
       "index": 213,
-      "source": "assets/textures/generated/items/permafrost.png",
+      "source": "items/permafrost.png",
       "source_kind": "generated",
       "x": 5,
       "y": 26
@@ -1206,7 +1208,7 @@
     "pig_spawn_egg": {
       "generator": "item_sprite",
       "index": 127,
-      "source": "assets/textures/generated/items/pig_spawn_egg.png",
+      "source": "items/pig_spawn_egg.png",
       "source_kind": "generated",
       "x": 7,
       "y": 15
@@ -1214,7 +1216,7 @@
     "podzol": {
       "generator": "block_item_icon",
       "index": 52,
-      "source": "assets/textures/generated/items/podzol.png",
+      "source": "items/podzol.png",
       "source_kind": "generated",
       "x": 4,
       "y": 6
@@ -1222,7 +1224,7 @@
     "pointed_dripstone": {
       "generator": "block_item_icon",
       "index": 155,
-      "source": "assets/textures/generated/items/pointed_dripstone.png",
+      "source": "items/pointed_dripstone.png",
       "source_kind": "generated",
       "x": 3,
       "y": 19
@@ -1230,7 +1232,7 @@
     "polished_basalt": {
       "generator": "block_item_icon",
       "index": 188,
-      "source": "assets/textures/generated/items/polished_basalt.png",
+      "source": "items/polished_basalt.png",
       "source_kind": "generated",
       "x": 4,
       "y": 23
@@ -1238,7 +1240,7 @@
     "polished_granite": {
       "generator": "block_item_icon",
       "index": 187,
-      "source": "assets/textures/generated/items/polished_granite.png",
+      "source": "items/polished_granite.png",
       "source_kind": "generated",
       "x": 3,
       "y": 23
@@ -1246,7 +1248,7 @@
     "polished_limestone": {
       "generator": "block_item_icon",
       "index": 189,
-      "source": "assets/textures/generated/items/polished_limestone.png",
+      "source": "items/polished_limestone.png",
       "source_kind": "generated",
       "x": 5,
       "y": 23
@@ -1254,7 +1256,7 @@
     "polished_tuff": {
       "generator": "block_item_icon",
       "index": 190,
-      "source": "assets/textures/generated/items/polished_tuff.png",
+      "source": "items/polished_tuff.png",
       "source_kind": "generated",
       "x": 6,
       "y": 23
@@ -1262,7 +1264,7 @@
     "poppy": {
       "generator": "block_item_icon",
       "index": 55,
-      "source": "assets/textures/generated/items/poppy.png",
+      "source": "items/poppy.png",
       "source_kind": "generated",
       "x": 7,
       "y": 6
@@ -1270,7 +1272,7 @@
     "raw_beef": {
       "generator": "item_sprite",
       "index": 75,
-      "source": "assets/textures/generated/items/raw_beef.png",
+      "source": "items/raw_beef.png",
       "source_kind": "generated",
       "x": 3,
       "y": 9
@@ -1278,7 +1280,7 @@
     "raw_chicken": {
       "generator": "item_sprite",
       "index": 79,
-      "source": "assets/textures/generated/items/raw_chicken.png",
+      "source": "items/raw_chicken.png",
       "source_kind": "generated",
       "x": 7,
       "y": 9
@@ -1286,7 +1288,7 @@
     "raw_gold": {
       "generator": "item_sprite",
       "index": 66,
-      "source": "assets/textures/generated/items/raw_gold.png",
+      "source": "items/raw_gold.png",
       "source_kind": "generated",
       "x": 2,
       "y": 8
@@ -1294,7 +1296,7 @@
     "raw_iron": {
       "generator": "item_sprite",
       "index": 65,
-      "source": "assets/textures/generated/items/raw_iron.png",
+      "source": "items/raw_iron.png",
       "source_kind": "generated",
       "x": 1,
       "y": 8
@@ -1302,7 +1304,7 @@
     "raw_mutton": {
       "generator": "item_sprite",
       "index": 81,
-      "source": "assets/textures/generated/items/raw_mutton.png",
+      "source": "items/raw_mutton.png",
       "source_kind": "generated",
       "x": 1,
       "y": 10
@@ -1310,7 +1312,7 @@
     "raw_porkchop": {
       "generator": "item_sprite",
       "index": 77,
-      "source": "assets/textures/generated/items/raw_porkchop.png",
+      "source": "items/raw_porkchop.png",
       "source_kind": "generated",
       "x": 5,
       "y": 9
@@ -1318,7 +1320,7 @@
     "red_dye": {
       "generator": "item_sprite",
       "index": 202,
-      "source": "assets/textures/generated/items/red_dye.png",
+      "source": "items/red_dye.png",
       "source_kind": "generated",
       "x": 2,
       "y": 25
@@ -1326,7 +1328,7 @@
     "red_mushroom": {
       "generator": "block_item_icon",
       "index": 225,
-      "source": "assets/textures/generated/items/red_mushroom.png",
+      "source": "items/red_mushroom.png",
       "source_kind": "generated",
       "x": 1,
       "y": 28
@@ -1334,7 +1336,7 @@
     "red_sand": {
       "generator": "block_item_icon",
       "index": 50,
-      "source": "assets/textures/generated/items/red_sand.png",
+      "source": "items/red_sand.png",
       "source_kind": "generated",
       "x": 2,
       "y": 6
@@ -1342,7 +1344,7 @@
     "red_sandstone": {
       "generator": "block_item_icon",
       "index": 216,
-      "source": "assets/textures/generated/items/red_sandstone.png",
+      "source": "items/red_sandstone.png",
       "source_kind": "generated",
       "x": 0,
       "y": 27
@@ -1350,7 +1352,7 @@
     "red_wool": {
       "generator": "block_item_icon",
       "index": 195,
-      "source": "assets/textures/generated/items/red_wool.png",
+      "source": "items/red_wool.png",
       "source_kind": "generated",
       "x": 3,
       "y": 24
@@ -1358,7 +1360,7 @@
     "reeds": {
       "generator": "block_item_icon",
       "index": 56,
-      "source": "assets/textures/generated/items/reeds.png",
+      "source": "items/reeds.png",
       "source_kind": "generated",
       "x": 0,
       "y": 7
@@ -1366,7 +1368,7 @@
     "resonant_crystal": {
       "generator": "block_item_icon",
       "index": 159,
-      "source": "assets/textures/generated/items/resonant_crystal.png",
+      "source": "items/resonant_crystal.png",
       "source_kind": "generated",
       "x": 7,
       "y": 19
@@ -1374,7 +1376,7 @@
     "rooted_dirt": {
       "generator": "block_item_icon",
       "index": 208,
-      "source": "assets/textures/generated/items/rooted_dirt.png",
+      "source": "items/rooted_dirt.png",
       "source_kind": "generated",
       "x": 0,
       "y": 26
@@ -1382,7 +1384,7 @@
     "rotten_flesh": {
       "generator": "item_sprite",
       "index": 83,
-      "source": "assets/textures/generated/items/rotten_flesh.png",
+      "source": "items/rotten_flesh.png",
       "source_kind": "generated",
       "x": 3,
       "y": 10
@@ -1390,7 +1392,7 @@
     "sand": {
       "generator": "block_item_icon",
       "index": 36,
-      "source": "assets/textures/generated/items/sand.png",
+      "source": "items/sand.png",
       "source_kind": "generated",
       "x": 4,
       "y": 4
@@ -1398,7 +1400,7 @@
     "sandstone": {
       "generator": "block_item_icon",
       "index": 192,
-      "source": "assets/textures/generated/items/sandstone.png",
+      "source": "items/sandstone.png",
       "source_kind": "generated",
       "x": 0,
       "y": 24
@@ -1406,7 +1408,7 @@
     "shale": {
       "generator": "block_item_icon",
       "index": 215,
-      "source": "assets/textures/generated/items/shale.png",
+      "source": "items/shale.png",
       "source_kind": "generated",
       "x": 7,
       "y": 26
@@ -1414,7 +1416,7 @@
     "sheep_spawn_egg": {
       "generator": "item_sprite",
       "index": 128,
-      "source": "assets/textures/generated/items/sheep_spawn_egg.png",
+      "source": "items/sheep_spawn_egg.png",
       "source_kind": "generated",
       "x": 0,
       "y": 16
@@ -1422,7 +1424,7 @@
     "shield": {
       "generator": "item_sprite",
       "index": 93,
-      "source": "assets/textures/generated/items/shield.png",
+      "source": "items/shield.png",
       "source_kind": "generated",
       "x": 5,
       "y": 11
@@ -1430,7 +1432,7 @@
     "silt": {
       "generator": "block_item_icon",
       "index": 211,
-      "source": "assets/textures/generated/items/silt.png",
+      "source": "items/silt.png",
       "source_kind": "generated",
       "x": 3,
       "y": 26
@@ -1438,7 +1440,7 @@
     "skeleton_spawn_egg": {
       "generator": "item_sprite",
       "index": 131,
-      "source": "assets/textures/generated/items/skeleton_spawn_egg.png",
+      "source": "items/skeleton_spawn_egg.png",
       "source_kind": "generated",
       "x": 3,
       "y": 16
@@ -1446,7 +1448,7 @@
     "skyroot_leaves": {
       "generator": "block_item_icon",
       "index": 149,
-      "source": "assets/textures/generated/items/skyroot_leaves.png",
+      "source": "items/skyroot_leaves.png",
       "source_kind": "generated",
       "x": 5,
       "y": 18
@@ -1454,7 +1456,7 @@
     "skyroot_log": {
       "generator": "block_item_icon",
       "index": 148,
-      "source": "assets/textures/generated/items/skyroot_log.png",
+      "source": "items/skyroot_log.png",
       "source_kind": "generated",
       "x": 4,
       "y": 18
@@ -1462,7 +1464,7 @@
     "smithing_table": {
       "generator": "block_item_icon",
       "index": 169,
-      "source": "assets/textures/generated/items/smithing_table.png",
+      "source": "items/smithing_table.png",
       "source_kind": "generated",
       "x": 1,
       "y": 21
@@ -1470,7 +1472,7 @@
     "smooth_sandstone": {
       "generator": "block_item_icon",
       "index": 194,
-      "source": "assets/textures/generated/items/smooth_sandstone.png",
+      "source": "items/smooth_sandstone.png",
       "source_kind": "generated",
       "x": 2,
       "y": 24
@@ -1478,7 +1480,7 @@
     "snow": {
       "generator": "block_item_icon",
       "index": 39,
-      "source": "assets/textures/generated/items/snow.png",
+      "source": "items/snow.png",
       "source_kind": "generated",
       "x": 7,
       "y": 4
@@ -1486,7 +1488,7 @@
     "spider_spawn_egg": {
       "generator": "item_sprite",
       "index": 132,
-      "source": "assets/textures/generated/items/spider_spawn_egg.png",
+      "source": "items/spider_spawn_egg.png",
       "source_kind": "generated",
       "x": 4,
       "y": 16
@@ -1494,7 +1496,7 @@
     "spruce_leaves": {
       "generator": "block_item_icon",
       "index": 60,
-      "source": "assets/textures/generated/items/spruce_leaves.png",
+      "source": "items/spruce_leaves.png",
       "source_kind": "generated",
       "x": 4,
       "y": 7
@@ -1502,7 +1504,7 @@
     "spruce_log": {
       "generator": "block_item_icon",
       "index": 59,
-      "source": "assets/textures/generated/items/spruce_log.png",
+      "source": "items/spruce_log.png",
       "source_kind": "generated",
       "x": 3,
       "y": 7
@@ -1510,7 +1512,7 @@
     "spruce_sapling": {
       "generator": "block_item_icon",
       "index": 113,
-      "source": "assets/textures/generated/items/spruce_sapling.png",
+      "source": "items/spruce_sapling.png",
       "source_kind": "generated",
       "x": 1,
       "y": 14
@@ -1518,7 +1520,7 @@
     "star_crystal": {
       "generator": "block_item_icon",
       "index": 150,
-      "source": "assets/textures/generated/items/star_crystal.png",
+      "source": "items/star_crystal.png",
       "source_kind": "generated",
       "x": 6,
       "y": 18
@@ -1526,7 +1528,7 @@
     "starflower": {
       "generator": "block_item_icon",
       "index": 151,
-      "source": "assets/textures/generated/items/starflower.png",
+      "source": "items/starflower.png",
       "source_kind": "generated",
       "x": 7,
       "y": 18
@@ -1534,7 +1536,7 @@
     "starstep_scepter": {
       "generator": "item_sprite",
       "index": 181,
-      "source": "assets/textures/generated/items/starstep_scepter.png",
+      "source": "items/starstep_scepter.png",
       "source_kind": "generated",
       "x": 5,
       "y": 22
@@ -1542,7 +1544,7 @@
     "steak": {
       "generator": "item_sprite",
       "index": 76,
-      "source": "assets/textures/generated/items/steak.png",
+      "source": "items/steak.png",
       "source_kind": "generated",
       "x": 4,
       "y": 9
@@ -1550,7 +1552,7 @@
     "stick": {
       "generator": "item_sprite",
       "index": 9,
-      "source": "assets/textures/generated/items/stick.png",
+      "source": "items/stick.png",
       "source_kind": "generated",
       "x": 1,
       "y": 1
@@ -1558,7 +1560,7 @@
     "stone": {
       "generator": "block_item_icon",
       "index": 2,
-      "source": "assets/textures/generated/items/stone.png",
+      "source": "items/stone.png",
       "source_kind": "generated",
       "x": 2,
       "y": 0
@@ -1566,7 +1568,7 @@
     "stone_axe": {
       "generator": "item_sprite",
       "index": 21,
-      "source": "assets/textures/generated/items/stone_axe.png",
+      "source": "items/stone_axe.png",
       "source_kind": "generated",
       "x": 5,
       "y": 2
@@ -1574,7 +1576,7 @@
     "stone_bricks": {
       "generator": "block_item_icon",
       "index": 182,
-      "source": "assets/textures/generated/items/stone_bricks.png",
+      "source": "items/stone_bricks.png",
       "source_kind": "generated",
       "x": 6,
       "y": 22
@@ -1582,7 +1584,7 @@
     "stone_hoe": {
       "generator": "item_sprite",
       "index": 23,
-      "source": "assets/textures/generated/items/stone_hoe.png",
+      "source": "items/stone_hoe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 2
@@ -1590,7 +1592,7 @@
     "stone_pickaxe": {
       "generator": "item_sprite",
       "index": 20,
-      "source": "assets/textures/generated/items/stone_pickaxe.png",
+      "source": "items/stone_pickaxe.png",
       "source_kind": "generated",
       "x": 4,
       "y": 2
@@ -1598,7 +1600,7 @@
     "stone_shovel": {
       "generator": "item_sprite",
       "index": 22,
-      "source": "assets/textures/generated/items/stone_shovel.png",
+      "source": "items/stone_shovel.png",
       "source_kind": "generated",
       "x": 6,
       "y": 2
@@ -1606,7 +1608,7 @@
     "stone_sword": {
       "generator": "item_sprite",
       "index": 24,
-      "source": "assets/textures/generated/items/stone_sword.png",
+      "source": "items/stone_sword.png",
       "source_kind": "generated",
       "x": 0,
       "y": 3
@@ -1614,7 +1616,7 @@
     "string": {
       "generator": "item_sprite",
       "index": 67,
-      "source": "assets/textures/generated/items/string.png",
+      "source": "items/string.png",
       "source_kind": "generated",
       "x": 3,
       "y": 8
@@ -1622,7 +1624,7 @@
     "sulfur_crust": {
       "generator": "block_item_icon",
       "index": 160,
-      "source": "assets/textures/generated/items/sulfur_crust.png",
+      "source": "items/sulfur_crust.png",
       "source_kind": "generated",
       "x": 0,
       "y": 20
@@ -1630,7 +1632,7 @@
     "sunflower": {
       "generator": "block_item_icon",
       "index": 123,
-      "source": "assets/textures/generated/items/sunflower.png",
+      "source": "items/sunflower.png",
       "source_kind": "generated",
       "x": 3,
       "y": 15
@@ -1638,7 +1640,7 @@
     "sunstone": {
       "generator": "block_item_icon",
       "index": 147,
-      "source": "assets/textures/generated/items/sunstone.png",
+      "source": "items/sunstone.png",
       "source_kind": "generated",
       "x": 3,
       "y": 18
@@ -1646,7 +1648,7 @@
     "sunstone_slab": {
       "generator": "block_item_icon",
       "index": 177,
-      "source": "assets/textures/generated/items/sunstone_slab.png",
+      "source": "items/sunstone_slab.png",
       "source_kind": "generated",
       "x": 1,
       "y": 22
@@ -1654,7 +1656,7 @@
     "sunstone_stairs": {
       "generator": "block_item_icon",
       "index": 178,
-      "source": "assets/textures/generated/items/sunstone_stairs.png",
+      "source": "items/sunstone_stairs.png",
       "source_kind": "generated",
       "x": 2,
       "y": 22
@@ -1662,7 +1664,7 @@
     "tall_grass": {
       "generator": "block_item_icon",
       "index": 54,
-      "source": "assets/textures/generated/items/tall_grass.png",
+      "source": "items/tall_grass.png",
       "source_kind": "generated",
       "x": 6,
       "y": 6
@@ -1670,7 +1672,7 @@
     "terracotta": {
       "generator": "block_item_icon",
       "index": 51,
-      "source": "assets/textures/generated/items/terracotta.png",
+      "source": "items/terracotta.png",
       "source_kind": "generated",
       "x": 3,
       "y": 6
@@ -1678,7 +1680,7 @@
     "terracotta_slab": {
       "generator": "block_item_icon",
       "index": 175,
-      "source": "assets/textures/generated/items/terracotta_slab.png",
+      "source": "items/terracotta_slab.png",
       "source_kind": "generated",
       "x": 7,
       "y": 21
@@ -1686,7 +1688,7 @@
     "terracotta_stairs": {
       "generator": "block_item_icon",
       "index": 176,
-      "source": "assets/textures/generated/items/terracotta_stairs.png",
+      "source": "items/terracotta_stairs.png",
       "source_kind": "generated",
       "x": 0,
       "y": 22
@@ -1694,7 +1696,7 @@
     "tnt": {
       "generator": "block_item_icon",
       "index": 117,
-      "source": "assets/textures/generated/items/tnt.png",
+      "source": "items/tnt.png",
       "source_kind": "generated",
       "x": 5,
       "y": 14
@@ -1702,7 +1704,7 @@
     "torch": {
       "generator": "item_sprite",
       "index": 14,
-      "source": "assets/textures/generated/items/torch.png",
+      "source": "items/torch.png",
       "source_kind": "generated",
       "x": 6,
       "y": 1
@@ -1710,7 +1712,7 @@
     "tropical_flower": {
       "generator": "block_item_icon",
       "index": 229,
-      "source": "assets/textures/generated/items/tropical_flower.png",
+      "source": "items/tropical_flower.png",
       "source_kind": "generated",
       "x": 5,
       "y": 28
@@ -1718,7 +1720,7 @@
     "tuff": {
       "generator": "block_item_icon",
       "index": 138,
-      "source": "assets/textures/generated/items/tuff.png",
+      "source": "items/tuff.png",
       "source_kind": "generated",
       "x": 2,
       "y": 17
@@ -1726,7 +1728,7 @@
     "villager_spawn_egg": {
       "generator": "item_sprite",
       "index": 134,
-      "source": "assets/textures/generated/items/villager_spawn_egg.png",
+      "source": "items/villager_spawn_egg.png",
       "source_kind": "generated",
       "x": 6,
       "y": 16
@@ -1734,7 +1736,7 @@
     "volcanic_ash": {
       "generator": "block_item_icon",
       "index": 219,
-      "source": "assets/textures/generated/items/volcanic_ash.png",
+      "source": "items/volcanic_ash.png",
       "source_kind": "generated",
       "x": 3,
       "y": 27
@@ -1742,7 +1744,7 @@
     "water": {
       "generator": "block_item_icon",
       "index": 38,
-      "source": "assets/textures/generated/items/water.png",
+      "source": "items/water.png",
       "source_kind": "generated",
       "x": 6,
       "y": 4
@@ -1750,7 +1752,7 @@
     "wheat": {
       "generator": "item_sprite",
       "index": 73,
-      "source": "assets/textures/generated/items/wheat.png",
+      "source": "items/wheat.png",
       "source_kind": "generated",
       "x": 1,
       "y": 9
@@ -1758,7 +1760,7 @@
     "wheat_seeds": {
       "generator": "item_sprite",
       "index": 72,
-      "source": "assets/textures/generated/items/wheat_seeds.png",
+      "source": "items/wheat_seeds.png",
       "source_kind": "generated",
       "x": 0,
       "y": 9
@@ -1766,7 +1768,7 @@
     "white_bed": {
       "generator": "block_item_icon",
       "index": 85,
-      "source": "assets/textures/generated/items/white_bed.png",
+      "source": "items/white_bed.png",
       "source_kind": "generated",
       "x": 5,
       "y": 10
@@ -1774,7 +1776,7 @@
     "white_terracotta": {
       "generator": "block_item_icon",
       "index": 218,
-      "source": "assets/textures/generated/items/white_terracotta.png",
+      "source": "items/white_terracotta.png",
       "source_kind": "generated",
       "x": 2,
       "y": 27
@@ -1782,7 +1784,7 @@
     "white_wool": {
       "generator": "block_item_icon",
       "index": 84,
-      "source": "assets/textures/generated/items/white_wool.png",
+      "source": "items/white_wool.png",
       "source_kind": "generated",
       "x": 4,
       "y": 10
@@ -1790,7 +1792,7 @@
     "wooden_axe": {
       "generator": "item_sprite",
       "index": 16,
-      "source": "assets/textures/generated/items/wooden_axe.png",
+      "source": "items/wooden_axe.png",
       "source_kind": "generated",
       "x": 0,
       "y": 2
@@ -1798,7 +1800,7 @@
     "wooden_hoe": {
       "generator": "item_sprite",
       "index": 18,
-      "source": "assets/textures/generated/items/wooden_hoe.png",
+      "source": "items/wooden_hoe.png",
       "source_kind": "generated",
       "x": 2,
       "y": 2
@@ -1806,7 +1808,7 @@
     "wooden_pickaxe": {
       "generator": "item_sprite",
       "index": 15,
-      "source": "assets/textures/generated/items/wooden_pickaxe.png",
+      "source": "items/wooden_pickaxe.png",
       "source_kind": "generated",
       "x": 7,
       "y": 1
@@ -1814,7 +1816,7 @@
     "wooden_shovel": {
       "generator": "item_sprite",
       "index": 17,
-      "source": "assets/textures/generated/items/wooden_shovel.png",
+      "source": "items/wooden_shovel.png",
       "source_kind": "generated",
       "x": 1,
       "y": 2
@@ -1822,7 +1824,7 @@
     "wooden_sword": {
       "generator": "item_sprite",
       "index": 19,
-      "source": "assets/textures/generated/items/wooden_sword.png",
+      "source": "items/wooden_sword.png",
       "source_kind": "generated",
       "x": 3,
       "y": 2
@@ -1830,7 +1832,7 @@
     "yellow_dye": {
       "generator": "item_sprite",
       "index": 203,
-      "source": "assets/textures/generated/items/yellow_dye.png",
+      "source": "items/yellow_dye.png",
       "source_kind": "generated",
       "x": 3,
       "y": 25
@@ -1838,7 +1840,7 @@
     "yellow_wool": {
       "generator": "block_item_icon",
       "index": 196,
-      "source": "assets/textures/generated/items/yellow_wool.png",
+      "source": "items/yellow_wool.png",
       "source_kind": "generated",
       "x": 4,
       "y": 24
@@ -1846,7 +1848,7 @@
     "zombie_spawn_egg": {
       "generator": "item_sprite",
       "index": 130,
-      "source": "assets/textures/generated/items/zombie_spawn_egg.png",
+      "source": "items/zombie_spawn_egg.png",
       "source_kind": "generated",
       "x": 2,
       "y": 16
@@ -1854,7 +1856,7 @@
     "zombie_villager_spawn_egg": {
       "generator": "item_sprite",
       "index": 135,
-      "source": "assets/textures/generated/items/zombie_villager_spawn_egg.png",
+      "source": "items/zombie_villager_spawn_egg.png",
       "source_kind": "generated",
       "x": 7,
       "y": 16

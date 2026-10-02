@@ -9,14 +9,18 @@ MinecraftC separates authored, generated, imported, and declarative assets:
 - `assets/textures/third_party/` contains imported packs with their licenses.
 - `assets/textures/definitions/` contains JSON block, item, texture, style, and
   entity-material definitions. The default generated style is
-  `bright-comfortable` (generator version 3); it uses dependency-free
+  `bright-comfortable` (generator version 4); it uses dependency-free
   OKLab/OKLCH role palettes and keeps the runtime tile contracts unchanged.
 
 The client loads `atlas.json`, `blocks.json`, and `items.json` before chunk
 meshing. Logical material names are converted to atlas slots from metadata;
-block faces come from `blocks.json`. Existing source images and procedural
-tiles remain compatibility fallbacks when generated files or definitions are
-missing. The runtime atlas still builds per-tile mip levels to prevent bleeding.
+block faces come from `blocks.json`. Missing logical definitions retain the
+compiled face/material mappings. Rendering requires a valid generated albedo
+atlas; legacy atlases without semantic map declarations use runtime material-map
+synthesis. Authored/imported source images retain their provenance and are not
+silently substituted for malformed declared assets. The runtime atlas builds per-tile mip levels in linear light with alpha weighting
+and leaf coverage preservation. The v4 block atlas packs 188 materials into a
+14×14 grid (224×224); logical indices retain their existing order.
 Every registered `BlockTexture` now has a generated PNG loaded by its logical
 metadata name. Older authored and runtime-procedural tiles are fallback-only.
 
@@ -73,11 +77,15 @@ These development files are not
 part of `atlas.png` or `atlas.json`. `--preview` additionally emits
 `block_preview.png` (tile, repeat, grass/structure board, and noon/dusk/cave
 lighting samples), `items_contact_sheet.png`, `entity_contact_sheet.png`,
-`entity_semantic_preview.png`, and `visual_report.json`. The report contains
+`entity_semantic_preview.png`, `mip_preview.png`, and `visual_report.json`. The report contains
 OKLab lightness/chroma percentiles, role palettes, binary-alpha coverage,
 edge/seam/periodicity metrics, and family structure-correlation summaries;
 CMake exposes the same operation as
 `cmake --build build-local --target texture_preview`.
+Block and mip previews read the final PNGs, including effective local seeds;
+`generation.json` and atlas metadata record effective seeds and pixel SHA-256.
+Atlas assembly rejects mismatched global-seed provenance. Comparison reports
+cover all materials; `texture_review.py --all-materials` writes paginated boards.
 
 ## Item icons
 
@@ -102,8 +110,11 @@ is packed without resampling. Metadata and runtime use nearest filtering.
 composes an isometric inventory cube without changing block tiles, seamless
 validation, or the existing block atlas format.
 
-Selection order is an authored PNG in `source/items/`, the automatic icon, a
-PNG in `legacy/items/`, then the missing-resource/existing runtime icon.
+Selection starts with an authored PNG in `source/items/`, then automatic generation.
+Invalid authored images or failed generation are errors by default. Explicit
+`--allow-item-fallback` permits a legacy PNG and then a visible missing-resource
+checker, records the generation error in metadata, and validates legacy images.
+Imported overrides are copied into final `items/` so review and runtime agree.
 `items_atlas.json` records source kind, generator category, tile index, grid
 dimensions, and this priority. Items absent from the atlas retain the old path.
 
@@ -162,10 +173,10 @@ to reproduce all ten runtime GLBs. `python3 tests/test_entity_models.py`
 performs byte-for-byte regeneration plus the skin, animation, vertex semantic,
 embedded PNG, and nearest-sampler contract checks.
 
-## Generator v3: clean natural pixel art
+## Generator v4: semantic material pipeline
 
 The `bright-comfortable` style keeps its identifier and advances the generator
-revision to 3. Definition format versions and serialized game IDs are unchanged.
+revision to 4. Definition format versions and serialized game IDs are unchanged.
 Absolute thresholds from `style.json` preserve middle-color planes; material
 features supply sparse connected accents instead of rank-equalized noise.
 Periodic tiles may be translated as a whole to put the repeat cut at ordinary
@@ -195,7 +206,7 @@ The review tool writes native/4x/3x3 repeat comparisons, per-face functional
 sheets, all item/entity sheets, and quantitative lightness, neighbor-difference
 and dark-pixel statistics. Previews do not change runtime resources. Approximated
 lighting previews supplement actual Vulkan checks; they do not simulate the
-complete renderer. No global exposure or lighting change is part of v3.
+complete renderer. No global exposure change is part of v4.
 
 ### Leaf cutout minification
 
@@ -212,5 +223,43 @@ interior foliage from the visible leaf clusters without adding noise.
 Transparent-mode sampling and scene lighting are unchanged. `asset_definition_tests` checks the actual runtime mip data.
 
 The follow-up art pass restores modest grass/stone/wood/leaf complexity after
-the initial v3 simplification. In-world visual acceptance is performed by the
-user; automated validation views generated material sheets only.
+the initial v3 simplification. Visual validation uses the final generated sheets and a real Vulkan startup after implementation and automated checks.
+
+## V4 effective configuration and semantic maps
+
+Generation requires valid repository definitions and reports malformed/missing
+JSON instead of silently falling back. `style.json` global brightness, contrast,
+saturation, temperature, shadow/highlight limits and every semantic palette role
+are effective controls. Item material RGB arrays supply the palette anchor;
+`palette_processing` controls shadow floor and chroma. `textures.json` family
+`field_gain`, `radius_scale`, and `anchor_scale` control periodic fields.
+Descriptive feature/shape lists are explicitly under `documentation`; they are
+not promised executable art programs. Material names use all UTF-8 bytes in a
+stable FNV-1a/avalanche domain. New output belongs to generator v4, independently
+of world generation/save versions.
+
+`material_profiles.json` specifies family geometry patterns, height strength,
+roughness, metallic fraction and emission, with per-material overrides. Atlas
+assembly writes `atlas_height.png`, `atlas_normal.png`, and `atlas_property.png`
+beside albedo. Height derives from semantic material roles, not RGB brightness;
+recoloring a role layout retains geometry. Air receives neutral normals and no
+emission. Property R/G/B/A is roughness/metallic/emission/height, in linear space.
+Normal green follows bottom-left runtime UVs while PNG rows remain top-left.
+The renderer loads declared maps strictly, flips each tile and generates
+independent normal/property mip levels (normal vectors renormalized). Legacy
+atlases without a map declaration retain runtime synthesis. Enhanced materials
+use mineral metallic response and colored self-emission; disabled material detail
+continues to use the existing path. World/GI light strength remains gameplay-owned.
+
+PNG import accepts non-interlaced RGB/RGBA/gray/gray-alpha/indexed images, all
+five PNG filters, 8-bit channels and 1/2/4-bit gray/indexed data, including tRNS.
+CRC, chunk boundaries, decompressed length and dimensions are checked. All icon
+sources must be exactly 16×16 with bounded binary alpha and nonempty contents.
+16-bit/interlaced input reports an explicit unsupported-format error.
+
+QA retains the 2.60 seam threshold, adding separate axis metrics for OKLab color
+and alpha. Directional turf caps wrap horizontally; upright sprites retain their
+orientation. Periodic-origin selection translates the whole tile without copying
+borders or changing connected clusters. Regression checks cover 36 seeds across
+all 188 materials, malformed/imported PNGs, authorable knobs, provenance, compact
+packing, color-independent geometry, linear-light mip values and leaf coverage.

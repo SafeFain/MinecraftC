@@ -7,10 +7,35 @@ from pathlib import Path
 import texture_generator as tg
 
 
-def compare(before, after, output):
+def compare(before, after, output, all_materials=False):
     output.mkdir(parents=True, exist_ok=True)
     names=("grass_top", "dirt", "stone", "sand", "oak_planks", "deepslate", "obsidian")
-    report={"generator_version":tg.GENERATOR_VERSION,"textures":{}}
+    report={"generator_version":tg.GENERATOR_VERSION,"textures":{},"all_materials":{}}
+    for name in tg.NAMES:
+        entry={}
+        for label,directory in (("before",before),("after",after)):
+            path=directory/f"{name}.png"
+            if path.exists():
+                pixels=tg.read_generated_png(path)[2]
+                entry[label]=dict(tg._visual_color_stats(pixels),seams=tg.seam_metrics(pixels),
+                                  mips=[dict(tg._visual_color_stats(tile),tile_size=size)
+                                        for size,tile in tg.tile_mip_chain(pixels,name in tg.LEAF_NAMES)])
+        report["all_materials"][name]=entry
+    if all_materials:
+        # Paginate rather than creating a 30,000-pixel vertical image.
+        for page,start in enumerate(range(0,len(tg.NAMES),16)):
+            width=1024;cell_w=256;cell_h=110
+            canvas=[(33,36,39,255)]*(width*cell_h*4)
+            for i,name in enumerate(tg.NAMES[start:start+16]):
+                x=(i%4)*cell_w;y=(i//4)*cell_h
+                tg.draw_text(canvas,width,x+3,y+3,name[:34])
+                for col,(label,directory) in enumerate((("before",before),("after",after))):
+                    pixels=tg.read_generated_png(directory/f"{name}.png")[2]
+                    tg.draw_text(canvas,width,x+col*124+3,y+16,label)
+                    tg.blit(canvas,width,x+col*124+3,y+30,pixels,16,16,3)
+                    for ry in range(3):
+                        for rx in range(3):tg.blit(canvas,width,x+col*124+59+rx*16,y+30+ry*16,pixels,16,16)
+            tg.write_png(output/f"comparison_page_{page}.png",width,cell_h*4,canvas)
     width=680
     canvas=[(33,36,39,255)]*(width*len(names)*165)
     for row,name in enumerate(names):
@@ -60,9 +85,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--before",type=Path,required=True)
     parser.add_argument("--after",type=Path,default=Path("assets/textures/generated"))
+    parser.add_argument("--all-materials",action="store_true")
     parser.add_argument("--output",type=Path,default=Path("build-local/texture-review"))
     args=parser.parse_args()
-    compare(args.before,args.after,args.output)
+    compare(args.before,args.after,args.output,args.all_materials)
 
 
 if __name__=="__main__":

@@ -23,6 +23,49 @@ int main() {
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");
+    require(atlas.tilesPerSide == 14 && atlas.texture.width == 224,
+            "v4 atlas must use a compact grid while retaining logical slots");
+    require(atlas.normalTexture.format == TextureFormat::Rgba8Unorm &&
+            atlas.propertyTexture.format == TextureFormat::Rgba8Unorm &&
+            atlas.normalTexture.mipLevels.size() == 4 && atlas.propertyTexture.mipLevels.size() == 4,
+            "semantic material maps require linear formats and tile-local mips");
+    const auto propertyAt = [&](BlockTexture texture, uint32_t x, uint32_t y, int channel) {
+        const uint32_t slot = getAtlasTextureIndex(texture);
+        const size_t offset = ((slot / atlas.tilesPerSide * 16u + y) * atlas.texture.width +
+                               slot % atlas.tilesPerSide * 16u + x) * 4u;
+        return atlas.propertyTexture.pixels[offset + channel];
+    };
+    require(propertyAt(BlockTexture::BlueIce, 8, 8, 0) <
+            propertyAt(BlockTexture::Shale, 8, 8, 0),
+            "ice and rock must retain semantic roughness differences");
+    require(propertyAt(BlockTexture::SkyrootLeaves, 8, 8, 0) > 220,
+            "skyroot foliage must use foliage roughness");
+    require(propertyAt(BlockTexture::StarCrystal, 8, 8, 2) > 0 &&
+            propertyAt(BlockTexture::Stone, 8, 8, 2) == 0,
+            "semantic emission leaked into non-emissive material");
+    // Check every first-level color sample against independent linear-light,
+    // alpha-weighted reference math. This also tests all atlas row boundaries.
+    const auto& firstMip = atlas.texture.mipLevels.front();
+    for (uint32_t y = 0; y < firstMip.height; ++y) for (uint32_t x = 0; x < firstMip.width; ++x) {
+        float sum[3]{};
+        int alpha = 0;
+        for (uint32_t dy = 0; dy < 2; ++dy) for (uint32_t dx = 0; dx < 2; ++dx) {
+            const size_t source = ((size_t(y) * 2u + dy) * atlas.texture.width + x * 2u + dx) * 4u;
+            const int a = atlas.texture.pixels[source + 3];
+            alpha += a;
+            for (int c = 0; c < 3; ++c)
+                sum[c] += voxelGiSrgbToLinear(atlas.texture.pixels[source + c] / 255.0f) * a;
+        }
+        if (!alpha) continue;
+        for (int c = 0; c < 3; ++c) {
+            const float linear = sum[c] / alpha;
+            const float encoded = linear <= .0031308f ? linear * 12.92f :
+                1.055f * std::pow(linear, 1.0f / 2.4f) - .055f;
+            const int expected = static_cast<int>(std::lround(encoded * 255.0f));
+            require(std::abs(int(firstMip.pixels[(size_t(y) * firstMip.width + x) * 4u + c]) - expected) <= 1,
+                    "color mip used encoded RGB averaging or crossed a tile boundary");
+        }
+    }
     for (uint16_t raw = 183; raw <= 200; ++raw) {
         const auto block = static_cast<BlockId>(raw);
         const auto texture = getFaceTexture(block, FaceDir::TOP);

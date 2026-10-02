@@ -330,7 +330,9 @@ void main() {
             emission*=1.0+(0.08+0.04*sin(worldPosition.x*0.73+worldPosition.z*0.61))*
                 sin(environment.weatherParams.x*1.45+worldPosition.y*0.37)*
                 environment.visualParams.x;
-        illumination=max(illumination,vec3(2.15,0.72,0.16)*emission);
+        vec3 emissionTint=isLava?vec3(2.15,0.72,0.16):
+            texel.rgb/max(max(texel.r,texel.g),max(texel.b,0.001))*1.65;
+        illumination=max(illumination,emissionTint*emission);
     }
 
     float roughness=isWater?0.08:mix(properties.r,0.82,step(5.5,surfaceFace));
@@ -352,8 +354,9 @@ void main() {
         float distribution=alpha2/(3.14159265*denominator*denominator);
         float k=(roughness+1.0)*(roughness+1.0)*0.125;
         float geometry=(noV/(noV*(1.0-k)+k))*(noL/(noL*(1.0-k)+k));
-        float fresnel=0.04+(1.0-0.04)*pow(1.0-
-            voH,5.0);
+        float metallic=clamp(properties.g,0.0,1.0);
+        float baseReflectance=mix(0.04,0.32,metallic);
+        float fresnel=baseReflectance+(1.0-baseReflectance)*pow(1.0-voH,5.0);
         float pbrSpecular=distribution*geometry*fresnel/max(4.0*noV*noL,0.01);
         float legacyExponent=mix(128.0,10.0,roughness*roughness);
         float legacyFresnel=0.04+0.96*pow(1.0-noV,5.0);
@@ -361,7 +364,9 @@ void main() {
             mix(0.16,1.0,legacyFresnel)*(1.0-roughness*0.45);
         float specular=mix(legacySpecular,pbrSpecular,
             environment.visualParams.y);
-        illumination+=environment.directColorIntensity.rgb*specular*
+        vec3 specularTint=mix(vec3(1.0),texel.rgb/
+            max(max(texel.r,texel.g),max(texel.b,0.001)),metallic);
+        illumination+=environment.directColorIntensity.rgb*specular*specularTint*
             skyLight*visibility*(isWater?0.82:0.34);
         if(isWater&&environment.visualParams.x>0.001){
             float waterFresnel=pow(1.0-max(dot(normal,viewDir),0.0),3.0);

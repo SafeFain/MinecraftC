@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Deterministic pixel materials, semantic sprites, validator and atlas builder.
 
-V3 uses absolute field thresholds and sparse material features so quiet planes
-stay quiet. Functional blocks have explicit face art, tools have disjoint part
+V4 uses compact semantic material atlases, strict PNG import and configurable
+OKLCH palettes. Absolute field thresholds and sparse material features keep quiet
+planes quiet. Functional blocks have explicit face art, tools have disjoint part
 masks, and entity skins share their source with embedded GLB textures.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import struct
@@ -14,9 +16,11 @@ import sys
 import zlib
 from collections import Counter, deque
 from pathlib import Path
+from functools import lru_cache
+from texture_png import read_png
 
 SIZE = 16
-GENERATOR_VERSION = 3
+GENERATOR_VERSION = 4
 STYLE_ID = "bright-comfortable"
 # Selected from the deterministic contact-sheet candidates. CMake's asset
 # target relies on this default, so keep it aligned with committed atlas.json.
@@ -125,61 +129,80 @@ BIOME_PLANTS = ('fern', 'dead_bush', 'dry_grass', 'brown_mushroom', 'red_mushroo
 NAMES += list(BIOME_BASES) + list(BIOME_PLANTS) + ["dry_grass_side", "leaf_litter_side"]
 
 
-def _load_texture_families():
-    definition_path = Path(__file__).resolve().parents[1] / \
-        "assets/textures/definitions/textures.json"
+def _read_definition(path):
     try:
-        data = json.loads(definition_path.read_text(encoding="utf-8"))
-        if data.get("version") != 2 or data.get("style") != STYLE_ID:
-            raise ValueError("texture definitions do not match generator style")
-        families = data.get("families", {})
-        if any(name not in families for name in NAMES):
-            raise ValueError("texture definitions are missing a material family")
-        family_specs = data.get("family_specs", {})
-        if any(families[name] not in family_specs for name in NAMES):
-            raise ValueError("texture definitions are missing family specifications")
-        return {name: families[name] for name in NAMES}
-    except (OSError, ValueError, json.JSONDecodeError):
-        # Keep direct standalone use deterministic if the source tree is copied
-        # without definitions; the committed tree always takes the data path.
-        return {name: "constructed" for name in NAMES}
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValueError(f"cannot load definition {path}: {error}") from error
+    if not isinstance(data, dict):
+        raise ValueError(f"definition {path} must be an object")
+    return data
 
 
-TEXTURE_FAMILIES = _load_texture_families()
+DEFINITION_ROOT = Path(__file__).resolve().parents[1] / "assets/textures/definitions"
 
 
-def _load_style_definition():
-    definition_path = Path(__file__).resolve().parents[1] / \
-        "assets/textures/definitions/style.json"
-    try:
-        data = json.loads(definition_path.read_text(encoding="utf-8"))
-        if data.get("generator_version") != GENERATOR_VERSION or \
-                data.get("id") != STYLE_ID:
-            raise ValueError("style definition does not match generator style")
-        required_roles = {"shadow", "base_dark", "base", "base_light", "highlight", "accent"}
-        if not required_roles.issubset(data.get("palette_roles", [])):
-            raise ValueError("style definition is missing palette roles")
-        return data
-    except (OSError, ValueError, json.JSONDecodeError):
-        return {"id": STYLE_ID, "generator_version": GENERATOR_VERSION,
-                "palette_roles": ["shadow", "base_dark", "base", "base_light",
-                                   "highlight", "accent"], "global": {}}
+def _load_texture_definition(path=None):
+    data = _read_definition(path or DEFINITION_ROOT / "textures.json")
+    if data.get("version") != 2 or data.get("generator_version") != GENERATOR_VERSION or data.get("style") != STYLE_ID:
+        raise ValueError("texture definitions do not match generator version/style")
+    families = data.get("families", {})
+    specs = data.get("family_specs", {})
+    for name in NAMES:
+        if name not in families or families[name] not in specs:
+            raise ValueError(f"texture definitions missing family/spec for {name}")
+    for family, spec in specs.items():
+        for key in ("field_gain", "radius_scale", "anchor_scale"):
+            value = spec.get(key)
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or not .1 <= value <= 3:
+                raise ValueError(f"invalid {family}.{key}; expected .1..3")
+    return data
 
 
-def _load_entity_style_definitions():
-    definition_path = Path(__file__).resolve().parents[1] / \
-        "assets/textures/definitions/entity_styles.json"
-    try:
-        data = json.loads(definition_path.read_text(encoding="utf-8"))
-        if data.get("generator_version") != GENERATOR_VERSION or \
-                data.get("style") != STYLE_ID:
-            raise ValueError("entity style definitions do not match generator style")
-        if any(name not in data.get("entities", {}) for name in ENTITY_SKIN_NAMES):
-            raise ValueError("entity style definitions are incomplete")
-        return data
-    except (OSError, ValueError, json.JSONDecodeError):
-        return {"version": GENERATOR_VERSION, "generator_version": GENERATOR_VERSION,
-                "style": STYLE_ID, "entities": {name: {} for name in ENTITY_SKIN_NAMES}}
+TEXTURE_DEFINITION = _load_texture_definition()
+TEXTURE_FAMILIES = {name: TEXTURE_DEFINITION["families"][name] for name in NAMES}
+
+
+def _load_style_definition(path=None):
+    data = _read_definition(path or DEFINITION_ROOT / "style.json")
+    if data.get("generator_version") != GENERATOR_VERSION or data.get("id") != STYLE_ID:
+        raise ValueError("style definition does not match generator version/style")
+    roles = ("shadow", "base_dark", "base", "base_light", "highlight", "accent")
+    if data.get("palette_roles") != list(roles):
+        raise ValueError("style requires the six ordered semantic palette roles")
+    limits = {"brightness": (.1, 2), "contrast": (.1, 2), "saturation": (0, 2),
+              "shadow_floor": (0, 1), "highlight_ceiling": (0, 1), "temperature": (-.5, .5)}
+    for key, (lo, hi) in limits.items():
+        value = data.get("global", {}).get(key)
+        if not isinstance(value, (int, float)) or not math.isfinite(value) or not lo <= value <= hi:
+            raise ValueError(f"invalid style global.{key}")
+    if data["global"]["shadow_floor"] >= data["global"]["highlight_ceiling"]:
+        raise ValueError("shadow floor must be below highlight ceiling")
+    biases = []
+    for role in roles:
+        spec = data.get("semantic_palette", {}).get(role, {})
+        for key, bounds in (("lightness_bias", (-.5, .5)), ("chroma_scale", (0, 2)), ("hue_shift", (-1, 1))):
+            value = spec.get(key)
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or not bounds[0] <= value <= bounds[1]:
+                raise ValueError(f"invalid semantic_palette.{role}.{key}")
+        biases.append(spec["lightness_bias"])
+    if biases != sorted(biases):
+        raise ValueError("semantic palette lightness biases must be ordered")
+    thresholds=data.get("quantization", {}).get("default", [])
+    if data.get("quantization", {}).get("mode")!="absolute_thresholds" or len(thresholds)!=5 or any(
+            not isinstance(v,(int,float)) or not math.isfinite(v) for v in thresholds) or any(
+            a>=b for a,b in zip(thresholds,thresholds[1:])):
+        raise ValueError("quantization requires five increasing finite absolute thresholds")
+    return data
+
+
+def _load_entity_style_definitions(path=None):
+    data = _read_definition(path or DEFINITION_ROOT / "entity_styles.json")
+    if data.get("generator_version") != GENERATOR_VERSION or data.get("style") != STYLE_ID:
+        raise ValueError("entity style definitions do not match generator version/style")
+    if any(name not in data.get("entities", {}) for name in ENTITY_SKIN_NAMES):
+        raise ValueError("entity style definitions are incomplete")
+    return data
 
 
 STYLE_DEFINITION = _load_style_definition()
@@ -291,27 +314,29 @@ def _role_palette(base, transparent=False, shadow_floor=0.34, chroma_scale=0.92,
     here dependency-free makes the style deterministic on every build host.
     """
     l, a, b = _srgb_to_oklab(base)
-    chroma = math.sqrt(a*a + b*b) * chroma_scale
-    hue = math.atan2(b, a) + hue_shift
-    # Keep a useful lightness span even for near-white snow/cloud anchors and
-    # near-black volcanic anchors; clipping every role to one endpoint was the
-    # reason the previous pass produced only three or four actual colors.
-    low = max(shadow_floor, l - 0.085)
-    high = min(0.96, l + 0.085)
-    if high - low < 0.09:
-        if low <= 0.22:
-            high = min(0.96, low + 0.09)
-        else:
-            low = max(0.20, high - 0.09)
+    knobs = STYLE_DEFINITION["global"]
+    chroma = math.hypot(a, b) * chroma_scale * knobs["saturation"]
+    hue = math.atan2(b, a) + hue_shift + knobs["temperature"]
+    l *= knobs["brightness"]
+    low = max(0.0, min(.90, shadow_floor + knobs["shadow_floor"] - .34))
+    high = max(low + .09, knobs["highlight_ceiling"])
+    # Shift the center rather than clipping every highlight to the same color.
+    roles = [STYLE_DEFINITION["semantic_palette"][role]
+             for role in STYLE_DEFINITION["palette_roles"]]
+    span = (roles[-1]["lightness_bias"] - roles[0]["lightness_bias"]) * knobs["contrast"]
+    center = max(low + span / 2, min(high - span / 2, l))
     colors = []
     for index in range(levels):
-        lightness = low + (high - low) * index / max(1, levels - 1)
-        # Slightly soften the darkest role and reserve the brightest role for
-        # small highlights, rather than making every tile look glossy.
-        role_chroma = chroma * (0.82 if index < max(1, levels // 3) else 1.0)
-        rgb = _oklab_to_srgb((lightness, role_chroma * math.cos(hue),
-                              role_chroma * math.sin(hue)))
-        colors.append(tuple(max(2, min(248, c)) for c in rgb) + (255,))
+        position = index * 5 / max(1, levels - 1)
+        first = min(4, int(position)); fraction = position - first
+        role = {key: roles[first][key] * (1-fraction) + roles[first+1][key] * fraction
+                for key in ("lightness_bias", "chroma_scale", "hue_shift")}
+        lightness = max(low, min(high, center + role["lightness_bias"] * knobs["contrast"]))
+        c = chroma * role["chroma_scale"]
+        angle = hue + role["hue_shift"]
+        rgb = _oklab_to_srgb((lightness, c * math.cos(angle), c * math.sin(angle)))
+        colors.append(tuple(max(2, min(248, value)) for value in rgb) + (255,))
+
     return ([(0, 0, 0, 0)] + colors) if transparent else colors
 
 
@@ -444,9 +469,18 @@ def mix64(v):
     v=((v^(v>>27))*0x94D049BB133111EB)&0xffffffffffffffff
     return v^(v>>31)
 
+@lru_cache(maxsize=4096)
+def name_hash(name):
+    # FNV-1a over every UTF-8 byte, followed by avalanche; never Python hash().
+    value = 0xcbf29ce484222325
+    for byte in name.encode("utf-8"):
+        value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+    return mix64(value)
+
+
 def sample(seed,name,x,y,channel=0):
-    salt=int.from_bytes(name.encode(),"little")&0xffffffffffffffff
-    return mix64(seed^salt^(x*0x8DA6B343)^(y*0xD8163841)^(channel*0xA24BAED4963EE407))
+    return mix64(seed ^ name_hash(name) ^ (x*0x8DA6B343) ^
+                 (y*0xD8163841) ^ (channel*0xA24BAED4963EE407))
 
 def rand01(seed,name,x,y,channel=0): return sample(seed,name,x,y,channel)/0xffffffffffffffff
 def wrap(v): return v%SIZE
@@ -459,10 +493,13 @@ def neighbors8(x,y):
 
 def macro_field(seed,name,count=5):
     """Irregular radial influence on a torus; no enlarged low-res rectangles."""
+    family = TEXTURE_FAMILIES.get(name)
+    spec = TEXTURE_DEFINITION["family_specs"].get(family, {})
+    count = max(1, round(count * spec.get("anchor_scale", 1.0)))
     anchors=[]
     for i in range(count):
         h=sample(seed,name,i,31,1)
-        anchors.append((h%SIZE,(h>>8)%SIZE,1.8+((h>>16)%25)/10.0,((h>>24)%201-100)/100.0))
+        anchors.append((h%SIZE,(h>>8)%SIZE,(1.8+((h>>16)%25)/10.0)*spec.get("radius_scale", 1.0),((h>>24)%201-100)/100.0))
     field=[]
     for y in range(SIZE):
         for x in range(SIZE):
@@ -473,7 +510,7 @@ def macro_field(seed,name,count=5):
                 dist=math.sqrt((dx+0.23*dy)**2+(dy-0.17*dx)**2)
                 w=max(0.0,1.0-dist/r)**2
                 value+=tone*w; weight+=w
-            field.append(value/max(0.45,weight))
+            field.append(value/max(0.45,weight)*spec.get("field_gain", 1.0))
     return field
 
 def grow_blob(seed,name,anchor,size,channel=0,elongation=None):
@@ -954,21 +991,57 @@ def generate_plant_texture(name,seed):
 def resolve_seed(seed,name,local_seeds=None):
     return int((local_seeds or {}).get(name,seed))
 
-def center_periodic_tile(pixels):
-    """Choose a repeat origin whose boundary has ordinary interior variation.
+TURF_SIDE_NAMES = {"grass_side", "aether_grass_side", "dry_grass_side", "leaf_litter_side"}
 
-    A calm field can put its only small cluster on the atlas cut. Translating
-    the complete torus prevents that accidental seam emphasis without adding
-    noise, changing any pixels, or aliasing the last row/column to the first.
+
+@lru_cache(maxsize=4096)
+def _pixel_lab(pixel):
+    return _srgb_to_oklab(pixel[:3])
+
+
+def perceptual_distance(a, b):
+    if not a[3] or not b[3]:
+        return abs(a[3]-b[3]) / 255.0
+    return math.sqrt(sum((x-y)**2 for x,y in zip(_pixel_lab(a),_pixel_lab(b))))
+
+
+def seam_metrics(pixels):
+    """Independent axes, perceptual RGB and alpha; no hidden hue discontinuities."""
+    result={}
+    for axis in ("x", "y"):
+        for label,distance in (("luminance",color_distance), ("perceptual",perceptual_distance),
+                               ("alpha",lambda a,b: abs(a[3]-b[3])/255.0)):
+            cuts=[]
+            for cut in range(SIZE):
+                pairs=((pixels[t*SIZE+cut],pixels[t*SIZE+wrap(cut-1)]) for t in range(SIZE))                     if axis=="x" else ((pixels[cut*SIZE+t],pixels[wrap(cut-1)*SIZE+t]) for t in range(SIZE))
+                cuts.append(sum(distance(a,b) for a,b in pairs)/SIZE)
+            floor=1.0 if label=="luminance" else .005
+            interior=sum(cuts[1:])/15
+            result[f"{label}_{axis}"]={"seam":cuts[0],"interior":interior,
+                                          "ratio":cuts[0]/max(floor,interior)}
+    return result
+
+
+def center_periodic_tile(pixels, axes=("x", "y")):
+    """Choose repeat cuts with ordinary color and alpha adjacency.
+
+    Translate the entire torus; directional caps may translate horizontally
+    only. This retains pixel histograms, cluster counts and plant orientation.
     """
-    cuts_x=[sum(color_distance(pixels[y*16+x],pixels[y*16+wrap(x-1)])
-                for y in range(16)) for x in range(16)]
-    cuts_y=[sum(color_distance(pixels[y*16+x],pixels[wrap(y-1)*16+x])
-                for x in range(16)) for y in range(16)]
-    sx=min(range(16),key=lambda x:abs(cuts_x[x]-sum(cuts_x)/16))
-    sy=min(range(16),key=lambda y:abs(cuts_y[y]-sum(cuts_y)/16))
-    return [pixels[wrap(y+sy)*16+wrap(x+sx)] for y in range(16) for x in range(16)]
-
+    origins={"x":0,"y":0}
+    for axis in axes:
+        measures=[]
+        for distance,floor in ((color_distance,1.0),(perceptual_distance,.005),
+                               (lambda a,b:abs(a[3]-b[3])/255.0,.005)):
+            cuts=[]
+            for cut in range(SIZE):
+                pairs=((pixels[t*SIZE+cut],pixels[t*SIZE+wrap(cut-1)]) for t in range(SIZE))                     if axis=="x" else ((pixels[cut*SIZE+t],pixels[wrap(cut-1)*SIZE+t]) for t in range(SIZE))
+                cuts.append(sum(distance(a,b) for a,b in pairs)/SIZE)
+            measures.append([value/max(floor,(sum(cuts)-value)/15) for value in cuts])
+        origins[axis]=min(range(SIZE),key=lambda cut:(max(0,max(m[cut] for m in measures)-2.4)*100 +
+                                                    sum(abs(m[cut]-1) for m in measures),cut))
+    sx,sy=origins["x"],origins["y"]
+    return [pixels[wrap(y+sy)*SIZE+wrap(x+sx)] for y in range(SIZE) for x in range(SIZE)]
 
 
 def generate_decoration_texture(name, seed):
@@ -977,13 +1050,23 @@ def generate_decoration_texture(name, seed):
     pixels = []
     for y in range(SIZE):
         for x in range(SIZE):
-            h = mix64(seed ^ (x + y * SIZE))
+            h = sample(seed, name, x, y)
             shade = 2 + int(h % 19 == 0) - int(h % 23 == 0)
             if name.endswith("_wool"):
-                shade = 2 + int((x + 2*y) % 4 == 0) - int((2*x + y) % 7 == 0)
+                phase = sample(seed,name,0,0) % 4
+                shade = 2 + int((x + 2*y + phase) % 4 == 0) - int((2*x + y + phase) % 7 == 0)
             elif name.startswith("polished_") or name == "smooth_sandstone":
                 # Quiet polished planes with sparse connected mineral flecks.
-                shade = 2 + int((x//2 + y//2 + seed % 7) % 11 == 0)
+                if name == "polished_basalt":
+                    shade = 2 + int((y + sample(seed,name,x//4,0)%4) % 8 == 0)
+                elif name == "polished_limestone":
+                    shade = 2 + int((x + round(2*math.sin(y*math.tau/16))) % 13 == 0)
+                elif name == "polished_granite":
+                    shade = 2 + int(sample(seed,name,x//2,y//2) % 13 == 0)
+                elif name == "polished_tuff":
+                    shade = 2 + int(sample(seed,name,x//3,y//2) % 11 == 0)
+                else:
+                    shade = 2 + int((x//4,y//4) == (sample(seed,name,0,0)%4,sample(seed,name,1,0)%4))
             elif name == "chiseled_stone_bricks":
                 if x in (1, 14) or y in (1, 14): shade = 1
                 if (x in (4, 11) and 4 <= y <= 11) or (y in (4, 11) and 4 <= x <= 11): shade = 0
@@ -1001,7 +1084,7 @@ def generate_decoration_texture(name, seed):
                 if joint: shade = 0
                 elif y % height == 1: shade = 3
                 if name == "cracked_stone_bricks" and (x - y//2) % 8 == 3: shade = 0
-                if name == "mossy_stone_bricks" and (mix64(seed ^ ((x//3) + (y//3)*17)) % 5 == 0):
+                if name == "mossy_stone_bricks" and (sample(seed,name,x//3,y//3) % 5 == 0):
                     pixels.append(palette[4 + int(shade >= 2)])
                     continue
             pixels.append(palette[shade])
@@ -1039,21 +1122,26 @@ def generate_biome_texture(name, seed):
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
     if name in BIOME_BASES or name in {"dry_grass_side", "leaf_litter_side"}:
-        return generate_biome_texture(name,local)
-    if name in DECORATION_BASES:
-        return generate_decoration_texture(name,local)
-    if name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL
-                                       for face in ("top","side","bottom")):
+        pixels=generate_biome_texture(name,local)
+    elif name in DECORATION_BASES:
+        pixels=generate_decoration_texture(name,local)
+    elif name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL for face in ("top","side","bottom")):
         return generate_functional_texture(name,local)
-    if name in PLANTS:
+    elif name in PLANTS:
         return generate_plant_texture(name,local)
-    indices=generate_generic(name,local)
-    indices=generate_special(name,local,indices)
-    palette=PALETTES[name]
-    pixels=[palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
-    if name in NATURAL | LEAF_NAMES | {"white_wool", "water", "lava", "ice"}:
-        pixels=center_periodic_tile(pixels)
-    return pixels
+    else:
+        indices=generate_special(name,local,generate_generic(name,local))
+        palette=PALETTES[name]
+        pixels=[palette[max(0,min(len(palette)-1,int(i)))] for i in indices]
+    if name == "fire":
+        # Flames are upright sprites, not repeating surfaces. Preserve the
+        # complete silhouette and convert bottom-up drawing to PNG row order.
+        return [pixels[(SIZE-1-y)*SIZE+x] for y in range(SIZE) for x in range(SIZE)]
+    if name in TURF_SIDE_NAMES:
+        return center_periodic_tile(pixels, ("x",))
+    if name.endswith("_log_top"):
+        return pixels
+    return center_periodic_tile(pixels)
 
 def generate_entity_texture(name,seed):
     """Generate a wrapping material swatch, not a face portrait."""
@@ -1281,11 +1369,15 @@ def build_entity_skins(output,seed):
         # entity GLBs embed the exact same bytes in their glTF buffers.
         path=skin_dir/f"{name}.png"; write_png(path,ENTITY_SKIN_SIZE,ENTITY_SKIN_SIZE,pixels,0)
         metadata["entities"][name]={"source":f"entity_skins/{name}.png",
-                                     "features":ENTITY_STYLE_DEFINITIONS["entities"][name].get("motifs", [])}
+                                     "features":ENTITY_STYLE_DEFINITIONS["entities"][name].get("documentation", {}).get("motifs", [])}
     (output/"entity_skins.json").write_text(
         json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
 def png_bytes(width,height,pixels,compression_level=9):
+    if width <= 0 or height <= 0 or len(pixels) != width*height:
+        raise ValueError("PNG dimensions do not match pixel count")
+    if any(len(pixel) != 4 or any(type(c) is not int or not 0 <= c <= 255 for c in pixel) for pixel in pixels):
+        raise ValueError("PNG pixels require four uint8 channels")
     raw=bytearray()
     for y in range(height):
         raw.append(0)
@@ -1299,7 +1391,11 @@ def write_png(path,width,height,pixels,compression_level=9):
     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(png_bytes(width,height,pixels,compression_level))
 
 def load_item_icon_definitions(path):
-    data=json.loads(Path(path).read_text(encoding="utf-8"))
+    data=_read_definition(path)
+    if not all(isinstance(data.get(key),dict) for key in ("templates","materials","items")):
+        raise ValueError("item definitions require templates/materials/items objects")
+    if data.get("generator_version") != GENERATOR_VERSION or data.get("style") != STYLE_ID:
+        raise ValueError("item definitions do not match generator version/style")
     if data.get("version") not in (1, 2):
         raise ValueError("item icon definitions require version 1 or 2")
     for category in data.get("generator_categories",[]):
@@ -1314,36 +1410,22 @@ def load_item_icon_definitions(path):
         for color in shades:
             if len(color)!=3 or any(not isinstance(c,int) or c<0 or c>255 for c in color):
                 raise ValueError(f"invalid RGB color in material '{name}'")
-    # Item palettes share the same bright-comfortable color contract as block
-    # materials.  Keep the JSON RGB values readable for artists, but resolve
-    # them through OKLCH here so every generator invocation uses the same
-    # perceptual roles and shadow floor.
-    item_bases = {
-        "wood": (151, 103, 55), "stone": (122, 128, 130),
-        "copper": (177, 99, 69), "iron": (188, 194, 193),
-        "gold": (224, 166, 42), "diamond": (56, 190, 181),
-        "fiber": (188, 181, 158), "bone": (202, 195, 163),
-        "leather": (157, 87, 48), "plant": (85, 147, 55),
-        "wheat": (202, 153, 44), "raw_meat": (187, 70, 65),
-        "cooked_meat": (151, 81, 43), "rotten": (113, 116, 42),
-        "powder": (83, 86, 80), "cow_egg": (158, 98, 56),
-        "pig_egg": (220, 125, 139), "sheep_egg": (198, 194, 180),
-        "chicken_egg": (218, 155, 46), "zombie_egg": (68, 129, 83),
-        "skeleton_egg": (170, 176, 173), "spider_egg": (119, 56, 51),
-        "blastling_egg": (116, 72, 157), "villager_egg": (151, 102, 63),
-        "zombie_villager_egg": (75, 122, 69), "emerald": (42, 202, 112),
-    }
-    for material, base in item_bases.items():
-        if material not in data["materials"]:
-            continue
-        palette = _role_palette(base, shadow_floor=0.30,
-                                chroma_scale=1.02, levels=4)
+    processing = data.get("palette_processing", {})
+    for key,default,lo,hi in (("shadow_floor",.30,0,.8),("chroma_scale",1.02,0,2)):
+        value=processing.get(key,default)
+        if not isinstance(value,(int,float)) or not math.isfinite(value) or not lo<=value<=hi:
+            raise ValueError(f"invalid item palette_processing.{key}")
+    for material, shades in data["materials"].items():
+        if not isinstance(shades, list) or len(shades) < 4 or any(
+                not isinstance(color, list) or len(color) != 3 or
+                any(type(c) is not int or not 0 <= c <= 255 for c in color) for color in shades):
+            raise ValueError(f"invalid RGB material {material}")
+        # Authored midtones drive the result; JSON edits are never replaced by
+        # a hardcoded material-name table. Roles provide consistent shading.
+        anchor = tuple(round(sum(color[c] for color in shades)/len(shades)) for c in range(3))
+        palette = _role_palette(anchor, shadow_floor=processing.get("shadow_floor", .30),
+                                chroma_scale=processing.get("chroma_scale", 1.02), levels=4)
         data["materials"][material] = [list(color[:3]) for color in palette]
-    for material in data["materials"]:
-        species=material[:-4]
-        if material.endswith("_egg") and species in _ENTITY_BASES:
-            palette=_entity_part_palette(species,"body")
-            data["materials"][material]=[list(palette[i][:3]) for i in (1,2,3,4)]
     data["generator_version"] = GENERATOR_VERSION
     data["style"] = STYLE_ID
     return data
@@ -1568,63 +1650,79 @@ def validate_item_sprite(pixels,name="item"):
     if sum(p[:3]==(0,0,0) for p in opaque)>max(2,len(opaque)//12): errors.append(f"{name}: excessive pure-black outline")
     return errors
 
-def build_items_atlas(output,seed,definitions_path,block_definitions_path,override_dir=None,legacy_dir=None):
+def _read_item_tile(path, name):
+    width, height, pixels = read_generated_png(path)
+    if (width, height) != (SIZE, SIZE):
+        raise ValueError(f"{name}: imported icon must be 16x16, got {width}x{height}")
+    errors = validate_item_sprite(pixels, name)
+    if errors:
+        raise ValueError("\n".join(errors))
+    return pixels
+
+
+def build_items_atlas(output,seed,definitions_path,block_definitions_path,override_dir=None,legacy_dir=None,allow_fallback=False):
     definitions=load_item_icon_definitions(definitions_path)
-    blocks=json.loads(Path(block_definitions_path).read_text(encoding="utf-8"))["blocks"]
+    blocks=_read_definition(block_definitions_path)["blocks"]
     item_dir=output/"items"; item_dir.mkdir(parents=True,exist_ok=True)
     resolved=[]
+    failures={}
     # Definition insertion order is the stable atlas slot order; append new items.
     for name,spec in definitions["items"].items():
         override=Path(override_dir)/f"{name}.png" if override_dir else None
         legacy=Path(legacy_dir)/f"{name}.png" if legacy_dir else None
-        source_kind="generated"; source_path=item_dir/f"{name}.png"
-        pixels=None
-        if override and override.exists(): source_kind="override"; source_path=override; _,_,pixels=read_generated_png(override)
-        if pixels is None:
-            category=spec["generator"]
-            if category=="item_sprite": pixels=generate_item_sprite(spec["template"],spec["material"],definitions)
-            elif category=="block_item_icon":
-                block=blocks[spec["block"]]; top=block.get("top",block.get("all")); side=block.get("side",block.get("all",top))
-                _,_,top_pixels=read_generated_png(output/f"{top}.png"); _,_,side_pixels=read_generated_png(output/f"{side}.png")
-                _,_,front_pixels=read_generated_png(output/f"{block.get('front',side)}.png")
-                pixels=top_pixels if top in PLANTS else generate_block_item_icon(top_pixels,side_pixels,front_pixels)
-            else: raise ValueError(f"item '{name}' has invalid generator '{category}'")
-            errors=validate_item_sprite(pixels,name)
-            if errors: raise ValueError("\n".join(errors))
-            write_png(source_path,SIZE,SIZE,pixels)
-        if pixels is None and legacy and legacy.exists(): source_kind="legacy"; source_path=legacy; _,_,pixels=read_generated_png(legacy)
-        if pixels is None: source_kind="missing"; pixels=generate_item_sprite("coal","stone",definitions)
-        resolved.append((name,spec,source_kind,source_path,pixels))
+        source_kind="generated"; source=f"items/{name}.png"
+        if override and override.exists():
+            pixels=_read_item_tile(override,name)
+            source_kind="override"; source=f"override/{name}.png"
+        else:
+            try:
+                category=spec["generator"]
+                if category=="item_sprite":
+                    pixels=generate_item_sprite(spec["template"],spec["material"],definitions)
+                elif category=="block_item_icon":
+                    block=blocks[spec["block"]]
+                    top=block.get("top",block.get("all")); side=block.get("side",block.get("all",top))
+                    top_pixels=_read_item_tile(output/f"{top}.png",name)
+                    side_pixels=_read_item_tile(output/f"{side}.png",name)
+                    front_pixels=_read_item_tile(output/f"{block.get('front',side)}.png",name)
+                    pixels=top_pixels if top in PLANTS else generate_block_item_icon(top_pixels,side_pixels,front_pixels)
+                else:
+                    raise ValueError(f"item '{name}' has invalid generator '{category}'")
+                errors=validate_item_sprite(pixels,name)
+                if errors: raise ValueError("\n".join(errors))
+            except (OSError,ValueError,KeyError) as error:
+                if not allow_fallback:
+                    raise ValueError(f"cannot generate item {name}: {error}") from error
+                failures[name]=str(error)
+                if legacy and legacy.exists():
+                    pixels=_read_item_tile(legacy,name)
+                    source_kind="legacy"; source=f"legacy/{name}.png"
+                else:
+                    source_kind="missing"; source=None
+                    pixels=[(214,71,173,255) if (x//4+y//4)%2 else (73,43,78,255)
+                            for y in range(SIZE) for x in range(SIZE)]
+        # Final images, including authored imports, feed all previews/reports.
+        write_png(item_dir/f"{name}.png",SIZE,SIZE,pixels)
+        resolved.append((name,spec,source_kind,source,pixels))
     columns=8; rows=max(1,math.ceil(len(resolved)/columns)); atlas=[(0,0,0,0)]*(columns*SIZE*rows*SIZE)
     metadata={"version":1,"generator_version":GENERATOR_VERSION,"style":STYLE_ID,
               "tile_size":SIZE,"columns":columns,"rows":rows,"filter":"nearest",
               "seed":seed,"priority":["override","generated","legacy","missing"],
-              "template_schema":definitions.get("template_schema", {}),"items":{}}
-    for index,(name,spec,kind,path,pixels) in enumerate(resolved):
+              "fallback_enabled":allow_fallback,"generation_failures":failures,
+              "template_schema":definitions.get("documentation", {}).get("template_schema", {}),"items":{}}
+    for index,(name,spec,kind,source,pixels) in enumerate(resolved):
         tx,ty=index%columns,index//columns
-        for y in range(SIZE): atlas[(ty*SIZE+y)*columns*SIZE+tx*SIZE:(ty*SIZE+y)*columns*SIZE+(tx+1)*SIZE]=pixels[y*SIZE:(y+1)*SIZE]
-        metadata["items"][name]={"index":index,"x":tx,"y":ty,"generator":spec["generator"],"source_kind":kind,"source":str(path)}
+        for y in range(SIZE):
+            begin=(ty*SIZE+y)*columns*SIZE+tx*SIZE
+            atlas[begin:begin+SIZE]=pixels[y*SIZE:(y+1)*SIZE]
+        metadata["items"][name]={"index":index,"x":tx,"y":ty,"generator":spec["generator"],"source_kind":kind,"source":source}
     write_png(output/"items_atlas.png",columns*SIZE,rows*SIZE,atlas)
     (output/"items_atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
+
 def read_generated_png(path):
-    data=path.read_bytes()
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"): raise ValueError(f"not a PNG: {path}")
-    offset=8; compressed=bytearray(); width=height=0
-    while offset<len(data):
-        length=struct.unpack(">I",data[offset:offset+4])[0]; kind=data[offset+4:offset+8]
-        payload=data[offset+8:offset+8+length]; offset+=12+length
-        if kind==b"IHDR":
-            width,height,depth,color,_,_,_=struct.unpack(">IIBBBBB",payload)
-            if depth!=8 or color!=6: raise ValueError(f"expected 8-bit RGBA PNG: {path}")
-        elif kind==b"IDAT": compressed.extend(payload)
-        elif kind==b"IEND": break
-    raw=zlib.decompress(compressed); stride=width*4; pixels=[]
-    for y in range(height):
-        start=y*(stride+1)
-        if raw[start]!=0: raise ValueError(f"unsupported PNG filter in {path}")
-        row=raw[start+1:start+1+stride]; pixels.extend(tuple(row[x:x+4]) for x in range(0,stride,4))
-    return width,height,pixels
+    return read_png(Path(path))
+
 
 def luminance(c): return c[0]*.2126+c[1]*.7152+c[2]*.0722
 def palette_contrast(palette):
@@ -1713,7 +1811,15 @@ def validate_texture(path):
             fail("horizontal toroidal seam discontinuity",f"{horizontal_ratio:.2f}","<= 2.60x interior")
     elif metrics["seam_ratio"]>2.60:
         fail("toroidal seam discontinuity",f"{metrics['seam_ratio']:.2f}","<= 2.60x interior")
-    # Large calm planes are intentional in v3. Seam and palette checks above
+    axes=("x",) if name in TURF_SIDE_NAMES else ("x","y")
+    if name not in PLANTS | {"fire"}:
+        checks=seam_metrics(pixels)
+        for axis in axes:
+            if checks[f"perceptual_{axis}"]["ratio"] > 2.60:
+                fail(f"{axis} perceptual seam",f"{checks[f'perceptual_{axis}']['ratio']:.2f}","<= 2.60x interior")
+            if name in LEAF_NAMES and checks[f"alpha_{axis}"]["ratio"] > 2.60:
+                fail(f"{axis} alpha seam",f"{checks[f'alpha_{axis}']['ratio']:.2f}","<= 2.60x interior")
+    # Large calm planes are intentional in v4. Seam and palette checks above
     # still reject broken boundaries; frequency metrics are reported for review.
     if name in {"grass_side", "aether_grass_side", "dry_grass_side", "leaf_litter_side"}:
         grass=set(PALETTES[name][4:]); rows=[y for y in range(SIZE) for x in range(SIZE) if pixels[y*SIZE+x] in grass]
@@ -1732,30 +1838,130 @@ def validate_texture(path):
 
 def generate(output,seed,local_seeds=None):
     output.mkdir(parents=True,exist_ok=True)
-    for name in NAMES: write_png(output/f"{name}.png",SIZE,SIZE,generate_texture(name,seed,local_seeds))
+    sources={}
+    for name in NAMES:
+        pixels=generate_texture(name,seed,local_seeds)
+        write_png(output/f"{name}.png",SIZE,SIZE,pixels)
+        sources[name]={"effective_seed":resolve_seed(seed,name,local_seeds),
+                       "sha256":hashlib.sha256(bytes(c for p in pixels for c in p)).hexdigest()}
+    manifest={"generator_version":GENERATOR_VERSION,"seed":seed,"materials":sources}
+    (output/"generation.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
+
 
 def validate(output):
     errors=[]
     for name in NAMES:
         path=output/f"{name}.png"
-        errors.extend([f"missing texture: {path}"] if not path.exists() else validate_texture(path))
+        try:
+            errors.extend([f"missing texture: {path}"] if not path.exists() else validate_texture(path))
+        except (OSError,ValueError) as error:
+            errors.append(str(error))
     if errors: raise ValueError("\n".join(errors))
 
+
+def load_material_profiles(path=None):
+    data=_read_definition(path or DEFINITION_ROOT/"material_profiles.json")
+    if data.get("version")!=1 or data.get("generator_version")!=GENERATOR_VERSION or data.get("style")!=STYLE_ID:
+        raise ValueError("material profiles do not match generator version/style")
+    patterns={"clods","tufts","flakes","mineral","fibers","leaf","grains","flat","panels","crystal","weave"}
+    if set(data.get("materials", {}))-set(NAMES):
+        raise ValueError("material profile contains unknown material")
+    profiles={}
+    for name in NAMES:
+        profile=dict(data.get("families", {}).get(TEXTURE_FAMILIES[name], {}))
+        profile.update(data.get("materials", {}).get(name, {}))
+        if profile.get("pattern") not in patterns:
+            raise ValueError(f"unknown material geometry pattern for {name}")
+        for key in ("roughness","metallic","emission","height_strength"):
+            value=profile.get(key)
+            if not isinstance(value,(float,int)) or not math.isfinite(value) or not 0<=value<=1:
+                raise ValueError(f"invalid material profile {name}.{key}")
+        profiles[name]=profile
+    return profiles
+
+
+def generate_material_maps(name,pixels,profile):
+    """Derive geometry from material roles, never treating hue as elevation.
+
+    R/G/B/A property channels are roughness/metallic/emission/height, linear.
+    Cutout air has flat normals and no emission; its RGB never forms a crater.
+    """
+    palette=PALETTES[name]
+    pattern=profile["pattern"]
+    heights=[]
+    for y in range(SIZE):
+        for x in range(SIZE):
+            pixel=pixels[y*SIZE+x]
+            role=palette.index(pixel) if pixel in palette else 2
+            normalized=role/max(1,len(palette)-1)
+            if pattern=="flat": h=.5
+            elif pattern=="weave": h=.5+.10*math.sin(x*math.tau/4)*math.sin(y*math.tau/4)
+            elif pattern=="fibers": h=.5+.22*(normalized-.5)
+            elif pattern=="mineral": h=.42+.10*min(role,2)/2+.12*(role>=3)
+            elif pattern in {"leaf","tufts"}: h=.5+.18*(normalized-.5)
+            elif pattern=="crystal": h=.5+.08*(normalized-.5)
+            elif pattern=="grains": h=.5+.12*(normalized-.5)
+            elif pattern=="panels": h=.5+.24*(normalized-.5)
+            else: h=.5+.30*(normalized-.5)
+            heights.append(h if pixel[3] else .5)
+    normals=[];properties=[];height_pixels=[]
+    def neighbor(x,y,center):
+        x=wrap(x)
+        y=max(0,min(SIZE-1,y)) if name in TURF_SIDE_NAMES or name in PLANTS else wrap(y)
+        index=y*SIZE+x
+        return heights[index] if pixels[index][3] else center
+    byte=lambda value:max(0,min(255,round(value*255)))
+    for y in range(SIZE):
+        for x in range(SIZE):
+            i=y*SIZE+x; h=heights[i]; visible=bool(pixels[i][3])
+            strength=profile["height_strength"]*4 if visible else 0
+            nx=(neighbor(x-1,y,h)-neighbor(x+1,y,h))*strength
+            ny=(neighbor(x,y+1,h)-neighbor(x,y-1,h))*strength
+            length=math.sqrt(nx*nx+ny*ny+1)
+            normals.append((byte(.5+.5*nx/length),byte(.5+.5*ny/length),byte(.5+.5/length),255))
+            mineral=pattern=="mineral" and pixels[i] in palette[3:]
+            roughness=profile["roughness"] if pattern!="mineral" or mineral else .80
+            metallic=profile["metallic"] if pattern!="mineral" or mineral else 0
+            properties.append((byte(roughness),byte(metallic),byte(profile["emission"]) if visible else 0,byte(h)))
+            height_pixels.append((byte(h),byte(h),byte(h),255))
+    return normals,properties,height_pixels
+
+
 def build_atlas(output,seed,local_seeds=None):
-    validate(output); columns=4; rows=math.ceil(len(NAMES)/columns); grid=max(columns,rows)
-    atlas=[(0,0,0,0)]*(grid*SIZE*grid*SIZE)
+    validate(output); grid=math.ceil(math.sqrt(len(NAMES)))
+    atlas=[(0,0,0,0)]*(grid*SIZE)**2
+    normal=[(128,128,255,255)]*len(atlas)
+    properties=[(255,0,0,128)]*len(atlas)
+    heights=[(128,128,128,255)]*len(atlas)
+    profiles=load_material_profiles()
+    manifest=_read_definition(output/"generation.json") if (output/"generation.json").exists() else {}
+    if manifest and manifest.get("seed")!=seed:
+        raise ValueError("atlas seed does not match generated tile provenance")
     metadata={"version":1,"generator_version":GENERATOR_VERSION,"style":STYLE_ID,
-              "tile_size":SIZE,"grid_size":grid,"filter":"nearest","seed":seed,"textures":{}}
+              "tile_size":SIZE,"grid_size":grid,"filter":"nearest","seed":seed,"textures":{},
+              "material_maps":{"normal":"atlas_normal.png","property":"atlas_property.png","height":"atlas_height.png"},
+              "property_channels":["roughness","metallic","emission","height"]}
     for index,name in enumerate(NAMES):
         _,_,pixels=read_generated_png(output/f"{name}.png"); tx,ty=index%grid,index//grid
-        for y in range(SIZE):
-            begin=(ty*SIZE+y)*grid*SIZE+tx*SIZE; atlas[begin:begin+SIZE]=pixels[y*SIZE:(y+1)*SIZE]
-        entry={"index":index,"x":tx,"y":ty,"source":f"{name}.png",
-               "family":TEXTURE_FAMILIES.get(name,"constructed"),"generated":True}
+        maps=generate_material_maps(name,pixels,profiles[name])
+        for target,tile in zip((atlas,normal,properties,heights),(pixels,)+maps):
+            for y in range(SIZE):
+                begin=(ty*SIZE+y)*grid*SIZE+tx*SIZE
+                target[begin:begin+SIZE]=tile[y*SIZE:(y+1)*SIZE]
+        provenance=manifest.get("materials", {}).get(name, {})
+        digest=hashlib.sha256(bytes(c for p in pixels for c in p)).hexdigest()
+        entry={"index":index,"x":tx,"y":ty,"source":f"{name}.png", "sha256":digest,
+               "family":TEXTURE_FAMILIES[name],"generated":digest==provenance.get("sha256"),
+               "effective_seed":provenance.get("effective_seed",resolve_seed(seed,name,local_seeds))}
+        # Flat profile fields keep the existing logical-name parser compatible.
+        entry.update(profiles[name])
         if local_seeds and name in local_seeds: entry["local_seed"]=int(local_seeds[name])
         metadata["textures"][name]=entry
-    write_png(output/"atlas.png",grid*SIZE,grid*SIZE,atlas)
+    for filename,pixels in (("atlas.png",atlas),("atlas_normal.png",normal),
+                            ("atlas_property.png",properties),("atlas_height.png",heights)):
+        write_png(output/filename,grid*SIZE,grid*SIZE,pixels)
     (output/"atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+
 
 def build_entity_atlas(output,seed):
     columns=math.ceil(math.sqrt(len(ENTITY_NAMES))); rows=columns
@@ -1774,7 +1980,7 @@ def build_entity_atlas(output,seed):
             atlas[begin:begin+SIZE]=pixels[y*SIZE:(y+1)*SIZE]
         metadata["entities"][name]={"index":index,"x":tx,"y":ty,
                                     "source":f"entities/{name}.png",
-                                    "features":ENTITY_STYLE_DEFINITIONS["entities"].get(name, {}).get("motifs", [])}
+                                    "features":ENTITY_STYLE_DEFINITIONS["entities"].get(name, {}).get("documentation", {}).get("motifs", [])}
     write_png(output/"entity_atlas.png",columns*SIZE,rows*SIZE,atlas)
     (output/"entity_atlas.json").write_text(
         json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
@@ -1931,7 +2137,7 @@ def build_block_preview(output, seed):
     for index,name in enumerate(names):
         tx,ty=index%columns,index//columns; x0=tx*cell_w; y0=ty*cell_h
         draw_text(canvas,width,x0+3,y0+2,name[:16])
-        pixels=generate_texture(name,seed)
+        pixels=read_generated_png(output/f"{name}.png")[2]
         # Original tile and an 8x8 repeat share a cell, then three small
         # lighting swatches make the palette readable under game conditions.
         blit(canvas,width,x0+3,y0+14,pixels,SIZE,SIZE,2)
@@ -1944,15 +2150,15 @@ def build_block_preview(output, seed):
                      pixels,SIZE,SIZE,1)
     base_y=rows*cell_h
     draw_text(canvas,width,4,base_y+3,"grass_combo")
-    grass_top=generate_texture("grass_top",seed)
-    grass_side=generate_texture("grass_side",seed)
+    grass_top=read_generated_png(output/"grass_top.png")[2]
+    grass_side=read_generated_png(output/"grass_side.png")[2]
     blit(canvas,width,4,base_y+18,grass_top,SIZE,SIZE,2)
     blit(canvas,width,40,base_y+18,grass_side,SIZE,SIZE,2)
     draw_text(canvas,width,78,base_y+3,"wall")
     wall=("stone", "oak_planks", "bricks" if "bricks" in NAMES else "cobblestone",
           "sand", "white_wool", "crafting_table")
     for index,name in enumerate(wall):
-        pixels=generate_texture(name,seed)
+        pixels=read_generated_png(output/f"{name}.png")[2]
         wx=78+(index%3)*32; wy=base_y+18+(index//3)*32
         blit(canvas,width,wx,wy,pixels,SIZE,SIZE,2)
     draw_text(canvas,width,188,base_y+3,"light")
@@ -1963,8 +2169,16 @@ def build_block_preview(output, seed):
     write_png(output/"block_preview.png",width,height,canvas)
 
 
+def _final_item_paths(output):
+    metadata=output/"items_atlas.json"
+    if not metadata.exists():
+        return []
+    names=_read_definition(metadata)["items"]
+    return [output/"items"/f"{name}.png" for name in sorted(names)]
+
+
 def _item_contact_sheet(output):
-    paths=sorted((output/"items").glob("*.png"))
+    paths=_final_item_paths(output)
     if not paths:
         return
     columns=8; cell_w=72; cell_h=48; label_h=10
@@ -2065,24 +2279,29 @@ def build_visual_report(output,seed):
             "palette_roles":STYLE_DEFINITION.get("palette_roles", []),
             "previews": {
                 "blocks": "block_preview.png",
+                "mips": "mip_preview.png",
                 "items": "items_contact_sheet.png",
                 "entities": "entity_contact_sheet.png",
                 "entity_semantic": "entity_semantic_preview.png",
                 "lighting_profiles": ["noon", "dusk", "cave"],
             }}
     texture_pixels={}
+    report["effective_materials"] = json.loads((output/"atlas.json").read_text())["textures"] if (output/"atlas.json").exists() else {}
     for name in NAMES:
         path=output/f"{name}.png"
         if path.exists():
             _,_,pixels=read_generated_png(path)
             texture_pixels[name]=pixels
             structure=structure_metrics(pixels)
+            structure["seams"]=seam_metrics(pixels)
             structure["edge_density"]=round(
                 structure["transitions"] / float(2 * SIZE * SIZE), 5)
             report["textures"][name]=dict(_visual_color_stats(pixels),
                                           family=TEXTURE_FAMILIES.get(name,"constructed"),
                                           palette_roles=STYLE_DEFINITION.get("palette_roles", []),
-                                          structure=structure)
+                                          structure=structure,
+                                          mips=[dict(_visual_color_stats(tile),tile_size=size)
+                                                for size,tile in tile_mip_chain(pixels,name in LEAF_NAMES)])
     family_groups={}
     for name,family in TEXTURE_FAMILIES.items():
         if name in texture_pixels:
@@ -2095,7 +2314,7 @@ def build_visual_report(output,seed):
                                    "mean_abs_correlation":round(sum(pairs)/len(pairs),5) if pairs else 0.0,
                                    "max_abs_correlation":round(max(pairs),5) if pairs else 0.0}
     report["family_structure_similarity"]=family_similarity
-    for path in sorted((output/"items").glob("*.png")):
+    for path in _final_item_paths(output):
         _,_,pixels=read_generated_png(path)
         report["items"][path.stem]=_visual_color_stats(pixels)
     for path in sorted((output/"entity_skins").glob("*.png")):
@@ -2105,9 +2324,49 @@ def build_visual_report(output,seed):
         json.dumps(report,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
 
+def tile_mip_chain(pixels, preserve_cutout=False):
+    """Reference color mips in linear light; coverage correction never feeds back."""
+    levels=[(SIZE,list(pixels))]
+    source=list(pixels); size=SIZE
+    base_holes=sum(p[3]==0 for p in pixels)
+    while size>1:
+        next_size=size//2; down=[]
+        for y in range(next_size):
+            for x in range(next_size):
+                samples=[source[(y*2+dy)*size+x*2+dx] for dy in range(2) for dx in range(2)]
+                alpha=sum(p[3] for p in samples)
+                rgb=tuple(_linear_to_srgb(sum(_srgb_to_linear(p[c])*p[3] for p in samples)/alpha)
+                          if alpha else 0 for c in range(3))
+                down.append(rgb+(alpha//4,))
+        source=down; size=next_size
+        display=list(down)
+        if preserve_cutout and size>1 and base_holes:
+            count=min(size*size-1,max(1,(base_holes*size*size+128)//256))
+            order=sorted(range(len(display)),key=lambda i:display[i][3])
+            for rank,i in enumerate(order):display[i]=display[i][:3]+(0 if rank<count else 255,)
+        levels.append((size,display))
+    return levels
+
+
+def build_mip_preview(output):
+    columns=4; cell_w=244; cell_h=90
+    width=columns*cell_w; height=math.ceil(len(NAMES)/columns)*cell_h
+    canvas=[(29,32,35,255)]*(width*height)
+    for index,name in enumerate(NAMES):
+        x0=(index%columns)*cell_w; y0=(index//columns)*cell_h
+        draw_text(canvas,width,x0+3,y0+3,name[:34])
+        pixels=read_generated_png(output/f"{name}.png")[2]
+        for level,(size,tile) in enumerate(tile_mip_chain(pixels,name in LEAF_NAMES)):
+            x=x0+4+level*46
+            draw_text(canvas,width,x,y0+16,str(size))
+            blit(canvas,width,x,y0+28,tile,size,size,max(1,32//size))
+    write_png(output/"mip_preview.png",width,height,canvas)
+
+
 def build_preview(output,seed,count=3,local_seeds=None):
     build_contact_sheet(output,seed,count,local_seeds)
     build_block_preview(output,seed)
+    build_mip_preview(output)
     _item_contact_sheet(output)
     _entity_contact_sheet(output)
     _entity_semantic_preview(output)
@@ -2143,6 +2402,7 @@ def parse_args(argv=None):
     parser.add_argument("--item-definitions",type=Path,default=Path("assets/textures/definitions/item_icons.json"))
     parser.add_argument("--block-definitions",type=Path,default=Path("assets/textures/definitions/blocks.json"))
     parser.add_argument("--item-overrides",type=Path,default=Path("assets/textures/source/items"))
+    parser.add_argument("--allow-item-fallback",action="store_true",help="explicitly allow reported legacy/missing item fallbacks")
     parser.add_argument("--legacy-items",type=Path,default=Path("assets/textures/legacy/items"))
     return parser.parse_args(argv)
 
@@ -2156,13 +2416,13 @@ def main(argv=None):
             generate(args.output,args.seed,local_seeds)
             validate(args.output)
             build_atlas(args.output,args.seed,local_seeds)
-            build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
+            build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items,args.allow_item_fallback)
             build_entity_atlas(args.output,args.seed)
             build_entity_skins(args.output,args.seed)
         if args.generate: generate(args.output,args.seed,local_seeds)
         if args.validate: validate(args.output)
         if args.build_atlas: build_atlas(args.output,args.seed,local_seeds)
-        if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items)
+        if args.build_items_atlas: build_items_atlas(args.output,args.seed,args.item_definitions,args.block_definitions,args.item_overrides,args.legacy_items,args.allow_item_fallback)
         if args.build_entity_atlas: build_entity_atlas(args.output,args.seed)
         if args.build_entity_skins: build_entity_skins(args.output,args.seed)
         if args.build_ios_icon: build_app_icon(args.ios_icon_output,args.seed)

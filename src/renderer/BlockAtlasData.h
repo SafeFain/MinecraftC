@@ -14,7 +14,8 @@ struct BlockAtlasData {
 };
 
 // Loads the generated logical-material atlas and constructs every mip by
-// downsampling each tile independently, so filtering cannot bleed across slots.
+// alpha-weighted linear-light tile downsampling, so filtering cannot bleed across
+// slots. V4 semantic normal/property maps are linear; legacy atlases synthesize them.
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot);
 
 VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas);

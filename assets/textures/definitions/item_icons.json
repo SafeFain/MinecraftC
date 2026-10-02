@@ -1,17 +1,42 @@
 {
   "version": 2,
-  "generator_version": 3,
+  "generator_version": 4,
   "style": "bright-comfortable",
-  "generator_categories": ["block_texture", "item_sprite", "block_item_icon"],
-  "lighting": "top_left",
+  "generator_categories": [
+    "block_texture",
+    "item_sprite",
+    "block_item_icon"
+  ],
   "templates": {
-    "sword": {}, "pickaxe": {}, "axe": {}, "shovel": {}, "hoe": {},
-    "stick": {}, "ingot": {}, "gem": {}, "coal": {}, "torch": {},
-    "string": {}, "feather": {}, "leather": {}, "bone": {}, "arrow": {},
-    "seeds": {}, "wheat": {}, "food": {}, "bow": {}, "shield": {},
-    "helmet": {}, "chestplate": {}, "leggings": {}, "boots": {}, "flint": {},
+    "sword": {},
+    "pickaxe": {},
+    "axe": {},
+    "shovel": {},
+    "hoe": {},
+    "stick": {},
+    "ingot": {},
+    "gem": {},
+    "coal": {},
+    "torch": {},
+    "string": {},
+    "feather": {},
+    "leather": {},
+    "bone": {},
+    "arrow": {},
+    "seeds": {},
+    "wheat": {},
+    "food": {},
+    "bow": {},
+    "shield": {},
+    "helmet": {},
+    "chestplate": {},
+    "leggings": {},
+    "boots": {},
+    "flint": {},
     "scepter": {},
-    "flint_and_steel": {}, "gunpowder": {}, "spawn_egg": {},
+    "flint_and_steel": {},
+    "gunpowder": {},
+    "spawn_egg": {},
     "beef": {},
     "porkchop": {},
     "drumstick": {},
@@ -22,320 +47,2148 @@
     "brick": {},
     "dye": {}
   },
-  "template_schema": {
-    "outline": "binary silhouette with a dark material-aware edge",
-    "parts": ["grip", "connector", "working_head", "edge", "highlight"],
-    "material_processing": "oklch_role_palette_and_linear_light_highlight",
-    "alpha": "binary",
-    "filter": "nearest"
-  },
-  "template_specs": {
-    "sword": {"outline": "long_blade", "parts": ["grip", "guard", "blade", "edge"], "material_processing": "blade_facets"},
-    "pickaxe": {"outline": "crossed_head", "parts": ["grip", "connector", "pick_head", "edge"], "material_processing": "asymmetric_chip"},
-    "axe": {"outline": "broad_head", "parts": ["grip", "connector", "axe_head", "edge"], "material_processing": "broad_warm_highlight"},
-    "shovel": {"outline": "spade", "parts": ["grip", "connector", "spade_head", "edge"], "material_processing": "center_facet"},
-    "hoe": {"outline": "narrow_tine", "parts": ["grip", "connector", "tine", "edge"], "material_processing": "small_specular"},
-    "stick": {"outline": "diagonal_rod", "parts": ["fiber", "knob"], "material_processing": "wood_grain"},
-    "ingot": {"outline": "cast_bar", "parts": ["body", "rim", "highlight"], "material_processing": "rolled_metal"},
-    "gem": {"outline": "faceted_crystal", "parts": ["dark_edge", "facets", "glint"], "material_processing": "sharp_planes"},
-    "coal": {"outline": "irregular_lump", "parts": ["dark_body", "fracture", "glint"], "material_processing": "matte_vein"},
-    "torch": {"outline": "flame_on_stick", "parts": ["handle", "ember", "flame", "glow"], "material_processing": "emissive_warm"},
-    "string": {"outline": "curved_thread", "parts": ["fiber", "bend"], "material_processing": "soft_highlight"},
-    "feather": {"outline": "barbed_quill", "parts": ["shaft", "barbs", "tip"], "material_processing": "light_edges"},
-    "bone": {"outline": "jointed_bone", "parts": ["shaft", "knobs", "highlight"], "material_processing": "porous_bone"},
-    "arrow": {"outline": "shafthead", "parts": ["shaft", "head", "fletching"], "material_processing": "metal_tip"},
-    "seeds": {"outline": "sprout_cluster", "parts": ["stem", "seed", "leaf"], "material_processing": "growth_stage"},
-    "wheat": {"outline": "grain_stalk", "parts": ["stem", "grain", "leaf"], "material_processing": "golden_grain"},
-    "food": {"outline": "food_chunk", "parts": ["crust_or_skin", "flesh", "highlight"], "material_processing": "cooked_or_raw"},
-    "bow": {"outline": "curved_limb", "parts": ["limbs", "grip", "string"], "material_processing": "wood_and_fiber"},
-    "shield": {"outline": "shield_plate", "parts": ["plate", "rim", "grip", "highlight"], "material_processing": "painted_panel"},
-    "helmet": {"outline": "head_armor", "parts": ["crown", "rim", "opening"], "material_processing": "cold_metal"},
-    "chestplate": {"outline": "torso_armor", "parts": ["plate", "shoulders", "rim"], "material_processing": "layered_metal"},
-    "leggings": {"outline": "split_leg_armor", "parts": ["left_leg", "right_leg", "waist"], "material_processing": "jointed_metal"},
-    "boots": {"outline": "paired_boots", "parts": ["left_boot", "right_boot", "sole"], "material_processing": "reinforced_edge"},
-    "flint": {"outline": "shard", "parts": ["dark_edge", "facets", "chip"], "material_processing": "stone_fracture"},
-    "flint_and_steel": {"outline": "striker_loop", "parts": ["flint", "steel", "grip"], "material_processing": "cold_metal"},
-    "gunpowder": {"outline": "granule_cluster", "parts": ["granules", "dust", "highlight"], "material_processing": "matte_powder"},
-    "spawn_egg": {"outline": "oval_egg", "parts": ["shell", "species_spots", "highlight"], "material_processing": "entity_palette_derived"},
-    "beef": {"outline": "beef", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "porkchop": {"outline": "porkchop", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "drumstick": {"outline": "drumstick", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "mutton": {"outline": "mutton", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "bread": {"outline": "bread", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "rotten_flesh": {"outline": "rotten_flesh", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "clay_ball": {"outline": "rounded_lump", "parts": ["body", "edge", "highlight"], "material_processing": "matte"},
-    "brick": {"outline": "fired_brick", "parts": ["body", "edge", "highlight"], "material_processing": "matte"},
-    "dye": {"outline": "powder_pile", "parts": ["body", "edge", "highlight"], "material_processing": "matte"}
-  },
-  "handle_palette": [[66, 40, 22], [112, 72, 37], [171, 119, 61], [211, 160, 88]],
+  "handle_palette": [
+    [
+      66,
+      40,
+      22
+    ],
+    [
+      112,
+      72,
+      37
+    ],
+    [
+      171,
+      119,
+      61
+    ],
+    [
+      211,
+      160,
+      88
+    ]
+  ],
   "materials": {
-    "wood": [[65, 39, 20], [105, 67, 34], [157, 108, 55], [205, 157, 85]],
-    "stone": [[48, 51, 53], [80, 84, 86], [126, 130, 131], [181, 185, 184]],
-    "copper": [[76, 42, 31], [128, 70, 48], [190, 109, 71], [235, 164, 111]],
-    "iron": [[70, 75, 76], [123, 129, 129], [185, 191, 189], [239, 242, 235]],
-    "gold": [[92, 61, 13], [158, 107, 18], [226, 166, 35], [255, 226, 96]],
-    "diamond": [[20, 76, 79], [28, 135, 137], [52, 205, 195], [157, 255, 238]],
-    "fiber": [[62, 58, 51], [119, 113, 99], [190, 183, 159], [244, 239, 212]],
-    "bone": [[91, 86, 70], [151, 145, 119], [216, 210, 174], [250, 246, 213]],
-    "leather": [[66, 36, 22], [112, 58, 33], [169, 93, 51], [219, 139, 79]],
-    "plant": [[35, 72, 28], [57, 111, 37], [94, 155, 53], [167, 205, 74]],
-    "wheat": [[95, 67, 21], [153, 108, 28], [211, 161, 45], [249, 211, 91]],
-    "raw_meat": [[82, 31, 31], [139, 50, 48], [202, 88, 78], [245, 158, 139]],
-    "cooked_meat": [[55, 29, 20], [103, 53, 31], [158, 86, 45], [215, 137, 77]],
-    "rotten": [[53, 62, 24], [87, 96, 35], [132, 126, 49], [184, 161, 75]],
-    "powder": [[32, 33, 31], [58, 61, 57], [91, 95, 88], [137, 142, 132]],
-    "cow_egg": [[54, 31, 19], [104, 60, 34], [166, 105, 62], [235, 225, 200]],
-    "pig_egg": [[92, 44, 50], [164, 77, 88], [232, 137, 148], [255, 203, 207]],
-    "sheep_egg": [[65, 64, 61], [133, 130, 120], [218, 215, 201], [255, 252, 238]],
-    "chicken_egg": [[96, 75, 35], [218, 136, 31], [235, 229, 205], [255, 250, 230]],
-    "zombie_egg": [[28, 59, 44], [53, 105, 67], [91, 156, 84], [72, 118, 145]],
-    "skeleton_egg": [[45, 48, 49], [99, 104, 105], [175, 181, 178], [238, 241, 230]],
-    "spider_egg": [[29, 23, 25], [61, 43, 45], [111, 58, 53], [191, 54, 39]],
-    "blastling_egg": [[37, 27, 57], [76, 49, 111], [132, 76, 171], [219, 137, 238]],
-    "villager_egg": [[72, 45, 29], [121, 78, 49], [181, 131, 83], [91, 151, 78]],
-    "zombie_villager_egg": [[28, 58, 42], [55, 103, 64], [105, 145, 79], [116, 78, 49]],
-    "emerald": [[11, 77, 49], [18, 132, 75], [42, 202, 112], [155, 255, 193]],
-    "clay_ball": [[73, 80, 85], [106, 116, 124], [133, 146, 156], [152, 167, 179]],
-    "brick": [[95, 50, 36], [139, 72, 53], [174, 91, 67], [200, 104, 77]],
-    "red_dye": [[101, 29, 26], [148, 42, 38], [185, 53, 48], [212, 60, 55]],
-    "yellow_dye": [[123, 101, 18], [180, 147, 27], [225, 184, 34], [255, 211, 39]],
-    "blue_dye": [[31, 62, 105], [46, 90, 153], [58, 113, 192], [66, 129, 220]],
-    "green_dye": [[41, 72, 30], [60, 104, 44], [76, 131, 55], [87, 150, 63]],
-    "black_dye": [[24, 24, 26], [35, 36, 39], [44, 45, 49], [50, 51, 56]],
-    "bone_meal": [[111, 107, 89], [161, 156, 130], [202, 195, 163], [232, 224, 187]]
+    "wood": [
+      [
+        151,
+        103,
+        55
+      ],
+      [
+        151,
+        103,
+        55
+      ],
+      [
+        151,
+        103,
+        55
+      ],
+      [
+        151,
+        103,
+        55
+      ]
+    ],
+    "stone": [
+      [
+        122,
+        128,
+        130
+      ],
+      [
+        122,
+        128,
+        130
+      ],
+      [
+        122,
+        128,
+        130
+      ],
+      [
+        122,
+        128,
+        130
+      ]
+    ],
+    "copper": [
+      [
+        177,
+        99,
+        69
+      ],
+      [
+        177,
+        99,
+        69
+      ],
+      [
+        177,
+        99,
+        69
+      ],
+      [
+        177,
+        99,
+        69
+      ]
+    ],
+    "iron": [
+      [
+        188,
+        194,
+        193
+      ],
+      [
+        188,
+        194,
+        193
+      ],
+      [
+        188,
+        194,
+        193
+      ],
+      [
+        188,
+        194,
+        193
+      ]
+    ],
+    "gold": [
+      [
+        224,
+        166,
+        42
+      ],
+      [
+        224,
+        166,
+        42
+      ],
+      [
+        224,
+        166,
+        42
+      ],
+      [
+        224,
+        166,
+        42
+      ]
+    ],
+    "diamond": [
+      [
+        56,
+        190,
+        181
+      ],
+      [
+        56,
+        190,
+        181
+      ],
+      [
+        56,
+        190,
+        181
+      ],
+      [
+        56,
+        190,
+        181
+      ]
+    ],
+    "fiber": [
+      [
+        188,
+        181,
+        158
+      ],
+      [
+        188,
+        181,
+        158
+      ],
+      [
+        188,
+        181,
+        158
+      ],
+      [
+        188,
+        181,
+        158
+      ]
+    ],
+    "bone": [
+      [
+        202,
+        195,
+        163
+      ],
+      [
+        202,
+        195,
+        163
+      ],
+      [
+        202,
+        195,
+        163
+      ],
+      [
+        202,
+        195,
+        163
+      ]
+    ],
+    "leather": [
+      [
+        157,
+        87,
+        48
+      ],
+      [
+        157,
+        87,
+        48
+      ],
+      [
+        157,
+        87,
+        48
+      ],
+      [
+        157,
+        87,
+        48
+      ]
+    ],
+    "plant": [
+      [
+        85,
+        147,
+        55
+      ],
+      [
+        85,
+        147,
+        55
+      ],
+      [
+        85,
+        147,
+        55
+      ],
+      [
+        85,
+        147,
+        55
+      ]
+    ],
+    "wheat": [
+      [
+        202,
+        153,
+        44
+      ],
+      [
+        202,
+        153,
+        44
+      ],
+      [
+        202,
+        153,
+        44
+      ],
+      [
+        202,
+        153,
+        44
+      ]
+    ],
+    "raw_meat": [
+      [
+        187,
+        70,
+        65
+      ],
+      [
+        187,
+        70,
+        65
+      ],
+      [
+        187,
+        70,
+        65
+      ],
+      [
+        187,
+        70,
+        65
+      ]
+    ],
+    "cooked_meat": [
+      [
+        151,
+        81,
+        43
+      ],
+      [
+        151,
+        81,
+        43
+      ],
+      [
+        151,
+        81,
+        43
+      ],
+      [
+        151,
+        81,
+        43
+      ]
+    ],
+    "rotten": [
+      [
+        113,
+        116,
+        42
+      ],
+      [
+        113,
+        116,
+        42
+      ],
+      [
+        113,
+        116,
+        42
+      ],
+      [
+        113,
+        116,
+        42
+      ]
+    ],
+    "powder": [
+      [
+        83,
+        86,
+        80
+      ],
+      [
+        83,
+        86,
+        80
+      ],
+      [
+        83,
+        86,
+        80
+      ],
+      [
+        83,
+        86,
+        80
+      ]
+    ],
+    "cow_egg": [
+      [
+        54,
+        31,
+        19
+      ],
+      [
+        104,
+        60,
+        34
+      ],
+      [
+        166,
+        105,
+        62
+      ],
+      [
+        235,
+        225,
+        200
+      ]
+    ],
+    "pig_egg": [
+      [
+        92,
+        44,
+        50
+      ],
+      [
+        164,
+        77,
+        88
+      ],
+      [
+        232,
+        137,
+        148
+      ],
+      [
+        255,
+        203,
+        207
+      ]
+    ],
+    "sheep_egg": [
+      [
+        65,
+        64,
+        61
+      ],
+      [
+        133,
+        130,
+        120
+      ],
+      [
+        218,
+        215,
+        201
+      ],
+      [
+        255,
+        252,
+        238
+      ]
+    ],
+    "chicken_egg": [
+      [
+        96,
+        75,
+        35
+      ],
+      [
+        218,
+        136,
+        31
+      ],
+      [
+        235,
+        229,
+        205
+      ],
+      [
+        255,
+        250,
+        230
+      ]
+    ],
+    "zombie_egg": [
+      [
+        28,
+        59,
+        44
+      ],
+      [
+        53,
+        105,
+        67
+      ],
+      [
+        91,
+        156,
+        84
+      ],
+      [
+        72,
+        118,
+        145
+      ]
+    ],
+    "skeleton_egg": [
+      [
+        45,
+        48,
+        49
+      ],
+      [
+        99,
+        104,
+        105
+      ],
+      [
+        175,
+        181,
+        178
+      ],
+      [
+        238,
+        241,
+        230
+      ]
+    ],
+    "spider_egg": [
+      [
+        29,
+        23,
+        25
+      ],
+      [
+        61,
+        43,
+        45
+      ],
+      [
+        111,
+        58,
+        53
+      ],
+      [
+        191,
+        54,
+        39
+      ]
+    ],
+    "blastling_egg": [
+      [
+        37,
+        27,
+        57
+      ],
+      [
+        76,
+        49,
+        111
+      ],
+      [
+        132,
+        76,
+        171
+      ],
+      [
+        219,
+        137,
+        238
+      ]
+    ],
+    "villager_egg": [
+      [
+        72,
+        45,
+        29
+      ],
+      [
+        121,
+        78,
+        49
+      ],
+      [
+        181,
+        131,
+        83
+      ],
+      [
+        91,
+        151,
+        78
+      ]
+    ],
+    "zombie_villager_egg": [
+      [
+        28,
+        58,
+        42
+      ],
+      [
+        55,
+        103,
+        64
+      ],
+      [
+        105,
+        145,
+        79
+      ],
+      [
+        116,
+        78,
+        49
+      ]
+    ],
+    "emerald": [
+      [
+        42,
+        202,
+        112
+      ],
+      [
+        42,
+        202,
+        112
+      ],
+      [
+        42,
+        202,
+        112
+      ],
+      [
+        42,
+        202,
+        112
+      ]
+    ],
+    "clay_ball": [
+      [
+        73,
+        80,
+        85
+      ],
+      [
+        106,
+        116,
+        124
+      ],
+      [
+        133,
+        146,
+        156
+      ],
+      [
+        152,
+        167,
+        179
+      ]
+    ],
+    "brick": [
+      [
+        95,
+        50,
+        36
+      ],
+      [
+        139,
+        72,
+        53
+      ],
+      [
+        174,
+        91,
+        67
+      ],
+      [
+        200,
+        104,
+        77
+      ]
+    ],
+    "red_dye": [
+      [
+        101,
+        29,
+        26
+      ],
+      [
+        148,
+        42,
+        38
+      ],
+      [
+        185,
+        53,
+        48
+      ],
+      [
+        212,
+        60,
+        55
+      ]
+    ],
+    "yellow_dye": [
+      [
+        123,
+        101,
+        18
+      ],
+      [
+        180,
+        147,
+        27
+      ],
+      [
+        225,
+        184,
+        34
+      ],
+      [
+        255,
+        211,
+        39
+      ]
+    ],
+    "blue_dye": [
+      [
+        31,
+        62,
+        105
+      ],
+      [
+        46,
+        90,
+        153
+      ],
+      [
+        58,
+        113,
+        192
+      ],
+      [
+        66,
+        129,
+        220
+      ]
+    ],
+    "green_dye": [
+      [
+        41,
+        72,
+        30
+      ],
+      [
+        60,
+        104,
+        44
+      ],
+      [
+        76,
+        131,
+        55
+      ],
+      [
+        87,
+        150,
+        63
+      ]
+    ],
+    "black_dye": [
+      [
+        24,
+        24,
+        26
+      ],
+      [
+        35,
+        36,
+        39
+      ],
+      [
+        44,
+        45,
+        49
+      ],
+      [
+        50,
+        51,
+        56
+      ]
+    ],
+    "bone_meal": [
+      [
+        111,
+        107,
+        89
+      ],
+      [
+        161,
+        156,
+        130
+      ],
+      [
+        202,
+        195,
+        163
+      ],
+      [
+        232,
+        224,
+        187
+      ]
+    ]
   },
   "items": {
-    "grass_block": {"generator": "block_item_icon", "block": "grass"},
-    "dirt": {"generator": "block_item_icon", "block": "dirt"},
-    "stone": {"generator": "block_item_icon", "block": "stone"},
-    "oak_log": {"generator": "block_item_icon", "block": "wood"},
-    "oak_planks": {"generator": "block_item_icon", "block": "planks"},
-    "cobblestone": {"generator": "block_item_icon", "block": "cobblestone"},
-    "crafting_table": {"generator": "block_item_icon", "block": "crafting_table"},
-    "furnace": {"generator": "block_item_icon", "block": "furnace"},
-    "chest": {"generator": "block_item_icon", "block": "chest"},
-    "stick": {"generator": "item_sprite", "template": "stick", "material": "wood"},
-    "coal": {"generator": "item_sprite", "template": "coal", "material": "stone"},
-    "iron_ingot": {"generator": "item_sprite", "template": "ingot", "material": "iron"},
-    "gold_ingot": {"generator": "item_sprite", "template": "ingot", "material": "gold"},
-    "diamond": {"generator": "item_sprite", "template": "gem", "material": "diamond"},
-    "torch": {"generator": "item_sprite", "template": "torch", "material": "gold"},
-    "wooden_pickaxe": {"generator": "item_sprite", "template": "pickaxe", "material": "wood"},
-    "wooden_axe": {"generator": "item_sprite", "template": "axe", "material": "wood"},
-    "wooden_shovel": {"generator": "item_sprite", "template": "shovel", "material": "wood"},
-    "wooden_hoe": {"generator": "item_sprite", "template": "hoe", "material": "wood"},
-    "wooden_sword": {"generator": "item_sprite", "template": "sword", "material": "wood"},
-    "stone_pickaxe": {"generator": "item_sprite", "template": "pickaxe", "material": "stone"},
-    "stone_axe": {"generator": "item_sprite", "template": "axe", "material": "stone"},
-    "stone_shovel": {"generator": "item_sprite", "template": "shovel", "material": "stone"},
-    "stone_hoe": {"generator": "item_sprite", "template": "hoe", "material": "stone"},
-    "stone_sword": {"generator": "item_sprite", "template": "sword", "material": "stone"},
-    "iron_pickaxe": {"generator": "item_sprite", "template": "pickaxe", "material": "iron"},
-    "iron_axe": {"generator": "item_sprite", "template": "axe", "material": "iron"},
-    "iron_shovel": {"generator": "item_sprite", "template": "shovel", "material": "iron"},
-    "iron_hoe": {"generator": "item_sprite", "template": "hoe", "material": "iron"},
-    "iron_sword": {"generator": "item_sprite", "template": "sword", "material": "iron"},
-    "golden_pickaxe": {"generator": "item_sprite", "template": "pickaxe", "material": "gold"},
-    "golden_axe": {"generator": "item_sprite", "template": "axe", "material": "gold"},
-    "golden_shovel": {"generator": "item_sprite", "template": "shovel", "material": "gold"},
-    "golden_hoe": {"generator": "item_sprite", "template": "hoe", "material": "gold"},
-    "golden_sword": {"generator": "item_sprite", "template": "sword", "material": "gold"},
-    "oak_leaves": {"generator": "block_item_icon", "block": "leaves"},
-    "sand": {"generator": "block_item_icon", "block": "sand"},
-    "bedrock": {"generator": "block_item_icon", "block": "bedrock"},
-    "water": {"generator": "block_item_icon", "block": "water"},
-    "snow": {"generator": "block_item_icon", "block": "snow"},
-    "deepslate": {"generator": "block_item_icon", "block": "deepslate"},
-    "cactus": {"generator": "block_item_icon", "block": "cactus_block"},
-    "coal_ore": {"generator": "block_item_icon", "block": "coal_ore"},
-    "iron_ore": {"generator": "block_item_icon", "block": "iron_ore"},
-    "gold_ore": {"generator": "block_item_icon", "block": "gold_ore"},
-    "diamond_ore": {"generator": "block_item_icon", "block": "diamond_ore"},
-    "lava": {"generator": "block_item_icon", "block": "lava"},
-    "ice": {"generator": "block_item_icon", "block": "ice"},
-    "gravel": {"generator": "block_item_icon", "block": "gravel"},
-    "clay": {"generator": "block_item_icon", "block": "clay"},
-    "red_sand": {"generator": "block_item_icon", "block": "red_sand"},
-    "terracotta": {"generator": "block_item_icon", "block": "terracotta"},
-    "podzol": {"generator": "block_item_icon", "block": "podzol"},
-    "moss": {"generator": "block_item_icon", "block": "moss"},
-    "tall_grass": {"generator": "block_item_icon", "block": "tall_grass"},
-    "poppy": {"generator": "block_item_icon", "block": "flower"},
-    "reeds": {"generator": "block_item_icon", "block": "reeds"},
-    "birch_log": {"generator": "block_item_icon", "block": "birch_wood"},
-    "birch_leaves": {"generator": "block_item_icon", "block": "birch_leaves"},
-    "spruce_log": {"generator": "block_item_icon", "block": "spruce_wood"},
-    "spruce_leaves": {"generator": "block_item_icon", "block": "spruce_leaves"},
-    "jungle_log": {"generator": "block_item_icon", "block": "jungle_wood"},
-    "jungle_leaves": {"generator": "block_item_icon", "block": "jungle_leaves"},
-    "acacia_log": {"generator": "block_item_icon", "block": "acacia_wood"},
-    "acacia_leaves": {"generator": "block_item_icon", "block": "acacia_leaves"},
-    "raw_iron": {"generator": "item_sprite", "template": "coal", "material": "iron"},
-    "raw_gold": {"generator": "item_sprite", "template": "coal", "material": "gold"},
-    "string": {"generator": "item_sprite", "template": "string", "material": "fiber"},
-    "feather": {"generator": "item_sprite", "template": "feather", "material": "fiber"},
-    "leather": {"generator": "item_sprite", "template": "leather", "material": "leather"},
-    "bone": {"generator": "item_sprite", "template": "bone", "material": "bone"},
-    "arrow": {"generator": "item_sprite", "template": "arrow", "material": "stone"},
-    "wheat_seeds": {"generator": "item_sprite", "template": "seeds", "material": "plant"},
-    "wheat": {"generator": "item_sprite", "template": "wheat", "material": "wheat"},
-    "bread": {"generator": "item_sprite", "template": "bread", "material": "wheat"},
-    "raw_beef": {"generator": "item_sprite", "template": "beef", "material": "raw_meat"},
-    "steak": {"generator": "item_sprite", "template": "beef", "material": "cooked_meat"},
-    "raw_porkchop": {"generator": "item_sprite", "template": "porkchop", "material": "raw_meat"},
-    "cooked_porkchop": {"generator": "item_sprite", "template": "porkchop", "material": "cooked_meat"},
-    "raw_chicken": {"generator": "item_sprite", "template": "drumstick", "material": "raw_meat"},
-    "cooked_chicken": {"generator": "item_sprite", "template": "drumstick", "material": "cooked_meat"},
-    "raw_mutton": {"generator": "item_sprite", "template": "mutton", "material": "raw_meat"},
-    "cooked_mutton": {"generator": "item_sprite", "template": "mutton", "material": "cooked_meat"},
-    "rotten_flesh": {"generator": "item_sprite", "template": "rotten_flesh", "material": "rotten"},
-    "white_wool": {"generator": "block_item_icon", "block": "white_wool"},
-    "white_bed": {"generator": "block_item_icon", "block": "white_bed"},
-    "farmland": {"generator": "block_item_icon", "block": "farmland"},
-    "diamond_pickaxe": {"generator": "item_sprite", "template": "pickaxe", "material": "diamond"},
-    "diamond_axe": {"generator": "item_sprite", "template": "axe", "material": "diamond"},
-    "diamond_shovel": {"generator": "item_sprite", "template": "shovel", "material": "diamond"},
-    "diamond_hoe": {"generator": "item_sprite", "template": "hoe", "material": "diamond"},
-    "diamond_sword": {"generator": "item_sprite", "template": "sword", "material": "diamond"},
-    "bow": {"generator": "item_sprite", "template": "bow", "material": "fiber"},
-    "shield": {"generator": "item_sprite", "template": "shield", "material": "wood"},
-    "leather_helmet": {"generator": "item_sprite", "template": "helmet", "material": "leather"},
-    "leather_chestplate": {"generator": "item_sprite", "template": "chestplate", "material": "leather"},
-    "leather_leggings": {"generator": "item_sprite", "template": "leggings", "material": "leather"},
-    "leather_boots": {"generator": "item_sprite", "template": "boots", "material": "leather"},
-    "iron_helmet": {"generator": "item_sprite", "template": "helmet", "material": "iron"},
-    "iron_chestplate": {"generator": "item_sprite", "template": "chestplate", "material": "iron"},
-    "iron_leggings": {"generator": "item_sprite", "template": "leggings", "material": "iron"},
-    "iron_boots": {"generator": "item_sprite", "template": "boots", "material": "iron"},
-    "golden_helmet": {"generator": "item_sprite", "template": "helmet", "material": "gold"},
-    "golden_chestplate": {"generator": "item_sprite", "template": "chestplate", "material": "gold"},
-    "golden_leggings": {"generator": "item_sprite", "template": "leggings", "material": "gold"},
-    "golden_boots": {"generator": "item_sprite", "template": "boots", "material": "gold"},
-    "diamond_helmet": {"generator": "item_sprite", "template": "helmet", "material": "diamond"},
-    "diamond_chestplate": {"generator": "item_sprite", "template": "chestplate", "material": "diamond"},
-    "diamond_leggings": {"generator": "item_sprite", "template": "leggings", "material": "diamond"},
-    "diamond_boots": {"generator": "item_sprite", "template": "boots", "material": "diamond"},
-    "flint": {"generator": "item_sprite", "template": "flint", "material": "stone"},
-    "oak_sapling": {"generator": "block_item_icon", "block": "oak_sapling"},
-    "birch_sapling": {"generator": "block_item_icon", "block": "birch_sapling"},
-    "spruce_sapling": {"generator": "block_item_icon", "block": "spruce_sapling"},
-    "jungle_sapling": {"generator": "block_item_icon", "block": "jungle_sapling"},
-    "acacia_sapling": {"generator": "block_item_icon", "block": "acacia_sapling"},
-    "glass": {"generator": "block_item_icon", "block": "glass"},
-    "tnt": {"generator": "block_item_icon", "block": "tnt"},
-    "obsidian": {"generator": "block_item_icon", "block": "obsidian"},
-    "dandelion": {"generator": "block_item_icon", "block": "dandelion"},
-    "blue_orchid": {"generator": "block_item_icon", "block": "blue_orchid"},
-    "allium": {"generator": "block_item_icon", "block": "allium"},
-    "oxeye_daisy": {"generator": "block_item_icon", "block": "oxeye_daisy"},
-    "sunflower": {"generator": "block_item_icon", "block": "sunflower"},
-    "flint_and_steel": {"generator": "item_sprite", "template": "flint_and_steel", "material": "iron"},
-    "gunpowder": {"generator": "item_sprite", "template": "gunpowder", "material": "powder"},
-    "cow_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "cow_egg"},
-    "pig_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "pig_egg"},
-    "sheep_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "sheep_egg"},
-    "chicken_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "chicken_egg"},
-    "zombie_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "zombie_egg"},
-    "skeleton_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "skeleton_egg"},
-    "spider_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "spider_egg"},
-    "blastling_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "blastling_egg"},
-    "villager_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "villager_egg"},
-    "zombie_villager_spawn_egg": {"generator": "item_sprite", "template": "spawn_egg", "material": "zombie_villager_egg"},
-    "limestone": {"generator": "block_item_icon", "block": "limestone"},
-    "basalt": {"generator": "block_item_icon", "block": "basalt"},
-    "tuff": {"generator": "block_item_icon", "block": "tuff"},
-    "coarse_dirt": {"generator": "block_item_icon", "block": "coarse_dirt"},
-    "mud": {"generator": "block_item_icon", "block": "mud"},
-    "packed_ice": {"generator": "block_item_icon", "block": "packed_ice"},
-    "black_sand": {"generator": "block_item_icon", "block": "black_sand"},
-    "granite": {"generator": "block_item_icon", "block": "granite"},
-    "aether_grass": {"generator": "block_item_icon", "block": "aether_grass"},
-    "aether_soil": {"generator": "block_item_icon", "block": "aether_soil"},
-    "cloudstone": {"generator": "block_item_icon", "block": "cloudstone"},
-    "sunstone": {"generator": "block_item_icon", "block": "sunstone"},
-    "skyroot_log": {"generator": "block_item_icon", "block": "skyroot_wood"},
-    "skyroot_leaves": {"generator": "block_item_icon", "block": "skyroot_leaves"},
-    "star_crystal": {"generator": "block_item_icon", "block": "star_crystal"},
-    "starflower": {"generator": "block_item_icon", "block": "starflower"},
-    "cloud_bloom": {"generator": "block_item_icon", "block": "cloud_bloom"},
-    "glowshroom": {"generator": "block_item_icon", "block": "glowshroom"},
-    "dripstone_block": {"generator": "block_item_icon", "block": "dripstone_block"},
-    "pointed_dripstone": {"generator": "block_item_icon", "block": "pointed_dripstone_up"},
-    "calcite": {"generator": "block_item_icon", "block": "calcite"},
-    "hanging_roots": {"generator": "block_item_icon", "block": "hanging_roots"},
-    "glow_fern": {"generator": "block_item_icon", "block": "glow_fern"},
-    "resonant_crystal": {"generator": "block_item_icon", "block": "resonant_crystal"},
-    "sulfur_crust": {"generator": "block_item_icon", "block": "sulfur_crust"},
-    "emerald": {"generator": "item_sprite", "template": "gem", "material": "emerald"},
-    "emerald_ore": {"generator": "block_item_icon", "block": "emerald_ore"},
-    "deepslate_emerald_ore": {"generator": "block_item_icon", "block": "deepslate_emerald_ore"},
-    "composter": {"generator": "block_item_icon", "block": "composter"},
-    "fletching_table": {"generator": "block_item_icon", "block": "fletching_table"},
-    "loom": {"generator": "block_item_icon", "block": "loom"},
-    "cauldron": {"generator": "block_item_icon", "block": "cauldron"},
-    "blast_furnace": {"generator": "block_item_icon", "block": "blast_furnace"},
-    "smithing_table": {"generator": "block_item_icon", "block": "smithing_table"},
-    "grindstone": {"generator": "block_item_icon", "block": "grindstone"},
-    "oak_planks_slab": {"generator": "block_item_icon", "block": "planks"},
-    "oak_planks_stairs": {"generator": "block_item_icon", "block": "planks"},
-    "cobblestone_slab": {"generator": "block_item_icon", "block": "cobblestone"},
-    "cobblestone_stairs": {"generator": "block_item_icon", "block": "cobblestone"},
-    "terracotta_slab": {"generator": "block_item_icon", "block": "terracotta"},
-    "terracotta_stairs": {"generator": "block_item_icon", "block": "terracotta"},
-    "sunstone_slab": {"generator": "block_item_icon", "block": "sunstone"},
-    "sunstone_stairs": {"generator": "block_item_icon", "block": "sunstone"},
-    "cloudstone_slab": {"generator": "block_item_icon", "block": "cloudstone"},
-    "cloudstone_stairs": {"generator": "block_item_icon", "block": "cloudstone"},
-    "starstep_scepter": {"generator": "item_sprite", "template": "scepter", "material": "diamond"},
-    "stone_bricks": {"generator": "block_item_icon", "block": "stone_bricks"},
-    "mossy_stone_bricks": {"generator": "block_item_icon", "block": "mossy_stone_bricks"},
-    "cracked_stone_bricks": {"generator": "block_item_icon", "block": "cracked_stone_bricks"},
-    "chiseled_stone_bricks": {"generator": "block_item_icon", "block": "chiseled_stone_bricks"},
-    "bricks": {"generator": "block_item_icon", "block": "bricks"},
-    "polished_granite": {"generator": "block_item_icon", "block": "polished_granite"},
-    "polished_basalt": {"generator": "block_item_icon", "block": "polished_basalt"},
-    "polished_limestone": {"generator": "block_item_icon", "block": "polished_limestone"},
-    "polished_tuff": {"generator": "block_item_icon", "block": "polished_tuff"},
-    "deepslate_bricks": {"generator": "block_item_icon", "block": "deepslate_bricks"},
-    "sandstone": {"generator": "block_item_icon", "block": "sandstone"},
-    "cut_sandstone": {"generator": "block_item_icon", "block": "cut_sandstone"},
-    "smooth_sandstone": {"generator": "block_item_icon", "block": "smooth_sandstone"},
-    "red_wool": {"generator": "block_item_icon", "block": "red_wool"},
-    "yellow_wool": {"generator": "block_item_icon", "block": "yellow_wool"},
-    "blue_wool": {"generator": "block_item_icon", "block": "blue_wool"},
-    "green_wool": {"generator": "block_item_icon", "block": "green_wool"},
-    "black_wool": {"generator": "block_item_icon", "block": "black_wool"},
-    "clay_ball": {"generator": "item_sprite", "template": "clay_ball", "material": "clay_ball"},
-    "brick": {"generator": "item_sprite", "template": "brick", "material": "brick"},
-    "red_dye": {"generator": "item_sprite", "template": "dye", "material": "red_dye"},
-    "yellow_dye": {"generator": "item_sprite", "template": "dye", "material": "yellow_dye"},
-    "blue_dye": {"generator": "item_sprite", "template": "dye", "material": "blue_dye"},
-    "green_dye": {"generator": "item_sprite", "template": "dye", "material": "green_dye"},
-    "black_dye": {"generator": "item_sprite", "template": "dye", "material": "black_dye"},
-    "bone_meal": {"generator": "item_sprite", "template": "dye", "material": "bone_meal"},
-    "rooted_dirt": {"generator": "block_item_icon", "block": "rooted_dirt"},
-    "leaf_litter_soil": {"generator": "block_item_icon", "block": "leaf_litter_soil"},
-    "peat": {"generator": "block_item_icon", "block": "peat"},
-    "silt": {"generator": "block_item_icon", "block": "silt"},
-    "dry_grass_block": {"generator": "block_item_icon", "block": "dry_grass_block"},
-    "permafrost": {"generator": "block_item_icon", "block": "permafrost"},
-    "blue_ice": {"generator": "block_item_icon", "block": "blue_ice"},
-    "shale": {"generator": "block_item_icon", "block": "shale"},
-    "red_sandstone": {"generator": "block_item_icon", "block": "red_sandstone"},
-    "ochre_terracotta": {"generator": "block_item_icon", "block": "ochre_terracotta"},
-    "white_terracotta": {"generator": "block_item_icon", "block": "white_terracotta"},
-    "volcanic_ash": {"generator": "block_item_icon", "block": "volcanic_ash"},
-    "coral_rock": {"generator": "block_item_icon", "block": "coral_rock"},
-    "fern": {"generator": "block_item_icon", "block": "fern"},
-    "dead_bush": {"generator": "block_item_icon", "block": "dead_bush"},
-    "dry_grass": {"generator": "block_item_icon", "block": "dry_grass"},
-    "brown_mushroom": {"generator": "block_item_icon", "block": "brown_mushroom"},
-    "red_mushroom": {"generator": "block_item_icon", "block": "red_mushroom"},
-    "lavender": {"generator": "block_item_icon", "block": "lavender"},
-    "bellflower": {"generator": "block_item_icon", "block": "bellflower"},
-    "alpine_flower": {"generator": "block_item_icon", "block": "alpine_flower"},
-    "tropical_flower": {"generator": "block_item_icon", "block": "tropical_flower"},
-    "cattail": {"generator": "block_item_icon", "block": "cattail"},
-    "beach_grass": {"generator": "block_item_icon", "block": "beach_grass"}
+    "grass_block": {
+      "generator": "block_item_icon",
+      "block": "grass"
+    },
+    "dirt": {
+      "generator": "block_item_icon",
+      "block": "dirt"
+    },
+    "stone": {
+      "generator": "block_item_icon",
+      "block": "stone"
+    },
+    "oak_log": {
+      "generator": "block_item_icon",
+      "block": "wood"
+    },
+    "oak_planks": {
+      "generator": "block_item_icon",
+      "block": "planks"
+    },
+    "cobblestone": {
+      "generator": "block_item_icon",
+      "block": "cobblestone"
+    },
+    "crafting_table": {
+      "generator": "block_item_icon",
+      "block": "crafting_table"
+    },
+    "furnace": {
+      "generator": "block_item_icon",
+      "block": "furnace"
+    },
+    "chest": {
+      "generator": "block_item_icon",
+      "block": "chest"
+    },
+    "stick": {
+      "generator": "item_sprite",
+      "template": "stick",
+      "material": "wood"
+    },
+    "coal": {
+      "generator": "item_sprite",
+      "template": "coal",
+      "material": "stone"
+    },
+    "iron_ingot": {
+      "generator": "item_sprite",
+      "template": "ingot",
+      "material": "iron"
+    },
+    "gold_ingot": {
+      "generator": "item_sprite",
+      "template": "ingot",
+      "material": "gold"
+    },
+    "diamond": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "diamond"
+    },
+    "torch": {
+      "generator": "item_sprite",
+      "template": "torch",
+      "material": "gold"
+    },
+    "wooden_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "wood"
+    },
+    "wooden_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "wood"
+    },
+    "wooden_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "wood"
+    },
+    "wooden_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "wood"
+    },
+    "wooden_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "wood"
+    },
+    "stone_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "stone"
+    },
+    "stone_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "stone"
+    },
+    "stone_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "stone"
+    },
+    "stone_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "stone"
+    },
+    "stone_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "stone"
+    },
+    "iron_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "iron"
+    },
+    "iron_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "iron"
+    },
+    "iron_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "iron"
+    },
+    "iron_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "iron"
+    },
+    "iron_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "iron"
+    },
+    "golden_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "gold"
+    },
+    "golden_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "gold"
+    },
+    "golden_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "gold"
+    },
+    "golden_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "gold"
+    },
+    "golden_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "gold"
+    },
+    "oak_leaves": {
+      "generator": "block_item_icon",
+      "block": "leaves"
+    },
+    "sand": {
+      "generator": "block_item_icon",
+      "block": "sand"
+    },
+    "bedrock": {
+      "generator": "block_item_icon",
+      "block": "bedrock"
+    },
+    "water": {
+      "generator": "block_item_icon",
+      "block": "water"
+    },
+    "snow": {
+      "generator": "block_item_icon",
+      "block": "snow"
+    },
+    "deepslate": {
+      "generator": "block_item_icon",
+      "block": "deepslate"
+    },
+    "cactus": {
+      "generator": "block_item_icon",
+      "block": "cactus_block"
+    },
+    "coal_ore": {
+      "generator": "block_item_icon",
+      "block": "coal_ore"
+    },
+    "iron_ore": {
+      "generator": "block_item_icon",
+      "block": "iron_ore"
+    },
+    "gold_ore": {
+      "generator": "block_item_icon",
+      "block": "gold_ore"
+    },
+    "diamond_ore": {
+      "generator": "block_item_icon",
+      "block": "diamond_ore"
+    },
+    "lava": {
+      "generator": "block_item_icon",
+      "block": "lava"
+    },
+    "ice": {
+      "generator": "block_item_icon",
+      "block": "ice"
+    },
+    "gravel": {
+      "generator": "block_item_icon",
+      "block": "gravel"
+    },
+    "clay": {
+      "generator": "block_item_icon",
+      "block": "clay"
+    },
+    "red_sand": {
+      "generator": "block_item_icon",
+      "block": "red_sand"
+    },
+    "terracotta": {
+      "generator": "block_item_icon",
+      "block": "terracotta"
+    },
+    "podzol": {
+      "generator": "block_item_icon",
+      "block": "podzol"
+    },
+    "moss": {
+      "generator": "block_item_icon",
+      "block": "moss"
+    },
+    "tall_grass": {
+      "generator": "block_item_icon",
+      "block": "tall_grass"
+    },
+    "poppy": {
+      "generator": "block_item_icon",
+      "block": "flower"
+    },
+    "reeds": {
+      "generator": "block_item_icon",
+      "block": "reeds"
+    },
+    "birch_log": {
+      "generator": "block_item_icon",
+      "block": "birch_wood"
+    },
+    "birch_leaves": {
+      "generator": "block_item_icon",
+      "block": "birch_leaves"
+    },
+    "spruce_log": {
+      "generator": "block_item_icon",
+      "block": "spruce_wood"
+    },
+    "spruce_leaves": {
+      "generator": "block_item_icon",
+      "block": "spruce_leaves"
+    },
+    "jungle_log": {
+      "generator": "block_item_icon",
+      "block": "jungle_wood"
+    },
+    "jungle_leaves": {
+      "generator": "block_item_icon",
+      "block": "jungle_leaves"
+    },
+    "acacia_log": {
+      "generator": "block_item_icon",
+      "block": "acacia_wood"
+    },
+    "acacia_leaves": {
+      "generator": "block_item_icon",
+      "block": "acacia_leaves"
+    },
+    "raw_iron": {
+      "generator": "item_sprite",
+      "template": "coal",
+      "material": "iron"
+    },
+    "raw_gold": {
+      "generator": "item_sprite",
+      "template": "coal",
+      "material": "gold"
+    },
+    "string": {
+      "generator": "item_sprite",
+      "template": "string",
+      "material": "fiber"
+    },
+    "feather": {
+      "generator": "item_sprite",
+      "template": "feather",
+      "material": "fiber"
+    },
+    "leather": {
+      "generator": "item_sprite",
+      "template": "leather",
+      "material": "leather"
+    },
+    "bone": {
+      "generator": "item_sprite",
+      "template": "bone",
+      "material": "bone"
+    },
+    "arrow": {
+      "generator": "item_sprite",
+      "template": "arrow",
+      "material": "stone"
+    },
+    "wheat_seeds": {
+      "generator": "item_sprite",
+      "template": "seeds",
+      "material": "plant"
+    },
+    "wheat": {
+      "generator": "item_sprite",
+      "template": "wheat",
+      "material": "wheat"
+    },
+    "bread": {
+      "generator": "item_sprite",
+      "template": "bread",
+      "material": "wheat"
+    },
+    "raw_beef": {
+      "generator": "item_sprite",
+      "template": "beef",
+      "material": "raw_meat"
+    },
+    "steak": {
+      "generator": "item_sprite",
+      "template": "beef",
+      "material": "cooked_meat"
+    },
+    "raw_porkchop": {
+      "generator": "item_sprite",
+      "template": "porkchop",
+      "material": "raw_meat"
+    },
+    "cooked_porkchop": {
+      "generator": "item_sprite",
+      "template": "porkchop",
+      "material": "cooked_meat"
+    },
+    "raw_chicken": {
+      "generator": "item_sprite",
+      "template": "drumstick",
+      "material": "raw_meat"
+    },
+    "cooked_chicken": {
+      "generator": "item_sprite",
+      "template": "drumstick",
+      "material": "cooked_meat"
+    },
+    "raw_mutton": {
+      "generator": "item_sprite",
+      "template": "mutton",
+      "material": "raw_meat"
+    },
+    "cooked_mutton": {
+      "generator": "item_sprite",
+      "template": "mutton",
+      "material": "cooked_meat"
+    },
+    "rotten_flesh": {
+      "generator": "item_sprite",
+      "template": "rotten_flesh",
+      "material": "rotten"
+    },
+    "white_wool": {
+      "generator": "block_item_icon",
+      "block": "white_wool"
+    },
+    "white_bed": {
+      "generator": "block_item_icon",
+      "block": "white_bed"
+    },
+    "farmland": {
+      "generator": "block_item_icon",
+      "block": "farmland"
+    },
+    "diamond_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "diamond"
+    },
+    "diamond_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "diamond"
+    },
+    "diamond_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "diamond"
+    },
+    "diamond_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "diamond"
+    },
+    "diamond_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "diamond"
+    },
+    "bow": {
+      "generator": "item_sprite",
+      "template": "bow",
+      "material": "fiber"
+    },
+    "shield": {
+      "generator": "item_sprite",
+      "template": "shield",
+      "material": "wood"
+    },
+    "leather_helmet": {
+      "generator": "item_sprite",
+      "template": "helmet",
+      "material": "leather"
+    },
+    "leather_chestplate": {
+      "generator": "item_sprite",
+      "template": "chestplate",
+      "material": "leather"
+    },
+    "leather_leggings": {
+      "generator": "item_sprite",
+      "template": "leggings",
+      "material": "leather"
+    },
+    "leather_boots": {
+      "generator": "item_sprite",
+      "template": "boots",
+      "material": "leather"
+    },
+    "iron_helmet": {
+      "generator": "item_sprite",
+      "template": "helmet",
+      "material": "iron"
+    },
+    "iron_chestplate": {
+      "generator": "item_sprite",
+      "template": "chestplate",
+      "material": "iron"
+    },
+    "iron_leggings": {
+      "generator": "item_sprite",
+      "template": "leggings",
+      "material": "iron"
+    },
+    "iron_boots": {
+      "generator": "item_sprite",
+      "template": "boots",
+      "material": "iron"
+    },
+    "golden_helmet": {
+      "generator": "item_sprite",
+      "template": "helmet",
+      "material": "gold"
+    },
+    "golden_chestplate": {
+      "generator": "item_sprite",
+      "template": "chestplate",
+      "material": "gold"
+    },
+    "golden_leggings": {
+      "generator": "item_sprite",
+      "template": "leggings",
+      "material": "gold"
+    },
+    "golden_boots": {
+      "generator": "item_sprite",
+      "template": "boots",
+      "material": "gold"
+    },
+    "diamond_helmet": {
+      "generator": "item_sprite",
+      "template": "helmet",
+      "material": "diamond"
+    },
+    "diamond_chestplate": {
+      "generator": "item_sprite",
+      "template": "chestplate",
+      "material": "diamond"
+    },
+    "diamond_leggings": {
+      "generator": "item_sprite",
+      "template": "leggings",
+      "material": "diamond"
+    },
+    "diamond_boots": {
+      "generator": "item_sprite",
+      "template": "boots",
+      "material": "diamond"
+    },
+    "flint": {
+      "generator": "item_sprite",
+      "template": "flint",
+      "material": "stone"
+    },
+    "oak_sapling": {
+      "generator": "block_item_icon",
+      "block": "oak_sapling"
+    },
+    "birch_sapling": {
+      "generator": "block_item_icon",
+      "block": "birch_sapling"
+    },
+    "spruce_sapling": {
+      "generator": "block_item_icon",
+      "block": "spruce_sapling"
+    },
+    "jungle_sapling": {
+      "generator": "block_item_icon",
+      "block": "jungle_sapling"
+    },
+    "acacia_sapling": {
+      "generator": "block_item_icon",
+      "block": "acacia_sapling"
+    },
+    "glass": {
+      "generator": "block_item_icon",
+      "block": "glass"
+    },
+    "tnt": {
+      "generator": "block_item_icon",
+      "block": "tnt"
+    },
+    "obsidian": {
+      "generator": "block_item_icon",
+      "block": "obsidian"
+    },
+    "dandelion": {
+      "generator": "block_item_icon",
+      "block": "dandelion"
+    },
+    "blue_orchid": {
+      "generator": "block_item_icon",
+      "block": "blue_orchid"
+    },
+    "allium": {
+      "generator": "block_item_icon",
+      "block": "allium"
+    },
+    "oxeye_daisy": {
+      "generator": "block_item_icon",
+      "block": "oxeye_daisy"
+    },
+    "sunflower": {
+      "generator": "block_item_icon",
+      "block": "sunflower"
+    },
+    "flint_and_steel": {
+      "generator": "item_sprite",
+      "template": "flint_and_steel",
+      "material": "iron"
+    },
+    "gunpowder": {
+      "generator": "item_sprite",
+      "template": "gunpowder",
+      "material": "powder"
+    },
+    "cow_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "cow_egg"
+    },
+    "pig_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "pig_egg"
+    },
+    "sheep_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "sheep_egg"
+    },
+    "chicken_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "chicken_egg"
+    },
+    "zombie_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "zombie_egg"
+    },
+    "skeleton_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "skeleton_egg"
+    },
+    "spider_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "spider_egg"
+    },
+    "blastling_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "blastling_egg"
+    },
+    "villager_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "villager_egg"
+    },
+    "zombie_villager_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "zombie_villager_egg"
+    },
+    "limestone": {
+      "generator": "block_item_icon",
+      "block": "limestone"
+    },
+    "basalt": {
+      "generator": "block_item_icon",
+      "block": "basalt"
+    },
+    "tuff": {
+      "generator": "block_item_icon",
+      "block": "tuff"
+    },
+    "coarse_dirt": {
+      "generator": "block_item_icon",
+      "block": "coarse_dirt"
+    },
+    "mud": {
+      "generator": "block_item_icon",
+      "block": "mud"
+    },
+    "packed_ice": {
+      "generator": "block_item_icon",
+      "block": "packed_ice"
+    },
+    "black_sand": {
+      "generator": "block_item_icon",
+      "block": "black_sand"
+    },
+    "granite": {
+      "generator": "block_item_icon",
+      "block": "granite"
+    },
+    "aether_grass": {
+      "generator": "block_item_icon",
+      "block": "aether_grass"
+    },
+    "aether_soil": {
+      "generator": "block_item_icon",
+      "block": "aether_soil"
+    },
+    "cloudstone": {
+      "generator": "block_item_icon",
+      "block": "cloudstone"
+    },
+    "sunstone": {
+      "generator": "block_item_icon",
+      "block": "sunstone"
+    },
+    "skyroot_log": {
+      "generator": "block_item_icon",
+      "block": "skyroot_wood"
+    },
+    "skyroot_leaves": {
+      "generator": "block_item_icon",
+      "block": "skyroot_leaves"
+    },
+    "star_crystal": {
+      "generator": "block_item_icon",
+      "block": "star_crystal"
+    },
+    "starflower": {
+      "generator": "block_item_icon",
+      "block": "starflower"
+    },
+    "cloud_bloom": {
+      "generator": "block_item_icon",
+      "block": "cloud_bloom"
+    },
+    "glowshroom": {
+      "generator": "block_item_icon",
+      "block": "glowshroom"
+    },
+    "dripstone_block": {
+      "generator": "block_item_icon",
+      "block": "dripstone_block"
+    },
+    "pointed_dripstone": {
+      "generator": "block_item_icon",
+      "block": "pointed_dripstone_up"
+    },
+    "calcite": {
+      "generator": "block_item_icon",
+      "block": "calcite"
+    },
+    "hanging_roots": {
+      "generator": "block_item_icon",
+      "block": "hanging_roots"
+    },
+    "glow_fern": {
+      "generator": "block_item_icon",
+      "block": "glow_fern"
+    },
+    "resonant_crystal": {
+      "generator": "block_item_icon",
+      "block": "resonant_crystal"
+    },
+    "sulfur_crust": {
+      "generator": "block_item_icon",
+      "block": "sulfur_crust"
+    },
+    "emerald": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "emerald"
+    },
+    "emerald_ore": {
+      "generator": "block_item_icon",
+      "block": "emerald_ore"
+    },
+    "deepslate_emerald_ore": {
+      "generator": "block_item_icon",
+      "block": "deepslate_emerald_ore"
+    },
+    "composter": {
+      "generator": "block_item_icon",
+      "block": "composter"
+    },
+    "fletching_table": {
+      "generator": "block_item_icon",
+      "block": "fletching_table"
+    },
+    "loom": {
+      "generator": "block_item_icon",
+      "block": "loom"
+    },
+    "cauldron": {
+      "generator": "block_item_icon",
+      "block": "cauldron"
+    },
+    "blast_furnace": {
+      "generator": "block_item_icon",
+      "block": "blast_furnace"
+    },
+    "smithing_table": {
+      "generator": "block_item_icon",
+      "block": "smithing_table"
+    },
+    "grindstone": {
+      "generator": "block_item_icon",
+      "block": "grindstone"
+    },
+    "oak_planks_slab": {
+      "generator": "block_item_icon",
+      "block": "planks"
+    },
+    "oak_planks_stairs": {
+      "generator": "block_item_icon",
+      "block": "planks"
+    },
+    "cobblestone_slab": {
+      "generator": "block_item_icon",
+      "block": "cobblestone"
+    },
+    "cobblestone_stairs": {
+      "generator": "block_item_icon",
+      "block": "cobblestone"
+    },
+    "terracotta_slab": {
+      "generator": "block_item_icon",
+      "block": "terracotta"
+    },
+    "terracotta_stairs": {
+      "generator": "block_item_icon",
+      "block": "terracotta"
+    },
+    "sunstone_slab": {
+      "generator": "block_item_icon",
+      "block": "sunstone"
+    },
+    "sunstone_stairs": {
+      "generator": "block_item_icon",
+      "block": "sunstone"
+    },
+    "cloudstone_slab": {
+      "generator": "block_item_icon",
+      "block": "cloudstone"
+    },
+    "cloudstone_stairs": {
+      "generator": "block_item_icon",
+      "block": "cloudstone"
+    },
+    "starstep_scepter": {
+      "generator": "item_sprite",
+      "template": "scepter",
+      "material": "diamond"
+    },
+    "stone_bricks": {
+      "generator": "block_item_icon",
+      "block": "stone_bricks"
+    },
+    "mossy_stone_bricks": {
+      "generator": "block_item_icon",
+      "block": "mossy_stone_bricks"
+    },
+    "cracked_stone_bricks": {
+      "generator": "block_item_icon",
+      "block": "cracked_stone_bricks"
+    },
+    "chiseled_stone_bricks": {
+      "generator": "block_item_icon",
+      "block": "chiseled_stone_bricks"
+    },
+    "bricks": {
+      "generator": "block_item_icon",
+      "block": "bricks"
+    },
+    "polished_granite": {
+      "generator": "block_item_icon",
+      "block": "polished_granite"
+    },
+    "polished_basalt": {
+      "generator": "block_item_icon",
+      "block": "polished_basalt"
+    },
+    "polished_limestone": {
+      "generator": "block_item_icon",
+      "block": "polished_limestone"
+    },
+    "polished_tuff": {
+      "generator": "block_item_icon",
+      "block": "polished_tuff"
+    },
+    "deepslate_bricks": {
+      "generator": "block_item_icon",
+      "block": "deepslate_bricks"
+    },
+    "sandstone": {
+      "generator": "block_item_icon",
+      "block": "sandstone"
+    },
+    "cut_sandstone": {
+      "generator": "block_item_icon",
+      "block": "cut_sandstone"
+    },
+    "smooth_sandstone": {
+      "generator": "block_item_icon",
+      "block": "smooth_sandstone"
+    },
+    "red_wool": {
+      "generator": "block_item_icon",
+      "block": "red_wool"
+    },
+    "yellow_wool": {
+      "generator": "block_item_icon",
+      "block": "yellow_wool"
+    },
+    "blue_wool": {
+      "generator": "block_item_icon",
+      "block": "blue_wool"
+    },
+    "green_wool": {
+      "generator": "block_item_icon",
+      "block": "green_wool"
+    },
+    "black_wool": {
+      "generator": "block_item_icon",
+      "block": "black_wool"
+    },
+    "clay_ball": {
+      "generator": "item_sprite",
+      "template": "clay_ball",
+      "material": "clay_ball"
+    },
+    "brick": {
+      "generator": "item_sprite",
+      "template": "brick",
+      "material": "brick"
+    },
+    "red_dye": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "red_dye"
+    },
+    "yellow_dye": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "yellow_dye"
+    },
+    "blue_dye": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "blue_dye"
+    },
+    "green_dye": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "green_dye"
+    },
+    "black_dye": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "black_dye"
+    },
+    "bone_meal": {
+      "generator": "item_sprite",
+      "template": "dye",
+      "material": "bone_meal"
+    },
+    "rooted_dirt": {
+      "generator": "block_item_icon",
+      "block": "rooted_dirt"
+    },
+    "leaf_litter_soil": {
+      "generator": "block_item_icon",
+      "block": "leaf_litter_soil"
+    },
+    "peat": {
+      "generator": "block_item_icon",
+      "block": "peat"
+    },
+    "silt": {
+      "generator": "block_item_icon",
+      "block": "silt"
+    },
+    "dry_grass_block": {
+      "generator": "block_item_icon",
+      "block": "dry_grass_block"
+    },
+    "permafrost": {
+      "generator": "block_item_icon",
+      "block": "permafrost"
+    },
+    "blue_ice": {
+      "generator": "block_item_icon",
+      "block": "blue_ice"
+    },
+    "shale": {
+      "generator": "block_item_icon",
+      "block": "shale"
+    },
+    "red_sandstone": {
+      "generator": "block_item_icon",
+      "block": "red_sandstone"
+    },
+    "ochre_terracotta": {
+      "generator": "block_item_icon",
+      "block": "ochre_terracotta"
+    },
+    "white_terracotta": {
+      "generator": "block_item_icon",
+      "block": "white_terracotta"
+    },
+    "volcanic_ash": {
+      "generator": "block_item_icon",
+      "block": "volcanic_ash"
+    },
+    "coral_rock": {
+      "generator": "block_item_icon",
+      "block": "coral_rock"
+    },
+    "fern": {
+      "generator": "block_item_icon",
+      "block": "fern"
+    },
+    "dead_bush": {
+      "generator": "block_item_icon",
+      "block": "dead_bush"
+    },
+    "dry_grass": {
+      "generator": "block_item_icon",
+      "block": "dry_grass"
+    },
+    "brown_mushroom": {
+      "generator": "block_item_icon",
+      "block": "brown_mushroom"
+    },
+    "red_mushroom": {
+      "generator": "block_item_icon",
+      "block": "red_mushroom"
+    },
+    "lavender": {
+      "generator": "block_item_icon",
+      "block": "lavender"
+    },
+    "bellflower": {
+      "generator": "block_item_icon",
+      "block": "bellflower"
+    },
+    "alpine_flower": {
+      "generator": "block_item_icon",
+      "block": "alpine_flower"
+    },
+    "tropical_flower": {
+      "generator": "block_item_icon",
+      "block": "tropical_flower"
+    },
+    "cattail": {
+      "generator": "block_item_icon",
+      "block": "cattail"
+    },
+    "beach_grass": {
+      "generator": "block_item_icon",
+      "block": "beach_grass"
+    }
+  },
+  "documentation": {
+    "template_schema": {
+      "outline": "binary silhouette with a dark material-aware edge",
+      "parts": [
+        "grip",
+        "connector",
+        "working_head",
+        "edge",
+        "highlight"
+      ],
+      "material_processing": "oklch_role_palette_and_linear_light_highlight",
+      "alpha": "binary",
+      "filter": "nearest"
+    },
+    "template_specs": {
+      "sword": {
+        "outline": "long_blade",
+        "parts": [
+          "grip",
+          "guard",
+          "blade",
+          "edge"
+        ],
+        "material_processing": "blade_facets"
+      },
+      "pickaxe": {
+        "outline": "crossed_head",
+        "parts": [
+          "grip",
+          "connector",
+          "pick_head",
+          "edge"
+        ],
+        "material_processing": "asymmetric_chip"
+      },
+      "axe": {
+        "outline": "broad_head",
+        "parts": [
+          "grip",
+          "connector",
+          "axe_head",
+          "edge"
+        ],
+        "material_processing": "broad_warm_highlight"
+      },
+      "shovel": {
+        "outline": "spade",
+        "parts": [
+          "grip",
+          "connector",
+          "spade_head",
+          "edge"
+        ],
+        "material_processing": "center_facet"
+      },
+      "hoe": {
+        "outline": "narrow_tine",
+        "parts": [
+          "grip",
+          "connector",
+          "tine",
+          "edge"
+        ],
+        "material_processing": "small_specular"
+      },
+      "stick": {
+        "outline": "diagonal_rod",
+        "parts": [
+          "fiber",
+          "knob"
+        ],
+        "material_processing": "wood_grain"
+      },
+      "ingot": {
+        "outline": "cast_bar",
+        "parts": [
+          "body",
+          "rim",
+          "highlight"
+        ],
+        "material_processing": "rolled_metal"
+      },
+      "gem": {
+        "outline": "faceted_crystal",
+        "parts": [
+          "dark_edge",
+          "facets",
+          "glint"
+        ],
+        "material_processing": "sharp_planes"
+      },
+      "coal": {
+        "outline": "irregular_lump",
+        "parts": [
+          "dark_body",
+          "fracture",
+          "glint"
+        ],
+        "material_processing": "matte_vein"
+      },
+      "torch": {
+        "outline": "flame_on_stick",
+        "parts": [
+          "handle",
+          "ember",
+          "flame",
+          "glow"
+        ],
+        "material_processing": "emissive_warm"
+      },
+      "string": {
+        "outline": "curved_thread",
+        "parts": [
+          "fiber",
+          "bend"
+        ],
+        "material_processing": "soft_highlight"
+      },
+      "feather": {
+        "outline": "barbed_quill",
+        "parts": [
+          "shaft",
+          "barbs",
+          "tip"
+        ],
+        "material_processing": "light_edges"
+      },
+      "bone": {
+        "outline": "jointed_bone",
+        "parts": [
+          "shaft",
+          "knobs",
+          "highlight"
+        ],
+        "material_processing": "porous_bone"
+      },
+      "arrow": {
+        "outline": "shafthead",
+        "parts": [
+          "shaft",
+          "head",
+          "fletching"
+        ],
+        "material_processing": "metal_tip"
+      },
+      "seeds": {
+        "outline": "sprout_cluster",
+        "parts": [
+          "stem",
+          "seed",
+          "leaf"
+        ],
+        "material_processing": "growth_stage"
+      },
+      "wheat": {
+        "outline": "grain_stalk",
+        "parts": [
+          "stem",
+          "grain",
+          "leaf"
+        ],
+        "material_processing": "golden_grain"
+      },
+      "food": {
+        "outline": "food_chunk",
+        "parts": [
+          "crust_or_skin",
+          "flesh",
+          "highlight"
+        ],
+        "material_processing": "cooked_or_raw"
+      },
+      "bow": {
+        "outline": "curved_limb",
+        "parts": [
+          "limbs",
+          "grip",
+          "string"
+        ],
+        "material_processing": "wood_and_fiber"
+      },
+      "shield": {
+        "outline": "shield_plate",
+        "parts": [
+          "plate",
+          "rim",
+          "grip",
+          "highlight"
+        ],
+        "material_processing": "painted_panel"
+      },
+      "helmet": {
+        "outline": "head_armor",
+        "parts": [
+          "crown",
+          "rim",
+          "opening"
+        ],
+        "material_processing": "cold_metal"
+      },
+      "chestplate": {
+        "outline": "torso_armor",
+        "parts": [
+          "plate",
+          "shoulders",
+          "rim"
+        ],
+        "material_processing": "layered_metal"
+      },
+      "leggings": {
+        "outline": "split_leg_armor",
+        "parts": [
+          "left_leg",
+          "right_leg",
+          "waist"
+        ],
+        "material_processing": "jointed_metal"
+      },
+      "boots": {
+        "outline": "paired_boots",
+        "parts": [
+          "left_boot",
+          "right_boot",
+          "sole"
+        ],
+        "material_processing": "reinforced_edge"
+      },
+      "flint": {
+        "outline": "shard",
+        "parts": [
+          "dark_edge",
+          "facets",
+          "chip"
+        ],
+        "material_processing": "stone_fracture"
+      },
+      "flint_and_steel": {
+        "outline": "striker_loop",
+        "parts": [
+          "flint",
+          "steel",
+          "grip"
+        ],
+        "material_processing": "cold_metal"
+      },
+      "gunpowder": {
+        "outline": "granule_cluster",
+        "parts": [
+          "granules",
+          "dust",
+          "highlight"
+        ],
+        "material_processing": "matte_powder"
+      },
+      "spawn_egg": {
+        "outline": "oval_egg",
+        "parts": [
+          "shell",
+          "species_spots",
+          "highlight"
+        ],
+        "material_processing": "entity_palette_derived"
+      },
+      "beef": {
+        "outline": "beef",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "porkchop": {
+        "outline": "porkchop",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "drumstick": {
+        "outline": "drumstick",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "mutton": {
+        "outline": "mutton",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "bread": {
+        "outline": "bread",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "rotten_flesh": {
+        "outline": "rotten_flesh",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "clipped_highlight"
+      },
+      "clay_ball": {
+        "outline": "rounded_lump",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "matte"
+      },
+      "brick": {
+        "outline": "fired_brick",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "matte"
+      },
+      "dye": {
+        "outline": "powder_pile",
+        "parts": [
+          "body",
+          "edge",
+          "highlight"
+        ],
+        "material_processing": "matte"
+      }
+    },
+    "lighting": "top_left"
+  },
+  "palette_processing": {
+    "shadow_floor": 0.3,
+    "chroma_scale": 1.02
   }
 }
