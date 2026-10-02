@@ -536,11 +536,12 @@ class TextureGeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output=Path(directory);tg.generate(output,99,{"grass_top":77});tg.build_atlas(output,99,{"grass_top":77})
             metadata=json.loads((output/"atlas.json").read_text())
-            self.assertEqual(metadata["grid_size"],14)
+            self.assertEqual(metadata["grid_size"], __import__("math").ceil(__import__("math").sqrt(len(metadata["physical_tiles"]))))
+            self.assertGreater(len(metadata["physical_tiles"]),188)
             self.assertEqual(metadata["textures"]["grass_top"]["effective_seed"],77)
             self.assertEqual([metadata["textures"][n]["index"] for n in tg.NAMES],list(range(188)))
             for filename in ("atlas.png","atlas_normal.png","atlas_property.png","atlas_height.png"):
-                self.assertEqual(tg.read_generated_png(output/filename)[:2],(224,224))
+                self.assertEqual(tg.read_generated_png(output/filename)[:2],(metadata["grid_size"]*16,metadata["grid_size"]*16))
             tg.build_items_atlas(output,99,*self.item_definitions())
             tg.write_png(output/"items/stale.png",16,16,[(11,22,33,255)]*256)
             tg.build_visual_report(output,99)

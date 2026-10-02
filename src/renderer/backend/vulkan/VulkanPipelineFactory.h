@@ -42,6 +42,8 @@ struct ChunkEnvironmentUniforms {
     std::array<glm::mat4, 4> shadowMatrices{};
     glm::vec4 shadowSplits{0.0f};
     glm::vec4 shadowOptions{0.0f};
+    glm::uvec4 materialOrigin{0u};
+    glm::vec4 materialOriginFraction{0.0f};
 };
 
 struct ShadowConstants {
@@ -143,7 +145,7 @@ static_assert(sizeof(CloudUniforms) == 128);
 static_assert(offsetof(CloudUniforms, nearRegion) == 112);
 static_assert(sizeof(FrameUniforms) == 128);
 static_assert(offsetof(FrameUniforms, chunkOrigin) == 80);
-static_assert(sizeof(ChunkEnvironmentUniforms) == 416);
+static_assert(sizeof(ChunkEnvironmentUniforms) == 448);
 static_assert(offsetof(ChunkEnvironmentUniforms, materialParams) == 80);
 static_assert(offsetof(ChunkEnvironmentUniforms, weatherParams) == 96);
 static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);

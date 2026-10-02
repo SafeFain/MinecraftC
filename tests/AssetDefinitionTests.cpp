@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -23,8 +24,28 @@ int main() {
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");
-    require(atlas.tilesPerSide == 14 && atlas.texture.width == 224,
-            "v4 atlas must use a compact grid while retaining logical slots");
+    require(atlas.texture.width <= 1024 && atlas.tilesPerSide * 16 == atlas.texture.width &&
+            atlas.sequences.size() == atlas.tilesPerSide * atlas.tilesPerSide,
+            "v5 atlas must respect physical budget and sequence capacity");
+    const auto& stoneSequence = atlas.sequences[getAtlasTextureIndex(BlockTexture::Stone)];
+    const auto& fireSequence = atlas.sequences[getAtlasTextureIndex(BlockTexture::Fire)];
+    require(stoneSequence.variants == 4 && stoneSequence.frames == 1 &&
+            fireSequence.frames == 16 && fireSequence.fpsMilli == 10000,
+            "formal stone variants and fire animation were not enabled");
+    for (size_t i = 0; i < atlas.sequences.size(); ++i) {
+        const auto& sequence = atlas.sequences[i];
+        require(sequence.slots[0] == i, "foundation slots changed");
+        for (uint32_t j = 0; j < sequence.variants * sequence.frames; ++j)
+            require(sequence.slots[j] < atlas.sequences.size(), "sequence escaped physical atlas");
+    }
+    std::array<bool,4> selected{};
+    for (int x = -40; x < 40; ++x) for (int z = -18; z < 18; ++z) {
+        const auto variant = materialVariant(stoneSequence,x,-7,z,0);
+        selected[variant] = true;
+        require(variant == materialVariant(stoneSequence,(x-32)+32,-7,(z+16)-16,0),
+                "world coordinate hashing changed across chunk-local reconstruction");
+    }
+    for (bool visible : selected) require(visible, "hash never selected a declared variant");
     require(atlas.normalTexture.format == TextureFormat::Rgba8Unorm &&
             atlas.propertyTexture.format == TextureFormat::Rgba8Unorm &&
             atlas.normalTexture.mipLevels.size() == 4 && atlas.propertyTexture.mipLevels.size() == 4,
@@ -43,6 +64,35 @@ int main() {
     require(propertyAt(BlockTexture::StarCrystal, 8, 8, 2) > 0 &&
             propertyAt(BlockTexture::Stone, 8, 8, 2) == 0,
             "semantic emission leaked into non-emissive material");
+    // Exercise the real loader's legacy path and malformed declared sequence data.
+    const auto fixtureRoot = std::filesystem::temp_directory_path() /
+        ("minecraftc-material-sequence-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto fixtureTextures = fixtureRoot / "textures/generated";
+    std::filesystem::create_directories(fixtureTextures);
+    struct FixtureCleanup {
+        std::filesystem::path path;
+        ~FixtureCleanup() { std::error_code error; std::filesystem::remove_all(path,error); }
+    } cleanup{fixtureRoot};
+    const auto sourceTextures = std::filesystem::path(root) / "assets/textures/generated";
+    for (const char* name : {"atlas.png", "atlas_normal.png", "atlas_property.png"})
+        std::filesystem::copy_file(sourceTextures / name, fixtureTextures / name);
+    std::ifstream metadataStream(sourceTextures / "atlas.json");
+    const std::string currentMetadata((std::istreambuf_iterator<char>(metadataStream)), {});
+    std::string legacyMetadata = currentMetadata;
+    legacyMetadata.replace(legacyMetadata.find("sequence_blob"), 13, "unused_sequence");
+    { std::ofstream file(fixtureTextures / "atlas.json"); file << legacyMetadata; }
+    const auto legacyAtlas = buildBlockAtlasData(fixtureRoot);
+    for (size_t slot = 0; slot < legacyAtlas.sequences.size(); ++slot)
+        require(legacyAtlas.sequences[slot].variants == 1 && legacyAtlas.sequences[slot].frames == 1 &&
+                legacyAtlas.sequences[slot].slots[0] == slot, "legacy atlas did not synthesize identity sequences");
+    { std::ofstream file(fixtureTextures / "atlas.json"); file << currentMetadata; }
+    { std::ofstream file(fixtureTextures / "atlas_sequences.bin", std::ios::binary); file << "invalid"; }
+    bool rejected = false;
+    try { (void)buildBlockAtlasData(fixtureRoot); } catch (const std::runtime_error&) { rejected = true; }
+    require(rejected, "malformed declared sequence table was silently accepted");
+    loadTextureAssetDefinitions(sourceTextures / "atlas.json",
+        std::filesystem::path(root) / "assets/textures/definitions/blocks.json",
+        std::filesystem::path(root) / "assets/textures/definitions/items.json");
     // Check every first-level color sample against independent linear-light,
     // alpha-weighted reference math. This also tests all atlas row boundaries.
     const auto& firstMip = atlas.texture.mipLevels.front();
@@ -100,12 +150,16 @@ int main() {
             "different emissive atlas materials share a fixed warm color");
     BlockAtlasData fixture = atlas;
     const auto fillTile = [&](BlockTexture texture) {
-        const auto slot = getAtlasTextureIndex(texture);
-        for (uint32_t y = 0; y < 16; ++y) for (uint32_t x = 0; x < 16; ++x) {
+        const auto logical = getAtlasTextureIndex(texture);
+        const auto& sequence = fixture.sequences[logical];
+        for (uint32_t sample = 0; sample < sequence.variants * sequence.frames; ++sample) {
+          const auto slot = sequence.slots[sample];
+          for (uint32_t y = 0; y < 16; ++y) for (uint32_t x = 0; x < 16; ++x) {
             const size_t offset = (size_t(slot/atlas.tilesPerSide*16+y)*atlas.texture.width+
                 slot%atlas.tilesPerSide*16+x)*4;
             for (int c = 0; c < 3; ++c) fixture.texture.pixels[offset+c] = x%2 ? 255 : 128;
             fixture.texture.pixels[offset+3] = x%2 ? 0 : 255;
+          }
         }
     };
     fillTile(BlockTexture::Stone);
@@ -199,7 +253,7 @@ int main() {
         root + "/assets/shaders/vulkan/shadow.vert");
     require(chunkShader.find("int slotIndex=max(int(floor(tile)),0);") !=
                 std::string::npos &&
-            chunkShader.find("slotIndex%tileCount") != std::string::npos &&
+            chunkShader.find("physicalSlot%tileCount") != std::string::npos &&
             shadowShader.find("int tileIndex=max(int(floor(tileData.z)),0);") !=
                 std::string::npos &&
             shadowShader.find("tileIndex%tileCount") != std::string::npos,

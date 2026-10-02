@@ -23,16 +23,20 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
     mat4 shadowMatrices[4];
     vec4 shadowSplits;
     vec4 shadowOptions;
+    uvec4 materialOrigin;
+    vec4 materialOriginFraction;
 } environment;
 layout(location=0) out vec4 lighting;
 layout(location=1) out vec2 tileUv;
 layout(location=2) flat out float tile;
 layout(location=3) flat out float face;
 layout(location=4) out vec3 worldPosition;
+layout(location=5) out vec3 materialPosition;
 
 void main() {
     vec3 position=inPosition;
     vec3 world=inPosition+frame.chunkOrigin.xyz;
+    materialPosition=world;
     float encodedFace=inFace>=64.0?inFace-64.0:inFace;
     float surfaceFace=encodedFace>=32.0?encodedFace-32.0:
         encodedFace>=16.0?encodedFace-16.0:encodedFace;

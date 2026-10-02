@@ -149,7 +149,7 @@ RenderMaterialHandle VulkanRenderer::createMaterial(const MaterialDesc& desc) {
     if (normal == m_impl->textures.end() || properties == m_impl->textures.end())
         throw std::logic_error("Vulkan block material maps are unavailable");
     material.descriptorSet = m_impl->createMaterialDescriptor(
-        texture->second, normal->second, properties->second);
+        texture->second, normal->second, properties->second, blockAtlas);
     m_impl->materials.emplace(handle.value, material);
     return handle;
 }
@@ -257,6 +257,13 @@ void VulkanRenderer::initialize(Window& window,
     m_assetRoot = assetRoot;
     m_impl = std::make_unique<Impl>(window, assetRoot);
     const BlockAtlasData atlas = buildBlockAtlasData(assetRoot);
+    const size_t sequenceBytes = atlas.sequences.size() * sizeof(MaterialSequence);
+    m_impl->materialSequences = m_impl->createBuffer(sequenceBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+        VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    std::memcpy(m_impl->materialSequences.mapped, atlas.sequences.data(), sequenceBytes);
+    require(vmaFlushAllocation(m_impl->allocator, m_impl->materialSequences.allocation, 0, sequenceBytes),
+            "flush material sequences");
     m_impl->voxelGiCache.setMaterials(buildVoxelGiMaterials(atlas));
     m_blockAtlasTilesPerSide = atlas.tilesPerSide;
     TextureSamplerDesc sampler;

@@ -5,6 +5,7 @@ layout(location=1) in vec2 tileUv;
 layout(location=2) flat in float tile;
 layout(location=3) flat in float face;
 layout(location=4) in vec3 worldPosition;
+layout(location=5) in vec3 materialPosition;
 layout(push_constant) uniform FrameUniforms {
     mat4 modelViewProjection;
     vec4 atlasAndLighting;
@@ -15,6 +16,8 @@ layout(push_constant) uniform FrameUniforms {
 layout(set=0,binding=0) uniform sampler2D blockAtlas;
 layout(set=0,binding=1) uniform sampler2D normalAtlas;
 layout(set=0,binding=2) uniform sampler2D propertyAtlas;
+struct MaterialSequence { uvec4 parameters; uint slots[64]; };
+layout(std430,set=0,binding=3) readonly buffer MaterialSequences { MaterialSequence sequences[]; };
 layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 cameraPosition;
     vec4 lightDirection;
@@ -27,6 +30,8 @@ layout(set=1,binding=0) uniform ChunkEnvironment {
     mat4 shadowMatrices[4];
     vec4 shadowSplits;
     vec4 shadowOptions;
+    uvec4 materialOrigin;
+    vec4 materialOriginFraction;
 } environment;
 layout(set=1,binding=1) uniform sampler2D shadowMap;
 layout(location=0) out vec4 outColor;
@@ -227,7 +232,24 @@ void main() {
     // jungle-log slot 34.
     int slotIndex=max(int(floor(tile)),0);
     float slot=float(slotIndex);
-    ivec2 tileOrigin=ivec2(slotIndex%tileCount,slotIndex/tileCount);
+    int physicalSlot=slotIndex;
+    if(slotIndex<sequences.length()&&sequences[slotIndex].parameters.x>0u){
+        uvec4 p=sequences[slotIndex].parameters;
+        float encoded=face>=64.0?face-64.0:face;
+        float direction=encoded>=32.0?encoded-32.0:encoded>=16.0?encoded-16.0:encoded;
+        uint variant=0u;
+        if(p.x>1u&&direction<5.5){
+            ivec3 cell=ivec3(floor(materialPosition+environment.materialOriginFraction.xyz-faceNormal(direction)*0.001));
+            uint h=p.w;
+            h=(h^(uint(cell.x)+environment.materialOrigin.x))*16777619u;h=(h^(uint(cell.y)+environment.materialOrigin.y))*16777619u;
+            h=(h^(uint(cell.z)+environment.materialOrigin.z))*16777619u;h=(h^uint(direction))*16777619u;
+            h^=h>>16;h*=2246822519u;h^=h>>13;
+            variant=h%p.x;
+        }
+        uint animationFrame=uint(floor(mod(max(environment.weatherParams.x,0.0)*float(p.z)/1000.0,float(p.y))));
+        physicalSlot=int(sequences[slotIndex].slots[variant*p.y+animationFrame]);
+    }
+    ivec2 tileOrigin=ivec2(physicalSlot%tileCount,physicalSlot/tileCount);
     float tiles=float(tileCount);
     vec2 origin=vec2(tileOrigin);
     vec2 localPixel=mix(vec2(0.5),vec2(15.5),fract(tileUv));

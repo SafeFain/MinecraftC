@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic pixel materials, semantic sprites, validator and atlas builder.
 
-V4 uses compact semantic material atlases, strict PNG import and configurable
+V5 uses composable semantic recipes and sequences with compact semantic material atlases, strict PNG import and configurable
 OKLCH palettes. Absolute field thresholds and sparse material features keep quiet
 planes quiet. Functional blocks have explicit face art, tools have disjoint part
 masks, and entity skins share their source with embedded GLB textures.
@@ -20,7 +20,7 @@ from functools import lru_cache
 from texture_png import read_png
 
 SIZE = 16
-GENERATOR_VERSION = 4
+GENERATOR_VERSION = 5
 STYLE_ID = "bright-comfortable"
 # Selected from the deterministic contact-sheet candidates. CMake's asset
 # target relies on this default, so keep it aligned with committed atlas.json.
@@ -1036,10 +1036,12 @@ def center_periodic_tile(pixels, axes=("x", "y")):
             cuts=[]
             for cut in range(SIZE):
                 pairs=((pixels[t*SIZE+cut],pixels[t*SIZE+wrap(cut-1)]) for t in range(SIZE))                     if axis=="x" else ((pixels[cut*SIZE+t],pixels[wrap(cut-1)*SIZE+t]) for t in range(SIZE))
-                cuts.append(sum(distance(a,b) for a,b in pairs)/SIZE)
-            measures.append([value/max(floor,(sum(cuts)-value)/15) for value in cuts])
-        origins[axis]=min(range(SIZE),key=lambda cut:(max(0,max(m[cut] for m in measures)-2.4)*100 +
-                                                    sum(abs(m[cut]-1) for m in measures),cut))
+                cuts.append(math.fsum(distance(a,b) for a,b in pairs)/SIZE)
+            measures.append([value/max(floor,(math.fsum(cuts)-value)/15) for value in cuts])
+        # Python 3.12 changed sum(float). Stable reductions and explicit
+        # near-tie rounding keep periodic origins identical across interpreters.
+        origins[axis]=min(range(SIZE),key=lambda cut:(round(max(0,max(m[cut] for m in measures)-2.4)*100 +
+                                                    math.fsum(abs(m[cut]-1) for m in measures),12),cut))
     sx,sy=origins["x"],origins["y"]
     return [pixels[wrap(y+sy)*SIZE+wrap(x+sx)] for y in range(SIZE) for x in range(SIZE)]
 
@@ -1117,6 +1119,19 @@ def generate_biome_texture(name, seed):
             h = sample(seed,name,i,22)
             for x,y in grow_blob(seed,name,(h%16,(h>>8)%16),3,i): indices[y*16+x] = 1
     return center_periodic_tile([palette[max(0,min(5,int(i)))] for i in indices])
+
+
+class SemanticColor(tuple):
+    """A palette choice carries its structural role through drawing/translation."""
+    def __new__(cls, rgba, role):
+        value = super().__new__(cls, rgba)
+        value.role = role
+        return value
+
+
+for _name, _palette in PALETTES.items():
+    PALETTES[_name] = [SemanticColor(color, role) for role, color in enumerate(_palette)]
+STRUCTURE_PALETTES = dict(PALETTES)
 
 
 def generate_texture(name,seed,local_seeds=None):
@@ -1782,13 +1797,21 @@ def structure_metrics(pixels):
             "center_cross":max(abs(sum(center_rows)/4-outer),abs(sum(center_cols)/4-outer))/max(1,palette_contrast(list(set(pixels)))),
             "transitions":sum(pixels[y*SIZE+x]!=pixels[y*SIZE+wrap(x+1)] for y in range(SIZE) for x in range(SIZE))+sum(pixels[y*SIZE+x]!=pixels[wrap(y+1)*SIZE+x] for y in range(SIZE) for x in range(SIZE))}
 
-def validate_texture(path):
-    width,height,pixels=read_generated_png(path); errors=[]; name=path.stem
+def validate_texture(path,pixels=None):
+    width,height,pixels=read_generated_png(path) if pixels is None else (SIZE,SIZE,pixels)
+    errors=[]; name=path.stem
     def fail(rule,value,limit): errors.append(f"{name}: {rule}: detected {value}, allowed {limit}")
     if (width,height)!=(SIZE,SIZE): fail("dimensions",f"{width}x{height}","16x16"); return errors
-    colors=set(pixels); palette_limit=len(PALETTES.get(name,[])) or 16
+    declared=list(PALETTES.get(name,[]))
+    if getattr(sys.modules[__name__],"RECIPE_DOCUMENT",None) is not None and name in NAMES:
+        from texture_recipes import load_recipes
+        document,resolved=load_recipes(sys.modules[__name__])
+        spec=document["materials"][name]
+        declared=[tuple(c) for c in spec.get("palette",declared)]
+        declared += [tuple(layer["color"]) for layer in resolved[spec["recipe"]] if "color" in layer]
+    colors=set(pixels); palette_limit=len(set(declared)) or 16
     if len(colors)>palette_limit: fail("palette size",len(colors),f"<= {palette_limit}")
-    if name in PALETTES and not colors.issubset(set(PALETTES[name])):
+    if name in PALETTES and not colors.issubset(set(declared)):
         fail("palette membership", "unknown color", "declared colors only")
     if any(c[3] not in (0,255) for c in pixels): fail("alpha values","non-binary","0 or 255")
     if any(c[3] and c[:3]==(0,0,0) for c in pixels): fail("opaque black outline",1,0)
@@ -1840,7 +1863,11 @@ def generate(output,seed,local_seeds=None):
     output.mkdir(parents=True,exist_ok=True)
     sources={}
     for name in NAMES:
-        pixels=generate_texture(name,seed,local_seeds)
+        from texture_recipes import generate_material
+        result=generate_material(sys.modules[__name__],name,seed,local_seeds=local_seeds)
+        pixels=result["pixels"]
+        result["pixel_sha256"]=hashlib.sha256(bytes(c for p in pixels for c in p)).hexdigest()
+        (output/f"{name}.semantic.json").write_text(json.dumps({k:v for k,v in result.items() if k!="pixels"},sort_keys=True)+"\n")
         write_png(output/f"{name}.png",SIZE,SIZE,pixels)
         sources[name]={"effective_seed":resolve_seed(seed,name,local_seeds),
                        "sha256":hashlib.sha256(bytes(c for p in pixels for c in p)).hexdigest()}
@@ -1880,7 +1907,7 @@ def load_material_profiles(path=None):
     return profiles
 
 
-def generate_material_maps(name,pixels,profile):
+def generate_material_maps(name,pixels,profile,roles=None,masks=None):
     """Derive geometry from material roles, never treating hue as elevation.
 
     R/G/B/A property channels are roughness/metallic/emission/height, linear.
@@ -1892,7 +1919,7 @@ def generate_material_maps(name,pixels,profile):
     for y in range(SIZE):
         for x in range(SIZE):
             pixel=pixels[y*SIZE+x]
-            role=palette.index(pixel) if pixel in palette else 2
+            role=roles[y*SIZE+x] if roles is not None else getattr(pixel,"role",palette.index(pixel) if pixel in palette else 2)
             normalized=role/max(1,len(palette)-1)
             if pattern=="flat": h=.5
             elif pattern=="weave": h=.5+.10*math.sin(x*math.tau/4)*math.sin(y*math.tau/4)
@@ -1903,6 +1930,9 @@ def generate_material_maps(name,pixels,profile):
             elif pattern=="grains": h=.5+.12*(normalized-.5)
             elif pattern=="panels": h=.5+.24*(normalized-.5)
             else: h=.5+.30*(normalized-.5)
+            if masks:
+                for mask, overrides in masks.get("properties", []):
+                    if mask[y*SIZE+x]: h=overrides.get("height",h)
             heights.append(h if pixel[3] else .5)
     normals=[];properties=[];height_pixels=[]
     def neighbor(x,y,center):
@@ -1919,48 +1949,26 @@ def generate_material_maps(name,pixels,profile):
             ny=(neighbor(x,y+1,h)-neighbor(x,y-1,h))*strength
             length=math.sqrt(nx*nx+ny*ny+1)
             normals.append((byte(.5+.5*nx/length),byte(.5+.5*ny/length),byte(.5+.5/length),255))
-            mineral=pattern=="mineral" and pixels[i] in palette[3:]
+            mineral=pattern=="mineral" and (roles[i]>=3 if roles is not None else pixels[i] in palette[3:])
             roughness=profile["roughness"] if pattern!="mineral" or mineral else .80
             metallic=profile["metallic"] if pattern!="mineral" or mineral else 0
-            properties.append((byte(roughness),byte(metallic),byte(profile["emission"]) if visible else 0,byte(h)))
+            if masks:
+                for mask, overrides in masks.get("properties", []):
+                    if mask[i]:
+                        roughness=overrides.get("roughness",roughness)
+                        metallic=overrides.get("metallic",metallic)
+            emission=profile["emission"]
+            if masks:
+                for mask, overrides in masks.get("properties", []):
+                    if mask[i]: emission=overrides.get("emission",emission)
+            properties.append((byte(roughness),byte(metallic),byte(emission) if visible else 0,byte(h)))
             height_pixels.append((byte(h),byte(h),byte(h),255))
     return normals,properties,height_pixels
 
 
 def build_atlas(output,seed,local_seeds=None):
-    validate(output); grid=math.ceil(math.sqrt(len(NAMES)))
-    atlas=[(0,0,0,0)]*(grid*SIZE)**2
-    normal=[(128,128,255,255)]*len(atlas)
-    properties=[(255,0,0,128)]*len(atlas)
-    heights=[(128,128,128,255)]*len(atlas)
-    profiles=load_material_profiles()
-    manifest=_read_definition(output/"generation.json") if (output/"generation.json").exists() else {}
-    if manifest and manifest.get("seed")!=seed:
-        raise ValueError("atlas seed does not match generated tile provenance")
-    metadata={"version":1,"generator_version":GENERATOR_VERSION,"style":STYLE_ID,
-              "tile_size":SIZE,"grid_size":grid,"filter":"nearest","seed":seed,"textures":{},
-              "material_maps":{"normal":"atlas_normal.png","property":"atlas_property.png","height":"atlas_height.png"},
-              "property_channels":["roughness","metallic","emission","height"]}
-    for index,name in enumerate(NAMES):
-        _,_,pixels=read_generated_png(output/f"{name}.png"); tx,ty=index%grid,index//grid
-        maps=generate_material_maps(name,pixels,profiles[name])
-        for target,tile in zip((atlas,normal,properties,heights),(pixels,)+maps):
-            for y in range(SIZE):
-                begin=(ty*SIZE+y)*grid*SIZE+tx*SIZE
-                target[begin:begin+SIZE]=tile[y*SIZE:(y+1)*SIZE]
-        provenance=manifest.get("materials", {}).get(name, {})
-        digest=hashlib.sha256(bytes(c for p in pixels for c in p)).hexdigest()
-        entry={"index":index,"x":tx,"y":ty,"source":f"{name}.png", "sha256":digest,
-               "family":TEXTURE_FAMILIES[name],"generated":digest==provenance.get("sha256"),
-               "effective_seed":provenance.get("effective_seed",resolve_seed(seed,name,local_seeds))}
-        # Flat profile fields keep the existing logical-name parser compatible.
-        entry.update(profiles[name])
-        if local_seeds and name in local_seeds: entry["local_seed"]=int(local_seeds[name])
-        metadata["textures"][name]=entry
-    for filename,pixels in (("atlas.png",atlas),("atlas_normal.png",normal),
-                            ("atlas_property.png",properties),("atlas_height.png",heights)):
-        write_png(output/filename,grid*SIZE,grid*SIZE,pixels)
-    (output/"atlas.json").write_text(json.dumps(metadata,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+    from texture_recipes import build_sequence_atlas
+    return build_sequence_atlas(sys.modules[__name__],output,seed,local_seeds)
 
 
 def build_entity_atlas(output,seed):
@@ -2093,8 +2101,10 @@ def build_contact_sheet(output,seed,count,local_seeds=None):
         canvas=[(25,27,29,255)]*(width*height)
         for index,name in enumerate(NAMES):
             x=(index%columns)*cell_w; y=(index//columns)*cell_h
-            chosen=(local_seeds or {}).get(name,candidate) if candidate_index==0 else candidate
-            pixels=generate_texture(name,chosen)
+            from texture_recipes import generate_material
+            source=output/f"{name}.png"
+            pixels=read_generated_png(source)[2] if candidate_index==0 and source.exists() else generate_material(
+                sys.modules[__name__],name,candidate,local_seeds if candidate_index==0 else None)["pixels"]
             draw_text(canvas,width,x+3,y+4,name[:34])
             blit(canvas,width,x+4,y+20,pixels,SIZE,SIZE,3)
             blit(canvas,width,x+4,y+76,pixels,SIZE,SIZE)
@@ -2384,6 +2394,7 @@ def parse_local_seeds(values):
 def parse_args(argv=None):
     parser=argparse.ArgumentParser(); parser.add_argument("--generate",action="store_true")
     parser.add_argument("--validate",action="store_true"); parser.add_argument("--build-atlas",action="store_true")
+    parser.add_argument("--recipes",type=Path,help="versioned recipe document override")
     parser.add_argument("--seed",type=int,default=DEFAULT_SEED); parser.add_argument("--output",type=Path,default=Path("assets/textures/generated"))
     parser.add_argument("--candidate-count",type=int,default=1); parser.add_argument("--contact-sheet",action="store_true")
     parser.add_argument("--preview",action="store_true",help="build all assets and development previews")
@@ -2408,6 +2419,11 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args=parse_args(argv)
+    if args.recipes:
+        global RECIPE_DOCUMENT
+        RECIPE_DOCUMENT=_read_definition(args.recipes)
+        from texture_recipes import load_recipes
+        load_recipes(sys.modules[__name__])
     if not (args.generate or args.validate or args.build_atlas or args.build_items_atlas or args.build_entity_atlas or args.build_entity_skins or args.build_ios_icon or args.build_android_icon or args.build_desktop_icons or args.contact_sheet or args.preview or args.visual_report): raise SystemExit("select a generation, validation, or atlas operation")
     try:
         if args.candidate_count<1: raise ValueError("--candidate-count must be at least 1")
@@ -2429,7 +2445,10 @@ def main(argv=None):
         if args.build_android_icon: build_app_icon(args.android_icon_output,args.seed)
         if args.build_desktop_icons: build_desktop_app_icons(Path("packaging/icons"),args.seed)
         if args.contact_sheet: build_contact_sheet(args.output,args.seed,args.candidate_count,local_seeds)
-        if args.preview: build_preview(args.output,args.seed,args.candidate_count,local_seeds)
+        if args.preview:
+            build_preview(args.output,args.seed,args.candidate_count,local_seeds)
+            from texture_recipes import build_sequence_preview
+            build_sequence_preview(sys.modules[__name__],args.output)
         if args.visual_report: build_visual_report(args.output,args.seed)
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0

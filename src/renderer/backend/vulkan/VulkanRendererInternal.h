@@ -286,6 +286,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     ~Impl() { cleanup(); }
 
+    Buffer materialSequences;
+    Buffer identitySequences;
+
     Window& window;
     std::filesystem::path assetRoot;
     bool presentationSuspended = false;
@@ -1242,11 +1245,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void createDescriptorLayout() {
-        std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
+        std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
         for (uint32_t binding = 0; binding < bindings.size(); ++binding) {
             bindings[binding].binding = binding;
-            bindings[binding].descriptorType =
-                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[binding].descriptorType = binding == 3 ?
+                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             bindings[binding].descriptorCount = 1;
             bindings[binding].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         }
@@ -1373,7 +1376,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
              static_cast<uint32_t>(FRAMES_IN_FLIGHT)},
             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 16},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,256}}};
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,4352}}};
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -1382,6 +1385,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         poolInfo.pPoolSizes = poolSizes.data();
         require(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptors.descriptorPool),
                 "vkCreateDescriptorPool");
+        // An empty sequence view for UI/model/particle materials using this layout.
+        identitySequences = createBuffer(272, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_MEMORY_USAGE_AUTO, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+            VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        std::memset(identitySequences.mapped, 0, 272);
+        require(vmaFlushAllocation(allocator, identitySequences.allocation, 0, 272), "flush identity sequences");
     }
 
     void createShadowImage(ShadowQuality quality) {
@@ -1474,7 +1483,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     VkDescriptorSet createMaterialDescriptor(const GpuTexture& texture,
                                              const GpuTexture& normal,
-                                             const GpuTexture& properties) {
+                                             const GpuTexture& properties, bool blockAtlas = false) {
         VkDescriptorSetAllocateInfo allocate{};
         allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocate.descriptorPool = descriptors.descriptorPool;
@@ -1501,6 +1510,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             writes[binding].pImageInfo = &imageInfos[binding];
         }
         vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
+        VkDescriptorBufferInfo sequenceInfo{blockAtlas ? materialSequences.handle : identitySequences.handle,
+            0, VK_WHOLE_SIZE};
+        VkWriteDescriptorSet sequenceWrite{}; sequenceWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        sequenceWrite.dstSet = set; sequenceWrite.dstBinding = 3; sequenceWrite.descriptorCount = 1;
+        sequenceWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        sequenceWrite.pBufferInfo = &sequenceInfo;
+        vkUpdateDescriptorSets(device, 1, &sequenceWrite, 0, nullptr);
         return set;
     }
 
@@ -2038,6 +2054,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void prepareChunkBuffer() {
+        // Preserve coordinate hashing across floating-origin rebases without
+        // converting large absolute world positions to floats in the shader.
+        for (int axis = 0; axis < 3; ++axis) {
+            const double integer = std::floor(postProcess.worldOrigin[axis]);
+            submittedChunkEnvironment.materialOrigin[axis] = static_cast<uint32_t>(static_cast<int64_t>(integer));
+            submittedChunkEnvironment.materialOriginFraction[axis] = static_cast<float>(postProcess.worldOrigin[axis] - integer);
+        }
         if (submittedDraws.empty() && submittedLodDraws.empty()) return;
         ChunkFrameBuffer& frame = chunkBuffers[currentFrame];
         std::memcpy(frame.uniform.mapped, &submittedChunkEnvironment,
@@ -3056,6 +3079,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (device) vkDeviceWaitIdle(device);
         if (allocator) {
             destroyVoxelGiResources();
+            destroyBuffer(materialSequences);
+            destroyBuffer(identitySequences);
             for (auto& [id, mesh] : meshes) {
                 (void)id;
                 destroyGpuMesh(mesh);

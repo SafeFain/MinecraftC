@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <stb_image.h>
@@ -58,7 +59,8 @@ std::vector<uint8_t> downsampleTiles(const std::vector<uint8_t>& source,
 
 void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
                                const std::vector<uint8_t>& base,
-                               uint32_t tiles, uint32_t size) {
+                               uint32_t tiles, uint32_t size,
+                               const std::vector<MaterialSequence>& sequences) {
     // One texel cannot represent both foliage and air. Keep the averaged
     // terminal mip for distant canopies and the opaque-leaf fallback shader.
     if (size == 1) return;
@@ -67,7 +69,9 @@ void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
         BlockTexture::SpruceLeaves, BlockTexture::JungleLeaves,
         BlockTexture::AcaciaLeaves, BlockTexture::SkyrootLeaves}};
     for (BlockTexture texture : leaves) {
-        const uint32_t slot = getAtlasTextureIndex(texture);
+        const auto& sequence = sequences.at(getAtlasTextureIndex(texture));
+        for (uint32_t sample = 0; sample < sequence.variants * sequence.frames; ++sample) {
+        const uint32_t slot = sequence.slots[sample];
         const uint32_t tx = slot % tiles, ty = slot / tiles;
         uint32_t holes = 0;
         for (uint32_t y = 0; y < TILE_SIZE; ++y)
@@ -91,6 +95,7 @@ void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
             std::max<size_t>(1, (holes * size * size + 128u) / 256u));
         for (size_t i = 0; i < offsets.size(); ++i)
             mip[offsets[i]] = i < count ? 0 : 255;
+        }
     }
 }
 
@@ -334,6 +339,43 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     result.texture.pixels.assign(decoded, decoded + static_cast<size_t>(width) * height * 4u);
     stbi_image_free(decoded);
 
+    std::string metadata;
+    try { metadata = AssetStore::readTextPath(generatedRoot / "atlas.json"); }
+    catch (const std::runtime_error&) { /* Legacy logical-material fallback. */ }
+    const uint32_t capacity = result.tilesPerSide * result.tilesPerSide;
+    result.sequences.resize(capacity);
+    for (uint32_t slot = 0; slot < capacity; ++slot)
+        result.sequences[slot].slots.fill(slot);
+    if (metadata.find("\"sequence_blob\"") != std::string::npos) {
+        if (result.texture.width > 1024) throw std::runtime_error("Material atlas exceeds 1024px budget");
+        const auto bytes = AssetStore::readPath(generatedRoot / "atlas_sequences.bin");
+        const auto read = [&](size_t offset) {
+            if (offset + 4 > bytes.size()) throw std::runtime_error("Truncated material sequence table");
+            return uint32_t(bytes[offset]) | uint32_t(bytes[offset+1]) << 8 |
+                uint32_t(bytes[offset+2]) << 16 | uint32_t(bytes[offset+3]) << 24;
+        };
+        if (bytes.size() < 12 || std::memcmp(bytes.data(), "MCTSEQ5\0", 8) != 0)
+            throw std::runtime_error("Invalid material sequence table header");
+        const uint32_t count = read(8);
+        if (!count || count > capacity || bytes.size() != 12 + size_t(count) * 272)
+            throw std::runtime_error("Invalid material sequence table size");
+        for (uint32_t i = 0; i < count; ++i) {
+            auto& sequence = result.sequences[i]; const size_t offset = 12 + size_t(i) * 272;
+            sequence.variants = read(offset); sequence.frames = read(offset+4);
+            sequence.fpsMilli = read(offset+8); sequence.seed = read(offset+12);
+            if (!sequence.variants || sequence.variants > 4 || !sequence.frames || sequence.frames > 16 ||
+                sequence.variants * sequence.frames > 64 || sequence.fpsMilli > 60000 ||
+                (sequence.frames > 1 && !sequence.fpsMilli))
+                throw std::runtime_error("Material sequence exceeds budget");
+            for (uint32_t j = 0; j < 64; ++j) {
+                sequence.slots[j] = read(offset+16+j*4);
+                if (sequence.slots[j] >= capacity)
+                    throw std::runtime_error("Material sequence slot outside atlas");
+            }
+            if (sequence.slots[0] != i)
+                throw std::runtime_error("Material sequence changed a foundation slot");
+        }
+    }
     // Keep logical slot rows in their generated row-major positions (slot zero
     // is sampled from the texture's bottom row), but flip pixels inside every
     // tile for the bottom-left texture-coordinate convention.
@@ -347,14 +389,11 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
         // coverage correction never feeds back into color or opacity.
         auto cutoutLevel = level;
         preserveLeafCutoutCoverage(cutoutLevel, result.texture.pixels,
-                                   result.tilesPerSide, tileSize);
+                                   result.tilesPerSide, tileSize, result.sequences);
         result.texture.mipLevels.push_back({result.tilesPerSide * tileSize,
                                             result.tilesPerSide * tileSize,
                                             std::move(cutoutLevel)});
     }
-    std::string metadata;
-    try { metadata = AssetStore::readTextPath(generatedRoot / "atlas.json"); }
-    catch (const std::runtime_error&) { /* Legacy logical-material fallback. */ }
     buildMaterialTextures(result, generatedRoot, metadata.find("\"material_maps\"") != std::string::npos);
     validateTextureData(result.texture);
     return result;
@@ -363,10 +402,13 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
 VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
     std::array<glm::vec3, static_cast<size_t>(BlockTexture::Count)> colors{};
     for (size_t t = 0; t < colors.size(); ++t) {
-        const uint32_t slot = getAtlasTextureIndex(static_cast<BlockTexture>(t));
+        const uint32_t logical = getAtlasTextureIndex(static_cast<BlockTexture>(t));
+        const auto& sequence = atlas.sequences.at(logical);
         glm::vec3 sum(0.0f);
         float weight = 0.0f;
-        for (uint32_t y = 0; y < atlas.tileSize; ++y)
+        for (uint32_t sample = 0; sample < sequence.variants * sequence.frames; ++sample) {
+          const uint32_t slot = sequence.slots[sample];
+          for (uint32_t y = 0; y < atlas.tileSize; ++y)
             for (uint32_t x = 0; x < atlas.tileSize; ++x) {
                 const size_t pixel = (size_t(slot / atlas.tilesPerSide * atlas.tileSize + y) *
                     atlas.texture.width + slot % atlas.tilesPerSide * atlas.tileSize + x) * 4;
@@ -375,6 +417,7 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
                     sum[c] += voxelGiSrgbToLinear(atlas.texture.pixels[pixel + c] / 255.0f) * alpha;
                 weight += alpha;
             }
+        }
         colors[t] = weight > 0.0f ? sum / weight : glm::vec3(0.0f);
     }
     VoxelGiMaterialTable result{};

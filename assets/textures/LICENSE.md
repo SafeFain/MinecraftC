@@ -114,3 +114,13 @@ remains 213785369; names use full stable hash domains and material/style JSON
 parameters. Reproduce runtime textures and GLB skins together with
 `cmake --build build-local --target texture_generator`. World generation and
 serialized block IDs are unchanged. Earlier provenance entries remain historical.
+
+# Generator v5 authoring and sequence upgrade
+
+The 2026-10-02 v5 recipes, role/coverage/layer masks, deterministic variants,
+looping fire/lava/crystal frames and generated material maps are original
+MinecraftC procedural artwork under CC0-1.0. The default foundation art keeps
+the v4 style and seed 213785369. No new third-party raster assets were imported.
+The dependency-free local workbench uses the same generator and records recipes,
+seeds and digests in its exports. Existing historical asset attributions above
+remain applicable to their named source assets.

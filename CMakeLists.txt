@@ -510,6 +510,8 @@ if(BUILD_TESTING)
     set_tests_properties(removed_opengl_renderer_cli PROPERTIES
         WILL_FAIL TRUE
         TIMEOUT 10)
+    add_test(NAME texture_recipes_sequences_and_workbench
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_texture_recipes.py)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)

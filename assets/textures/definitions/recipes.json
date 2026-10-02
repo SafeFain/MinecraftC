@@ -1,0 +1,842 @@
+{
+  "version": 1,
+  "generator_version": 5,
+  "recipes": {
+    "base": {
+      "layers": [
+        {
+          "op": "base"
+        }
+      ]
+    }
+  },
+  "materials": {
+    "dirt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "grass_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "grass_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "stone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "oak_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "oak_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "sand": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "bedrock": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "water": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "snow": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "oak_planks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "deepslate": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cactus_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cactus_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "coal_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "iron_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "gold_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "diamond_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "lava": {
+      "recipe": "base",
+      "variants": 1,
+      "animation": {
+        "frames": 16,
+        "fps": 8,
+        "loop": "repeat"
+      }
+    },
+    "ice": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "gravel": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "clay": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "red_sand": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "terracotta": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "podzol_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "moss": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tall_grass": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "flower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "reeds": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "birch_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "birch_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "spruce_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "jungle_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "acacia_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cobblestone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "crafting_table": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "furnace": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chest": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "torch": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "white_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "white_bed": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "farmland": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "wet_farmland": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "wheat_young": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "wheat_middle": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "wheat_mature": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "oak_sapling": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "birch_sapling": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_sapling": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_sapling": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_sapling": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "snow_layer": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fire": {
+      "recipe": "base",
+      "variants": 1,
+      "animation": {
+        "frames": 16,
+        "fps": 10,
+        "loop": "repeat"
+      }
+    },
+    "glass": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tnt": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "obsidian": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dandelion": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blue_orchid": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "allium": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "oxeye_daisy": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "sunflower_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "sunflower_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cloud": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "limestone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "basalt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "tuff": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "coarse_dirt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "mud": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "packed_ice": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "black_sand": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "granite": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "aether_grass_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "aether_grass_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "aether_soil": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cloudstone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sunstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skyroot_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "star_crystal": {
+      "recipe": "base",
+      "variants": 1,
+      "animation": {
+        "frames": 16,
+        "fps": 6,
+        "loop": "repeat"
+      }
+    },
+    "starflower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cloud_bloom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glowshroom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dripstone_block": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "pointed_dripstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "calcite": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "hanging_roots": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glow_fern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "resonant_crystal": {
+      "recipe": "base",
+      "variants": 1,
+      "animation": {
+        "frames": 16,
+        "fps": 6,
+        "loop": "repeat"
+      }
+    },
+    "sulfur_crust": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "emerald_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "deepslate_emerald_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "composter": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fletching_table": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "loom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cauldron": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blast_furnace": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smithing_table": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "grindstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "copper_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "birch_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crafting_table_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crafting_table_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crafting_table_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "furnace_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "furnace_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "furnace_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chest_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chest_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chest_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "composter_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "composter_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "composter_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fletching_table_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fletching_table_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fletching_table_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "loom_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "loom_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "loom_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cauldron_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cauldron_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cauldron_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blast_furnace_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blast_furnace_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blast_furnace_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smithing_table_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smithing_table_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smithing_table_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "grindstone_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "grindstone_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "grindstone_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "white_bed_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "white_bed_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "white_bed_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tnt_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tnt_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tnt_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "stone_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "mossy_stone_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cracked_stone_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chiseled_stone_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "polished_granite": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "polished_basalt": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "polished_limestone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "polished_tuff": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "deepslate_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "sandstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cut_sandstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smooth_sandstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "red_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "yellow_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blue_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "green_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "black_wool": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "rooted_dirt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "leaf_litter_soil": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "peat": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "silt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "dry_grass_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "permafrost": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "blue_ice": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "shale": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "red_sandstone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "ochre_terracotta": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "white_terracotta": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "volcanic_ash": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "coral_rock": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "fern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dead_bush": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dry_grass": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "brown_mushroom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "red_mushroom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "lavender": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "bellflower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "alpine_flower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tropical_flower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cattail": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "beach_grass": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dry_grass_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "leaf_litter_side": {
+      "recipe": "base",
+      "variants": 1
+    }
+  },
+  "examples": {
+    "mossy_stone": {
+      "parent": "base",
+      "layers": [
+        {
+          "op": "cover",
+          "mask": "moss",
+          "density": 0.22,
+          "scale": 2,
+          "role": 3,
+          "color": [
+            91,
+            137,
+            72,
+            255
+          ],
+          "properties": {
+            "roughness": 0.95
+          }
+        }
+      ]
+    },
+    "cracked_bricks": {
+      "parent": "base",
+      "layers": [
+        {
+          "op": "cracks",
+          "mask": "cracks",
+          "density": 0.12,
+          "scale": 1,
+          "role": 0,
+          "properties": {
+            "height": 0.25,
+            "roughness": 0.9
+          }
+        }
+      ]
+    },
+    "glowing_crystal": {
+      "parent": "base",
+      "layers": [
+        {
+          "op": "veins",
+          "mask": "crystal",
+          "density": 0.2,
+          "scale": 2,
+          "role": 4,
+          "properties": {
+            "emission": 1.0,
+            "metallic": 0.0
+          }
+        }
+      ]
+    }
+  }
+}

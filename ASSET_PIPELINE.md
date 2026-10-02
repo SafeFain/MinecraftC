@@ -9,7 +9,7 @@ MinecraftC separates authored, generated, imported, and declarative assets:
 - `assets/textures/third_party/` contains imported packs with their licenses.
 - `assets/textures/definitions/` contains JSON block, item, texture, style, and
   entity-material definitions. The default generated style is
-  `bright-comfortable` (generator version 4); it uses dependency-free
+  `bright-comfortable` (generator version 5); it uses dependency-free
   OKLab/OKLCH role palettes and keeps the runtime tile contracts unchanged.
 
 The client loads `atlas.json`, `blocks.json`, and `items.json` before chunk
@@ -19,8 +19,8 @@ compiled face/material mappings. Rendering requires a valid generated albedo
 atlas; legacy atlases without semantic map declarations use runtime material-map
 synthesis. Authored/imported source images retain their provenance and are not
 silently substituted for malformed declared assets. The runtime atlas builds per-tile mip levels in linear light with alpha weighting
-and leaf coverage preservation. The v4 block atlas packs 188 materials into a
-14×14 grid (224×224); logical indices retain their existing order.
+and leaf coverage preservation. The v5 block atlas retains 188 foundation slots and appends physical variants/frames;
+its square grid is derived from physical count. Logical indices retain their existing order.
 Every registered `BlockTexture` now has a generated PNG loaded by its logical
 metadata name. Older authored and runtime-procedural tiles are fallback-only.
 
@@ -263,3 +263,76 @@ orientation. Periodic-origin selection translates the whole tile without copying
 borders or changing connected clusters. Regression checks cover 36 seeds across
 all 188 materials, malformed/imported PNGs, authorable knobs, provenance, compact
 packing, color-independent geometry, linear-light mip values and leaf coverage.
+
+## V5 recipes, structural masks and sequences
+
+`definitions/recipes.json` version 1 covers all 188 block materials. A recipe starts
+with `base`, may inherit a parent, and adds ordered `texture`, `cracks`, `veins` or
+`cover` layers. Each layer has independent integer `seed`, `density` (0–1), `scale`
+(0.25–16), palette `role`, optional RGBA `color`, a named `mask`, and optional
+`roughness`, `metallic`, `emission`, `height` overrides (0–1). Inheritance cycles,
+unknown operations, invalid palettes and budget overflows fail explicitly. A child
+recipe can use `overrides: {"mask-name": {"density": 0.35}}` (or a zero-based layer
+index string) to override inherited layer parameters without mutating its parent.
+
+Canonical drawing palette choices carry role IDs through all 188 generators;
+colors are applied after structure and periodic-cut decisions. Each default PNG
+has a matching `.semantic.json` containing roles, coverage/role/layer masks,
+property overrides, recipe digest and pixel digest. Atlas assembly rejects a
+stale semantic sidecar. A recolor does not move structure or alter normals.
+Examples include `mossy_stone`, `cracked_bricks`, and `glowing_crystal`; select an
+example as a material's recipe in the workbench to export it.
+
+Suitable soil, rock, ore, sand, bark and plank materials use four variants.
+Variants share macro structure and use independent interior detail fields with a
+boundary-zero analytical envelope. Direction-sensitive turf sides, farmland,
+functional faces, foliage, glass, ice and plants remain single-variant by default.
+Fire uses 16 frames at 10 FPS; lava 16 at 8 FPS; star/resonant crystals 16 at 6 FPS.
+Crystal permutations retain silhouette and total radiance. Frames repeat without
+per-frame GPU uploads; albedo, normal and property maps share the selected slot.
+
+`atlas.json` version 2 records physical tiles, ordered `slots` (variant-major,
+frame-minor), counts, FPS and selection seed. Slot zero in each sequence remains
+its original foundation slot, allowing UI, item icons and held items to retain
+the default variant/first frame. `preferred_variant` rotates the exported
+sequence so a locked workbench candidate becomes that foundation image.
+`atlas_sequences.bin` has magic `MCTSEQ5\0`, a little-endian uint32 logical count,
+then 272-byte entries: four uint32 fields (variants, frames, FPS×1000, seed),
+followed by 64 uint32 slots. The renderer validates length, counts and bounds;
+legacy atlases without a declared table use identity sequences. Limits are four
+variants, 16 frames, 64 combinations per material and 1024px atlas edge.
+
+Chunk fragments select variants with an unsigned coordinate hash, retaining
+44-byte vertices and greedy merges. Integer/fractional floating-origin components
+preserve choices during camera movement, including negatives. GI derives stable
+alpha-weighted linear color averages over complete sequences; emitter strength
+continues to follow existing block lighting rules. Recipe emission controls surface
+glow without changing simulation lighting. Every physical
+tile has independent mips; foliage coverage includes appended custom leaf slots.
+`--preview` emits `animation_preview.png` and paginated `variant_preview_*.png`.
+
+### Local material workbench
+
+```bash
+python3 tools/texture_workbench.py
+# Open http://127.0.0.1:8765
+python3 tools/texture_generator.py --recipes path/to/recipes.json \
+  --generate --validate --build-atlas --output path/to/output
+```
+
+The standard-library server listens only on loopback and rejects foreign
+Host/Origin headers and oversized/non-JSON writes. It serves local HTML/CSS/JS;
+no CDN, remote service or package dependency is required. WebGL2 is used only by
+the standalone authoring tool, never by the Vulkan game. Unsupported browsers
+retain 2D preview, editing, save and export. Cube lighting approximates the game;
+final rendering checks must use Vulkan.
+
+The editor exposes material/seed, variants and frame rates, inherited layer JSON,
+layer parameters, palette colors, masks, animation scrubbing, cube rotation,
+variant wall and noon/dusk/cave lighting. Locking captures the seed and selected
+variant independently of changes to other materials. Save/restore uses
+`build-local/texture-workbench/draft.json`; exports go to content-addressed
+`exports/` directories and include recipes, semantic data, atlases, sequences,
+derived item icons and provenance. Only **Apply to formal assets** writes the
+fixed repository asset/recipe destinations. Restart the game after applying;
+this first workbench version does not hot-reload the running game's resources.

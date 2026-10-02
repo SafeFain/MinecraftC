@@ -3,7 +3,7 @@
   "fallback_enabled": false,
   "filter": "nearest",
   "generation_failures": {},
-  "generator_version": 4,
+  "generator_version": 5,
   "items": {
     "acacia_leaves": {
       "generator": "block_item_icon",
