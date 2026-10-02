@@ -36,6 +36,19 @@ int main() {
             getAtlasTextureIndex(BlockTexture::StoneBricks) == 144 &&
             getAtlasTextureIndex(BlockTexture::BlackWool) == 161,
             "atlas slots beyond logical material count remain mapped to authored tiles");
+    require(getAtlasTextureIndex(BlockTexture::RootedDirt) == 162 &&
+            getAtlasTextureIndex(BlockTexture::BeachGrass) == 185 &&
+            getFaceTexture(BlockId::DRY_GRASS_BLOCK,FaceDir::BOTTOM) == BlockTexture::Dirt &&
+            getFaceTexture(BlockId::DRY_GRASS_BLOCK,FaceDir::FRONT) == BlockTexture::DryGrassSide &&
+            getFaceTexture(BlockId::LEAF_LITTER_SOIL,FaceDir::FRONT) == BlockTexture::LeafLitterSide,
+            "natural material slots and semantic side faces resolve correctly");
+    for (uint16_t raw = 201; raw <= 224; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const auto texture = getFaceTexture(block,FaceDir::TOP);
+        const auto slot = getAtlasTextureIndex(texture);
+        require(slot == raw-39 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
+                "all natural materials resolve their appended atlas slots");
+    }
     const auto materials = buildVoxelGiMaterials(atlas);
     require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
             "non-emissive atlas material generated a light source");

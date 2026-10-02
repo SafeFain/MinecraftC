@@ -119,6 +119,12 @@ DECORATION_BASES = {
 }
 NAMES += list(DECORATION_BASES)
 
+# Generation-v15 natural materials; existing slots are unchanged.
+BIOME_BASES = {'rooted_dirt': (130, 94, 65), 'leaf_litter_soil': (151, 104, 52), 'peat': (76, 66, 48), 'silt': (145, 133, 96), 'dry_grass_block': (172, 158, 78), 'permafrost': (134, 139, 144), 'blue_ice': (86, 154, 215), 'shale': (105, 112, 121), 'red_sandstone': (181, 106, 61), 'ochre_terracotta': (184, 136, 61), 'white_terracotta': (211, 189, 160), 'volcanic_ash': (107, 107, 105), 'coral_rock': (195, 143, 126)}
+BIOME_PLANTS = ('fern', 'dead_bush', 'dry_grass', 'brown_mushroom', 'red_mushroom', 'lavender', 'bellflower', 'alpine_flower', 'tropical_flower', 'cattail', 'beach_grass')
+NAMES += list(BIOME_BASES) + list(BIOME_PLANTS) + ["dry_grass_side", "leaf_litter_side"]
+
+
 def _load_texture_families():
     definition_path = Path(__file__).resolve().parents[1] / \
         "assets/textures/definitions/textures.json"
@@ -376,6 +382,11 @@ for _name in FUNCTIONAL:
 for _name, _base in DECORATION_BASES.items():
     _floor = 0.24 if _name in {"black_wool", "polished_basalt", "deepslate_bricks"} else 0.34
     PALETTES[_name] = _role_palette(_base, shadow_floor=_floor)
+
+for _name, _base in BIOME_BASES.items():
+    PALETTES[_name] = _role_palette(_base)
+PALETTES["dry_grass_side"] = PALETTES["dirt"][:4] + PALETTES["dry_grass_block"][2:4]
+PALETTES["leaf_litter_side"] = PALETTES["dirt"][:4] + PALETTES["leaf_litter_soil"][2:4]
 
 PALETTES["mossy_stone_bricks"] = PALETTES["stone_bricks"][:4] + PALETTES["moss"][2:4]
 
@@ -674,6 +685,8 @@ PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","whea
         "starflower","cloud_bloom","glowshroom","hanging_roots",
         "glow_fern","resonant_crystal"}
 
+PLANTS.update(BIOME_PLANTS)
+
 def generate_special(name,seed,indices):
     if name in {"grass_side", "aether_grass_side"}:
         soil_name = "dirt" if name == "grass_side" else "aether_soil"
@@ -840,6 +853,13 @@ def plant_palette(name):
                    "cloud_bloom":(234,225,243),"sunflower_top":(242,195,53),
                    "glowshroom":(145,210,203)}
     if name in flower_colors: palette[6]=flower_colors[name]+(255,)
+    if name in BIOME_PLANTS:
+        if name in {"dead_bush", "dry_grass"}:
+            palette[1:4] = [(110,85,42,255),(157,126,61,255),(196,177,98,255)]
+        colors = {"red_mushroom":(203,70,54), "brown_mushroom":(145,104,71),
+                  "lavender":(167,125,201), "bellflower":(231,232,221),
+                  "alpine_flower":(169,197,224), "tropical_flower":(231,134,77)}
+        if name in colors: palette[6] = colors[name] + (255,)
     return palette
 
 
@@ -856,6 +876,39 @@ def generate_plant_texture(name,seed):
     def line(x0,y0,x1,y1,index,width=1): _line(image,x0,y0,x1,y1,palette[index],width)
     def rect(x0,y0,x1,y1,index): _paint_rect(image,x0,y0,x1,y1,palette[index])
     # Draw growth bottom-up, then return PNG top-left rows for the atlas loader.
+    if name in BIOME_PLANTS:
+        if name == "fern":
+            line(8,0,8,13,2)
+            for y,half in ((3,5),(6,4),(9,3),(12,1)):
+                line(8,y,8-half,y+2,3); line(8,y,8+half,y+2,2)
+        elif name in {"red_mushroom", "brown_mushroom"}:
+            rect(7,0,9,6,6); rect(3,5,13,8,6); rect(5,8,11,10,6)
+            rect(4,5,12,6,7)
+            if name == "red_mushroom":
+                for x,y in ((5,7),(9,8),(11,6)): rect(x,y,x+1,y+1,5)
+        elif name == "dead_bush":
+            line(8,0,8,10,1,2); line(8,4,3,8,2); line(8,5,12,10,2)
+            line(4,7,4,11,3); line(11,8,14,8,3)
+        elif name == "cattail":
+            for x,height in ((5,11),(10,14)):
+                line(x,0,x,height-3,2); rect(x-1,height-4,x+1,height,7)
+            line(7,0,3,7,3); line(8,0,12,9,2)
+        elif name in {"dry_grass", "beach_grass"}:
+            for x,height in ((3,6),(5,10),(9,12),(12,8)):
+                line(7,0,x,height,2); line(x,height-3,x-1,height,3)
+        elif name == "lavender":
+            for x,height in ((5,10),(8,14),(11,11)):
+                line(x,0,x,height,2)
+                for y in range(height-4,height+1,2): rect(x-1,y,x+1,y+1,6)
+        else:
+            line(8,0,8,10,2); line(8,3,4,6,3); line(8,5,12,7,2)
+            if name == "bellflower":
+                line(8,10,11,11,2); rect(10,8,13,11,6); rect(9,8,14,9,6)
+            else:
+                for cx,cy in ((6,11),(10,11),(8,13)):
+                    rect(cx-1,cy-1,cx+2,cy+2,6)
+                rect(7,10,9,12,5)
+        return [image[(15-y)*16+x] for y in range(16) for x in range(16)]
     if name == "torch":
         rect(7,0,9,10,4); rect(8,0,9,9,7); rect(6,10,10,14,5); rect(7,11,9,15,6)
     elif name in {"wheat_young","wheat_middle","wheat_mature"}:
@@ -955,8 +1008,38 @@ def generate_decoration_texture(name, seed):
     return center_periodic_tile(pixels) if name.startswith("polished_") or name == "smooth_sandstone" else pixels
 
 
+def generate_biome_texture(name, seed):
+    if name in {"dry_grass_side", "leaf_litter_side"}:
+        palette = PALETTES[name]
+        indices = generate_dirt("dirt", seed)
+        return [palette[4 + int((x//3)%2 == 0)] if y < 5 else palette[min(3, indices[y*16+x])]
+                for y in range(16) for x in range(16)]
+    palette = PALETTES[name]
+    indices = quantize(macro_field(seed, name, 6))
+    if name in {"rooted_dirt", "permafrost", "shale", "red_sandstone"}:
+        for x in range(16):
+            y = (round(2*math.sin(x*math.tau/16)) + 6) % 16
+            indices[y*16+x] = 3 if name == "permafrost" else 1
+    if name == "leaf_litter_soil":
+        for i in range(7):
+            h = sample(seed,name,i,17)
+            for x,y in grow_blob(seed,name,(h%16,(h>>8)%16),4,i):
+                indices[y*16+x] = 4 if i%2 else 1
+    if name == "rooted_dirt":
+        for x in range(16): indices[((x//3+10)%16)*16+x] = 4
+    if name == "blue_ice":
+        for x in range(16): indices[((x+3)%16)*16+x] = 4
+    if name == "coral_rock":
+        for i in range(6):
+            h = sample(seed,name,i,22)
+            for x,y in grow_blob(seed,name,(h%16,(h>>8)%16),3,i): indices[y*16+x] = 1
+    return center_periodic_tile([palette[max(0,min(5,int(i)))] for i in indices])
+
+
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in BIOME_BASES or name in {"dry_grass_side", "leaf_litter_side"}:
+        return generate_biome_texture(name,local)
     if name in DECORATION_BASES:
         return generate_decoration_texture(name,local)
     if name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL
@@ -1617,7 +1700,7 @@ def validate_texture(path):
                    for c in PALETTES[name][3:]]
         if max(distances)<.10: fail("ore/background perceptual contrast",max(distances),">= .10 OKLab")
     metrics=structure_metrics(pixels)
-    if name in {"grass_side", "aether_grass_side"}:
+    if name in {"grass_side", "aether_grass_side", "dry_grass_side", "leaf_litter_side"}:
         # A side-face turf cap is intentionally directional: its soil bottom
         # must not wrap vertically into its green top.  Horizontal repetition
         # still follows the normal seamless-tile contract used by greedy quads.
@@ -1632,7 +1715,7 @@ def validate_texture(path):
         fail("toroidal seam discontinuity",f"{metrics['seam_ratio']:.2f}","<= 2.60x interior")
     # Large calm planes are intentional in v3. Seam and palette checks above
     # still reject broken boundaries; frequency metrics are reported for review.
-    if name in {"grass_side", "aether_grass_side"}:
+    if name in {"grass_side", "aether_grass_side", "dry_grass_side", "leaf_litter_side"}:
         grass=set(PALETTES[name][4:]); rows=[y for y in range(SIZE) for x in range(SIZE) if pixels[y*SIZE+x] in grass]
         top_coverage=sum(pixels[y*SIZE+x] in grass for y in range(5) for x in range(SIZE))
         if top_coverage != 5*SIZE: fail("grass-side solid turf cap",top_coverage,f"= {5*SIZE}")

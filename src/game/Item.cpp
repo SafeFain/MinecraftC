@@ -360,6 +360,55 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     set(ItemId::BLACK_DYE, {"Black Dye"});
     set(ItemId::BONE_MEAL, {"Bone Meal"});
 
+    set(ItemId::ROOTED_DIRT, {"Rooted Dirt", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ROOTED_DIRT});
+    set(ItemId::LEAF_LITTER_SOIL, {"Leaf Litter Soil", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::LEAF_LITTER_SOIL});
+    set(ItemId::PEAT, {"Peat", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::PEAT});
+    set(ItemId::SILT, {"Silt", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SILT});
+    set(ItemId::DRY_GRASS_BLOCK, {"Dry Grass Block", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DRY_GRASS_BLOCK});
+    set(ItemId::PERMAFROST, {"Permafrost", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::PERMAFROST});
+    set(ItemId::BLUE_ICE, {"Blue Ice", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BLUE_ICE});
+    set(ItemId::SHALE, {"Shale", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SHALE});
+    set(ItemId::RED_SANDSTONE, {"Red Sandstone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::RED_SANDSTONE});
+    set(ItemId::OCHRE_TERRACOTTA, {"Ochre Terracotta", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::OCHRE_TERRACOTTA});
+    set(ItemId::WHITE_TERRACOTTA, {"White Terracotta", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::WHITE_TERRACOTTA});
+    set(ItemId::VOLCANIC_ASH, {"Volcanic Ash", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::VOLCANIC_ASH});
+    set(ItemId::CORAL_ROCK, {"Coral Rock", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CORAL_ROCK});
+    set(ItemId::FERN, {"Fern", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::FERN});
+    set(ItemId::DEAD_BUSH, {"Dead Bush", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DEAD_BUSH});
+    set(ItemId::DRY_GRASS, {"Dry Grass", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DRY_GRASS});
+    set(ItemId::BROWN_MUSHROOM, {"Brown Mushroom", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BROWN_MUSHROOM});
+    set(ItemId::RED_MUSHROOM, {"Red Mushroom", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::RED_MUSHROOM});
+    set(ItemId::LAVENDER, {"Lavender", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::LAVENDER});
+    set(ItemId::BELLFLOWER, {"Bellflower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BELLFLOWER});
+    set(ItemId::ALPINE_FLOWER, {"Alpine Flower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ALPINE_FLOWER});
+    set(ItemId::TROPICAL_FLOWER, {"Tropical Flower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::TROPICAL_FLOWER});
+    set(ItemId::CATTAIL, {"Cattail", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CATTAIL});
+    set(ItemId::BEACH_GRASS, {"Beach Grass", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BEACH_GRASS});
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -414,6 +463,19 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::BLUE_WOOL:
         case ItemId::GREEN_WOOL:
         case ItemId::BLACK_WOOL:
+        case ItemId::ROOTED_DIRT:
+        case ItemId::LEAF_LITTER_SOIL:
+        case ItemId::PEAT:
+        case ItemId::SILT:
+        case ItemId::DRY_GRASS_BLOCK:
+        case ItemId::PERMAFROST:
+        case ItemId::BLUE_ICE:
+        case ItemId::SHALE:
+        case ItemId::RED_SANDSTONE:
+        case ItemId::OCHRE_TERRACOTTA:
+        case ItemId::WHITE_TERRACOTTA:
+        case ItemId::VOLCANIC_ASH:
+        case ItemId::CORAL_ROCK:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -431,6 +493,17 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::CLOUD_BLOOM: case ItemId::GLOWSHROOM:
         case ItemId::POINTED_DRIPSTONE: case ItemId::HANGING_ROOTS:
         case ItemId::GLOW_FERN: case ItemId::RESONANT_CRYSTAL:
+        case ItemId::FERN:
+        case ItemId::DEAD_BUSH:
+        case ItemId::DRY_GRASS:
+        case ItemId::BROWN_MUSHROOM:
+        case ItemId::RED_MUSHROOM:
+        case ItemId::LAVENDER:
+        case ItemId::BELLFLOWER:
+        case ItemId::ALPINE_FLOWER:
+        case ItemId::TROPICAL_FLOWER:
+        case ItemId::CATTAIL:
+        case ItemId::BEACH_GRASS:
             return CreativeItemCategory::Nature;
 
         // ── Functional Blocks ───────────────────────────────────────────
@@ -588,6 +661,31 @@ ItemId itemForBlock(BlockId id) {
     const auto raw = static_cast<uint16_t>(id);
     if (raw > 0 && raw <= 35) return static_cast<ItemId>(raw);
     switch (raw) {
+        case static_cast<uint16_t>(BlockId::ROOTED_DIRT): return ItemId::ROOTED_DIRT;
+        case static_cast<uint16_t>(BlockId::LEAF_LITTER_SOIL): return ItemId::LEAF_LITTER_SOIL;
+        case static_cast<uint16_t>(BlockId::PEAT): return ItemId::PEAT;
+        case static_cast<uint16_t>(BlockId::SILT): return ItemId::SILT;
+        case static_cast<uint16_t>(BlockId::DRY_GRASS_BLOCK): return ItemId::DRY_GRASS_BLOCK;
+        case static_cast<uint16_t>(BlockId::PERMAFROST): return ItemId::PERMAFROST;
+        case static_cast<uint16_t>(BlockId::BLUE_ICE): return ItemId::BLUE_ICE;
+        case static_cast<uint16_t>(BlockId::SHALE): return ItemId::SHALE;
+        case static_cast<uint16_t>(BlockId::RED_SANDSTONE): return ItemId::RED_SANDSTONE;
+        case static_cast<uint16_t>(BlockId::OCHRE_TERRACOTTA): return ItemId::OCHRE_TERRACOTTA;
+        case static_cast<uint16_t>(BlockId::WHITE_TERRACOTTA): return ItemId::WHITE_TERRACOTTA;
+        case static_cast<uint16_t>(BlockId::VOLCANIC_ASH): return ItemId::VOLCANIC_ASH;
+        case static_cast<uint16_t>(BlockId::CORAL_ROCK): return ItemId::CORAL_ROCK;
+        case static_cast<uint16_t>(BlockId::FERN): return ItemId::FERN;
+        case static_cast<uint16_t>(BlockId::DEAD_BUSH): return ItemId::DEAD_BUSH;
+        case static_cast<uint16_t>(BlockId::DRY_GRASS): return ItemId::DRY_GRASS;
+        case static_cast<uint16_t>(BlockId::BROWN_MUSHROOM): return ItemId::BROWN_MUSHROOM;
+        case static_cast<uint16_t>(BlockId::RED_MUSHROOM): return ItemId::RED_MUSHROOM;
+        case static_cast<uint16_t>(BlockId::LAVENDER): return ItemId::LAVENDER;
+        case static_cast<uint16_t>(BlockId::BELLFLOWER): return ItemId::BELLFLOWER;
+        case static_cast<uint16_t>(BlockId::ALPINE_FLOWER): return ItemId::ALPINE_FLOWER;
+        case static_cast<uint16_t>(BlockId::TROPICAL_FLOWER): return ItemId::TROPICAL_FLOWER;
+        case static_cast<uint16_t>(BlockId::CATTAIL): return ItemId::CATTAIL;
+        case static_cast<uint16_t>(BlockId::BEACH_GRASS): return ItemId::BEACH_GRASS;
+
         case static_cast<uint16_t>(BlockId::STONE_BRICKS): return ItemId::STONE_BRICKS;
         case static_cast<uint16_t>(BlockId::MOSSY_STONE_BRICKS): return ItemId::MOSSY_STONE_BRICKS;
         case static_cast<uint16_t>(BlockId::CRACKED_STONE_BRICKS): return ItemId::CRACKED_STONE_BRICKS;

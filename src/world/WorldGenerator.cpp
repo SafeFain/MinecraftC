@@ -1,3 +1,4 @@
+#include "world/BiomeBlockLogic.h"
 #include "world/WorldGenerator.h"
 #include "Config.h"
 #include "world/RegionGenerator.h"
@@ -1372,7 +1373,6 @@ void WorldGenerator::generate(Chunk& chunk,
             heightMap[x][z] = height;
             biomeMap[x][z] = biome;
             riverMap[x][z] = column.isRiver;
-            const BiomeProperties& bprops = getBiomeProps(biome);
             SurfaceRuleContext surfaceContext{
                 biome, column.archetype, height, column.waterLevel,
                 column.slope, column.localRelief,
@@ -1427,12 +1427,6 @@ void WorldGenerator::generate(Chunk& chunk,
                         m_seed, worldX, worldZ, depth, surfaceContext));
             }
 
-            // Snow cover: if height >= biome snowLine, override surface
-            if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
-                chunk.blockAt(x, height, z) =
-                    static_cast<uint8_t>(BlockId::SNOW);
-            }
-
             // Water fill (oceans, lakes, rivers)
             int waterTop = column.waterLevel;
             if (height < waterTop) {
@@ -1482,6 +1476,8 @@ void WorldGenerator::generate(Chunk& chunk,
                                  current == BlockId::GRASS || current == BlockId::SNOW ||
                                  current == BlockId::GRANITE || current == BlockId::TUFF ||
                                  current == BlockId::LIMESTONE || current == BlockId::BASALT;
+                carveable = carveable || isBiomeSoil(current) ||
+                    isBiomeRock(current);
                 if (!carveable) continue;
                 chunk.setBlock(x, y, z, cell == CaveCell::Water ? BlockId::WATER :
                     cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR);
@@ -1506,22 +1502,22 @@ void WorldGenerator::generate(Chunk& chunk,
                     current, biomeMap[x][z]);
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
-            if (heightMap[x][z] + 1 < Config::WORLD_MAX_Y &&
-                chunk.getBlock(x, heightMap[x][z], z) != BlockId::AIR &&
-                chunk.getBlock(x, heightMap[x][z] + 1, z) == BlockId::AIR) {
-                BlockId decoration = SurfaceRules::decoration(
-                    m_seed, wx, wz, heightMap[x][z], biomeMap[x][z], riverMap[x][z]);
-                if (decoration != BlockId::AIR) {
-                    const int featureHeight = SurfaceRules::decorationHeight(
-                        m_seed, wx, wz, heightMap[x][z], decoration);
-                    for (int dy = 1; dy <= featureHeight; ++dy)
-                        if (heightMap[x][z] + dy < Config::WORLD_MAX_Y)
-                            chunk.setBlock(x, heightMap[x][z] + dy, z, decoration);
-                    if (decoration == BlockId::SUNFLOWER_BOTTOM &&
-                        heightMap[x][z] + 2 < Config::WORLD_MAX_Y)
-                        chunk.setBlock(x, heightMap[x][z] + 2, z,
-                                       BlockId::SUNFLOWER_TOP);
-                }
+            if (!m_structureGenerator.reservationAt(wx,wz)) {
+                const auto context = SurfaceRules::contextForColumn(terrainColumns[static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x]);
+                SurfaceRules::decorateColumn(m_seed,wx,wz,context,
+                    [&](int y) { return chunk.getBlock(x,y,z); },
+                    [&](int y, BlockId block) { chunk.setBlock(x,y,z,block); },
+                    [&] {
+                        for (int dz = -2; dz <= 2; ++dz) {
+                            for (int dx = -2; dx <= 2; ++dx) {
+                                if (std::abs(dx) + std::abs(dz) > 2) continue;
+                                const auto nearby = m_heightPipeline.sampleColumn(wx+dx,wz+dz);
+                                if (nearby.height < nearby.waterLevel &&
+                                    std::abs(nearby.waterLevel-context.height) <= 2) return true;
+                            }
+                        }
+                        return false;
+                    });
             }
         }
     }

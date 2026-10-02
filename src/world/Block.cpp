@@ -1,3 +1,4 @@
+#include "world/BiomeBlockLogic.h"
 #include "world/Block.h"
 #include "core/AssetStore.h"
 
@@ -54,7 +55,9 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "smithing_table_top", "smithing_table_side", "smithing_table_bottom",
     "grindstone_top", "grindstone_side", "grindstone_bottom", "white_bed_top",
     "white_bed_side", "white_bed_bottom", "tnt_top", "tnt_side", "tnt_bottom",
-    "stone_bricks", "mossy_stone_bricks", "cracked_stone_bricks", "chiseled_stone_bricks", "bricks", "polished_granite", "polished_basalt", "polished_limestone", "polished_tuff", "deepslate_bricks", "sandstone", "cut_sandstone", "smooth_sandstone", "red_wool", "yellow_wool", "blue_wool", "green_wool", "black_wool"
+    "stone_bricks", "mossy_stone_bricks", "cracked_stone_bricks", "chiseled_stone_bricks", "bricks", "polished_granite", "polished_basalt", "polished_limestone", "polished_tuff", "deepslate_bricks", "sandstone", "cut_sandstone", "smooth_sandstone", "red_wool", "yellow_wool", "blue_wool", "green_wool", "black_wool",
+    "rooted_dirt", "leaf_litter_soil", "peat", "silt", "dry_grass_block", "permafrost", "blue_ice", "shale", "red_sandstone", "ochre_terracotta", "white_terracotta", "volcanic_ash", "coral_rock", "fern", "dead_bush", "dry_grass", "brown_mushroom", "red_mushroom", "lavender", "bellflower", "alpine_flower", "tropical_flower", "cattail", "beach_grass",
+    "dry_grass_side", "leaf_litter_side"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -341,6 +344,30 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::GREEN_WOOL, "Green Wool", glm::vec3(0.298f,0.514f,0.216f), true, false},
     {BlockId::BLACK_WOOL, "Black Wool", glm::vec3(0.173f,0.176f,0.192f), true, false},
 
+    {BlockId::ROOTED_DIRT, "Rooted Dirt", glm::vec3(0.510f,0.369f,0.255f), true, false},
+    {BlockId::LEAF_LITTER_SOIL, "Leaf Litter Soil", glm::vec3(0.592f,0.408f,0.204f), true, false},
+    {BlockId::PEAT, "Peat", glm::vec3(0.298f,0.259f,0.188f), true, false},
+    {BlockId::SILT, "Silt", glm::vec3(0.569f,0.522f,0.376f), true, false},
+    {BlockId::DRY_GRASS_BLOCK, "Dry Grass Block", glm::vec3(0.675f,0.620f,0.306f), true, false},
+    {BlockId::PERMAFROST, "Permafrost", glm::vec3(0.525f,0.545f,0.565f), true, false},
+    {BlockId::BLUE_ICE, "Blue Ice", glm::vec3(0.337f,0.604f,0.843f), true, false},
+    {BlockId::SHALE, "Shale", glm::vec3(0.412f,0.439f,0.475f), true, false},
+    {BlockId::RED_SANDSTONE, "Red Sandstone", glm::vec3(0.710f,0.416f,0.239f), true, false},
+    {BlockId::OCHRE_TERRACOTTA, "Ochre Terracotta", glm::vec3(0.722f,0.533f,0.239f), true, false},
+    {BlockId::WHITE_TERRACOTTA, "White Terracotta", glm::vec3(0.827f,0.741f,0.627f), true, false},
+    {BlockId::VOLCANIC_ASH, "Volcanic Ash", glm::vec3(0.420f,0.420f,0.412f), true, false},
+    {BlockId::CORAL_ROCK, "Coral Rock", glm::vec3(0.765f,0.561f,0.494f), true, false},
+    {BlockId::FERN, "Fern", glm::vec3(0.314f,0.573f,0.271f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::DEAD_BUSH, "Dead Bush", glm::vec3(0.620f,0.439f,0.235f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::DRY_GRASS, "Dry Grass", glm::vec3(0.714f,0.663f,0.337f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::BROWN_MUSHROOM, "Brown Mushroom", glm::vec3(0.569f,0.408f,0.278f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::RED_MUSHROOM, "Red Mushroom", glm::vec3(0.796f,0.275f,0.212f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::LAVENDER, "Lavender", glm::vec3(0.655f,0.490f,0.788f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::BELLFLOWER, "Bellflower", glm::vec3(0.906f,0.910f,0.867f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::ALPINE_FLOWER, "Alpine Flower", glm::vec3(0.663f,0.773f,0.878f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::TROPICAL_FLOWER, "Tropical Flower", glm::vec3(0.906f,0.525f,0.302f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::CATTAIL, "Cattail", glm::vec3(0.529f,0.361f,0.188f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::BEACH_GRASS, "Beach Grass", glm::vec3(0.624f,0.686f,0.384f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -410,6 +437,32 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
                    face == FaceDir::FRONT ? BlockTexture::Chest : BlockTexture::ChestSide;
         case BlockId::TORCH:         return BlockTexture::Torch;
         case BlockId::WHITE_WOOL:    return BlockTexture::WhiteWool;
+        case BlockId::ROOTED_DIRT: return BlockTexture::RootedDirt;
+        case BlockId::LEAF_LITTER_SOIL: return face == FaceDir::TOP ? BlockTexture::LeafLitterSoil :
+            face == FaceDir::BOTTOM ? BlockTexture::Dirt : BlockTexture::LeafLitterSide;
+        case BlockId::PEAT: return BlockTexture::Peat;
+        case BlockId::SILT: return BlockTexture::Silt;
+        case BlockId::DRY_GRASS_BLOCK: return face == FaceDir::TOP ? BlockTexture::DryGrassBlock :
+            face == FaceDir::BOTTOM ? BlockTexture::Dirt : BlockTexture::DryGrassSide;
+        case BlockId::PERMAFROST: return BlockTexture::Permafrost;
+        case BlockId::BLUE_ICE: return BlockTexture::BlueIce;
+        case BlockId::SHALE: return BlockTexture::Shale;
+        case BlockId::RED_SANDSTONE: return BlockTexture::RedSandstone;
+        case BlockId::OCHRE_TERRACOTTA: return BlockTexture::OchreTerracotta;
+        case BlockId::WHITE_TERRACOTTA: return BlockTexture::WhiteTerracotta;
+        case BlockId::VOLCANIC_ASH: return BlockTexture::VolcanicAsh;
+        case BlockId::CORAL_ROCK: return BlockTexture::CoralRock;
+        case BlockId::FERN: return BlockTexture::Fern;
+        case BlockId::DEAD_BUSH: return BlockTexture::DeadBush;
+        case BlockId::DRY_GRASS: return BlockTexture::DryGrass;
+        case BlockId::BROWN_MUSHROOM: return BlockTexture::BrownMushroom;
+        case BlockId::RED_MUSHROOM: return BlockTexture::RedMushroom;
+        case BlockId::LAVENDER: return BlockTexture::Lavender;
+        case BlockId::BELLFLOWER: return BlockTexture::Bellflower;
+        case BlockId::ALPINE_FLOWER: return BlockTexture::AlpineFlower;
+        case BlockId::TROPICAL_FLOWER: return BlockTexture::TropicalFlower;
+        case BlockId::CATTAIL: return BlockTexture::Cattail;
+        case BlockId::BEACH_GRASS: return BlockTexture::BeachGrass;
         case BlockId::STONE_BRICKS: return BlockTexture::StoneBricks;
         case BlockId::MOSSY_STONE_BRICKS: return BlockTexture::MossyStoneBricks;
         case BlockId::CRACKED_STONE_BRICKS: return BlockTexture::CrackedStoneBricks;
@@ -949,6 +1002,7 @@ bool isReplaceableByFluid(BlockId id) {
     // Java's flowing-fluid passability admits non-collision blocks, with
     // sugar cane (REEDS) as the notable plant exception.  Crops and torches
     // are destroyed by the incoming fluid; solid farmland and beds are not.
+    if (isBiomePlant(id)) return true;
     if (id == BlockId::REEDS) return false;
     if (id == BlockId::AIR || id == BlockId::FIRE || id == BlockId::SNOW_LAYER ||
         id == BlockId::TORCH || id == BlockId::TALL_GRASS || isFlower(id) ||
@@ -957,6 +1011,8 @@ bool isReplaceableByFluid(BlockId id) {
 }
 
 uint8_t fireEncouragement(BlockId id) {
+    if (isBiomePlant(id)) return 60;
+    if (id == BlockId::LEAF_LITTER_SOIL) return 30;
     if (isBed(id)) return 30;
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id,architectural) &&
@@ -996,6 +1052,8 @@ uint8_t fireEncouragement(BlockId id) {
 }
 
 uint8_t burnOdds(BlockId id) {
+    if (isBiomePlant(id)) return 100;
+    if (id == BlockId::LEAF_LITTER_SOIL) return 20;
     const uint8_t encouragement = fireEncouragement(id);
     if (encouragement == 0) return 0;
     if (encouragement == 5) {

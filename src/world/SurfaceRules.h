@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/BiomeMap.h"
+#include "world/BiomeBlockLogic.h"
 #include "world/TerrainArchetype.h"
 #include "world/WorldGenContext.h"
 #include "Config.h"
@@ -37,6 +38,32 @@ public:
         int quotient = value / divisor;
         const int remainder = value % divisor;
         return remainder < 0 ? quotient - 1 : quotient;
+    }
+
+    // Smooth world-aligned fields, including negative cells. Separate domains
+    // keep material patches independent of tree/structure placement.
+    static float patch(uint64_t seed, int x, int z, uint64_t domain, int scale = 16) {
+        const int cx = floorDiv(x, scale), cz = floorDiv(z, scale);
+        float fx = static_cast<float>(x - cx * scale) / scale;
+        float fz = static_cast<float>(z - cz * scale) / scale;
+        fx = fx * fx * (3.0f - 2.0f * fx);
+        fz = fz * fz * (3.0f - 2.0f * fz);
+        const auto value = [&](int dx, int dz) {
+            return static_cast<float>(WorldGenContext::hashPosition(
+                WorldGenContext(seed).derive(domain), cx + dx, 0, cz + dz) & 65535u) / 65535.0f;
+        };
+        const float a = value(0,0), b = value(1,0), c = value(0,1), d = value(1,1);
+        return (a + (b-a)*fx) * (1.0f-fz) + (c + (d-c)*fx) * fz;
+    }
+
+    template<typename Column>
+    static SurfaceRuleContext contextForColumn(const Column& c) {
+        SurfaceRuleContext result{c.biome, c.archetype, c.height, c.waterLevel,
+            c.slope, c.localRelief, c.primaryArchetypeWeight,
+            c.volcanicWeight, c.craterWeight, c.riverWeight, c.isRiver};
+        result.secondaryArchetype = c.secondaryArchetype;
+        result.secondaryArchetypeWeight = c.archetypeBlend;
+        return result;
     }
 
     static BlockId naturalLandmark(uint64_t seed, int worldX, int worldZ,
@@ -187,6 +214,72 @@ public:
                 break;
         }
 
+        const float materialPatch = patch(seed, worldX, worldZ, 0x42494F4D45534F49ULL);
+        const bool rich = materialPatch > 0.65f;
+        const bool secondary = materialPatch < 0.25f;
+        switch (context.biome) {
+            case Biome::FOREST: case Biome::FLOWER_FOREST:
+            case Biome::BIRCH_FOREST: case Biome::TAIGA:
+                if (rich) result = {BlockId::LEAF_LITTER_SOIL, BlockId::ROOTED_DIRT, 3};
+                else if (secondary) result.under = BlockId::ROOTED_DIRT;
+                break;
+            case Biome::JUNGLE: case Biome::KARST_FOREST:
+                if (context.slope < 0.48f && rich)
+                    result = {BlockId::MOSS, BlockId::ROOTED_DIRT, 4};
+                break;
+            case Biome::DESERT:
+                result.under = BlockId::SANDSTONE;
+                if (!rich) result.depth = 5; // sand cap, sandstone below it
+                break;
+            case Biome::SAVANNA: case Biome::DRY_WOODLAND:
+            case Biome::ROCKY_STEPPE:
+                if (rich) result = {BlockId::DRY_GRASS_BLOCK, BlockId::COARSE_DIRT, 3};
+                break;
+            case Biome::SWAMP: case Biome::LUSH_VALLEY:
+                if (rich) result = {BlockId::PEAT, BlockId::MUD, 4};
+                if (secondary || context.height < context.waterLevel)
+                    result = {BlockId::SILT, BlockId::CLAY, 3};
+                break;
+            case Biome::RIVER:
+                if (rich) result = {BlockId::SILT, BlockId::CLAY, 3};
+                break;
+            case Biome::OCEAN:
+                if (rich && context.height < context.waterLevel &&
+                    context.height >= context.waterLevel - 18)
+                    result = {BlockId::CORAL_ROCK, BlockId::LIMESTONE, 2};
+                else if (secondary) result = {BlockId::SILT, BlockId::CLAY, 3};
+                break;
+            case Biome::DEEP_OCEAN:
+                if (rich) result = {BlockId::SHALE, BlockId::SHALE, 3};
+                else if (secondary) result = {BlockId::SILT, BlockId::CLAY, 3};
+                break;
+            case Biome::BEACH:
+                if (rich) result.under = BlockId::SANDSTONE;
+                break;
+            case Biome::STONY_SHORE: case Biome::MOUNTAINS:
+                if (rich) result = {BlockId::SHALE, BlockId::STONE, 3};
+                break;
+            case Biome::LIMESTONE_HIGHLANDS:
+                if (rich) result = {BlockId::CALCITE, BlockId::LIMESTONE, 4};
+                else if (secondary) result = {BlockId::SHALE, BlockId::LIMESTONE, 3};
+                break;
+            case Biome::SNOW_TUNDRA: case Biome::ALPINE_TUNDRA:
+                result.under = BlockId::PERMAFROST;
+                if (rich && context.slope < 0.56f) result.top = BlockId::PERMAFROST;
+                break;
+            case Biome::GLACIAL_PEAKS:
+                if (rich) result = {BlockId::BLUE_ICE, BlockId::BLUE_ICE, 5};
+                break;
+            case Biome::VOLCANIC_HIGHLANDS:
+                if (rich && context.volcanicWeight < 0.35f)
+                    result = {BlockId::VOLCANIC_ASH, BlockId::TUFF, 3};
+                break;
+            case Biome::BLACK_SAND_COAST:
+                if (rich) result.under = BlockId::VOLCANIC_ASH;
+                break;
+            default: break;
+        }
+
         // Volcanic materials follow continuous masks and never replace the
         // surrounding biome outside the cone. Basalt is deliberately sparse:
         // steep patches, crater mottling, and narrow deterministic flow scars.
@@ -230,6 +323,25 @@ public:
             result.under = BlockId::STONE;
             result.depth = 3;
         }
+        // Ash is limited to volcanic ground; basalt scars keep their identity.
+        if (rich && context.volcanicWeight >= 0.35f &&
+            result.top == BlockId::TUFF && context.slope < 0.65f &&
+            context.craterWeight < 0.58f) result.top = BlockId::VOLCANIC_ASH;
+        if (context.biome == Biome::BLACK_SAND_COAST && rich)
+            result.under = BlockId::VOLCANIC_ASH;
+        if (context.biome == Biome::MOUNTAINS && rich &&
+            result.top != BlockId::TUFF && result.top != BlockId::BASALT)
+            result.top = BlockId::SHALE;
+
+        // One final surface authority for generated chunks and procedural LOD.
+        // Preserve exposed ice and cold bare patches rather than painting every
+        // glacial column with opaque snow.
+        const int snowLine = getBiomeProps(context.biome).snowLine;
+        if (context.height >= snowLine && snowLine < Config::SNOW_LINE_DISABLED &&
+            result.top != BlockId::PACKED_ICE && result.top != BlockId::BLUE_ICE &&
+            result.top != BlockId::PERMAFROST &&
+            !(context.biome == Biome::ALPINE_TUNDRA && context.slope > 0.56f))
+            result.top = BlockId::SNOW;
         return result;
     }
 
@@ -239,10 +351,14 @@ public:
         const SurfaceProfile surface = profile(
             seed, worldX, worldZ, context);
         if (depth == 0) return surface.top;
-        if (context.biome == Biome::RED_CANYON) {
-            const int band = (context.height - depth + 512) % 9;
-            if (band == 0 || band == 1) return BlockId::GRANITE;
-            return band < 5 ? BlockId::TERRACOTTA : BlockId::RED_SAND;
+        if (context.biome == Biome::DESERT)
+            return depth >= 3 ? BlockId::SANDSTONE : BlockId::SAND;
+        if (context.biome == Biome::BADLANDS || context.biome == Biome::RED_CANYON) {
+            const int band = ((context.height - depth) % 12 + 12) % 12;
+            if (band <= 1) return BlockId::WHITE_TERRACOTTA;
+            if (band <= 4) return BlockId::OCHRE_TERRACOTTA;
+            if (band <= 6) return BlockId::RED_SANDSTONE;
+            return BlockId::TERRACOTTA;
         }
         if (context.volcanicWeight >= 0.35f && depth >= 2)
             return BlockId::TUFF;
@@ -251,7 +367,7 @@ public:
         return surface.under;
     }
 
-    static BlockId decoration(uint64_t seed, int worldX, int worldZ,
+    static BlockId legacyDecoration(uint64_t seed, int worldX, int worldZ,
                               int height, Biome biome, bool river) {
         if (river) return BlockId::AIR;
         uint64_t h = WorldGenContext::hashPosition(
@@ -294,6 +410,72 @@ public:
             }
         }
         return BlockId::TALL_GRASS;
+    }
+
+    static BlockId decoration(uint64_t seed, int x, int z,
+                              const SurfaceRuleContext& context, BlockId soil) {
+        if (context.height < context.waterLevel) return BlockId::AIR;
+        const uint64_t h = WorldGenContext::hashPosition(
+            WorldGenContext(seed).derive(0x42494F4D45504C41ULL), x, context.height, z);
+        const float cluster = patch(seed,x,z,0x504C414E54504154ULL,12);
+        const int density = cluster > 0.60f ? 22 : 6;
+        BlockId plant = BlockId::AIR;
+        if (static_cast<int>(h % 100) < density) {
+            switch (context.biome) {
+                case Biome::FOREST: case Biome::FLOWER_FOREST:
+                case Biome::BIRCH_FOREST: case Biome::TAIGA:
+                    plant = h % 4 < 2 ? BlockId::FERN :
+                        h % 4 == 2 ? BlockId::BROWN_MUSHROOM : BlockId::RED_MUSHROOM;
+                    break;
+                case Biome::JUNGLE: case Biome::KARST_FOREST:
+                    plant = h % 3 == 0 ? BlockId::TROPICAL_FLOWER :
+                        h % 3 == 1 ? BlockId::FERN : BlockId::BROWN_MUSHROOM;
+                    break;
+                case Biome::PLAINS: case Biome::MEADOW:
+                case Biome::SUNFLOWER_PLAINS: case Biome::HILLS:
+                    plant = h % 2 ? BlockId::LAVENDER : BlockId::BELLFLOWER;
+                    break;
+                case Biome::DESERT: case Biome::BADLANDS: case Biome::RED_CANYON:
+                    plant = BlockId::DEAD_BUSH; break;
+                case Biome::SAVANNA: case Biome::DRY_WOODLAND: case Biome::ROCKY_STEPPE:
+                    plant = h % 4 == 0 ? BlockId::DEAD_BUSH : BlockId::DRY_GRASS; break;
+                case Biome::SWAMP: case Biome::LUSH_VALLEY: case Biome::RIVER:
+                    plant = h % 3 == 0 ? BlockId::CATTAIL :
+                        h % 3 == 1 ? BlockId::FERN : BlockId::BROWN_MUSHROOM; break;
+                case Biome::SNOW_TUNDRA: case Biome::ALPINE_TUNDRA:
+                    plant = BlockId::ALPINE_FLOWER; break;
+                case Biome::BEACH: case Biome::STONY_SHORE: case Biome::BLACK_SAND_COAST:
+                    plant = BlockId::BEACH_GRASS; break;
+                default: break;
+            }
+        }
+        if (plant != BlockId::AIR && supportsBiomePlant(plant,soil)) return plant;
+        const BlockId fallback = legacyDecoration(seed,x,z,context.height,context.biome,context.river);
+        // Existing landmarks remain valid on exposed rock. Existing flowers
+        // and grass must not grow on ice, bare rock or deep sediment.
+        if (fallback == BlockId::TALL_GRASS || isFlower(fallback))
+            return supportsBiomePlant(BlockId::FERN,soil) ? fallback : BlockId::AIR;
+        return fallback;
+    }
+
+    template<typename GetBlock, typename SetBlock, typename NearWater>
+    static void decorateColumn(uint64_t seed, int x, int z,
+                               const SurfaceRuleContext& context,
+                               GetBlock&& get, SetBlock&& set, NearWater&& nearWater) {
+        const int y = context.height;
+        if (!Config::isValidWorldY(y+1) || get(y+1) != BlockId::AIR ||
+            !isFullCollisionBlock(get(y))) return;
+        const BlockId block = decoration(seed,x,z,context,get(y));
+        if (block == BlockId::AIR) return;
+        if ((block == BlockId::CATTAIL || block == BlockId::REEDS) && !nearWater()) return;
+        const int count = decorationHeight(seed,x,z,y,block);
+        for (int dy = 1; dy <= count; ++dy) {
+            if (!Config::isValidWorldY(y+dy) || get(y+dy) != BlockId::AIR) return;
+        }
+        if (block == BlockId::SUNFLOWER_BOTTOM &&
+            (!Config::isValidWorldY(y+2) || get(y+2) != BlockId::AIR)) return;
+        for (int dy = 1; dy <= count; ++dy) set(y+dy,block);
+        if (block == BlockId::SUNFLOWER_BOTTOM) set(y+2,BlockId::SUNFLOWER_TOP);
     }
 
     static int decorationHeight(uint64_t seed, int worldX, int worldZ,

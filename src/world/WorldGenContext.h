@@ -6,7 +6,13 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 14;
+    static constexpr uint32_t GENERATION_VERSION = 15;
+    // v15 changes surface ecology only. v14 heights, seed domains, structure
+    // anchors and serialized edits remain compatible; older worlds do not.
+    static constexpr bool canLoadGeneration(uint32_t version) {
+        return version == GENERATION_VERSION || version == 14;
+    }
+
     // Base chunk caches may be invalidated without changing the user-visible
     // generation version. v14 adds deterministic cave biomes, formations,
     // and cave-surface ecology. v13 seals village-house, traveler-hut, and igloo

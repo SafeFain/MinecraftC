@@ -33,7 +33,10 @@ void require(bool condition, const char* message) {
 using TreeKey = std::tuple<int, int, int, int, int>;
 }
 
+#include "BiomeSurfaceScenarios.h"
+
 int main() {
+    testBiomeSurfaceEcology();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
         [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
             ? Biome::PLAINS : Biome::FOREST; }, 128, 32);

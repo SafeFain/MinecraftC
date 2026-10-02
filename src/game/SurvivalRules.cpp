@@ -104,6 +104,31 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::BLUE_WOOL, 0.8f);
     set(BlockId::GREEN_WOOL, 0.8f);
     set(BlockId::BLACK_WOOL, 0.8f);
+    set(BlockId::ROOTED_DIRT, 0.6f, ToolKind::Shovel);
+    set(BlockId::LEAF_LITTER_SOIL, 0.6f, ToolKind::Shovel);
+    set(BlockId::PEAT, 0.6f, ToolKind::Shovel);
+    set(BlockId::SILT, 0.6f, ToolKind::Shovel);
+    set(BlockId::DRY_GRASS_BLOCK, 0.6f, ToolKind::Shovel);
+    set(BlockId::PERMAFROST, 0.6f, ToolKind::Shovel);
+    set(BlockId::BLUE_ICE, 0.5f, ToolKind::Pickaxe);
+    set(BlockId::SHALE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::RED_SANDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::OCHRE_TERRACOTTA, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::WHITE_TERRACOTTA, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::VOLCANIC_ASH, 0.6f, ToolKind::Shovel);
+    set(BlockId::CORAL_ROCK, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::FERN, 0.0f);
+    set(BlockId::DEAD_BUSH, 0.0f);
+    set(BlockId::DRY_GRASS, 0.0f);
+    set(BlockId::BROWN_MUSHROOM, 0.0f);
+    set(BlockId::RED_MUSHROOM, 0.0f);
+    set(BlockId::LAVENDER, 0.0f);
+    set(BlockId::BELLFLOWER, 0.0f);
+    set(BlockId::ALPINE_FLOWER, 0.0f);
+    set(BlockId::TROPICAL_FLOWER, 0.0f);
+    set(BlockId::CATTAIL, 0.0f);
+    set(BlockId::BEACH_GRASS, 0.0f);
+
 
     for (uint8_t raw = static_cast<uint8_t>(BlockId::WHITE_BED);
          raw <= static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST); ++raw) {

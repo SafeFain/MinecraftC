@@ -94,3 +94,12 @@ external textures were imported. Reproduce with:
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas --build-items-atlas
 ```
+
+## Natural biome expansion
+
+The 24 generation-v15 natural block materials, two soil/turf side faces and
+matching item icons are original MinecraftC procedural pixel art. They use
+`tools/texture_generator.py` v3, default seed 213785369, the existing
+bright-comfortable style and generated-asset license. No external art was
+imported. Existing material indices and independent texture files are retained.
+Use the reproduction command above to regenerate and validate the assets.

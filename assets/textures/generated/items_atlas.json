@@ -51,6 +51,14 @@
       "x": 1,
       "y": 15
     },
+    "alpine_flower": {
+      "generator": "block_item_icon",
+      "index": 228,
+      "source": "assets/textures/generated/items/alpine_flower.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 28
+    },
     "arrow": {
       "generator": "item_sprite",
       "index": 71,
@@ -67,6 +75,14 @@
       "x": 1,
       "y": 17
     },
+    "beach_grass": {
+      "generator": "block_item_icon",
+      "index": 231,
+      "source": "assets/textures/generated/items/beach_grass.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 28
+    },
     "bedrock": {
       "generator": "block_item_icon",
       "index": 37,
@@ -74,6 +90,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 4
+    },
+    "bellflower": {
+      "generator": "block_item_icon",
+      "index": 227,
+      "source": "assets/textures/generated/items/bellflower.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 28
     },
     "birch_leaves": {
       "generator": "block_item_icon",
@@ -147,6 +171,14 @@
       "x": 4,
       "y": 25
     },
+    "blue_ice": {
+      "generator": "block_item_icon",
+      "index": 214,
+      "source": "assets/textures/generated/items/blue_ice.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 26
+    },
     "blue_orchid": {
       "generator": "block_item_icon",
       "index": 120,
@@ -211,6 +243,14 @@
       "x": 2,
       "y": 23
     },
+    "brown_mushroom": {
+      "generator": "block_item_icon",
+      "index": 224,
+      "source": "assets/textures/generated/items/brown_mushroom.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 28
+    },
     "cactus": {
       "generator": "block_item_icon",
       "index": 41,
@@ -226,6 +266,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 19
+    },
+    "cattail": {
+      "generator": "block_item_icon",
+      "index": 230,
+      "source": "assets/textures/generated/items/cattail.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 28
     },
     "cauldron": {
       "generator": "block_item_icon",
@@ -387,6 +435,14 @@
       "x": 6,
       "y": 9
     },
+    "coral_rock": {
+      "generator": "block_item_icon",
+      "index": 220,
+      "source": "assets/textures/generated/items/coral_rock.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 27
+    },
     "cow_spawn_egg": {
       "generator": "item_sprite",
       "index": 126,
@@ -426,6 +482,14 @@
       "source_kind": "generated",
       "x": 7,
       "y": 14
+    },
+    "dead_bush": {
+      "generator": "block_item_icon",
+      "index": 222,
+      "source": "assets/textures/generated/items/dead_bush.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 27
     },
     "deepslate": {
       "generator": "block_item_icon",
@@ -555,6 +619,22 @@
       "x": 2,
       "y": 19
     },
+    "dry_grass": {
+      "generator": "block_item_icon",
+      "index": 223,
+      "source": "assets/textures/generated/items/dry_grass.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 27
+    },
+    "dry_grass_block": {
+      "generator": "block_item_icon",
+      "index": 212,
+      "source": "assets/textures/generated/items/dry_grass_block.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 26
+    },
     "emerald": {
       "generator": "item_sprite",
       "index": 161,
@@ -586,6 +666,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 8
+    },
+    "fern": {
+      "generator": "block_item_icon",
+      "index": 221,
+      "source": "assets/textures/generated/items/fern.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 27
     },
     "fletching_table": {
       "generator": "block_item_icon",
@@ -923,6 +1011,22 @@
       "x": 6,
       "y": 5
     },
+    "lavender": {
+      "generator": "block_item_icon",
+      "index": 226,
+      "source": "assets/textures/generated/items/lavender.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 28
+    },
+    "leaf_litter_soil": {
+      "generator": "block_item_icon",
+      "index": 209,
+      "source": "assets/textures/generated/items/leaf_litter_soil.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 26
+    },
     "leather": {
       "generator": "item_sprite",
       "index": 69,
@@ -1059,6 +1163,14 @@
       "x": 6,
       "y": 14
     },
+    "ochre_terracotta": {
+      "generator": "block_item_icon",
+      "index": 217,
+      "source": "assets/textures/generated/items/ochre_terracotta.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 27
+    },
     "oxeye_daisy": {
       "generator": "block_item_icon",
       "index": 122,
@@ -1074,6 +1186,22 @@
       "source_kind": "generated",
       "x": 5,
       "y": 17
+    },
+    "peat": {
+      "generator": "block_item_icon",
+      "index": 210,
+      "source": "assets/textures/generated/items/peat.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 26
+    },
+    "permafrost": {
+      "generator": "block_item_icon",
+      "index": 213,
+      "source": "assets/textures/generated/items/permafrost.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 26
     },
     "pig_spawn_egg": {
       "generator": "item_sprite",
@@ -1195,6 +1323,14 @@
       "x": 2,
       "y": 25
     },
+    "red_mushroom": {
+      "generator": "block_item_icon",
+      "index": 225,
+      "source": "assets/textures/generated/items/red_mushroom.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 28
+    },
     "red_sand": {
       "generator": "block_item_icon",
       "index": 50,
@@ -1202,6 +1338,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 6
+    },
+    "red_sandstone": {
+      "generator": "block_item_icon",
+      "index": 216,
+      "source": "assets/textures/generated/items/red_sandstone.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 27
     },
     "red_wool": {
       "generator": "block_item_icon",
@@ -1227,6 +1371,14 @@
       "x": 7,
       "y": 19
     },
+    "rooted_dirt": {
+      "generator": "block_item_icon",
+      "index": 208,
+      "source": "assets/textures/generated/items/rooted_dirt.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 26
+    },
     "rotten_flesh": {
       "generator": "item_sprite",
       "index": 83,
@@ -1251,6 +1403,14 @@
       "x": 0,
       "y": 24
     },
+    "shale": {
+      "generator": "block_item_icon",
+      "index": 215,
+      "source": "assets/textures/generated/items/shale.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 26
+    },
     "sheep_spawn_egg": {
       "generator": "item_sprite",
       "index": 128,
@@ -1266,6 +1426,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 11
+    },
+    "silt": {
+      "generator": "block_item_icon",
+      "index": 211,
+      "source": "assets/textures/generated/items/silt.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 26
     },
     "skeleton_spawn_egg": {
       "generator": "item_sprite",
@@ -1539,6 +1707,14 @@
       "x": 6,
       "y": 1
     },
+    "tropical_flower": {
+      "generator": "block_item_icon",
+      "index": 229,
+      "source": "assets/textures/generated/items/tropical_flower.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 28
+    },
     "tuff": {
       "generator": "block_item_icon",
       "index": 138,
@@ -1554,6 +1730,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 16
+    },
+    "volcanic_ash": {
+      "generator": "block_item_icon",
+      "index": 219,
+      "source": "assets/textures/generated/items/volcanic_ash.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 27
     },
     "water": {
       "generator": "block_item_icon",
@@ -1586,6 +1770,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 10
+    },
+    "white_terracotta": {
+      "generator": "block_item_icon",
+      "index": 218,
+      "source": "assets/textures/generated/items/white_terracotta.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 27
     },
     "white_wool": {
       "generator": "block_item_icon",
@@ -1674,7 +1866,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 26,
+  "rows": 29,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

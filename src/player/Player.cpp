@@ -1,3 +1,4 @@
+#include "world/BiomeBlockLogic.h"
 #include "player/Player.h"
 #include "world/World.h"
 #include "world/Block.h"
@@ -1116,6 +1117,12 @@ bool Player::placeBlock() {
                 return false;
         }
     }
+
+    if (isBiomePlant(placed) &&
+        (hit->faceNormal.y <= 0 ||
+         m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
+         !supportsBiomePlant(placed, m_world.getBlock(
+             placePos.x, placePos.y - 1, placePos.z)))) return false;
 
     ArchitecturalBlockState selectedArchitecture;
     if (activeItem == ItemId::POINTED_DRIPSTONE) {

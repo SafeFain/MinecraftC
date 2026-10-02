@@ -12,6 +12,27 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def test_biome_materials_and_plants(self):
+        names = list(tg.BIOME_BASES) + list(tg.BIOME_PLANTS)
+        self.assertEqual(len(names), 24)
+        self.assertEqual(tg.NAMES[161], "black_wool")
+        self.assertEqual(tg.NAMES[162:186], names)
+        with tempfile.TemporaryDirectory() as directory:
+            fingerprints = set()
+            for name in names:
+                pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
+                self.assertEqual(pixels, tg.generate_texture(name, tg.DEFAULT_SEED))
+                fingerprints.add(tuple(pixels))
+                if name in tg.BIOME_PLANTS:
+                    self.assertTrue(any(p[3] == 0 for p in pixels))
+                    self.assertTrue(any(p[3] == 255 for p in pixels))
+                else:
+                    self.assertTrue(all(p[3] == 255 for p in pixels))
+                path = Path(directory) / (name+".png")
+                tg.write_png(path,16,16,pixels)
+                self.assertFalse(tg.validate_texture(path),name)
+            self.assertEqual(len(fingerprints),24)
+
     def test_decoration_materials_are_deterministic_distinct_and_tile_safe(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
@@ -29,7 +50,9 @@ class TextureGeneratorTests(unittest.TestCase):
         order = list(definitions["items"])
         self.assertEqual(order[181], "starstep_scepter")
         self.assertEqual(order[182], "stone_bricks")
-        self.assertEqual(order[-1], "bone_meal")
+        self.assertEqual(order[207], "bone_meal")
+        self.assertEqual(order[208], "rooted_dirt")
+        self.assertEqual(order[-1], "beach_grass")
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]

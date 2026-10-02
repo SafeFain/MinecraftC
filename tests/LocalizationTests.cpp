@@ -64,9 +64,9 @@ int main() {
                 Language::SimplifiedChinese, "settings.frame_rate"),
             "frame-rate setting is translated");
     for (const Language language : languagesByEnglishName()) {
-        for (uint16_t item = 183; item <= 208; ++item)
+        for (uint16_t item = 183; item <= 232; ++item)
             require(localization.hasTranslation(language, "item." + std::to_string(item)),
-                    "all decoration items have translations in every language");
+                    "all decoration and natural items have translations in every language");
         require(localization.hasTranslation(language, "message.given"),
                 "give command feedback is translated");
     }

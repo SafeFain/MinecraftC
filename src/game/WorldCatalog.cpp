@@ -44,7 +44,7 @@ std::vector<WorldSummary> WorldCatalog::list() const {
             worlds.push_back({id, metadata.displayName, metadata.gameMode,
                               metadata.difficulty, metadata.seed,
                               metadata.worldTicks, metadata.generationVersion,
-                              metadata.generationVersion == WorldGenContext::GENERATION_VERSION,
+                              WorldGenContext::canLoadGeneration(metadata.generationVersion),
                               metadata.worldType});
         } catch (const std::runtime_error&) {
             // Invalid worlds stay untouched on disk but are not loadable.

@@ -1,3 +1,4 @@
+#include "world/BiomeBlockLogic.h"
 #include "game/InventoryModel.h"
 #include "game/VillagerTrade.h"
 
@@ -18,6 +19,21 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    static_assert(static_cast<uint8_t>(BlockId::BLACK_WOOL) == 200);
+    static_assert(static_cast<uint16_t>(ItemId::BONE_MEAL) == 208);
+    for (uint16_t raw = 201; raw <= 224; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const auto item = itemForBlock(block);
+        require(static_cast<uint16_t>(item) == raw+8 &&
+                getItemProps(item).placedBlock == block && getItemProps(item).maxStack == 64,
+                "all natural blocks preserve explicit item/placement mappings");
+        require(getBlockProps(block).id == block &&
+                (isBiomePlant(block) ? getBlockProps(block).shape == RenderShape::Cross &&
+                 !isSolid(block) && isReplaceableByFluid(block) && getLightEmission(block) == 0 :
+                 getBlockProps(block).shape == RenderShape::Cube && isSolid(block)),
+                "natural block shapes, fluids and lighting match their registry");
+    }
+
     require(static_cast<uint16_t>(ItemId::GRASS_BLOCK) ==
             static_cast<uint8_t>(BlockId::GRASS),
             "legacy block item ids remain aligned");
@@ -39,7 +55,7 @@ int main() {
             static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint8_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 201 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 225 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -84,7 +100,8 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::BONE_MEAL,
+            creativeItems[207] == ItemId::BONE_MEAL &&
+            creativeItems.back() == ItemId::BEACH_GRASS,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -105,9 +122,9 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 73 &&
+                CreativeItemCategory::BuildingBlocks)] == 86 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 31 &&
+                CreativeItemCategory::Nature)] == 42 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(

@@ -679,6 +679,7 @@ if(BUILD_TESTING)
 
     add_executable(terrain_preview
         tools/terrain_preview.cpp
+        src/world/Block.cpp
         src/world/BiomeMap.cpp
         src/world/HeightPipeline.cpp
         src/world/Noise.cpp)

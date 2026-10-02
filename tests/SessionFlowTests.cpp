@@ -288,6 +288,14 @@ int main(int argc, char** argv) {
     }
 
     {
+        // v14 migration preserves metadata and never updates it before loading.
+        WorldCatalog migrationCatalog(root / "saves");
+        auto migrationStore = migrationCatalog.open(migrationCatalog.list().front().id);
+        auto migrationMetadata = migrationStore.loadMetadata();
+        migrationMetadata.generationVersion = 14;
+        migrationMetadata.inventory.slot(8) = {ItemId::IRON_INGOT,23,0};
+        migrationMetadata.heaven.worldTicks = 6789;
+        migrationStore.saveMetadata(migrationMetadata);
         // Reopening the world restores its mode and saved position.
         GameSession reopened(root / "saves");
         const auto worlds = reopened.listWorlds();
@@ -302,6 +310,28 @@ int main(int argc, char** argv) {
         require(position.x == 100000.0 && position.z == 100000.0 &&
                     position.y == Config::SEA_LEVEL + 1.01f,
                 "existing world restores the saved player position");
+        require(reopened.metadata().generationVersion == 14 &&
+                migrationStore.loadMetadata().generationVersion == 14 &&
+                reopened.playerState().inventory().slot(8).id == ItemId::IRON_INGOT &&
+                reopened.metadata().heaven.worldTicks == 6789,
+                "v14 loading retains inventory and Heaven without early metadata writes");
+        bool prematureSaveError = false;
+        reopened.saveNow([&] { prematureSaveError = true; });
+        require(!prematureSaveError && migrationStore.loadMetadata().generationVersion == 14,
+                "incomplete loading cannot write a migrated version");
+        drainGeneration(reopened);
+        GameSessionTestAccess::markTerrainReady(reopened);
+        bool migrationError = false;
+        reopened.saveNow([&] { migrationError = true; });
+        const auto migrated = migrationStore.loadMetadata();
+        require(!migrationError && migrated.generationVersion == WorldGenContext::GENERATION_VERSION &&
+                migrated.inventory.slot(8).id == ItemId::IRON_INGOT &&
+                migrated.inventory.slot(8).count == 23 && migrated.heaven.worldTicks == 6789,
+                "successful v14 migration saves v15 and preserves inventory and Heaven");
+        reopened.leaveWorld();
+        reopened.startWorld(worlds[0].id,false,clock.now());
+        require(reopened.metadata().generationVersion == WorldGenContext::GENERATION_VERSION,
+                "migrated v15 world reopens normally");
         drainGeneration(reopened);
     }
 

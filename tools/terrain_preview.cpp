@@ -41,7 +41,11 @@ Color materialColor(BlockId block) {
         case BlockId::SAND: return {218, 204, 139};
         case BlockId::RED_SAND: return {179, 94, 47};
         case BlockId::SNOW: return {238, 243, 245};
-        default: return {128, 128, 128};
+        default: {
+            const glm::vec3 color = getBlockProps(block).color;
+            return {static_cast<uint8_t>(color.r*255),
+                    static_cast<uint8_t>(color.g*255),static_cast<uint8_t>(color.b*255)};
+        }
     }
 }
 

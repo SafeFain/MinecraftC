@@ -9,12 +9,20 @@
 #include <stdexcept>
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory>\n";
+    if (argc < 2 || argc > 3) {
+        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview]\n";
         return 2;
     }
+    const std::string mode = argc == 3 ? argv[2] : "";
+    if (!mode.empty() && mode != "--natural" && mode != "--natural-preview") return 2;
+    const bool natural = !mode.empty();
+    const int frames = mode == "--natural-preview" ? 1200 : 120;
+    const int count = natural ? 24 : 18;
+    const int first = natural ? 201 : 183;
+    const int cubes = natural ? 13 : 18;
+    const int plants = natural ? 11 : 0;
     try {
-        Window window(960, 540, "MinecraftC crafted decoration smoke",
+        Window window(960, 540, "MinecraftC natural materials smoke",
                       Window::SurfaceMode::Vulkan, false, false);
         VulkanRenderer renderer;
         renderer.initialize(window, std::filesystem::absolute(argv[1]));
@@ -25,24 +33,25 @@ int main(int argc, char** argv) {
         std::vector<uint8_t> blocks(Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z *
                                     Config::CHUNK_SIZE_Y, 0);
         int maxima[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
-        for (int i = 0; i < 18; ++i) {
+        for (int i = 0; i < count; ++i) {
             const int x = 2 + (i % 6) * 2;
-            const int y = 66 + (2 - i / 6) * 2;
+            const int y = 66 + (3 - i / 6) * 2;
             const int z = 8;
             blocks[x + z * 16 + Config::worldYToStorageY(y) * 256] =
-                static_cast<uint8_t>(183 + i);
+                static_cast<uint8_t>(first + i);
             maxima[x][z] = y;
         }
         ChunkMesh mesh;
         mesh.build(0, 0, blocks.data(), maxima,
             [](int, int, int) { return BlockId::AIR; },
             [](int, int, int) { return LightSample{15, 0}; });
-        if (mesh.vertices.size() != 18 * 24 || mesh.indices.size() != 18 * 72 ||
-            mesh.opaqueIndexCount != 18 * 36 || mesh.translucentIndexCount != 0 ||
+        if (mesh.vertices.size() != static_cast<size_t>(cubes*24+plants*8) ||
+            mesh.indices.size() != static_cast<size_t>(cubes*72+plants*48) ||
+            mesh.opaqueIndexCount != static_cast<size_t>(cubes*36+plants*24) || mesh.translucentIndexCount != 0 ||
             mesh.shadowCasterIndexOffset != mesh.opaqueIndexCount ||
-            mesh.shadowCasterIndexCount != 18 * 36 || mesh.indexCount != mesh.indices.size())
+            mesh.shadowCasterIndexCount != static_cast<size_t>(cubes*36+plants*24) || mesh.indexCount != mesh.indices.size())
             throw std::runtime_error("Decoration cube geometry/layer handoff mismatch");
-        for (uint16_t raw = 183; raw <= 200; ++raw) {
+        for (uint16_t raw = first; raw < first+count; ++raw) {
             const float tile = getFaceTextureIndex(static_cast<BlockId>(raw), FaceDir::TOP);
             bool found = false;
             for (const auto& vertex : mesh.vertices) if (std::floor(vertex.tile) == tile) found = true;
@@ -50,11 +59,11 @@ int main(int argc, char** argv) {
         }
         renderer.uploadChunkMesh(mesh);
         const glm::vec3 camera(7.5f, 70.0f, 0.0f);
-        const auto view = glm::lookAt(camera, glm::vec3(7.5f, 68.5f, 8.5f), glm::vec3(0,1,0));
+        const auto view = glm::lookAt(camera, glm::vec3(7.5f, 69.5f, 8.5f), glm::vec3(0,1,0));
         const auto vp = glm::perspective(glm::radians(70.0f), window.aspectRatio(),
                                          0.1f, 128.0f) * view;
         const RenderEnvironment environment = DayNightCycle{}.evaluate();
-        for (int frame = 0; frame < 48; ++frame) {
+        for (int frame = 0; frame < frames; ++frame) {
             renderer.beginFrame();
             renderer.setEnvironment(environment, camera);
             renderer.setViewProjection(vp);
@@ -69,7 +78,7 @@ int main(int argc, char** argv) {
         }
         renderer.waitIdle();
         renderer.releaseChunkMesh(mesh);
-        std::cout << "Decoration smoke: 18 materials, 48 Vulkan frames, cube/layer/upload handoff passed\n";
+        std::cout << "Decoration smoke: " << count << " materials, " << frames << " Vulkan frames, geometry/layer/upload handoff passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Decoration smoke failed: " << error.what() << '\n';

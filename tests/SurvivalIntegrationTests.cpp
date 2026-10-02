@@ -13,6 +13,18 @@
 namespace { void require(bool v,const char* m){if(!v){std::cerr<<"FAILED: "<<m<<'\n';std::exit(1);}} }
 
 int main(){
+    for (uint16_t raw = 201; raw <= 224; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const bool rock = (raw >= 208 && raw <= 211) || raw == 213;
+        const auto drops = getBlockDrops(block, {ItemId::WOODEN_PICKAXE,1,0});
+        require(drops.size() == 1 && drops[0].id == itemForBlock(block) && drops[0].count == 1,
+                "all natural blocks drop their corresponding item");
+        require(!rock || getBlockDrops(block,{}).empty(),
+                "natural rocks require a pickaxe for harvesting");
+        if (raw >= 214) require(!getBlockDrops(block,{}).empty(),
+                "natural plants can be harvested by hand");
+    }
+
     InventoryModel inventory;
     inventory.slot(0)={ItemId::OAK_LOG,4,0};
     std::array<ItemId,9> grid{};grid.fill(ItemId::EMPTY);grid[0]=ItemId::OAK_LOG;

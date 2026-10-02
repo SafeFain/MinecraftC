@@ -27,7 +27,7 @@ GitHub prereleases; release-channel tags create normal releases.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 208-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 232-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories
@@ -169,7 +169,7 @@ middle-click cloning and middle-button drag filling.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v12 can read v2-v11 desktop saves. The current world
-generation version is v14 (with Heaven structures at v7). Generation v11 adds
+generation version is v15 (with Heaven generation at v8). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
@@ -177,10 +177,16 @@ village variants substantially more common while retaining their biome,
 spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
 the wall-to-roof courses of village houses and traveler huts, keeps hut
 decorations outside the wall, and closes the igloo's diagonal lower shell.
-Older generation versions remain on disk and are shown as incompatible rather
-than migrated or blended into v14 terrain. Generation v14 adds deterministic
+Generation v14 worlds can migrate to v15: base caches are rebuilt and saved
+player block edits are reapplied, retaining inventory, entities and Heaven data.
+Natural ground materials and decoration can change. Versions older than v14
+remain on disk and are shown as incompatible. Generation v14 adds deterministic
 Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
-transition cave ecology with larger chambers and rifts.
+transition cave ecology with larger chambers and rifts. Generation v15 adds
+24 collectable natural materials and plants across all 30 surface biomes,
+including forest litter/ferns/mushrooms, dry vegetation, sediment, colored
+rock layers, frozen ground/blue ice, volcanic ash and coral rock. Seed layout,
+terrain heights and Heaven v8 remain unchanged.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/give <item_name> [1..64]`,

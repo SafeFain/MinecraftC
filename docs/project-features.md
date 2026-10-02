@@ -28,12 +28,12 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   ready. New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 14 routes 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 15 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
   Y=-64..319 while preserving the v6 hybrid-cave algorithm, and adds eight
   deterministic overworld structures (plains/adobe villages, traveler huts,
   abandoned camps, desert wells, igloos, ruined towers, lumber camps). Base
-  cache revision 1 is part of the v14 cache key. Version 14 adds four
+  cache revision 1 is part of the v15 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
@@ -45,7 +45,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 200 serialized
+  types, and 224 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -53,7 +53,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 208-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 232-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -123,9 +123,33 @@ Eight material items add clay balls, bricks, five dyes and bone meal.
 All have original generator-produced 16×16 materials/icons, ten-language names,
 creative entries and survival crafting/smelting paths. Masonry requires at least
 a wooden pickaxe and drops itself; dyed wool retains white wool mining/fire rules.
-Existing generation v14/v8 and save v12 remain unchanged.
+This crafted pack introduced no generation or save-format changes.
+The subsequent natural biome expansion advances Overworld generation to v15;
+Heaven remains v8 and save format remains v12.
 
 `/give <item_name> [1..64]` supplies the current player's inventory when cheats
 are enabled, defaulting to one item. Names use lowercase English with underscores,
 for example `mossy_stone_bricks`, `red_wool` and `bone_meal`, with Tab completion.
 Full inventories retain their contents; feedback reports the quantity actually added.
+
+## Natural surface ecology (generation v15)
+
+24 collectable/placeable blocks enrich all 30 Overworld surface biomes:
+rooted dirt, leaf litter soil, peat, silt, dry grass block, permafrost, blue ice,
+shale, red sandstone, ochre/white terracotta, volcanic ash, coral rock, fern,
+dead bush, dry grass, brown/red mushrooms, lavender, bellflower, alpine flower,
+tropical flower, cattail and beach grass. Soil/stone patches use smooth
+world-coordinate seed fields; red canyon/badlands layers follow world Y.
+Existing sandstone/calcite and other materials are reused where appropriate.
+
+Plants use single-cell cutout models and shared substrate checks for generation
+and placement; cattails generate only on dry banks near water. All drop their
+own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
+growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
+Snow cover is resolved by the same surface rules used by near terrain and LOD.
+
+v14 worlds load compatibly, with stale base caches rejected independently of
+saved player edits. Migration metadata is committed by a save after the full
+playing gate. Inventory, entities, containers and Heaven data retain their
+existing persistence paths. Older/future incompatible versions remain blocked.
+Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.

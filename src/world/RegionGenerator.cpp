@@ -1,3 +1,4 @@
+#include "world/BiomeBlockLogic.h"
 #include "world/RegionGenerator.h"
 #include "world/HeightPipeline.h"
 #include "world/CaveGenerator.h"
@@ -361,7 +362,6 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
 
             int   height = col.height;
             Biome biome  = col.biome;
-            const BiomeProperties& bprops = getBiomeProps(biome);
             SurfaceRuleContext surfaceContext{
                 biome, col.archetype, height, col.waterLevel, col.slope,
                 col.localRelief, col.primaryArchetypeWeight,
@@ -415,13 +415,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                         m_seed, worldX, worldZ, depth, surfaceContext));
             }
 
-            // Snow cover
-            if (height >= bprops.snowLine && bprops.snowLine < Config::SNOW_LINE_DISABLED) {
-                chunk.blockAt(x, height, z) =
-                    static_cast<uint8_t>(BlockId::SNOW);
-            }
-
-            // Water fill
+            // Water fill; snow was resolved by SurfaceRules.
             int waterTop = col.waterLevel;
             if (height < waterTop) {
                 for (int y = height + 1; y <= waterTop; ++y) {
@@ -459,6 +453,8 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                                  existing == BlockId::GRASS || existing == BlockId::SNOW ||
                                  existing == BlockId::GRANITE || existing == BlockId::TUFF ||
                                  existing == BlockId::LIMESTONE || existing == BlockId::BASALT;
+                carveable = carveable || isBiomeSoil(existing) ||
+                    isBiomeRock(existing);
                 if (!carveable) continue;
                 BlockId replacement = cell == CaveCell::Water ? BlockId::WATER :
                                       cell == CaveCell::Lava ? BlockId::LAVA : BlockId::AIR;
@@ -494,22 +490,22 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             const auto& decoCol = m_regionData.col(
                 pad + localCX * Config::CHUNK_SIZE_X + x,
                 pad + localCZ * Config::CHUNK_SIZE_Z + z);
-            if (decoCol.height + 1 < Config::WORLD_MAX_Y &&
-                chunk.getBlock(x, decoCol.height, z) != BlockId::AIR &&
-                chunk.getBlock(x, decoCol.height + 1, z) == BlockId::AIR) {
-                BlockId decoration = SurfaceRules::decoration(
-                    m_seed, wx, wz, decoCol.height, decoCol.biome, decoCol.isRiver);
-                if (decoration != BlockId::AIR) {
-                    const int featureHeight = SurfaceRules::decorationHeight(
-                        m_seed, wx, wz, decoCol.height, decoration);
-                    for (int dy = 1; dy <= featureHeight; ++dy)
-                        if (decoCol.height + dy < Config::WORLD_MAX_Y)
-                            chunk.setBlock(x, decoCol.height + dy, z, decoration);
-                    if (decoration == BlockId::SUNFLOWER_BOTTOM &&
-                        decoCol.height + 2 < Config::WORLD_MAX_Y)
-                        chunk.setBlock(x, decoCol.height + 2, z,
-                                       BlockId::SUNFLOWER_TOP);
-                }
+            if (!m_structureGenerator.reservationAt(wx,wz)) {
+                const auto context = SurfaceRules::contextForColumn(decoCol);
+                SurfaceRules::decorateColumn(m_seed,wx,wz,context,
+                    [&](int y) { return chunk.getBlock(x,y,z); },
+                    [&](int y, BlockId block) { chunk.setBlock(x,y,z,block); },
+                    [&] {
+                        for (int dz = -2; dz <= 2; ++dz) {
+                            for (int dx = -2; dx <= 2; ++dx) {
+                                if (std::abs(dx) + std::abs(dz) > 2) continue;
+                                const auto nearby = m_heightPipeline.sampleColumn(wx+dx,wz+dz);
+                                if (nearby.height < nearby.waterLevel &&
+                                    std::abs(nearby.waterLevel-context.height) <= 2) return true;
+                            }
+                        }
+                        return false;
+                    });
             }
         }
     }

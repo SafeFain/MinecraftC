@@ -173,6 +173,16 @@ int main() {
                 std::abs(loaded.heaven.dayPhase - source.heaven.dayPhase) < 0.0001f,
                 "independent dimension state round trips");
 
+        WorldMetadata naturalInventory = source;
+        for (uint16_t raw = 209; raw <= 232; ++raw)
+            naturalInventory.inventory.slot(raw-209) = {static_cast<ItemId>(raw),64,0};
+        store.saveMetadata(naturalInventory);
+        const auto naturalRoundTrip = store.loadMetadata();
+        for (uint16_t raw = 209; raw <= 232; ++raw)
+            require(naturalRoundTrip.inventory.slot(raw-209).id == static_cast<ItemId>(raw) &&
+                    naturalRoundTrip.inventory.slot(raw-209).count == 64,
+                    "all appended natural item IDs survive metadata serialization");
+
         WorldMetadata replacement = source;
         replacement.worldTicks += 1;
         store.saveMetadata(replacement);
@@ -240,7 +250,7 @@ int main() {
                 migratedV10.heaven.worldTicks == source.heaven.worldTicks,
                 "v10 dimension state remains readable after migration");
 
-        const std::vector<BlockOverride> overrides = {
+        std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},
             {static_cast<uint32_t>(15 + 15 * 16 +
                 Config::worldYToStorageY(319) * 256), BlockId::DIAMOND_ORE},
@@ -251,9 +261,14 @@ int main() {
             {517, BlockId::STONE_BRICKS},
             {518, BlockId::BLACK_WOOL}
         };
+        for (uint16_t raw = 201; raw <= 224; ++raw)
+            overrides.push_back({static_cast<uint32_t>(520+raw), static_cast<BlockId>(raw)});
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 8, "chunk overrides round trip");
+        require(loadedOverrides.size() == 32, "chunk overrides round trip");
+        for (size_t i = 8; i < loadedOverrides.size(); ++i)
+            require(loadedOverrides[i].block == static_cast<BlockId>(201+i-8),
+                    "all v15 natural block IDs survive serialization");
         require(loadedOverrides[6].block == BlockId::STONE_BRICKS &&
                 loadedOverrides[7].block == BlockId::BLACK_WOOL,
                 "appended decoration block IDs survive save round trip");
@@ -273,6 +288,10 @@ int main() {
 
         std::vector<uint8_t> generated(Config::CHUNK_VOLUME,
                                        static_cast<uint8_t>(BlockId::STONE));
+        store.saveGeneratedChunk(-2,-7,generated,(14u << 16) | 1u);
+        require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::CHUNK_CACHE_VERSION) &&
+                store.loadChunkOverrides(-2,-7).size() == 32,
+                "v15 rejects v14 base cache while retaining player overrides");
         generated.front() = static_cast<uint8_t>(BlockId::BEDROCK);
         generated.back() = static_cast<uint8_t>(BlockId::AIR);
         generated[513] = static_cast<uint8_t>(BlockId::BASALT);
