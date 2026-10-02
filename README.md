@@ -30,7 +30,8 @@ GitHub prereleases; release-channel tags create normal releases.
 - JSON-driven block, 182-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
-- Ten localized interfaces and an About screen linking to the project's source
+- Ten localized interfaces and an About screen listing third-party repositories
+  and licenses, and linking to the project's source
   repository.
 
 ## Build and Run

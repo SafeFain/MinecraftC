@@ -64,6 +64,7 @@ public:
     void setSelected(bool s) { m_selected = s; }
     void setPressed(bool p) { m_pressed = p; }
     void setLabel(std::string label) { m_label = std::move(label); }
+    void setDetail(std::string detail) { m_detail = std::move(detail); }
     void setDanger(bool danger) { m_danger = danger; }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
@@ -79,6 +80,7 @@ public:
 
 private:
     std::string m_label;
+    std::string m_detail;
     std::function<void()> m_onClick;
     float m_x = 0, m_y = 0, m_w = Config::UI_BUTTON_WIDTH, m_h = Config::UI_BUTTON_HEIGHT;
     ButtonColors m_colors;
@@ -144,6 +146,7 @@ private:
     WorldType m_createWorldType = WorldType::Normal;
     bool m_createCheats = false;
     int m_worldOffset = 0;
+    int m_aboutPage = 0;
     int m_selectedWorld = -1;
     int m_pressedButton = -1;
     int m_pressedDeleteButton = -1;
@@ -155,6 +158,8 @@ private:
     void showWorlds();
     void showCreate();
     void showAbout();
+    void changeAboutPage(int delta);
+    void renderAbout(UIRenderer& ui, int screenWidth, int screenHeight);
     void refreshWorlds();
     void rebuildButtons();
     void selectField(Field field);

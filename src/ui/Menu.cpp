@@ -7,6 +7,38 @@
 #include <algorithm>
 #include "game/Utf8.h"
 
+namespace {
+struct ThirdPartyCredit {
+    const char* name;
+    const char* repository;
+    const char* license;
+};
+
+// Keep these aligned with CMake dependencies and the bundled upstream records.
+constexpr ThirdPartyCredit THIRD_PARTY_CREDITS[] = {
+    {"SDL", "https://github.com/libsdl-org/SDL", "Zlib"},
+    {"GLM", "https://github.com/g-truc/glm", "MIT"},
+    {"Vulkan Headers", "https://github.com/KhronosGroup/Vulkan-Headers", "Apache-2.0 OR MIT"},
+    {"Vulkan Loader", "https://github.com/KhronosGroup/Vulkan-Loader", "Apache-2.0"},
+    {"MoltenVK (macOS / iOS)", "https://github.com/KhronosGroup/MoltenVK", "Apache-2.0"},
+    {"Vulkan Memory Allocator", "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator", "MIT"},
+    {"FastNoiseLite", "https://github.com/Auburn/FastNoiseLite", "MIT"},
+    {"cgltf", "https://github.com/jkuhlmann/cgltf", "MIT"},
+    {"nlohmann/json", "https://github.com/nlohmann/json", "MIT"},
+    {"stb_image / stb_truetype", "https://github.com/nothings/stb", "MIT"},
+    {"Noto Sans CJK SC", "https://github.com/notofonts/noto-cjk", "SIL OFL 1.1"},
+    {"Noto Naskh Arabic", "https://github.com/notofonts/arabic", "SIL OFL 1.1"},
+};
+constexpr int CREDITS_PER_PAGE = 4;
+constexpr int CREDIT_COUNT = sizeof(THIRD_PARTY_CREDITS) / sizeof(ThirdPartyCredit);
+constexpr int CREDIT_PAGE_COUNT = (CREDIT_COUNT + CREDITS_PER_PAGE - 1) / CREDITS_PER_PAGE;
+
+float fittedTextScale(UIRenderer& ui, const std::string& text, float scale, float width) {
+    const float measured = ui.measureText(text, scale).x;
+    return measured > width && measured > 0.0f ? scale * width / measured : scale;
+}
+}
+
 // ── Button ────────────────────────────────────────────────────────────────
 
 Button::Button(const std::string& label, std::function<void()> onClick)
@@ -22,7 +54,20 @@ void Button::render(UIRenderer& ui) const {
     if (m_pressed) state = UiTheme::WidgetState::Pressed;
     else if (m_selected) state = UiTheme::WidgetState::Selected;
     else if (m_hovered) state = UiTheme::WidgetState::Hover;
-    UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger);
+    if (m_detail.empty()) {
+        UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger);
+        return;
+    }
+    UiTheme::button(ui, m_x, m_y, m_w, m_h, "", state, m_danger);
+    const float padding = std::min(5.0f, m_h * 0.12f);
+    const float scale = std::min(1.4f, (m_h - 2.0f * padding - 2.0f) / 28.0f);
+    const auto color = m_hovered || m_selected ? UiTheme::TEXT_HOVER : UiTheme::TEXT;
+    const float labelScale = fittedTextScale(ui, m_label, scale, m_w - 20.0f);
+    const float detailScale = fittedTextScale(ui, m_detail, scale * 0.85f, m_w - 20.0f);
+    UiTheme::textWithShadow(ui, m_label, m_x + 10.0f, m_y + m_h * 0.5f + 1.0f,
+                            labelScale, color);
+    UiTheme::textWithShadow(ui, m_detail, m_x + 10.0f, m_y + padding,
+                            detailScale, UiTheme::TEXT_DIM);
 }
 
 void Button::activate() {
@@ -89,6 +134,15 @@ void MainMenu::showCreate() {
 
 void MainMenu::showAbout() {
     m_page = Page::About;
+    m_aboutPage = 0;
+    rebuildButtons();
+}
+
+void MainMenu::changeAboutPage(int delta) {
+    const int page = std::clamp(m_aboutPage + delta, 0, CREDIT_PAGE_COUNT - 1);
+    if (page == m_aboutPage) return;
+    m_aboutPage = page;
+    m_pressedButton = -1;
     rebuildButtons();
 }
 
@@ -232,6 +286,20 @@ void MainMenu::rebuildButtons() {
             if (m_callbacks.onOpenUrl)
                 m_callbacks.onOpenUrl("https://github.com/SafeFain/MinecraftC");
         });
+        const int end = std::min(CREDIT_COUNT, (m_aboutPage + 1) * CREDITS_PER_PAGE);
+        for (int index = m_aboutPage * CREDITS_PER_PAGE; index < end; ++index) {
+            const auto& credit = THIRD_PARTY_CREDITS[index];
+            const std::string repository = credit.repository;
+            m_buttons.emplace_back(std::string(credit.name) + " | " + credit.license,
+                [this, repository]() {
+                    if (m_callbacks.onOpenUrl) m_callbacks.onOpenUrl(repository);
+                });
+            m_buttons.back().setDetail(repository);
+        }
+        m_buttons.emplace_back(m_localization.text("menu.about.previous"),
+                               [this]() { changeAboutPage(-1); });
+        m_buttons.emplace_back(m_localization.text("menu.about.next"),
+                               [this]() { changeAboutPage(1); });
         m_buttons.emplace_back(m_localization.text("common.back"),
                                [this]() { showHome(); });
     }
@@ -250,6 +318,10 @@ void MainMenu::selectField(Field field) {
 void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
     UiTheme::menuBackground(ui, static_cast<float>(screenWidth),
                             static_cast<float>(screenHeight));
+    if (m_page == Page::About) {
+        renderAbout(ui, screenWidth, screenHeight);
+        return;
+    }
     const float panelW = std::min(520.0f, screenWidth - 24.0f);
     UiTheme::panel(ui, (screenWidth-panelW)*.5f, 18.0f, panelW,
                    screenHeight-36.0f, UiTheme::PANEL);
@@ -342,7 +414,68 @@ void MainMenu::render(UIRenderer& ui, int screenWidth, int screenHeight) {
                             glm::vec3(0.62f, 0.62f, 0.66f));
 }
 
+void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
+    // Explicit GUI scaling can leave a 320 x 180 logical canvas at 720p.
+    const float layoutScale = std::clamp(screenHeight / 480.0f, 0.25f, 1.0f);
+    const float panelW = std::min(720.0f, screenWidth - 24.0f);
+    const float panelX = (screenWidth - panelW) * 0.5f;
+    const float contentX = panelX + 16.0f;
+    const float contentW = panelW - 32.0f;
+    UiTheme::panel(ui, panelX, 18.0f, panelW, screenHeight - 36.0f, UiTheme::PANEL);
+    const std::string title = m_localization.text("menu.about.title");
+    const float titleScale = fittedTextScale(ui, title, 3.0f * layoutScale, contentW);
+    const auto titleSize = ui.measureText(title, titleScale);
+    const float titleY = screenHeight - 38.0f * layoutScale - titleSize.y;
+    UiTheme::textWithShadow(ui, title, (screenWidth - titleSize.x) * 0.5f,
+                            titleY, titleScale, UiTheme::TEXT_TITLE);
+    const std::string subtitle = m_localization.text("menu.about.subtitle");
+    const float subScale = fittedTextScale(ui, subtitle, 1.2f * layoutScale, contentW);
+    const auto subSize = ui.measureText(subtitle, subScale);
+    const float subY = titleY - subSize.y - 12.0f * layoutScale;
+    UiTheme::textWithShadow(ui, subtitle, (screenWidth - subSize.x) * 0.5f,
+                            subY, subScale, UiTheme::TEXT_DIM);
+    const float projectY = subY - 46.0f * layoutScale;
+    m_buttons[0].setPosition(contentX, projectY);
+    m_buttons[0].setSize(contentW, 32.0f * layoutScale);
+    m_buttons[0].render(ui);
+
+    const std::string heading = m_localization.format("menu.about.third_party", {
+        std::to_string(m_aboutPage + 1), std::to_string(CREDIT_PAGE_COUNT)});
+    const float headingScale = fittedTextScale(ui, heading, 1.2f * layoutScale, contentW);
+    const auto headingSize = ui.measureText(heading, headingScale);
+    const float headingY = projectY - headingSize.y - 12.0f * layoutScale;
+    UiTheme::textWithShadow(ui, heading, contentX, headingY, headingScale, UiTheme::TEXT);
+    UiTheme::rect(ui, contentX, headingY - 8.0f * layoutScale, contentW, 2.0f, UiTheme::GOLD_DIM);
+
+    const float navigationY = 24.0f;
+    const float navigationH = 30.0f * layoutScale;
+    const float gap = 6.0f * layoutScale;
+    const float listTop = headingY - 16.0f * layoutScale;
+    const float rowHeight = std::min(62.0f,
+        (listTop - navigationY - navigationH - 12.0f * layoutScale) / CREDITS_PER_PAGE - gap);
+    const size_t rows = m_buttons.size() - 4; // Project, previous, next, back.
+    for (size_t i = 0; i < rows; ++i) {
+        auto& button = m_buttons[i + 1];
+        button.setPosition(contentX, listTop - (i + 1) * (rowHeight + gap));
+        button.setSize(contentW, rowHeight);
+        button.render(ui);
+    }
+    const float navigationW = (contentW - 2.0f * gap) / 3.0f;
+    for (size_t i = 0; i < 3; ++i) {
+        auto& button = m_buttons[rows + 1 + i];
+        button.setPosition(contentX + i * (navigationW + gap), navigationY);
+        button.setSize(navigationW, navigationH);
+        button.render(ui);
+    }
+    UiTheme::textWithShadow(ui, Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
+                            glm::vec3(0.62f, 0.62f, 0.66f));
+}
+
 void MainMenu::onKeyPress(int key, int mods) {
+    if (m_page == Page::About && (key == Key::Left || key == Key::Right)) {
+        changeAboutPage(key == Key::Left ? -1 : 1);
+        return;
+    }
     if (m_page == Page::Create && key == Key::Tab) {
         selectField(m_field == Field::Name ? Field::Seed : Field::Name);
         return;
@@ -485,6 +618,10 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
 }
 
 void MainMenu::onScroll(double yOffset) {
+    if (m_page == Page::About) {
+        if (yOffset != 0.0) changeAboutPage(yOffset < 0.0 ? 1 : -1);
+        return;
+    }
     if (m_page != Page::Worlds || m_worlds.size() <= 6) return;
     const int maximum = std::max(0, static_cast<int>(m_worlds.size()) - 6);
     m_worldOffset = std::clamp(m_worldOffset + (yOffset < 0 ? 1 : -1), 0, maximum);

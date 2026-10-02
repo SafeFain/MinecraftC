@@ -298,9 +298,54 @@ int main() {
         require(openedUrl == "https://github.com/SafeFain/MinecraftC" &&
                     openedUrlCount == 1,
                 "About menu opens the canonical project URL");
+        // Follow the public keyboard/scroll paths across the complete credits.
+        const std::vector<std::string> repositories = {
+            "https://github.com/libsdl-org/SDL",
+            "https://github.com/g-truc/glm",
+            "https://github.com/KhronosGroup/Vulkan-Headers",
+            "https://github.com/KhronosGroup/Vulkan-Loader",
+            "https://github.com/KhronosGroup/MoltenVK",
+            "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator",
+            "https://github.com/Auburn/FastNoiseLite",
+            "https://github.com/jkuhlmann/cgltf",
+            "https://github.com/nlohmann/json",
+            "https://github.com/nothings/stb",
+            "https://github.com/notofonts/noto-cjk",
+            "https://github.com/notofonts/arabic",
+        };
+        menu.onKeyPress(Key::Left); // Clamp at the first page.
+        menu.onScroll(0.0); // No movement must preserve the page.
+        for (size_t page = 0; page < 3; ++page) {
+            for (size_t row = 0; row < 4; ++row) {
+                menu.onKeyPress(Key::Down);
+                menu.onKeyPress(Key::Enter);
+                require(openedUrl == repositories[page * 4 + row],
+                        "Every About credit opens its upstream repository");
+            }
+            if (page == 0) {
+                menu.onKeyPress(Key::Down); // Previous.
+                menu.onKeyPress(Key::Down); // Next.
+                menu.onKeyPress(Key::Enter);
+            } else if (page == 1) {
+                menu.onScroll(-1.0);
+            }
+        }
+        menu.onKeyPress(Key::Right); // Clamp at the last page.
+        menu.onKeyPress(Key::Enter);
+        require(openedUrl == repositories.back(),
+                "Last-page navigation preserves the selected credit");
+        menu.onKeyPress(Key::Left);
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter);
+        require(openedUrl == repositories[4], "Left returns to the preceding credits page");
+        menu.onScroll(1.0);
+        menu.onKeyPress(Key::Down);
+        menu.onKeyPress(Key::Enter);
+        require(openedUrl == repositories[0], "Scroll up returns to the first credits page");
+        const int countBeforeEscape = openedUrlCount;
         menu.onKeyPress(Key::Escape); // About -> Home.
         menu.onKeyPress(Key::Enter); // Home -> world list.
-        require(openedUrlCount == 1,
+        require(openedUrlCount == countBeforeEscape,
                 "Escape returns from About without reopening the URL");
     }
 
@@ -538,6 +583,19 @@ int main() {
         harness.settings.controlMode = ControlMode::Touch;
         harness.ui.commandInput.setText("/locate st");
         harness.ui.resetCommandCompletion();
+        int sdlWindowCount = 0;
+        SDL_Window** sdlWindows = SDL_GetWindows(&sdlWindowCount);
+        require(sdlWindows && sdlWindowCount == 1,
+                "chat IME test has one native window");
+        SDL_Window* sdlWindow = sdlWindows[0];
+        SDL_free(sdlWindows);
+        require(!SDL_TextInputActive(sdlWindow),
+                "chat input has not started before its first frame");
+        harness.router.beginFrame(harness.clock.now(), true);
+        SDL_Rect imeArea{};
+        require(SDL_GetTextInputArea(sdlWindow, &imeArea, nullptr) &&
+                SDL_TextInputActive(sdlWindow),
+                "the first chat frame supplies a native input area and starts text input");
         const WindowSafeArea safe = window->safeArea();
         const int uiWidth = std::max(1, safe.width / harness.ui.guiScale);
         const int uiHeight = std::max(1, safe.height / harness.ui.guiScale);
@@ -551,6 +609,20 @@ int main() {
         const double touchY =
             (window->height() - safe.y -
              (tab.y + tab.h * 0.5) * harness.ui.guiScale) / scaleY;
+        require(touchX >= imeArea.x && touchX <= imeArea.x + imeArea.w &&
+                touchY >= imeArea.y && touchY <= imeArea.y + imeArea.h,
+                "native keyboard avoidance includes the virtual Tab button");
+        require(imeArea.y + imeArea.h > window->windowHeight() / 2,
+                "native keyboard avoidance targets the bottom chat field");
+        harness.settings.guiScale = 2;
+        harness.router.beginFrame(harness.clock.now(), true);
+        SDL_Rect scaledImeArea{};
+        require(SDL_GetTextInputArea(sdlWindow, &scaledImeArea, nullptr) &&
+                harness.ui.guiScale == 2 && scaledImeArea.h > imeArea.h &&
+                scaledImeArea.y < imeArea.y,
+                "GUI scale changes refresh the native chat input bounds");
+        harness.settings.guiScale = 0;
+        harness.router.beginFrame(harness.clock.now(), true);
         const TouchContactId tabContact{2, 1};
         harness.router.handleTouch(
             {tabContact, TouchPhase::Begin, touchX, touchY});
@@ -560,6 +632,11 @@ int main() {
             {tabContact, TouchPhase::End, touchX, touchY});
         harness.settings.controlMode = ControlMode::Auto;
         harness.flow.closeCommandInput();
+        harness.router.beginFrame(harness.clock.now(), false);
+        require(SDL_GetTextInputArea(sdlWindow, &imeArea, nullptr) &&
+                imeArea.w == 0 && imeArea.h == 0 &&
+                !SDL_TextInputActive(sdlWindow),
+                "closing chat clears the native input bounds and stops text input");
 
         // Touch input in the gameplay region activates the touch HUD and
         // routes the contact as gameplay.

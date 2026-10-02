@@ -43,6 +43,8 @@ public:
     // guiScale, so the conversion lives here with the state it writes.
     void updateMouseScreenPosition(Window& window);
     glm::vec2 touchToUi(Window& window, double x, double y) const;
+    void updateTextInputArea(Window& window, const ClientSettings& settings,
+                             const ApplicationInputController& inputs);
     void render(const GameSession& session, const ClientSettings& settings,
                 ApplicationInputController& inputs, Window& window,
                 GameState state, bool showCrosshair);
@@ -80,6 +82,7 @@ private:
     };
 
     CommandCompletionState commandCompletion;
+    std::vector<std::string> commandInputLines(int uiWidth, bool touchTabVisible);
     void renderSurvivalHud(const Player& player, int screenWidth);
     void renderSelectedItemName(const Player& player, int screenWidth);
     void renderCrosshairAndMiningProgress(const Player& player,

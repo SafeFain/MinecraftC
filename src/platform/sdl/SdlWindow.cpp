@@ -323,6 +323,17 @@ void Window::setTextInputEnabled(bool enabled) {
     m_textInputEnabled = enabled;
 }
 
+void Window::setTextInputArea(const WindowTextInputArea* area) {
+    SDL_Rect rect{};
+    if (area) rect = {area->x, area->y, area->width, area->height};
+    SDL_Rect previous{};
+    int cursor = 0;
+    if (SDL_GetTextInputArea(sdlWindow(m_window), &previous, &cursor) &&
+        SDL_RectsEqual(&rect, &previous) && cursor == 0) return;
+    if (!SDL_SetTextInputArea(sdlWindow(m_window), area ? &rect : nullptr, 0))
+        LOG_WARN("Could not update SDL text input area: " << SDL_GetError());
+}
+
 bool Window::openUrl(const std::string& url) const {
     if (SDL_OpenURL(url.c_str())) return true;
     LOG_WARN("Could not open URL '" << url << "': " << SDL_GetError());

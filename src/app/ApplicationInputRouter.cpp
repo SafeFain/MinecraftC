@@ -43,6 +43,9 @@ void ApplicationInputRouter::bind() {
 
 void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
                                         bool textInputWanted) {
+    // Android positions its native editor when text input starts; iOS uses
+    // this same rectangle to pan the view above the keyboard.
+    m_ui.updateTextInputArea(m_window, m_settings, m_inputs);
     m_inputs.beginFrame(m_window, m_settings, touchConfig(), m_ui.guiScale,
                         textInputWanted);
     updateLongPress();

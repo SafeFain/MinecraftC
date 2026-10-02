@@ -14,6 +14,50 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+constexpr float commandLineHeight = 25.0f;
+constexpr float commandBottom = 18.0f;
+}
+
+std::vector<std::string> GameUiController::commandInputLines(
+    int uiWidth, bool touchTabVisible) {
+    const float width = std::max(1.0f,
+        static_cast<float>(uiWidth - (touchTabVisible ? 122 : 40)));
+    return wrapTextPixels("> " + commandInput.text() + "_", width,
+        [&](const std::string& text) { return renderer.measureText(text, 1.25f).x; });
+}
+
+void GameUiController::updateTextInputArea(
+    Window& window, const ClientSettings& settings,
+    const ApplicationInputController& inputs) {
+    // Calculate with the current surface size before opening the keyboard,
+    // including the first frame and frames following a rotation or GUI change.
+    guiScale = effectiveGuiScale(window.width(), window.height(), settings.guiScale);
+    if (!commandOpen) {
+        window.setTextInputArea(nullptr);
+        return;
+    }
+    const WindowSafeArea safe = window.safeArea();
+    const int uiWidth = std::max(1, safe.width / guiScale);
+    const bool touchTabVisible = settings.controlMode == ControlMode::Touch ||
+        (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible);
+    const auto lines = commandInputLines(uiWidth, touchTabVisible);
+    float height = 11.0f + commandLineHeight * static_cast<float>(lines.size());
+    if (touchTabVisible) {
+        const TouchRect tab = touchCommandTabRect(uiWidth, safe.height / guiScale);
+        height = std::max(height, tab.y + tab.h - commandBottom);
+    }
+    const WindowSafeArea pixels{
+        safe.x + 12 * guiScale,
+        safe.y + static_cast<int>(commandBottom) * guiScale,
+        std::max(1, (uiWidth - 24) * guiScale),
+        static_cast<int>(std::ceil(height * guiScale))};
+    const auto area = projectTextInputArea(
+        pixels, window.windowWidth(), window.windowHeight(),
+        window.width(), window.height());
+    window.setTextInputArea(&area);
+}
+
 void GameUiController::render(
     const GameSession& session, const ClientSettings& settings,
     ApplicationInputController& inputs, Window& window, GameState state,
@@ -79,7 +123,7 @@ void GameUiController::render(
 
     if (commandOpen || chatVisibleSeconds > 0.0f) {
         renderer.beginUIFrame(uiWidth, uiHeight);
-        constexpr float lineHeight = 25.0f;
+        constexpr float lineHeight = commandLineHeight;
         const float textWidth = std::max(1.0f, static_cast<float>(uiWidth - 40));
         auto wrap = [&](const std::string& text, float scale, float width) {
             return wrapTextPixels(text, width,
@@ -93,11 +137,7 @@ void GameUiController::render(
                 settings.controlMode == ControlMode::Touch ||
                 (settings.controlMode == ControlMode::Auto &&
                  inputs.touchHudVisible);
-            const float inputWidth = touchTabVisible
-                ? std::max(1.0f, static_cast<float>(uiWidth - 122))
-                : textWidth;
-            inputLines = wrap("> " + commandInput.text() + "_", 1.25f,
-                              inputWidth);
+            inputLines = commandInputLines(uiWidth, touchTabVisible);
         }
         const float inputHeight = commandOpen
             ? 11.0f + lineHeight * static_cast<float>(inputLines.size()) : 0.0f;
@@ -112,7 +152,7 @@ void GameUiController::render(
                 visibleHistory.push_back(*line);
         }
         if (!visibleHistory.empty()) {
-            UiTheme::panel(renderer, 12.0f, 18.0f + inputHeight,
+            UiTheme::panel(renderer, 12.0f, commandBottom + inputHeight,
                 static_cast<float>(uiWidth - 24),
                 lineHeight * static_cast<float>(visibleHistory.size()) + 8.0f,
                 UiTheme::PANEL, {}, 1.0f, 0.88f);
@@ -122,7 +162,7 @@ void GameUiController::render(
                     1.0f, glm::vec3(1.0f, 0.88f, 0.58f), 0.95f);
         }
         if (commandOpen) {
-            UiTheme::panel(renderer, 12.0f, 18.0f,
+            UiTheme::panel(renderer, 12.0f, commandBottom,
                 static_cast<float>(uiWidth - 24), inputHeight,
                 UiTheme::PANEL, {}, 1.0f, 0.92f);
             for (size_t i = 0; i < inputLines.size(); ++i)

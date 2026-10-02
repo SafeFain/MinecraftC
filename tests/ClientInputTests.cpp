@@ -201,6 +201,21 @@ int main(){
         20, 10, 600, 330, 640, 360, 1280, 720);
     require(safe.x==40&&safe.y==40&&safe.width==1200&&safe.height==660,
             "top-left logical safe area projects to bottom-left framebuffer coordinates");
+    const WindowTextInputArea inputArea = projectTextInputArea(
+        {64, 76, 1152, 72}, 640, 360, 1280, 720);
+    require(inputArea.x == 32 && inputArea.y == 286 &&
+            inputArea.width == 576 && inputArea.height == 36,
+            "chat framebuffer rectangle converts to top-left logical IME coordinates");
+    const WindowTextInputArea fractionalArea = projectTextInputArea(
+        {13, 19, 100, 37}, 640, 360, 960, 540);
+    require(fractionalArea.x == 8 && fractionalArea.y == 322 &&
+            fractionalArea.width == 68 && fractionalArea.height == 26,
+            "fractional DPI input bounds round outward to cover the whole input field");
+    const WindowTextInputArea clippedArea = projectTextInputArea(
+        {-10, -10, 2000, 2000}, 640, 360, 1280, 720);
+    require(clippedArea.x == 0 && clippedArea.y == 0 &&
+            clippedArea.width == 640 && clippedArea.height == 360,
+            "oversized input bounds remain within the logical window");
     require(SDL_InitSubSystem(SDL_INIT_JOYSTICK|SDL_INIT_GAMEPAD),
             "SDL gamepad test subsystem initializes");
     SDL_VirtualJoystickDesc virtualDesc{};SDL_INIT_INTERFACE(&virtualDesc);

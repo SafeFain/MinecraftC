@@ -7,6 +7,7 @@
 #include <array>
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -19,6 +20,32 @@ struct WindowSafeArea {
     int width = 1;
     int height = 1;
 };
+
+// Top-left origin, logical window coordinates, as required by native IMEs.
+struct WindowTextInputArea {
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+};
+
+inline WindowTextInputArea projectTextInputArea(
+    const WindowSafeArea& pixels, int windowWidth, int windowHeight,
+    int pixelWidth, int pixelHeight) {
+    windowWidth = std::max(1, windowWidth);
+    windowHeight = std::max(1, windowHeight);
+    const double scaleX = static_cast<double>(windowWidth) / std::max(1, pixelWidth);
+    const double scaleY = static_cast<double>(windowHeight) / std::max(1, pixelHeight);
+    const int left = std::clamp(static_cast<int>(std::floor(pixels.x * scaleX)),
+                              0, windowWidth - 1);
+    const int top = std::clamp(static_cast<int>(std::floor(
+        (pixelHeight - pixels.y - pixels.height) * scaleY)), 0, windowHeight - 1);
+    const int right = std::clamp(static_cast<int>(std::ceil(
+        (pixels.x + pixels.width) * scaleX)), left + 1, windowWidth);
+    const int bottom = std::clamp(static_cast<int>(std::ceil(
+        (pixelHeight - pixels.y) * scaleY)), top + 1, windowHeight);
+    return {left, top, right - left, bottom - top};
+}
 
 inline WindowSafeArea projectWindowSafeArea(
     int areaX, int areaY, int areaWidth, int areaHeight,
@@ -70,6 +97,7 @@ public:
     bool isFullscreen() const;
     void toggleFullscreen();
     void setTextInputEnabled(bool enabled);
+    void setTextInputArea(const WindowTextInputArea* area);
     bool openUrl(const std::string& url) const;
 
     bool isTouchAvailable() const { return m_touchAvailable; }
