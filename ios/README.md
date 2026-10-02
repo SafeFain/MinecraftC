@@ -4,6 +4,23 @@ The iOS client supports iOS 14 or newer on arm64 iPhone and iPad devices. It is
 landscape-only and builds the Vulkan renderer, statically linked to MoltenVK
 1.4.1, consistently with every other supported platform.
 
+## Versioning and releases
+
+The root `VERSION` drives both CMake and CI. Alpha/beta/rc can carry `.N`
+iterations from 1 to 999; `release` remains unnumbered. For example,
+`1.4.0-beta.1` keeps `CFBundleShortVersionString` at `1.4.0` and sets
+`CFBundleVersion` to `104002001`, using the same increasing numeric mapping as
+Android. The full version remains in the runtime display and package filenames.
+See the root [version rules](../README.md#versioning-and-releases) for the formula
+and supported limits.
+
+Only a pushed tag exactly matching `v<VERSION>` publishes the unsigned device
+IPA and Simulator ZIP after all platform jobs pass. For `v1.4.0-beta.1`, the
+files are `MinecraftC-1.4.0-beta.1-ios-arm64-unsigned.ipa` and
+`MinecraftC-1.4.0-beta.1-ios-simulator-arm64.zip`. Alpha/beta/rc tags create GitHub
+prereleases; `release` creates a normal release. Branch pushes and manual runs
+build without publishing.
+
 ## Dependencies
 
 - Full Xcode installation

@@ -1,28 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" MINECRAFTC_VERSION
-     LIMIT_COUNT 1)
-if(NOT MINECRAFTC_VERSION MATCHES
-   "^([0-9]+)\\.([0-9]+)\\.([0-9]+)-(alpha|beta|rc|release)$")
-    message(FATAL_ERROR
-        "VERSION must use X.Y.Z-alpha|beta|rc|release (for example 1.2.3-rc)")
-endif()
-set(MINECRAFTC_VERSION_CORE "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
-set(MINECRAFTC_VERSION_CHANNEL "${CMAKE_MATCH_4}")
-if(MINECRAFTC_VERSION_CHANNEL STREQUAL "release")
-    set(MINECRAFTC_VERSION_LABEL "Release")
-    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 4)
-elseif(MINECRAFTC_VERSION_CHANNEL STREQUAL "rc")
-    set(MINECRAFTC_VERSION_LABEL "RC")
-    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 3)
-elseif(MINECRAFTC_VERSION_CHANNEL STREQUAL "beta")
-    set(MINECRAFTC_VERSION_LABEL "Beta")
-    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 2)
-else()
-    set(MINECRAFTC_VERSION_LABEL "Alpha")
-    set(MINECRAFTC_VERSION_CHANNEL_NUMBER 1)
-endif()
-set(MINECRAFTC_VERSION_DISPLAY
-    "${MINECRAFTC_VERSION_LABEL}-${MINECRAFTC_VERSION_CORE}")
+include("${CMAKE_CURRENT_SOURCE_DIR}/tools/project_version.cmake")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
 project(MinecraftC VERSION "${MINECRAFTC_VERSION_CORE}" LANGUAGES CXX C)
 
 if(ANDROID OR IOS)
@@ -358,11 +337,10 @@ if(APPLE AND NOT IOS)
         MACOSX_BUNDLE_ICON_FILE "minecraftc.icns"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_BUNDLE_VERSION
-            "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${PROJECT_VERSION_PATCH}")
+            "${MINECRAFTC_VERSION_CODE}")
 endif()
 if(IOS)
-    math(EXPR MINECRAFTC_IOS_BUILD_NUMBER
-        "(${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}) * 10 + ${MINECRAFTC_VERSION_CHANNEL_NUMBER}")
+    set(MINECRAFTC_IOS_BUILD_NUMBER "${MINECRAFTC_VERSION_CODE}")
     configure_file(ios/Info.plist.in
         "${CMAKE_CURRENT_BINARY_DIR}/ios/Info.plist" @ONLY)
     string(CONCAT MINECRAFTC_IOS_OTHER_LDFLAGS
@@ -499,6 +477,9 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tools/check_api_boundaries.py
                 --root ${CMAKE_SOURCE_DIR})
+    add_test(NAME numbered_prerelease_versions
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_project_version.py
+                --cmake ${CMAKE_COMMAND})
     add_test(NAME release_version_cli COMMAND minecraftc --version)
     set_tests_properties(release_version_cli PROPERTIES
         PASS_REGULAR_EXPRESSION "MinecraftC ${MINECRAFTC_VERSION_DISPLAY}")

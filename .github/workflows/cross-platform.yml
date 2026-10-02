@@ -2,6 +2,8 @@ name: Cross-platform build and release
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -21,24 +23,7 @@ jobs:
       - name: Validate version and release tag
         id: version
         shell: bash
-        run: |
-          version="$(tr -d '\r\n' < VERSION)"
-          if [[ ! "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]; then
-            echo "Invalid VERSION: $version" >&2
-            exit 1
-          fi
-          channel="${BASH_REMATCH[2]}"
-          release_tag="v$version"
-          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "$release_tag" ]]; then
-            echo "Release tag '$GITHUB_REF_NAME' must exactly match VERSION as '$release_tag'" >&2
-            exit 1
-          fi
-          prerelease=true
-          if [[ "$channel" == release ]]; then prerelease=false; fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "channel=$channel" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+        run: cmake -P tools/ci_version.cmake
 
   linux:
     needs: version
@@ -47,16 +32,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Read project version
         shell: bash
-        run: |
-          version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
-          core="${BASH_REMATCH[1]}"
-          channel="${BASH_REMATCH[2]}"
-          case "$channel" in alpha) label=Alpha;; beta) label=Beta;; rc) label=RC;; release) label=Release;; esac
-          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_CORE=$core" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
-          echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
+        run: cmake -P tools/ci_version.cmake
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
@@ -134,18 +110,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Read project version
         shell: pwsh
-        run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          if ($version -notmatch '^(\d+\.\d+\.\d+)-(alpha|beta|rc|release)$') {
-            throw "Invalid VERSION: $version"
-          }
-          $core = $Matches[1]
-          $labels = @{ alpha = 'Alpha'; beta = 'Beta'; rc = 'RC'; release = 'Release' }
-          $display = "$($labels[$Matches[2]])-$core"
-          "MINECRAFTC_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "MINECRAFTC_VERSION_CORE=$core" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "MINECRAFTC_VERSION_DISPLAY=$display" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "RELEASE_DIR=MinecraftC-$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: cmake -P tools/ci_version.cmake
       - name: Install pinned Vulkan SDK
         shell: pwsh
         run: |
@@ -226,15 +191,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Read project version
         shell: bash
-        run: |
-          version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
-          core="${BASH_REMATCH[1]}"; channel="${BASH_REMATCH[2]}"
-          case "$channel" in alpha) label=Alpha;; beta) label=Beta;; rc) label=RC;; release) label=Release;; esac
-          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_CORE=$core" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_DISPLAY=$label-$core" >> "$GITHUB_ENV"
-          echo "RELEASE_DIR=MinecraftC-$version" >> "$GITHUB_ENV"
+        run: cmake -P tools/ci_version.cmake
       - name: Install pinned MoltenVK and shader compiler
         shell: bash
         run: |
@@ -274,6 +231,8 @@ jobs:
           otool -L "$executable" | grep -q '@rpath/libMoltenVK.dylib'
           ! otool -L "$executable" | grep -E 'OpenGL|OpenGLES'
           test "$(defaults read "$app/Contents/Info" CFBundleIconFile)" = "minecraftc.icns"
+          test "$(defaults read "$app/Contents/Info" CFBundleShortVersionString)" = "$MINECRAFTC_VERSION_CORE"
+          test "$(defaults read "$app/Contents/Info" CFBundleVersion)" = "$MINECRAFTC_VERSION_CODE"
           test -f "$app/Contents/Resources/minecraftc.icns"
           test -f "$app/Contents/Resources/assets/shaders/vulkan/chunk.vert.spv"
           test -f "$RUNNER_TEMP/$RELEASE_DIR/LICENSE"
@@ -320,11 +279,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Read project version
         shell: bash
-        run: |
-          version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
-          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_CORE=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+        run: cmake -P tools/ci_version.cmake
       - name: Install pinned MoltenVK and shader compiler
         shell: bash
         run: |
@@ -393,6 +348,7 @@ jobs:
           }
           check_plist CFBundleIdentifier io.github.SafeFain.MinecraftC
           check_plist CFBundleShortVersionString "$MINECRAFTC_VERSION_CORE"
+          check_plist CFBundleVersion "$MINECRAFTC_VERSION_CODE"
           check_plist MinimumOSVersion 14.0
           check_plist UIDeviceFamily:0 1
           check_plist UIDeviceFamily:1 2
@@ -670,11 +626,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Read project version
         shell: bash
-        run: |
-          version="$(tr -d '\r\n' < VERSION)"
-          [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(alpha|beta|rc|release)$ ]]
-          echo "MINECRAFTC_VERSION=$version" >> "$GITHUB_ENV"
-          echo "MINECRAFTC_VERSION_CORE=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+        run: cmake -P tools/ci_version.cmake
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -699,13 +651,9 @@ jobs:
         run: |
           source_apk="android/app/build/outputs/apk/release/app-release-unsigned.apk"
           release_apk="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-android-arm64-unsigned.apk"
-          IFS=. read -r version_major version_minor version_patch <<< "$MINECRAFTC_VERSION_CORE"
-          channel="${MINECRAFTC_VERSION##*-}"
-          case "$channel" in alpha) channel_code=1;; beta) channel_code=2;; rc) channel_code=3;; release) channel_code=4;; esac
-          version_code=$(((version_major * 10000 + version_minor * 100 + version_patch) * 10 + channel_code))
           test -f "$source_apk"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$source_apk" > "$RUNNER_TEMP/android-badging.txt"
-          grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='$version_code' versionName='$MINECRAFTC_VERSION'" "$RUNNER_TEMP/android-badging.txt"
+          grep -q "package: name='io.github.SafeFain.MinecraftC' versionCode='$MINECRAFTC_VERSION_CODE' versionName='$MINECRAFTC_VERSION'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "^application:.*icon='" "$RUNNER_TEMP/android-badging.txt"
           grep -q "sdkVersion:'29'" "$RUNNER_TEMP/android-badging.txt"
           grep -q "targetSdkVersion:'35'" "$RUNNER_TEMP/android-badging.txt"
@@ -732,7 +680,7 @@ jobs:
           retention-days: 14
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: [version, linux, windows, macos-universal, ios-arm64, android-arm64]
     runs-on: ubuntu-24.04
     permissions:

@@ -26,7 +26,19 @@ GPL-3.0-only except for third-party components and assets that identify a
 different license; their notices remain beside the corresponding source or
 asset and are summarized in the root `README.md`.
 
+## Versioning and releases
+
+The root `VERSION` supplies Gradle's full `versionName`, including an optional
+alpha/beta/rc iteration. For example, `1.4.0-beta.1` uses `versionName`
+`1.4.0-beta.1` and `versionCode` `104002001`. Increasing the iteration advances
+the installation code without changing the core `1.4.0`. See the root
+[version rules](../README.md#versioning-and-releases) for channel ordering,
+numbering limits and the shared mobile version-code formula.
+
 GitHub Actions builds the same unsigned arm64 release APK on every workflow run.
-Pushed `v*` tags publish it as
-`MinecraftC-<version>-android-arm64-unsigned.apk` alongside the Linux, Windows,
-macOS, unsigned iOS device, and iOS Simulator packages.
+Only a pushed tag exactly matching `v<VERSION>` publishes it as
+`MinecraftC-<version>-android-arm64-unsigned.apk` alongside the other platform
+packages, after all platform jobs pass. For example, `v1.4.0-beta.1` publishes
+`MinecraftC-1.4.0-beta.1-android-arm64-unsigned.apk` as a GitHub prerelease.
+Alpha/beta/rc are prereleases; `release` is a normal release. Branch pushes and
+manual workflow runs build without publishing.

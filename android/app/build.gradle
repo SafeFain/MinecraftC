@@ -2,12 +2,20 @@ plugins { id "com.android.application" }
 
 def repositoryRoot = rootProject.projectDir.parentFile
 def versionText = new File(repositoryRoot, "VERSION").getText("UTF-8").trim()
-def versionMatch = versionText =~ /^(\d+)\.(\d+)\.(\d+)-(alpha|beta|rc|release)$/
+def versionMatch = versionText =~ /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc|release)(?:\.([1-9][0-9]*))?$/
 if (!versionMatch.find()) throw new GradleException("Cannot read MinecraftC version")
-def versionMajor = versionMatch.group(1).toInteger()
-def versionMinor = versionMatch.group(2).toInteger()
-def versionPatch = versionMatch.group(3).toInteger()
+def versionMajor = versionMatch.group(1).toBigInteger()
+def versionMinor = versionMatch.group(2).toBigInteger()
+def versionPatch = versionMatch.group(3).toBigInteger()
 def versionChannel = versionMatch.group(4).toString()
+def iterationText = versionMatch.group(5)
+def versionIteration = iterationText == null ? 0 : iterationText.toBigInteger()
+if (versionChannel == "release" && iterationText != null) {
+    throw new GradleException("Release versions cannot have a prerelease iteration")
+}
+if (versionIteration > 999 || versionMajor > 20 || versionMinor > 99 || versionPatch > 99) {
+    throw new GradleException("Version exceeds supported mobile ranges: major <= 20, minor/patch <= 99, iteration 1..999")
+}
 def channelNumber
 switch (versionChannel) {
     case "alpha": channelNumber = 1; break
@@ -16,8 +24,12 @@ switch (versionChannel) {
     case "release": channelNumber = 4; break
     default: throw new GradleException("Unsupported MinecraftC version channel: ${versionChannel}")
 }
-def androidVersionCode =
-        (versionMajor * 10000 + versionMinor * 100 + versionPatch) * 10 + channelNumber
+def versionCodeValue =
+        (versionMajor * 10000 + versionMinor * 100 + versionPatch) * 10000 + channelNumber * 1000 + versionIteration
+if (versionCodeValue > 2100000000) {
+    throw new GradleException("Version code exceeds Android's 2100000000 limit")
+}
+def androidVersionCode = versionCodeValue.toInteger()
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
 
 tasks.register("prepareLegalAssets", Sync) {
