@@ -209,6 +209,33 @@ enum class ItemId : uint16_t {
 
     STARSTEP_SCEPTER,
 
+    STONE_BRICKS,
+    MOSSY_STONE_BRICKS,
+    CRACKED_STONE_BRICKS,
+    CHISELED_STONE_BRICKS,
+    BRICKS,
+    POLISHED_GRANITE,
+    POLISHED_BASALT,
+    POLISHED_LIMESTONE,
+    POLISHED_TUFF,
+    DEEPSLATE_BRICKS,
+    SANDSTONE,
+    CUT_SANDSTONE,
+    SMOOTH_SANDSTONE,
+    RED_WOOL,
+    YELLOW_WOOL,
+    BLUE_WOOL,
+    GREEN_WOOL,
+    BLACK_WOOL,
+    CLAY_BALL,
+    BRICK,
+    RED_DYE,
+    YELLOW_DYE,
+    BLUE_DYE,
+    GREEN_DYE,
+    BLACK_DYE,
+    BONE_MEAL,
+
     COUNT,
     POPPY = FLOWER
 };
@@ -320,6 +347,8 @@ struct ItemStack {
 
 const ItemProperties& getItemProps(ItemId id);
 bool isValidItemId(ItemId id);
+const std::string& itemCommandName(ItemId id);
+std::optional<ItemId> itemFromCommandName(std::string_view name);
 ItemId itemForBlock(BlockId id);
 std::vector<ItemId> creativeInventoryItems();
 CreativeItemCategory creativeInventoryCategory(ItemId id);

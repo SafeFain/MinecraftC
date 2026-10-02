@@ -725,6 +725,26 @@ if(BUILD_TESTING)
     add_test(NAME rendering_day_cycle_and_environment COMMAND rendering_logic_tests)
 
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
+    add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
+        tests/VulkanDecorationSmoke.cpp
+        src/debug/Log.cpp
+        src/model/ModelRenderer.cpp
+        src/renderer/BlockAtlasData.cpp
+        src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp
+        src/renderer/RenderDevice.cpp
+        src/renderer/StbImageImpl.cpp
+        src/world/Block.cpp
+        src/world/Chunk.cpp)
+    target_include_directories(vulkan_decoration_smoke PRIVATE src external/stb)
+    target_link_libraries(vulkan_decoration_smoke PRIVATE
+        glm::glm minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_decoration_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(vulkan_decoration_smoke PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
     add_executable(vulkan_cloud_lod_smoke EXCLUDE_FROM_ALL
         tests/VulkanCloudLodSmoke.cpp
         src/debug/Log.cpp
@@ -887,10 +907,12 @@ if(BUILD_TESTING)
 
     add_executable(command_tests
         tests/CommandTests.cpp
+        src/game/Item.cpp
+        src/world/Block.cpp
         src/game/Utf8.cpp
         src/world/BiomeMap.cpp)
     target_include_directories(command_tests PRIVATE src)
-    target_link_libraries(command_tests PRIVATE glm::glm)
+    target_link_libraries(command_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()

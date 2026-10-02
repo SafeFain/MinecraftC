@@ -12,6 +12,25 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def test_decoration_materials_are_deterministic_distinct_and_tile_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            fingerprints = set()
+            for name in tg.DECORATION_BASES:
+                pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
+                self.assertEqual(pixels, tg.generate_texture(name, tg.DEFAULT_SEED))
+                self.assertTrue(all(p[3] == 255 for p in pixels))
+                path = output / (name + ".png")
+                tg.write_png(path, 16, 16, pixels)
+                self.assertFalse(tg.validate_texture(path), name)
+                fingerprints.add(tuple(pixels))
+            self.assertEqual(len(fingerprints), 18)
+        definitions = tg.load_item_icon_definitions(self.item_definitions()[0])
+        order = list(definitions["items"])
+        self.assertEqual(order[181], "starstep_scepter")
+        self.assertEqual(order[182], "stone_bricks")
+        self.assertEqual(order[-1], "bone_meal")
+
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]
         return (root / "assets/textures/definitions/item_icons.json",

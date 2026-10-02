@@ -17,7 +17,10 @@
     "drumstick": {},
     "mutton": {},
     "bread": {},
-    "rotten_flesh": {}
+    "rotten_flesh": {},
+    "clay_ball": {},
+    "brick": {},
+    "dye": {}
   },
   "template_schema": {
     "outline": "binary silhouette with a dark material-aware edge",
@@ -59,7 +62,10 @@
     "drumstick": {"outline": "drumstick", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
     "mutton": {"outline": "mutton", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
     "bread": {"outline": "bread", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
-    "rotten_flesh": {"outline": "rotten_flesh", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"}
+    "rotten_flesh": {"outline": "rotten_flesh", "parts": ["body", "edge", "highlight"], "material_processing": "clipped_highlight"},
+    "clay_ball": {"outline": "rounded_lump", "parts": ["body", "edge", "highlight"], "material_processing": "matte"},
+    "brick": {"outline": "fired_brick", "parts": ["body", "edge", "highlight"], "material_processing": "matte"},
+    "dye": {"outline": "powder_pile", "parts": ["body", "edge", "highlight"], "material_processing": "matte"}
   },
   "handle_palette": [[66, 40, 22], [112, 72, 37], [171, 119, 61], [211, 160, 88]],
   "materials": {
@@ -88,7 +94,15 @@
     "blastling_egg": [[37, 27, 57], [76, 49, 111], [132, 76, 171], [219, 137, 238]],
     "villager_egg": [[72, 45, 29], [121, 78, 49], [181, 131, 83], [91, 151, 78]],
     "zombie_villager_egg": [[28, 58, 42], [55, 103, 64], [105, 145, 79], [116, 78, 49]],
-    "emerald": [[11, 77, 49], [18, 132, 75], [42, 202, 112], [155, 255, 193]]
+    "emerald": [[11, 77, 49], [18, 132, 75], [42, 202, 112], [155, 255, 193]],
+    "clay_ball": [[73, 80, 85], [106, 116, 124], [133, 146, 156], [152, 167, 179]],
+    "brick": [[95, 50, 36], [139, 72, 53], [174, 91, 67], [200, 104, 77]],
+    "red_dye": [[101, 29, 26], [148, 42, 38], [185, 53, 48], [212, 60, 55]],
+    "yellow_dye": [[123, 101, 18], [180, 147, 27], [225, 184, 34], [255, 211, 39]],
+    "blue_dye": [[31, 62, 105], [46, 90, 153], [58, 113, 192], [66, 129, 220]],
+    "green_dye": [[41, 72, 30], [60, 104, 44], [76, 131, 55], [87, 150, 63]],
+    "black_dye": [[24, 24, 26], [35, 36, 39], [44, 45, 49], [50, 51, 56]],
+    "bone_meal": [[111, 107, 89], [161, 156, 130], [202, 195, 163], [232, 224, 187]]
   },
   "items": {
     "grass_block": {"generator": "block_item_icon", "block": "grass"},
@@ -272,6 +286,32 @@
     "sunstone_stairs": {"generator": "block_item_icon", "block": "sunstone"},
     "cloudstone_slab": {"generator": "block_item_icon", "block": "cloudstone"},
     "cloudstone_stairs": {"generator": "block_item_icon", "block": "cloudstone"},
-    "starstep_scepter": {"generator": "item_sprite", "template": "scepter", "material": "diamond"}
+    "starstep_scepter": {"generator": "item_sprite", "template": "scepter", "material": "diamond"},
+    "stone_bricks": {"generator": "block_item_icon", "block": "stone_bricks"},
+    "mossy_stone_bricks": {"generator": "block_item_icon", "block": "mossy_stone_bricks"},
+    "cracked_stone_bricks": {"generator": "block_item_icon", "block": "cracked_stone_bricks"},
+    "chiseled_stone_bricks": {"generator": "block_item_icon", "block": "chiseled_stone_bricks"},
+    "bricks": {"generator": "block_item_icon", "block": "bricks"},
+    "polished_granite": {"generator": "block_item_icon", "block": "polished_granite"},
+    "polished_basalt": {"generator": "block_item_icon", "block": "polished_basalt"},
+    "polished_limestone": {"generator": "block_item_icon", "block": "polished_limestone"},
+    "polished_tuff": {"generator": "block_item_icon", "block": "polished_tuff"},
+    "deepslate_bricks": {"generator": "block_item_icon", "block": "deepslate_bricks"},
+    "sandstone": {"generator": "block_item_icon", "block": "sandstone"},
+    "cut_sandstone": {"generator": "block_item_icon", "block": "cut_sandstone"},
+    "smooth_sandstone": {"generator": "block_item_icon", "block": "smooth_sandstone"},
+    "red_wool": {"generator": "block_item_icon", "block": "red_wool"},
+    "yellow_wool": {"generator": "block_item_icon", "block": "yellow_wool"},
+    "blue_wool": {"generator": "block_item_icon", "block": "blue_wool"},
+    "green_wool": {"generator": "block_item_icon", "block": "green_wool"},
+    "black_wool": {"generator": "block_item_icon", "block": "black_wool"},
+    "clay_ball": {"generator": "item_sprite", "template": "clay_ball", "material": "clay_ball"},
+    "brick": {"generator": "item_sprite", "template": "brick", "material": "brick"},
+    "red_dye": {"generator": "item_sprite", "template": "dye", "material": "red_dye"},
+    "yellow_dye": {"generator": "item_sprite", "template": "dye", "material": "yellow_dye"},
+    "blue_dye": {"generator": "item_sprite", "template": "dye", "material": "blue_dye"},
+    "green_dye": {"generator": "item_sprite", "template": "dye", "material": "green_dye"},
+    "black_dye": {"generator": "item_sprite", "template": "dye", "material": "black_dye"},
+    "bone_meal": {"generator": "item_sprite", "template": "dye", "material": "bone_meal"}
   }
 }

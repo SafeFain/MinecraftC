@@ -514,6 +514,7 @@ GameSession::CommandResult GameSession::executeCommand(
         message(localization.text("message.help_header"));
         message("/help");
         message("/gamemode 0|1|3");
+        message("/give <item> [1..64]");
         message("/tp <x> <y> <z>");
         message("/time set day|night");
         message("/weather clear|rain|thunder");
@@ -525,6 +526,15 @@ GameSession::CommandResult GameSession::executeCommand(
     }
     if (!worldMetadata.cheatsEnabled) {
         message(localization.text("message.cheats_disabled"));
+        return result;
+    }
+    if (command.type == CommandType::Give) {
+        if (!isValidItemId(command.item) || command.item == ItemId::EMPTY ||
+            command.itemCount < 1 || command.itemCount > 64) return result;
+        const uint32_t remaining = player.inventory().add({command.item, command.itemCount, 0});
+        message(localization.format("message.given", {
+            localization.itemName(command.item),
+            std::to_string(command.itemCount - remaining)}));
         return result;
     }
     if (command.type == CommandType::Gamemode) {

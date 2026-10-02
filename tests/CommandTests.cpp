@@ -14,6 +14,25 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const auto give = parseCommand("/give stone_bricks 64");
+    require(give.command && give.command->type == CommandType::Give &&
+            give.command->item == ItemId::STONE_BRICKS && give.command->itemCount == 64,
+            "give parses the stable item name and count");
+    require(parseCommand("/give bone_meal").command->itemCount == 1,
+            "give count defaults to one");
+    for (const char* invalid : {"/give", "/give missing", "/give stone_bricks 0",
+         "/give stone_bricks 65", "/give stone_bricks -1", "/give stone_bricks 1.5",
+         "/give stone_bricks 999999999999", "/give stone_bricks 2 extra"})
+        require(!parseCommand(invalid).command, "give rejects invalid names/counts/arguments");
+    const std::string prefix = "/give polished_";
+    require(commandSuggestions(prefix, prefix.size()).size() == 4,
+            "give completes all polished stone variants");
+    for (uint16_t raw = 183; raw <= 208; ++raw) {
+        const auto item = static_cast<ItemId>(raw);
+        require(itemFromCommandName(itemCommandName(item)) == item,
+                "new item command names round trip");
+    }
+
     const auto englishLines = wrapTextPixels("alpha beta gamma", 10.0f,
         [](const std::string& text) { return static_cast<float>(text.size()); });
     require(englishLines.size() == 2 && englishLines[0] == "alpha beta" &&

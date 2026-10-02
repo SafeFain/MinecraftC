@@ -99,6 +99,14 @@
       "x": 0,
       "y": 14
     },
+    "black_dye": {
+      "generator": "item_sprite",
+      "index": 206,
+      "source": "assets/textures/generated/items/black_dye.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 25
+    },
     "black_sand": {
       "generator": "block_item_icon",
       "index": 142,
@@ -106,6 +114,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 17
+    },
+    "black_wool": {
+      "generator": "block_item_icon",
+      "index": 199,
+      "source": "assets/textures/generated/items/black_wool.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 24
     },
     "blast_furnace": {
       "generator": "block_item_icon",
@@ -123,6 +139,14 @@
       "x": 5,
       "y": 16
     },
+    "blue_dye": {
+      "generator": "item_sprite",
+      "index": 204,
+      "source": "assets/textures/generated/items/blue_dye.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 25
+    },
     "blue_orchid": {
       "generator": "block_item_icon",
       "index": 120,
@@ -131,6 +155,14 @@
       "x": 0,
       "y": 15
     },
+    "blue_wool": {
+      "generator": "block_item_icon",
+      "index": 197,
+      "source": "assets/textures/generated/items/blue_wool.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 24
+    },
     "bone": {
       "generator": "item_sprite",
       "index": 70,
@@ -138,6 +170,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 8
+    },
+    "bone_meal": {
+      "generator": "item_sprite",
+      "index": 207,
+      "source": "assets/textures/generated/items/bone_meal.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 25
     },
     "bow": {
       "generator": "item_sprite",
@@ -154,6 +194,22 @@
       "source_kind": "generated",
       "x": 2,
       "y": 9
+    },
+    "brick": {
+      "generator": "item_sprite",
+      "index": 201,
+      "source": "assets/textures/generated/items/brick.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 25
+    },
+    "bricks": {
+      "generator": "block_item_icon",
+      "index": 186,
+      "source": "assets/textures/generated/items/bricks.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 23
     },
     "cactus": {
       "generator": "block_item_icon",
@@ -195,6 +251,14 @@
       "x": 1,
       "y": 16
     },
+    "chiseled_stone_bricks": {
+      "generator": "block_item_icon",
+      "index": 185,
+      "source": "assets/textures/generated/items/chiseled_stone_bricks.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 23
+    },
     "clay": {
       "generator": "block_item_icon",
       "index": 49,
@@ -202,6 +266,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 6
+    },
+    "clay_ball": {
+      "generator": "item_sprite",
+      "index": 200,
+      "source": "assets/textures/generated/items/clay_ball.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 25
     },
     "cloud_bloom": {
       "generator": "block_item_icon",
@@ -323,6 +395,14 @@
       "x": 6,
       "y": 15
     },
+    "cracked_stone_bricks": {
+      "generator": "block_item_icon",
+      "index": 184,
+      "source": "assets/textures/generated/items/cracked_stone_bricks.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 23
+    },
     "crafting_table": {
       "generator": "block_item_icon",
       "index": 6,
@@ -330,6 +410,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 0
+    },
+    "cut_sandstone": {
+      "generator": "block_item_icon",
+      "index": 193,
+      "source": "assets/textures/generated/items/cut_sandstone.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 24
     },
     "dandelion": {
       "generator": "block_item_icon",
@@ -346,6 +434,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 5
+    },
+    "deepslate_bricks": {
+      "generator": "block_item_icon",
+      "index": 191,
+      "source": "assets/textures/generated/items/deepslate_bricks.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 23
     },
     "deepslate_emerald_ore": {
       "generator": "block_item_icon",
@@ -659,6 +755,22 @@
       "x": 0,
       "y": 6
     },
+    "green_dye": {
+      "generator": "item_sprite",
+      "index": 205,
+      "source": "assets/textures/generated/items/green_dye.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 25
+    },
+    "green_wool": {
+      "generator": "block_item_icon",
+      "index": 198,
+      "source": "assets/textures/generated/items/green_wool.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 24
+    },
     "grindstone": {
       "generator": "block_item_icon",
       "index": 170,
@@ -875,6 +987,14 @@
       "x": 5,
       "y": 6
     },
+    "mossy_stone_bricks": {
+      "generator": "block_item_icon",
+      "index": 183,
+      "source": "assets/textures/generated/items/mossy_stone_bricks.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 22
+    },
     "mud": {
       "generator": "block_item_icon",
       "index": 140,
@@ -979,6 +1099,38 @@
       "x": 3,
       "y": 19
     },
+    "polished_basalt": {
+      "generator": "block_item_icon",
+      "index": 188,
+      "source": "assets/textures/generated/items/polished_basalt.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 23
+    },
+    "polished_granite": {
+      "generator": "block_item_icon",
+      "index": 187,
+      "source": "assets/textures/generated/items/polished_granite.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 23
+    },
+    "polished_limestone": {
+      "generator": "block_item_icon",
+      "index": 189,
+      "source": "assets/textures/generated/items/polished_limestone.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 23
+    },
+    "polished_tuff": {
+      "generator": "block_item_icon",
+      "index": 190,
+      "source": "assets/textures/generated/items/polished_tuff.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 23
+    },
     "poppy": {
       "generator": "block_item_icon",
       "index": 55,
@@ -1035,6 +1187,14 @@
       "x": 5,
       "y": 9
     },
+    "red_dye": {
+      "generator": "item_sprite",
+      "index": 202,
+      "source": "assets/textures/generated/items/red_dye.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 25
+    },
     "red_sand": {
       "generator": "block_item_icon",
       "index": 50,
@@ -1042,6 +1202,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 6
+    },
+    "red_wool": {
+      "generator": "block_item_icon",
+      "index": 195,
+      "source": "assets/textures/generated/items/red_wool.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 24
     },
     "reeds": {
       "generator": "block_item_icon",
@@ -1074,6 +1242,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 4
+    },
+    "sandstone": {
+      "generator": "block_item_icon",
+      "index": 192,
+      "source": "assets/textures/generated/items/sandstone.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 24
     },
     "sheep_spawn_egg": {
       "generator": "item_sprite",
@@ -1122,6 +1298,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 21
+    },
+    "smooth_sandstone": {
+      "generator": "block_item_icon",
+      "index": 194,
+      "source": "assets/textures/generated/items/smooth_sandstone.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 24
     },
     "snow": {
       "generator": "block_item_icon",
@@ -1218,6 +1402,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 2
+    },
+    "stone_bricks": {
+      "generator": "block_item_icon",
+      "index": 182,
+      "source": "assets/textures/generated/items/stone_bricks.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 22
     },
     "stone_hoe": {
       "generator": "item_sprite",
@@ -1443,6 +1635,22 @@
       "x": 3,
       "y": 2
     },
+    "yellow_dye": {
+      "generator": "item_sprite",
+      "index": 203,
+      "source": "assets/textures/generated/items/yellow_dye.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 25
+    },
+    "yellow_wool": {
+      "generator": "block_item_icon",
+      "index": 196,
+      "source": "assets/textures/generated/items/yellow_wool.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 24
+    },
     "zombie_spawn_egg": {
       "generator": "item_sprite",
       "index": 130,
@@ -1466,7 +1674,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 23,
+  "rows": 26,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

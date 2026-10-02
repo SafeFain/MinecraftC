@@ -60,6 +60,24 @@
     "fletching_table": {"texture": "fletching_table"}, "loom": {"texture": "loom"},
     "cauldron": {"texture": "cauldron"}, "blast_furnace": {"texture": "blast_furnace"},
     "smithing_table": {"texture": "smithing_table"}, "grindstone": {"texture": "grindstone"},
-    "copper_ore": {"texture": "copper_ore", "future": true}
+    "copper_ore": {"texture": "copper_ore", "future": true},
+    "stone_bricks": {"texture": "stone_bricks"},
+    "mossy_stone_bricks": {"texture": "mossy_stone_bricks"},
+    "cracked_stone_bricks": {"texture": "cracked_stone_bricks"},
+    "chiseled_stone_bricks": {"texture": "chiseled_stone_bricks"},
+    "bricks": {"texture": "bricks"},
+    "polished_granite": {"texture": "polished_granite"},
+    "polished_basalt": {"texture": "polished_basalt"},
+    "polished_limestone": {"texture": "polished_limestone"},
+    "polished_tuff": {"texture": "polished_tuff"},
+    "deepslate_bricks": {"texture": "deepslate_bricks"},
+    "sandstone": {"texture": "sandstone"},
+    "cut_sandstone": {"texture": "cut_sandstone"},
+    "smooth_sandstone": {"texture": "smooth_sandstone"},
+    "red_wool": {"texture": "red_wool"},
+    "yellow_wool": {"texture": "yellow_wool"},
+    "blue_wool": {"texture": "blue_wool"},
+    "green_wool": {"texture": "green_wool"},
+    "black_wool": {"texture": "black_wool"}
   }
 }

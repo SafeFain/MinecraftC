@@ -27,7 +27,7 @@ GitHub prereleases; release-channel tags create normal releases.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 182-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 208-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories
@@ -183,6 +183,7 @@ Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
 transition cave ecology with larger chambers and rifts.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
+`/give <item_name> [1..64]`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
 supports the current dimension's Overworld structures plus Heaven's
 `xiguang_ruin`, `star_crystal_geode`, `cloudspire_tower`, and `skyway_shrine`.
@@ -238,3 +239,19 @@ Vendored dependency directories retain their upstream, checksum, and license
 records in an `UPSTREAM.md` or dependency README; CMake records pins for fetched
 dependencies. See [ASSET_SOURCES.md](ASSET_SOURCES.md) and
 [assets/textures/LICENSE.md](assets/textures/LICENSE.md) for asset provenance.
+
+### Crafted building materials
+
+Craft stone bricks and polished granite/basalt/limestone/tuff from 2×2 base
+materials (four outputs). Smelt cobblestone into stone, stone bricks into cracked
+stone bricks, and sandstone into smooth sandstone. Combine stone bricks with
+moss for mossy bricks; two vertical stone bricks make two chiseled bricks.
+Four sand make sandstone; four sandstone make four cut sandstone.
+
+Split clay into four clay balls, smelt them into bricks, then combine four bricks
+into a brick block. Four clay balls also restore one clay block. Poppies,
+dandelions, blue orchids and coal yield red, yellow, blue and black dye;
+smelting cactus yields green dye. Combine white wool with dye to color it.
+One bone makes three bone meal, which bleaches colored wool back to white.
+Bone meal currently serves as a crafting material. All new items are available
+in the creative catalog; for example, `/give stone_bricks 64` requires cheats.

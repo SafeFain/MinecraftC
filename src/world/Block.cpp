@@ -53,7 +53,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "blast_furnace_top", "blast_furnace_side", "blast_furnace_bottom",
     "smithing_table_top", "smithing_table_side", "smithing_table_bottom",
     "grindstone_top", "grindstone_side", "grindstone_bottom", "white_bed_top",
-    "white_bed_side", "white_bed_bottom", "tnt_top", "tnt_side", "tnt_bottom"
+    "white_bed_side", "white_bed_bottom", "tnt_top", "tnt_side", "tnt_bottom",
+    "stone_bricks", "mossy_stone_bricks", "cracked_stone_bricks", "chiseled_stone_bricks", "bricks", "polished_granite", "polished_basalt", "polished_limestone", "polished_tuff", "deepslate_bricks", "sandstone", "cut_sandstone", "smooth_sandstone", "red_wool", "yellow_wool", "blue_wool", "green_wool", "black_wool"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -321,6 +322,25 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::RESONANT_CRYSTAL, "Resonant Crystal", glm::vec3(.35f,.72f,.92f), false, true,
      RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::SULFUR_CRUST, "Sulfur Crust", glm::vec3(.78f,.69f,.18f), true, false},
+    {BlockId::STONE_BRICKS, "Stone Bricks", glm::vec3(0.502f,0.518f,0.518f), true, false},
+    {BlockId::MOSSY_STONE_BRICKS, "Mossy Stone Bricks", glm::vec3(0.431f,0.514f,0.412f), true, false},
+    {BlockId::CRACKED_STONE_BRICKS, "Cracked Stone Bricks", glm::vec3(0.471f,0.486f,0.486f), true, false},
+    {BlockId::CHISELED_STONE_BRICKS, "Chiseled Stone Bricks", glm::vec3(0.502f,0.518f,0.518f), true, false},
+    {BlockId::BRICKS, "Bricks", glm::vec3(0.682f,0.357f,0.263f), true, false},
+    {BlockId::POLISHED_GRANITE, "Polished Granite", glm::vec3(0.557f,0.357f,0.302f), true, false},
+    {BlockId::POLISHED_BASALT, "Polished Basalt", glm::vec3(0.224f,0.235f,0.251f), true, false},
+    {BlockId::POLISHED_LIMESTONE, "Polished Limestone", glm::vec3(0.722f,0.710f,0.639f), true, false},
+    {BlockId::POLISHED_TUFF, "Polished Tuff", glm::vec3(0.357f,0.408f,0.376f), true, false},
+    {BlockId::DEEPSLATE_BRICKS, "Deepslate Bricks", glm::vec3(0.227f,0.251f,0.286f), true, false},
+    {BlockId::SANDSTONE, "Sandstone", glm::vec3(0.827f,0.725f,0.510f), true, false},
+    {BlockId::CUT_SANDSTONE, "Cut Sandstone", glm::vec3(0.827f,0.725f,0.510f), true, false},
+    {BlockId::SMOOTH_SANDSTONE, "Smooth Sandstone", glm::vec3(0.859f,0.773f,0.584f), true, false},
+    {BlockId::RED_WOOL, "Red Wool", glm::vec3(0.725f,0.208f,0.188f), true, false},
+    {BlockId::YELLOW_WOOL, "Yellow Wool", glm::vec3(0.882f,0.722f,0.133f), true, false},
+    {BlockId::BLUE_WOOL, "Blue Wool", glm::vec3(0.227f,0.443f,0.753f), true, false},
+    {BlockId::GREEN_WOOL, "Green Wool", glm::vec3(0.298f,0.514f,0.216f), true, false},
+    {BlockId::BLACK_WOOL, "Black Wool", glm::vec3(0.173f,0.176f,0.192f), true, false},
+
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -390,6 +410,25 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
                    face == FaceDir::FRONT ? BlockTexture::Chest : BlockTexture::ChestSide;
         case BlockId::TORCH:         return BlockTexture::Torch;
         case BlockId::WHITE_WOOL:    return BlockTexture::WhiteWool;
+        case BlockId::STONE_BRICKS: return BlockTexture::StoneBricks;
+        case BlockId::MOSSY_STONE_BRICKS: return BlockTexture::MossyStoneBricks;
+        case BlockId::CRACKED_STONE_BRICKS: return BlockTexture::CrackedStoneBricks;
+        case BlockId::CHISELED_STONE_BRICKS: return BlockTexture::ChiseledStoneBricks;
+        case BlockId::BRICKS: return BlockTexture::Bricks;
+        case BlockId::POLISHED_GRANITE: return BlockTexture::PolishedGranite;
+        case BlockId::POLISHED_BASALT: return BlockTexture::PolishedBasalt;
+        case BlockId::POLISHED_LIMESTONE: return BlockTexture::PolishedLimestone;
+        case BlockId::POLISHED_TUFF: return BlockTexture::PolishedTuff;
+        case BlockId::DEEPSLATE_BRICKS: return BlockTexture::DeepslateBricks;
+        case BlockId::SANDSTONE: return BlockTexture::Sandstone;
+        case BlockId::CUT_SANDSTONE: return BlockTexture::CutSandstone;
+        case BlockId::SMOOTH_SANDSTONE: return BlockTexture::SmoothSandstone;
+        case BlockId::RED_WOOL: return BlockTexture::RedWool;
+        case BlockId::YELLOW_WOOL: return BlockTexture::YellowWool;
+        case BlockId::BLUE_WOOL: return BlockTexture::BlueWool;
+        case BlockId::GREEN_WOOL: return BlockTexture::GreenWool;
+        case BlockId::BLACK_WOOL: return BlockTexture::BlackWool;
+
         case BlockId::WHITE_BED:     return BlockTexture::WhiteBed;
         case BlockId::FARMLAND:      return BlockTexture::Farmland;
         case BlockId::FARMLAND_1: case BlockId::FARMLAND_2:
@@ -517,10 +556,12 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         const auto texture = textureNames().find((*it)[1].str());
         if (texture == textureNames().end()) continue;
         const int index = std::stoi((*it)[2].str());
-        if (index >= 0 && index < static_cast<int>(TEXTURE_COUNT))
+        // Atlas slots include generator-only materials (for example copper ore),
+        // so their range is independent of the logical BlockTexture count.
+        if (index >= 0 && index <= 255)
             requested[static_cast<size_t>(texture->second)] = index;
     }
-    std::array<bool, TEXTURE_COUNT> used{};
+    std::array<bool, 256> used{};
     for (size_t texture = 0; texture < TEXTURE_COUNT; ++texture) {
         if (requested[texture] >= 0 && !used[requested[texture]]) {
             g_atlasIndices[texture] = static_cast<uint8_t>(requested[texture]);
@@ -930,6 +971,11 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
         case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
         case BlockId::ACACIA_LEAVES: case BlockId::SKYROOT_LEAVES:
+        case BlockId::RED_WOOL:
+        case BlockId::YELLOW_WOOL:
+        case BlockId::BLUE_WOOL:
+        case BlockId::GREEN_WOOL:
+        case BlockId::BLACK_WOOL:
         case BlockId::WHITE_WOOL: return 30;
         case BlockId::OAK_SAPLING: case BlockId::BIRCH_SAPLING:
         case BlockId::SPRUCE_SAPLING: case BlockId::JUNGLE_SAPLING:

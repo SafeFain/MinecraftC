@@ -45,7 +45,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 182 serialized
+  types, and 200 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -53,7 +53,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 182-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 208-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -113,3 +113,19 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   and sound-effect volume controls cover every mixed game sound. Audio
   initialization failure does not prevent the client from starting.
 - Determinism/boundary tests for caves and complete world generation.
+
+## Crafted masonry and dyed wool
+
+18 crafted full-cube blocks add stone brick variants (plain, mossy, cracked,
+chiseled), bricks, polished granite/basalt/limestone/tuff, deepslate bricks,
+and sandstone/cut sandstone/smooth sandstone plus red/yellow/blue/green/black wool.
+Eight material items add clay balls, bricks, five dyes and bone meal.
+All have original generator-produced 16×16 materials/icons, ten-language names,
+creative entries and survival crafting/smelting paths. Masonry requires at least
+a wooden pickaxe and drops itself; dyed wool retains white wool mining/fire rules.
+Existing generation v14/v8 and save v12 remain unchanged.
+
+`/give <item_name> [1..64]` supplies the current player's inventory when cheats
+are enabled, defaulting to one item. Names use lowercase English with underscores,
+for example `mossy_stone_bricks`, `red_wool` and `bone_meal`, with Tab completion.
+Full inventories retain their contents; feedback reports the quantity actually added.

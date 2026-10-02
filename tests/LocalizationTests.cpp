@@ -63,6 +63,13 @@ int main() {
             localization.hasTranslation(
                 Language::SimplifiedChinese, "settings.frame_rate"),
             "frame-rate setting is translated");
+    for (const Language language : languagesByEnglishName()) {
+        for (uint16_t item = 183; item <= 208; ++item)
+            require(localization.hasTranslation(language, "item." + std::to_string(item)),
+                    "all decoration items have translations in every language");
+        require(localization.hasTranslation(language, "message.given"),
+                "give command feedback is translated");
+    }
     constexpr const char* audioSettingsKeys[] = {
         "settings.audio", "settings.audio_title", "settings.master_volume",
         "settings.music_volume", "settings.weather_volume",

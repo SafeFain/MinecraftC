@@ -86,6 +86,25 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
                        BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
         set(id, 0.2f);
     set(BlockId::WHITE_WOOL, 0.8f);
+    set(BlockId::STONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::MOSSY_STONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::CRACKED_STONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::CHISELED_STONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::POLISHED_GRANITE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::POLISHED_BASALT, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::POLISHED_LIMESTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::POLISHED_TUFF, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::DEEPSLATE_BRICKS, 3.0f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SANDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::CUT_SANDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SMOOTH_SANDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::RED_WOOL, 0.8f);
+    set(BlockId::YELLOW_WOOL, 0.8f);
+    set(BlockId::BLUE_WOOL, 0.8f);
+    set(BlockId::GREEN_WOOL, 0.8f);
+    set(BlockId::BLACK_WOOL, 0.8f);
+
     for (uint8_t raw = static_cast<uint8_t>(BlockId::WHITE_BED);
          raw <= static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST); ++raw) {
         const BlockId id = static_cast<BlockId>(raw);
@@ -310,6 +329,48 @@ std::vector<CraftingRecipe> buildRecipes() {
     addArmorSet(recipes, ItemId::IRON_INGOT, ItemId::IRON_HELMET);
     addArmorSet(recipes, ItemId::GOLD_INGOT, ItemId::GOLDEN_HELMET);
     addArmorSet(recipes, ItemId::DIAMOND, ItemId::DIAMOND_HELMET);
+    // Crafted decoration stays independent of seeded terrain generation.
+    const std::array<std::pair<ItemId, ItemId>, 7> masonry{{
+        {ItemId::STONE, ItemId::STONE_BRICKS},
+        {ItemId::GRANITE, ItemId::POLISHED_GRANITE},
+        {ItemId::BASALT, ItemId::POLISHED_BASALT},
+        {ItemId::LIMESTONE, ItemId::POLISHED_LIMESTONE},
+        {ItemId::TUFF, ItemId::POLISHED_TUFF},
+        {ItemId::DEEPSLATE, ItemId::DEEPSLATE_BRICKS},
+        {ItemId::SANDSTONE, ItemId::CUT_SANDSTONE}
+    }};
+    for (const auto& entry : masonry)
+        recipes.push_back(shaped(2, 2, {entry.first, entry.first,
+            entry.first, entry.first}, {entry.second, 4, 0}, false));
+    recipes.push_back(shaped(2, 1, {ItemId::STONE_BRICKS, ItemId::MOSS},
+        {ItemId::MOSSY_STONE_BRICKS, 1, 0}));
+    recipes.push_back(shaped(1, 2, {ItemId::STONE_BRICKS, ItemId::STONE_BRICKS},
+        {ItemId::CHISELED_STONE_BRICKS, 2, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::SAND, ItemId::SAND,
+        ItemId::SAND, ItemId::SAND}, {ItemId::SANDSTONE, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::CLAY}, {ItemId::CLAY_BALL, 4, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::CLAY_BALL, ItemId::CLAY_BALL,
+        ItemId::CLAY_BALL, ItemId::CLAY_BALL}, {ItemId::CLAY, 1, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::BRICK, ItemId::BRICK,
+        ItemId::BRICK, ItemId::BRICK}, {ItemId::BRICKS, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::POPPY}, {ItemId::RED_DYE, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::DANDELION}, {ItemId::YELLOW_DYE, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::BLUE_ORCHID}, {ItemId::BLUE_DYE, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::COAL}, {ItemId::BLACK_DYE, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::BONE}, {ItemId::BONE_MEAL, 3, 0}, false));
+    const std::array<std::pair<ItemId, ItemId>, 5> woolColors{{
+        {ItemId::RED_DYE, ItemId::RED_WOOL},
+        {ItemId::YELLOW_DYE, ItemId::YELLOW_WOOL},
+        {ItemId::BLUE_DYE, ItemId::BLUE_WOOL},
+        {ItemId::GREEN_DYE, ItemId::GREEN_WOOL},
+        {ItemId::BLACK_DYE, ItemId::BLACK_WOOL}
+    }};
+    for (const auto& color : woolColors) {
+        recipes.push_back(shaped(2, 1, {ItemId::WHITE_WOOL, color.first},
+            {color.second, 1, 0}));
+        recipes.push_back(shaped(2, 1, {color.second, ItemId::BONE_MEAL},
+            {ItemId::WHITE_WOOL, 1, 0}));
+    }
     return recipes;
 }
 
@@ -376,7 +437,12 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
-const std::array<SmeltingRecipe, 10> SMELTING = {{
+const std::array<SmeltingRecipe, 15> SMELTING = {{
+    {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
+    {ItemId::STONE_BRICKS, {ItemId::CRACKED_STONE_BRICKS, 1, 0}, 200},
+    {ItemId::SANDSTONE, {ItemId::SMOOTH_SANDSTONE, 1, 0}, 200},
+    {ItemId::CLAY_BALL, {ItemId::BRICK, 1, 0}, 200},
+    {ItemId::CACTUS, {ItemId::GREEN_DYE, 1, 0}, 200},
     {ItemId::RAW_IRON, {ItemId::IRON_INGOT, 1, 0}, 200},
     {ItemId::IRON_ORE, {ItemId::IRON_INGOT, 1, 0}, 200},
     {ItemId::RAW_GOLD, {ItemId::GOLD_INGOT, 1, 0}, 200},

@@ -23,6 +23,19 @@ int main() {
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");
+    for (uint16_t raw = 183; raw <= 200; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const auto texture = getFaceTexture(block, FaceDir::TOP);
+        require(getAtlasTextureIndex(texture) < atlas.tilesPerSide * atlas.tilesPerSide,
+                "new decoration material fits atlas capacity");
+        for (int face = 0; face < 6; ++face)
+            require(getFaceTexture(block, static_cast<FaceDir>(face)) == texture,
+                    "new decoration maps all faces consistently");
+    }
+    require(getAtlasTextureIndex(BlockTexture::TntBottom) == 143 &&
+            getAtlasTextureIndex(BlockTexture::StoneBricks) == 144 &&
+            getAtlasTextureIndex(BlockTexture::BlackWool) == 161,
+            "atlas slots beyond logical material count remain mapped to authored tiles");
     const auto materials = buildVoxelGiMaterials(atlas);
     require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
             "non-emissive atlas material generated a light source");

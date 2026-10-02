@@ -1,6 +1,7 @@
 #include "game/Item.h"
 
 #include <array>
+#include <cctype>
 #include <stdexcept>
 #include <utility>
 
@@ -314,6 +315,51 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     set(ItemId::STARSTEP_SCEPTER,
         {"Starstep Scepter", ItemKind::Tool, 1, 192});
 
+    set(ItemId::STONE_BRICKS, {"Stone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STONE_BRICKS});
+    set(ItemId::MOSSY_STONE_BRICKS, {"Mossy Stone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOSSY_STONE_BRICKS});
+    set(ItemId::CRACKED_STONE_BRICKS, {"Cracked Stone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CRACKED_STONE_BRICKS});
+    set(ItemId::CHISELED_STONE_BRICKS, {"Chiseled Stone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CHISELED_STONE_BRICKS});
+    set(ItemId::BRICKS, {"Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BRICKS});
+    set(ItemId::POLISHED_GRANITE, {"Polished Granite", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::POLISHED_GRANITE});
+    set(ItemId::POLISHED_BASALT, {"Polished Basalt", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::POLISHED_BASALT});
+    set(ItemId::POLISHED_LIMESTONE, {"Polished Limestone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::POLISHED_LIMESTONE});
+    set(ItemId::POLISHED_TUFF, {"Polished Tuff", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::POLISHED_TUFF});
+    set(ItemId::DEEPSLATE_BRICKS, {"Deepslate Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DEEPSLATE_BRICKS});
+    set(ItemId::SANDSTONE, {"Sandstone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SANDSTONE});
+    set(ItemId::CUT_SANDSTONE, {"Cut Sandstone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CUT_SANDSTONE});
+    set(ItemId::SMOOTH_SANDSTONE, {"Smooth Sandstone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SMOOTH_SANDSTONE});
+    set(ItemId::RED_WOOL, {"Red Wool", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::RED_WOOL});
+    set(ItemId::YELLOW_WOOL, {"Yellow Wool", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::YELLOW_WOOL});
+    set(ItemId::BLUE_WOOL, {"Blue Wool", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BLUE_WOOL});
+    set(ItemId::GREEN_WOOL, {"Green Wool", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GREEN_WOOL});
+    set(ItemId::BLACK_WOOL, {"Black Wool", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BLACK_WOOL});
+    set(ItemId::CLAY_BALL, {"Clay Ball"});
+    set(ItemId::BRICK, {"Brick"});
+    set(ItemId::RED_DYE, {"Red Dye"});
+    set(ItemId::YELLOW_DYE, {"Yellow Dye"});
+    set(ItemId::BLUE_DYE, {"Blue Dye"});
+    set(ItemId::GREEN_DYE, {"Green Dye"});
+    set(ItemId::BLACK_DYE, {"Black Dye"});
+    set(ItemId::BONE_MEAL, {"Bone Meal"});
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -350,6 +396,24 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::EMERALD_ORE: case ItemId::DEEPSLATE_EMERALD_ORE:
         case ItemId::DRIPSTONE_BLOCK: case ItemId::CALCITE:
         case ItemId::SULFUR_CRUST:
+        case ItemId::STONE_BRICKS:
+        case ItemId::MOSSY_STONE_BRICKS:
+        case ItemId::CRACKED_STONE_BRICKS:
+        case ItemId::CHISELED_STONE_BRICKS:
+        case ItemId::BRICKS:
+        case ItemId::POLISHED_GRANITE:
+        case ItemId::POLISHED_BASALT:
+        case ItemId::POLISHED_LIMESTONE:
+        case ItemId::POLISHED_TUFF:
+        case ItemId::DEEPSLATE_BRICKS:
+        case ItemId::SANDSTONE:
+        case ItemId::CUT_SANDSTONE:
+        case ItemId::SMOOTH_SANDSTONE:
+        case ItemId::RED_WOOL:
+        case ItemId::YELLOW_WOOL:
+        case ItemId::BLUE_WOOL:
+        case ItemId::GREEN_WOOL:
+        case ItemId::BLACK_WOOL:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -418,6 +482,14 @@ CreativeItemCategory categoryFor(ItemId id) {
             return CreativeItemCategory::Food;
 
         // ── Materials ───────────────────────────────────────────────────
+        case ItemId::CLAY_BALL:
+        case ItemId::BRICK:
+        case ItemId::RED_DYE:
+        case ItemId::YELLOW_DYE:
+        case ItemId::BLUE_DYE:
+        case ItemId::GREEN_DYE:
+        case ItemId::BLACK_DYE:
+        case ItemId::BONE_MEAL:
         case ItemId::STICK: case ItemId::COAL: case ItemId::RAW_IRON:
         case ItemId::IRON_INGOT: case ItemId::RAW_GOLD:
         case ItemId::GOLD_INGOT: case ItemId::DIAMOND: case ItemId::STRING:
@@ -516,6 +588,25 @@ ItemId itemForBlock(BlockId id) {
     const auto raw = static_cast<uint16_t>(id);
     if (raw > 0 && raw <= 35) return static_cast<ItemId>(raw);
     switch (raw) {
+        case static_cast<uint16_t>(BlockId::STONE_BRICKS): return ItemId::STONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::MOSSY_STONE_BRICKS): return ItemId::MOSSY_STONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::CRACKED_STONE_BRICKS): return ItemId::CRACKED_STONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::CHISELED_STONE_BRICKS): return ItemId::CHISELED_STONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::BRICKS): return ItemId::BRICKS;
+        case static_cast<uint16_t>(BlockId::POLISHED_GRANITE): return ItemId::POLISHED_GRANITE;
+        case static_cast<uint16_t>(BlockId::POLISHED_BASALT): return ItemId::POLISHED_BASALT;
+        case static_cast<uint16_t>(BlockId::POLISHED_LIMESTONE): return ItemId::POLISHED_LIMESTONE;
+        case static_cast<uint16_t>(BlockId::POLISHED_TUFF): return ItemId::POLISHED_TUFF;
+        case static_cast<uint16_t>(BlockId::DEEPSLATE_BRICKS): return ItemId::DEEPSLATE_BRICKS;
+        case static_cast<uint16_t>(BlockId::SANDSTONE): return ItemId::SANDSTONE;
+        case static_cast<uint16_t>(BlockId::CUT_SANDSTONE): return ItemId::CUT_SANDSTONE;
+        case static_cast<uint16_t>(BlockId::SMOOTH_SANDSTONE): return ItemId::SMOOTH_SANDSTONE;
+        case static_cast<uint16_t>(BlockId::RED_WOOL): return ItemId::RED_WOOL;
+        case static_cast<uint16_t>(BlockId::YELLOW_WOOL): return ItemId::YELLOW_WOOL;
+        case static_cast<uint16_t>(BlockId::BLUE_WOOL): return ItemId::BLUE_WOOL;
+        case static_cast<uint16_t>(BlockId::GREEN_WOOL): return ItemId::GREEN_WOOL;
+        case static_cast<uint16_t>(BlockId::BLACK_WOOL): return ItemId::BLACK_WOOL;
+
         case static_cast<uint16_t>(BlockId::COBBLESTONE): return ItemId::COBBLESTONE;
         case static_cast<uint16_t>(BlockId::CRAFTING_TABLE): return ItemId::CRAFTING_TABLE;
         case static_cast<uint16_t>(BlockId::FURNACE): return ItemId::FURNACE;
@@ -610,4 +701,24 @@ std::vector<ItemId> creativeInventoryItems() {
         if (!props.name.empty() && props.maxStack > 0) items.push_back(id);
     }
     return items;
+}
+
+const std::string& itemCommandName(ItemId id) {
+    static const auto names = [] {
+        std::array<std::string, itemCount> result{};
+        for (size_t i = 1; i < result.size(); ++i) {
+            for (unsigned char c : getItemProps(static_cast<ItemId>(i)).name)
+                result[i] += c == ' ' ? '_' : static_cast<char>(std::tolower(c));
+        }
+        return result;
+    }();
+    return names[isValidItemId(id) ? static_cast<size_t>(id) : 0];
+}
+
+std::optional<ItemId> itemFromCommandName(std::string_view name) {
+    for (size_t i = 1; i < itemCount; ++i) {
+        const auto id = static_cast<ItemId>(i);
+        if (itemCommandName(id) == name) return id;
+    }
+    return std::nullopt;
 }

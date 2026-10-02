@@ -39,7 +39,7 @@ int main() {
             static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint8_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 183 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 201 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -84,7 +84,7 @@ int main() {
                 ItemId::BLASTLING_SPAWN_EGG &&
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
-            creativeItems.back() == ItemId::STARSTEP_SCEPTER,
+            creativeItems.back() == ItemId::BONE_MEAL,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -105,7 +105,7 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 55 &&
+                CreativeItemCategory::BuildingBlocks)] == 73 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Nature)] == 31 &&
             categoryCounts[static_cast<size_t>(
@@ -117,7 +117,7 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Food)] == 10 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Materials)] == 16 &&
+                CreativeItemCategory::Materials)] == 24 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::SpawnEggs)] == 10,
             "creative category sizes do not match the tab assignment");

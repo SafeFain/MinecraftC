@@ -96,6 +96,29 @@ NAMES += list(EXTRA_LOG_TOPS) + [name + "_" + face for name in FUNCTIONAL
                                for face in ("top", "side", "bottom")]
 
 
+# Crafted decoration is appended after all existing atlas slots.
+DECORATION_BASES = {
+    "stone_bricks": (128, 132, 132),
+    "mossy_stone_bricks": (110, 131, 105),
+    "cracked_stone_bricks": (120, 124, 124),
+    "chiseled_stone_bricks": (128, 132, 132),
+    "bricks": (174, 91, 67),
+    "polished_granite": (142, 91, 77),
+    "polished_basalt": (57, 60, 64),
+    "polished_limestone": (184, 181, 163),
+    "polished_tuff": (91, 104, 96),
+    "deepslate_bricks": (58, 64, 73),
+    "sandstone": (211, 185, 130),
+    "cut_sandstone": (211, 185, 130),
+    "smooth_sandstone": (219, 197, 149),
+    "red_wool": (185, 53, 48),
+    "yellow_wool": (225, 184, 34),
+    "blue_wool": (58, 113, 192),
+    "green_wool": (76, 131, 55),
+    "black_wool": (44, 45, 49),
+}
+NAMES += list(DECORATION_BASES)
+
 def _load_texture_families():
     definition_path = Path(__file__).resolve().parents[1] / \
         "assets/textures/definitions/textures.json"
@@ -349,6 +372,12 @@ for _name, _base in zip(EXTRA_LOG_TOPS,
 for _name in FUNCTIONAL:
     for _face in ("top", "side", "bottom"):
         PALETTES[_name+"_"+_face] = PALETTES[_name]
+
+for _name, _base in DECORATION_BASES.items():
+    _floor = 0.24 if _name in {"black_wool", "polished_basalt", "deepslate_bricks"} else 0.34
+    PALETTES[_name] = _role_palette(_base, shadow_floor=_floor)
+
+PALETTES["mossy_stone_bricks"] = PALETTES["stone_bricks"][:4] + PALETTES["moss"][2:4]
 
 # Grass-side tiles need two semantic materials in one six-role palette.  The
 # first four roles are soil; the last two are living turf.  Keeping this
@@ -888,8 +917,48 @@ def center_periodic_tile(pixels):
     return [pixels[wrap(y+sy)*16+wrap(x+sx)] for y in range(16) for x in range(16)]
 
 
+
+def generate_decoration_texture(name, seed):
+    """Periodic masonry and fabric, with coordinate-local deterministic detail."""
+    palette = PALETTES[name]
+    pixels = []
+    for y in range(SIZE):
+        for x in range(SIZE):
+            h = mix64(seed ^ (x + y * SIZE))
+            shade = 2 + int(h % 19 == 0) - int(h % 23 == 0)
+            if name.endswith("_wool"):
+                shade = 2 + int((x + 2*y) % 4 == 0) - int((2*x + y) % 7 == 0)
+            elif name.startswith("polished_") or name == "smooth_sandstone":
+                # Quiet polished planes with sparse connected mineral flecks.
+                shade = 2 + int((x//2 + y//2 + seed % 7) % 11 == 0)
+            elif name == "chiseled_stone_bricks":
+                if x in (1, 14) or y in (1, 14): shade = 1
+                if (x in (4, 11) and 4 <= y <= 11) or (y in (4, 11) and 4 <= x <= 11): shade = 0
+                if (x in (5, 10) and 5 <= y <= 10) or (y in (5, 10) and 5 <= x <= 10): shade = 3
+            elif name == "cut_sandstone":
+                if x in (0, 15) or y in (0, 15): shade = 1
+                elif x == 1 or y == 1: shade = 3
+            elif name == "sandstone":
+                if y % 8 == 0: shade = 1
+                elif y % 8 == 1: shade = 3
+            else:
+                height = 4 if name == "bricks" else 8
+                width = 8
+                joint = y % height == 0 or (x + (4 if (y//height) % 2 else 0)) % width == 0
+                if joint: shade = 0
+                elif y % height == 1: shade = 3
+                if name == "cracked_stone_bricks" and (x - y//2) % 8 == 3: shade = 0
+                if name == "mossy_stone_bricks" and (mix64(seed ^ ((x//3) + (y//3)*17)) % 5 == 0):
+                    pixels.append(palette[4 + int(shade >= 2)])
+                    continue
+            pixels.append(palette[shade])
+    return center_periodic_tile(pixels) if name.startswith("polished_") or name == "smooth_sandstone" else pixels
+
+
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in DECORATION_BASES:
+        return generate_decoration_texture(name,local)
     if name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL
                                        for face in ("top","side","bottom")):
         return generate_functional_texture(name,local)
@@ -1275,6 +1344,18 @@ def generate_item_sprite(template,material,definitions):
         return generate_tool_sprite(template,material,definitions)
     if template=="stick":
         _line(image,4,13,12,3,outline,3); _line(image,4,13,12,3,handle[1],1); _line(image,9,6,12,3,handle[2],1)
+    elif template in {"clay_ball", "brick", "dye"}:
+        if template == "clay_ball":
+            rows = ((4,6,9),(5,4,11),(6,3,12),(7,3,12),(8,3,12),(9,4,11),(10,5,10))
+        elif template == "brick":
+            rows = ((5,5,11),(6,3,12),(7,3,12),(8,3,12),(9,3,11),(10,5,10))
+        else:
+            rows = ((6,7,8),(7,5,10),(8,4,11),(9,3,12),(10,3,12),(11,5,10))
+        for y,left,right in rows:
+            for x in range(left,right+1):
+                _put(image,x,y,outline if x in (left,right) else shades[2 if x+y<16 else 1])
+        _line(image,6,6,9,6,shades[3],1)
+        if template == "brick": _line(image,4,8,10,8,shades[0],1)
     elif template=="ingot":
         for y,left,right in ((5,6,10),(6,4,12),(7,3,12),(8,3,11),(9,4,10),(10,5,9)):
             for x in range(left,right+1): _put(image,x,y,outline)
@@ -1409,6 +1490,7 @@ def build_items_atlas(output,seed,definitions_path,block_definitions_path,overri
     blocks=json.loads(Path(block_definitions_path).read_text(encoding="utf-8"))["blocks"]
     item_dir=output/"items"; item_dir.mkdir(parents=True,exist_ok=True)
     resolved=[]
+    # Definition insertion order is the stable atlas slot order; append new items.
     for name,spec in definitions["items"].items():
         override=Path(override_dir)/f"{name}.png" if override_dir else None
         legacy=Path(legacy_dir)/f"{name}.png" if legacy_dir else None

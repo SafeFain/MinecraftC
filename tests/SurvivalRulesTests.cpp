@@ -3,6 +3,7 @@
 #include "world/FluidLogic.h"
 
 #include <cstdlib>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -331,6 +332,94 @@ int main() {
             "enclosed fluids do not report blocked spread directions");
     require(fuelTicks(ItemId::COAL) == 1600, "coal smelts eight items");
     require(fuelTicks(ItemId::DIAMOND) == 0, "non-fuels are rejected");
+
+    // New IDs must remain complete across placement, mining, light and fire.
+    static_assert(static_cast<uint8_t>(BlockId::STONE_BRICKS) == 183);
+    static_assert(static_cast<uint8_t>(BlockId::BLACK_WOOL) == 200);
+    static_assert(static_cast<uint16_t>(ItemId::STONE_BRICKS) == 183);
+    static_assert(static_cast<uint16_t>(ItemId::BONE_MEAL) == 208);
+    for (uint16_t raw = 183; raw <= 200; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const auto item = static_cast<ItemId>(raw);
+        require(getItemProps(item).placedBlock == block && itemForBlock(block) == item,
+                "crafted blocks have bidirectional item mappings");
+        require(getBlockProps(block).shape == RenderShape::Cube &&
+                isFullCollisionBlock(block) && getLightDampening(block) == 15 &&
+                getLightEmission(block) == 0,
+                "crafted decoration is a full opaque non-emissive cube");
+        const auto drops = getBlockDrops(block, {ItemId::WOODEN_PICKAXE, 1, 0});
+        require(drops.size() == 1 && drops[0].id == item && drops[0].count == 1,
+                "crafted block drops itself with appropriate tool");
+        if (raw < 196)
+            require(getBlockDrops(block, {}).empty(), "masonry requires a pickaxe");
+        else
+            require(getBlockDrops(block, {}).size() == 1 &&
+                    fireEncouragement(block) == fireEncouragement(BlockId::WHITE_WOOL) &&
+                    burnOdds(block) == burnOdds(BlockId::WHITE_WOOL),
+                    "colored wool retains white wool harvesting and flammability");
+    }
+    auto expectRecipe = [&](std::initializer_list<ItemId> ingredients,
+                            uint8_t width, ItemId output, uint8_t count) {
+        std::array<ItemId, 9> grid{};
+        size_t i = 0;
+        for (ItemId item : ingredients) { grid[(i/width)*3+i%width] = item; ++i; }
+        const auto* recipe = findCraftingRecipe(grid, 3, 3);
+        require(recipe && recipe->output.id == output && recipe->output.count == count,
+                "decoration recipe resolves with intended quantity");
+    };
+    for (const auto& pair : {
+        std::pair{ItemId::STONE, ItemId::STONE_BRICKS},
+        std::pair{ItemId::GRANITE, ItemId::POLISHED_GRANITE},
+        std::pair{ItemId::BASALT, ItemId::POLISHED_BASALT},
+        std::pair{ItemId::LIMESTONE, ItemId::POLISHED_LIMESTONE},
+        std::pair{ItemId::TUFF, ItemId::POLISHED_TUFF},
+        std::pair{ItemId::DEEPSLATE, ItemId::DEEPSLATE_BRICKS},
+        std::pair{ItemId::SANDSTONE, ItemId::CUT_SANDSTONE}})
+        expectRecipe({pair.first,pair.first,pair.first,pair.first}, 2, pair.second, 4);
+    expectRecipe({ItemId::STONE_BRICKS, ItemId::MOSS}, 2, ItemId::MOSSY_STONE_BRICKS, 1);
+    expectRecipe({ItemId::MOSS, ItemId::STONE_BRICKS}, 2, ItemId::MOSSY_STONE_BRICKS, 1);
+    expectRecipe({ItemId::STONE_BRICKS, ItemId::STONE_BRICKS}, 1, ItemId::CHISELED_STONE_BRICKS, 2);
+    expectRecipe({ItemId::SAND,ItemId::SAND,ItemId::SAND,ItemId::SAND}, 2, ItemId::SANDSTONE, 1);
+    expectRecipe({ItemId::CLAY}, 1, ItemId::CLAY_BALL, 4);
+    expectRecipe({ItemId::CLAY_BALL,ItemId::CLAY_BALL,ItemId::CLAY_BALL,ItemId::CLAY_BALL}, 2, ItemId::CLAY, 1);
+    expectRecipe({ItemId::BRICK,ItemId::BRICK,ItemId::BRICK,ItemId::BRICK}, 2, ItemId::BRICKS, 1);
+    expectRecipe({ItemId::POPPY}, 1, ItemId::RED_DYE, 1);
+    expectRecipe({ItemId::DANDELION}, 1, ItemId::YELLOW_DYE, 1);
+    expectRecipe({ItemId::BLUE_ORCHID}, 1, ItemId::BLUE_DYE, 1);
+    expectRecipe({ItemId::COAL}, 1, ItemId::BLACK_DYE, 1);
+    expectRecipe({ItemId::BONE}, 1, ItemId::BONE_MEAL, 3);
+    for (uint16_t color = 0; color < 5; ++color) {
+        const auto dye = static_cast<ItemId>(201 + color + 2);
+        const auto wool = static_cast<ItemId>(196 + color);
+        expectRecipe({ItemId::WHITE_WOOL,dye}, 2, wool, 1);
+        expectRecipe({dye,ItemId::WHITE_WOOL}, 2, wool, 1);
+        expectRecipe({wool,ItemId::BONE_MEAL}, 2, ItemId::WHITE_WOOL, 1);
+        expectRecipe({ItemId::BONE_MEAL,wool}, 2, ItemId::WHITE_WOOL, 1);
+    }
+    for (const auto& pair : {
+        std::pair{ItemId::COBBLESTONE, ItemId::STONE},
+        std::pair{ItemId::STONE_BRICKS, ItemId::CRACKED_STONE_BRICKS},
+        std::pair{ItemId::SANDSTONE, ItemId::SMOOTH_SANDSTONE},
+        std::pair{ItemId::CLAY_BALL, ItemId::BRICK},
+        std::pair{ItemId::CACTUS, ItemId::GREEN_DYE}}) {
+        const auto* recipe = findSmeltingRecipe(pair.first);
+        require(recipe && recipe->output.id == pair.second && recipe->output.count == 1 &&
+                recipe->cookTicks == 200, "decoration smelts using standard furnace timing");
+    }
+    InventoryModel insufficient;
+    insufficient.add({ItemId::STONE,3,0});
+    std::array<ItemStack,9> craftGrid{};
+    const CraftingRecipe* brickRecipe = nullptr;
+    for (const auto& recipe : craftingRecipes())
+        if (recipe.output.id == ItemId::STONE_BRICKS) brickRecipe = &recipe;
+    require(brickRecipe && !fillCraftingRecipe(*brickRecipe, insufficient, craftGrid, 2, 2) &&
+            insufficient.count(ItemId::STONE) == 3,
+            "insufficient crafting ingredients leave inventory intact");
+    insufficient.add({ItemId::STONE,1,0});
+    const auto decorationRecipes = availableCraftingRecipes(insufficient,craftGrid,2,2);
+    require(std::find(decorationRecipes.begin(),decorationRecipes.end(),brickRecipe) != decorationRecipes.end() &&
+            fillCraftingRecipe(*brickRecipe, insufficient, craftGrid, 2, 2),
+            "new masonry recipe participates in guided crafting");
 
     std::cout << "Survival rules tests passed\n";
     return 0;

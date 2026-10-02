@@ -48,6 +48,9 @@ struct GameSessionTestAccess {
                                 const std::function<void()>& onError) {
         session.processAutosave(onError);
     }
+    static void setCheats(GameSession& session, bool enabled) {
+        session.worldMetadata.cheatsEnabled = enabled;
+    }
     static void setDay(GameSession& session) { session.dayNightCycle.setDay(); }
     static void setNight(GameSession& session) { session.dayNightCycle.setNight(); }
     static void setHeavenSafePosition(GameSession& session,
@@ -88,6 +91,9 @@ void drainGeneration(GameSession& session) {
 
 // Session command execution reads localization strings; returning keys
 // verbatim keeps this flow test free of font and asset loading.
+std::string Localization::itemName(ItemId item) const {
+    return getItemProps(item).name;
+}
 std::string Localization::text(std::string_view key) const {
     return std::string(key);
 }
@@ -162,6 +168,23 @@ int main(int argc, char** argv) {
                     result.messages[0] == "message.help_header",
                 "help emits the header message");
         require(!result.gameModeChanged, "help does not change the mode");
+
+        session.inventory().clear();
+        GameSessionTestAccess::setCheats(session, false);
+        result = runCommand(session, localization, "/give stone_bricks 64");
+        require(session.inventory().count(ItemId::STONE_BRICKS) == 0 &&
+                result.messages[0] == "message.cheats_disabled",
+                "give respects the world cheats setting");
+        GameSessionTestAccess::setCheats(session, true);
+        result = runCommand(session, localization, "/give stone_bricks 64");
+        require(session.inventory().count(ItemId::STONE_BRICKS) == 64,
+                "give adds the requested stack to real inventory");
+        for (size_t slot = 0; slot < InventoryModel::STORAGE_SIZE; ++slot)
+            session.inventory().slot(slot) = {ItemId::STONE,64,0};
+        result = runCommand(session, localization, "/give bone_meal 64");
+        require(session.inventory().count(ItemId::BONE_MEAL) == 0,
+                "give never overwrites a full inventory");
+        session.inventory().clear();
 
         // Gamemode transitions update player rules and metadata together.
         result = runCommand(session, localization, "/gamemode 1");

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "game/GameRules.h"
+#include "game/Item.h"
 #include "game/Weather.h"
 #include "world/Biome.h"
 #include "world/Structure.h"
@@ -29,13 +30,16 @@ enum class CommandType {
     Time,
     Weather,
     LocateBiome,
-    LocateStructure
+    LocateStructure,
+    Give
 };
 
 struct ParsedCommand {
     CommandType type = CommandType::Help;
     GameMode gameMode = GameMode::Survival;
     TeleportTarget teleport;
+    ItemId item = ItemId::EMPTY;
+    uint8_t itemCount = 1;
     TimePreset time = TimePreset::Day;
     WeatherType weather = WeatherType::Clear;
     Biome biome = Biome::PLAINS;
@@ -103,6 +107,22 @@ inline CommandParseResult parseCommand(const std::string& input) {
     if (name == "/help") {
         if (tokens.size() != 1) return expected(input, tokens, 1, "<end>");
         parsed.type = CommandType::Help;
+    } else if (name == "/give") {
+        if (tokens.size() < 2) return expected(input, tokens, 1, "<item>");
+        const auto item = itemFromCommandName(tokens[1].text);
+        if (!item) return expected(input, tokens, 1, "<item>");
+        parsed.item = *item;
+        if (tokens.size() > 2) {
+            const auto& value = tokens[2].text;
+            if (value.empty() || value.size() > 2 ||
+                value.find_first_not_of("0123456789") != std::string::npos)
+                return expected(input, tokens, 2, "1..64");
+            const int count = std::stoi(value);
+            if (count < 1 || count > 64) return expected(input, tokens, 2, "1..64");
+            parsed.itemCount = static_cast<uint8_t>(count);
+        }
+        if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
+        parsed.type = CommandType::Give;
     } else if (name == "/gamemode") {
         if (tokens.size() < 2) return expected(input, tokens, 1, "0|1|3");
         if (tokens[1].text == "0") parsed.gameMode = GameMode::Survival;
@@ -206,12 +226,15 @@ inline std::vector<CommandSuggestion> commandSuggestions(
     };
 
     if (argument == 0) {
-        constexpr std::array<std::string_view, 6> commands{
-            "/gamemode", "/help", "/locate", "/time", "/tp", "/weather"};
+        constexpr std::array<std::string_view, 7> commands{
+            "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
         for (const auto command : commands) add(command);
     } else {
         const std::string& command = before[0].text;
-        if (argument == 1 && command == "/gamemode") {
+        if (argument == 1 && command == "/give") {
+            for (uint16_t raw = 1; raw < static_cast<uint16_t>(ItemId::COUNT); ++raw)
+                add(itemCommandName(static_cast<ItemId>(raw)));
+        } else if (argument == 1 && command == "/gamemode") {
             add("0"); add("1"); add("3");
         } else if (argument == 1 && command == "/time") {
             add("set");

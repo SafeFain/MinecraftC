@@ -66,6 +66,24 @@
     "fletching_table": {"top": "fletching_table_top", "bottom": "fletching_table_bottom", "side": "fletching_table_side", "front": "fletching_table"}, "loom": {"top": "loom_top", "bottom": "loom_bottom", "side": "loom_side", "front": "loom"},
     "cauldron": {"top": "cauldron_top", "bottom": "cauldron_bottom", "side": "cauldron_side", "front": "cauldron"}, "blast_furnace": {"top": "blast_furnace_top", "bottom": "blast_furnace_bottom", "side": "blast_furnace_side", "front": "blast_furnace"},
     "smithing_table": {"top": "smithing_table_top", "bottom": "smithing_table_bottom", "side": "smithing_table_side", "front": "smithing_table"}, "grindstone": {"top": "grindstone_top", "bottom": "grindstone_bottom", "side": "grindstone_side", "front": "grindstone"},
-    "copper_ore": {"all": "copper_ore", "future": true}
+    "copper_ore": {"all": "copper_ore", "future": true},
+    "stone_bricks": {"all": "stone_bricks"},
+    "mossy_stone_bricks": {"all": "mossy_stone_bricks"},
+    "cracked_stone_bricks": {"all": "cracked_stone_bricks"},
+    "chiseled_stone_bricks": {"all": "chiseled_stone_bricks"},
+    "bricks": {"all": "bricks"},
+    "polished_granite": {"all": "polished_granite"},
+    "polished_basalt": {"all": "polished_basalt"},
+    "polished_limestone": {"all": "polished_limestone"},
+    "polished_tuff": {"all": "polished_tuff"},
+    "deepslate_bricks": {"all": "deepslate_bricks"},
+    "sandstone": {"all": "sandstone"},
+    "cut_sandstone": {"all": "cut_sandstone"},
+    "smooth_sandstone": {"all": "smooth_sandstone"},
+    "red_wool": {"all": "red_wool"},
+    "yellow_wool": {"all": "yellow_wool"},
+    "blue_wool": {"all": "blue_wool"},
+    "green_wool": {"all": "green_wool"},
+    "black_wool": {"all": "black_wool"}
   }
 }

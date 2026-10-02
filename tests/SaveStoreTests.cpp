@@ -73,6 +73,8 @@ int main() {
         source.inventory.slot(0) = {ItemId::IRON_PICKAXE, 1, 42};
         source.inventory.slot(9) = {ItemId::COAL, 37, 0};
         source.inventory.slot(10) = {ItemId::LIMESTONE, 23, 0};
+        source.inventory.slot(11) = {ItemId::BLACK_WOOL, 64, 0};
+        source.inventory.slot(12) = {ItemId::BONE_MEAL, 17, 0};
         source.inventory.armor()[1] = {ItemId::IRON_CHESTPLATE, 1, 12};
         source.inventory.offhand() = {ItemId::SHIELD, 1, 4};
         source.entities.push_back({
@@ -150,6 +152,10 @@ int main() {
                 loaded.entities[2].villager.professionLocked &&
                 loaded.entities[2].villager.restocksToday == 2,
                 "persistent entities round trip");
+        require(store.loadMetadata().inventory.slot(11).id == ItemId::BLACK_WOOL &&
+                store.loadMetadata().inventory.slot(11).count == 64 &&
+                store.loadMetadata().inventory.slot(12).id == ItemId::BONE_MEAL,
+                "new block items and materials survive metadata round trip");
         store.saveChunkEntityPopulationVersion(-3, 9, 1);
         require(store.loadChunkEntityPopulationVersion(-3, 9) == 1 &&
                 store.loadChunkEntityPopulationVersion(-3, 8) == 0,
@@ -241,11 +247,16 @@ int main() {
             {513, BlockId::FARMLAND_7},
             {514, BlockId::ACACIA_SAPLING},
             {515, BlockId::GRANITE},
-            {516, BlockId::WHITE_BED_HEAD_EAST}
+            {516, BlockId::WHITE_BED_HEAD_EAST},
+            {517, BlockId::STONE_BRICKS},
+            {518, BlockId::BLACK_WOOL}
         };
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 6, "chunk overrides round trip");
+        require(loadedOverrides.size() == 8, "chunk overrides round trip");
+        require(loadedOverrides[6].block == BlockId::STONE_BRICKS &&
+                loadedOverrides[7].block == BlockId::BLACK_WOOL,
+                "appended decoration block IDs survive save round trip");
         require(loadedOverrides[0].block == BlockId::AIR,
                 "explicit AIR override is preserved");
         require(loadedOverrides[1].localIndex == overrides[1].localIndex,

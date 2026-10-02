@@ -287,20 +287,27 @@ int main() {
             "exact LOD merges adjacent block IDs that share a render layer");
 
     std::vector<uint8_t> allBlocks(Config::CHUNK_VOLUME, 0);
-    int allBlockY = Config::WORLD_MIN_Y;
-    for (int raw = 1; raw < static_cast<int>(BlockId::COUNT); ++raw) {
-        allBlocks[blockIndex(8, allBlockY, 8)] = static_cast<uint8_t>(raw);
-        allBlockY += 2;
+    // Keep air gaps while distributing IDs across columns: the registry can
+    // exceed half the world height, so one two-block-spaced column is insufficient.
+    constexpr int idsPerColumn = Config::WORLD_HEIGHT / 2;
+    const int blockCount = static_cast<int>(BlockId::COUNT) - 1;
+    for (int raw = 1; raw <= blockCount; ++raw) {
+        const int x = 8 + 2 * ((raw - 1) / idsPerColumn);
+        const int y = Config::WORLD_MIN_Y + 2 * ((raw - 1) % idsPerColumn);
+        require(x < Config::CHUNK_SIZE_X && y < Config::WORLD_MAX_Y,
+                "all-block LOD fixture stays within chunk bounds");
+        allBlocks[blockIndex(x, y, 8)] = static_cast<uint8_t>(raw);
     }
     const LodTileData allBlockTile = extractExactLodChunk(allBlocks);
-    const LodColumn& allBlockColumn = allBlockTile.at(8, 8);
-    require(allBlockColumn.spans.size() == static_cast<size_t>(
-                static_cast<int>(BlockId::COUNT) - 1),
-            "exact LOD did not retain every non-air BlockId");
-    for (int raw = 1; raw < static_cast<int>(BlockId::COUNT); ++raw)
-        require(allBlockColumn.spans[static_cast<size_t>(raw - 1)].block ==
-                    static_cast<BlockId>(raw),
-                "exact LOD changed a retained BlockId");
+    for (int column = 0; column * idsPerColumn < blockCount; ++column) {
+        const auto& spans = allBlockTile.at(8 + 2 * column, 8).spans;
+        require(spans.size() == static_cast<size_t>(
+                    std::min(idsPerColumn, blockCount - column * idsPerColumn)),
+                "exact LOD did not retain every non-air BlockId");
+        for (size_t i = 0; i < spans.size(); ++i)
+            require(spans[i].block == static_cast<BlockId>(column * idsPerColumn + i + 1),
+                    "exact LOD changed a retained BlockId");
+    }
     const std::vector<uint8_t> allBlockPayload =
         encodeLodTilePayload(allBlockTile);
     LodTileData decodedAllBlocks;
