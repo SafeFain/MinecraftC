@@ -408,6 +408,63 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CATTAIL});
     set(ItemId::BEACH_GRASS, {"Beach Grass", ItemKind::Block, 64, 0,
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BEACH_GRASS});
+    set(ItemId::ANDESITE, {"Andesite", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ANDESITE});
+    set(ItemId::DIORITE, {"Diorite", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DIORITE});
+    set(ItemId::GNEISS, {"Gneiss", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GNEISS});
+    set(ItemId::MARBLE, {"Marble", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MARBLE});
+    set(ItemId::LATERITE, {"Laterite", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::LATERITE});
+    set(ItemId::RED_CLAY, {"Red Clay", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::RED_CLAY});
+    set(ItemId::CRACKED_MUD, {"Cracked Mud", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CRACKED_MUD});
+    set(ItemId::SALT_CRUST, {"Salt Crust", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SALT_CRUST});
+    set(ItemId::CLOVER, {"Clover", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CLOVER});
+    set(ItemId::HEATHER, {"Heather", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::HEATHER});
+    set(ItemId::WILD_MINT, {"Wild Mint", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::WILD_MINT});
+    set(ItemId::NETTLE, {"Nettle", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::NETTLE});
+    set(ItemId::DESERT_FLOWER, {"Desert Flower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DESERT_FLOWER});
+    set(ItemId::SMALL_CACTUS, {"Small Cactus", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SMALL_CACTUS});
+    set(ItemId::REED_FLOWER, {"Reed Flower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::REED_FLOWER});
+    set(ItemId::TUNDRA_MOSS, {"Tundra Moss", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::TUNDRA_MOSS});
+    set(ItemId::FALLEN_TWIGS, {"Fallen Twigs", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::FALLEN_TWIGS});
+    set(ItemId::JUNGLE_FERN, {"Jungle Fern", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::JUNGLE_FERN});
+    set(ItemId::CAVE_MOSS, {"Cave Moss", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CAVE_MOSS});
+    set(ItemId::WET_LIMESTONE, {"Wet Limestone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::WET_LIMESTONE});
+    set(ItemId::GYPSUM, {"Gypsum", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GYPSUM});
+    set(ItemId::AMETHYST_BLOCK, {"Amethyst Block", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::AMETHYST_BLOCK});
+    set(ItemId::QUARTZ_BLOCK, {"Quartz Block", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::QUARTZ_BLOCK});
+    set(ItemId::IRON_STAINED_ROCK, {"Iron Stained Rock", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::IRON_STAINED_ROCK});
+    set(ItemId::SULFUR_ROCK, {"Sulfur Rock", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SULFUR_ROCK});
+    set(ItemId::AMETHYST_CLUSTER, {"Amethyst Cluster", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::AMETHYST_CLUSTER});
+    set(ItemId::QUARTZ_CLUSTER, {"Quartz Cluster", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::QUARTZ_CLUSTER});
+    set(ItemId::CAVE_GLOWSHROOM, {"Cave Glowshroom", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CAVE_GLOWSHROOM});
+
 
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
@@ -476,6 +533,21 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::WHITE_TERRACOTTA:
         case ItemId::VOLCANIC_ASH:
         case ItemId::CORAL_ROCK:
+        case ItemId::ANDESITE:
+        case ItemId::DIORITE:
+        case ItemId::GNEISS:
+        case ItemId::MARBLE:
+        case ItemId::LATERITE:
+        case ItemId::RED_CLAY:
+        case ItemId::CRACKED_MUD:
+        case ItemId::SALT_CRUST:
+        case ItemId::CAVE_MOSS:
+        case ItemId::WET_LIMESTONE:
+        case ItemId::GYPSUM:
+        case ItemId::AMETHYST_BLOCK:
+        case ItemId::QUARTZ_BLOCK:
+        case ItemId::IRON_STAINED_ROCK:
+        case ItemId::SULFUR_ROCK:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -504,6 +576,19 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::TROPICAL_FLOWER:
         case ItemId::CATTAIL:
         case ItemId::BEACH_GRASS:
+        case ItemId::CLOVER:
+        case ItemId::HEATHER:
+        case ItemId::WILD_MINT:
+        case ItemId::NETTLE:
+        case ItemId::DESERT_FLOWER:
+        case ItemId::SMALL_CACTUS:
+        case ItemId::REED_FLOWER:
+        case ItemId::TUNDRA_MOSS:
+        case ItemId::FALLEN_TWIGS:
+        case ItemId::JUNGLE_FERN:
+        case ItemId::AMETHYST_CLUSTER:
+        case ItemId::QUARTZ_CLUSTER:
+        case ItemId::CAVE_GLOWSHROOM:
             return CreativeItemCategory::Nature;
 
         // ── Functional Blocks ───────────────────────────────────────────
@@ -685,6 +770,35 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::TROPICAL_FLOWER): return ItemId::TROPICAL_FLOWER;
         case static_cast<uint16_t>(BlockId::CATTAIL): return ItemId::CATTAIL;
         case static_cast<uint16_t>(BlockId::BEACH_GRASS): return ItemId::BEACH_GRASS;
+        case static_cast<uint16_t>(BlockId::ANDESITE): return ItemId::ANDESITE;
+        case static_cast<uint16_t>(BlockId::DIORITE): return ItemId::DIORITE;
+        case static_cast<uint16_t>(BlockId::GNEISS): return ItemId::GNEISS;
+        case static_cast<uint16_t>(BlockId::MARBLE): return ItemId::MARBLE;
+        case static_cast<uint16_t>(BlockId::LATERITE): return ItemId::LATERITE;
+        case static_cast<uint16_t>(BlockId::RED_CLAY): return ItemId::RED_CLAY;
+        case static_cast<uint16_t>(BlockId::CRACKED_MUD): return ItemId::CRACKED_MUD;
+        case static_cast<uint16_t>(BlockId::SALT_CRUST): return ItemId::SALT_CRUST;
+        case static_cast<uint16_t>(BlockId::CLOVER): return ItemId::CLOVER;
+        case static_cast<uint16_t>(BlockId::HEATHER): return ItemId::HEATHER;
+        case static_cast<uint16_t>(BlockId::WILD_MINT): return ItemId::WILD_MINT;
+        case static_cast<uint16_t>(BlockId::NETTLE): return ItemId::NETTLE;
+        case static_cast<uint16_t>(BlockId::DESERT_FLOWER): return ItemId::DESERT_FLOWER;
+        case static_cast<uint16_t>(BlockId::SMALL_CACTUS): return ItemId::SMALL_CACTUS;
+        case static_cast<uint16_t>(BlockId::REED_FLOWER): return ItemId::REED_FLOWER;
+        case static_cast<uint16_t>(BlockId::TUNDRA_MOSS): return ItemId::TUNDRA_MOSS;
+        case static_cast<uint16_t>(BlockId::FALLEN_TWIGS): return ItemId::FALLEN_TWIGS;
+        case static_cast<uint16_t>(BlockId::JUNGLE_FERN): return ItemId::JUNGLE_FERN;
+        case static_cast<uint16_t>(BlockId::CAVE_MOSS): return ItemId::CAVE_MOSS;
+        case static_cast<uint16_t>(BlockId::WET_LIMESTONE): return ItemId::WET_LIMESTONE;
+        case static_cast<uint16_t>(BlockId::GYPSUM): return ItemId::GYPSUM;
+        case static_cast<uint16_t>(BlockId::AMETHYST_BLOCK): return ItemId::AMETHYST_BLOCK;
+        case static_cast<uint16_t>(BlockId::QUARTZ_BLOCK): return ItemId::QUARTZ_BLOCK;
+        case static_cast<uint16_t>(BlockId::IRON_STAINED_ROCK): return ItemId::IRON_STAINED_ROCK;
+        case static_cast<uint16_t>(BlockId::SULFUR_ROCK): return ItemId::SULFUR_ROCK;
+        case static_cast<uint16_t>(BlockId::AMETHYST_CLUSTER): return ItemId::AMETHYST_CLUSTER;
+        case static_cast<uint16_t>(BlockId::QUARTZ_CLUSTER): return ItemId::QUARTZ_CLUSTER;
+        case static_cast<uint16_t>(BlockId::CAVE_GLOWSHROOM): return ItemId::CAVE_GLOWSHROOM;
+
 
         case static_cast<uint16_t>(BlockId::STONE_BRICKS): return ItemId::STONE_BRICKS;
         case static_cast<uint16_t>(BlockId::MOSSY_STONE_BRICKS): return ItemId::MOSSY_STONE_BRICKS;

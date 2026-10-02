@@ -128,6 +128,35 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::TROPICAL_FLOWER, 0.0f);
     set(BlockId::CATTAIL, 0.0f);
     set(BlockId::BEACH_GRASS, 0.0f);
+    set(BlockId::ANDESITE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::DIORITE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::GNEISS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::MARBLE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::LATERITE, 0.6f, ToolKind::Shovel);
+    set(BlockId::RED_CLAY, 0.6f, ToolKind::Shovel);
+    set(BlockId::CRACKED_MUD, 0.6f, ToolKind::Shovel);
+    set(BlockId::SALT_CRUST, 0.6f, ToolKind::Shovel);
+    set(BlockId::CLOVER, 0.0f);
+    set(BlockId::HEATHER, 0.0f);
+    set(BlockId::WILD_MINT, 0.0f);
+    set(BlockId::NETTLE, 0.0f);
+    set(BlockId::DESERT_FLOWER, 0.0f);
+    set(BlockId::SMALL_CACTUS, 0.0f);
+    set(BlockId::REED_FLOWER, 0.0f);
+    set(BlockId::TUNDRA_MOSS, 0.0f);
+    set(BlockId::FALLEN_TWIGS, 0.0f);
+    set(BlockId::JUNGLE_FERN, 0.0f);
+    set(BlockId::CAVE_MOSS, 0.6f, ToolKind::Shovel);
+    set(BlockId::WET_LIMESTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::GYPSUM, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::AMETHYST_BLOCK, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::QUARTZ_BLOCK, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::IRON_STAINED_ROCK, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SULFUR_ROCK, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::AMETHYST_CLUSTER, 0.0f);
+    set(BlockId::QUARTZ_CLUSTER, 0.0f);
+    set(BlockId::CAVE_GLOWSHROOM, 0.0f);
+
 
 
     for (uint8_t raw = static_cast<uint8_t>(BlockId::WHITE_BED);

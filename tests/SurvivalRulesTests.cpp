@@ -1,6 +1,7 @@
 #include "game/SurvivalRules.h"
 #include "game/InventoryModel.h"
 #include "world/FluidLogic.h"
+#include "world/BiomeBlockLogic.h"
 
 #include <cstdlib>
 #include <algorithm>
@@ -17,6 +18,17 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    for (uint16_t raw=225; raw<=252; ++raw) {
+        const auto block=static_cast<BlockId>(raw);
+        const auto item=itemForBlock(block);
+        const bool decoration=isNaturalDecoration(block);
+        const bool rock=!decoration && !isBiomeSoil(block);
+        const auto drops=getBlockDrops(block,rock ? ItemStack{ItemId::WOODEN_PICKAXE,1,0} : ItemStack{});
+        require(drops.size()==1 && drops[0].id==item && drops[0].count==1,
+                "v16 blocks drop themselves with suitable tools");
+        if (rock) require(getBlockDrops(block,{}).empty(),"new rock requires a pickaxe");
+    }
+
     static_assert(static_cast<uint8_t>(BlockId::FLOWING_LAVA_7) == 88);
     static_assert(static_cast<uint8_t>(BlockId::LIMESTONE) == 89);
     static_assert(static_cast<uint8_t>(BlockId::BASALT) == 90);

@@ -1838,6 +1838,118 @@
     "beach_grass": {
       "generator": "block_item_icon",
       "block": "beach_grass"
+    },
+    "andesite": {
+      "generator": "block_item_icon",
+      "block": "andesite"
+    },
+    "diorite": {
+      "generator": "block_item_icon",
+      "block": "diorite"
+    },
+    "gneiss": {
+      "generator": "block_item_icon",
+      "block": "gneiss"
+    },
+    "marble": {
+      "generator": "block_item_icon",
+      "block": "marble"
+    },
+    "laterite": {
+      "generator": "block_item_icon",
+      "block": "laterite"
+    },
+    "red_clay": {
+      "generator": "block_item_icon",
+      "block": "red_clay"
+    },
+    "cracked_mud": {
+      "generator": "block_item_icon",
+      "block": "cracked_mud"
+    },
+    "salt_crust": {
+      "generator": "block_item_icon",
+      "block": "salt_crust"
+    },
+    "clover": {
+      "generator": "block_item_icon",
+      "block": "clover"
+    },
+    "heather": {
+      "generator": "block_item_icon",
+      "block": "heather"
+    },
+    "wild_mint": {
+      "generator": "block_item_icon",
+      "block": "wild_mint"
+    },
+    "nettle": {
+      "generator": "block_item_icon",
+      "block": "nettle"
+    },
+    "desert_flower": {
+      "generator": "block_item_icon",
+      "block": "desert_flower"
+    },
+    "small_cactus": {
+      "generator": "block_item_icon",
+      "block": "small_cactus"
+    },
+    "reed_flower": {
+      "generator": "block_item_icon",
+      "block": "reed_flower"
+    },
+    "tundra_moss": {
+      "generator": "block_item_icon",
+      "block": "tundra_moss"
+    },
+    "fallen_twigs": {
+      "generator": "block_item_icon",
+      "block": "fallen_twigs"
+    },
+    "jungle_fern": {
+      "generator": "block_item_icon",
+      "block": "jungle_fern"
+    },
+    "cave_moss": {
+      "generator": "block_item_icon",
+      "block": "cave_moss"
+    },
+    "wet_limestone": {
+      "generator": "block_item_icon",
+      "block": "wet_limestone"
+    },
+    "gypsum": {
+      "generator": "block_item_icon",
+      "block": "gypsum"
+    },
+    "amethyst_block": {
+      "generator": "block_item_icon",
+      "block": "amethyst_block"
+    },
+    "quartz_block": {
+      "generator": "block_item_icon",
+      "block": "quartz_block"
+    },
+    "iron_stained_rock": {
+      "generator": "block_item_icon",
+      "block": "iron_stained_rock"
+    },
+    "sulfur_rock": {
+      "generator": "block_item_icon",
+      "block": "sulfur_rock"
+    },
+    "amethyst_cluster": {
+      "generator": "block_item_icon",
+      "block": "amethyst_cluster"
+    },
+    "quartz_cluster": {
+      "generator": "block_item_icon",
+      "block": "quartz_cluster"
+    },
+    "cave_glowshroom": {
+      "generator": "block_item_icon",
+      "block": "cave_glowshroom"
     }
   },
   "documentation": {

@@ -1,4 +1,5 @@
 #include "world/CaveGenerator.h"
+#include "world/CaveEcology.h"
 #include "world/Noise.h"
 #include "world/WorldGenContext.h"
 #ifndef MINECRAFTC_CAVEGEN_NO_DECORATOR
@@ -262,11 +263,6 @@ CaveVolume CaveGenerator::generateVolume(int minX, int minZ, int width, int dept
 
 #ifndef MINECRAFTC_CAVEGEN_NO_DECORATOR
 void CaveGenerator::decorateChunk(Chunk& chunk, const CaveVolume& volume) const {
-    const auto rock = [](BlockId id) {
-        return id == BlockId::STONE || id == BlockId::DEEPSLATE ||
-               id == BlockId::GRANITE || id == BlockId::TUFF ||
-               id == BlockId::LIMESTONE || id == BlockId::BASALT;
-    };
     const auto chooseSurface = [](CaveBiome biome, uint64_t hash) {
         switch (biome) {
             case CaveBiome::VerdantGrotto:
@@ -309,14 +305,14 @@ void CaveGenerator::decorateChunk(Chunk& chunk, const CaveVolume& volume) const 
                     runTop + 1 >= Config::WORLD_MAX_Y) continue;
                 const int sampleY = runBottom + clearance / 2;
                 const CaveBiome caveBiome = volume.biome(wx, sampleY, wz);
-                if (caveBiome == CaveBiome::Neutral) continue;
                 const uint64_t hash = WorldGenContext::hashPosition(
                     m_seed ^ 0x434156455F444543ULL, wx, runBottom, wz);
-                const BlockId surface = chooseSurface(caveBiome, hash);
+                const BlockId surface = CaveEcology::surface(m_seed,wx,runBottom,wz,
+                    caveBiome,chooseSurface(caveBiome, hash));
                 if (surface != BlockId::AIR) {
-                    if (rock(chunk.getBlock(x, runBottom - 1, z)))
+                    if (isNaturalRock(chunk.getBlock(x, runBottom - 1, z)))
                         chunk.setBlock(x, runBottom - 1, z, surface);
-                    if (rock(chunk.getBlock(x, runTop + 1, z)))
+                    if (isNaturalRock(chunk.getBlock(x, runTop + 1, z)))
                         chunk.setBlock(x, runTop + 1, z, surface);
                 }
 
@@ -326,8 +322,12 @@ void CaveGenerator::decorateChunk(Chunk& chunk, const CaveVolume& volume) const 
                 if (!clear) continue;
 
                 if (caveBiome == CaveBiome::VerdantGrotto) {
-                    if (clearance >= 2 && (hash >> 8) % 100u < 22u)
-                        chunk.setBlock(x, runBottom, z, BlockId::GLOW_FERN);
+                    if (clearance >= 2 && (hash >> 8) % 100u < 22u) {
+                        const BlockId plant = (hash >> 36)%2 ? BlockId::CAVE_GLOWSHROOM : BlockId::GLOW_FERN;
+                        if (plant != BlockId::CAVE_GLOWSHROOM ||
+                            supportsNaturalDecoration(plant,chunk.getBlock(x,runBottom-1,z)))
+                            chunk.setBlock(x,runBottom,z,plant);
+                    }
                     if (clearance >= 2 && (hash >> 16) % 100u < 16u)
                         chunk.setBlock(x, runTop, z, BlockId::HANGING_ROOTS);
                 } else if (caveBiome == CaveBiome::DripstoneKarst) {
@@ -351,6 +351,13 @@ void CaveGenerator::decorateChunk(Chunk& chunk, const CaveVolume& volume) const 
                 } else if (caveBiome == CaveBiome::CrystalHollow &&
                            clearance >= 2 && (hash >> 18) % 100u < 14u) {
                     chunk.setBlock(x, runBottom, z, BlockId::RESONANT_CRYSTAL);
+                }
+                if (caveBiome == CaveBiome::CrystalHollow && clearance >= 2 &&
+                    chunk.getBlock(x,runBottom,z) == BlockId::AIR) {
+                    const BlockId cluster = CaveEcology::cluster(m_seed,wx,runBottom,wz);
+                    if (isCrystalCluster(cluster) &&
+                        supportsNaturalDecoration(cluster,chunk.getBlock(x,runBottom-1,z)))
+                        chunk.setBlock(x,runBottom,z,cluster);
                 }
             }
         }

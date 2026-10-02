@@ -34,6 +34,23 @@ int main() {
                 "natural block shapes, fluids and lighting match their registry");
     }
 
+    static_assert(static_cast<uint16_t>(ItemId::CAVE_GLOWSHROOM)==260);
+    static_assert(static_cast<uint8_t>(BlockId::CAVE_GLOWSHROOM)==252);
+    for (uint16_t raw=225; raw<=252; ++raw) {
+        const auto block=static_cast<BlockId>(raw);
+        const auto item=itemForBlock(block);
+        const bool decoration=isNaturalDecoration(block);
+        require(static_cast<uint16_t>(item)==raw+8 && getItemProps(item).placedBlock==block &&
+                getItemProps(item).maxStack==64 &&
+                itemFromCommandName(itemCommandName(item))==item,"v16 blocks map to appended items including >255 IDs");
+        require(getBlockProps(block).shape==(decoration ? RenderShape::Cross : RenderShape::Cube) &&
+                isSolid(block)==!decoration,"v16 materials and decoration shapes");
+        require(getLightEmission(block)==(block==BlockId::CAVE_GLOWSHROOM ? 5 : 0),
+                "only new cave fungus emits light");
+        if (isCrystalCluster(block))
+            require(!isFlammable(block),"mineral clusters do not burn");
+    }
+
     require(static_cast<uint16_t>(ItemId::GRASS_BLOCK) ==
             static_cast<uint8_t>(BlockId::GRASS),
             "legacy block item ids remain aligned");
@@ -55,7 +72,7 @@ int main() {
             static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint8_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 225 &&
+            static_cast<uint8_t>(BlockId::COUNT) == 253 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -101,7 +118,8 @@ int main() {
             creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
                 ItemId::AETHER_GRASS &&
             creativeItems[207] == ItemId::BONE_MEAL &&
-            creativeItems.back() == ItemId::BEACH_GRASS,
+            creativeItems[231] == ItemId::BEACH_GRASS &&
+            creativeItems.back() == ItemId::CAVE_GLOWSHROOM,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -122,9 +140,9 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 86 &&
+                CreativeItemCategory::BuildingBlocks)] == 101 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 42 &&
+                CreativeItemCategory::Nature)] == 55 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(

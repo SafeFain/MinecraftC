@@ -61,6 +61,30 @@
       "x": 4,
       "y": 28
     },
+    "amethyst_block": {
+      "generator": "block_item_icon",
+      "index": 253,
+      "source": "items/amethyst_block.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 31
+    },
+    "amethyst_cluster": {
+      "generator": "block_item_icon",
+      "index": 257,
+      "source": "items/amethyst_cluster.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 32
+    },
+    "andesite": {
+      "generator": "block_item_icon",
+      "index": 232,
+      "source": "items/andesite.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 29
+    },
     "arrow": {
       "generator": "item_sprite",
       "index": 71,
@@ -285,6 +309,22 @@
       "x": 7,
       "y": 20
     },
+    "cave_glowshroom": {
+      "generator": "block_item_icon",
+      "index": 259,
+      "source": "items/cave_glowshroom.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 32
+    },
+    "cave_moss": {
+      "generator": "block_item_icon",
+      "index": 250,
+      "source": "items/cave_moss.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 31
+    },
     "chest": {
       "generator": "block_item_icon",
       "index": 8,
@@ -356,6 +396,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 22
+    },
+    "clover": {
+      "generator": "block_item_icon",
+      "index": 240,
+      "source": "items/clover.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 30
     },
     "coal": {
       "generator": "item_sprite",
@@ -453,6 +501,14 @@
       "x": 6,
       "y": 15
     },
+    "cracked_mud": {
+      "generator": "block_item_icon",
+      "index": 238,
+      "source": "items/cracked_mud.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 29
+    },
     "cracked_stone_bricks": {
       "generator": "block_item_icon",
       "index": 184,
@@ -516,6 +572,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 20
+    },
+    "desert_flower": {
+      "generator": "block_item_icon",
+      "index": 244,
+      "source": "items/desert_flower.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 30
     },
     "diamond": {
       "generator": "item_sprite",
@@ -605,6 +669,14 @@
       "x": 3,
       "y": 11
     },
+    "diorite": {
+      "generator": "block_item_icon",
+      "index": 233,
+      "source": "items/diorite.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 29
+    },
     "dirt": {
       "generator": "block_item_icon",
       "index": 1,
@@ -652,6 +724,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 20
+    },
+    "fallen_twigs": {
+      "generator": "block_item_icon",
+      "index": 248,
+      "source": "items/fallen_twigs.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 31
     },
     "farmland": {
       "generator": "block_item_icon",
@@ -732,6 +812,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 19
+    },
+    "gneiss": {
+      "generator": "block_item_icon",
+      "index": 234,
+      "source": "items/gneiss.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 29
     },
     "gold_ingot": {
       "generator": "item_sprite",
@@ -877,6 +965,14 @@
       "x": 5,
       "y": 15
     },
+    "gypsum": {
+      "generator": "block_item_icon",
+      "index": 252,
+      "source": "items/gypsum.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 31
+    },
     "hanging_roots": {
       "generator": "block_item_icon",
       "index": 157,
@@ -884,6 +980,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 19
+    },
+    "heather": {
+      "generator": "block_item_icon",
+      "index": 241,
+      "source": "items/heather.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 30
     },
     "ice": {
       "generator": "block_item_icon",
@@ -973,6 +1077,14 @@
       "x": 3,
       "y": 3
     },
+    "iron_stained_rock": {
+      "generator": "block_item_icon",
+      "index": 255,
+      "source": "items/iron_stained_rock.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 31
+    },
     "iron_sword": {
       "generator": "item_sprite",
       "index": 29,
@@ -980,6 +1092,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 3
+    },
+    "jungle_fern": {
+      "generator": "block_item_icon",
+      "index": 249,
+      "source": "items/jungle_fern.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 31
     },
     "jungle_leaves": {
       "generator": "block_item_icon",
@@ -1004,6 +1124,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 14
+    },
+    "laterite": {
+      "generator": "block_item_icon",
+      "index": 236,
+      "source": "items/laterite.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 29
     },
     "lava": {
       "generator": "block_item_icon",
@@ -1085,6 +1213,14 @@
       "x": 6,
       "y": 20
     },
+    "marble": {
+      "generator": "block_item_icon",
+      "index": 235,
+      "source": "items/marble.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 29
+    },
     "moss": {
       "generator": "block_item_icon",
       "index": 53,
@@ -1108,6 +1244,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 17
+    },
+    "nettle": {
+      "generator": "block_item_icon",
+      "index": 243,
+      "source": "items/nettle.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 30
     },
     "oak_leaves": {
       "generator": "block_item_icon",
@@ -1269,6 +1413,22 @@
       "x": 7,
       "y": 6
     },
+    "quartz_block": {
+      "generator": "block_item_icon",
+      "index": 254,
+      "source": "items/quartz_block.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 31
+    },
+    "quartz_cluster": {
+      "generator": "block_item_icon",
+      "index": 258,
+      "source": "items/quartz_cluster.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 32
+    },
     "raw_beef": {
       "generator": "item_sprite",
       "index": 75,
@@ -1317,6 +1477,14 @@
       "x": 5,
       "y": 9
     },
+    "red_clay": {
+      "generator": "block_item_icon",
+      "index": 237,
+      "source": "items/red_clay.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 29
+    },
     "red_dye": {
       "generator": "item_sprite",
       "index": 202,
@@ -1357,6 +1525,14 @@
       "x": 3,
       "y": 24
     },
+    "reed_flower": {
+      "generator": "block_item_icon",
+      "index": 246,
+      "source": "items/reed_flower.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 30
+    },
     "reeds": {
       "generator": "block_item_icon",
       "index": 56,
@@ -1388,6 +1564,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 10
+    },
+    "salt_crust": {
+      "generator": "block_item_icon",
+      "index": 239,
+      "source": "items/salt_crust.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 29
     },
     "sand": {
       "generator": "block_item_icon",
@@ -1460,6 +1644,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 18
+    },
+    "small_cactus": {
+      "generator": "block_item_icon",
+      "index": 245,
+      "source": "items/small_cactus.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 30
     },
     "smithing_table": {
       "generator": "block_item_icon",
@@ -1629,6 +1821,14 @@
       "x": 0,
       "y": 20
     },
+    "sulfur_rock": {
+      "generator": "block_item_icon",
+      "index": 256,
+      "source": "items/sulfur_rock.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 32
+    },
     "sunflower": {
       "generator": "block_item_icon",
       "index": 123,
@@ -1725,6 +1925,14 @@
       "x": 2,
       "y": 17
     },
+    "tundra_moss": {
+      "generator": "block_item_icon",
+      "index": 247,
+      "source": "items/tundra_moss.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 30
+    },
     "villager_spawn_egg": {
       "generator": "item_sprite",
       "index": 134,
@@ -1748,6 +1956,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 4
+    },
+    "wet_limestone": {
+      "generator": "block_item_icon",
+      "index": 251,
+      "source": "items/wet_limestone.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 31
     },
     "wheat": {
       "generator": "item_sprite",
@@ -1788,6 +2004,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 10
+    },
+    "wild_mint": {
+      "generator": "block_item_icon",
+      "index": 242,
+      "source": "items/wild_mint.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 30
     },
     "wooden_axe": {
       "generator": "item_sprite",
@@ -1868,7 +2092,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 29,
+  "rows": 33,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

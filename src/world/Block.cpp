@@ -57,7 +57,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "white_bed_side", "white_bed_bottom", "tnt_top", "tnt_side", "tnt_bottom",
     "stone_bricks", "mossy_stone_bricks", "cracked_stone_bricks", "chiseled_stone_bricks", "bricks", "polished_granite", "polished_basalt", "polished_limestone", "polished_tuff", "deepslate_bricks", "sandstone", "cut_sandstone", "smooth_sandstone", "red_wool", "yellow_wool", "blue_wool", "green_wool", "black_wool",
     "rooted_dirt", "leaf_litter_soil", "peat", "silt", "dry_grass_block", "permafrost", "blue_ice", "shale", "red_sandstone", "ochre_terracotta", "white_terracotta", "volcanic_ash", "coral_rock", "fern", "dead_bush", "dry_grass", "brown_mushroom", "red_mushroom", "lavender", "bellflower", "alpine_flower", "tropical_flower", "cattail", "beach_grass",
-    "dry_grass_side", "leaf_litter_side"
+    "dry_grass_side", "leaf_litter_side",
+    "andesite", "diorite", "gneiss", "marble", "laterite", "red_clay", "cracked_mud", "salt_crust", "clover", "heather", "wild_mint", "nettle", "desert_flower", "small_cactus", "reed_flower", "tundra_moss", "fallen_twigs", "jungle_fern", "cave_moss", "wet_limestone", "gypsum", "amethyst_block", "quartz_block", "iron_stained_rock", "sulfur_rock", "amethyst_cluster", "quartz_cluster", "cave_glowshroom"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -368,6 +369,34 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::TROPICAL_FLOWER, "Tropical Flower", glm::vec3(0.906f,0.525f,0.302f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::CATTAIL, "Cattail", glm::vec3(0.529f,0.361f,0.188f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::BEACH_GRASS, "Beach Grass", glm::vec3(0.624f,0.686f,0.384f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::ANDESITE, "Andesite", glm::vec3(0.486f,0.502f,0.475f), true, false},
+    {BlockId::DIORITE, "Diorite", glm::vec3(0.780f,0.776f,0.725f), true, false},
+    {BlockId::GNEISS, "Gneiss", glm::vec3(0.486f,0.455f,0.502f), true, false},
+    {BlockId::MARBLE, "Marble", glm::vec3(0.859f,0.847f,0.784f), true, false},
+    {BlockId::LATERITE, "Laterite", glm::vec3(0.663f,0.333f,0.192f), true, false},
+    {BlockId::RED_CLAY, "Red Clay", glm::vec3(0.698f,0.408f,0.306f), true, false},
+    {BlockId::CRACKED_MUD, "Cracked Mud", glm::vec3(0.518f,0.463f,0.329f), true, false},
+    {BlockId::SALT_CRUST, "Salt Crust", glm::vec3(0.882f,0.867f,0.792f), true, false},
+    {BlockId::CLOVER, "Clover", glm::vec3(0.345f,0.604f,0.263f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::HEATHER, "Heather", glm::vec3(0.725f,0.482f,0.682f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::WILD_MINT, "Wild Mint", glm::vec3(0.314f,0.620f,0.514f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::NETTLE, "Nettle", glm::vec3(0.341f,0.494f,0.224f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::DESERT_FLOWER, "Desert Flower", glm::vec3(0.922f,0.635f,0.298f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::SMALL_CACTUS, "Small Cactus", glm::vec3(0.361f,0.573f,0.286f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::REED_FLOWER, "Reed Flower", glm::vec3(0.757f,0.690f,0.545f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::TUNDRA_MOSS, "Tundra Moss", glm::vec3(0.573f,0.627f,0.420f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::FALLEN_TWIGS, "Fallen Twigs", glm::vec3(0.541f,0.400f,0.271f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::JUNGLE_FERN, "Jungle Fern", glm::vec3(0.161f,0.541f,0.306f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::CAVE_MOSS, "Cave Moss", glm::vec3(0.263f,0.439f,0.282f), true, false},
+    {BlockId::WET_LIMESTONE, "Wet Limestone", glm::vec3(0.537f,0.620f,0.592f), true, false},
+    {BlockId::GYPSUM, "Gypsum", glm::vec3(0.859f,0.816f,0.706f), true, false},
+    {BlockId::AMETHYST_BLOCK, "Amethyst Block", glm::vec3(0.580f,0.431f,0.714f), true, false},
+    {BlockId::QUARTZ_BLOCK, "Quartz Block", glm::vec3(0.863f,0.820f,0.776f), true, false},
+    {BlockId::IRON_STAINED_ROCK, "Iron Stained Rock", glm::vec3(0.588f,0.424f,0.302f), true, false},
+    {BlockId::SULFUR_ROCK, "Sulfur Rock", glm::vec3(0.698f,0.616f,0.247f), true, false},
+    {BlockId::AMETHYST_CLUSTER, "Amethyst Cluster", glm::vec3(0.678f,0.502f,0.831f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::QUARTZ_CLUSTER, "Quartz Cluster", glm::vec3(0.882f,0.827f,0.749f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::CAVE_GLOWSHROOM, "Cave Glowshroom", glm::vec3(0.451f,0.784f,0.643f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -463,6 +492,35 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::TROPICAL_FLOWER: return BlockTexture::TropicalFlower;
         case BlockId::CATTAIL: return BlockTexture::Cattail;
         case BlockId::BEACH_GRASS: return BlockTexture::BeachGrass;
+        case BlockId::ANDESITE: return BlockTexture::Andesite;
+        case BlockId::DIORITE: return BlockTexture::Diorite;
+        case BlockId::GNEISS: return BlockTexture::Gneiss;
+        case BlockId::MARBLE: return BlockTexture::Marble;
+        case BlockId::LATERITE: return BlockTexture::Laterite;
+        case BlockId::RED_CLAY: return BlockTexture::RedClay;
+        case BlockId::CRACKED_MUD: return BlockTexture::CrackedMud;
+        case BlockId::SALT_CRUST: return BlockTexture::SaltCrust;
+        case BlockId::CLOVER: return BlockTexture::Clover;
+        case BlockId::HEATHER: return BlockTexture::Heather;
+        case BlockId::WILD_MINT: return BlockTexture::WildMint;
+        case BlockId::NETTLE: return BlockTexture::Nettle;
+        case BlockId::DESERT_FLOWER: return BlockTexture::DesertFlower;
+        case BlockId::SMALL_CACTUS: return BlockTexture::SmallCactus;
+        case BlockId::REED_FLOWER: return BlockTexture::ReedFlower;
+        case BlockId::TUNDRA_MOSS: return BlockTexture::TundraMoss;
+        case BlockId::FALLEN_TWIGS: return BlockTexture::FallenTwigs;
+        case BlockId::JUNGLE_FERN: return BlockTexture::JungleFern;
+        case BlockId::CAVE_MOSS: return BlockTexture::CaveMoss;
+        case BlockId::WET_LIMESTONE: return BlockTexture::WetLimestone;
+        case BlockId::GYPSUM: return BlockTexture::Gypsum;
+        case BlockId::AMETHYST_BLOCK: return BlockTexture::AmethystBlock;
+        case BlockId::QUARTZ_BLOCK: return BlockTexture::QuartzBlock;
+        case BlockId::IRON_STAINED_ROCK: return BlockTexture::IronStainedRock;
+        case BlockId::SULFUR_ROCK: return BlockTexture::SulfurRock;
+        case BlockId::AMETHYST_CLUSTER: return BlockTexture::AmethystCluster;
+        case BlockId::QUARTZ_CLUSTER: return BlockTexture::QuartzCluster;
+        case BlockId::CAVE_GLOWSHROOM: return BlockTexture::CaveGlowshroom;
+
         case BlockId::STONE_BRICKS: return BlockTexture::StoneBricks;
         case BlockId::MOSSY_STONE_BRICKS: return BlockTexture::MossyStoneBricks;
         case BlockId::CRACKED_STONE_BRICKS: return BlockTexture::CrackedStoneBricks;
@@ -901,6 +959,7 @@ uint8_t getLightEmission(BlockId id) {
     if (id == BlockId::CLOUD_BLOOM) return 4;
     if (id == BlockId::GLOWSHROOM) return 6;
     if (id == BlockId::GLOW_FERN) return 4;
+    if (id == BlockId::CAVE_GLOWSHROOM) return 5;
     if (id == BlockId::RESONANT_CRYSTAL) return 8;
     return id == BlockId::FIRE || isLava(id) ? 15 : 0;
 }
@@ -1002,7 +1061,7 @@ bool isReplaceableByFluid(BlockId id) {
     // Java's flowing-fluid passability admits non-collision blocks, with
     // sugar cane (REEDS) as the notable plant exception.  Crops and torches
     // are destroyed by the incoming fluid; solid farmland and beds are not.
-    if (isBiomePlant(id)) return true;
+    if (isNaturalDecoration(id)) return true;
     if (id == BlockId::REEDS) return false;
     if (id == BlockId::AIR || id == BlockId::FIRE || id == BlockId::SNOW_LAYER ||
         id == BlockId::TORCH || id == BlockId::TALL_GRASS || isFlower(id) ||

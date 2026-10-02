@@ -129,6 +129,11 @@ BIOME_PLANTS = ('fern', 'dead_bush', 'dry_grass', 'brown_mushroom', 'red_mushroo
 NAMES += list(BIOME_BASES) + list(BIOME_PLANTS) + ["dry_grass_side", "leaf_litter_side"]
 
 
+# Generation-v16 ecology: append logical slots after all v15 materials.
+ECOLOGY_BASES = {'andesite': (124, 128, 121), 'diorite': (199, 198, 185), 'gneiss': (124, 116, 128), 'marble': (219, 216, 200), 'laterite': (169, 85, 49), 'red_clay': (178, 104, 78), 'cracked_mud': (132, 118, 84), 'salt_crust': (225, 221, 202), 'cave_moss': (67, 112, 72), 'wet_limestone': (137, 158, 151), 'gypsum': (219, 208, 180), 'amethyst_block': (148, 110, 182), 'quartz_block': (220, 209, 198), 'iron_stained_rock': (150, 108, 77), 'sulfur_rock': (178, 157, 63)}
+ECOLOGY_PLANTS = ('clover', 'heather', 'wild_mint', 'nettle', 'desert_flower', 'small_cactus', 'reed_flower', 'tundra_moss', 'fallen_twigs', 'jungle_fern', 'amethyst_cluster', 'quartz_cluster', 'cave_glowshroom')
+NAMES += ['andesite', 'diorite', 'gneiss', 'marble', 'laterite', 'red_clay', 'cracked_mud', 'salt_crust', 'clover', 'heather', 'wild_mint', 'nettle', 'desert_flower', 'small_cactus', 'reed_flower', 'tundra_moss', 'fallen_twigs', 'jungle_fern', 'cave_moss', 'wet_limestone', 'gypsum', 'amethyst_block', 'quartz_block', 'iron_stained_rock', 'sulfur_rock', 'amethyst_cluster', 'quartz_cluster', 'cave_glowshroom']
+
 def _read_definition(path):
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -409,6 +414,8 @@ for _name, _base in DECORATION_BASES.items():
     PALETTES[_name] = _role_palette(_base, shadow_floor=_floor)
 
 for _name, _base in BIOME_BASES.items():
+    PALETTES[_name] = _role_palette(_base)
+for _name, _base in ECOLOGY_BASES.items():
     PALETTES[_name] = _role_palette(_base)
 PALETTES["dry_grass_side"] = PALETTES["dirt"][:4] + PALETTES["dry_grass_block"][2:4]
 PALETTES["leaf_litter_side"] = PALETTES["dirt"][:4] + PALETTES["leaf_litter_soil"][2:4]
@@ -723,6 +730,7 @@ PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","whea
         "glow_fern","resonant_crystal"}
 
 PLANTS.update(BIOME_PLANTS)
+PLANTS.update(ECOLOGY_PLANTS)
 
 def generate_special(name,seed,indices):
     if name in {"grass_side", "aether_grass_side"}:
@@ -897,6 +905,18 @@ def plant_palette(name):
                   "lavender":(167,125,201), "bellflower":(231,232,221),
                   "alpine_flower":(169,197,224), "tropical_flower":(231,134,77)}
         if name in colors: palette[6] = colors[name] + (255,)
+    if name in ECOLOGY_PLANTS:
+        colors = {"heather":(192,133,182), "wild_mint":(179,210,181),
+            "desert_flower":(240,168,79), "reed_flower":(212,193,153),
+            "clover":(225,227,195), "cave_glowshroom":(133,226,183)}
+        if name in colors: palette[6] = colors[name] + (255,)
+        if name == "wild_mint": palette[1:4] = [(48,112,85,255),(75,160,121,255),(121,190,143,255)]
+        if name == "tundra_moss": palette[1:4] = [(86,104,65,255),(139,155,99,255),(184,192,133,255)]
+        if name == "jungle_fern": palette[1:4] = [(25,91,50,255),(33,140,69,255),(76,178,100,255)]
+        if name == "fallen_twigs": palette[1:4] = [(90,64,41,255),(142,103,64,255),(185,143,96,255)]
+        if name in {"amethyst_cluster", "quartz_cluster"}:
+            base = (163,119,198) if name == "amethyst_cluster" else (217,205,184)
+            palette = [(0,0,0,0)] + _role_palette(base)
     return palette
 
 
@@ -913,6 +933,53 @@ def generate_plant_texture(name,seed):
     def line(x0,y0,x1,y1,index,width=1): _line(image,x0,y0,x1,y1,palette[index],width)
     def rect(x0,y0,x1,y1,index): _paint_rect(image,x0,y0,x1,y1,palette[index])
     # Draw growth bottom-up, then return PNG top-left rows for the atlas loader.
+    if name in ECOLOGY_PLANTS:
+        if name in {"amethyst_cluster", "quartz_cluster"}:
+            for x,height in ((3,7),(7,14),(11,10)):
+                rect(x,0,x+3,height-2,2); line(x+1,0,x+1,height-1,4)
+                line(x,height-2,x+1,height,5); line(x+1,height,x+2,height-2,3)
+        elif name == "cave_glowshroom":
+            for x,h in ((5,8),(10,12)):
+                rect(x,0,x+2,h-3,3); rect(x-3,h-3,x+4,h,6)
+                rect(x-1,h,x+2,h+1,6); line(x-2,h-2,x+2,h-2,2)
+        elif name == "small_cactus":
+            rect(6,0,10,12,2); rect(7,1,8,12,3); rect(3,4,6,8,2)
+            rect(11,6,13,10,2); line(10,6,12,6,1)
+            for x,y in ((6,3),(9,7),(7,10)): rect(x,y,x+1,y+1,5)
+        elif name == "fallen_twigs":
+            line(2,1,13,5,1,2); line(6,3,5,7,2); line(9,4,12,8,3)
+            line(4,6,11,1,2); line(3,2,12,5,3)
+        elif name in {"jungle_fern", "nettle"}:
+            line(8,0,8,14,1)
+            for y,half in ((3,5),(6,6),(9,4),(12,2)):
+                line(8,y,8-half,y+2,3,2); line(8,y,8+half,y+2,2,2)
+                if name == "jungle_fern":
+                    line(8-half,y+2,8-half+1,y+4,2); line(8+half,y+2,8+half-1,y+4,3)
+        elif name == "tundra_moss":
+            for x,h in ((2,3),(5,5),(8,4),(11,6),(14,3)):
+                line(x,0,x,h,2); line(x,h-1,x-2,h+1,3); line(x,h-1,x+1,h,1)
+        elif name == "reed_flower":
+            for x,h in ((4,10),(8,14),(12,11)):
+                line(x,0,x,h-2,2); line(x,h-3,x-2,h,6); line(x,h-3,x+2,h,6)
+        elif name == "heather":
+            for x,h in ((4,7),(7,12),(11,9)):
+                line(8,0,x,h,2)
+                for y in range(h-4,h+1,2): rect(x-1,y,x+2,y+1,6)
+        elif name == "clover":
+            for x,h in ((4,5),(8,8),(12,6)):
+                line(x,0,x,h,1); rect(x-2,h-1,x,h+1,3)
+                rect(x+1,h-1,x+3,h+1,2); rect(x,h+1,x+2,h+3,3)
+            rect(6,8,8,10,6)
+        elif name == "wild_mint":
+            for x,h in ((5,9),(10,13)):
+                line(x,0,x,h,1)
+                for y in range(3,h,3): line(x-3,y+2,x+3,y+1,3,2)
+                rect(x-1,h,x+2,h+2,6)
+        else: # desert flower: low succulent leaves and warm petals
+            line(8,0,8,8,2); line(8,2,3,4,3,2); line(8,2,12,3,2,2)
+            for x,y in ((5,8),(9,8),(7,11)): rect(x,y,x+3,y+2,6)
+            rect(7,8,10,10,5)
+        return [image[(15-y)*16+x] for y in range(16) for x in range(16)]
     if name in BIOME_PLANTS:
         if name == "fern":
             line(8,0,8,13,2)
@@ -1121,6 +1188,38 @@ def generate_biome_texture(name, seed):
     return center_periodic_tile([palette[max(0,min(5,int(i)))] for i in indices])
 
 
+def generate_ecology_texture(name, seed):
+    palette = PALETTES[name]
+    indices = quantize(macro_field(seed, name, 6))
+    for y in range(16):
+        for x in range(16):
+            i = y*16+x
+            wave = round(2*math.sin(x*math.tau/16))
+            if name in {"gneiss", "wet_limestone", "gypsum"}:
+                if (y+wave) % (4 if name == "gneiss" else 8) == 0: indices[i] = 1
+                elif (y+wave) % 8 == 1: indices[i] = 4
+            elif name == "marble":
+                if (x+round(3*math.sin(y*math.tau/16))) % 13 == 0: indices[i] = 1
+            elif name in {"cracked_mud", "salt_crust"}:
+                if (x+wave)%8 == 0 or (y+round(2*math.sin(x*math.tau/8)))%8 == 0: indices[i] = 1
+                elif name == "salt_crust": indices[i] = min(4,indices[i]+1)
+            elif name in {"amethyst_block", "quartz_block"}:
+                facet = (x+y//2)%8
+                if facet < 2: indices[i] = 4
+                elif facet == 7: indices[i] = 1
+            elif name == "diorite":
+                if sample(seed,name,x//2,y//2)%4 == 0: indices[i] = 1
+            elif name == "andesite":
+                if sample(seed,name,x//3,y//2)%9 == 0: indices[i] = 4
+            elif name in {"laterite", "red_clay", "iron_stained_rock"}:
+                if (y+wave)%9 == 0: indices[i] = 1
+            elif name == "sulfur_rock":
+                if sample(seed,name,x//3,y//3)%4 == 0: indices[i] = 4
+            elif name == "cave_moss":
+                if sample(seed,name,x//2,y//2)%7 == 0: indices[i] = 1
+    return center_periodic_tile([palette[max(0,min(5,int(i)))] for i in indices])
+
+
 class SemanticColor(tuple):
     """A palette choice carries its structural role through drawing/translation."""
     def __new__(cls, rgba, role):
@@ -1136,7 +1235,9 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
-    if name in BIOME_BASES or name in {"dry_grass_side", "leaf_litter_side"}:
+    if name in ECOLOGY_BASES:
+        pixels=generate_ecology_texture(name,local)
+    elif name in BIOME_BASES or name in {"dry_grass_side", "leaf_litter_side"}:
         pixels=generate_biome_texture(name,local)
     elif name in DECORATION_BASES:
         pixels=generate_decoration_texture(name,local)

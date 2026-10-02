@@ -244,10 +244,12 @@ GameMode GameSession::startWorld(
     const std::string& worldId, bool newWorld,
     RuntimeClock::Tick loadingStarted) {
     if (saveStore) detachSaveStore();
-    saveStore = std::make_unique<SaveStore>(worldCatalog.open(worldId));
-    worldMetadata = saveStore->loadMetadata();
-    if (!WorldGenContext::canLoadGeneration(worldMetadata.generationVersion))
+    auto selectedStore = std::make_unique<SaveStore>(worldCatalog.open(worldId));
+    auto selectedMetadata = selectedStore->loadMetadata();
+    if (!WorldGenContext::canLoadGeneration(selectedMetadata.generationVersion))
         throw std::runtime_error("World generation version is incompatible");
+    saveStore = std::move(selectedStore);
+    worldMetadata = std::move(selectedMetadata);
 
     dimension = worldMetadata.activeDimension;
     loadingReason = dimension == DimensionId::Heaven
@@ -966,10 +968,6 @@ void GameSession::ensureHeavenSafePosition() {
 }
 
 void GameSession::updateSaveMetadata() {
-    // Heaven's loading preparation also updates metadata. Commit migration
-    // only after the full playing gate, including meshes/uploads, succeeded.
-    if (terrainGenerated)
-        worldMetadata.generationVersion = WorldGenContext::GENERATION_VERSION;
     saveActiveDimensionState();
     worldMetadata.inventory = player.inventory();
     worldMetadata.health = player.survivalStats().health();

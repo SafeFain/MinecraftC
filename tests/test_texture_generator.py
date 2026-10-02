@@ -15,6 +15,25 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def test_v16_ecology_materials_and_plants(self):
+        names = [n for n in tg.NAMES if n in tg.ECOLOGY_BASES or n in tg.ECOLOGY_PLANTS]
+        self.assertEqual(len(names),28)
+        self.assertEqual(tg.NAMES[188:],names)
+        fingerprints=set()
+        with tempfile.TemporaryDirectory() as directory:
+            for name in names:
+                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
+                fingerprints.add(tuple(pixels))
+                if name in tg.ECOLOGY_PLANTS:
+                    self.assertEqual({p[3] for p in pixels},{0,255})
+                else:
+                    self.assertEqual({p[3] for p in pixels},{255})
+                path=Path(directory)/(name+'.png')
+                tg.write_png(path,16,16,pixels)
+                self.assertFalse(tg.validate_texture(path),name)
+        self.assertEqual(len(fingerprints),28)
+
     def test_biome_materials_and_plants(self):
         names = list(tg.BIOME_BASES) + list(tg.BIOME_PLANTS)
         self.assertEqual(len(names), 24)
@@ -55,7 +74,8 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(order[182], "stone_bricks")
         self.assertEqual(order[207], "bone_meal")
         self.assertEqual(order[208], "rooted_dirt")
-        self.assertEqual(order[-1], "beach_grass")
+        self.assertEqual(order[231], "beach_grass")
+        self.assertEqual(order[-1], "cave_glowshroom")
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]
@@ -539,7 +559,7 @@ class TextureGeneratorTests(unittest.TestCase):
             self.assertEqual(metadata["grid_size"], __import__("math").ceil(__import__("math").sqrt(len(metadata["physical_tiles"]))))
             self.assertGreater(len(metadata["physical_tiles"]),188)
             self.assertEqual(metadata["textures"]["grass_top"]["effective_seed"],77)
-            self.assertEqual([metadata["textures"][n]["index"] for n in tg.NAMES],list(range(188)))
+            self.assertEqual([metadata["textures"][n]["index"] for n in tg.NAMES],list(range(len(tg.NAMES))))
             for filename in ("atlas.png","atlas_normal.png","atlas_property.png","atlas_height.png"):
                 self.assertEqual(tg.read_generated_png(output/filename)[:2],(metadata["grid_size"]*16,metadata["grid_size"]*16))
             tg.build_items_atlas(output,99,*self.item_definitions())

@@ -333,6 +333,37 @@ public:
             result.top != BlockId::TUFF && result.top != BlockId::BASALT)
             result.top = BlockId::SHALE;
 
+        // v16 materials occupy continuous patches, retaining each biome's base.
+        const float ecology = patch(seed,worldX,worldZ,0x45434F3136534F49ULL);
+        if (ecology > 0.64f && context.volcanicWeight < 0.35f) {
+            switch (context.biome) {
+                case Biome::MOUNTAINS: case Biome::STONY_SHORE:
+                case Biome::ROCKY_STEPPE:
+                    result = {ecology > 0.78f ? BlockId::DIORITE : BlockId::GNEISS,
+                              BlockId::ANDESITE,3}; break;
+                case Biome::HILLS:
+                    result.under = BlockId::ANDESITE; break;
+                case Biome::LIMESTONE_HIGHLANDS: case Biome::KARST_FOREST:
+                    result = {BlockId::MARBLE,BlockId::LIMESTONE,3}; break;
+                case Biome::JUNGLE: case Biome::SAVANNA: case Biome::DRY_WOODLAND:
+                    result = {BlockId::LATERITE,BlockId::RED_CLAY,3}; break;
+                case Biome::RED_CANYON: case Biome::BADLANDS:
+                    result.top = BlockId::RED_CLAY; break;
+                case Biome::SWAMP: case Biome::RIVER: case Biome::LUSH_VALLEY:
+                    if (context.height >= context.waterLevel+2 && context.slope < 0.25f)
+                        result = {BlockId::CRACKED_MUD,BlockId::CLAY,2};
+                    break;
+                case Biome::DESERT:
+                    if (context.slope < 0.18f)
+                        result = {BlockId::SALT_CRUST,BlockId::SANDSTONE,2};
+                    break;
+                default: break;
+            }
+        }
+        if (context.biome == Biome::VOLCANIC_HIGHLANDS && ecology > 0.68f &&
+            context.volcanicWeight < 0.58f && context.slope < 0.55f)
+            result.under = BlockId::ANDESITE;
+
         // One final surface authority for generated chunks and procedural LOD.
         // Preserve exposed ice and cold bare patches rather than painting every
         // glacial column with opaque snow.
@@ -449,6 +480,26 @@ public:
                 default: break;
             }
         }
+        if ((h >> 24) % 100u < static_cast<unsigned>(density)) {
+            switch (context.biome) {
+                case Biome::PLAINS: case Biome::MEADOW: case Biome::SUNFLOWER_PLAINS:
+                case Biome::HILLS: plant = BlockId::CLOVER; break;
+                case Biome::FOREST: case Biome::BIRCH_FOREST: case Biome::FLOWER_FOREST:
+                    plant = (h >> 32)%2 ? BlockId::NETTLE : BlockId::FALLEN_TWIGS; break;
+                case Biome::TAIGA: case Biome::DRY_WOODLAND:
+                    plant = (h >> 32)%2 ? BlockId::HEATHER : BlockId::FALLEN_TWIGS; break;
+                case Biome::JUNGLE: case Biome::KARST_FOREST:
+                    plant = BlockId::JUNGLE_FERN; break;
+                case Biome::DESERT: case Biome::BADLANDS: case Biome::SAVANNA:
+                case Biome::RED_CANYON:
+                    plant = (h >> 32)%2 ? BlockId::DESERT_FLOWER : BlockId::SMALL_CACTUS; break;
+                case Biome::SWAMP: case Biome::LUSH_VALLEY: case Biome::RIVER:
+                    plant = (h >> 32)%2 ? BlockId::REED_FLOWER : BlockId::WILD_MINT; break;
+                case Biome::SNOW_TUNDRA: case Biome::ALPINE_TUNDRA:
+                    plant = (h >> 32)%2 ? BlockId::TUNDRA_MOSS : BlockId::HEATHER; break;
+                default: break;
+            }
+        }
         if (plant != BlockId::AIR && supportsBiomePlant(plant,soil)) return plant;
         const BlockId fallback = legacyDecoration(seed,x,z,context.height,context.biome,context.river);
         // Existing landmarks remain valid on exposed rock. Existing flowers
@@ -456,6 +507,55 @@ public:
         if (fallback == BlockId::TALL_GRASS || isFlower(fallback))
             return supportsBiomePlant(BlockId::FERN,soil) ? fallback : BlockId::AIR;
         return fallback;
+    }
+
+    struct RubbleColumn { BlockId material = BlockId::AIR; int height = 0; };
+
+    template<typename Sample, typename Reserved>
+    static RubbleColumn rubbleColumn(uint64_t seed, int x, int z,
+                                     Sample&& sample, Reserved&& reserved) {
+        const int cellX = floorDiv(x,16), cellZ = floorDiv(z,16);
+        for (int dz = -1; dz <= 1; ++dz) for (int dx = -1; dx <= 1; ++dx) {
+            const int cx = cellX+dx, cz = cellZ+dz;
+            const uint64_t hash = WorldGenContext::hashPosition(
+                WorldGenContext(seed).derive(0x45434F3136525542ULL),cx,0,cz);
+            if (hash%100 >= 20) continue;
+            const int ax = cx*16+static_cast<int>((hash>>8)%16);
+            const int az = cz*16+static_cast<int>((hash>>24)%16);
+            if (std::abs(x-ax)>1 || std::abs(z-az)>1) continue;
+            const auto anchor = sample(ax,az);
+            BlockId material = BlockId::AIR;
+            switch (anchor.biome) {
+                case Biome::MOUNTAINS: case Biome::STONY_SHORE:
+                    material = (hash>>40)%2 ? BlockId::DIORITE : BlockId::ANDESITE; break;
+                case Biome::ROCKY_STEPPE: material = BlockId::GNEISS; break;
+                case Biome::LIMESTONE_HIGHLANDS: material = BlockId::MARBLE; break;
+                case Biome::VOLCANIC_HIGHLANDS: material = BlockId::ANDESITE; break;
+                default: continue;
+            }
+            bool valid = true;
+            for (int rz = -1; rz <= 1; ++rz) for (int rx = -1; rx <= 1; ++rx) {
+                const auto c = sample(ax+rx,az+rz);
+                valid = valid && c.biome == anchor.biome && c.slope < 0.3f &&
+                    c.height >= c.waterLevel && std::abs(c.height-anchor.height)<=1 &&
+                    !reserved(ax+rx,az+rz);
+            }
+            if (!valid) continue;
+            // A cross footprint uses at most five columns; the center is tallest.
+            const int distance = std::abs(x-ax)+std::abs(z-az);
+            if (distance <= 1) return {material,distance == 0 ? 2 : 1};
+        }
+        return {};
+    }
+
+    template<typename GetBlock, typename SetBlock>
+    static bool placeRubble(const RubbleColumn& rubble, int y,
+                            GetBlock&& get, SetBlock&& set) {
+        if (!rubble.height || !isFullCollisionBlock(get(y))) return false;
+        for (int dy=1; dy<=rubble.height; ++dy)
+            if (!Config::isValidWorldY(y+dy) || get(y+dy)!=BlockId::AIR) return false;
+        for (int dy=1; dy<=rubble.height; ++dy) set(y+dy,rubble.material);
+        return true;
     }
 
     template<typename GetBlock, typename SetBlock, typename NearWater>
@@ -467,7 +567,8 @@ public:
             !isFullCollisionBlock(get(y))) return;
         const BlockId block = decoration(seed,x,z,context,get(y));
         if (block == BlockId::AIR) return;
-        if ((block == BlockId::CATTAIL || block == BlockId::REEDS) && !nearWater()) return;
+        if ((block == BlockId::CATTAIL || block == BlockId::REEDS ||
+             block == BlockId::REED_FLOWER || block == BlockId::WILD_MINT) && !nearWater()) return;
         const int count = decorationHeight(seed,x,z,y,block);
         for (int dy = 1; dy <= count; ++dy) {
             if (!Config::isValidWorldY(y+dy) || get(y+dy) != BlockId::AIR) return;

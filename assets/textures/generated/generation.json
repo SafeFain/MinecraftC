@@ -37,6 +37,18 @@
       "effective_seed": 213785369,
       "sha256": "d739e2e07282920d8363cef383e42c7fd22ba3f40832df260d674140e4de768d"
     },
+    "amethyst_block": {
+      "effective_seed": 213785369,
+      "sha256": "059ee5e3984066d90566cd85ae8a7bbbd3c35b4f094fff42ce2e19ada070f492"
+    },
+    "amethyst_cluster": {
+      "effective_seed": 213785369,
+      "sha256": "21c0fff4f6d044509446b74e4e25f9a3a76da9e8af8905e61059741cf0fbd127"
+    },
+    "andesite": {
+      "effective_seed": 213785369,
+      "sha256": "13504a92a103b863bbd9a156cacdc221564a6bc81e5046e60269a23914ae5248"
+    },
     "basalt": {
       "effective_seed": 213785369,
       "sha256": "b2bd14d8c846a11b12fd3a53d8aad334fde470ac31aaba0b81f453398e694369"
@@ -145,6 +157,14 @@
       "effective_seed": 213785369,
       "sha256": "164f12e143a57c6e41d8781cabe81926649567ac59f9c41e9beab54a59aff9a0"
     },
+    "cave_glowshroom": {
+      "effective_seed": 213785369,
+      "sha256": "4384e42a785670285bb9c22e6c659875339fe8be0dd7a68dc54eef4faee8a56f"
+    },
+    "cave_moss": {
+      "effective_seed": 213785369,
+      "sha256": "3fc0f71a766c33c6b50a17e6faf5d686c1e544a0f91fd912def5e0f32dbc440f"
+    },
     "chest": {
       "effective_seed": 213785369,
       "sha256": "7e0903cbc3ba4f3aefe197fa06c0e6d53bbe16b1e5779dcf1099994a1e8fe3e9"
@@ -181,6 +201,10 @@
       "effective_seed": 213785369,
       "sha256": "1f15cf40382f1546619714995330a59b54827c1bcc88b38ed3cccf00c54d92b6"
     },
+    "clover": {
+      "effective_seed": 213785369,
+      "sha256": "5352fd4138c42929535b293cd3337d8bdd89f168eaa4792d9d6bbe230e02013c"
+    },
     "coal_ore": {
       "effective_seed": 213785369,
       "sha256": "c8ce8a42446272d27e8c170f1e740b7a142d99a8336cf715b949b2fe941c1af4"
@@ -216,6 +240,10 @@
     "coral_rock": {
       "effective_seed": 213785369,
       "sha256": "e51c4993bf8c673a29e474b52025633a453a7ff4caddd6c8778fd0fd9038ee54"
+    },
+    "cracked_mud": {
+      "effective_seed": 213785369,
+      "sha256": "b1d7e6ede7f5f9269bcf7b08ca4ee32b7800f78ac3efb63a91bb0b24d29ba830"
     },
     "cracked_stone_bricks": {
       "effective_seed": 213785369,
@@ -261,9 +289,17 @@
       "effective_seed": 213785369,
       "sha256": "2503532d1e24ffe62926929fdb2807336c93ac84332f51ff41b441765a00234d"
     },
+    "desert_flower": {
+      "effective_seed": 213785369,
+      "sha256": "1543cb5ab3dceb4e1c9818177fca848bf3d6782154cbe351828b74f10f0ee5c9"
+    },
     "diamond_ore": {
       "effective_seed": 213785369,
       "sha256": "36d2ea76f2f4751c9918e8ebaa766c1ded8f7ce21055fb3294d44152572736be"
+    },
+    "diorite": {
+      "effective_seed": 213785369,
+      "sha256": "d25ccc7f28a12a5a6d05c9a75e4dab6bd3b72c7d468bd1bf5f9db6f4a94fb8ee"
     },
     "dirt": {
       "effective_seed": 213785369,
@@ -288,6 +324,10 @@
     "emerald_ore": {
       "effective_seed": 213785369,
       "sha256": "dafa7806a175ca951e91f305035e5c27b6e908d2432e6c2de79c6c804780e682"
+    },
+    "fallen_twigs": {
+      "effective_seed": 213785369,
+      "sha256": "bdaefe9fd58f3955ffdfddedbe8ea544602e69f24f885d8c835a5348f2896f4f"
     },
     "farmland": {
       "effective_seed": 213785369,
@@ -349,6 +389,10 @@
       "effective_seed": 213785369,
       "sha256": "34a27d5b270210d0d31bcbd6be4fe1647a7a97b75bc3c59a632947c6015222f2"
     },
+    "gneiss": {
+      "effective_seed": 213785369,
+      "sha256": "4d548b94d45eace46188f5df1c2f204bc32e0ec8dc17fec622bfbda4101b08c5"
+    },
     "gold_ore": {
       "effective_seed": 213785369,
       "sha256": "e512181829ceb33578873e4f361bc29f4dafe02e5bf8fb55bf66f1cd40d75729"
@@ -389,9 +433,17 @@
       "effective_seed": 213785369,
       "sha256": "82168ec73ba6f998377051afdf84b3d696bc8ef918fcdf49857cb075a96755b1"
     },
+    "gypsum": {
+      "effective_seed": 213785369,
+      "sha256": "e12082ba384bf4d7f8d6744b8274fffede16ce7b7a334c023090fa9414c7f429"
+    },
     "hanging_roots": {
       "effective_seed": 213785369,
       "sha256": "565d4c069ee700cab6a4f44dcdafbe5b8275e4f66fa915dc8d890e9095baaf80"
+    },
+    "heather": {
+      "effective_seed": 213785369,
+      "sha256": "40617ed98491aa3420e7c01195be0bf46d46b92c8efc024f1f1357e5baab61ea"
     },
     "ice": {
       "effective_seed": 213785369,
@@ -400,6 +452,14 @@
     "iron_ore": {
       "effective_seed": 213785369,
       "sha256": "e88bdc2ab86d54a048a673b80fa22c60f4236416216f6fcca2c12939eeb8434d"
+    },
+    "iron_stained_rock": {
+      "effective_seed": 213785369,
+      "sha256": "ac40c4bbdb62b923e60ca2b918ff549f3214336ae6d136cddac0da19640debde"
+    },
+    "jungle_fern": {
+      "effective_seed": 213785369,
+      "sha256": "8d56f6807863eee454db138229953e78313276b85c0d38ad5a9fbf72b1aa5a13"
     },
     "jungle_leaves": {
       "effective_seed": 213785369,
@@ -416,6 +476,10 @@
     "jungle_sapling": {
       "effective_seed": 213785369,
       "sha256": "6c41280a496c609133145070476391535cf78ed0ea79df82f7074c3673cdc4df"
+    },
+    "laterite": {
+      "effective_seed": 213785369,
+      "sha256": "c1c4953cea42a368a29378b621ca696ca499345186365c338a5cea780d620de1"
     },
     "lava": {
       "effective_seed": 213785369,
@@ -457,6 +521,10 @@
       "effective_seed": 213785369,
       "sha256": "cc600cc9d126e10fa630ed49318dd64e361e4f63e48affc2346d28e46262829e"
     },
+    "marble": {
+      "effective_seed": 213785369,
+      "sha256": "ead8c53cecc6bfb638ab0f9bcbb6742a7ca748ada2cc904ecdbcca8d684939da"
+    },
     "moss": {
       "effective_seed": 213785369,
       "sha256": "199f5a17d99c7e9aa3e0b264c0b58073ba35abdd3cb5006a43ea8c12db8efed1"
@@ -468,6 +536,10 @@
     "mud": {
       "effective_seed": 213785369,
       "sha256": "7415b6a75afa8c39de4992c891d90d2e817949583046b297597eb2d0778e9230"
+    },
+    "nettle": {
+      "effective_seed": 213785369,
+      "sha256": "a69112de23dc74efa1a68ea77fdb72866a1c0e16b55342d3a20548aa81179746"
     },
     "oak_log": {
       "effective_seed": 213785369,
@@ -533,6 +605,18 @@
       "effective_seed": 213785369,
       "sha256": "a0ccc2e8d64a992f9ad69a2fac7697264347caff39f491ac1e8b9b55d3d8469a"
     },
+    "quartz_block": {
+      "effective_seed": 213785369,
+      "sha256": "b4da641c7f5cbe23ee12625d2b20fc8d5ef27ae65b86f62f7150ed9fa389ad72"
+    },
+    "quartz_cluster": {
+      "effective_seed": 213785369,
+      "sha256": "ffc26aecb09c64e569d636238faaab322dc7c8e9d729a8607ad0ec69aa5d79c1"
+    },
+    "red_clay": {
+      "effective_seed": 213785369,
+      "sha256": "7219910d3b41662310dd9c549845bcf86c71eb80cdcebbffe3d34afe044a931e"
+    },
     "red_mushroom": {
       "effective_seed": 213785369,
       "sha256": "0610ecce29bf3d55ef4f5ec760f77e966fd1a3629c65a47e96d9ddf64f3fa5ab"
@@ -549,6 +633,10 @@
       "effective_seed": 213785369,
       "sha256": "8a4d91daf31fc89999f4f4cb2e4bb2dcb63bc8800fcd5a883de162d814c77cdf"
     },
+    "reed_flower": {
+      "effective_seed": 213785369,
+      "sha256": "5b186e00613a1d7538fb81cb4487fdafa7d9c75fe6fb714e3444807a6d9c9b5e"
+    },
     "reeds": {
       "effective_seed": 213785369,
       "sha256": "40c6f46a4cbdbb8a5036ccf7a52833d04fe5efc230f9dd5b30f8fd41d05143c3"
@@ -560,6 +648,10 @@
     "rooted_dirt": {
       "effective_seed": 213785369,
       "sha256": "cc9a7d8f75fcbf8ec58f355dda06791b04eea4d0643a6e61399c9102b91bb364"
+    },
+    "salt_crust": {
+      "effective_seed": 213785369,
+      "sha256": "f0e48f08271134182051abeedef858e59255fc500319c0dad214176fca4577e6"
     },
     "sand": {
       "effective_seed": 213785369,
@@ -588,6 +680,10 @@
     "skyroot_log_top": {
       "effective_seed": 213785369,
       "sha256": "e058388699263d2b43f57198f2ba85bfce937e8a49d84ce94e19083b1655b36c"
+    },
+    "small_cactus": {
+      "effective_seed": 213785369,
+      "sha256": "a412bba665e42aafe72705976df49ad979874ef87c5b80d6d5e210216769fd69"
     },
     "smithing_table": {
       "effective_seed": 213785369,
@@ -653,6 +749,10 @@
       "effective_seed": 213785369,
       "sha256": "b9782949ed9b8d16be645d6dda700f6f9ac2140317aa1c5298632fde0856a44a"
     },
+    "sulfur_rock": {
+      "effective_seed": 213785369,
+      "sha256": "f6f44e7ce438786a796f08d32141390e3710b035bf1fd0e58e1fb086c8ba3ac3"
+    },
     "sunflower_bottom": {
       "effective_seed": 213785369,
       "sha256": "54a1c3f9f512ded94f72552b0d1515360e2c6ba6bfb33044f729bc4372756a95"
@@ -701,6 +801,10 @@
       "effective_seed": 213785369,
       "sha256": "553fb6ed76b66c1279ca7a4e75d0c44133e6b28695aeae73fb56c0e3c5e63463"
     },
+    "tundra_moss": {
+      "effective_seed": 213785369,
+      "sha256": "3e5d7b0872f9f0d105a47e18ae8013307e9542b556b3b9af0a1097267b61d0d0"
+    },
     "volcanic_ash": {
       "effective_seed": 213785369,
       "sha256": "83020f992df2c209e44c73ee9ebc8f0c4df373e67574764b2f30edebf7d2df09"
@@ -712,6 +816,10 @@
     "wet_farmland": {
       "effective_seed": 213785369,
       "sha256": "92f3370c01ef9fbb81367b8e5701750b00b04b182f5309d3eff8d5d451e7d6e6"
+    },
+    "wet_limestone": {
+      "effective_seed": 213785369,
+      "sha256": "299ba78295f01c291de4bd3cf60c50dea0d8734df118d81cd471f00507bfcdfb"
     },
     "wheat_mature": {
       "effective_seed": 213785369,
@@ -748,6 +856,10 @@
     "white_wool": {
       "effective_seed": 213785369,
       "sha256": "f55673ff9fa82effb89ba79781a9d885573f112c9fec535aa437e74c62c46cf6"
+    },
+    "wild_mint": {
+      "effective_seed": 213785369,
+      "sha256": "582bb667af78303acfc13f4019622830bc968a306240812f554f65620590a47e"
     },
     "yellow_wool": {
       "effective_seed": 213785369,

@@ -10,17 +10,19 @@
 
 int main(int argc, char** argv) {
     if (argc < 2 || argc > 3) {
-        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview]\n";
+        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview|--ecology|--ecology-preview]\n";
         return 2;
     }
     const std::string mode = argc == 3 ? argv[2] : "";
-    if (!mode.empty() && mode != "--natural" && mode != "--natural-preview") return 2;
+    if (!mode.empty() && mode != "--natural" && mode != "--natural-preview" &&
+        mode != "--ecology" && mode != "--ecology-preview") return 2;
+    const bool ecology = mode == "--ecology" || mode == "--ecology-preview";
     const bool natural = !mode.empty();
-    const int frames = mode == "--natural-preview" ? 1200 : 120;
-    const int count = natural ? 24 : 18;
-    const int first = natural ? 201 : 183;
-    const int cubes = natural ? 13 : 18;
-    const int plants = natural ? 11 : 0;
+    const int frames = (mode == "--natural-preview" || mode == "--ecology-preview") ? 1200 : 120;
+    const int count = ecology ? 28 : natural ? 24 : 18;
+    const int first = ecology ? 225 : natural ? 201 : 183;
+    const int cubes = ecology ? 15 : natural ? 13 : 18;
+    const int plants = ecology ? 13 : natural ? 11 : 0;
     try {
         Window window(960, 540, "MinecraftC natural materials smoke",
                       Window::SurfaceMode::Vulkan, false, false);

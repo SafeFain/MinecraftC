@@ -37,6 +37,7 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 
 int main() {
     testBiomeSurfaceEcology();
+    testEcologyFormations();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
         [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
             ? Biome::PLAINS : Biome::FOREST; }, 128, 32);
@@ -709,7 +710,8 @@ int main() {
                             block == BlockId::POINTED_DRIPSTONE_DOWN ||
                             block == BlockId::HANGING_ROOTS ||
                             block == BlockId::GLOW_FERN ||
-                            block == BlockId::RESONANT_CRYSTAL;
+                            block == BlockId::RESONANT_CRYSTAL ||
+                            isCrystalCluster(block) || block == BlockId::CAVE_GLOWSHROOM;
                         if (!caveFeature) continue;
                         const int wx = regionChunks[i]->worldX() + x;
                         const int wz = regionChunks[i]->worldZ() + z;
@@ -717,7 +719,8 @@ int main() {
                                 "cave feature replaced an aquifer or lava cell");
                         if (block == BlockId::POINTED_DRIPSTONE_UP ||
                             block == BlockId::GLOW_FERN ||
-                            block == BlockId::RESONANT_CRYSTAL)
+                            block == BlockId::RESONANT_CRYSTAL || isCrystalCluster(block) ||
+                            block == BlockId::CAVE_GLOWSHROOM)
                             require(isSolid(regionChunks[i]->getBlock(x, y - 1, z)),
                                     "floor cave feature lacks solid support");
                         if (block == BlockId::POINTED_DRIPSTONE_DOWN ||

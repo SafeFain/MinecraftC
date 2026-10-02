@@ -1118,10 +1118,10 @@ bool Player::placeBlock() {
         }
     }
 
-    if (isBiomePlant(placed) &&
+    if (isNaturalDecoration(placed) &&
         (hit->faceNormal.y <= 0 ||
          m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
-         !supportsBiomePlant(placed, m_world.getBlock(
+         !supportsNaturalDecoration(placed, m_world.getBlock(
              placePos.x, placePos.y - 1, placePos.z)))) return false;
 
     ArchitecturalBlockState selectedArchitecture;

@@ -309,8 +309,8 @@ void testAsyncGeneratedCacheRoundTrip() {
                 "compressed cache round-trips terrain bytes exactly");
         drainWorkers(reopened, pool);
     }
-    // A stale v14 cache must regenerate base terrain and reapply edits.
-    store.saveGeneratedChunk(0,0,original,(14u << 16) | 1u);
+    // A stale base-cache revision in a current world regenerates terrain and reapplies edits.
+    store.saveGeneratedChunk(0,0,original,(WorldGenContext::GENERATION_VERSION << 16));
     const uint32_t editedIndex = 8 + 8*16 + Config::worldYToStorageY(64)*256;
     store.saveChunkOverrides(0,0,{{editedIndex,BlockId::BLACK_WOOL}});
     {
@@ -324,7 +324,7 @@ void testAsyncGeneratedCacheRoundTrip() {
         generateTarget(migrated,pool);
         require(migrated.generationProgress().cacheHits == 0 &&
                 migrated.getBlock(8,64,8) == BlockId::BLACK_WOOL,
-                "v14 base regeneration preserves player edits");
+                "current-world stale-cache regeneration preserves player edits");
         drainWorkers(migrated,pool);
     }
     std::filesystem::remove_all(root);

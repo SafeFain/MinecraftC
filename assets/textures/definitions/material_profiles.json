@@ -191,6 +191,19 @@
     },
     "resonant_crystal": {
       "emission": 0.85
+    },
+    "amethyst_block": {
+      "pattern": "crystal",
+      "roughness": 0.3,
+      "emission": 0.0
+    },
+    "quartz_block": {
+      "pattern": "crystal",
+      "roughness": 0.3,
+      "emission": 0.0
+    },
+    "cave_glowshroom": {
+      "emission": 0.3333333333333333
     }
   }
 }

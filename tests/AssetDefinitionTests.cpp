@@ -142,6 +142,12 @@ int main() {
         require(slot == raw-39 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
                 "all natural materials resolve their appended atlas slots");
     }
+    for (uint16_t raw=225; raw<=252; ++raw) {
+        const auto block = static_cast<BlockId>(raw);
+        const auto slot = getFaceTextureIndex(block,FaceDir::TOP);
+        require(slot == raw-37 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
+                "v16 blocks map to appended material slots");
+    }
     const auto materials = buildVoxelGiMaterials(atlas);
     require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
             "non-emissive atlas material generated a light source");

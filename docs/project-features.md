@@ -28,12 +28,12 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   ready. New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 15 retains 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 16 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
   Y=-64..319 while preserving the v6 hybrid-cave algorithm, and adds eight
   deterministic overworld structures (plains/adobe villages, traveler huts,
   abandoned camps, desert wells, igloos, ruined towers, lumber camps). Base
-  cache revision 1 is part of the v15 cache key. Version 14 adds four
+  cache revision 1 is part of the v16 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
@@ -45,7 +45,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 224 serialized
+  types, and 252 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -53,7 +53,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 232-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 260-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -148,8 +148,38 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-v14 worlds load compatibly, with stale base caches rejected independently of
-saved player edits. Migration metadata is committed by a save after the full
-playing gate. Inventory, entities, containers and Heaven data retain their
-existing persistence paths. Older/future incompatible versions remain blocked.
+The v15 content remains available in current v16 worlds. Old generation versions
+are incompatible; current compatibility rules are described below.
 Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
+
+
+## Surface and cave ecology (generation v16)
+
+28 additional collectable blocks provide 18 surface and 10 cave materials/plants:
+andesite, diorite, gneiss, marble, laterite, red clay, cracked mud, salt crust;
+clover, heather, wild mint, nettle, desert flower, small cactus, reed flower,
+tundra moss, fallen twigs and jungle fern; cave moss, wet limestone, gypsum,
+amethyst/quartz blocks, iron-stained rock, sulfur rock, amethyst/quartz clusters
+and cave glowshroom. The fungus emits level-5 light; the new crystals do not emit.
+
+Materials form continuous world-coordinate patches. Rubble has one candidate per
+16×16 cell at 20% probability, a cross within a 3×3 footprint, and a maximum
+height of two. It avoids steep/wet ground, tree canopies and structure reservations.
+Cave crystal groups have one candidate per 8×8 cell per floor plane at 15%
+probability and at most five supported single-cell clusters. Each chunk reconstructs
+anchors independently, including negative coordinates and boundary crossings.
+Decorations occupy dry air and never replace water or occupied feature space.
+Wild mint and reed flowers generate near water. Shared substrate checks apply
+to generation and manual placement; crystals require natural rock support.
+Small cactus is non-colliding and causes no contact damage.
+
+New materials use opaque cubes; plants and crystal clusters use crossed cutout
+meshes. All drop themselves and stack to 64. Soil/salt/cave moss uses shovel
+acceleration without a harvest requirement; rock requires wooden or better
+pickaxes; crossed decorations can be collected by hand. No recipes or growth
+mechanics are added. Ten language catalogs include all new items.
+
+Only generation v16 worlds can load. v14/v15 and other previous or future
+versions stay listed as incompatible, retaining their untouched files. No world
+migration remains. Save format v12, seed layout 5, terrain heights, cave-carving
+algorithms, tree/structure anchors and Heaven generation v8 remain unchanged.

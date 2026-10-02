@@ -782,6 +782,118 @@
     "leaf_litter_side": {
       "recipe": "base",
       "variants": 1
+    },
+    "andesite": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "diorite": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "gneiss": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "marble": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "laterite": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "red_clay": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cracked_mud": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "salt_crust": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "clover": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "heather": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "wild_mint": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nettle": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "desert_flower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "small_cactus": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "reed_flower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "tundra_moss": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "fallen_twigs": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_fern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cave_moss": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "wet_limestone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "gypsum": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "amethyst_block": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "quartz_block": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "iron_stained_rock": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sulfur_rock": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "amethyst_cluster": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "quartz_cluster": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cave_glowshroom": {
+      "recipe": "base",
+      "variants": 1
     }
   },
   "examples": {

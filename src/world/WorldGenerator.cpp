@@ -1487,6 +1487,21 @@ void WorldGenerator::generate(Chunk& chunk,
 
     m_caveGenerator.decorateChunk(chunk, caveVolume);
 
+    const auto ecologyTrees = m_treeGenerator.generateTreesForArea(
+        wxBase-8,wzBase-8,Config::CHUNK_SIZE_X+16,Config::CHUNK_SIZE_Z+16,
+        [&](int tx,int tz,int& height,Biome& biome,bool& river) {
+            const auto c = m_heightPipeline.sampleColumn(tx,tz);
+            height=c.height; biome=c.biome; river=c.river;
+        });
+    const auto ecologyReserved = [&](int tx,int tz) {
+        if (m_structureGenerator.reservationAt(tx,tz)) return true;
+        for (const auto& tree : ecologyTrees)
+            if (std::abs(tx-(wxBase-8+tree.localX))<=6 &&
+                std::abs(tz-(wzBase-8+tree.localZ))<=6) return true;
+        return false;
+    };
+
+
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
             const int wx = wxBase + x, wz = wzBase + z;
@@ -1504,6 +1519,12 @@ void WorldGenerator::generate(Chunk& chunk,
             }
             if (!m_structureGenerator.reservationAt(wx,wz)) {
                 const auto context = SurfaceRules::contextForColumn(terrainColumns[static_cast<size_t>(z) * Config::CHUNK_SIZE_X + x]);
+                const auto rubble = SurfaceRules::rubbleColumn(m_seed,wx,wz,
+                    [&](int sx,int sz) { return m_heightPipeline.sampleColumn(sx,sz); },
+                    ecologyReserved);
+                if (SurfaceRules::placeRubble(rubble,context.height,
+                    [&](int y) { return chunk.getBlock(x,y,z); },
+                    [&](int y,BlockId block) { chunk.setBlock(x,y,z,block); })) continue;
                 SurfaceRules::decorateColumn(m_seed,wx,wz,context,
                     [&](int y) { return chunk.getBlock(x,y,z); },
                     [&](int y, BlockId block) { chunk.setBlock(x,y,z,block); },

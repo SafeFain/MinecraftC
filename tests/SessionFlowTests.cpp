@@ -13,6 +13,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -288,14 +290,31 @@ int main(int argc, char** argv) {
     }
 
     {
-        // v14 migration preserves metadata and never updates it before loading.
-        WorldCatalog migrationCatalog(root / "saves");
-        auto migrationStore = migrationCatalog.open(migrationCatalog.list().front().id);
-        auto migrationMetadata = migrationStore.loadMetadata();
-        migrationMetadata.generationVersion = 14;
-        migrationMetadata.inventory.slot(8) = {ItemId::IRON_INGOT,23,0};
-        migrationMetadata.heaven.worldTicks = 6789;
-        migrationStore.saveMetadata(migrationMetadata);
+        WorldCatalog currentCatalog(root / "saves");
+        auto currentStore = currentCatalog.open(currentCatalog.list().front().id);
+        auto currentMetadata = currentStore.loadMetadata();
+        currentMetadata.inventory.slot(8) = {ItemId::CAVE_GLOWSHROOM,23,0};
+        currentMetadata.heaven.worldTicks = 6789;
+        currentStore.saveMetadata(currentMetadata);
+        for (uint32_t version : {14u,15u,17u}) {
+            auto incompatible = currentMetadata;
+            incompatible.generationVersion = version;
+            currentStore.saveMetadata(incompatible);
+            std::ifstream beforeFile(currentStore.worldDirectory()/"level.bin",std::ios::binary);
+            const std::string before((std::istreambuf_iterator<char>(beforeFile)),{});
+            GameSession refused(root / "saves");
+            bool rejected = false;
+            try { refused.startWorld(currentCatalog.list().front().id,false,clock.now()); }
+            catch (const std::runtime_error&) { rejected = true; }
+            require(rejected && !refused.hasWorldStore(),
+                    "incompatible generation never attaches a world store");
+            refused.saveNow([] {});
+            refused.leaveWorld();
+            std::ifstream afterFile(currentStore.worldDirectory()/"level.bin",std::ios::binary);
+            const std::string after((std::istreambuf_iterator<char>(afterFile)),{});
+            require(before == after,"refused legacy/future save bytes remain untouched");
+        }
+        currentStore.saveMetadata(currentMetadata);
         // Reopening the world restores its mode and saved position.
         GameSession reopened(root / "saves");
         const auto worlds = reopened.listWorlds();
@@ -310,28 +329,21 @@ int main(int argc, char** argv) {
         require(position.x == 100000.0 && position.z == 100000.0 &&
                     position.y == Config::SEA_LEVEL + 1.01f,
                 "existing world restores the saved player position");
-        require(reopened.metadata().generationVersion == 14 &&
-                migrationStore.loadMetadata().generationVersion == 14 &&
-                reopened.playerState().inventory().slot(8).id == ItemId::IRON_INGOT &&
+        require(reopened.metadata().generationVersion == WorldGenContext::GENERATION_VERSION &&
+                reopened.playerState().inventory().slot(8).id == ItemId::CAVE_GLOWSHROOM &&
                 reopened.metadata().heaven.worldTicks == 6789,
-                "v14 loading retains inventory and Heaven without early metadata writes");
-        bool prematureSaveError = false;
-        reopened.saveNow([&] { prematureSaveError = true; });
-        require(!prematureSaveError && migrationStore.loadMetadata().generationVersion == 14,
-                "incomplete loading cannot write a migrated version");
+                "v16 restores new items and independent Heaven state");
         drainGeneration(reopened);
         GameSessionTestAccess::markTerrainReady(reopened);
-        bool migrationError = false;
-        reopened.saveNow([&] { migrationError = true; });
-        const auto migrated = migrationStore.loadMetadata();
-        require(!migrationError && migrated.generationVersion == WorldGenContext::GENERATION_VERSION &&
-                migrated.inventory.slot(8).id == ItemId::IRON_INGOT &&
-                migrated.inventory.slot(8).count == 23 && migrated.heaven.worldTicks == 6789,
-                "successful v14 migration saves v15 and preserves inventory and Heaven");
+        bool saveError = false;
+        reopened.saveNow([&] { saveError = true; });
+        require(!saveError && currentStore.loadMetadata().generationVersion == 16 &&
+                currentStore.loadMetadata().inventory.slot(8).count == 23,
+                "v16 saves new items and current generation version");
         reopened.leaveWorld();
         reopened.startWorld(worlds[0].id,false,clock.now());
-        require(reopened.metadata().generationVersion == WorldGenContext::GENERATION_VERSION,
-                "migrated v15 world reopens normally");
+        require(reopened.metadata().generationVersion == 16,
+                "v16 world reopens normally");
         drainGeneration(reopened);
     }
 

@@ -19,7 +19,7 @@ compiled face/material mappings. Rendering requires a valid generated albedo
 atlas; legacy atlases without semantic map declarations use runtime material-map
 synthesis. Authored/imported source images retain their provenance and are not
 silently substituted for malformed declared assets. The runtime atlas builds per-tile mip levels in linear light with alpha weighting
-and leaf coverage preservation. The v5 block atlas retains 188 foundation slots and appends physical variants/frames;
+and leaf coverage preservation. The v5 block atlas retains 216 foundation slots and appends physical variants/frames;
 its square grid is derived from physical count. Logical indices retain their existing order.
 Every registered `BlockTexture` now has a generated PNG loaded by its logical
 metadata name. Older authored and runtime-procedural tiles are fallback-only.
@@ -261,12 +261,12 @@ QA retains the 2.60 seam threshold, adding separate axis metrics for OKLab color
 and alpha. Directional turf caps wrap horizontally; upright sprites retain their
 orientation. Periodic-origin selection translates the whole tile without copying
 borders or changing connected clusters. Regression checks cover 36 seeds across
-all 188 materials, malformed/imported PNGs, authorable knobs, provenance, compact
+all 216 materials, malformed/imported PNGs, authorable knobs, provenance, compact
 packing, color-independent geometry, linear-light mip values and leaf coverage.
 
 ## V5 recipes, structural masks and sequences
 
-`definitions/recipes.json` version 1 covers all 188 block materials. A recipe starts
+`definitions/recipes.json` version 1 covers all 216 block materials. A recipe starts
 with `base`, may inherit a parent, and adds ordered `texture`, `cracks`, `veins` or
 `cover` layers. Each layer has independent integer `seed`, `density` (0–1), `scale`
 (0.25–16), palette `role`, optional RGBA `color`, a named `mask`, and optional
@@ -275,7 +275,7 @@ unknown operations, invalid palettes and budget overflows fail explicitly. A chi
 recipe can use `overrides: {"mask-name": {"density": 0.35}}` (or a zero-based layer
 index string) to override inherited layer parameters without mutating its parent.
 
-Canonical drawing palette choices carry role IDs through all 188 generators;
+Canonical drawing palette choices carry role IDs through all 216 generators;
 colors are applied after structure and periodic-cut decisions. Each default PNG
 has a matching `.semantic.json` containing roles, coverage/role/layer masks,
 property overrides, recipe digest and pixel digest. Atlas assembly rejects a

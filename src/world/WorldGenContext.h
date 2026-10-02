@@ -6,11 +6,11 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 15;
-    // v15 changes surface ecology only. v14 heights, seed domains, structure
-    // anchors and serialized edits remain compatible; older worlds do not.
+    static constexpr uint32_t GENERATION_VERSION = 16;
+    // v16 expands surface and cave ecology. Only current-generation worlds
+    // can load; old files remain listed but are never migrated.
     static constexpr bool canLoadGeneration(uint32_t version) {
-        return version == GENERATION_VERSION || version == 14;
+        return version == GENERATION_VERSION;
     }
 
     // Base chunk caches may be invalidated without changing the user-visible

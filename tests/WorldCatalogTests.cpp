@@ -37,18 +37,20 @@ int main() {
         legacy.displayName = "Surface v14";
         legacy.generationVersion = 14;
         SaveStore(root / "surface-v14").saveMetadata(legacy);
+        legacy.generationVersion = 15;
+        SaveStore(root / "surface-v15").saveMetadata(legacy);
         legacy.generationVersion = WorldGenContext::GENERATION_VERSION + 1;
         SaveStore(root / "future-world").saveMetadata(legacy);
         require(first == "my-survival-world", "display name creates a safe id");
         require(second == "my-survival-world-2", "duplicate names get unique ids");
         const auto worlds = catalog.list();
-        require(worlds.size() == 6, "catalog lists compatible and legacy saves");
+        require(worlds.size() == 7, "catalog lists compatible and legacy saves");
         bool sawLegacy = false;
         bool sawSuperflat = false;
         for (const auto& world : worlds) {
-            if (world.id == "surface-v14" || world.id == "future-world") {
-                require(world.compatible == (world.id == "surface-v14"),
-                        "catalog allows v14 migration but rejects future versions");
+            if (world.id == "surface-v14" || world.id == "surface-v15" || world.id == "future-world") {
+                require(!world.compatible,
+                        "catalog rejects every previous or future generation version");
                 continue;
             }
             require(world.generationVersion == 2 || world.generationVersion == 3 ||

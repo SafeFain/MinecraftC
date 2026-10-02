@@ -125,7 +125,7 @@ class MaterialRecipeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             out=Path(directory);tg.generate(out,1,{'stone':123});metadata=tg.build_atlas(out,1,{'stone':123})
             data=(out/'atlas_sequences.bin').read_bytes();self.assertEqual(data[:8],b'MCTSEQ5\0')
-            self.assertEqual(len(data),12+188*272);self.assertEqual(struct.unpack_from('<I',data,8)[0],188)
+            self.assertEqual(len(data),12+len(tg.NAMES)*272);self.assertEqual(struct.unpack_from('<I',data,8)[0],len(tg.NAMES))
             count=len(metadata['physical_tiles']);self.assertEqual(metadata['grid_size'],math.ceil(math.sqrt(count)))
             self.assertLessEqual(metadata['grid_size']*16,1024)
             width,_,atlas=tg.read_generated_png(out/'atlas.png')

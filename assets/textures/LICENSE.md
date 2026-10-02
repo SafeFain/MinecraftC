@@ -124,3 +124,13 @@ the v4 style and seed 213785369. No new third-party raster assets were imported.
 The dependency-free local workbench uses the same generator and records recipes,
 seeds and digests in its exports. Existing historical asset attributions above
 remain applicable to their named source assets.
+
+
+# Generation v16 ecology assets
+
+The 28 additional block materials and matching inventory icons are original
+MinecraftC deterministic procedural artwork generated with the v5 tool and
+seed 213785369, under CC0-1.0. Rock strata, salt/mud cracks, mineral facets and
+13 plant/crystal silhouettes use native recipes; no external artwork or image
+service was used. Four deterministic variants are provided for each new cube.
+Existing logical material slots and previous individual textures are retained.
