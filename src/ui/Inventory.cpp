@@ -15,7 +15,7 @@ void CreativeInventory::selectCategory(CreativeItemCategory category) {
     m_activeCategory = category;
     m_slots.clear();
     for (const ItemId id : creativeInventoryItemsIn(category))
-        m_slots.push_back({id,0,0,false,false});
+        m_slots.push_back({id,0,0,false,false,{}});
     m_scrollRow = 0;
     m_focus = 0;
     m_tabMode = false;
@@ -25,6 +25,7 @@ void CreativeInventory::selectCategory(CreativeItemCategory category) {
 }
 
 void CreativeInventory::updateSlotHover() {
+    for (auto& tab : m_tabs) tab.hovered=false;
     for (size_t i = 0; i < m_slots.size(); ++i)
         m_slots[i].hovered = static_cast<int>(i) == m_focus;
 }
@@ -85,6 +86,7 @@ void CreativeInventory::layoutSlots(int width,int height) {
 
 void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,int mouseY) {
     layoutSlots(width,height);
+    if (m_gamepadFocus && !m_tabMode) updateSlotHover();
     const float slot=m_slotSize;
     constexpr float footer=34.0f,tabGapY=14.0f;
     ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),
@@ -100,18 +102,18 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
                             m_panelY+14.0f,.8f,UiTheme::TEXT_DIM);
     const std::string playerLabel=ui.localization().text("inventory.player_tab");
     UiTheme::button(ui,m_playerButtonX,m_playerButtonY,m_playerButtonW,
-                    m_playerButtonH,playerLabel,UiTheme::WidgetState::Normal,
-                    false,0.72f);
+                    m_playerButtonH,playerLabel,m_playerHovered?UiTheme::WidgetState::Hover:UiTheme::WidgetState::Normal,
+                    false,0.72f,1,-1,-1,false,0,&m_playerFeedback);
 
     // Icon tabs (Minecraft style): one representative item per category.
     int hoveredTab=-1;
     for(size_t i=0;i<m_tabs.size();++i){
-        const auto& tab=m_tabs[i];
+        auto& tab=m_tabs[i];
         const bool active=static_cast<int>(i)==
             static_cast<int>(m_activeCategory);
         const UiTheme::WidgetState state=active?UiTheme::WidgetState::Selected
             :tab.hovered?UiTheme::WidgetState::Hover:UiTheme::WidgetState::Normal;
-        UiTheme::button(ui,tab.x,tab.y,tab.w,tab.h,{},state,false,0.0f);
+        UiTheme::button(ui,tab.x,tab.y,tab.w,tab.h,{},state,false,0.0f,1,-1,-1,false,0,&tab.feedback);
         const auto& info=creativeCategoryInfo(static_cast<CreativeItemCategory>(i));
         const float iconSize=std::max(1.0f,std::min({20.0f,tab.h-6.0f,tab.w-4.0f}));
         ui.drawItemIcon(tab.x+(tab.w-iconSize)*.5f,tab.y+(tab.h-iconSize)*.5f,
@@ -128,18 +130,18 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
         tabBarBottom-(tabGapY+categorySize.y)*.5f,categoryScale,UiTheme::TEXT_DIM);
 
     const Slot* hovered=nullptr;
-    for(const auto& item:m_slots){
+    for(auto& item:m_slots){
         if(!item.visible) continue;
         const auto& props=getItemProps(item.id);
         const glm::vec3 background = props.placedBlock
             ? glm::mix(glm::vec3(UiTheme::SLOT),getBlockProps(*props.placedBlock).color,.12f)
             : glm::vec3(UiTheme::SLOT);
-        const UiTheme::WidgetState state = item.id==m_selected
+        const UiTheme::WidgetState state = item.id==m_selected || (m_gamepadFocus && item.hovered)
             ? UiTheme::WidgetState::Selected
             : item.hovered ? UiTheme::WidgetState::Hover
                            : UiTheme::WidgetState::Normal;
         UiTheme::slot(ui,item.x,item.y,slot,slot,state,
-                      glm::vec4(background,1.0f));
+                      glm::vec4(background,1.0f),1,&item.feedback);
         ui.drawItemIcon(item.x+4,item.y+4,slot-8,slot-8,{item.id,1,0});
         if(item.hovered)hovered=&item;
     }
@@ -151,28 +153,37 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
         UiTheme::scrollBar(ui,trackX,trackY,6.0f,trackH,
                            m_scrollRow,m_visibleRows,m_totalRows);
     }
-    if(hovered)ui.drawTooltip(mouseX+12.0f,mouseY+12.0f,{hovered->id,1,0});
+    if(hovered)ui.drawTooltip(m_gamepadFocus?hovered->x+slot:mouseX+12.0f,
+        m_gamepadFocus?hovered->y+slot:mouseY+12.0f,{hovered->id,1,0});
     else if(hoveredTab>=0){
         const auto& info=creativeCategoryInfo(
             static_cast<CreativeItemCategory>(hoveredTab));
-        UiTheme::tooltip(ui,mouseX+12.0f,mouseY+12.0f,
+        const auto& tab=m_tabs[static_cast<size_t>(hoveredTab)];
+        UiTheme::tooltip(ui,m_gamepadFocus?tab.x+tab.w:mouseX+12.0f,
+                         m_gamepadFocus?tab.y+tab.h:mouseY+12.0f,
                          ui.localization().text(info.localizationKey));
     }
 }
 
 void CreativeInventory::onMouseMove(int x,int y){
+    m_gamepadFocus=false;
+    m_playerHovered=x>=m_playerButtonX&&x<=m_playerButtonX+m_playerButtonW&&
+        y>=m_playerButtonY&&y<=m_playerButtonY+m_playerButtonH;
     const float slot=m_slotSize;
     for(auto& item:m_slots)item.hovered=item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot;
+    for (size_t i=0;i<m_slots.size();++i) if (m_slots[i].hovered) m_focus=static_cast<int>(i);
     for(auto& tab:m_tabs)tab.hovered=x>=tab.x&&x<=tab.x+tab.w&&y>=tab.y&&y<=tab.y+tab.h;
 }
 
 void CreativeInventory::onMouseClick(int button,int x,int y,
                                      std::function<void(ItemId)> select,
                                      std::function<void()> openPlayerInventory){
+    m_gamepadFocus=false;
     if(button!=MouseButton::Left && button!=MouseButton::Middle) return;
     for(size_t i=0;i<m_tabs.size();++i){
-        const auto& tab=m_tabs[i];
+        auto& tab=m_tabs[i];
         if(x>=tab.x&&x<=tab.x+tab.w&&y>=tab.y&&y<=tab.y+tab.h){
+            m_tabs[i].feedback.activate();
             selectCategory(static_cast<CreativeItemCategory>(i));
             return;
         }
@@ -183,8 +194,8 @@ void CreativeInventory::onMouseClick(int button,int x,int y,
         return;
     }
     const float slot=m_slotSize;
-    for(const auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
-        m_selected=item.id;if(select)select(item.id);return;}
+    for(auto& item:m_slots)if(item.visible&&x>=item.x&&x<=item.x+slot&&y>=item.y&&y<=item.y+slot){
+        item.feedback.activate();m_selected=item.id;if(select)select(item.id);return;}
 }
 
 void CreativeInventory::onScroll(double yOffset){
@@ -193,6 +204,7 @@ void CreativeInventory::onScroll(double yOffset){
 }
 
 void CreativeInventory::onGamepadNavigate(int dx,int dy) {
+    m_gamepadFocus=true;m_playerHovered=false;
     const int categoryCount=static_cast<int>(m_tabs.size());
     if(m_tabMode){
         if(dx!=0){
@@ -223,11 +235,15 @@ void CreativeInventory::onGamepadNavigate(int dx,int dy) {
 
 void CreativeInventory::onGamepadAction(bool select,std::function<void(ItemId)> callback) {
     if(!select)return;
+    m_gamepadFocus=true;
     if(m_tabMode){
+        m_tabs[static_cast<size_t>(m_tabFocus)].feedback.activate();
         selectCategory(static_cast<CreativeItemCategory>(m_tabFocus));
         return;
     }
     if(m_focus<0||m_focus>=static_cast<int>(m_slots.size()))return;
+    updateSlotHover();
+    m_slots[static_cast<size_t>(m_focus)].feedback.activate();
     m_selected=m_slots[static_cast<size_t>(m_focus)].id;
     if(callback)callback(m_selected);
 }

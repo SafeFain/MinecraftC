@@ -2,6 +2,7 @@
 
 #include "core/Input.h"
 #include "core/Touch.h"
+#include "ui/UILayout.h"
 
 #include <algorithm>
 #include <array>
@@ -79,6 +80,7 @@ private:
     glm::vec2 m_lookDelta{0.0f};
     std::unordered_map<TouchContactId, Capture, TouchContactHash> m_touches;
     bool m_jumpHeld = false, m_sneakHeld = false;
+    mutable std::array<UiFeedback, static_cast<size_t>(Target::Hotbar)> m_feedback{};
 
     Target targetAt(float x, float y, int& slot) const;
     void updateMove(float x, float y);

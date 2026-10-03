@@ -209,6 +209,11 @@ constexpr float UI_BUTTON_SPACING    = 12.0f;
 constexpr float UI_FONT_SCALE        = 1.8f;
 constexpr float UI_TITLE_SCALE       = 4.5f;
 constexpr float UI_OVERLAY_ALPHA     = 0.55f;
+constexpr float UI_HOVER_SECONDS     = 0.12f;
+constexpr float UI_FOCUS_SECONDS     = 0.10f;
+constexpr float UI_PRESS_SECONDS     = 0.06f;
+constexpr float UI_RELEASE_SECONDS   = 0.14f;
+constexpr float UI_ACTIVATE_SECONDS  = 0.18f;
 
 // Modern UI palette lives in src/ui/UIStyle.h (UiTheme); these constants
 // remain as the shared, backend-neutral names other subsystems may reference.

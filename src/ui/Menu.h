@@ -55,6 +55,7 @@ public:
     bool containsPoint(float px, float py) const;
     void setHovered(bool h) { m_hovered = h; }
     void setSelected(bool s) { m_selected = s; }
+    void setFocusVisible(bool visible) { m_focusVisible = visible; }
     void setPressed(bool p) { m_pressed = p; }
     void setLabel(std::string label) { m_label = std::move(label); }
     void setDetail(std::string detail) { m_detail = std::move(detail); }
@@ -64,6 +65,8 @@ public:
     void setBottomInset(float inset) { m_bottomInset = inset; }
     bool isHovered() const { return m_hovered; }
     bool isSelected() const { return m_selected; }
+    bool isEnabled() const { return m_enabled; }
+    void inheritFeedback(const Button& previous) { m_feedback = previous.m_feedback; }
 
     void render(UIRenderer& ui) const;
     void activate();
@@ -85,9 +88,9 @@ private:
     bool m_danger = false;
     bool m_primary = false;
     bool m_enabled = true;
+    bool m_focusVisible = true;
     float m_bottomInset = 0;
-    mutable UiTransition m_hoverTransition, m_pressTransition;
-    mutable uint64_t m_animationFrame = UINT64_MAX;
+    mutable UiFeedback m_feedback;
 };
 
 // ── Menu base class ───────────────────────────────────────────────────────
@@ -107,14 +110,21 @@ public:
     virtual void onChar(unsigned int) {}
     virtual bool wantsTextInput() const { return false; }
     virtual bool capturesPointerDrag(double, double) const { return false; }
+    virtual void onPointerCancel() {}
 
 private:
     UiTransition m_fade;
 
 protected:
+    void navigationFocus() { m_pointerFocus = false; }
+    void pointerFocus(double x, double y) { m_pointerFocus = true; m_pointer = {x,y}; }
+    void prepareButton(Button& button);
+    void cancelButtons(std::vector<Button>& buttons);
     void navigateUp(std::vector<Button>& buttons, int& selectedIdx);
     void navigateDown(std::vector<Button>& buttons, int& selectedIdx);
     void activateSelected(std::vector<Button>& buttons, int selectedIdx);
+    bool m_pointerFocus = false;
+    glm::dvec2 m_pointer{0};
 };
 
 // ── Main Menu ─────────────────────────────────────────────────────────────
@@ -131,6 +141,7 @@ public:
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
     void onChar(unsigned int codepoint) override;
+    void onPointerCancel() override;
     bool wantsTextInput() const override { return m_page == Page::Create; }
 
 private:
@@ -145,6 +156,7 @@ private:
     std::vector<Button> m_deleteButtons;
     int m_selectedIdx = 0;
     Page m_page = Page::Home;
+    Page m_buttonPage = Page::Home;
     Field m_field = Field::Name;
     TextEditBuffer m_worldName{{}, 32};
     TextEditBuffer m_seedText{{}, 20};
@@ -186,6 +198,7 @@ public:
     void onKeyPress(int key, int mods = 0) override;
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
+    void onPointerCancel() override;
 
 private:
     std::vector<Button> m_buttons;
@@ -204,6 +217,7 @@ public:
     void onKeyPress(int key, int mods = 0) override;
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
+    void onPointerCancel() override;
 
 private:
     std::vector<Button> m_buttons;

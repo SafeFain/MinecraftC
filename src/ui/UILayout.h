@@ -3,6 +3,7 @@
 #include "Config.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <glm/glm.hpp>
 
 struct UiCanvasFit {
@@ -39,6 +40,50 @@ struct UiTransition {
         value=target?std::min(1.0f,value+step):std::max(0.0f,value-step);
     }
 };
+
+// Each widget owns its feedback; rendering it twice in a frame must not speed
+// up motion. A short pulse makes a tap/keyboard activation visible even when
+// press and release happen between two rendered frames.
+struct UiFeedback {
+    UiTransition hover, focus, press, pulse;
+    uint64_t frame = UINT64_MAX;
+
+    void activate() { pulse.value = 1; }
+    void sample(uint64_t serial, float dt, bool hovered, bool focused, bool pressed) {
+        if (frame == serial) return;
+        frame = serial;
+        hover.tick(dt, hovered || focused || pressed, Config::UI_HOVER_SECONDS);
+        focus.tick(dt, focused, Config::UI_FOCUS_SECONDS);
+        press.tick(dt, pressed, pressed ? Config::UI_PRESS_SECONDS : Config::UI_RELEASE_SECONDS);
+        pulse.tick(dt, false, Config::UI_ACTIVATE_SECONDS);
+    }
+    static float ease(float value) { return value * value * (3 - 2 * value); }
+    float hoverAmount() const { return ease(hover.value); }
+    float focusAmount() const { return ease(focus.value); }
+    float pressAmount() const { return ease(std::max(press.value, pulse.value)); }
+};
+
+// Navigation uses actual fitted rectangle centers, including small touch
+// canvases. Keeping an index lets focus follow its slot after a resize.
+template<class Rects>
+inline int uiDirectionalNeighbor(const Rects& rects,int current,int dx,int dy) {
+    if (rects.empty()) return -1;
+    current=std::clamp(current,0,static_cast<int>(rects.size())-1);
+    if (!dx && !dy) return current;
+    if (dy) dx=0;
+    const auto& origin=rects[static_cast<size_t>(current)];
+    const float x=origin.x+origin.w*.5f,y=origin.y+origin.h*.5f;
+    float best=1e30f;
+    int chosen=current;
+    for (size_t i=0;i<rects.size();++i) {
+        const auto& r=rects[i];
+        const float vx=r.x+r.w*.5f-x,vy=r.y+r.h*.5f-y;
+        if ((dx && vx*dx<=1) || (dy && vy*dy<=1)) continue;
+        const float score=(dx?std::abs(vx):std::abs(vy))+2*(dx?std::abs(vy):std::abs(vx));
+        if (score<best) { best=score;chosen=static_cast<int>(i); }
+    }
+    return chosen;
+}
 
 inline int uiTextLineCapacity(float height,float reserved,float lineHeight) {
     if (!(lineHeight>0)) return 0;

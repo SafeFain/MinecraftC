@@ -66,9 +66,9 @@ int main(int argc,char** argv) {
         VillagerTradeScreen trades(items);trades.open(access,1);
         Hotbar hotbar;hotbar.setInventory(&items);
         TouchControls touch;touch.configure(width,height,{});
-        const auto draw=[&](const std::string& name,const std::function<void()>& render) {
+        const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
             size_t previousVertices=0,previousBatches=0;
-            for (int frame=0;frame<12;++frame) {
+            for (int frame=0;frame<frames;++frame) {
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -135,6 +135,34 @@ int main(int argc,char** argv) {
             UiTheme::menuBackground(ui,width,height);
             UiTheme::tooltip(ui,width-8,height-8,"A long inventory tooltip that wraps safely within a small viewport");
         });
+        int activations=0;
+        Button feedbackButton(localization.text("menu.home.settings"),[&]{++activations;});
+        const float feedbackWidth=std::min(320.0f,width-32.0f);
+        feedbackButton.setPosition((width-feedbackWidth)*.5f,height*.5f-22);
+        feedbackButton.setSize(feedbackWidth,44);
+        const auto feedbackScene=[&]{
+            UiTheme::menuBackground(ui,width,height);feedbackButton.render(ui);
+        };
+        draw("button-normal",feedbackScene);
+        feedbackButton.setHovered(true);draw("button-hover",feedbackScene);
+        feedbackButton.setPressed(true);draw("button-pressed",feedbackScene);
+        feedbackButton.setPressed(false);draw("button-released",feedbackScene);
+        feedbackButton.setHovered(false);feedbackButton.setSelected(true);
+        draw("button-navigation",feedbackScene);
+        feedbackButton.activate();draw("button-activation",feedbackScene,4);
+        if (activations!=1) throw std::runtime_error("feedback delays or duplicates activation");
+        feedbackButton.setEnabled(false);draw("button-disabled",feedbackScene);
+        creative.onGamepadNavigate(1,0);
+        draw("creative-focus",[&]{creative.render(ui,width,height,-10000,-10000);});
+        survival.onGamepadNavigate(1,0);
+        draw("survival-focus",[&]{survival.render(ui,width,height,-10000,-10000);});
+        container.onGamepadNavigate(1,0);
+        draw("container-focus",[&]{container.render(ui,width,height,-10000,-10000);});
+        touch.onTouch({{1,1},TouchPhase::Begin,width-20.0,height-20.0});
+        draw("hud-touch-pressed",[&]{
+            UiTheme::menuBackground(ui,width,height);hotbar.render(ui,width,height);touch.render(ui);
+        });
+        touch.onTouch({{1,1},TouchPhase::End,width-20.0,height-20.0});
         for (Language language:languagesByEnglishName()) {
             localization.setLanguage(language);
             SettingsMenu translated(settings,[]{},[]{},localization);

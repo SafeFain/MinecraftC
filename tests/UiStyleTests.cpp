@@ -70,5 +70,26 @@ int main() {
     require(std::abs(feedback.value-.5f)<.001f,"feedback reverses without a discontinuity");
     feedback.tick(-1,true,.1f);
     require(std::abs(feedback.value-.5f)<.001f,"negative time does not advance animation");
+
+    for (int rate : {30,60,120,200}) {
+        UiFeedback widget;
+        for (int i=0;i<rate;++i) widget.sample(i,1.0f/rate,true,false,false);
+        require(widget.hoverAmount()==1,"hover settles at every supported frame rate");
+        const auto hovered=widget.hoverAmount();
+        widget.sample(rate-1,1,false,false,false);
+        require(widget.hoverAmount()==hovered,"duplicate draw cannot advance interaction time");
+        widget.activate();
+        widget.sample(rate,1.0f/rate,false,false,false);
+        require(widget.pressAmount()>.8f,"a tap between frames retains visible feedback");
+        for (int i=rate+1;i<rate*2;++i) widget.sample(i,1.0f/rate,false,false,false);
+        require(widget.hoverAmount()==0&&widget.pressAmount()==0,
+                "hover and activation feedback settle after release");
+    }
+    const std::vector<Rect> fittedSlots{{12,20,18,18},{34,20,18,18},{12,42,18,18}};
+    require(uiDirectionalNeighbor(fittedSlots,0,1,0)==1 &&
+            uiDirectionalNeighbor(fittedSlots,0,0,1)==2 &&
+            uiDirectionalNeighbor(fittedSlots,0,0,0)==0 &&
+            uiDirectionalNeighbor(fittedSlots,0,-1,0)==0,
+            "small fitted slots navigate by their real centers and stop at edges");
     std::cout<<"Modern UI geometry, responsive layout and transitions passed\n";
 }

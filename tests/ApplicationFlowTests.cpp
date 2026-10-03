@@ -27,6 +27,7 @@
 #include "renderer/GameRenderer.h"
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
+#include "ui/UIStyle.h"
 #include "debug/Log.h"
 #include "Config.h"
 
@@ -41,6 +42,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 struct GameSessionTestAccess {
     static void markPlayerDead(GameSession& session) {
@@ -58,14 +60,24 @@ struct GameSessionTestAccess {
 // UIRenderer is a graphics-backed facade; the flow tests never render, so these
 // inert definitions keep the target free of the Vulkan backend (same pattern
 // as InputRoutingTests).
-namespace { glm::vec2 drawnShortcutSlot{-1,-1}; }
+namespace {
+glm::vec2 drawnShortcutSlot{-1,-1};
+struct DrawnRounded { float x,y,w,h; glm::vec4 color; };
+bool recordUi=false;
+std::vector<DrawnRounded> drawnRounded;
+std::unordered_map<std::string,glm::vec2> drawnLabels;
+}
 
 UIRenderer::~UIRenderer() = default;
 void UIRenderer::beginUIFrame(int, int) {}
 void UIRenderer::setCanvas(float, float, float, float) {}
 void UIRenderer::endUIFrame() {}
-void UIRenderer::drawRoundedRect(float,float,float,float,float,const glm::vec4&) {}
-void UIRenderer::renderTextAlpha(const std::string&,float,float,float,const glm::vec3&,float) {}
+void UIRenderer::drawRoundedRect(float x,float y,float w,float h,float,const glm::vec4& color) {
+    if (recordUi) drawnRounded.push_back({x,y,w,h,color});
+}
+void UIRenderer::renderTextAlpha(const std::string& label,float x,float y,float,const glm::vec3&,float) {
+    if (recordUi) drawnLabels[label]={x,y};
+}
 void UIRenderer::setOpacity(float) {}
 void UIRenderer::drawRect(float, float, float, float, const glm::vec4&) {}
 void UIRenderer::drawBlockIcon(float, float, float, float, BlockId) {}
@@ -110,6 +122,17 @@ void require(bool condition, const char* message) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
     }
+}
+
+glm::vec4 drawnBorder(glm::vec2 center) {
+    glm::vec4 color{0};
+    float width=0;
+    for (const auto& r:drawnRounded)
+        if (r.h<=Config::UI_BUTTON_HEIGHT && r.color.a>.9f && r.w>width &&
+            center.x>=r.x && center.x<=r.x+r.w && center.y>=r.y && center.y<=r.y+r.h) {
+            width=r.w;color=r.color;
+        }
+    return color;
 }
 
 // Inert renderer for the loading gate: mesh uploads/releases are no-ops.
@@ -286,6 +309,137 @@ int main() {
             std::cerr << "FAILED: no SDL video driver can create a window\n";
             return 1;
         }
+    }
+
+    {
+        recordUi=true;
+        UIRenderer ui; Localization localization;ui.setLocalization(localization);
+        int confirmed=0;
+        Button button("feedback",[&]{++confirmed;});
+        button.setPosition(10,20);button.setSize(200,44);button.setHovered(true);
+        ui.advanceTime(.5f);drawnRounded.clear();button.render(ui);
+        require(drawnBorder({110,42}).g>UiTheme::BORDER.g+.2f,
+                "mouse hover visibly highlights the border");
+        button.setPressed(true);ui.advanceTime(.1f);drawnRounded.clear();button.render(ui);
+        require(button.containsPoint(10,20)&&button.containsPoint(210,64),
+                "pressed motion keeps the original click corners active");
+        button.setPressed(false);button.setHovered(false);button.activate();
+        ui.advanceTime(1.0f/60);drawnRounded.clear();button.render(ui);
+        require(confirmed==1&&drawnBorder({110,42}).g>UiTheme::BORDER.g+.2f,
+                "immediate activation still leaves a visible pulse");
+        button.setEnabled(false);button.activate();
+        require(confirmed==1,"disabled buttons cannot activate");
+
+        MenuCallbacks callbacks;PauseMenu menu(callbacks,localization);
+        const auto renderMenu=[&]{drawnRounded.clear();ui.advanceTime(.5f);menu.render(ui,640,480);};
+        renderMenu();
+        const auto resume=drawnLabels.at("menu.pause.resume");
+        const auto options=drawnLabels.at("menu.home.settings");
+        const auto quit=drawnLabels.at("menu.home.quit");
+        menu.onMouseMove(quit.x,quit.y);renderMenu();
+        require(drawnBorder(quit).g>UiTheme::BORDER.g+.2f&&drawnBorder(resume)==UiTheme::BORDER,
+                "pointer hover clears the previous navigation highlight");
+        menu.onKeyPress(Key::Down);renderMenu();
+        require(drawnBorder(options)==UiTheme::ACCENT&&drawnBorder(quit)==UiTheme::BORDER,
+                "keyboard/controller navigation clears the stationary pointer highlight");
+        recordUi=false;
+    }
+
+    {
+        Harness harness(root,*window);
+        int confirmed=0;
+        MenuCallbacks callbacks;callbacks.onResume=[&]{++confirmed;};
+        harness.ui.activeMenu=std::make_unique<PauseMenu>(callbacks,harness.ui.localization);
+        harness.ui.guiScale=1;
+        harness.settings.controlMode=ControlMode::Touch;
+        recordUi=true;
+        const auto safe=window->safeArea();
+        harness.ui.activeMenu->render(harness.ui.renderer,safe.width,safe.height);
+        const auto center=drawnLabels.at("menu.pause.resume");
+        const auto event=[&](TouchPhase phase,glm::vec2 position) {
+            const double sx=static_cast<double>(window->windowWidth())/window->width();
+            const double sy=static_cast<double>(window->windowHeight())/window->height();
+            harness.router.handleTouch({{9,1},phase,(safe.x+position.x)*sx,
+                (window->height()-safe.y-position.y)*sy});
+        };
+        event(TouchPhase::Begin,center);
+        require(harness.inputs.uiTouch.buttonDown&&confirmed==0,
+                "touch menus capture on finger down and activate on release");
+        event(TouchPhase::Move,center+glm::vec2(0,60));
+        event(TouchPhase::End,center);
+        require(confirmed==0&&!harness.inputs.uiTouch.active,
+                "scrolling from a menu button cancels activation");
+        event(TouchPhase::Begin,center);event(TouchPhase::Cancel,center);
+        require(confirmed==0,"system touch cancellation never activates a menu button");
+        event(TouchPhase::Begin,center);event(TouchPhase::End,center);
+        require(confirmed==1&&!harness.inputs.uiPointerVisible,
+                "a normal tap activates once and clears hover after finger lift");
+        event(TouchPhase::Begin,center);
+        event(TouchPhase::Move,center+glm::vec2(500,0));event(TouchPhase::End,center);
+        require(confirmed==1,"releasing outside the captured button cancels a tap");
+        harness.ui.activeMenu->onMouseButton(MouseButton::Left,ButtonAction::Press,center.x,center.y);
+        harness.router.bind();
+        SDL_Event lost{};lost.type=SDL_EVENT_WINDOW_FOCUS_LOST;window->handleEvent(&lost);
+        harness.ui.activeMenu->onMouseButton(MouseButton::Left,ButtonAction::Release,center.x,center.y);
+        require(confirmed==1,"focus loss cancels captured mouse presses");
+        window->setKeyCallback({});window->setCharCallback({});
+        window->setMouseButtonCallback({});window->setScrollCallback({});
+        window->setTouchCallback({});window->setFocusCallback({});
+        window->setScreenKeyboardCallback({});
+        recordUi=false;
+    }
+
+    {
+        SDL_VirtualJoystickDesc descriptor{};SDL_INIT_INTERFACE(&descriptor);
+        descriptor.type=SDL_JOYSTICK_TYPE_GAMEPAD;descriptor.naxes=6;descriptor.nbuttons=15;
+        descriptor.axis_mask=(1u<<SDL_GAMEPAD_AXIS_LEFTX)|(1u<<SDL_GAMEPAD_AXIS_LEFTY);
+        descriptor.button_mask=1u<<SDL_GAMEPAD_BUTTON_SOUTH;
+        descriptor.name="MinecraftC UI Gamepad";
+        const auto id=SDL_AttachVirtualJoystick(&descriptor);
+        require(id!=0,"UI test virtual controller attaches");
+        SDL_Event added{};added.type=SDL_EVENT_GAMEPAD_ADDED;added.gdevice.which=id;window->handleEvent(&added);
+        auto* joystick=SDL_OpenJoystick(id);require(joystick!=nullptr,"UI virtual joystick opens");
+        Harness harness(root,*window);
+        int confirmed=0;
+        MenuCallbacks callbacks;callbacks.onOpenSettings=[&]{++confirmed;};
+        harness.ui.activeMenu=std::make_unique<PauseMenu>(callbacks,harness.ui.localization);
+        const auto update=[&]{SDL_UpdateJoysticks();harness.router.beginFrame(harness.clock.now(),false);};
+        require(SDL_SetJoystickVirtualAxis(joystick,SDL_GAMEPAD_AXIS_LEFTY,32767),"UI controller axis updates");
+        update();
+        require(SDL_SetJoystickVirtualAxis(joystick,SDL_GAMEPAD_AXIS_LEFTY,0),"UI controller axis centers");
+        update();
+        require(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_SOUTH,true),"UI controller confirms");
+        update();update();
+        require(confirmed==1&&!harness.inputs.uiPointerVisible,
+                "controller navigation and A confirm once while keeping the stationary cursor hidden");
+        require(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_SOUTH,false),"UI controller releases");
+        update();
+        harness.inputs.uiTouch.active=true;
+        require(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_SOUTH,true),"UI mixed-input confirms");
+        update();harness.inputs.uiTouch.active=false;update();
+        require(confirmed==1,"a held controller button cannot steal an active touch or activate after lift");
+        SDL_CloseJoystick(joystick);require(SDL_DetachVirtualJoystick(id),"UI controller detaches");
+        SDL_Event removed{};removed.type=SDL_EVENT_GAMEPAD_REMOVED;removed.gdevice.which=id;window->handleEvent(&removed);
+    }
+
+    for (const auto size:{glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+        InventoryModel inventory;inventory.slot(1)={ItemId::DIRT,8,0};
+        SurvivalInventoryScreen screen(inventory);
+        UIRenderer ui;Localization localization;ui.setLocalization(localization);
+        screen.render(ui,960,600,-10000,-10000);
+        screen.onGamepadNavigate(1,0);
+        ui.advanceTime(.5f);screen.render(ui,size.x,size.y,-10000,-10000);
+        screen.onGamepadAction(0);
+        require(inventory.slot(1).empty(),"controller focus follows its slot across canvas resizing");
+        screen.onGamepadNavigate(1,0);screen.onGamepadAction(0);
+        require(inventory.slot(2).id==ItemId::DIRT&&inventory.slot(2).count==8,
+                "controller navigation places into the adjacent fitted slot");
+        recordUi=true;
+        screen.onMouseMove(-10000,-10000);ui.advanceTime(.5f);drawnRounded.clear();
+        screen.render(ui,size.x,size.y,-10000,-10000);
+        require(drawnBorder(drawnShortcutSlot)==UiTheme::BORDER,
+                "mouse movement releases stale controller inventory focus");
+        recordUi=false;
     }
 
     {

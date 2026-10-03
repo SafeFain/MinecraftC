@@ -51,23 +51,20 @@ bool Button::containsPoint(float px, float py) const {
 
 void Button::render(UIRenderer& ui) const {
     UiTheme::WidgetState state = UiTheme::WidgetState::Normal;
-    if (m_pressed) state = UiTheme::WidgetState::Pressed;
-    else if (m_selected) state = UiTheme::WidgetState::Selected;
-    else if (m_hovered) state = UiTheme::WidgetState::Hover;
-    if (m_animationFrame != ui.frameSerial()) {
-        m_animationFrame=ui.frameSerial();
-        m_hoverTransition.tick(ui.frameDelta(),m_hovered||m_selected,0.10f);
-        m_pressTransition.tick(ui.frameDelta(),m_pressed,0.08f);
+    if (m_enabled) {
+        if (m_pressed && m_hovered) state = UiTheme::WidgetState::Pressed;
+        else if (m_selected && m_focusVisible) state = UiTheme::WidgetState::Selected;
+        else if (m_hovered) state = UiTheme::WidgetState::Hover;
     }
     const float alpha=m_enabled?1.0f:.45f;
     if (m_detail.empty()) {
-        UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger,0,alpha,m_hoverTransition.value,m_pressTransition.value,m_primary,m_bottomInset);
+        UiTheme::button(ui, m_x, m_y, m_w, m_h, m_label, state, m_danger,0,alpha,-1,-1,m_primary,m_bottomInset,&m_feedback);
         return;
     }
-    UiTheme::button(ui, m_x, m_y, m_w, m_h, "", state, m_danger,0,alpha,m_hoverTransition.value,m_pressTransition.value,m_primary,m_bottomInset);
+    UiTheme::button(ui, m_x, m_y, m_w, m_h, "", state, m_danger,0,alpha,-1,-1,m_primary,m_bottomInset,&m_feedback);
     const float padding = std::min(5.0f, m_h * 0.12f);
     const float scale = std::min(1.4f, (m_h - 2.0f * padding - 2.0f) / 28.0f);
-    const auto color = m_hovered || m_selected ? UiTheme::TEXT_HOVER : UiTheme::TEXT;
+    const auto color = glm::mix(UiTheme::TEXT,UiTheme::TEXT_HOVER,m_feedback.hoverAmount());
     const float labelScale = fittedTextScale(ui, m_label, scale, m_w - 20.0f);
     const float detailScale = fittedTextScale(ui, m_detail, scale * 0.85f, m_w - 20.0f);
     UiTheme::textWithShadow(ui, m_label, m_x + 10.0f, m_y + m_h * 0.5f + 1.0f,
@@ -77,12 +74,27 @@ void Button::render(UIRenderer& ui) const {
 }
 
 void Button::activate() {
-    if (m_enabled && m_onClick) m_onClick();
+    if (!m_enabled || !m_onClick) return;
+    m_feedback.activate();
+    // Menu callbacks can rebuild the vector or close the menu itself.
+    const auto callback = m_onClick;
+    callback();
 }
 
 // ── Menu base ─────────────────────────────────────────────────────────────
 
+void Menu::prepareButton(Button& button) {
+    button.setFocusVisible(!m_pointerFocus);
+    button.setHovered(m_pointerFocus && button.isEnabled() &&
+        button.containsPoint(static_cast<float>(m_pointer.x),static_cast<float>(m_pointer.y)));
+}
+
+void Menu::cancelButtons(std::vector<Button>& buttons) {
+    for (auto& button : buttons) button.setPressed(false);
+}
+
 void Menu::navigateUp(std::vector<Button>& buttons, int& selectedIdx) {
+    navigationFocus();
     if (buttons.empty()) return;
     buttons[selectedIdx].setSelected(false);
     selectedIdx = (selectedIdx - 1 + static_cast<int>(buttons.size())) % static_cast<int>(buttons.size());
@@ -90,6 +102,7 @@ void Menu::navigateUp(std::vector<Button>& buttons, int& selectedIdx) {
 }
 
 void Menu::navigateDown(std::vector<Button>& buttons, int& selectedIdx) {
+    navigationFocus();
     if (buttons.empty()) return;
     buttons[selectedIdx].setSelected(false);
     selectedIdx = (selectedIdx + 1) % static_cast<int>(buttons.size());
@@ -97,6 +110,7 @@ void Menu::navigateDown(std::vector<Button>& buttons, int& selectedIdx) {
 }
 
 void Menu::activateSelected(std::vector<Button>& buttons, int selectedIdx) {
+    navigationFocus();
     if (selectedIdx >= 0 && selectedIdx < static_cast<int>(buttons.size())) {
         buttons[selectedIdx].activate();
     }
@@ -188,7 +202,12 @@ void MainMenu::refreshWorlds() {
 }
 
 void MainMenu::rebuildButtons() {
+    const bool preserve = m_page == m_buttonPage;
+    m_buttonPage = m_page;
+    auto previous = std::move(m_buttons);
     m_buttons.clear();
+    m_pressedButton = -1;
+    m_pressedDeleteButton = -1;
     m_deleteButtons.clear();
     if (m_page == Page::Home) {
         m_buttons.emplace_back(m_localization.text("menu.home.singleplayer"),
@@ -311,6 +330,10 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back(m_localization.text("common.back"),
                                [this]() { showHome(); });
     }
+    if (preserve && previous.size()==m_buttons.size())
+        for (size_t i=0;i<m_buttons.size();++i)
+            if (m_page==Page::Create || previous[i].label()==m_buttons[i].label())
+                m_buttons[i].inheritFeedback(previous[i]);
     m_selectedIdx=m_page==Page::Worlds && m_selectedWorld>=m_worldOffset &&
         m_selectedWorld<m_worldOffset+m_visibleWorlds?m_selectedWorld-m_worldOffset:0;
     if (!m_buttons.empty()) {
@@ -381,7 +404,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
                 m_buttons[i].setPosition(contentX,contentTop-buttonH-i*(buttonH+gap));
                 m_buttons[i].setSize(contentW,buttonH);
             }
-            m_buttons[i].render(ui);
+            prepareButton(m_buttons[i]);m_buttons[i].render(ui);
         }
     } else if (m_page==Page::Create) {
         const bool twoColumns=w>=440;
@@ -410,7 +433,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             const bool right=i==2||i==6;
             m_buttons[i].setPosition(contentX+(half&&right?bw+gap:0),
                                      contentTop-rowH-row*(rowH+gap));
-            m_buttons[i].setSize(bw,rowH);m_buttons[i].render(ui);
+            m_buttons[i].setSize(bw,rowH);prepareButton(m_buttons[i]);m_buttons[i].render(ui);
         }
         if (rows>m_formVisibleRows) UiTheme::scrollBar(ui,panelX+panelW-10,contentBottom,4,
             contentTop-contentBottom,m_formOffset,m_formVisibleRows,rows);
@@ -424,11 +447,11 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             const float y=contentTop-rowH-i*(rowH+gap);
             m_buttons[i].setPosition(contentX,y);
             m_buttons[i].setSize(contentW-deleteW-gap,rowH);
-            m_buttons[i].render(ui);
+            prepareButton(m_buttons[i]);m_buttons[i].render(ui);
             if (m_worldOffset+static_cast<int>(i)==m_selectedWorld)
                 UiTheme::rounded(ui,contentX+4,y+6,2,std::max(1.0f,rowH-12),1,UiTheme::ACCENT);
             m_deleteButtons[i].setPosition(contentX+contentW-deleteW,y);
-            m_deleteButtons[i].setSize(deleteW,rowH);m_deleteButtons[i].render(ui);
+            m_deleteButtons[i].setSize(deleteW,rowH);prepareButton(m_deleteButtons[i]);m_deleteButtons[i].render(ui);
         }
         if (cards==0) {
             const std::string empty=m_localization.text("menu.worlds.subtitle");
@@ -440,7 +463,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             const size_t action=i-cards;
             m_buttons[i].setPosition(contentX+(action%2)*(bw+gap),
                                     contentBottom+(1-action/2)*(rowH+gap));
-            m_buttons[i].setSize(bw,rowH);m_buttons[i].render(ui);
+            m_buttons[i].setSize(bw,rowH);prepareButton(m_buttons[i]);m_buttons[i].render(ui);
         }
     }
     UiTheme::textWithShadow(ui,Config::GAME_VERSION,16,8,.85f,UiTheme::TEXT_DIM);
@@ -469,6 +492,7 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
     const float projectY = subY - 46.0f * layoutScale;
     m_buttons[0].setPosition(contentX, projectY);
     m_buttons[0].setSize(contentW, 32.0f * layoutScale);
+    prepareButton(m_buttons[0]);
     m_buttons[0].render(ui);
 
     const std::string heading = m_localization.format("menu.about.third_party", {
@@ -490,6 +514,7 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
         auto& button = m_buttons[i + 1];
         button.setPosition(contentX, listTop - (i + 1) * (rowHeight + gap));
         button.setSize(contentW, rowHeight);
+        prepareButton(button);
         button.render(ui);
     }
     const float navigationW = (contentW - 2.0f * gap) / 3.0f;
@@ -497,6 +522,7 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
         auto& button = m_buttons[rows + 1 + i];
         button.setPosition(contentX + i * (navigationW + gap), navigationY);
         button.setSize(navigationW, navigationH);
+        prepareButton(button);
         button.render(ui);
     }
     UiTheme::textWithShadow(ui, Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
@@ -504,6 +530,12 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
 }
 
 void MainMenu::onKeyPress(int key, int mods) {
+    navigationFocus();
+    if (key==Key::Tab && m_page!=Page::Create) {
+        if (mods&KeyModifier::Shift) navigateUp(m_buttons,m_selectedIdx);
+        else navigateDown(m_buttons,m_selectedIdx);
+        return;
+    }
     if (m_page == Page::About && (key == Key::Left || key == Key::Right)) {
         changeAboutPage(key == Key::Left ? -1 : 1);
         return;
@@ -591,17 +623,13 @@ void MainMenu::onChar(unsigned int codepoint) {
 }
 
 void MainMenu::onMouseMove(double x, double y) {
-    for (auto& btn : m_buttons) {
-        btn.setHovered(btn.containsPoint(static_cast<float>(x),
-                                          static_cast<float>(y)));
-    }
-    for (auto& btn : m_deleteButtons) {
-        btn.setHovered(btn.containsPoint(static_cast<float>(x),
-                                         static_cast<float>(y)));
-    }
+    pointerFocus(x,y);
+    for (auto& button : m_buttons) prepareButton(button);
+    for (auto& button : m_deleteButtons) prepareButton(button);
 }
 
 void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    onMouseMove(x,y);
     if (button != MouseButton::Left) return;
     if (action == ButtonAction::Press) {
         m_pressedButton = -1;
@@ -615,7 +643,7 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
             }
         }
         for (size_t i = 0; i < m_buttons.size(); ++i) {
-            if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
+            if (m_buttons[i].isEnabled() && m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
                 m_pressedButton = static_cast<int>(i);
                 m_buttons[i].setPressed(true);
                 return;
@@ -702,11 +730,18 @@ PauseMenu::PauseMenu(
 
 void PauseMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
+    for (auto& button : m_buttons) prepareButton(button);
     renderActionMenu(ui,screenWidth,screenHeight,
                      ui.localization().text("menu.pause.title"),m_buttons);
 }
 
-void PauseMenu::onKeyPress(int key, int) {
+void PauseMenu::onKeyPress(int key, int mods) {
+    navigationFocus();
+    if (key==Key::Tab) {
+        if (mods&KeyModifier::Shift) navigateUp(m_buttons,m_selectedIdx);
+        else navigateDown(m_buttons,m_selectedIdx);
+        return;
+    }
     switch (key) {
         case Key::Up:
         case Key::W:
@@ -732,18 +767,17 @@ void PauseMenu::onKeyPress(int key, int) {
 }
 
 void PauseMenu::onMouseMove(double x, double y) {
-    for (auto& btn : m_buttons) {
-        btn.setHovered(btn.containsPoint(static_cast<float>(x),
-                                          static_cast<float>(y)));
-    }
+    pointerFocus(x,y);
+    for (auto& button : m_buttons) prepareButton(button);
 }
 
 void PauseMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    onMouseMove(x,y);
     if (button != MouseButton::Left) return;
     if (action == ButtonAction::Press) {
         m_pressedButton = -1;
         for (size_t i = 0; i < m_buttons.size(); ++i) {
-            if (m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
+            if (m_buttons[i].isEnabled() && m_buttons[i].containsPoint(static_cast<float>(x), static_cast<float>(y))) {
                 m_pressedButton = static_cast<int>(i);
                 m_buttons[i].setPressed(true);
                 return;
@@ -777,11 +811,18 @@ SleepMenu::SleepMenu(
 
 void SleepMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
+    for (auto& button : m_buttons) prepareButton(button);
     renderActionMenu(ui,screenWidth,screenHeight,
                      ui.localization().text("sleep.title"),m_buttons);
 }
 
-void SleepMenu::onKeyPress(int key, int) {
+void SleepMenu::onKeyPress(int key, int mods) {
+    navigationFocus();
+    if (key==Key::Tab) {
+        if (mods&KeyModifier::Shift) navigateUp(m_buttons,m_selectedIdx);
+        else navigateDown(m_buttons,m_selectedIdx);
+        return;
+    }
     switch (key) {
         case Key::Up:
         case Key::W: navigateUp(m_buttons, m_selectedIdx); break;
@@ -797,13 +838,13 @@ void SleepMenu::onKeyPress(int key, int) {
 }
 
 void SleepMenu::onMouseMove(double x, double y) {
-    for (auto& button : m_buttons)
-        button.setHovered(button.containsPoint(static_cast<float>(x),
-                                               static_cast<float>(y)));
+    pointerFocus(x,y);
+    for (auto& button : m_buttons) prepareButton(button);
 }
 
 void SleepMenu::onMouseButton(
     int button, ButtonAction action, double x, double y) {
+    onMouseMove(x,y);
     if (button != MouseButton::Left) return;
     if (action == ButtonAction::Press) {
         m_pressedButton = -1;
@@ -822,4 +863,21 @@ void SleepMenu::onMouseButton(
                 static_cast<float>(x), static_cast<float>(y)))
             m_buttons[static_cast<size_t>(selected)].activate();
     }
+}
+
+void MainMenu::onPointerCancel() {
+    m_pressedButton = -1;
+    cancelButtons(m_buttons);
+    m_pressedDeleteButton = -1;
+    cancelButtons(m_deleteButtons);
+}
+
+void PauseMenu::onPointerCancel() {
+    m_pressedButton = -1;
+    cancelButtons(m_buttons);
+}
+
+void SleepMenu::onPointerCancel() {
+    m_pressedButton = -1;
+    cancelButtons(m_buttons);
 }

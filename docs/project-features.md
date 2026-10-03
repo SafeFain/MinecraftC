@@ -107,6 +107,11 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   Menus, inventories, containers, trades, chat, HUD and touch share one theme;
   narrow settings/forms scroll, world cards paginate, and portrait equipment
   moves above the nine-column backpack. Item and survival icons retain pixel art.
+  Hover/focus borders, pressed surfaces and quick activation pulses use eased,
+  frame-time feedback with fixed hit rectangles. Keyboard/controller focus and
+  pointer hover switch with input; Tab/Shift+Tab traverse menu controls. Touch
+  menus show contact feedback, cancel taps on scrolling/focus loss and clear
+  hover on release. Inventory controller focus follows fitted slots on resize.
 - Ten UI languages (Arabic, Simplified Chinese, English, French, German, Japanese,
   Korean, Portuguese, Russian, Spanish) selectable from the main menu in
   English-name order; Arabic strings are shaped (joined forms, lam-alef

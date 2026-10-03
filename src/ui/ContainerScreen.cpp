@@ -13,6 +13,7 @@
 #include <algorithm>
 
 bool ContainerScreen::open(IContainerAccess& access, const glm::ivec3& position) {
+    m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};
     m_access = &access;
     m_position = position;
     return valid();
@@ -57,11 +58,12 @@ void ContainerScreen::layout(int width, int height) {
 }
 
 void ContainerScreen::drawStack(UIRenderer& ui, const Rect& r,
-                                const ItemStack& stack, bool hovered) {
+                                const ItemStack& stack, bool hovered, bool selected, UiFeedback* feedback) {
     UiTheme::slot(ui, r.x, r.y, r.w, r.h,
+                  selected?UiTheme::WidgetState::Selected:
                   hovered ? UiTheme::WidgetState::Hover
                           : UiTheme::WidgetState::Normal,
-                  UiTheme::SLOT);
+                  UiTheme::SLOT,1,feedback);
     if (stack.empty()) return;
     const float s=r.w/44;
     ui.drawItemIcon(r.x+4*s,r.y+4*s,r.w-8*s,r.h-8*s,stack);
@@ -96,10 +98,14 @@ void ContainerScreen::quickMove(int x,int y) {
 void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int my) {
     layout(width, height);
     m_pointerX=mx;m_pointerY=my;
-    if(m_focusX||m_focusY){mx=m_focusX;my=m_focusY;}
+    if(m_gamepadFocus){updateFocusPosition();mx=m_focusX;my=m_focusY;}
     const BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0,0,0,.62f});
+    const auto drawSlot=[&](size_t index,const Rect& rect,const ItemStack& stack,bool hovered,bool selected=false) {
+        auto& feedback=m_slotFeedback[index];
+        drawStack(ui,rect,stack,hovered,selected||(m_gamepadFocus&&hovered),&feedback);
+    };
     const float scale=m_layoutScale;
     UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
     UiTheme::rect(ui,m_panelRect.x+16*scale,m_panelRect.y+242*scale,
@@ -109,13 +115,13 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     UiTheme::textWithShadow(ui,title,m_panelRect.x+16*scale,m_panelRect.y+432*scale,
         UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-32*scale),UiTheme::TEXT);
     for (size_t i=0;i<m_inventoryRects.size();++i)
-        drawStack(ui,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
+        drawSlot(i,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
     if (entity->type == BlockEntityType::Chest) {
-        for (int i=0;i<27;++i) drawStack(ui,m_containerRects[i],entity->chest[i],contains(m_containerRects[i],mx,my));
+        for (int i=0;i<27;++i) drawSlot(36+i,m_containerRects[i],entity->chest[i],contains(m_containerRects[i],mx,my));
     } else {
-        drawStack(ui,m_containerRects[0],entity->input,contains(m_containerRects[0],mx,my));
-        drawStack(ui,m_containerRects[1],entity->fuel,contains(m_containerRects[1],mx,my));
-        drawStack(ui,m_containerRects[2],entity->output,contains(m_containerRects[2],mx,my));
+        drawSlot(36,m_containerRects[0],entity->input,contains(m_containerRects[0],mx,my));
+        drawSlot(37,m_containerRects[1],entity->fuel,contains(m_containerRects[1],mx,my));
+        drawSlot(38,m_containerRects[2],entity->output,contains(m_containerRects[2],mx,my));
         if (entity->burnTotal) {
             const float burn = std::clamp(
                 static_cast<float>(entity->burnRemaining) /
@@ -172,7 +178,7 @@ void ContainerScreen::click(int button, int x, int y) {
 
 void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,int mods) {
     m_pointerX=x;m_pointerY=y;
-    if(action==ButtonAction::Press){m_focusX=x;m_focusY=y;}
+    if(action==ButtonAction::Press){m_gamepadFocus=false;m_focusX=x;m_focusY=y;}
     if (button!=MouseButton::Left && button!=MouseButton::Right) return;
     if (action==ButtonAction::Press) { m_pressed=true;m_button=button;m_pressX=x;m_pressY=y;m_pressMods=mods;
         m_cursorHeldAtPress=!m_cursor.empty();m_dragTargets.clear();return; }
@@ -191,28 +197,45 @@ void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,i
     m_pressed=false;m_button=-1;
 }
 
-void ContainerScreen::onMouseMove(int x,int y){m_pointerX=x;m_pointerY=y;if(!m_pressed||!m_cursorHeldAtPress)return;ItemStack* target=nullptr;
+void ContainerScreen::onMouseMove(int x,int y){
+    m_gamepadFocus=false;m_pointerX=x;m_pointerY=y;if(!m_pressed||!m_cursorHeldAtPress)return;ItemStack* target=nullptr;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){target=&m_inventory.slot(i);break;}
     BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(!target&&entity&&entity->type==BlockEntityType::Chest)
         for(int i=0;i<27;++i)if(contains(m_containerRects[i],x,y)){target=&entity->chest[i];break;}
     if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);}
 
-void ContainerScreen::onGamepadNavigate(int dx,int dy) {
+std::vector<ContainerScreen::Rect> ContainerScreen::focusRects() const {
     std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
     const BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
     const int count=entity?(entity->type==BlockEntityType::Chest?27:3):0;
     for(int i=0;i<count;++i)rects.push_back(m_containerRects[static_cast<size_t>(i)]);
-    if(rects.empty())return;
-    if(!m_focusX&&!m_focusY){m_focusX=static_cast<int>(rects[0].x+22);m_focusY=static_cast<int>(rects[0].y+22);}
-    float best=1e30f;const Rect* chosen=nullptr;
-    for(const Rect& r:rects){const float cx=r.x+22,cy=r.y+22,vx=cx-m_focusX,vy=cy-m_focusY;
-        if((dx&&vx*dx<=1)||(dy&&vy*dy<=1))continue;
-        const float primary=dx?std::abs(vx):std::abs(vy),secondary=dx?std::abs(vy):std::abs(vx);
-        const float score=primary+secondary*2.0f;if(score<best){best=score;chosen=&r;}}
-    if(chosen){m_focusX=static_cast<int>(chosen->x+22);m_focusY=static_cast<int>(chosen->y+22);}
+    return rects;
 }
 
+void ContainerScreen::updateFocusPosition() {
+    const auto rects=focusRects();
+    if (rects.empty()) return;
+    m_focusIndex=std::clamp(m_focusIndex,0,static_cast<int>(rects.size())-1);
+    const auto& r=rects[static_cast<size_t>(m_focusIndex)];
+    m_focusX=static_cast<int>(r.x+r.w*.5f);m_focusY=static_cast<int>(r.y+r.h*.5f);
+}
+
+void ContainerScreen::onGamepadNavigate(int dx,int dy) {
+    const auto rects=focusRects();
+    if (rects.empty()) return;
+    if (!m_gamepadFocus) {
+        m_focusIndex=0;
+        for (size_t i=0;i<rects.size();++i)
+            if (contains(rects[i],m_pointerX,m_pointerY)) { m_focusIndex=static_cast<int>(i);break; }
+    }
+    m_gamepadFocus=true;
+    m_focusIndex=uiDirectionalNeighbor(rects,m_focusIndex,dx,dy);
+    updateFocusPosition();
+}
+
+
 void ContainerScreen::onGamepadAction(int action) {
+    onGamepadNavigate(0,0);
     if(action==2)quickMove(m_focusX,m_focusY);
     else click(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
 }
@@ -279,4 +302,9 @@ void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
         m_cursor.clear();
     }
     m_access=nullptr;m_pressed=false;m_button=-1;
+}
+
+void ContainerScreen::onPointerCancel() {
+    m_pressed=false;m_button=-1;
+    m_dragTargets.clear();m_cursorHeldAtPress=false;
 }

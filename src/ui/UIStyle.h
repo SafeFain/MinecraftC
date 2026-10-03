@@ -21,6 +21,7 @@
 #include "game/Item.h"
 #include "game/Localization.h"
 #include "game/TextWrap.h"
+#include "ui/UILayout.h"
 
 namespace UiTheme {
 
@@ -144,31 +145,45 @@ template <class T>
 inline void button(T& ui,float x,float y,float w,float h,
                    const std::string& label,WidgetState state,bool danger=false,
                    float textScale=0,float alpha=1,float hoverBlend=-1,
-                   float pressBlend=-1,bool primary=false,float bottomInset=0) {
-    const float hover=hoverBlend<0?(state==WidgetState::Hover||state==WidgetState::Selected?1:0):hoverBlend;
-    const float press=pressBlend<0?(state==WidgetState::Pressed?1:0):pressBlend;
+                   float pressBlend=-1,bool primary=false,float bottomInset=0,
+                   UiFeedback* feedback=nullptr) {
+    if (w<=0 || h<=0) return;
+    if (feedback) feedback->sample(ui.frameSerial(),ui.frameDelta(),
+        state==WidgetState::Hover,state==WidgetState::Selected,state==WidgetState::Pressed);
+    const float hover=feedback?feedback->hoverAmount():hoverBlend<0?
+        (state==WidgetState::Hover||state==WidgetState::Selected||state==WidgetState::Pressed?1:0):hoverBlend;
+    const float press=feedback?feedback->pressAmount():pressBlend<0?(state==WidgetState::Pressed?1:0):pressBlend;
+    const float focus=feedback?feedback->focusAmount():(state==WidgetState::Selected?1.0f:0.0f);
     const auto normal=danger?BUTTON_DANGER:primary?ACCENT_DIM:BUTTON;
     const auto lit=danger?BUTTON_DANGER_HOVER:primary?glm::vec4(.28f,.58f,.43f,1):BUTTON_HOVER;
     glm::vec4 fill=glm::mix(normal,lit,hover);
     fill=glm::mix(fill,danger?BUTTON_DANGER:BUTTON_PRESSED,press);
-    const auto border=state==WidgetState::Selected?ACCENT:
-        state==WidgetState::Pressed?ACCENT_DIM:BORDER;
-    outline(ui,x,y,w,h,BUTTON_RADIUS,withAlpha(fill,alpha),withAlpha(border,alpha),
-            state==WidgetState::Selected?2.0f:1.0f);
+    const auto light=danger?glm::vec4(.96f,.49f,.48f,1):ACCENT;
+    const auto border=glm::mix(BORDER,light,std::max({hover*.85f,focus,press}));
+    // Only the drawn body contracts; its hit rectangle stays fixed.
+    const float inset=std::min(1.0f,std::min(w,h)*.04f)*press;
+    rounded(ui,x,y-2+press,w,h,BUTTON_RADIUS,glm::vec4(0,0,0,.15f*alpha*(1-.7f*press)));
+    outline(ui,x+inset,y+inset,w-2*inset,h-2*inset,BUTTON_RADIUS,
+            withAlpha(fill,alpha),withAlpha(border,alpha),1+std::max(hover,focus));
     if (textScale<=0) textScale=std::clamp((h-bottomInset-12)/14,0.85f,1.35f);
     textScale=fittedScale(ui,label,textScale,w-24);
     const auto size=ui.measureText(label,textScale);
     textWithShadow(ui,label,x+(w-size.x)*.5f,y+(h-size.y+bottomInset)*.5f-press,
-                   textScale,hover>.5f?TEXT_HOVER:TEXT,alpha);
+                   textScale,glm::mix(TEXT,TEXT_HOVER,hover),alpha);
 }
 
 template <class T>
 inline void slot(T& ui,float x,float y,float w,float h,WidgetState state,
-                 const glm::vec4& fill=SLOT,float alpha=1) {
+                 const glm::vec4& fill=SLOT,float alpha=1,UiFeedback* feedback=nullptr) {
+    if (feedback) feedback->sample(ui.frameSerial(),ui.frameDelta(),
+        state==WidgetState::Hover,state==WidgetState::Selected,state==WidgetState::Pressed);
+    const float hover=feedback?feedback->hoverAmount():(state==WidgetState::Hover?1.0f:0.0f);
+    const float focus=feedback?feedback->focusAmount():(state==WidgetState::Selected?1.0f:0.0f);
+    const float press=feedback?feedback->pressAmount():(state==WidgetState::Pressed?1.0f:0.0f);
+    const float light=std::max({hover*.85f,focus,press});
     outline(ui,x,y,w,h,SLOT_RADIUS,
-            withAlpha(state==WidgetState::Hover?SLOT_HOVER:fill,alpha),
-            withAlpha(state==WidgetState::Selected?ACCENT:BORDER,alpha),
-            state==WidgetState::Selected?2.0f:1.0f);
+            withAlpha(glm::mix(glm::mix(fill,SLOT_HOVER,hover),BUTTON_PRESSED,press),alpha),
+            withAlpha(glm::mix(BORDER,ACCENT,light),alpha),1+std::max(hover,focus));
 }
 
 template <class T>

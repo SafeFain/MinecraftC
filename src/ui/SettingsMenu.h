@@ -180,6 +180,7 @@ public:
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
+    void onPointerCancel() override;
     void onChar(unsigned int codepoint) override;
     bool wantsTextInput() const override { return m_lodDistanceEditing; }
     bool capturesPointerDrag(double x, double y) const override;
@@ -206,6 +207,8 @@ private:
     std::function<VoxelGiStatus()> m_giStatus;
     VoxelGiStatus m_displayedGiStatus{};
     SettingsPage m_page = SettingsPage::General;
+    SettingsPage m_buttonPage = SettingsPage::General;
+    int m_buttonControlOffset = 0;
     int m_controlOffset = 0;
     int m_captureAction = -1;
     int m_pressedButton = -1;

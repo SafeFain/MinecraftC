@@ -72,6 +72,8 @@ std::vector<TouchCommandEvent> TouchControls::onTouch(const TouchEvent& event) {
         const bool occupied=std::any_of(m_touches.begin(),m_touches.end(),
             [target](const auto& entry){return entry.second.target==target;});
         const Target captured=occupied?Target::Look:target;
+        if (captured>=Target::Jump && captured<Target::Hotbar)
+            m_feedback[static_cast<size_t>(captured)].activate();
         m_touches[event.id]={captured,{x,y},slot};
         switch(captured){
             case Target::Move:updateMove(x,y);break;
@@ -124,16 +126,17 @@ void TouchControls::applyTo(InputState& input) const {
 }
 
 glm::vec2 TouchControls::consumeLookDelta(){const glm::vec2 value=m_lookDelta;m_lookDelta={0,0};return value;}
-void TouchControls::cancelAll(){m_touches.clear();m_move={0,0};m_lookDelta={0,0};m_jumpHeld=false;m_sneakHeld=false;}
+void TouchControls::cancelAll(){m_touches.clear();m_move={0,0};m_lookDelta={0,0};m_jumpHeld=false;m_sneakHeld=false;m_feedback={};}
 
 void TouchControls::render(UIRenderer& ui) const {
     const float alpha=std::clamp(m_config.opacity,.35f,1.0f);
-    const auto draw=[&](const TouchRect&r,const std::string&label,
-                        bool pressed){
+    const auto draw=[&](const TouchRect&r,const std::string&label,Target target){
+        const bool pressed=std::any_of(m_touches.begin(),m_touches.end(),
+            [target](const auto& t){return t.second.target==target;});
         UiTheme::button(ui,r.x,r.y,r.w,r.h,label,
                         pressed ? UiTheme::WidgetState::Pressed
                                 : UiTheme::WidgetState::Normal,
-                        false,0.0f,alpha);
+                        false,0.0f,alpha,-1,-1,false,0,&m_feedback[static_cast<size_t>(target)]);
     };
     UiTheme::rounded(ui,m_moveCenter.x-m_moveRadius,m_moveCenter.y-m_moveRadius,
         m_moveRadius*2,m_moveRadius*2,m_moveRadius,UiTheme::withAlpha(UiTheme::BORDER,alpha*.6f));
@@ -143,12 +146,12 @@ void TouchControls::render(UIRenderer& ui) const {
     const float knobR=m_moveRadius*.36f;
     UiTheme::rounded(ui,knob.x-knobR,knob.y-knobR,knobR*2,knobR*2,knobR,
         UiTheme::withAlpha(glm::length(m_move)>.01f?UiTheme::ACCENT:UiTheme::BUTTON_HOVER,alpha));
-    draw(m_jump,ui.localization().text("touch.jump"),m_jumpHeld);
-    draw(m_sneak,ui.localization().text("touch.sneak"),m_sneakHeld);
-    draw(m_attack,ui.localization().text("touch.attack"),std::any_of(m_touches.begin(),m_touches.end(),[](const auto& t){return t.second.target==Target::Attack;}));
-    draw(m_use,ui.localization().text("touch.use"),std::any_of(m_touches.begin(),m_touches.end(),[](const auto& t){return t.second.target==Target::Use;}));
-    draw(m_inventory,ui.localization().text("touch.inventory"),false);
-    draw(m_command,ui.localization().text("touch.command"),false);
-    draw(m_perspective,ui.localization().text("touch.perspective"),false);
-    draw(m_pause,"II",false);
+    draw(m_jump,ui.localization().text("touch.jump"),Target::Jump);
+    draw(m_sneak,ui.localization().text("touch.sneak"),Target::Sneak);
+    draw(m_attack,ui.localization().text("touch.attack"),Target::Attack);
+    draw(m_use,ui.localization().text("touch.use"),Target::Use);
+    draw(m_inventory,ui.localization().text("touch.inventory"),Target::Inventory);
+    draw(m_command,ui.localization().text("touch.command"),Target::Command);
+    draw(m_perspective,ui.localization().text("touch.perspective"),Target::Perspective);
+    draw(m_pause,"II",Target::Pause);
 }

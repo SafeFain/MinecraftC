@@ -92,12 +92,12 @@ bool SurvivalInventoryScreen::creativeCatalogButtonContains(int x,int y) const {
 }
 
 void SurvivalInventoryScreen::drawStack(
-    UIRenderer& ui, const Rect& rect, const ItemStack& stack, bool hovered, bool selected) {
+    UIRenderer& ui, const Rect& rect, const ItemStack& stack, bool hovered, bool selected, UiFeedback* feedback) {
     UiTheme::slot(ui, rect.x, rect.y, rect.w, rect.h,
                   selected?UiTheme::WidgetState::Selected:
                   hovered ? UiTheme::WidgetState::Hover
                           : UiTheme::WidgetState::Normal,
-                  UiTheme::SLOT);
+                  UiTheme::SLOT,1,feedback);
     if (stack.empty()) return;
     const float s=rect.w/44.0f;
     ui.drawItemIcon(rect.x+4*s,rect.y+4*s,rect.w-8*s,rect.h-8*s,stack);
@@ -143,9 +143,13 @@ void SurvivalInventoryScreen::render(
     refreshAvailableRecipes();
     m_pointerX = mouseX;
     m_pointerY = mouseY;
-    if(m_focusX||m_focusY){mouseX=m_focusX;mouseY=m_focusY;}
+    if(m_gamepadFocus){updateFocusPosition();mouseX=m_focusX;mouseY=m_focusY;}
     ui.drawRect(0, 0, static_cast<float>(screenWidth), static_cast<float>(screenHeight),
                 glm::vec4(0, 0, 0, 0.62f));
+    const auto drawSlot=[&](size_t index,const Rect& rect,const ItemStack& stack,bool hovered,bool selected=false) {
+        auto& feedback=m_slotFeedback[index];
+        drawStack(ui,rect,stack,hovered,selected||(m_gamepadFocus&&hovered),&feedback);
+    };
     const float scale=m_layoutScale;
     UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
     const int craftSize=m_craftingTable?3:2;
@@ -168,16 +172,16 @@ void SurvivalInventoryScreen::render(
 
     const ItemStack* tooltip = nullptr;
     for (size_t i = 0; i < m_inventoryRects.size(); ++i) {
-        drawStack(ui, m_inventoryRects[i], m_inventory.slot(i),
+        drawSlot(i,m_inventoryRects[i], m_inventory.slot(i),
                   contains(m_inventoryRects[i], mouseX, mouseY));
         if (contains(m_inventoryRects[i], mouseX, mouseY)) tooltip = &m_inventory.slot(i);
     }
     const size_t craftSlots = m_craftingTable ? 9 : 4;
     for (size_t i = 0; i < craftSlots; ++i)
-        drawStack(ui, m_craftingRects[i], m_crafting[i],
+        drawSlot(36+i,m_craftingRects[i], m_crafting[i],
                   contains(m_craftingRects[i], mouseX, mouseY));
     const bool outputReady = !craftingOutput().empty();
-    drawStack(ui, m_outputRect, craftingOutput(),
+    drawSlot(50,m_outputRect, craftingOutput(),
               contains(m_outputRect, mouseX, mouseY),outputReady);
 
     ItemStack recipeTooltip;
@@ -222,14 +226,14 @@ void SurvivalInventoryScreen::render(
             const CraftingRecipe* recipe = visibleRecipe(i);
             if (!recipe) continue;
             const bool hovered = contains(m_recipeRects[i], mouseX, mouseY);
-            drawStack(ui, m_recipeRects[i], recipe->output, hovered);
+            drawSlot(51+i,m_recipeRects[i], recipe->output, hovered);
             if (hovered) recipeTooltip = recipe->output;
         }
     }
     for (size_t i = 0; i < m_armorRects.size(); ++i)
-        drawStack(ui, m_armorRects[i], m_inventory.armor()[i],
+        drawSlot(45+i,m_armorRects[i], m_inventory.armor()[i],
                   contains(m_armorRects[i], mouseX, mouseY));
-    drawStack(ui, m_offhandRect, m_inventory.offhand(),
+    drawSlot(49,m_offhandRect, m_inventory.offhand(),
               contains(m_offhandRect, mouseX, mouseY));
 
     if (!recipeTooltip.empty())
@@ -239,7 +243,7 @@ void SurvivalInventoryScreen::render(
 
     if (!m_cursor.empty()) {
         Rect cursor{static_cast<float>(mouseX + 8), static_cast<float>(mouseY + 8), 38, 38};
-        drawStack(ui, cursor, m_cursor, true);
+        drawStack(ui,cursor,m_cursor,true);
     }
 }
 
@@ -340,7 +344,7 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 void SurvivalInventoryScreen::onMouseButton(
     int button, ButtonAction action, int mouseX, int mouseY, int mods) {
     m_pointerX=mouseX;m_pointerY=mouseY;
-    if(action==ButtonAction::Press){m_focusX=mouseX;m_focusY=mouseY;}
+    if(action==ButtonAction::Press){m_gamepadFocus=false;m_focusX=mouseX;m_focusY=mouseY;}
     if (button == MouseButton::Middle && m_creativeAccess) {
         if (action == ButtonAction::Press) {
             if (ItemStack* hovered = hoveredStack(mouseX, mouseY);
@@ -398,6 +402,7 @@ void SurvivalInventoryScreen::onMouseButton(
 }
 
 void SurvivalInventoryScreen::onMouseMove(int x,int y){
+    m_gamepadFocus=false;
     m_pointerX=x;m_pointerY=y;
     if (m_pointerPressed && m_pressedButton == MouseButton::Middle &&
         m_creativeAccess && !m_cursor.empty()) {
@@ -420,7 +425,7 @@ void SurvivalInventoryScreen::onMouseMove(int x,int y){
     if(target&&std::find(m_dragTargets.begin(),m_dragTargets.end(),target)==m_dragTargets.end())m_dragTargets.push_back(target);
 }
 
-void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
+std::vector<SurvivalInventoryScreen::Rect> SurvivalInventoryScreen::focusRects() const {
     std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
     const size_t craftingCount=m_craftingTable?9:4;
     for(size_t i=0;i<craftingCount;++i)rects.push_back(m_craftingRects[i]);
@@ -432,17 +437,33 @@ void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
         (m_availableRecipes.size()+RECIPES_PER_PAGE-1)/RECIPES_PER_PAGE);
     if(pageCount>1){rects.push_back(m_previousRecipePageRect);
                     rects.push_back(m_nextRecipePageRect);}
-    if(rects.empty())return;
-    if(!m_focusX&&!m_focusY){m_focusX=static_cast<int>(rects[0].x+22);m_focusY=static_cast<int>(rects[0].y+22);}
-    float best=1e30f;const Rect* chosen=nullptr;
-    for(const Rect& r:rects){const float cx=r.x+22,cy=r.y+22,vx=cx-m_focusX,vy=cy-m_focusY;
-        if((dx&&vx*dx<=1)||(dy&&vy*dy<=1))continue;
-        const float primary=dx?std::abs(vx):std::abs(vy),secondary=dx?std::abs(vy):std::abs(vx);
-        const float score=primary+secondary*2.0f;if(score<best){best=score;chosen=&r;}}
-    if(chosen){m_focusX=static_cast<int>(chosen->x+22);m_focusY=static_cast<int>(chosen->y+22);}
+    return rects;
 }
 
+void SurvivalInventoryScreen::updateFocusPosition() {
+    const auto rects=focusRects();
+    if (rects.empty()) return;
+    m_focusIndex=std::clamp(m_focusIndex,0,static_cast<int>(rects.size())-1);
+    const auto& r=rects[static_cast<size_t>(m_focusIndex)];
+    m_focusX=static_cast<int>(r.x+r.w*.5f);m_focusY=static_cast<int>(r.y+r.h*.5f);
+}
+
+void SurvivalInventoryScreen::onGamepadNavigate(int dx,int dy) {
+    const auto rects=focusRects();
+    if (rects.empty()) return;
+    if (!m_gamepadFocus) {
+        m_focusIndex=0;
+        for (size_t i=0;i<rects.size();++i)
+            if (contains(rects[i],m_pointerX,m_pointerY)) { m_focusIndex=static_cast<int>(i);break; }
+    }
+    m_gamepadFocus=true;
+    m_focusIndex=uiDirectionalNeighbor(rects,m_focusIndex,dx,dy);
+    updateFocusPosition();
+}
+
+
 void SurvivalInventoryScreen::onGamepadAction(int action) {
+    onGamepadNavigate(0,0);
     if(action==2)quickMove(m_focusX,m_focusY);
     else performClick(action==1?MouseButton::Right:MouseButton::Left,m_focusX,m_focusY);
 }
@@ -499,6 +520,7 @@ bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {
 }
 
 void SurvivalInventoryScreen::onClose() {
+    m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};
     m_pointerPressed = false;
     m_pressedButton = -1;
     for (auto& stack : m_crafting) {
@@ -507,4 +529,9 @@ void SurvivalInventoryScreen::onClose() {
     if (!m_cursor.empty() && m_inventory.add(m_cursor) == 0) m_cursor.clear();
     m_availableRecipes.clear();
     m_recipePage = 0;
+}
+
+void SurvivalInventoryScreen::onPointerCancel() {
+    m_pointerPressed=false;m_pressedButton=-1;
+    m_dragTargets.clear();m_cursorHeldAtPress=false;
 }

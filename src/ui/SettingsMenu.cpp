@@ -84,7 +84,11 @@ void SettingsMenu::showPage(SettingsPage page) {
 }
 
 void SettingsMenu::refreshButtons() {
+    const bool preserve = m_page==m_buttonPage && m_controlOffset==m_buttonControlOffset;
+    m_buttonPage=m_page;m_buttonControlOffset=m_controlOffset;
+    auto previous=std::move(m_buttons);
     m_buttons.clear();
+    onPointerCancel();
     m_frameRateButton = -1;
     m_volumeButtons.fill(-1);
     m_backButton = -1;
@@ -454,6 +458,8 @@ void SettingsMenu::refreshButtons() {
         m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back_to_bindings"),[this]{showPage(SettingsPage::KeyBindings);});
     }
+    if (preserve && previous.size()==m_buttons.size())
+        for (size_t i=0;i<m_buttons.size();++i) m_buttons[i].inheritFeedback(previous[i]);
     m_selectedIdx = std::clamp(m_selectedIdx, 0, std::max(0, static_cast<int>(m_buttons.size()) - 1));
     if (!m_buttons.empty()) m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
 }
@@ -552,6 +558,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         const bool slider=static_cast<int>(i)==m_frameRateButton||
             std::find(m_volumeButtons.begin(),m_volumeButtons.end(),static_cast<int>(i))!=m_volumeButtons.end();
         m_buttons[i].setBottomInset(slider?10.0f:0.0f);
+        prepareButton(m_buttons[i]);
         if (visible) m_buttons[i].render(ui);
     }
     if (m_totalRows>m_visibleRows)
@@ -594,6 +601,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
 }
 
 void SettingsMenu::onKeyPress(int key, int mods) {
+    navigationFocus();
     if (m_lodWarningPending && key == Key::Escape) {
         m_lodWarningPending = false;
         refreshButtons();
@@ -641,6 +649,11 @@ void SettingsMenu::onKeyPress(int key, int mods) {
                          key == Key::Right ? 1 : -1);
             return;
         }
+    }
+    if (key==Key::Tab) {
+        if (mods&KeyModifier::Shift) navigateUp(m_buttons,m_selectedIdx);
+        else navigateDown(m_buttons,m_selectedIdx);
+        return;
     }
     const auto selectNeighbor = [this](int columnDelta, int rowDelta) {
         if (m_buttons.empty()) return;
@@ -705,14 +718,16 @@ void SettingsMenu::commitLodDistanceEdit() {
 }
 
 void SettingsMenu::onMouseMove(double x, double y) {
+    pointerFocus(x,y);
     if (m_frameRateDragging) setFrameRateFromPointer(x);
     if (m_volumeDragging >= 0)
         setVolumeFromPointer(static_cast<size_t>(m_volumeDragging), x);
     for (auto& button : m_buttons)
-        button.setHovered(button.containsPoint(static_cast<float>(x), static_cast<float>(y)));
+        prepareButton(button);
 }
 
 void SettingsMenu::onMouseButton(int button, ButtonAction action, double x, double y) {
+    onMouseMove(x,y);
     if (m_captureAction >= 0 && action == ButtonAction::Press) {
         if (m_page == SettingsPage::KeyboardMouse)
             assignBinding({InputDevice::Mouse, button});
@@ -857,4 +872,11 @@ void SettingsMenu::onScroll(double yOffset) {
     const int maximum = std::max(0, static_cast<int>(INPUT_ACTION_COUNT) - visible);
     m_controlOffset = std::clamp(m_controlOffset + (yOffset < 0 ? 1 : -1), 0, maximum);
     refreshButtons();
+}
+
+void SettingsMenu::onPointerCancel() {
+    m_pressedButton=-1;
+    m_frameRateDragging=false;
+    m_volumeDragging=-1;
+    cancelButtons(m_buttons);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/Item.h"
+#include "ui/UILayout.h"
 #include <array>
 #include <vector>
 #include <functional>
@@ -28,10 +29,12 @@ private:
         float x = 0.0f, y = 0.0f;  // screen-space bottom-left
         bool hovered = false;
         bool visible = false;
+        UiFeedback feedback;
     };
     struct Tab {
         float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;
         bool hovered = false;
+        UiFeedback feedback;
     };
 
     std::vector<Slot> m_slots;
@@ -46,6 +49,9 @@ private:
     int m_totalRows = 0;
     ItemId m_selected = ItemId::EMPTY;
     int m_focus = 0;
+    bool m_gamepadFocus = false;
+    bool m_playerHovered = false;
+    UiFeedback m_playerFeedback;
     float m_panelX = 0.0f, m_panelY = 0.0f, m_panelW = 0.0f, m_panelH = 0.0f;
     float m_playerButtonX = 0.0f, m_playerButtonY = 0.0f;
     float m_playerButtonW = 0.0f, m_playerButtonH = 0.0f;

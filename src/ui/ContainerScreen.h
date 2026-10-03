@@ -7,6 +7,7 @@
 
 #include "game/InventoryModel.h"
 #include "core/InputCodes.h"
+#include "ui/UILayout.h"
 
 class UIRenderer;
 class IContainerAccess;
@@ -19,6 +20,7 @@ public:
     void render(UIRenderer& ui, int width, int height, int mouseX, int mouseY);
     void onMouseButton(int button, ButtonAction action, int mouseX, int mouseY, int mods = 0);
     void onMouseMove(int mouseX, int mouseY);
+    void onPointerCancel();
     void onGamepadNavigate(int dx, int dy);
     void onGamepadAction(int action);
     bool swapHoveredWithHotbar(int hotbarSlot);
@@ -42,6 +44,11 @@ private:
     std::vector<ItemStack*> m_dragTargets;
     bool m_cursorHeldAtPress = false;
     int m_focusX = 0, m_focusY = 0;
+    int m_focusIndex = 0;
+    bool m_gamepadFocus = false;
+    std::array<UiFeedback, 64> m_slotFeedback{};
+    std::vector<Rect> focusRects() const;
+    void updateFocusPosition();
     int m_pointerX = 0, m_pointerY = 0;
 
     float m_layoutScale = 1.0f;
@@ -52,6 +59,6 @@ private:
     ItemStack* hoveredStack(int x, int y);
     static bool contains(const Rect& rect, int x, int y);
     static void drawStack(UIRenderer& ui, const Rect& rect,
-                          const ItemStack& stack, bool hovered);
+                          const ItemStack& stack, bool hovered, bool selected = false, UiFeedback* feedback = nullptr);
     static void moveStack(ItemStack& cursor, ItemStack& slot, bool right);
 };

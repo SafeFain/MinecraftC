@@ -7,6 +7,7 @@
 
 #include "core/InputCodes.h"
 #include "game/InventoryModel.h"
+#include "ui/UILayout.h"
 
 class ITradeAccess;
 class UIRenderer;
@@ -32,6 +33,7 @@ private:
     uint8_t m_selected = 0;
     std::array<Rect, 5> m_rows{};
     std::array<Rect, 5> m_outputs{};
+    std::array<UiFeedback, 5> m_feedback{};
 
     float m_layoutScale = 1.0f;
     Rect m_panelRect{};

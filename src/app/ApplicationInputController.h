@@ -32,6 +32,8 @@ public:
         bool buttonDown = false;
         bool rightButton = false;
         bool scrolling = false;
+        bool menuContact = false;
+        bool pointerDrag = false;
     };
 
     void beginFrame(Window& window, const ClientSettings& settings,
@@ -52,6 +54,7 @@ public:
     bool gamepadCaptureArmed = false;
     TouchControls touchControls;
     bool touchHudVisible = false;
+    bool uiPointerVisible = true;
     std::unordered_map<TouchContactId, bool, TouchContactHash> touchGameplay;
     UiTouchState uiTouch;
     std::array<bool, Key::Count> keys{};

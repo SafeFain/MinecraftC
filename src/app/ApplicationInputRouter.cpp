@@ -91,11 +91,14 @@ void ApplicationInputRouter::handleFrameInput(float dt) {
         double pointerDx = 0, pointerDy = 0;
         m_window.getCursorDelta(pointerDx, pointerDy);
         const bool pointerMoved = m_inputs.uiTouch.active || pointerDx != 0.0 || pointerDy != 0.0;
+        if (!m_inputs.uiTouch.active && (pointerDx != 0.0 || pointerDy != 0.0))
+            m_inputs.uiPointerVisible = true;
         if (!m_inputs.uiTouch.active) m_ui.updateMouseScreenPosition(m_window);
         else {
-            m_ui.mouseScreenX = m_inputs.uiTouch.position.x;
-            m_ui.mouseScreenY = m_inputs.uiTouch.position.y;
+            m_ui.mouseScreenX = m_inputs.uiTouch.scrolling ? -10000 : m_inputs.uiTouch.position.x;
+            m_ui.mouseScreenY = m_inputs.uiTouch.scrolling ? -10000 : m_inputs.uiTouch.position.y;
         }
+        if (!m_inputs.uiPointerVisible) m_ui.mouseScreenX = m_ui.mouseScreenY = -10000;
 
         // Route to inventory hover if open
         if (m_ui.inventoryOpen && pointerMoved) {
@@ -134,6 +137,8 @@ bool ApplicationInputRouter::touchUiVisible() const {
 
 void ApplicationInputRouter::handleKeyEvent(
     int key, int, ButtonAction action, int mods) {
+    if (m_inputs.uiTouch.active && (action==ButtonAction::Press || action==ButtonAction::Repeat))
+        handleTouch({{},TouchPhase::Cancel,0,0});
     if (action == ButtonAction::Press && m_settings.controlMode == ControlMode::Auto)
         m_inputs.touchHudVisible = false;
     auto keyBound = [this, key](InputAction inputAction) {
@@ -350,6 +355,7 @@ void ApplicationInputRouter::handleTextEvent(std::string_view text) {
 void ApplicationInputRouter::handleMouseButtonEvent(
     int button, ButtonAction action, int mods) {
     if (m_inputs.uiTouch.active) return;
+    m_inputs.uiPointerVisible = true;
     if (action == ButtonAction::Press && m_settings.controlMode == ControlMode::Auto)
         m_inputs.touchHudVisible = false;
     auto mouseBound = [this, button](InputAction inputAction) {
@@ -565,9 +571,11 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
     if (event.phase == TouchPhase::Begin) {
         if (m_inputs.uiTouch.active) return;
         m_inputs.uiTouch = {event.id, position, position, m_clock.now(), true, false, false, false};
+        m_inputs.uiPointerVisible = true;
         dispatchUiTouchMove(position);
-        if (m_ui.activeMenu && m_ui.activeMenu->capturesPointerDrag(
-                position.x, position.y)) {
+        if (m_ui.activeMenu) {
+            m_inputs.uiTouch.menuContact = true;
+            m_inputs.uiTouch.pointerDrag = m_ui.activeMenu->capturesPointerDrag(position.x, position.y);
             dispatchUiTouchButton(
                 MouseButton::Left, ButtonAction::Press, position);
             m_inputs.uiTouch.buttonDown = true;
@@ -581,7 +589,12 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
         const bool scrollSurface = m_ui.activeMenu || (m_ui.inventoryOpen &&
             m_session.playerState().gameMode() == GameMode::Creative &&
             m_ui.creativeCatalogOpen && !m_ui.containerOpen && !m_ui.tradeOpen);
-        if (scrollSurface && !m_inputs.uiTouch.buttonDown && std::abs(delta.y) > 24.0f) {
+        if (scrollSurface && !m_inputs.uiTouch.pointerDrag &&
+            (!m_inputs.uiTouch.buttonDown || m_inputs.uiTouch.menuContact) && std::abs(delta.y) > 24.0f) {
+            if (m_inputs.uiTouch.menuContact && m_ui.activeMenu) {
+                m_ui.activeMenu->onPointerCancel();
+                m_inputs.uiTouch.buttonDown = false;
+            }
             const double scroll = delta.y > 0.0f ? -1.0 : 1.0;
             if (m_ui.activeMenu) m_ui.activeMenu->onScroll(scroll); else m_ui.inventory.onScroll(scroll);
             m_inputs.uiTouch.origin = position; m_inputs.uiTouch.scrolling = true;
@@ -589,7 +602,7 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
             dispatchUiTouchButton(MouseButton::Left, ButtonAction::Press, m_inputs.uiTouch.origin);
             m_inputs.uiTouch.buttonDown = true;
         }
-        dispatchUiTouchMove(position); return;
+        dispatchUiTouchMove(m_inputs.uiTouch.scrolling ? glm::vec2(-10000) : position); return;
     }
     if (event.phase == TouchPhase::End) {
         if (m_inputs.uiTouch.buttonDown) dispatchUiTouchButton(
@@ -600,6 +613,8 @@ void ApplicationInputRouter::handleUiTouch(const TouchEvent& event,
             dispatchUiTouchButton(MouseButton::Left, ButtonAction::Release, m_inputs.uiTouch.position);
         }
         m_inputs.uiTouch = {};
+        m_inputs.uiPointerVisible = false;
+        dispatchUiTouchMove(glm::vec2(-10000));
     }
 }
 
@@ -619,10 +634,13 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
         handleGameplayAction(false, ButtonAction::Release);
         handleGameplayAction(true, ButtonAction::Release);
         m_inputs.touchControls.cancelAll(); m_inputs.touchGameplay.clear();
-        if (m_inputs.uiTouch.active && m_inputs.uiTouch.buttonDown) dispatchUiTouchButton(
-            m_inputs.uiTouch.rightButton ? MouseButton::Right : MouseButton::Left,
-            ButtonAction::Release, m_inputs.uiTouch.position);
-        m_inputs.uiTouch = {}; return;
+        if (m_ui.activeMenu) m_ui.activeMenu->onPointerCancel();
+        m_ui.survivalInventory.onPointerCancel();
+        m_ui.containerScreen.onPointerCancel();
+        m_inputs.uiTouch = {};
+        m_inputs.uiPointerVisible = false;
+        dispatchUiTouchMove(glm::vec2(-10000));
+        return;
     }
     const WindowSafeArea safe = m_window.safeArea();
     m_inputs.touchControls.configure(
@@ -705,6 +723,10 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
 }
 
 void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
+    if (m_inputs.uiTouch.active) {
+        m_inputs.previousGamepadButtons = m_inputs.gamepadButtons;
+        return;
+    }
     auto* settings = dynamic_cast<SettingsMenu*>(m_ui.activeMenu.get());
     if (settings && settings->capturingGamepad()) {
         bool centered = true;
@@ -744,6 +766,8 @@ void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
     if ((navX != m_inputs.gamepadNavX || navY != m_inputs.gamepadNavY) && (navX || navY))
         m_inputs.gamepadRepeatTick = now + RuntimeClock::fromSeconds(.35);
     m_inputs.gamepadNavX = navX; m_inputs.gamepadNavY = navY;
+    navigate = navigate && (navX || navY);
+    if (navigate || pressA || pressB || pressX || pressY) m_inputs.uiPointerVisible = false;
     if (m_ui.inventoryOpen) {
         if (navigate) {
             if (m_ui.tradeOpen) m_ui.tradeScreen.onGamepadNavigate(navX, -navY);

@@ -17,6 +17,7 @@ bool VillagerTradeScreen::open(ITradeAccess& access, uint64_t entityId) {
     m_access = &access;
     m_entityId = entityId;
     m_selected = 0;
+    m_feedback = {};
     return true;
 }
 
@@ -83,10 +84,10 @@ void VillagerTradeScreen::render(
         const bool enabled = i < unlocked &&
             entity->villager.uses[i] < offers[i].maximumUses;
         const bool selected = i == m_selected;
-        const bool hovered = contains(m_rows[i], mouseX, mouseY);
+        const bool hovered = enabled && contains(m_rows[i], mouseX, mouseY);
         UiTheme::button(ui,m_rows[i].x,m_rows[i].y,m_rows[i].w,m_rows[i].h,{},
             selected?UiTheme::WidgetState::Selected:hovered?UiTheme::WidgetState::Hover:
-                UiTheme::WidgetState::Normal,false,0,enabled?1.0f:.55f);
+                UiTheme::WidgetState::Normal,false,0,enabled?1.0f:.55f,-1,-1,false,0,&m_feedback[i]);
         Rect input{m_rows[i].x+8*scale,m_rows[i].y+4*scale,44*scale,44*scale};
         drawStack(ui, input, offers[i].input, false);
         UiTheme::sprite(ui, m_rows[i].x+118*scale,m_rows[i].y+16*scale,
@@ -103,8 +104,10 @@ void VillagerTradeScreen::render(
 }
 
 void VillagerTradeScreen::executeSelected() {
-    if (m_access)
+    if (m_access) {
+        m_feedback[m_selected].activate();
         m_access->executeTrade(m_entityId, m_selected, m_inventory);
+    }
 }
 
 void VillagerTradeScreen::onMouseButton(
