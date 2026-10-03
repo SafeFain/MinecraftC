@@ -475,6 +475,60 @@ int main() {
         require(opened==1,"selected world remains focused after rebuilding its card");
     }
 
+    for (const auto language : languagesByEnglishName()) {
+        ClientSettings settings; settings.language=Language::English;
+        Localization localization; localization.setLanguage(settings.language);
+        int changes=0;
+        MenuCallbacks callbacks; callbacks.onSettingsChanged=[&]{++changes;};
+        MainMenu menu(callbacks,{},settings,localization,nullptr);
+        menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter);
+        require(settings.language==Language::English && changes==0,
+                "opening language submenu does not cycle or save language");
+        const auto& languages=languagesByEnglishName();
+        const int target=static_cast<int>(std::find(languages.begin(),languages.end(),language)-languages.begin());
+        for (int i=2;i<target;++i) menu.onKeyPress(Key::Down);
+        for (int i=2;i>target;--i) menu.onKeyPress(Key::Up);
+        menu.onKeyPress(Key::Enter);
+        require(settings.language==language && localization.language()==language &&
+                    changes==(language==Language::English?0:1),
+                "language submenu directly selects and persists every supported language");
+        menu.onKeyPress(Key::Enter);
+        require(changes==(language==Language::English?0:1),
+                "reselecting current language keeps focus and avoids redundant saving");
+        menu.onKeyPress(Key::Escape);
+        UIRenderer ui;recordUi=true;drawnLabels.clear();menu.render(ui,960,600);
+        require(drawnLabels.count("MINECRAFTC")==1,"Escape returns from language page to home");
+        recordUi=false;
+    }
+
+    for (const auto size : {glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+        ClientSettings settings;settings.language=Language::English;
+        Localization localization;localization.setLanguage(settings.language);
+        int changes=0;
+        MenuCallbacks callbacks;callbacks.onSettingsChanged=[&]{++changes;};
+        MainMenu menu(callbacks,{},settings,localization,nullptr);
+        menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter);
+        UIRenderer ui;recordUi=true;
+        for (int i=0;i<8;++i) menu.onScroll(-1);
+        drawnLabels.clear();menu.render(ui,size.x,size.y);
+        // Keyboard focus takes priority on the first render; wheel scroll follows it.
+        for (int i=0;i<11;++i) menu.onScroll(-1);
+        drawnLabels.clear();menu.render(ui,size.x,size.y);
+        require(drawnLabels.count("Español")==1,"wheel scrolling reveals last language on compact canvases");
+        auto point=drawnLabels.at("Español")+glm::vec2(1,1);
+        menu.onMouseButton(MouseButton::Left,ButtonAction::Press,point.x,point.y);
+        menu.onMouseButton(MouseButton::Left,ButtonAction::Release,point.x,point.y);
+        require(settings.language==Language::Spanish && changes==1,"pointer directly selects visible language");
+        menu.onKeyPress(Key::Down);drawnLabels.clear();menu.render(ui,size.x,size.y);
+        require(drawnLabels.count("common.back")==1,"keyboard focus scrolls Back into view");
+        point=drawnLabels.at("common.back")+glm::vec2(1,1);
+        menu.onMouseButton(MouseButton::Left,ButtonAction::Press,point.x,point.y);
+        menu.onMouseButton(MouseButton::Left,ButtonAction::Release,point.x,point.y);
+        drawnLabels.clear();menu.render(ui,size.x,size.y);
+        require(drawnLabels.count("MINECRAFTC")==1,"language Back button returns home");
+        recordUi=false;
+    }
+
     {
         ClientSettings menuSettings;
         Localization menuLocalization;

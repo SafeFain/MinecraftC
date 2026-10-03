@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "Одиночная игра",
   "menu.home.settings": "Настройки",
   "menu.home.language": "Язык: {0}",
+  "menu.language.title": "Язык",
   "menu.home.quit": "Выход",
   "menu.home.about": "О проекте",
   "menu.about.title": "О ПРОЕКТЕ",

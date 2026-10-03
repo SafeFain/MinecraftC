@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "싱글플레이",
   "menu.home.settings": "설정",
   "menu.home.language": "언어: {0}",
+  "menu.language.title": "언어",
   "menu.home.quit": "종료",
   "menu.home.about": "정보",
   "menu.about.title": "정보",

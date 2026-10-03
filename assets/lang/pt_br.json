@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "Um jogador",
   "menu.home.settings": "Configurações",
   "menu.home.language": "Idioma: {0}",
+  "menu.language.title": "Idioma",
   "menu.home.quit": "Sair",
   "menu.home.about": "Sobre",
   "menu.about.title": "SOBRE",

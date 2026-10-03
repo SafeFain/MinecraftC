@@ -55,6 +55,7 @@
   "menu.home.singleplayer": "单人游戏",
   "menu.home.settings": "设置",
   "menu.home.language": "语言：{0}",
+  "menu.language.title": "语言",
   "menu.home.quit": "退出游戏",
   "menu.home.about": "关于",
   "menu.about.title": "关于",

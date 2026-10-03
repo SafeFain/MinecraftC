@@ -1189,6 +1189,7 @@ if(BUILD_TESTING)
         src/game/ClientSettings.cpp
         src/game/InventoryInteraction.cpp
         src/game/InventoryModel.cpp
+        src/game/ArabicShaper.cpp
         src/game/Language.cpp
         src/game/Item.cpp
         src/game/SaveStore.cpp

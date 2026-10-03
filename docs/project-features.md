@@ -113,8 +113,9 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   menus show contact feedback, cancel taps on scrolling/focus loss and clear
   hover on release. Inventory controller focus follows fitted slots on resize.
 - Ten UI languages (Arabic, Simplified Chinese, English, French, German, Japanese,
-  Korean, Portuguese, Russian, Spanish) selectable from the main menu in
-  English-name order; Arabic strings are shaped (joined forms, lam-alef
+  Korean, Portuguese, Russian, Spanish) directly selectable in a language submenu
+  opened from the main menu, with native names, current-language highlighting,
+  immediate saving and compact-screen scrolling in English-name order; Arabic strings are shaped (joined forms, lam-alef
   ligatures, right-to-left runs) at runtime with a bundled Noto Naskh fallback
   face. The main menu also provides refreshable world selection with confirmed
   deletion and a localized About page linking to the project repository.

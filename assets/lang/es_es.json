@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "Un jugador",
   "menu.home.settings": "Ajustes",
   "menu.home.language": "Idioma: {0}",
+  "menu.language.title": "Idioma",
   "menu.home.quit": "Salir",
   "menu.home.about": "Acerca de",
   "menu.about.title": "ACERCA DE",

@@ -55,6 +55,7 @@
   "menu.home.singleplayer": "Singleplayer",
   "menu.home.settings": "Settings",
   "menu.home.language": "Language: {0}",
+  "menu.language.title": "Language",
   "menu.home.quit": "Quit",
   "menu.home.about": "About",
   "menu.about.title": "ABOUT",

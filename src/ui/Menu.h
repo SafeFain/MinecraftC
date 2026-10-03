@@ -145,7 +145,7 @@ public:
     bool wantsTextInput() const override { return m_page == Page::Create; }
 
 private:
-    enum class Page { Home, Worlds, Create, About };
+    enum class Page { Home, Worlds, Create, Language, About };
     enum class Field { Name, Seed };
 
     MenuCallbacks m_callbacks;
@@ -180,6 +180,7 @@ private:
     void showHome();
     void showWorlds();
     void showCreate();
+    void showLanguage();
     void showAbout();
     void changeAboutPage(int delta);
     void renderAbout(UIRenderer& ui, int screenWidth, int screenHeight);

@@ -83,6 +83,17 @@ int main(int argc,char** argv) {
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
         draw("home",[&]{main.render(ui,width,height);});
+        main.onKeyPress(Key::Down);main.onKeyPress(Key::Down);main.onKeyPress(Key::Enter);
+        for (const auto language : languagesByEnglishName()) {
+            settings.language=language;localization.setLanguage(language);
+            main.onKeyPress(Key::Escape);main.onKeyPress(Key::Down);
+            main.onKeyPress(Key::Down);main.onKeyPress(Key::Enter);
+            draw("language-menu-"+std::string(languageCode(language)),[&]{main.render(ui,width,height);});
+        }
+        main.onKeyPress(Key::Down);
+        draw("language-menu-back",[&]{main.render(ui,width,height);});
+        main.onKeyPress(Key::Escape);
+        settings.language=Language::English;localization.setLanguage(settings.language);
         main.onKeyPress(Key::Enter);
         draw("worlds",[&]{main.render(ui,width,height);});
         main.onKeyPress(Key::Escape);main.onKeyPress(Key::Down);main.onKeyPress(Key::Down);

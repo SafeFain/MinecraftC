@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "シングルプレイ",
   "menu.home.settings": "設定",
   "menu.home.language": "言語: {0}",
+  "menu.language.title": "言語",
   "menu.home.quit": "終了",
   "menu.home.about": "情報",
   "menu.about.title": "情報",

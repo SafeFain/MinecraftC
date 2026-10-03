@@ -6,6 +6,7 @@
 #include "core/RuntimeClock.h"
 #include <algorithm>
 #include "game/Utf8.h"
+#include "game/ArabicShaper.h"
 
 namespace {
 struct ThirdPartyCredit {
@@ -156,6 +157,14 @@ void MainMenu::showCreate() {
     rebuildButtons();
 }
 
+void MainMenu::showLanguage() {
+    resetTransition();
+    m_page = Page::Language;
+    m_formOffset = 0;
+    m_formSelection = -1;
+    rebuildButtons();
+}
+
 void MainMenu::showAbout() {
     resetTransition();
     m_page = Page::About;
@@ -216,15 +225,24 @@ void MainMenu::rebuildButtons() {
                                m_callbacks.onOpenSettings);
         m_buttons.emplace_back(m_localization.format("menu.home.language",
                                {std::string(languageNativeName(m_settings.language))}),
-            [this]() {
-            m_settings.language = nextLanguage(m_settings.language);
-            m_localization.setLanguage(m_settings.language);
-            if (m_callbacks.onSettingsChanged) m_callbacks.onSettingsChanged();
-            rebuildButtons();
-        });
+                               [this]() { showLanguage(); });
         m_buttons.emplace_back(m_localization.text("menu.home.quit"), m_callbacks.onQuit);
         m_buttons.emplace_back(m_localization.text("menu.home.about"),
                                [this]() { showAbout(); });
+    } else if (m_page == Page::Language) {
+        for (const auto language : languagesByEnglishName()) {
+            m_buttons.emplace_back(language == Language::Arabic?
+                shapeArabic(std::string(languageNativeName(language))):
+                std::string(languageNativeName(language)), [this, language]() {
+                if (m_settings.language == language) return;
+                m_settings.language = language;
+                m_localization.setLanguage(language);
+                if (m_callbacks.onSettingsChanged) m_callbacks.onSettingsChanged();
+                rebuildButtons();
+            });
+            m_buttons.back().setPrimary(language == m_settings.language);
+        }
+        m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
     } else if (m_page == Page::Worlds) {
         const int visible=m_visibleWorlds;
         const int end = std::min(static_cast<int>(m_worlds.size()), m_worldOffset + visible);
@@ -336,6 +354,12 @@ void MainMenu::rebuildButtons() {
                 m_buttons[i].inheritFeedback(previous[i]);
     m_selectedIdx=m_page==Page::Worlds && m_selectedWorld>=m_worldOffset &&
         m_selectedWorld<m_worldOffset+m_visibleWorlds?m_selectedWorld-m_worldOffset:0;
+    if (m_page == Page::Language) {
+        const auto& languages = languagesByEnglishName();
+        m_selectedIdx = static_cast<int>(std::find(languages.begin(), languages.end(),
+                                                 m_settings.language) - languages.begin());
+        m_selectedIdx = std::clamp(m_selectedIdx, 0, static_cast<int>(languages.size()) - 1);
+    }
     if (!m_buttons.empty()) {
         m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
         if (m_page==Page::Home) m_buttons[0].setPrimary(true);
@@ -379,8 +403,11 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     const float panelY=(h-panelH)*.5f;
     UiTheme::panel(ui,panelX,panelY,panelW,panelH,UiTheme::PANEL);
     const std::string title=home?"MINECRAFTC":m_localization.text(
+        m_page==Page::Language?"menu.language.title":
         m_page==Page::Worlds?"menu.worlds.title":"menu.create.title");
-    const std::string subtitle=m_localization.text(home?"menu.home.subtitle":
+    const std::string subtitle=m_page==Page::Language?
+        m_localization.format("menu.home.language", {std::string(languageNativeName(m_settings.language))}):
+        m_localization.text(home?"menu.home.subtitle":
         m_page==Page::Worlds?"menu.worlds.subtitle":"menu.create.subtitle");
     const float titleW=wideHome?panelX-64:panelW-40;
     const float titleScale=fittedTextScale(ui,title,h<400?2.0f:home?3.4f:2.4f,titleW);
@@ -406,9 +433,10 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             }
             prepareButton(m_buttons[i]);m_buttons[i].render(ui);
         }
-    } else if (m_page==Page::Create) {
-        const bool twoColumns=w>=440;
-        const int rows=twoColumns?5:7;
+    } else if (m_page==Page::Create || m_page==Page::Language) {
+        const bool languagePage=m_page==Page::Language;
+        const bool twoColumns=!languagePage && w>=440;
+        const int rows=languagePage?static_cast<int>(m_buttons.size()):twoColumns?5:7;
         const float gap=8;
         if (m_formRows!=rows) m_formSelection=-1;
         m_formRows=rows;
@@ -434,6 +462,10 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             m_buttons[i].setPosition(contentX+(half&&right?bw+gap:0),
                                      contentTop-rowH-row*(rowH+gap));
             m_buttons[i].setSize(bw,rowH);prepareButton(m_buttons[i]);m_buttons[i].render(ui);
+            if (languagePage && i<languagesByEnglishName().size() &&
+                languagesByEnglishName()[i]==m_settings.language)
+                UiTheme::rounded(ui,contentX+4,m_buttons[i].y()+6,2,
+                                 std::max(1.0f,rowH-12),1,UiTheme::ACCENT);
         }
         if (rows>m_formVisibleRows) UiTheme::scrollBar(ui,panelX+panelW-10,contentBottom,4,
             contentTop-contentBottom,m_formOffset,m_formVisibleRows,rows);
@@ -576,7 +608,7 @@ void MainMenu::onKeyPress(int key, int mods) {
     }
     if (key == Key::Escape) {
         if (m_page == Page::Create) showWorlds();
-        else if (m_page == Page::Worlds || m_page == Page::About) showHome();
+        else if (m_page == Page::Worlds || m_page == Page::About || m_page == Page::Language) showHome();
         return;
     }
     if (m_page==Page::Worlds && (key==Key::Right || key==Key::Left)) {
@@ -686,7 +718,7 @@ void MainMenu::onScroll(double yOffset) {
         if (yOffset != 0.0) changeAboutPage(yOffset < 0.0 ? 1 : -1);
         return;
     }
-    if (m_page==Page::Create && yOffset!=0) {
+    if ((m_page==Page::Create || m_page==Page::Language) && yOffset!=0) {
         m_formOffset=std::clamp(m_formOffset+(yOffset<0?1:-1),0,m_formRows-m_formVisibleRows);
         return;
     }

@@ -53,6 +53,7 @@
   "menu.home.singleplayer": "لاعب واحد",
   "menu.home.settings": "الإعدادات",
   "menu.home.language": "اللغة: {0}",
+  "menu.language.title": "اللغة",
   "menu.home.quit": "خروج",
   "menu.home.about": "حول",
   "menu.about.title": "حول",
