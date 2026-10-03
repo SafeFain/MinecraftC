@@ -118,7 +118,7 @@ public:
     bool deleteWorld(const std::string& id);
     void setOverworldBedSpawn(const glm::ivec3& bed);
     bool isNight() const { return dayNightCycle.isNight(); }
-    void updateDaylight(float dt, float minutes, bool playing);
+    void updateDaylight(float dt, bool playing);
     void configureVisuals(const EnhancedVisualSettings& visuals, VisualQuality quality);
     void configureLod(const LodSettings& settings);
     void setToggleSneak(bool enabled);

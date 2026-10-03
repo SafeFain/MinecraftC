@@ -54,8 +54,8 @@ void GameSession::setOverworldBedSpawn(const glm::ivec3& bed) {
     if (dimension == DimensionId::Overworld) worldMetadata.bedSpawn = bed;
 }
 
-void GameSession::updateDaylight(float dt, float minutes, bool playing) {
-    dayNightCycle.update(dt, minutes, playing);
+void GameSession::updateDaylight(float dt, bool playing) {
+    dayNightCycle.update(dt, worldMetadata.dayNightDurationSeconds, playing);
 }
 
 void GameSession::configureVisuals(
@@ -519,6 +519,7 @@ GameSession::CommandResult GameSession::executeCommand(
         message("/give <item> [1..64]");
         message("/tp <x> <y> <z>");
         message("/time set day|night");
+        message("/gamerule DayNightDuration <seconds>");
         message("/weather clear|rain|thunder");
         message("/locate biome <biome>");
         message(localization.text("message.help_biomes"));
@@ -560,6 +561,13 @@ GameSession::CommandResult GameSession::executeCommand(
         message(localization.format("message.teleported", {
             std::to_string(target.x), std::to_string(target.y),
             std::to_string(target.z)}));
+        return result;
+    }
+    if (command.type == CommandType::DayNightDuration) {
+        if (command.dayNightDurationSeconds == 0) return result;
+        worldMetadata.dayNightDurationSeconds = command.dayNightDurationSeconds;
+        message(localization.format("message.day_night_duration", {
+            std::to_string(command.dayNightDurationSeconds)}));
         return result;
     }
     if (command.type == CommandType::Time) {

@@ -290,6 +290,14 @@ int main(){
     settings.invertGamepadY=true;settings.gamepadRumble=.6f;
     settings.touchControlSize=1.25f;settings.touchControlOpacity=.8f;settings.touchLeftHanded=true;
     require(settings.save(root/"options.txt"),"settings save succeeds");
+    {
+        std::ifstream input(root/"options.txt");
+        const std::string text((std::istreambuf_iterator<char>(input)), {});
+        require(text.find("day_cycle=") == std::string::npos,
+                "client settings no longer write world duration");
+        std::ofstream output(root/"options.txt", std::ios::app);
+        output << "day_cycle=0\n";
+    }
     const auto loaded=ClientSettings::load(root/"options.txt");
     require(loaded.mouseSensitivity==.42f&&loaded.guiScale==3&&
             loaded.frameRateLimit==137&&loaded.invertMouseY&&loaded.toggleSneak&&

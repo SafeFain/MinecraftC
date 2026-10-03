@@ -403,7 +403,6 @@ private:
     void applyClientSettings(bool persist = true) {
         m_clientSettings.validate();
         Config::RENDER_DISTANCE = m_clientSettings.renderDistance;
-        Config::DAY_CYCLE_MINUTES = m_clientSettings.dayCycleMinutes;
         Config::SMOOTH_LIGHTING = m_clientSettings.smoothLighting;
         Config::AUTO_JUMP = m_clientSettings.autoJump;
         m_session.setToggleSneak(m_clientSettings.toggleSneak);
@@ -452,8 +451,7 @@ private:
 
     void updateFrameState(float dt, RuntimeClock::Tick now) {
         // ── Update ────────────────────────────────────────────────
-        m_session.updateDaylight(
-            dt, Config::DAY_CYCLE_MINUTES, m_flow.state() == GameState::Playing);
+        m_session.updateDaylight(dt, m_flow.state() == GameState::Playing);
         if (m_flow.state() != GameState::Playing || m_ui.inventoryOpen ||
             m_ui.commandOpen || m_session.isPlayerDead())
             m_session.cancelBowCharge();

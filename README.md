@@ -192,7 +192,7 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v13 uses little-endian 16-bit block IDs and can read v2-v12 desktop
+one exists. Save format v14 uses little-endian 16-bit block IDs and can read v2-v13 desktop
 metadata. The current world generation version is v17 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
@@ -223,8 +223,12 @@ choices; shards, berries and roasted foods support collection and crafting.
 Five altitude layers, eight biomes and existing shrine transport remain.
 Block storage, overrides and derived caches now preserve IDs above 255.
 
+Each world saves its day/night duration, defaulting to 1200 seconds for a full
+day and night. Set it with `/gamerule DayNightDuration 1200` (positive integer
+seconds); older saves also default to 1200. This is no longer a client setting.
+
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
-`/give <item_name> [1..64]`,
+`/give <item_name> [1..64]`, `/gamerule DayNightDuration <seconds>`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
 supports the current dimension's Overworld structures plus Heaven's
 `xiguang_ruin`, `star_crystal_geode`, `cloudspire_tower`, and `skyway_shrine`.

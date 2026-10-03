@@ -112,13 +112,11 @@ public:
     static constexpr float STATIC_DAY_PHASE = 0.25f;
 
     void resetMorning() {
-        m_phase = Config::DAY_CYCLE_MINUTES == 0
-            ? STATIC_DAY_PHASE : MORNING_PHASE;
-        m_manualTimeSet = false;
+        m_phase = MORNING_PHASE;
     }
 
-    void setDay() { m_phase = 0.0f; m_manualTimeSet = true; }
-    void setNight() { m_phase = 0.5f; m_manualTimeSet = true; }
+    void setDay() { m_phase = 0.0f; }
+    void setNight() { m_phase = 0.5f; }
 
     // Restore a persisted dimension phase while keeping the phase bounded.
     // Invalid values are treated as morning so corrupted metadata cannot
@@ -127,24 +125,23 @@ public:
         if (!std::isfinite(phase) || phase < 0.0f || phase >= 1.0f)
             phase = MORNING_PHASE;
         m_phase = phase;
-        m_manualTimeSet = false;
     }
 
-    void update(float deltaSeconds, int cycleMinutes, bool advancing) {
-        if (cycleMinutes == 0) {
-            if (!m_manualTimeSet) m_phase = STATIC_DAY_PHASE;
-            return;
-        }
+    void update(float deltaSeconds, uint32_t cycleSeconds, bool advancing) {
+        if (cycleSeconds == 0) return;
         if (advancing && deltaSeconds > 0.0f) {
-            const float seconds = static_cast<float>(cycleMinutes) * 60.0f;
+            const double seconds = static_cast<double>(cycleSeconds);
             m_phase += std::min(deltaSeconds, 0.1f) / seconds;
             m_phase -= std::floor(m_phase);
         }
     }
 
-    float phase() const { return m_phase; }
+    float phase() const {
+        // Float rounding must not turn a valid phase just below one into one.
+        return std::min(static_cast<float>(m_phase), std::nextafter(1.0f, 0.0f));
+    }
     static bool isDayPhase(float phase) { return phase >= 0.0f && phase < 0.5f; }
-    bool isDay() const { return isDayPhase(m_phase); }
+    bool isDay() const { return m_phase >= 0.0 && m_phase < 0.5; }
     bool isNight() const { return !isDay(); }
 
     RenderEnvironment evaluate() const {
@@ -159,7 +156,7 @@ public:
             1.0f - std::abs(sun.y) / 0.32f, 0.0f, 1.0f);
 
         RenderEnvironment env;
-        env.dayPhase = m_phase;
+        env.dayPhase = phase();
         env.daylight = daylight;
         env.starIntensity = smoothstep(0.18f, 0.72f, 1.0f - daylight);
         env.sunDirection = sun;
@@ -192,8 +189,8 @@ public:
     }
 
 private:
-    float m_phase = MORNING_PHASE;
-    bool m_manualTimeSet = false;
+    // Retain sub-frame increments even for very long world cycle durations.
+    double m_phase = MORNING_PHASE;
 
     static float smoothstep(float edge0, float edge1, float value) {
         float t = std::clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);

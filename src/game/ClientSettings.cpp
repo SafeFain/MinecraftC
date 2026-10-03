@@ -183,9 +183,6 @@ void ClientSettings::validate() {
     if (std::find(std::begin(cloudDistances), std::end(cloudDistances),
                   cloudRenderDistance) == std::end(cloudDistances))
         cloudRenderDistance = 192;
-    constexpr int cycles[] = {0,10,20,40};
-    if (std::find(std::begin(cycles), std::end(cycles), dayCycleMinutes) == std::end(cycles))
-        dayCycleMinutes = 20;
     mouseSensitivity = std::clamp(mouseSensitivity, 0.05f, 0.50f);
     if (static_cast<int>(shadowQuality) < static_cast<int>(ShadowQuality::Off) ||
         static_cast<int>(shadowQuality) > static_cast<int>(ShadowQuality::High))
@@ -271,7 +268,6 @@ ClientSettings ClientSettings::load(const std::filesystem::path& path) {
                 settings.renderClouds = std::stoi(value) != 0;
             else if (name == "cloud_render_distance")
                 settings.cloudRenderDistance = std::stoi(value);
-            else if (name == "day_cycle") settings.dayCycleMinutes = std::stoi(value);
             else if (name == "auto_jump") settings.autoJump = std::stoi(value) != 0;
             else if (name == "toggle_sneak") settings.toggleSneak = std::stoi(value) != 0;
             else if (name == "master_volume")
@@ -404,7 +400,6 @@ bool ClientSettings::save(const std::filesystem::path& path) const {
            << "lod_precision=" << static_cast<int>(lodPrecision) << '\n'
            << "render_clouds=" << renderClouds << '\n'
            << "cloud_render_distance=" << cloudRenderDistance << '\n'
-           << "day_cycle=" << dayCycleMinutes << '\n'
            << "auto_jump=" << autoJump << '\n'
            << "toggle_sneak=" << toggleSneak << '\n'
            << "master_volume=" << static_cast<int>(masterVolume) << '\n'

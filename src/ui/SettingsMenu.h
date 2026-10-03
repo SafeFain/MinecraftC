@@ -226,11 +226,9 @@ private:
     void cycleRenderDistance();
     void toggleCloudRendering();
     void cycleCloudRenderDistance();
-    void cycleDayCycle();
     void toggleAutoJump();
     std::string labelForRenderDist() const;
     std::string labelForCloudRenderDist() const;
-    std::string labelForDayCycle() const;
     std::string labelForAutoJump() const;
     void showPage(SettingsPage page);
     void refreshButtons();

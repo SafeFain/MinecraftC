@@ -220,6 +220,29 @@ int main(int argc, char** argv) {
         runCommand(session, localization, "/time set day");
         require(!session.daylightState().isNight(), "day preset applies");
 
+        require(session.metadata().dayNightDurationSeconds == 1200,
+                "new world defaults to a twenty-minute day and night");
+        const float phase = session.daylightState().phase();
+        session.updateDaylight(0.1f, false);
+        require(session.daylightState().phase() == phase, "paused world time does not advance");
+        session.updateDaylight(0.1f, true);
+        require(std::abs(session.daylightState().phase() - phase - 0.1f / 1200.0f) < 0.000001f,
+                "default world cycle advances in seconds");
+        GameSessionTestAccess::setCheats(session, false);
+        result = runCommand(session, localization, "/gamerule DayNightDuration 180");
+        require(session.metadata().dayNightDurationSeconds == 1200 &&
+                result.messages[0] == "message.cheats_disabled", "duration requires cheats");
+        GameSessionTestAccess::setCheats(session, true);
+        const float beforeRule = session.daylightState().phase();
+        result = runCommand(session, localization, "/gamerule DayNightDuration 180");
+        require(session.metadata().dayNightDurationSeconds == 180 &&
+                session.daylightState().phase() == beforeRule &&
+                result.messages[0] == "message.day_night_duration",
+                "duration updates world rule and preserves phase");
+        session.updateDaylight(0.1f, true);
+        require(std::abs(session.daylightState().phase() - beforeRule - 0.1f / 180.0f) < 0.000001f,
+                "world duration controls live cycle speed");
+
         // Weather presets drive the weather state.
         runCommand(session, localization, "/weather thunder");
         require(session.weatherState().thundering(), "thunder preset applies");
@@ -323,6 +346,8 @@ int main(int argc, char** argv) {
             reopened.startWorld(worlds[0].id, false, clock.now());
         require(mode == GameMode::Survival,
                 "existing world restores its saved mode");
+        require(reopened.metadata().dayNightDurationSeconds == 180,
+                "world duration survives save and reopen");
         require(!GameSessionTestAccess::newWorldLoading(reopened),
                 "existing world loads without the new-world flag");
         const glm::dvec3 position = reopened.playerState().getPosition();
@@ -368,6 +393,9 @@ int main(int argc, char** argv) {
             "Dimension Test", 999, GameMode::Creative, Difficulty::Normal,
             true);
         dimensions.startWorld(id, true, clock.now());
+        require(dimensions.metadata().dayNightDurationSeconds == 1200,
+                "independent world retains default duration");
+        runCommand(dimensions, localization, "/gamerule DayNightDuration 73");
         GameSessionTestAccess::markTerrainReady(dimensions);
         GameSessionTestAccess::setNight(dimensions);
         require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
@@ -377,6 +405,8 @@ int main(int argc, char** argv) {
                 "heaven switch installs its generator and data store");
         require(!dimensions.daylightState().isNight(),
                 "heaven starts with its independent day phase");
+        require(dimensions.metadata().dayNightDurationSeconds == 73,
+                "duration rule is shared across dimensions");
         require(dimensions.entityState().entities().empty(),
                 "heaven starts without natural entities");
         auto locateResult = runCommand(

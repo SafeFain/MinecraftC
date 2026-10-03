@@ -112,10 +112,12 @@ int main() {
         source.heaven.worldTicks = 987654;
         source.heaven.dayPhase = 0.81f;
 
+        source.dayNightDurationSeconds = 180;
         store.saveMetadata(source);
         require(store.exists(), "metadata file is created");
         const auto loaded = store.loadMetadata();
         require(loaded.displayName == source.displayName, "world name round trips");
+        require(loaded.dayNightDurationSeconds == 180, "world duration round trips in seconds");
         require(loaded.seed == source.seed, "64-bit seed round trips");
         require(loaded.gameMode == GameMode::Survival &&
                 loaded.difficulty == Difficulty::Hard,
@@ -201,6 +203,32 @@ int main() {
         for (uint16_t raw=261; raw<=281; ++raw)
             require(heavenRoundTrip.inventory.slot(raw-261).id==static_cast<ItemId>(raw),
                     "Heaven resource and food IDs survive metadata serialization");
+        const auto v13Directory = root / "legacy-v13";
+        SaveStore(v13Directory).saveMetadata(source);
+        const auto v13Path = v13Directory / "level.bin";
+        {
+            auto bytes = readBytes(v13Path);
+            bytes.resize(bytes.size() - sizeof(uint32_t));
+            writeLittleEndian(bytes, 8, 13, 4);
+            writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
+            writeLittleEndian(bytes, 16, payloadChecksum(bytes, 24), 8);
+            std::ofstream output(v13Path, std::ios::binary | std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        }
+        const auto v13 = SaveStore(v13Directory).loadMetadata();
+        require(v13.dayNightDurationSeconds == 1200 && v13.foodTickTimer == source.foodTickTimer,
+                "v13 retains food timer and defaults duration to twenty minutes");
+        SaveStore(v13Directory).saveMetadata(v13);
+        require(SaveStore(v13Directory).loadMetadata().dayNightDurationSeconds == 1200,
+                "legacy duration default survives upgrade to v14");
+        WorldMetadata invalidDuration = source;
+        invalidDuration.dayNightDurationSeconds = 0;
+        SaveStore(v13Directory).saveMetadata(invalidDuration);
+        bool invalidDurationRejected = false;
+        try { (void)SaveStore(v13Directory).loadMetadata(); }
+        catch (const std::exception&) { invalidDurationRejected = true; }
+        require(invalidDurationRejected, "zero saved duration is rejected");
+
         WorldMetadata replacement = source;
         replacement.worldTicks += 1;
         store.saveMetadata(replacement);
@@ -253,7 +281,7 @@ int main() {
         {
             std::vector<uint8_t> bytes = readBytes(v10Path);
             require(bytes.size() > 28, "v10 fixture has a food timer tail");
-            bytes.resize(bytes.size() - sizeof(uint32_t));
+            bytes.resize(bytes.size() - 2 * sizeof(uint32_t));
             writeLittleEndian(bytes, 8, 10, 4);
             writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
             writeLittleEndian(bytes, 16, payloadChecksum(bytes, 24), 8);
@@ -262,6 +290,7 @@ int main() {
                          static_cast<std::streamsize>(bytes.size()));
         }
         const auto migratedV10 = SaveStore(v10Directory).loadMetadata();
+        require(migratedV10.dayNightDurationSeconds == 1200, "v10 defaults duration to twenty minutes");
         require(migratedV10.foodTickTimer == 0,
                 "v10 metadata defaults the Java food timer to zero");
         require(migratedV10.activeDimension == source.activeDimension &&

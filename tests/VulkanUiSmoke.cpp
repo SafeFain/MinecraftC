@@ -110,13 +110,13 @@ int main(int argc,char** argv) {
             if (index%columns) options.onKeyPress(Key::Right);
             options.onKeyPress(Key::Enter);
         };
-        choose(2);draw("settings-video",[&]{options.render(ui,width,height);});
+        choose(1);draw("settings-video",[&]{options.render(ui,width,height);});
         choose(4);draw("settings-effects",[&]{options.render(ui,width,height);});
         options.onKeyPress(Key::Escape);choose(12);
         draw("settings-lod",[&]{options.render(ui,width,height);});
-        options.onKeyPress(Key::Escape);options.onKeyPress(Key::Escape);choose(3);
+        options.onKeyPress(Key::Escape);options.onKeyPress(Key::Escape);choose(2);
         draw("settings-audio",[&]{options.render(ui,width,height);});
-        options.onKeyPress(Key::Escape);choose(4);
+        options.onKeyPress(Key::Escape);choose(3);
         draw("settings-bindings",[&]{options.render(ui,width,height);});
         choose(0);draw("settings-keyboard",[&]{options.render(ui,width,height);});
         // Reaching the last control must scroll it into view on narrow screens.

@@ -141,7 +141,7 @@ creative entries and survival crafting/smelting paths. Masonry requires at least
 a wooden pickaxe and drops itself; dyed wool retains white wool mining/fire rules.
 This crafted pack introduced no generation or save-format changes.
 The subsequent natural biome expansion advances Overworld generation to v15;
-At that stage Heaven remained v8 and save format remained v12; current versions are v9/v13.
+At that stage Heaven remained v8 and save format remained v12; current versions are v9/v14.
 
 `/give <item_name> [1..64]` supplies the current player's inventory when cheats
 are enabled, defaulting to one item. Names use lowercase English with underscores,
@@ -225,7 +225,9 @@ changes Heaven and block encoding while retaining Overworld generation output.
   and 4/2 for berries, roasted berries, berry bread and roasted glowshrooms.
 - Existing Heaven loot gains shards, berries and bricks while the origin shrine
   retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
-- Save v13 and block buffers use 16-bit IDs; packed light remains byte-sized.
+- Save v14 persists a world-wide day/night duration (default 1200 seconds), changed
+  using `/gamerule DayNightDuration <seconds>` with cheats enabled; v2-v13 default
+  to 1200 seconds. Save v13 introduced 16-bit IDs, retained in v14; packed light remains byte-sized.
   Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
   Old metadata remains readable/listed; worlds outside global generation v17
   remain incompatible and are never migrated or rewritten by refused loads.

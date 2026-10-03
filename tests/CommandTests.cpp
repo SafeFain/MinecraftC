@@ -44,6 +44,28 @@ int main() {
     require(chineseLines.size() == 2 && chineseLines[0] == "沼泽丛" &&
             chineseLines[1] == "林恶地", "CJK chat was not wrapped on UTF-8 boundaries");
 
+    const auto duration = parseCommand("/gamerule DayNightDuration 1200");
+    require(duration.command && duration.command->type == CommandType::DayNightDuration &&
+            duration.command->dayNightDurationSeconds == 1200,
+            "day/night gamerule accepts seconds");
+    require(parseCommand("/gamerule DayNightDuration 1").command &&
+            parseCommand("/gamerule DayNightDuration 4294967295").command,
+            "duration accepts full positive uint32 range");
+    for (const char* input : {"/gamerule", "/gamerule daynightduration 1200",
+            "/gamerule DayNightDuration", "/gamerule DayNightDuration 0",
+            "/gamerule DayNightDuration -1", "/gamerule DayNightDuration 1.5",
+            "/gamerule DayNightDuration NaN", "/gamerule DayNightDuration inf",
+            "/gamerule DayNightDuration 4294967296",
+            "/gamerule DayNightDuration 999999999999999999999999",
+            "/gamerule DayNightDuration 1200 extra"})
+        require(parseCommand(input).error.has_value(), "invalid gamerule rejected");
+    const auto ruleSuggestions = commandSuggestions("/gamerule Day", 13);
+    require(ruleSuggestions.size() == 1 && ruleSuggestions[0].text == "DayNightDuration",
+            "gamerule name supports completion");
+    const auto commandSuggestion = commandSuggestions("/gamer", 6);
+    require(commandSuggestion.size() == 1 && commandSuggestion[0].text == "/gamerule",
+            "gamerule command supports completion");
+
     const auto help = parseCommand("/help");
     require(help.command && help.command->type == CommandType::Help,
             "help command was not parsed");

@@ -28,6 +28,7 @@ enum class CommandType {
     Gamemode,
     Teleport,
     Time,
+    DayNightDuration,
     Weather,
     LocateBiome,
     LocateStructure,
@@ -41,6 +42,7 @@ struct ParsedCommand {
     ItemId item = ItemId::EMPTY;
     uint8_t itemCount = 1;
     TimePreset time = TimePreset::Day;
+    uint32_t dayNightDurationSeconds = DEFAULT_DAY_NIGHT_DURATION_SECONDS;
     WeatherType weather = WeatherType::Clear;
     Biome biome = Biome::PLAINS;
     StructureType structure = StructureType::Village;
@@ -148,6 +150,20 @@ inline CommandParseResult parseCommand(const std::string& input) {
         if (tokens.size() > 4) return expected(input, tokens, 4, "<end>");
         parsed.type = CommandType::Teleport;
         parsed.teleport = {coordinates[0], coordinates[1], coordinates[2]};
+    } else if (name == "/gamerule") {
+        if (tokens.size() < 2 || tokens[1].text != "DayNightDuration")
+            return expected(input, tokens, 1, "DayNightDuration");
+        if (tokens.size() < 3) return expected(input, tokens, 2, "1..4294967295 seconds");
+        const auto& value = tokens[2].text;
+        if (value.empty() || value.size() > 10 ||
+            value.find_first_not_of("0123456789") != std::string::npos)
+            return expected(input, tokens, 2, "1..4294967295 seconds");
+        const uint64_t seconds = std::stoull(value);
+        if (seconds == 0 || seconds > UINT32_MAX)
+            return expected(input, tokens, 2, "1..4294967295 seconds");
+        if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
+        parsed.type = CommandType::DayNightDuration;
+        parsed.dayNightDurationSeconds = static_cast<uint32_t>(seconds);
     } else if (name == "/time") {
         if (tokens.size() < 2 || tokens[1].text != "set")
             return expected(input, tokens, 1, "set");
@@ -226,8 +242,8 @@ inline std::vector<CommandSuggestion> commandSuggestions(
     };
 
     if (argument == 0) {
-        constexpr std::array<std::string_view, 7> commands{
-            "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
+        constexpr std::array<std::string_view, 8> commands{
+            "/gamerule", "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
         for (const auto command : commands) add(command);
     } else {
         const std::string& command = before[0].text;
@@ -236,6 +252,8 @@ inline std::vector<CommandSuggestion> commandSuggestions(
                 add(itemCommandName(static_cast<ItemId>(raw)));
         } else if (argument == 1 && command == "/gamemode") {
             add("0"); add("1"); add("3");
+        } else if (argument == 1 && command == "/gamerule") {
+            add("DayNightDuration");
         } else if (argument == 1 && command == "/time") {
             add("set");
         } else if (argument == 2 && command == "/time" &&

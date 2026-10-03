@@ -28,7 +28,6 @@ struct ClientSettings {
     LodPrecision lodPrecision = LodPrecision::Medium;
     bool renderClouds = true;
     int cloudRenderDistance = 192;
-    int dayCycleMinutes = 20;
     bool autoJump = true;
     bool toggleSneak = false;
     uint8_t masterVolume = 100;

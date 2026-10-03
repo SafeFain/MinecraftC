@@ -28,12 +28,6 @@ std::string SettingsMenu::labelForCloudRenderDist() const {
     return m_localization.format(
         "settings.cloud_distance", {std::to_string(m_settings.cloudRenderDistance)});
 }
-std::string SettingsMenu::labelForDayCycle() const {
-    return m_settings.dayCycleMinutes == 0
-        ? m_localization.text("settings.day_static")
-        : m_localization.format(
-            "settings.day_minutes", {std::to_string(m_settings.dayCycleMinutes)});
-}
 std::string SettingsMenu::labelForAutoJump() const {
     return m_localization.format("settings.auto_jump", {m_localization.text(
         m_settings.autoJump ? "common.on" : "common.off")});
@@ -57,13 +51,6 @@ void SettingsMenu::cycleCloudRenderDistance() {
                         m_settings.cloudRenderDistance);
     m_settings.cloudRenderDistance = options[(it == std::end(options) ? 0 :
         (static_cast<int>(it - std::begin(options)) + 1) % 7)];
-    m_onChanged(); refreshButtons();
-}
-void SettingsMenu::cycleDayCycle() {
-    constexpr int options[] = {0,10,20,40};
-    auto it = std::find(std::begin(options), std::end(options), m_settings.dayCycleMinutes);
-    m_settings.dayCycleMinutes = options[(it == std::end(options) ? 0 :
-        (static_cast<int>(it - std::begin(options)) + 1) % 4)];
     m_onChanged(); refreshButtons();
 }
 void SettingsMenu::toggleAutoJump() {
@@ -95,7 +82,6 @@ void SettingsMenu::refreshButtons() {
     m_frameRateDragging = false;
     m_volumeDragging = -1;
     if (m_page == SettingsPage::General) {
-        m_buttons.emplace_back(labelForDayCycle(), [this]{ cycleDayCycle(); });
         m_buttons.emplace_back(labelForAutoJump(), [this]{ toggleAutoJump(); });
         m_buttons.emplace_back(m_localization.text("settings.video"), [this]{
             showPage(SettingsPage::Video);

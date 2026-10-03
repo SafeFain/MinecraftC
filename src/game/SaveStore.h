@@ -34,6 +34,7 @@ struct WorldMetadata {
     Difficulty difficulty = Difficulty::Normal;
     bool cheatsEnabled = false;
     uint64_t worldTicks = 0;
+    uint32_t dayNightDurationSeconds = DEFAULT_DAY_NIGHT_DURATION_SECONDS;
     WeatherSaveState weather;
     glm::dvec3 playerPosition{0.0, 50.0, 0.0};
     glm::ivec3 worldSpawn{0, 50, 0};

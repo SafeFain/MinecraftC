@@ -440,6 +440,8 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload, metadata.heaven.dayPhase);
     // v11 persists the Java-style food timer at the payload tail.
     append(payload, metadata.foodTickTimer);
+    // v14 stores the world-wide day/night duration in seconds.
+    append(payload, metadata.dayNightDurationSeconds);
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
@@ -511,6 +513,11 @@ WorldMetadata SaveStore::loadMetadata() const {
     }
     if (checked.version >= 11)
         metadata.foodTickTimer = reader.read<uint32_t>();
+    if (checked.version >= 14) {
+        metadata.dayNightDurationSeconds = reader.read<uint32_t>();
+        if (metadata.dayNightDurationSeconds == 0)
+            throw std::runtime_error("Save contains invalid day/night duration");
+    }
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
     // fully decoded above, so safely ignore that tail; v10 remains strict.

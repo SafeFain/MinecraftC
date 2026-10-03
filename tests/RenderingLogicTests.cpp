@@ -844,27 +844,38 @@ int main() {
             "set night did not select sunset");
     cycle.update(0.1f, 0, true);
     require(cycle.phase() == 0.5f,
-            "a manually selected time was lost in static-cycle mode");
+            "zero duration guard changed the current phase");
     cycle.resetMorning();
     const float morning = cycle.phase();
     require(!cycle.isNight(), "morning was classified as night");
 
-    cycle.update(1.0f, 20, false);
+    cycle.update(1.0f, 1200, false);
     require(cycle.phase() == morning, "paused cycle advanced");
 
-    cycle.update(0.1f, 20, true);
+    cycle.update(0.1f, 1200, true);
     require(cycle.phase() > morning, "active cycle did not advance");
 
+    DayNightCycle longCycle;
+    longCycle.setNight();
+    for (int i = 0; i < 10000; ++i) longCycle.update(0.1f, UINT32_MAX, true);
+    require(longCycle.phase() > 0.5f,
+            "long world durations must accumulate sub-float frame increments");
+
+    longCycle.setPhase(std::nextafter(1.0f, 0.0f));
+    for (int i = 0; i < 2000; ++i) longCycle.update(0.1f, UINT32_MAX, true);
+    require(longCycle.phase() < 1.0f && longCycle.evaluate().dayPhase < 1.0f,
+            "long duration near wrap must retain a valid persisted/render phase");
+
     DayNightCycle nightCycle;
-    for (int i = 0; i < 900; ++i) nightCycle.update(0.1f, 1, true);
+    for (int i = 0; i < 900; ++i) nightCycle.update(0.1f, 60, true);
     require(nightCycle.isNight(), "night phase was not recognized");
 
-    cycle.update(0.1f, 0, false);
+    cycle.setPhase(DayNightCycle::STATIC_DAY_PHASE);
     require(std::abs(cycle.phase() - DayNightCycle::STATIC_DAY_PHASE) < 0.0001f,
-            "static day did not select noon");
+            "explicit phase did not select noon");
 
     const RenderEnvironment noon = cycle.evaluate();
-    require(noon.daylight > 0.95f, "static noon is not daylight");
+    require(noon.daylight > 0.95f, "noon is not daylight");
     require(noon.ambientIntensity >= Config::NIGHT_AMBIENT_MIN &&
             noon.ambientIntensity <= 1.0f,
             "noon ambient is outside expected range");
@@ -929,9 +940,9 @@ int main() {
             cascades.splits.y <= 128.0f,
             "shadow cascade splits are invalid or ignored fog-distance clamping");
 
-    // Switching back to an automatic cycle resumes from noon. Advance half a
+    // Advance from noon through half a
     // cycle in bounded frame-sized steps to reach midnight.
-    for (int i = 0; i < 6000; ++i) cycle.update(0.1f, 20, true);
+    for (int i = 0; i < 6000; ++i) cycle.update(0.1f, 1200, true);
     const RenderEnvironment midnight = cycle.evaluate();
     require(midnight.daylight < 0.05f, "half cycle did not reach night");
     require(midnight.starIntensity > 0.9f, "night sky has no stars");
@@ -942,9 +953,9 @@ int main() {
             "night clouds should be darker than daytime clouds");
 
     // One complete 10-minute cycle must wrap back to its starting phase.
-    cycle.update(0.1f, 0, false);
+    cycle.setPhase(DayNightCycle::STATIC_DAY_PHASE);
     const float start = cycle.phase();
-    for (int i = 0; i < 6000; ++i) cycle.update(0.1f, 10, true);
+    for (int i = 0; i < 6000; ++i) cycle.update(0.1f, 600, true);
     require(std::abs(cycle.phase() - start) < 0.001f,
             "day cycle did not wrap deterministically");
 
