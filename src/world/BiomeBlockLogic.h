@@ -3,7 +3,8 @@
 #include "world/Block.h"
 
 inline bool isBiomePlant(BlockId block) {
-    return (block >= BlockId::FERN && block <= BlockId::BEACH_GRASS) ||
+    return (block >= BlockId::SKY_FERN && block <= BlockId::CLOUDBERRY_BUSH) ||
+        (block >= BlockId::FERN && block <= BlockId::BEACH_GRASS) ||
         (block >= BlockId::CLOVER && block <= BlockId::JUNGLE_FERN) ||
         block == BlockId::CAVE_GLOWSHROOM;
 }
@@ -39,6 +40,13 @@ inline bool supportsBiomePlant(BlockId plant, BlockId soil) {
         soil == BlockId::CAVE_MOSS;
     const bool sandy = soil == BlockId::SAND || soil == BlockId::RED_SAND ||
         soil == BlockId::BLACK_SAND;
+    if (plant >= BlockId::SKY_FERN && plant <= BlockId::CLOUDBERRY_BUSH) {
+        if (plant == BlockId::MOONFLOWER)
+            return soil == BlockId::MOONSTONE || soil == BlockId::AETHER_MOSS ||
+                soil == BlockId::AETHER_GRASS || soil == BlockId::AETHER_SOIL;
+        return soil == BlockId::AETHER_GRASS || soil == BlockId::AETHER_SOIL ||
+            soil == BlockId::AETHER_MOSS || soil == BlockId::GLIMMER_SILT;
+    }
     if (plant == BlockId::CAVE_GLOWSHROOM)
         return soil == BlockId::CAVE_MOSS || soil == BlockId::MOSS ||
             soil == BlockId::MUD || soil == BlockId::CLAY;

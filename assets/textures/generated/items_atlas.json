@@ -37,6 +37,14 @@
       "x": 0,
       "y": 18
     },
+    "aether_moss": {
+      "generator": "block_item_icon",
+      "index": 262,
+      "source": "items/aether_moss.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 32
+    },
     "aether_soil": {
       "generator": "block_item_icon",
       "index": 145,
@@ -373,6 +381,30 @@
       "x": 0,
       "y": 19
     },
+    "cloudberry": {
+      "generator": "item_sprite",
+      "index": 277,
+      "source": "items/cloudberry.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 34
+    },
+    "cloudberry_bread": {
+      "generator": "item_sprite",
+      "index": 279,
+      "source": "items/cloudberry_bread.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 34
+    },
+    "cloudberry_bush": {
+      "generator": "block_item_icon",
+      "index": 274,
+      "source": "items/cloudberry_bush.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 34
+    },
     "cloudstone": {
       "generator": "block_item_icon",
       "index": 146,
@@ -380,6 +412,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 18
+    },
+    "cloudstone_bricks": {
+      "generator": "block_item_icon",
+      "index": 266,
+      "source": "items/cloudstone_bricks.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 33
     },
     "cloudstone_slab": {
       "generator": "block_item_icon",
@@ -540,6 +580,14 @@
       "source_kind": "generated",
       "x": 7,
       "y": 14
+    },
+    "dawn_bell": {
+      "generator": "block_item_icon",
+      "index": 271,
+      "source": "items/dawn_bell.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 33
     },
     "dead_bush": {
       "generator": "block_item_icon",
@@ -797,6 +845,22 @@
       "x": 4,
       "y": 14
     },
+    "glimmer_reed": {
+      "generator": "block_item_icon",
+      "index": 273,
+      "source": "items/glimmer_reed.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 34
+    },
+    "glimmer_silt": {
+      "generator": "block_item_icon",
+      "index": 263,
+      "source": "items/glimmer_silt.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 32
+    },
     "glow_fern": {
       "generator": "block_item_icon",
       "index": 158,
@@ -972,6 +1036,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 31
+    },
+    "hanging_cloud_vine": {
+      "generator": "block_item_icon",
+      "index": 275,
+      "source": "items/hanging_cloud_vine.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 34
     },
     "hanging_roots": {
       "generator": "block_item_icon",
@@ -1220,6 +1292,30 @@
       "source_kind": "generated",
       "x": 3,
       "y": 29
+    },
+    "moonflower": {
+      "generator": "block_item_icon",
+      "index": 272,
+      "source": "items/moonflower.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 34
+    },
+    "moonstone": {
+      "generator": "block_item_icon",
+      "index": 260,
+      "source": "items/moonstone.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 32
+    },
+    "moonstone_bricks": {
+      "generator": "block_item_icon",
+      "index": 268,
+      "source": "items/moonstone_bricks.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 33
     },
     "moss": {
       "generator": "block_item_icon",
@@ -1549,6 +1645,22 @@
       "x": 7,
       "y": 19
     },
+    "roasted_cloudberry": {
+      "generator": "item_sprite",
+      "index": 278,
+      "source": "items/roasted_cloudberry.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 34
+    },
+    "roasted_glowshroom": {
+      "generator": "item_sprite",
+      "index": 280,
+      "source": "items/roasted_glowshroom.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 35
+    },
     "rooted_dirt": {
       "generator": "block_item_icon",
       "index": 208,
@@ -1629,6 +1741,14 @@
       "x": 3,
       "y": 16
     },
+    "sky_fern": {
+      "generator": "block_item_icon",
+      "index": 270,
+      "source": "items/sky_fern.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 33
+    },
     "skyroot_leaves": {
       "generator": "block_item_icon",
       "index": 149,
@@ -1644,6 +1764,22 @@
       "source_kind": "generated",
       "x": 4,
       "y": 18
+    },
+    "skyroot_planks": {
+      "generator": "block_item_icon",
+      "index": 265,
+      "source": "items/skyroot_planks.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 33
+    },
+    "skystone": {
+      "generator": "block_item_icon",
+      "index": 261,
+      "source": "items/skystone.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 32
     },
     "small_cactus": {
       "generator": "block_item_icon",
@@ -1716,6 +1852,30 @@
       "source_kind": "generated",
       "x": 6,
       "y": 18
+    },
+    "star_crystal_lamp": {
+      "generator": "block_item_icon",
+      "index": 269,
+      "source": "items/star_crystal_lamp.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 33
+    },
+    "star_crystal_ore": {
+      "generator": "block_item_icon",
+      "index": 264,
+      "source": "items/star_crystal_ore.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 33
+    },
+    "star_crystal_shard": {
+      "generator": "item_sprite",
+      "index": 276,
+      "source": "items/star_crystal_shard.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 34
     },
     "starflower": {
       "generator": "block_item_icon",
@@ -1844,6 +2004,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 18
+    },
+    "sunstone_bricks": {
+      "generator": "block_item_icon",
+      "index": 267,
+      "source": "items/sunstone_bricks.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 33
     },
     "sunstone_slab": {
       "generator": "block_item_icon",
@@ -2092,7 +2260,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 33,
+  "rows": 36,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

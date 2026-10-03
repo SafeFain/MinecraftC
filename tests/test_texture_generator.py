@@ -15,10 +15,26 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def test_heaven_v9_materials_and_plants(self):
+        names=list(tg.HEAVEN_TEXTURES)
+        self.assertEqual(tg.NAMES[216:], names)
+        self.assertEqual(len(names),16)
+        fingerprints=set()
+        with tempfile.TemporaryDirectory() as directory:
+            for index,name in enumerate(names):
+                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
+                self.assertEqual({p[3] for p in pixels},{0,255} if index>=10 else {255})
+                fingerprints.add(tuple(pixels))
+                path=Path(directory)/(name+'.png')
+                tg.write_png(path,16,16,pixels)
+                self.assertFalse(tg.validate_texture(path),name)
+        self.assertEqual(len(fingerprints),16)
+
     def test_v16_ecology_materials_and_plants(self):
         names = [n for n in tg.NAMES if n in tg.ECOLOGY_BASES or n in tg.ECOLOGY_PLANTS]
         self.assertEqual(len(names),28)
-        self.assertEqual(tg.NAMES[188:],names)
+        self.assertEqual(tg.NAMES[188:216],names)
         fingerprints=set()
         with tempfile.TemporaryDirectory() as directory:
             for name in names:
@@ -75,7 +91,8 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(order[207], "bone_meal")
         self.assertEqual(order[208], "rooted_dirt")
         self.assertEqual(order[231], "beach_grass")
-        self.assertEqual(order[-1], "cave_glowshroom")
+        self.assertEqual(order[259], "cave_glowshroom")
+        self.assertEqual(order[-1], "roasted_glowshroom")
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]

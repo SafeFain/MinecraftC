@@ -136,6 +136,22 @@
     "sulfur_rock": {"all": "sulfur_rock"},
     "amethyst_cluster": {"all": "amethyst_cluster"},
     "quartz_cluster": {"all": "quartz_cluster"},
-    "cave_glowshroom": {"all": "cave_glowshroom"}
+    "cave_glowshroom": {"all": "cave_glowshroom"},
+    "moonstone": {"all": "moonstone"},
+    "skystone": {"all": "skystone"},
+    "aether_moss": {"all": "aether_moss"},
+    "glimmer_silt": {"all": "glimmer_silt"},
+    "star_crystal_ore": {"all": "star_crystal_ore"},
+    "skyroot_planks": {"all": "skyroot_planks"},
+    "cloudstone_bricks": {"all": "cloudstone_bricks"},
+    "sunstone_bricks": {"all": "sunstone_bricks"},
+    "moonstone_bricks": {"all": "moonstone_bricks"},
+    "star_crystal_lamp": {"all": "star_crystal_lamp"},
+    "sky_fern": {"all": "sky_fern"},
+    "dawn_bell": {"all": "dawn_bell"},
+    "moonflower": {"all": "moonflower"},
+    "glimmer_reed": {"all": "glimmer_reed"},
+    "cloudberry_bush": {"all": "cloudberry_bush"},
+    "hanging_cloud_vine": {"all": "hanging_cloud_vine"}
   }
 }

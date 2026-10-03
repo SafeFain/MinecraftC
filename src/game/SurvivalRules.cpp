@@ -159,8 +159,8 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
 
 
 
-    for (uint8_t raw = static_cast<uint8_t>(BlockId::WHITE_BED);
-         raw <= static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST); ++raw) {
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::WHITE_BED);
+         raw <= static_cast<uint16_t>(BlockId::WHITE_BED_HEAD_WEST); ++raw) {
         const BlockId id = static_cast<BlockId>(raw);
         if (isBed(id)) set(id, 0.2f);
     }
@@ -170,8 +170,8 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     for (BlockId id : {BlockId::DANDELION, BlockId::BLUE_ORCHID, BlockId::ALLIUM,
                        BlockId::OXEYE_DAISY, BlockId::SUNFLOWER_BOTTOM,
                        BlockId::SUNFLOWER_TOP}) set(id, 0.0f);
-    for (uint8_t raw = static_cast<uint8_t>(BlockId::FLOWING_WATER_1);
-         raw <= static_cast<uint8_t>(BlockId::FLOWING_LAVA_7); ++raw)
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::FLOWING_WATER_1);
+         raw <= static_cast<uint16_t>(BlockId::FLOWING_LAVA_7); ++raw)
         set(static_cast<BlockId>(raw), -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::FALLING_WATER, -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::FALLING_LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
@@ -200,8 +200,8 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     for (BlockId id : {BlockId::HANGING_ROOTS, BlockId::GLOW_FERN})
         set(id, 0.0f);
     set(BlockId::RESONANT_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    for (uint8_t raw=static_cast<uint8_t>(BlockId::PLANKS_SLAB_BOTTOM);
-         raw<static_cast<uint8_t>(BlockId::COUNT);++raw) {
+    for (uint16_t raw=static_cast<uint16_t>(BlockId::PLANKS_SLAB_BOTTOM);
+         raw<static_cast<uint16_t>(BlockId::COUNT);++raw) {
         const BlockId id=static_cast<BlockId>(raw);
         ArchitecturalBlockState state;
         if(!decodeArchitecturalBlock(id,state))continue;
@@ -210,6 +210,22 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
         else
             set(id,1.5f,ToolKind::Pickaxe,ToolTier::Wood);
     }
+    set(BlockId::MOONSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SKYSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::AETHER_MOSS, 0.6f, ToolKind::Shovel);
+    set(BlockId::GLIMMER_SILT, 0.6f, ToolKind::Shovel);
+    set(BlockId::STAR_CRYSTAL_ORE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SKYROOT_PLANKS, 2.0f, ToolKind::Axe);
+    set(BlockId::CLOUDSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SUNSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::MOONSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::STAR_CRYSTAL_LAMP, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
+    set(BlockId::SKY_FERN, 0.0f);
+    set(BlockId::DAWN_BELL, 0.0f);
+    set(BlockId::MOONFLOWER, 0.0f);
+    set(BlockId::GLIMMER_REED, 0.0f);
+    set(BlockId::CLOUDBERRY_BUSH, 0.0f);
+    set(BlockId::HANGING_CLOUD_VINE, 0.0f);
     return values;
 }
 
@@ -269,7 +285,7 @@ std::vector<CraftingRecipe> buildRecipes() {
                        ItemId::JUNGLE_LOG, ItemId::ACACIA_LOG})
         recipes.push_back(shaped(1, 1, {log}, {ItemId::OAK_PLANKS, 4, 0}, false));
     recipes.push_back(shaped(1, 1, {ItemId::SKYROOT_LOG},
-                             {ItemId::OAK_PLANKS, 4, 0}, false));
+                             {ItemId::SKYROOT_PLANKS, 4, 0}, false));
     recipes.push_back(shaped(1, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
                              {ItemId::STICK, 4, 0}, false));
     recipes.push_back(shaped(2, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
@@ -425,6 +441,16 @@ std::vector<CraftingRecipe> buildRecipes() {
         recipes.push_back(shaped(2, 1, {color.second, ItemId::BONE_MEAL},
             {ItemId::WHITE_WOOL, 1, 0}));
     }
+    recipes.push_back(shaped(2, 2, {ItemId::CLOUDSTONE, ItemId::CLOUDSTONE, ItemId::CLOUDSTONE, ItemId::CLOUDSTONE}, {ItemId::CLOUDSTONE_BRICKS, 4, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::SUNSTONE, ItemId::SUNSTONE, ItemId::SUNSTONE, ItemId::SUNSTONE}, {ItemId::SUNSTONE_BRICKS, 4, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::MOONSTONE, ItemId::MOONSTONE, ItemId::MOONSTONE, ItemId::MOONSTONE}, {ItemId::MOONSTONE_BRICKS, 4, 0}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD}, {ItemId::STAR_CRYSTAL, 1, 0}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::STAR_CRYSTAL}, {ItemId::STAR_CRYSTAL_SHARD, 4, 0}, false));
+    recipes.push_back(shaped(3, 3, {E, ItemId::CLOUDSTONE_BRICKS, E,
+        ItemId::CLOUDSTONE_BRICKS, ItemId::STAR_CRYSTAL, ItemId::CLOUDSTONE_BRICKS,
+        E, ItemId::CLOUDSTONE_BRICKS, E}, {ItemId::STAR_CRYSTAL_LAMP, 1, 0}, false));
+    recipes.push_back(shaped(3, 1, {ItemId::CLOUDBERRY, ItemId::BREAD, ItemId::CLOUDBERRY},
+        {ItemId::CLOUDBERRY_BREAD, 1, 0}, false));
     return recipes;
 }
 
@@ -441,20 +467,27 @@ bool recipeMatches(const CraftingRecipe& recipe, const std::array<ItemId, 9>& gr
                     : static_cast<uint8_t>(x - offsetX);
                 expected = recipe.ingredients[(y - offsetY) * recipe.width + rx];
             }
-            if (grid[y * gridWidth + x] != expected) return false;
+            const ItemId actual = grid[y * gridWidth + x];
+            if (actual != expected && !(expected == ItemId::OAK_PLANKS &&
+                                        actual == ItemId::SKYROOT_PLANKS)) return false;
         }
     }
     return true;
 }
 
-bool takeIngredient(ItemId item, InventoryModel& inventory,
-                    std::array<ItemStack, 9>& grid) {
+ItemId takeIngredient(ItemId item, InventoryModel& inventory,
+                      std::array<ItemStack, 9>& grid) {
     for (ItemStack& stack : grid) {
-        if (stack.empty() || stack.id != item) continue;
+        if (stack.empty() || (stack.id != item &&
+            !(item == ItemId::OAK_PLANKS && stack.id == ItemId::SKYROOT_PLANKS))) continue;
+        const ItemId consumed = stack.id;
         if (--stack.count == 0) stack.clear();
-        return true;
+        return consumed;
     }
-    return inventory.remove(item, 1);
+    if (inventory.remove(item, 1)) return item;
+    if (item == ItemId::OAK_PLANKS && inventory.remove(ItemId::SKYROOT_PLANKS, 1))
+        return ItemId::SKYROOT_PLANKS;
+    return ItemId::EMPTY;
 }
 
 bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
@@ -465,11 +498,14 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
         recipe.width > gridWidth || recipe.height > gridHeight)
         return false;
 
+    std::array<ItemId, 9> selected{};
     for (uint8_t y = 0; y < recipe.height; ++y)
         for (uint8_t x = 0; x < recipe.width; ++x) {
-            const ItemId item = recipe.ingredients[y * recipe.width + x];
-            if (item != ItemId::EMPTY && !takeIngredient(item, inventory, grid))
-                return false;
+            const size_t index = y * recipe.width + x;
+            const ItemId item = recipe.ingredients[index];
+            if (item == ItemId::EMPTY) continue;
+            selected[index] = takeIngredient(item, inventory, grid);
+            if (selected[index] == ItemId::EMPTY) return false;
         }
 
     // Return everything not consumed before replacing the grid. Callers run
@@ -482,7 +518,7 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 
     for (uint8_t y = 0; y < recipe.height; ++y)
         for (uint8_t x = 0; x < recipe.width; ++x) {
-            const ItemId item = recipe.ingredients[y * recipe.width + x];
+            const ItemId item = selected[y * recipe.width + x];
             if (item != ItemId::EMPTY)
                 grid[y * gridWidth + x] = {item, 1, 0};
         }
@@ -491,7 +527,9 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
-const std::array<SmeltingRecipe, 15> SMELTING = {{
+const std::array<SmeltingRecipe, 17> SMELTING = {{
+    {ItemId::CLOUDBERRY, {ItemId::ROASTED_CLOUDBERRY, 1, 0}, 200},
+    {ItemId::GLOWSHROOM, {ItemId::ROASTED_GLOWSHROOM, 1, 0}, 200},
     {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
     {ItemId::STONE_BRICKS, {ItemId::CRACKED_STONE_BRICKS, 1, 0}, 200},
     {ItemId::SANDSTONE, {ItemId::SMOOTH_SANDSTONE, 1, 0}, 200},
@@ -522,6 +560,8 @@ std::vector<ItemStack> getBlockDrops(
                                          : getItemProps(toolStack.id);
     if (blockProps.unbreakable || !canHarvest(blockProps, tool)) return {};
     switch (block) {
+        case BlockId::STAR_CRYSTAL_ORE: return {{ItemId::STAR_CRYSTAL_SHARD, 2, 0}};
+        case BlockId::CLOUDBERRY_BUSH: return {{ItemId::CLOUDBERRY, 2, 0}};
         case BlockId::STONE: return {{ItemId::COBBLESTONE, 1, 0}};
         case BlockId::COAL_ORE: return {{ItemId::COAL, 1, 0}};
         case BlockId::IRON_ORE: return {{ItemId::RAW_IRON, 1, 0}};
@@ -648,7 +688,7 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
 uint16_t fuelTicks(ItemId fuel) {
     if (fuel == ItemId::COAL) return 1600;
     if (fuel == ItemId::STICK) return 100;
-    if (fuel == ItemId::OAK_PLANKS) return 300;
+    if (fuel == ItemId::OAK_PLANKS || fuel == ItemId::SKYROOT_PLANKS) return 300;
     const auto& props = getItemProps(fuel);
     if (props.tool != ToolKind::None && props.tier == ToolTier::Wood) return 200;
     return 0;

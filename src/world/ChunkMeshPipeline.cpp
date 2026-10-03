@@ -18,9 +18,9 @@ struct MeshSnapshot {
     static constexpr int DEPTH = Config::CHUNK_SIZE_Z + 2;
     int baseX = 0;
     int baseZ = 0;
-    std::vector<uint8_t> blocks;
+    std::vector<uint16_t> blocks;
     std::vector<uint8_t> light;
-    std::vector<uint8_t> targetBlocks;
+    std::vector<uint16_t> targetBlocks;
     int columns[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
 
     int ringIndex(int x, int y, int z) const {
@@ -70,7 +70,8 @@ bool makeMeshSnapshot(ChunkStore& store, Chunk* target, MeshSnapshot& snapshot) 
         for (int z = -1; z <= 1; ++z) {
             Chunk* source = store.findUnlocked(target->cx + x, target->cz + z);
             if (source == nullptr || !source->generated.load()) continue;
-            std::vector<uint8_t> sourceBlocks, sourceLight;
+            std::vector<uint16_t> sourceBlocks;
+            std::vector<uint8_t> sourceLight;
             source->copyRawState(sourceBlocks, sourceLight);
             const int minX = x == -1 ? Config::CHUNK_SIZE_X - 1 : 0;
             const int maxX = x == 1 ? 0 : Config::CHUNK_SIZE_X - 1;

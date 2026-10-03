@@ -218,7 +218,23 @@
     "sulfur_rock": "stone",
     "amethyst_cluster": "foliage",
     "quartz_cluster": "foliage",
-    "cave_glowshroom": "foliage"
+    "cave_glowshroom": "foliage",
+    "moonstone": "stone",
+    "skystone": "stone",
+    "aether_moss": "soil",
+    "glimmer_silt": "soil",
+    "star_crystal_ore": "ore",
+    "skyroot_planks": "wood",
+    "cloudstone_bricks": "stone",
+    "sunstone_bricks": "stone",
+    "moonstone_bricks": "stone",
+    "star_crystal_lamp": "stone",
+    "sky_fern": "foliage",
+    "dawn_bell": "foliage",
+    "moonflower": "foliage",
+    "glimmer_reed": "foliage",
+    "cloudberry_bush": "foliage",
+    "hanging_cloud_vine": "foliage"
   },
   "family_specs": {
     "soil": {
@@ -394,7 +410,13 @@
     "jungle_fern",
     "amethyst_cluster",
     "quartz_cluster",
-    "cave_glowshroom"
+    "cave_glowshroom",
+    "sky_fern",
+    "dawn_bell",
+    "moonflower",
+    "glimmer_reed",
+    "cloudberry_bush",
+    "hanging_cloud_vine"
   ],
   "generated": [
     "dirt",
@@ -528,6 +550,22 @@
     "sulfur_rock",
     "amethyst_cluster",
     "quartz_cluster",
-    "cave_glowshroom"
+    "cave_glowshroom",
+    "moonstone",
+    "skystone",
+    "aether_moss",
+    "glimmer_silt",
+    "star_crystal_ore",
+    "skyroot_planks",
+    "cloudstone_bricks",
+    "sunstone_bricks",
+    "moonstone_bricks",
+    "star_crystal_lamp",
+    "sky_fern",
+    "dawn_bell",
+    "moonflower",
+    "glimmer_reed",
+    "cloudberry_bush",
+    "hanging_cloud_vine"
   ]
 }

@@ -390,6 +390,14 @@ int main() {
     }
 
     {
+        // Native CI windows may never gain keyboard focus. Keep synthetic
+        // controller sampling independent of desktop activation for this block.
+        const char* previousHint = SDL_GetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS);
+        const bool hadPreviousHint = previousHint != nullptr;
+        const std::string previousBackgroundInput = previousHint ? previousHint : "";
+        require(SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,
+                                        "1", SDL_HINT_OVERRIDE),
+                "UI virtual controller permits background input");
         SDL_VirtualJoystickDesc descriptor{};SDL_INIT_INTERFACE(&descriptor);
         descriptor.type=SDL_JOYSTICK_TYPE_GAMEPAD;descriptor.naxes=6;descriptor.nbuttons=15;
         descriptor.axis_mask=(1u<<SDL_GAMEPAD_AXIS_LEFTX)|(1u<<SDL_GAMEPAD_AXIS_LEFTY);
@@ -406,12 +414,15 @@ int main() {
         const auto update=[&]{SDL_UpdateJoysticks();harness.router.beginFrame(harness.clock.now(),false);};
         require(SDL_SetJoystickVirtualAxis(joystick,SDL_GAMEPAD_AXIS_LEFTY,32767),"UI controller axis updates");
         update();
+        require(harness.inputs.gamepadAxes[1] > .99f,"UI controller down axis is sampled");
         require(SDL_SetJoystickVirtualAxis(joystick,SDL_GAMEPAD_AXIS_LEFTY,0),"UI controller axis centers");
         update();
+        require(harness.inputs.gamepadAxes[1] == 0,"UI controller centered axis is sampled");
         require(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_SOUTH,true),"UI controller confirms");
         update();update();
-        require(confirmed==1&&!harness.inputs.uiPointerVisible,
-                "controller navigation and A confirm once while keeping the stationary cursor hidden");
+        require(harness.inputs.gamepadButtons[0],"UI controller A press is sampled");
+        require(confirmed==1,"controller navigation and held A confirm exactly once");
+        require(!harness.inputs.uiPointerVisible,"controller keeps the stationary cursor hidden");
         require(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_SOUTH,false),"UI controller releases");
         update();
         harness.inputs.uiTouch.active=true;
@@ -420,6 +431,11 @@ int main() {
         require(confirmed==1,"a held controller button cannot steal an active touch or activate after lift");
         SDL_CloseJoystick(joystick);require(SDL_DetachVirtualJoystick(id),"UI controller detaches");
         SDL_Event removed{};removed.type=SDL_EVENT_GAMEPAD_REMOVED;removed.gdevice.which=id;window->handleEvent(&removed);
+        require(hadPreviousHint
+                    ? SDL_SetHintWithPriority(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,
+                                              previousBackgroundInput.c_str(), SDL_HINT_OVERRIDE)
+                    : SDL_ResetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS),
+                "UI virtual controller restores background input hint");
     }
 
     for (const auto size:{glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240)}) {

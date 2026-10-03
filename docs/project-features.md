@@ -28,24 +28,24 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   ready. New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 16 retains 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 17 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
   Y=-64..319 while preserving the v6 hybrid-cave algorithm, and adds eight
   deterministic overworld structures (plains/adobe villages, traveler huts,
   abandoned camps, desert wells, igloos, ruined towers, lumber camps). Base
-  cache revision 1 is part of the v16 cache key. Version 14 adds four
+  cache revision 1 is part of the v17 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
   envelopes of village houses, traveler huts, and igloos. Version 11 added
   mountain-family emerald ore and deterministic once-only village population
   requests; version 12 increases accepted plains/desert village density. Heaven
-  structure generation is version 8. Deterministic five-level Skyway Shrines
+  generation is version 9. Deterministic five-level Skyway Shrines
   and the Heaven-only Starstep Scepter provide safe vertical travel.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 252 serialized
+  types, and 268 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -53,7 +53,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 260-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 281-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -135,7 +135,7 @@ creative entries and survival crafting/smelting paths. Masonry requires at least
 a wooden pickaxe and drops itself; dyed wool retains white wool mining/fire rules.
 This crafted pack introduced no generation or save-format changes.
 The subsequent natural biome expansion advances Overworld generation to v15;
-Heaven remains v8 and save format remains v12.
+At that stage Heaven remained v8 and save format remained v12; current versions are v9/v13.
 
 `/give <item_name> [1..64]` supplies the current player's inventory when cheats
 are enabled, defaulting to one item. Names use lowercase English with underscores,
@@ -158,7 +158,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-The v15 content remains available in current v16 worlds. Old generation versions
+The v15 content remains available in current v17 worlds. Old generation versions
 are incompatible; current compatibility rules are described below.
 Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
 
@@ -189,7 +189,38 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-Only generation v16 worlds can load. v14/v15 and other previous or future
+Only generation v17 worlds can load. v14/v15 and other previous or future
 versions stay listed as incompatible, retaining their untouched files. No world
-migration remains. Save format v12, seed layout 5, terrain heights, cave-carving
-algorithms, tree/structure anchors and Heaven generation v8 remain unchanged.
+migration remains. The v16 update retained save format v12, seed layout 5, terrain heights, cave-carving
+algorithms, tree/structure anchors and Heaven generation v8. The v17 update below
+changes Heaven and block encoding while retaining Overworld generation output.
+
+## Heaven ecology and resources (generation v17 / Heaven v9)
+
+- Sixteen appended blocks: Moonstone, Skystone, Aether Moss, Glimmer Silt,
+  Star Crystal Ore, Skyroot Planks, Cloudstone/Sunstone/Moonstone Bricks,
+  Star Crystal Lamp, Sky Fern, Dawn Bell, Moonflower, Glimmer Reed,
+  Cloudberry Bush and Hanging Cloud Vine.
+- Five appended items: Star Crystal Shard, Cloudberry, Roasted Cloudberry,
+  Cloudberry Bread and Roasted Glowshroom. All 281 items have icons and names
+  in all ten languages; 268 non-air block IDs retain existing numeric values.
+- Existing eight biomes/five layers gain clustered vegetation, distinct soils,
+  ore pockets, rock pillars, sealed one-block-deep pools and supported underside
+  vines. Primary island shapes and shrine transport remain; ecology and fine LOD
+  share coordinate-owned feature sampling. Crafted blocks do not generate naturally.
+- Skyroot logs yield four Skyroot Planks, usable alongside oak planks in basic
+  recipes and as furnace fuel. Four base stones yield four corresponding bricks.
+  Four shards yield one Star Crystal (reversible); four Cloudstone Bricks around
+  a crystal yield one level-15 Star Crystal Lamp. Moonflowers emit level 4.
+- Star Crystal Ore requires at least a wooden pickaxe and drops two shards;
+  breaking a Cloudberry Bush yields two berries without a renewable bush drop.
+  One bread plus two berries yields Cloudberry Bread; berries and existing Heaven
+  Glowshrooms roast in furnaces. Food/saturation values are 2/0.4, 4/1.2, 7/6,
+  and 4/2 for berries, roasted berries, berry bread and roasted glowshrooms.
+- Existing Heaven loot gains shards, berries and bricks while the origin shrine
+  retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
+- Save v13 and block buffers use 16-bit IDs; packed light remains byte-sized.
+  Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
+  Old metadata remains readable/listed; worlds outside global generation v17
+  remain incompatible and are never migrated or rewritten by refused loads.
+  Seed layout, Overworld generation output and application VERSION are unchanged.

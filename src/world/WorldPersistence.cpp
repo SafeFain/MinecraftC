@@ -75,7 +75,16 @@ void populateGeneratedLoot(BlockEntity& entity, StructureLootProfile profile,
                            uint64_t seed) {
     if(entity.type!=BlockEntityType::Chest||profile==StructureLootProfile::None)
         return;
-    const std::vector<LootEntry> entries=lootEntries(profile);
+    std::vector<LootEntry> entries=lootEntries(profile);
+    if (profile >= StructureLootProfile::XiguangRuin &&
+        profile <= StructureLootProfile::OriginSkywayShrine) {
+        entries.push_back({ItemId::STAR_CRYSTAL_SHARD, 2, 5, 85});
+        entries.push_back({ItemId::CLOUDBERRY, 2, 4, 70});
+        const ItemId brick = profile == StructureLootProfile::XiguangRuin
+            ? ItemId::SUNSTONE_BRICKS : profile == StructureLootProfile::StarCrystalGeode
+            ? ItemId::MOONSTONE_BRICKS : ItemId::CLOUDSTONE_BRICKS;
+        entries.push_back({brick, 3, 8, 80});
+    }
     for(size_t i=0;i<entries.size();++i) {
         const LootEntry& entry=entries[i];
         const uint64_t h=WorldGenContext::mix(seed^
@@ -146,7 +155,7 @@ void WorldPersistence::installLoadedChunkDataUnlocked(
     auto& cached = m_blockOverrides[key];
     for (const auto& entry : overrides) {
         if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
-            static_cast<uint8_t>(entry.block) >= static_cast<uint8_t>(BlockId::COUNT) ||
+            static_cast<uint16_t>(entry.block) >= static_cast<uint16_t>(BlockId::COUNT) ||
             isDerivedFluidState(entry.block)) continue;
         cached[entry.localIndex] = entry.block;
     }

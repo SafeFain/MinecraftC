@@ -44,7 +44,7 @@ void fillRing(const StructureGenerator::StructureWriter& write, int x0, int y,
 }
 
 BlockId wheatStage(uint64_t hash) {
-    return static_cast<BlockId>(static_cast<uint8_t>(BlockId::WHEAT_0) +
+    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::WHEAT_0) +
                                 static_cast<uint8_t>(hash % 8));
 }
 

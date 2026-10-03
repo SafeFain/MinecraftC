@@ -78,7 +78,7 @@ struct ChunkEntityLoadData {
 // the remaining vectors may be empty when the corresponding partition has
 // never been written.
 struct ChunkLoadBundle {
-    std::optional<std::vector<uint8_t>> generated;
+    std::optional<std::vector<uint16_t>> generated;
     std::vector<BlockOverride> overrides;
     std::vector<PersistedBlockEntity> blockEntities;
     std::vector<WorldMetadata::PersistedEntity> entities;
@@ -97,9 +97,9 @@ public:
                             const std::vector<BlockOverride>& overrides) const;
     std::vector<BlockOverride> loadChunkOverrides(int chunkX, int chunkZ) const;
     void saveGeneratedChunk(int chunkX, int chunkZ,
-                            const std::vector<uint8_t>& blocks,
+                            const std::vector<uint16_t>& blocks,
                             uint32_t generationVersion) const;
-    std::optional<std::vector<uint8_t>> loadGeneratedChunk(
+    std::optional<std::vector<uint16_t>> loadGeneratedChunk(
         int chunkX, int chunkZ, uint32_t generationVersion) const;
     ChunkLoadBundle loadChunkLoadBundle(
         int chunkX, int chunkZ, uint32_t generationVersion) const;

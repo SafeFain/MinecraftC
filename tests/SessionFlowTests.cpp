@@ -296,7 +296,7 @@ int main(int argc, char** argv) {
         currentMetadata.inventory.slot(8) = {ItemId::CAVE_GLOWSHROOM,23,0};
         currentMetadata.heaven.worldTicks = 6789;
         currentStore.saveMetadata(currentMetadata);
-        for (uint32_t version : {14u,15u,17u}) {
+        for (uint32_t version : {14u,15u,16u,18u}) {
             auto incompatible = currentMetadata;
             incompatible.generationVersion = version;
             currentStore.saveMetadata(incompatible);
@@ -337,12 +337,12 @@ int main(int argc, char** argv) {
         GameSessionTestAccess::markTerrainReady(reopened);
         bool saveError = false;
         reopened.saveNow([&] { saveError = true; });
-        require(!saveError && currentStore.loadMetadata().generationVersion == 16 &&
+        require(!saveError && currentStore.loadMetadata().generationVersion == WorldGenContext::GENERATION_VERSION &&
                 currentStore.loadMetadata().inventory.slot(8).count == 23,
                 "v16 saves new items and current generation version");
         reopened.leaveWorld();
         reopened.startWorld(worlds[0].id,false,clock.now());
-        require(reopened.metadata().generationVersion == 16,
+        require(reopened.metadata().generationVersion == WorldGenContext::GENERATION_VERSION,
                 "v16 world reopens normally");
         drainGeneration(reopened);
     }

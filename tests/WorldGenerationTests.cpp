@@ -8,6 +8,7 @@
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
 #include "world/BiomeLocator.h"
+#include "world/BiomeBlockLogic.h"
 #include "Config.h"
 
 #include <cstdlib>
@@ -691,9 +692,9 @@ int main() {
                                       << '\n';
                             require(false, "region and singleton full block output differ");
                         }
-                        const uint8_t raw = static_cast<uint8_t>(block);
-                        if (raw >= static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) &&
-                            raw <= static_cast<uint8_t>(BlockId::SULFUR_CRUST)) {
+                        const uint16_t raw = static_cast<uint16_t>(block);
+                        if (raw >= static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) &&
+                            raw <= static_cast<uint16_t>(BlockId::SULFUR_CRUST)) {
                             ++caveDecorationCount;
                             require(y > Config::WORLD_MIN_Y,
                                     "cave decoration overwrote the bedrock floor");
@@ -1303,14 +1304,14 @@ int main() {
 
     // CPU mesh classification: plants and leaves use opaque/cutout geometry,
     // water uses the translucent range, and leaves carry a shader marker.
-    std::vector<uint8_t> meshBlocks(Config::CHUNK_VOLUME, 0);
+    std::vector<uint16_t> meshBlocks(Config::CHUNK_VOLUME, 0);
     auto meshIndex = [](int x, int y, int z) {
         return x + z * 16 + Config::worldYToStorageY(y) * 16 * 16;
     };
-    meshBlocks[meshIndex(1, 42, 1)] = static_cast<uint8_t>(BlockId::TALL_GRASS);
-    meshBlocks[meshIndex(2, 40, 2)] = static_cast<uint8_t>(BlockId::WATER);
-    meshBlocks[meshIndex(3, 44, 3)] = static_cast<uint8_t>(BlockId::BIRCH_LEAVES);
-    meshBlocks[meshIndex(4, 46, 4)] = static_cast<uint8_t>(BlockId::JUNGLE_LEAVES);
+    meshBlocks[meshIndex(1, 42, 1)] = static_cast<uint16_t>(BlockId::TALL_GRASS);
+    meshBlocks[meshIndex(2, 40, 2)] = static_cast<uint16_t>(BlockId::WATER);
+    meshBlocks[meshIndex(3, 44, 3)] = static_cast<uint16_t>(BlockId::BIRCH_LEAVES);
+    meshBlocks[meshIndex(4, 46, 4)] = static_cast<uint16_t>(BlockId::JUNGLE_LEAVES);
     int maxY[16][16]{};
     ChunkMesh mesh;
     mesh.build(0, 0, meshBlocks.data(), maxY,
@@ -1346,7 +1347,7 @@ int main() {
     for (BlockHalf half : {BlockHalf::Bottom, BlockHalf::Top}) {
         for (BedDirection direction : {BedDirection::North, BedDirection::East,
                                        BedDirection::South, BedDirection::West}) {
-            std::vector<uint8_t> architecturalBlocks(Config::CHUNK_VOLUME, 0);
+            std::vector<uint16_t> architecturalBlocks(Config::CHUNK_VOLUME, 0);
             architecturalBlocks[meshIndex(8, 40, 8)] = static_cast<uint8_t>(
                 stairBlock(ArchitecturalMaterial::Cobblestone, half, direction));
             architecturalBlocks[meshIndex(10, 40, 8)] = static_cast<uint8_t>(
@@ -1373,11 +1374,11 @@ int main() {
                     "architectural geometry escaped its voxel bounds");
         }
     }
-    std::vector<uint8_t> joinedSlabs(Config::CHUNK_VOLUME, 0);
+    std::vector<uint16_t> joinedSlabs(Config::CHUNK_VOLUME, 0);
     joinedSlabs[meshIndex(8, 40, 8)] =
-        static_cast<uint8_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
+        static_cast<uint16_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
     joinedSlabs[meshIndex(9, 40, 8)] =
-        static_cast<uint8_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
+        static_cast<uint16_t>(BlockId::COBBLESTONE_SLAB_BOTTOM);
     ChunkMesh joinedSlabMesh;
     joinedSlabMesh.build(0, 0, joinedSlabs.data(), maxY,
         [&](int wx, int wy, int wz) {
@@ -1389,10 +1390,10 @@ int main() {
                 joinedSlabMesh.shadowCasterIndexCount == 60,
             "fully covered slab boundary faces were not removed");
 
-    std::vector<uint8_t> bedBlocks(Config::CHUNK_VOLUME, 0);
-    bedBlocks[meshIndex(8, 40, 8)] = static_cast<uint8_t>(BlockId::WHITE_BED);
+    std::vector<uint16_t> bedBlocks(Config::CHUNK_VOLUME, 0);
+    bedBlocks[meshIndex(8, 40, 8)] = static_cast<uint16_t>(BlockId::WHITE_BED);
     bedBlocks[meshIndex(8, 40, 7)] =
-        static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_NORTH);
+        static_cast<uint16_t>(BlockId::WHITE_BED_HEAD_NORTH);
     ChunkMesh bedMesh;
     bedMesh.build(0, 0, bedBlocks.data(), maxY,
         [&](int wx, int wy, int wz) {
@@ -1435,10 +1436,10 @@ int main() {
     // Isolated surfaces receive full AO. A classic two-side corner around an
     // exposed top face must darken the shared vertex to the minimum level,
     // while a covered column is marked as having no direct sky light.
-    std::vector<uint8_t> aoBlocks(Config::CHUNK_VOLUME, 0);
-    aoBlocks[meshIndex(5, 40, 5)] = static_cast<uint8_t>(BlockId::STONE);
-    aoBlocks[meshIndex(6, 41, 5)] = static_cast<uint8_t>(BlockId::STONE);
-    aoBlocks[meshIndex(5, 41, 6)] = static_cast<uint8_t>(BlockId::STONE);
+    std::vector<uint16_t> aoBlocks(Config::CHUNK_VOLUME, 0);
+    aoBlocks[meshIndex(5, 40, 5)] = static_cast<uint16_t>(BlockId::STONE);
+    aoBlocks[meshIndex(6, 41, 5)] = static_cast<uint16_t>(BlockId::STONE);
+    aoBlocks[meshIndex(5, 41, 6)] = static_cast<uint16_t>(BlockId::STONE);
     int aoMaxY[16][16]{};
     aoMaxY[5][5] = 60;
     ChunkMesh aoMesh;
@@ -1462,8 +1463,8 @@ int main() {
     require(foundDarkCorner, "voxel corner AO was not generated");
     require(foundCoveredSurface, "covered surface incorrectly received sky light");
 
-    std::vector<uint8_t> litBlocks(Config::CHUNK_VOLUME,0);
-    litBlocks[meshIndex(8,40,8)]=static_cast<uint8_t>(BlockId::STONE);
+    std::vector<uint16_t> litBlocks(Config::CHUNK_VOLUME,0);
+    litBlocks[meshIndex(8,40,8)]=static_cast<uint16_t>(BlockId::STONE);
     ChunkMesh litMesh;
     litMesh.build(0,0,litBlocks.data(),maxY,
         [&](int wx,int wy,int wz){
@@ -1862,6 +1863,8 @@ int main() {
                     "Heaven v7 exploration window missed a biome or layer");
 
     std::array<bool, 10> heavenMaterials{};
+    std::array<bool,16> newHeavenMaterials{};
+    size_t boundedPools=0;
     bool foundLayer1 = false;
     bool foundLayer2 = false;
     bool foundLayer3 = false;
@@ -1880,11 +1883,35 @@ int main() {
                 for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
                     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
                         const BlockId block = chunk.getBlock(x, y, z);
-                        if (block == BlockId::BEDROCK || block == BlockId::WATER)
-                            foundForbiddenBlock = true;
-                        const auto rawBlock = static_cast<uint8_t>(block);
-                        if (rawBlock >= static_cast<uint8_t>(BlockId::AETHER_GRASS) &&
-                            rawBlock <= static_cast<uint8_t>(BlockId::GLOWSHROOM)) {
+                        if (block == BlockId::BEDROCK) foundForbiddenBlock = true;
+                        if (block >= BlockId::MOONSTONE && block <= BlockId::HANGING_CLOUD_VINE)
+                            newHeavenMaterials[static_cast<size_t>(block)-253]=true;
+                        if (block>=BlockId::SKY_FERN && block<=BlockId::CLOUDBERRY_BUSH)
+                            require(supportsBiomePlant(block,chunk.getBlock(x,y-1,z)),
+                                    "generated Heaven plants require valid ground support");
+                        if (block==BlockId::HANGING_CLOUD_VINE)
+                            require(chunk.getBlock(x,y+1,z)!=BlockId::AIR,
+                                    "island vines remain attached to their ceiling chain");
+                        if (block == BlockId::WATER) {
+                            ++boundedPools;
+                            bool enclosed=false;
+                            const int wx=chunk.worldX()+x, wz=chunk.worldZ()+z;
+                            const auto layers=heaven.sampleHeavenLayers(wx,wz);
+                            for (int layer=0; layer<WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
+                                const auto& island=layers[static_cast<size_t>(layer)];
+                                if (!island.present || island.top!=y ||
+                                    island.biome!=WorldGenerator::HeavenBiome::GlimmerFen) continue;
+                                enclosed=chunk.getBlock(x,y-1,z)!=BlockId::AIR;
+                                for (const auto& offset : std::array<glm::ivec2,4>{{{1,0},{-1,0},{0,1},{0,-1}}}) {
+                                    const auto neighbor=heaven.sampleHeavenLayers(wx+offset.x,wz+offset.y)[static_cast<size_t>(layer)];
+                                    enclosed=enclosed && neighbor.present && neighbor.top>=y && neighbor.bottom<y;
+                                }
+                            }
+                            require(enclosed,"Heaven water is confined to supported shallow pools");
+                        }
+                        const auto rawBlock = static_cast<uint16_t>(block);
+                        if (rawBlock >= static_cast<uint16_t>(BlockId::AETHER_GRASS) &&
+                            rawBlock <= static_cast<uint16_t>(BlockId::GLOWSHROOM)) {
                             heavenMaterials[static_cast<size_t>(block) -
                                              static_cast<size_t>(BlockId::AETHER_GRASS)] = true;
                         }
@@ -1923,6 +1950,11 @@ int main() {
             }
         }
     }
+    for (size_t i=0; i<newHeavenMaterials.size(); ++i) {
+        if (i>=5 && i<=9) continue; // Crafted materials do not generate naturally.
+        require(newHeavenMaterials[i],"Heaven window missed a new natural material");
+    }
+    require(boundedPools>0,"Heaven exploration window missed shallow pools");
     for (const bool found : heavenMaterials)
         require(found, "Heaven v7 window missed a dedicated material");
     require(foundLayer1 && foundLayer2 && foundLayer3 && foundLayer4 &&

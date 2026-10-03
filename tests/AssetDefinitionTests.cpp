@@ -148,6 +148,13 @@ int main() {
         require(slot == raw-37 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
                 "v16 blocks map to appended material slots");
     }
+    for (uint16_t raw=253; raw<269; ++raw) {
+        const auto block=static_cast<BlockId>(raw);
+        require(getFaceTextureIndex(block,FaceDir::TOP)==raw-37,
+                "Heaven materials retain appended atlas mapping");
+    }
+    require(propertyAt(BlockTexture::StarCrystalLamp,8,8,2)>0,
+            "star lamps inject authored emission into GI");
     const auto materials = buildVoxelGiMaterials(atlas);
     require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
             "non-emissive atlas material generated a light source");
@@ -295,6 +302,15 @@ int main() {
         require(itemMetadata.find("\"" + logicalName + "\"") != std::string::npos,
                 ("items atlas missing registered item: " + logicalName).c_str());
     }
+    const auto highAtlas=std::filesystem::temp_directory_path() /
+        ("minecraftc-high-atlas-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".json");
+    { std::ofstream out(highAtlas); out << R"({"textures":{"star_crystal_lamp":{"index":300}}})"; }
+    require(loadTextureAssetDefinitions(highAtlas,
+        root+"/assets/textures/definitions/blocks.json",
+        root+"/assets/textures/definitions/items.json") &&
+        getFaceTextureIndex(BlockId::STAR_CRYSTAL_LAMP,FaceDir::TOP)==300,
+        "atlas slots above 255 must not narrow");
+    std::filesystem::remove(highAtlas);
     std::cout << "Asset definition tests passed\n";
     return 0;
 }

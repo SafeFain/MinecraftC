@@ -362,7 +362,7 @@ private:
         int cz = 0;
         uint64_t revision = 0;
         uint64_t lastSeen = 0;
-        std::vector<uint8_t> blocks;
+        std::vector<uint16_t> blocks;
         std::vector<uint8_t> light;
         std::array<std::vector<VoxelGiPacked>, 4> coarse;
     };

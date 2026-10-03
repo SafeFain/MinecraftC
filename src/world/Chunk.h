@@ -64,19 +64,19 @@ public:
     void markDirty()  { m_dirty = true; }
 
     // Raw block array access (for WorldGenerator)
-    uint8_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }
-    const uint8_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
+    uint16_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }
+    const uint16_t& blockAt(int x, int y, int z) const { return m_blocks[index(x, y, z)]; }
     // Generation owns an unpublished chunk exclusively. It may fill through
     // blockAt(), update column maxima, then publish the whole edit once.
     void finishBulkBlockEdit() { ++m_blockRevision; ++m_dataRevision; m_dirty = true; }
-    const uint8_t* rawBlocks() const { return m_blocks.data(); }
-    void copyRawState(std::vector<uint8_t>& blocks,
+    const uint16_t* rawBlocks() const { return m_blocks.data(); }
+    void copyRawState(std::vector<uint16_t>& blocks,
                       std::vector<uint8_t>& light) const {
         std::shared_lock lock(m_dataMutex);
         blocks.assign(m_blocks.begin(), m_blocks.end());
         light.assign(m_light.begin(), m_light.end());
     }
-    void copyRawBlocks(std::vector<uint8_t>& blocks) const {
+    void copyRawBlocks(std::vector<uint16_t>& blocks) const {
         std::shared_lock lock(m_dataMutex);
         blocks.assign(m_blocks.begin(), m_blocks.end());
     }
@@ -84,7 +84,7 @@ public:
     // block snapshot. Publish it under one lock and one data revision instead
     // of taking the chunk mutex once for every lit voxel.
     void replaceRawLight(const std::vector<uint8_t>& light);
-    void loadRawBlocks(const std::vector<uint8_t>& blocks);
+    void loadRawBlocks(const std::vector<uint16_t>& blocks);
 
     // A base snapshot is captured before player overrides are applied.  It
     // lets the asynchronous generated-cache writer persist terrain without
@@ -93,10 +93,10 @@ public:
         m_baseBlocks.assign(m_blocks.begin(), m_blocks.end());
     }
     bool hasBaseSnapshot() const { return !m_baseBlocks.empty(); }
-    const std::vector<uint8_t>& baseSnapshot() const { return m_baseBlocks; }
+    const std::vector<uint16_t>& baseSnapshot() const { return m_baseBlocks; }
     void setBaseBlock(int x, int y, int z, BlockId id) {
         if (!m_baseBlocks.empty()) m_baseBlocks[index(x, y, z)] =
-            static_cast<uint8_t>(id);
+            static_cast<uint16_t>(id);
     }
     void clearBaseSnapshot() { m_baseBlocks.clear(); m_baseBlocks.shrink_to_fit(); }
     uint8_t getPackedLight(int x, int y, int z) const {
@@ -205,9 +205,9 @@ public:
 
 private:
     // Flat array: blocks[x + z*16 + y*16*16]
-    std::array<uint8_t, Config::CHUNK_VOLUME> m_blocks{};
+    std::array<uint16_t, Config::CHUNK_VOLUME> m_blocks{};
     std::array<uint8_t, Config::CHUNK_VOLUME> m_light{};
-    std::vector<uint8_t> m_baseBlocks;
+    std::vector<uint16_t> m_baseBlocks;
     mutable std::shared_mutex m_dataMutex;
     int m_columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
 

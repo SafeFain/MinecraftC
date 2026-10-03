@@ -230,7 +230,7 @@ private:
         int cz = 0;
         uint64_t epoch = 0;
         bool hit = false;
-        std::vector<uint8_t> blocks;
+        std::vector<uint16_t> blocks;
         std::vector<BlockOverride> overrides;
         std::vector<PersistedBlockEntity> blockEntities;
         std::vector<WorldMetadata::PersistedEntity> entities;

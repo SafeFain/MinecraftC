@@ -51,7 +51,7 @@ Android's 2100000000 limit. The Apple short version remains `X.Y.Z`.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 260-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 281-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories
@@ -192,8 +192,8 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v12 can read v2-v11 desktop saves. The current world
-generation version is v16 (with Heaven generation at v8). Generation v11 adds
+one exists. Save format v13 uses little-endian 16-bit block IDs and can read v2-v12 desktop
+metadata. The current world generation version is v17 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
@@ -201,7 +201,7 @@ village variants substantially more common while retaining their biome,
 spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
 the wall-to-roof courses of village houses and traveler huts, keeps hut
 decorations outside the wall, and closes the igloo's diagonal lower shell.
-Only generation v16 worlds can load. All previous and future generation versions
+Only generation v17 worlds can load. All previous and future generation versions
 remain on disk and are shown as incompatible; there is no automatic migration.
 Generation v14 adds deterministic
 Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
@@ -214,6 +214,14 @@ natural blocks: mountain rocks, warm-climate soils, salt crust, biome vegetation
 cave moss, gypsum, quartz/amethyst, sulfur rock and a softly glowing cave fungus.
 Small rubble heaps and crystal groups use deterministic world-coordinate anchors;
 all new blocks support collection, placement and the Creative catalog.
+
+Generation v17 retains the v16 Overworld output and expands Heaven to v9:
+moonstone/skystone terrain, aether moss, glimmer silt, star crystal ore,
+clustered flowers/ferns/berries, sealed shallow pools and hanging island vines.
+Skyroot planks, three brick materials and star lamps provide exclusive building
+choices; shards, berries and roasted foods support collection and crafting.
+Five altitude layers, eight biomes and existing shrine transport remain.
+Block storage, overrides and derived caches now preserve IDs above 255.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/give <item_name> [1..64]`,

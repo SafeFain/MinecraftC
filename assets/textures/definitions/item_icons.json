@@ -817,6 +817,28 @@
         224,
         187
       ]
+    ],
+    "cloudberry": [
+      [
+        69,
+        81,
+        129
+      ],
+      [
+        103,
+        121,
+        179
+      ],
+      [
+        156,
+        178,
+        221
+      ],
+      [
+        211,
+        225,
+        247
+      ]
     ]
   },
   "items": {
@@ -1950,6 +1972,95 @@
     "cave_glowshroom": {
       "generator": "block_item_icon",
       "block": "cave_glowshroom"
+    },
+    "moonstone": {
+      "generator": "block_item_icon",
+      "block": "moonstone"
+    },
+    "skystone": {
+      "generator": "block_item_icon",
+      "block": "skystone"
+    },
+    "aether_moss": {
+      "generator": "block_item_icon",
+      "block": "aether_moss"
+    },
+    "glimmer_silt": {
+      "generator": "block_item_icon",
+      "block": "glimmer_silt"
+    },
+    "star_crystal_ore": {
+      "generator": "block_item_icon",
+      "block": "star_crystal_ore"
+    },
+    "skyroot_planks": {
+      "generator": "block_item_icon",
+      "block": "skyroot_planks"
+    },
+    "cloudstone_bricks": {
+      "generator": "block_item_icon",
+      "block": "cloudstone_bricks"
+    },
+    "sunstone_bricks": {
+      "generator": "block_item_icon",
+      "block": "sunstone_bricks"
+    },
+    "moonstone_bricks": {
+      "generator": "block_item_icon",
+      "block": "moonstone_bricks"
+    },
+    "star_crystal_lamp": {
+      "generator": "block_item_icon",
+      "block": "star_crystal_lamp"
+    },
+    "sky_fern": {
+      "generator": "block_item_icon",
+      "block": "sky_fern"
+    },
+    "dawn_bell": {
+      "generator": "block_item_icon",
+      "block": "dawn_bell"
+    },
+    "moonflower": {
+      "generator": "block_item_icon",
+      "block": "moonflower"
+    },
+    "glimmer_reed": {
+      "generator": "block_item_icon",
+      "block": "glimmer_reed"
+    },
+    "cloudberry_bush": {
+      "generator": "block_item_icon",
+      "block": "cloudberry_bush"
+    },
+    "hanging_cloud_vine": {
+      "generator": "block_item_icon",
+      "block": "hanging_cloud_vine"
+    },
+    "star_crystal_shard": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "diamond"
+    },
+    "cloudberry": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "cloudberry"
+    },
+    "roasted_cloudberry": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "wheat"
+    },
+    "cloudberry_bread": {
+      "generator": "item_sprite",
+      "template": "bread",
+      "material": "wheat"
+    },
+    "roasted_glowshroom": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "cloudberry"
     }
   },
   "documentation": {

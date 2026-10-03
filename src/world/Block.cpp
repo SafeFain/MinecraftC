@@ -12,9 +12,9 @@
 
 namespace {
 constexpr size_t TEXTURE_COUNT = static_cast<size_t>(BlockTexture::Count);
-std::array<uint8_t, TEXTURE_COUNT> g_atlasIndices = [] {
-    std::array<uint8_t, TEXTURE_COUNT> result{};
-    for (size_t i = 0; i < result.size(); ++i) result[i] = static_cast<uint8_t>(i);
+std::array<uint16_t, TEXTURE_COUNT> g_atlasIndices = [] {
+    std::array<uint16_t, TEXTURE_COUNT> result{};
+    for (size_t i = 0; i < result.size(); ++i) result[i] = static_cast<uint16_t>(i);
     return result;
 }();
 std::array<std::array<BlockTexture, FACE_COUNT>, static_cast<size_t>(BlockId::COUNT)>
@@ -58,7 +58,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "stone_bricks", "mossy_stone_bricks", "cracked_stone_bricks", "chiseled_stone_bricks", "bricks", "polished_granite", "polished_basalt", "polished_limestone", "polished_tuff", "deepslate_bricks", "sandstone", "cut_sandstone", "smooth_sandstone", "red_wool", "yellow_wool", "blue_wool", "green_wool", "black_wool",
     "rooted_dirt", "leaf_litter_soil", "peat", "silt", "dry_grass_block", "permafrost", "blue_ice", "shale", "red_sandstone", "ochre_terracotta", "white_terracotta", "volcanic_ash", "coral_rock", "fern", "dead_bush", "dry_grass", "brown_mushroom", "red_mushroom", "lavender", "bellflower", "alpine_flower", "tropical_flower", "cattail", "beach_grass",
     "dry_grass_side", "leaf_litter_side",
-    "andesite", "diorite", "gneiss", "marble", "laterite", "red_clay", "cracked_mud", "salt_crust", "clover", "heather", "wild_mint", "nettle", "desert_flower", "small_cactus", "reed_flower", "tundra_moss", "fallen_twigs", "jungle_fern", "cave_moss", "wet_limestone", "gypsum", "amethyst_block", "quartz_block", "iron_stained_rock", "sulfur_rock", "amethyst_cluster", "quartz_cluster", "cave_glowshroom"
+    "andesite", "diorite", "gneiss", "marble", "laterite", "red_clay", "cracked_mud", "salt_crust", "clover", "heather", "wild_mint", "nettle", "desert_flower", "small_cactus", "reed_flower", "tundra_moss", "fallen_twigs", "jungle_fern", "cave_moss", "wet_limestone", "gypsum", "amethyst_block", "quartz_block", "iron_stained_rock", "sulfur_rock", "amethyst_cluster", "quartz_cluster", "cave_glowshroom",
+    "moonstone", "skystone", "aether_moss", "glimmer_silt", "star_crystal_ore", "skyroot_planks", "cloudstone_bricks", "sunstone_bricks", "moonstone_bricks", "star_crystal_lamp", "sky_fern", "dawn_bell", "moonflower", "glimmer_reed", "cloudberry_bush", "hanging_cloud_vine"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -397,6 +398,22 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::AMETHYST_CLUSTER, "Amethyst Cluster", glm::vec3(0.678f,0.502f,0.831f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::QUARTZ_CLUSTER, "Quartz Cluster", glm::vec3(0.882f,0.827f,0.749f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::CAVE_GLOWSHROOM, "Cave Glowshroom", glm::vec3(0.451f,0.784f,0.643f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::MOONSTONE, "Moonstone", glm::vec3(0.835f, 0.859f, 0.922f), true, false},
+    {BlockId::SKYSTONE, "Skystone", glm::vec3(0.455f, 0.600f, 0.702f), true, false},
+    {BlockId::AETHER_MOSS, "Aether Moss", glm::vec3(0.427f, 0.694f, 0.616f), true, false},
+    {BlockId::GLIMMER_SILT, "Glimmer Silt", glm::vec3(0.376f, 0.533f, 0.561f), true, false},
+    {BlockId::STAR_CRYSTAL_ORE, "Star Crystal Ore", glm::vec3(0.392f, 0.698f, 0.808f), true, false},
+    {BlockId::SKYROOT_PLANKS, "Skyroot Planks", glm::vec3(0.749f, 0.604f, 0.416f), true, false},
+    {BlockId::CLOUDSTONE_BRICKS, "Cloudstone Bricks", glm::vec3(0.792f, 0.851f, 0.902f), true, false},
+    {BlockId::SUNSTONE_BRICKS, "Sunstone Bricks", glm::vec3(0.910f, 0.761f, 0.447f), true, false},
+    {BlockId::MOONSTONE_BRICKS, "Moonstone Bricks", glm::vec3(0.843f, 0.875f, 0.941f), true, false},
+    {BlockId::STAR_CRYSTAL_LAMP, "Star Crystal Lamp", glm::vec3(0.522f, 0.902f, 0.949f), true, false},
+    {BlockId::SKY_FERN, "Sky Fern", glm::vec3(0.420f, 0.714f, 0.659f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::DAWN_BELL, "Dawn Bell", glm::vec3(0.957f, 0.780f, 0.486f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::MOONFLOWER, "Moonflower", glm::vec3(0.706f, 0.733f, 0.961f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::GLIMMER_REED, "Glimmer Reed", glm::vec3(0.482f, 0.827f, 0.765f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::CLOUDBERRY_BUSH, "Cloudberry Bush", glm::vec3(0.529f, 0.733f, 0.651f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::HANGING_CLOUD_VINE, "Hanging Cloud Vine", glm::vec3(0.490f, 0.733f, 0.800f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -414,6 +431,23 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
     switch (id) {
+        case BlockId::MOONSTONE: return BlockTexture::Moonstone;
+        case BlockId::SKYSTONE: return BlockTexture::Skystone;
+        case BlockId::AETHER_MOSS: return BlockTexture::AetherMoss;
+        case BlockId::GLIMMER_SILT: return BlockTexture::GlimmerSilt;
+        case BlockId::STAR_CRYSTAL_ORE: return BlockTexture::StarCrystalOre;
+        case BlockId::SKYROOT_PLANKS: return BlockTexture::SkyrootPlanks;
+        case BlockId::CLOUDSTONE_BRICKS: return BlockTexture::CloudstoneBricks;
+        case BlockId::SUNSTONE_BRICKS: return BlockTexture::SunstoneBricks;
+        case BlockId::MOONSTONE_BRICKS: return BlockTexture::MoonstoneBricks;
+        case BlockId::STAR_CRYSTAL_LAMP: return BlockTexture::StarCrystalLamp;
+        case BlockId::SKY_FERN: return BlockTexture::SkyFern;
+        case BlockId::DAWN_BELL: return BlockTexture::DawnBell;
+        case BlockId::MOONFLOWER: return BlockTexture::Moonflower;
+        case BlockId::GLIMMER_REED: return BlockTexture::GlimmerReed;
+        case BlockId::CLOUDBERRY_BUSH: return BlockTexture::CloudberryBush;
+        case BlockId::HANGING_CLOUD_VINE: return BlockTexture::HangingCloudVine;
+
         case BlockId::GRASS:
             return top ? BlockTexture::GrassTop :
                    bottom ? BlockTexture::Dirt : BlockTexture::GrassSide;
@@ -636,7 +670,7 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     }
 }
 
-uint8_t getAtlasTextureIndex(BlockTexture texture) {
+uint16_t getAtlasTextureIndex(BlockTexture texture) {
     const size_t index = static_cast<size_t>(texture);
     return index < g_atlasIndices.size() ? g_atlasIndices[index] : 0;
 }
@@ -646,7 +680,7 @@ const char* getBlockTextureAssetName(BlockTexture texture) {
     return index < TEXTURE_ASSET_NAMES.size() ? TEXTURE_ASSET_NAMES[index] : "dirt";
 }
 
-uint8_t getFaceTextureIndex(BlockId id, FaceDir face) {
+uint16_t getFaceTextureIndex(BlockId id, FaceDir face) {
     return getAtlasTextureIndex(getFaceTexture(id, face));
 }
 
@@ -669,13 +703,13 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         const int index = std::stoi((*it)[2].str());
         // Atlas slots include generator-only materials (for example copper ore),
         // so their range is independent of the logical BlockTexture count.
-        if (index >= 0 && index <= 255)
+        if (index >= 0 && index <= 65535)
             requested[static_cast<size_t>(texture->second)] = index;
     }
-    std::array<bool, 256> used{};
+    std::array<bool, 65536> used{};
     for (size_t texture = 0; texture < TEXTURE_COUNT; ++texture) {
         if (requested[texture] >= 0 && !used[requested[texture]]) {
-            g_atlasIndices[texture] = static_cast<uint8_t>(requested[texture]);
+            g_atlasIndices[texture] = static_cast<uint16_t>(requested[texture]);
             used[requested[texture]] = true;
         }
     }
@@ -684,7 +718,7 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         if (requested[texture] >= 0) continue;
         while (next < used.size() && used[next]) ++next;
         if (next < used.size()) {
-            g_atlasIndices[texture] = static_cast<uint8_t>(next);
+            g_atlasIndices[texture] = static_cast<uint16_t>(next);
             used[next] = true;
         }
     }
@@ -729,14 +763,14 @@ bool isFarmland(BlockId id) {
 uint8_t farmlandMoisture(BlockId id) {
     if (id == BlockId::FARMLAND) return 0;
     if (id >= BlockId::FARMLAND_1 && id <= BlockId::FARMLAND_7)
-        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FARMLAND_1) + 1;
+        return static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::FARMLAND_1) + 1;
     return 0;
 }
 
 BlockId farmlandForMoisture(uint8_t moisture) {
     if (moisture == 0) return BlockId::FARMLAND;
     moisture = std::min<uint8_t>(moisture, 7);
-    return static_cast<BlockId>(static_cast<uint8_t>(BlockId::FARMLAND_1) + moisture - 1);
+    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::FARMLAND_1) + moisture - 1);
 }
 
 bool isSapling(BlockId id) {
@@ -819,14 +853,15 @@ glm::ivec3 bedPartnerOffset(BlockId id) {
 
 namespace {
 constexpr uint8_t ARCHITECTURAL_FIRST =
-    static_cast<uint8_t>(BlockId::PLANKS_SLAB_BOTTOM);
+    static_cast<uint16_t>(BlockId::PLANKS_SLAB_BOTTOM);
 constexpr uint8_t ARCHITECTURAL_STRIDE = 10;
 }
 
 bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
-    const uint8_t raw = static_cast<uint8_t>(id);
+    const uint16_t raw = static_cast<uint16_t>(id);
     if (raw < ARCHITECTURAL_FIRST ||
-        raw >= static_cast<uint8_t>(BlockId::COUNT)) return false;
+        raw >= ARCHITECTURAL_FIRST + ARCHITECTURAL_STRIDE *
+                   static_cast<uint16_t>(ArchitecturalMaterial::Count)) return false;
     const uint8_t offset = raw - ARCHITECTURAL_FIRST;
     const uint8_t material = offset / ARCHITECTURAL_STRIDE;
     const uint8_t local = offset % ARCHITECTURAL_STRIDE;
@@ -954,6 +989,8 @@ bool isLava(BlockId id) {
 
 uint8_t getLightEmission(BlockId id) {
     if (id == BlockId::TORCH) return 14;
+    if (id == BlockId::STAR_CRYSTAL_LAMP) return 15;
+    if (id == BlockId::MOONFLOWER) return 4;
     if (id == BlockId::STAR_CRYSTAL) return 8;
     if (id == BlockId::STARFLOWER) return 5;
     if (id == BlockId::CLOUD_BLOOM) return 4;
@@ -984,11 +1021,11 @@ std::optional<FluidStateInfo> decodeFluidState(BlockId id) {
     if (id == BlockId::LAVA) return FluidStateInfo{true, 8, true, false};
     if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)
         return FluidStateInfo{false, static_cast<uint8_t>(8 -
-            (static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_WATER_1) + 1)),
+            (static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::FLOWING_WATER_1) + 1)),
             false, false};
     if (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7)
         return FluidStateInfo{true, static_cast<uint8_t>(8 -
-            (static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_LAVA_1) + 1)),
+            (static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::FLOWING_LAVA_1) + 1)),
             false, false};
     if (id == BlockId::FALLING_WATER)
         return FluidStateInfo{false, 8, false, true};
@@ -1011,9 +1048,9 @@ uint8_t fluidLevel(BlockId id) {
     if (id == BlockId::WATER || id == BlockId::LAVA) return 0;
     if (isFallingFluid(id)) return 8;
     if (id >= BlockId::FLOWING_WATER_1 && id <= BlockId::FLOWING_WATER_7)
-        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_WATER_1) + 1;
+        return static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::FLOWING_WATER_1) + 1;
     if (id >= BlockId::FLOWING_LAVA_1 && id <= BlockId::FLOWING_LAVA_7)
-        return static_cast<uint8_t>(id) - static_cast<uint8_t>(BlockId::FLOWING_LAVA_1) + 1;
+        return static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::FLOWING_LAVA_1) + 1;
     return 0;
 }
 
@@ -1052,6 +1089,7 @@ bool isFlower(BlockId id) {
            id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
            id == BlockId::OXEYE_DAISY || id == BlockId::STARFLOWER ||
            id == BlockId::CLOUD_BLOOM || id == BlockId::GLOWSHROOM ||
+           (id >= BlockId::SKY_FERN && id <= BlockId::HANGING_CLOUD_VINE) ||
            id == BlockId::GLOW_FERN || id == BlockId::RESONANT_CRYSTAL ||
            id == BlockId::HANGING_ROOTS ||
            isSunflower(id);
@@ -1079,7 +1117,7 @@ uint8_t fireEncouragement(BlockId id) {
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-        case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: return 5;
+        case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: case BlockId::SKYROOT_PLANKS: return 5;
         case BlockId::PLANKS: case BlockId::CRAFTING_TABLE:
         case BlockId::CHEST: case BlockId::COMPOSTER:
         case BlockId::FLETCHING_TABLE: case BlockId::LOOM: return 5;
@@ -1119,7 +1157,7 @@ uint8_t burnOdds(BlockId id) {
         switch (id) {
             case BlockId::WOOD: case BlockId::BIRCH_WOOD:
             case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-            case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: return 5;
+            case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: case BlockId::SKYROOT_PLANKS: return 5;
             default: return 20;
         }
     }

@@ -9,7 +9,7 @@
 
 // ── Block ID enum ─────────────────────────────────────────────────────
 
-enum class BlockId : uint8_t {
+enum class BlockId : uint16_t {
     AIR          = 0,
     GRASS        = 1,
     DIRT         = 2,
@@ -252,7 +252,24 @@ enum class BlockId : uint8_t {
     AMETHYST_CLUSTER,
     QUARTZ_CLUSTER,
     CAVE_GLOWSHROOM,
-    COUNT        = 253,
+    // Heaven v9 content; preserve all previously serialized identifiers.
+    MOONSTONE = 253,
+    SKYSTONE,
+    AETHER_MOSS,
+    GLIMMER_SILT,
+    STAR_CRYSTAL_ORE,
+    SKYROOT_PLANKS,
+    CLOUDSTONE_BRICKS,
+    SUNSTONE_BRICKS,
+    MOONSTONE_BRICKS,
+    STAR_CRYSTAL_LAMP,
+    SKY_FERN,
+    DAWN_BELL,
+    MOONFLOWER,
+    GLIMMER_REED,
+    CLOUDBERRY_BUSH,
+    HANGING_CLOUD_VINE,
+    COUNT        = 269,
     POPPY        = FLOWER
 };
 
@@ -330,7 +347,7 @@ uint8_t getLightEmission(BlockId id);
 uint8_t getLightDampening(BlockId id);
 
 // Material tiles in the dynamically sized shared block atlas.
-enum class BlockTexture : uint8_t {
+enum class BlockTexture : uint16_t {
     Dirt, GrassTop, GrassSide, Stone, OakLog, LogTop, Leaves, Sand,
     Bedrock, Water, Snow, Planks, Deepslate, CactusSide, CactusTop,
     CoalOre, IronOre, GoldOre, DiamondOre, Lava, Ice, Gravel, Clay,
@@ -429,6 +446,7 @@ enum class BlockTexture : uint8_t {
     AmethystCluster,
     QuartzCluster,
     CaveGlowshroom,
+    Moonstone, Skystone, AetherMoss, GlimmerSilt, StarCrystalOre, SkyrootPlanks, CloudstoneBricks, SunstoneBricks, MoonstoneBricks, StarCrystalLamp, SkyFern, DawnBell, Moonflower, GlimmerReed, CloudberryBush, HangingCloudVine,
     Count
 };
 
@@ -437,7 +455,7 @@ extern const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BL
 
 // Quick lookup
 inline const BlockProperties& getBlockProps(BlockId id) {
-    return BLOCK_TABLE[static_cast<uint8_t>(id)];
+    return BLOCK_TABLE[static_cast<uint16_t>(id)];
 }
 
 inline bool isLeafBlock(BlockId id) {
@@ -489,8 +507,8 @@ bool pointInsideBlockCollision(BlockId id, float localY);
 bool pointInsideBlockCollision(BlockId id, const glm::vec3& localPosition);
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face);
-uint8_t getAtlasTextureIndex(BlockTexture texture);
-uint8_t getFaceTextureIndex(BlockId id, FaceDir face);
+uint16_t getAtlasTextureIndex(BlockTexture texture);
+uint16_t getFaceTextureIndex(BlockId id, FaceDir face);
 const char* getBlockTextureAssetName(BlockTexture texture);
 bool loadTextureAssetDefinitions(
     const std::filesystem::path& atlasMetadataPath,

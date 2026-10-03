@@ -466,6 +466,48 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CAVE_GLOWSHROOM});
 
 
+    set(ItemId::MOONSTONE, {"Moonstone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONSTONE});
+    set(ItemId::SKYSTONE, {"Skystone", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKYSTONE});
+    set(ItemId::AETHER_MOSS, {"Aether Moss", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::AETHER_MOSS});
+    set(ItemId::GLIMMER_SILT, {"Glimmer Silt", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GLIMMER_SILT});
+    set(ItemId::STAR_CRYSTAL_ORE, {"Star Crystal Ore", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STAR_CRYSTAL_ORE});
+    set(ItemId::SKYROOT_PLANKS, {"Skyroot Planks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKYROOT_PLANKS});
+    set(ItemId::CLOUDSTONE_BRICKS, {"Cloudstone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CLOUDSTONE_BRICKS});
+    set(ItemId::SUNSTONE_BRICKS, {"Sunstone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SUNSTONE_BRICKS});
+    set(ItemId::MOONSTONE_BRICKS, {"Moonstone Bricks", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONSTONE_BRICKS});
+    set(ItemId::STAR_CRYSTAL_LAMP, {"Star Crystal Lamp", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STAR_CRYSTAL_LAMP});
+    set(ItemId::SKY_FERN, {"Sky Fern", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKY_FERN});
+    set(ItemId::DAWN_BELL, {"Dawn Bell", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DAWN_BELL});
+    set(ItemId::MOONFLOWER, {"Moonflower", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONFLOWER});
+    set(ItemId::GLIMMER_REED, {"Glimmer Reed", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GLIMMER_REED});
+    set(ItemId::CLOUDBERRY_BUSH, {"Cloudberry Bush", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CLOUDBERRY_BUSH});
+    set(ItemId::HANGING_CLOUD_VINE, {"Hanging Cloud Vine", ItemKind::Block, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::HANGING_CLOUD_VINE});
+    set(ItemId::STAR_CRYSTAL_SHARD, {"Star Crystal Shard"});
+    set(ItemId::CLOUDBERRY, {"Cloudberry", ItemKind::Food, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 2, 0.4f});
+    set(ItemId::ROASTED_CLOUDBERRY, {"Roasted Cloudberry", ItemKind::Food, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 4, 1.2f});
+    set(ItemId::CLOUDBERRY_BREAD, {"Cloudberry Bread", ItemKind::Food, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 7, 6.0f});
+    set(ItemId::ROASTED_GLOWSHROOM, {"Roasted Glowshroom", ItemKind::Food, 64, 0,
+        ToolKind::None, ToolTier::None, 0, 0, 4, 2.0f});
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -548,6 +590,16 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::QUARTZ_BLOCK:
         case ItemId::IRON_STAINED_ROCK:
         case ItemId::SULFUR_ROCK:
+        case ItemId::MOONSTONE:
+        case ItemId::SKYSTONE:
+        case ItemId::AETHER_MOSS:
+        case ItemId::GLIMMER_SILT:
+        case ItemId::STAR_CRYSTAL_ORE:
+        case ItemId::SKYROOT_PLANKS:
+        case ItemId::CLOUDSTONE_BRICKS:
+        case ItemId::SUNSTONE_BRICKS:
+        case ItemId::MOONSTONE_BRICKS:
+        case ItemId::STAR_CRYSTAL_LAMP:
             return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
@@ -589,6 +641,12 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::AMETHYST_CLUSTER:
         case ItemId::QUARTZ_CLUSTER:
         case ItemId::CAVE_GLOWSHROOM:
+        case ItemId::SKY_FERN:
+        case ItemId::DAWN_BELL:
+        case ItemId::MOONFLOWER:
+        case ItemId::GLIMMER_REED:
+        case ItemId::CLOUDBERRY_BUSH:
+        case ItemId::HANGING_CLOUD_VINE:
             return CreativeItemCategory::Nature;
 
         // ── Functional Blocks ───────────────────────────────────────────
@@ -637,6 +695,10 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::RAW_CHICKEN: case ItemId::COOKED_CHICKEN:
         case ItemId::MUTTON: case ItemId::COOKED_MUTTON:
         case ItemId::ROTTEN_FLESH:
+        case ItemId::CLOUDBERRY:
+        case ItemId::ROASTED_CLOUDBERRY:
+        case ItemId::CLOUDBERRY_BREAD:
+        case ItemId::ROASTED_GLOWSHROOM:
             return CreativeItemCategory::Food;
 
         // ── Materials ───────────────────────────────────────────────────
@@ -654,7 +716,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::FEATHER: case ItemId::LEATHER: case ItemId::BONE:
         case ItemId::WHEAT_SEEDS: case ItemId::WHEAT: case ItemId::FLINT:
         case ItemId::GUNPOWDER:
-        case ItemId::EMERALD:
+        case ItemId::EMERALD: case ItemId::STAR_CRYSTAL_SHARD:
             return CreativeItemCategory::Materials;
 
         // ── Spawn Eggs ──────────────────────────────────────────────────
@@ -900,6 +962,22 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::GLOW_FERN): return ItemId::GLOW_FERN;
         case static_cast<uint16_t>(BlockId::RESONANT_CRYSTAL): return ItemId::RESONANT_CRYSTAL;
         case static_cast<uint16_t>(BlockId::SULFUR_CRUST): return ItemId::SULFUR_CRUST;
+        case static_cast<uint16_t>(BlockId::MOONSTONE): return ItemId::MOONSTONE;
+        case static_cast<uint16_t>(BlockId::SKYSTONE): return ItemId::SKYSTONE;
+        case static_cast<uint16_t>(BlockId::AETHER_MOSS): return ItemId::AETHER_MOSS;
+        case static_cast<uint16_t>(BlockId::GLIMMER_SILT): return ItemId::GLIMMER_SILT;
+        case static_cast<uint16_t>(BlockId::STAR_CRYSTAL_ORE): return ItemId::STAR_CRYSTAL_ORE;
+        case static_cast<uint16_t>(BlockId::SKYROOT_PLANKS): return ItemId::SKYROOT_PLANKS;
+        case static_cast<uint16_t>(BlockId::CLOUDSTONE_BRICKS): return ItemId::CLOUDSTONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::SUNSTONE_BRICKS): return ItemId::SUNSTONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::MOONSTONE_BRICKS): return ItemId::MOONSTONE_BRICKS;
+        case static_cast<uint16_t>(BlockId::STAR_CRYSTAL_LAMP): return ItemId::STAR_CRYSTAL_LAMP;
+        case static_cast<uint16_t>(BlockId::SKY_FERN): return ItemId::SKY_FERN;
+        case static_cast<uint16_t>(BlockId::DAWN_BELL): return ItemId::DAWN_BELL;
+        case static_cast<uint16_t>(BlockId::MOONFLOWER): return ItemId::MOONFLOWER;
+        case static_cast<uint16_t>(BlockId::GLIMMER_REED): return ItemId::GLIMMER_REED;
+        case static_cast<uint16_t>(BlockId::CLOUDBERRY_BUSH): return ItemId::CLOUDBERRY_BUSH;
+        case static_cast<uint16_t>(BlockId::HANGING_CLOUD_VINE): return ItemId::HANGING_CLOUD_VINE;
         default: return ItemId::EMPTY;
     }
 }

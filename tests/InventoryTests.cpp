@@ -19,7 +19,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
-    static_assert(static_cast<uint8_t>(BlockId::BLACK_WOOL) == 200);
+    static_assert(static_cast<uint16_t>(BlockId::BLACK_WOOL) == 200);
     static_assert(static_cast<uint16_t>(ItemId::BONE_MEAL) == 208);
     for (uint16_t raw = 201; raw <= 224; ++raw) {
         const auto block = static_cast<BlockId>(raw);
@@ -35,7 +35,19 @@ int main() {
     }
 
     static_assert(static_cast<uint16_t>(ItemId::CAVE_GLOWSHROOM)==260);
-    static_assert(static_cast<uint8_t>(BlockId::CAVE_GLOWSHROOM)==252);
+    static_assert(static_cast<uint16_t>(BlockId::CAVE_GLOWSHROOM)==252);
+    static_assert(sizeof(BlockId) == sizeof(uint16_t));
+    static_assert(static_cast<uint16_t>(BlockId::MOONSTONE) == 253);
+    static_assert(static_cast<uint16_t>(BlockId::HANGING_CLOUD_VINE) == 268);
+    static_assert(static_cast<uint16_t>(ItemId::MOONSTONE) == 261);
+    for (uint16_t raw=253; raw<269; ++raw) {
+        const auto block=static_cast<BlockId>(raw);
+        const auto item=itemForBlock(block);
+        require(item != ItemId::EMPTY && getItemProps(item).placedBlock == block,
+                "high-ID Heaven blocks map to placeable items without truncation");
+        require(itemFromCommandName(itemCommandName(item)) == item,
+                "Heaven item command names round trip");
+    }
     for (uint16_t raw=225; raw<=252; ++raw) {
         const auto block=static_cast<BlockId>(raw);
         const auto item=itemForBlock(block);
@@ -52,7 +64,7 @@ int main() {
     }
 
     require(static_cast<uint16_t>(ItemId::GRASS_BLOCK) ==
-            static_cast<uint8_t>(BlockId::GRASS),
+            static_cast<uint16_t>(BlockId::GRASS),
             "legacy block item ids remain aligned");
     require(static_cast<uint16_t>(ItemId::GUNPOWDER) == 126 &&
             static_cast<uint16_t>(ItemId::COW_SPAWN_EGG) == 127 &&
@@ -60,19 +72,19 @@ int main() {
             "spawn eggs did not append after stable serialized item ids");
     require(itemForBlock(BlockId::DIAMOND_ORE) == ItemId::DIAMOND_ORE,
             "block maps to its inventory item");
-    require(static_cast<uint8_t>(BlockId::ACACIA_SAPLING) == 63 &&
-            static_cast<uint8_t>(BlockId::SNOW_LAYER) == 64 &&
-            static_cast<uint8_t>(BlockId::FIRE) == 65,
+    require(static_cast<uint16_t>(BlockId::ACACIA_SAPLING) == 63 &&
+            static_cast<uint16_t>(BlockId::SNOW_LAYER) == 64 &&
+            static_cast<uint16_t>(BlockId::FIRE) == 65,
             "weather blocks did not append after stable serialized ids");
     require(getBlockProps(BlockId::SNOW_LAYER).shape == RenderShape::SnowLayer &&
             !isSolid(BlockId::SNOW_LAYER) && !isSolid(BlockId::FIRE),
             "weather block geometry or collision properties are invalid");
-    require(static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
-            static_cast<uint8_t>(BlockId::AETHER_GRASS) == 106 &&
-            static_cast<uint8_t>(BlockId::EMERALD_ORE) == 166 &&
-            static_cast<uint8_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
-            static_cast<uint8_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint8_t>(BlockId::COUNT) == 253 &&
+    require(static_cast<uint16_t>(BlockId::WHITE_BED_HEAD_WEST) == 103 &&
+            static_cast<uint16_t>(BlockId::AETHER_GRASS) == 106 &&
+            static_cast<uint16_t>(BlockId::EMERALD_ORE) == 166 &&
+            static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
+            static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
+            static_cast<uint16_t>(BlockId::COUNT) == 269 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -119,7 +131,8 @@ int main() {
                 ItemId::AETHER_GRASS &&
             creativeItems[207] == ItemId::BONE_MEAL &&
             creativeItems[231] == ItemId::BEACH_GRASS &&
-            creativeItems.back() == ItemId::CAVE_GLOWSHROOM,
+            creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
+            creativeItems.back() == ItemId::ROASTED_GLOWSHROOM,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -140,9 +153,9 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 101 &&
+                CreativeItemCategory::BuildingBlocks)] == 111 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 55 &&
+                CreativeItemCategory::Nature)] == 61 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(
@@ -150,9 +163,9 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Combat)] == 24 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Food)] == 10 &&
+                CreativeItemCategory::Food)] == 14 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Materials)] == 24 &&
+                CreativeItemCategory::Materials)] == 25 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::SpawnEggs)] == 10,
             "creative category sizes do not match the tab assignment");

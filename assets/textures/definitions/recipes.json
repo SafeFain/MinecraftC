@@ -894,6 +894,70 @@
     "cave_glowshroom": {
       "recipe": "base",
       "variants": 1
+    },
+    "moonstone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skystone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "aether_moss": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "glimmer_silt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "star_crystal_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skyroot_planks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cloudstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sunstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "moonstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "star_crystal_lamp": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sky_fern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dawn_bell": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "moonflower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glimmer_reed": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cloudberry_bush": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "hanging_cloud_vine": {
+      "recipe": "base",
+      "variants": 1
     }
   },
   "examples": {

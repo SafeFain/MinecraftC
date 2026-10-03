@@ -1129,7 +1129,8 @@ bool Player::placeBlock() {
         if (hit->faceNormal.y == 0) return false;
         placed = pointedDripstoneForPlacementFace(hit->faceNormal.y);
     }
-    if (placed == BlockId::HANGING_ROOTS && hit->faceNormal.y >= 0)
+    if ((placed == BlockId::HANGING_ROOTS || placed == BlockId::HANGING_CLOUD_VINE) &&
+        hit->faceNormal.y >= 0)
         return false;
     if ((placed == BlockId::GLOW_FERN ||
          placed == BlockId::RESONANT_CRYSTAL) && hit->faceNormal.y <= 0)

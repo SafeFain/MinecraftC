@@ -23,8 +23,8 @@ std::vector<CaveColumnInfo> columns(int width, int depth, int surface = 80,
 }
 
 int main() {
-    static_assert(WorldGenContext::GENERATION_VERSION == 16);
-    static_assert(WorldGenContext::CHUNK_CACHE_VERSION == (16u << 16 | 1u));
+    static_assert(WorldGenContext::GENERATION_VERSION == 17);
+    static_assert(WorldGenContext::CHUNK_CACHE_VERSION == (17u << 16 | 1u));
     Noise noise(1234567890ULL);
     CaveGenerator caves(noise, 1234567890ULL);
     auto large = caves.generateVolume(-48, -48, 96, 96, columns(96, 96));

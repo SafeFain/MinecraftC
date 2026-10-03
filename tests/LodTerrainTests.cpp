@@ -58,8 +58,8 @@ int blockIndex(int x, int y, int z) {
 }
 
 ChunkMesh singleBlockLodMesh(BlockId block) {
-    std::vector<uint8_t> blocks(Config::CHUNK_VOLUME, 0);
-    blocks[blockIndex(8, 64, 8)] = static_cast<uint8_t>(block);
+    std::vector<uint16_t> blocks(Config::CHUNK_VOLUME, 0);
+    blocks[blockIndex(8, 64, 8)] = static_cast<uint16_t>(block);
     return buildLodTileMesh(extractExactLodChunk(blocks), 1, 24);
 }
 
@@ -246,16 +246,16 @@ int main() {
             require(!isHeavenSurfaceFeature(span.block),
                     "coarse Heaven LOD magnifies a surface feature");
 
-    std::vector<uint8_t> blocks(Config::CHUNK_VOLUME, 0);
+    std::vector<uint16_t> blocks(Config::CHUNK_VOLUME, 0);
     for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
         for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
             for (int y = 0; y <= 10; ++y)
-                blocks[blockIndex(x, y, z)] = static_cast<uint8_t>(BlockId::STONE);
+                blocks[blockIndex(x, y, z)] = static_cast<uint16_t>(BlockId::STONE);
         }
     }
     for (int y = 20; y <= 23; ++y)
-        blocks[blockIndex(0, y, 0)] = static_cast<uint8_t>(BlockId::WOOD);
-    blocks[blockIndex(0, 30, 0)] = static_cast<uint8_t>(BlockId::WATER);
+        blocks[blockIndex(0, y, 0)] = static_cast<uint16_t>(BlockId::WOOD);
+    blocks[blockIndex(0, 30, 0)] = static_cast<uint16_t>(BlockId::WATER);
     const LodTileData exact = extractExactLodChunk(blocks);
     require(exact.at(0, 0).exact && exact.at(0, 0).spans.size() == 3 &&
             exact.at(0, 0).spans[1].bottom == 20 &&
@@ -269,13 +269,13 @@ int main() {
     require(exactMesh.vertices.size() < exactMesh.indices.size(),
             "LOD faces share vertices instead of duplicating triangle corners");
 
-    std::vector<uint8_t> adjacentTypes(Config::CHUNK_VOLUME, 0);
-    adjacentTypes[blockIndex(1, 20, 1)] = static_cast<uint8_t>(BlockId::STONE);
+    std::vector<uint16_t> adjacentTypes(Config::CHUNK_VOLUME, 0);
+    adjacentTypes[blockIndex(1, 20, 1)] = static_cast<uint16_t>(BlockId::STONE);
     adjacentTypes[blockIndex(1, 21, 1)] =
-        static_cast<uint8_t>(BlockId::CRAFTING_TABLE);
-    adjacentTypes[blockIndex(1, 22, 1)] = static_cast<uint8_t>(BlockId::WHEAT_7);
-    adjacentTypes[blockIndex(1, 23, 1)] = static_cast<uint8_t>(BlockId::GLASS);
-    adjacentTypes[blockIndex(1, 24, 1)] = static_cast<uint8_t>(BlockId::WATER);
+        static_cast<uint16_t>(BlockId::CRAFTING_TABLE);
+    adjacentTypes[blockIndex(1, 22, 1)] = static_cast<uint16_t>(BlockId::WHEAT_7);
+    adjacentTypes[blockIndex(1, 23, 1)] = static_cast<uint16_t>(BlockId::GLASS);
+    adjacentTypes[blockIndex(1, 24, 1)] = static_cast<uint16_t>(BlockId::WATER);
     const LodTileData adjacentExact = extractExactLodChunk(adjacentTypes);
     const LodColumn& adjacentColumn = adjacentExact.at(1, 1);
     require(adjacentColumn.spans.size() == 5 &&
@@ -286,7 +286,7 @@ int main() {
             adjacentColumn.spans[4].block == BlockId::WATER,
             "exact LOD merges adjacent block IDs that share a render layer");
 
-    std::vector<uint8_t> allBlocks(Config::CHUNK_VOLUME, 0);
+    std::vector<uint16_t> allBlocks(Config::CHUNK_VOLUME, 0);
     // Keep air gaps while distributing IDs across columns: the registry can
     // exceed half the world height, so one two-block-spaced column is insufficient.
     constexpr int idsPerColumn = Config::WORLD_HEIGHT / 2;
@@ -296,7 +296,7 @@ int main() {
         const int y = Config::WORLD_MIN_Y + 2 * ((raw - 1) % idsPerColumn);
         require(x < Config::CHUNK_SIZE_X && y < Config::WORLD_MAX_Y,
                 "all-block LOD fixture stays within chunk bounds");
-        allBlocks[blockIndex(x, y, 8)] = static_cast<uint8_t>(raw);
+        allBlocks[blockIndex(x, y, 8)] = static_cast<uint16_t>(raw);
     }
     const LodTileData allBlockTile = extractExactLodChunk(allBlocks);
     for (int column = 0; column * idsPerColumn < blockCount; ++column) {
@@ -314,7 +314,7 @@ int main() {
     require(decodeLodTilePayload(allBlockPayload, decodedAllBlocks) &&
             sameTile(allBlockTile, decodedAllBlocks) &&
             decodedAllBlocks.at(8, 8).spans.size() > 24,
-            "r4 LOD payload does not round-trip columns beyond 24 runs");
+            "r5 LOD payload does not round-trip columns beyond 24 runs");
     const ChunkMesh allBlockMesh = buildLodTileMesh(decodedAllBlocks, 1, 24);
     require(allBlockMesh.opaqueIndexCount > 0 &&
             allBlockMesh.translucentIndexCount > 0 &&
@@ -358,10 +358,10 @@ int main() {
     require(buildLodTileMesh(coarseDecoration, 4, 24).empty(),
             "coarse LOD magnifies a one-block decoration across its full cell");
 
-    std::vector<uint8_t> edgeCenterBlocks(Config::CHUNK_VOLUME, 0);
-    std::vector<uint8_t> edgeEastBlocks(Config::CHUNK_VOLUME, 0);
-    edgeCenterBlocks[blockIndex(15, 64, 8)] = static_cast<uint8_t>(BlockId::STONE);
-    edgeEastBlocks[blockIndex(0, 64, 8)] = static_cast<uint8_t>(BlockId::STONE);
+    std::vector<uint16_t> edgeCenterBlocks(Config::CHUNK_VOLUME, 0);
+    std::vector<uint16_t> edgeEastBlocks(Config::CHUNK_VOLUME, 0);
+    edgeCenterBlocks[blockIndex(15, 64, 8)] = static_cast<uint16_t>(BlockId::STONE);
+    edgeEastBlocks[blockIndex(0, 64, 8)] = static_cast<uint16_t>(BlockId::STONE);
     const LodTileData edgeCenter = extractExactLodChunk(edgeCenterBlocks);
     const LodTileData edgeEast = extractExactLodChunk(edgeEastBlocks);
     LodExactNeighborTiles edgeNeighbors;
@@ -393,7 +393,7 @@ int main() {
             "an approximate tile has no solid wall at a precision transition");
 
     edgeCenterBlocks.assign(Config::CHUNK_VOLUME, 0);
-    edgeCenterBlocks[blockIndex(15, 64, 8)] = static_cast<uint8_t>(BlockId::WATER);
+    edgeCenterBlocks[blockIndex(15, 64, 8)] = static_cast<uint16_t>(BlockId::WATER);
     const LodTileData edgeWater = extractExactLodChunk(edgeCenterBlocks);
     const ChunkMesh safeWaterEdge = buildLodTileMesh(edgeWater, 1, 24);
     require(safeWaterEdge.translucentIndexCount < 36,
@@ -402,9 +402,9 @@ int main() {
     edgeCenterBlocks.assign(Config::CHUNK_VOLUME, 0);
     edgeEastBlocks.assign(Config::CHUNK_VOLUME, 0);
     edgeCenterBlocks[blockIndex(15, 64, 8)] =
-        static_cast<uint8_t>(BlockId::WHITE_BED_FOOT_EAST);
+        static_cast<uint16_t>(BlockId::WHITE_BED_FOOT_EAST);
     edgeEastBlocks[blockIndex(0, 64, 8)] =
-        static_cast<uint8_t>(BlockId::WHITE_BED_HEAD_EAST);
+        static_cast<uint16_t>(BlockId::WHITE_BED_HEAD_EAST);
     const LodTileData edgeBed = extractExactLodChunk(edgeCenterBlocks);
     edgeNeighbors = {};
     const LodTileData edgeBedPartner = extractExactLodChunk(edgeEastBlocks);
@@ -639,7 +639,7 @@ int main() {
                 "asynchronous LOD completion publishes bounded CPU data");
     }
     bool cacheFound = false;
-    const auto tileDirectory = root / "lod" / "r4" / "d_0" / "tiles";
+    const auto tileDirectory = root / "lod" / "r5" / "d_0" / "tiles";
     for (const auto& entry : std::filesystem::directory_iterator(tileDirectory)) {
         cacheFound = entry.is_regular_file();
         if (cacheFound) {

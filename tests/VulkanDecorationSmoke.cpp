@@ -1,6 +1,7 @@
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
+#include "world/WorldGenerator.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -10,19 +11,22 @@
 
 int main(int argc, char** argv) {
     if (argc < 2 || argc > 3) {
-        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview|--ecology|--ecology-preview]\n";
+        std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview|--ecology|--ecology-preview|--heaven|--heaven-preview|--heaven-island]\n";
         return 2;
     }
     const std::string mode = argc == 3 ? argv[2] : "";
     if (!mode.empty() && mode != "--natural" && mode != "--natural-preview" &&
-        mode != "--ecology" && mode != "--ecology-preview") return 2;
+        mode != "--ecology" && mode != "--ecology-preview" &&
+        mode != "--heaven" && mode != "--heaven-preview" && mode != "--heaven-island") return 2;
+    const bool island = mode == "--heaven-island";
+    const bool heaven = island || mode == "--heaven" || mode == "--heaven-preview";
     const bool ecology = mode == "--ecology" || mode == "--ecology-preview";
     const bool natural = !mode.empty();
-    const int frames = (mode == "--natural-preview" || mode == "--ecology-preview") ? 1200 : 120;
-    const int count = ecology ? 28 : natural ? 24 : 18;
-    const int first = ecology ? 225 : natural ? 201 : 183;
-    const int cubes = ecology ? 15 : natural ? 13 : 18;
-    const int plants = ecology ? 13 : natural ? 11 : 0;
+    const int frames = (mode == "--natural-preview" || mode == "--ecology-preview" || mode == "--heaven-preview") ? 1200 : 120;
+    const int count = heaven ? 16 : ecology ? 28 : natural ? 24 : 18;
+    const int first = heaven ? 253 : ecology ? 225 : natural ? 201 : 183;
+    const int cubes = heaven ? 10 : ecology ? 15 : natural ? 13 : 18;
+    const int plants = heaven ? 6 : ecology ? 13 : natural ? 11 : 0;
     try {
         Window window(960, 540, "MinecraftC natural materials smoke",
                       Window::SurfaceMode::Vulkan, false, false);
@@ -32,7 +36,7 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Black wool lost its generated atlas slot");
         renderer.setVisualQuality(VisualQuality::Medium);
         renderer.setEnhancedVisuals(false);
-        std::vector<uint8_t> blocks(Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z *
+        std::vector<uint16_t> blocks(Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z *
                                     Config::CHUNK_SIZE_Y, 0);
         int maxima[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
         for (int i = 0; i < count; ++i) {
@@ -40,7 +44,7 @@ int main(int argc, char** argv) {
             const int y = 66 + (3 - i / 6) * 2;
             const int z = 8;
             blocks[x + z * 16 + Config::worldYToStorageY(y) * 256] =
-                static_cast<uint8_t>(first + i);
+                static_cast<uint16_t>(first + i);
             maxima[x][z] = y;
         }
         ChunkMesh mesh;
@@ -60,11 +64,31 @@ int main(int argc, char** argv) {
             if (!found) throw std::runtime_error("Decoration material missing from CPU mesh");
         }
         renderer.uploadChunkMesh(mesh);
-        const glm::vec3 camera(7.5f, 70.0f, 0.0f);
-        const auto view = glm::lookAt(camera, glm::vec3(7.5f, 69.5f, 8.5f), glm::vec3(0,1,0));
+        glm::vec3 camera(7.5f, 70.0f, 0.0f);
+        glm::vec3 lookAt(7.5f, 69.5f, 8.5f);
+        if (island) {
+            renderer.releaseChunkMesh(mesh);
+            WorldGenerator generator(1234567890ULL,WorldType::Normal,DimensionId::Heaven);
+            const auto spawn=generator.heavenSpawnBlock();
+            const int cx=static_cast<int>(std::floor(spawn.x/16.0));
+            const int cz=static_cast<int>(std::floor(spawn.z/16.0));
+            Chunk chunk(cx,cz);
+            generator.generate(chunk);
+            chunk.copyColumnMaxY(maxima);
+            mesh.build(0,0,chunk.rawBlocks(),maxima,
+                [](int,int,int){return BlockId::AIR;},
+                [](int,int,int){return LightSample{15,0};});
+            if (mesh.opaqueIndexCount==0 || mesh.indexCount!=mesh.indices.size())
+                throw std::runtime_error("Generated Heaven island lost geometry metadata");
+            renderer.uploadChunkMesh(mesh);
+            camera=glm::vec3(8,spawn.y+14,-28);
+            lookAt=glm::vec3(8,spawn.y,8);
+        }
+        const auto view = glm::lookAt(camera, lookAt, glm::vec3(0,1,0));
         const auto vp = glm::perspective(glm::radians(70.0f), window.aspectRatio(),
                                          0.1f, 128.0f) * view;
-        const RenderEnvironment environment = DayNightCycle{}.evaluate();
+        const RenderEnvironment environment = heaven ? applyHeavenEnvironment(DayNightCycle{}.evaluate()) :
+            DayNightCycle{}.evaluate();
         for (int frame = 0; frame < frames; ++frame) {
             renderer.beginFrame();
             renderer.setEnvironment(environment, camera);

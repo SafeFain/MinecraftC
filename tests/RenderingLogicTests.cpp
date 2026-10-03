@@ -604,11 +604,11 @@ int main() {
         rejectedMesh = true;
     }
     require(rejectedMesh, "out-of-range mesh index was accepted");
-    std::vector<uint8_t> blocks(Config::CHUNK_VOLUME,
-                                static_cast<uint8_t>(BlockId::AIR));
+    std::vector<uint16_t> blocks(Config::CHUNK_VOLUME,
+                                static_cast<uint16_t>(BlockId::AIR));
     const int blockIndex = Config::worldYToStorageY(0) *
         Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
-    blocks[static_cast<size_t>(blockIndex)] = static_cast<uint8_t>(BlockId::STONE);
+    blocks[static_cast<size_t>(blockIndex)] = static_cast<uint16_t>(BlockId::STONE);
     int columnMax[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z]{};
     ChunkMesh windingMesh;
     windingMesh.build(0, 0, blocks.data(), columnMax,

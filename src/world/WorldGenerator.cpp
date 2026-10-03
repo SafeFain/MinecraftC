@@ -1,5 +1,6 @@
 #include "world/BiomeBlockLogic.h"
 #include "world/WorldGenerator.h"
+#include "world/BiomeBlockLogic.h"
 #include "Config.h"
 #include "world/RegionGenerator.h"
 #include "world/SurfaceRules.h"
@@ -385,10 +386,10 @@ void WorldGenerator::populateSuperflat(Chunk& chunk) {
     const int grassY = bedrockY + 3;
     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
         for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            chunk.blockAt(x, bedrockY, z) = static_cast<uint8_t>(BlockId::BEDROCK);
+            chunk.blockAt(x, bedrockY, z) = static_cast<uint16_t>(BlockId::BEDROCK);
             for (int y = bedrockY + 1; y <= dirtTop; ++y)
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::DIRT);
-            chunk.blockAt(x, grassY, z) = static_cast<uint8_t>(BlockId::GRASS);
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(BlockId::DIRT);
+            chunk.blockAt(x, grassY, z) = static_cast<uint16_t>(BlockId::GRASS);
             chunk.setColumnMaxY(x, z, grassY);
         }
     }
@@ -504,6 +505,95 @@ WorldGenerator::sampleHeavenLayers(int worldX, int worldZ) const {
     return layers;
 }
 
+BlockId WorldGenerator::heavenSurfaceBlock(HeavenBiome biome) {
+    switch (biome) {
+        case HeavenBiome::SunstoneHeights: return BlockId::SUNSTONE;
+        case HeavenBiome::MoonpearlTerrace: return BlockId::MOONSTONE;
+        case HeavenBiome::StarCrystalGarden: return BlockId::AETHER_MOSS;
+        case HeavenBiome::GlimmerFen: return BlockId::GLIMMER_SILT;
+        case HeavenBiome::SkystoneBarrens: return BlockId::SKYSTONE;
+        default: return BlockId::AETHER_GRASS;
+    }
+}
+
+std::vector<WorldGenerator::HeavenLodFeature>
+WorldGenerator::sampleHeavenEcologyFeatures(int worldX, int worldZ) const {
+    std::vector<HeavenLodFeature> features;
+    if (!isHeaven()) return features;
+    constexpr uint64_t domain = 0x48455645434F5639ULL;
+    const auto layers = sampleHeavenLayers(worldX, worldZ);
+    const int cellX = floorDiv(worldX, 8), cellZ = floorDiv(worldZ, 8);
+    const int anchorX = cellX * 8 + 4, anchorZ = cellZ * 8 + 4;
+    const int dx = std::abs(worldX - anchorX), dz = std::abs(worldZ - anchorZ);
+    for (int layer = 0; layer < HEAVEN_LAYER_COUNT; ++layer) {
+        const auto& island = layers[static_cast<size_t>(layer)];
+        if (!island.present) continue;
+        // Spawn standing area remains clear; shrines are stamped after ecology.
+        if (layer == 2 && std::abs(worldX-m_heavenSpawnBlock.x) <= 3 &&
+            std::abs(worldZ-m_heavenSpawnBlock.z) <= 3) continue;
+        const int patch = hashPercent(m_seed ^ domain, cellX, layer, cellZ);
+        const int roll = hashPercent(m_seed ^ domain, worldX, 19 + layer, worldZ);
+        const bool clustered = dx <= 2 && dz <= 2 && patch < 45;
+        const int density = layer == 2 ? 36 : layer == 4 ? 8 : 20;
+        const auto add = [&](BlockId block, int bottom, int top, bool replace = false) {
+            if (island.top + top >= Config::WORLD_MAX_Y ||
+                island.top + bottom < HEAVEN_LAYERS[static_cast<size_t>(layer)].baseY)
+                return;
+            features.push_back({layer, bottom, top, block, replace, island.biome});
+        };
+        switch (island.biome) {
+            case HeavenBiome::DawnMeadow:
+            case HeavenBiome::SkyrootGrove:
+            case HeavenBiome::CloudbloomFields:
+                if (clustered) {
+                    add(BlockId::AETHER_MOSS, 0, 0, true);
+                    if (roll < density) add(roll < density/3 ? BlockId::CLOUDBERRY_BUSH :
+                        island.biome == HeavenBiome::SkyrootGrove ? BlockId::SKY_FERN :
+                        BlockId::DAWN_BELL, 1, 1);
+                }
+                break;
+            case HeavenBiome::StarCrystalGarden:
+                if (clustered && roll < density)
+                    add(roll < density/2 ? BlockId::SKY_FERN : BlockId::STAR_CRYSTAL, 1, 1);
+                break;
+            case HeavenBiome::GlimmerFen: {
+                // A shallow 3x3 pool requires a complete same-height floor and
+                // a surrounding retaining ring. No source can drain into void.
+                bool pool = dx <= 1 && dz <= 1 && patch < 12;
+                const auto center = sampleHeavenLayer(anchorX, anchorZ, layer);
+                if (pool && center.present && center.top == island.top &&
+                    center.biome == HeavenBiome::GlimmerFen) {
+                    for (int ox=-2; ox<=2 && pool; ++ox)
+                        for (int oz=-2; oz<=2; ++oz) {
+                            const auto neighbor=sampleHeavenLayer(anchorX+ox,anchorZ+oz,layer);
+                            if (!neighbor.present || neighbor.top != center.top ||
+                                neighbor.bottom >= center.top-1 ||
+                                neighbor.biome != HeavenBiome::GlimmerFen) { pool=false; break; }
+                        }
+                } else pool=false;
+                if (pool) add(BlockId::WATER, 0, 0, true);
+                else if (clustered && roll < density) add(BlockId::GLIMMER_REED, 1, 1);
+                break;
+            }
+            case HeavenBiome::MoonpearlTerrace:
+                if (clustered && roll < density) add(BlockId::MOONFLOWER, 1, 1);
+                break;
+            case HeavenBiome::SunstoneHeights:
+            case HeavenBiome::SkystoneBarrens:
+                if (dx <= 1 && dz <= 1 && patch < 12)
+                    add(island.biome == HeavenBiome::SkystoneBarrens ? BlockId::SKYSTONE :
+                        BlockId::SUNSTONE, 1, dx+dz == 0 ? 3 : 1);
+                break;
+        }
+        if ((island.biome == HeavenBiome::SkyrootGrove ||
+             island.biome == HeavenBiome::CloudbloomFields) && roll < 10) {
+            const int bottom = island.bottom - island.top;
+            add(BlockId::HANGING_CLOUD_VINE, bottom-2, bottom-1);
+        }
+    }
+    return features;
+}
+
 std::vector<WorldGenerator::HeavenLodFeature>
 WorldGenerator::sampleHeavenLodFeatures(int worldX, int worldZ) const {
     std::vector<HeavenLodFeature> features;
@@ -613,6 +703,8 @@ WorldGenerator::sampleHeavenLodFeatures(int worldX, int worldZ) const {
     }
     for (HeavenLodFeature& feature : features)
         feature.biome = layers[static_cast<size_t>(feature.layer)].biome;
+    const auto ecology = sampleHeavenEcologyFeatures(worldX, worldZ);
+    features.insert(features.end(), ecology.begin(), ecology.end());
     return features;
 }
 
@@ -814,7 +906,7 @@ void WorldGenerator::populateHeaven(
             !Config::isValidWorldY(worldY)) return;
         const int localX = worldX - baseX;
         const int localZ = worldZ - baseZ;
-        chunk.blockAt(localX, worldY, localZ) = static_cast<uint8_t>(id);
+        chunk.blockAt(localX, worldY, localZ) = static_cast<uint16_t>(id);
     };
     const auto setIfAir = [&](int worldX, int worldY, int worldZ, BlockId id) {
         if (!inChunk(worldX, worldZ, baseX, baseZ) ||
@@ -822,8 +914,8 @@ void WorldGenerator::populateHeaven(
         const int localX = worldX - baseX;
         const int localZ = worldZ - baseZ;
         if (chunk.blockAt(localX, worldY, localZ) ==
-            static_cast<uint8_t>(BlockId::AIR))
-            chunk.blockAt(localX, worldY, localZ) = static_cast<uint8_t>(id);
+            static_cast<uint16_t>(BlockId::AIR))
+            chunk.blockAt(localX, worldY, localZ) = static_cast<uint16_t>(id);
     };
     const auto buildStructure = [&](const StructurePlacement& placement) {
         StructureGenerator::build(placement,
@@ -841,19 +933,6 @@ void WorldGenerator::populateHeaven(
                             placement.variant,worldX,worldY,worldZ));
             });
     };
-    const auto surfaceBlock = [](HeavenBiome biome) {
-        switch (biome) {
-            case HeavenBiome::SunstoneHeights:
-            case HeavenBiome::MoonpearlTerrace: return BlockId::SUNSTONE;
-            case HeavenBiome::StarCrystalGarden:
-            case HeavenBiome::GlimmerFen: return BlockId::MOSS;
-            case HeavenBiome::SkystoneBarrens: return BlockId::CLOUDSTONE;
-            case HeavenBiome::DawnMeadow:
-            case HeavenBiome::SkyrootGrove:
-            case HeavenBiome::CloudbloomFields: return BlockId::AETHER_GRASS;
-        }
-        return BlockId::AETHER_GRASS;
-    };
     const auto wantsSoil = [](HeavenBiome biome) {
         return biome == HeavenBiome::DawnMeadow ||
                biome == HeavenBiome::SkyrootGrove ||
@@ -869,7 +948,7 @@ void WorldGenerator::populateHeaven(
         for (int worldY = island.bottom; worldY <= island.top; ++worldY) {
             BlockId block = BlockId::CLOUDSTONE;
             if (worldY == island.top) {
-                block = surfaceBlock(island.biome);
+                block = heavenSurfaceBlock(island.biome);
             } else if (wantsSoil(island.biome) && worldY >= island.top - 2) {
                 block = BlockId::AETHER_SOIL;
             } else if (wantsVeins(island.biome) &&
@@ -877,6 +956,13 @@ void WorldGenerator::populateHeaven(
                                    worldX, worldY, worldZ) < 13) {
                 block = BlockId::SUNSTONE;
             }
+            if (worldY <= island.top-2 && worldY >= island.bottom+2 &&
+                (island.biome == HeavenBiome::StarCrystalGarden ||
+                 island.biome == HeavenBiome::SunstoneHeights ||
+                 island.biome == HeavenBiome::MoonpearlTerrace) &&
+                hashPercent(generator.m_seed ^ 0x4845564F52455639ULL,
+                    floorDiv(worldX,3), floorDiv(worldY,2), floorDiv(worldZ,3)) < 9)
+                block = BlockId::STAR_CRYSTAL_ORE;
             setLocal(worldX, worldY, worldZ, block);
         }
     };
@@ -1142,6 +1228,26 @@ void WorldGenerator::populateHeaven(
         }
     }
 
+    // Shared coordinate-owned ecology is applied after legacy decorations,
+    // then structures restore their reserved floors and standing volumes.
+    for (int x=0; x<Config::CHUNK_SIZE_X; ++x)
+        for (int z=0; z<Config::CHUNK_SIZE_Z; ++z) {
+            const int wx=baseX+x, wz=baseZ+z;
+            const auto layers=generator.sampleHeavenLayers(wx,wz);
+            for (const auto& feature : generator.sampleHeavenEcologyFeatures(wx,wz)) {
+                const auto& island=layers[static_cast<size_t>(feature.layer)];
+                for (int y=island.top+feature.bottomOffset; y<=island.top+feature.topOffset; ++y) {
+                    const BlockId current=chunk.getBlock(x,y,z);
+                    if (feature.replacesSurface || current==BlockId::AIR ||
+                        isNaturalDecoration(current) || current==BlockId::STARFLOWER ||
+                        current==BlockId::CLOUD_BLOOM || current==BlockId::GLOWSHROOM)
+                        setLocal(wx,y,wz,feature.block);
+                }
+                if (feature.block==BlockId::WATER)
+                    setLocal(wx,island.top+1,wz,BlockId::AIR);
+            }
+        }
+
     // Rare coordinate-owned shrines provide a long-distance landmark. The
     // anchor is selected from a wide cell, but every piece is written through
     // setIfAir so the exact same structure appears regardless of chunk order.
@@ -1271,6 +1377,25 @@ void WorldGenerator::populateHeaven(
             placeSkyway(*skyway);
         }
     }
+    // Structures may clear terrain beneath a previously placed plant. Reconcile
+    // new vegetation against final support, using the same rules as placement.
+    for (int x=0; x<Config::CHUNK_SIZE_X; ++x)
+        for (int z=0; z<Config::CHUNK_SIZE_Z; ++z) {
+            const auto layers=generator.sampleHeavenLayers(baseX+x,baseZ+z);
+            for (const auto& island:layers) {
+                if (!island.present) continue;
+                const int y=island.top+1;
+                const BlockId plant=chunk.getBlock(x,y,z);
+                if (plant>=BlockId::SKY_FERN && plant<=BlockId::CLOUDBERRY_BUSH &&
+                    !supportsBiomePlant(plant,chunk.getBlock(x,y-1,z)))
+                    setLocal(baseX+x,y,baseZ+z,BlockId::AIR);
+                for (int vineY=island.bottom-1; vineY>=island.bottom-2; --vineY)
+                    if (chunk.getBlock(x,vineY,z)==BlockId::HANGING_CLOUD_VINE &&
+                        chunk.getBlock(x,vineY+1,z)==BlockId::AIR)
+                        setLocal(baseX+x,vineY,baseZ+z,BlockId::AIR);
+            }
+        }
+
     // The spawn selector operates on terrain columns before decoration.
     // Reserve its standing volume after every decorative/structure pass.
     setLocal(generator.m_heavenSpawnBlock.x,
@@ -1285,7 +1410,7 @@ void WorldGenerator::populateHeaven(
             int maxY = Config::WORLD_MIN_Y - 1;
             for (int y = Config::WORLD_MAX_Y - 1;
                  y >= Config::WORLD_MIN_Y; --y) {
-                if (chunk.blockAt(x, y, z) != static_cast<uint8_t>(BlockId::AIR)) {
+                if (chunk.blockAt(x, y, z) != static_cast<uint16_t>(BlockId::AIR)) {
                     maxY = y;
                     break;
                 }
@@ -1406,7 +1531,7 @@ void WorldGenerator::generate(Chunk& chunk,
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
             for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::BEDROCK);
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(BlockId::BEDROCK);
             }
 
             for (int y = bedrockTop + 1; y <= height; ++y) {
@@ -1414,7 +1539,7 @@ void WorldGenerator::generate(Chunk& chunk,
                 const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
                     WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
                         Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(
                     deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
             for (int depth = 0; depth <= surface.depth; ++depth) {
@@ -1422,7 +1547,7 @@ void WorldGenerator::generate(Chunk& chunk,
                 const BlockId current = static_cast<BlockId>(
                     chunk.blockAt(x, y, z));
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(
                     SurfaceRules::blockAtDepth(
                         m_seed, worldX, worldZ, depth, surfaceContext));
             }
@@ -1433,14 +1558,14 @@ void WorldGenerator::generate(Chunk& chunk,
                 for (int y = height + 1; y <= waterTop; ++y) {
                     if (y < Config::WORLD_MAX_Y) {
                         chunk.blockAt(x, y, z) =
-                            static_cast<uint8_t>(BlockId::WATER);
+                            static_cast<uint16_t>(BlockId::WATER);
                     }
                 }
                 // Ice: freeze surface water in cold biomes
                 if ((biome == Biome::SNOW_TUNDRA || biome == Biome::TAIGA) &&
                     height + 1 <= Config::ICE_FREEZE_MAX_Y) {
                     chunk.blockAt(x, height + 1, z) =
-                        static_cast<uint8_t>(BlockId::ICE);
+                        static_cast<uint16_t>(BlockId::ICE);
                 }
             }
             chunk.setColumnMaxY(x, z, std::max(height, waterTop));

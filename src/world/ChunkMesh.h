@@ -97,7 +97,7 @@ struct ChunkMesh {
 
     template<typename NeighborFunc, typename LightFunc>
     void build(int chunkWorldX, int chunkWorldZ,
-               const uint8_t* blocks,
+               const uint16_t* blocks,
                const int columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z],
                NeighborFunc&& getNeighbor, LightFunc&& getLight)
     {
@@ -145,7 +145,7 @@ struct ChunkMesh {
         };
 
         struct MaskCell {
-            uint8_t block = 0;
+            uint16_t block = 0;
             uint8_t ao[4] = {3, 3, 3, 3};
             uint8_t sky[4] = {};
             uint8_t light[4] = {};
@@ -259,7 +259,7 @@ struct ChunkMesh {
                         BlockId visible = faceVisible(x, y, z, face);
                         if (visible == BlockId::AIR) continue;
                         MaskCell& cell = mask[u + v * size1];
-                        cell.block = static_cast<uint8_t>(visible);
+                        cell.block = static_cast<uint16_t>(visible);
                         cell.ao[0] = cornerAO(x, y, z, face, -1, -1);
                         cell.ao[1] = cornerAO(x, y, z, face,  1, -1);
                         cell.ao[2] = cornerAO(x, y, z, face,  1,  1);

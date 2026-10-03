@@ -752,8 +752,17 @@ if(BUILD_TESTING)
         src/renderer/RenderDevice.cpp
         src/renderer/StbImageImpl.cpp
         src/world/Block.cpp
-        src/world/Chunk.cpp)
-    target_include_directories(vulkan_decoration_smoke PRIVATE src external/stb)
+        src/world/Chunk.cpp
+        src/world/HeightPipeline.cpp
+        src/world/TreeGenerator.cpp
+        src/world/StructureGenerator.cpp
+        src/world/WorldGenerator.cpp
+        src/world/RegionGenerator.cpp
+        src/world/CaveGenerator.cpp
+        src/world/OreGenerator.cpp
+        src/world/Noise.cpp
+        src/world/BiomeMap.cpp)
+    target_include_directories(vulkan_decoration_smoke PRIVATE src external/stb external/FastNoiseLite)
     target_link_libraries(vulkan_decoration_smoke PRIVATE
         glm::glm minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

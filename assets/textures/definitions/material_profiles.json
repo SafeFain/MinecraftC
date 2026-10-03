@@ -204,6 +204,14 @@
     },
     "cave_glowshroom": {
       "emission": 0.3333333333333333
+    },
+    "star_crystal_lamp": {
+      "emission": 1.0,
+      "pattern": "crystal",
+      "roughness": 0.3
+    },
+    "moonflower": {
+      "emission": 0.26666666666666666
     }
   }
 }

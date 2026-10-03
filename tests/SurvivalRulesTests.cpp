@@ -18,6 +18,48 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    const auto oreDrops=getBlockDrops(BlockId::STAR_CRYSTAL_ORE,
+        {ItemId::WOODEN_PICKAXE,1,0});
+    require(oreDrops.size()==1 && oreDrops[0].id==ItemId::STAR_CRYSTAL_SHARD &&
+            oreDrops[0].count==2 && getBlockDrops(BlockId::STAR_CRYSTAL_ORE,{}).empty(),
+            "star ore requires a pickaxe and drops two shards");
+    const auto berries=getBlockDrops(BlockId::CLOUDBERRY_BUSH,{});
+    require(berries.size()==1 && berries[0].id==ItemId::CLOUDBERRY && berries[0].count==2,
+            "cloudberry bushes provide food rather than renewable bushes");
+    require(getItemProps(ItemId::CLOUDBERRY).food==2 &&
+            getItemProps(ItemId::ROASTED_CLOUDBERRY).food==4 &&
+            getItemProps(ItemId::CLOUDBERRY_BREAD).food==7 &&
+            getItemProps(ItemId::ROASTED_GLOWSHROOM).food==4,
+            "Heaven food values match the resource package");
+    require(findSmeltingRecipe(ItemId::CLOUDBERRY)->output.id==ItemId::ROASTED_CLOUDBERRY &&
+            findSmeltingRecipe(ItemId::GLOWSHROOM)->output.id==ItemId::ROASTED_GLOWSHROOM,
+            "Heaven foods use existing furnace recipes");
+    require(supportsBiomePlant(BlockId::SKY_FERN,BlockId::AETHER_MOSS) &&
+            supportsBiomePlant(BlockId::MOONFLOWER,BlockId::MOONSTONE) &&
+            !supportsBiomePlant(BlockId::SKY_FERN,BlockId::STONE),
+            "Heaven planting uses matching substrates");
+    require(getLightEmission(BlockId::STAR_CRYSTAL_LAMP)==15 &&
+            getLightEmission(BlockId::MOONFLOWER)==4,
+            "Heaven lamp and moonflower emit registered light");
+    std::array<ItemId,9> skyGrid{};
+    skyGrid[0]=ItemId::SKYROOT_PLANKS; skyGrid[1]=ItemId::SKYROOT_PLANKS;
+    skyGrid[2]=ItemId::SKYROOT_PLANKS; skyGrid[3]=ItemId::SKYROOT_PLANKS;
+    const auto skyRecipe=findCraftingRecipe(skyGrid,2,2);
+    require(skyRecipe && skyRecipe->output.id==ItemId::CRAFTING_TABLE,
+            "skyroot planks support foundation crafting");
+    InventoryModel mixedWood;
+    mixedWood.add({ItemId::OAK_PLANKS,2,0});
+    mixedWood.add({ItemId::SKYROOT_PLANKS,2,0});
+    std::array<ItemStack,9> mixedGrid{};
+    require(fillCraftingRecipe(*skyRecipe,mixedWood,mixedGrid,2,2),
+            "recipe guide supports mixed normal and skyroot planks");
+    int retainedSky=0, retainedOak=0;
+    for (const auto& stack:mixedGrid) {
+        retainedSky += stack.id==ItemId::SKYROOT_PLANKS ? stack.count : 0;
+        retainedOak += stack.id==ItemId::OAK_PLANKS ? stack.count : 0;
+    }
+    require(retainedSky==2 && retainedOak==2,
+            "recipe guide preserves wood identity while moving ingredients");
     for (uint16_t raw=225; raw<=252; ++raw) {
         const auto block=static_cast<BlockId>(raw);
         const auto item=itemForBlock(block);
@@ -29,15 +71,15 @@ int main() {
         if (rock) require(getBlockDrops(block,{}).empty(),"new rock requires a pickaxe");
     }
 
-    static_assert(static_cast<uint8_t>(BlockId::FLOWING_LAVA_7) == 88);
-    static_assert(static_cast<uint8_t>(BlockId::LIMESTONE) == 89);
-    static_assert(static_cast<uint8_t>(BlockId::BASALT) == 90);
-    static_assert(static_cast<uint8_t>(BlockId::TUFF) == 91);
-    static_assert(static_cast<uint8_t>(BlockId::COARSE_DIRT) == 92);
-    static_assert(static_cast<uint8_t>(BlockId::MUD) == 93);
-    static_assert(static_cast<uint8_t>(BlockId::PACKED_ICE) == 94);
-    static_assert(static_cast<uint8_t>(BlockId::BLACK_SAND) == 95);
-    static_assert(static_cast<uint8_t>(BlockId::GRANITE) == 96);
+    static_assert(static_cast<uint16_t>(BlockId::FLOWING_LAVA_7) == 88);
+    static_assert(static_cast<uint16_t>(BlockId::LIMESTONE) == 89);
+    static_assert(static_cast<uint16_t>(BlockId::BASALT) == 90);
+    static_assert(static_cast<uint16_t>(BlockId::TUFF) == 91);
+    static_assert(static_cast<uint16_t>(BlockId::COARSE_DIRT) == 92);
+    static_assert(static_cast<uint16_t>(BlockId::MUD) == 93);
+    static_assert(static_cast<uint16_t>(BlockId::PACKED_ICE) == 94);
+    static_assert(static_cast<uint16_t>(BlockId::BLACK_SAND) == 95);
+    static_assert(static_cast<uint16_t>(BlockId::GRANITE) == 96);
     static_assert(static_cast<uint16_t>(ItemId::BLASTLING_SPAWN_EGG) == 134);
     static_assert(static_cast<uint16_t>(ItemId::LIMESTONE) == 135);
     static_assert(static_cast<uint16_t>(ItemId::GRANITE) == 142);
@@ -145,7 +187,7 @@ int main() {
     require(miningSeconds(BlockId::STONE, ironPick, true, false) >
             miningSeconds(BlockId::STONE, ironPick, false, false),
             "underwater mining penalty is represented");
-    require(static_cast<uint8_t>(BlockId::WHEAT_7) == 51 &&
+    require(static_cast<uint16_t>(BlockId::WHEAT_7) == 51 &&
             static_cast<uint16_t>(ItemId::FLINT) < static_cast<uint16_t>(ItemId::OAK_SAPLING),
             "new serialized ids append after existing values");
     for (uint8_t moisture = 0; moisture <= 7; ++moisture) {
@@ -278,7 +320,7 @@ int main() {
     grid.fill(ItemId::EMPTY);
     grid[0] = ItemId::SKYROOT_LOG;
     const auto* skyrootPlanks = findCraftingRecipe(grid, 1, 1);
-    require(skyrootPlanks && skyrootPlanks->output.id == ItemId::OAK_PLANKS &&
+    require(skyrootPlanks && skyrootPlanks->output.id == ItemId::SKYROOT_PLANKS &&
                 skyrootPlanks->output.count == 4,
             "skyroot logs do not provide Heaven-local crafting progression");
     struct ArchitecturalRecipeCase {
@@ -346,8 +388,8 @@ int main() {
     require(fuelTicks(ItemId::DIAMOND) == 0, "non-fuels are rejected");
 
     // New IDs must remain complete across placement, mining, light and fire.
-    static_assert(static_cast<uint8_t>(BlockId::STONE_BRICKS) == 183);
-    static_assert(static_cast<uint8_t>(BlockId::BLACK_WOOL) == 200);
+    static_assert(static_cast<uint16_t>(BlockId::STONE_BRICKS) == 183);
+    static_assert(static_cast<uint16_t>(BlockId::BLACK_WOOL) == 200);
     static_assert(static_cast<uint16_t>(ItemId::STONE_BRICKS) == 183);
     static_assert(static_cast<uint16_t>(ItemId::BONE_MEAL) == 208);
     for (uint16_t raw = 183; raw <= 200; ++raw) {

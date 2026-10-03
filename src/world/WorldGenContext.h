@@ -6,8 +6,9 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 16;
-    // v16 expands surface and cave ecology. Only current-generation worlds
+    static constexpr uint32_t GENERATION_VERSION = 17;
+    // v17 adds Heaven v9 ecology and 16-bit block storage, retaining v16 Overworld output.
+    // Only current-generation worlds
     // can load; old files remain listed but are never migrated.
     static constexpr bool canLoadGeneration(uint32_t version) {
         return version == GENERATION_VERSION;

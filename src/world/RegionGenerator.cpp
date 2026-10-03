@@ -394,7 +394,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
             const int bedrockTop = Config::WORLD_MIN_Y + static_cast<int>(
                 WorldGenContext::hashPosition(m_seed, worldX, 0, worldZ) % 5);
             for (int y = Config::WORLD_MIN_Y; y <= bedrockTop; ++y) {
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(BlockId::BEDROCK);
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(BlockId::BEDROCK);
             }
 
             for (int y = bedrockTop + 1; y <= height; ++y) {
@@ -402,7 +402,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 const bool deepslate = y <= 0 || (y < Config::DEEPSLATE_DEPTH &&
                     WorldGenContext::hashPosition(m_seed, worldX, y, worldZ) %
                         Config::DEEPSLATE_DEPTH >= static_cast<uint64_t>(y));
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(
                     deepslate ? BlockId::DEEPSLATE : BlockId::STONE);
             }
             for (int depth = 0; depth <= surface.depth; ++depth) {
@@ -410,7 +410,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 const BlockId current = static_cast<BlockId>(
                     chunk.blockAt(x, y, z));
                 if (current != BlockId::STONE && current != BlockId::DEEPSLATE) continue;
-                chunk.blockAt(x, y, z) = static_cast<uint8_t>(
+                chunk.blockAt(x, y, z) = static_cast<uint16_t>(
                     SurfaceRules::blockAtDepth(
                         m_seed, worldX, worldZ, depth, surfaceContext));
             }
@@ -421,14 +421,14 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                 for (int y = height + 1; y <= waterTop; ++y) {
                     if (y < Config::WORLD_MAX_Y) {
                         chunk.blockAt(x, y, z) =
-                            static_cast<uint8_t>(BlockId::WATER);
+                            static_cast<uint16_t>(BlockId::WATER);
                     }
                 }
                 // Ice in cold biomes
                 if ((biome == Biome::SNOW_TUNDRA || biome == Biome::TAIGA) &&
                     height + 1 <= Config::ICE_FREEZE_MAX_Y) {
                     chunk.blockAt(x, height + 1, z) =
-                        static_cast<uint8_t>(BlockId::ICE);
+                        static_cast<uint16_t>(BlockId::ICE);
                 }
             }
             chunk.setColumnMaxY(x, z, std::max(height, waterTop));

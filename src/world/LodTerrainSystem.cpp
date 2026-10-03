@@ -21,7 +21,7 @@
 #include <type_traits>
 
 namespace {
-constexpr uint32_t CACHE_REVISION = 4;
+constexpr uint32_t CACHE_REVISION = 5;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
 
 using Bytes = std::vector<uint8_t>;
@@ -69,7 +69,7 @@ Bytes encodeTile(const LodTileData& tile) {
         for (size_t i = 0; i < column.spans.size(); ++i) {
             append<int16_t>(payload, column.spans[i].bottom);
             append<int16_t>(payload, column.spans[i].top);
-            append<uint8_t>(payload, static_cast<uint8_t>(column.spans[i].block));
+            append<uint16_t>(payload, static_cast<uint16_t>(column.spans[i].block));
         }
     }
     return payload;
@@ -88,12 +88,12 @@ bool decodeTile(const Bytes& payload, LodTileData& tile) {
         column.spans.reserve(count);
         for (uint16_t i = 0; i < count; ++i) {
             LodSpan span;
-            uint8_t block = 0;
+            uint16_t block = 0;
             if (!read(payload, cursor, span.bottom) ||
                 !read(payload, cursor, span.top) ||
                 !read(payload, cursor, block) ||
                 span.bottom > span.top ||
-                block >= static_cast<uint8_t>(BlockId::COUNT))
+                block >= static_cast<uint16_t>(BlockId::COUNT))
                 return false;
             span.block = static_cast<BlockId>(block);
             column.spans.push_back(span);
@@ -190,18 +190,7 @@ LodExactNeighborTiles readExactNeighbors(const std::filesystem::path& root,
 }
 
 BlockId heavenSurface(WorldGenerator::HeavenBiome biome) {
-    switch (biome) {
-        case WorldGenerator::HeavenBiome::SunstoneHeights:
-        case WorldGenerator::HeavenBiome::MoonpearlTerrace:
-            return BlockId::SUNSTONE;
-        case WorldGenerator::HeavenBiome::StarCrystalGarden:
-        case WorldGenerator::HeavenBiome::GlimmerFen:
-            return BlockId::MOSS;
-        case WorldGenerator::HeavenBiome::SkystoneBarrens:
-            return BlockId::CLOUDSTONE;
-        default:
-            return BlockId::AETHER_GRASS;
-    }
+    return WorldGenerator::heavenSurfaceBlock(biome);
 }
 
 BlockId lodTreeFoliage(TreeType type) {
@@ -234,7 +223,8 @@ bool isLodTreeFoliage(BlockId block) {
 
 bool isFineHeavenDecoration(BlockId block) {
     return block == BlockId::STARFLOWER || block == BlockId::CLOUD_BLOOM ||
-           block == BlockId::GLOWSHROOM;
+           block == BlockId::GLOWSHROOM ||
+           (block >= BlockId::SKY_FERN && block <= BlockId::HANGING_CLOUD_VINE);
 }
 
 int lodTreeRadius(TreeType type) {
@@ -501,7 +491,13 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                 [surfaceTop](const LodSpan& span) {
                                     return span.top == surfaceTop;
                                 });
-                            if (found != column.spans.end()) found->block = feature.block;
+                            if (found != column.spans.end()) {
+                                if (found->bottom < surfaceTop) {
+                                    found->top = static_cast<int16_t>(surfaceTop-1);
+                                    column.spans.push_back({static_cast<int16_t>(surfaceTop),
+                                        static_cast<int16_t>(surfaceTop),feature.block});
+                                } else found->block=feature.block;
+                            }
                             continue;
                         }
                         const int bottom = surfaceTop + feature.bottomOffset;
@@ -587,7 +583,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     return tile;
 }
 
-LodTileData extractExactLodChunk(const std::vector<uint8_t>& blocks) {
+LodTileData extractExactLodChunk(const std::vector<uint16_t>& blocks) {
     LodTileData tile;
     if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME)) return tile;
     auto index = [](int x, int y, int z) {
@@ -734,7 +730,7 @@ BlockId exactColumnBlock(const LodColumn& column, int y) {
 ChunkMesh buildExactLodTileMesh(const LodTileData& data,
                                 const LodExactNeighborTiles* neighbors,
                                 bool sealTileEdges) {
-    std::vector<uint8_t> blocks(static_cast<size_t>(Config::CHUNK_VOLUME), 0);
+    std::vector<uint16_t> blocks(static_cast<size_t>(Config::CHUNK_VOLUME), 0);
     int columnMaxY[Config::CHUNK_SIZE_X][Config::CHUNK_SIZE_Z];
     for (auto& column : columnMaxY)
         std::fill(std::begin(column), std::end(column), Config::WORLD_MIN_Y - 1);
@@ -749,7 +745,7 @@ ChunkMesh buildExactLodTileMesh(const LodTileData& data,
                 const int top = std::min<int>(span.top, Config::WORLD_MAX_Y - 1);
                 for (int y = bottom; y <= top; ++y)
                     blocks[static_cast<size_t>(index(x, y, z))] =
-                        static_cast<uint8_t>(span.block);
+                        static_cast<uint16_t>(span.block);
                 columnMaxY[x][z] = std::max(columnMaxY[x][z], top);
             }
         }
@@ -991,7 +987,7 @@ LodTerrainSystem::~LodTerrainSystem() {
 
 void LodTerrainSystem::setSaveStore(SaveStore* store) {
     m_saveStore = store;
-    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r4" /
+    m_cacheRoot = store ? store->worldDirectory() / "lod" / "r5" /
         ("d_" + std::to_string(static_cast<int>(m_generator
             ? m_generator->dimension() : DimensionId::Overworld)))
         : std::filesystem::path{};
@@ -1015,7 +1011,7 @@ void LodTerrainSystem::reset(WorldGenerator* generator) {
     m_generator = generator;
     m_nextRequestLevel = 0;
     if (m_saveStore && m_generator) {
-        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r4" /
+        m_cacheRoot = m_saveStore->worldDirectory() / "lod" / "r5" /
             ("d_" + std::to_string(static_cast<int>(m_generator->dimension())));
     }
     ++m_epoch;
@@ -1335,7 +1331,8 @@ void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunk
         const uint64_t revision = chunk->dataRevision();
         const auto found = m_exactRevisions.find(packed);
         if (found != m_exactRevisions.end() && found->second == revision) continue;
-        std::vector<uint8_t> blocks, light;
+        std::vector<uint16_t> blocks;
+        std::vector<uint8_t> light;
         chunk->copyRawState(blocks, light);
         m_exactRevisions[packed] = revision;
         const int cx = chunk->cx, cz = chunk->cz;

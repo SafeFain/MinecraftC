@@ -318,7 +318,7 @@ void ChunkStreamer::enqueueCacheReads() {
         ChunkStreamer* streamer = this;
         m_cacheIo.enqueue([streamer, directory, key, epoch, cacheVersion] {
             bool hit = false;
-            std::vector<uint8_t> blocks;
+            std::vector<uint16_t> blocks;
             std::vector<BlockOverride> overrides;
             std::vector<PersistedBlockEntity> blockEntities;
             std::vector<WorldMetadata::PersistedEntity> entities;
@@ -445,7 +445,7 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
     const int cx = chunk->cx;
     const int cz = chunk->cz;
     const uint64_t epoch = m_streamEpoch;
-    const std::vector<uint8_t> blocks = chunk->baseSnapshot();
+    const std::vector<uint16_t> blocks = chunk->baseSnapshot();
     ++m_cacheWriteTasksInFlight;
     ChunkStreamer* streamer = this;
     m_cacheIo.enqueue([streamer, directory, cx, cz, epoch, blocks, cacheVersion] {

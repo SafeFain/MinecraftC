@@ -104,6 +104,8 @@ public:
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }
+    static BlockId heavenSurfaceBlock(HeavenBiome biome);
+    std::vector<HeavenLodFeature> sampleHeavenEcologyFeatures(int worldX, int worldZ) const;
     HeavenBiome heavenBiomeAt(int worldX, int worldZ) const;
     std::array<HeavenIslandColumn, HEAVEN_LAYER_COUNT> sampleHeavenLayers(
         int worldX, int worldZ) const;
@@ -127,7 +129,7 @@ public:
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
-    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 8;
+    static constexpr uint32_t HEAVEN_GENERATION_VERSION = 9;
     static constexpr uint32_t HEAVEN_CHUNK_CACHE_VERSION =
         (HEAVEN_GENERATION_VERSION << 16) | 1u;
 

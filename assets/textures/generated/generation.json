@@ -25,6 +25,10 @@
       "effective_seed": 213785369,
       "sha256": "9ed15f96fcb5a6b984a0eebfac673f96e42783a24c545b418c3674763469d280"
     },
+    "aether_moss": {
+      "effective_seed": 213785369,
+      "sha256": "8001a6ffd067b250bf788d8688cfbeb51a76ad10e1108c78cb3d8aa7e5883737"
+    },
     "aether_soil": {
       "effective_seed": 213785369,
       "sha256": "86c42eb8aab5e0bb06ab8d1df89e12f4e4870818ab674f4e613f6018a2940e6c"
@@ -197,9 +201,17 @@
       "effective_seed": 213785369,
       "sha256": "f29b5bd40b39824644960dd1566e36b4b9732fdcf5321486943237a7ec9143e1"
     },
+    "cloudberry_bush": {
+      "effective_seed": 213785369,
+      "sha256": "e04c3f320077fda2128055b33da8bd242b4ba2d75e9196d3ef9d182aceaca088"
+    },
     "cloudstone": {
       "effective_seed": 213785369,
       "sha256": "1f15cf40382f1546619714995330a59b54827c1bcc88b38ed3cccf00c54d92b6"
+    },
+    "cloudstone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "a61e47110a0aa9fa865333184bbd462fb7b6fd9e40282f19003aeb4c82d18280"
     },
     "clover": {
       "effective_seed": 213785369,
@@ -272,6 +284,10 @@
     "dandelion": {
       "effective_seed": 213785369,
       "sha256": "94a903260d446a94eb105b5c90434aef073327b0a6e9733ef557c84da594a03b"
+    },
+    "dawn_bell": {
+      "effective_seed": 213785369,
+      "sha256": "2802573ecac8904ad42fc4cb313c852859c7d32b216bf1bb041cf95bb018cc93"
     },
     "dead_bush": {
       "effective_seed": 213785369,
@@ -381,6 +397,14 @@
       "effective_seed": 213785369,
       "sha256": "dce1a61245c4898714b2ad4cd822e9ab0aaddc483fdd1049b714dd2ab2a5362e"
     },
+    "glimmer_reed": {
+      "effective_seed": 213785369,
+      "sha256": "0ac63ce73b0988390c97d0b8ebeb099e12f60bb2c568f2a132af25e2424afb74"
+    },
+    "glimmer_silt": {
+      "effective_seed": 213785369,
+      "sha256": "5d19b976bf1f699240d671c8cf7693c3fd43ae589f0203a0c4708c7976da0c82"
+    },
     "glow_fern": {
       "effective_seed": 213785369,
       "sha256": "9b648ebd1f9177a456f8dc1f002bc97889ebaa14fb98e704964db2f4097c5094"
@@ -436,6 +460,10 @@
     "gypsum": {
       "effective_seed": 213785369,
       "sha256": "e12082ba384bf4d7f8d6744b8274fffede16ce7b7a334c023090fa9414c7f429"
+    },
+    "hanging_cloud_vine": {
+      "effective_seed": 213785369,
+      "sha256": "6e6c030c052233bb6f7af793a6c158ecb4b2cf36bd4eb554c675c6a04faf2142"
     },
     "hanging_roots": {
       "effective_seed": 213785369,
@@ -524,6 +552,18 @@
     "marble": {
       "effective_seed": 213785369,
       "sha256": "ead8c53cecc6bfb638ab0f9bcbb6742a7ca748ada2cc904ecdbcca8d684939da"
+    },
+    "moonflower": {
+      "effective_seed": 213785369,
+      "sha256": "ef3ccb442d772a0e2971f33bb477725057c2d6351995c096fcc413f64de186ee"
+    },
+    "moonstone": {
+      "effective_seed": 213785369,
+      "sha256": "884126ab2fb0c48db24acefbeede4199b2ff90f9391ab6f111a36a072de8f04d"
+    },
+    "moonstone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "a46596d066c9e08cfccafef49f251797156460d27245435af5a4581429d0c7cb"
     },
     "moss": {
       "effective_seed": 213785369,
@@ -669,6 +709,10 @@
       "effective_seed": 213785369,
       "sha256": "61e8bb91a166a21704154f903035598488147042018c51254e4b380f7e5bc19c"
     },
+    "sky_fern": {
+      "effective_seed": 213785369,
+      "sha256": "3e4a8e62a9b5976be097e9ed8a1dd39e061419315c1a1ab807a8ed398f44f88b"
+    },
     "skyroot_leaves": {
       "effective_seed": 213785369,
       "sha256": "b5b17573e36b9c84ccd8feb715f7d3f81afcd4c87fac94dacd7a1c46c4ba27a1"
@@ -680,6 +724,14 @@
     "skyroot_log_top": {
       "effective_seed": 213785369,
       "sha256": "e058388699263d2b43f57198f2ba85bfce937e8a49d84ce94e19083b1655b36c"
+    },
+    "skyroot_planks": {
+      "effective_seed": 213785369,
+      "sha256": "a23c737ebd6ce4d92ac470152e0aead77e40915f269983993d833ef558498fff"
+    },
+    "skystone": {
+      "effective_seed": 213785369,
+      "sha256": "ba914867ff0f72b4fd280c335eea6590432f9cdec54955598e45cf762af88cbe"
     },
     "small_cactus": {
       "effective_seed": 213785369,
@@ -733,6 +785,14 @@
       "effective_seed": 213785369,
       "sha256": "04757a555332b09d1c53b8ff27933fde5d20e79480fc9672f39106afc2f656a3"
     },
+    "star_crystal_lamp": {
+      "effective_seed": 213785369,
+      "sha256": "c1ba1a7ed2f0b53d97e27e9e7daf6c8085a5b8e1c441fa86565f16d9baa8a840"
+    },
+    "star_crystal_ore": {
+      "effective_seed": 213785369,
+      "sha256": "fa581e81fc94eac1ce121718dbcb0ab4bef2eb6d147cc6f64796e57f0f292253"
+    },
     "starflower": {
       "effective_seed": 213785369,
       "sha256": "d4853a02df291fad417900433ae06b33826834669c2012bf3654728f90afcbe0"
@@ -764,6 +824,10 @@
     "sunstone": {
       "effective_seed": 213785369,
       "sha256": "75f588dde27d78b67716eefde6e870ba5858bf2a1bdfbcd6b74565f648caac6e"
+    },
+    "sunstone_bricks": {
+      "effective_seed": 213785369,
+      "sha256": "ab0f4a9f7e39543997cc0561dddccc9c922cf789f7550d9ea4ebb39bf1143d46"
     },
     "tall_grass": {
       "effective_seed": 213785369,

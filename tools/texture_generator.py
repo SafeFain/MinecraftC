@@ -134,6 +134,11 @@ ECOLOGY_BASES = {'andesite': (124, 128, 121), 'diorite': (199, 198, 185), 'gneis
 ECOLOGY_PLANTS = ('clover', 'heather', 'wild_mint', 'nettle', 'desert_flower', 'small_cactus', 'reed_flower', 'tundra_moss', 'fallen_twigs', 'jungle_fern', 'amethyst_cluster', 'quartz_cluster', 'cave_glowshroom')
 NAMES += ['andesite', 'diorite', 'gneiss', 'marble', 'laterite', 'red_clay', 'cracked_mud', 'salt_crust', 'clover', 'heather', 'wild_mint', 'nettle', 'desert_flower', 'small_cactus', 'reed_flower', 'tundra_moss', 'fallen_twigs', 'jungle_fern', 'cave_moss', 'wet_limestone', 'gypsum', 'amethyst_block', 'quartz_block', 'iron_stained_rock', 'sulfur_rock', 'amethyst_cluster', 'quartz_cluster', 'cave_glowshroom']
 
+# Heaven v9: append slots, using existing structural recipes with exclusive palettes.
+HEAVEN_TEXTURES = {'moonstone': 'marble', 'skystone': 'andesite', 'aether_moss': 'cave_moss', 'glimmer_silt': 'silt', 'star_crystal_ore': 'diamond_ore', 'skyroot_planks': 'oak_planks', 'cloudstone_bricks': 'stone_bricks', 'sunstone_bricks': 'bricks', 'moonstone_bricks': 'stone_bricks', 'star_crystal_lamp': 'amethyst_block', 'sky_fern': 'fern', 'dawn_bell': 'bellflower', 'moonflower': 'alpine_flower', 'glimmer_reed': 'reed_flower', 'cloudberry_bush': 'wild_mint', 'hanging_cloud_vine': 'hanging_roots'}
+HEAVEN_COLORS = {'moonstone': (213, 219, 235), 'skystone': (116, 153, 179), 'aether_moss': (109, 177, 157), 'glimmer_silt': (96, 136, 143), 'star_crystal_ore': (100, 178, 206), 'skyroot_planks': (191, 154, 106), 'cloudstone_bricks': (202, 217, 230), 'sunstone_bricks': (232, 194, 114), 'moonstone_bricks': (215, 223, 240), 'star_crystal_lamp': (133, 230, 242), 'sky_fern': (107, 182, 168), 'dawn_bell': (244, 199, 124), 'moonflower': (180, 187, 245), 'glimmer_reed': (123, 211, 195), 'cloudberry_bush': (135, 187, 166), 'hanging_cloud_vine': (125, 187, 204)}
+NAMES += list(HEAVEN_TEXTURES)
+
 def _read_definition(path):
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -275,6 +280,8 @@ TRANSPARENT = {"tall_grass","flower","reeds","torch","wheat_young","wheat_middle
                "blue_orchid","allium","oxeye_daisy","sunflower_bottom",
                "sunflower_top", "starflower", "cloud_bloom", "glowshroom",
                "hanging_roots", "glow_fern", "resonant_crystal"}
+
+TRANSPARENT.update(list(HEAVEN_TEXTURES)[10:])
 
 def _srgb_to_linear(value):
     value = value / 255.0
@@ -731,6 +738,7 @@ PLANTS={"tall_grass","flower","reeds","torch","wheat_young","wheat_middle","whea
 
 PLANTS.update(BIOME_PLANTS)
 PLANTS.update(ECOLOGY_PLANTS)
+PLANTS.update(list(HEAVEN_TEXTURES)[10:])
 
 def generate_special(name,seed,indices):
     if name in {"grass_side", "aether_grass_side"}:
@@ -1220,6 +1228,7 @@ def generate_ecology_texture(name, seed):
     return center_periodic_tile([palette[max(0,min(5,int(i)))] for i in indices])
 
 
+# Mineral pixels use three stone roles followed by three cyan crystal roles.
 class SemanticColor(tuple):
     """A palette choice carries its structural role through drawing/translation."""
     def __new__(cls, rgba, role):
@@ -1228,6 +1237,18 @@ class SemanticColor(tuple):
         return value
 
 
+for _name, _base in HEAVEN_TEXTURES.items():
+    PALETTES[_name] = list(PALETTES[_base])
+    _roles = _role_palette(HEAVEN_COLORS[_name])
+    if _base in PLANTS:
+        PALETTES[_name][1:7] = _roles
+    else:
+        PALETTES[_name] = _roles
+
+PALETTES["star_crystal_ore"] = list(PALETTES["diamond_ore"])
+PALETTES["star_crystal_ore"][3:] = _role_palette((104,205,227))[3:]
+PALETTES["cloudberry_bush"][6] = (147,169,229,255)
+
 for _name, _palette in PALETTES.items():
     PALETTES[_name] = [SemanticColor(color, role) for role, color in enumerate(_palette)]
 STRUCTURE_PALETTES = dict(PALETTES)
@@ -1235,6 +1256,18 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in HEAVEN_TEXTURES:
+        base = HEAVEN_TEXTURES[name]
+        original = generate_texture(base, local)
+        source_palette = PALETTES[base]
+        target_palette = PALETTES[name]
+        pixels = [target_palette[min(range(len(source_palette)),
+            key=lambda i: sum((p[c]-source_palette[i][c])**2 for c in range(4)))]
+            for p in original]
+        if name == "cloudberry_bush":
+            for px, py in ((5, 5), (9, 7), (7, 10)):
+                _paint_rect(pixels, px, py, px+1, py+1, PALETTES[name][6])
+        return pixels
     if name in ECOLOGY_BASES:
         pixels=generate_ecology_texture(name,local)
     elif name in BIOME_BASES or name in {"dry_grass_side", "leaf_litter_side"}:

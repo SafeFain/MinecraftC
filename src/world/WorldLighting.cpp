@@ -41,7 +41,7 @@ void WorldLighting::rebuild() {
         std::unordered_set<Chunk*> lightChanged;
         store.forEachUniqueUnlocked([&](Chunk* chunk) {
             if (!chunk->generated.load()||chunk->lightingInitialized.load()) return;
-            std::vector<uint8_t> blocks;
+            std::vector<uint16_t> blocks;
             chunk->copyRawBlocks(blocks);
             std::vector<uint8_t> directLight(
                 static_cast<size_t>(Config::CHUNK_VOLUME), 0);

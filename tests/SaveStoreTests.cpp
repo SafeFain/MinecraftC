@@ -193,6 +193,14 @@ int main() {
                     ecologyRoundTrip.inventory.slot(raw-233).count == 64,
                     "v16 item IDs above 255 survive serialization");
 
+        WorldMetadata heavenInventory=source;
+        for (uint16_t raw=261; raw<=281; ++raw)
+            heavenInventory.inventory.slot(raw-261)={static_cast<ItemId>(raw),64,0};
+        store.saveMetadata(heavenInventory);
+        const auto heavenRoundTrip=store.loadMetadata();
+        for (uint16_t raw=261; raw<=281; ++raw)
+            require(heavenRoundTrip.inventory.slot(raw-261).id==static_cast<ItemId>(raw),
+                    "Heaven resource and food IDs survive metadata serialization");
         WorldMetadata replacement = source;
         replacement.worldTicks += 1;
         store.saveMetadata(replacement);
@@ -271,14 +279,14 @@ int main() {
             {517, BlockId::STONE_BRICKS},
             {518, BlockId::BLACK_WOOL}
         };
-        for (uint16_t raw = 201; raw <= 252; ++raw)
+        for (uint16_t raw = 201; raw <= 268; ++raw)
             overrides.push_back({static_cast<uint32_t>(520+raw), static_cast<BlockId>(raw)});
         store.saveChunkOverrides(-2, -7, overrides);
         const auto loadedOverrides = store.loadChunkOverrides(-2, -7);
-        require(loadedOverrides.size() == 60, "chunk overrides round trip");
+        require(loadedOverrides.size() == 76, "chunk overrides round trip");
         for (size_t i = 8; i < loadedOverrides.size(); ++i)
             require(loadedOverrides[i].block == static_cast<BlockId>(201+i-8),
-                    "all v16 natural block IDs survive serialization");
+                    "old and high-ID natural blocks survive serialization");
         require(loadedOverrides[6].block == BlockId::STONE_BRICKS &&
                 loadedOverrides[7].block == BlockId::BLACK_WOOL,
                 "appended decoration block IDs survive save round trip");
@@ -296,15 +304,15 @@ int main() {
         require(store.loadChunkOverrides(4, 9).empty(),
                 "unmodified chunks have no overrides");
 
-        std::vector<uint8_t> generated(Config::CHUNK_VOLUME,
-                                       static_cast<uint8_t>(BlockId::STONE));
+        std::vector<uint16_t> generated(Config::CHUNK_VOLUME,
+                                       static_cast<uint16_t>(BlockId::STONE));
         store.saveGeneratedChunk(-2,-7,generated,(WorldGenContext::GENERATION_VERSION << 16));
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::CHUNK_CACHE_VERSION) &&
-                store.loadChunkOverrides(-2,-7).size() == 60,
+                store.loadChunkOverrides(-2,-7).size() == 76,
                 "current generation rejects an obsolete cache revision while retaining overrides");
-        generated.front() = static_cast<uint8_t>(BlockId::BEDROCK);
-        generated.back() = static_cast<uint8_t>(BlockId::AIR);
-        generated[513] = static_cast<uint8_t>(BlockId::BASALT);
+        generated.front() = static_cast<uint16_t>(BlockId::BEDROCK);
+        generated.back() = static_cast<uint16_t>(BlockId::AIR);
+        generated[513] = static_cast<uint16_t>(BlockId::BASALT);
         store.saveGeneratedChunk(-2, -7, generated,
                                  WorldGenContext::GENERATION_VERSION);
         const auto loadedGenerated = store.loadGeneratedChunk(
@@ -335,6 +343,7 @@ int main() {
         std::copy(generated.begin(), generated.end(), legacyPayload.begin() + 16);
         auto legacyBytes = compressedBytes;
         legacyBytes.resize(24 + legacyPayload.size());
+        writeLittleEndian(legacyBytes, 8, 12, 4);
         std::copy(legacyPayload.begin(), legacyPayload.end(), legacyBytes.begin() + 24);
         writeLittleEndian(legacyBytes, 12,
                           static_cast<uint32_t>(legacyPayload.size()), 4);
@@ -349,11 +358,40 @@ int main() {
         require(loadedLegacy && *loadedLegacy == generated,
                 "pre-codec raw generated cache remains readable");
 
+        generated[0]=255; generated[1]=256;
+        generated[2]=static_cast<uint16_t>(BlockId::HANGING_CLOUD_VINE);
+        store.saveGeneratedChunk(-2,-7,generated,WorldGenContext::GENERATION_VERSION);
+        require(store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION)==generated,
+                "16-bit RLE preserves IDs at and above byte boundary");
+        const auto validWide=readBytes(generatedPath);
+        const auto writeWideFixture=[&](std::vector<uint8_t> bytes) {
+            writeLittleEndian(bytes,12,static_cast<uint32_t>(bytes.size()-24),4);
+            writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            std::ofstream file(generatedPath,std::ios::binary|std::ios::trunc);
+            file.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        };
+        auto invalidWide=validWide;
+        writeLittleEndian(invalidWide,47,static_cast<uint16_t>(BlockId::COUNT),2);
+        writeWideFixture(invalidWide);
+        require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
+                "checksummed RLE rejects an out-of-range 16-bit ID");
+        invalidWide=validWide;
+        writeLittleEndian(invalidWide,45,0,2);
+        writeWideFixture(invalidWide);
+        require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
+                "checksummed RLE rejects zero-length runs");
+        invalidWide=validWide;
+        invalidWide.pop_back();
+        writeLittleEndian(invalidWide,41,static_cast<uint32_t>(invalidWide.size()-45),4);
+        writeWideFixture(invalidWide);
+        require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
+                "checksummed RLE rejects a truncated 16-bit value");
+        writeWideFixture(validWide);
         // An incompressible block stream uses the raw fallback marker rather
         // than growing by the codec header and run table.
-        std::vector<uint8_t> incompressible(Config::CHUNK_VOLUME);
+        std::vector<uint16_t> incompressible(Config::CHUNK_VOLUME);
         for (size_t i = 0; i < incompressible.size(); ++i)
-            incompressible[i] = static_cast<uint8_t>(i %
+            incompressible[i] = static_cast<uint16_t>(i %
                 static_cast<size_t>(BlockId::COUNT));
         store.saveGeneratedChunk(-3, 4, incompressible,
                                  WorldGenContext::GENERATION_VERSION);

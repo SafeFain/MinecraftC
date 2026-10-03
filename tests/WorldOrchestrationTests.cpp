@@ -251,7 +251,7 @@ void testAsyncGeneratedCacheRoundTrip() {
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     SaveStore store(root);
-    std::vector<uint8_t> original;
+    std::vector<uint16_t> original;
     {
         ThreadPool pool(2);
         World world;
@@ -303,7 +303,7 @@ void testAsyncGeneratedCacheRoundTrip() {
         const Chunk* cached = reopened.getChunk(0, 0);
         require(cached != nullptr && cached->generated.load(),
                 "cached chunk remains generated after publication");
-        const std::vector<uint8_t> roundTrip(
+        const std::vector<uint16_t> roundTrip(
             cached->rawBlocks(), cached->rawBlocks() + Config::CHUNK_VOLUME);
         require(roundTrip == original,
                 "compressed cache round-trips terrain bytes exactly");
@@ -1176,7 +1176,7 @@ void testGeneratedStructureWorkBlocks() {
         size_t missingEntities = 0;
         for (const Chunk* chunk : world.getActiveChunks()) {
             if (chunk == nullptr || !chunk->generated.load()) continue;
-            std::vector<uint8_t> blocks(chunk->rawBlocks(),
+            std::vector<uint16_t> blocks(chunk->rawBlocks(),
                                         chunk->rawBlocks() + Config::CHUNK_VOLUME);
             for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
                 for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
