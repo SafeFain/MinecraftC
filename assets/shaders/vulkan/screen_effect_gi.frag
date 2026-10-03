@@ -45,18 +45,17 @@ void main(){
     vec3 ray=normalize(farPoint.xyz/farPoint.w-
         (gi.cameraWorld.xyz-gi.currentWorldOrigin.xyz));
     vec3 world=gi.cameraWorld.xyz+ray*abs(surface.z);
-    float coverage=0.0;
     vec4 receiver=texelFetch(receiverAlbedo,surfacePixel,0);
-    vec3 current=traceGi(world,normal,coverage)*receiver.rgb;
-    if(receiver.a>0.5)current=vec3(0.0);
+    if(receiver.a>0.5){outEffects=vec4(0,0,0,ao);return;}
     vec3 localPrevious=world-gi.previousWorldOrigin.xyz;
     vec4 previousClip=gi.previousViewProjection*vec4(localPrevious,1.0);
     vec2 previousUv=previousClip.xy/max(previousClip.w,0.0001)*0.5+0.5;
     bool inside=previousClip.w>0.0&&all(greaterThan(previousUv,vec2(0.002)))&&
         all(lessThan(previousUv,vec2(0.998)));
     float weight=0.0;
-    vec3 history=current;
-    if(inside&&gi.temporal.y>0.5&&coverage>0.05){
+    vec3 history=vec3(0);
+    float historyConfidence=0.0;
+    if(inside&&gi.temporal.y>0.5&&gi.temporal.z>0.0){
         float previousDistance=length(world-gi.previousCameraWorld.xyz);
         ivec2 size=textureSize(previousHistory,0);
         vec2 pixel=previousUv*vec2(size)-0.5;
@@ -76,13 +75,34 @@ void main(){
         }
         if(accepted>0.01){
             history=sum/accepted;
-            float change=length(history-current)/max(length(current)+0.03,0.03);
-            vec3 extent=max(vec3(0.03),abs(current)*0.45+vec3(0.04));
-            history=clamp(history,current-extent,current+extent);
-            weight=gi.temporal.z*coverage*min(accepted,1.0)*
-                (1.0-smoothstep(0.15,0.60,change));
+            historyConfidence=min(accepted,1.0);
         }
     }
+    ivec2 effectPixel=ivec2(gl_FragCoord.xy);
+    // Only stationary reprojected receivers skip tracing. Fresh/moving pixels
+    // always evaluate all cones, including disocclusions and revision changes.
+    // Neighboring fragment lanes take the same branch; a pixel checkerboard
+    // leaves half of every wave idle while still executing the full trace.
+    ivec2 refreshTile=effectPixel/max(int(gi.traversal.z),1);
+    bool refresh=((refreshTile.x+refreshTile.y+int(gi.sampling.x))&1)==0;
+    vec2 drift=(previousUv-receiverUv)*vec2(textureSize(previousHistory,0));
+    if(inside&&gi.sampling.y>0.5&&!refresh&&length(drift)<0.25){
+        ivec2 size=textureSize(previousHistory,0);
+        ivec2 tap=clamp(ivec2(previousUv*vec2(size)),ivec2(0),size-1);
+        vec4 guide=texelFetch(previousSurfaceData,tap,0);
+        if(giSurfaceWeight(surface,guide,length(world-gi.previousCameraWorld.xyz),0.008)>0.98){
+            outEffects=vec4(max(texelFetch(previousHistory,tap,0).rgb,vec3(0)),gi.traversal.y>0.5?0.0:ao);return;
+        }
+    }
+    float coverage=0.0;
+    vec3 current=traceGi(world,normal,coverage)*receiver.rgb;
+    if(historyConfidence>0.01&&coverage>0.05){
+        float change=length(history-current)/max(length(current)+0.03,0.03);
+        vec3 extent=max(vec3(0.03),abs(current)*0.45+vec3(0.04));
+        history=clamp(history,current-extent,current+extent);
+        weight=gi.temporal.z*coverage*historyConfidence*
+            (1.0-smoothstep(0.15,0.60,change));
+    }
     vec3 result=mix(current,history,clamp(weight,0.0,0.999));
-    outEffects=vec4(max(result,vec3(0.0)),ao);
+    outEffects=vec4(max(result,vec3(0.0)),gi.traversal.y>0.5?1.0:ao);
 }

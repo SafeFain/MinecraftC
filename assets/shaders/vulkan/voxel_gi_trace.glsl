@@ -17,6 +17,8 @@ layout(set=0,binding=10) uniform GiScreenUniforms {
     vec4 minimumCellAndSize[4];
     vec4 config;
     vec4 temporal;
+    vec4 sampling;
+    vec4 traversal;
 } gi;
 // Validity stays discrete at mip zero. Never interpolate the -1 sentinel
 // with opacity, or wrap a filter footprint across a world-space clipmap edge.
@@ -99,15 +101,27 @@ vec3 radianceFootprint(int level,vec3 world,float diameter,vec3 direction){
     vec3 tangent=normalize(abs(direction.y)<0.9?cross(direction,vec3(0,1,0)):cross(direction,vec3(1,0,0)));
     vec3 bitangent=cross(direction,tangent);
     vec3 sum=vec3(0); float weight=0.0;
+    ivec3 visited[4]; vec4 cachedValues[4]; vec3 cachedRadiance[4]; int visitedCount=0;
     for(int tap=0;tap<4;++tap){
         vec3 point=world+(tangent*(tap%2==0?-1.0:1.0)+bitangent*(tap<2?-1.0:1.0))*diameter*0.25;
         ivec3 cell=ivec3(floor(point/size));
-        vec4 value=fetchCell(level,cell);
-        if(value.a<0.0||dot(point-world,direction)>size*0.01||
+        int index=-1;
+        for(int i=0;i<visitedCount;++i)if(all(equal(visited[i],cell)))index=i;
+        if(index<0){
+            index=visitedCount++;
+            visited[index]=cell; cachedValues[index]=fetchCell(level,cell);
+            cachedRadiance[index]=vec3(0);
+            if(cachedValues[index].a>=0.0){
+                GiAux a=fetchAux(level,cell);
+                cachedRadiance[index]=max(cachedValues[index].rgb-giRgb(a.emission)*1.35,vec3(0))*
+                    giDirectionalWeight(a,-direction);
+            }
+        }
+        // Fetches may be shared, but visibility belongs to each individual tap:
+        // two points in the same coarse cell can lie on opposite sides of a wall.
+        if(cachedValues[index].a<0.0||dot(point-world,direction)>size*0.01||
            !visibleFilterTap(world-direction*0.003,point,level))continue;
-        GiAux a=fetchAux(level,cell);
-        vec3 reflected=max(value.rgb-giRgb(a.emission)*1.35,vec3(0));
-        sum+=reflected*giDirectionalWeight(a,-direction); weight+=1.0;
+        sum+=cachedRadiance[index]; weight+=1.0;
     }
     if(weight>0.0)return sum/weight;
     ivec3 cell=ivec3(floor(world/size));
@@ -134,7 +148,7 @@ vec3 filteredRadiance(int geometryLevel,vec3 world,float diameter,vec3 direction
     // Emission is sampled at the actual geometry intersection, not imported
     // from a wider coarse footprint that could include a source behind a wall.
     GiAux hit=fetchAux(geometryLevel,ivec3(floor(world/gi.minimumCellAndSize[geometryLevel].w)));
-    return reflected+giRgb(hit.emission)*1.35;
+    return reflected*gi.sampling.z+giRgb(hit.emission)*1.35*gi.sampling.w;
 }
 
 vec3 coneDirection(vec3 normal,int index,int count,float rotation){
@@ -143,6 +157,36 @@ vec3 coneDirection(vec3 normal,int index,int count,float rotation){
     vec3 bitangent=cross(normal,tangent);
     float angle=6.2831853*(float(index)/max(float(count),1.0)+rotation);
     return normalize(normal*0.72+(tangent*cos(angle)+bitangent*sin(angle))*0.69);
+}
+
+// A coarse empty cell is safe only with converged source data. Clip the
+// crossing to every finer active window; never jump over a finer-only source.
+float emptyCrossing(vec3 position,vec3 direction,int geometryLevel,float initial){
+    if(gi.traversal.x<0.5)return initial;
+    float distance=initial;
+    for(int level=geometryLevel+1;level<int(gi.config.y);++level){
+        float size=gi.minimumCellAndSize[level].w;
+        ivec3 cell=ivec3(floor(position/size));
+        vec4 value=fetchCell(level,cell);
+        if(value.a<0.0)break;
+        GiAux a=fetchAux(level,cell);
+        if((a.occupiedLo|a.occupiedHi)!=0u)break;
+        float candidate=cellCrossing(position,direction,size);
+        distance=max(distance,candidate);
+    }
+    for(int finer=0;finer<int(gi.config.y);++finer){
+        float fineSize=gi.minimumCellAndSize[finer].w;
+        vec3 minimum=gi.minimumCellAndSize[finer].xyz*fineSize;
+        vec3 maximum=minimum+vec3(gi.config.x*fineSize);
+        for(int axis=0;axis<3;++axis){
+            if(abs(direction[axis])<0.00001)continue;
+            float enter=(minimum[axis]-position[axis])/direction[axis];
+            float leave=(maximum[axis]-position[axis])/direction[axis];
+            if(enter>0.0001)distance=min(distance,enter+0.001);
+            if(leave>0.0001)distance=min(distance,leave+0.001);
+        }
+    }
+    return distance;
 }
 
 vec3 traceCone(vec3 origin,vec3 direction,out float coverage){
@@ -172,7 +216,10 @@ vec3 traceCone(vec3 origin,vec3 direction,out float coverage){
         // every conservative subcell, including oblique thin-wall crossings.
         GiAux a=fetchAux(level,ivec3(floor(position/cellSize)));
         float stepSize=(a.occupiedLo|a.occupiedHi)==0u?cellSize:microSize(level);
-        travel+=cellCrossing(position,direction,stepSize);
+        float crossing=cellCrossing(position,direction,stepSize);
+        if((a.occupiedLo|a.occupiedHi)==0u)
+            crossing=emptyCrossing(position,direction,level,crossing);
+        travel+=crossing;
         knownDistance=min(travel,maximumDistance);
     }
     coverage=1.0-transmittance*(1.0-knownDistance/maximumDistance);

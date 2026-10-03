@@ -160,6 +160,7 @@ struct VulkanSwapchainBundle {
 
     VkSwapchainKHR handle = VK_NULL_HANDLE;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
+    bool captureSupported = false;
     VkFormat sceneFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     VkFormat surfaceFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;

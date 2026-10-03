@@ -17,8 +17,11 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   traversal, conservative subcell occupancy, directional coverage and footprint-based
   radiance filtering, linear atlas reflectance, independent colored emission and
   sun/moon direction injection, partial GPU volume updates, time-based temporal
-  accumulation and surface-guided upsampling
-  while preserving the legacy path when disabled. GI caches survive unrelated
+  accumulation, validated alternating-tile history reuse, conservative empty-cell
+  hierarchy skips and surface-guided upsampling. Reflected and emissive bounce have
+  independent gains; coarse source rebuilds and smooth environment relights are bounded.
+  [GI benchmark and validation](gi-performance.md) records frame percentiles and
+  asynchronous GPU phases, without claiming unmeasured hardware gains. GI preserves the legacy path when disabled. GI caches survive unrelated
   settings changes. It deliberately retains voxel and flat cirrus
   clouds instead of adding volumetric clouds. The basic page owns five complete
   quality presets plus an automatic Custom state; the advanced page independently

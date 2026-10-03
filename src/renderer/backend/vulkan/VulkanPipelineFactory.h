@@ -108,6 +108,8 @@ struct VoxelGiScreenUniforms {
     std::array<glm::vec4, 4> minimumCellAndSize{};
     glm::vec4 config{0.0f};
     glm::vec4 temporal{0.0f};
+    glm::vec4 sampling{0.0f}; // checker phase, reuse, reflected/emissive gains
+    glm::vec4 traversal{0.0f}; // conservative hierarchy enabled
 };
 
 struct VoxelGiInjectConstants {
@@ -152,7 +154,9 @@ static_assert(offsetof(ChunkEnvironmentUniforms, visualParams) == 112);
 static_assert(sizeof(WireUniforms) == 80);
 static_assert(sizeof(UiConstants) == 80);
 static_assert(sizeof(PostConstants) == 128);
-static_assert(sizeof(VoxelGiScreenUniforms) == 288);
+static_assert(sizeof(VoxelGiScreenUniforms) == 320);
+static_assert(offsetof(VoxelGiScreenUniforms, sampling) == 288);
+static_assert(offsetof(VoxelGiScreenUniforms, traversal) == 304);
 static_assert(sizeof(VoxelGiInjectConstants) == 96);
 static_assert(offsetof(VoxelGiInjectConstants, regionOffset) == 64);
 static_assert(offsetof(VoxelGiInjectConstants, regionExtent) == 80);

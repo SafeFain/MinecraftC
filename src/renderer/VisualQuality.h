@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "renderer/RenderEnvironment.h"
+#include "Config.h"
 
 // Ultra keeps its historical serialized value. VeryHigh is appended and the
 // settings UI supplies the human-facing Low -> Medium -> High -> VeryHigh ->
@@ -94,6 +95,13 @@ struct VoxelGiConfig {
     float strength = 1.0f;
     float distance = 64.0f;
     float historyWeight = 0.7125f;
+    bool temporalReuse = true;
+    int reuseTileSize = Config::GI_REUSE_TILE_SIZE;
+    bool emptySpaceSkipping = true;
+    float reflectedGain = Config::GI_REFLECTED_GAIN;
+    float emissionGain = Config::GI_EMISSION_GAIN;
+    size_t coarseVoxelBudget = Config::GI_COARSE_VOXELS_PER_FRAME;
+    int sourceCopiesPerFrame = Config::GI_SOURCE_COPIES_PER_FRAME;
 };
 
 inline constexpr std::array<VisualQuality, 5> VISUAL_QUALITY_ORDER{{

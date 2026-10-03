@@ -128,6 +128,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         VkDescriptorSet computeSet = VK_NULL_HANDLE;
         VoxelGiDirtyRegions dirty;
         size_t validVoxels = 0;
+        VoxelGiInjectConstants lighting{};
+        bool lightingInitialized = false;
         std::vector<uint8_t> albedoBytes;
         std::vector<uint8_t> lightBytes;
     };
@@ -258,6 +260,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         createAllocator();
         LOG_INFO("Vulkan memory allocator initialized");
         createCommandPool();
+        createTimingPools();
         LOG_INFO("Vulkan command pool initialized");
         createDescriptorLayout();
         createDescriptorPool();
@@ -383,17 +386,107 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     std::vector<glm::dvec3> voxelGiPreviousWorldOrigin;
     uint64_t voxelGiLastSceneId = std::numeric_limits<uint64_t>::max();
     glm::dvec3 voxelGiLastCamera{0.0};
-    glm::vec4 voxelGiLastSkyInjection{-1.0f};
-    glm::vec4 voxelGiLastBlockInjection{-1.0f};
-    glm::vec4 voxelGiLastDirectInjection{-1.0f};
-    glm::vec4 voxelGiLastDirectionInjection{-1.0f};
     uint64_t voxelGiHistoryRevision = 1;
     uint64_t voxelGiSourceRevision = 0;
     bool voxelGiContentUpdating = false;
     std::vector<uint64_t> voxelGiPreviousHistoryRevision;
     std::vector<RuntimeClock::Tick> voxelGiPreviousHistoryTime;
+    std::vector<uint32_t> voxelGiHistoryPhase;
+    size_t voxelGiRelightCursor = 0;
+    bool voxelGiEnvironmentUpdating = false;
+    RuntimeClock::Tick voxelGiCacheStart = 0;
+    std::array<VkQueryPool, FRAMES_IN_FLIGHT> timingPools{};
+    std::array<uint64_t, FRAMES_IN_FLIGHT> timingSamples{};
+    uint64_t timingSequence = 0;
+    uint32_t timestampBits = 0;
+    float timestampPeriod = 0;
+    Buffer diagnosticCapture;
+    bool diagnosticCapturePending = false;
+    VkExtent2D diagnosticCaptureExtent{};
+    std::optional<VoxelGiConfig> diagnosticGiConfig;
+    bool diagnosticGiReuseMask = false;
     bool sceneFinished = false;
     RendererPerformanceStats performance{};
+
+    VoxelGiConfig effectiveVoxelGiConfig() const {
+        return diagnosticGiConfig.value_or(voxelGiConfig(visualQuality, enhancedVisualSettings));
+    }
+
+    void recordDiagnosticCapture(VkCommandBuffer command, uint32_t imageIndex) {
+        if (!diagnosticCapturePending) return;
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = swapchain.images[imageIndex];
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,nullptr,0,nullptr,1,&barrier);
+        VkBufferImageCopy copy{};
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
+        copy.imageExtent = {diagnosticCaptureExtent.width,diagnosticCaptureExtent.height,1};
+        vkCmdCopyImageToBuffer(command,barrier.image,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            diagnosticCapture.handle,1,&copy);
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT; barrier.dstAccessMask = 0;
+        VkBufferMemoryBarrier host{};
+        host.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        host.srcQueueFamilyIndex = host.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        host.buffer = diagnosticCapture.handle; host.size = VK_WHOLE_SIZE;
+        vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,0,nullptr,1,&host,1,&barrier);
+        diagnosticCapturePending = false;
+    }
+
+    void createTimingPools() {
+        if (!timestampBits || !(timestampPeriod > 0)) return;
+        VkQueryPoolCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+        info.queryType = VK_QUERY_TYPE_TIMESTAMP; info.queryCount = 8;
+        for (auto& pool : timingPools) {
+            if (vkCreateQueryPool(device, &info, nullptr, &pool) == VK_SUCCESS) continue;
+            for (auto& created : timingPools) {
+                if (created) vkDestroyQueryPool(device, created, nullptr);
+                created = VK_NULL_HANDLE;
+            }
+            LOG_WARN("GPU timestamp allocation unavailable");
+            break;
+        }
+    }
+
+    void timestamp(VkCommandBuffer command, uint32_t query,
+                   VkPipelineStageFlagBits stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT) {
+        if (timingPools[currentFrame])
+            vkCmdWriteTimestamp(command, stage, timingPools[currentFrame], query);
+    }
+
+    void readTimingPool() {
+        voxelGiRuntime.gpuTimingAvailable = false;
+        if (!timingPools[currentFrame] || !timingSamples[currentFrame]) return;
+        std::array<std::array<uint64_t, 2>, 8> values{};
+        // The ordinary frame fence has already signaled. Never add WAIT_BIT.
+        const auto result = vkGetQueryPoolResults(device, timingPools[currentFrame], 0, 8,
+            sizeof(values), values.data(), sizeof(values[0]),
+            VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+        if (result != VK_SUCCESS) return;
+        for (const auto& v : values) if (!v[1]) return;
+        const uint64_t mask = timestampBits >= 64 ? UINT64_MAX : (uint64_t(1) << timestampBits) - 1;
+        const auto ms = [&](int first, int last) {
+            return double((values[last][0] - values[first][0]) & mask) * timestampPeriod / 1000000.0;
+        };
+        voxelGiRuntime.gpuTimingAvailable = true;
+        voxelGiRuntime.gpuInjectionMs = ms(1,2);
+        voxelGiRuntime.gpuScreenMs = ms(3,4);
+        voxelGiRuntime.gpuCompositeMs = ms(5,6);
+        voxelGiRuntime.gpuFrameMs = ms(0,7);
+        voxelGiRuntime.gpuSampleId = timingSamples[currentFrame];
+    }
 
     void createInstance() {
         std::vector<std::string> extensionStorage =
@@ -483,6 +576,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             presentFamily = *queues.present;
             VkPhysicalDeviceProperties properties{};
             vkGetPhysicalDeviceProperties(candidate, &properties);
+            uint32_t familyCount = 0;
+            vkGetPhysicalDeviceQueueFamilyProperties(candidate, &familyCount, nullptr);
+            std::vector<VkQueueFamilyProperties> families(familyCount);
+            vkGetPhysicalDeviceQueueFamilyProperties(candidate, &familyCount, families.data());
+            timestampBits = families[graphicsFamily].timestampValidBits;
+            timestampPeriod = properties.limits.timestampPeriod;
             VkFormatProperties attributeFormat{};
             VkFormatProperties irradianceFormat{};
             vkGetPhysicalDeviceFormatProperties(
@@ -555,8 +654,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (visualQuality == quality) return;
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig previousGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = effectiveVoxelGiConfig();
         visualQuality = quality;
         const int samples = visualQualityConfig(quality).sceneSamples;
         requestedSampleCount = samples >= 4 ? VK_SAMPLE_COUNT_4_BIT :
@@ -565,8 +663,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ? requestedSampleCount : maxSampleCount;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig currentGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = effectiveVoxelGiConfig();
         applyVoxelGiConfigChange(previousGi, currentGi);
         const bool resourcesChanged = previous.bloomLevels != current.bloomLevels ||
             previous.screenEffectDivisor != current.screenEffectDivisor ||
@@ -585,14 +682,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (enhancedVisualSettings.enabled == enabled) return;
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig previousGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = effectiveVoxelGiConfig();
         enhancedVisuals = enabled;
         enhancedVisualSettings.enabled = enabled;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig currentGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = effectiveVoxelGiConfig();
         applyVoxelGiConfigChange(previousGi, currentGi);
         if (previous.bloomLevels != current.bloomLevels ||
             previous.screenEffectDivisor != current.screenEffectDivisor ||
@@ -603,14 +698,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     void configureEnhancedVisualSettings(const EnhancedVisualSettings& settings) {
         const EnhancedVisualConfig previous = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig previousGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig previousGi = effectiveVoxelGiConfig();
         enhancedVisualSettings = settings;
         enhancedVisuals = settings.enabled;
         const EnhancedVisualConfig current = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
-        const VoxelGiConfig currentGi = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig currentGi = effectiveVoxelGiConfig();
         applyVoxelGiConfigChange(previousGi, currentGi);
         if (previous.bloomLevels != current.bloomLevels ||
             previous.screenEffectDivisor != current.screenEffectDivisor ||
@@ -621,13 +714,16 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void beginVoxelGiFrame(const glm::dvec3& camera, uint64_t sceneId) {
-        const VoxelGiConfig config = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig config = effectiveVoxelGiConfig();
         voxelGiRuntime.requested = config.enabled;
         voxelGiRuntime.active = config.enabled && swapchain.voxelGiEnabled &&
             voxelGiGpu.levelCount > 0 &&
             voxelGiRuntime.availability == VoxelGiAvailability::Available;
-        if (!voxelGiRuntime.active) return;
+        if (!voxelGiRuntime.active) {
+            voxelGiRuntime.cpuCacheMs = voxelGiRuntime.cpuCoarseMs = 0;
+            voxelGiRuntime.coarseVoxels = voxelGiRuntime.pendingCoarseChunks = 0;
+            return;
+        }
         if (sceneId != voxelGiLastSceneId ||
             glm::distance(camera, voxelGiLastCamera) > 12.0) {
             voxelGiHistoryValid = false;
@@ -637,6 +733,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         voxelGiLastSceneId = sceneId;
         voxelGiLastCamera = camera;
         voxelGiCache.configure(config);
+        voxelGiCacheStart = RuntimeClock{}.now();
         voxelGiCache.beginFrame(camera, sceneId);
     }
 
@@ -649,20 +746,31 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             voxelGiUpdates.clear();
             return;
         }
+        const auto coarseStart = RuntimeClock{}.now();
         voxelGiCache.endFrame();
+        const auto coarseEnd = RuntimeClock{}.now();
+        voxelGiRuntime.cpuCoarseMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(coarseStart, coarseEnd)) * 1000.0;
+        voxelGiRuntime.cpuCacheMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(voxelGiCacheStart, coarseStart)) * 1000.0;
+        voxelGiRuntime.pendingCoarseChunks = voxelGiCache.pendingCoarseChunks();
+        voxelGiRuntime.coarseVoxels = voxelGiCache.coarseVoxelsBuilt();
         if (voxelGiSourceRevision != voxelGiCache.contentRevision()) {
             voxelGiContentUpdating = true;
             voxelGiSourceRevision = voxelGiCache.contentRevision();
         }
         const VoxelGiConfig& config = voxelGiCache.config();
         voxelGiUpdates = voxelGiCache.takeUpdates(config.updateSlicesPerFrame);
+        voxelGiRuntime.cpuCacheMs += RuntimeClock::seconds(
+            RuntimeClock::elapsed(coarseEnd, RuntimeClock{}.now())) * 1000.0;
         voxelGiRuntime.pendingSlices = voxelGiCache.pendingSlices();
         voxelGiRuntime.sourceChunks = voxelGiCache.cachedChunks();
         // Source edits can take several bounded frames to reach every plane.
         // Each intermediate lighting result must reject the previous revision.
         if (voxelGiContentUpdating) {
             ++voxelGiHistoryRevision;
-            voxelGiContentUpdating = voxelGiRuntime.pendingSlices > 0;
+            voxelGiContentUpdating = voxelGiRuntime.pendingSlices > 0 ||
+                voxelGiRuntime.pendingCoarseChunks > 0;
         }
     }
 
@@ -840,6 +948,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         voxelGiRuntime.validVoxelFraction = 0.0f;
         voxelGiRuntime.pendingSlices = 0;
         voxelGiRuntime.sourceChunks = 0;
+        voxelGiRuntime.pendingCoarseChunks = 0;
         voxelGiHistoryValid = false;
     }
 
@@ -1521,8 +1630,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void createSwapchain() {
-        const VoxelGiConfig giConfig = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig giConfig = effectiveVoxelGiConfig();
         voxelGiRuntime.requested = giConfig.enabled;
         if (voxelGiRuntime.availability == VoxelGiAvailability::AllocationFailed)
             voxelGiRuntime.availability = VoxelGiAvailability::Available;
@@ -1586,6 +1694,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             swapchain.images.size(), glm::dvec3(0.0));
         voxelGiPreviousHistoryRevision.assign(swapchain.images.size(), 0);
         voxelGiPreviousHistoryTime.assign(swapchain.images.size(), 0);
+        voxelGiHistoryPhase.assign(swapchain.images.size(), 0);
         voxelGiHistoryValid = false;
         swapchainDirty = false;
     }
@@ -1653,21 +1762,41 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         voxelGiRuntime.injectedVoxels = 0;
         if (!voxelGiRuntime.active || voxelGiGpu.levelCount <= 0) return;
         const auto lighting = voxelGiInjectionConstants();
-        if (glm::any(glm::greaterThan(glm::abs(lighting.skyColorDaylight -
-                voxelGiLastSkyInjection), glm::vec4(0.01f))) ||
-            glm::any(glm::greaterThan(glm::abs(lighting.blockColorWeather -
-                voxelGiLastBlockInjection), glm::vec4(0.01f))) ||
-            glm::any(glm::greaterThan(glm::abs(lighting.directColorIntensity -
-                voxelGiLastDirectInjection), glm::vec4(0.01f))) ||
-            glm::any(glm::greaterThan(glm::abs(lighting.lightDirection -
-                voxelGiLastDirectionInjection), glm::vec4(0.01f)))) {
-            for (int level = 0; level < voxelGiGpu.levelCount; ++level)
-                voxelGiGpu.levels[static_cast<size_t>(level)].dirty.markFull();
-            voxelGiLastSkyInjection = lighting.skyColorDaylight;
-            voxelGiLastBlockInjection = lighting.blockColorWeather;
-            voxelGiLastDirectInjection = lighting.directColorIntensity;
-            voxelGiLastDirectionInjection = lighting.lightDirection;
+        const auto delta = [](const VoxelGiInjectConstants& a, const VoxelGiInjectConstants& b) {
+            float difference = 0;
+            for (const auto v : {glm::abs(a.skyColorDaylight-b.skyColorDaylight),
+                    glm::abs(a.blockColorWeather-b.blockColorWeather),
+                    glm::abs(a.directColorIntensity-b.directColorIntensity),
+                    glm::abs(a.lightDirection-b.lightDirection)})
+                for (int c = 0; c < 4; ++c) difference = std::max(difference, v[c]);
+            return difference;
+        };
+        bool abrupt = false;
+        for (int i = 0; i < voxelGiGpu.levelCount; ++i) {
+            const auto& level = voxelGiGpu.levels[size_t(i)];
+            abrupt |= !level.lightingInitialized || delta(lighting, level.lighting) > 0.15f;
+        }
+        voxelGiEnvironmentUpdating = false;
+        if (abrupt) {
+            for (int i = 0; i < voxelGiGpu.levelCount; ++i) {
+                auto& level = voxelGiGpu.levels[size_t(i)];
+                level.dirty.markFull(); level.lighting = lighting;
+                level.lightingInitialized = true;
+            }
             ++voxelGiHistoryRevision;
+            voxelGiEnvironmentUpdating = true;
+        } else {
+            // Merge requests into the latest light, rotating to avoid starving
+            // outer levels while time/weather continue to change.
+            for (int offset = 0; offset < voxelGiGpu.levelCount; ++offset) {
+                const size_t i = (voxelGiRelightCursor + offset) % voxelGiGpu.levelCount;
+                auto& level = voxelGiGpu.levels[i];
+                if (delta(lighting, level.lighting) <= 0.01f) continue;
+                level.dirty.markFull(); level.lighting = lighting;
+                voxelGiRelightCursor = (i + 1) % voxelGiGpu.levelCount;
+                voxelGiEnvironmentUpdating = true;
+                break;
+            }
         }
         const int resolution = voxelGiGpu.resolution;
         std::array<VoxelGiDirtyRegions, 4> changed;
@@ -1799,8 +1928,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             glm::vec3(postProcess.worldOrigin), 0.0f);
         uniforms.previousWorldOrigin = glm::vec4(
             glm::vec3(voxelGiPreviousWorldOrigin[imageIndex]), 0.0f);
-        const VoxelGiConfig config = voxelGiConfig(
-            visualQuality, enhancedVisualSettings);
+        const VoxelGiConfig config = effectiveVoxelGiConfig();
         for (int level = 0; level < config.clipmapLevels; ++level) {
             const VoxelGiLevelMapping mapping = voxelGiCache.levelMapping(level);
             uniforms.minimumCellAndSize[static_cast<size_t>(level)] = glm::vec4(
@@ -1825,6 +1953,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             voxelGiPreviousHistoryTime[imageIndex], now));
         uniforms.temporal = {config.strength, historyAvailable ? 1.0f : 0.0f,
             voxelGiHistoryWeight(config.historyWeight, historyAge), config.distance};
+        uniforms.sampling = {float(voxelGiHistoryPhase[imageIndex]++ & 1u),
+            config.temporalReuse && historyAvailable && uniforms.temporal.z > 0 &&
+                !voxelGiEnvironmentUpdating ? 1.0f : 0.0f,
+            config.reflectedGain, config.emissionGain};
+        uniforms.traversal.x = config.emptySpaceSkipping &&
+            voxelGiRuntime.pendingSlices == 0 && voxelGiRuntime.pendingCoarseChunks == 0 ? 1.0f : 0.0f;
+        uniforms.traversal.y = diagnosticGiReuseMask ? 1.0f : 0.0f;
+        uniforms.traversal.z = float(std::max(config.reuseTileSize, 1));
         voxelGiPreviousHistoryTime[imageIndex] = now;
         voxelGiPreviousHistoryRevision[imageIndex] = voxelGiHistoryRevision;
         Buffer& buffer = voxelGiGpu.uniforms[currentFrame];
@@ -2100,16 +2236,27 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         require(vkBeginCommandBuffer(command, &begin), "vkBeginCommandBuffer");
+        if (timingPools[currentFrame])
+            vkCmdResetQueryPool(command, timingPools[currentFrame], 0, 8);
+        timestamp(command, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         recordUploads(command);
+        timestamp(command, 1);
         recordVoxelGiInjection(command);
+        timestamp(command, 2);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
+        timestamp(command, 3);
         recordScreenEffectPass(command, imageIndex);
+        timestamp(command, 4);
         recordBloomPasses(command, imageIndex);
         // The post and UI draws share one present render pass; the pass
         // bracket spans recordPostPass and recordUiPass.
+        timestamp(command, 5);
         recordPostPass(command, imageIndex);
+        timestamp(command, 6);
         recordUiPass(command);
+        timestamp(command, 7);
+        recordDiagnosticCapture(command, imageIndex);
         require(vkEndCommandBuffer(command), "vkEndCommandBuffer");
     }
 
@@ -2192,12 +2339,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const uint32_t resolution = static_cast<uint32_t>(voxelGiGpu.resolution);
         vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE,
                           voxelGiGpu.computePipeline);
-        auto constants = voxelGiInjectionConstants();
         for (int levelIndex = 0; levelIndex < voxelGiGpu.levelCount; ++levelIndex) {
             VoxelGiGpuLevel& level = voxelGiGpu.levels[
                 static_cast<size_t>(levelIndex)];
             if (!level.albedoOpacity.initialized || !level.lightValidity.initialized) continue;
             if (!level.irradiance.initialized) level.dirty.markFull();
+            auto constants = level.lighting;
             const auto regions = level.dirty.regions(static_cast<int>(resolution));
             if (regions.empty()) continue;
             VkImageMemoryBarrier toGeneral{};
@@ -2931,7 +3078,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (presentationSuspended) resumePresentation();
         if (presentationSuspended || !swapchain.handle) return;
         if (voxelGiRuntime.availability == VoxelGiAvailability::AllocationFailed &&
-            voxelGiConfig(visualQuality, enhancedVisualSettings).enabled &&
+            effectiveVoxelGiConfig().enabled &&
             RuntimeClock::seconds(RuntimeClock::elapsed(voxelGiRetryAt,
                 RuntimeClock{}.now())) >= 5.0)
             swapchainDirty = true;
@@ -2943,6 +3090,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                                 UINT64_MAX), "vkWaitForFences");
         performance.cpuWaitMs += RuntimeClock::seconds(
             RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
+        readTimingPool();
         for (GpuMesh& mesh : retiredMeshes[currentFrame]) {
             destroyGpuMesh(mesh);
         }
@@ -2975,7 +3123,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         prepareParticleBuffer();
         prepareModelBuffer();
         prepareUiBuffers();
+        const auto giPackStart = clock.now();
         prepareVoxelGiUploads();
+        voxelGiRuntime.cpuPackMs = RuntimeClock::seconds(
+            RuntimeClock::elapsed(giPackStart, clock.now())) * 1000.0;
         prepareBufferUploads();
         prepareVoxelGiUniform(imageIndex);
         performance.cpuPrepareMs = RuntimeClock::seconds(
@@ -2999,6 +3150,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         submit.pSignalSemaphores = &frameSync.renderFinished[currentFrame];
         require(vkQueueSubmit(graphicsQueue, 1, &submit, frameSync.fences[currentFrame]),
                 "vkQueueSubmit");
+        if (timingPools[currentFrame]) timingSamples[currentFrame] = ++timingSequence;
         VkPresentInfoKHR present{};
         present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present.waitSemaphoreCount = 1;
@@ -3077,7 +3229,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     void cleanup() {
         if (device) vkDeviceWaitIdle(device);
+        for (auto& pool : timingPools) {
+            if (pool) vkDestroyQueryPool(device, pool, nullptr);
+            pool = VK_NULL_HANDLE;
+        }
         if (allocator) {
+            destroyBuffer(diagnosticCapture);
             destroyVoxelGiResources();
             destroyBuffer(materialSequences);
             destroyBuffer(identitySequences);

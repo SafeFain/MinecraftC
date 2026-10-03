@@ -34,6 +34,17 @@ struct VoxelGiStatus {
     float validVoxelFraction = 0.0f;
     size_t uploadedBytes = 0;
     size_t injectedVoxels = 0;
+    size_t pendingCoarseChunks = 0;
+    size_t coarseVoxels = 0;
+    double cpuCacheMs = 0.0;
+    double cpuCoarseMs = 0.0;
+    double cpuPackMs = 0.0;
+    bool gpuTimingAvailable = false;
+    double gpuInjectionMs = 0.0;
+    double gpuScreenMs = 0.0;
+    double gpuCompositeMs = 0.0;
+    double gpuFrameMs = 0.0;
+    uint64_t gpuSampleId = 0;
 };
 
 struct VoxelGiConfigChange {
@@ -49,7 +60,8 @@ inline VoxelGiConfigChange voxelGiConfigChange(
         before.clipmapLevels != after.clipmapLevels;
     const bool spatial = resources || before.distance != after.distance;
     return {spatial, spatial || before.strength != after.strength ||
-        before.coneCount != after.coneCount || before.coneSteps != after.coneSteps,
+        before.coneCount != after.coneCount || before.coneSteps != after.coneSteps ||
+        before.reflectedGain != after.reflectedGain || before.emissionGain != after.emissionGain,
         resources};
 }
 
@@ -259,7 +271,8 @@ public:
 
     void beginFrame(const glm::dvec3& camera, uint64_t sceneId) {
         ++m_frame;
-        m_chunkCopiesRemaining = std::max(1, m_config.updateSlicesPerFrame * 2);
+        m_chunkCopiesRemaining = std::max(1, m_config.sourceCopiesPerFrame);
+        m_coarseVoxelsBuilt = 0;
         if (sceneId != m_sceneId) {
             reset();
             m_sceneId = sceneId;
@@ -301,11 +314,32 @@ public:
                 ++m_contentRevision;
             } else ++it;
         }
-        for (const auto key : m_coarseDirty) {
-            const auto found = m_chunks.find(key);
-            if (found != m_chunks.end()) buildCoarseCells(found->second);
+        size_t budget = m_config.coarseVoxelBudget;
+        while (budget >= 8 && !m_coarseDirty.empty()) {
+            // Resume the nearest source first, independent of hash iteration.
+            auto next = m_coarseDirty.begin();
+            double nearest = std::numeric_limits<double>::max();
+            for (auto it = m_coarseDirty.begin(); it != m_coarseDirty.end(); ++it) {
+                const auto found = m_chunks.find(*it);
+                if (found == m_chunks.end()) continue;
+                const auto& c = found->second;
+                const double dx = c.cx * 16.0 + 8.0 - m_camera.x;
+                const double dz = c.cz * 16.0 + 8.0 - m_camera.z;
+                const double distance = dx * dx + dz * dz;
+                if (distance < nearest || (distance == nearest && *it < *next)) {
+                    nearest = distance; next = it;
+                }
+            }
+            const auto found = m_chunks.find(*next);
+            if (found == m_chunks.end()) { m_coarseDirty.erase(next); continue; }
+            auto& c = found->second;
+            if (!buildCoarseCells(c, budget)) break;
+            c.coarse = std::move(c.buildingCoarse);
+            c.coarseMip = 0; c.coarseCursor = 0;
+            markChunkDirty(c.cx, c.cz);
+            ++m_contentRevision;
+            m_coarseDirty.erase(next);
         }
-        m_coarseDirty.clear();
     }
 
     std::vector<VoxelGiSliceUpdate> takeUpdates(int maximum) {
@@ -336,6 +370,8 @@ public:
     }
 
     size_t pendingSlices() const { return m_dirty.size(); }
+    size_t pendingCoarseChunks() const { return m_coarseDirty.size(); }
+    size_t coarseVoxelsBuilt() const { return m_coarseVoxelsBuilt; }
     size_t cachedChunks() const { return m_chunks.size(); }
     uint64_t contentRevision() const { return m_contentRevision; }
     const VoxelGiConfig& config() const { return m_config; }
@@ -365,6 +401,9 @@ private:
         std::vector<uint16_t> blocks;
         std::vector<uint8_t> light;
         std::array<std::vector<VoxelGiPacked>, 4> coarse;
+        std::array<std::vector<VoxelGiPacked>, 4> buildingCoarse;
+        int coarseMip = 0;
+        size_t coarseCursor = 0;
     };
     struct Level {
         glm::ivec3 minimumCell{0};
@@ -381,6 +420,7 @@ private:
     uint64_t m_frame = 0;
     uint64_t m_contentRevision = 0;
     int m_chunkCopiesRemaining = 0;
+    size_t m_coarseVoxelsBuilt = 0;
     std::unordered_map<int64_t, CachedChunk> m_chunks;
     std::vector<Level> m_levels;
     std::deque<DirtySlice> m_dirty;
@@ -506,7 +546,14 @@ private:
                                   glm::ivec2(0,-1), glm::ivec2(0,1)}) {
             const int x = cx + offset.x, z = cz + offset.y;
             if (m_chunks.count(chunkKey(x,z)) || (x == cx && z == cz)) {
-                m_coarseDirty.insert(chunkKey(x,z));
+                const int64_t key = chunkKey(x,z);
+                m_coarseDirty.insert(key);
+                auto found = m_chunks.find(key);
+                if (found != m_chunks.end()) {
+                    found->second.buildingCoarse = {};
+                    found->second.coarseMip = 0;
+                    found->second.coarseCursor = 0;
+                }
                 markChunkDirty(x,z);
             }
         }
@@ -549,59 +596,69 @@ private:
         return result;
     }
 
-    void buildCoarseCells(CachedChunk& chunk) const {
+    bool buildCoarseCells(CachedChunk& chunk, size_t& budget) {
         const int maximumCellSize = voxelGiCellSize(m_config, m_config.clipmapLevels - 1);
-        for (int mip = 0, size = 2; mip < 4 && size <= maximumCellSize; ++mip, size *= 2) {
+        for (int mip = chunk.coarseMip, size = 2 << mip;
+             mip < 4 && size <= maximumCellSize; ++mip, size *= 2) {
             const int width = Config::CHUNK_SIZE_X / size;
             const int height = Config::CHUNK_SIZE_Y / size;
-            auto& output = chunk.coarse[static_cast<size_t>(mip)];
+            auto& output = chunk.buildingCoarse[static_cast<size_t>(mip)];
             output.resize(static_cast<size_t>(width * width * height));
-            for (int y = 0; y < height; ++y)
-                for (int z = 0; z < width; ++z)
-                    for (int x = 0; x < width; ++x) {
-                        VoxelGiPacked aggregate;
-                        unsigned red = 0, green = 0, blue = 0, weight = 0, sky = 0, block = 0;
-                        std::array<unsigned,6> exposure{};
-                        glm::vec3 emission(0.0f);
-                        unsigned emitters = 0;
-                        const int n = std::min(size,4), previousN = std::min(size/2,4);
-                        for (int dy = 0; dy < 2; ++dy)
-                            for (int dz = 0; dz < 2; ++dz)
-                                for (int dx = 0; dx < 2; ++dx) {
-                                    const int px = x*2+dx, py = y*2+dy, pz = z*2+dz;
-                                    const int previousWidth = width*2;
-                                    const size_t index = static_cast<size_t>(px + previousWidth*(pz + previousWidth*py));
-                                    const auto value = mip == 0 ? sourceVoxel(chunk,px,py,pz) :
-                                        chunk.coarse[static_cast<size_t>(mip-1)][index];
-                                    aggregate.opacity = std::max(aggregate.opacity,value.opacity);
-                                    aggregate.emission = std::max(aggregate.emission,value.emission);
-                                    aggregate.valid = 255;
-                                    red += value.red*value.opacity; green += value.green*value.opacity;
-                                    blue += value.blue*value.opacity; weight += value.opacity;
-                                    sky += value.skyLight*value.opacity; block += value.blockLight*value.opacity;
-                                    for (int f = 0; f < 6; ++f) exposure[f] += voxelGiExposure(value.aux,f)*value.opacity;
-                                    if (value.aux.emission) { emission += voxelGiUnpackRgb(value.aux.emission); ++emitters; }
-                                    for (int sz = 0; sz < previousN; ++sz)
-                                        for (int sy = 0; sy < previousN; ++sy)
-                                            for (int sx = 0; sx < previousN; ++sx)
-                                                if (voxelGiOccupied(value.aux,sx+previousN*(sy+previousN*sz))) {
-                                                    const int divisor = size > 4 ? 2 : 1;
-                                                    const int ax = (dx*previousN+sx)/divisor;
-                                                    const int ay = (dy*previousN+sy)/divisor;
-                                                    const int az = (dz*previousN+sz)/divisor;
-                                                    setVoxelGiOccupied(aggregate.aux,ax+n*(ay+n*az));
-                                                }
-                                }
-                        if (weight) {
-                            aggregate.red = red/weight; aggregate.green = green/weight; aggregate.blue = blue/weight;
-                            aggregate.skyLight = sky/weight; aggregate.blockLight = block/weight;
-                            for (int f = 0; f < 6; ++f) setVoxelGiExposure(aggregate.aux,f,exposure[f]/weight);
+            for (size_t cursor = chunk.coarseCursor; cursor < output.size(); ++cursor) {
+                if (budget < 8) {
+                    chunk.coarseMip = mip; chunk.coarseCursor = cursor;
+                    return false;
+                }
+                budget -= 8; m_coarseVoxelsBuilt += 8;
+                const int x = static_cast<int>(cursor % width);
+                const int z = static_cast<int>((cursor / width) % width);
+                const int y = static_cast<int>(cursor / (width * width));
+                VoxelGiPacked aggregate;
+                unsigned red = 0, green = 0, blue = 0, weight = 0, sky = 0, block = 0;
+                std::array<unsigned,6> exposure{};
+                glm::vec3 emission(0.0f);
+                unsigned emitters = 0;
+                const int n = std::min(size,4), previousN = std::min(size/2,4);
+                for (int dy = 0; dy < 2; ++dy)
+                    for (int dz = 0; dz < 2; ++dz)
+                        for (int dx = 0; dx < 2; ++dx) {
+                            const int px = x*2+dx, py = y*2+dy, pz = z*2+dz;
+                            const int previousWidth = width*2;
+                            const size_t index = static_cast<size_t>(px + previousWidth*(pz + previousWidth*py));
+                            const auto value = mip == 0 ? sourceVoxel(chunk,px,py,pz) :
+                                chunk.buildingCoarse[static_cast<size_t>(mip-1)][index];
+                            aggregate.opacity = std::max(aggregate.opacity,value.opacity);
+                            aggregate.emission = std::max(aggregate.emission,value.emission);
+                            aggregate.valid = 255;
+                            red += value.red*value.opacity; green += value.green*value.opacity;
+                            blue += value.blue*value.opacity; weight += value.opacity;
+                            sky += value.skyLight*value.opacity; block += value.blockLight*value.opacity;
+                            for (int f = 0; f < 6; ++f) exposure[f] += voxelGiExposure(value.aux,f)*value.opacity;
+                            if (value.aux.emission) { emission += voxelGiUnpackRgb(value.aux.emission); ++emitters; }
+                            for (int sz = 0; sz < previousN; ++sz)
+                                for (int sy = 0; sy < previousN; ++sy)
+                                    for (int sx = 0; sx < previousN; ++sx)
+                                        if (voxelGiOccupied(value.aux,sx+previousN*(sy+previousN*sz))) {
+                                            const int divisor = size > 4 ? 2 : 1;
+                                            const int ax = (dx*previousN+sx)/divisor;
+                                            const int ay = (dy*previousN+sy)/divisor;
+                                            const int az = (dz*previousN+sz)/divisor;
+                                            setVoxelGiOccupied(aggregate.aux,ax+n*(ay+n*az));
+                                        }
                         }
-                        if (emitters) aggregate.aux.emission = voxelGiRgb(emission/float(emitters));
-                        updateVoxelGiCoverage(aggregate.aux,n);
-                        output[static_cast<size_t>(x+width*(z+width*y))] = aggregate;
-                    }
+                if (weight) {
+                    aggregate.red = red/weight; aggregate.green = green/weight; aggregate.blue = blue/weight;
+                    aggregate.skyLight = sky/weight; aggregate.blockLight = block/weight;
+                    for (int f = 0; f < 6; ++f) setVoxelGiExposure(aggregate.aux,f,exposure[f]/weight);
+                }
+                if (emitters) aggregate.aux.emission = voxelGiRgb(emission/float(emitters));
+                updateVoxelGiCoverage(aggregate.aux,n);
+                output[static_cast<size_t>(x+width*(z+width*y))] = aggregate;
+            }
+            chunk.coarseCursor = 0;
+            chunk.coarseMip = mip + 1;
         }
+        return true;
     }
 
     VoxelGiPacked sample(int worldX, int worldY, int worldZ, int cellSize) const {
@@ -613,6 +670,8 @@ private:
         const int x = voxelGiPositiveMod(worldX, Config::CHUNK_SIZE_X);
         const int z = voxelGiPositiveMod(worldZ, Config::CHUNK_SIZE_Z);
         if (cellSize > 1) {
+            // Never publish old neighbor exposure or partly rebuilt occupancy.
+            if (m_coarseDirty.count(chunkKey(cx, cz))) return {};
             int mip = 0;
             for (int size = 2; size < cellSize; size *= 2) ++mip;
             const int width = Config::CHUNK_SIZE_X / cellSize;

@@ -122,10 +122,36 @@ VoxelGiPacked drainVoxel(VoxelGiSceneCache& cache,int level,const glm::ivec3& wo
     return result;
 }
 
+void checkResumableCoarseBuild() {
+    VoxelGiConfig config;
+    config.enabled = true; config.clipmapResolution = 32;
+    config.clipmapLevels = 4; config.distance = 128;
+    config.coarseVoxelBudget = 1024;
+    VoxelGiSceneCache cache; cache.configure(config);
+    auto chunk = std::make_unique<Chunk>(0,0);
+    chunk->setBlock(4,68,4,BlockId::STONE);
+    cache.beginFrame({8,68,8},9); cache.submit(*chunk); cache.endFrame();
+    require(cache.pendingCoarseChunks()==1 && cache.coarseVoxelsBuilt()<=1024,
+            "coarse source rebuild was not bounded/resumable");
+    auto incomplete = drainVoxel(cache,3,{4,68,4});
+    require(incomplete.valid==0,"partly built coarse occupancy was published");
+    // Restart in flight: the completed source must contain only the new edit.
+    chunk->setBlock(4,68,4,BlockId::STAR_CRYSTAL);
+    for(int i=0;i<200 && cache.pendingCoarseChunks();++i){
+        cache.beginFrame({8,68,8},9); cache.submit(*chunk); cache.endFrame();
+        require(cache.coarseVoxelsBuilt()<=1024,"coarse continuation exceeded budget");
+    }
+    require(cache.pendingCoarseChunks()==0,"bounded coarse rebuild failed to converge");
+    auto completed=drainVoxel(cache,3,{4,68,4});
+    require(completed.valid==255 && completed.aux.emission==packVoxelGi(BlockId::STAR_CRYSTAL,0).aux.emission,
+            "cancelled source revision contaminated published coarse data");
+}
+
 void checkDirectionalAttributes() {
     VoxelGiConfig config;
     config.enabled = true; config.clipmapResolution = 32; config.clipmapLevels = 4;
     config.distance = 128; config.updateSlicesPerFrame = 128;
+    config.coarseVoxelBudget = 4 * Config::GI_COARSE_VOXELS_PER_FRAME;
     for (int axis = 0; axis < 3; ++axis) {
         VoxelGiSceneCache cache; cache.configure(config);
         // Large chunk fixtures must fit within Windows' default 1 MiB stack
@@ -187,6 +213,7 @@ void checkDirectionalAttributes() {
 
 int main() {
     checkUpdatePolicyAndRegions();
+    checkResumableCoarseBuild();
     checkDirectionalAttributes();
     VoxelGiDeviceSupport supported{64, 8, 8, 1, 1, true, true, true,
         4,4,64u*64u*64u*sizeof(VoxelGiAux)};
@@ -294,9 +321,9 @@ int main() {
         cache.beginFrame(glm::dvec3(0.5, 64.0, 0.5), 12);
         int accepted = 0;
         for (const auto& source : sources) if (cache.submit(*source)) ++accepted;
-        require(accepted <= config.updateSlicesPerFrame * 2,
+        require(accepted <= config.sourceCopiesPerFrame,
                 "source snapshots exceeded their bounded copy budget");
-        if (frame > 3) require(accepted == 0, "unchanged active chunks were evicted and recopied");
+        if (frame > 7) require(accepted == 0, "unchanged active chunks were evicted and recopied");
         cache.endFrame();
         auto updates = cache.takeUpdates(config.updateSlicesPerFrame);
         cache.recycleUpdates(updates);
@@ -338,6 +365,7 @@ int main() {
     settings.gi.strength = 100;
     settings.gi.distance = 128;
     config = voxelGiConfig(VisualQuality::High, settings); // non-power-of-two 48³
+    config.coarseVoxelBudget = 4 * Config::GI_COARSE_VOXELS_PER_FRAME;
     config.updateSlicesPerFrame = 128;
     cache.configure(config);
     std::array<std::vector<VoxelGiPacked>, 4> volumes;

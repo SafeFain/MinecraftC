@@ -37,6 +37,12 @@ constexpr int storageYToWorldY(int y) { return y + WORLD_MIN_Y; }
 // ── Async generation ──────────────────────────────────────────────────
 constexpr int   MESH_UPLOADS_PER_FRAME = 4;   // max GL uploads per frame (avoids GPU stalls)
 constexpr size_t MESH_UPLOAD_BYTES_PER_FRAME = 8u * 1024u * 1024u;
+// GI work is bounded separately from world streaming and mesh uploads.
+constexpr size_t GI_COARSE_VOXELS_PER_FRAME = 16u * 384u * 16u;
+constexpr int GI_SOURCE_COPIES_PER_FRAME = 4;
+constexpr int GI_REUSE_TILE_SIZE = 8; // keep neighboring fragment lanes coherent
+constexpr float GI_REFLECTED_GAIN = 2.4f;
+constexpr float GI_EMISSION_GAIN = 2.0f;
 constexpr int   CHUNK_LOADS_PER_FRAME = 4;
 constexpr int   CHUNK_UNLOADS_PER_FRAME = 2;
 constexpr int   INITIAL_CHUNK_LOADS_PER_FRAME = 16;

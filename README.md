@@ -249,6 +249,9 @@ git diff --check
 ./build-local/terrain_benchmark 1592615476 9
 ```
 
+For GI frame-time measurements and fixed-exposure visual comparisons, see
+[GI benchmark and validation](docs/gi-performance.md).
+
 Regenerate Vulkan shaders after editing their GLSL sources:
 
 ```bash

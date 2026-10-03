@@ -192,6 +192,8 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
     info.imageExtent = extent;
     info.imageArrayLayers = 1;
     info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    result.captureSupported = (capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+    if (result.captureSupported) info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     const uint32_t queueFamilies[]{params.graphicsFamily, params.presentFamily};
     if (params.graphicsFamily != params.presentFamily) {
         info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -929,6 +931,7 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
     VulkanSwapchainBundle&& other) noexcept
     : handle(other.handle),
       swapchainFormat(other.swapchainFormat),
+      captureSupported(other.captureSupported),
       sceneFormat(other.sceneFormat),
       surfaceFormat(other.surfaceFormat),
       depthFormat(other.depthFormat),
@@ -1039,6 +1042,7 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     destroy();
     handle = other.handle;
     swapchainFormat = other.swapchainFormat;
+    captureSupported = other.captureSupported;
     sceneFormat = other.sceneFormat;
     surfaceFormat = other.surfaceFormat;
     depthFormat = other.depthFormat;

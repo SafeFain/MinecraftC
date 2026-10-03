@@ -51,10 +51,11 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     mesh.opaqueIndexCount = mesh.indices.size();
     renderer.uploadChunkMesh(mesh);
     glm::vec3 camera(8,70,8);
+    glm::vec3 lookDirection(0,-0.25f,1);
     RenderEnvironment environment = DayNightCycle{}.evaluate();
     uint64_t sceneId = 17;
     const auto frame = [&] {
-        const auto view = glm::lookAt(camera, camera + glm::vec3(0,-0.25f,1), glm::vec3(0,1,0));
+        const auto view = glm::lookAt(camera, camera + lookDirection, glm::vec3(0,1,0));
         const auto vp = glm::perspective(glm::radians(70.0f), window.aspectRatio(), 0.1f, 512.0f)*view;
         renderer.beginFrame();
         renderer.setEnvironment(environment, camera);
@@ -74,8 +75,15 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
         requireSmoke(renderer.voxelGiStatus().active, "GI did not activate");
     };
     const auto settle = [&] {
-        for (int i = 0; i < 40; ++i) frame();
-        requireSmoke(renderer.voxelGiStatus().pendingSlices == 0, "GI queue did not converge");
+        for (int i = 0; i < 240; ++i) {
+            frame();
+            const auto status=renderer.voxelGiStatus();
+            if(status.sourceChunks==chunks.size() && status.pendingSlices==0 &&
+               status.pendingCoarseChunks==0)break;
+        }
+        // Exercise every history image after the last source revision settles.
+        for(int i=0;i<8;++i)frame();
+        requireSmoke(renderer.voxelGiStatus().pendingSlices == 0 && renderer.voxelGiStatus().pendingCoarseChunks == 0, "GI queue did not converge");
     };
     settle();
     const auto initial = VulkanGiSmokeProbe::readEffects(renderer);
@@ -156,6 +164,49 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     requireSmoke(renderer.voxelGiStatus().uploadedBytes == 0 &&
                  renderer.voxelGiStatus().injectedVoxels == 0,
                  "stability adjustment rebuilt GI");
+    // Actual production fragment early exit, rather than merely checking a flag.
+    settle();
+    VulkanGiSmokeProbe::showReuseMask(renderer,true);
+    frame();
+    const auto reuseMask=VulkanGiSmokeProbe::readEffects(renderer);
+    size_t reused=0;
+    for(size_t i=3;i<reuseMask.size();i+=4)if(reuseMask[i]==0)++reused;
+    requireSmoke(reused>reuseMask.size()/40,"stationary GI did not reuse validated receivers");
+    std::cout << "GI validated stationary reuse pixels=" << reused << '/' << reuseMask.size()/4 << '\n';
+    // Turn without changing source geometry: disoccluded/moving receivers must
+    // reject the early exit even if the global history revision is unchanged.
+    lookDirection.x=0.25f; frame();
+    const auto turned=VulkanGiSmokeProbe::readEffects(renderer);
+    for(size_t i=3;i<turned.size();i+=4)
+        requireSmoke(turned[i]>0,"camera rotation skipped new receiver tracing");
+    lookDirection.x=0; frame();
+    camera.x+=0.5f; frame();
+    const auto moved=VulkanGiSmokeProbe::readEffects(renderer);
+    for(size_t i=3;i<moved.size();i+=4)
+        requireSmoke(moved[i]>0,"camera movement reused another receiver");
+    camera.x-=0.5f; frame();
+    VulkanGiSmokeProbe::showReuseMask(renderer,false);
+    settings.gi.temporalStability=0;
+    renderer.setEnhancedVisualSettings(settings); frame();
+    VulkanGiSmokeProbe::showReuseMask(renderer,true); frame();
+    const auto noReuse=VulkanGiSmokeProbe::readEffects(renderer);
+    for(size_t i=3;i<noReuse.size();i+=4)
+        requireSmoke(noReuse[i]>0,"zero stability reused lighting history");
+    VulkanGiSmokeProbe::showReuseMask(renderer,false);
+    settings.gi.temporalStability=100;
+    renderer.setEnhancedVisualSettings(settings);
+    settle();
+    environment.directIntensity -= 0.04f;
+    const size_t relightLevels=quality==VisualQuality::Ultra?4:3;
+    for(size_t i=0;i<relightLevels;++i){
+        frame();
+        requireSmoke(renderer.voxelGiStatus().injectedVoxels==64u*64u*64u &&
+            renderer.voxelGiStatus().uploadedBytes==0 &&
+            VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y==1,
+            "smooth light update was unbounded or discarded valid history");
+    }
+    frame();
+    requireSmoke(renderer.voxelGiStatus().injectedVoxels==0,"smooth relight failed to converge");
     settings.gi.strength = 50;
     renderer.setEnhancedVisualSettings(settings);
     frame();
@@ -166,7 +217,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     frame();
     requireSmoke(VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0,
                  "block edit reused stale lighting history");
-    while (renderer.voxelGiStatus().pendingSlices > 0) {
+    while (renderer.voxelGiStatus().pendingSlices > 0 || renderer.voxelGiStatus().pendingCoarseChunks > 0) {
         frame();
         requireSmoke(VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0,
                      "bounded edit propagation accumulated intermediate old lighting");

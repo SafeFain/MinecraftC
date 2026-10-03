@@ -6,6 +6,57 @@
 
 class VulkanGiSmokeProbe {
 public:
+    static std::string deviceDescription(VulkanRenderer& renderer) {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(renderer.m_impl->physicalDevice,&properties);
+        return std::string(properties.deviceName)+"; driver="+std::to_string(properties.driverVersion)+
+            "; swapchain images="+std::to_string(renderer.m_impl->swapchain.images.size());
+    }
+
+    static void configureDiagnostic(VulkanRenderer& renderer, const VoxelGiConfig& config) {
+        auto& impl = *renderer.m_impl;
+        const auto before = impl.effectiveVoxelGiConfig();
+        impl.diagnosticGiConfig = config;
+        impl.applyVoxelGiConfigChange(before, config);
+    }
+
+    static void showReuseMask(VulkanRenderer& renderer, bool enabled) {
+        renderer.m_impl->diagnosticGiReuseMask = enabled;
+    }
+
+    static void requestCapture(VulkanRenderer& renderer) {
+        renderer.waitIdle();
+        auto& impl = *renderer.m_impl;
+        if (!impl.swapchain.captureSupported) throw std::runtime_error("surface capture unavailable");
+        const auto format = impl.swapchain.swapchainFormat;
+        if (format != VK_FORMAT_B8G8R8A8_SRGB && format != VK_FORMAT_R8G8B8A8_SRGB &&
+            format != VK_FORMAT_B8G8R8A8_UNORM && format != VK_FORMAT_R8G8B8A8_UNORM)
+            throw std::runtime_error("capture requires an RGBA8/BGRA8 swapchain");
+        impl.destroyBuffer(impl.diagnosticCapture);
+        impl.diagnosticCaptureExtent = impl.swapchain.swapchainExtent;
+        const auto e = impl.diagnosticCaptureExtent;
+        impl.diagnosticCapture = impl.createBuffer(size_t(e.width)*e.height*4,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+        impl.diagnosticCapturePending = true;
+    }
+
+    static std::vector<uint8_t> readCapture(VulkanRenderer& renderer) {
+        renderer.waitIdle();
+        auto& impl = *renderer.m_impl;
+        if (!impl.diagnosticCapture.handle || impl.diagnosticCapturePending)
+            throw std::runtime_error("capture needs a completed frame");
+        const auto e = impl.diagnosticCaptureExtent;
+        vkhelp::require(vmaInvalidateAllocation(impl.allocator,impl.diagnosticCapture.allocation,
+            0,VK_WHOLE_SIZE),"invalidate frame capture");
+        const auto* data = static_cast<const uint8_t*>(impl.diagnosticCapture.mapped);
+        std::vector<uint8_t> rgba(data,data+size_t(e.width)*e.height*4);
+        if (impl.swapchain.swapchainFormat == VK_FORMAT_B8G8R8A8_SRGB ||
+            impl.swapchain.swapchainFormat == VK_FORMAT_B8G8R8A8_UNORM)
+            for(size_t i=0;i<rgba.size();i+=4)std::swap(rgba[i],rgba[i+2]);
+        return rgba;
+    }
+
     struct Ray {
         glm::vec4 origin{0.0f};
         glm::vec4 direction{0.0f};
