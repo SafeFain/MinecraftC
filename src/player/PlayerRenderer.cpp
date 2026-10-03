@@ -25,16 +25,23 @@ void PlayerRenderer::initialize(const std::filesystem::path& root,
     m_mixer.reset(m_asset.get(), m_graph.get());
     m_mixer.play(m_graph->actionFor("idle"));
     m_locomotion = "idle";
-    m_headNode = m_rightArmNode = -1;
+    m_headNode = m_rightArmNode = m_leftArmNode = -1;
+    m_bowCharging=false;m_bowCharge=0;m_shieldRaise=0;
     for (size_t i=0;i<m_asset->nodes.size();++i) {
         if(m_asset->nodes[i].name=="head")m_headNode=static_cast<int>(i);
         if(m_asset->nodes[i].name=="arm_r")m_rightArmNode=static_cast<int>(i);
+        if(m_asset->nodes[i].name=="arm_l")m_leftArmNode=static_cast<int>(i);
     }
 }
 
 void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
     if (!m_asset || !m_graph) return;
     m_sleeping = state.sleeping;
+    m_bowCharging=state.bowCharging && !state.sleeping;
+    m_bowCharge=m_bowCharging ? std::clamp(state.bowCharge,0.0f,1.0f) : 0.0f;
+    const float target=state.blocking && !state.sleeping ? 1.0f : 0.0f;
+    const float step=std::max(dt,0.0f)*8.0f;
+    m_shieldRaise+=std::clamp(target-m_shieldRaise,-step,step);
     m_prone = state.pose == PlayerPhysics::Pose::Swimming ||
               state.pose == PlayerPhysics::Pose::Crawling;
     if (state.sleeping) {
@@ -90,18 +97,40 @@ void PlayerRenderer::update(const PlayerVisualState& state, float dt) {
     m_mixer.advance(dt);
 }
 
-glm::mat4 PlayerRenderer::renderThirdPerson(
+PlayerHandTransforms PlayerRenderer::renderThirdPerson(
     IGameRenderer& renderer, const glm::dvec3& position,
     const glm::dvec3& renderOrigin, float yawDegrees, float pitchDegrees,
     const glm::mat4& viewProjection, SmoothLightSample light,
     glm::vec3 sleepingFacing) {
-    if (!m_asset || !m_handle) return glm::mat4(1.0f);
+    if (!m_asset || !m_handle) return {};
     m_mixer.evaluate(m_instance.pose);
     if (m_headNode >= 0) {
         const size_t head=static_cast<size_t>(m_headNode);
         m_instance.pose.rotation[head] = glm::angleAxis(
             glm::radians(-std::clamp(pitchDegrees,-70.0f,70.0f)),glm::vec3(1,0,0)) *
             m_instance.pose.rotation[head];
+        model::composeGlobals(*m_asset,m_instance.pose);
+    }
+    // Action overlays rotate around the authored shoulder pivots.
+    if(!m_sleeping) {
+        if(m_bowCharging && m_rightArmNode>=0 && m_leftArmNode>=0) {
+            const size_t right=static_cast<size_t>(m_rightArmNode);
+            const size_t left=static_cast<size_t>(m_leftArmNode);
+            const float aimPitch=m_prone ? 0.0f : std::clamp(pitchDegrees,-70.0f,70.0f);
+            const glm::mat4 aim=glm::rotate(glm::mat4(1),glm::radians(aimPitch),glm::vec3(1,0,0));
+            const glm::vec3 grip=m_instance.pose.translation[right]+glm::vec3(-.24f,-.06f,-.58f);
+            const glm::vec3 nock=grip+glm::vec3(aim*glm::vec4(0,0,.70f*(.03f+.38f*m_bowCharge),0));
+            const auto rightPose=playerArmGripPose(m_instance.pose.translation[right],grip);
+            const auto leftPose=playerArmGripPose(m_instance.pose.translation[left],nock);
+            m_instance.pose.rotation[right]=rightPose.rotation;
+            m_instance.pose.scale[right]=rightPose.scale;
+            m_instance.pose.rotation[left]=leftPose.rotation;
+            m_instance.pose.scale[left]=leftPose.scale;
+        } else if(m_shieldRaise>0.0f && m_leftArmNode>=0) {
+            const size_t i=static_cast<size_t>(m_leftArmNode);
+            const glm::quat raised=glm::angleAxis(glm::radians(80.0f),glm::vec3(1,0,0));
+            m_instance.pose.rotation[i]=glm::slerp(m_instance.pose.rotation[i],raised,m_shieldRaise);
+        }
         model::composeGlobals(*m_asset,m_instance.pose);
     }
     m_instance.jointPalettes.clear();
@@ -132,7 +161,24 @@ glm::mat4 PlayerRenderer::renderThirdPerson(
     renderer.modelRenderer().queue({m_handle,world,&m_instance,
         glm::vec4(glm::max(illumination,glm::vec3(.025f)),1),0.0f,light});
     renderer.flushModels(viewProjection);
-    if(m_rightArmNode<0)return world;
-    return world*m_instance.pose.global[static_cast<size_t>(m_rightArmNode)]*
-        glm::translate(glm::mat4(1),glm::vec3(0,-.42f,-.12f));
+    const auto hand=[&](int node) {
+        if(node<0)return world;
+        return world*m_instance.pose.global[static_cast<size_t>(node)]*
+            glm::translate(glm::mat4(1),playerWristOffset());
+    };
+    PlayerHandTransforms hands{hand(m_rightArmNode),hand(m_leftArmNode)};
+    if(m_bowCharging && m_rightArmNode>=0) {
+        // The bow aims along player forward while its origin stays at the wrist.
+        // Arm stretch must not scale the held mesh or the arrow/string distance.
+        const size_t right=static_cast<size_t>(m_rightArmNode);
+        const int parent=m_asset->nodes[right].parent;
+        const glm::mat4 parentTransform=parent>=0 ?
+            m_instance.pose.global[static_cast<size_t>(parent)] : glm::mat4(1);
+        const glm::vec3 wrist=m_instance.pose.translation[right]+
+            m_instance.pose.rotation[right]*(m_instance.pose.scale[right]*playerWristOffset());
+        hands.right=world*parentTransform*glm::translate(glm::mat4(1),wrist)*
+            glm::rotate(glm::mat4(1),glm::radians(m_prone ? 0.0f :
+                std::clamp(pitchDegrees,-70.0f,70.0f)),glm::vec3(1,0,0));
+    }
+    return hands;
 }

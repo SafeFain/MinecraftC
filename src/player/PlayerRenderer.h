@@ -11,12 +11,17 @@
 
 class IGameRenderer;
 
+struct PlayerHandTransforms {
+    glm::mat4 right{1.0f};
+    glm::mat4 left{1.0f};
+};
+
 class PlayerRenderer {
 public:
     void initialize(const std::filesystem::path& assetRoot,
                     IGameRenderer& renderer);
     void update(const PlayerVisualState& state, float dt);
-    glm::mat4 renderThirdPerson(IGameRenderer& renderer,
+    PlayerHandTransforms renderThirdPerson(IGameRenderer& renderer,
                                 const glm::dvec3& playerPosition,
                                 const glm::dvec3& renderOrigin,
                                 float yawDegrees, float pitchDegrees,
@@ -34,6 +39,10 @@ private:
     std::string m_locomotion = "idle";
     int m_headNode = -1;
     int m_rightArmNode = -1;
+    int m_leftArmNode = -1;
+    bool m_bowCharging = false;
+    float m_bowCharge = 0.0f;
+    float m_shieldRaise = 0.0f;
     bool m_sleeping = false;
     bool m_prone = false;
 };

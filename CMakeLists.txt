@@ -698,6 +698,7 @@ if(BUILD_TESTING)
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/HeldItemMesh.cpp
+        src/renderer/HeldToolModel.cpp
         src/renderer/RenderDevice.cpp
         src/world/Block.cpp
     )
@@ -739,6 +740,24 @@ if(BUILD_TESTING)
         minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_ui_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    add_executable(held_tool_vulkan_smoke EXCLUDE_FROM_ALL
+        tests/HeldToolVulkanSmoke.cpp
+        src/core/Input.cpp src/core/InputCodes.cpp
+        src/debug/Log.cpp src/game/Item.cpp
+        src/model/AnimationGraph.cpp src/model/AnimationMixer.cpp
+        src/model/GltfLoader.cpp src/model/ModelAnimation.cpp src/model/ModelRenderer.cpp
+        src/player/PlayerRenderer.cpp
+        src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
+        src/renderer/HeldItemMesh.cpp src/renderer/HeldToolModel.cpp
+        src/renderer/HeldItemRenderer.cpp src/world/Block.cpp)
+    target_include_directories(held_tool_vulkan_smoke PRIVATE src external external/stb external/cgltf)
+    target_link_libraries(held_tool_vulkan_smoke PRIVATE glm::glm
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(held_tool_vulkan_smoke PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
@@ -1218,6 +1237,7 @@ if(BUILD_TESTING)
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
         src/renderer/HeldItemMesh.cpp
+        src/renderer/HeldToolModel.cpp
         src/renderer/HeldItemRenderer.cpp
         src/renderer/ParticleSystem.cpp
         src/renderer/RenderDevice.cpp

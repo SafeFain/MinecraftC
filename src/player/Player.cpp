@@ -553,7 +553,9 @@ PlayerVisualState Player::visualState() const {
     return {{m_visualHorizontalVelocity.x, m_velocity.y,
              m_visualHorizontalVelocity.y}, m_onGround, m_isSprinting,
             m_swingSequence, m_swingProgress, m_sleeping, m_sleepProgress,
-            attackStrength(), m_pose};
+            attackStrength(), m_pose, bowCharging(), bowCharge(),
+            m_blocking && !m_inventory.offhand().empty() &&
+                m_inventory.offhand().id == ItemId::SHIELD};
 }
 
 float Player::attackStrength() const {

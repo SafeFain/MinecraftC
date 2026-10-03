@@ -72,3 +72,10 @@ the shared entity-skin pipeline; no online texture files are imported.
   textures or AI image assets were imported. Existing geometry and animation
   data are unchanged. Existing asset licenses remain applicable.
 - Visual QA: `tools/texture_review.py`; actual renderer lighting is unchanged.
+
+## Held weapon and tool models (2026-10-03)
+
+Original programmatic cuboid models and a deterministic pixel palette atlas,
+implemented in `src/renderer/HeldToolModel.cpp`; no imported models or textures.
+Licensed under the repository GPL-3.0-only license. Existing inventory icons
+and player-skin provenance remain as recorded above.

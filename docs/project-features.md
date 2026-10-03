@@ -63,6 +63,11 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   category tabs. F5 cycles first person
   and front/back third person; the animated player and first-person right hand
   display the selected block or item and swing during interaction.
+- All five tiers of swords, pickaxes, axes, shovels and hoes have complete
+  block-style held models, alongside bows, shields, flint and steel and the
+  Starstep Scepter. Both perspectives show continuous bow bending, string draw
+  and a nocked arrow while charging, and the offhand shield smoothly raises
+  during blocking. Inventory icons retain their existing appearance.
 - Creative and Survival share the persisted player hotbar and backpack. New
   worlds start empty; the Creative catalog supplies full stacks into the real
   hotbar, and its player-inventory tab exposes the same storage used by containers.

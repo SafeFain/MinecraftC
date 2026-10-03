@@ -2,6 +2,7 @@
 
 #include "game/Item.h"
 #include "renderer/RenderHandles.h"
+#include "renderer/HeldToolModel.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -20,17 +21,27 @@ public:
     void initialize(IGameRenderer& renderer,
                     const std::filesystem::path& assetRoot);
     void reset();
-    void renderFirstPerson(const ItemStack& item, float swingProgress,
+    void updateUseState(bool bowCharging, float charge, bool blocking, float dt);
+    void renderFirstPerson(const ItemStack& item, const ItemStack& offhand, float swingProgress,
                            float attackStrength,
                            float aspectRatio, const glm::mat4& movementTransform);
     void renderThirdPerson(const ItemStack& item, const glm::mat4& viewProjection,
-                           const glm::mat4& handTransform);
+                           const glm::mat4& handTransform,
+                           const ItemStack& offhand, const glm::mat4& leftHandTransform);
 
 private:
-    struct CachedMesh { RenderMeshHandle handle{}; bool blockAtlas = false; };
+    struct CachedMesh {
+        RenderMeshHandle handle{};
+        bool blockAtlas = false;
+        bool toolModel = false;
+        std::vector<HeldToolRange> ranges;
+    };
     IGameRenderer* m_renderer = nullptr;
     RenderTextureHandle m_itemTexture{};
     RenderTextureHandle m_armTexture{};
+    RenderTextureHandle m_toolTexture{};
+    RenderMaterialHandle m_toolMaterial{};
+    HeldItemUseState m_use;
     RenderMaterialHandle m_itemMaterial{};
     RenderMaterialHandle m_blockMaterial{};
     RenderMaterialHandle m_armMaterial{};
@@ -45,4 +56,6 @@ private:
     std::unordered_map<uint16_t, CachedMesh> m_meshes;
 
     CachedMesh meshFor(ItemId item);
+    void drawItem(const ItemStack& item, const glm::mat4& vp,
+                  const glm::mat4& transform, bool firstPerson);
 };

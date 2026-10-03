@@ -4,6 +4,7 @@
 #include "renderer/CameraEffects.h"
 #include "renderer/CloudRenderData.h"
 #include "renderer/HeldItemMesh.h"
+#include "renderer/HeldToolModel.h"
 #include "model/ModelRenderLogic.h"
 #include "renderer/RenderDevice.h"
 #include "renderer/ParticleSystem.h"
@@ -411,6 +412,83 @@ int main() {
             firstPersonSwingTransform(1.0f) == glm::mat4(1.0f) &&
             firstPersonSwingTransform(0.5f) != glm::mat4(1.0f),
             "first-person swing curve endpoints or motion are incorrect");
+    for(const glm::vec3 target:{glm::vec3(.12f,1.33f,-.58f),
+                               glm::vec3(.12f,1.33f,-.29f),glm::vec3(-.36f,2,0)}) {
+        const glm::vec3 shoulder(-.36f,1.39f,0);
+        const auto pose=playerArmGripPose(shoulder,target);
+        require(glm::length(shoulder+pose.rotation*(pose.scale*playerWristOffset())-target)<.0001f,
+                "player hand misses bow grip/string");
+    }
+    const TextureData toolTexture=buildHeldToolTexture();
+    validateTextureData(toolTexture);
+    const auto checkTool=[&](ItemId id,ToolKind kind,ToolTier tier) {
+        const HeldToolModel model=buildHeldToolModel(id,kind,tier);
+        validateMeshData(model.mesh);
+        require(!model.mesh.indices.empty() && !model.ranges.empty(),"missing 3D tool");
+        uint32_t covered=0;
+        glm::vec3 lo(100),hi(-100);
+        for(const auto& v:model.mesh.vertices) {
+            lo=glm::min(lo,v.position);hi=glm::max(hi,v.position);
+            require(v.uv.x>0 && v.uv.x<1 && v.uv.y>0 && v.uv.y<1,
+                    "tool UV out of atlas");
+        }
+        require(hi.z-lo.z>.05f,"tool model lost thickness");
+        for(const auto& r:model.ranges) {
+            require(r.firstIndex==covered && r.indexCount>0 && r.indexCount%3==0,
+                    "tool component index range invalid");
+            covered+=r.indexCount;
+        }
+        require(covered==model.mesh.indices.size(),"tool index handoff incomplete");
+        return model;
+    };
+    for(const auto kind:{ToolKind::Sword,ToolKind::Pickaxe,ToolKind::Axe,
+                        ToolKind::Shovel,ToolKind::Hoe}) {
+        glm::vec2 previous(-1);
+        for(const auto tier:{ToolTier::Wood,ToolTier::Stone,ToolTier::Iron,
+                            ToolTier::Gold,ToolTier::Diamond}) {
+            const auto model=checkTool(ItemId::WOODEN_SWORD,kind,tier);
+            const glm::vec2 headUv=model.mesh.vertices[24].uv;
+            require(headUv!=previous,"tool tiers share wrong palette");
+            previous=headUv;
+            require(model.mesh.vertices[0].position.y<0 &&
+                model.mesh.vertices[1].position.y>0,"tool grip no longer inside handle");
+        }
+    }
+    checkTool(ItemId::SHIELD,ToolKind::Shield,ToolTier::None);
+    checkTool(ItemId::FLINT_AND_STEEL,ToolKind::None,ToolTier::None);
+    checkTool(ItemId::STARSTEP_SCEPTER,ToolKind::None,ToolTier::None);
+    const auto bowModel=checkTool(ItemId::BOW,ToolKind::Bow,ToolTier::None);
+    require(bowModel.ranges.size()==8,"bow components missing");
+    require(!hasHeldToolModel(ItemId::BREAD,ToolKind::None) &&
+        buildHeldToolModel(ItemId::BREAD,ToolKind::None,ToolTier::None).mesh.indices.empty(),
+        "ordinary items replaced with tool model");
+    for(float charge:{0.0f,.5f,1.0f}) {
+        const auto point=[&](HeldToolPart part,float end) {
+            return glm::vec3(heldToolPartTransform(part,charge)*glm::vec4(0,end,0,1));
+        };
+        require(glm::length(point(HeldToolPart::BowUpperInner,.5f)-
+            point(HeldToolPart::BowUpperOuter,-.5f))<.0001f,"bow elbow disconnected");
+        require(glm::length(point(HeldToolPart::BowUpperOuter,.5f)-
+            point(HeldToolPart::StringUpper,.5f))<.0001f,"bow string disconnected");
+        require(glm::length(point(HeldToolPart::StringUpper,-.5f)-
+            point(HeldToolPart::StringLower,.5f))<.0001f,"bow nock disconnected");
+        const glm::vec3 nock=glm::vec3(heldToolPartTransform(HeldToolPart::Arrow,charge)[3]);
+        require(glm::length(nock-point(HeldToolPart::StringUpper,-.5f))<.0001f,
+                "arrow does not follow string");
+    }
+    require(nearMatrix(heldToolPartTransform(HeldToolPart::StringUpper,-1),
+                       heldToolPartTransform(HeldToolPart::StringUpper,0)) &&
+            nearMatrix(heldToolPartTransform(HeldToolPart::StringUpper,2),
+                       heldToolPartTransform(HeldToolPart::StringUpper,1)),"charge not bounded");
+    HeldItemUseState use=advanceHeldItemUseState({},true,.5f,true,.05f);
+    require(use.bowCharging && use.bowCharge==.5f && use.shieldRaise>.0f &&
+            use.shieldRaise<1,"use state failed to animate");
+    use=advanceHeldItemUseState(use,false,1,false,.2f);
+    require(!use.bowCharging && use.bowCharge==0 && use.shieldRaise==0,
+            "cancelled use state did not reset");
+    use=advanceHeldItemUseState({},true,4,true,1);
+    require(use.bowCharge==1 && use.shieldRaise==1,"use state overshot");
+
     const MeshData blockHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, true);
     const MeshData rawHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, false);
     require(blockHeldCube.vertices.size() == 24 &&

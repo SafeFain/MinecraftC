@@ -176,14 +176,15 @@ void GameScenePresenter::render(
         session.entityState().render(renderer, vp, renderOrigin);
         if (perspective != CameraPerspective::FirstPerson &&
             !session.playerState().isSpectator()) {
-            const glm::mat4 hand = playerRenderer.renderThirdPerson(
+            const PlayerHandTransforms hands = playerRenderer.renderThirdPerson(
                 renderer, session.playerState().getPosition(), renderOrigin,
                 session.playerState().getYaw(), session.playerState().getPitch(), vp,
                 session.worldState().sampleLight(session.playerState().getEyePosition()),
                 session.sleepFacing());
             if (!session.isSleeping())
                 heldItemRenderer.renderThirdPerson(
-                    session.playerState().activeItem(), vp, hand);
+                    session.playerState().activeItem(), vp, hands.right,
+                    session.playerState().inventory().offhand(),hands.left);
         }
         session.particleState().buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
@@ -240,7 +241,8 @@ void GameScenePresenter::render(
             showFirstPersonItem && !session.playerState().isSpectator() &&
             !session.isPlayerDead() && !session.isSleeping())
             heldItemRenderer.renderFirstPerson(
-                session.playerState().activeItem(), session.playerState().visualState().swingProgress,
+                session.playerState().activeItem(),session.playerState().inventory().offhand(),
+                session.playerState().visualState().swingProgress,
                 session.playerState().attackStrength(),
                 window.aspectRatio(),
                 cameraEffects.viewModelTransform());
@@ -359,7 +361,13 @@ void GameScenePresenter::updateCamera(
     bool sleeping, const glm::ivec3& sleepBed,
     const glm::vec3& sleepFacing, float sleepProgress) {
     const PlayerVisualState visual = player.visualState();
-    playerRenderer.update(visual, dt);
+    PlayerVisualState renderVisual=visual;
+    if(playerDead || player.isSpectator() || sleeping) {
+        renderVisual.bowCharging=false;renderVisual.bowCharge=0;renderVisual.blocking=false;
+    }
+    playerRenderer.update(renderVisual, dt);
+    heldItemRenderer.updateUseState(renderVisual.bowCharging,renderVisual.bowCharge,
+                                   renderVisual.blocking,dt);
     camera.updateFov(dynamicViewFov(
         Config::FOV, Config::SPRINT_FOV_BOOST, Config::BOW_FOV_REDUCTION,
         visual, perspective, player.isFlying(),
