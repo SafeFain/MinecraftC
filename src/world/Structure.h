@@ -19,6 +19,12 @@ enum class StructureType : uint8_t {
     StarCrystalGeode,
     CloudspireTower,
     SkywayShrine,
+    DesertTemple,
+    JungleRuins,
+    SwampHut,
+    MountainWatchtower,
+    StoneCircle,
+    AbandonedFarmstead,
     Count
 };
 
@@ -34,7 +40,13 @@ enum class StructureLootProfile : uint8_t {
     StarCrystalGeode,
     CloudspireTower,
     SkywayShrine,
-    OriginSkywayShrine
+    OriginSkywayShrine,
+    DesertTemple,
+    JungleRuins,
+    SwampHut,
+    MountainWatchtower,
+    StoneCircle,
+    AbandonedFarmstead
 };
 
 inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
@@ -50,11 +62,17 @@ inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
         case StructureType::StarCrystalGeode: return StructureLootProfile::StarCrystalGeode;
         case StructureType::CloudspireTower: return StructureLootProfile::CloudspireTower;
         case StructureType::SkywayShrine: return StructureLootProfile::SkywayShrine;
+        case StructureType::DesertTemple: return StructureLootProfile::DesertTemple;
+        case StructureType::JungleRuins: return StructureLootProfile::JungleRuins;
+        case StructureType::SwampHut: return StructureLootProfile::SwampHut;
+        case StructureType::MountainWatchtower: return StructureLootProfile::MountainWatchtower;
+        case StructureType::StoneCircle: return StructureLootProfile::StoneCircle;
+        case StructureType::AbandonedFarmstead: return StructureLootProfile::AbandonedFarmstead;
         default: return StructureLootProfile::None;
     }
 }
 
-inline constexpr std::array<StructureType, 8> OVERWORLD_STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 14> OVERWORLD_STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -63,6 +81,12 @@ inline constexpr std::array<StructureType, 8> OVERWORLD_STRUCTURE_TYPES{
     StructureType::Igloo,
     StructureType::RuinedTower,
     StructureType::LumberCamp,
+    StructureType::DesertTemple,
+    StructureType::JungleRuins,
+    StructureType::SwampHut,
+    StructureType::MountainWatchtower,
+    StructureType::StoneCircle,
+    StructureType::AbandonedFarmstead,
 };
 
 inline constexpr std::array<StructureType, 4> HEAVEN_STRUCTURE_TYPES{
@@ -72,7 +96,7 @@ inline constexpr std::array<StructureType, 4> HEAVEN_STRUCTURE_TYPES{
     StructureType::SkywayShrine,
 };
 
-inline constexpr std::array<StructureType, 12> STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 18> STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -85,6 +109,12 @@ inline constexpr std::array<StructureType, 12> STRUCTURE_TYPES{
     StructureType::StarCrystalGeode,
     StructureType::CloudspireTower,
     StructureType::SkywayShrine,
+    StructureType::DesertTemple,
+    StructureType::JungleRuins,
+    StructureType::SwampHut,
+    StructureType::MountainWatchtower,
+    StructureType::StoneCircle,
+    StructureType::AbandonedFarmstead,
 };
 
 inline constexpr bool isOverworldStructure(StructureType type) {
@@ -113,6 +143,12 @@ inline constexpr std::string_view structureCommandName(StructureType type) {
         case StructureType::StarCrystalGeode: return "star_crystal_geode";
         case StructureType::CloudspireTower: return "cloudspire_tower";
         case StructureType::SkywayShrine: return "skyway_shrine";
+        case StructureType::DesertTemple: return "desert_temple";
+        case StructureType::JungleRuins: return "jungle_ruins";
+        case StructureType::SwampHut: return "swamp_hut";
+        case StructureType::MountainWatchtower: return "mountain_watchtower";
+        case StructureType::StoneCircle: return "stone_circle";
+        case StructureType::AbandonedFarmstead: return "abandoned_farmstead";
         default: return "none";
     }
 }

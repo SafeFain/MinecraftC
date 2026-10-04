@@ -31,12 +31,13 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   ready. New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 17 retains 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 18 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
-  Y=-64..319 while preserving the v6 hybrid-cave algorithm, and adds eight
+  Y=-64..319 while preserving the v6 hybrid-cave algorithm, and includes fourteen
   deterministic overworld structures (plains/adobe villages, traveler huts,
-  abandoned camps, desert wells, igloos, ruined towers, lumber camps). Base
-  cache revision 1 is part of the v17 cache key. Version 14 adds four
+  abandoned camps, desert wells, igloos, ruined towers, lumber camps, desert
+  temples, jungle ruins, swamp huts, mountain watchtowers, stone circles,
+  abandoned farmsteads). Base cache revision 1 is part of the v18 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
@@ -173,7 +174,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-The v15 content remains available in current v17 worlds. Old generation versions
+The v15 content remains available in current v18 worlds. Old generation versions
 are incompatible; current compatibility rules are described below.
 Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
 
@@ -204,7 +205,7 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-Only generation v17 worlds can load. v14/v15 and other previous or future
+Only generation v18 worlds can load. v14/v15 and other previous or future
 versions stay listed as incompatible, retaining their untouched files. No world
 migration remains. The v16 update retained save format v12, seed layout 5, terrain heights, cave-carving
 algorithms, tree/structure anchors and Heaven generation v8. The v17 update below
@@ -242,9 +243,41 @@ changes Heaven and block encoding while retaining Overworld generation output.
   using `/gamerule DayNightDuration <seconds>` with cheats enabled; v2-v13 default
   to 1200 seconds. Save v13 introduced 16-bit IDs, retained in v14; packed light remains byte-sized.
   Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
-  Old metadata remains readable/listed; worlds outside global generation v17
+  Old metadata remains readable/listed; worlds outside global generation v18
   remain incompatible and are never migrated or rewritten by refused loads.
   Seed layout, Overworld generation output and application VERSION are unchanged.
+
+## Overworld structures (generation v18)
+
+Global generation v18 adds six structures, bringing the Overworld total to 14.
+Each has seeded rotation, mirroring and material or damage variants; generation,
+reservations and locate use world-coordinate hashes. Existing structure and loot
+enum values are preserved. All new structures reuse existing blocks and supplies;
+there are no new mobs, villager population requests, traps, or items.
+
+| Locate name | Biomes | Layout / supplies | Cell / chance / radius / relief / height |
+|---|---|---|---|
+| `desert_temple` | Desert | Tiered sandstone temple; hall, five-step descent to a shallow chamber; two tower-loot chests | 256 / 35% / 10 / 3 / 12 |
+| `jungle_ruins` | Jungle, Karst Forest | Mossy courtyard, broken gateways, sealed side room; one tower-loot chest | 192 / 25% / 8 / 3 / 9 |
+| `swamp_hut` | Dry Swamp ground | Raised timber house, piles, three-step entrance and workbench; one traveler-hut chest | 128 / 20% / 6 / 2 / 10 |
+| `mountain_watchtower` | Mountains, Hills, Rocky Steppe, Limestone Highlands | Stone/wood tower, four connected stair flights and viewing platform; one tower-loot chest | 192 / 20% / 6 / 5 / 18 |
+| `stone_circle` | Meadow, Alpine Tundra, Rocky Steppe | Varied stone pillars, ruined lintels and central altar; one tower-loot chest | 128 / 15% / 7 / 3 / 7 |
+| `abandoned_farmstead` | Plains, Sunflower Plains, Savanna, Dry Woodland | Damaged farmhouse, crop plot, open shed and furnace; one village-loot chest | 160 / 15% / 10 / 3 / 9 |
+
+Chance is a per-cell prefilter, not the final world density. Biome, spacing,
+village-priority overlap and full-footprint terrain checks still apply. Sites
+exclude rivers and submerged ground; graded foundations follow the authoritative
+surface sampler. Interior terrain/foliage is carved before walls and stairs.
+Temple chambers extend at most five blocks below the surface, with build limits
+checked. All supplies and the tower platform are accessible by walking stairs.
+Chests/furnaces use the existing pending registration channel; consumed supplies
+stay consumed across unload and reload. Commands also accept `minecraftc:` names.
+
+Global generation and base-cache keys advance to v18/revision 1. Terrain heights,
+cave carving, ore algorithms, seed layout 5, Heaven v9, block IDs, save format v16
+and application VERSION stay unchanged. Added reservations and overlaps can change
+local trees and other small structures. Only v18 worlds load; older/future worlds
+remain listed and refused without rewriting or migration.
 
 ## Classic fishing
 
@@ -279,7 +312,7 @@ changes Heaven and block encoding while retaining Overworld generation output.
   Switching slots, dropping/losing the rod, sleeping, death, Spectator mode,
   dimension changes, world exit, unloaded water and excess distance cancel it.
   Rods and fish persist using save v14; bobbers and timers are transient. World
-  generation remains v17. No enchantments, experience, bait or entity hooking.
+  fishing introduced no generation change (v17 at introduction). No enchantments, experience, bait or entity hooking.
 
 ### GameRule commands
 

@@ -35,8 +35,10 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 }
 
 #include "BiomeSurfaceScenarios.h"
+#include "OverworldStructureScenarios.h"
 
 int main() {
+    testNewStructureBlueprints();
     testBiomeSurfaceEcology();
     testEcologyFormations();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
@@ -853,6 +855,7 @@ int main() {
         switch (placement.type) {
             case StructureType::DesertWell:
             case StructureType::DesertVillage:
+            case StructureType::DesertTemple:
                 require(anchorBiome.biome == Biome::DESERT,
                         "desert structure anchored outside a desert");
                 break;
@@ -865,6 +868,27 @@ int main() {
                             anchorBiome.biome == Biome::SUNFLOWER_PLAINS ||
                             anchorBiome.biome == Biome::MEADOW,
                         "plains village anchored outside plains family");
+                break;
+            case StructureType::JungleRuins:
+                require(anchorBiome.biome == Biome::JUNGLE || anchorBiome.biome == Biome::KARST_FOREST,
+                        "jungle ruins anchored outside a jungle family");
+                break;
+            case StructureType::SwampHut:
+                require(anchorBiome.biome == Biome::SWAMP, "swamp hut anchored outside swamp");
+                break;
+            case StructureType::MountainWatchtower:
+                require(anchorBiome.biome == Biome::MOUNTAINS || anchorBiome.biome == Biome::HILLS ||
+                            anchorBiome.biome == Biome::ROCKY_STEPPE || anchorBiome.biome == Biome::LIMESTONE_HIGHLANDS,
+                        "watchtower anchored outside its mountain families");
+                break;
+            case StructureType::StoneCircle:
+                require(anchorBiome.biome == Biome::MEADOW || anchorBiome.biome == Biome::ALPINE_TUNDRA ||
+                            anchorBiome.biome == Biome::ROCKY_STEPPE, "stone circle anchored outside upland biomes");
+                break;
+            case StructureType::AbandonedFarmstead:
+                require(anchorBiome.biome == Biome::PLAINS || anchorBiome.biome == Biome::SUNFLOWER_PLAINS ||
+                            anchorBiome.biome == Biome::SAVANNA || anchorBiome.biome == Biome::DRY_WOODLAND,
+                        "farmstead anchored outside its plains families");
                 break;
             default:
                 break;
@@ -914,6 +938,9 @@ int main() {
     for (const StructureType type : OVERWORLD_STRUCTURE_TYPES)
         require(structureCounts[static_cast<size_t>(type)] > 0,
                 "structure type is missing from the exploration window");
+    for (const auto& fixture : NEW_STRUCTURE_FIXTURES)
+        std::cout << structureCommandName(fixture.type) << " window count="
+                  << structureCounts[static_cast<size_t>(fixture.type)] << '\n';
 
     // Locate uses the same accepted anchors and must return the globally
     // nearest one in the search radius, not merely the first cell-ring hit.
@@ -943,6 +970,7 @@ int main() {
 
     // Structure material sanity: build a chosen placement through a
     // recording writer and confirm the signature materials appear.
+    testNewStructureGeneration(terrain, structureGenerator);
     auto countMaterials = [](const StructurePlacement& placement,
                              std::set<BlockId>& blocks) {
         StructureGenerator::build(placement, [&](int, int, int, BlockId id) {
@@ -1105,8 +1133,8 @@ int main() {
     // Every public blueprint honors its advertised horizontal reservation,
     // remains inside the world build range, and derives visible variation only
     // from the stable placement variant.
-    const std::array<int, 12> blueprintRadii{
-        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6, 3};
+    const std::array<int, 18> blueprintRadii{
+        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6, 3, 10, 8, 6, 6, 7, 10};
     for (size_t typeIndex = 0; typeIndex < STRUCTURE_TYPES.size(); ++typeIndex) {
         const StructureType type = STRUCTURE_TYPES[typeIndex];
         auto makePlacement = [&](uint64_t variant) {

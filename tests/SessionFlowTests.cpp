@@ -435,7 +435,7 @@ int main(int argc, char** argv) {
         currentMetadata.inventory.slot(8) = {ItemId::CAVE_GLOWSHROOM,23,0};
         currentMetadata.heaven.worldTicks = 6789;
         currentStore.saveMetadata(currentMetadata);
-        for (uint32_t version : {14u,15u,16u,18u}) {
+        for (uint32_t version : {14u,15u,16u,17u,19u}) {
             auto incompatible = currentMetadata;
             incompatible.generationVersion = version;
             currentStore.saveMetadata(incompatible);

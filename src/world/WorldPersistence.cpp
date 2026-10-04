@@ -37,9 +37,11 @@ struct LootEntry {
 std::vector<LootEntry> lootEntries(StructureLootProfile profile) {
     using P=StructureLootProfile;
     switch(profile) {
+        case P::AbandonedFarmstead:
         case P::Village: return {{ItemId::BREAD,1,4,90},{ItemId::WHEAT,2,7,80},
             {ItemId::WHEAT_SEEDS,2,8,75},{ItemId::COAL,1,4,45},
             {ItemId::OAK_SAPLING,1,3,40},{ItemId::RAW_IRON,1,2,20}};
+        case P::SwampHut:
         case P::TravelerHut: return {{ItemId::BREAD,1,3,80},{ItemId::STICK,2,8,90},
             {ItemId::COAL,1,4,65},{ItemId::LEATHER,1,3,45},
             {ItemId::OAK_SAPLING,1,2,55}};
@@ -48,6 +50,10 @@ std::vector<LootEntry> lootEntries(StructureLootProfile profile) {
             {ItemId::ROTTEN_FLESH,1,3,35},{ItemId::BREAD,1,2,30}};
         case P::Igloo: return {{ItemId::COAL,2,6,85},{ItemId::BREAD,1,3,75},
             {ItemId::LEATHER,1,3,55}};
+        case P::DesertTemple:
+        case P::JungleRuins:
+        case P::MountainWatchtower:
+        case P::StoneCircle:
         case P::RuinedTower: return {{ItemId::ARROW,3,10,90},{ItemId::BONE,2,6,80},
             {ItemId::COAL,2,5,65},{ItemId::RAW_IRON,1,3,35},
             {ItemId::GOLD_INGOT,1,2,12}};

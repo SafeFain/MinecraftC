@@ -810,6 +810,27 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_decoration_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
+    # Share the decoration scene's world/mesh dependencies without adding
+    # display-dependent runs to ordinary CTest.
+    get_target_property(MINECRAFTC_STRUCTURE_SMOKE_SOURCES vulkan_decoration_smoke SOURCES)
+    list(REMOVE_ITEM MINECRAFTC_STRUCTURE_SMOKE_SOURCES tests/VulkanDecorationSmoke.cpp)
+    add_executable(vulkan_structure_smoke EXCLUDE_FROM_ALL
+        tests/VulkanStructureSmoke.cpp ${MINECRAFTC_STRUCTURE_SMOKE_SOURCES})
+    target_include_directories(vulkan_structure_smoke PRIVATE src external/stb external/FastNoiseLite)
+    target_include_directories(vulkan_structure_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
+    target_compile_definitions(vulkan_structure_smoke PRIVATE
+        MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        VMA_VULKAN_VERSION=1000000)
+    target_link_libraries(vulkan_structure_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_structure_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(vulkan_structure_smoke PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
     add_executable(vulkan_cloud_lod_smoke EXCLUDE_FROM_ALL
         tests/VulkanCloudLodSmoke.cpp
         src/debug/Log.cpp

@@ -195,7 +195,7 @@ middle-click cloning and middle-button drag filling.
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
 one exists. Save format v14 uses little-endian 16-bit block IDs and can read v2-v13 desktop
-metadata. The current world generation version is v17 (Heaven v9). Generation v11 adds
+metadata. The current world generation version is v18 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
@@ -203,7 +203,7 @@ village variants substantially more common while retaining their biome,
 spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
 the wall-to-roof courses of village houses and traveler huts, keeps hut
 decorations outside the wall, and closes the igloo's diagonal lower shell.
-Only generation v17 worlds can load. All previous and future generation versions
+Only generation v18 worlds can load. All previous and future generation versions
 remain on disk and are shown as incompatible; there is no automatic migration.
 Generation v14 adds deterministic
 Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
@@ -225,6 +225,14 @@ choices; shards, berries and roasted foods support collection and crafting.
 Five altitude layers, eight biomes and existing shrine transport remain.
 Block storage, overrides and derived caches now preserve IDs above 255.
 
+Generation v18 adds six Overworld structures: desert temples, jungle ruins,
+swamp huts, mountain watchtowers, stone circles, and abandoned farmsteads.
+All use existing materials and seeded layout variants, provide accessible
+supplies, and support `/locate structure` (see [structure details](docs/project-features.md#overworld-structures-generation-v18)).
+Terrain heights, cave-carving, seed layout 5, Heaven v9, save format v16 and
+application VERSION are unchanged. New reservations may alter nearby trees
+and structure spacing. v17 worlds remain listed but cannot load or migrate.
+
 Each world saves its day/night duration, defaulting to 1200 seconds for a full
 day and night. Set it with `/gamerule DayNightDuration 1200` (positive integer
 seconds); older saves also default to 1200. This is no longer a client setting.
@@ -232,7 +240,7 @@ seconds); older saves also default to 1200. This is no longer a client setting.
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
 `/give <item_name> [1..64]`, `/gamerule <rule> [<value>]`, `/help gamerule [<rule>]`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
-supports the current dimension's Overworld structures plus Heaven's
+supports all fourteen Overworld structures in the Overworld plus Heaven's
 `xiguang_ruin`, `star_crystal_geode`, `cloudspire_tower`, and `skyway_shrine`.
 Skyway Shrines link all five altitude bands, while the Heaven-only Starstep
 Scepter provides a reusable 96-block safe-surface jump. Command arguments

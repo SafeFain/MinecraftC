@@ -13,6 +13,7 @@
 #include "world/ChunkStore.h"
 #include "world/FluidLogic.h"
 #include "world/WorldPersistence.h"
+#include "OverworldStructureFixtures.h"
 
 #include <glm/glm.hpp>
 
@@ -1152,6 +1153,65 @@ void testGeneratedBlockEntityRegistration() {
             "removing a generated chest left its block entity behind");
 }
 
+void testNewStructureLootPersistence() {
+    const auto root = std::filesystem::temp_directory_path() / "minecraftc-world-orch-v18-loot";
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    SaveStore save(root);
+    const auto sameContents = [](const auto& a, const auto& b) {
+        return std::equal(a.begin(),a.end(),b.begin(),[](const ItemStack& x,const ItemStack& y) {
+            return x.id==y.id && x.count==y.count && x.damage==y.damage;
+        });
+    };
+    for (const auto& fixture : NEW_STRUCTURE_FIXTURES) {
+        ChunkStore chunks;
+        WorldPersistence persistence(chunks);
+        persistence.setSaveStore(&save);
+        const auto profile = structureLootProfile(fixture.type);
+        const auto baseProfile = fixture.type==StructureType::SwampHut ? StructureLootProfile::TravelerHut :
+            fixture.type==StructureType::AbandonedFarmstead ? StructureLootProfile::Village : StructureLootProfile::RuinedTower;
+        const int y = 70+static_cast<int>(fixture.type);
+        const auto index = [&](int x) { return static_cast<uint32_t>(x+7*16+Config::worldYToStorageY(y)*256); };
+        const glm::ivec3 left{-17,y,23}, right{-15,y,23}, baseline{-14,y,23};
+        std::array<ItemStack,27> first{};
+        for (uint64_t seed = 1; seed <= 32; ++seed) {
+            persistence.clear();
+            chunks.withUnique([&](ChunkStore&) {
+                persistence.registerGeneratedBlockEntityUnlocked(-2,1,index(15),BlockId::CHEST,profile,seed);
+                persistence.registerGeneratedBlockEntityUnlocked(-1,1,index(1),BlockId::CHEST,profile,seed);
+                persistence.registerGeneratedBlockEntityUnlocked(-1,1,index(2),BlockId::CHEST,baseProfile,seed);
+            });
+            first = persistence.getBlockEntity(left)->chest;
+            require(sameContents(first,persistence.getBlockEntity(right)->chest),
+                    "new structure loot changes with chunk or registration order");
+            require(sameContents(first,persistence.getBlockEntity(baseline)->chest),
+                    "new structure loot no longer reuses its intended supplies");
+        }
+        // Drain the generated supplies, persist both sides of a negative
+        // chunk boundary, then regenerate and apply the saved empty inventory.
+        persistence.getBlockEntity(left)->chest.fill({});
+        persistence.getBlockEntity(right)->chest.fill({});
+        chunks.withUnique([&](ChunkStore&) {
+            persistence.saveBlockEntities(-2,1);
+            persistence.saveBlockEntities(-1,1);
+        });
+        persistence.clear();
+        chunks.withUnique([&](ChunkStore&) {
+            persistence.registerGeneratedBlockEntityUnlocked(-1,1,index(1),BlockId::CHEST,profile,999);
+            persistence.registerGeneratedBlockEntityUnlocked(-2,1,index(15),BlockId::CHEST,profile,999);
+            persistence.loadBlockEntities(-2,1);
+            persistence.loadBlockEntities(-1,1);
+            persistence.registerGeneratedBlockEntityUnlocked(-2,1,index(15),BlockId::CHEST,profile,1000);
+        });
+        for (const auto& position : {left,right}) {
+            const auto& contents = persistence.getBlockEntity(position)->chest;
+            require(std::all_of(contents.begin(),contents.end(),[](const ItemStack& s) { return s.empty(); }),
+                    "new structure chest replenished after save/reload");
+        }
+    }
+    std::filesystem::remove_all(root);
+}
+
 void testGeneratedStructureWorkBlocks() {
     // Seed 8 places an abandoned camp (with a generated chest) near world
     // origin. After streaming generation, every generated Chest/Furnace in
@@ -1264,6 +1324,7 @@ int main() {
     testSuperflatFluidSpreadAndBudget();
     testBedLifecycle();
     testGeneratedBlockEntityRegistration();
+    testNewStructureLootPersistence();
     testGeneratedStructureWorkBlocks();
     testHeavenStarstepResolution();
     std::cout << "World orchestration tests passed\n";

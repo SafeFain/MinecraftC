@@ -99,6 +99,10 @@ int main(int argc, char** argv) {
                     parsed.command->type == CommandType::LocateStructure &&
                     parsed.command->structure == type,
                 "a registered structure name was not accepted by locate");
+        const auto namespaced = parseCommand(
+            "/locate structure minecraftc:" + std::string(structureCommandName(type)));
+        require(namespaced.command && namespaced.command->structure == type,
+                "a registered namespaced structure was not accepted by locate");
     }
     const auto namespacedStructure =
         parseCommand("/locate structure minecraftc:igloo");
@@ -120,9 +124,10 @@ int main(int argc, char** argv) {
     const std::string structurePrefix = "/locate structure de";
     const auto structureSuggestions = commandSuggestions(
         structurePrefix, structurePrefix.size());
-    require(structureSuggestions.size() == 2 &&
-                structureSuggestions[0].text == "desert_village" &&
-                structureSuggestions[1].text == "desert_well",
+    require(structureSuggestions.size() == 3 &&
+                structureSuggestions[0].text == "desert_temple" &&
+                structureSuggestions[1].text == "desert_village" &&
+                structureSuggestions[2].text == "desert_well",
             "structure argument completion did not return sorted matches");
     const std::string heavenStructurePrefix = "/locate structure cloud";
     const auto heavenStructureSuggestions = commandSuggestions(

@@ -649,6 +649,258 @@ void buildLumberCamp(const StructurePlacement& placement,
           BlockId::SPRUCE_SAPLING);
 }
 
+void prepareSite(const StructurePlacement& placement,
+                 const StructureGenerator::StructureWriter& write,
+                 int height, BlockId ground, bool round = false) {
+    const int cx = (placement.minX + placement.maxX) / 2;
+    const int cz = (placement.minZ + placement.maxZ) / 2;
+    const int radius = (placement.maxX - placement.minX) / 2;
+    for (int dz = -radius; dz <= radius; ++dz) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            if (round && dx * dx + dz * dz > radius * radius) continue;
+            // Base writes also fill the gap to sampleColumn's natural surface
+            // through the transformed writer. Carving removes uphill terrain
+            // and incoming foliage before any rooms or access stairs are built.
+            write(cx + dx, placement.baseY, cz + dz, ground);
+            for (int dy = 1; dy <= height; ++dy)
+                write(cx + dx, placement.baseY + dy, cz + dz, BlockId::AIR);
+        }
+    }
+}
+
+void buildDesertTemple(const StructurePlacement& p,
+                       const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 12, BlockId::SANDSTONE);
+    fillBox(write, x-5, y-5, z-6, x+5, y, z+6, BlockId::CUT_SANDSTONE);
+    for (int dy = 1; dy <= 11; ++dy) {
+        const int half = dy <= 3 ? 8 : dy <= 6 ? 6 : dy <= 9 ? 4 : 2;
+        fillBox(write, x-half, y+dy, z-half, x+half, y+dy, z+half,
+                dy % 3 == 0 ? BlockId::SMOOTH_SANDSTONE : BlockId::SANDSTONE);
+    }
+    fillBox(write, x-4, y+1, z-5, x+4, y+3, z+5, BlockId::AIR);
+    fillBox(write, x-1, y+1, z-8, x+1, y+2, z-5, BlockId::AIR);
+    for (const int side : {-2, 2}) {
+        for (int dy = 1; dy <= 4; ++dy)
+            write(x+side, y+dy, z-8,
+                  dy == 3 ? BlockId::TERRACOTTA : BlockId::CUT_SANDSTONE);
+    }
+    // A five-step descent opens into the shallow chamber; all three columns
+    // retain full headroom, including where they cross the surface floor.
+    fillBox(write, x-3, y-4, z, x+3, y-1, z+4, BlockId::AIR);
+    for (int step = 0; step <= 5; ++step) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const int stairY = y-step;
+            write(x+dx, stairY, z-5+step,
+                  step == 5 ? BlockId::CUT_SANDSTONE :
+                      stairBlock(ArchitecturalMaterial::Terracotta,
+                                 BlockHalf::Bottom, BedDirection::North));
+            for (int clearY = stairY+1; clearY <= y+3; ++clearY)
+                write(x+dx, clearY, z-5+step, BlockId::AIR);
+        }
+    }
+    for (const int side : {-2, 2}) {
+        write(x+side, y-4, z+3, BlockId::CHEST);
+        write(x+side, y-2, z+4, BlockId::TORCH);
+    }
+    const int crest = (p.variant & 1u) ? -1 : 1;
+    write(x+crest, y+12, z, BlockId::CHISELED_STONE_BRICKS);
+    write(x-crest, y+11, z, BlockId::TERRACOTTA);
+}
+
+void buildJungleRuins(const StructurePlacement& p,
+                      const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 9, BlockId::MOSSY_STONE_BRICKS);
+    for (int dz = -6; dz <= 6; ++dz) {
+        for (int dx = -6; dx <= 6; ++dx) {
+            if (std::abs(dx) != 6 && std::abs(dz) != 6) continue;
+            for (int dy = 1; dy <= 3; ++dy) {
+                const uint64_t h = WorldGenContext::hashPosition(p.variant, dx, dy, dz);
+                if (dy > 1 && h % 4 == 0) continue;
+                write(x+dx, y+dy, z+dz,
+                      h % 3 == 0 ? BlockId::CRACKED_STONE_BRICKS : BlockId::MOSSY_STONE_BRICKS);
+            }
+        }
+    }
+    fillBox(write, x-1, y+1, z-6, x+1, y+3, z-6, BlockId::AIR);
+    for (const int side : {-2, 2})
+        fillBox(write, x+side, y+1, z-6, x+side, y+4, z-6, BlockId::STONE_BRICKS);
+    fillBox(write, x-2, y+5, z-6, x+2, y+5, z-6, BlockId::CHISELED_STONE_BRICKS);
+    for (const int dx : {-4, 4})
+        fillBox(write, x+dx, y+1, z+5, x+dx, y+6, z+5, BlockId::MOSSY_STONE_BRICKS);
+    for (int dx = -4; dx <= 4; ++dx) {
+        if (WorldGenContext::hashPosition(p.variant, dx, 6, 5) % 5 != 0)
+            write(x+dx, y+6, z+5, BlockId::CRACKED_STONE_BRICKS);
+    }
+    // Sealed side chamber with an open courtyard-facing entrance.
+    for (int dy = 1; dy <= 4; ++dy)
+        fillRing(write, x+2, y+dy, z-1, x+6, z+4, BlockId::MOSSY_STONE_BRICKS);
+    fillBox(write, x+2, y+5, z-1, x+6, y+5, z+4, BlockId::STONE_BRICKS);
+    write(x+2, y+1, z+1, BlockId::AIR);
+    write(x+2, y+2, z+1, BlockId::AIR);
+    write(x+5, y+1, z+3, BlockId::CHEST);
+    write(x+4, y+3, z+3, BlockId::TORCH);
+    for (int i = 0; i < 6; ++i) {
+        const uint64_t h = WorldGenContext::hashPosition(p.variant, i, 0, 7);
+        const int px = x-6+static_cast<int>(h%5);
+        const int pz = z+3+static_cast<int>((h>>8)%4);
+        write(px, y, pz, BlockId::MOSS);
+        write(px, y+1, pz,
+              (h&1u) ? BlockId::MOSS : BlockId::FERN);
+    }
+}
+
+void buildSwampHut(const StructurePlacement& p,
+                   const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 10, BlockId::COARSE_DIRT, true);
+    for (const int dx : {-3, 3}) for (const int dz : {-2, 2})
+        fillBox(write, x+dx, y, z+dz, x+dx, y+6, z+dz, BlockId::WOOD);
+    fillBox(write, x-3, y+3, z-2, x+3, y+3, z+2, BlockId::PLANKS);
+    for (int dy = 4; dy <= 6; ++dy)
+        fillRing(write, x-3, y+dy, z-2, x+3, z+2, BlockId::PLANKS);
+    for (const int dx : {-3, 3}) for (const int dz : {-2, 2})
+        fillBox(write, x+dx, y+4, z+dz, x+dx, y+6, z+dz, BlockId::WOOD);
+    fillBox(write, x-4, y+7, z-3, x+4, y+7, z+3, BlockId::PLANKS);
+    fillBox(write, x-2, y+8, z-3, x+2, y+8, z+3, BlockId::PLANKS);
+    fillBox(write, x-1, y+9, z-3, x+1, y+9, z+3, BlockId::PLANKS);
+    for (int step = 1; step <= 3; ++step) {
+        const int sz = z-6+step;
+        fillBox(write, x-1, y, sz, x+1, y+step-1, sz, BlockId::WOOD);
+        for (int dx = -1; dx <= 1; ++dx)
+            write(x+dx, y+step, sz,
+                  stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                             BedDirection::South));
+    }
+    write(x, y+4, z-2, BlockId::AIR);
+    write(x, y+5, z-2, BlockId::AIR);
+    write(x-3, y+5, z, BlockId::GLASS);
+    write(x+3, y+5, z, BlockId::GLASS);
+    write(x-2, y+4, z+1, BlockId::CHEST);
+    write(x+2, y+4, z+1, BlockId::CRAFTING_TABLE);
+    write(x+2, y+6, z, BlockId::TORCH);
+    const int chimney = (p.variant & 1u) ? -2 : 2;
+    fillBox(write, x+chimney, y+8, z+1, x+chimney, y+10, z+1, BlockId::COBBLESTONE);
+}
+
+void buildMountainWatchtower(const StructurePlacement& p,
+                             const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 18, BlockId::COBBLESTONE, true);
+    for (int dy = 1; dy <= 16; ++dy) {
+        fillRing(write, x-4, y+dy, z-4, x+4, z+4,
+                 dy%4 == 0 ? BlockId::WOOD : BlockId::STONE_BRICKS);
+    }
+    for (int level = 4; level <= 16; level += 4)
+        fillBox(write, x-3, y+level, z-3, x+3, y+level, z+3, BlockId::PLANKS);
+    for (int dy = 1; dy <= 2; ++dy) write(x, y+dy, z+4, BlockId::AIR);
+    for (int level = 2; level <= 14; level += 4) {
+        for (const int dx : {-4, 4}) write(x+dx, y+level, z, BlockId::GLASS);
+        write(x, y+level, z-4, BlockId::GLASS);
+    }
+    // Alternating four-step flights joined by the full floor landings. Carve
+    // three blocks above every stair after all floors exist, so floor edges
+    // cannot seal the next flight's headroom.
+    for (int flight = 0; flight < 4; ++flight) {
+        const bool north = flight%2 == 0;
+        for (int step = 1; step <= 4; ++step) {
+            const int sz = north ? z+3-step : z-1+step;
+            const int sy = y+flight*4+step;
+            for (const int dx : (north ? std::array<int,2>{-3,-2} : std::array<int,2>{2,3})) {
+                write(x+dx, sy, sz,
+                      stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
+                                 north ? BedDirection::North : BedDirection::South));
+                for (int clearY = sy+1; clearY <= std::min(y+18, sy+3); ++clearY)
+                    write(x+dx, clearY, sz, BlockId::AIR);
+            }
+        }
+    }
+    for (int dx = -4; dx <= 4; ++dx) for (int dz = -4; dz <= 4; ++dz) {
+        if (std::abs(dx) != 4 && std::abs(dz) != 4) continue;
+        if (WorldGenContext::hashPosition(p.variant, dx, 17, dz)%3 != 0)
+            write(x+dx, y+17, z+dz, BlockId::STONE_BRICKS);
+    }
+    for (const int dx : {-4, 4}) for (const int dz : {-4, 4})
+        write(x+dx, y+18, z+dz, BlockId::WOOD);
+    write(x, y+1, z-2, BlockId::CHEST);
+    write(x+1, y+3, z-2, BlockId::TORCH);
+}
+
+void buildStoneCircle(const StructurePlacement& p,
+                      const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 7, BlockId::GRASS, true);
+    for (const int side : {-5, 5}) {
+        const int height = 4+static_cast<int>(WorldGenContext::hashPosition(p.variant,side,0,0)%3);
+        for (const int dz : {-3, 3})
+            fillBox(write, x+side, y+1, z+dz, x+side, y+height, z+dz, BlockId::STONE_BRICKS);
+        for (int dz = -3; dz <= 3; ++dz)
+            if (WorldGenContext::hashPosition(p.variant,side,height,dz)%4 != 0)
+                write(x+side, y+height+1, z+dz, BlockId::CRACKED_STONE_BRICKS);
+    }
+    for (const int dz : {-6, 6}) {
+        const int height = 3+static_cast<int>(WorldGenContext::hashPosition(p.variant,0,0,dz)%3);
+        fillBox(write, x, y+1, z+dz, x, y+height, z+dz, BlockId::CHISELED_STONE_BRICKS);
+    }
+    fillBox(write, x-1, y+1, z-1, x+1, y+1, z+1, BlockId::MOSSY_STONE_BRICKS);
+    write(x, y+2, z, BlockId::CHISELED_STONE_BRICKS);
+    write(x, y+1, z+3, BlockId::CHEST);
+}
+
+void buildAbandonedFarmstead(const StructurePlacement& p,
+                             const StructureGenerator::StructureWriter& write) {
+    const int x = (p.minX + p.maxX) / 2;
+    const int z = (p.minZ + p.maxZ) / 2;
+    const int y = p.baseY;
+    prepareSite(p, write, 9, BlockId::COARSE_DIRT);
+    fillBox(write, x-8, y, z-7, x, y, z+1, BlockId::COBBLESTONE);
+    for (int dy = 1; dy <= 3; ++dy)
+        fillRing(write, x-8, y+dy, z-7, x, z+1, BlockId::PLANKS);
+    for (const int dx : {-8, 0}) for (const int dz : {-7, 1})
+        fillBox(write, x+dx, y+1, z+dz, x+dx, y+3, z+dz, BlockId::WOOD);
+    for (int dy = 4; dy <= 6; ++dy) {
+        const int half = 5-(dy-4);
+        for (int dz = -8; dz <= 2; ++dz) for (int dx = -half; dx <= half; ++dx) {
+            const uint64_t h = WorldGenContext::hashPosition(p.variant,dx,dy,dz);
+            if (dy > 4 && h%5 == 0) continue;
+            write(x-4+dx, y+dy, z+dz, h%7 == 0 ? BlockId::COBBLESTONE : BlockId::PLANKS);
+        }
+    }
+    write(x-4, y+1, z+1, BlockId::AIR);
+    write(x-4, y+2, z+1, BlockId::AIR);
+    write(x-8, y+2, z-3, BlockId::GLASS);
+    write(x, y+2, z-3, BlockId::GLASS);
+    write(x-6, y+1, z-5, BlockId::CHEST);
+    write(x-2, y+1, z-5, BlockId::FURNACE);
+    write(x-2, y+1, z-3, BlockId::CRAFTING_TABLE);
+    write(x-6, y+3, z-3, BlockId::TORCH);
+    for (const int dx : {2, 7}) for (const int dz : {-7, -1})
+        fillBox(write, x+dx, y+1, z+dz, x+dx, y+4, z+dz, BlockId::WOOD);
+    fillBox(write, x+2, y+5, z-7, x+7, y+5, z-1, BlockId::PLANKS);
+    for (int dz = 3; dz <= 7; ++dz) for (int dx = 1; dx <= 7; ++dx) {
+        if (dx == 4) {
+            write(x+dx, y, z+dz, BlockId::WATER);
+        } else {
+            write(x+dx, y, z+dz, BlockId::FARMLAND_7);
+            const uint64_t h = WorldGenContext::hashPosition(p.variant,dx,0,dz);
+            if (h%3 != 0) write(x+dx, y+1, z+dz, wheatStage(h));
+        }
+    }
+    fillBox(write, x+3, y+1, z-6, x+5, y+1, z-5, BlockId::PLANKS);
+    write(x+4, y+2, z-6, BlockId::WOOD);
+}
+
 void buildXiguangRuin(const StructurePlacement& placement,
                       const StructureGenerator::StructureWriter& write) {
     const int cx=(placement.minX+placement.maxX)/2;
@@ -802,7 +1054,7 @@ int StructureGenerator::floorDiv(int value, int divisor) {
 
 const StructureGenerator::TypeParams& StructureGenerator::params(
     StructureType type) {
-    static constexpr std::array<TypeParams, 9> table{{
+    static constexpr std::array<TypeParams, 15> table{{
         {StructureType::None, 0, 0, 0, 0},
         // Village candidates still pass biome, spacing and full-footprint
         // terrain checks. Plains have a 40% cell chance; desert candidates run
@@ -816,10 +1068,17 @@ const StructureGenerator::TypeParams& StructureGenerator::params(
         {StructureType::Igloo, 80, 12, 2, 7},
         {StructureType::RuinedTower, 128, 10, 3, 18},
         {StructureType::LumberCamp, 96, 10, 2, 8},
+        {StructureType::DesertTemple, 256, 35, 3, 12},
+        {StructureType::JungleRuins, 192, 25, 3, 9},
+        {StructureType::SwampHut, 128, 20, 2, 10},
+        {StructureType::MountainWatchtower, 192, 20, 5, 18},
+        {StructureType::StoneCircle, 128, 15, 3, 7},
+        {StructureType::AbandonedFarmstead, 160, 15, 3, 9},
     }};
-    const int index = static_cast<int>(type);
-    return table[index >= 0 && index < static_cast<int>(table.size())
-                     ? index : 0];
+    // Overworld types are appended after the stable Heaven enum values.
+    for (const TypeParams& entry : table)
+        if (entry.type == type) return entry;
+    return table.front();
 }
 
 bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
@@ -829,6 +1088,7 @@ bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
                    biome == Biome::MEADOW;
         case StructureType::DesertVillage:
         case StructureType::DesertWell:
+        case StructureType::DesertTemple:
             return biome == Biome::DESERT;
         case StructureType::TravelerHut:
             return biome == Biome::PLAINS || biome == Biome::SUNFLOWER_PLAINS ||
@@ -847,6 +1107,19 @@ bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
                    biome == Biome::PLAINS || biome == Biome::DRY_WOODLAND;
         case StructureType::LumberCamp:
             return biome == Biome::TAIGA;
+        case StructureType::JungleRuins:
+            return biome == Biome::JUNGLE || biome == Biome::KARST_FOREST;
+        case StructureType::SwampHut:
+            return biome == Biome::SWAMP;
+        case StructureType::MountainWatchtower:
+            return biome == Biome::MOUNTAINS || biome == Biome::HILLS ||
+                   biome == Biome::ROCKY_STEPPE || biome == Biome::LIMESTONE_HIGHLANDS;
+        case StructureType::StoneCircle:
+            return biome == Biome::MEADOW || biome == Biome::ALPINE_TUNDRA ||
+                   biome == Biome::ROCKY_STEPPE;
+        case StructureType::AbandonedFarmstead:
+            return biome == Biome::PLAINS || biome == Biome::SUNFLOWER_PLAINS ||
+                   biome == Biome::SAVANNA || biome == Biome::DRY_WOODLAND;
         default:
             return false;
     }
@@ -871,6 +1144,12 @@ int StructureGenerator::halfSize(StructureType type, uint64_t variant) {
             return 8;
         case StructureType::DesertWell:
             return 4;
+        case StructureType::DesertTemple:
+        case StructureType::AbandonedFarmstead: return 10;
+        case StructureType::JungleRuins: return 8;
+        case StructureType::SwampHut:
+        case StructureType::MountainWatchtower: return 6;
+        case StructureType::StoneCircle: return 7;
         default:
             return 3;
     }
@@ -913,12 +1192,15 @@ bool StructureGenerator::terrainFits(const Candidate& candidate) const {
     const int anchorHeight = m_heightPipeline.sampleColumn(
         candidate.x, candidate.z).height;
     const TypeParams& p = params(candidate.type);
+    if (candidate.type == StructureType::DesertTemple &&
+        anchorHeight - 5 < Config::WORLD_MIN_Y)
+        return false;
     for (int z = candidate.minZ; z <= candidate.maxZ; ++z) {
         for (int x = candidate.minX; x <= candidate.maxX; ++x) {
             const SurfaceColumn column = m_heightPipeline.sampleColumn(x, z);
             if (column.river || column.height < column.waterLevel) return false;
             if (column.height <= Config::SEA_LEVEL) return false;
-            if (column.height > Config::WORLD_MAX_Y - p.maxBuildHeight)
+            if (column.height >= Config::WORLD_MAX_Y - p.maxBuildHeight)
                 return false;
             if (std::abs(column.height - anchorHeight) > p.tolerance)
                 return false;
@@ -1189,6 +1471,24 @@ void StructureGenerator::build(const StructurePlacement& placement,
             break;
         case StructureType::LumberCamp:
             buildLumberCamp(placement, transformedWrite);
+            break;
+        case StructureType::DesertTemple:
+            buildDesertTemple(placement, transformedWrite);
+            break;
+        case StructureType::JungleRuins:
+            buildJungleRuins(placement, transformedWrite);
+            break;
+        case StructureType::SwampHut:
+            buildSwampHut(placement, transformedWrite);
+            break;
+        case StructureType::MountainWatchtower:
+            buildMountainWatchtower(placement, transformedWrite);
+            break;
+        case StructureType::StoneCircle:
+            buildStoneCircle(placement, transformedWrite);
+            break;
+        case StructureType::AbandonedFarmstead:
+            buildAbandonedFarmstead(placement, transformedWrite);
             break;
         case StructureType::XiguangRuin:
             buildXiguangRuin(placement, transformedWrite);
