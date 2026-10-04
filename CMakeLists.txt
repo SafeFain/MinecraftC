@@ -1018,7 +1018,7 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME entity_ground_navigation COMMAND ground_navigation_tests)
 
-    add_executable(entity_logic_tests tests/EntityLogicTests.cpp)
+    add_executable(entity_logic_tests tests/EntityLogicTests.cpp src/world/Block.cpp)
     target_include_directories(entity_logic_tests PRIVATE src)
     target_link_libraries(entity_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1206,6 +1206,8 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
     add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_test(NAME projectile_flight_integration COMMAND session_flow_tests --projectile-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(projectile_flight_integration PROPERTIES TIMEOUT 120)
     set_tests_properties(entity_ai_integration PROPERTIES TIMEOUT 120)
     # This test is normally sub-second; a generous ceiling turns a future
     # deadlock into a fast, actionable CTest timeout instead of a stuck job.

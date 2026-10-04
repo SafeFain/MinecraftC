@@ -3,7 +3,7 @@
 #include "Config.h"
 #include "app/GameSession.h"
 #include "core/Window.h"
-#include "entity/ProjectileLogic.h"
+#include "entity/ProjectileCollision.h"
 #include "game/ClientSettings.h"
 #include "game/Localization.h"
 #include "player/Player.h"
@@ -321,19 +321,18 @@ void GameScenePresenter::render(
 void GameScenePresenter::appendBowTrajectory(
     const GameSession& session, const glm::dvec3& renderOrigin) {
     const auto launch = session.playerState().bowLaunchPreview();
-    if (!launch) return;
+    if (!launch || particleRenderData.size() >= ParticleSystem::MAX_PARTICLES) return;
     constexpr double stepSeconds = 0.10;
     constexpr int pointCount = 32;
-    glm::dvec3 previous = launch->origin;
+    const auto blockHit = projectileBlockHit(
+        launch->origin, launch->velocity, pointCount * stepSeconds,
+        [&session](int x, int y, int z) {
+            return session.worldState().getBlock(x, y, z);
+        });
     for (int point = 1; point <= pointCount; ++point) {
+        if (blockHit && point * stepSeconds >= *blockHit) break;
         const glm::dvec3 current = projectilePosition(
             launch->origin, launch->velocity, point * stepSeconds);
-        const glm::dvec3 segment = current - previous;
-        const float segmentLength = static_cast<float>(glm::length(segment));
-        if (segmentLength <= 0.0001f) break;
-        if (session.worldState().raycast(
-                previous, glm::normalize(glm::vec3(segment)), segmentLength))
-            break;
         if (particleRenderData.size() >= ParticleSystem::MAX_PARTICLES) break;
         const float fade = static_cast<float>(point - 1) /
             static_cast<float>(pointCount);
@@ -341,7 +340,6 @@ void GameScenePresenter::appendBowTrajectory(
             glm::vec3(current - renderOrigin),
             static_cast<float>(ParticleKind::Trajectory),
             0.08f + fade * 0.68f, 0.0f, 0.13f, 0.0f});
-        previous = current;
     }
 }
 

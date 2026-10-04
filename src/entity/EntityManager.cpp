@@ -1,6 +1,6 @@
 #include "entity/EntityManager.h"
 #include "entity/EntityLogic.h"
-#include "entity/ProjectileLogic.h"
+#include "entity/ProjectileCollision.h"
 
 #include "player/Player.h"
 #include "world/World.h"
@@ -931,64 +931,86 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         }
         return;
     }
-    const glm::dvec3 start=arrow.position;
-    const glm::dvec3 delta=projectilePosition(
-        glm::dvec3(0.0), arrow.velocity, static_cast<double>(dt));
-    const int steps=sweptCollisionSteps(glm::length(delta));
-    for(int step=1;step<=steps;++step) {
-        const glm::dvec3 next=start+delta*(static_cast<double>(step)/steps);
-        const glm::ivec3 block(glm::floor(next));
-        const BlockId hitBlock = m_world.getBlock(block.x,block.y,block.z);
-        if(pointInsideBlockCollision(hitBlock,
-                glm::vec3(next - glm::dvec3(block)))) {
-            arrow.position=next;arrow.velocity={0,0,0};arrow.inGround=true;return;
+    const glm::dvec3 start = arrow.position;
+    const glm::vec3 initialVelocity = arrow.velocity;
+    double contactTime = dt;
+    Entity* victim = nullptr;
+    bool hitPlayer = false;
+    if (!arrow.playerOwned) {
+        const auto hit = projectileAabbHit(start, initialVelocity,
+            player.getPosition() + glm::dvec3(-.3, 0, -.3),
+            player.getPosition() + glm::dvec3(.3, player.currentHeight(), .3),
+            contactTime);
+        if (hit) {
+            contactTime = *hit;
+            hitPlayer = true;
         }
-        if (!arrow.playerOwned) {
-            const glm::dvec3 playerMin=player.getPosition()+glm::dvec3(-.3,0,-.3);
-            const glm::dvec3 playerMax=player.getPosition()+glm::dvec3(.3,1.8,.3);
-            if(next.x>=playerMin.x&&next.x<=playerMax.x&&next.y>=playerMin.y&&
-               next.y<=playerMax.y&&next.z>=playerMin.z&&next.z<=playerMax.z) {
-                DamageSourceInfo source;
-                source.amount = arrow.projectileDamage;
-                source.cause = DamageCause::Projectile;
-                source.shieldBlockable = true;
-                source.hasOrigin = true;
-                source.origin = arrow.position;
-                glm::vec3 impulse(arrow.velocity.x, 0.0f, arrow.velocity.z);
-                if (glm::length(impulse) > 0.001f)
-                    impulse = glm::normalize(impulse) * 3.0f;
-                impulse.y = 1.5f;
-                source.impulse = impulse;
-                const DamageOutcome outcome = player.takeDamage(source);
-                if (outcome.blocked) {
-                    arrow.position = next;
-                    arrow.velocity *= -0.2f;
-                    arrow.playerOwned = true;
-                    return;
-                }
-                arrow.health=0;return;
-            }
-        }
-        for(auto& target:m_entities) {
-            if(&target==&arrow || target.id==arrow.shooterId || target.type==EntityType::Item || target.type==EntityType::Arrow || target.health<=0) continue;
-            const glm::vec3 size=renderSize(target.type);
-            const glm::dvec3 min=target.position+glm::dvec3(-size.x*.5,0,-size.z*.5);
-            const glm::dvec3 max=target.position+glm::dvec3(size.x*.5,size.y,size.z*.5);
-            if(next.x>=min.x&&next.x<=max.x&&next.y>=min.y&&next.y<=max.y&&next.z>=min.z&&next.z<=max.z) {
-                glm::vec3 knockback(arrow.velocity.x, 0.0f, arrow.velocity.z);
-                if (glm::length(knockback) > 0.001f)
-                    knockback = glm::normalize(knockback) * 3.0f;
-                knockback.y = 1.5f;
-                damageEntity(target, arrow.projectileDamage, knockback,
-                             arrow.playerOwned, arrow.position, arrow.shooterId);
-                arrow.health=0;return;
-            }
-        }
-        arrow.position=next;
     }
-    arrow.velocity=projectileVelocityAfter(arrow.velocity,dt);
-    if(glm::length(arrow.velocity)>0.0001f)
-        arrow.facing=glm::normalize(arrow.velocity);
+    // Test each eligible target once and choose the first contact in flight order.
+    for (auto& target : m_entities) {
+        if (!meleeTarget(target) || target.id == arrow.shooterId) continue;
+        const glm::vec3 size = renderSize(target.type);
+        const auto hit = projectileAabbHit(start, initialVelocity,
+            target.position + glm::dvec3(-size.x * .5, 0, -size.z * .5),
+            target.position + glm::dvec3(size.x * .5, size.y, size.z * .5),
+            contactTime);
+        if (hit && (*hit < contactTime || (*hit == contactTime && !hitPlayer &&
+                    (!victim || target.id < victim->id)))) {
+            contactTime = *hit;
+            victim = &target;
+            hitPlayer = false;
+        }
+    }
+    // Stop voxel traversal at the nearest target. Blocks win ties so touching
+    // or embedded targets cannot bypass walls.
+    const auto blockHit = projectileBlockHit(start, initialVelocity, contactTime,
+        [this](int x, int y, int z) { return m_world.getBlock(x, y, z); });
+    if (blockHit) {
+        contactTime = *blockHit;
+        victim = nullptr;
+        hitPlayer = false;
+    }
+    arrow.position = projectilePosition(start, initialVelocity, contactTime);
+    arrow.velocity = projectileVelocityAfter(initialVelocity, static_cast<float>(contactTime));
+    if (glm::length(arrow.velocity) > 0.0001f)
+        arrow.facing = glm::normalize(arrow.velocity);
+    if (!hitPlayer && !victim) {
+        if (blockHit) {
+            arrow.velocity = glm::vec3(0.0f);
+            arrow.inGround = true;
+        }
+        return;
+    }
+    glm::vec3 knockback(arrow.velocity.x, 0.0f, arrow.velocity.z);
+    if (glm::length(knockback) > 0.001f)
+        knockback = glm::normalize(knockback) * 3.0f;
+    knockback.y = 1.5f;
+    // Incoming side of the contact supplies the shield/retaliation direction.
+    const glm::dvec3 sourceOrigin = arrow.position - glm::dvec3(arrow.velocity) * .01;
+    if (hitPlayer) {
+        DamageSourceInfo source;
+        source.amount = arrow.projectileDamage;
+        source.cause = DamageCause::Projectile;
+        source.shieldBlockable = true;
+        source.hasOrigin = true;
+        source.origin = sourceOrigin;
+        source.impulse = knockback;
+        if (player.takeDamage(source).blocked) {
+            arrow.velocity *= -0.2f;
+            arrow.playerOwned = true;
+            if (glm::length(arrow.velocity) > 0.0001f)
+                arrow.facing = glm::normalize(arrow.velocity);
+            // Consume the rest of this frame after reflection. Ownership now
+            // excludes the player, so this continuation cannot reflect again.
+            const float remaining = dt - static_cast<float>(contactTime);
+            if (remaining > 0.0f) updateArrow(arrow, player, remaining);
+            return;
+        }
+    } else {
+        damageEntity(*victim, arrow.projectileDamage, knockback,
+                     arrow.playerOwned, sourceOrigin, arrow.shooterId);
+    }
+    arrow.health = 0.0f;
 }
 
 void EntityManager::explode(Player& player, const glm::dvec3& center,

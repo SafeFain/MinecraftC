@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 #include <glm/glm.hpp>
@@ -60,6 +61,54 @@ inline glm::vec3 projectileVelocityAfter(const glm::vec3& initialVelocity,
     glm::vec3 result = initialVelocity;
     result.y -= PROJECTILE_GRAVITY * std::max(0.0f, seconds);
     return result;
+}
+
+// Earliest contact of the analytic parabola with a closed, stationary AABB.
+// Horizontal slabs restrict the time interval; vertical boundary roots retain
+// both the ascending and descending parts, including contact at the apex.
+inline std::optional<double> projectileAabbHit(
+    const glm::dvec3& origin, const glm::vec3& velocity,
+    const glm::dvec3& minimum, const glm::dvec3& maximum,
+    double seconds) {
+    if (seconds < 0.0) return std::nullopt;
+    double enter = 0.0, leave = seconds;
+    for (int axis : {0, 2}) {
+        if (velocity[axis] == 0.0f) {
+            if (origin[axis] < minimum[axis] || origin[axis] > maximum[axis])
+                return std::nullopt;
+            continue;
+        }
+        double first = (minimum[axis] - origin[axis]) / velocity[axis];
+        double last = (maximum[axis] - origin[axis]) / velocity[axis];
+        if (first > last) std::swap(first, last);
+        enter = std::max(enter, first);
+        leave = std::min(leave, last);
+        if (enter > leave) return std::nullopt;
+    }
+    const double y = origin.y + velocity.y * enter -
+        0.5 * PROJECTILE_GRAVITY * enter * enter;
+    if (y >= minimum.y && y <= maximum.y) return enter;
+    std::optional<double> hit;
+    for (double boundary : {minimum.y, maximum.y}) {
+        const double offset = origin.y - boundary;
+        double discriminant = static_cast<double>(velocity.y) * velocity.y +
+            2.0 * PROJECTILE_GRAVITY * offset;
+        // Tangent contacts can round just below zero, particularly after the
+        // subtraction of world-space heights. Bound that error, not real gaps.
+        const double roundoff = 8.0 * std::numeric_limits<double>::epsilon() *
+            (static_cast<double>(velocity.y) * velocity.y +
+             2.0 * PROJECTILE_GRAVITY * (std::abs(origin.y) + std::abs(boundary)));
+        if (discriminant < -roundoff) continue;
+        discriminant = std::max(0.0, discriminant);
+        // Stable quadratic roots avoid cancellation for contacts near the origin.
+        const double q = velocity.y + std::copysign(std::sqrt(discriminant), velocity.y);
+        const double first = q / PROJECTILE_GRAVITY;
+        const double second = q == 0.0 ? first : -2.0 * offset / q;
+        for (double time : {first, second})
+            if (time >= enter && time <= leave && (!hit || time < *hit))
+                hit = time;
+    }
+    return hit;
 }
 
 inline std::optional<glm::vec3> lowArcBallisticVelocity(

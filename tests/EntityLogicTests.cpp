@@ -1,5 +1,6 @@
 #include "entity/EntityLogic.h"
 #include "entity/ProjectileLogic.h"
+#include "entity/ProjectileCollision.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -114,6 +115,92 @@ int main() {
         projectileVelocityAfter({4.0f, 5.0f, 6.0f}, 0.4f), 0.6);
     require(glm::length(splitPosition - oneSecond) < 0.00001,
             "projectile integration changed with frame subdivision");
+    const auto thinHit = projectileAabbHit({0, 2, 0}, {1000, 0, 0},
+        {5.001, 1.9, -.01}, {5.002, 2.1, .01}, .01);
+    require(thinHit && std::abs(*thinHit - .005001) < 1e-10,
+            "high-speed arrow skipped a thin target");
+    const glm::vec3 risingVelocity(4, 9.8f, 0);
+    const glm::dvec3 apexPoint = projectilePosition({0, 2, 0}, risingVelocity, 1.0);
+    const auto curvedHit = projectileAabbHit({0, 2, 0}, risingVelocity,
+        apexPoint - glm::dvec3(.01), apexPoint + glm::dvec3(.01), 2.0);
+    require(curvedHit && *curvedHit > .99 && *curvedHit < 1.01,
+            "parabolic sweep missed a target above the frame chord");
+    for (int i = 1; i <= 1000; ++i) {
+        const glm::vec3 velocity(0, i * .01f, 0);
+        const double apexTime = velocity.y / static_cast<double>(PROJECTILE_GRAVITY);
+        const double height = projectilePosition({0, 2, 0}, velocity, apexTime).y;
+        const auto tangent = projectileAabbHit({0, 2, 0}, velocity,
+            {-.1, height, -.1}, {.1, height + .1, .1}, 2.0);
+        require(tangent && std::abs(*tangent - apexTime) < 1e-6 &&
+                !projectileAabbHit({0, 2, 0}, velocity,
+                    {-.1, height + .00001, -.1}, {.1, height + .1, .1}, 2.0),
+                "apex tangency roundoff lost contact or accepted a true near miss");
+    }
+    const auto fallingHit = projectileAabbHit({0, 2, 0}, risingVelocity,
+        {5.99, 5.5, -.1}, {6.01, 6.0, .1}, 2.0);
+    require(fallingHit && *fallingHit > 1.49,
+            "descending branch lost a vertical boundary contact");
+    require(!projectileAabbHit({0, 2, 0}, {0, 0, 0},
+                {1, 0, 0}, {2, 4, 1}, 1.0) &&
+            !projectileAabbHit({0, 2, 0}, {4, 0, 0},
+                {1, 2.1, -.1}, {2, 3, .1}, 1.0) &&
+            projectileAabbHit({0, 2, 0}, {0, 0, 0},
+                {-1, 1, -1}, {1, 3, 1}, 0.0) == 0.0,
+            "parallel, unreachable or initial-overlap AABB contacts failed");
+    const glm::dvec3 distantOrigin(-1000000.5, 10, 1000000.5);
+    const auto distantHit = projectileAabbHit(distantOrigin, {100, 0, 0},
+        distantOrigin + glm::dvec3(1, -.1, -.1),
+        distantOrigin + glm::dvec3(1.01, .1, .1), .1);
+    require(distantHit && std::abs(*distantHit - .01) < 1e-10,
+            "large negative world coordinates lost contact precision");
+    const auto wall = [](int x, int y, int z) {
+        return x == 5 && y == 2 && z == 0 ? BlockId::STONE : BlockId::AIR;
+    };
+    const glm::dvec3 shotOrigin(.5, 2.5, .5);
+    const glm::vec3 shotVelocity(100, 0, 0);
+    const auto wallHit = projectileBlockHit(shotOrigin, shotVelocity, .2, wall);
+    require(wallHit && std::abs(*wallHit - .045) < 1e-10,
+            "voxel collision did not find exact entry surface");
+    for (int fps : {10, 30, 60, 144}) {
+        glm::dvec3 position = shotOrigin;
+        glm::vec3 velocity = shotVelocity;
+        double elapsed = 0.0;
+        std::optional<double> contact;
+        for (int frame = 0; frame < fps && !contact; ++frame) {
+            const double dt = 1.0 / fps;
+            const auto hit = projectileBlockHit(position, velocity, dt, wall);
+            if (hit) contact = elapsed + *hit;
+            position = projectilePosition(position, velocity, dt);
+            velocity = projectileVelocityAfter(velocity, static_cast<float>(dt));
+            elapsed += dt;
+        }
+        require(contact && std::abs(*contact - *wallHit) < 1e-8,
+                "block contact time changed with frame subdivision");
+    }
+    const auto dripstone = [](int x, int y, int z) {
+        return x == -2 && y == 2 && z == -1
+            ? BlockId::POINTED_DRIPSTONE_UP : BlockId::AIR;
+    };
+    const auto dripHit = projectileBlockHit({-3, 2.8, -.5}, {100, 0, 0}, .03, dripstone);
+    require(dripHit && std::abs(*dripHit - .0125) < 1e-10 &&
+            !projectileBlockHit({-3, 2.8, -.1}, {100, 0, 0}, .03, dripstone),
+            "thin partial blocks or negative voxel coordinates collided incorrectly");
+    const auto slab = [](int x, int y, int z) {
+        return x == 1 && y == 2 && z == 0
+            ? slabBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom) : BlockId::AIR;
+    };
+    require(!projectileBlockHit({.5, 2.8, .5}, {100, 0, 0}, .02, slab) &&
+            projectileBlockHit({.5, 2.3, .5}, {100, 0, 0}, .02, slab),
+            "arrows collided with the empty half of a slab");
+    const auto apexBlock = [](int x, int y, int z) {
+        return x == 4 && y == 6 && z == 0 ? BlockId::STONE : BlockId::AIR;
+    };
+    require(projectileBlockHit({.5, 2, .5}, risingVelocity, 2.0, apexBlock).has_value(),
+            "voxel candidate traversal missed the arc apex");
+    int queries = 0;
+    projectileBlockHit({.5, 10.5, .5}, {1000, 0, 0}, .1,
+        [&queries](int, int, int) { ++queries; return BlockId::AIR; });
+    require(queries < 350, "high-speed candidate traversal sampled excessively");
     const auto ballistic = lowArcBallisticVelocity(
         {0.0, 1.0, 0.0}, {12.0, 2.0, 0.0}, 20.0f);
     require(ballistic.has_value(), "reachable low ballistic arc had no solution");

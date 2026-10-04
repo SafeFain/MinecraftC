@@ -1,6 +1,7 @@
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"
 #include "EntityAiIntegration.h"
+#include "ProjectileIntegration.h"
 #include "Config.h"
 #include "core/RuntimeClock.h"
 #include "game/Command.h"
@@ -134,6 +135,8 @@ std::string Localization::format(
 }
 
 int main(int argc, char** argv) {
+    if (argc > 2 && std::string(argv[1]) == "--projectile-tests")
+        return ProjectileIntegration::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--ai-demo")
         return EntityAiScenarios::writeDemo(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--ai-tests")

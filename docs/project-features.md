@@ -89,7 +89,10 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - Bows charge while Use is held and fire on release. Charge controls speed,
   damage, first-person FOV narrowing, and a collision-clipped trajectory preview;
   player and skeleton arrows share gravity, inherited shooter velocity, and
-  analytic frame-rate-independent projectile motion.
+  analytic frame-rate-independent projectile motion. Continuous parabolic contact
+  selects the nearest block/entity impact, respects stairs/slabs and player pose
+  height, and shares exact block tracing with the preview; shields reflect the
+  velocity at contact and arrows retain their impact orientation when embedded.
 - Persistent Survival, Creative, and Spectator worlds with crafting, furnaces,
   containers, farming, weather, combat, passive/hostile entities, and commands.
   `/locate structure` queries the nearest deterministic structure in the
