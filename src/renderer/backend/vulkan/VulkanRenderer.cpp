@@ -690,10 +690,12 @@ model::ModelRenderer& VulkanRenderer::modelRenderer() { return *m_modelRenderer;
 void VulkanRenderer::flushModels(const glm::mat4& viewProjection) {
     const float fogEnd = (static_cast<float>(Config::RENDER_DISTANCE) + 0.5f) *
                          Config::CHUNK_SIZE_X;
+    // Model transforms and the camera share render-origin coordinates, whose
+    // Y component retains world height. Zero would turn altitude into distance.
     m_modelRenderer->flushOpaque(viewProjection, m_environment,
-        glm::vec3(0.0f), fogEnd * Config::FOG_START_FRACTION, fogEnd);
+        m_cameraPosition, fogEnd * Config::FOG_START_FRACTION, fogEnd);
     m_modelRenderer->flushBlend(viewProjection, m_environment,
-        glm::vec3(0.0f), fogEnd * Config::FOG_START_FRACTION, fogEnd);
+        m_cameraPosition, fogEnd * Config::FOG_START_FRACTION, fogEnd);
 }
 void VulkanRenderer::beginViewModel(const glm::mat4& projection) {
     if (!m_impl || !m_impl->frameBegun)

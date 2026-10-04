@@ -830,6 +830,32 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_cloud_lod_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
+    add_executable(vulkan_model_fog_smoke EXCLUDE_FROM_ALL
+        tests/VulkanModelFogSmoke.cpp
+        src/debug/Log.cpp
+        src/model/ModelRenderer.cpp
+        src/renderer/BlockAtlasData.cpp
+        src/renderer/CloudRenderData.cpp
+        src/renderer/Frustum.cpp
+        src/renderer/RenderDevice.cpp
+        src/renderer/StbImageImpl.cpp
+        src/world/Block.cpp
+        src/world/Chunk.cpp)
+    target_include_directories(vulkan_model_fog_smoke PRIVATE src external/stb)
+    target_include_directories(vulkan_model_fog_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
+    target_compile_definitions(vulkan_model_fog_smoke PRIVATE
+        MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        VMA_VULKAN_VERSION=1000000)
+    target_link_libraries(vulkan_model_fog_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_model_fog_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(vulkan_model_fog_smoke PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
     add_executable(vulkan_gi_smoke EXCLUDE_FROM_ALL
         tests/VulkanGiSmoke.cpp
         src/debug/Log.cpp
