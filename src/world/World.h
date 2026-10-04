@@ -35,6 +35,9 @@ class SaveStore;
 
 class World : private IChunkStreamingWorld {
 public:
+    void setGameRules(const GameRuleSet& rules) { m_gameRules = rules; }
+    const GameRuleSet& gameRules() const { return m_gameRules; }
+
     World();
     ~World();
 
@@ -256,6 +259,7 @@ public:
     }
 
 private:
+    GameRuleSet m_gameRules;
     friend class ChunkMeshPipeline;
     friend class FluidScheduler;
     ChunkStore m_chunks;

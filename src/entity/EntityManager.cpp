@@ -41,6 +41,7 @@ void EntityManager::clear() {
     m_deadEntityRenders.clear();
     m_spawnTimer = 0.0f;
     m_spawnSequence = 0;
+    m_lastPopulationEnabled = false;
     m_loadedChunks.clear();
     m_dirtyEntityChunks.clear();
     m_pendingEntitySaves.clear();
@@ -90,7 +91,12 @@ void EntityManager::loadEntities(
 void EntityManager::syncChunks() {
     if (!m_saveStore) return;
     const uint64_t revision = m_world.streamingRevision();
-    if (revision == m_lastStreamingRevision) return;
+    const bool populationEnabled = m_naturalSpawningEnabled && m_world.gameRules().boolean(GameRuleId::SpawnMobs);
+    const bool recheckPopulation = populationEnabled && !m_lastPopulationEnabled;
+    if (revision == m_lastStreamingRevision && !recheckPopulation) {
+        m_lastPopulationEnabled = populationEnabled;
+        return;
+    }
     std::set<std::pair<int,int>> active;
     for (const Chunk* chunk : m_world.getActiveChunks())
         if (chunk->generated.load()) active.insert({chunk->cx,chunk->cz});
@@ -116,9 +122,11 @@ void EntityManager::syncChunks() {
         const auto key=entityChunk(entity.position);
         return m_loadedChunks.count(key) && !active.count(key);
     }),m_entities.end());
-    for (const auto& key : active) if (!m_loadedChunks.count(key)) {
+    for (const auto& key : active) if (!m_loadedChunks.count(key) || recheckPopulation) {
         uint32_t populationVersion = 0;
-        if (auto prefetched = m_world.takePrefetchedChunkEntities(
+        if (m_loadedChunks.count(key)) {
+            populationVersion = m_saveStore->loadChunkEntityPopulationVersion(key.first, key.second);
+        } else if (auto prefetched = m_world.takePrefetchedChunkEntities(
                 key.first, key.second)) {
             loadEntities(prefetched->entities);
             populationVersion = prefetched->populationVersion;
@@ -127,7 +135,7 @@ void EntityManager::syncChunks() {
             populationVersion = m_saveStore->loadChunkEntityPopulationVersion(
                 key.first, key.second);
         }
-        if (populationVersion < 1u) {
+        if (populationVersion < 1u && populationEnabled) {
             const auto requests = m_world.villageSpawnsForChunk(
                 key.first, key.second);
             for (const auto& request : requests) {
@@ -170,6 +178,7 @@ void EntityManager::syncChunks() {
     }
     m_loadedChunks=std::move(active);
     m_lastStreamingRevision = revision;
+    m_lastPopulationEnabled = populationEnabled;
 }
 
 void EntityManager::beginChunkEntityAutosave() {
@@ -595,9 +604,10 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         glm::dvec3 position;
         uint32_t seed;
         float power;
+        bool mobExplosion = false;
     };
     std::vector<PendingExplosion> pendingExplosions;
-    if (m_naturalSpawningEnabled) {
+    if (m_naturalSpawningEnabled && m_world.gameRules().boolean(GameRuleId::SpawnMobs)) {
         m_spawnTimer += dt;
         if (m_spawnTimer >= 4.0f) {
             const glm::dvec3 playerPosition = player.getPosition();
@@ -605,11 +615,10 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             const int py = static_cast<int>(std::floor(playerPosition.y + 1.0));
             const int pz = static_cast<int>(std::floor(playerPosition.z));
             const bool underground = !m_world.hasSkyAccess(px, py, pz);
-            if (!underground || !peaceful)
-                spawnAroundPlayer(playerPosition,
-                    shouldAttemptHostileSpawn(underground, isDay,
-                                              thunderstorm, peaceful),
-                    underground);
+            const bool spawnHostile = shouldAttemptHostileSpawn(underground, isDay, thunderstorm, peaceful);
+            if ((!underground || !peaceful) &&
+                (!spawnHostile || m_world.gameRules().boolean(GameRuleId::SpawnMonsters)))
+                spawnAroundPlayer(playerPosition, spawnHostile, underground);
             m_spawnTimer = 0.0f;
         }
     } else {
@@ -716,15 +725,16 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         spawnArrow(arrow.position, arrow.velocity, arrow.damage, false, arrow.shooterId);
     m_aiArrows.clear();
     for (const auto& explosion : m_aiExplosions)
-        pendingExplosions.push_back({explosion.position, explosion.seed, 2.5f});
+        pendingExplosions.push_back({explosion.position, explosion.seed, 2.5f, true});
     m_aiExplosions.clear();
 
     for (const auto& entity : m_entities)
-        if (entity.type == EntityType::PrimedTnt && entity.health <= 0.0f)
+        if (entity.type == EntityType::PrimedTnt && entity.health <= 0.0f &&
+            m_world.gameRules().boolean(GameRuleId::TntExplodes))
             pendingExplosions.push_back(
                 {entity.position, entity.behaviorSeed, 4.0f});
     for (const auto& explosion : pendingExplosions)
-        explode(player, explosion.position, explosion.power, explosion.seed);
+        explode(player, explosion.position, explosion.power, explosion.seed, explosion.mobExplosion);
 
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
@@ -774,6 +784,7 @@ void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) 
 }
 
 void EntityManager::dropMobLoot(const Entity& entity) {
+    if (!m_world.gameRules().boolean(GameRuleId::MobDrops)) return;
     std::vector<ItemStack> loot;
     switch (entity.type) {
         case EntityType::Cow:
@@ -1014,7 +1025,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
 }
 
 void EntityManager::explode(Player& player, const glm::dvec3& center,
-                            float power, uint32_t eventSeed) {
+                            float power, uint32_t eventSeed, bool mobExplosion) {
     const float effectRadius = power * 2.0f;
     auto impactAt = [&](const glm::dvec3& target) {
         const glm::dvec3 delta = target - center;
@@ -1064,7 +1075,10 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
 
     std::vector<glm::ivec3> chain;
     size_t spawnedDrops = 0;
-    const int radius = static_cast<int>(std::ceil(power));
+    const bool destroysBlocks = !mobExplosion || m_world.gameRules().boolean(GameRuleId::MobGriefing);
+    const bool decay = m_world.gameRules().boolean(mobExplosion
+        ? GameRuleId::MobExplosionDropDecay : GameRuleId::TntExplosionDropDecay);
+    const int radius = destroysBlocks ? static_cast<int>(std::ceil(power)) : -1;
     const ItemStack diamondPick{ItemId::DIAMOND_PICKAXE, 1, 0};
     const glm::ivec3 blockCenter(glm::floor(center));
     for (int dy = -radius; dy <= radius; ++dy) {
@@ -1086,7 +1100,8 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
                 if (distance + resistance * .18f > strength) continue;
                 if (block == BlockId::TNT) {
                     chain.push_back(p);
-                } else if (spawnedDrops < 32 && random % 3 == 0) {
+                } else if (m_world.gameRules().boolean(GameRuleId::BlockDrops) && spawnedDrops < 32 &&
+                           explosionDropSurvives(random, power, decay)) {
                     for (const ItemStack& drop : getBlockDrops(block, diamondPick, random)) {
                         if (spawnedDrops >= 32) break;
                         const glm::vec3 velocity(

@@ -1,6 +1,7 @@
 #include "core/Window.h"
 #include "entity/EntityManager.h"
 #include "game/SessionAccess.h"
+#include "game/Command.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
@@ -180,6 +181,22 @@ int main(int argc,char** argv) {
             draw(std::string("language-")+std::string(languageCode(language)),[&]{translated.render(ui,width,height);});
             const auto measured=ui.measureText(localization.text("settings.title"),1);
             if (measured.x<=0 || measured.y!=14) throw std::runtime_error("localized font measurement failed");
+        }
+        for (const Language language : languagesByEnglishName()) {
+            localization.setLanguage(language);
+            const std::string input="/gamerule keep_inventory tr";
+            const auto suggestions=commandSuggestions(input,input.size());
+            if (suggestions.size()!=1 || suggestions[0].text!="true")
+                throw std::runtime_error("GameRule completion failed during Vulkan smoke");
+            draw("gamerule-chat-"+std::string(languageCode(language)),[&]{
+                UiTheme::menuBackground(ui,width,height);
+                ui.renderText(input,16,height-35,1,glm::vec3(1));
+                ui.renderText("Tab: "+suggestions[0].text,16,height-60,1,glm::vec3(1));
+                UiTheme::tooltip(ui,width-8,height-90,
+                    localization.format("message.gamerule_set",{"keep_inventory","true"})+"\n"+
+                    localization.text("message.gamerule_partial")+"\n"+
+                    localization.text("message.gamerule_unavailable"));
+            },3);
         }
         std::cout<<"Modern UI Vulkan smoke passed\n";
     } catch (const std::exception& error) { std::cerr<<"UI smoke failed: "<<error.what()<<'\n';return 1; }

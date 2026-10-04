@@ -230,7 +230,7 @@ day and night. Set it with `/gamerule DayNightDuration 1200` (positive integer
 seconds); older saves also default to 1200. This is no longer a client setting.
 
 Worlds with cheats enabled support `/gamemode`, `/tp`, `/time`, `/weather`,
-`/give <item_name> [1..64]`, `/gamerule DayNightDuration <seconds>`,
+`/give <item_name> [1..64]`, `/gamerule <rule> [<value>]`, `/help gamerule [<rule>]`,
 `/locate biome <biome>`, and `/locate structure <structure>`. Structure locate
 supports the current dimension's Overworld structures plus Heaven's
 `xiguang_ruin`, `star_crystal_geode`, `cloudspire_tower`, and `skyway_shrine`.
@@ -238,6 +238,10 @@ Skyway Shrines link all five altitude bands, while the Heaven-only Starstep
 Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
+GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
+new standard names and classic aliases. Rules persist per world in save v15; missing
+or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
+
 Run `./build-local/minecraftc --version` to print the version without opening a
 window.
 

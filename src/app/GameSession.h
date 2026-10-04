@@ -52,6 +52,7 @@ public:
         std::function<void(float, uint32_t)> rumble;
         std::function<void(FishingEventKind)> playFishing;
         std::function<void()> playerDied;
+        std::function<void()> playerDeathMessage;
         std::function<void()> autosaveMetadataError;
         std::function<void()> autosaveFlushError;
         std::function<void()> sleepStarted;
@@ -210,6 +211,7 @@ private:
     glm::vec3 sleepFacingDirection{0.0f, 0.0f, -1.0f};
 
 private:
+    CommandResult executeCommandImpl(const ParsedCommand& command, const Localization& localization, RuntimeClock::Tick now);
     SaveStore* activeDataStore() const;
     void saveActiveDimensionState();
     void loadActiveDimensionState();

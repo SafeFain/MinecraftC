@@ -7,6 +7,8 @@
 namespace Config {
     constexpr float FISHING_CAST_SPEED = 12.0f;
     constexpr float FISHING_GRAVITY = 9.8f;
+    constexpr uint32_t RANDOM_TICK_DRAWS_PER_TICK = 16384;
+    constexpr double RANDOM_TICK_RADIUS = 128.0;
     constexpr float FISHING_MAX_DISTANCE = 32.0f;
     constexpr float FISHING_BITE_SECONDS = 1.0f;
 

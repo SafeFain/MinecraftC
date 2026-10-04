@@ -49,6 +49,7 @@ private:
     bool growSapling(const glm::ivec3& p, BlockId sapling);
     bool hasWaterForFarmland(const glm::ivec3& position, bool raining) const;
 
+    glm::dvec3 m_playerPosition{0.0};
     World& m_world;
     WorldPersistence& m_persistence;
     ChunkStore& m_chunks;

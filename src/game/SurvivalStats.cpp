@@ -49,18 +49,18 @@ void SurvivalStats::heal(float amount) {
     m_health = std::min(MAX_HEALTH, m_health + std::max(amount, 0.0f));
 }
 
-void SurvivalStats::tick(Difficulty difficulty, uint32_t ticks) {
+void SurvivalStats::tick(Difficulty difficulty, uint32_t ticks, bool naturalRegeneration) {
     for (uint32_t i = 0; i < ticks; ++i) {
         if (dead()) return;
         consumeExhaustion(difficulty);
         if (difficulty == Difficulty::Peaceful) {
             ++m_foodTickTimer;
             if (m_hunger < MAX_HUNGER && m_foodTickTimer % 10 == 0) ++m_hunger;
-            if (m_health < MAX_HEALTH && m_foodTickTimer % 20 == 0) heal(1.0f);
+            if (naturalRegeneration && m_health < MAX_HEALTH && m_foodTickTimer % 20 == 0) heal(1.0f);
             continue;
         }
 
-        if (m_health < MAX_HEALTH && m_hunger == MAX_HUNGER &&
+        if (naturalRegeneration && m_health < MAX_HEALTH && m_hunger == MAX_HUNGER &&
             m_saturation > 0.0f) {
             if (++m_foodTickTimer >= 10) {
                 const float used = std::min(m_saturation, 6.0f);
@@ -68,7 +68,7 @@ void SurvivalStats::tick(Difficulty difficulty, uint32_t ticks) {
                 addExhaustion(used);
                 m_foodTickTimer = 0;
             }
-        } else if (m_health < MAX_HEALTH && m_hunger >= 18) {
+        } else if (naturalRegeneration && m_health < MAX_HEALTH && m_hunger >= 18) {
             if (++m_foodTickTimer >= 80) {
                 heal(1.0f);
                 addExhaustion(6.0f);

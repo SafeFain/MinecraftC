@@ -12,6 +12,7 @@
 #include <system_error>
 #include <type_traits>
 #include <utility>
+#include <set>
 
 namespace {
 
@@ -442,6 +443,30 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload, metadata.foodTickTimer);
     // v14 stores the world-wide day/night duration in seconds.
     append(payload, metadata.dayNightDurationSeconds);
+    const size_t ruleCount = static_cast<size_t>(GameRuleId::DayNightDuration) + metadata.gameRules.unknown.size();
+    if (ruleCount > 1024) throw std::runtime_error("Too many saved game rules");
+    append(payload, static_cast<uint32_t>(ruleCount));
+    std::set<std::string> ruleNames;
+    auto appendRule = [&](const std::string& name, GameRuleValue value) {
+        if (name.empty() || name.size() > 256 || !ruleNames.insert(name).second ||
+            (value.type != GameRuleType::Boolean && value.type != GameRuleType::Integer) ||
+            (value.type == GameRuleType::Boolean && value.number != 0 && value.number != 1) ||
+            (value.type == GameRuleType::Integer && (value.number < INT32_MIN || value.number > INT32_MAX)))
+            throw std::runtime_error("Invalid saved game rule");
+        appendString(payload, name);
+        append(payload, static_cast<uint8_t>(value.type));
+        append(payload, static_cast<int32_t>(value.number));
+    };
+    for (const auto& rule : GAME_RULES) {
+        if (rule.id == GameRuleId::DayNightDuration) continue;
+        const auto value = metadata.gameRules.get(rule.id);
+        if (!validGameRuleValue(rule.id, value)) throw std::runtime_error("Invalid saved game rule value");
+        appendRule(std::string(rule.fullName), value);
+    }
+    for (const auto& rule : metadata.gameRules.unknown) {
+        if (findGameRule(rule.name)) throw std::runtime_error("Unknown game rule conflicts with registry");
+        appendRule(rule.name, rule.value);
+    }
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
@@ -517,6 +542,27 @@ WorldMetadata SaveStore::loadMetadata() const {
         metadata.dayNightDurationSeconds = reader.read<uint32_t>();
         if (metadata.dayNightDurationSeconds == 0)
             throw std::runtime_error("Save contains invalid day/night duration");
+    }
+    if (checked.version >= 15) {
+        const uint32_t count = reader.read<uint32_t>();
+        if (count > 1024) throw std::runtime_error("Too many saved game rules");
+        std::set<std::string> names;
+        for (uint32_t i = 0; i < count; ++i) {
+            const std::string name = reader.readString();
+            const auto type = static_cast<GameRuleType>(reader.read<uint8_t>());
+            const int32_t number = reader.read<int32_t>();
+            if (name.empty() || name.size() > 256 || !names.insert(name).second ||
+                (type != GameRuleType::Boolean && type != GameRuleType::Integer) ||
+                (type == GameRuleType::Boolean && number != 0 && number != 1))
+                throw std::runtime_error("Invalid saved game rule");
+            const GameRuleValue value{type, number};
+            const auto rule = findGameRule(name);
+            if (rule) {
+                if (name != gameRuleDefinition(rule->id).fullName ||
+                    !metadata.gameRules.set(rule->id, value))
+                    throw std::runtime_error("Invalid known game rule");
+            } else metadata.gameRules.unknown.push_back({name, value});
+        }
     }
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already

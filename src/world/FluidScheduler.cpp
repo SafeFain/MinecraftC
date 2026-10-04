@@ -327,8 +327,10 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
         const glm::ivec3 below = position + DOWN;
         const BlockId belowBlock = m_world.getBlock(below.x, below.y, below.z);
         const bool supported = isSolid(belowBlock) ||
-            (isWater(belowBlock) && isSource(belowBlock));
-        if (!lava && sourceNeighbors >= 2 && supported) {
+            (isSame(belowBlock, lava) && isSource(belowBlock));
+        const bool conversion = m_world.gameRules().boolean(lava
+            ? GameRuleId::LavaSourceConversion : GameRuleId::WaterSourceConversion);
+        if (conversion && sourceNeighbors >= 2 && supported) {
             desiredAmount = 8;
             desiredFalling = false;
         }

@@ -253,6 +253,9 @@ private:
             m_window.gamepads().rumble(
                 strength, duration, m_clientSettings.gamepadRumble);
         };
+        m_sessionFeedback.playerDeathMessage = [this] {
+            m_flow.showCommandMessage(m_ui.localization.text("message.player_died"));
+        };
         m_sessionFeedback.playerDied = [this] {
             m_window.setCursorLocked(false);
         };

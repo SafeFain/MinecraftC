@@ -184,6 +184,7 @@ private:
     float m_spawnTimer = 0.0f;
     uint32_t m_spawnSequence = 0;
     bool m_naturalSpawningEnabled = true;
+    bool m_lastPopulationEnabled = false;
     SaveStore* m_saveStore = nullptr;
     std::set<std::pair<int,int>> m_loadedChunks;
     std::set<std::pair<int,int>> m_dirtyEntityChunks;
@@ -219,7 +220,7 @@ private:
                        uint64_t sourceId = 0);
     void updateArrow(Entity& entity, Player& player, float dt);
     void explode(Player& player, const glm::dvec3& center, float power,
-                 uint32_t eventSeed);
+                 uint32_t eventSeed, bool mobExplosion = false);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);
     static glm::vec3 renderColor(EntityType type);

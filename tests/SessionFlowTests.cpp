@@ -48,6 +48,28 @@ struct GameSessionTestAccess {
     static void tickFishingDrops(GameSession& session,float dt) {
         session.entities.update(session.player,dt,true,true,true,true,false,false,0);
     }
+    static World& world(GameSession& session) { return session.world; }
+    static Player& player(GameSession& session) { return session.player; }
+    static EntityManager& entities(GameSession& session) { return session.entities; }
+    static void flatRuleScene(GameSession& session) {
+        session.world.setThreadPool(nullptr);
+        for (int cx=-1;cx<=1;++cx) for (int cz=-1;cz<=1;++cz) {
+            Chunk* chunk=session.world.getChunk(cx,cz);
+            for(int x=0;x<16;++x)for(int z=0;z<16;++z)chunk->setBlock(x,0,z,BlockId::STONE);
+            chunk->generated=true;chunk->lifecycle=Chunk::LifecycleState::Renderable;
+        }
+        session.world.update({.5,1.01,.5},0);
+        session.worldMetadata.worldSpawn={0,0,0};
+        session.player.configureRules(GameMode::Survival,Difficulty::Normal);
+        session.player.setPosition({.5,1.01,.5});
+        session.entities.setNaturalSpawningEnabled(false);
+    }
+    static void setRules(GameSession& session, const GameRuleSet& rules) { session.worldMetadata.gameRules=rules; session.world.setGameRules(rules); }
+    static void tickWeather(GameSession& session) { session.weather.tick(session.worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather)); }
+    static void sleepChoice(GameSession& session, GameSession::Feedback feedback) {
+        session.sleepState=GameSession::SleepVisualState::Choosing;
+        session.chooseSleepAction(GameSession::SleepAction::SleepUntilMorning,0,feedback);
+    }
     static void die(GameSession& session) { session.beginPlayerDeath(); }
     static void processCompletedGenerations(GameSession& session) {
         session.world.processCompletedGenerations();
@@ -134,7 +156,10 @@ std::string Localization::format(
     return std::string(key);
 }
 
+#include "GameRuleIntegration.h"
+
 int main(int argc, char** argv) {
+    if (argc > 2 && std::string(argv[1]) == "--gamerule-tests") return GameRuleIntegration::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--projectile-tests")
         return ProjectileIntegration::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--ai-demo")
@@ -326,7 +351,7 @@ int main(int argc, char** argv) {
         result = runCommand(session, localization, "/gamerule DayNightDuration 180");
         require(session.metadata().dayNightDurationSeconds == 180 &&
                 session.daylightState().phase() == beforeRule &&
-                result.messages[0] == "message.day_night_duration",
+                result.messages[0] == "message.gamerule_set",
                 "duration updates world rule and preserves phase");
         session.updateDaylight(0.1f, true);
         require(std::abs(session.daylightState().phase() - beforeRule - 0.1f / 180.0f) < 0.000001f,

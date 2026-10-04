@@ -38,6 +38,15 @@ int main() {
     require(weather.type() == WeatherType::Thunder,
             "thunder command did not enable rain and thunder");
 
+    WeatherSystem frozen;
+    frozen.reset(1234,{false,false,1,1,0});
+    frozen.setWeather(WeatherType::Thunder);
+    const auto frozenTimers=frozen.saveState();
+    frozen.tick(false);
+    require(frozen.saveState().rainTicks==frozenTimers.rainTicks && frozen.saveState().thunderTicks==frozenTimers.thunderTicks &&
+            frozen.rainGradient()>0 && frozen.thunderGradient()>0,"disabled cycle freezes timers but not explicit weather blend");
+    frozen.tick(); require(frozen.saveState().rainTicks<frozenTimers.rainTicks,"natural weather resumes");
+
     WeatherSystem replay;
     replay.reset(9999);
     WeatherSystem replayCopy;

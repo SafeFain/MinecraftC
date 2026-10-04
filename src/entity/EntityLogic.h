@@ -68,6 +68,12 @@ inline glm::vec3 autonomousHorizontalVelocity(const glm::dvec3& before,
 inline bool attackImpactValid(float distance, float reach, bool clearSight) {
     return distance >= 0.0f && distance < reach && clearSight;
 }
+// A full uint32 draw gives the same 1/power probability for fractional
+// Blastling power as for integer TNT power. Do not truncate power to an int.
+inline bool explosionDropSurvives(uint32_t random, float power, bool decay) {
+    return !decay || power <= 1.0f || static_cast<double>(random) / 4294967296.0 < 1.0 / static_cast<double>(power);
+}
+
 inline float explosionImpact(float distance, float radius, bool clearSight) {
     if (!clearSight || distance < 0.0f || radius <= 0.0f || distance >= radius)
         return 0.0f;

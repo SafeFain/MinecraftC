@@ -996,7 +996,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests)
+    add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/java-1.21.11-gamerules.tsv)
 
     add_executable(weather_logic_tests
         tests/WeatherTests.cpp
@@ -1205,6 +1205,8 @@ if(BUILD_TESTING)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(gamerule_integration PROPERTIES TIMEOUT 120)
     add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME projectile_flight_integration COMMAND session_flow_tests --projectile-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(projectile_flight_integration PROPERTIES TIMEOUT 120)

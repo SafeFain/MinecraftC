@@ -276,3 +276,11 @@ changes Heaven and block encoding while retaining Overworld generation output.
   dimension changes, world exit, unloaded water and excess distance cancel it.
   Rods and fish persist using save v14; bobbers and timers are transient. World
   generation remains v17. No enchantments, experience, bait or entity hooking.
+
+### GameRule commands
+
+Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
+query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
+are world-wide and persisted in save v15; v2–v14 retain readable defaults and
+existing duration values. Missing/partial mechanics are explicit in feedback.
+See [game-rules.md](game-rules.md) for the full table and limits.

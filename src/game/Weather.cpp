@@ -41,12 +41,12 @@ uint32_t WeatherSystem::randomDuration(uint32_t minimum, uint32_t maximum) {
     return minimum + static_cast<uint32_t>(random % (maximum - minimum + 1));
 }
 
-void WeatherSystem::tick() {
-    if (m_state.rainTicks > 0 && --m_state.rainTicks == 0) {
+void WeatherSystem::tick(bool advanceCycle) {
+    if (advanceCycle && m_state.rainTicks > 0 && --m_state.rainTicks == 0) {
         m_state.raining = !m_state.raining;
         m_state.rainTicks = nextRainDuration();
     }
-    if (m_state.thunderTicks > 0 && --m_state.thunderTicks == 0) {
+    if (advanceCycle && m_state.thunderTicks > 0 && --m_state.thunderTicks == 0) {
         m_state.thundering = !m_state.thundering;
         m_state.thunderTicks = nextThunderDuration();
     }

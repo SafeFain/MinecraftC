@@ -34,6 +34,13 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+void stripV15Rules(std::vector<uint8_t>& bytes) {
+    const std::string marker = "minecraft:advance_time";
+    const auto start = std::search(bytes.begin(), bytes.end(), marker.begin(), marker.end());
+    require(start != bytes.end() && start - bytes.begin() > 6, "v15 registry tail found");
+    bytes.resize(static_cast<size_t>(start - bytes.begin()) - 6);
+}
+
 void writeLittleEndian(std::vector<uint8_t>& bytes, size_t offset,
                        uint64_t value, size_t width) {
     for (size_t i = 0; i < width; ++i) {
@@ -118,10 +125,19 @@ int main() {
         source.heaven.dayPhase = 0.81f;
 
         source.dayNightDurationSeconds = 180;
+        source.gameRules.set(GameRuleId::KeepInventory, GameRuleValue::boolean(true));
+        source.gameRules.set(GameRuleId::RandomTickSpeed, GameRuleValue::integer(17));
+        source.gameRules.set(GameRuleId::Raids, GameRuleValue::boolean(false));
+        source.gameRules.unknown.push_back({"future:sample", GameRuleValue::integer(-123)});
         store.saveMetadata(source);
         require(store.exists(), "metadata file is created");
         const auto loaded = store.loadMetadata();
         require(loaded.displayName == source.displayName, "world name round trips");
+        require(loaded.gameRules.boolean(GameRuleId::KeepInventory) &&
+                loaded.gameRules.integer(GameRuleId::RandomTickSpeed) == 17 &&
+                !loaded.gameRules.boolean(GameRuleId::Raids) && loaded.gameRules.unknown.size() == 1 &&
+                loaded.gameRules.unknown[0].name == "future:sample" && loaded.gameRules.unknown[0].value.number == -123,
+                "typed rules and unknown IDs survive v15 round trip");
         require(loaded.dayNightDurationSeconds == 180, "world duration round trips in seconds");
         require(loaded.seed == source.seed, "64-bit seed round trips");
         require(loaded.gameMode == GameMode::Survival &&
@@ -215,11 +231,27 @@ int main() {
         for (uint16_t raw=261; raw<=281; ++raw)
             require(heavenRoundTrip.inventory.slot(raw-261).id==static_cast<ItemId>(raw),
                     "Heaven resource and food IDs survive metadata serialization");
+        const auto v14Directory = root / "legacy-v14";
+        SaveStore(v14Directory).saveMetadata(source);
+        {
+            auto bytes = readBytes(v14Directory / "level.bin");
+            stripV15Rules(bytes);
+            writeLittleEndian(bytes,8,14,4);
+            writeLittleEndian(bytes,12,bytes.size()-24,4);
+            writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            std::ofstream output(v14Directory / "level.bin", std::ios::binary);
+            output.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        }
+        const auto v14 = SaveStore(v14Directory).loadMetadata();
+        require(v14.dayNightDurationSeconds == 180 && !v14.gameRules.boolean(GameRuleId::KeepInventory) &&
+                v14.gameRules.integer(GameRuleId::RandomTickSpeed) == 3 && v14.gameRules.unknown.empty(),
+                "v14 preserves duration and fills Java defaults");
         const auto v13Directory = root / "legacy-v13";
         SaveStore(v13Directory).saveMetadata(source);
         const auto v13Path = v13Directory / "level.bin";
         {
             auto bytes = readBytes(v13Path);
+            stripV15Rules(bytes);
             bytes.resize(bytes.size() - sizeof(uint32_t));
             writeLittleEndian(bytes, 8, 13, 4);
             writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
@@ -241,6 +273,29 @@ int main() {
         catch (const std::exception&) { invalidDurationRejected = true; }
         require(invalidDurationRejected, "zero saved duration is rejected");
 
+        const auto corruptDirectory = root / "corrupt-rules";
+        SaveStore(corruptDirectory).saveMetadata(source);
+        const auto ruleBytes = readBytes(corruptDirectory / "level.bin");
+        const std::string firstName = "minecraft:advance_time";
+        const size_t first = static_cast<size_t>(std::search(ruleBytes.begin(),ruleBytes.end(),firstName.begin(),firstName.end())-ruleBytes.begin());
+        auto rejectRules = [&](std::vector<uint8_t> bytes) {
+            writeLittleEndian(bytes,12,bytes.size()-24,4);
+            writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            std::ofstream output(corruptDirectory / "level.bin",std::ios::binary|std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(bytes.data()),bytes.size()); output.close();
+            bool failed=false; try { (void)SaveStore(corruptDirectory).loadMetadata(); } catch (const std::exception&) { failed=true; }
+            require(failed,"malformed typed rule table rejected");
+        };
+        auto changed = ruleBytes; changed[first+firstName.size()]=9; rejectRules(changed);
+        changed=ruleBytes; writeLittleEndian(changed,first+firstName.size()+1,2,4); rejectRules(changed);
+        changed=ruleBytes; writeLittleEndian(changed,first-6,1025,4); rejectRules(changed);
+        changed=ruleBytes; changed.pop_back(); rejectRules(changed);
+        changed=ruleBytes;
+        const size_t originalCount = 60;
+        writeLittleEndian(changed,first-6,originalCount+1,4);
+        changed.insert(changed.end(),ruleBytes.begin()+static_cast<std::ptrdiff_t>(first-2),
+            ruleBytes.begin()+static_cast<std::ptrdiff_t>(first+firstName.size()+5));
+        rejectRules(changed);
         WorldMetadata replacement = source;
         replacement.worldTicks += 1;
         store.saveMetadata(replacement);
@@ -293,6 +348,7 @@ int main() {
         {
             std::vector<uint8_t> bytes = readBytes(v10Path);
             require(bytes.size() > 28, "v10 fixture has a food timer tail");
+            stripV15Rules(bytes);
             bytes.resize(bytes.size() - 2 * sizeof(uint32_t));
             writeLittleEndian(bytes, 8, 10, 4);
             writeLittleEndian(bytes, 12, bytes.size() - 24, 4);

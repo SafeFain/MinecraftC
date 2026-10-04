@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "game/GameRules.h"
+#include "game/GameRuleRegistry.h"
 #include "game/InventoryModel.h"
 #include "game/Weather.h"
 #include "game/VillagerTrade.h"
@@ -35,6 +36,7 @@ struct WorldMetadata {
     bool cheatsEnabled = false;
     uint64_t worldTicks = 0;
     uint32_t dayNightDurationSeconds = DEFAULT_DAY_NIGHT_DURATION_SECONDS;
+    GameRuleSet gameRules;
     WeatherSaveState weather;
     glm::dvec3 playerPosition{0.0, 50.0, 0.0};
     glm::ivec3 worldSpawn{0, 50, 0};

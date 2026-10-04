@@ -63,6 +63,11 @@ DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
 DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
     DamageOutcome outcome;
     outcome.rawDamage = source.amount;
+    const auto& rules = m_world.gameRules();
+    if ((source.cause == DamageCause::Fall && !rules.boolean(GameRuleId::FallDamage)) ||
+        (source.cause == DamageCause::Drowning && !rules.boolean(GameRuleId::DrowningDamage)) ||
+        (source.cause == DamageCause::Fire && !rules.boolean(GameRuleId::FireDamage)))
+        return outcome;
     if (m_gameMode != GameMode::Survival || source.amount <= 0.0f)
         return outcome;
 
@@ -416,7 +421,7 @@ void Player::updateSleeping(float dt) {
     m_survivalTickRemainder += dt * 20.0f;
     const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
     if (ticks == 0) return;
-    m_survivalStats.tick(m_difficulty, ticks);
+    m_survivalStats.tick(m_difficulty, ticks, m_world.gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
     updateEnvironment(ticks);
     m_survivalTickRemainder -= static_cast<float>(ticks);
 }
@@ -468,7 +473,7 @@ void Player::update(float dt) {
         m_survivalTickRemainder += dt * 20.0f;
         const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
         if (ticks > 0) {
-            m_survivalStats.tick(m_difficulty, ticks);
+            m_survivalStats.tick(m_difficulty, ticks, m_world.gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
             updateEnvironment(ticks);
             m_survivalTickRemainder -= static_cast<float>(ticks);
         }
@@ -954,9 +959,12 @@ bool Player::breakBlock() {
             block = BlockId::SUNFLOWER_BOTTOM;
         }
         if (m_gameMode == GameMode::Survival) {
+            const bool blockDrops = m_world.gameRules().boolean(GameRuleId::BlockDrops);
             if (m_entities) {
-                for (const auto& content : m_world.takeBlockEntityContents(hit->blockPos))
-                    m_entities->spawnItem(glm::dvec3(hit->blockPos) + glm::dvec3(0.5), content);
+                for (const auto& content : m_world.takeBlockEntityContents(hit->blockPos)) {
+                    if (blockDrops)
+                        m_entities->spawnItem(glm::dvec3(hit->blockPos) + glm::dvec3(0.5), content);
+                }
             }
             const ItemStack& tool = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
             const auto drops = getBlockDrops(block, tool,
@@ -964,6 +972,7 @@ bool Player::breakBlock() {
                 static_cast<uint32_t>(hit->blockPos.y) * 912931u ^
                 static_cast<uint32_t>(hit->blockPos.z) * 438289u);
             for (const auto& drop : drops) {
+                if (!blockDrops) break;
                 ItemStack remaining = drop;
                 remaining.count = static_cast<uint8_t>(m_inventory.add(drop));
                 if (!remaining.empty() && m_entities)

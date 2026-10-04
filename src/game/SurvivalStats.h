@@ -23,7 +23,7 @@ public:
     bool eat(ItemId food);
     void damage(float amount);
     void heal(float amount);
-    void tick(Difficulty difficulty, uint32_t ticks = 1);
+    void tick(Difficulty difficulty, uint32_t ticks = 1, bool naturalRegeneration = true);
 
 private:
     float m_health = MAX_HEALTH;

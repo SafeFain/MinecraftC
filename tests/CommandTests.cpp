@@ -1,4 +1,5 @@
 #include "game/Command.h"
+#include "GameRuleCommandTests.h"
 #include "game/TextWrap.h"
 
 #include <cstdlib>
@@ -13,7 +14,8 @@ void require(bool condition, const char* message) {
 }
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc > 1) verifyGameRuleBaseline(argv[1]);
     const auto give = parseCommand("/give stone_bricks 64");
     require(give.command && give.command->type == CommandType::Give &&
             give.command->item == ItemId::STONE_BRICKS && give.command->itemCount == 64,
@@ -45,14 +47,14 @@ int main() {
             chineseLines[1] == "林恶地", "CJK chat was not wrapped on UTF-8 boundaries");
 
     const auto duration = parseCommand("/gamerule DayNightDuration 1200");
-    require(duration.command && duration.command->type == CommandType::DayNightDuration &&
-            duration.command->dayNightDurationSeconds == 1200,
+    require(duration.command && duration.command->type == CommandType::GameRule &&
+            duration.command->gameRuleValue && duration.command->gameRuleValue->number == 1200,
             "day/night gamerule accepts seconds");
     require(parseCommand("/gamerule DayNightDuration 1").command &&
             parseCommand("/gamerule DayNightDuration 4294967295").command,
             "duration accepts full positive uint32 range");
     for (const char* input : {"/gamerule", "/gamerule daynightduration 1200",
-            "/gamerule DayNightDuration", "/gamerule DayNightDuration 0",
+            "/gamerule DayNightDuration 0",
             "/gamerule DayNightDuration -1", "/gamerule DayNightDuration 1.5",
             "/gamerule DayNightDuration NaN", "/gamerule DayNightDuration inf",
             "/gamerule DayNightDuration 4294967296",

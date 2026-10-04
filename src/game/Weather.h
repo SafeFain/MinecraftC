@@ -36,7 +36,7 @@ public:
     static constexpr uint32_t THUNDER_MAX_TICKS = 15600;
 
     void reset(uint64_t worldSeed, const WeatherSaveState& state = {});
-    void tick();
+    void tick(bool advanceCycle = true);
     void setWeather(WeatherType type);
 
     WeatherType type() const;

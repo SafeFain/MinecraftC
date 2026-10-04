@@ -299,12 +299,13 @@ void GameScenePresenter::render(
                     "MinecraftC" + (session.playerState().isFlying()
                         ? " [" + localization.text("window.fly") + "]" : "") +
                     " | FPS: " + std::to_string(fps) +
+                    (session.metadata().gameRules.boolean(GameRuleId::ReducedDebugInfo) ? std::string{} :
                     " | XYZ: " + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().x))) +
                     "," + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().y))) +
                     "," + std::to_string(static_cast<int>(std::floor(session.playerState().getPosition().z))) +
                     " | " + localization.text("window.chunks") + ": " +
                     std::to_string(rendered) +
-                    "/" + std::to_string(session.worldState().getActiveChunks().size()) + giInfo
+                    "/" + std::to_string(session.worldState().getActiveChunks().size()) + giInfo)
                 );
             }
         } else {

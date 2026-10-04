@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "game/GameRules.h"
+#include "game/GameRuleRegistry.h"
 #include "game/Item.h"
 #include "game/Weather.h"
 #include "world/Biome.h"
@@ -28,7 +29,7 @@ enum class CommandType {
     Gamemode,
     Teleport,
     Time,
-    DayNightDuration,
+    GameRule,
     Weather,
     LocateBiome,
     LocateStructure,
@@ -42,7 +43,10 @@ struct ParsedCommand {
     ItemId item = ItemId::EMPTY;
     uint8_t itemCount = 1;
     TimePreset time = TimePreset::Day;
-    uint32_t dayNightDurationSeconds = DEFAULT_DAY_NIGHT_DURATION_SECONDS;
+    GameRuleReference gameRule{GameRuleId::DayNightDuration};
+    std::optional<GameRuleValue> gameRuleValue;
+    bool gameRuleHelp = false;
+    bool gameRuleHelpSingle = false;
     WeatherType weather = WeatherType::Clear;
     Biome biome = Biome::PLAINS;
     StructureType structure = StructureType::Village;
@@ -107,7 +111,17 @@ inline CommandParseResult parseCommand(const std::string& input) {
     const std::string& name = tokens[0].text;
     ParsedCommand parsed;
     if (name == "/help") {
-        if (tokens.size() != 1) return expected(input, tokens, 1, "<end>");
+        if (tokens.size() > 1) {
+            if (tokens[1].text != "gamerule") return expected(input, tokens, 1, "gamerule");
+            parsed.gameRuleHelp = true;
+            if (tokens.size() > 2) {
+                const auto rule = findGameRule(tokens[2].text);
+                if (!rule) return expected(input, tokens, 2, "<rule>");
+                parsed.gameRule = *rule;
+                parsed.gameRuleHelpSingle = true;
+            }
+            if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
+        }
         parsed.type = CommandType::Help;
     } else if (name == "/give") {
         if (tokens.size() < 2) return expected(input, tokens, 1, "<item>");
@@ -151,19 +165,16 @@ inline CommandParseResult parseCommand(const std::string& input) {
         parsed.type = CommandType::Teleport;
         parsed.teleport = {coordinates[0], coordinates[1], coordinates[2]};
     } else if (name == "/gamerule") {
-        if (tokens.size() < 2 || tokens[1].text != "DayNightDuration")
-            return expected(input, tokens, 1, "DayNightDuration");
-        if (tokens.size() < 3) return expected(input, tokens, 2, "1..4294967295 seconds");
-        const auto& value = tokens[2].text;
-        if (value.empty() || value.size() > 10 ||
-            value.find_first_not_of("0123456789") != std::string::npos)
-            return expected(input, tokens, 2, "1..4294967295 seconds");
-        const uint64_t seconds = std::stoull(value);
-        if (seconds == 0 || seconds > UINT32_MAX)
-            return expected(input, tokens, 2, "1..4294967295 seconds");
+        if (tokens.size() < 2) return expected(input, tokens, 1, "<rule> [<value>]");
+        const auto rule = findGameRule(tokens[1].text);
+        if (!rule) return expected(input, tokens, 1, "<rule> (see /help gamerule)");
+        parsed.gameRule = *rule;
+        if (tokens.size() > 2) {
+            parsed.gameRuleValue = parseGameRuleValue(*rule, tokens[2].text);
+            if (!parsed.gameRuleValue) return expected(input, tokens, 2, gameRuleRange(*rule));
+        }
         if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
-        parsed.type = CommandType::DayNightDuration;
-        parsed.dayNightDurationSeconds = static_cast<uint32_t>(seconds);
+        parsed.type = CommandType::GameRule;
     } else if (name == "/time") {
         if (tokens.size() < 2 || tokens[1].text != "set")
             return expected(input, tokens, 1, "set");
@@ -252,8 +263,21 @@ inline std::vector<CommandSuggestion> commandSuggestions(
                 add(itemCommandName(static_cast<ItemId>(raw)));
         } else if (argument == 1 && command == "/gamemode") {
             add("0"); add("1"); add("3");
-        } else if (argument == 1 && command == "/gamerule") {
-            add("DayNightDuration");
+        } else if ((argument == 1 && command == "/gamerule") ||
+                   (argument == 2 && command == "/help" && before[1].text == "gamerule")) {
+            for (const auto& rule : GAME_RULES) {
+                if (prefix.find(':') != std::string_view::npos) add(rule.fullName);
+                else {
+                    add(rule.name);
+                    if (!prefix.empty() && !rule.legacyName.empty()) add(rule.legacyName);
+                }
+            }
+            if (!prefix.empty()) { add("doFireTick"); add("allowFireTicksAwayFromPlayer"); add("command_modification_block_limit"); }
+        } else if (argument == 2 && command == "/gamerule") {
+            const auto rule = findGameRule(before[1].text);
+            if (rule && gameRuleInputType(*rule) == GameRuleType::Boolean) { add("true"); add("false"); }
+        } else if (argument == 1 && command == "/help") {
+            add("gamerule");
         } else if (argument == 1 && command == "/time") {
             add("set");
         } else if (argument == 2 && command == "/time" &&

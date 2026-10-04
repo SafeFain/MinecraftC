@@ -55,7 +55,7 @@ void GameSession::setOverworldBedSpawn(const glm::ivec3& bed) {
 }
 
 void GameSession::updateDaylight(float dt, bool playing) {
-    dayNightCycle.update(dt, worldMetadata.dayNightDurationSeconds, playing);
+    dayNightCycle.update(dt, worldMetadata.dayNightDurationSeconds, playing && worldMetadata.gameRules.boolean(GameRuleId::AdvanceTime));
 }
 
 void GameSession::configureVisuals(
@@ -310,6 +310,7 @@ GameMode GameSession::startWorld(
         throw std::runtime_error("World generation version is incompatible");
     saveStore = std::move(selectedStore);
     worldMetadata = std::move(selectedMetadata);
+    world.setGameRules(worldMetadata.gameRules);
 
     dimension = worldMetadata.activeDimension;
     loadingReason = dimension == DimensionId::Heaven
@@ -520,7 +521,11 @@ void GameSession::updatePlaying(
     }
     if (player.isSurvival() && !playerDead && player.survivalStats().dead()) {
         beginPlayerDeath();
-        if (feedback.playerDied) feedback.playerDied();
+        if (worldMetadata.gameRules.boolean(GameRuleId::ShowDeathMessages) && feedback.playerDeathMessage)
+            feedback.playerDeathMessage();
+        if (worldMetadata.gameRules.boolean(GameRuleId::ImmediateRespawn)) {
+            respawn(RuntimeClock{}.now());
+        } else if (feedback.playerDied) feedback.playerDied();
     }
 
     survivalWorldTickRemainder += dt * 20.0f;
@@ -532,7 +537,7 @@ void GameSession::updatePlaying(
     while (survivalWorldTickRemainder >= 1.0f) {
         ++survivalTicks;
         survivalWorldTickRemainder -= 1.0f;
-        if (dimension == DimensionId::Overworld) weather.tick();
+        if (dimension == DimensionId::Overworld) weather.tick(worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather));
         if (dimension == DimensionId::Overworld) tickLightning(feedback);
         world.tickBlockEntities();
         const size_t fluidBudget = std::min(
@@ -543,9 +548,8 @@ void GameSession::updatePlaying(
         fluidUpdatesRemaining -= fluidBudget;
         world.tickFluids(survivalTicks,
                          FluidTickBudget{fluidBudget, fluidDeadline});
+        world.tickSurvival(player.getPosition(), survivalTicks, weather.raining());
         if ((survivalTicks % 20) == 0) {
-            world.tickSurvival(
-                player.getPosition(), survivalTicks, weather.raining());
             if (dimension == DimensionId::Overworld)
                 world.tickWeather(weather, dayNightCycle.isDay(), survivalTicks);
         }
@@ -558,8 +562,10 @@ void GameSession::updatePlaying(
         [](const LightningEvent& event) { return event.seconds <= 0.0f; }),
         lightningEvents.end());
 
-    world.update(player.getPosition(), 0, glm::dvec3(player.velocity()));
-    world.enqueueGeneration();
+    if (!player.isSpectator() || worldMetadata.gameRules.boolean(GameRuleId::SpectatorsGenerateChunks)) {
+        world.update(player.getPosition(), 0, glm::dvec3(player.velocity()));
+        world.enqueueGeneration();
+    }
     world.processCompletedGenerations();
     entities.syncChunks();
     world.enqueueMeshBuilds();
@@ -580,10 +586,49 @@ void GameSession::updatePlaying(
 GameSession::CommandResult GameSession::executeCommand(
     const ParsedCommand& command, const Localization& localization,
     RuntimeClock::Tick now) {
+    const bool feedbackEnabled = worldMetadata.gameRules.boolean(GameRuleId::SendCommandFeedback);
+    CommandResult result = executeCommandImpl(command, localization, now);
+    const bool query = command.type == CommandType::GameRule && !command.gameRuleValue;
+    const bool feedbackToggle = command.type == CommandType::GameRule &&
+        command.gameRule.id == GameRuleId::SendCommandFeedback;
+    const bool supportWarning = command.type == CommandType::GameRule &&
+        gameRuleDefinition(command.gameRule.id).support != GameRuleSupport::Implemented;
+    if (worldMetadata.cheatsEnabled && command.type != CommandType::Help && !query &&
+        worldMetadata.gameRules.boolean(GameRuleId::LogAdminCommands))
+        LOG_INFO("Executed local command " << (std::array<const char*, 9>{
+            "/help", "/gamemode", "/tp", "/time", "/gamerule", "/weather", "/locate biome", "/locate structure", "/give"
+        }.at(static_cast<size_t>(command.type))));
+    if (worldMetadata.cheatsEnabled && !feedbackEnabled && !query &&
+        command.type != CommandType::Help && !feedbackToggle) {
+        if (supportWarning && result.messages.size() > 1) result.messages.erase(result.messages.begin());
+        else result.messages.clear();
+    }
+    return result;
+}
+
+GameSession::CommandResult GameSession::executeCommandImpl(
+    const ParsedCommand& command, const Localization& localization,
+    RuntimeClock::Tick now) {
     CommandResult result;
     auto message = [&](std::string value) {
         result.messages.push_back(std::move(value));
     };
+    if (command.type == CommandType::Help && command.gameRuleHelp) {
+        for (const auto& rule : GAME_RULES) {
+            if (command.gameRuleHelpSingle && rule.id != command.gameRule.id) continue;
+            message(localization.format("message.gamerule_help", {
+                std::string(rule.name), gameRuleValueText({rule.type, rule.defaultValue}),
+                gameRuleRange({rule.id}), std::string(rule.legacyName)}));
+            const std::string support = localization.text(rule.support == GameRuleSupport::Unavailable
+                ? "message.gamerule_unavailable" : rule.support == GameRuleSupport::Partial
+                ? "message.gamerule_partial" : "message.gamerule_implemented");
+            if (command.gameRuleHelpSingle) {
+                message(localization.text("gamerule.description." + std::string(rule.name)));
+                message(support);
+            } else result.messages.back() += " — " + support;
+        }
+        return result;
+    }
     if (command.type == CommandType::Help) {
         message(localization.text("message.help_header"));
         message("/help");
@@ -591,7 +636,8 @@ GameSession::CommandResult GameSession::executeCommand(
         message("/give <item> [1..64]");
         message("/tp <x> <y> <z>");
         message("/time set day|night");
-        message("/gamerule DayNightDuration <seconds>");
+        message("/gamerule <rule> [<value>]");
+        message("/help gamerule [<rule>]");
         message("/weather clear|rain|thunder");
         message("/locate biome <biome>");
         message(localization.text("message.help_biomes"));
@@ -635,11 +681,32 @@ GameSession::CommandResult GameSession::executeCommand(
             std::to_string(target.z)}));
         return result;
     }
-    if (command.type == CommandType::DayNightDuration) {
-        if (command.dayNightDurationSeconds == 0) return result;
-        worldMetadata.dayNightDurationSeconds = command.dayNightDurationSeconds;
-        message(localization.format("message.day_night_duration", {
-            std::to_string(command.dayNightDurationSeconds)}));
+    if (command.type == CommandType::GameRule) {
+        const auto ref = command.gameRule;
+        const auto& rule = gameRuleDefinition(ref.id);
+        if (command.gameRuleValue) {
+            if (!validGameRuleValue(ref.id, *command.gameRuleValue)) {
+                message(localization.text("message.gamerule_invalid"));
+                return result;
+            }
+            if (ref.id == GameRuleId::DayNightDuration)
+                worldMetadata.dayNightDurationSeconds = static_cast<uint32_t>(command.gameRuleValue->number);
+            else {
+                worldMetadata.gameRules.set(ref.id, *command.gameRuleValue);
+                world.setGameRules(worldMetadata.gameRules);
+            }
+        }
+        const auto value = ref.id == GameRuleId::DayNightDuration
+            ? GameRuleValue::integer(worldMetadata.dayNightDurationSeconds)
+            : worldMetadata.gameRules.get(ref.id);
+        message(localization.format(command.gameRuleValue ? "message.gamerule_set" : "message.gamerule_query", {
+            std::string(ref.adapter == GameRuleAdapter::FireEnabled ? "doFireTick" :
+                ref.adapter == GameRuleAdapter::FireAway ? "allowFireTicksAwayFromPlayer" :
+                ref.adapter == GameRuleAdapter::Inverted ? rule.legacyName : rule.name),
+            gameRuleValueText(gameRuleQueryValue(ref, value))}));
+        if (rule.support != GameRuleSupport::Implemented)
+            message(localization.text(rule.support == GameRuleSupport::Partial
+                ? "message.gamerule_partial" : "message.gamerule_unavailable"));
         return result;
     }
     if (command.type == CommandType::Time) {
@@ -747,8 +814,12 @@ void GameSession::chooseSleepAction(
         return;
     }
     if (action == SleepAction::SleepUntilMorning) {
-        dayNightCycle.resetMorning();
-        if (dimension == DimensionId::Overworld)
+        if (worldMetadata.gameRules.integer(GameRuleId::PlayersSleepingPercentage) > 100) {
+            finishSleep(feedback);
+            return;
+        }
+        if (worldMetadata.gameRules.boolean(GameRuleId::AdvanceTime)) dayNightCycle.resetMorning();
+        if (dimension == DimensionId::Overworld && worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather))
             weather.setWeather(WeatherType::Clear);
     }
     if (action == SleepAction::TravelToHeaven) {
@@ -858,8 +929,9 @@ void GameSession::beginPlayerDeath() {
     playerDead = true;
     const glm::vec3 deathPosition = glm::vec3(
         player.getPosition() + glm::dvec3(0.0, 0.5, 0.0));
-    for (const auto& stack : takeDeathDrops(player.inventory()))
-        entities.spawnItem(deathPosition, stack);
+    if (!worldMetadata.gameRules.boolean(GameRuleId::KeepInventory))
+        for (const auto& stack : takeDeathDrops(player.inventory()))
+            entities.spawnItem(deathPosition, stack);
 }
 
 void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
@@ -871,8 +943,27 @@ void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
         : (worldMetadata.bedSpawn
             ? world.validBedFoot(*worldMetadata.bedSpawn) : std::nullopt);
     const bool bedValid = validBed.has_value();
-    const glm::ivec3 spawn = chooseRespawnPosition(
-        worldMetadata.worldSpawn, validBed, bedValid);
+    glm::ivec3 spawn = chooseRespawnPosition(worldMetadata.worldSpawn, validBed, bedValid);
+    if (!bedValid) {
+        const int64_t radius = worldMetadata.gameRules.integer(GameRuleId::RespawnRadius);
+        const uint64_t width = static_cast<uint64_t>(radius * 2 + 1);
+        for (int attempt = 0; radius > 0 && attempt < 16; ++attempt) {
+            const uint64_t hash = WorldGenContext::hashPosition(worldMetadata.seed ^ survivalTicks,
+                worldMetadata.worldSpawn.x, attempt, worldMetadata.worldSpawn.z);
+            const int64_t x = static_cast<int64_t>(spawn.x) + static_cast<int64_t>(hash % width) - radius;
+            const int64_t z = static_cast<int64_t>(spawn.z) + static_cast<int64_t>((hash >> 32) % width) - radius;
+            if (x < INT32_MIN || x > INT32_MAX || z < INT32_MIN || z > INT32_MAX) continue;
+            if (!world.getLoadedBlock(static_cast<int>(x), spawn.y, static_cast<int>(z))) continue;
+            const int y = world.getSurfaceY(static_cast<int>(x), static_cast<int>(z));
+            if (!Config::isValidWorldY(y + 2)) continue;
+            const BlockId ground = world.getBlock(static_cast<int>(x), y, static_cast<int>(z));
+            if (!isFullCollisionBlock(ground) || isFluid(ground) || ground == BlockId::FIRE ||
+                world.getBlock(static_cast<int>(x), y + 1, static_cast<int>(z)) != BlockId::AIR ||
+                world.getBlock(static_cast<int>(x), y + 2, static_cast<int>(z)) != BlockId::AIR) continue;
+            spawn = {static_cast<int>(x), y, static_cast<int>(z)};
+            break;
+        }
+    }
     const float spawnHeight = bedValid
         ? blockCollisionHeight(world.getBlock(spawn.x, spawn.y, spawn.z)) + 0.001f
         : 1.01f;

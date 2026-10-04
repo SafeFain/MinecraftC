@@ -31,5 +31,5 @@ enum class DimensionId : uint8_t {
 };
 
 constexpr uint32_t SURVIVAL_RULESET_VERSION = 2602;
-constexpr uint32_t SAVE_FORMAT_VERSION = 14;
+constexpr uint32_t SAVE_FORMAT_VERSION = 15;
 constexpr uint32_t DEFAULT_DAY_NIGHT_DURATION_SECONDS = 1200;
