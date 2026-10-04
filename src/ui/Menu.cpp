@@ -226,6 +226,7 @@ void MainMenu::rebuildButtons() {
         m_buttons.emplace_back(m_localization.format("menu.home.language",
                                {std::string(languageNativeName(m_settings.language))}),
                                [this]() { showLanguage(); });
+        if(m_callbacks.onOpenPlugins) m_buttons.emplace_back(m_localization.text("plugins.title"),m_callbacks.onOpenPlugins);
         m_buttons.emplace_back(m_localization.text("menu.home.quit"), m_callbacks.onQuit);
         m_buttons.emplace_back(m_localization.text("menu.home.about"),
                                [this]() { showAbout(); });
@@ -258,6 +259,7 @@ void MainMenu::rebuildButtons() {
             m_buttons.back().setDetail(world.compatible ? mode + "  ·  " +
                 std::to_string(world.seed) : m_localization.format("menu.worlds.incompatible", {
                     std::to_string(world.generationVersion)}));
+            if(!world.incompatibilityReason.empty())m_buttons.back().setDetail(world.incompatibilityReason);
             const std::string worldId = world.id;
             m_deleteButtons.emplace_back(
                 m_localization.text(m_pendingDeleteWorldId == worldId
@@ -423,9 +425,10 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     const float contentX=panelX+20;
     if (home) {
         const float gap=h<400?4:8;
-        const float buttonH=std::min(48.0f,(contentTop-contentBottom-gap*3)/4);
+        const float rows=static_cast<float>(m_buttons.size()-1);
+        const float buttonH=std::min(48.0f,(contentTop-contentBottom-gap*(rows-1))/rows);
         for (size_t i=0;i<m_buttons.size();++i) {
-            if (i==4) {
+            if (i+1==m_buttons.size()) {
                 m_buttons[i].setPosition(w-116,4);m_buttons[i].setSize(100,24);
             } else {
                 m_buttons[i].setPosition(contentX,contentTop-buttonH-i*(buttonH+gap));

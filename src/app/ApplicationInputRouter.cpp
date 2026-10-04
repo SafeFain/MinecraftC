@@ -688,13 +688,16 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
 void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action) {
     if (m_ui.activeMenu) return;
     const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
+    const bool pluginUse=use&&action==ButtonAction::Press&&!m_session.playerState().isSpectator();
+    if(pluginUse&&!m_session.pluginUse())return;
     if (use && m_session.playerState().activeItem().id == ItemId::FISHING_ROD) {
-        m_session.handleMouseButton(logicalButton,action);
+        m_session.handleMouseButton(logicalButton,action,pluginUse);
         return;
     }
     if (action == ButtonAction::Press && use && !m_session.playerState().isSpectator()) {
         if (const auto villager = m_session.useVillagerRay(3.0f)) {
             if (m_ui.tradeScreen.open(m_session, *villager)) {
+                m_session.pluginUse(true);
                 m_ui.containerOpen = false;
                 m_ui.tradeOpen = true;
                 m_ui.inventoryOpen = true;
@@ -710,10 +713,12 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
             if (target == BlockId::CRAFTING_TABLE && m_session.playerState().isSurvival()) {
                 m_flow.openInventory();
                 m_ui.survivalInventory.setCraftingTable(true);
+                m_session.pluginUse(true);
                 return;
             }
             if (target == BlockId::CHEST || target == BlockId::FURNACE) {
                 if (m_ui.containerScreen.open(m_session, hit->blockPos)) {
+                    m_session.pluginUse(true);
                     m_ui.tradeOpen = false;
                     m_ui.containerOpen = true;
                     m_ui.inventoryOpen = true;
@@ -723,7 +728,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
             }
         }
     }
-    m_session.handleMouseButton(logicalButton, action);
+    m_session.handleMouseButton(logicalButton, action,pluginUse);
 }
 
 void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {

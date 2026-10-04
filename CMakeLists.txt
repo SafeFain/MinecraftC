@@ -155,6 +155,15 @@ else()
     endif()
 endif()
 
+set(MINECRAFTC_PLUGIN_GAME_VERSION "${MINECRAFTC_VERSION}")
+if(MINECRAFTC_VERSION_CHANNEL STREQUAL "release")
+    set(MINECRAFTC_PLUGIN_GAME_VERSION "${MINECRAFTC_VERSION_CORE}")
+endif()
+set_source_files_properties(src/plugins/PluginManager.cpp PROPERTIES
+    COMPILE_DEFINITIONS "MINECRAFTC_PLUGIN_GAME_VERSION=\"${MINECRAFTC_PLUGIN_GAME_VERSION}\"")
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sdk")
+
 add_library(minecraftc_assets STATIC
     src/core/AssetStore.cpp
     src/platform/sdl/SdlAssetStore.cpp)
@@ -187,7 +196,8 @@ foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/${BACKEND_SOURCE}")
 endforeach()
 list(REMOVE_ITEM SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeDynamicLibrary.cpp")
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlMain.cpp")
 list(REMOVE_ITEM SOURCES
@@ -200,9 +210,11 @@ list(REMOVE_ITEM SOURCES
 
 add_library(minecraftc_platform STATIC
     src/platform/native/NativePlatform.cpp
+    src/platform/native/NativeDynamicLibrary.cpp
     src/platform/native/NativeCrashHandler.cpp
     src/platform/sdl/SdlPlatformPaths.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
+target_link_libraries(minecraftc_platform PRIVATE ${CMAKE_DL_LIBS})
 target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
 target_link_libraries(minecraftc_platform PRIVATE ${MINECRAFTC_SDL_TARGET})
@@ -429,6 +441,9 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
     endif()
     install(FILES LICENSE README.md packaging/README-release.md
             DESTINATION .)
+    install(FILES docs/plugins.md DESTINATION docs)
+    install(DIRECTORY sdk/ DESTINATION sdk)
+    install(DIRECTORY examples/plugins/ DESTINATION examples/plugins)
     if(WIN32)
         install(FILES packaging/run-minecraftc.cmd DESTINATION .)
     else()
@@ -451,6 +466,10 @@ else()
             DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
     endif()
     install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES docs/plugins.md DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
+    install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/sdk)
+    install(DIRECTORY examples/plugins/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples/plugins)
     if(APPLE)
         install(FILES "${MINECRAFTC_MOLTENVK_LIBRARY}"
                 DESTINATION "MinecraftC.app/Contents/Frameworks")
@@ -718,6 +737,7 @@ if(BUILD_TESTING)
     add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
 
     add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
+        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
         tests/VulkanUiSmoke.cpp
         src/core/Input.cpp src/core/InputCodes.cpp src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
@@ -897,6 +917,36 @@ if(BUILD_TESTING)
         target_compile_options(inventory_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
+
+    add_executable(plugin_tests tests/PluginTests.cpp
+        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp
+        src/world/Block.cpp src/world/Chunk.cpp
+        src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
+        src/game/SaveStore.cpp src/game/WorldCatalog.cpp
+        src/renderer/BlockAtlasData.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
+        src/debug/Log.cpp)
+    target_include_directories(plugin_tests PRIVATE src external external/stb)
+    target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
+    target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(plugin_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(plugin_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        add_library(plugin_native_demo MODULE examples/plugins/native_demo/plugin.cpp)
+        add_library(plugin_bad_abi MODULE tests/PluginBadEntry.cpp)
+        target_compile_definitions(plugin_bad_abi PRIVATE MC_BAD_ABI=1)
+        add_library(plugin_bad_entry MODULE tests/PluginBadEntry.cpp)
+        add_library(plugin_callback_fault MODULE tests/PluginBadEntry.cpp)
+        target_compile_definitions(plugin_callback_fault PRIVATE MC_CALLBACK_FAULT=1)
+        add_dependencies(plugin_tests plugin_native_demo plugin_bad_abi plugin_bad_entry plugin_callback_fault)
+        add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests
+            $<TARGET_FILE:plugin_native_demo> $<TARGET_FILE:plugin_bad_abi> $<TARGET_FILE:plugin_bad_entry> $<TARGET_FILE:plugin_callback_fault>)
+    else()
+        add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests)
+    endif()
 
     add_executable(save_store_tests
         tests/SaveStoreTests.cpp
@@ -1130,6 +1180,7 @@ if(BUILD_TESTING)
     add_test(NAME application_input_routing COMMAND input_routing_tests)
 
     add_executable(session_flow_tests
+        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp
         tests/SessionFlowTests.cpp
         src/app/GameSession.cpp
         src/game/FishingSystem.cpp
@@ -1205,6 +1256,7 @@ if(BUILD_TESTING)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    add_test(NAME plugin_game_session_integration COMMAND session_flow_tests --plugin-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(gamerule_integration PROPERTIES TIMEOUT 120)
     add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)

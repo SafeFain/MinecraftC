@@ -1,3 +1,5 @@
+#include "plugins/PluginManager.h"
+#include "ui/PluginMenu.h"
 #include "app/Application.h"
 #include "app/ApplicationInputController.h"
 #include "app/ApplicationInputRouter.h"
@@ -70,9 +72,10 @@
 
 class Application final : public ApplicationHost {
 public:
-    explicit Application(RuntimePaths paths)
+    explicit Application(RuntimePaths paths, bool safeMode)
         : m_paths(std::move(paths)),
           m_assets(m_paths.assetRoot),
+          m_plugins(m_paths),m_safeMode(safeMode),
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"),
           m_renderer(std::make_unique<VulkanRenderer>()),
           m_session(m_paths.savesDirectory()),
@@ -83,6 +86,7 @@ public:
                    m_clientSettings, m_flow, m_runtimeClock)
     {}
 
+    ~Application() override { shutdown(); }
     void start() { initialize(); }
     bool iterate() override {
         if (m_graphicsResetPending) restoreGraphics();
@@ -123,6 +127,8 @@ public:
 private:
     RuntimePaths m_paths;
     AssetStore m_assets;
+    Plugins::PluginManager m_plugins;
+    bool m_safeMode=false;
     platform::sdl::SdlClipboard m_clipboard;
     Window      m_window;
     std::unique_ptr<IGameRenderer> m_renderer;
@@ -158,6 +164,16 @@ private:
                          m_paths.logFile());
         Debug::installCrashHandlers();
 
+        m_plugins.initialize(m_safeMode);
+        m_ui.inventory=CreativeInventory{};
+        m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};
+        m_plugins.operations.getBlock=[this](int32_t x,int32_t y,int32_t z,uint16_t& id){return m_session.pluginGetBlock(x,y,z,id);};
+        m_plugins.operations.setBlock=[this](int32_t x,int32_t y,int32_t z,uint16_t id){return m_session.pluginSetBlock(x,y,z,id);};
+        m_plugins.operations.giveItem=[this](uint16_t id,uint32_t count){return m_session.pluginGiveItem(id,count);};
+        m_plugins.operations.worldDirectory=[this]{return m_session.pluginWorldDirectory();};
+        m_plugins.operations.hudRect=[this](float x,float y,float w,float h,const glm::vec4& c){m_ui.renderer.drawRect(x,y,w,h,c);};
+        m_plugins.operations.hudText=[this](float x,float y,const std::string& text,const glm::vec4& c){m_ui.renderer.renderTextAlpha(text,x,y,1,glm::vec3(c),c.a);};
+        m_plugins.operations.hudImage=[this](float x,float y,float w,float h,uint16_t tile,const glm::vec4& c){m_ui.renderer.drawAtlasIcon(x,y,w,h,tile,c);};
         m_clientSettings = ClientSettings::load(m_paths.settingsFile());
         m_ui.localization.load(m_paths.assetRoot);
         m_ui.localization.setLanguage(m_clientSettings.language);
@@ -303,8 +319,9 @@ private:
         });
 
         // ── Menu callbacks ────────────────────────────────────────────
+        m_ui.menuCallbacks.onOpenPlugins=[this]{m_ui.activeMenu=std::make_unique<PluginMenu>(m_plugins,m_ui.localization,[this]{m_flow.showMainMenu();});};
         m_ui.menuCallbacks.onOpenWorld = [this](const std::string& id) {
-            m_flow.startGame(id, false);
+            try {m_flow.startGame(id, false);} catch(const std::exception& error){LOG_ERROR(error.what());m_flow.showCommandMessage(error.what());}
         };
         m_ui.menuCallbacks.onRefreshWorlds = [this]() {
             return m_session.listWorlds();
@@ -344,10 +361,12 @@ private:
                     if (consumed != seedText.size())
                         LOG_WARN("Seed contained unused characters: " << seedText);
                 }
+                try {
                 const std::string id = m_session.createWorld(
                     name.empty() ? m_ui.localization.text("menu.create.default_name") : name,
                     seed, mode, Difficulty::Normal, cheatsEnabled, worldType);
                 m_flow.startGame(id, true);
+                }catch(const std::exception& error){LOG_ERROR(error.what());m_flow.showCommandMessage(error.what());}
             };
         m_ui.menuCallbacks.onResume = [this]() { m_flow.resume(); };
         m_ui.menuCallbacks.onBackToMenu = [this]() { m_flow.backToMainMenu(); };
@@ -518,22 +537,29 @@ private:
             return !m_window.shouldClose() && m_running;
         }
         m_router.handleFrameInput(frame.dt);
-        updateFrameState(frame.dt, frame.now);
+        if(Plugins::content().runtimeFault.empty())updateFrameState(frame.dt, frame.now);
+        if(!Plugins::content().runtimeFault.empty()) {
+            if(m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::content().runtimeFault);
+            m_plugins.discardOperations();
+        } else m_plugins.flushOperations();
         renderFrameScene(frame.dt, frame.now);
         renderFrameUi();
+        if(!Plugins::content().runtimeFault.empty()&&m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::content().runtimeFault);
         finishFramePhases(frame.started);
         m_window.finishEventFrame();
         return !m_window.shouldClose() && m_running;
     }
     void cleanup() {
-        if (!m_savedForTermination) m_flow.saveCurrentWorld();
+        if(!Plugins::content().runtimeFault.empty())m_session.abortPluginWorld();
+        else {if (!m_savedForTermination) m_flow.saveCurrentWorld();m_session.leaveWorld();}
+        m_plugins.shutdown();
         Debug::Log::shutdown();
         // Resources cleaned up by destructors
     }
 };
 
-std::unique_ptr<ApplicationHost> createGameApplication(RuntimePaths paths) {
-    auto app = std::make_unique<Application>(std::move(paths));
+std::unique_ptr<ApplicationHost> createGameApplication(RuntimePaths paths, bool safeMode) {
+    auto app = std::make_unique<Application>(std::move(paths),safeMode);
     app->start();
     return app;
 }

@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "ui/UIGeometry.h"
@@ -94,6 +95,11 @@ public:
         const glm::vec4 tinted=uiLinearColor(color,m_opacity);
         appendRoundedRect(b.vertices,b.indices,x,y,w,h,radius,tinted);
     }
+    void drawAtlasIcon(float x,float y,float w,float h,uint16_t tile,const glm::vec4& color)override{
+        const int side=m_blockAtlasTilesPerSide;const float s=static_cast<float>(side);
+        const float inset=.5f/(16.0f*s);
+        quad(x,y,w,h,{tile%side/s+inset,tile/side/s+inset,(tile%side+1)/s-inset,(tile/side+1)/s-inset},color,m_blockMaterial);
+    }
     void drawBlockIcon(float x,float y,float w,float h,BlockId block)override{
         if (block == BlockId::AIR) return;
         FaceDir face = FaceDir::TOP;
@@ -110,6 +116,9 @@ public:
     }
     void drawItemIcon(float x,float y,float w,float h,const ItemStack& stack)override{
         if(stack.empty())return;
+        if(const auto* item=Plugins::pluginItem(stack.id)) {
+            drawAtlasIcon(x,y,w,h,item->tile,glm::vec4(1));return;
+        }
         std::string name=getItemProps(stack.id).name;
         for(char& c:name)c=std::isalnum(static_cast<unsigned char>(c))?
             static_cast<char>(std::tolower(static_cast<unsigned char>(c))):'_';

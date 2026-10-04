@@ -259,8 +259,8 @@ inline std::vector<CommandSuggestion> commandSuggestions(
     } else {
         const std::string& command = before[0].text;
         if (argument == 1 && command == "/give") {
-            for (uint16_t raw = 1; raw < static_cast<uint16_t>(ItemId::COUNT); ++raw)
-                add(itemCommandName(static_cast<ItemId>(raw)));
+            for (const ItemId registeredItem : creativeInventoryItems())
+                add(itemCommandName(registeredItem));
         } else if (argument == 1 && command == "/gamemode") {
             add("0"); add("1"); add("3");
         } else if ((argument == 1 && command == "/gamerule") ||

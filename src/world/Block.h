@@ -454,9 +454,8 @@ enum class BlockTexture : uint16_t {
 extern const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE;
 
 // Quick lookup
-inline const BlockProperties& getBlockProps(BlockId id) {
-    return BLOCK_TABLE[static_cast<uint16_t>(id)];
-}
+const BlockProperties& getBlockProps(BlockId id);
+bool isValidBlockId(BlockId id);
 
 inline bool isLeafBlock(BlockId id) {
     return id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||

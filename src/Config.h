@@ -5,6 +5,9 @@
 #include <glm/glm.hpp>
 
 namespace Config {
+    constexpr size_t PLUGIN_MAX_OPERATIONS = 1024;
+    constexpr size_t PLUGIN_MAX_HUD_COMMANDS = 1024;
+
     constexpr float FISHING_CAST_SPEED = 12.0f;
     constexpr float FISHING_GRAVITY = 9.8f;
     constexpr uint32_t RANDOM_TICK_DRAWS_PER_TICK = 16384;

@@ -43,6 +43,7 @@ public:
     void pause();
     void resume();
     void backToMainMenu();
+    void abortPluginSession(const std::string& error);
     void respawnPlayer();
 
     // UI transitions

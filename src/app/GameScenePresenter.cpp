@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "app/GameScenePresenter.h"
 
 #include "Config.h"
@@ -43,6 +44,16 @@ void GameScenePresenter::render(
         if (session.worldState().isHeaven())
             environment = applyHeavenEnvironment(environment);
 
+        auto pluginEnvironment=Plugins::event(MC_ENVIRONMENT);
+        auto copyColor=[](float* destination,const glm::vec3& source){for(int i=0;i<3;++i)destination[i]=source[i];};
+        copyColor(pluginEnvironment.environment.zenith,environment.zenithColor);copyColor(pluginEnvironment.environment.horizon,environment.horizonColor);
+        copyColor(pluginEnvironment.environment.fog,environment.fogColor);copyColor(pluginEnvironment.environment.ambient_color,environment.ambientColor);copyColor(pluginEnvironment.environment.direct_color,environment.directColor);
+        pluginEnvironment.environment.ambient_intensity=environment.ambientIntensity;pluginEnvironment.environment.direct_intensity=environment.directIntensity;
+        Plugins::dispatch(pluginEnvironment);
+        auto color=[](const float* c){return glm::vec3(c[0],c[1],c[2]);};
+        environment.zenithColor=color(pluginEnvironment.environment.zenith);environment.horizonColor=color(pluginEnvironment.environment.horizon);environment.fogColor=color(pluginEnvironment.environment.fog);
+        environment.ambientColor=color(pluginEnvironment.environment.ambient_color);environment.directColor=color(pluginEnvironment.environment.direct_color);
+        environment.ambientIntensity=pluginEnvironment.environment.ambient_intensity;environment.directIntensity=pluginEnvironment.environment.direct_intensity;
         renderer.beginFrame();
         renderer.renderSky(
             environment, glm::inverse(vp), camera.m_position,

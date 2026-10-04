@@ -17,6 +17,7 @@ struct WorldSummary {
     uint32_t generationVersion = 0;
     bool compatible = false;
     WorldType worldType = WorldType::Normal;
+    std::string incompatibilityReason;
 };
 
 class WorldCatalog {

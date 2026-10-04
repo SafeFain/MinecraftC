@@ -157,8 +157,10 @@ std::string Localization::format(
 }
 
 #include "GameRuleIntegration.h"
+#include "PluginSessionIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc>2&&std::string(argv[1])=="--plugin-tests")return PluginSessionIntegration::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--gamerule-tests") return GameRuleIntegration::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--projectile-tests")
         return ProjectileIntegration::run(argv[2]);

@@ -28,6 +28,8 @@ struct WorldMetadata {
     };
 
     std::string displayName;
+    std::vector<std::pair<std::string,std::string>> pluginRequirements;
+    std::string pluginCompatibilityError;
     uint64_t seed = 0;
     uint32_t generationVersion = 0;
     uint32_t rulesetVersion = SURVIVAL_RULESET_VERSION;
@@ -94,8 +96,10 @@ public:
 
     const std::filesystem::path& worldDirectory() const { return m_worldDirectory; }
     bool exists() const;
+    void validatePluginFiles() const;
     void saveMetadata(const WorldMetadata& metadata) const;
-    WorldMetadata loadMetadata() const;
+    // Inspection reports incompatibility without loading or writing the world.
+    WorldMetadata loadMetadata(bool inspection = false) const;
     void saveChunkOverrides(int chunkX, int chunkZ,
                             const std::vector<BlockOverride>& overrides) const;
     std::vector<BlockOverride> loadChunkOverrides(int chunkX, int chunkZ) const;

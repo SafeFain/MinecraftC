@@ -36,6 +36,7 @@ struct MenuCallbacks {
     std::function<void()> onBackToMenu;
     std::function<void()> onQuit;
     std::function<void()> onOpenSettings;
+    std::function<void()> onOpenPlugins;
     std::function<void()> onSettingsChanged;
     std::function<void(const std::string&)> onOpenUrl;
     // Sleep actions use stable integer values so the UI layer remains

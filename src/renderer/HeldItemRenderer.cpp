@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "renderer/HeldItemRenderer.h"
 
 #include "core/AssetStore.h"
@@ -173,6 +174,13 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::TOP)),
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::BOTTOM))},
                        m_blockTiles,true);
+        block=true;
+    }else if(const auto* item=Plugins::pluginItem(id)) {
+        const float s=static_cast<float>(m_blockTiles);const int tile=item->tile;
+        const float u0=(tile%m_blockTiles+.5f/16)/s,u1=(tile%m_blockTiles+1-.5f/16)/s;
+        const float v0=(tile/m_blockTiles+.5f/16)/s,v1=(tile/m_blockTiles+1-.5f/16)/s;
+        quad(mesh,{-.5f,-.5f,.04f},{.5f,-.5f,.04f},{.5f,.5f,.04f},{-.5f,.5f,.04f},{u0,v0},{u1,v0},{u1,v1},{u0,v1});
+        quad(mesh,{.5f,-.5f,-.04f},{-.5f,-.5f,-.04f},{-.5f,.5f,-.04f},{.5f,.5f,-.04f},{u1,v0},{u0,v0},{u0,v1},{u1,v1});
         block=true;
     }else{
         const auto found=m_itemIndices.find(itemKey(id));

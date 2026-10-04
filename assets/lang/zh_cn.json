@@ -649,5 +649,14 @@
   "gamerule.description.tnt_explosion_drop_decay": "启用时按 1/爆炸强度的概率衰减 TNT 方块掉落，默认禁用。爆炸掉落仍最多 32 堆。",
   "gamerule.description.universal_anger": "向全部玩家共享中立生物愤怒；当前尚无中立愤怒系统。",
   "gamerule.description.water_source_conversion": "允许两个源邻居之间有支撑的流动水形成源。",
-  "gamerule.description.DayNightDuration": "MinecraftC 扩展：昼夜时长，单位秒，范围 1–4294967295。也接受 minecraftc:day_night_duration。"
+  "gamerule.description.DayNightDuration": "MinecraftC 扩展：昼夜时长，单位秒，范围 1–4294967295。也接受 minecraftc:day_night_duration。",
+  "plugins.title": "插件",
+  "plugins.hint": "更改将在重启游戏后生效。",
+  "plugins.builtin": "内置",
+  "plugins.user": "用户",
+  "plugins.enabled": "已启用",
+  "plugins.disabled": "已禁用",
+  "plugins.loaded": "已加载",
+  "plugins.restart": "需要重启",
+  "plugins.back": "返回"
 }

@@ -239,7 +239,7 @@ Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
-new standard names and classic aliases. Rules persist per world in save v15; missing
+new standard names and classic aliases. Rules persist per world in save v16 (introduced in v15); missing
 or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
 
 Run `./build-local/minecraftc --version` to print the version without opening a
@@ -309,3 +309,10 @@ smelting cactus yields green dye. Combine white wool with dye to color it.
 One bone makes three bone meal, which bleaches colored wool back to white.
 Bone meal currently serves as a crafting material. All new items are available
 in the creative catalog; for example, `/give stone_bricks 64` requires cheats.
+
+### Game plugins
+
+Official builtin plugins and user data/native packages can extend blocks, items, recipes,
+interaction, environment colors and HUD. Enable them through the main menu’s Plugins page
+and restart. See [plugin installation and SDK](docs/plugins.md) for platform support,
+examples and world compatibility. `--safe-mode` starts with optional plugins disabled.

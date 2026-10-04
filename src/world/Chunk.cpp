@@ -12,7 +12,7 @@ void Chunk::loadRawBlocks(const std::vector<uint16_t>& blocks) {
     if (blocks.size() != m_blocks.size())
         throw std::runtime_error("Generated chunk cache has the wrong size");
     for (const uint16_t block : blocks)
-        if (block >= static_cast<uint16_t>(BlockId::COUNT))
+        if (!isValidBlockId(static_cast<BlockId>(block)))
             throw std::runtime_error("Generated chunk has an invalid block ID");
     std::unique_lock lock(m_dataMutex);
     std::copy(blocks.begin(), blocks.end(), m_blocks.begin());

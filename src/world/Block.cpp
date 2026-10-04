@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "world/BiomeBlockLogic.h"
 #include "world/Block.h"
 #include "core/AssetStore.h"
@@ -417,6 +418,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    if (Plugins::pluginBlock(id)) return BlockTexture::Stone;
     if (g_definitionFacesReady) {
         const BlockTexture defined = g_definitionFaces[static_cast<size_t>(id)]
                                                        [static_cast<size_t>(face)];
@@ -681,6 +683,7 @@ const char* getBlockTextureAssetName(BlockTexture texture) {
 }
 
 uint16_t getFaceTextureIndex(BlockId id, FaceDir face) {
+    if (const auto* block = Plugins::pluginBlock(id)) return block->tiles.at(static_cast<size_t>(face));
     return getAtlasTextureIndex(getFaceTexture(id, face));
 }
 
@@ -988,6 +991,7 @@ bool isLava(BlockId id) {
 }
 
 uint8_t getLightEmission(BlockId id) {
+    if (const auto* block = Plugins::pluginBlock(id)) return block->emission;
     if (id == BlockId::TORCH) return 14;
     if (id == BlockId::STAR_CRYSTAL_LAMP) return 15;
     if (id == BlockId::MOONFLOWER) return 4;
@@ -1233,3 +1237,10 @@ const std::array<glm::vec3, 24> WIRE_CUBE_VERTICES = {{
     {0,0,0}, {0,1,0},   {1,0,0}, {1,1,0},
     {1,0,1}, {1,1,1},   {0,0,1}, {0,1,1},
 }};
+
+const BlockProperties& getBlockProps(BlockId id) {
+    if (const auto* block = Plugins::pluginBlock(id)) return block->properties;
+    if (!isValidBlockId(id)) throw std::out_of_range("Invalid block ID");
+    return BLOCK_TABLE[static_cast<uint16_t>(id)];
+}
+bool isValidBlockId(BlockId id) { return Plugins::validBlock(id); }

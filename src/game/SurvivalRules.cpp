@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "game/SurvivalRules.h"
 
 #include <algorithm>
@@ -556,6 +557,8 @@ const std::array<SmeltingRecipe, 19> SMELTING = {{
 } // namespace
 
 const BlockSurvivalProperties& getBlockSurvivalProps(BlockId block) {
+    if (const auto* value = Plugins::pluginBlock(block)) return value->survival;
+    if (!isValidBlockId(block)) throw std::out_of_range("Invalid block ID");
     return BLOCKS[static_cast<size_t>(block)];
 }
 
@@ -637,13 +640,36 @@ float miningSeconds(BlockId block, const ItemStack& toolStack,
     return seconds;
 }
 
-const std::vector<CraftingRecipe>& craftingRecipes() { return RECIPES; }
+bool isBuiltinRecipeKey(const std::string& key, bool smelting) {
+    const std::string prefix = smelting ? "minecraftc:smelting_" : "minecraftc:crafting_";
+    if (key.rfind(prefix, 0) != 0) return false;
+    const size_t count = smelting ? SMELTING.size() : RECIPES.size();
+    for (size_t i = 0; i < count; ++i)
+        if (key == prefix + std::to_string(i)) return true;
+    return false;
+}
+
+const std::vector<CraftingRecipe>& craftingRecipes() {
+    static uint64_t revision = UINT64_MAX;
+    static std::vector<CraftingRecipe> merged;
+    if (revision != Plugins::content().revision) {
+        merged.clear();
+        for (size_t i=0; i<RECIPES.size(); ++i) {
+            const auto key="minecraftc:crafting_"+std::to_string(i);
+            const auto& removed=Plugins::content().removeCrafting;
+            if (std::find(removed.begin(),removed.end(),key)==removed.end()) merged.push_back(RECIPES[i]);
+        }
+        for (const auto& entry:Plugins::content().crafting) merged.push_back(entry.second);
+        revision=Plugins::content().revision;
+    }
+    return merged;
+}
 
 const CraftingRecipe* findCraftingRecipe(
     const std::array<ItemId, 9>& grid, uint8_t gridWidth, uint8_t gridHeight) {
     if (gridWidth == 0 || gridWidth > 3 || gridHeight == 0 || gridHeight > 3)
         return nullptr;
-    for (const auto& recipe : RECIPES) {
+    for (const auto& recipe : craftingRecipes()) {
         if (recipe.width > gridWidth || recipe.height > gridHeight) continue;
         for (uint8_t oy = 0; oy <= gridHeight - recipe.height; ++oy) {
             for (uint8_t ox = 0; ox <= gridWidth - recipe.width; ++ox) {
@@ -675,7 +701,7 @@ std::vector<const CraftingRecipe*> availableCraftingRecipes(
     const InventoryModel& inventory, const std::array<ItemStack, 9>& grid,
     uint8_t gridWidth, uint8_t gridHeight) {
     std::vector<const CraftingRecipe*> result;
-    for (const CraftingRecipe& recipe : RECIPES) {
+    for (const CraftingRecipe& recipe : craftingRecipes()) {
         InventoryModel candidateInventory = inventory;
         std::array<ItemStack, 9> candidateGrid = grid;
         if (tryFillCraftingRecipe(recipe, candidateInventory, candidateGrid,
@@ -686,9 +712,14 @@ std::vector<const CraftingRecipe*> availableCraftingRecipes(
 }
 
 const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
-    const auto it = std::find_if(SMELTING.begin(), SMELTING.end(),
-        [input](const SmeltingRecipe& recipe) { return recipe.input == input; });
-    return it == SMELTING.end() ? nullptr : &*it;
+    for (const auto& entry : Plugins::content().smelting)
+        if (entry.second.input == input) return &entry.second;
+    for (size_t i=0;i<SMELTING.size();++i) {
+        const auto key="minecraftc:smelting_"+std::to_string(i);
+        const auto& removed=Plugins::content().removeSmelting;
+        if (SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
+    }
+    return nullptr;
 }
 
 uint16_t fuelTicks(ItemId fuel) {

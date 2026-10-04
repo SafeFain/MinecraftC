@@ -1,0 +1,7 @@
+{
+  "id": "example_content",
+  "name": "Data Content Example",
+  "version": "1.0.0",
+  "api": 1,
+  "data": "content.json"
+}

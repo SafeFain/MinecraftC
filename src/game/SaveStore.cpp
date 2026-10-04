@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "game/SaveStore.h"
 #include "Config.h"
 #include "core/Platform.h"
@@ -77,7 +78,49 @@ void appendString(Bytes& bytes, const std::string& value) {
 
 class Reader {
 public:
-    explicit Reader(Bytes bytes) : m_bytes(std::move(bytes)) {}
+    explicit Reader(Bytes bytes, uint32_t version=0, bool inspection=false) : inspectOnly(inspection), m_bytes(std::move(bytes)) {
+        if (version < 16) return;
+        const uint32_t requirementCount=read<uint32_t>();
+        if (requirementCount>4096) throw std::runtime_error("Too many plugin requirements");
+        std::set<std::string> pluginIds;
+        for (uint32_t i=0;i<requirementCount;++i) {
+            const auto id=readString(), fingerprint=readString();
+            if (!Plugins::validKey(id+":test") || !pluginIds.insert(id).second) throw std::runtime_error("Invalid plugin requirement");
+            requirements.emplace_back(id,fingerprint);
+        }
+        auto expected=Plugins::content().requirements, saved=requirements;
+        std::sort(expected.begin(),expected.end());std::sort(saved.begin(),saved.end());
+        if (expected!=saved) {
+            compatibilityError="Required content/behavior plugin set differs";
+            for (const auto& plugin:saved) if(std::find(expected.begin(),expected.end(),plugin)==expected.end()) compatibilityError+="; "+plugin.first+" ("+plugin.second+")";
+            if(!inspection) throw std::runtime_error(compatibilityError);
+        }
+        auto palette=[&](bool blocks) {
+            const uint32_t count=read<uint32_t>();
+            if(count>65535) throw std::runtime_error("Plugin palette is too large");
+            auto& map=blocks?blockMap:itemMap;std::set<std::string> keys;
+            for(uint32_t i=0;i<count;++i) {
+                const uint16_t raw=read<uint16_t>();const std::string key=readString();
+                if(raw<Plugins::FIRST_CONTENT_ID||raw==Plugins::INVALID_CONTENT_ID||!Plugins::validKey(key)||map.count(raw)||!keys.insert(key).second) throw std::runtime_error("Invalid plugin palette");
+                uint16_t resolved=Plugins::INVALID_CONTENT_ID;
+                try {resolved=blocks?static_cast<uint16_t>(Plugins::resolveBlock(key)):static_cast<uint16_t>(Plugins::resolveItem(key));}
+                catch(const std::exception&) {if(!inspection)throw;compatibilityError+="; missing content "+key;}
+                map.emplace(raw,resolved);
+            }
+        };
+        palette(true);palette(false);
+    }
+    bool inspectOnly=false;
+    std::vector<std::pair<std::string,std::string>> requirements;
+    std::string compatibilityError;
+    std::map<uint16_t,uint16_t> blockMap,itemMap;
+    uint16_t contentId(uint16_t raw, bool block) const {
+        const uint16_t count=block?static_cast<uint16_t>(BlockId::COUNT):static_cast<uint16_t>(ItemId::COUNT);
+        if(raw<count)return raw;
+        const auto& map=block?blockMap:itemMap;const auto it=map.find(raw);
+        if(it==map.end())throw std::runtime_error("Unmapped serialized content ID");
+        return it->second;
+    }
 
     template<typename T>
     T read() {
@@ -205,7 +248,16 @@ std::vector<uint16_t> decodeChunkRle(const Bytes& encoded, size_t expectedSize,
     return decoded;
 }
 
-void writeAtomic(const std::filesystem::path& path, const Bytes& payload) {
+void writeAtomic(const std::filesystem::path& path, const Bytes& body) {
+    Bytes payload;
+    append(payload, static_cast<uint32_t>(Plugins::content().requirements.size()));
+    for(const auto& p:Plugins::content().requirements){appendString(payload,p.first);appendString(payload,p.second);}
+    append(payload,static_cast<uint32_t>(Plugins::content().blocks.size()));
+    for(const auto& p:Plugins::content().blocks){append(payload,p.first);appendString(payload,p.second.key);}
+    append(payload,static_cast<uint32_t>(Plugins::content().items.size()));
+    for(const auto& p:Plugins::content().items){append(payload,p.first);appendString(payload,p.second.key);}
+    payload.insert(payload.end(),body.begin(),body.end());
+    if(payload.size()>MAX_PAYLOAD)throw std::runtime_error("Save payload exceeds limit");
     std::filesystem::create_directories(path.parent_path());
     auto temporary = path;
     temporary += ".tmp";
@@ -271,9 +323,10 @@ void appendStack(Bytes& payload, const ItemStack& stack) {
 
 ItemStack readStack(Reader& reader) {
     ItemStack stack;
-    stack.id = static_cast<ItemId>(reader.read<uint16_t>());
+    stack.id = static_cast<ItemId>(reader.contentId(reader.read<uint16_t>(), false));
     stack.count = reader.read<uint8_t>();
     stack.damage = reader.read<uint16_t>();
+    if (reader.inspectOnly && !isValidItemId(stack.id)) return stack;
     if (!isValidItemId(stack.id)) throw std::runtime_error("Save contains invalid item id");
     if (stack.empty()) {
         stack.clear();
@@ -470,10 +523,16 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
-WorldMetadata SaveStore::loadMetadata() const {
+WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
-    Reader reader(std::move(checked.payload));
+    Reader reader(std::move(checked.payload), checked.version, inspection);
     WorldMetadata metadata;
+    metadata.pluginRequirements = reader.requirements;
+    metadata.pluginCompatibilityError = reader.compatibilityError;
+    if (checked.version < 16 && !Plugins::content().requirements.empty()) {
+        metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
+        if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
+    }
     metadata.displayName = reader.readString();
     metadata.seed = reader.read<uint64_t>();
     metadata.generationVersion = reader.read<uint32_t>();
@@ -606,7 +665,7 @@ void SaveStore::saveChunkOverrides(
     append(payload, static_cast<uint32_t>(overrides.size()));
     for (const auto& entry : overrides) {
         if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
-            static_cast<uint16_t>(entry.block) >= static_cast<uint16_t>(BlockId::COUNT))
+            !isValidBlockId(entry.block))
             throw std::runtime_error("Invalid block override");
         append(payload, entry.localIndex);
         append(payload, static_cast<uint16_t>(entry.block));
@@ -618,7 +677,7 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
     const auto path = chunkPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload));
+    Reader reader(std::move(checked.payload), checked.version);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Chunk save coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
@@ -630,13 +689,13 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
         BlockOverride entry;
         entry.localIndex = checked.version >= 6
             ? reader.read<uint32_t>() : reader.read<uint16_t>();
-        entry.block = static_cast<BlockId>(checked.version >= 13
-            ? reader.read<uint16_t>() : reader.read<uint8_t>());
+        entry.block = static_cast<BlockId>(reader.contentId(checked.version >= 13
+            ? reader.read<uint16_t>() : reader.read<uint8_t>(), true));
         const uint32_t legacyLimit = 16u * 128u * 16u;
         const uint32_t limit = checked.version >= 6
             ? static_cast<uint32_t>(Config::CHUNK_VOLUME) : legacyLimit;
         if (entry.localIndex >= limit ||
-            static_cast<uint16_t>(entry.block) >= static_cast<uint16_t>(BlockId::COUNT))
+            !isValidBlockId(entry.block))
             throw std::runtime_error("Invalid block override");
         overrides.push_back(entry);
     }
@@ -650,7 +709,7 @@ void SaveStore::saveGeneratedChunk(
     if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid generated chunk size");
     for (const uint16_t block : blocks)
-        if (block >= static_cast<uint16_t>(BlockId::COUNT))
+        if (!isValidBlockId(static_cast<BlockId>(block)))
             throw std::runtime_error("Invalid generated block ID");
     Bytes payload;
     payload.reserve(sizeof(int32_t) * 2 + sizeof(uint32_t) * 2 + blocks.size() * sizeof(uint16_t));
@@ -679,7 +738,7 @@ std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
     if (!std::filesystem::exists(path)) return std::nullopt;
     try {
         CheckedBytes checked = readChecked(path);
-        Reader reader(std::move(checked.payload));
+        Reader reader(std::move(checked.payload), checked.version);
         if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ ||
             reader.read<uint32_t>() != generationVersion)
             return std::nullopt;
@@ -708,8 +767,10 @@ std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
                 blocks = decodeChunkRle(encoded, size, wide);
             else return std::nullopt;
         }
-        for (const uint16_t block : blocks)
-            if (block >= static_cast<uint16_t>(BlockId::COUNT)) return std::nullopt;
+        for (uint16_t& block : blocks) {
+            block = reader.contentId(block, true);
+            if (!isValidBlockId(static_cast<BlockId>(block))) return std::nullopt;
+        }
         if (!reader.finished()) return std::nullopt;
         return blocks;
     } catch (const std::exception&) {
@@ -751,7 +812,7 @@ std::vector<PersistedBlockEntity> SaveStore::loadBlockEntities(
     const auto path = blockEntityPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload));
+    Reader reader(std::move(checked.payload), checked.version);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Block entity coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
@@ -780,7 +841,7 @@ std::vector<WorldMetadata::PersistedEntity> SaveStore::loadChunkEntities(
     const auto path = entityPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload));
+    Reader reader(std::move(checked.payload), checked.version);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Entity chunk coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
@@ -806,11 +867,23 @@ uint32_t SaveStore::loadChunkEntityPopulationVersion(
     const auto path = entityPopulationPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return 0;
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload));
+    Reader reader(std::move(checked.payload), checked.version);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Entity population coordinate mismatch");
     const uint32_t version = reader.read<uint32_t>();
     if (!reader.finished())
         throw std::runtime_error("Unexpected entity population data");
     return version;
+}
+
+void SaveStore::validatePluginFiles() const {
+    for (const auto& file : std::filesystem::recursive_directory_iterator(m_worldDirectory)) {
+        if (!file.is_regular_file() || file.path().extension() != ".bin") continue;
+        // Generated base caches are disposable; durable partitions must retain
+        // resolvable names before a session can attach a writable store.
+        if (file.path().parent_path().filename() == "generated") continue;
+        auto bytes=readChecked(file.path());
+        Reader reader(std::move(bytes.payload),bytes.version);
+        (void)reader;
+    }
 }

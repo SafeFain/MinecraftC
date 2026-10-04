@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "world/BiomeBlockLogic.h"
 #include "player/Player.h"
 #include "world/World.h"
@@ -61,6 +62,15 @@ DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
 }
 
 DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
+    auto e=Plugins::event(MC_DAMAGE_PRE);e.damage=source.amount;
+    if(!Plugins::dispatch(e))return {};
+    auto adjusted=source;adjusted.amount=e.damage;
+    auto result=takeDamageImpl(adjusted);
+    if(result.appliedDamage>0) {e.kind=MC_DAMAGE_POST;e.damage=result.appliedDamage;Plugins::dispatch(e);}
+    return result;
+}
+
+DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
     DamageOutcome outcome;
     outcome.rawDamage = source.amount;
     const auto& rules = m_world.gameRules();
@@ -947,6 +957,16 @@ void Player::updateHighlight() {
 }
 
 bool Player::breakBlock() {
+    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    if(!hit)return false;
+    auto e=Plugins::event(MC_BREAK_PRE);e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;
+    e.block=static_cast<uint16_t>(m_world.getBlock(e.x,e.y,e.z));e.item=static_cast<uint16_t>(activeItem().id);
+    if(!Plugins::dispatch(e))return false;
+    if(!breakBlockImpl())return false;
+    e.kind=MC_BREAK_POST;e.cancelled=0;Plugins::dispatch(e);return true;
+}
+
+bool Player::breakBlockImpl() {
     auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (hit) {
         glm::ivec3 breakPos = hit->blockPos;
@@ -1032,6 +1052,19 @@ void Player::updateMining(float dt) {
 }
 
 bool Player::placeBlock() {
+    const auto block=getItemProps(activeItem().id).placedBlock;
+    if(!block)return placeBlockImpl();
+    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    if(!hit)return false;
+    const auto position=hit->blockPos+hit->faceNormal;
+    auto e=Plugins::event(MC_PLACE_PRE);e.x=position.x;e.y=position.y;e.z=position.z;
+    e.block=static_cast<uint16_t>(*block);e.item=static_cast<uint16_t>(activeItem().id);
+    if(!Plugins::dispatch(e))return false;
+    if(!placeBlockImpl())return false;
+    e.kind=MC_PLACE_POST;e.cancelled=0;Plugins::dispatch(e);return true;
+}
+
+bool Player::placeBlockImpl() {
     const ItemId selectedItem =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id;
     if (m_gameMode == GameMode::Survival) {

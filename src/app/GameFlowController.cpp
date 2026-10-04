@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "app/GameFlowController.h"
 #include "app/GameScenePresenter.h"
 #include "app/GameSession.h"
@@ -93,6 +94,11 @@ void GameFlowController::backToMainMenu() {
     showMainMenu();
 }
 
+void GameFlowController::abortPluginSession(const std::string& error) {
+    m_session.abortPluginWorld();m_audio.stopRain();m_audio.setPaused(false);
+    m_state=GameState::MainMenu;m_window.setCursorLocked(false);showMainMenu();showCommandMessage(error);
+}
+
 void GameFlowController::respawnPlayer() {
     const bool wasHeaven = m_session.activeDimension() == DimensionId::Heaven;
     m_session.respawn(m_clock.now());
@@ -145,6 +151,7 @@ void GameFlowController::executeCommand() {
         return;
     }
 
+    if(Plugins::commandDispatcher() && Plugins::commandDispatcher()(submitted))return;
     const CommandParseResult result = parseCommand(submitted);
     if (result.error) {
         showCommandError(submitted, *result.error);

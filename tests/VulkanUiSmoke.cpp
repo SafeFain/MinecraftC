@@ -1,3 +1,6 @@
+#include "plugins/PluginManager.h"
+#include "ui/PluginMenu.h"
+#include <fstream>
 #include "core/Window.h"
 #include "entity/EntityManager.h"
 #include "game/SessionAccess.h"
@@ -40,6 +43,10 @@ int main(int argc,char** argv) {
         const int width=argc>=4?std::stoi(argv[2]):960,height=argc>=4?std::stoi(argv[3]):600;
         const bool capture=argc==5 && std::string(argv[4])=="--capture";
         const auto assets=std::filesystem::absolute(argv[1]);
+        const auto pluginRoot=std::filesystem::temp_directory_path()/"minecraftc-plugin-ui-smoke";
+        std::filesystem::create_directories(pluginRoot);
+        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true}";}
+        Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
@@ -84,6 +91,12 @@ int main(int argc,char** argv) {
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
         draw("home",[&]{main.render(ui,width,height);});
+        for(const auto language:languagesByEnglishName()) {
+            localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[]{});
+            draw("plugins-"+std::string(languageCode(language)),[&]{pluginMenu.render(ui,width,height);});
+        }
+        localization.setLanguage(Language::English);
+        draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});
         main.onKeyPress(Key::Down);main.onKeyPress(Key::Down);main.onKeyPress(Key::Enter);
         for (const auto language : languagesByEnglishName()) {
             settings.language=language;localization.setLanguage(language);

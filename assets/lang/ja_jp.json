@@ -642,5 +642,14 @@
   "gamerule.description.tnt_explosion_drop_decay": "詳細説明（英語）：Reduce TNT block drops with probability 1/explosion power when true, default false. Explosion drops remain capped at 32 stacks.",
   "gamerule.description.universal_anger": "詳細説明（英語）：Share neutral-mob anger with all players; neutral anger is absent.",
   "gamerule.description.water_source_conversion": "詳細説明（英語）：Allow supported flowing water between two source neighbors to become a source.",
-  "gamerule.description.DayNightDuration": "詳細説明（英語）：MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration."
+  "gamerule.description.DayNightDuration": "詳細説明（英語）：MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration.",
+  "plugins.title": "プラグイン",
+  "plugins.hint": "変更はゲームの再起動後に反映されます。",
+  "plugins.builtin": "内蔵",
+  "plugins.user": "ユーザー",
+  "plugins.enabled": "有効",
+  "plugins.disabled": "無効",
+  "plugins.loaded": "読み込み済み",
+  "plugins.restart": "再起動が必要",
+  "plugins.back": "戻る"
 }

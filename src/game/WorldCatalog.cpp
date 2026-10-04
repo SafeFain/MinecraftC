@@ -40,12 +40,12 @@ std::vector<WorldSummary> WorldCatalog::list() const {
         SaveStore store(entry.path());
         if (!store.exists()) continue;
         try {
-            const auto metadata = store.loadMetadata();
+            const auto metadata = store.loadMetadata(true);
             worlds.push_back({id, metadata.displayName, metadata.gameMode,
                               metadata.difficulty, metadata.seed,
                               metadata.worldTicks, metadata.generationVersion,
-                              WorldGenContext::canLoadGeneration(metadata.generationVersion),
-                              metadata.worldType});
+                              WorldGenContext::canLoadGeneration(metadata.generationVersion) && metadata.pluginCompatibilityError.empty(),
+                              metadata.worldType, metadata.pluginCompatibilityError});
         } catch (const std::runtime_error&) {
             // Invalid worlds stay untouched on disk but are not loadable.
         }

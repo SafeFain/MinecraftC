@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 inline float voxelGiSrgbToLinear(float value) {
     return value <= 0.04045f ? value / 12.92f :
@@ -16,7 +17,9 @@ struct VoxelGiMaterial {
     std::array<glm::vec3, 6> reflectance{};
     glm::vec3 emission{0.0f};
 };
-using VoxelGiMaterialTable = std::array<VoxelGiMaterial, static_cast<size_t>(BlockId::COUNT)>;
+struct VoxelGiMaterialTable : std::vector<VoxelGiMaterial> {
+    VoxelGiMaterialTable() : std::vector<VoxelGiMaterial>(static_cast<size_t>(BlockId::COUNT)) {}
+};
 
 // Six scalar uints have an identical 24-byte stride in C++ and GLSL std430.
 // Masks use x + n*(y + n*z), with n=min(cellSize,4); no shaderInt64 needed.

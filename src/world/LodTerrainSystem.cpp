@@ -93,7 +93,7 @@ bool decodeTile(const Bytes& payload, LodTileData& tile) {
                 !read(payload, cursor, span.top) ||
                 !read(payload, cursor, block) ||
                 span.bottom > span.top ||
-                block >= static_cast<uint16_t>(BlockId::COUNT))
+                !isValidBlockId(static_cast<BlockId>(block)))
                 return false;
             span.block = static_cast<BlockId>(block);
             column.spans.push_back(span);

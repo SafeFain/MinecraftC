@@ -32,6 +32,7 @@ public:
     virtual void setOpacity(float opacity) = 0;
     virtual void renderTextAlpha(const std::string& text, float x, float y,
                                  float scale, const glm::vec3& color, float alpha) = 0;
+    virtual void drawAtlasIcon(float,float,float,float,uint16_t,const glm::vec4&) {}
     virtual void drawBlockIcon(float x, float y, float width, float height,
                                BlockId block) = 0;
     virtual void drawItemIcon(float x, float y, float width, float height,
@@ -70,6 +71,7 @@ public:
     void endUIFrame();
     UiFrameStats frameStats() const;
     void drawRect(float,float,float,float,const glm::vec4&);
+    void drawAtlasIcon(float x,float y,float w,float h,uint16_t tile,const glm::vec4& c) { m_backend->drawAtlasIcon(x,y,w,h,tile,c); }
     void drawRoundedRect(float,float,float,float,float,const glm::vec4&);
     void setOpacity(float);
     void renderTextAlpha(const std::string&,float,float,float,const glm::vec3&,float);

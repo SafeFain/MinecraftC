@@ -155,7 +155,7 @@ void WorldPersistence::installLoadedChunkDataUnlocked(
     auto& cached = m_blockOverrides[key];
     for (const auto& entry : overrides) {
         if (entry.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME) ||
-            static_cast<uint16_t>(entry.block) >= static_cast<uint16_t>(BlockId::COUNT) ||
+            !isValidBlockId(entry.block) ||
             isDerivedFluidState(entry.block)) continue;
         cached[entry.localIndex] = entry.block;
     }

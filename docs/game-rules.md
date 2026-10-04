@@ -13,7 +13,7 @@ Queries through inverted old names return inverted values too.
 sets -1/128. These are compatibility conversions; the last write wins.
 
 Each world owns its rules, shared across Overworld and Heaven. Save v15 appends
-a typed rule table using canonical IDs. v2–v14 read with Java defaults; existing
+a typed rule table using canonical IDs, retained in save v16 alongside plugin palettes. v2–v14 read with Java defaults; existing
 v14 day/night duration is preserved. Unknown well-typed IDs round-trip. Loading
 never changes terrain generation version 17. Query/help/error/support messages
 remain visible with command feedback disabled. General feedback/status strings

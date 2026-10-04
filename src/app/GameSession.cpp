@@ -1,3 +1,5 @@
+#include "plugins/ContentRegistry.h"
+#include "plugins/Runtime.h"
 #include "app/GameSession.h"
 
 #include "Config.h"
@@ -43,6 +45,7 @@ std::vector<WorldSummary> GameSession::listWorlds() const {
 std::string GameSession::createWorld(const std::string& name, uint64_t seed,
                                      GameMode mode, Difficulty difficulty,
                                      bool cheats, WorldType type) {
+    if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
     return worldCatalog.create(name, seed, mode, difficulty, cheats, type);
 }
 
@@ -154,7 +157,10 @@ void GameSession::collectFishingEvents() {
         fishingFeedback.push_back(event);
     }
 }
-void GameSession::handleMouseButton(int button, ButtonAction action) {
+void GameSession::handleMouseButton(int button, ButtonAction action, bool pluginUseApproved) {
+    const bool use=button==MouseButton::Right&&action==ButtonAction::Press&&!player.isSpectator();
+    if(use&&!pluginUseApproved&&!pluginUse())return;
+    struct UseEnd { GameSession& session; bool use; ~UseEnd(){if(use)session.pluginUse(true);} } useEnd{*this,use};
     validateFishingRod();
     if (button == MouseButton::Right && player.activeItem().id == ItemId::FISHING_ROD) {
         if (action == ButtonAction::Press && player.isMouseLocked() &&
@@ -277,6 +283,8 @@ void GameSession::detachSaveStore() {
 }
 
 void GameSession::leaveWorld() {
+    if (terrainGenerated) { auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e); }
+    if (!Plugins::content().runtimeFault.empty()) { abortPluginWorld(); return; }
     fishing.cancel(); fishingFeedback.clear();
     if (terrainGenerated) {
         saveActiveDimensionState();
@@ -303,9 +311,11 @@ void GameSession::leaveWorld() {
 GameMode GameSession::startWorld(
     const std::string& worldId, bool newWorld,
     RuntimeClock::Tick loadingStarted) {
+    if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
     if (saveStore) detachSaveStore();
     auto selectedStore = std::make_unique<SaveStore>(worldCatalog.open(worldId));
     auto selectedMetadata = selectedStore->loadMetadata();
+    selectedStore->validatePluginFiles();
     if (!WorldGenContext::canLoadGeneration(selectedMetadata.generationVersion))
         throw std::runtime_error("World generation version is incompatible");
     saveStore = std::move(selectedStore);
@@ -445,6 +455,7 @@ bool GameSession::advanceLoading(
         return false;
 
     terrainGenerated = true;
+    { auto e=Plugins::event(MC_WORLD_READY);Plugins::dispatch(e); }
     const float seconds = static_cast<float>(RuntimeClock::seconds(
         RuntimeClock::elapsed(worldLoadingStarted, now)));
     LOG_INFO("World render target loaded in " << seconds << "s ("
@@ -456,6 +467,10 @@ bool GameSession::advanceLoading(
 
 void GameSession::updatePlaying(
     float dt, IGameRenderer* renderer, const Feedback& feedback) {
+    auto pluginUpdate=Plugins::event(MC_UPDATE_PRE);pluginUpdate.dt=dt;
+    const auto pluginPosition=player.getPosition();for(int i=0;i<3;++i)pluginUpdate.player[i]=pluginPosition[i];
+    Plugins::dispatch(pluginUpdate);
+    if (!Plugins::content().runtimeFault.empty()) return;
     if (sleepState == SleepVisualState::Entering) {
         sleepProgress = std::min(1.0f, sleepProgress + dt / 0.6f);
         player.setSleepingVisual(true, sleepProgress);
@@ -486,6 +501,7 @@ void GameSession::updatePlaying(
         feedback.setRainVolume(
             weather.rainGradient() * (rainExposure ? 0.72f : 0.06f));
     if (!playerDead) player.update(dt);
+    if (!Plugins::content().runtimeFault.empty()) return;
     validateFishingRod();
     fishing.update(dt,player.getEyePosition(),fishingEnvironment());
     collectFishingEvents();
@@ -562,6 +578,7 @@ void GameSession::updatePlaying(
         [](const LightningEvent& event) { return event.seconds <= 0.0f; }),
         lightningEvents.end());
 
+    if (!Plugins::content().runtimeFault.empty()) return;
     if (!player.isSpectator() || worldMetadata.gameRules.boolean(GameRuleId::SpectatorsGenerateChunks)) {
         world.update(player.getPosition(), 0, glm::dvec3(player.velocity()));
         world.enqueueGeneration();
@@ -575,6 +592,8 @@ void GameSession::updatePlaying(
 
     if (dimension == DimensionId::Heaven) weather.setWeather(WeatherType::Clear);
     if (dimension == DimensionId::Heaven) saveActiveDimensionState();
+    pluginUpdate.kind=MC_UPDATE_POST;Plugins::dispatch(pluginUpdate);
+    if (!Plugins::content().runtimeFault.empty()) return;
     autosaveSeconds += dt;
     if (autosaveSeconds >= 30.0f) {
         beginAutosave(feedback.autosaveMetadataError);
@@ -1192,6 +1211,7 @@ void GameSession::processAutosave(const std::function<void()>& onError) {
 }
 
 void GameSession::saveNow(const std::function<void()>& onError) {
+    if (!Plugins::content().runtimeFault.empty()) return;
     if (!saveStore || !terrainGenerated) return;
     try {
         updateSaveMetadata();
@@ -1205,4 +1225,40 @@ void GameSession::saveNow(const std::function<void()>& onError) {
         LOG_ERROR("Could not save world: " << error.what());
         if (onError) onError();
     }
+}
+
+bool GameSession::pluginUse(bool after) {
+    if(!terrainGenerated)return !Plugins::dispatcher();
+    auto e=Plugins::event(after?MC_USE_POST:MC_USE_PRE);e.item=static_cast<uint16_t>(player.activeItem().id);
+    const auto hit=world.raycast(player.getEyePosition(),player.getForward(),Config::REACH_DISTANCE);
+    if(hit){e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;e.block=static_cast<uint16_t>(world.getBlock(e.x,e.y,e.z));}
+    return Plugins::dispatch(e);
+}
+bool GameSession::pluginPlayer(MC_PlayerSnapshot& out) const {
+    if(!terrainGenerated)return false;
+    const auto p=player.getPosition();for(int i=0;i<3;++i)out.position[i]=p[i];out.health=player.survivalStats().health();out.mode=static_cast<uint32_t>(player.gameMode());return true;
+}
+bool GameSession::pluginGetBlock(int32_t x,int32_t y,int32_t z,uint16_t& id) {
+    if(!terrainGenerated||y<Config::WORLD_MIN_Y||y>=Config::WORLD_MAX_Y||std::abs(int64_t(x))>100000000||std::abs(int64_t(z))>100000000)return false;
+    const auto value=world.getLoadedBlock(x,y,z);if(!value)return false;
+    id=static_cast<uint16_t>(*value);return true;
+}
+bool GameSession::pluginSetBlock(int32_t x,int32_t y,int32_t z,uint16_t id) {
+    uint16_t old=0;if(!isValidBlockId(static_cast<BlockId>(id))||!pluginGetBlock(x,y,z,old))return false;
+    world.setBlock(x,y,z,static_cast<BlockId>(id));return true;
+}
+bool GameSession::pluginGiveItem(uint16_t raw,uint32_t count) {
+    const auto id=static_cast<ItemId>(raw);if(!terrainGenerated||!isValidItemId(id)||!raw)return false;
+    InventoryModel candidate=player.inventory();const auto stackSize=getItemProps(id).maxStack;
+    while(count){const auto amount=static_cast<uint8_t>(std::min(count,uint32_t(stackSize)));if(candidate.add({id,amount,0}))return false;count-=amount;}
+    player.inventory()=std::move(candidate);return true;
+}
+std::filesystem::path GameSession::pluginWorldDirectory() const {return saveStore?saveStore->worldDirectory():std::filesystem::path{};}
+
+void GameSession::abortPluginWorld() {
+    if(terrainGenerated){auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e);}
+    // Discard the live session, draining worker/cache work while its stores are
+    // alive. No player state, edited chunks or entities are flushed here.
+    world.resetForNewSeed(worldMetadata.seed,worldMetadata.worldType,dimension);
+    entities.clear();fishing.cancel();detachSaveStore();terrainGenerated=false;
 }

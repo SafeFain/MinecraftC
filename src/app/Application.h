@@ -5,7 +5,7 @@
 
 #include <memory>
 
-std::unique_ptr<ApplicationHost> createGameApplication(RuntimePaths paths);
+std::unique_ptr<ApplicationHost> createGameApplication(RuntimePaths paths, bool safeMode = false);
 
 std::unique_ptr<ApplicationHost> createRenderDemoApplication(
     RuntimePaths paths, bool texturedDemo, int benchmarkFrames);

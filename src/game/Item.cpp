@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "game/Item.h"
 
 #include <array>
@@ -776,12 +777,13 @@ std::array<std::vector<ItemId>, categoryCount> buildCategoryItems() {
     return buckets;
 }
 
-const auto CATEGORY_ITEMS = buildCategoryItems();
+auto CATEGORY_ITEMS = buildCategoryItems();
 
 } // namespace
 
 CreativeItemCategory creativeInventoryCategory(ItemId id) {
     if (!isValidItemId(id)) return CreativeItemCategory::Count;
+    if (const auto* item = Plugins::pluginItem(id)) return item->category;
     return categoryFor(id);
 }
 
@@ -789,6 +791,15 @@ const std::vector<ItemId>& creativeInventoryItemsIn(
     CreativeItemCategory category) {
     static const std::vector<ItemId> empty;
     if (static_cast<size_t>(category) >= categoryCount) return empty;
+    static uint64_t revision = UINT64_MAX;
+    if (revision != Plugins::content().revision) {
+        CATEGORY_ITEMS = buildCategoryItems();
+        for (size_t i = 0; i < categoryCount; ++i) {
+            const auto& extra = Plugins::content().categories[i];
+            CATEGORY_ITEMS[i].insert(CATEGORY_ITEMS[i].end(), extra.begin(), extra.end());
+        }
+        revision = Plugins::content().revision;
+    }
     return CATEGORY_ITEMS[static_cast<size_t>(category)];
 }
 
@@ -800,15 +811,17 @@ const CreativeCategoryInfo& creativeCategoryInfo(CreativeItemCategory category) 
 }
 
 bool isValidItemId(ItemId id) {
-    return static_cast<size_t>(id) < itemCount;
+    return static_cast<size_t>(id) < itemCount || Plugins::pluginItem(id);
 }
 
 const ItemProperties& getItemProps(ItemId id) {
     if (!isValidItemId(id)) throw std::out_of_range("Invalid serialized item id");
+    if (const auto* item = Plugins::pluginItem(id)) return item->properties;
     return REGISTRY[static_cast<size_t>(id)];
 }
 
 ItemId itemForBlock(BlockId id) {
+    if (const auto* block = Plugins::pluginBlock(id)) return block->drop;
     if (isBed(id)) return ItemId::WHITE_BED;
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural)) {
@@ -1002,10 +1015,12 @@ std::vector<ItemId> creativeInventoryItems() {
         const auto& props = getItemProps(id);
         if (!props.name.empty() && props.maxStack > 0) items.push_back(id);
     }
+    for (const auto& entry : Plugins::content().items) items.push_back(static_cast<ItemId>(entry.first));
     return items;
 }
 
 const std::string& itemCommandName(ItemId id) {
+    if (const auto* item = Plugins::pluginItem(id)) return item->key;
     static const auto names = [] {
         std::array<std::string, itemCount> result{};
         for (size_t i = 1; i < result.size(); ++i) {
@@ -1018,6 +1033,8 @@ const std::string& itemCommandName(ItemId id) {
 }
 
 std::optional<ItemId> itemFromCommandName(std::string_view name) {
+    for (const auto& entry : Plugins::content().items)
+        if (entry.second.key == name) return static_cast<ItemId>(entry.first);
     for (size_t i = 1; i < itemCount; ++i) {
         const auto id = static_cast<ItemId>(i);
         if (itemCommandName(id) == name) return id;

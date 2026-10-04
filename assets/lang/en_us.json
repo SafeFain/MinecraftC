@@ -505,5 +505,14 @@
   "gamerule.description.tnt_explosion_drop_decay": "Reduce TNT block drops with probability 1/explosion power when true, default false. Explosion drops remain capped at 32 stacks.",
   "gamerule.description.universal_anger": "Share neutral-mob anger with all players; neutral anger is absent.",
   "gamerule.description.water_source_conversion": "Allow supported flowing water between two source neighbors to become a source.",
-  "gamerule.description.DayNightDuration": "MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration."
+  "gamerule.description.DayNightDuration": "MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration.",
+  "plugins.title": "Plugins",
+  "plugins.hint": "Changes take effect after restarting the game.",
+  "plugins.builtin": "Built-in",
+  "plugins.user": "User",
+  "plugins.enabled": "Enabled",
+  "plugins.disabled": "Disabled",
+  "plugins.loaded": "Loaded",
+  "plugins.restart": "Restart required",
+  "plugins.back": "Back"
 }

@@ -34,6 +34,12 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+void stripV16Envelope(std::vector<uint8_t>& bytes) {
+    require(bytes.size()>=36 && bytes[8]==16,"fixture starts in save v16");
+    require(std::all_of(bytes.begin()+24,bytes.begin()+36,[](uint8_t b){return b==0;}),"vanilla fixture has three empty plugin tables");
+    bytes.erase(bytes.begin()+24,bytes.begin()+36);
+}
+
 void stripV15Rules(std::vector<uint8_t>& bytes) {
     const std::string marker = "minecraft:advance_time";
     const auto start = std::search(bytes.begin(), bytes.end(), marker.begin(), marker.end());
@@ -235,6 +241,7 @@ int main() {
         SaveStore(v14Directory).saveMetadata(source);
         {
             auto bytes = readBytes(v14Directory / "level.bin");
+            stripV16Envelope(bytes);
             stripV15Rules(bytes);
             writeLittleEndian(bytes,8,14,4);
             writeLittleEndian(bytes,12,bytes.size()-24,4);
@@ -251,6 +258,7 @@ int main() {
         const auto v13Path = v13Directory / "level.bin";
         {
             auto bytes = readBytes(v13Path);
+            stripV16Envelope(bytes);
             stripV15Rules(bytes);
             bytes.resize(bytes.size() - sizeof(uint32_t));
             writeLittleEndian(bytes, 8, 13, 4);
@@ -303,7 +311,7 @@ int main() {
                 "saving again atomically replaces an existing metadata file");
 
         const auto metadataPath = root / "negative-coordinates" / "level.bin";
-        std::array<uint8_t, 47> prefix{};
+        std::array<uint8_t, 59> prefix{};
         {
             std::ifstream file(metadataPath, std::ios::binary);
             file.read(reinterpret_cast<char*>(prefix.data()), prefix.size());
@@ -315,7 +323,7 @@ int main() {
                 "save version is encoded as little-endian uint32");
         constexpr std::array<uint8_t, 8> expectedSeed =
             {0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe};
-        require(std::equal(expectedSeed.begin(), expectedSeed.end(), prefix.begin() + 39),
+        require(std::equal(expectedSeed.begin(), expectedSeed.end(), prefix.begin() + 51),
                 "64-bit seed is encoded in canonical little-endian order");
 
         const auto legacyDirectory = root / "legacy-v7";
@@ -328,6 +336,7 @@ int main() {
             std::ifstream input(legacyPath, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
             require(bytes.size() > 24, "legacy fixture has a complete save header");
+            stripV16Envelope(bytes);
             bytes.pop_back(); // v7 has no appended world-type byte.
             writeLittleEndian(bytes, 8, 7, 4);
             writeLittleEndian(bytes, 12, bytes.size() - 24, 4);
@@ -348,6 +357,7 @@ int main() {
         {
             std::vector<uint8_t> bytes = readBytes(v10Path);
             require(bytes.size() > 28, "v10 fixture has a food timer tail");
+            stripV16Envelope(bytes);
             stripV15Rules(bytes);
             bytes.resize(bytes.size() - 2 * sizeof(uint32_t));
             writeLittleEndian(bytes, 8, 10, 4);
@@ -419,7 +429,7 @@ int main() {
         const auto generatedPath = root / "negative-coordinates" /
             "generated" / "g.-2.-7.bin";
         const auto compressedBytes = readBytes(generatedPath);
-        require(compressedBytes.size() > 41 && compressedBytes[40] == 1,
+        require(compressedBytes.size() > 53 && compressedBytes[52] == 1,
                 "compressible generated cache selects the RLE codec");
         require(!store.loadGeneratedChunk(
                     -2, -7, WorldGenContext::GENERATION_VERSION + 1),
@@ -468,18 +478,18 @@ int main() {
             file.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         };
         auto invalidWide=validWide;
-        writeLittleEndian(invalidWide,47,static_cast<uint16_t>(BlockId::COUNT),2);
+        writeLittleEndian(invalidWide,59,static_cast<uint16_t>(BlockId::COUNT),2);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects an out-of-range 16-bit ID");
         invalidWide=validWide;
-        writeLittleEndian(invalidWide,45,0,2);
+        writeLittleEndian(invalidWide,57,0,2);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects zero-length runs");
         invalidWide=validWide;
         invalidWide.pop_back();
-        writeLittleEndian(invalidWide,41,static_cast<uint32_t>(invalidWide.size()-45),4);
+        writeLittleEndian(invalidWide,53,static_cast<uint32_t>(invalidWide.size()-57),4);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects a truncated 16-bit value");
@@ -494,7 +504,7 @@ int main() {
                                  WorldGenContext::GENERATION_VERSION);
         const auto rawFallback = readBytes(root / "negative-coordinates" /
             "generated" / "g.-3.4.bin");
-        require(rawFallback.size() > 40 && rawFallback[40] == 0,
+        require(rawFallback.size() > 52 && rawFallback[52] == 0,
                 "incompressible generated cache selects raw fallback");
         const auto loadedRawFallback = store.loadGeneratedChunk(
             -3, 4, WorldGenContext::GENERATION_VERSION);

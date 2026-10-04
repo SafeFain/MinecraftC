@@ -642,5 +642,14 @@
   "gamerule.description.tnt_explosion_drop_decay": "자세한 설명 (영어): Reduce TNT block drops with probability 1/explosion power when true, default false. Explosion drops remain capped at 32 stacks.",
   "gamerule.description.universal_anger": "자세한 설명 (영어): Share neutral-mob anger with all players; neutral anger is absent.",
   "gamerule.description.water_source_conversion": "자세한 설명 (영어): Allow supported flowing water between two source neighbors to become a source.",
-  "gamerule.description.DayNightDuration": "자세한 설명 (영어): MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration."
+  "gamerule.description.DayNightDuration": "자세한 설명 (영어): MinecraftC extension: day/night duration in seconds, 1–4294967295. Also accepts minecraftc:day_night_duration.",
+  "plugins.title": "플러그인",
+  "plugins.hint": "게임을 다시 시작하면 변경 사항이 적용됩니다.",
+  "plugins.builtin": "내장",
+  "plugins.user": "사용자",
+  "plugins.enabled": "활성화",
+  "plugins.disabled": "비활성화",
+  "plugins.loaded": "로드됨",
+  "plugins.restart": "재시작 필요",
+  "plugins.back": "뒤로"
 }

@@ -32,7 +32,7 @@ void printHelp() {
     std::cout << "MinecraftC " << Config::GAME_VERSION << "\n"
               << "Usage: minecraftc [--help] [--version]"
               << " [--renderer=vulkan|vulkan-demo|vulkan-textured-demo]"
-              << " [--benchmark-frames=N]\n"
+              << " [--benchmark-frames=N] [--safe-mode]\n"
               << "Worlds and settings are stored in the platform user-data directory.\n";
 }
 
@@ -81,5 +81,7 @@ std::unique_ptr<ApplicationHost> createApplication(int argc, char** argv) {
     if (benchmarkFrames > 0)
         throw CommandLineError("--benchmark-frames requires a renderer demo");
 
-    return createGameApplication(std::move(paths));
+    bool safeMode=false;
+    for(int i=1;i<argc;++i) if(std::string_view(argv[i])=="--safe-mode") safeMode=true;
+    return createGameApplication(std::move(paths),safeMode);
 }

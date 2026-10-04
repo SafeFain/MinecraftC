@@ -1,3 +1,5 @@
+#include "plugins/ContentRegistry.h"
+#include <fstream>
 #include "renderer/BlockAtlasData.h"
 
 #include "core/AssetStore.h"
@@ -303,6 +305,8 @@ void buildMaterialTextures(BlockAtlasData& result, const std::filesystem::path& 
 }
 }
 
+namespace { void appendPluginMaterials(BlockAtlasData&); }
+
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     const auto generatedRoot = assetRoot / "textures" / "generated";
     loadTextureAssetDefinitions(
@@ -396,13 +400,89 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
     }
     buildMaterialTextures(result, generatedRoot, metadata.find("\"material_maps\"") != std::string::npos);
     validateTextureData(result.texture);
+    appendPluginMaterials(result);
     return result;
 }
 
+namespace {
+void appendPluginMaterials(BlockAtlasData& atlas) {
+    auto& registry=Plugins::content();
+    if(registry.materials.empty()&&registry.blocks.empty()&&registry.items.empty())return;
+    const uint32_t oldSide=atlas.tilesPerSide,oldCapacity=oldSide*oldSide;
+    std::map<std::string,uint16_t> indices;
+    for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)
+        indices[getBlockTextureAssetName(static_cast<BlockTexture>(i))]=getAtlasTextureIndex(static_cast<BlockTexture>(i));
+    uint32_t next=oldCapacity;
+    for(auto& entry:registry.materials) {
+        auto found=indices.find(entry.first);
+        if(found!=indices.end()) {
+            if(!entry.second.replace)throw std::runtime_error("Material requires explicit replacement");
+            entry.second.tile=found->second;
+        } else {
+            if(entry.second.replace)throw std::runtime_error("Unknown replacement material: "+entry.first);
+            if(next>=65535)throw std::runtime_error("Plugin atlas capacity exceeded");
+            entry.second.tile=static_cast<uint16_t>(next++);
+            indices[entry.first]=entry.second.tile;
+        }
+    }
+    uint32_t side=oldSide;while(side*side<next)++side;
+    if(side*TILE_SIZE>4096)throw std::runtime_error("Plugin atlas exceeds portable texture size");
+    auto repack=[&](TextureData& texture,std::array<uint8_t,4> fill) {
+        std::vector<uint8_t> pixels(size_t(side*TILE_SIZE)*side*TILE_SIZE*4);
+        for(size_t p=0;p<pixels.size();p+=4)std::copy(fill.begin(),fill.end(),pixels.begin()+static_cast<std::ptrdiff_t>(p));
+        for(uint32_t tile=0;tile<oldCapacity;++tile)for(uint32_t y=0;y<TILE_SIZE;++y) {
+            size_t source=(size_t(tile/oldSide*TILE_SIZE+y)*oldSide*TILE_SIZE+tile%oldSide*TILE_SIZE)*4;
+            size_t target=(size_t(tile/side*TILE_SIZE+y)*side*TILE_SIZE+tile%side*TILE_SIZE)*4;
+            std::copy_n(texture.pixels.begin()+static_cast<std::ptrdiff_t>(source),TILE_SIZE*4,pixels.begin()+static_cast<std::ptrdiff_t>(target));
+        }
+        texture.width=texture.height=side*TILE_SIZE;texture.pixels=std::move(pixels);texture.mipLevels.clear();
+    };
+    repack(atlas.texture,{255,255,255,0});repack(atlas.normalTexture,{128,128,255,255});repack(atlas.propertyTexture,{255,0,0,255});
+    atlas.tilesPerSide=side;atlas.sequences.resize(size_t(side)*side);
+    for(uint32_t i=oldCapacity;i<side*side;++i)atlas.sequences[i].slots.fill(i);
+    auto tileImage=[](const std::filesystem::path& path,std::array<uint8_t,4> color) {
+        std::vector<uint8_t> result(TILE_SIZE*TILE_SIZE*4);
+        if(path.empty()) {for(size_t p=0;p<result.size();p+=4)std::copy(color.begin(),color.end(),result.begin()+static_cast<std::ptrdiff_t>(p));return result;}
+        // Plugin files live outside title storage and have already passed containment checks.
+        std::ifstream file(path,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+        int w=0,h=0,c=0;stbi_uc* decoded=stbi_load_from_memory(bytes.data(),static_cast<int>(bytes.size()),&w,&h,&c,4);
+        if(!decoded||w!=16||h!=16){stbi_image_free(decoded);throw std::runtime_error("Plugin material must be a 16x16 PNG: "+path.string());}
+        result.assign(decoded,decoded+TILE_SIZE*TILE_SIZE*4);stbi_image_free(decoded);return result;
+    };
+    auto insert=[&](TextureData& texture,uint32_t slot,const std::vector<uint8_t>& pixels) {
+        for(uint32_t y=0;y<TILE_SIZE;++y) {
+            const size_t target=(size_t(slot/side*TILE_SIZE+y)*side*TILE_SIZE+slot%side*TILE_SIZE)*4;
+            std::copy_n(pixels.begin()+static_cast<std::ptrdiff_t>((TILE_SIZE-1-y)*TILE_SIZE*4),TILE_SIZE*4,texture.pixels.begin()+static_cast<std::ptrdiff_t>(target));
+        }
+    };
+    for(const auto& entry:registry.materials) {
+        const auto& m=entry.second;std::array<uint8_t,4> color{};for(size_t i=0;i<4;++i)color[i]=static_cast<uint8_t>(std::lround(m.color[i]*255));
+        auto rgb=tileImage(m.image,color),normal=tileImage(m.normal,{128,128,255,255});
+        bool emissive=false;for(const auto& block:registry.blocks)for(const auto& material:block.second.materials)if(material==m.key&&block.second.emission)emissive=true;
+        auto properties=tileImage(m.properties,{255,0,static_cast<uint8_t>(emissive?255:0),255});
+        const auto& sequence=atlas.sequences.at(m.tile);
+        for(uint32_t i=0;i<sequence.variants*sequence.frames;++i) {insert(atlas.texture,sequence.slots[i],rgb);insert(atlas.normalTexture,sequence.slots[i],normal);insert(atlas.propertyTexture,sequence.slots[i],properties);}
+    }
+    for(auto& entry:registry.blocks)for(size_t i=0;i<6;++i)if(entry.second.tiles[i]!=indices.at(entry.second.materials[i]))entry.second.tiles[i]=indices.at(entry.second.materials[i]);
+    for(auto& entry:registry.items)if(entry.second.tile!=indices.at(entry.second.material))entry.second.tile=indices.at(entry.second.material);
+    auto mips=[&](TextureData& texture,bool linear) {
+        uint32_t tileSize=TILE_SIZE;auto level=texture.pixels;
+        while(tileSize>1) {
+            level=linear?downsampleLinearTiles(level,side,tileSize,&texture==&atlas.normalTexture):downsampleTiles(level,side,tileSize);
+            tileSize/=2;auto filtered=level;
+            if(!linear)preserveLeafCutoutCoverage(filtered,texture.pixels,side,tileSize,atlas.sequences);
+            texture.mipLevels.push_back({side*tileSize,side*tileSize,std::move(filtered)});
+        }
+        validateTextureData(texture);
+    };
+    mips(atlas.texture,false);mips(atlas.normalTexture,true);mips(atlas.propertyTexture,true);
+}
+}
+
 VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
-    std::array<glm::vec3, static_cast<size_t>(BlockTexture::Count)> colors{};
+    std::vector<glm::vec3> colors(atlas.sequences.size());
     for (size_t t = 0; t < colors.size(); ++t) {
-        const uint32_t logical = getAtlasTextureIndex(static_cast<BlockTexture>(t));
+        const uint32_t logical = static_cast<uint32_t>(t);
         const auto& sequence = atlas.sequences.at(logical);
         glm::vec3 sum(0.0f);
         float weight = 0.0f;
@@ -421,11 +501,13 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
         colors[t] = weight > 0.0f ? sum / weight : glm::vec3(0.0f);
     }
     VoxelGiMaterialTable result{};
+    if(!Plugins::content().blocks.empty()) result.resize(Plugins::content().blocks.rbegin()->first+1u);
     for (size_t b = 1; b < result.size(); ++b) {
         const auto id = static_cast<BlockId>(b);
+        if(!isValidBlockId(id)) continue;
         glm::vec3 emissionColor(0.0f);
         for (int f = 0; f < 6; ++f) {
-            const auto color = colors[static_cast<size_t>(getFaceTexture(id, static_cast<FaceDir>(f)))];
+            const auto color = colors.at(getFaceTextureIndex(id,static_cast<FaceDir>(f)));
             result[b].reflectance[f] = glm::min(color, glm::vec3(0.9f));
             emissionColor += color / 6.0f;
         }

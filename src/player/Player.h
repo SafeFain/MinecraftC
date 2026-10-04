@@ -248,6 +248,9 @@ private:
     void updateEnvironment(uint32_t ticks);
 
     bool breakBlock();
+    bool breakBlockImpl();
+    bool placeBlockImpl();
+    DamageOutcome takeDamageImpl(const DamageSourceInfo&);
     bool placeBlock();
     bool useStarstepScepter();
     void beginBowCharge();

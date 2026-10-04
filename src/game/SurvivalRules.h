@@ -37,6 +37,7 @@ float miningSeconds(BlockId block, const ItemStack& tool, bool underwater = fals
                     bool airborne = false);
 
 const std::vector<CraftingRecipe>& craftingRecipes();
+bool isBuiltinRecipeKey(const std::string& key, bool smelting);
 const CraftingRecipe* findCraftingRecipe(const std::array<ItemId, 9>& grid,
                                          uint8_t gridWidth, uint8_t gridHeight);
 bool fillCraftingRecipe(const CraftingRecipe& recipe, InventoryModel& inventory,

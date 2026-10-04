@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "app/GameUiController.h"
 
 #include "Config.h"
@@ -126,6 +127,7 @@ void GameUiController::render(
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible)))
             inputs.touchControls.render(renderer);
+        auto pluginHud=Plugins::event(MC_HUD);pluginHud.screen_width=static_cast<float>(uiWidth);pluginHud.screen_height=static_cast<float>(uiHeight);Plugins::dispatch(pluginHud);
         renderer.endUIFrame();
     }
 

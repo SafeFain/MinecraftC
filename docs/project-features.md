@@ -281,6 +281,13 @@ changes Heaven and block encoding while retaining Overworld generation output.
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v15; v2–v14 retain readable defaults and
+are world-wide and persisted in save v16 (introduced in v15); v2–v14 retain readable defaults and
 existing duration values. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
+
+### Plugin loader
+
+ABI 1 supports optional compiled-in examples, desktop native plugins and portable
+data packages; frozen block/item/recipe registries, shared material atlases, controlled
+gameplay events/operations, environment colors and HUD. Save v16 resolves namespaced
+content and checks exact gameplay package requirements. [Installation and SDK](plugins.md).

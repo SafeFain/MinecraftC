@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #pragma once
 
 #include "core/RuntimeClock.h"
@@ -80,6 +81,7 @@ public:
     explicit GameSession(const std::filesystem::path& savesDirectory);
 
     void leaveWorld();
+    void abortPluginWorld();
     GameMode startWorld(const std::string& worldId, bool newWorld,
                         RuntimeClock::Tick loadingStarted);
     bool advanceLoading(IGameRenderer* renderer, RuntimeClock::Tick now);
@@ -141,7 +143,7 @@ public:
     void cancelBowCharge();
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
     void handleMovement(const InputState& input, float dt);
-    void handleMouseButton(int button, ButtonAction action);
+    void handleMouseButton(int button, ButtonAction action, bool pluginUseApproved = false);
     void setSelectedSlot(int slot);
     InventoryModel& inventory() { return player.inventory(); }
     const InventoryModel& inventory() const { return player.inventory(); }
@@ -152,6 +154,12 @@ public:
     void executeTrade(uint64_t entityId, uint8_t offerIndex,
                       InventoryModel& inventory) override;
     std::optional<uint64_t> useVillagerRay(float reach);
+    bool pluginUse(bool after = false);
+    bool pluginPlayer(MC_PlayerSnapshot&) const;
+    bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
+    bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);
+    bool pluginGiveItem(uint16_t,uint32_t);
+    std::filesystem::path pluginWorldDirectory() const;
     void giveCreativeItem(ItemId item, int hotbarSlot);
     void dropSelectedItem(int hotbarSlot, bool entireStack);
     void dropInventoryItem(ItemStack stack);
