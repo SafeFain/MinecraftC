@@ -212,6 +212,10 @@
     },
     "moonflower": {
       "emission": 0.26666666666666666
+    },
+    "hanging_cloud_vine": {
+      "emission": 0.8,
+      "emission_roles": [4, 5, 6]
     }
   }
 }

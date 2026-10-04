@@ -15,6 +15,33 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    def test_stardew_vine_emission_follows_beads_not_color(self):
+        from texture_recipes import generate_material, material_maps
+        name = "hanging_cloud_vine"
+        profile = tg.load_material_profiles()[name]
+        result = generate_material(tg, name, tg.DEFAULT_SEED)
+        properties = material_maps(tg, name, result, profile)[1]
+        self.assertTrue(any(p[2] == 204 for p in properties))
+        self.assertTrue(any(p[3] and role in (1,2,3)
+                            for p,role in zip(result["pixels"],result["roles"])))
+        for pixel, role, prop in zip(result["pixels"],result["roles"],properties):
+            self.assertEqual(prop[2],204 if pixel[3] and role in (4,5,6) else 0)
+        # Authoring a different palette must not move the emissive silhouette.
+        recolored = copy.deepcopy(result)
+        recolored["pixels"] = [(255,20,40,p[3]) for p in result["pixels"]]
+        self.assertEqual(properties,material_maps(tg,name,recolored,profile)[1])
+        tile = tg.generate_texture(name,tg.DEFAULT_SEED)
+        self.assertTrue(tile[8][3] and tile[15*16+8][3])
+        self.assertFalse(tile[0][3])
+        profiles = json.loads((tg.DEFINITION_ROOT/"material_profiles.json").read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"profiles.json"
+            for invalid in ([], [True], [-1], [7], "4,5,6"):
+                profiles["materials"][name]["emission_roles"] = invalid
+                path.write_text(json.dumps(profiles))
+                with self.assertRaisesRegex(ValueError,"emission_roles"):
+                    tg.load_material_profiles(path)
+
     def test_heaven_v9_materials_and_plants(self):
         names=list(tg.HEAVEN_TEXTURES)
         self.assertEqual(tg.NAMES[216:], names)

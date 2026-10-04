@@ -1248,6 +1248,9 @@ for _name, _base in HEAVEN_TEXTURES.items():
 PALETTES["star_crystal_ore"] = list(PALETTES["diamond_ore"])
 PALETTES["star_crystal_ore"][3:] = _role_palette((104,205,227))[3:]
 PALETTES["cloudberry_bush"][6] = (147,169,229,255)
+PALETTES["hanging_cloud_vine"] = [(0,0,0,0), (48,94,100,255),
+    (76,139,146,255), (117,183,177,255), (106,211,223,255),
+    (183,242,244,255), (239,255,246,255)]
 
 for _name, _palette in PALETTES.items():
     PALETTES[_name] = [SemanticColor(color, role) for role, color in enumerate(_palette)]
@@ -1256,6 +1259,27 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name == "hanging_cloud_vine":
+        palette = PALETTES[name]
+        pixels = [palette[0]] * (SIZE*SIZE)
+        # PNG rows run downwards: all tendrils hang from the top, and the
+        # central strand continues across vertically stacked vine blocks.
+        for y in range(SIZE): pixels[y*SIZE+8] = palette[2]
+        for x, y in ((7,2), (6,3), (5,3), (4,3), (3,4), (3,5),
+                     (3,6), (9,6), (10,7), (11,7), (12,8), (12,9)):
+            pixels[y*SIZE+x] = palette[1]
+        for x, y in ((5,1), (6,2), (10,4), (11,3), (6,9), (7,10)):
+            pixels[y*SIZE+x] = palette[3]
+        # Cyan rims, milk-white hearts and a pointed tip read as stardew,
+        # rather than flowers or ordinary fruit. Roles 4..6 alone emit.
+        for x, y in ((3,7), (12,10), (8,12)):
+            pixels[y*SIZE+x] = palette[4]
+            for dy in (1,2):
+                for dx in (-1,0,1):
+                    pixels[(y+dy)*SIZE+x+dx] = palette[5 if dx == 0 else 4]
+            pixels[(y+1)*SIZE+x] = palette[6]
+            pixels[(y+3)*SIZE+x] = palette[5]
+        return pixels
     if name in HEAVEN_TEXTURES:
         base = HEAVEN_TEXTURES[name]
         original = generate_texture(base, local)
@@ -2050,6 +2074,10 @@ def load_material_profiles(path=None):
             value=profile.get(key)
             if not isinstance(value,(float,int)) or not math.isfinite(value) or not 0<=value<=1:
                 raise ValueError(f"invalid material profile {name}.{key}")
+        if "emission_roles" in profile and (not isinstance(profile["emission_roles"],list) or
+            not profile["emission_roles"] or any(type(role) is not int or
+                not 0<=role<len(PALETTES[name]) for role in profile["emission_roles"])):
+            raise ValueError(f"invalid material profile {name}.emission_roles")
         profiles[name]=profile
     return profiles
 
@@ -2105,6 +2133,9 @@ def generate_material_maps(name,pixels,profile,roles=None,masks=None):
                         roughness=overrides.get("roughness",roughness)
                         metallic=overrides.get("metallic",metallic)
             emission=profile["emission"]
+            if "emission_roles" in profile:
+                role = roles[i] if roles is not None else getattr(pixels[i],"role",palette.index(pixels[i]) if pixels[i] in palette else 2)
+                if role not in profile["emission_roles"]: emission=0
             if masks:
                 for mask, overrides in masks.get("properties", []):
                     if mask[i]: emission=overrides.get("emission",emission)

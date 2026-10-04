@@ -994,6 +994,7 @@ uint8_t getLightEmission(BlockId id) {
     if (const auto* block = Plugins::pluginBlock(id)) return block->emission;
     if (id == BlockId::TORCH) return 14;
     if (id == BlockId::STAR_CRYSTAL_LAMP) return 15;
+    if (id == BlockId::HANGING_CLOUD_VINE) return 12;
     if (id == BlockId::MOONFLOWER) return 4;
     if (id == BlockId::STAR_CRYSTAL) return 8;
     if (id == BlockId::STARFLOWER) return 5;

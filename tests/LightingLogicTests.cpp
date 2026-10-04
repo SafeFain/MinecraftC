@@ -14,6 +14,9 @@ int main(){
     require(packed.sky==9&&packed.block==7,"packed light round trips");
     require(getLightEmission(BlockId::TORCH)==14&&
             getLightEmission(BlockId::LAVA)==15,"emissive block levels are explicit");
+    require(getLightEmission(BlockId::HANGING_CLOUD_VINE)==12&&
+            getLightDampening(BlockId::HANGING_CLOUD_VINE)==0,
+            "stardew vines illuminate the island underside without blocking their chain");
     require(getLightDampening(BlockId::STONE)==15&&
             getLightDampening(BlockId::GLASS)==0&&
             getLightDampening(BlockId::LEAVES)==1&&
@@ -34,6 +37,16 @@ int main(){
         [&](int x,int,int){return light[x];},
         [&](int x,int,int,uint8_t value){light[x]=value;});
     require(light[16]==0&&light[17]==0,"opaque boundary blocks propagation");
+
+    light.fill(0);blocked.fill(false);
+    light[15]=getLightEmission(BlockId::HANGING_CLOUD_VINE);
+    queue.push({15,0,0,light[15]});
+    propagateBlockLight(queue,
+        [&](int x,int y,int z){return y==0&&z==0&&x>=0&&x<40;},
+        [&](int x,int,int){return light[x];},
+        [&](int x,int,int,uint8_t value){light[x]=value;});
+    require(light[16]==11&&light[20]==7&&light[26]==1&&light[27]==0,
+            "vine light spreads into surrounding air across chunk boundaries with bounded falloff");
 
     std::array<uint8_t,8> sky{};
     sky[0]=15;

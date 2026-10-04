@@ -227,6 +227,10 @@ changes Heaven and block encoding while retaining Overworld generation output.
   recipes and as furnace fuel. Four base stones yield four corresponding bricks.
   Four shards yield one Star Crystal (reversible); four Cloudstone Bricks around
   a crystal yield one level-15 Star Crystal Lamp. Moonflowers emit level 4.
+- Hanging Cloud Vines bear cyan-white stardew beads and emit level 12 beneath
+  Skyroot Grove / Cloudbloom Fields islands. Only the beads carry material
+  emission; stems retain their natural color. Existing vines gain normal block
+  lighting and cyan GI without changing generated blocks, save IDs or versions.
 - Star Crystal Ore requires at least a wooden pickaxe and drops two shards;
   breaking a Cloudberry Bush yields two berries without a renewable bush drop.
   One bread plus two berries yields Cloudberry Bread; berries and existing Heaven

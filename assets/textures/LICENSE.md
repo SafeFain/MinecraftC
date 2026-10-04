@@ -155,3 +155,10 @@ palettes are deterministic MinecraftC v5 procedural artwork under CC0-1.0,
 using seed 213785369. No external imagery was imported. The rod model, red/white
 bobber, curved fishing line and synthesized cast/splash/bite/reel audio are
 original repository work under GPL-3.0-only.
+
+## Hanging Cloud Vine stardew
+
+The 2026-10-04 cyan-white stardew beads, hanging stems and updated vine item
+icon are original deterministic MinecraftC procedural art under CC0-1.0.
+Generated with texture generator v5, seed 213785369; no external assets were
+imported. See `ASSET_SOURCES.md` for the reproduction command.

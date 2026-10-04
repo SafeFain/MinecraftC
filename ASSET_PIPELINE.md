@@ -244,6 +244,9 @@ assembly writes `atlas_height.png`, `atlas_normal.png`, and `atlas_property.png`
 beside albedo. Height derives from semantic material roles, not RGB brightness;
 recoloring a role layout retains geometry. Air receives neutral normals and no
 emission. Property R/G/B/A is roughness/metallic/emission/height, in linear space.
+An optional `emission_roles` list restricts profile emission to palette
+role indices; Hanging Cloud Vine uses roles 4–6 for its stardew beads. This
+selection follows semantic roles even when an author changes their colors.
 Normal green follows bottom-left runtime UVs while PNG rows remain top-left.
 The renderer loads declared maps strictly, flips each tile and generates
 independent normal/property mip levels (normal vectors renormalized). Legacy

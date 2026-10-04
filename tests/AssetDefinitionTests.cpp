@@ -155,7 +155,15 @@ int main() {
     }
     require(propertyAt(BlockTexture::StarCrystalLamp,8,8,2)>0,
             "star lamps inject authored emission into GI");
+    require(propertyAt(BlockTexture::HangingCloudVine,3,8,2)==204 &&
+            propertyAt(BlockTexture::HangingCloudVine,8,14,2)==0 &&
+            propertyAt(BlockTexture::HangingCloudVine,0,0,2)==0,
+            "only stardew beads glow; vine stems and transparent air remain non-emissive");
     const auto materials = buildVoxelGiMaterials(atlas);
+    const auto& vineMaterial = materials[size_t(BlockId::HANGING_CLOUD_VINE)];
+    require(std::abs(vineMaterial.emission.b-0.8f)<0.00001f &&
+            vineMaterial.emission.b>vineMaterial.emission.r,
+            "stardew GI lighting must retain its cyan tint and level-12 strength");
     require(materials[size_t(BlockId::STONE)].emission == glm::vec3(0),
             "non-emissive atlas material generated a light source");
     require(materials[size_t(BlockId::STAR_CRYSTAL)].emission !=

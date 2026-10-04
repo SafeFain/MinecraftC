@@ -5904,7 +5904,12 @@
     },
     "hanging_cloud_vine": {
       "effective_seed": 213785369,
-      "emission": 0.0,
+      "emission": 0.8,
+      "emission_roles": [
+        4,
+        5,
+        6
+      ],
       "family": "foliage",
       "fps": 0,
       "frames": 1,
@@ -5917,7 +5922,7 @@
       "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
       "roughness": 0.91,
       "selection_seed": 1310307523,
-      "sha256": "6e6c030c052233bb6f7af793a6c158ecb4b2cf36bd4eb554c675c6a04faf2142",
+      "sha256": "ce808940bba86d649a644bd37898c7d6529363ebd48e178175b7c49d4487bb1d",
       "slots": [
         231
       ],

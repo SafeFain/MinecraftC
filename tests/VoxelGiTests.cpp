@@ -252,6 +252,10 @@ int main() {
     const VoxelGiPacked flower = packVoxelGi(BlockId::FLOWER, 0x00);
     const VoxelGiPacked slab = packVoxelGi(BlockId::PLANKS_SLAB_BOTTOM, 0x00);
     const VoxelGiPacked torch = packVoxelGi(BlockId::TORCH, 0x0f);
+    const VoxelGiPacked vine = packVoxelGi(BlockId::HANGING_CLOUD_VINE, 0x0c);
+    require(vine.emission == 12*17 && vine.blockLight == 12*17 &&
+            vine.aux.emission != 0 && vine.opacity == flower.opacity,
+            "stardew vines must inject light into GI while retaining cutout opacity");
     require(stone.opacity == 255 && stone.skyLight == 255 && stone.valid == 255 &&
             leaves.opacity > water.opacity && leaves.opacity < stone.opacity &&
             flower.opacity < leaves.opacity && slab.opacity < stone.opacity &&
