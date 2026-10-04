@@ -39,6 +39,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <thread>
@@ -136,7 +137,7 @@ glm::vec4 drawnBorder(glm::vec2 center) {
 }
 
 // Inert renderer for the loading gate: mesh uploads/releases are no-ops.
-class StubRenderer final : public IGameRenderer {
+class StubRenderer : public IGameRenderer {
 public:
     // ── IRenderDevice ──────────────────────────────────────────────
     RenderDeviceCapabilities capabilities() const override { return {}; }
@@ -218,6 +219,89 @@ private:
     Frustum m_frustum;
 };
 
+class ItemRecordingRenderer final : public StubRenderer {
+public:
+    std::unordered_map<uint32_t,MeshData> meshes;
+    std::unordered_map<uint32_t,MaterialDesc> materials;
+    std::unordered_map<uint32_t,TextureData> textures;
+    std::vector<DrawCommand> draws;
+    uint32_t next=1;
+    size_t cubes=0;
+    RenderMeshHandle createMesh(const MeshData& data) override {
+        validateMeshData(data);const uint32_t id=next++;meshes.emplace(id,data);return {id};
+    }
+    void destroyMesh(RenderMeshHandle id) override {meshes.erase(id.value);}
+    RenderTextureHandle createTexture(const TextureData& data,const TextureSamplerDesc&) override {
+        validateTextureData(data);const uint32_t id=next++;textures.emplace(id,data);return {id};
+    }
+    void destroyTexture(RenderTextureHandle id) override {textures.erase(id.value);}
+    RenderMaterialHandle createMaterial(const MaterialDesc& data) override {
+        const uint32_t id=next++;materials.emplace(id,data);return {id};
+    }
+    void destroyMaterial(RenderMaterialHandle id) override {materials.erase(id.value);}
+    RenderTextureHandle getBlockAtlasTexture() const override {return {999};}
+    uint32_t blockAtlasTilesPerSide() const override {return 32;}
+    void draw(const DrawCommand& command) override {draws.push_back(command);}
+    void renderCompatibilityEntityCube(const glm::vec3&,const glm::vec3&,
+        const glm::vec3&,int,float,const glm::mat4&,SmoothLightSample) override {++cubes;}
+};
+
+void checkDroppedItems(const std::filesystem::path& assets) {
+    ItemRecordingRenderer renderer;
+    HeldItemRenderer items;items.initialize(renderer,assets);
+    const glm::vec3 position(-16.5f,70,-.5f);
+    for (uint16_t i=1;i<static_cast<uint16_t>(ItemId::COUNT);++i) {
+        const ItemStack item{static_cast<ItemId>(i),1,0};
+        renderer.draws.clear();items.updateUseState(false,0,false,1);
+        items.renderDropped(item,glm::mat4(1),position,0,0,{1,0});
+        require(!renderer.draws.empty(),"every nonempty item must have dropped geometry");
+        const auto original=renderer.draws;
+        const size_t meshCount=renderer.meshes.size();
+        glm::vec3 minimum(std::numeric_limits<float>::max());
+        glm::vec3 maximum(std::numeric_limits<float>::lowest());
+        for (const auto& command : original) {
+            const auto& mesh=renderer.meshes.at(command.mesh.value);
+            require(command.useCustomViewProjection && command.tint==glm::vec4(1),
+                    "world item lost its projection or daylight tint");
+            const auto& props=getItemProps(item.id);
+            const bool cube=props.placedBlock && getBlockProps(*props.placedBlock).shape==RenderShape::Cube;
+            require((renderer.materials.at(command.material.value).baseColorTexture.value==999)==cube,
+                    "dropped block must use the shared block atlas");
+            const uint32_t count=command.indexCount ? command.indexCount : mesh.indices.size();
+            require(command.firstIndex+count<=mesh.indices.size(),"dropped tool index range invalid");
+            for (uint32_t n=command.firstIndex;n<command.firstIndex+count;++n) {
+                const glm::vec3 p(command.model*glm::vec4(mesh.vertices[mesh.indices[n]].position,1));
+                minimum=glm::min(minimum,p);maximum=glm::max(maximum,p);
+            }
+        }
+        const glm::vec3 extent=maximum-minimum;
+        require(std::max({extent.x,extent.y,extent.z})<=.401f && minimum.y>=position.y,
+                "dropped geometry must fit above the ground");
+        require(glm::length((minimum+maximum)*.5f-position-glm::vec3(0,.25f,0))<.001f,
+                "dropped model must rotate around its geometry center");
+        items.updateUseState(true,1,true,1);renderer.draws.clear();
+        items.renderDropped(item,glm::mat4(1),position,0,0,{1,0});
+        require(renderer.meshes.size()==meshCount && renderer.draws.size()==original.size(),
+                "player use state changed dropped geometry or allocated another mesh");
+        for (size_t n=0;n<original.size();++n)
+            require(renderer.draws[n].model==original[n].model &&
+                    renderer.draws[n].indexCount==original[n].indexCount,
+                    "dropped bow inherited player charge or arrow");
+    }
+    renderer.draws.clear();items.renderDropped({},glm::mat4(1),position,0,0,{1,0});
+    require(renderer.draws.empty(),"empty stacks must not draw");
+    items.renderDropped({ItemId::DIAMOND,1,0},glm::mat4(1),position,1,1,{0,0});
+    require(renderer.draws.front().tint.r<.03f,"dark dropped items must retain world lighting");
+    items.reset();
+    require(renderer.meshes.empty() && renderer.materials.empty() && renderer.textures.empty(),
+            "shared item renderer leaked cached resources");
+    World world;EntityManager entities(world);
+    entities.spawnItem(glm::dvec3(position),{ItemId::DIAMOND,1,0});
+    entities.render(renderer,glm::mat4(1),{0,0,0});
+    require(renderer.cubes==0,"item entities must not draw a duplicate placeholder cube");
+    std::cout<<"PASS dropped item models, bounds, lighting, use isolation and cache lifecycle\n";
+}
+
 // Drives the loading gate the same way the application does until the world
 // render target is fully loaded or the budget is exhausted.
 bool loadWorld(GameSession& session, StubRenderer& stub, RuntimeClock& clock) {
@@ -288,7 +372,10 @@ struct Harness {
 };
 }
 
-int main() {
+int main(int argc,char** argv) {
+    if (argc==3 && std::string(argv[1])=="--dropped-item-tests") {
+        checkDroppedItems(argv[2]);return 0;
+    }
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-application-flow-test";
     std::filesystem::remove_all(root);

@@ -77,6 +77,9 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - The bindable Drop Item action defaults to Q and removes one item from the
   selected real hotbar stack in Creative and Survival. Creative hoes can till
   valid grass/dirt top faces without durability loss.
+- Dropped items show their own block, weapon/tool model or extruded item icon,
+  with centered rotation, a gentle hover and world lighting. Dropped bows stay
+  in their rest pose independently of the player's charging animation.
 - Java-style non-debug keyboard and mouse controls are configurable: T opens
   chat, `/` opens a slash-prefilled command, middle click picks a block, F swaps
   the selected/offhand stacks, F5 changes perspective, F11 toggles fullscreen,

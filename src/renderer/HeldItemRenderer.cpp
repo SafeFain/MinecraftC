@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <stb_image.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -47,6 +48,32 @@ void quad(MeshData& mesh, const glm::vec3& a, const glm::vec3& b,
     const uint32_t base = static_cast<uint32_t>(mesh.vertices.size());
     mesh.vertices.insert(mesh.vertices.end(), {{a,ta},{b,tb},{c,tc},{d,td}});
     mesh.indices.insert(mesh.indices.end(), {base,base+1,base+2,base,base+2,base+3});
+}
+
+glm::mat4 droppedMeshTransform(const MeshData& mesh,
+                               const std::vector<HeldToolRange>& ranges, float size) {
+    glm::vec3 minimum(std::numeric_limits<float>::max());
+    glm::vec3 maximum(std::numeric_limits<float>::lowest());
+    const auto include = [&](glm::vec3 p) {
+        minimum=glm::min(minimum,p);maximum=glm::max(maximum,p);
+    };
+    if (ranges.empty()) {
+        for (const auto& vertex : mesh.vertices) include(vertex.position);
+    } else {
+        // Bow geometry contains unit boxes and a drawn arrow. Bound only the
+        // visible rest pose, so dropped models never inherit player use state.
+        for (const auto& range : ranges) {
+            if (range.part==HeldToolPart::Arrow) continue;
+            const glm::mat4 part=heldToolPartTransform(range.part,0.0f);
+            for (uint32_t i=range.firstIndex;i<range.firstIndex+range.indexCount;++i)
+                include(glm::vec3(part*glm::vec4(mesh.vertices[mesh.indices[i]].position,1)));
+        }
+    }
+    if (minimum.x>maximum.x) return glm::mat4(1);
+    const glm::vec3 extent=maximum-minimum;
+    const float scale=size/std::max({extent.x,extent.y,extent.z,0.001f});
+    return glm::scale(glm::mat4(1),glm::vec3(scale))*
+        glm::translate(glm::mat4(1),-(minimum+maximum)*0.5f);
 }
 // Shared by the view model draw and world-space fishing-line attachment.
 glm::mat4 toolFirstPersonPose(float swing, float strength, float aspect,
@@ -133,6 +160,7 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
     if(hasHeldToolModel(id,props.tool)) {
         HeldToolModel model=buildHeldToolModel(id,props.tool,props.tier);
         CachedMesh result{m_renderer->createMesh(model.mesh),false,true,std::move(model.ranges)};
+        result.droppedTransform=droppedMeshTransform(model.mesh,result.ranges,.4f);
         m_meshes.emplace(key,result);
         return result;
     }
@@ -167,7 +195,36 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
             if(!opaque(x,y+1))quad(mesh,{x0,y0,-z},{x1,y0,-z},{x1,y0,z},{x0,y0,z},uv(x,y+1),uv(x+1,y+1),uv(x+1,y+1),uv(x,y+1));
         }
     }
-    CachedMesh result{m_renderer->createMesh(mesh),block,false,{}};m_meshes.emplace(key,result);return result;
+    CachedMesh result{m_renderer->createMesh(mesh),block,false,{}};
+    result.droppedTransform=droppedMeshTransform(mesh,{},block ? .3f : .4f);
+    m_meshes.emplace(key,result);return result;
+}
+
+void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
+    const glm::vec3& position, float ageSeconds, uint32_t phaseSeed, SmoothLightSample light) {
+    if (!m_renderer || item.empty()) return;
+    const CachedMesh cached=meshFor(item.id);
+    if (!cached.handle) return;
+    const float phase=static_cast<float>(phaseSeed%628u)*.01f;
+    const glm::mat4 pose=glm::translate(glm::mat4(1),position+
+        glm::vec3(0,.25f+.035f*std::sin(ageSeconds*2.5f+phase),0))*
+        glm::rotate(glm::mat4(1),ageSeconds*1.5f+phase,glm::vec3(0,1,0))*cached.droppedTransform;
+    const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.20f);
+    const float block=std::pow(std::clamp(light.block,0.0f,1.0f),1.35f);
+    DrawCommand command;command.mesh=cached.handle;
+    command.material=cached.toolModel ? m_toolMaterial :
+        (cached.blockAtlas ? m_blockMaterial : m_itemMaterial);
+    command.viewProjection=vp;command.useCustomViewProjection=true;
+    command.tint=glm::vec4(glm::max(glm::max(glm::vec3(sky),
+        glm::vec3(1,.72f,.38f)*block),glm::vec3(.025f)),1);
+    command.model=pose;
+    if (!cached.toolModel) {m_renderer->draw(command);return;}
+    for (const auto& range : cached.ranges) {
+        if (range.part==HeldToolPart::Arrow) continue;
+        command.firstIndex=range.firstIndex;command.indexCount=range.indexCount;
+        command.model=pose*heldToolPartTransform(range.part,0.0f);
+        m_renderer->draw(command);
+    }
 }
 
 void HeldItemRenderer::updateUseState(bool charging, float charge, bool blocking, float dt) {

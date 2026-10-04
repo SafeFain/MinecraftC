@@ -4,6 +4,7 @@
 #include "game/FishingSystem.h"
 #include "renderer/RenderHandles.h"
 #include "renderer/HeldToolModel.h"
+#include "world/BlockLightLogic.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -34,6 +35,9 @@ public:
     void renderThirdPerson(const ItemStack& item, const glm::mat4& viewProjection,
                            const glm::mat4& handTransform,
                            const ItemStack& offhand, const glm::mat4& leftHandTransform);
+    void renderDropped(const ItemStack& item, const glm::mat4& viewProjection,
+                       const glm::vec3& position, float ageSeconds, uint32_t phaseSeed,
+                       SmoothLightSample light);
 
 private:
     struct CachedMesh {
@@ -41,6 +45,7 @@ private:
         bool blockAtlas = false;
         bool toolModel = false;
         std::vector<HeldToolRange> ranges;
+        glm::mat4 droppedTransform{1.0f};
     };
     IGameRenderer* m_renderer = nullptr;
     RenderTextureHandle m_itemTexture{};

@@ -1322,6 +1322,8 @@ if(BUILD_TESTING)
         target_compile_options(application_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME application_flow_state_transitions COMMAND application_flow_tests)
+    add_test(NAME dropped_item_rendering COMMAND application_flow_tests
+        --dropped-item-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 
     add_executable(world_orchestration_tests
         tests/WorldOrchestrationTests.cpp

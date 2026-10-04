@@ -174,6 +174,12 @@ void GameScenePresenter::render(
         renderer.endTranslucent();
 
         session.entityState().render(renderer, vp, renderOrigin);
+        for (const auto& entity : session.entityState().entities()) {
+            if (entity.type!=EntityType::Item) continue;
+            heldItemRenderer.renderDropped(entity.item,vp,
+                glm::vec3(entity.position-renderOrigin),entity.ageSeconds,entity.behaviorSeed,
+                session.worldState().sampleLight(entity.position+glm::dvec3(0,.25,0)));
+        }
         glm::vec3 fishingTip(0);
         bool fishingTipVisible=false;
         if (perspective != CameraPerspective::FirstPerson &&

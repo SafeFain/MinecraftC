@@ -1130,6 +1130,8 @@ void EntityManager::render(
     const glm::dvec3& renderOrigin) const {
     m_modelRegistry.beginFrame();
     for (const auto& entity : m_entities) {
+        // Item geometry/materials are drawn by the scene presenter's shared item cache.
+        if (entity.type==EntityType::Item) continue;
         int textureIndex = 8;
         switch (entity.type) {
             case EntityType::Cow: textureIndex = 0; break;

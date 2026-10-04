@@ -11,11 +11,12 @@
 int main(int argc,char** argv) {
     if(argc<2 || argc>5)return 2;
     try {
-        bool capture=false,portrait=false,fishingOnly=false;
+        bool capture=false,portrait=false,fishingOnly=false,droppedOnly=false;
         for(int i=2;i<argc;++i) {
             if(std::string(argv[i])=="--capture")capture=true;
             else if(std::string(argv[i])=="--portrait")portrait=true;
             else if(std::string(argv[i])=="--fishing-only")fishingOnly=true;
+            else if(std::string(argv[i])=="--dropped-only")droppedOnly=true;
             else return 2;
         }
         const int width=portrait ? 480 : 960;
@@ -27,6 +28,39 @@ int main(int argc,char** argv) {
         HeldItemRenderer held;held.initialize(renderer,root);
         PlayerRenderer player;player.initialize(root,renderer);
         const glm::mat4 projection=glm::perspective(glm::radians(55.0f),aspect,.05f,20.0f);
+        if (droppedOnly) {
+            const std::vector<ItemId> samples={ItemId::GRASS_BLOCK,ItemId::OAK_LOG,
+                ItemId::GLASS,ItemId::OAK_LEAVES,ItemId::FLOWER,ItemId::BREAD,
+                ItemId::WOODEN_PICKAXE,ItemId::STONE_AXE,ItemId::IRON_SHOVEL,
+                ItemId::GOLDEN_HOE,ItemId::DIAMOND_SWORD,ItemId::SHIELD,
+                ItemId::BOW,ItemId::FISHING_ROD,ItemId::STARSTEP_SCEPTER,
+                ItemId::FLINT_AND_STEEL,ItemId::DIAMOND,ItemId::COAL,
+                ItemId::RAW_COD,ItemId::RAW_SALMON,ItemId::COOKED_COD,
+                ItemId::COOKED_SALMON,ItemId::WHEAT,ItemId::STICK};
+            const glm::mat4 vp=projection*glm::lookAt(glm::vec3(0,1.1f,portrait ? 6.0f : 3.4f),
+                glm::vec3(0,1.1f,0),glm::vec3(0,1,0));
+            uint32_t expected=0;
+            for (int angle=0;angle<3;++angle) {
+                for (int frame=0;frame<12;++frame) {
+                    held.updateUseState(angle==1,1,angle==1,1);
+                    FrameData data;data.clearColor={.16f,.21f,.28f,1};renderer.beginFrame(data);
+                    for (size_t i=0;i<samples.size();++i) {
+                        const glm::vec3 p((static_cast<int>(i)%6-2.5f)*.65f,
+                            (3-static_cast<int>(i)/6)*.65f,0);
+                        held.renderDropped({samples[i],1,0},vp,p,0,angle*157u,{1,0});
+                    }
+                    renderer.endFrame();
+                    const uint32_t draws=renderer.performanceStats().drawCalls;
+                    if (frame>2 && expected && draws!=expected)
+                        throw std::runtime_error("dropped draw count changed with player use state");
+                    expected=draws;
+                }
+                renderer.waitIdle();std::cout<<"READY dropped-"<<angle<<std::endl;
+                if(capture){std::string line;std::getline(std::cin,line);}
+            }
+            held.reset();renderer.waitIdle();std::cout<<"PASS dropped item Vulkan scenes"<<std::endl;
+            return 0;
+        }
         const auto scene=[&](std::string name,ItemId id,bool third,bool front,
                              bool charging,float charge,bool shield,bool blocking,float swing=1.0f,float pitch=0.0f) {
             uint32_t previous=0;
