@@ -48,6 +48,19 @@ void quad(MeshData& mesh, const glm::vec3& a, const glm::vec3& b,
     mesh.vertices.insert(mesh.vertices.end(), {{a,ta},{b,tb},{c,tc},{d,td}});
     mesh.indices.insert(mesh.indices.end(), {base,base+1,base+2,base,base+2,base+3});
 }
+// Shared by the view model draw and world-space fishing-line attachment.
+glm::mat4 toolFirstPersonPose(float swing, float strength, float aspect,
+                             const glm::mat4& movement) {
+    const float lowered = (1.0f-std::clamp(strength,0.0f,1.0f))*.28f;
+    const float horizontal = std::min(1.0f,std::max(aspect,.1f)/(4.0f/3.0f));
+    return movement * glm::translate(glm::mat4(1),glm::vec3(0,-lowered,0)) *
+        firstPersonSwingTransform(swing) *
+        glm::translate(glm::mat4(1),glm::vec3(.32f*horizontal,-.39f,-.72f)) *
+        glm::rotate(glm::mat4(1),glm::radians(-28.0f*horizontal),glm::vec3(0,0,1)) *
+        glm::rotate(glm::mat4(1),glm::radians(25.0f),glm::vec3(0,1,0)) *
+        glm::scale(glm::mat4(1),glm::vec3(.46f*std::sqrt(horizontal)));
+}
+
 }
 
 HeldItemRenderer::~HeldItemRenderer() { reset(); }
@@ -68,6 +81,11 @@ void HeldItemRenderer::initialize(IGameRenderer& renderer,
     TextureSamplerDesc sampler; sampler.addressU=TextureAddressMode::ClampToEdge;
     sampler.addressV=TextureAddressMode::ClampToEdge;
     m_itemTexture = renderer.createTexture(items, sampler);
+    TextureData white; white.width=white.height=1; white.pixels={255,255,255,255};
+    m_fishingTexture=renderer.createTexture(white,sampler);
+    MaterialDesc fishingMaterial; fishingMaterial.baseColorTexture=m_fishingTexture;
+    m_fishingMaterial=renderer.createMaterial(fishingMaterial);
+    m_fishingCube=renderer.createMesh(buildHeldCubeMesh({0,0,0,0,0,0},1,false));
     m_toolTexture = renderer.createTexture(buildHeldToolTexture(), sampler);
     TextureData arm = decode(root / "textures/generated/entity_skins/player.png");
     m_armTexture = renderer.createTexture(arm, sampler);
@@ -90,6 +108,10 @@ void HeldItemRenderer::reset() {
     if (!m_renderer) return;
     for (const auto& entry : m_meshes) if(entry.second.handle)m_renderer->destroyMesh(entry.second.handle);
     m_meshes.clear();
+    if(m_fishingCube)m_renderer->destroyMesh(m_fishingCube);
+    if(m_fishingMaterial)m_renderer->destroyMaterial(m_fishingMaterial);
+    if(m_fishingTexture)m_renderer->destroyTexture(m_fishingTexture);
+    m_fishingCube={};m_fishingMaterial={};m_fishingTexture={};
     if(m_toolMaterial)m_renderer->destroyMaterial(m_toolMaterial);
     if(m_toolTexture)m_renderer->destroyTexture(m_toolTexture);
     m_toolMaterial={};m_toolTexture={};m_use={};
@@ -229,7 +251,8 @@ void HeldItemRenderer::renderFirstPerson(const ItemStack& item, const ItemStack&
             glm::rotate(glm::mat4(1),glm::radians(bow ? 0.0f : -28.0f*itemHorizontal),glm::vec3(0,0,1))*
             glm::rotate(glm::mat4(1),glm::radians(bow ? 35.0f : 25.0f),glm::vec3(0,1,0))*
             glm::scale(glm::mat4(1),glm::vec3(cached.blockAtlas ? .32f : .46f*std::sqrt(itemHorizontal)));
-        drawItem(item,frame.projection,pose,true);
+        drawItem(item,frame.projection,
+            !bow && cached.toolModel ? toolFirstPersonPose(swing,attackStrength,aspect,movementTransform) : pose,true);
     }
     if(offhand.id==ItemId::SHIELD && !offhand.empty() && !drawingBow) {
         const float r=m_use.shieldRaise;
@@ -258,4 +281,48 @@ void HeldItemRenderer::renderThirdPerson(const ItemStack& item,
         drawItem(offhand,vp,leftHand*
             glm::rotate(glm::mat4(1),glm::radians(-80.0f*m_use.shieldRaise),glm::vec3(1,0,0))*
             glm::scale(glm::mat4(1),glm::vec3(.85f)),false);
+}
+
+glm::vec3 HeldItemRenderer::firstPersonFishingTip(float swing, float strength, float aspect,
+    const glm::mat4& movement, const glm::mat4& worldVp) const {
+    const auto projection=glm::perspective(glm::radians(70.0f),aspect,.05f,8.0f);
+    const glm::vec4 world=glm::inverse(worldVp)*projection*
+        toolFirstPersonPose(swing,strength,aspect,movement)*glm::vec4(0,1.25f,0,1);
+    return glm::vec3(world)/world.w;
+}
+glm::vec3 HeldItemRenderer::thirdPersonFishingTip(const glm::mat4& hand) {
+    return glm::vec3(hand*glm::scale(glm::mat4(1),glm::vec3(.70f))*
+        heldToolGripTransform(ItemId::FISHING_ROD,ToolKind::FishingRod,false)*glm::vec4(0,1.25f,0,1));
+}
+void HeldItemRenderer::renderFishing(const FishingView& fishing, const glm::dvec3& origin,
+    const glm::vec3& tip, const glm::mat4& vp) {
+    if (!m_renderer || !fishing.active()) return;
+    const glm::vec3 bobber=glm::vec3(fishing.position-origin);
+    DrawCommand command;command.mesh=m_fishingCube;command.material=m_fishingMaterial;
+    command.viewProjection=vp;command.useCustomViewProjection=true;
+    auto box=[&](glm::vec3 position,glm::vec3 size,glm::vec4 tint) {
+        command.model=glm::translate(glm::mat4(1),position)*glm::scale(glm::mat4(1),size);
+        command.tint=tint;m_renderer->draw(command);
+    };
+    box(bobber+glm::vec3(0,.04f,0),{.15f,.08f,.15f},{.95f,.95f,.90f,1});
+    box(bobber+glm::vec3(0,.12f,0),{.15f,.08f,.15f},{.85f,.08f,.06f,1});
+    box(bobber+glm::vec3(0,.20f,0),{.025f,.10f,.025f},{.25f,.22f,.19f,1});
+    const glm::vec3 end=bobber+glm::vec3(0,.25f,0);
+    const float sag=std::min(1.0f,glm::length(end-tip)*.08f);
+    glm::vec3 previous=tip;
+    for(int i=1;i<=24;++i) {
+        const float t=i/24.0f;
+        const glm::vec3 p=glm::mix(tip,end,t)-glm::vec3(0,4*t*(1-t)*sag,0);
+        const glm::vec3 delta=p-previous;
+        const float length=glm::length(delta);
+        if(length>1e-6f) {
+            const glm::vec3 direction=delta/length;
+            const glm::quat rotation=direction.y < -.99999f ? glm::quat(0,1,0,0) :
+                glm::normalize(glm::quat(1.0f+direction.y,direction.z,0,-direction.x));
+            command.model=glm::translate(glm::mat4(1),(p+previous)*.5f)*
+                glm::mat4_cast(rotation)*glm::scale(glm::mat4(1),glm::vec3(.008f,length,.008f));
+            command.tint={.13f,.12f,.11f,1};m_renderer->draw(command);
+        }
+        previous=p;
+    }
 }

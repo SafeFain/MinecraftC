@@ -1699,6 +1699,19 @@ def generate_item_sprite(template,material,definitions):
         for points in (((5,4),(10,3),(12,6),(10,10),(5,11),(3,8),(5,5),(9,5),(10,7),(8,9),(6,8)),):
             for a,b in zip(points,points[1:]): _line(image,*a,*b,shades[2])
         _line(image,10,10,12,13,shades[3])
+    elif template=="fishing_rod":
+        _line(image,3,14,11,2,outline,3)
+        _line(image,3,14,11,2,handle[2],1)
+        _line(image,11,2,13,11,shades[3],1)
+        _line(image,3,12,5,9,handle[0],3)
+        _put(image,13,12,(230,56,43,255)); _put(image,13,11,(240,235,218,255))
+    elif template=="fish":
+        for y,left,right in ((5,9,11),(6,7,12),(7,5,13),(8,4,13),(9,5,12),(10,7,11)):
+            for x in range(left,right+1):
+                _put(image,x,y,outline if x in (left,right) else shades[2 if y<9 else 1])
+        _line(image,3,6,3,10,outline,2); _line(image,3,8,6,8,shades[1],2)
+        _line(image,8,5,10,4,shades[2],1); _line(image,8,10,9,11,shades[1],1)
+        _put(image,12,7,(24,26,25,255)); _put(image,11,6,shades[3])
     elif template=="bow":
         points=((5,2),(8,3),(10,5),(11,8),(10,11),(8,13),(5,14))
         for a,b in zip(points,points[1:]): _line(image,*a,*b,handle[2],2)

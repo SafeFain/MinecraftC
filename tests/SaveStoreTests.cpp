@@ -75,6 +75,11 @@ int main() {
         source.inventory.slot(10) = {ItemId::LIMESTONE, 23, 0};
         source.inventory.slot(11) = {ItemId::BLACK_WOOL, 64, 0};
         source.inventory.slot(12) = {ItemId::BONE_MEAL, 17, 0};
+        source.inventory.slot(13) = {ItemId::FISHING_ROD, 1, 63};
+        source.inventory.slot(14) = {ItemId::RAW_COD, 64, 0};
+        source.inventory.slot(15) = {ItemId::RAW_SALMON, 12, 0};
+        source.inventory.slot(16) = {ItemId::COOKED_COD, 32, 0};
+        source.inventory.slot(17) = {ItemId::COOKED_SALMON, 7, 0};
         source.inventory.armor()[1] = {ItemId::IRON_CHESTPLATE, 1, 12};
         source.inventory.offhand() = {ItemId::SHIELD, 1, 4};
         source.entities.push_back({
@@ -136,6 +141,13 @@ int main() {
         require(loaded.inventory.slot(0).id == ItemId::IRON_PICKAXE &&
                 loaded.inventory.slot(0).damage == 42,
                 "durable inventory item round trips");
+        require(loaded.inventory.slot(13).id == ItemId::FISHING_ROD &&
+                loaded.inventory.slot(13).damage == 63 &&
+                loaded.inventory.slot(14).id == ItemId::RAW_COD && loaded.inventory.slot(14).count == 64 &&
+                loaded.inventory.slot(15).id == ItemId::RAW_SALMON &&
+                loaded.inventory.slot(16).id == ItemId::COOKED_COD &&
+                loaded.inventory.slot(17).id == ItemId::COOKED_SALMON,
+                "appended fishing items and rod wear round trip without a format change");
         require(loaded.inventory.offhand().id == ItemId::SHIELD,
                 "offhand round trips");
         require(loaded.foodTickTimer == source.foodTickTimer,

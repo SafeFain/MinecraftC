@@ -51,7 +51,9 @@ Android's 2100000000 limit. The Apple short version remains `X.Y.Z`.
 - Crafting, furnaces, containers, Java 1.9-style charged melee combat, hunger,
   fast regeneration, armor/shields, weather, commands, and persistent
   players, entities, and worlds.
-- JSON-driven block, 281-item, and entity atlases with a deterministic 16x16
+- Classic fishing with craftable durable rods, visible bobbers and lines, manual
+  bite/reel timing, fish/junk/open-water treasure, and edible/cookable cod and salmon.
+- JSON-driven block, 286-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories

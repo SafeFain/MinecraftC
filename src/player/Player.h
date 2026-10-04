@@ -100,6 +100,7 @@ public:
         }
         m_selectedSlot = slot;
     }
+    void animateItemUse() { startSwing(); }
     int selectedSlot() const { return m_selectedSlot; }
     float airFraction() const { return std::clamp(m_airTicks / 300.0f, 0.0f, 1.0f); }
     bool underwater() const { return m_airTicks < 300; }

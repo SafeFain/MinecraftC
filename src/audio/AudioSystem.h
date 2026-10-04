@@ -10,6 +10,8 @@ enum class AudioMusicMode {
     Heaven
 };
 
+enum class FishingSound { Cast, Splash, Bite, Reel };
+
 enum class CombatSound {
     Miss, Weak, Strong, Critical, Sweep, ShieldBlock, ShieldBreak
 };
@@ -36,6 +38,7 @@ public:
     void stopRain();
     void playThunder(float pan, float volume);
     void playExplosion(float pan, float volume);
+    void playFishing(FishingSound sound);
     void playCombat(CombatSound sound);
     bool available() const;
 

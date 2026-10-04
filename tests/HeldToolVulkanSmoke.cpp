@@ -9,12 +9,13 @@
 // Opt-in display-dependent scene harness. Capture mode pauses after each scene
 // so an external screen grab can inspect actual Vulkan output.
 int main(int argc,char** argv) {
-    if(argc<2 || argc>4)return 2;
+    if(argc<2 || argc>5)return 2;
     try {
-        bool capture=false,portrait=false;
+        bool capture=false,portrait=false,fishingOnly=false;
         for(int i=2;i<argc;++i) {
             if(std::string(argv[i])=="--capture")capture=true;
             else if(std::string(argv[i])=="--portrait")portrait=true;
+            else if(std::string(argv[i])=="--fishing-only")fishingOnly=true;
             else return 2;
         }
         const int width=portrait ? 480 : 960;
@@ -46,7 +47,18 @@ int main(int argc,char** argv) {
                     const glm::mat4 vp=projection*view;
                     const auto hands=player.renderThirdPerson(renderer,{0,0,0},{0,0,0},0,pitch,vp,{1,0});
                     held.renderThirdPerson(item,vp,hands.right,offhand,hands.left);
-                } else held.renderFirstPerson(item,offhand,swing,1,aspect,glm::mat4(1));
+                    if(id==ItemId::FISHING_ROD) {
+                        FishingView fishing;fishing.phase=FishingPhase::Waiting;fishing.position={0,.7,2};
+                        held.renderFishing(fishing,{0,0,0},HeldItemRenderer::thirdPersonFishingTip(hands.right),vp);
+                    }
+                } else {
+                    if(id==ItemId::FISHING_ROD) {
+                        const glm::mat4 vp=projection;
+                        FishingView fishing;fishing.phase=FishingPhase::Waiting;fishing.position={.1,-.4,-3};
+                        held.renderFishing(fishing,{0,0,0},held.firstPersonFishingTip(swing,1,aspect,glm::mat4(1),vp),vp);
+                    }
+                    held.renderFirstPerson(item,offhand,swing,1,aspect,glm::mat4(1));
+                }
                 renderer.endFrame();
                 const uint32_t count=renderer.performanceStats().drawCalls;
                 if(frame>2 && count!=previous)throw std::runtime_error("draw count changed across fixed scene");
@@ -56,6 +68,11 @@ int main(int argc,char** argv) {
             std::cout<<"READY "<<name<<std::endl;
             if(capture){std::string line;std::getline(std::cin,line);}
         };
+        scene("fishing-first",ItemId::FISHING_ROD,false,false,false,0,false,false);
+        scene("fishing-reel",ItemId::FISHING_ROD,false,false,false,0,false,false,.4f);
+        scene("fishing-third-rear",ItemId::FISHING_ROD,true,false,false,0,false,false);
+        scene("fishing-third-front",ItemId::FISHING_ROD,true,true,false,0,false,false);
+        if(fishingOnly) { held.reset();renderer.waitIdle();std::cout<<"PASS fishing Vulkan scenes"<<std::endl;return 0; }
         for(int i=static_cast<int>(ItemId::WOODEN_PICKAXE);i<=static_cast<int>(ItemId::DIAMOND_SWORD);++i)
             scene("first-"+itemCommandName(static_cast<ItemId>(i)),static_cast<ItemId>(i),false,false,false,0,false,false);
         for(const auto id:{ItemId::FLINT_AND_STEEL,ItemId::STARSTEP_SCEPTER,ItemId::SHIELD})

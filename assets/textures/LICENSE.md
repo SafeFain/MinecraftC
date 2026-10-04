@@ -147,3 +147,11 @@ The held weapon/tool palette atlas is generated at runtime by
 `src/renderer/HeldToolModel.cpp`. Its pixel colors, face shading and cuboid
 models are original MinecraftC work under the repository GPL-3.0-only license;
 no third-party weapon or tool model assets are used.
+
+## Classic fishing artwork
+
+The five appended fishing rod/cod/salmon inventory sprites and their original
+palettes are deterministic MinecraftC v5 procedural artwork under CC0-1.0,
+using seed 213785369. No external imagery was imported. The rod model, red/white
+bobber, curved fishing line and synthesized cast/splash/bite/reel audio are
+original repository work under GPL-3.0-only.

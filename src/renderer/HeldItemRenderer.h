@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/Item.h"
+#include "game/FishingSystem.h"
 #include "renderer/RenderHandles.h"
 #include "renderer/HeldToolModel.h"
 
@@ -25,6 +26,11 @@ public:
     void renderFirstPerson(const ItemStack& item, const ItemStack& offhand, float swingProgress,
                            float attackStrength,
                            float aspectRatio, const glm::mat4& movementTransform);
+    glm::vec3 firstPersonFishingTip(float swing, float attackStrength, float aspect,
+        const glm::mat4& movement, const glm::mat4& worldViewProjection) const;
+    static glm::vec3 thirdPersonFishingTip(const glm::mat4& hand);
+    void renderFishing(const FishingView& fishing, const glm::dvec3& renderOrigin,
+                       const glm::vec3& tip, const glm::mat4& viewProjection);
     void renderThirdPerson(const ItemStack& item, const glm::mat4& viewProjection,
                            const glm::mat4& handTransform,
                            const ItemStack& offhand, const glm::mat4& leftHandTransform);
@@ -46,6 +52,9 @@ private:
     RenderMaterialHandle m_blockMaterial{};
     RenderMaterialHandle m_armMaterial{};
     RenderMeshHandle m_armMesh{};
+    RenderMeshHandle m_fishingCube{};
+    RenderTextureHandle m_fishingTexture{};
+    RenderMaterialHandle m_fishingMaterial{};
     int m_itemColumns = 0;
     int m_itemRows = 0;
     int m_blockTiles = 1;

@@ -509,6 +509,14 @@
       "x": 0,
       "y": 10
     },
+    "cooked_cod": {
+      "generator": "item_sprite",
+      "index": 284,
+      "source": "items/cooked_cod.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 35
+    },
     "cooked_mutton": {
       "generator": "item_sprite",
       "index": 82,
@@ -524,6 +532,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 9
+    },
+    "cooked_salmon": {
+      "generator": "item_sprite",
+      "index": 285,
+      "source": "items/cooked_salmon.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 35
     },
     "coral_rock": {
       "generator": "block_item_icon",
@@ -804,6 +820,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 27
+    },
+    "fishing_rod": {
+      "generator": "item_sprite",
+      "index": 281,
+      "source": "items/fishing_rod.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 35
     },
     "fletching_table": {
       "generator": "block_item_icon",
@@ -1541,6 +1565,14 @@
       "x": 7,
       "y": 9
     },
+    "raw_cod": {
+      "generator": "item_sprite",
+      "index": 282,
+      "source": "items/raw_cod.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 35
+    },
     "raw_gold": {
       "generator": "item_sprite",
       "index": 66,
@@ -1572,6 +1604,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 9
+    },
+    "raw_salmon": {
+      "generator": "item_sprite",
+      "index": 283,
+      "source": "items/raw_salmon.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 35
     },
     "red_clay": {
       "generator": "block_item_icon",

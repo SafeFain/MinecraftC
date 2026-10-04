@@ -86,6 +86,7 @@ public:
     void emitBlockBreak(const glm::ivec3& position, BlockId block);
     void emitExplosion(const glm::dvec3& position);
     void emitCriticalHit(const glm::dvec3& position);
+    void emitFishingSplash(const glm::dvec3& position, bool bite);
     void emitSweepAttack(const glm::dvec3& position);
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(

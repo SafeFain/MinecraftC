@@ -115,6 +115,13 @@ void GameUiController::render(
                 renderCrosshairAndMiningProgress(session.playerState(), uiWidth, uiHeight);
             renderAttackIndicator(session.playerState(), settings.attackIndicator,
                                   uiWidth, uiHeight);
+            if (session.fishingState().phase == FishingPhase::Bite) {
+                const std::string hint = localization.text("message.fishing_bite");
+                const float scale = UiTheme::fittedScale(renderer,hint,1.1f,uiWidth-24);
+                const auto size = renderer.measureText(hint,scale);
+                UiTheme::textWithShadow(renderer,hint,(uiWidth-size.x)*.5f,
+                    uiHeight*.5f+28,scale,glm::vec4(1,.9f,.5f,1));
+            }
             if (itemNameSeconds > 0.0f) renderSelectedItemName(session.playerState(), uiWidth);
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible)))

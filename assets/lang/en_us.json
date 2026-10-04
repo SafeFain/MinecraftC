@@ -431,5 +431,11 @@
   "item.278": "Cloudberry",
   "item.279": "Roasted Cloudberry",
   "item.280": "Cloudberry Bread",
-  "item.281": "Roasted Glowshroom"
+  "item.281": "Roasted Glowshroom",
+  "item.282": "Fishing Rod",
+  "item.283": "Raw Cod",
+  "item.284": "Raw Salmon",
+  "item.285": "Cooked Cod",
+  "item.286": "Cooked Salmon",
+  "message.fishing_bite": "Bite! Use to reel in!"
 }

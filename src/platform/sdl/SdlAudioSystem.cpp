@@ -55,6 +55,9 @@ struct AudioSystem::Impl {
     std::atomic<float> explosionVolume{0.0f};
     std::atomic<unsigned> explosionTriggers{0};
     std::atomic<int> combatTrigger{-1};
+    std::atomic<int> fishingTrigger{-1};
+    float fishingEnvelope = 0, fishingPhase = 0, fishingFrequency = 0;
+    float fishingDecay = 0, fishingNoise = 0;
     float rainVolume = 0.0f;
     float rainLowLeft = 0.0f;
     float rainLowRight = 0.0f;
@@ -158,6 +161,16 @@ struct AudioSystem::Impl {
             thunderEnvelope = thunderVolume.load();
         if (explosionTriggers.exchange(0) > 0)
             explosionEnvelope = explosionVolume.load();
+        const int requestedFishing = fishingTrigger.exchange(-1);
+        if (requestedFishing >= 0) {
+            static constexpr float frequency[] = {900, 180, 620, 320};
+            static constexpr float decay[] = {.9980f, .9987f, .9990f, .9981f};
+            static constexpr float noiseMix[] = {.8f, .9f, .35f, .65f};
+            const int index = std::clamp(requestedFishing,0,3);
+            fishingEnvelope = .22f; fishingPhase = 0;
+            fishingFrequency = frequency[index]; fishingDecay = decay[index];
+            fishingNoise = noiseMix[index];
+        }
         const int requestedCombat = combatTrigger.exchange(-1);
         if (requestedCombat >= 0) {
             static constexpr float frequencies[] = {
@@ -288,14 +301,20 @@ struct AudioSystem::Impl {
                                   noise() * combatNoiseMix) * combatEnvelope;
             combatEnvelope *= combatDecay;
             if (combatEnvelope < .0001f) combatEnvelope = 0.0f;
+            fishingPhase += 6.283185307f * fishingFrequency / SAMPLE_RATE;
+            if (fishingPhase > 6.283185307f) fishingPhase -= 6.283185307f;
+            const float fishing = (std::sin(fishingPhase) * (1-fishingNoise) +
+                noise() * fishingNoise) * fishingEnvelope;
+            fishingEnvelope *= fishingDecay;
+            if (fishingEnvelope < .0001f) fishingEnvelope = 0;
             samples[frame * 2] = std::clamp(masterGain * (
                 left + (rainLeft + thunder * leftPan) * weatherGain +
-                    (explosion * explosionLeft + combat * .707f) * soundEffectsGain),
+                    (explosion * explosionLeft + (combat + fishing) * .707f) * soundEffectsGain),
                 -1.0f, 1.0f);
             samples[frame * 2 + 1] =
                 std::clamp(masterGain * (right +
                                (rainRight + thunder * rightPan) * weatherGain +
-                               (explosion * explosionRight + combat * .707f) *
+                               (explosion * explosionRight + (combat + fishing) * .707f) *
                                    soundEffectsGain),
                            -1.0f, 1.0f);
         }
@@ -466,6 +485,11 @@ void AudioSystem::playExplosion(float pan, float volume) {
     m_impl->explosionPan = std::clamp(pan, -1.0f, 1.0f);
     m_impl->explosionVolume = std::clamp(volume, 0.0f, 1.0f);
     ++m_impl->explosionTriggers;
+}
+
+void AudioSystem::playFishing(FishingSound sound) {
+    if (!m_impl->initialized) return;
+    m_impl->fishingTrigger = static_cast<int>(sound);
 }
 
 void AudioSystem::playCombat(CombatSound sound) {

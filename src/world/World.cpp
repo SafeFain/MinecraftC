@@ -208,6 +208,17 @@ void World::rebuildStreamingLightingIfDirty() {
 
 // ── Block queries ─────────────────────────────────────────────────────
 
+std::optional<BlockId> World::getLoadedBlock(int worldX, int worldY, int worldZ) const {
+    if (!Config::isValidWorldY(worldY)) return std::nullopt;
+    const int cx = worldToChunkX(static_cast<double>(worldX));
+    const int cz = worldToChunkZ(static_cast<double>(worldZ));
+    const Chunk* chunk = m_chunks.find(cx,cz);
+    if (!chunk || !chunk->generated.load() ||
+        chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return std::nullopt;
+    return chunk->getBlock(worldX-cx*Config::CHUNK_SIZE_X,worldY,
+                           worldZ-cz*Config::CHUNK_SIZE_Z);
+}
+
 BlockId World::getBlock(int worldX, int worldY, int worldZ) const {
     if (!Config::isValidWorldY(worldY)) {
         return BlockId::AIR;

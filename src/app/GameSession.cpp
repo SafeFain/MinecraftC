@@ -114,10 +114,66 @@ void GameSession::handleMouseDelta(
 void GameSession::handleMovement(const InputState& input, float dt) {
     if (!playerDead) player.handleMovement(input, dt);
 }
+FishingEnvironment GameSession::fishingEnvironment() {
+    return {
+        [this](glm::ivec3 p) -> std::optional<BlockId> {
+            return world.getLoadedBlock(p.x,p.y,p.z);
+        },
+        [this](glm::ivec3 p) { return world.hasSkyAccess(p.x,p.y,p.z); },
+        [this](glm::ivec3 p) {
+            return weather.raining() &&
+                world.precipitationAt(p.x,p.y,p.z) == PrecipitationType::Rain;
+        }
+    };
+}
+void GameSession::validateFishingRod() {
+    if (!fishing.view().active()) return;
+    const auto item = player.activeItem();
+    if (playerDead || isSleeping() || player.isSpectator() ||
+        player.selectedSlot() != fishingSlot || item.empty() ||
+        item.id != ItemId::FISHING_ROD || item.damage != fishingRodDamage)
+        fishing.cancel();
+}
+void GameSession::collectFishingEvents() {
+    for (const auto& event : fishing.takeEvents()) {
+        if (!event.catchItem.empty()) {
+            const glm::dvec3 delta = player.getPosition() + glm::dvec3(0,.7,0) - event.position;
+            const float distance = static_cast<float>(glm::length(delta));
+            const float duration = std::clamp(distance / 12.0f, .2f, 1.2f);
+            const glm::vec3 velocity = glm::vec3(delta / static_cast<double>(duration)) +
+                glm::vec3(0, .5f * 20.0f * duration, 0);
+            entities.spawnItem(event.position, event.catchItem, velocity, .15f);
+        }
+        if (event.wear && player.isSurvival() && fishingSlot >= 0) {
+            auto& rod = player.inventory().slot(static_cast<size_t>(fishingSlot));
+            if (rod.id == ItemId::FISHING_ROD) {
+                rod.damage = static_cast<uint16_t>(rod.damage + event.wear);
+                if (rod.damage >= getItemProps(rod.id).maxDurability) rod.clear();
+            }
+        }
+        fishingFeedback.push_back(event);
+    }
+}
 void GameSession::handleMouseButton(int button, ButtonAction action) {
+    validateFishingRod();
+    if (button == MouseButton::Right && player.activeItem().id == ItemId::FISHING_ROD) {
+        if (action == ButtonAction::Press && player.isMouseLocked() &&
+            !playerDead && !isSleeping() && !player.isSpectator()) {
+            fishing.update(0,player.getEyePosition(),fishingEnvironment());
+            fishingSlot = player.selectedSlot();
+            fishingRodDamage = player.activeItem().damage;
+            fishing.use(player.getEyePosition(),player.getForward(),player.velocity(),fishingEnvironment());
+            player.animateItemUse();
+            collectFishingEvents();
+        }
+        return;
+    }
     player.handleMouseButton(button, action);
 }
-void GameSession::setSelectedSlot(int slot) { player.setSelectedSlot(slot); }
+void GameSession::setSelectedSlot(int slot) {
+    if (slot >= 0 && slot < 9 && slot != player.selectedSlot()) fishing.cancel();
+    player.setSelectedSlot(slot);
+}
 std::optional<uint64_t> GameSession::useVillagerRay(float reach) {
     return entities.useRay(player.getEyePosition(), player.getForward(), reach);
 }
@@ -138,6 +194,7 @@ void GameSession::executeTrade(uint64_t entityId, uint8_t offerIndex,
 void GameSession::giveCreativeItem(ItemId item, int hotbarSlot) {
     if (hotbarSlot < 0 ||
         hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
+    if (hotbarSlot == fishingSlot) fishing.cancel();
     InventoryInteraction::setCreativeItem(
         player.inventory().slot(static_cast<size_t>(hotbarSlot)), item);
 }
@@ -149,6 +206,7 @@ void GameSession::dropSelectedItem(int hotbarSlot, bool entireStack) {
     ItemStack dropped = slot;
     if (!entireStack) dropped = InventoryInteraction::takeOne(slot);
     else slot.clear();
+    validateFishingRod();
     dropInventoryItem(dropped);
 }
 
@@ -196,6 +254,7 @@ void GameSession::swapOffhand(int hotbarSlot) {
     if (player.isSpectator() || hotbarSlot < 0 ||
         hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
     auto& items = player.inventory();
+    if (hotbarSlot == fishingSlot) fishing.cancel();
     std::swap(items.slot(static_cast<size_t>(hotbarSlot)), items.offhand());
     player.cancelBowCharge();
 }
@@ -218,6 +277,7 @@ void GameSession::detachSaveStore() {
 }
 
 void GameSession::leaveWorld() {
+    fishing.cancel(); fishingFeedback.clear();
     if (terrainGenerated) {
         saveActiveDimensionState();
         updateSaveMetadata();
@@ -425,6 +485,18 @@ void GameSession::updatePlaying(
         feedback.setRainVolume(
             weather.rainGradient() * (rainExposure ? 0.72f : 0.06f));
     if (!playerDead) player.update(dt);
+    validateFishingRod();
+    fishing.update(dt,player.getEyePosition(),fishingEnvironment());
+    collectFishingEvents();
+    for (const auto& event : fishingFeedback) {
+        if (feedback.playFishing && event.kind != FishingEventKind::Approach)
+            feedback.playFishing(event.kind);
+        if (event.kind == FishingEventKind::Splash || event.kind == FishingEventKind::Bite ||
+            event.kind == FishingEventKind::Approach) particles.emitFishingSplash(event.position,
+                event.kind == FishingEventKind::Bite);
+        if (event.kind == FishingEventKind::Bite && feedback.rumble) feedback.rumble(.4f,160);
+    }
+    fishingFeedback.clear();
     particles.update(world, player.getPosition(), dt, weather.rainGradient(),
                      worldMetadata.seed ^ survivalTicks, dimension,
                      dayNightCycle.evaluate().daylight);
@@ -638,6 +710,7 @@ bool GameSession::beginSleepAtBed(const glm::ivec3& bed) {
     if (entities.hasHostileNear(glm::vec3(*foot), 8.0f))
         return false;
 
+    fishing.cancel();
     sleepBed = *foot;
     BedPart part = BedPart::Foot;
     BedDirection direction = BedDirection::North;
@@ -781,6 +854,7 @@ bool GameSession::handleVoidFall(
 }
 
 void GameSession::beginPlayerDeath() {
+    fishing.cancel();
     playerDead = true;
     const glm::vec3 deathPosition = glm::vec3(
         player.getPosition() + glm::dvec3(0.0, 0.5, 0.0));
@@ -866,6 +940,9 @@ void GameSession::resetTransientState(
     survivalWorldTickRemainder = 0.0f;
     lightningEvents.clear();
     particles.clear();
+    fishing.reset(worldMetadata.seed ^ worldTicks ^ 0xf1571a9ULL);
+    fishingFeedback.clear();
+    fishingSlot = -1;
 }
 
 void GameSession::saveActiveDimensionState() {

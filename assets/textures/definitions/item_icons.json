@@ -45,7 +45,9 @@
     "rotten_flesh": {},
     "clay_ball": {},
     "brick": {},
-    "dye": {}
+    "dye": {},
+    "fishing_rod": {},
+    "fish": {}
   },
   "handle_palette": [
     [
@@ -838,6 +840,72 @@
         211,
         225,
         247
+      ]
+    ],
+    "cod": [
+      [
+        51,
+        54,
+        40
+      ],
+      [
+        140,
+        140,
+        102
+      ],
+      [
+        184,
+        180,
+        139
+      ],
+      [
+        223,
+        220,
+        176
+      ]
+    ],
+    "salmon": [
+      [
+        78,
+        46,
+        44
+      ],
+      [
+        176,
+        87,
+        77
+      ],
+      [
+        224,
+        127,
+        107
+      ],
+      [
+        246,
+        184,
+        147
+      ]
+    ],
+    "cooked_fish": [
+      [
+        85,
+        46,
+        26
+      ],
+      [
+        160,
+        93,
+        41
+      ],
+      [
+        203,
+        139,
+        68
+      ],
+      [
+        240,
+        190,
+        111
       ]
     ]
   },
@@ -2061,6 +2129,31 @@
       "generator": "item_sprite",
       "template": "food",
       "material": "cloudberry"
+    },
+    "fishing_rod": {
+      "generator": "item_sprite",
+      "template": "fishing_rod",
+      "material": "fiber"
+    },
+    "raw_cod": {
+      "generator": "item_sprite",
+      "template": "fish",
+      "material": "cod"
+    },
+    "raw_salmon": {
+      "generator": "item_sprite",
+      "template": "fish",
+      "material": "salmon"
+    },
+    "cooked_cod": {
+      "generator": "item_sprite",
+      "template": "fish",
+      "material": "cooked_fish"
+    },
+    "cooked_salmon": {
+      "generator": "item_sprite",
+      "template": "fish",
+      "material": "cooked_fish"
     }
   },
   "documentation": {

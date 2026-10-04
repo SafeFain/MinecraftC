@@ -3,6 +3,7 @@
 #include "core/RuntimeClock.h"
 #include "entity/EntityManager.h"
 #include "game/SaveStore.h"
+#include "game/FishingSystem.h"
 #include "game/SessionAccess.h"
 #include "game/Weather.h"
 #include "game/WorldCatalog.h"
@@ -49,6 +50,7 @@ public:
         std::function<void(float, float)> playExplosion;
         std::function<void(float, float)> playThunder;
         std::function<void(float, uint32_t)> rumble;
+        std::function<void(FishingEventKind)> playFishing;
         std::function<void()> playerDied;
         std::function<void()> autosaveMetadataError;
         std::function<void()> autosaveFlushError;
@@ -104,6 +106,7 @@ public:
     const Player& playerState() const { return player; }
     const EntityManager& entityState() const { return entities; }
     const DayNightCycle& daylightState() const { return dayNightCycle; }
+    const FishingView& fishingState() const { return fishing.view(); }
     const WeatherSystem& weatherState() const { return weather; }
     const ParticleSystem& particleState() const { return particles; }
     const std::vector<LightningEvent>& lightningState() const { return lightningEvents; }
@@ -178,6 +181,13 @@ private:
     DayNightCycle dayNightCycle;
     WeatherSystem weather;
     ParticleSystem particles;
+    FishingSystem fishing;
+    int fishingSlot = -1;
+    uint16_t fishingRodDamage = 0;
+    std::vector<FishingEvent> fishingFeedback;
+    FishingEnvironment fishingEnvironment();
+    void collectFishingEvents();
+    void validateFishingRod();
     std::vector<LightningEvent> lightningEvents;
 
     bool terrainGenerated = false;

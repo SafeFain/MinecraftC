@@ -92,7 +92,9 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(order[208], "rooted_dirt")
         self.assertEqual(order[231], "beach_grass")
         self.assertEqual(order[259], "cave_glowshroom")
-        self.assertEqual(order[-1], "roasted_glowshroom")
+        self.assertEqual(order[280], "roasted_glowshroom")
+        self.assertEqual(order[281:], ["fishing_rod", "raw_cod", "raw_salmon",
+                                      "cooked_cod", "cooked_salmon"])
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]

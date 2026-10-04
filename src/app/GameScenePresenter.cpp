@@ -174,6 +174,8 @@ void GameScenePresenter::render(
         renderer.endTranslucent();
 
         session.entityState().render(renderer, vp, renderOrigin);
+        glm::vec3 fishingTip(0);
+        bool fishingTipVisible=false;
         if (perspective != CameraPerspective::FirstPerson &&
             !session.playerState().isSpectator()) {
             const PlayerHandTransforms hands = playerRenderer.renderThirdPerson(
@@ -181,11 +183,25 @@ void GameScenePresenter::render(
                 session.playerState().getYaw(), session.playerState().getPitch(), vp,
                 session.worldState().sampleLight(session.playerState().getEyePosition()),
                 session.sleepFacing());
+            if (session.playerState().activeItem().id==ItemId::FISHING_ROD) {
+                fishingTip=HeldItemRenderer::thirdPersonFishingTip(hands.right);
+                fishingTipVisible=true;
+            }
             if (!session.isSleeping())
                 heldItemRenderer.renderThirdPerson(
                     session.playerState().activeItem(), vp, hands.right,
                     session.playerState().inventory().offhand(),hands.left);
         }
+        if (perspective==CameraPerspective::FirstPerson && showFirstPersonItem &&
+            session.playerState().activeItem().id==ItemId::FISHING_ROD) {
+            fishingTip=heldItemRenderer.firstPersonFishingTip(
+                session.playerState().visualState().swingProgress,
+                session.playerState().attackStrength(),window.aspectRatio(),
+                cameraEffects.viewModelTransform(),vp);
+            fishingTipVisible=true;
+        }
+        if (fishingTipVisible)
+            heldItemRenderer.renderFishing(session.fishingState(),renderOrigin,fishingTip,vp);
         session.particleState().buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
         const float particleIntensity = session.worldState().isHeaven()

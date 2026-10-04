@@ -309,6 +309,10 @@ std::vector<CraftingRecipe> buildRecipes() {
                              {ItemId::WHITE_BED, 1, 0}, false));
     recipes.push_back(shaped(3, 1, {ItemId::WHEAT, ItemId::WHEAT, ItemId::WHEAT},
                              {ItemId::BREAD, 1, 0}, false));
+    recipes.push_back(shaped(3, 3, {E, E, ItemId::STICK,
+                                    E, ItemId::STICK, ItemId::STRING,
+                                    ItemId::STICK, E, ItemId::STRING},
+                             {ItemId::FISHING_ROD, 1, 0}));
     recipes.push_back(shaped(3, 3, {ItemId::STRING, ItemId::STICK, E,
                                     ItemId::STRING, E, ItemId::STICK,
                                     ItemId::STRING, ItemId::STICK, E},
@@ -527,7 +531,7 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
-const std::array<SmeltingRecipe, 17> SMELTING = {{
+const std::array<SmeltingRecipe, 19> SMELTING = {{
     {ItemId::CLOUDBERRY, {ItemId::ROASTED_CLOUDBERRY, 1, 0}, 200},
     {ItemId::GLOWSHROOM, {ItemId::ROASTED_GLOWSHROOM, 1, 0}, 200},
     {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
@@ -539,6 +543,8 @@ const std::array<SmeltingRecipe, 17> SMELTING = {{
     {ItemId::IRON_ORE, {ItemId::IRON_INGOT, 1, 0}, 200},
     {ItemId::RAW_GOLD, {ItemId::GOLD_INGOT, 1, 0}, 200},
     {ItemId::GOLD_ORE, {ItemId::GOLD_INGOT, 1, 0}, 200},
+    {ItemId::RAW_COD, {ItemId::COOKED_COD, 1, 0}, 200},
+    {ItemId::RAW_SALMON, {ItemId::COOKED_SALMON, 1, 0}, 200},
     {ItemId::RAW_BEEF, {ItemId::STEAK, 1, 0}, 200},
     {ItemId::RAW_CHICKEN, {ItemId::COOKED_CHICKEN, 1, 0}, 200},
     {ItemId::RAW_PORKCHOP, {ItemId::COOKED_PORKCHOP, 1, 0}, 200},

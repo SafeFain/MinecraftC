@@ -576,3 +576,17 @@ void ParticleSystem::buildRenderData(
                           particle.rotation});
     }
 }
+
+void ParticleSystem::emitFishingSplash(const glm::dvec3& position, bool bite) {
+    const int count = bite ? 14 : 8;
+    for (int i = 0; i < count && m_particles.size() < MAX_PARTICLES; ++i) {
+        const float angle = static_cast<float>(i) / count * 6.2831853f;
+        Particle p;
+        p.kind = ParticleKind::RainSplash;
+        p.position = position + glm::dvec3(std::cos(angle) * .16, .08, std::sin(angle) * .16);
+        p.velocity = glm::vec3(std::cos(angle) * .5f, .2f, std::sin(angle) * .5f);
+        p.lifetime = .45f;
+        p.size = bite ? .14f : .09f;
+        m_particles.push_back(p);
+    }
+}

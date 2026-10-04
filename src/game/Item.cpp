@@ -127,6 +127,15 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         }
     }
 
+    set(ItemId::FISHING_ROD, {"Fishing Rod", ItemKind::Tool, 1, 64, ToolKind::FishingRod});
+    set(ItemId::RAW_COD, {"Raw Cod", ItemKind::Food, 64, 0, ToolKind::None,
+                         ToolTier::None, 0, 0, 2, .4f});
+    set(ItemId::RAW_SALMON, {"Raw Salmon", ItemKind::Food, 64, 0, ToolKind::None,
+                            ToolTier::None, 0, 0, 2, .4f});
+    set(ItemId::COOKED_COD, {"Cooked Cod", ItemKind::Food, 64, 0, ToolKind::None,
+                            ToolTier::None, 0, 0, 5, 6.0f});
+    set(ItemId::COOKED_SALMON, {"Cooked Salmon", ItemKind::Food, 64, 0, ToolKind::None,
+                               ToolTier::None, 0, 0, 6, 9.6f});
     set(ItemId::BOW, {"Bow", ItemKind::Weapon, 1, 384, ToolKind::Bow});
     set(ItemId::SHIELD, {"Shield", ItemKind::Weapon, 1, 336, ToolKind::Shield});
 
@@ -672,6 +681,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::DIAMOND_SHOVEL: case ItemId::DIAMOND_HOE:
         case ItemId::FLINT_AND_STEEL:
         case ItemId::STARSTEP_SCEPTER:
+        case ItemId::FISHING_ROD:
             return CreativeItemCategory::Tools;
 
         // ── Combat ──────────────────────────────────────────────────────
@@ -694,6 +704,8 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::RAW_PORKCHOP: case ItemId::COOKED_PORKCHOP:
         case ItemId::RAW_CHICKEN: case ItemId::COOKED_CHICKEN:
         case ItemId::MUTTON: case ItemId::COOKED_MUTTON:
+        case ItemId::RAW_COD: case ItemId::RAW_SALMON:
+        case ItemId::COOKED_COD: case ItemId::COOKED_SALMON:
         case ItemId::ROTTEN_FLESH:
         case ItemId::CLOUDBERRY:
         case ItemId::ROASTED_CLOUDBERRY:

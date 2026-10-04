@@ -310,6 +310,11 @@ enum class ItemId : uint16_t {
     ROASTED_CLOUDBERRY,
     CLOUDBERRY_BREAD,
     ROASTED_GLOWSHROOM,
+    FISHING_ROD,
+    RAW_COD,
+    RAW_SALMON,
+    COOKED_COD,
+    COOKED_SALMON,
     COUNT,
     POPPY = FLOWER
 };
@@ -359,7 +364,8 @@ enum class ToolKind : uint8_t {
     Hoe,
     Sword,
     Bow,
-    Shield
+    Shield,
+    FishingRod
 };
 
 enum class ToolTier : uint8_t {

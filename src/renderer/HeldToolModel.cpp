@@ -98,7 +98,14 @@ HeldToolModel buildHeldToolModel(ItemId id, ToolKind tool, ToolTier tier) {
         range(m,HeldToolPart::Arrow,start);
         return m;
     }
-    if(tool==ToolKind::Shield) {
+    if(tool==ToolKind::FishingRod) {
+        add({0,.05f,0},{.10f,.40f,.10f},Handle);
+        add({0,.52f,0},{.055f,.65f,.055f},Wood);
+        add({0,1.02f,0},{.035f,.40f,.035f},Wood);
+        add({0,.03f,.09f},{.18f,.16f,.08f},Iron);
+        add({.13f,.03f,.09f},{.10f,.025f,.025f},Dark);
+        add({0,1.23f,0},{.07f,.04f,.07f},Iron);
+    } else if(tool==ToolKind::Shield) {
         add({0,.12f,0},{.68f,.84f,.12f},Wood);
         add({0,.56f,0},{.76f,.08f,.16f},Iron);
         add({0,-.32f,0},{.76f,.08f,.16f},Iron);
@@ -177,6 +184,8 @@ glm::mat4 heldToolGripTransform(ItemId, ToolKind tool, bool firstPerson) {
     glm::mat4 result(1);
     if(!firstPerson)
         result=glm::rotate(result,glm::radians(-120.0f),glm::vec3(1,0,0));
+    if(!firstPerson && tool==ToolKind::FishingRod)
+        result=glm::rotate(glm::mat4(1),glm::radians(-40.0f),glm::vec3(1,0,0));
     if(tool==ToolKind::Shield)result=glm::mat4(1);
     return result;
 }

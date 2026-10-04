@@ -56,7 +56,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 281-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 286-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -211,7 +211,7 @@ changes Heaven and block encoding while retaining Overworld generation output.
   Star Crystal Lamp, Sky Fern, Dawn Bell, Moonflower, Glimmer Reed,
   Cloudberry Bush and Hanging Cloud Vine.
 - Five appended items: Star Crystal Shard, Cloudberry, Roasted Cloudberry,
-  Cloudberry Bread and Roasted Glowshroom. All 281 items have icons and names
+  Cloudberry Bread and Roasted Glowshroom. All 286 items have icons and names
   in all ten languages; 268 non-air block IDs retain existing numeric values.
 - Existing eight biomes/five layers gain clustered vegetation, distinct soils,
   ore pockets, rock pillars, sealed one-block-deep pools and supported underside
@@ -235,3 +235,38 @@ changes Heaven and block encoding while retaining Overworld generation output.
   Old metadata remains readable/listed; worlds outside global generation v17
   remain incompatible and are never migrated or rewritten by refused loads.
   Seed layout, Overworld generation output and application VERSION are unchanged.
+
+## Classic fishing
+
+- Craft a Fishing Rod at a workbench with three sticks on a diagonal and two
+  strings down the right edge; the mirrored recipe also works. Rods stack to one
+  and have 64 durability. They appear in the Creative Tools catalog; fish appear
+  in Food. Commands use `fishing_rod`, `raw_cod`, `raw_salmon`, `cooked_cod`, and
+  `cooked_salmon`.
+- Press the bound Use action (mouse, keyboard, controller or touch) to cast;
+  press it again to reel. Watch the approaching splashes and red/white bobber.
+  When it sinks, the localized bite prompt, sound and optional controller rumble
+  signal a one-second catch window. Missing the window restarts the wait.
+- Base waiting time is 5–30 seconds, followed by 1–2 seconds of approaching fish.
+  Exposed rain makes waiting progress 25% faster; covered water halves progress.
+  Natural and artificial water works in both dimensions, including flowing water.
+  Lava does not. Each player has one bobber, limited to 32 blocks.
+- Open water yields fish/junk/treasure at 85%/10%/5%. Other pools yield 90%/10%/0%.
+  Treasure requires a loaded 5×5 source-water surface, another source-water layer
+  underneath, and two layers of air above. Fish are 60% cod and 40% salmon.
+  Junk is equally weighted sticks, string, bones and rotten flesh; treasure is
+  equally weighted unenchanted full-durability bows, rods and emeralds.
+- Each catch produces one normal item drop pulled toward the player. A full
+  backpack leaves the item in the world. Successful fishing costs one rod
+  durability; reeling a stuck bobber costs two; empty reels cost none. Creative
+  rods do not wear out.
+- Raw cod/salmon restore 2 hunger and 0.4 saturation. A normal 200-tick furnace
+  recipe cooks them; cooked cod restores 5/6 and cooked salmon 6/9.6.
+- First and third person show the rod, float and curved line attached to its tip,
+  including cast/reel swing. Bite effects work with enhancements disabled and
+  audio initialization failure does not affect fishing.
+- Pausing freezes fishing. Opening inventory follows normal world ticking.
+  Switching slots, dropping/losing the rod, sleeping, death, Spectator mode,
+  dimension changes, world exit, unloaded water and excess distance cancel it.
+  Rods and fish persist using save v14; bobbers and timers are transient. World
+  generation remains v17. No enchantments, experience, bait or entity hooking.

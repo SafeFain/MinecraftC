@@ -100,6 +100,8 @@ public:
 
     // ── Block queries ────────────────────────────────────────────────
     BlockId getBlock(int worldX, int worldY, int worldZ) const;
+    // Read-only simulation query: unknown/retired chunks are not air and are never allocated.
+    std::optional<BlockId> getLoadedBlock(int worldX, int worldY, int worldZ) const;
     LightSample getLight(int worldX, int worldY, int worldZ) const;
     SmoothLightSample sampleLight(const glm::dvec3& position) const;
     uint8_t getBlockLight(int worldX, int worldY, int worldZ) const;

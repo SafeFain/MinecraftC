@@ -568,5 +568,11 @@
   "item.278": "Wolkenbeere",
   "item.279": "Geröstete Wolkenbeere",
   "item.280": "Wolkenbeerenbrot",
-  "item.281": "Gerösteter Leuchtpilz"
+  "item.281": "Gerösteter Leuchtpilz",
+  "item.282": "Angel",
+  "item.283": "Roher Kabeljau",
+  "item.284": "Roher Lachs",
+  "item.285": "Gebratener Kabeljau",
+  "item.286": "Gebratener Lachs",
+  "message.fishing_bite": "Es beißt! Benutzen zum Einholen!"
 }

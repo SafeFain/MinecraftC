@@ -79,3 +79,11 @@ Original programmatic cuboid models and a deterministic pixel palette atlas,
 implemented in `src/renderer/HeldToolModel.cpp`; no imported models or textures.
 Licensed under the repository GPL-3.0-only license. Existing inventory icons
 and player-skin provenance remain as recorded above.
+
+## Classic fishing
+
+Five new 16×16 inventory sprites (fishing rod, raw/cooked cod and salmon) are
+original deterministic procedural artwork generated from `item_icons.json`
+using `tools/texture_generator.py`, v5, seed 213785369, under CC0-1.0. The runtime
+rod model, bobber, fish line and procedural fishing sounds are original
+MinecraftC GPL-3.0-only work. No external artwork or audio was imported.

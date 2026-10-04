@@ -20,6 +20,34 @@
 #include <thread>
 
 struct GameSessionTestAccess {
+    static void fishingPond(GameSession& session, GameMode mode) {
+        session.world.update({8.5,65,1.5},1);
+        Chunk* chunk=session.world.getChunk(0,0);
+        chunk->generated=true;
+        chunk->lifecycle=Chunk::LifecycleState::Renderable;
+        for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
+            chunk->setBlock(x,62,z,BlockId::STONE);
+            chunk->setBlock(x,63,z,BlockId::WATER);
+            chunk->setBlock(x,64,z,BlockId::WATER);
+        }
+        session.player.setPosition({8.5,65,1.5});
+        session.player.configureRules(mode,Difficulty::Peaceful);
+        session.player.inventory().slot(0)={ItemId::FISHING_ROD,1,63};
+        session.player.setSelectedSlot(0);
+        session.fishing=FishingSystem([]{return 0.0f;});
+    }
+    static void tickFishing(GameSession& session,float dt) {
+        session.validateFishingRod();
+        session.fishing.update(dt,session.player.getEyePosition(),session.fishingEnvironment());
+        session.collectFishingEvents();
+    }
+    static void retireFishingPond(GameSession& session) {
+        session.world.getChunk(0,0)->lifecycle=Chunk::LifecycleState::Warm;
+    }
+    static void tickFishingDrops(GameSession& session,float dt) {
+        session.entities.update(session.player,dt,true,true,true,true,false,false,0);
+    }
+    static void die(GameSession& session) { session.beginPlayerDeath(); }
     static void processCompletedGenerations(GameSession& session) {
         session.world.processCompletedGenerations();
     }
@@ -118,6 +146,64 @@ int main(int argc, char** argv) {
     std::filesystem::create_directories(root);
     Localization localization;
     RuntimeClock clock;
+
+    {
+        const int distance=Config::RENDER_DISTANCE;
+        Config::RENDER_DISTANCE=0;
+        GameSession fishingSession(root/"fishing");
+        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        for(size_t i=1;i<InventoryModel::STORAGE_SIZE;++i)
+            fishingSession.inventory().slot(i)={ItemId::STONE,64,0};
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        require(fishingSession.fishingState().active(),"Use casts rod through session");
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Release);
+        require(fishingSession.fishingState().active(),"Use release does not reel");
+        for(int i=0;i<1000 && fishingSession.fishingState().phase!=FishingPhase::Bite;++i)
+            GameSessionTestAccess::tickFishing(fishingSession,.01f);
+        require(fishingSession.fishingState().phase==FishingPhase::Bite,"session pond reaches bite");
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        require(!fishingSession.fishingState().active() && fishingSession.inventory().slot(0).empty(),
+            "successful catch breaks worn survival rod");
+        const auto& drops=fishingSession.entityState().entities();
+        require(drops.size()==1 && drops.front().item.id==ItemId::RAW_COD &&
+            fishingSession.inventory().count(ItemId::RAW_COD)==0,
+            "full inventory keeps catch as normal world drop");
+        for(int i=0;i<150;++i)GameSessionTestAccess::tickFishingDrops(fishingSession,.01f);
+        require(fishingSession.inventory().count(ItemId::RAW_COD)==1,
+            "reeled catch follows ordinary entity physics and inventory pickup");
+        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Creative);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        for(int i=0;i<1000 && fishingSession.fishingState().phase!=FishingPhase::Bite;++i)
+            GameSessionTestAccess::tickFishing(fishingSession,.01f);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        require(fishingSession.inventory().slot(0).damage==63,"creative reel has no rod wear");
+        GameSessionTestAccess::tickFishing(fishingSession,.3f);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        fishingSession.setSelectedSlot(1);
+        require(!fishingSession.fishingState().active(),"hotbar switch cancels fishing immediately");
+        fishingSession.setSelectedSlot(0);
+        GameSessionTestAccess::tickFishing(fishingSession,.3f);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        fishingSession.dropSelectedItem(0,true);
+        require(!fishingSession.fishingState().active(),"dropping rod cancels fishing immediately");
+        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        GameSessionTestAccess::retireFishingPond(fishingSession);
+        GameSessionTestAccess::tickFishing(fishingSession,.01f);
+        require(!fishingSession.fishingState().active() &&
+                !fishingSession.worldState().getLoadedBlock(8,64,8).has_value(),
+            "retired warm chunks cannot keep fishing active");
+        require(!fishingSession.worldState().getLoadedBlock(-1,64,-1).has_value() &&
+                !fishingSession.worldState().getLoadedBlock(8,320,8).has_value(),
+            "loaded-block query distinguishes missing negative chunks and build limits");
+        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        GameSessionTestAccess::die(fishingSession);
+        require(!fishingSession.fishingState().active(),"death removes bobber");
+        fishingSession.leaveWorld();
+        require(!fishingSession.fishingState().active(),"leaving world clears transient fishing");
+        Config::RENDER_DISTANCE=distance;
+    }
 
     {
         const int oldRenderDistance = Config::RENDER_DISTANCE;

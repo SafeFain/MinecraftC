@@ -5,6 +5,11 @@
 #include <glm/glm.hpp>
 
 namespace Config {
+    constexpr float FISHING_CAST_SPEED = 12.0f;
+    constexpr float FISHING_GRAVITY = 9.8f;
+    constexpr float FISHING_MAX_DISTANCE = 32.0f;
+    constexpr float FISHING_BITE_SECONDS = 1.0f;
+
 
 #ifndef MINECRAFTC_VERSION_STRING
 #  define MINECRAFTC_VERSION_STRING "Alpha-0.0.0"

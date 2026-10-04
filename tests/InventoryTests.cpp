@@ -132,7 +132,7 @@ int main() {
             creativeItems[207] == ItemId::BONE_MEAL &&
             creativeItems[231] == ItemId::BEACH_GRASS &&
             creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
-            creativeItems.back() == ItemId::ROASTED_GLOWSHROOM,
+            creativeItems.back() == ItemId::COOKED_SALMON,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -159,16 +159,22 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Functional)] == 14 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Tools)] == 22 &&
+                CreativeItemCategory::Tools)] == 23 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Combat)] == 24 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Food)] == 14 &&
+                CreativeItemCategory::Food)] == 18 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Materials)] == 25 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::SpawnEggs)] == 10,
             "creative category sizes do not match the tab assignment");
+    require(creativeInventoryCategory(ItemId::FISHING_ROD)==CreativeItemCategory::Tools &&
+            creativeInventoryCategory(ItemId::RAW_COD)==CreativeItemCategory::Food &&
+            creativeInventoryCategory(ItemId::RAW_SALMON)==CreativeItemCategory::Food &&
+            creativeInventoryCategory(ItemId::COOKED_COD)==CreativeItemCategory::Food &&
+            creativeInventoryCategory(ItemId::COOKED_SALMON)==CreativeItemCategory::Food,
+            "fishing additions belong to tools and food tabs");
     require(creativeInventoryCategory(ItemId::STONE) ==
                 CreativeItemCategory::BuildingBlocks &&
             creativeInventoryCategory(ItemId::TORCH) ==

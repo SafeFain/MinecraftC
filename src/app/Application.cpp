@@ -234,6 +234,15 @@ private:
             });
         m_sessionFeedback.setRainVolume =
             [this](float volume) { m_audio.setRainVolume(volume); };
+        m_sessionFeedback.playFishing = [this](FishingEventKind kind) {
+            switch (kind) {
+                case FishingEventKind::Cast: m_audio.playFishing(FishingSound::Cast); break;
+                case FishingEventKind::Splash: m_audio.playFishing(FishingSound::Splash); break;
+                case FishingEventKind::Bite: m_audio.playFishing(FishingSound::Bite); break;
+                case FishingEventKind::Reel: m_audio.playFishing(FishingSound::Reel); break;
+                case FishingEventKind::Approach: break;
+            }
+        };
         m_sessionFeedback.playExplosion = [this](float pan, float gain) {
             m_audio.playExplosion(pan, gain);
         };

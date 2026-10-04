@@ -454,6 +454,10 @@ int main() {
                 model.mesh.vertices[1].position.y>0,"tool grip no longer inside handle");
         }
     }
+    const glm::vec3 fishingTip=glm::vec3(heldToolGripTransform(
+        ItemId::FISHING_ROD,ToolKind::FishingRod,false)*glm::vec4(0,1.25f,0,1));
+    require(fishingTip.y>.8f && fishingTip.z<-.5f,"third-person rod points up and forward");
+    checkTool(ItemId::FISHING_ROD,ToolKind::FishingRod,ToolTier::None);
     checkTool(ItemId::SHIELD,ToolKind::Shield,ToolTier::None);
     checkTool(ItemId::FLINT_AND_STEEL,ToolKind::None,ToolTier::None);
     checkTool(ItemId::STARSTEP_SCEPTER,ToolKind::None,ToolTier::None);

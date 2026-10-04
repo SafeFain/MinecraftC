@@ -688,6 +688,10 @@ void ApplicationInputRouter::handleTouch(const TouchEvent& event) {
 void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action) {
     if (m_ui.activeMenu) return;
     const int logicalButton = use ? MouseButton::Right : MouseButton::Left;
+    if (use && m_session.playerState().activeItem().id == ItemId::FISHING_ROD) {
+        m_session.handleMouseButton(logicalButton,action);
+        return;
+    }
     if (action == ButtonAction::Press && use && !m_session.playerState().isSpectator()) {
         if (const auto villager = m_session.useVillagerRay(3.0f)) {
             if (m_ui.tradeScreen.open(m_session, *villager)) {

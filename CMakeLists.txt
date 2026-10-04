@@ -912,6 +912,15 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_save_roundtrip_and_corruption COMMAND save_store_tests)
 
+    add_executable(fishing_tests tests/FishingTests.cpp src/game/FishingSystem.cpp
+        src/game/Item.cpp src/game/InventoryModel.cpp src/game/SurvivalRules.cpp src/world/Block.cpp)
+    target_include_directories(fishing_tests PRIVATE src)
+    target_link_libraries(fishing_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(fishing_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME classic_fishing_simulation_and_rules COMMAND fishing_tests)
+
     add_executable(survival_rules_tests
         tests/SurvivalRulesTests.cpp
         src/game/InventoryModel.cpp
@@ -1123,6 +1132,7 @@ if(BUILD_TESTING)
     add_executable(session_flow_tests
         tests/SessionFlowTests.cpp
         src/app/GameSession.cpp
+        src/game/FishingSystem.cpp
         src/core/Input.cpp
         src/core/InputCodes.cpp
         src/debug/Log.cpp
@@ -1220,6 +1230,7 @@ if(BUILD_TESTING)
         src/app/GameFlowController.cpp
         src/app/GameScenePresenter.cpp
         src/app/GameSession.cpp
+        src/game/FishingSystem.cpp
         src/app/GameUiController.cpp
         src/core/Input.cpp
         src/core/InputCodes.cpp
