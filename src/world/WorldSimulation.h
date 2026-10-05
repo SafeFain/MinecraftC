@@ -33,6 +33,7 @@ public:
     // Drop simulation state (seed reset / teardown).
     void clear() {
         m_fireAges.clear();
+        m_cropScanCursor=0;
         m_tntIgnitions.clear();
     }
 
@@ -49,6 +50,7 @@ private:
     bool growSapling(const glm::ivec3& p, BlockId sapling);
     bool hasWaterForFarmland(const glm::ivec3& position, bool raining) const;
 
+    size_t m_cropScanCursor=0;
     glm::dvec3 m_playerPosition{0.0};
     World& m_world;
     WorldPersistence& m_persistence;

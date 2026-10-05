@@ -361,6 +361,14 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
         (entity.villager.professionLocked ? 4 : 0)));
     append(payload, entity.villager.lastRestockDay);
     append(payload, entity.villager.restocksToday);
+    for(const auto& stack:entity.villager.food)appendStack(payload,stack);
+    append(payload,entity.villager.growthSeconds);
+    append(payload,entity.villager.breedingCooldown);
+    append(payload,entity.villager.defenseCooldown);
+    append(payload,entity.villager.reputation);
+    for(auto value:entity.villager.demand)append(payload,value);
+    append(payload,entity.villager.reputationDay);
+    append(payload,entity.villager.tradesToday);
 }
 
 WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
@@ -393,12 +401,31 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
         entity.villager.lastRestockDay = reader.read<uint32_t>();
         entity.villager.restocksToday = reader.read<uint8_t>();
         if (entity.villager.profession >= VillagerProfession::Count ||
+            (version<17 && entity.villager.profession>=VillagerProfession::Fisherman) ||
             entity.villager.level < 1 || entity.villager.level > 5)
             throw std::runtime_error("Save contains invalid villager data");
     }
-    // EntityType values are serialized as uint8_t; ZombieVillager is the highest
-    // valid value, so reject anything beyond it.
-    if (entity.type > static_cast<uint8_t>(EntityType::ZombieVillager))
+    if(version>=17) {
+        for(auto& stack:entity.villager.food)stack=readStack(reader);
+        entity.villager.growthSeconds=reader.read<float>();
+        entity.villager.breedingCooldown=reader.read<float>();
+        entity.villager.defenseCooldown=reader.read<float>();
+        entity.villager.reputation=reader.read<int32_t>();
+        for(auto& value:entity.villager.demand)value=reader.read<uint8_t>();
+        entity.villager.reputationDay=reader.read<uint32_t>();
+        entity.villager.tradesToday=reader.read<uint8_t>();
+        const auto timerValid=[](float v,float maximum){return std::isfinite(v)&&v>=0&&v<=maximum;};
+        const auto& v=entity.villager;
+        if(!timerValid(v.growthSeconds,1200) || !timerValid(v.breedingCooldown,300) ||
+           !timerValid(v.defenseCooldown,600) || v.reputation < -100 || v.reputation>100 ||
+           v.tradesToday>5 || std::any_of(v.demand.begin(),v.demand.end(),[](uint8_t d){return d>25;}))
+            throw std::runtime_error("Save contains invalid village lifecycle data");
+        for(const auto& stack:v.food)if(!stack.empty() && stack.id!=ItemId::BREAD &&
+            stack.id!=ItemId::WHEAT && stack.id!=ItemId::WHEAT_SEEDS)
+            throw std::runtime_error("Save contains invalid villager food");
+    }
+    // Appended entity types are legal only in the versions that introduced them.
+    if (entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager))
         throw std::runtime_error("Save contains invalid entity type");
     return entity;
 }

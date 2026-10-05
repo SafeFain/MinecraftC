@@ -28,6 +28,15 @@
       ],
       "source": "entity_skins/cow.png"
     },
+    "iron_golem": {
+      "features": [
+        "iron_plate",
+        "vine",
+        "red_eyes",
+        "long_arms"
+      ],
+      "source": "entity_skins/iron_golem.png"
+    },
     "pig": {
       "features": [
         "snout",

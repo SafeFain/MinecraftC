@@ -162,3 +162,10 @@ The 2026-10-04 cyan-white stardew beads, hanging stems and updated vine item
 icon are original deterministic MinecraftC procedural art under CC0-1.0.
 Generated with texture generator v5, seed 213785369; no external assets were
 imported. See `ASSET_SOURCES.md` for the reproduction command.
+
+# Village lifecycle v19 assets
+
+Barrel, Lectern, Cartography Table, Brewing Stand, Smoker and Stonecutter tiles/icons,
+and the iron golem plates/vines/eyes skin and animated model, are original
+MinecraftC deterministic procedural assets. They use no downloaded game assets.
+Their source recipes, tools, seed and provenance are recorded in `ASSET_SOURCES.md`.

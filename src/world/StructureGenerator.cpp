@@ -2,10 +2,14 @@
 
 #include "Config.h"
 #include "world/HeightPipeline.h"
+#include "world/VillageLayout.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
+#include <tuple>
+#include <unordered_map>
 
 namespace {
 
@@ -235,101 +239,99 @@ void buildFarm(const StructureGenerator::StructureWriter& write, int cx, int cz,
     }
 }
 
-void buildCactusPen(const StructureGenerator::StructureWriter& write, int cx,
-                    int cz, int base, uint64_t variant) {
-    fillBox(write, cx - 3, base, cz - 3, cx + 3, base, cz + 3, BlockId::SAND);
-    fillRing(write, cx - 3, base, cz - 3, cx + 3, cz + 3, BlockId::RED_SAND);
-    for (int i = 0; i < 4; ++i) {
-        const uint64_t h = WorldGenContext::hashPosition(variant, cx, i, cz);
-        const int dx = static_cast<int>((h >> 8) % 5) - 2;
-        const int dz = static_cast<int>((h >> 24) % 5) - 2;
-        const int height = 1 + static_cast<int>((h >> 40) % 3);
-        for (int dy = 1; dy <= height; ++dy)
-            write(cx + dx, base + dy, cz + dz, BlockId::CACTUS_BLOCK);
-    }
-}
-
 void buildVillage(const StructurePlacement& placement,
                   const StructureGenerator::StructureWriter& write,
-                  const StructureGenerator::SurfaceSampler& surfaceSampler) {
-    const bool desert = placement.type == StructureType::DesertVillage;
-    const VillageStyle& style = desert ? kDesertVillage : kPlainsVillage;
-    const int cx = (placement.minX + placement.maxX) / 2;
-    const int cz = (placement.minZ + placement.maxZ) / 2;
-    const int base = placement.baseY;
-    const uint64_t variant = placement.variant;
-    const auto hash = [&](int x, int y, int z) {
-        return WorldGenContext::hashPosition(variant, x, y, z);
-    };
-
-    // Central plaza with the village well and torch posts.
-    fillBox(write, cx - 2, base, cz - 2, cx + 2, base, cz + 2, style.path);
-    buildWell(write, cx, cz, base, style.foundation);
-    for (const int dx : {-3, 3}) {
-        for (const int dz : {-3, 3}) {
-            write(cx + dx, base + 1, cz + dz, style.pillar);
-            write(cx + dx, base + 2, cz + dz, style.pillar);
-            write(cx + dx, base + 3, cz + dz, BlockId::TORCH);
+                  const StructureGenerator::SurfaceSampler& surface) {
+    VillageStyle style=kPlainsVillage;
+    if(placement.type==StructureType::DesertVillage)style=kDesertVillage;
+    else if(placement.type==StructureType::TaigaVillage)
+        style={BlockId::SPRUCE_WOOD,BlockId::SPRUCE_WOOD,BlockId::PLANKS,
+               BlockId::PLANKS,BlockId::COARSE_DIRT,BlockId::COBBLESTONE};
+    else if(placement.type==StructureType::SnowVillage)
+        style={BlockId::WHITE_TERRACOTTA,BlockId::SPRUCE_WOOD,BlockId::PLANKS,
+               BlockId::PLANKS,BlockId::COBBLESTONE,BlockId::COBBLESTONE};
+    else if(placement.type==StructureType::SavannaVillage)
+        style={BlockId::OCHRE_TERRACOTTA,BlockId::ACACIA_WOOD,BlockId::PLANKS,
+               BlockId::PLANKS,BlockId::COARSE_DIRT,BlockId::COBBLESTONE};
+    const auto layout=VillageLayout::create(placement,surface);
+    for(const auto& p:layout.roads) {
+        const int natural=surface?surface(p.x,p.z):p.y;
+        for(int y=natural;y<=p.y;++y)write(p.x,y,p.z,style.foundation);
+        write(p.x,p.y,p.z,style.path);
+        for(int y=1;y<=3;++y)write(p.x,p.y+y,p.z,BlockId::AIR);
+    }
+    for(size_t i=0;i<layout.buildings.size();++i) {
+        const auto& b=layout.buildings[i];
+        const StructureGenerator::StructureWriter houseWrite=[&](int x,int y,int z,BlockId id) {
+            const auto point=b.point(x-b.x,y,z-b.z);
+            ArchitecturalBlockState state;
+            if(b.rotation && decodeArchitecturalBlock(id,state) && state.shape==RenderShape::Stair) {
+                const auto offset=bedDirectionOffset(state.direction);
+                const auto direction=offset.z<0?BedDirection::East:offset.x>0?BedDirection::South:
+                    offset.z>0?BedDirection::West:BedDirection::North;
+                id=stairBlock(state.material,state.half,direction);
+            } else if(b.rotation && isBed(id)) {
+                BedPart part;BedDirection direction;
+                decodeBed(id,part,direction);
+                id=bedBlock(part,BedDirection::East);
+            }
+            write(point.x,point.y,point.z,id);
+        };
+        const StructureGenerator::SurfaceSampler houseSurface=surface?
+            StructureGenerator::SurfaceSampler([&](int x,int z){const auto point=b.point(x-b.x,0,z-b.z);return surface(point.x,point.z);}):
+            StructureGenerator::SurfaceSampler{};
+        // Square rooms can turn without changing their reserved lot. Beds,
+        // population, foundations and the door approach share the same turn.
+        buildHouse(houseWrite,b.x,b.z,b.base,(WorldGenContext::hashPosition(placement.variant,b.x,b.base,b.z) & ~((1ULL<<5)|(1ULL<<9))) |
+            (1ULL<<5)|(1ULL<<9),0,1,style,houseSurface);
+        houseWrite(b.x-1,b.base+1,b.z,BlockId::AIR);
+        houseWrite(b.x-1,b.base+1,b.z-1,BlockId::AIR);
+        houseWrite(b.x+1,b.base+1,b.z,BlockId::AIR);
+        for(const auto& bed:b.beds) {
+            write(bed.x,bed.y,bed.z,bedBlock(BedPart::Foot,b.bedDirection()));
+            const auto head=bed+bedDirectionOffset(b.bedDirection());
+            write(head.x,head.y,head.z,bedBlock(BedPart::Head,b.bedDirection()));
         }
+        houseWrite(b.x,b.base+1,b.z-2,b.workstation);
+        houseWrite(b.x,b.base+3,b.z-2,BlockId::TORCH);
+        if(b.workstation==BlockId::SMITHING_TABLE || b.workstation==BlockId::GRINDSTONE ||
+           b.workstation==BlockId::SMOKER || b.workstation==BlockId::BLAST_FURNACE)
+            houseWrite(b.x+1,b.base+1,b.z-2,BlockId::FURNACE);
+        if(b.workstation==BlockId::LOOM)
+            houseWrite(b.x,b.base,b.z-1,BlockId::BLUE_WOOL);
+        if(b.workstation==BlockId::CARTOGRAPHY_TABLE)
+            houseWrite(b.x,b.base,b.z-1,BlockId::GREEN_WOOL);
+        drawRoad(houseWrite,b.x,b.z+4,b.x,b.z+5,b.base,style.path,
+                 ArchitecturalMaterial::Cobblestone,houseSurface);
     }
-
-    // Houses ring the plaza; roads connect each door back to the well.
-    constexpr std::array<std::pair<int, int>, 8> kHouseOffsets{{
-        {-17, -10}, {17, -10}, {-11, 17}, {11, 17},
-        {-18, 5}, {18, 5}, {0, -18}, {0, 18},
-    }};
-    const int houseCount = 5 + static_cast<int>(hash(cx, 1, cz) % 3);
-    for (int i = 0; i < 8 && i < houseCount; ++i) {
-        const auto& offset = kHouseOffsets[static_cast<size_t>(i)];
-        // Adobe houses have roof terraces rather than deep eaves, so their
-        // residential ring can sit slightly closer to the plaza and remain
-        // within the advertised 41x41 desert-village reservation.
-        const int hx = cx + (desert ? offset.first * 8 / 9 : offset.first);
-        const int hz = cz + (desert ? offset.second * 8 / 9 : offset.second);
-        int doorDx = cx - hx;
-        int doorDz = cz - hz;
-        if (std::abs(doorDx) >= std::abs(doorDz)) {
-            doorDx = doorDx > 0 ? 1 : -1;
-            doorDz = 0;
-        } else {
-            doorDz = doorDz > 0 ? 1 : -1;
-            doorDx = 0;
+    const auto c=layout.center;
+    buildWell(write,c.x,c.z,c.y,style.foundation);
+    for(const auto& farm:layout.farms) {
+        for(int dz=-3;dz<=3;++dz)for(int dx=-3;dx<=3;++dx) {
+            const int natural=surface?surface(farm.x+dx,farm.z+dz):farm.y;
+            for(int y=natural;y<=farm.y;++y)write(farm.x+dx,y,farm.z+dz,style.foundation);
+            for(int y=1;y<=3;++y)write(farm.x+dx,farm.y+y,farm.z+dz,BlockId::AIR);
         }
-        drawRoad(write, cx, cz, hx, hz, base, style.path,
-                 desert ? ArchitecturalMaterial::Terracotta
-                        : ArchitecturalMaterial::Cobblestone,
-                 surfaceSampler);
-        const int houseBase=surfaceSampler
-            ? std::clamp(surfaceSampler(hx,hz),base-6,base+6) : base;
-        buildHouse(write, hx, hz, houseBase, hash(cx, 2, hz), doorDx, doorDz,
-                   style, surfaceSampler);
+        buildFarm(write,farm.x,farm.z,farm.y,placement.variant);
+        if(placement.type==StructureType::SnowVillage) {
+            for(int dx=-4;dx<=4;++dx)for(int dz=-4;dz<=4;++dz)
+                write(farm.x+dx,farm.y+4,farm.z+dz,BlockId::GLASS);
+        }
+        write(farm.x+4,farm.y+1,farm.z,BlockId::TORCH);
     }
-
-    // One corner holds a farm (plains) or a cactus pen (desert).
-    const uint64_t corner = hash(cx, 3, cz);
-    if (desert)
-        buildCactusPen(write, cx - 17, cz + 17,
-            surfaceSampler?surfaceSampler(cx-17,cz+17):base, corner);
-    else
-        buildFarm(write, cx - 17, cz + 17,
-            surfaceSampler?surfaceSampler(cx-17,cz+17):base, corner);
-
-    // Deterministic market canopy / public gathering lot opposite the farm.
-    const int marketX = cx + 16;
-    const int marketZ = cz + 16;
-    fillBox(write, marketX-4, base, marketZ-3,
-            marketX+4, base, marketZ+3, style.path);
-    for (const int dx : {-4, 4}) for (const int dz : {-3, 3}) {
-        for (int y=1; y<=3; ++y)
-            write(marketX+dx, base+y, marketZ+dz, style.pillar);
+    // Public market and lit gathering plaza use space between the main roads.
+    for(int dx=-4;dx<=4;++dx)for(int dz=-3;dz<=3;++dz)
+        if(std::abs(dx)>1 || std::abs(dz)>1)write(c.x+dx,c.y,c.z+dz,style.path);
+    for(int dx:{-4,4}) {
+        write(c.x+dx,c.y+1,c.z,style.pillar);
+        write(c.x+dx,c.y+2,c.z,BlockId::TORCH);
     }
-    const ArchitecturalMaterial canopy = desert
-        ? ArchitecturalMaterial::Terracotta : ArchitecturalMaterial::Planks;
-    fillBox(write, marketX-4, base+4, marketZ-3,
-            marketX+4, base+4, marketZ+3,
-            slabBlock(canopy, BlockHalf::Bottom));
-    write(marketX-1, base+1, marketZ, BlockId::CHEST);
-    write(marketX+1, base+1, marketZ, BlockId::CRAFTING_TABLE);
+    for(int dx:{-5,5})for(int dz:{-3,3})
+        for(int y=1;y<=3;++y)write(c.x+dx,c.y+y,c.z+dz,style.pillar);
+    fillBox(write,c.x-5,c.y+4,c.z-3,c.x+5,c.y+4,c.z+3,
+        slabBlock(ArchitecturalMaterial::Planks,BlockHalf::Bottom));
+    write(c.x-4,c.y+1,c.z-2,BlockId::CHEST);
+    write(c.x+4,c.y+1,c.z-2,BlockId::CRAFTING_TABLE);
 }
 
 void buildHut(const StructurePlacement& placement,
@@ -1054,7 +1056,7 @@ int StructureGenerator::floorDiv(int value, int divisor) {
 
 const StructureGenerator::TypeParams& StructureGenerator::params(
     StructureType type) {
-    static constexpr std::array<TypeParams, 15> table{{
+    static constexpr std::array<TypeParams, 18> table{{
         {StructureType::None, 0, 0, 0, 0},
         // Village candidates still pass biome, spacing and full-footprint
         // terrain checks. Plains have a 40% cell chance; desert candidates run
@@ -1062,6 +1064,9 @@ const StructureGenerator::TypeParams& StructureGenerator::params(
         // Both remain meaningfully gated after the old 12% prefilter.
         {StructureType::Village, 512, 40, 6, 16},
         {StructureType::DesertVillage, 512, 100, 6, 15},
+        {StructureType::TaigaVillage,512,60,6,16},
+        {StructureType::SnowVillage,512,60,6,16},
+        {StructureType::SavannaVillage,512,60,6,16},
         {StructureType::TravelerHut, 64, 10, 2, 9},
         {StructureType::AbandonedCamp, 80, 9, 2, 5},
         {StructureType::DesertWell, 64, 12, 2, 6},
@@ -1086,6 +1091,9 @@ bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
         case StructureType::Village:
             return biome == Biome::PLAINS || biome == Biome::SUNFLOWER_PLAINS ||
                    biome == Biome::MEADOW;
+        case StructureType::TaigaVillage: return biome==Biome::TAIGA;
+        case StructureType::SnowVillage: return biome==Biome::SNOW_TUNDRA;
+        case StructureType::SavannaVillage: return biome==Biome::SAVANNA;
         case StructureType::DesertVillage:
         case StructureType::DesertWell:
         case StructureType::DesertTemple:
@@ -1126,7 +1134,7 @@ bool StructureGenerator::acceptsBiome(StructureType type, Biome biome) {
 }
 
 int StructureGenerator::halfSize(StructureType type, uint64_t variant) {
-    (void)variant;
+    if(isVillageStructure(type))return 48+static_cast<int>(variant%3)*16;
     switch (type) {
         case StructureType::Village:
             return 22;
@@ -1156,6 +1164,7 @@ int StructureGenerator::halfSize(StructureType type, uint64_t variant) {
 }
 
 int StructureGenerator::maxHalfSize(StructureType type) {
+    if(isVillageStructure(type))return 80;
     switch (type) {
         case StructureType::Village: return 22;
         case StructureType::DesertVillage: return 20;
@@ -1166,35 +1175,94 @@ int StructureGenerator::maxHalfSize(StructureType type) {
 StructureGenerator::Candidate StructureGenerator::candidateForCell(
     StructureType type, int cellX, int cellZ) const {
     const TypeParams& p = params(type);
-    const uint64_t h = WorldGenContext::hashPosition(
-        m_structureSeed ^ domainFor(type), cellX, 0, cellZ);
+    using Key=std::tuple<uint64_t,int,int,int>;
+    thread_local std::map<Key,Candidate> cache;
+    const Key key{m_structureSeed,static_cast<int>(type),cellX,cellZ};
+    const bool village=isVillageStructure(type);
+    if(village) {
+        const auto cached=cache.find(key);
+        if(cached!=cache.end())return cached->second;
+        if(cache.size()>=8192)cache.clear();
+    }
+    const uint64_t initial=WorldGenContext::hashPosition(
+        m_structureSeed ^ domainFor(type),cellX,0,cellZ);
     Candidate candidate;
-    candidate.type = type;
-    candidate.chance = h % 100u < static_cast<uint64_t>(p.chancePercent);
-    const bool large = type == StructureType::Village ||
-                       type == StructureType::DesertVillage;
-    const int margin = large ? 16 : 8;
-    const int span = p.cell - 2 * margin;
-    candidate.x = cellX * p.cell + margin + static_cast<int>((h >> 8) % span);
-    candidate.z = cellZ * p.cell + margin +
-                  static_cast<int>((h >> 24) % span);
-    candidate.variant = variantSeed(h, type);
-    candidate.priority = WorldGenContext::mix(h ^ 0x7F4A7C159D88A3B1ULL);
-    const int half = halfSize(type, candidate.variant);
-    candidate.minX = candidate.x - half;
-    candidate.maxX = candidate.x + half;
-    candidate.minZ = candidate.z - half;
-    candidate.maxZ = candidate.z + half;
+    // Four independent anchors retain the established 512-block cell grid.
+    // First feasible layout wins; retries never depend on loaded chunks/order.
+    for(int attempt=0;attempt<(village?4:1);++attempt) {
+        const uint64_t h=attempt==0 ? initial : WorldGenContext::mix(initial ^
+            (static_cast<uint64_t>(attempt)*0xD6E8FEB86659FD93ULL));
+        candidate.type=type;
+        candidate.chance=h%100u<static_cast<uint64_t>(p.chancePercent);
+        const int margin=village?16:8, span=p.cell-2*margin;
+        candidate.x=cellX*p.cell+margin+static_cast<int>((h>>8)%span);
+        candidate.z=cellZ*p.cell+margin+static_cast<int>((h>>24)%span);
+        candidate.variant=variantSeed(h,type);
+        candidate.priority=WorldGenContext::mix(h^0x7F4A7C159D88A3B1ULL);
+        const int half=halfSize(type,candidate.variant);
+        candidate.minX=candidate.x-half;candidate.maxX=candidate.x+half;
+        candidate.minZ=candidate.z-half;candidate.maxZ=candidate.z+half;
+        if(!village)break;
+        if(candidate.chance && acceptsBiome(type,m_heightPipeline.sampleColumn(candidate.x,candidate.z).biome) &&
+           terrainFits(candidate)) {cache.emplace(key,candidate);return candidate;}
+    }
+    if(village) {candidate.chance=false;cache.emplace(key,candidate);}
     return candidate;
 }
 
 bool StructureGenerator::terrainFits(const Candidate& candidate) const {
+    // Workers have separate bounded caches. Keys include the seed domain so
+    // regeneration/recreated generators cannot reuse another world's answers.
+    using Key=std::tuple<uint64_t,int,int,int>;
+    thread_local std::map<Key,bool> cache;
+    const Key key{m_structureSeed,static_cast<int>(candidate.type),candidate.x,candidate.z};
+    const auto found=cache.find(key);
+    if(found!=cache.end())return found->second;
+    if(cache.size()>=16384)cache.clear();
+    const bool result=terrainFitsUncached(candidate);
+    cache.emplace(key,result);return result;
+}
+
+bool StructureGenerator::terrainFitsUncached(const Candidate& candidate) const {
     const int anchorHeight = m_heightPipeline.sampleColumn(
         candidate.x, candidate.z).height;
     const TypeParams& p = params(candidate.type);
     if (candidate.type == StructureType::DesertTemple &&
         anchorHeight - 5 < Config::WORLD_MIN_Y)
         return false;
+    if(isVillageStructure(candidate.type)) {
+        const StructurePlacement placement{0,0,anchorHeight,candidate.type,candidate.variant,
+            candidate.minX,candidate.maxX,candidate.minZ,candidate.maxZ};
+        std::unordered_map<uint64_t,SurfaceColumn> columns;
+        columns.reserve(4096);
+        const auto column=[&](int x,int z) -> const SurfaceColumn& {
+            const uint64_t key=(static_cast<uint64_t>(static_cast<uint32_t>(x))<<32)|static_cast<uint32_t>(z);
+            const auto found=columns.find(key);
+            if(found!=columns.end())return found->second;
+            return columns.emplace(key,m_heightPipeline.sampleColumn(x,z)).first->second;
+        };
+        const auto sample=[&](int x,int z){return column(x,z).height;};
+        // Decide geometry first, then sample lots before roads so rejected
+        // anchors avoid constructing thousands of unused terrain columns.
+        const auto layout=VillageLayout::create(placement);
+        const auto valid=[&](int x,int z,int base,int tolerance) {
+            const auto& c=column(x,z);
+            return !c.river && c.height>c.waterLevel &&
+                c.height<Config::WORLD_MAX_Y-p.maxBuildHeight &&
+                std::abs(c.height-base)<=tolerance;
+        };
+        for(const auto& b:layout.buildings)for(int dz=-4;dz<=4;++dz)for(int dx=-4;dx<=4;++dx)
+            if(!valid(b.x+dx,b.z+dz,sample(b.x,b.z),4))return false;
+        for(const auto& f:layout.farms)for(int dz=-4;dz<=4;++dz)for(int dx=-4;dx<=4;++dx)
+            if(!valid(f.x+dx,f.z+dz,sample(f.x,f.z),4))return false;
+        for(const auto& r:layout.roads) {
+            const int height=sample(r.x,r.z);
+            if(!valid(r.x,r.z,height,0))return false;
+            if(std::abs(sample(r.x+1,r.z)-height)>1 ||
+               std::abs(sample(r.x,r.z+1)-height)>1)return false;
+        }
+        return true;
+    }
     for (int z = candidate.minZ; z <= candidate.maxZ; ++z) {
         for (int x = candidate.minX; x <= candidate.maxX; ++x) {
             const SurfaceColumn column = m_heightPipeline.sampleColumn(x, z);
@@ -1210,8 +1278,7 @@ bool StructureGenerator::terrainFits(const Candidate& candidate) const {
 }
 
 bool StructureGenerator::winsOverlapSpacing(const Candidate& candidate) const {
-    const int rank = candidate.type == StructureType::Village ||
-                             candidate.type == StructureType::DesertVillage
+    const int rank = isVillageStructure(candidate.type)
                          ? 1 : 0;
     for (const StructureType otherType : OVERWORLD_STRUCTURE_TYPES) {
         const TypeParams& p = params(otherType);
@@ -1235,7 +1302,9 @@ bool StructureGenerator::winsOverlapSpacing(const Candidate& candidate) const {
                     const int ddx = other.x - candidate.x;
                     const int ddz = other.z - candidate.z;
                     if (ddx * ddx + ddz * ddz < reach * reach &&
-                        other.priority > candidate.priority)
+                        other.priority > candidate.priority &&
+                        (!isVillageStructure(otherType) ||
+                         (acceptsBiome(otherType,m_heightPipeline.sampleColumn(other.x,other.z).biome) && terrainFits(other))))
                         return false;
                     continue;
                 }
@@ -1245,11 +1314,12 @@ bool StructureGenerator::winsOverlapSpacing(const Candidate& candidate) const {
                                      other.maxZ >= candidate.minZ;
                 if (!overlap) continue;
                 const int otherRank =
-                    otherType == StructureType::Village ||
-                            otherType == StructureType::DesertVillage
+                    isVillageStructure(otherType)
                         ? 1 : 0;
-                if (otherRank > rank ||
-                    (otherRank == rank && other.priority > candidate.priority))
+                if ((otherRank > rank ||
+                    (otherRank == rank && other.priority > candidate.priority)) &&
+                    (!isVillageStructure(otherType) ||
+                     (acceptsBiome(otherType,m_heightPipeline.sampleColumn(other.x,other.z).biome) && terrainFits(other))))
                     return false;
             }
         }
@@ -1397,6 +1467,10 @@ void StructureGenerator::build(const StructurePlacement& placement,
                                const SurfaceSampler& surfaceSampler) {
     const int centerX = (placement.minX + placement.maxX) / 2;
     const int centerZ = (placement.minZ + placement.maxZ) / 2;
+    if(isVillageStructure(placement.type)) {
+        buildVillage(placement,write,surfaceSampler);
+        return;
+    }
     const int rotations = static_cast<int>((placement.variant >> 61) & 3u);
     const bool mirror = ((placement.variant >> 60) & 1u) != 0;
     const auto transformOffset = [&](int dx, int dz) {

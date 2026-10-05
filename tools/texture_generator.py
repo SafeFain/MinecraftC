@@ -27,7 +27,7 @@ STYLE_ID = "bright-comfortable"
 DEFAULT_SEED = 213785369
 GENERATOR_CATEGORIES = ("block_texture", "item_sprite", "block_item_icon")
 ENTITY_NAMES = ("cow", "pig", "sheep", "chicken", "zombie", "skeleton",
-                "spider", "blastling", "item", "villager", "zombie_villager")
+                "spider", "blastling", "item", "villager", "zombie_villager", "iron_golem")
 ENTITY_SKIN_NAMES = tuple(name for name in ENTITY_NAMES if name != "item") + ("player",)
 ENTITY_SKIN_SIZE = 64
 ENTITY_SKIN_LAYOUT = {
@@ -92,6 +92,7 @@ NAMES = [
 
 
 # Existing names retain their atlas positions. Additional faces are appended.
+VILLAGE_FUNCTIONAL = ("barrel", "lectern", "cartography_table", "brewing_stand", "smoker", "stonecutter")
 FUNCTIONAL = ("crafting_table", "furnace", "chest", "composter",
               "fletching_table", "loom", "cauldron", "blast_furnace",
               "smithing_table", "grindstone", "white_bed", "tnt")
@@ -138,6 +139,7 @@ NAMES += ['andesite', 'diorite', 'gneiss', 'marble', 'laterite', 'red_clay', 'cr
 HEAVEN_TEXTURES = {'moonstone': 'marble', 'skystone': 'andesite', 'aether_moss': 'cave_moss', 'glimmer_silt': 'silt', 'star_crystal_ore': 'diamond_ore', 'skyroot_planks': 'oak_planks', 'cloudstone_bricks': 'stone_bricks', 'sunstone_bricks': 'bricks', 'moonstone_bricks': 'stone_bricks', 'star_crystal_lamp': 'amethyst_block', 'sky_fern': 'fern', 'dawn_bell': 'bellflower', 'moonflower': 'alpine_flower', 'glimmer_reed': 'reed_flower', 'cloudberry_bush': 'wild_mint', 'hanging_cloud_vine': 'hanging_roots'}
 HEAVEN_COLORS = {'moonstone': (213, 219, 235), 'skystone': (116, 153, 179), 'aether_moss': (109, 177, 157), 'glimmer_silt': (96, 136, 143), 'star_crystal_ore': (100, 178, 206), 'skyroot_planks': (191, 154, 106), 'cloudstone_bricks': (202, 217, 230), 'sunstone_bricks': (232, 194, 114), 'moonstone_bricks': (215, 223, 240), 'star_crystal_lamp': (133, 230, 242), 'sky_fern': (107, 182, 168), 'dawn_bell': (244, 199, 124), 'moonflower': (180, 187, 245), 'glimmer_reed': (123, 211, 195), 'cloudberry_bush': (135, 187, 166), 'hanging_cloud_vine': (125, 187, 204)}
 NAMES += list(HEAVEN_TEXTURES)
+NAMES += ['barrel', 'lectern', 'cartography_table', 'brewing_stand', 'smoker', 'stonecutter']
 
 def _read_definition(path):
     try:
@@ -364,7 +366,7 @@ _ENTITY_BASES = {
     "zombie": (62, 119, 82), "skeleton": (185, 179, 155),
     "spider": (72, 41, 36), "blastling": (75, 148, 60),
     "item": (174, 116, 39), "villager": (157, 105, 66),
-    "zombie_villager": (72, 119, 73), "player": (76, 111, 145),
+    "zombie_villager": (72, 119, 73), "iron_golem": (185,187,168), "player": (76, 111, 145),
 }
 for _name, _base in _ENTITY_BASES.items():
     _entity_palette = _role_palette(_base, shadow_floor=0.30,
@@ -412,7 +414,9 @@ for _name, _base in EXTRA_BASES.items():
 for _name, _base in zip(EXTRA_LOG_TOPS,
                        ((208,183,128), (158,119,77), (185,143,96), (196,126,79))):
     PALETTES[_name] = _role_palette(_base)
-for _name in FUNCTIONAL:
+for _name in VILLAGE_FUNCTIONAL:
+    PALETTES[_name]=_role_palette((145,113,78))
+for _name in FUNCTIONAL + VILLAGE_FUNCTIONAL:
     for _face in ("top", "side", "bottom"):
         PALETTES[_name+"_"+_face] = PALETTES[_name]
 
@@ -790,7 +794,7 @@ def functional_palette(base):
 
 
 def generate_functional_texture(name, seed):
-    base = next(base for base in FUNCTIONAL if name == base or name.startswith(base+"_"))
+    base = next(base for base in FUNCTIONAL + VILLAGE_FUNCTIONAL if name == base or name.startswith(base+"_"))
     face = name[len(base)+1:] if name != base else "front"
     palette=PALETTES[name]
     wood=base in {"crafting_table","chest","composter","fletching_table","loom"}
@@ -866,6 +870,18 @@ def generate_functional_texture(name, seed):
         else:
             rect(2,3,14,6,0); rect(3,7,13,13,7)
             line(5,8,5,11,0); line(9,8,11,8,5); line(10,8,10,11,1)
+    elif base in {"barrel", "lectern", "cartography_table", "brewing_stand", "smoker", "stonecutter"}:
+        for y in range(SIZE):
+            for x in range(SIZE):
+                # Distinct work surfaces: hoops, book leaves, chart grid, bottles,
+                # smoking vent and the stone-cutting wheel.
+                motif = ((x in (2,13)) if base == "barrel" else
+                         (y in (3,4,10,11) and 3 <= x <= 12) if base == "lectern" else
+                         (x % 5 == 0 or y % 5 == 0) if base == "cartography_table" else
+                         (x in (4,8,12) and 4 <= y <= 12) if base == "brewing_stand" else
+                         (4 <= x <= 11 and y in (6,8,10)) if base == "smoker" else
+                         (x-8)**2+(y-8)**2 <= 20)
+                if motif: tile[y*SIZE+x] = palette[0]
     elif base == "grindstone":
         if face == "top":
             rect(4,1,12,15,2); rect(5,1,7,15,4)
@@ -928,7 +944,7 @@ def plant_palette(name):
     return palette
 
 
-for _name in FUNCTIONAL:
+for _name in FUNCTIONAL + VILLAGE_FUNCTIONAL:
     for _suffix in ("", "_top", "_side", "_bottom"):
         PALETTES[_name+_suffix]=functional_palette(_name)
 for _name in PLANTS:
@@ -1298,7 +1314,7 @@ def generate_texture(name,seed,local_seeds=None):
         pixels=generate_biome_texture(name,local)
     elif name in DECORATION_BASES:
         pixels=generate_decoration_texture(name,local)
-    elif name in FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL for face in ("top","side","bottom")):
+    elif name in FUNCTIONAL + VILLAGE_FUNCTIONAL or any(name == base+"_"+face for base in FUNCTIONAL for face in ("top","side","bottom")):
         return generate_functional_texture(name,local)
     elif name in PLANTS:
         return generate_plant_texture(name,local)
@@ -1451,6 +1467,10 @@ def _paint_entity_face(name,tile):
     elif name=="zombie":
         _paint_rect(tile,3,4,6,7,(26,40,29,255)); _paint_rect(tile,10,4,13,7,(26,40,29,255))
         _paint_rect(tile,5,10,11,12,(31,55,38,255)); _paint_rect(tile,7,9,9,10,(43,73,48,255))
+    elif name=="iron_golem":
+        _paint_rect(tile,3,6,6,8,(149,48,41,255))
+        _paint_rect(tile,10,6,13,8,(149,48,41,255))
+        _paint_rect(tile,7,8,9,13,(145,145,128,255))
     elif name in {"villager","zombie_villager"}:
         eye=(30,25,22,255) if name=="villager" else (18,32,20,255)
         nose=(126,78,48,255) if name=="villager" else (51,91,53,255)
@@ -1478,6 +1498,10 @@ def _paint_entity_body(name,tile):
         # Species patterns already wrap over the cuboid; do not stamp a second
         # face-like rectangle on the chest.
         return
+    elif name=="iron_golem":
+        _paint_rect(tile,3,1,5,14,(71,109,56,255))
+        _paint_rect(tile,5,6,8,8,(102,132,71,255))
+        _paint_rect(tile,2,12,14,13,(139,141,126,255))
     elif name=="skeleton":
         bone=(205,197,171,255); shadow=(82,75,62,255)
         _paint_rect(tile,7,2,9,14,bone)

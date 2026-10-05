@@ -45,6 +45,10 @@ void EntityManager::prepareAiFrame(float dt) {
     for (size_t i=0;i<m_entities.size();++i) {
         Entity& entity=m_entities[i];
         m_aiEntityIndices.emplace(entity.id,i);
+        if(entity.type==EntityType::Item && entity.health>0 &&
+           (entity.item.id==ItemId::BREAD || entity.item.id==ItemId::WHEAT || entity.item.id==ItemId::WHEAT_SEEDS))
+            m_aiBuckets[{static_cast<int>(std::floor(entity.position.x/16)),
+                static_cast<int>(std::floor(entity.position.y/16)),static_cast<int>(std::floor(entity.position.z/16))}].push_back(entity.id);
         if (entity.type==EntityType::Item || entity.type==EntityType::Arrow ||
             entity.type==EntityType::PrimedTnt || entity.health<=0) continue;
         m_aiBuckets[{static_cast<int>(std::floor(entity.position.x/16)),
@@ -121,6 +125,13 @@ void EntityManager::requestNavigation(Entity& entity,const GroundNavigation::Goa
     NavigationRequest request;
     request.origin=entity.position;
     request.goal=goal;
+    const auto delta=goal.position-entity.position;
+    if(purpose==NavigationPurpose::Move && glm::length(delta)>40) {
+        const auto intermediate=entity.position+delta*(32.0/glm::length(delta));
+        if(auto stand=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+            std::floor(intermediate.x)+.5,std::floor(intermediate.z)+.5,intermediate.y,8,8))
+            request.goal={*stand,.5,.6};
+    }
     request.purpose=purpose;
     request.queuedAt=m_aiTime;
     m_navigation.emplace(entity.id,std::move(request));
@@ -145,7 +156,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         auto& request=best->second;
         request.origin=entity->position;
         request.search=std::make_unique<GroundNavigation::Search>(
-            navigationTerrain(&request.revisions),renderSize(entity->type),
+            navigationTerrain(&request.revisions),entitySize(*entity),
             request.origin,request.goal);
         ++active;
     }
@@ -194,11 +205,13 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
                 }
             } else {
                 if (request.purpose==NavigationPurpose::Move && entity->type==EntityType::Villager) {
-                    if (ai.behavior==EntityBehavior::Work && entity->villager.hasWorkstation) {
+                    if (ai.behavior==EntityBehavior::Work && entity->villager.hasWorkstation &&
+                        m_aiChunks.count({World::worldToChunkX(entity->villager.claimedWorkstation.x),World::worldToChunkZ(entity->villager.claimedWorkstation.z)})) {
                         const auto poi=entity->villager.claimedWorkstation;
                         ai.failedPois[{poi.x,poi.y,poi.z}]=m_aiTime+ai.retryDelay;
                         entity->villager.hasWorkstation=false;
-                    } else if (ai.behavior==EntityBehavior::Sleep && entity->villager.hasBed) {
+                    } else if (ai.behavior==EntityBehavior::Sleep && entity->villager.hasBed &&
+                        m_aiChunks.count({World::worldToChunkX(entity->villager.claimedBed.x),World::worldToChunkZ(entity->villager.claimedBed.z)})) {
                         const auto poi=entity->villager.claimedBed;
                         ai.failedPois[{poi.x,poi.y,poi.z}]=m_aiTime+ai.retryDelay;
                         entity->villager.hasBed=false;
@@ -224,7 +237,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
     auto& ai=entity.ai;
     if (!ai.hasDestination || ai.speed<=0) return;
     const auto terrain=navigationTerrain();
-    const glm::vec3 size=renderSize(entity.type);
+    const glm::vec3 size=entitySize(entity);
     if (GroundNavigation::reached(entity.position,ai.destination)) {
         cancelNavigation(entity);
         entity.stuckSeconds=0;
@@ -280,7 +293,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
 
 void EntityManager::moveWithTerrain(Entity& entity,const glm::vec3& horizontal,float dt) {
     const auto terrain=navigationTerrain();
-    const auto size=renderSize(entity.type);
+    const auto size=entitySize(entity);
     const glm::dvec3 start=entity.position;
     const int steps=sweptCollisionSteps(glm::length(horizontal)*dt,Config::AI_COLLISION_STEP);
     const glm::dvec3 delta=glm::dvec3(horizontal)*(static_cast<double>(dt)/steps);
@@ -307,7 +320,7 @@ void EntityManager::integrateVelocity(Entity& entity,float dt) {
     const int frames=std::max(1,static_cast<int>(std::ceil(dt*120.0f)));
     const float h=dt/frames;
     const auto terrain=navigationTerrain();
-    const auto size=renderSize(entity.type);
+    const auto size=entitySize(entity);
     entity.ai.grounded=entity.velocity.y<=0 && GroundNavigation::supported(terrain,size,entity.position);
     if (entity.ai.grounded) entity.velocity.y=0;
     for (int frame=0;frame<frames;++frame) {

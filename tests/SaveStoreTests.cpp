@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -34,8 +35,28 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+// Convert current entity records to the frozen v12-v16 wire layout before
+// lowering a fixture's header version. Position markers are unique in this fixture.
+void stripV17EntityFields(std::vector<uint8_t>& bytes,
+                         const std::vector<WorldMetadata::PersistedEntity>& entities) {
+    std::vector<size_t> offsets;
+    for(const auto& entity:entities) {
+        std::vector<uint8_t> marker;
+        for(double value:{entity.position.x,entity.position.y,entity.position.z}) {
+            uint64_t bits=0;std::memcpy(&bits,&value,8);
+            for(int i=0;i<8;++i)marker.push_back(static_cast<uint8_t>(bits>>(i*8)));
+        }
+        const auto found=std::search(bytes.begin(),bytes.end(),marker.begin(),marker.end());
+        require(found!=bytes.end() && found!=bytes.begin() && *(found-1)==entity.type,
+            "legacy entity marker not found");
+        offsets.push_back(static_cast<size_t>(found-bytes.begin())-1+102);
+    }
+    std::sort(offsets.rbegin(),offsets.rend());
+    for(size_t offset:offsets)bytes.erase(bytes.begin()+offset,bytes.begin()+offset+66);
+}
+
 void stripV16Envelope(std::vector<uint8_t>& bytes) {
-    require(bytes.size()>=36 && bytes[8]==16,"fixture starts in save v16");
+    require(bytes.size()>=36 && bytes[8]==17,"fixture starts in save v17");
     require(std::all_of(bytes.begin()+24,bytes.begin()+36,[](uint8_t b){return b==0;}),"vanilla fixture has three empty plugin tables");
     bytes.erase(bytes.begin()+24,bytes.begin()+36);
 }
@@ -121,6 +142,14 @@ int main() {
         villager.villager.professionLocked = true;
         villager.villager.lastRestockDay = 12;
         villager.villager.restocksToday = 2;
+        villager.villager.food[0]={ItemId::BREAD,6,0};
+        villager.villager.growthSeconds=1200;
+        villager.villager.breedingCooldown=123;
+        villager.villager.defenseCooldown=456;
+        villager.villager.reputation=-35;
+        villager.villager.demand[2]=25;
+        villager.villager.reputationDay=7;
+        villager.villager.tradesToday=3;
         source.entities.push_back(villager);
         source.activeDimension = DimensionId::Heaven;
         source.overworldDayPhase = 0.37f;
@@ -192,6 +221,32 @@ int main() {
                 store.loadMetadata().inventory.slot(11).count == 64 &&
                 store.loadMetadata().inventory.slot(12).id == ItemId::BONE_MEAL,
                 "new block items and materials survive metadata round trip");
+        require(loaded.entities[2].villager.food[0].count==6 &&
+            loaded.entities[2].villager.growthSeconds==1200 &&
+            loaded.entities[2].villager.breedingCooldown==123 &&
+            loaded.entities[2].villager.defenseCooldown==456 &&
+            loaded.entities[2].villager.reputation==-35 && loaded.entities[2].villager.demand[2]==25,
+            "v17 villager lifecycle fields failed metadata roundtrip");
+        store.saveChunkEntities(6,-9,{source.entities[2]});
+        const auto chunkVillagers=store.loadChunkEntities(6,-9);
+        require(chunkVillagers.size()==1 && chunkVillagers[0].villager.growthSeconds==1200 &&
+            chunkVillagers[0].villager.food[0].count==6 && chunkVillagers[0].villager.reputation==-35,
+            "v17 villager lifecycle fields failed chunk roundtrip");
+        const auto v16Directory=root/"legacy-v16";
+        SaveStore(v16Directory).saveMetadata(source);
+        {
+            auto bytes=readBytes(v16Directory/"level.bin");
+            stripV17EntityFields(bytes,source.entities);
+            writeLittleEndian(bytes,8,16,4);
+            writeLittleEndian(bytes,12,bytes.size()-24,4);
+            writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            std::ofstream out(v16Directory/"level.bin",std::ios::binary|std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        }
+        const auto old=SaveStore(v16Directory).loadMetadata();
+        require(old.entities.size()==3 && old.entities[2].villager.adult() &&
+            old.entities[2].villager.food[0].empty() && old.entities[2].villager.reputation==0,
+            "v16 entity defaults changed or legacy entity layout is broken");
         store.saveChunkEntityPopulationVersion(-3, 9, 1);
         require(store.loadChunkEntityPopulationVersion(-3, 9) == 1 &&
                 store.loadChunkEntityPopulationVersion(-3, 8) == 0,
@@ -241,6 +296,7 @@ int main() {
         SaveStore(v14Directory).saveMetadata(source);
         {
             auto bytes = readBytes(v14Directory / "level.bin");
+            stripV17EntityFields(bytes,source.entities);
             stripV16Envelope(bytes);
             stripV15Rules(bytes);
             writeLittleEndian(bytes,8,14,4);
@@ -258,6 +314,7 @@ int main() {
         const auto v13Path = v13Directory / "level.bin";
         {
             auto bytes = readBytes(v13Path);
+            stripV17EntityFields(bytes,source.entities);
             stripV16Envelope(bytes);
             stripV15Rules(bytes);
             bytes.resize(bytes.size() - sizeof(uint32_t));

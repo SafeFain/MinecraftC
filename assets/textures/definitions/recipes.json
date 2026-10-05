@@ -958,7 +958,13 @@
     "hanging_cloud_vine": {
       "recipe": "base",
       "variants": 1
-    }
+    },
+    "barrel": {"recipe": "base", "variants": 1},
+    "lectern": {"recipe": "base", "variants": 1},
+    "cartography_table": {"recipe": "base", "variants": 1},
+    "brewing_stand": {"recipe": "base", "variants": 1},
+    "smoker": {"recipe": "base", "variants": 1},
+    "stonecutter": {"recipe": "base", "variants": 1}
   },
   "examples": {
     "mossy_stone": {

@@ -234,7 +234,13 @@
     "moonflower": "foliage",
     "glimmer_reed": "foliage",
     "cloudberry_bush": "foliage",
-    "hanging_cloud_vine": "foliage"
+    "hanging_cloud_vine": "foliage",
+    "barrel": "constructed",
+    "lectern": "constructed",
+    "cartography_table": "constructed",
+    "brewing_stand": "constructed",
+    "smoker": "constructed",
+    "stonecutter": "constructed"
   },
   "family_specs": {
     "soil": {
@@ -566,6 +572,12 @@
     "moonflower",
     "glimmer_reed",
     "cloudberry_bush",
-    "hanging_cloud_vine"
+    "hanging_cloud_vine",
+    "barrel",
+    "lectern",
+    "cartography_table",
+    "brewing_stand",
+    "smoker",
+    "stonecutter"
   ]
 }

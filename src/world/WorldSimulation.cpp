@@ -17,6 +17,22 @@ void WorldSimulation::tickSurvival(const glm::dvec3& playerPosition,
     m_playerPosition = playerPosition;
     const int64_t speed = m_world.gameRules().integer(GameRuleId::RandomTickSpeed);
     if (speed == 0) return;
+    // Generated farms must enter the same random-tick path as planted crops.
+    // Discover a bounded slice of surface columns, including sheltered fields.
+    const auto& active=m_world.getActiveChunks();
+    if(!active.empty())for(size_t scan=0;scan<Config::GENERATED_CROP_COLUMNS_PER_TICK;++scan) {
+        const size_t cursor=m_cropScanCursor++%(active.size()*256);
+        const auto* chunk=active[cursor/256];
+        if(!chunk->generated.load())continue;
+        const int lx=static_cast<int>(cursor%16),lz=static_cast<int>((cursor%256)/16);
+        const int top=chunk->getColumnMaxY(lx,lz);
+        for(int y=top;y>=std::max(Config::WORLD_MIN_Y,top-6);--y) {
+            const auto block=chunk->getBlock(lx,y,lz);
+            if(!isFarmland(block) && !(block>=BlockId::WHEAT_0 && block<=BlockId::WHEAT_7))continue;
+            const uint32_t index=static_cast<uint32_t>(lx+lz*16+(y-Config::WORLD_MIN_Y)*256);
+            m_persistence.recordOverride(chunk->cx,chunk->cz,index,block);
+        }
+    }
     // Only sections containing modeled random-tick blocks need sampling. Every
     // draw still selects uniformly from all 4096 positions, including empty ones.
     // Sorted section keys and an independent hash domain avoid iteration-order RNG.

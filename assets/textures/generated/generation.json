@@ -53,6 +53,10 @@
       "effective_seed": 213785369,
       "sha256": "13504a92a103b863bbd9a156cacdc221564a6bc81e5046e60269a23914ae5248"
     },
+    "barrel": {
+      "effective_seed": 213785369,
+      "sha256": "fe7f2bbda089aebef1b4a7f80c17d5c2132ca7395bd1d2927390930bb0149899"
+    },
     "basalt": {
       "effective_seed": 213785369,
       "sha256": "b2bd14d8c846a11b12fd3a53d8aad334fde470ac31aaba0b81f453398e694369"
@@ -121,6 +125,10 @@
       "effective_seed": 213785369,
       "sha256": "db84c281c8848ba2a7dce4526bfd3701e6ee56e6c84d5d67936f94d5640b40ab"
     },
+    "brewing_stand": {
+      "effective_seed": 213785369,
+      "sha256": "3a24f50f254620e76c46fdf701d4beeec3b22c24f0b27cddcbee8cdf0b741241"
+    },
     "bricks": {
       "effective_seed": 213785369,
       "sha256": "f4c4365982f679dca5330f8da2b9be395ceda5c4b3cc1c9e92235dc6251e7c2c"
@@ -140,6 +148,10 @@
     "calcite": {
       "effective_seed": 213785369,
       "sha256": "a075ceec95945ebf8b27f96a58a5b0ea0a8a825ed73af0d4708c877e9cfa6adc"
+    },
+    "cartography_table": {
+      "effective_seed": 213785369,
+      "sha256": "09807227802e57ce6af2f798a4dcba78093670b5d187d1fc7485a287c5f7a109"
     },
     "cattail": {
       "effective_seed": 213785369,
@@ -529,6 +541,10 @@
       "effective_seed": 213785369,
       "sha256": "5ae9aaf1e4a7575b98f81d9ed42debbbb0844bd0f3e204a14626c50e5cbd23fb"
     },
+    "lectern": {
+      "effective_seed": 213785369,
+      "sha256": "8c112b8908dc7d5c35a80c3149068755b0a73549ed68fb2570e35fc7d0caa90a"
+    },
     "limestone": {
       "effective_seed": 213785369,
       "sha256": "4254febee4d73be5836d5f4aa337cc760713f187ee2090d71da3b945f1a78102"
@@ -753,6 +769,10 @@
       "effective_seed": 213785369,
       "sha256": "a95ce21f2ae04b61252572197debca280eddec3781d7ed6e087e2a8633680741"
     },
+    "smoker": {
+      "effective_seed": 213785369,
+      "sha256": "9ef8dcbfa51d257654dea515784ff499150025c0d299a50b5264a06949d3e054"
+    },
     "smooth_sandstone": {
       "effective_seed": 213785369,
       "sha256": "1af115534948c5793b0ba110002ea46ad4cdf4f77120758ecf702ee9c191ea5f"
@@ -804,6 +824,10 @@
     "stone_bricks": {
       "effective_seed": 213785369,
       "sha256": "74bdbca06633e922711aeddf4be068ce424ad55ae07d17f68607c687ad35e13e"
+    },
+    "stonecutter": {
+      "effective_seed": 213785369,
+      "sha256": "1f3edef7323f78b738316dc008e1cb49092bca4c0c58cfc8026707423a0b4815"
     },
     "sulfur_crust": {
       "effective_seed": 213785369,

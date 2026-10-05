@@ -152,6 +152,12 @@
     "moonflower": {"all": "moonflower"},
     "glimmer_reed": {"all": "glimmer_reed"},
     "cloudberry_bush": {"all": "cloudberry_bush"},
-    "hanging_cloud_vine": {"all": "hanging_cloud_vine"}
+    "hanging_cloud_vine": {"all": "hanging_cloud_vine"},
+    "barrel": {"all": "barrel"},
+    "lectern": {"all": "lectern"},
+    "cartography_table": {"all": "cartography_table"},
+    "brewing_stand": {"all": "brewing_stand"},
+    "smoker": {"all": "smoker"},
+    "stonecutter": {"all": "stonecutter"}
   }
 }

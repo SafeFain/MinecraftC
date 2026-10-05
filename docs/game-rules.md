@@ -13,9 +13,9 @@ Queries through inverted old names return inverted values too.
 sets -1/128. These are compatibility conversions; the last write wins.
 
 Each world owns its rules, shared across Overworld and Heaven. Save v15 appends
-a typed rule table using canonical IDs, retained in save v16 alongside plugin palettes. v2–v14 read with Java defaults; existing
+a typed rule table using canonical IDs, retained in save v17 alongside plugin palettes and village state. v2–v14 read with Java defaults; existing
 v14 day/night duration is preserved. Unknown well-typed IDs round-trip. Loading
-never changes terrain generation version 17. Query/help/error/support messages
+never changes the saved terrain generation version. Query/help/error/support messages
 remain visible with command feedback disabled. General feedback/status strings
 are translated in all ten languages; detailed explanations are Chinese/English
 with an explicit localized “English explanation” label in other languages.
@@ -136,7 +136,7 @@ This adds no Nether, multiplayer, redstone, command blocks or advancements.
 - **`max_snow_accumulation_height`:** 0 disables new snow accumulation. Values 1–8 permit one existing snow layer; stacked snow layers are absent.
 - **`mob_drops`:** Allow mob death loot. Player inventory loss and existing dropped items are independent.
 - **`mob_explosion_drop_decay`:** Reduce Blastling explosion block drops with probability 1/explosion power.
-- **`mob_griefing`:** Allow Blastling explosions to destroy blocks; explosion damage still applies. Other Java mob block interactions are absent.
+- **`mob_griefing`:** Allow Blastling explosions to destroy blocks; explosion damage still applies. Villager harvesting/replanting and dropped-food collection also require this rule. Other Java mob block interactions remain absent.
 - **`natural_health_regeneration`:** Allow food-based natural healing. Hunger depletion and starvation continue independently.
 - **`player_movement_check`:** Enable multiplayer movement validation; no multiplayer validation exists. Legacy disablePlayerMovementCheck is inverted.
 - **`players_nether_portal_creative_delay`:** Creative Nether portal delay in ticks; Nether portals are absent.

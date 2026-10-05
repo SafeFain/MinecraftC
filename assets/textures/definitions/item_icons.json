@@ -2154,7 +2154,13 @@
       "generator": "item_sprite",
       "template": "fish",
       "material": "cooked_fish"
-    }
+    },
+    "barrel": {"generator": "block_item_icon", "block": "barrel"},
+    "lectern": {"generator": "block_item_icon", "block": "lectern"},
+    "cartography_table": {"generator": "block_item_icon", "block": "cartography_table"},
+    "brewing_stand": {"generator": "block_item_icon", "block": "brewing_stand"},
+    "smoker": {"generator": "block_item_icon", "block": "smoker"},
+    "stonecutter": {"generator": "block_item_icon", "block": "stonecutter"}
   },
   "documentation": {
     "template_schema": {

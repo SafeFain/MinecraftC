@@ -1,5 +1,6 @@
 #include "world/BiomeBlockLogic.h"
 #include "world/WorldGenerator.h"
+#include "world/VillageLayout.h"
 #include "world/BiomeBlockLogic.h"
 #include "Config.h"
 #include "world/RegionGenerator.h"
@@ -1926,29 +1927,25 @@ WorldGenerator::villageSpawnsForChunk(int chunkX, int chunkZ) const {
     const int originX = chunkX * Config::CHUNK_SIZE_X;
     const int originZ = chunkZ * Config::CHUNK_SIZE_Z;
     std::vector<StructurePlacement> placements;
-    constexpr int margin = 64;
+    constexpr int margin = 80;
     m_structureGenerator.generateStructuresRegion(
         originX - margin, originZ - margin,
         Config::CHUNK_SIZE_X + margin * 2,
         Config::CHUNK_SIZE_Z + margin * 2, placements);
     for (const StructurePlacement& placement : placements) {
-        if (placement.type != StructureType::Village &&
-            placement.type != StructureType::DesertVillage) continue;
-        StructureGenerator::build(placement,
-            [&](int x, int y, int z, BlockId block) {
-                BedPart part = BedPart::Foot;
-                BedDirection direction = BedDirection::North;
-                if (x < originX || x >= originX + Config::CHUNK_SIZE_X ||
-                    z < originZ || z >= originZ + Config::CHUNK_SIZE_Z ||
-                    !decodeBed(block, part, direction) || part != BedPart::Foot)
-                    return;
-                const uint64_t hash = WorldGenContext::hashPosition(
-                    placement.variant, x, y, z);
-                requests.push_back({glm::dvec3(x + 1.5, y, z + .5),
-                    static_cast<uint32_t>(hash ^ (hash >> 32))});
-            }, [&](int x, int z) {
-                return m_heightPipeline.sampleColumn(x, z).height;
-            });
+        if(!isVillageStructure(placement.type))continue;
+        const auto layout=VillageLayout::create(placement,[&](int x,int z) {
+            return m_heightPipeline.sampleColumn(x,z).height;
+        },false);
+        int remaining=layout.population;
+        for(const auto& building:layout.buildings)for(size_t slot=0;slot<2 && remaining>0;++slot,--remaining) {
+            const auto position=building.spawns[slot];
+            if(position.x<originX || position.x>=originX+16 ||
+               position.z<originZ || position.z>=originZ+16)continue;
+            const auto h=WorldGenContext::hashPosition(placement.variant,
+                building.beds[slot].x,building.beds[slot].y,building.beds[slot].z);
+            requests.push_back({position,static_cast<uint32_t>(h^(h>>32))});
+        }
     }
     std::sort(requests.begin(), requests.end(),
         [](const VillageSpawnRequest& a, const VillageSpawnRequest& b) {

@@ -281,7 +281,7 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     }
 
     set(ItemId::EMERALD, {"Emerald"});
-    const std::array<std::pair<ItemId, BlockId>, 9> villagerBlocks{{
+    const std::array<std::pair<ItemId, BlockId>, 15> villagerBlocks{{
         {ItemId::EMERALD_ORE, BlockId::EMERALD_ORE},
         {ItemId::DEEPSLATE_EMERALD_ORE, BlockId::DEEPSLATE_EMERALD_ORE},
         {ItemId::COMPOSTER, BlockId::COMPOSTER},
@@ -291,11 +291,18 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         {ItemId::BLAST_FURNACE, BlockId::BLAST_FURNACE},
         {ItemId::SMITHING_TABLE, BlockId::SMITHING_TABLE},
         {ItemId::GRINDSTONE, BlockId::GRINDSTONE},
+        {ItemId::BARREL, BlockId::BARREL},
+        {ItemId::LECTERN, BlockId::LECTERN},
+        {ItemId::CARTOGRAPHY_TABLE, BlockId::CARTOGRAPHY_TABLE},
+        {ItemId::BREWING_STAND, BlockId::BREWING_STAND},
+        {ItemId::SMOKER, BlockId::SMOKER},
+        {ItemId::STONECUTTER, BlockId::STONECUTTER},
+
     }};
-    const std::array<const char*, 9> villagerBlockNames{{
+    const std::array<const char*, 15> villagerBlockNames{{
         "Emerald Ore", "Deepslate Emerald Ore", "Composter",
         "Fletching Table", "Loom", "Cauldron", "Blast Furnace",
-        "Smithing Table", "Grindstone"
+        "Smithing Table", "Grindstone", "Barrel", "Lectern", "Cartography Table", "Brewing Stand", "Smoker", "Stonecutter"
     }};
     for (size_t i = 0; i < villagerBlocks.size(); ++i) {
         set(villagerBlocks[i].first,
@@ -666,6 +673,12 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::COMPOSTER: case ItemId::FLETCHING_TABLE:
         case ItemId::LOOM: case ItemId::CAULDRON:
         case ItemId::BLAST_FURNACE: case ItemId::SMITHING_TABLE:
+        case ItemId::BARREL:
+        case ItemId::LECTERN:
+        case ItemId::CARTOGRAPHY_TABLE:
+        case ItemId::BREWING_STAND:
+        case ItemId::SMOKER:
+        case ItemId::STONECUTTER:
         case ItemId::GRINDSTONE:
             return CreativeItemCategory::Functional;
 
@@ -943,6 +956,12 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::CAULDRON): return ItemId::CAULDRON;
         case static_cast<uint16_t>(BlockId::BLAST_FURNACE): return ItemId::BLAST_FURNACE;
         case static_cast<uint16_t>(BlockId::SMITHING_TABLE): return ItemId::SMITHING_TABLE;
+        case static_cast<uint16_t>(BlockId::BARREL): return ItemId::BARREL;
+        case static_cast<uint16_t>(BlockId::LECTERN): return ItemId::LECTERN;
+        case static_cast<uint16_t>(BlockId::CARTOGRAPHY_TABLE): return ItemId::CARTOGRAPHY_TABLE;
+        case static_cast<uint16_t>(BlockId::BREWING_STAND): return ItemId::BREWING_STAND;
+        case static_cast<uint16_t>(BlockId::SMOKER): return ItemId::SMOKER;
+        case static_cast<uint16_t>(BlockId::STONECUTTER): return ItemId::STONECUTTER;
         case static_cast<uint16_t>(BlockId::GRINDSTONE): return ItemId::GRINDSTONE;
         case static_cast<uint16_t>(BlockId::FLOWING_WATER_1):
         case static_cast<uint16_t>(BlockId::FLOWING_WATER_2):

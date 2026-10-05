@@ -649,6 +649,7 @@ if(BUILD_TESTING)
         target_compile_options(worldgen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests)
+    add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
 
     add_executable(lod_terrain_tests
         tests/LodTerrainTests.cpp
@@ -754,9 +755,14 @@ if(BUILD_TESTING)
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
     target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann)
+    target_include_directories(vulkan_ui_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_ui_smoke PRIVATE
+        MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        VMA_VULKAN_VERSION=1000000
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(vulkan_ui_smoke PRIVATE glm::glm
+    target_link_libraries(vulkan_ui_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
         minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_ui_smoke PRIVATE -Wall -Wextra -Wpedantic)
@@ -815,8 +821,10 @@ if(BUILD_TESTING)
     get_target_property(MINECRAFTC_STRUCTURE_SMOKE_SOURCES vulkan_decoration_smoke SOURCES)
     list(REMOVE_ITEM MINECRAFTC_STRUCTURE_SMOKE_SOURCES tests/VulkanDecorationSmoke.cpp)
     add_executable(vulkan_structure_smoke EXCLUDE_FROM_ALL
-        tests/VulkanStructureSmoke.cpp ${MINECRAFTC_STRUCTURE_SMOKE_SOURCES})
-    target_include_directories(vulkan_structure_smoke PRIVATE src external/stb external/FastNoiseLite)
+        tests/VulkanStructureSmoke.cpp ${MINECRAFTC_STRUCTURE_SMOKE_SOURCES}
+        src/entity/EntityModelRegistry.cpp src/model/AnimationGraph.cpp src/model/AnimationMixer.cpp
+        src/model/GltfLoader.cpp src/model/ModelAnimation.cpp)
+    target_include_directories(vulkan_structure_smoke PRIVATE src external external/stb external/FastNoiseLite external/cgltf)
     target_include_directories(vulkan_structure_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_structure_smoke PRIVATE
         MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

@@ -136,6 +136,11 @@ void WorldPersistence::registerGeneratedBlockEntityUnlocked(
 void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
                                       BlockId id) {
     m_chunks.withUnique([&](ChunkStore&) {
+        const auto existing=m_blockOverrides.find({cx,cz});
+        if(existing!=m_blockOverrides.end()) {
+            const auto value=existing->second.find(localIndex);
+            if(value!=existing->second.end() && value->second==id)return;
+        }
         m_blockOverrides[{cx, cz}][localIndex] = id;
         m_dirtyOverrideChunks.insert({cx, cz});
         m_overridesApplied.insert({cx, cz});

@@ -36,7 +36,7 @@ int main() {
             static_cast<uint16_t>(BlockId::GLOWSHROOM) == 115 &&
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint16_t>(BlockId::COUNT) == 269,
+            static_cast<uint16_t>(BlockId::COUNT) == 275,
             "fluid, Heaven, emerald, and workstation states append without renumbering old ids");
     for (bool lava : {false, true}) {
         const BlockId source = fluidBlockFromAmount(lava, 8);

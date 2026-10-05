@@ -101,4 +101,5 @@ private:
     bool accept(const Candidate& candidate) const;
     bool winsOverlapSpacing(const Candidate& candidate) const;
     bool terrainFits(const Candidate& candidate) const;
+    bool terrainFitsUncached(const Candidate& candidate) const;
 };

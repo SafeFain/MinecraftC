@@ -84,7 +84,7 @@ int main() {
             static_cast<uint16_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint16_t>(BlockId::COUNT) == 269 &&
+            static_cast<uint16_t>(BlockId::COUNT) == 275 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -132,7 +132,8 @@ int main() {
             creativeItems[207] == ItemId::BONE_MEAL &&
             creativeItems[231] == ItemId::BEACH_GRASS &&
             creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
-            creativeItems.back() == ItemId::COOKED_SALMON,
+            creativeItems[285] == ItemId::COOKED_SALMON &&
+            creativeItems.back() == ItemId::STONECUTTER,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -157,7 +158,7 @@ int main() {
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Nature)] == 61 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Functional)] == 14 &&
+                CreativeItemCategory::Functional)] == 20 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Tools)] == 23 &&
             categoryCounts[static_cast<size_t>(
@@ -309,6 +310,43 @@ int main() {
             !restockVillager(farmer, 7, true),
             "trade unlocking or twice-daily restock limit failed");
 
+
+    for(uint8_t raw=1;raw<static_cast<uint8_t>(VillagerProfession::Count);++raw) {
+        const auto profession=static_cast<VillagerProfession>(raw);
+        require(professionForWorkstation(workstationForProfession(profession))==profession,
+            "all thirteen professions have distinct valid workstations");
+        for(const auto& offer:villagerOffers(profession))require(!offer.input.empty() &&
+            !offer.output.empty() && isValidItemId(offer.input.id) && isValidItemId(offer.output.id),
+            "profession trade contains unsupported items");
+    }
+    VillagerData life;
+    require(addVillagerFood(life,{ItemId::BREAD,3,0})==0 && willingToBreed(life),
+        "food does not unlock adult breeding");
+    consumeBreedingFood(life);
+    require(villagerFoodCount(life,ItemId::BREAD)==0 && !willingToBreed(life),
+        "breeding food or cooldown was not consumed");
+    life.growthSeconds=1200;
+    advanceVillagerLife(life,300,1);
+    require(life.growthSeconds==900 && life.breedingCooldown==0 && !life.adult(),
+        "growth and breeding cooldown do not advance in simulated time");
+    advanceVillagerLife(life,900,1);
+    require(life.adult(),"child did not grow into an adult");
+    life.profession=VillagerProfession::Farmer;life.reputation=100;
+    const auto discount=villagerQuote(life,0);
+    life.reputation=-100;life.demand[0]=25;
+    const auto surcharge=villagerQuote(life,0);
+    require(discount.input.count==15 && surcharge.input.count==30,
+        "reputation and demand price bounds are incorrect");
+    InventoryModel priced;priced.add({ItemId::WHEAT,30,0});
+    require(executeVillagerTrade(life,0,priced)==TradeResult::Success && priced.count(ItemId::WHEAT)==0,
+        "executed price differs from displayed quote");
+    const auto before=life;
+    require(executeVillagerTrade(life,0,priced)==TradeResult::MissingInput &&
+        life.uses==before.uses && life.demand==before.demand && life.reputation==before.reputation,
+        "failed trade altered reputation, demand or uses");
+    for(auto& stack:life.food)stack={ItemId::WHEAT_SEEDS,64,0};
+    require(addVillagerFood(life,{ItemId::BREAD,3,0})==3,
+        "full villager inventory discarded surplus food");
     InventoryModel inventory;
     for (const auto& stack : inventory.storage())
         require(stack.empty(), "new player inventory starts with an empty hotbar and backpack");

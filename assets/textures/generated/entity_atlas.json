@@ -37,6 +37,18 @@
       "x": 0,
       "y": 0
     },
+    "iron_golem": {
+      "features": [
+        "iron_plate",
+        "vine",
+        "red_eyes",
+        "long_arms"
+      ],
+      "index": 11,
+      "source": "entities/iron_golem.png",
+      "x": 3,
+      "y": 2
+    },
     "item": {
       "features": [],
       "index": 8,

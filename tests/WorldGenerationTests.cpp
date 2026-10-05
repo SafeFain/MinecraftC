@@ -3,6 +3,7 @@
 #include "world/TreeGenerator.h"
 #include "world/StructureGenerator.h"
 #include "world/WorldGenerator.h"
+#include "world/VillageLayout.h"
 #include "world/RegionGenerator.h"
 #include "world/SurfaceRules.h"
 #include "world/Chunk.h"
@@ -36,9 +37,14 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 
 #include "BiomeSurfaceScenarios.h"
 #include "OverworldStructureScenarios.h"
+#include "VillageLayoutScenarios.h"
 
-int main() {
+int main(int argc,char** argv) {
+    if(argc==2 && std::string(argv[1])=="--village-layout-tests") {
+        testVillageLayouts();std::cout<<"Village layout tests passed\n";return 0;
+    }
     testNewStructureBlueprints();
+    testVillageLayouts();
     testBiomeSurfaceEcology();
     testEcologyFormations();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
@@ -863,6 +869,12 @@ int main() {
                 require(anchorBiome.biome == Biome::SNOW_TUNDRA,
                         "igloo anchored outside snowy plains");
                 break;
+            case StructureType::TaigaVillage:
+                require(anchorBiome.biome==Biome::TAIGA,"taiga village biome gate failed");break;
+            case StructureType::SnowVillage:
+                require(anchorBiome.biome==Biome::SNOW_TUNDRA,"snow village biome gate failed");break;
+            case StructureType::SavannaVillage:
+                require(anchorBiome.biome==Biome::SAVANNA,"savanna village biome gate failed");break;
             case StructureType::Village:
                 require(anchorBiome.biome == Biome::PLAINS ||
                             anchorBiome.biome == Biome::SUNFLOWER_PLAINS ||
@@ -914,10 +926,6 @@ int main() {
     // Generation v12 raises real accepted village density, not merely the
     // number of pre-biome candidates. The same v11 seed/window produced 12
     // plains villages and 2 desert villages.
-    require(structureCounts[static_cast<size_t>(StructureType::Village)] >= 36 &&
-                structureCounts[static_cast<size_t>(
-                    StructureType::DesertVillage)] >= 4,
-            "v12 village density fell back to the sparse v11 baseline");
     std::cout << "structure window counts: village="
               << structureCounts[static_cast<size_t>(StructureType::Village)]
               << " desert_village="
@@ -935,6 +943,10 @@ int main() {
               << " lumber="
               << structureCounts[static_cast<size_t>(StructureType::LumberCamp)]
               << '\n';
+    require(structureCounts[static_cast<size_t>(StructureType::Village)] >= 36 &&
+                structureCounts[static_cast<size_t>(
+                    StructureType::DesertVillage)] >= 4,
+            "v12 village density fell back to the sparse v11 baseline");
     for (const StructureType type : OVERWORLD_STRUCTURE_TYPES)
         require(structureCounts[static_cast<size_t>(type)] > 0,
                 "structure type is missing from the exploration window");
@@ -1109,8 +1121,9 @@ int main() {
         return it == blocks.end() ? BlockId::AIR : it->second;
     };
     {
-        const auto village = finalBlueprint(StructureType::Village, 22);
-        require(finalBlock(village, -17, 105, -10) == BlockId::PLANKS,
+        const auto village = finalBlueprint(StructureType::Village, 48);
+        const auto house=VillageLayout::create(StructurePlacement{0,0,100,StructureType::Village,0,-48,48,-48,48}).buildings.front();
+        require(finalBlock(village, house.x, 105, house.z) == BlockId::PLANKS,
                 "plains village house has an open wall-to-roof course");
     }
     {
@@ -1133,8 +1146,8 @@ int main() {
     // Every public blueprint honors its advertised horizontal reservation,
     // remains inside the world build range, and derives visible variation only
     // from the stable placement variant.
-    const std::array<int, 18> blueprintRadii{
-        22, 20, 5, 6, 4, 7, 5, 8, 9, 5, 6, 3, 10, 8, 6, 6, 7, 10};
+    const std::array<int, 21> blueprintRadii{
+        80, 80, 5, 6, 4, 7, 5, 8, 9, 5, 6, 3, 10, 8, 6, 6, 7, 10, 80, 80, 80};
     for (size_t typeIndex = 0; typeIndex < STRUCTURE_TYPES.size(); ++typeIndex) {
         const StructureType type = STRUCTURE_TYPES[typeIndex];
         auto makePlacement = [&](uint64_t variant) {
@@ -1208,8 +1221,8 @@ int main() {
                 spawnRequests.insert(spawnRequests.end(), first.begin(), first.end());
             }
         }
-        require(!spawnRequests.empty(),
-                "generated village beds produced no villager population requests");
+        require(spawnRequests.size()==static_cast<size_t>(VillageLayout::create(village).population),
+                "generated population disagrees with the village tier");
         const int anchorX = -8192 + village.localX;
         const int anchorZ = -8192 + village.localZ;
         const int originCX = floorChunk(anchorX - 24);

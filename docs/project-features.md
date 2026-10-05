@@ -31,13 +31,13 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   ready. New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 18 retains 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 19 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
-  Y=-64..319 while preserving the v6 hybrid-cave algorithm, and includes fourteen
-  deterministic overworld structures (plains/adobe villages, traveler huts,
+  Y=-64..319 while preserving the v6 hybrid-cave algorithm, and includes seventeen
+  deterministic overworld structures (plains/desert/taiga/snow/savanna villages, traveler huts,
   abandoned camps, desert wells, igloos, ruined towers, lumber camps, desert
   temples, jungle ruins, swamp huts, mountain watchtowers, stone circles,
-  abandoned farmsteads). Base cache revision 1 is part of the v18 cache key. Version 14 adds four
+  abandoned farmsteads). Base cache revision 1 is part of the v19 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
@@ -49,7 +49,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 268 serialized
+  types, and 274 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -57,7 +57,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 286-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 292-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -100,11 +100,11 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   Overworld or Heaven;
   command input supports Java-style Tab/Shift+Tab completion and a touch Tab.
 - Villagers and zombie villagers have spawn eggs and persistent original models.
-  Runtime villages require a living villager with exclusive reachable bed and
-  workstation claims; intersecting POI subchunk regions merge dynamically.
-  Seven professions trade fixed five-level emerald offers and restock twice per
-  day at their workstation. Plains/adobe village beds receive deterministic,
-  revisioned first-load population; zombie infection preserves trade data.
+  Runtime villages include living adult/child villagers with exclusive reachable
+  beds; workstation regions merge dynamically. Thirteen professions trade five-level
+  offers with bounded reputation/demand pricing and twice-daily workplace restocking.
+  Five village styles receive deterministic first-load populations independently
+  of spare beds; zombie infection preserves resident data. See the v19 lifecycle below.
 - Living mobs share bounded incremental ground navigation with collision-shape
   support, physical jumps, hazard avoidance, and block-revision path invalidation.
   Near/far decisions run at 10/2 Hz; target acquisition requires sight and retains
@@ -174,7 +174,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-The v15 content remains available in current v18 worlds. Old generation versions
+The v15 content remains available in current v19 worlds. Old generation versions
 are incompatible; current compatibility rules are described below.
 Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
 
@@ -205,7 +205,7 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-Only generation v18 worlds can load. v14/v15 and other previous or future
+Only generation v19 worlds can load. v14/v15 and other previous or future
 versions stay listed as incompatible, retaining their untouched files. No world
 migration remains. The v16 update retained save format v12, seed layout 5, terrain heights, cave-carving
 algorithms, tree/structure anchors and Heaven generation v8. The v17 update below
@@ -243,7 +243,7 @@ changes Heaven and block encoding while retaining Overworld generation output.
   using `/gamerule DayNightDuration <seconds>` with cheats enabled; v2-v13 default
   to 1200 seconds. Save v13 introduced 16-bit IDs, retained in v14; packed light remains byte-sized.
   Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
-  Old metadata remains readable/listed; worlds outside global generation v18
+  Old metadata remains readable/listed; worlds outside global generation v19
   remain incompatible and are never migrated or rewritten by refused loads.
   Seed layout, Overworld generation output and application VERSION are unchanged.
 
@@ -276,8 +276,52 @@ stay consumed across unload and reload. Commands also accept `minecraftc:` names
 Global generation and base-cache keys advance to v18/revision 1. Terrain heights,
 cave carving, ore algorithms, seed layout 5, Heaven v9, block IDs, save format v16
 and application VERSION stay unchanged. Added reservations and overlaps can change
-local trees and other small structures. Only v18 worlds load; older/future worlds
+local trees and other small structures. At that release, only v18 worlds loaded; older/future worlds
 remain listed and refused without rewriting or migration.
+
+## Village lifecycle (generation v19)
+
+- Five biome styles retain the 512-block candidate grid. Four deterministic
+  anchor attempts choose the first feasible layout per cell, maintaining village
+  availability despite larger footprints. Pure per-worker caches are bounded;
+  infeasible village candidates cannot suppress real neighbors.
+- Shared layouts supply 12/18/24 buildings, 20/30/40 initial residents and
+  24/36/48 beds; maximum reservations are 48/64/80 blocks from the anchor.
+  Seeded staggered lots, varied house orientations and variable lane spacing avoid identical housing rows.
+  Curved three-block roads connect homes, profession rooms, lit markets and irrigated
+  wheat fields; snow farms have glass covers. Terrain checks cover lots and roads,
+  avoiding aquatic/cliff layouts without flattening the entire reservation.
+- Existing seven professions append Fisherman, Librarian, Cartographer, Cleric,
+  Butcher and Mason. Barrel, Lectern, Cartography Table, Brewing Stand, Smoker and
+  Stonecutter are craftable full-cube workstations; they confer professions only,
+  without adding storage, brewing, map, enchanting or special crafting screens.
+  All offers use existing items. Traded professions remain locked.
+- Adults collect wheat/seeds/bread into eight slots. Two willing nearby adults
+  consume three bread or twelve wheat each only after a reachable free bed and
+  successful birth; parent cooldown is 300 simulated seconds. Children grow after
+  1200 simulated seconds, cannot work/trade/breed, and have half-scale bodies.
+- Farmers discover bounded field slices, harvest mature wheat and retain seeds
+  for replanting, bake three wheat into bread, and share surplus bread nearby.
+  Generated fields enter the existing random-tick path through bounded discovery.
+  `mob_griefing=false` prevents harvesting/replanting and dropped-food collection.
+- Personal single-player reputation is -100..100. Successful trades grant up to
+  five points per day; player injury/kills subtract 10/25, shared with same-village
+  witnesses within 16 blocks and line of sight. Reputation returns one point toward
+  zero daily. Prices adjust up to ±25%, with demand adding up to 25%; restocking
+  reduces demand. UI quotes and transactional inventory deductions share one function.
+- Villagers work in the existing two restock periods, gather in the afternoon and
+  return home at night. Long destinations use bounded intermediate navigation;
+  unloaded facilities retain claims. Lifecycle schedules at most eight residents
+  per second and 64 farm probes per scheduled farmer, alongside existing AI budgets.
+- Fully loaded villages with at least five bed-owning adults gain one iron golem.
+  Defenders use navigation, sight-gated melee and normal damage/save paths, patrol
+  near home and do not naturally despawn. Death imposes a 600-second village cooldown.
+  Low-reputation Survival players can become targets; Creative/Spectator cannot.
+- Save v17 persists food, growth/cooldowns, reputation and demand for metadata and
+  chunk entities; v2–v16 remain readable with defaults. No offline growth or cooldown
+  catch-up. No raids, zombie curing, gossip simulation, or automatic construction.
+  Only global v19 worlds load; refused older/future worlds are never rewritten.
+  Heaven v9, terrain/cave algorithms, existing IDs and application VERSION remain unchanged.
 
 ## Classic fishing
 
@@ -318,7 +362,7 @@ remain listed and refused without rewriting or migration.
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v16 (introduced in v15); v2–v14 retain readable defaults and
+are world-wide and persisted in save v17 (introduced in v15); v2–v14 retain readable defaults and
 existing duration values. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 

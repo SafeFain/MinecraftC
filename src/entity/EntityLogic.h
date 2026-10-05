@@ -11,7 +11,7 @@
 
 enum class EntityType : uint8_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
-    Arrow, PrimedTnt, Villager, ZombieVillager
+    Arrow, PrimedTnt, Villager, ZombieVillager, IronGolem
 };
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };

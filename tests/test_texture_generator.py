@@ -44,7 +44,7 @@ class TextureGeneratorTests(unittest.TestCase):
 
     def test_heaven_v9_materials_and_plants(self):
         names=list(tg.HEAVEN_TEXTURES)
-        self.assertEqual(tg.NAMES[216:], names)
+        self.assertEqual(tg.NAMES[216:232], names)
         self.assertEqual(len(names),16)
         fingerprints=set()
         with tempfile.TemporaryDirectory() as directory:
@@ -120,8 +120,24 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(order[231], "beach_grass")
         self.assertEqual(order[259], "cave_glowshroom")
         self.assertEqual(order[280], "roasted_glowshroom")
-        self.assertEqual(order[281:], ["fishing_rod", "raw_cod", "raw_salmon",
+        self.assertEqual(order[281:286], ["fishing_rod", "raw_cod", "raw_salmon",
                                       "cooked_cod", "cooked_salmon"])
+
+    def test_village_workstation_materials_preserve_slots(self):
+        names=list(tg.VILLAGE_FUNCTIONAL)
+        self.assertEqual(tg.NAMES[232:],names)
+        definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
+        self.assertEqual(list(definitions["items"])[286:],names)
+        fingerprints=set()
+        with tempfile.TemporaryDirectory() as directory:
+            for name in names:
+                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
+                path=Path(directory)/(name+".png")
+                tg.write_png(path,16,16,pixels)
+                self.assertFalse(tg.validate_texture(path),name)
+                fingerprints.add(tuple(pixels))
+        self.assertEqual(len(fingerprints),6)
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]

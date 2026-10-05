@@ -81,7 +81,7 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
                        BlockId::LOOM})
         set(id, 2.0f, ToolKind::Axe);
     for (BlockId id : {BlockId::CAULDRON, BlockId::BLAST_FURNACE,
-                       BlockId::SMITHING_TABLE, BlockId::GRINDSTONE})
+                       BlockId::SMITHING_TABLE, BlockId::GRINDSTONE, BlockId::BARREL, BlockId::LECTERN, BlockId::CARTOGRAPHY_TABLE, BlockId::BREWING_STAND, BlockId::SMOKER, BlockId::STONECUTTER})
         set(id, 3.5f, ToolKind::Pickaxe, ToolTier::Wood);
     for (BlockId id : {BlockId::BIRCH_LEAVES, BlockId::SPRUCE_LEAVES,
                        BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
@@ -376,6 +376,20 @@ std::vector<CraftingRecipe> buildRecipes() {
         ItemId::STICK, ItemId::COBBLESTONE_SLAB, ItemId::STICK,
         ItemId::OAK_PLANKS, E, ItemId::OAK_PLANKS},
         {ItemId::GRINDSTONE, 1, 0}, false));
+    recipes.push_back(shaped(3,3,{ItemId::OAK_PLANKS,ItemId::OAK_PLANKS_SLAB,ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS,E,ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS,ItemId::OAK_PLANKS_SLAB,ItemId::OAK_PLANKS},{ItemId::BARREL,1,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::OAK_PLANKS_SLAB,ItemId::OAK_PLANKS_SLAB,ItemId::OAK_PLANKS_SLAB,
+        E,ItemId::GLASS,E,E,ItemId::OAK_PLANKS,E},{ItemId::LECTERN,1,0},false));
+    recipes.push_back(shaped(2,3,{ItemId::GLASS,ItemId::GLASS,ItemId::OAK_PLANKS,
+        ItemId::OAK_PLANKS,ItemId::OAK_PLANKS,ItemId::OAK_PLANKS},{ItemId::CARTOGRAPHY_TABLE,1,0},false));
+    recipes.push_back(shaped(3,2,{E,ItemId::GOLD_INGOT,E,ItemId::COBBLESTONE,
+        ItemId::COBBLESTONE,ItemId::COBBLESTONE},{ItemId::BREWING_STAND,1,0},false));
+    recipes.push_back(shaped(3,3,{E,ItemId::OAK_LOG,E,ItemId::OAK_LOG,ItemId::FURNACE,
+        ItemId::OAK_LOG,E,ItemId::OAK_LOG,E},{ItemId::SMOKER,1,0},false));
+    recipes.push_back(shaped(3,2,{E,ItemId::IRON_INGOT,E,ItemId::STONE,
+        ItemId::STONE,ItemId::STONE},{ItemId::STONECUTTER,1,0},false));
+
     const std::array<std::tuple<ItemId, ItemId, ItemId>, 5> architecture{{
         {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS_SLAB,
          ItemId::OAK_PLANKS_STAIRS},

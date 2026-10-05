@@ -110,7 +110,7 @@ void requireStructureAccess(const StructurePlacement& p, const BlockAt& blockAt)
 inline void testNewStructureBlueprints() {
     static_assert(static_cast<uint8_t>(StructureType::SkywayShrine) == 12);
     static_assert(static_cast<uint8_t>(StructureLootProfile::OriginSkywayShrine) == 11);
-    static_assert(WorldGenContext::GENERATION_VERSION == 18);
+    static_assert(WorldGenContext::GENERATION_VERSION == 19);
     for (const auto& fixture : NEW_STRUCTURE_FIXTURES) {
         for (int base : {Config::WORLD_MIN_Y+5, Config::WORLD_MAX_Y-fixture.height-1}) {
             StructurePlacement limit;

@@ -6,6 +6,7 @@
 #include "game/SessionAccess.h"
 #include "game/Command.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
+#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "ui/Menu.h"
@@ -27,7 +28,10 @@ struct Access final : IContainerAccess,ITradeAccess {
     Entity villager;
     Access() {
         villager.type=EntityType::Villager;
-        villager.villager.profession=VillagerProfession::Farmer;
+        villager.villager.profession=VillagerProfession::Mason;
+        villager.villager.reputation=80;
+        villager.villager.demand[0]=10;
+        villager.villager.uses[1]=12;
         villager.villager.level=5;
     }
     BlockEntity* blockEntityAt(const glm::ivec3&) override { return &block; }
@@ -77,6 +81,7 @@ int main(int argc,char** argv) {
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
+                if(capture && name=="trades" && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -88,6 +93,13 @@ int main(int argc,char** argv) {
             }
             renderer.waitIdle();
             std::cout<<"READY "<<name<<" vertices="<<previousVertices<<" batches="<<previousBatches<<std::endl;
+            if(capture && name=="trades") {
+                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("trade capture size invalid");
+                std::ofstream out(std::filesystem::temp_directory_path()/"village-trades.ppm",std::ios::binary);
+                out<<"P6\n"<<width<<' '<<height<<"\n255\n";
+                for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
+            }
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
         draw("home",[&]{main.render(ui,width,height);});

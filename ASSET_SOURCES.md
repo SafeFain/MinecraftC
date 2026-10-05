@@ -99,3 +99,18 @@ emission; stems and transparent pixels do not. Reproduce with:
 ```bash
 python3 tools/texture_generator.py --generate --validate --build-atlas --build-items-atlas
 ```
+
+## Village lifecycle v19 workstations and iron golem
+
+- Logical names: barrel, lectern, cartography_table, brewing_stand, smoker,
+  stonecutter, iron_golem.
+- Local paths: `assets/textures/generated/`, `assets/models/entities/iron_golem.*`;
+  source definitions in `assets/textures/definitions/`.
+- Creator/tool: MinecraftC `tools/texture_generator.py` v5 and
+  `tools/generate_entity_models.py`; original geometric iron plates, vines and red eyes.
+- Creation date: 2026-10-05.
+- Seed: 213785369 for textures; model generator's existing deterministic seed.
+- Source or reference URLs: none; no downloaded or copied game assets.
+- License: original project-generated assets under the repository license.
+- Modifications: six workstation patterns/icons; iron golem body, skin,
+  idle/walk/hurt/death/melee animations; regenerated semantic atlases.

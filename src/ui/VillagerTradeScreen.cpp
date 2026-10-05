@@ -75,12 +75,15 @@ void VillagerTradeScreen::render(
                 {0, 0, 0, .62f});
     const float scale=m_layoutScale;
     UiTheme::panel(ui,m_panelRect.x,m_panelRect.y,m_panelRect.w,m_panelRect.h);
-    const std::string title=ui.localization().text("trade.title");
+    const std::string title=ui.localization().text("trade.profession."+
+        std::string(villagerProfessionKey(entity->villager.profession)))+"  "+
+        ui.localization().text("trade.level")+" "+std::to_string(entity->villager.level);
     UiTheme::textWithShadow(ui,title,m_panelRect.x+24*scale,m_panelRect.y+352*scale,
         UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-48*scale),UiTheme::TEXT);
     const auto& offers = villagerOffers(entity->villager.profession);
     const uint8_t unlocked = unlockedTradeCount(entity->villager);
     for (uint8_t i = 0; i < 5; ++i) {
+        const auto quote=villagerQuote(entity->villager,i);
         const bool enabled = i < unlocked &&
             entity->villager.uses[i] < offers[i].maximumUses;
         const bool selected = i == m_selected;
@@ -89,13 +92,14 @@ void VillagerTradeScreen::render(
             selected?UiTheme::WidgetState::Selected:hovered?UiTheme::WidgetState::Hover:
                 UiTheme::WidgetState::Normal,false,0,enabled?1.0f:.55f,-1,-1,false,0,&m_feedback[i]);
         Rect input{m_rows[i].x+8*scale,m_rows[i].y+4*scale,44*scale,44*scale};
-        drawStack(ui, input, offers[i].input, false);
+        drawStack(ui, input, quote.input, false);
         UiTheme::sprite(ui, m_rows[i].x+118*scale,m_rows[i].y+16*scale,
                         2*scale, UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE,
                         enabled ? 1.0f : .35f);
-        drawStack(ui, m_outputs[i], offers[i].output,
+        drawStack(ui, m_outputs[i], quote.output,
                   enabled && contains(m_outputs[i], mouseX, mouseY));
         UiTheme::textWithShadow(ui,
+            (entity->villager.uses[i]>=offers[i].maximumUses ? ui.localization().text("trade.exhausted")+" " : std::string{})+
             std::to_string(entity->villager.uses[i]) + "/" +
             std::to_string(offers[i].maximumUses),
             m_rows[i].x+170*scale,m_rows[i].y+18*scale,.8f*scale,

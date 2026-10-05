@@ -4,7 +4,7 @@
 #include <utility>
 #include <tuple>
 
-enum class EntityBehavior { Idle, Wander, Chase, Flee, Work, Sleep, ReturnHome };
+enum class EntityBehavior { Idle, Wander, Chase, Flee, Work, Sleep, ReturnHome, Gather, Farm, Breed };
 enum class NavigationPurpose { Move, BedClaim, WorkClaim };
 
 struct EntityAiState {
@@ -23,6 +23,7 @@ struct EntityAiState {
     double nextPath = 0;
     double retryDelay = Config::AI_RETRY_MIN_SECONDS;
     bool initialized = false;
+    double nextVillageAction = 0;
     bool grounded = false;
     bool hasDestination = false;
     float speed = 0;

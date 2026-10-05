@@ -40,6 +40,7 @@ void EntityManager::clear() {
     m_aiStats = {};
     m_deadEntityRenders.clear();
     m_spawnTimer = 0.0f;
+    m_villageLifeTimer=0; m_villageLifeCursor=0;
     m_spawnSequence = 0;
     m_lastPopulationEnabled = false;
     m_loadedChunks.clear();
@@ -293,12 +294,14 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
             entity.villager.offerSeed = entity.behaviorSeed;
             break;
         case EntityType::ZombieVillager: entity.health = 20.0f; break;
+        case EntityType::IronGolem: entity.health = 100.0f; break;
         case EntityType::Arrow: return false;
         case EntityType::PrimedTnt: return false;
         case EntityType::Item: return false;
     }
     if (collides(entity, position)) return false;
     m_entities.push_back(entity);
+    m_aiEntityIndices[entity.id]=m_entities.size()-1;
     m_dirtyEntityChunks.insert(entityChunk(position));
     return true;
 }
@@ -330,7 +333,7 @@ std::optional<uint64_t> EntityManager::useRay(
     std::optional<uint64_t> selected;
     for (const Entity& entity : m_entities) {
         if (entity.type != EntityType::Villager || entity.health <= 0.0f) continue;
-        const glm::vec3 size = renderSize(entity.type);
+        const glm::vec3 size = entitySize(entity);
         const glm::dvec3 minimum = entity.position +
             glm::dvec3(-size.x * .5, 0.0, -size.z * .5);
         const glm::dvec3 maximumBox = entity.position +
@@ -378,7 +381,7 @@ TradeResult EntityManager::tradeWith(
 bool EntityManager::isLogicalVillageMember(uint64_t entityId) const {
     const Entity* entity = entityById(entityId);
     return entity && entity->type == EntityType::Villager &&
-        entity->villager.hasBed && entity->villager.hasWorkstation;
+        entity->villager.hasBed;
 }
 
 bool EntityManager::villagerUsable(
@@ -407,13 +410,14 @@ void EntityManager::rebuildLogicalVillages() {
     };
     for (const Entity& entity : m_entities) {
         if (entity.type != EntityType::Villager || entity.health <= 0.0f ||
-            !entity.villager.hasBed || !entity.villager.hasWorkstation) continue;
+            !entity.villager.hasBed) continue;
         const glm::ivec3 bed(floorSubchunk(entity.villager.claimedBed.x),
                             floorSubchunk(entity.villager.claimedBed.y),
                             floorSubchunk(entity.villager.claimedBed.z));
-        const glm::ivec3 work(floorSubchunk(entity.villager.claimedWorkstation.x),
-                             floorSubchunk(entity.villager.claimedWorkstation.y),
-                             floorSubchunk(entity.villager.claimedWorkstation.z));
+        const glm::ivec3 work=entity.villager.hasWorkstation ?
+            glm::ivec3(floorSubchunk(entity.villager.claimedWorkstation.x),
+                floorSubchunk(entity.villager.claimedWorkstation.y),
+                floorSubchunk(entity.villager.claimedWorkstation.z)) : bed;
         LogicalVillage village;
         village.minimumSubchunk = glm::min(bed, work) - glm::ivec3(1);
         village.maximumSubchunk = glm::max(bed, work) + glm::ivec3(1);
@@ -448,6 +452,7 @@ void EntityManager::spawnAroundPlayer(
         m_entities.begin(), m_entities.end(),
         [spawnHostile](const Entity& entity) {
             return entity.type != EntityType::Item && entity.type != EntityType::Arrow &&
+                   entity.type != EntityType::Villager && entity.type != EntityType::IronGolem &&
                    hostile(entity.type) == spawnHostile;
         }));
     if (mobCount >= (spawnHostile ? 24u : 16u)) return;
@@ -503,7 +508,7 @@ bool EntityManager::exposedToSky(const Entity& entity) const {
     const int worldX = static_cast<int>(std::floor(entity.position.x));
     const int worldZ = static_cast<int>(std::floor(entity.position.z));
     const int headTop = static_cast<int>(std::floor(
-        entity.position.y + renderSize(entity.type).y - 1e-6));
+        entity.position.y + entitySize(entity).y - 1e-6));
     const int cx = World::worldToChunkX(static_cast<double>(worldX));
     const int cz = World::worldToChunkZ(static_cast<double>(worldZ));
     const int lx = worldX - cx * Config::CHUNK_SIZE_X;
@@ -515,7 +520,7 @@ bool EntityManager::exposedToSky(const Entity& entity) const {
 }
 
 bool EntityManager::touchesWater(const Entity& entity) const {
-    const glm::vec3 size = renderSize(entity.type);
+    const glm::vec3 size = entitySize(entity);
     const int x = static_cast<int>(std::floor(entity.position.x));
     const int z = static_cast<int>(std::floor(entity.position.z));
     const int feet = static_cast<int>(std::floor(entity.position.y + 0.05));
@@ -533,11 +538,19 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     const float accepted = PlayerPhysics::damageAfterImmunity(
         entity.hurtImmunity, damage, Config::PLAYER_HURT_IMMUNITY_SECONDS);
     if (accepted <= 0.0f) return 0.0f;
+    // Player damage must use current membership, including the victim before
+    // a lethal hit removes it and before the periodic village refresh.
+    if(playerAttack && entity.type==EntityType::Villager)rebuildLogicalVillages();
     entity.health -= accepted;
+    if(entity.health<=0 && entity.type==EntityType::IronGolem)
+        for(auto& resident:m_entities)if(resident.type==EntityType::Villager && resident.health>0 &&
+            glm::distance(resident.position,entity.position)<96)resident.villager.defenseCooldown=Config::VILLAGE_DEFENSE_COOLDOWN;
+    if(playerAttack && entity.type==EntityType::Villager)
+        changeVillageReputation(entity,entity.health<=0 ? -25 : -10);
     entity.ai.nextDecision = m_aiTime;
     if (source) {
         entity.ai.danger = *source;
-        if (hostile(entity.type) && (playerAttack || sourceId != 0)) {
+        if ((hostile(entity.type) || entity.type==EntityType::IronGolem) && (playerAttack || sourceId != 0)) {
             entity.ai.hasTarget = true;
             entity.ai.retaliating = true;
             entity.ai.targetId = playerAttack ? 0 : sourceId;
@@ -545,12 +558,12 @@ float EntityManager::damageEntity(Entity& entity, float damage,
             entity.ai.memoryUntil = m_aiTime + Config::AI_TARGET_MEMORY;
         }
     } else entity.ai.danger = entity.position - glm::dvec3(knockback);
-    if (!hostile(entity.type))
+    if (!hostile(entity.type) && entity.type!=EntityType::IronGolem)
         entity.ai.panicUntil = m_aiTime + Config::AI_PANIC_SECONDS;
     entity.hurtFlashSeconds = 0.2f;
     if ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
         entity.type == EntityType::Villager ||
-        entity.type == EntityType::ZombieVillager)
+        entity.type == EntityType::ZombieVillager || entity.type==EntityType::IronGolem)
         m_modelRegistry.playAction(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
     if (playerAttack && entity.type == EntityType::Spider)
@@ -559,7 +572,7 @@ float EntityManager::damageEntity(Entity& entity, float damage,
 }
 
 bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) const {
-    const glm::vec3 size=renderSize(entity.type);
+    const glm::vec3 size=entitySize(entity);
     const double halfX=size.x*0.5,halfZ=size.z*0.5;
     const int minX=static_cast<int>(std::floor(position.x-halfX));
     const int maxX=static_cast<int>(std::floor(position.x+halfX-1e-6));
@@ -697,7 +710,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                 m_world.precipitationAt(x, y, z) == PrecipitationType::Rain;
             const bool fireContact = m_world.getBlock(x, y, z) == BlockId::FIRE ||
                 m_world.getBlock(x, static_cast<int>(std::floor(
-                    entity.position.y + renderSize(entity.type).y * 0.5)), z) ==
+                    entity.position.y + entitySize(entity).y * 0.5)), z) ==
                     BlockId::FIRE;
             const bool undead = entity.type == EntityType::Zombie ||
                                 entity.type == EntityType::Skeleton ||
@@ -721,6 +734,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         updateMobAi(entity, player, dt, isDay,
                     playerTargetable, worldTick, thunderstorm);
     }
+    tickVillageLife(dt,worldTick);
     for (const auto& arrow : m_aiArrows)
         spawnArrow(arrow.position, arrow.velocity, arrow.damage, false, arrow.shooterId);
     m_aiArrows.clear();
@@ -800,6 +814,7 @@ void EntityManager::dropMobLoot(const Entity& entity) {
         case EntityType::Spider: loot = {{ItemId::STRING, 1, 0}}; break;
         case EntityType::Blastling: loot = {{ItemId::GUNPOWDER, 1, 0}}; break;
         case EntityType::Villager: break;
+        case EntityType::IronGolem: loot={{ItemId::IRON_INGOT,3,0}};break;
         case EntityType::ZombieVillager:
             loot = {{ItemId::ROTTEN_FLESH, 1, 0}};
             break;
@@ -814,7 +829,7 @@ namespace {
 bool meleeTarget(const Entity& entity) {
     return ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
             entity.type == EntityType::Villager ||
-            entity.type == EntityType::ZombieVillager) &&
+            entity.type == EntityType::ZombieVillager || entity.type==EntityType::IronGolem) &&
         entity.health > 0.0f;
 }
 
@@ -857,7 +872,7 @@ MeleeAttackResult EntityManager::attackRay(
     for (auto& entity : m_entities) {
         if (!meleeTarget(entity)) continue;
         float along = 0.0f;
-        if (!rayEntityAabb(origin, direction, entity, renderSize(entity.type),
+        if (!rayEntityAabb(origin, direction, entity, entitySize(entity),
                            attack.reach, along) || along >= bestAlong)
             continue;
         if (along > 0.001f &&
@@ -870,7 +885,7 @@ MeleeAttackResult EntityManager::attackRay(
 
     result.foundTarget = true;
     result.primaryPosition = best->position +
-        glm::dvec3(0.0, renderSize(best->type).y * 0.5, 0.0);
+        glm::dvec3(0.0, entitySize(*best).y * 0.5, 0.0);
     glm::vec3 horizontal(direction.x, 0.0f, direction.z);
     if (glm::length(horizontal) > 0.001f)
         horizontal = glm::normalize(horizontal) *
@@ -881,7 +896,7 @@ MeleeAttackResult EntityManager::attackRay(
     result.primaryDamaged = result.primaryDamage > 0.0f;
 
     if (!attack.sweeping || !result.primaryDamaged) return result;
-    const glm::vec3 bestSize = renderSize(best->type);
+    const glm::vec3 bestSize = entitySize(*best);
     const glm::dvec3 sweepMin(
         best->position.x - bestSize.x * 0.5 - 1.0,
         best->position.y - 1.0,
@@ -893,7 +908,7 @@ MeleeAttackResult EntityManager::attackRay(
     for (auto& entity : m_entities) {
         if (&entity == best || !meleeTarget(entity)) continue;
         const glm::dvec3 center = entity.position +
-            glm::dvec3(0.0, renderSize(entity.type).y * 0.5, 0.0);
+            glm::dvec3(0.0, entitySize(entity).y * 0.5, 0.0);
         if (center.x < sweepMin.x || center.x > sweepMax.x ||
             center.y < sweepMin.y || center.y > sweepMax.y ||
             center.z < sweepMin.z || center.z > sweepMax.z ||
@@ -922,7 +937,7 @@ bool EntityManager::hasAttackTarget(
     for (const auto& entity : m_entities) {
         if (!meleeTarget(entity)) continue;
         float along = 0.0f;
-        if (!rayEntityAabb(origin, direction, entity, renderSize(entity.type),
+        if (!rayEntityAabb(origin, direction, entity, entitySize(entity),
                            reach, along) || along >= bestAlong)
             continue;
         if (along > 0.001f &&
@@ -960,7 +975,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
     // Test each eligible target once and choose the first contact in flight order.
     for (auto& target : m_entities) {
         if (!meleeTarget(target) || target.id == arrow.shooterId) continue;
-        const glm::vec3 size = renderSize(target.type);
+        const glm::vec3 size = entitySize(target);
         const auto hit = projectileAabbHit(start, initialVelocity,
             target.position + glm::dvec3(-size.x * .5, 0, -size.z * .5),
             target.position + glm::dvec3(size.x * .5, size.y, size.z * .5),
@@ -1140,6 +1155,7 @@ glm::vec3 EntityManager::renderColor(EntityType type) {
         case EntityType::Blastling: return {0.35f, 0.72f, 0.30f};
         case EntityType::Villager: return {0.56f,0.36f,0.22f};
         case EntityType::ZombieVillager: return {0.27f,0.48f,0.29f};
+        case EntityType::IronGolem: return {.78f,.79f,.70f};
         case EntityType::Arrow: return {0.58f,0.42f,0.20f};
         case EntityType::PrimedTnt: return {0.86f,0.18f,0.12f};
     }
@@ -1153,6 +1169,7 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
         case EntityType::PrimedTnt: return {0.98f,0.98f,0.98f};
         case EntityType::Chicken: return {0.45f, 0.65f, 0.45f};
         case EntityType::Spider: return {1.2f, 0.55f, 1.2f};
+        case EntityType::IronGolem: return {1.35f,2.7f,1.0f};
         case EntityType::Villager:
         case EntityType::ZombieVillager: return {0.62f,1.80f,0.48f};
         case EntityType::Cow:
@@ -1181,6 +1198,7 @@ void EntityManager::render(
             case EntityType::Blastling: textureIndex = 7; break;
             case EntityType::Villager: textureIndex = 9; break;
             case EntityType::ZombieVillager: textureIndex = 10; break;
+            case EntityType::IronGolem: textureIndex = 11; break;
             case EntityType::Item: textureIndex = 8; break;
             case EntityType::Arrow: textureIndex = 8; break;
             case EntityType::PrimedTnt: textureIndex = 8; break;
@@ -1200,14 +1218,14 @@ void EntityManager::render(
         }
         const glm::vec3 position(
             glm::dvec3(entity.position) - renderOrigin);
-        const glm::vec3 size=renderSize(entity.type);
+        const glm::vec3 size=entitySize(entity);
         const SmoothLightSample light=m_world.sampleLight(
             entity.position+glm::dvec3(0.0,size.y*0.5,0.0));
         const bool passive = entity.type == EntityType::Cow ||
                              entity.type == EntityType::Pig ||
                              entity.type == EntityType::Sheep ||
                              entity.type == EntityType::Chicken ||
-                             entity.type == EntityType::Villager;
+                             entity.type == EntityType::Villager || entity.type==EntityType::IronGolem;
         const bool hostileMob = entity.type == EntityType::Zombie ||
                                 entity.type == EntityType::Skeleton ||
                              entity.type == EntityType::Spider ||
@@ -1217,7 +1235,10 @@ void EntityManager::render(
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
                 renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(),
-                visualTint, light, entity.sleeping);
+                visualTint * (entity.type==EntityType::Villager ?
+                    glm::mix(glm::vec3(1),glm::vec3(.65f+.025f*static_cast<int>(entity.villager.profession),
+                        .85f,.72f),.5f) : glm::vec3(1)), light, entity.sleeping,
+                    (entity.type==EntityType::Villager || entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
             continue;
         }
         if ((!passive && !hostileMob) || !renderer.capabilities().gameplay) {

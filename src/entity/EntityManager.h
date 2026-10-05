@@ -31,6 +31,8 @@ struct EntityAiStats {
     size_t pathNodes = 0;
     size_t activeSearches = 0;
     size_t poiBlocks = 0;
+    size_t villageActions = 0;
+    size_t farmBlocks = 0;
 };
 
 struct Entity {
@@ -225,6 +227,15 @@ private:
     static bool hostile(EntityType type);
     static glm::vec3 renderColor(EntityType type);
     static glm::vec3 renderSize(EntityType type);
+    static glm::vec3 entitySize(const Entity& entity) {
+        return renderSize(entity.type)*((entity.type==EntityType::Villager ||
+            entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
+    }
+    void tickVillageLife(float dt, uint64_t worldTick);
+    void changeVillageReputation(Entity& victim, int amount);
+    size_t m_villageLifeCursor = 0;
+    float m_villageLifeTimer = 0;
+
     void refreshVillageClaims();
 
     void rebuildLogicalVillages();

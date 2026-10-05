@@ -38,7 +38,7 @@ void EntityManager::chooseEscape(Entity& entity,const glm::dvec3& danger) {
         const double angle=offsets[(i+ai.sequence)%5];
         const glm::dvec3 direction(away.x*std::cos(angle)-away.z*std::sin(angle),0,
                                    away.x*std::sin(angle)+away.z*std::cos(angle));
-        const auto destination=GroundNavigation::stand(terrain,renderSize(entity.type),
+        const auto destination=GroundNavigation::stand(terrain,entitySize(entity),
             std::floor(entity.position.x+direction.x*6)+.5,
             std::floor(entity.position.z+direction.z*6)+.5,entity.position.y);
         if (!destination || glm::distance(*destination,danger)<=glm::distance(entity.position,danger))
@@ -54,7 +54,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
     ++m_aiStats.decisions;
     auto& ai=entity.ai;
     const auto previousBehavior=ai.behavior;
-    const glm::dvec3 eye=entity.position+glm::dvec3(0,renderSize(entity.type).y*.8,0);
+    const glm::dvec3 eye=entity.position+glm::dvec3(0,entitySize(entity).y*.8,0);
     if (entity.type==EntityType::Villager) {
         Entity* threat=nullptr;
         double nearest=Config::AI_VILLAGER_FEAR_DISTANCE;
@@ -63,7 +63,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             if (!other || !hostile(other->type)) continue;
             const double distance=glm::distance(entity.position,other->position);
             if (distance<nearest && aiClearSight(eye,other->position+
-                                              glm::dvec3(0,renderSize(other->type).y*.5,0))) {
+                                              glm::dvec3(0,entitySize(*other).y*.5,0))) {
                 threat=other; nearest=distance;
             }
         }
@@ -72,7 +72,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             ai.panicUntil=m_aiTime+Config::AI_PANIC_SECONDS;
         }
     }
-    if (!hostile(entity.type) && ai.panicUntil>m_aiTime) {
+    if (!hostile(entity.type) && entity.type!=EntityType::IronGolem && ai.panicUntil>m_aiTime) {
         if (previousBehavior!=EntityBehavior::Flee) {
             cancelNavigation(entity);
             ai.nextPath=m_aiTime;
@@ -96,6 +96,46 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
         ai.nextPath=m_aiTime;
         ai.actionUntil=m_aiTime;
     }
+    if(entity.type==EntityType::IronGolem) {
+        ai.targetVisible=false;
+        Entity* target=nullptr;
+        double nearest=Config::AI_SIGHT_DISTANCE;
+        for(uint64_t id:nearbyEntities(entity.position,nearest)) {
+            Entity* other=aiEntity(id);
+            if(!other || other->health<=0 || !hostile(other->type))continue;
+            const double distance=glm::distance(entity.position,other->position);
+            if(distance<nearest && aiClearSight(eye,other->position+glm::dvec3(0,.9,0))) {
+                target=other;nearest=distance;
+            }
+        }
+        bool angry=ai.retaliating && ai.hasTarget && ai.targetId==0;
+        for(uint64_t id:nearbyEntities(entity.position,16)) {
+            const Entity* v=aiEntity(id);
+            if(v && v->type==EntityType::Villager && v->villager.reputation<=-25)angry=true;
+        }
+        if(target) {
+            ai.hasTarget=true;ai.targetId=target->id;ai.lastSeen=target->position;
+            ai.targetVisible=true;ai.memoryUntil=m_aiTime+Config::AI_TARGET_MEMORY;
+        } else if(playerTargetable && angry && glm::distance(entity.position,player.getPosition())<nearest &&
+                  aiClearSight(eye,player.getEyePosition())) {
+            ai.hasTarget=true;ai.targetId=0;ai.lastSeen=player.getPosition();ai.targetVisible=true;
+            ai.memoryUntil=m_aiTime+Config::AI_TARGET_MEMORY;
+        } else if(m_aiTime>=ai.memoryUntil || (!ai.targetId && (!angry || !playerTargetable)))ai.hasTarget=false;
+        if(ai.hasTarget && entity.villager.hasBed &&
+            glm::distance(ai.lastSeen,glm::dvec3(entity.villager.claimedBed))>32)ai.hasTarget=false;
+        if(!ai.hasTarget && entity.villager.hasBed &&
+            glm::distance(entity.position,glm::dvec3(entity.villager.claimedBed))>12) {
+            if(auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+                entity.villager.claimedBed.x+.5,entity.villager.claimedBed.z+.5,entity.position.y,8,8)) {
+                ai.behavior=EntityBehavior::ReturnHome;ai.destination={*destination,3,.6};
+                ai.hasDestination=true;ai.speed=.75f;return;
+            }
+        }
+        if(ai.hasTarget) {
+            ai.behavior=EntityBehavior::Chase;ai.speed=.9f;
+            ai.destination={ai.lastSeen,1.8,.6};ai.hasDestination=true;return;
+        }
+    }
     if (hostile(entity.type)) {
         const double playerDistance=glm::distance(entity.position,player.getPosition());
         if (entity.type==EntityType::Spider && playerDistance>=Config::AI_SIGHT_DISTANCE)
@@ -110,7 +150,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             if (!valid) ai.hasTarget=false;
             else {
                 const glm::dvec3 position=other ? other->position : player.getPosition();
-                const glm::dvec3 center=position+glm::dvec3(0,other ? renderSize(other->type).y*.5 : .9,0);
+                const glm::dvec3 center=position+glm::dvec3(0,other ? entitySize(*other).y*.5 : .9,0);
                 if (glm::distance(entity.position,position)<Config::AI_SIGHT_DISTANCE &&
                     aiClearSight(eye,center)) {
                     ai.targetVisible=true;
@@ -169,10 +209,25 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
     if (entity.type==EntityType::Villager) {
         const auto& v=entity.villager;
         const uint32_t tick=static_cast<uint32_t>(worldTick%24000);
+        if(v.adult() && ai.behavior==EntityBehavior::Breed && ai.hasDestination &&
+            !GroundNavigation::reached(entity.position,ai.destination))return;
         const bool working=(tick>=2000 && tick<4000) || (tick>=9000 && tick<11000);
+        if(working && v.adult() && entity.ai.behavior==EntityBehavior::Farm &&
+           entity.ai.hasDestination && !GroundNavigation::reached(entity.position,entity.ai.destination))return;
+        if(tick>=11000 && tick<12000 && v.hasBed) {
+            for(const auto& village:m_logicalVillages)if(std::find(village.members.begin(),village.members.end(),entity.id)!=village.members.end()) {
+                glm::dvec3 center(0);int count=0;
+                for(auto id:village.members)if(const auto* other=aiEntity(id)) {center+=glm::dvec3(other->villager.claimedBed);++count;}
+                if(count>0)if(auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+                    std::floor(center.x/count)+.5,std::floor(center.z/count)+.5,entity.position.y,8,8)) {
+                    ai.behavior=EntityBehavior::Gather;ai.destination={*destination,3,.6};
+                    ai.hasDestination=true;ai.speed=.65f;entity.sleeping=false;return;
+                }
+            }
+        }
         std::optional<glm::ivec3> poi;
         if (!isDay && v.hasBed) { poi=v.claimedBed; ai.behavior=EntityBehavior::Sleep; }
-        else if (working && v.hasWorkstation) { poi=v.claimedWorkstation; ai.behavior=EntityBehavior::Work; }
+        else if (working && v.hasWorkstation && v.adult()) { poi=v.claimedWorkstation; ai.behavior=EntityBehavior::Work; }
         if (poi) {
             entity.sleeping=ai.behavior==EntityBehavior::Sleep && interactablePoi(entity,*poi);
             if (auto destination=poiGoal(entity,*poi)) {
@@ -183,7 +238,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             return;
         }
         entity.sleeping=false;
-        if (!v.hasBed || !v.hasWorkstation) {
+        if (!v.hasBed || (!v.hasWorkstation && v.adult())) {
             requestPoiClaim(entity);
             if (ai.pathStatus==GroundNavigation::Status::Pending &&
                 ai.purpose!=NavigationPurpose::Move) { ai.behavior=EntityBehavior::Idle; return; }
@@ -191,7 +246,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
         if (v.hasBed && v.hasWorkstation) {
             const glm::dvec3 center=(glm::dvec3(v.claimedBed)+glm::dvec3(v.claimedWorkstation))*.5;
             if (glm::distance(entity.position,center)>12) {
-                if (auto destination=GroundNavigation::stand(navigationTerrain(),renderSize(entity.type),
+                if (auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
                         std::floor(center.x)+.5,std::floor(center.z)+.5,entity.position.y)) {
                     ai.behavior=EntityBehavior::ReturnHome;
                     ai.destination={*destination,1,.6};
@@ -213,7 +268,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             ai.actionUntil=m_aiTime+3+(roll%300)*.01;
             const double angle=(roll%6283)*.001;
             const double radius=3+(roll%4);
-            if (auto destination=GroundNavigation::stand(navigationTerrain(),renderSize(entity.type),
+            if (auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
                     std::floor(entity.position.x+std::cos(angle)*radius)+.5,
                     std::floor(entity.position.z+std::sin(angle)*radius)+.5,entity.position.y))
                 ai.destination={*destination,.35,.6};
@@ -270,7 +325,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
         const glm::dvec3 origin=entity.position+glm::dvec3(0,ranged ? 1.45 : 1.2,0);
         const glm::dvec3 center=!ai.targetId && ranged ? player.getEyePosition() : *position+glm::dvec3(0,.9,0);
         const double distance=glm::distance(origin,center);
-        if (distance>=(ranged ? 14.0 : 1.5) || !aiClearSight(origin,center)) continue;
+        if (distance>=(ranged ? 14.0 : entity.type==EntityType::IronGolem ? 2.5 : 1.5) || !aiClearSight(origin,center)) continue;
         glm::vec3 direction=distance>.001 ? glm::vec3((center-origin)/distance) : glm::vec3(0);
         if (ranged) {
             auto velocity=lowArcBallisticVelocity(origin,center,bowLaunchSpeed(.9f),
@@ -285,12 +340,12 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             if (glm::length(knockback)>.001f) knockback=glm::normalize(knockback);
             if (!ai.targetId) {
                 DamageSourceInfo source;
-                source.amount=3; source.cause=DamageCause::Melee;
+                source.amount=entity.type==EntityType::IronGolem ? 10 : 3; source.cause=DamageCause::Melee;
                 source.shieldBlockable=true; source.hasOrigin=true; source.origin=origin;
                 source.impulse=knockback*4.0f+glm::vec3(0,2,0);
                 player.takeDamage(source);
             } else if (Entity* other=aiEntity(ai.targetId)) {
-                damageEntity(*other,3,knockback*3.0f+glm::vec3(0,1.5f,0),false,entity.position,entity.id);
+                damageEntity(*other,entity.type==EntityType::IronGolem ? 10 : 3,knockback*3.0f+glm::vec3(0,entity.type==EntityType::IronGolem ? 5.0f : 1.5f,0),false,entity.position,entity.id);
                 if (other->health<=0 && other->type==EntityType::Villager &&
                     (entity.type==EntityType::Zombie || entity.type==EntityType::ZombieVillager) &&
                     villagerInfectionConverts(player.difficulty(),aiHash(entity.behaviorSeed^
@@ -314,7 +369,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             const bool ranged=entity.type==EntityType::Skeleton;
             const glm::dvec3 origin=entity.position+glm::dvec3(0,ranged ? 1.45 : 1.2,0);
             const glm::dvec3 center=!ai.targetId && ranged ? player.getEyePosition() : *position+glm::dvec3(0,.9,0);
-            if (glm::distance(origin,center)<(ranged ? 14.0 : 1.5) && aiClearSight(origin,center)) {
+            if (glm::distance(origin,center)<(ranged ? 14.0 : entity.type==EntityType::IronGolem ? 2.5 : 1.5) && aiClearSight(origin,center)) {
                 entity.actionCooldown=ranged ? 2.0f : 1.0f;
                 entity.attackPending=m_modelRegistry.playAction(entity.type,entity.id,"attack");
             }

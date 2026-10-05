@@ -5,7 +5,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODEL_DIR = ROOT / "assets/models/entities"
 PLAYER_DIR = ROOT / "assets/models/player"
 NAMES = {"cow", "pig", "sheep", "chicken", "zombie", "skeleton", "spider",
-         "blastling", "villager", "zombie_villager"}
+         "blastling", "villager", "zombie_villager", "iron_golem"}
 
 def document(path):
     data = path.read_bytes()
@@ -92,10 +92,10 @@ def main():
     assert "uv=inUv" in vulkan_vertex_shader, \
         "Vulkan model UV contract changed"
     files = list(MODEL_DIR.glob("*.glb"))
-    assert {path.stem for path in files} == NAMES, "expected exactly ten entity GLBs"
+    assert {path.stem for path in files} == NAMES, "expected exactly eleven entity GLBs"
     graphs = list(MODEL_DIR.glob("*.anim.json"))
     assert {path.name[:-len(".anim.json")] for path in graphs} == NAMES, \
-        "expected exactly ten entity action graphs"
+        "expected exactly eleven entity action graphs"
     for path in files:
         doc, binary = document(path)
         assert {a["name"] for a in doc["animations"]} >= {"idle", "walk", "hurt", "death"}
@@ -151,7 +151,7 @@ def main():
         verify_joint_pivots(doc,binary,path.stem)
         graph = json.loads((MODEL_DIR/(path.stem+".anim.json")).read_text())
         assert graph["version"] == 1 and {"idle","walk","hurt","death"} <= set(graph["actions"])
-        if path.stem in {"zombie","skeleton","spider","blastling","zombie_villager"}:
+        if path.stem in {"zombie","skeleton","spider","blastling","zombie_villager", "iron_golem"}:
             assert "attack" in animations and graph["actions"]["attack"]["events"]
     player_path = PLAYER_DIR / "player.glb"
     player_doc, player_binary = document(player_path)

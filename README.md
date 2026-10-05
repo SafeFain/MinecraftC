@@ -53,7 +53,7 @@ Android's 2100000000 limit. The Apple short version remains `X.Y.Z`.
   players, entities, and worlds.
 - Classic fishing with craftable durable rods, visible bobbers and lines, manual
   bite/reel timing, fish/junk/open-water treasure, and edible/cookable cod and salmon.
-- JSON-driven block, 286-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 292-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories
@@ -194,8 +194,8 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v14 uses little-endian 16-bit block IDs and can read v2-v13 desktop
-metadata. The current world generation version is v18 (Heaven v9). Generation v11 adds
+one exists. Save format v17 uses little-endian 16-bit block IDs and can read v2-v16 desktop
+metadata. The current world generation version is v19 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
@@ -203,7 +203,7 @@ village variants substantially more common while retaining their biome,
 spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
 the wall-to-roof courses of village houses and traveler huts, keeps hut
 decorations outside the wall, and closes the igloo's diagonal lower shell.
-Only generation v18 worlds can load. All previous and future generation versions
+Only generation v19 worlds can load. All previous and future generation versions
 remain on disk and are shown as incompatible; there is no automatic migration.
 Generation v14 adds deterministic
 Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
@@ -247,11 +247,19 @@ Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
-new standard names and classic aliases. Rules persist per world in save v16 (introduced in v15); missing
+new standard names and classic aliases. Rules persist per world in save v17 (introduced in v15); missing
 or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
 
 Run `./build-local/minecraftc --version` to print the version without opening a
 window.
+
+Generation v19 adds five village styles (plains, desert, taiga, snow, savanna),
+12/18/24-building layouts and 20/30/40 initial residents. Thirteen professions,
+food-driven breeding and child growth, farmer harvesting/replanting/sharing,
+reputation/demand prices and iron golem defenders form a complete village lifecycle.
+Save v17 stores the new resident state; unloaded villages do not simulate offline.
+Use `/locate structure taiga_village`, `snow_village` or `savanna_village` for the new styles.
+See [village rules](docs/project-features.md#village-lifecycle-generation-v19).
 
 ## Development
 

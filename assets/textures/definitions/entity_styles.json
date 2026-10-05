@@ -124,7 +124,8 @@
         ],
         "marking": "adventurer"
       }
-    }
+    },
+    "iron_golem": {"documentation": {"motifs": ["iron_plate", "vine", "red_eyes", "long_arms"], "marking": "iron"}}
   },
   "documentation": {
     "parts": [

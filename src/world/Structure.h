@@ -25,6 +25,7 @@ enum class StructureType : uint8_t {
     MountainWatchtower,
     StoneCircle,
     AbandonedFarmstead,
+    TaigaVillage, SnowVillage, SavannaVillage,
     Count
 };
 
@@ -52,7 +53,10 @@ enum class StructureLootProfile : uint8_t {
 inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
     switch (type) {
         case StructureType::Village:
-        case StructureType::DesertVillage: return StructureLootProfile::Village;
+        case StructureType::DesertVillage:
+        case StructureType::TaigaVillage:
+        case StructureType::SnowVillage:
+        case StructureType::SavannaVillage: return StructureLootProfile::Village;
         case StructureType::TravelerHut: return StructureLootProfile::TravelerHut;
         case StructureType::AbandonedCamp: return StructureLootProfile::AbandonedCamp;
         case StructureType::Igloo: return StructureLootProfile::Igloo;
@@ -72,7 +76,7 @@ inline constexpr StructureLootProfile structureLootProfile(StructureType type) {
     }
 }
 
-inline constexpr std::array<StructureType, 14> OVERWORLD_STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 17> OVERWORLD_STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -87,6 +91,7 @@ inline constexpr std::array<StructureType, 14> OVERWORLD_STRUCTURE_TYPES{
     StructureType::MountainWatchtower,
     StructureType::StoneCircle,
     StructureType::AbandonedFarmstead,
+    StructureType::TaigaVillage, StructureType::SnowVillage, StructureType::SavannaVillage,
 };
 
 inline constexpr std::array<StructureType, 4> HEAVEN_STRUCTURE_TYPES{
@@ -96,7 +101,7 @@ inline constexpr std::array<StructureType, 4> HEAVEN_STRUCTURE_TYPES{
     StructureType::SkywayShrine,
 };
 
-inline constexpr std::array<StructureType, 18> STRUCTURE_TYPES{
+inline constexpr std::array<StructureType, 21> STRUCTURE_TYPES{
     StructureType::Village,
     StructureType::DesertVillage,
     StructureType::TravelerHut,
@@ -115,7 +120,14 @@ inline constexpr std::array<StructureType, 18> STRUCTURE_TYPES{
     StructureType::MountainWatchtower,
     StructureType::StoneCircle,
     StructureType::AbandonedFarmstead,
+    StructureType::TaigaVillage, StructureType::SnowVillage, StructureType::SavannaVillage,
 };
+
+inline constexpr bool isVillageStructure(StructureType type) {
+    return type == StructureType::Village || type == StructureType::DesertVillage ||
+           type == StructureType::TaigaVillage || type == StructureType::SnowVillage ||
+           type == StructureType::SavannaVillage;
+}
 
 inline constexpr bool isOverworldStructure(StructureType type) {
     for (const StructureType candidate : OVERWORLD_STRUCTURE_TYPES)
@@ -133,6 +145,9 @@ inline constexpr std::string_view structureCommandName(StructureType type) {
     switch (type) {
         case StructureType::Village: return "village";
         case StructureType::DesertVillage: return "desert_village";
+        case StructureType::TaigaVillage: return "taiga_village";
+        case StructureType::SnowVillage: return "snow_village";
+        case StructureType::SavannaVillage: return "savanna_village";
         case StructureType::TravelerHut: return "traveler_hut";
         case StructureType::AbandonedCamp: return "abandoned_camp";
         case StructureType::DesertWell: return "desert_well";

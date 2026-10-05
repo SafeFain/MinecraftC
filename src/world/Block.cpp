@@ -60,7 +60,8 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "rooted_dirt", "leaf_litter_soil", "peat", "silt", "dry_grass_block", "permafrost", "blue_ice", "shale", "red_sandstone", "ochre_terracotta", "white_terracotta", "volcanic_ash", "coral_rock", "fern", "dead_bush", "dry_grass", "brown_mushroom", "red_mushroom", "lavender", "bellflower", "alpine_flower", "tropical_flower", "cattail", "beach_grass",
     "dry_grass_side", "leaf_litter_side",
     "andesite", "diorite", "gneiss", "marble", "laterite", "red_clay", "cracked_mud", "salt_crust", "clover", "heather", "wild_mint", "nettle", "desert_flower", "small_cactus", "reed_flower", "tundra_moss", "fallen_twigs", "jungle_fern", "cave_moss", "wet_limestone", "gypsum", "amethyst_block", "quartz_block", "iron_stained_rock", "sulfur_rock", "amethyst_cluster", "quartz_cluster", "cave_glowshroom",
-    "moonstone", "skystone", "aether_moss", "glimmer_silt", "star_crystal_ore", "skyroot_planks", "cloudstone_bricks", "sunstone_bricks", "moonstone_bricks", "star_crystal_lamp", "sky_fern", "dawn_bell", "moonflower", "glimmer_reed", "cloudberry_bush", "hanging_cloud_vine"
+    "moonstone", "skystone", "aether_moss", "glimmer_silt", "star_crystal_ore", "skyroot_planks", "cloudstone_bricks", "sunstone_bricks", "moonstone_bricks", "star_crystal_lamp", "sky_fern", "dawn_bell", "moonflower", "glimmer_reed", "cloudberry_bush", "hanging_cloud_vine",
+    "barrel", "lectern", "cartography_table", "brewing_stand", "smoker", "stonecutter"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -415,6 +416,13 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::GLIMMER_REED, "Glimmer Reed", glm::vec3(0.482f, 0.827f, 0.765f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::CLOUDBERRY_BUSH, "Cloudberry Bush", glm::vec3(0.529f, 0.733f, 0.651f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::HANGING_CLOUD_VINE, "Hanging Cloud Vine", glm::vec3(0.490f, 0.733f, 0.800f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::BARREL, "Barrel", glm::vec3(.55f,.44f,.32f), true, false},
+    {BlockId::LECTERN, "Lectern", glm::vec3(.55f,.44f,.32f), true, false},
+    {BlockId::CARTOGRAPHY_TABLE, "Cartography Table", glm::vec3(.55f,.44f,.32f), true, false},
+    {BlockId::BREWING_STAND, "Brewing Stand", glm::vec3(.55f,.44f,.32f), true, false},
+    {BlockId::SMOKER, "Smoker", glm::vec3(.55f,.44f,.32f), true, false},
+    {BlockId::STONECUTTER, "Stonecutter", glm::vec3(.55f,.44f,.32f), true, false},
+
 }};
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
@@ -626,6 +634,12 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::SMITHING_TABLE: return top ? BlockTexture::SmithingTableTop :
                    bottom ? BlockTexture::SmithingTableBottom :
                    face == FaceDir::FRONT ? BlockTexture::SmithingTable : BlockTexture::SmithingTableSide;
+        case BlockId::BARREL: return BlockTexture::Barrel;
+        case BlockId::LECTERN: return BlockTexture::Lectern;
+        case BlockId::CARTOGRAPHY_TABLE: return BlockTexture::CartographyTable;
+        case BlockId::BREWING_STAND: return BlockTexture::BrewingStand;
+        case BlockId::SMOKER: return BlockTexture::Smoker;
+        case BlockId::STONECUTTER: return BlockTexture::Stonecutter;
         case BlockId::GRINDSTONE: return top ? BlockTexture::GrindstoneTop :
                    bottom ? BlockTexture::GrindstoneBottom :
                    face == FaceDir::FRONT ? BlockTexture::Grindstone : BlockTexture::GrindstoneSide;
@@ -787,7 +801,8 @@ bool isBed(BlockId id) {
 }
 
 bool isVillagerWorkstation(BlockId id) {
-    return id >= BlockId::COMPOSTER && id <= BlockId::GRINDSTONE;
+    return (id >= BlockId::COMPOSTER && id <= BlockId::GRINDSTONE) ||
+           (id >= BlockId::BARREL && id <= BlockId::STONECUTTER);
 }
 
 bool decodeBed(BlockId id, BedPart& part, BedDirection& direction) {

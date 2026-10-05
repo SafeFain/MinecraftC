@@ -100,7 +100,7 @@ std::string graphContractError(EntityType type,
             return std::string("missing required semantic action ") + semantic;
     const bool hostile = type == EntityType::Zombie || type == EntityType::Skeleton ||
                          type == EntityType::Spider || type == EntityType::Blastling ||
-                         type == EntityType::ZombieVillager;
+                         type == EntityType::ZombieVillager || type == EntityType::IronGolem;
     if (!hostile) return {};
     const model::AnimationActionDefinition* attack =
         graph.findAction(graph.actionFor("attack"));
@@ -124,7 +124,8 @@ EntityModelRegistry::EntityModelRegistry(Loader loader)
         {EntityType::Spider,"spider.glb",{},{},0,false},
         {EntityType::Blastling,"blastling.glb",{},{},0,false},
         {EntityType::Villager,"villager.glb",{},{},0,false},
-        {EntityType::ZombieVillager,"zombie_villager.glb",{},{},0,false}}},
+        {EntityType::ZombieVillager,"zombie_villager.glb",{},{},0,false},
+        {EntityType::IronGolem,"iron_golem.glb",{},{},0,false}}},
       m_placeholder(makePlaceholder()) {}
 
 void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot) {
@@ -234,7 +235,7 @@ void EntityModelRegistry::queue(
     const glm::vec3& facing, uint32_t behaviorSeed,
     const glm::dvec3& renderOrigin,
     const glm::vec3& cameraPosition, model::ModelRenderer& renderer,
-    const glm::vec3& visualTint, SmoothLightSample light, bool sleeping) {
+    const glm::vec3& visualTint, SmoothLightSample light, bool sleeping, float scale) {
     m_seen.insert(id);
     const auto& definition = this->definition(type);
     InstanceEntry& entry = ensure(type, id);
@@ -250,6 +251,7 @@ void EntityModelRegistry::queue(
     const glm::vec3 localPosition(glm::dvec3(position) - renderOrigin);
     glm::mat4 transform = glm::translate(glm::mat4(1), localPosition) *
         glm::rotate(glm::mat4(1), yaw, glm::vec3(0,1,0));
+    transform=transform*glm::scale(glm::mat4(1),glm::vec3(scale));
     if (sleeping)
         transform = transform * glm::translate(
             glm::mat4(1), glm::vec3(0.0f,.45f,0.0f)) *

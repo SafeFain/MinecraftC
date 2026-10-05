@@ -146,6 +146,12 @@
     "moonflower": {"texture": "moonflower"},
     "glimmer_reed": {"texture": "glimmer_reed"},
     "cloudberry_bush": {"texture": "cloudberry_bush"},
-    "hanging_cloud_vine": {"texture": "hanging_cloud_vine"}
+    "hanging_cloud_vine": {"texture": "hanging_cloud_vine"},
+    "barrel": {"texture": "barrel"},
+    "lectern": {"texture": "lectern"},
+    "cartography_table": {"texture": "cartography_table"},
+    "brewing_stand": {"texture": "brewing_stand"},
+    "smoker": {"texture": "smoker"},
+    "stonecutter": {"texture": "stonecutter"}
   }
 }

@@ -17,6 +17,7 @@ enum class VillagerProfession : uint8_t {
     Armorer,
     Toolsmith,
     Weaponsmith,
+    Fisherman, Librarian, Cartographer, Cleric, Butcher, Mason,
     Count
 };
 
@@ -40,6 +41,15 @@ struct VillagerData {
     bool professionLocked = false;
     uint32_t lastRestockDay = 0;
     uint8_t restocksToday = 0;
+    std::array<ItemStack,8> food{};
+    float growthSeconds = 0.0f;
+    float breedingCooldown = 0.0f;
+    float defenseCooldown = 0.0f;
+    int32_t reputation = 0;
+    std::array<uint8_t,5> demand{};
+    uint32_t reputationDay = 0;
+    uint8_t tradesToday = 0;
+    bool adult() const { return growthSeconds <= 0.0f; }
 };
 
 enum class TradeResult : uint8_t {
@@ -60,3 +70,12 @@ TradeResult executeVillagerTrade(VillagerData& villager, uint8_t offerIndex,
 bool restockVillager(VillagerData& villager, uint32_t day,
                      bool reachedWorkstation);
 
+
+TradeOffer villagerQuote(const VillagerData& villager, uint8_t offerIndex);
+const char* villagerProfessionKey(VillagerProfession profession);
+int villagerFoodCount(const VillagerData& villager, ItemId item);
+int addVillagerFood(VillagerData& villager, ItemStack stack);
+bool consumeVillagerFood(VillagerData& villager, ItemId item, int count);
+bool willingToBreed(const VillagerData& villager);
+void consumeBreedingFood(VillagerData& villager);
+void advanceVillagerLife(VillagerData& villager, float dt, uint32_t day);

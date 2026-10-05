@@ -101,6 +101,14 @@
       "x": 7,
       "y": 8
     },
+    "barrel": {
+      "generator": "block_item_icon",
+      "index": 286,
+      "source": "items/barrel.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 35
+    },
     "basalt": {
       "generator": "block_item_icon",
       "index": 137,
@@ -261,6 +269,14 @@
       "x": 2,
       "y": 9
     },
+    "brewing_stand": {
+      "generator": "block_item_icon",
+      "index": 289,
+      "source": "items/brewing_stand.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 36
+    },
     "brick": {
       "generator": "item_sprite",
       "index": 201,
@@ -300,6 +316,14 @@
       "source_kind": "generated",
       "x": 4,
       "y": 19
+    },
+    "cartography_table": {
+      "generator": "block_item_icon",
+      "index": 288,
+      "source": "items/cartography_table.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 36
     },
     "cattail": {
       "generator": "block_item_icon",
@@ -1293,6 +1317,14 @@
       "x": 0,
       "y": 12
     },
+    "lectern": {
+      "generator": "block_item_icon",
+      "index": 287,
+      "source": "items/lectern.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 35
+    },
     "limestone": {
       "generator": "block_item_icon",
       "index": 136,
@@ -1837,6 +1869,14 @@
       "x": 1,
       "y": 21
     },
+    "smoker": {
+      "generator": "block_item_icon",
+      "index": 290,
+      "source": "items/smoker.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 36
+    },
     "smooth_sandstone": {
       "generator": "block_item_icon",
       "index": 194,
@@ -2004,6 +2044,14 @@
       "source_kind": "generated",
       "x": 0,
       "y": 3
+    },
+    "stonecutter": {
+      "generator": "block_item_icon",
+      "index": 291,
+      "source": "items/stonecutter.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 36
     },
     "string": {
       "generator": "item_sprite",
@@ -2300,7 +2348,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 36,
+  "rows": 37,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

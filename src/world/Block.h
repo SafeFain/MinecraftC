@@ -269,7 +269,8 @@ enum class BlockId : uint16_t {
     GLIMMER_REED,
     CLOUDBERRY_BUSH,
     HANGING_CLOUD_VINE,
-    COUNT        = 269,
+    BARREL, LECTERN, CARTOGRAPHY_TABLE, BREWING_STAND, SMOKER, STONECUTTER,
+    COUNT        = 275,
     POPPY        = FLOWER
 };
 
@@ -447,6 +448,7 @@ enum class BlockTexture : uint16_t {
     QuartzCluster,
     CaveGlowshroom,
     Moonstone, Skystone, AetherMoss, GlimmerSilt, StarCrystalOre, SkyrootPlanks, CloudstoneBricks, SunstoneBricks, MoonstoneBricks, StarCrystalLamp, SkyFern, DawnBell, Moonflower, GlimmerReed, CloudberryBush, HangingCloudVine,
+    Barrel, Lectern, CartographyTable, BrewingStand, Smoker, Stonecutter,
     Count
 };
 

@@ -215,6 +215,15 @@ constexpr float AI_JUMP_SPEED = 8.0f;
 constexpr float AI_ANIMAL_PANIC_SPEED = 1.8f;
 constexpr float AI_VILLAGER_PANIC_SPEED = 1.6f;
 
+// Village lifecycle uses simulated seconds; unloaded residents do not advance.
+constexpr float VILLAGER_GROWTH_SECONDS = 1200.0f;
+constexpr float VILLAGER_BREEDING_COOLDOWN = 300.0f;
+constexpr float VILLAGE_DEFENSE_COOLDOWN = 600.0f;
+constexpr size_t VILLAGE_ACTIONS_PER_SECOND = 8;
+constexpr size_t VILLAGE_FARM_SCAN_SLICE = 64;
+constexpr double VILLAGE_POI_RADIUS = 160.0;
+constexpr size_t GENERATED_CROP_COLUMNS_PER_TICK = 128;
+
 // ── UI ──────────────────────────────────────────────────────────────────
 constexpr float UI_BUTTON_WIDTH      = 280.0f;
 constexpr float UI_BUTTON_HEIGHT     = 44.0f;
