@@ -1307,7 +1307,10 @@ void testHeavenStarstepResolution() {
 
 }  // namespace
 
+#include "WorldDoorScenarios.h"
+
 int main() {
+    testDoorsAndButtons();
     testChunkStreaming();
     testAsyncGeneratedCacheRoundTrip();
     testWarmChunkBacktrack();

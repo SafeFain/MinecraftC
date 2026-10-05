@@ -58,6 +58,7 @@ public:
         std::function<void(float, float)> playThunder;
         std::function<void(float, uint32_t)> rumble;
         std::function<void(FishingEventKind)> playFishing;
+        std::function<void(bool,bool,bool)> playBlockInteraction;
         std::function<void()> playerDied;
         std::function<void()> playerDeathMessage;
         std::function<void()> autosaveMetadataError;

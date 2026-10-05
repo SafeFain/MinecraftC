@@ -31,7 +31,12 @@ bool clear(const Terrain& terrain, const glm::vec3& size,
              y<=static_cast<int>(std::floor(p.y+size.y-epsilon));++y) {
             const BlockId block=terrain.block(x,y,z);
             if (avoidHazards && hazard(block)) return false;
-            const auto boxes=blockCollisionBoxes(block);
+            DoorState door;
+            BlockId collision=block;
+            if(terrain.canOpenWoodDoors && decodeDoor(block,door) && door.material!=DoorMaterial::Iron) {
+                door.open=true;collision=doorBlock(door);
+            }
+            const auto boxes=blockCollisionBoxes(collision);
             for (uint8_t i=0;i<boxes.count;++i) {
                 const auto& box=boxes.boxes[i];
                 if (overlapsXZ(p,size,x,z,box) && p.y < y+box.max.y-epsilon &&

@@ -99,5 +99,21 @@ int main() {
         require(chunk.blockRevision()==revision,"identical block write changed navigation revision");
         chunk.finishBulkBlockEdit(); require(chunk.blockRevision()>revision,"bulk edit failed to publish block revision");
     }
+    {
+        TerrainFixture f;
+        // A sealed wall forces the route through its single door.
+        for(int z=-10;z<=10;++z)for(int y=1;y<=3;++y)f.edits[{1,y,z}]=BlockId::STONE;
+        DoorState door;door.direction=BedDirection::East;
+        f.edits[{1,1,0}]=doorBlock(door);door.upper=true;f.edits[{1,2,0}]=doorBlock(door);
+        auto terrain=f.terrain();
+        require(!GroundNavigation::clear(terrain,human,{1.9,1,.5}),"closed door did not obstruct ordinary mobs");
+        terrain.canOpenWoodDoors=true;
+        GroundNavigation::Search search(terrain,human,{.5,1,.5},{{2.5,1,.5},.15,.1});
+        while(search.status()==GroundNavigation::Status::Pending)search.advance(terrain,32);
+        require(search.status()==GroundNavigation::Status::Succeeded,"villager cannot plan through wooden door");
+        door.upper=false;door.material=DoorMaterial::Iron;f.edits[{1,1,0}]=doorBlock(door);
+        door.upper=true;f.edits[{1,2,0}]=doorBlock(door);
+        require(!GroundNavigation::clear(terrain,human,{1.9,1,.5}),"villager treated closed iron door as openable");
+    }
     std::cout<<"Ground navigation tests passed\n";
 }

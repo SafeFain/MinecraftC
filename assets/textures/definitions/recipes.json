@@ -959,12 +959,102 @@
       "recipe": "base",
       "variants": 1
     },
-    "barrel": {"recipe": "base", "variants": 1},
-    "lectern": {"recipe": "base", "variants": 1},
-    "cartography_table": {"recipe": "base", "variants": 1},
-    "brewing_stand": {"recipe": "base", "variants": 1},
-    "smoker": {"recipe": "base", "variants": 1},
-    "stonecutter": {"recipe": "base", "variants": 1}
+    "barrel": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "lectern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cartography_table": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "brewing_stand": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "smoker": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "stonecutter": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "birch_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "oak_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "oak_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "birch_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "birch_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "spruce_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "jungle_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "acacia_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "iron_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "iron_door_top": {
+      "recipe": "base",
+      "variants": 1
+    }
   },
   "examples": {
     "mossy_stone": {

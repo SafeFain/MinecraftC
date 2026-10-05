@@ -18,6 +18,23 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    for(uint8_t material=0;material<7;++material) {
+        const ItemId ingredient=material==6?ItemId::IRON_INGOT:plankItem(static_cast<DoorMaterial>(material));
+        std::array<ItemId,9> grid{};
+        for(int y=0;y<3;++y)for(int x=0;x<2;++x)grid[y*3+x]=ingredient;
+        const auto* recipe=findCraftingRecipe(grid,3,3);
+        require(recipe && recipe->output.id==static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+material) &&
+            recipe->output.count==3,"door recipe has wrong variant or count");
+        if(material<6) {
+            grid[0]=plankItem(static_cast<DoorMaterial>((material+1)%6));
+            require(!findCraftingRecipe(grid,3,3),"mixed wood types crafted a door");
+        }
+        grid.fill(ItemId::EMPTY);grid[0]=material==6?ItemId::STONE:ingredient;
+        recipe=findCraftingRecipe(grid,2,2);
+        require(recipe && recipe->output.id==static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+material),
+            "button recipe has wrong material");
+    }
+
     const auto oreDrops=getBlockDrops(BlockId::STAR_CRYSTAL_ORE,
         {ItemId::WOODEN_PICKAXE,1,0});
     require(oreDrops.size()==1 && oreDrops[0].id==ItemId::STAR_CRYSTAL_SHARD &&
@@ -273,7 +290,7 @@ int main() {
     grid.fill(ItemId::EMPTY);
     grid[4] = ItemId::BIRCH_LOG;
     const auto* planks = findCraftingRecipe(grid, 3, 3);
-    require(planks && planks->output.id == ItemId::OAK_PLANKS &&
+    require(planks && planks->output.id == ItemId::BIRCH_PLANKS &&
             planks->output.count == 4,
             "recipe matching permits offsets and log variants");
 

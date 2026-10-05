@@ -5,7 +5,7 @@
 
 #include "game/InventoryModel.h"
 
-enum class BlockEntityType : uint8_t { Chest = 0, Furnace = 1 };
+enum class BlockEntityType : uint8_t { Chest = 0, Furnace = 1, Button = 2 };
 
 struct BlockEntity {
     BlockEntityType type = BlockEntityType::Chest;
@@ -17,6 +17,7 @@ struct BlockEntity {
     uint16_t burnTotal = 0;
     uint16_t cookProgress = 0;
     uint16_t cookTotal = 200;
+    uint16_t buttonRemaining = 0;
 };
 
 struct PersistedBlockEntity {

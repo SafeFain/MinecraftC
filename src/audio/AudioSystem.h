@@ -40,6 +40,7 @@ public:
     void playExplosion(float pan, float volume);
     void playFishing(FishingSound sound);
     void playCombat(CombatSound sound);
+    void playBlockInteraction(bool metal, bool opening, bool button);
     bool available() const;
 
 private:

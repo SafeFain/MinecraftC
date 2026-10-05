@@ -27,7 +27,7 @@ void writeCapture(VulkanRenderer& renderer, const std::filesystem::path& path) {
 
 int main(int argc, char** argv) {
     if (argc < 3 || argc > 4) {
-        std::cerr << "Usage: vulkan_structure_smoke <assets> <capture-directory> [--villages]\n";
+        std::cerr << "Usage: vulkan_structure_smoke <assets> <capture-directory> [--villages|--doors]\n";
         return 2;
     }
     try {
@@ -43,6 +43,8 @@ int main(int argc, char** argv) {
         const auto environment = day.evaluate();
         const bool villages=argc==4 && std::string(argv[3])=="--villages";
         std::vector<OverworldStructureFixture> fixtures(NEW_STRUCTURE_FIXTURES.begin(),NEW_STRUCTURE_FIXTURES.end());
+        const bool doors=argc==4 && std::string(argv[3])=="--doors";
+        if(doors)fixtures={{StructureType::TravelerHut,0,0,0,8,3}};
         EntityModelRegistry models;
         if(villages) {
             models.loadAll(std::filesystem::absolute(argv[1]));models.uploadAll(renderer.modelRenderer());
@@ -80,6 +82,26 @@ int main(int argc, char** argv) {
                 auto& c = chunks[cz*grid+cx];
                 c->setBlock(b.worldX-c->worldX(),b.worldY,b.worldZ-c->worldZ(),b.id);
             }
+            if(doors) {
+                for(auto& c:chunks)for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+                    for(int z=0;z<16;++z)for(int x=0;x<16;++x)c->setBlock(x,y,z,BlockId::AIR);
+                const auto put=[&](int x,int y,int z,BlockId id) {
+                    auto& c=chunks[(floorChunk(z)-oz)*grid+floorChunk(x)-ox];
+                    c->setBlock(x-c->worldX(),y,z-c->worldZ(),id);
+                };
+                for(int x=-8;x<=8;++x)for(int z=-2;z<=6;++z)put(x,0,z,BlockId::STONE);
+                for(int material=0;material<7;++material) {
+                    const int x=material*2-6;DoorState door;door.material=static_cast<DoorMaterial>(material);
+                    door.direction=BedDirection::North;
+                    for(int row=0;row<2;++row) {
+                        door.open=row;door.upper=false;put(x,1,row*4,doorBlock(door));
+                        door.upper=true;put(x,2,row*4,doorBlock(door));
+                    }
+                    put(x,1,2,woodPlanks(door.material));
+                    ButtonState button;button.material=door.material;button.attachment=FaceDir::FRONT;
+                    put(x,1,1,buttonBlock(button));
+                }
+            }
             std::vector<ChunkMesh> meshes(chunks.size());
             for (size_t i = 0; i < chunks.size(); ++i) {
                 int maxima[16][16];
@@ -87,7 +109,7 @@ int main(int argc, char** argv) {
                 auto& mesh = meshes[i];
                 mesh.build(chunks[i]->worldX(),chunks[i]->worldZ(),chunks[i]->rawBlocks(),maxima,
                            blockAt,[](int,int,int) { return LightSample{15,0}; });
-                if (mesh.opaqueIndexCount==0 || mesh.indexCount!=mesh.indices.size() ||
+                if ((!doors && mesh.opaqueIndexCount==0) || mesh.indexCount!=mesh.indices.size() ||
                     mesh.translucentIndexOffset!=mesh.opaqueIndexCount ||
                     mesh.shadowCasterIndexOffset!=mesh.opaqueIndexCount+mesh.translucentIndexCount)
                     throw std::runtime_error("structure index-layer handoff mismatch");
@@ -100,16 +122,17 @@ int main(int argc, char** argv) {
             std::vector<StructurePlacement> placements;
             world.getStructureGenerator().generateStructuresRegion(fixture.x,fixture.z,1,1,placements);
             const auto it = std::find_if(placements.begin(),placements.end(),[&](const auto& p) { return p.type==fixture.type; });
-            if (it==placements.end()) throw std::runtime_error("missing visual structure fixture");
+            if (!doors && it==placements.end()) throw std::runtime_error("missing visual structure fixture");
             glm::vec3 offset(r*2.2f,top+12,-r*3.2f);
             if(villages) {Config::RENDER_DISTANCE=32;offset={75,65,-100};}
             if (fixture.type==StructureType::MountainWatchtower || fixture.type==StructureType::AbandonedFarmstead)
                 offset.z = -offset.z;
-            if (!villages && ((it->variant>>60)&1u) != 0) offset.x = -offset.x;
-            const int rotations = villages?0:static_cast<int>((it->variant>>61)&3u);
+            if (!doors && !villages && ((it->variant>>60)&1u) != 0) offset.x = -offset.x;
+            const int rotations = (villages || doors)?0:static_cast<int>((it->variant>>61)&3u);
             for (int i = 0; i < rotations; ++i) { const float px=offset.x; offset.x=-offset.z; offset.z=px; }
             glm::vec3 camera = glm::vec3(0,fixture.y,0)+offset;
-            const glm::vec3 target(0,fixture.y+top*0.3f,0);
+            if(doors)camera={6,5,-18};
+            const glm::vec3 target(0,fixture.y+top*0.3f,doors?2:0);
             auto vp = glm::perspective(glm::radians(58.0f),window.aspectRatio(),0.1f,512.0f) *
                             glm::lookAt(camera,target,glm::vec3(0,1,0));
             const auto frame = [&] {
@@ -142,7 +165,7 @@ int main(int argc, char** argv) {
             for (int i = 0; i < 8; ++i) frame();
             VulkanGiSmokeProbe::requestCapture(renderer);
             frame();
-            writeCapture(renderer,std::filesystem::path(argv[2])/(std::string(structureCommandName(fixture.type))+".ppm"));
+            writeCapture(renderer,std::filesystem::path(argv[2])/(doors?"doors.ppm":std::string(structureCommandName(fixture.type))+".ppm"));
             if(villages) {
                 camera={0,fixture.y+4.0f,15};
                 vp=glm::perspective(glm::radians(58.0f),window.aspectRatio(),.1f,512.0f)*

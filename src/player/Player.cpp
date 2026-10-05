@@ -308,6 +308,7 @@ void Player::handleMovement(const InputState& input, float dt) {
 void Player::handleMouseButton(int button, ButtonAction action) {
     if (!m_mouseLocked) return;
     if (m_gameMode == GameMode::Spectator) return;
+    if (button==MouseButton::Right && action==ButtonAction::Press && tryUseInteractiveBlock()) return;
     const ItemStack& selected =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot));
     if (button == MouseButton::Right && action == ButtonAction::Press &&
@@ -1051,7 +1052,18 @@ void Player::updateMining(float dt) {
     }
 }
 
+bool Player::tryUseInteractiveBlock() {
+    if(!m_mouseLocked || m_gameMode==GameMode::Spectator || m_sneakInput || m_actionCooldown>0) return false;
+    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    if(!hit || !(m_world.interactDoor(hit->blockPos) || m_world.activateButton(hit->blockPos)))return false;
+    startSwing();m_actionCooldown=.15f;return true;
+}
+
 bool Player::placeBlock() {
+    if(!m_sneakInput) {
+        const auto target=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+        if(target && (m_world.interactDoor(target->blockPos) || m_world.activateButton(target->blockPos))) return true;
+    }
     const auto block=getItemProps(activeItem().id).placedBlock;
     if(!block)return placeBlockImpl();
     const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
@@ -1167,6 +1179,43 @@ bool Player::placeBlockImpl() {
          m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
          !supportsNaturalDecoration(placed, m_world.getBlock(
              placePos.x, placePos.y - 1, placePos.z)))) return false;
+
+    DoorState door; ButtonState buttonState;
+    if(decodeDoor(placed,door)) {
+        if(hit->faceNormal.y<=0) return false;
+        const float yawRadians=glm::radians(m_yaw);
+        door.direction=bedDirectionFromHorizontal({std::sin(yawRadians),std::cos(yawRadians)});
+        const glm::ivec3 out=bedDirectionOffset(door.direction), right(-out.z,0,out.x);
+        DoorState neighbor;
+        const auto left=placePos-right, rightPos=placePos+right;
+        const bool leftDoor=decodeDoor(m_world.getBlock(left.x,left.y,left.z),neighbor) &&
+            neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
+        const bool rightDoor=decodeDoor(m_world.getBlock(rightPos.x,rightPos.y,rightPos.z),neighbor) &&
+            neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
+        const glm::dvec3 local=hit->hitPosition-glm::floor(hit->hitPosition);
+        const auto obstructed=[&](const glm::ivec3& p) {
+            return int(isFullCollisionBlock(m_world.getBlock(p.x,p.y,p.z)))+
+                int(isFullCollisionBlock(m_world.getBlock(p.x,p.y+1,p.z)));
+        };
+        const int leftSolid=obstructed(left),rightSolid=obstructed(rightPos);
+        door.rightHinge=leftDoor || (!rightDoor && (leftSolid>rightSolid || (leftSolid==rightSolid &&
+            (right.x? (right.x>0?local.x:1-local.x):(right.z>0?local.z:1-local.z))>.5)));
+        const BlockId bottom=doorBlock(door); door.upper=true;
+        if(collidesWithPlayer(placePos,bottom) ||
+           collidesWithPlayer(placePos+glm::ivec3(0,1,0),doorBlock(door)) ||
+           !m_world.placeDoor(placePos,door)) return false;
+        if(m_gameMode==GameMode::Survival && --selectedStack.count==0) selectedStack.clear();
+        return true;
+    }
+    if(decodeButton(placed,buttonState)) {
+        for(uint8_t f=0;f<6;++f)
+            if(faceOffset(static_cast<FaceDir>(f))==hit->faceNormal) buttonState.attachment=static_cast<FaceDir>(f);
+        const float yawRadians=glm::radians(m_yaw);
+        buttonState.direction=bedDirectionFromHorizontal({std::sin(yawRadians),std::cos(yawRadians)});
+        if(!m_world.placeButton(placePos,buttonState)) return false;
+        if(m_gameMode==GameMode::Survival && --selectedStack.count==0) selectedStack.clear();
+        return true;
+    }
 
     ArchitecturalBlockState selectedArchitecture;
     if (activeItem == ItemId::POINTED_DRIPSTONE) {

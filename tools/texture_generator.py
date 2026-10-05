@@ -140,6 +140,10 @@ HEAVEN_TEXTURES = {'moonstone': 'marble', 'skystone': 'andesite', 'aether_moss':
 HEAVEN_COLORS = {'moonstone': (213, 219, 235), 'skystone': (116, 153, 179), 'aether_moss': (109, 177, 157), 'glimmer_silt': (96, 136, 143), 'star_crystal_ore': (100, 178, 206), 'skyroot_planks': (191, 154, 106), 'cloudstone_bricks': (202, 217, 230), 'sunstone_bricks': (232, 194, 114), 'moonstone_bricks': (215, 223, 240), 'star_crystal_lamp': (133, 230, 242), 'sky_fern': (107, 182, 168), 'dawn_bell': (244, 199, 124), 'moonflower': (180, 187, 245), 'glimmer_reed': (123, 211, 195), 'cloudberry_bush': (135, 187, 166), 'hanging_cloud_vine': (125, 187, 204)}
 NAMES += list(HEAVEN_TEXTURES)
 NAMES += ['barrel', 'lectern', 'cartography_table', 'brewing_stand', 'smoker', 'stonecutter']
+DOOR_WOODS = ('oak', 'birch', 'spruce', 'jungle', 'acacia', 'skyroot', 'iron')
+VARIANT_PLANKS = ('birch_planks', 'spruce_planks', 'jungle_planks', 'acacia_planks')
+DOOR_TEXTURES = tuple(w+"_door_"+h for w in DOOR_WOODS for h in ("bottom","top"))
+NAMES += list(VARIANT_PLANKS) + list(DOOR_TEXTURES)
 
 def _read_definition(path):
     try:
@@ -480,6 +484,16 @@ DIRECTIONAL = {"oak_planks","oak_log","birch_log","spruce_log","jungle_log","aca
                "grass_side","aether_grass_side"}
 LEAF_NAMES = {"leaves","birch_leaves","spruce_leaves","jungle_leaves","acacia_leaves",
               "skyroot_leaves"}
+
+DOOR_COLORS = {"oak":(181,140,88), "birch":(213,197,136),
+    "spruce":(112,78,43), "jungle":(176,119,86), "acacia":(197,99,56),
+    "skyroot":(191,154,106), "iron":(197,206,211)}
+for _name in VARIANT_PLANKS:
+    PALETTES[_name] = _role_palette(DOOR_COLORS[_name.split("_")[0]])
+for _name in DOOR_TEXTURES:
+    PALETTES[_name] = _role_palette(DOOR_COLORS[_name.split("_")[0]], transparent=True)
+TRANSPARENT.update(DOOR_TEXTURES)
+DIRECTIONAL.update(VARIANT_PLANKS)
 
 def mix64(v):
     v=(v+0x9E3779B97F4A7C15)&0xffffffffffffffff
@@ -1275,6 +1289,33 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in VARIANT_PLANKS:
+        palette=PALETTES[name]
+        return [palette[i] for i in generate_planks(name,local)]
+    if name in DOOR_TEXTURES:
+        palette=PALETTES[name]; wood=name.split("_")[0]; top=name.endswith("_top")
+        style=DOOR_WOODS.index(wood)
+        pixels=[]
+        for y in range(16):
+            for x in range(16):
+                border=x<2 or x>13 or y<2 or y>13
+                role=2 if border else 3+(x//3+style)%2
+                if x in (2,13) or y in (2,13): role=1
+                if not border and y in (7,8): role=2
+                # Different lattices/panels for each available wood family.
+                if top and wood in ("oak","birch","acacia","skyroot","iron"):
+                    window=3<=x<=12 and 3<=y<=11
+                    if wood=="oak": window=window and x not in (7,8) and y not in (7,8)
+                    elif wood=="birch": window=5<=x<=10 and 3<=y<=9
+                    elif wood=="acacia": window=3<=x<=12 and y in (4,5,9,10)
+                    elif wood=="skyroot": window=abs(x-7.5)+abs(y-7)<=4
+                    elif wood=="iron": window=x in (4,5,10,11) and 3<=y<=6
+                    if window: role=0
+                if wood=="spruce" and x in (4,8,12):role=1
+                if wood=="jungle" and not border and (x+y)%8==0:role=2
+                if not top and x in (11,12) and y==4:role=5
+                pixels.append(palette[role])
+        return pixels
     if name == "hanging_cloud_vine":
         palette = PALETTES[name]
         pixels = [palette[0]] * (SIZE*SIZE)
@@ -1704,6 +1745,19 @@ def generate_item_sprite(template,material,definitions):
     image=[(0,0,0,0)]*(SIZE*SIZE)
     if template in TOOL_TEMPLATES:
         return generate_tool_sprite(template,material,definitions)
+    if template in ("door","button"):
+        if template=="door":
+            for y in range(1,15):
+                for x in range(4,12):
+                    image[y*SIZE+x]=shades[0 if x in (4,11) or y in (1,14,8) else 2]
+            for y in range(3,7):
+                for x in (6,7,8,9):image[y*SIZE+x]=(0,0,0,0)
+            image[10*SIZE+10]=shades[-1]
+        else:
+            _paint_rect(image,3,6,12,10,shades[0])
+            _paint_rect(image,4,6,11,8,shades[2])
+            _paint_rect(image,4,6,11,6,shades[-1])
+        return image
     if template=="stick":
         _line(image,4,13,12,3,outline,3); _line(image,4,13,12,3,handle[1],1); _line(image,9,6,12,3,handle[2],1)
     elif template in {"clay_ball", "brick", "dye"}:

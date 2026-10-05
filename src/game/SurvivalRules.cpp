@@ -284,7 +284,11 @@ std::vector<CraftingRecipe> buildRecipes() {
     std::vector<CraftingRecipe> recipes;
     for (ItemId log : {ItemId::OAK_LOG, ItemId::BIRCH_LOG, ItemId::SPRUCE_LOG,
                        ItemId::JUNGLE_LOG, ItemId::ACACIA_LOG})
-        recipes.push_back(shaped(1, 1, {log}, {ItemId::OAK_PLANKS, 4, 0}, false));
+        recipes.push_back(shaped(1, 1, {log},
+            {plankItem(log==ItemId::OAK_LOG?DoorMaterial::Oak:
+                       log==ItemId::BIRCH_LOG?DoorMaterial::Birch:
+                       log==ItemId::SPRUCE_LOG?DoorMaterial::Spruce:
+                       log==ItemId::JUNGLE_LOG?DoorMaterial::Jungle:DoorMaterial::Acacia),4,0},false));
     recipes.push_back(shaped(1, 1, {ItemId::SKYROOT_LOG},
                              {ItemId::SKYROOT_PLANKS, 4, 0}, false));
     recipes.push_back(shaped(1, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
@@ -470,6 +474,15 @@ std::vector<CraftingRecipe> buildRecipes() {
         E, ItemId::CLOUDSTONE_BRICKS, E}, {ItemId::STAR_CRYSTAL_LAMP, 1, 0}, false));
     recipes.push_back(shaped(3, 1, {ItemId::CLOUDBERRY, ItemId::BREAD, ItemId::CLOUDBERRY},
         {ItemId::CLOUDBERRY_BREAD, 1, 0}, false));
+    for(uint8_t i=0;i<7;++i) {
+        const ItemId ingredient=i==6?ItemId::IRON_INGOT:plankItem(static_cast<DoorMaterial>(i));
+        auto door=shaped(2,3,{ingredient,ingredient,ingredient,ingredient,ingredient,ingredient},
+            {static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+i),3,0});
+        door.allowPlankVariants=false; recipes.push_back(door);
+        auto button=shaped(1,1,{i==6?ItemId::STONE:ingredient},
+            {static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+i),1,0},false);
+        button.allowPlankVariants=false; recipes.push_back(button);
+    }
     return recipes;
 }
 
@@ -488,24 +501,27 @@ bool recipeMatches(const CraftingRecipe& recipe, const std::array<ItemId, 9>& gr
             }
             const ItemId actual = grid[y * gridWidth + x];
             if (actual != expected && !(expected == ItemId::OAK_PLANKS &&
-                                        actual == ItemId::SKYROOT_PLANKS)) return false;
+                                        recipe.allowPlankVariants && isWoodPlankItem(actual))) return false;
         }
     }
     return true;
 }
 
 ItemId takeIngredient(ItemId item, InventoryModel& inventory,
-                      std::array<ItemStack, 9>& grid) {
+                      std::array<ItemStack, 9>& grid, bool plankVariants) {
     for (ItemStack& stack : grid) {
         if (stack.empty() || (stack.id != item &&
-            !(item == ItemId::OAK_PLANKS && stack.id == ItemId::SKYROOT_PLANKS))) continue;
+            !(plankVariants && item == ItemId::OAK_PLANKS && isWoodPlankItem(stack.id)))) continue;
         const ItemId consumed = stack.id;
         if (--stack.count == 0) stack.clear();
         return consumed;
     }
     if (inventory.remove(item, 1)) return item;
-    if (item == ItemId::OAK_PLANKS && inventory.remove(ItemId::SKYROOT_PLANKS, 1))
-        return ItemId::SKYROOT_PLANKS;
+    if (plankVariants && item == ItemId::OAK_PLANKS)
+        for(uint8_t i=1;i<6;++i) {
+            const ItemId candidate=plankItem(static_cast<DoorMaterial>(i));
+            if(inventory.remove(candidate,1)) return candidate;
+        }
     return ItemId::EMPTY;
 }
 
@@ -523,7 +539,7 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
             const size_t index = y * recipe.width + x;
             const ItemId item = recipe.ingredients[index];
             if (item == ItemId::EMPTY) continue;
-            selected[index] = takeIngredient(item, inventory, grid);
+            selected[index] = takeIngredient(item, inventory, grid, recipe.allowPlankVariants);
             if (selected[index] == ItemId::EMPTY) return false;
         }
 
@@ -573,6 +589,15 @@ const std::array<SmeltingRecipe, 19> SMELTING = {{
 const BlockSurvivalProperties& getBlockSurvivalProps(BlockId block) {
     if (const auto* value = Plugins::pluginBlock(block)) return value->survival;
     if (!isValidBlockId(block)) throw std::out_of_range("Invalid block ID");
+    DoorState door; ButtonState button;
+    static const BlockSurvivalProperties woodDoor{3.0f,ToolKind::Axe,ToolTier::None,false};
+    static const BlockSurvivalProperties ironDoor{5.0f,ToolKind::Pickaxe,ToolTier::Wood,false};
+    static const BlockSurvivalProperties woodButton{.5f,ToolKind::Axe,ToolTier::None,false};
+    static const BlockSurvivalProperties stoneButton{.5f,ToolKind::Pickaxe,ToolTier::None,false};
+    if(decodeDoor(block,door)) return door.material==DoorMaterial::Iron?ironDoor:woodDoor;
+    if(decodeButton(block,button)) return button.material==DoorMaterial::Iron?stoneButton:woodButton;
+    if(block>=BlockId::BIRCH_PLANKS && block<=BlockId::ACACIA_PLANKS)
+        return BLOCKS[static_cast<size_t>(BlockId::PLANKS)];
     return BLOCKS[static_cast<size_t>(block)];
 }
 
@@ -737,6 +762,9 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
 }
 
 uint16_t fuelTicks(ItemId fuel) {
+    if(isWoodPlankItem(fuel)) return 300;
+    if(fuel>=ItemId::OAK_DOOR && fuel<=ItemId::SKYROOT_DOOR)return 200;
+    if(fuel>=ItemId::OAK_BUTTON && fuel<=ItemId::SKYROOT_BUTTON)return 100;
     if (fuel == ItemId::COAL) return 1600;
     if (fuel == ItemId::STICK) return 100;
     if (fuel == ItemId::OAK_PLANKS || fuel == ItemId::SKYROOT_PLANKS) return 300;

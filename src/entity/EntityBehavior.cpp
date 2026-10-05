@@ -31,7 +31,7 @@ void EntityManager::chooseEscape(Entity& entity,const glm::dvec3& danger) {
     if (glm::length(away)<.01) away=glm::dvec3(entity.facing)*-1.0;
     if (glm::length(away)<.01) away={1,0,0};
     away=glm::normalize(away);
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,entity.type==EntityType::Villager);
     const double offsets[]={0,.785398163,-.785398163,1.570796327,-1.570796327};
     ai.hasDestination=false;
     for (int i=0;i<5;++i) {
@@ -125,7 +125,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             glm::distance(ai.lastSeen,glm::dvec3(entity.villager.claimedBed))>32)ai.hasTarget=false;
         if(!ai.hasTarget && entity.villager.hasBed &&
             glm::distance(entity.position,glm::dvec3(entity.villager.claimedBed))>12) {
-            if(auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+            if(auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
                 entity.villager.claimedBed.x+.5,entity.villager.claimedBed.z+.5,entity.position.y,8,8)) {
                 ai.behavior=EntityBehavior::ReturnHome;ai.destination={*destination,3,.6};
                 ai.hasDestination=true;ai.speed=.75f;return;
@@ -218,7 +218,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             for(const auto& village:m_logicalVillages)if(std::find(village.members.begin(),village.members.end(),entity.id)!=village.members.end()) {
                 glm::dvec3 center(0);int count=0;
                 for(auto id:village.members)if(const auto* other=aiEntity(id)) {center+=glm::dvec3(other->villager.claimedBed);++count;}
-                if(count>0)if(auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+                if(count>0)if(auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
                     std::floor(center.x/count)+.5,std::floor(center.z/count)+.5,entity.position.y,8,8)) {
                     ai.behavior=EntityBehavior::Gather;ai.destination={*destination,3,.6};
                     ai.hasDestination=true;ai.speed=.65f;entity.sleeping=false;return;
@@ -246,7 +246,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
         if (v.hasBed && v.hasWorkstation) {
             const glm::dvec3 center=(glm::dvec3(v.claimedBed)+glm::dvec3(v.claimedWorkstation))*.5;
             if (glm::distance(entity.position,center)>12) {
-                if (auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+                if (auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
                         std::floor(center.x)+.5,std::floor(center.z)+.5,entity.position.y)) {
                     ai.behavior=EntityBehavior::ReturnHome;
                     ai.destination={*destination,1,.6};
@@ -268,7 +268,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             ai.actionUntil=m_aiTime+3+(roll%300)*.01;
             const double angle=(roll%6283)*.001;
             const double radius=3+(roll%4);
-            if (auto destination=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+            if (auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
                     std::floor(entity.position.x+std::cos(angle)*radius)+.5,
                     std::floor(entity.position.z+std::sin(angle)*radius)+.5,entity.position.y))
                 ai.destination={*destination,.35,.6};

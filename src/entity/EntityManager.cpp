@@ -30,6 +30,7 @@ std::pair<int,int> entityChunk(const glm::dvec3& position) {
 void EntityManager::clear() {
     m_entities.clear();
     m_navigation.clear();
+    m_openedVillageDoors.clear();
     m_aiChunks.clear();
     m_aiBuckets.clear();
     m_aiEntityIndices.clear();
@@ -1004,6 +1005,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         if (blockHit) {
             arrow.velocity = glm::vec3(0.0f);
             arrow.inGround = true;
+            m_world.activateButtonsAtArrow(arrow.position);
         }
         return;
     }
@@ -1268,4 +1270,18 @@ void EntityManager::initializeModels(const std::filesystem::path& assetRoot,
     m_modelRegistry.loadAll(assetRoot);
     if (renderer.capabilities().gameplay)
         m_modelRegistry.uploadAll(renderer.modelRenderer());
+}
+
+bool EntityManager::arrowTouchesButton(const glm::ivec3& position) const {
+    ButtonState state;
+    if(!decodeButton(m_world.getBlock(position.x,position.y,position.z),state)) return false;
+    state.pressed=false;
+    const auto box=blockSelectionBoxes(buttonBlock(state)).boxes[0];
+    for(const auto& arrow:m_entities) {
+        if(arrow.type!=EntityType::Arrow || !arrow.inGround || arrow.health<=0) continue;
+        const glm::dvec3 local=arrow.position-glm::dvec3(position);
+        if(glm::all(glm::greaterThanEqual(local,glm::dvec3(box.min)-.03)) &&
+           glm::all(glm::lessThanEqual(local,glm::dvec3(box.max)+.03))) return true;
+    }
+    return false;
 }

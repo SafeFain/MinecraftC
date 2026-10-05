@@ -9,6 +9,8 @@
 #include <unordered_set>
 #include <atomic>
 #include <queue>
+#include <set>
+#include <tuple>
 #include <limits>
 
 #include <glm/glm.hpp>
@@ -129,6 +131,21 @@ public:
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
+    bool placeDoor(const glm::ivec3& bottom, DoorState state);
+    bool setDoorOpen(const glm::ivec3& position, bool open);
+    bool interactDoor(const glm::ivec3& position);
+    bool placeButton(const glm::ivec3& position, ButtonState state);
+    bool activateButton(const glm::ivec3& position);
+    void activateButtonsAtArrow(const glm::dvec3& position);
+    void tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& arrowPresent);
+    bool supportsFace(const glm::ivec3& position, FaceDir outward) const;
+    std::vector<std::pair<glm::ivec3,ItemStack>> takeSupportDrops() {
+        auto result=std::move(m_supportDrops); m_supportDrops.clear(); return result;
+    }
+    struct BlockInteractionSound { glm::ivec3 position; bool metal, opening, button; };
+    std::vector<BlockInteractionSound> takeInteractionSounds() {
+        auto result=std::move(m_interactionSounds); m_interactionSounds.clear(); return result;
+    }
     bool placeBed(const glm::ivec3& foot, BedDirection direction);
     std::optional<glm::ivec3> validBedFoot(const glm::ivec3& position) const;
 
@@ -264,6 +281,13 @@ private:
     GameRuleSet m_gameRules;
     friend class ChunkMeshPipeline;
     friend class FluidScheduler;
+    bool m_pairMutation = false;
+    std::set<std::tuple<int,int,int>> m_pendingDoorPower;
+    std::vector<std::pair<glm::ivec3,ItemStack>> m_supportDrops;
+    std::vector<BlockInteractionSound> m_interactionSounds;
+    void refreshDoorPower(const glm::ivec3& position);
+    void updateButtonPower(const glm::ivec3& position, const ButtonState& state);
+    void validateInteractiveNeighbors(const glm::ivec3& position);
     ChunkStore m_chunks;
     WorldPersistence m_persistence{m_chunks};
     FluidScheduler m_fluids{*this};

@@ -18,6 +18,30 @@ inline void bed(Scene& s,int x,int z) {
 }
 inline void villageLife(const std::filesystem::path& assets) {
     {
+        Scene s(assets);
+        for(int z=-12;z<=12;++z)for(int y=1;y<=3;++y)s.block(2,y,z,BlockId::STONE);
+        s.block(2,1,0,BlockId::AIR);s.block(2,2,0,BlockId::AIR);
+        DoorState door;door.direction=BedDirection::East;
+        check(s.world.placeDoor({2,1,0},door),"AI fixture door placement failed");
+        const auto id=worker(s,{.5,1,.5},{5,1,0});
+        bool opened=false;
+        for(int frame=0;frame<1200;++frame) {
+            s.step(1.f/60,false,3000);
+            DoorState state;decodeDoor(s.world.getBlock(2,1,0),state);opened=opened || state.open;
+        }
+        const auto* villager=s.mobs.entityById(id);
+        if(villager && (!opened || villager->position.x<=3.5))std::cerr<<"door AI position="
+            <<villager->position.x<<','<<villager->position.y<<','<<villager->position.z
+            <<" opened="<<opened<<" workstation="<<villager->villager.hasWorkstation
+            <<" behavior="<<int(villager->ai.behavior)<<" path="<<int(villager->ai.pathStatus)
+            <<" nodes="<<villager->ai.path.size()<<" waypoint="<<villager->ai.waypoint<<'\n';
+        check(opened && villager && villager->position.x>3.5,"villager failed to open and cross a wooden door");
+        decodeDoor(s.world.getBlock(2,1,0),door);
+        check(!door.open,"villager left its door open after passing");
+        check(villager->villager.hasWorkstation,"door passage lost reachable workstation claim");
+    }
+
+    {
         Scene s(assets);bed(s,2,0);bed(s,6,0);bed(s,2,4);
         s.add(EntityType::Villager,{.5,1,.5});s.add(EntityType::Villager,{1.5,1,.5});
         auto saved=s.mobs.saveEntities();

@@ -152,6 +152,24 @@
     "cartography_table": {"texture": "cartography_table"},
     "brewing_stand": {"texture": "brewing_stand"},
     "smoker": {"texture": "smoker"},
-    "stonecutter": {"texture": "stonecutter"}
+    "stonecutter": {"texture": "stonecutter"},
+    "birch_planks": {"texture": "birch_planks"},
+    "spruce_planks": {"texture": "spruce_planks"},
+    "jungle_planks": {"texture": "jungle_planks"},
+    "acacia_planks": {"texture": "acacia_planks"},
+    "oak_door": {"texture": "oak_door_bottom"},
+    "oak_button": {"texture": "oak_planks"},
+    "birch_door": {"texture": "birch_door_bottom"},
+    "birch_button": {"texture": "birch_planks"},
+    "spruce_door": {"texture": "spruce_door_bottom"},
+    "spruce_button": {"texture": "spruce_planks"},
+    "jungle_door": {"texture": "jungle_door_bottom"},
+    "jungle_button": {"texture": "jungle_planks"},
+    "acacia_door": {"texture": "acacia_door_bottom"},
+    "acacia_button": {"texture": "acacia_planks"},
+    "skyroot_door": {"texture": "skyroot_door_bottom"},
+    "skyroot_button": {"texture": "skyroot_planks"},
+    "iron_door": {"texture": "iron_door_bottom"},
+    "stone_button": {"texture": "stone"}
   }
 }

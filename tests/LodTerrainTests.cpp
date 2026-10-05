@@ -292,7 +292,7 @@ int main() {
     constexpr int idsPerColumn = Config::WORLD_HEIGHT / 2;
     const int blockCount = static_cast<int>(BlockId::COUNT) - 1;
     for (int raw = 1; raw <= blockCount; ++raw) {
-        const int x = 8 + 2 * ((raw - 1) / idsPerColumn);
+        const int x = 2 + 2 * ((raw - 1) / idsPerColumn);
         const int y = Config::WORLD_MIN_Y + 2 * ((raw - 1) % idsPerColumn);
         require(x < Config::CHUNK_SIZE_X && y < Config::WORLD_MAX_Y,
                 "all-block LOD fixture stays within chunk bounds");
@@ -300,7 +300,7 @@ int main() {
     }
     const LodTileData allBlockTile = extractExactLodChunk(allBlocks);
     for (int column = 0; column * idsPerColumn < blockCount; ++column) {
-        const auto& spans = allBlockTile.at(8 + 2 * column, 8).spans;
+        const auto& spans = allBlockTile.at(2 + 2 * column, 8).spans;
         require(spans.size() == static_cast<size_t>(
                     std::min(idsPerColumn, blockCount - column * idsPerColumn)),
                 "exact LOD did not retain every non-air BlockId");
@@ -313,7 +313,7 @@ int main() {
     LodTileData decodedAllBlocks;
     require(decodeLodTilePayload(allBlockPayload, decodedAllBlocks) &&
             sameTile(allBlockTile, decodedAllBlocks) &&
-            decodedAllBlocks.at(8, 8).spans.size() > 24,
+            decodedAllBlocks.at(2, 8).spans.size() > 24,
             "r5 LOD payload does not round-trip columns beyond 24 runs");
     const ChunkMesh allBlockMesh = buildLodTileMesh(decodedAllBlocks, 1, 24);
     require(allBlockMesh.opaqueIndexCount > 0 &&

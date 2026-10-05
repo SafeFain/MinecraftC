@@ -34,13 +34,13 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   New worlds persist spawn caches; compatible caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
-- Generation version 19 retains 15 fixed-anchor, boundary-blended macro terrain
+- Generation version 20 retains 15 fixed-anchor, boundary-blended macro terrain
   archetypes, finite volcanic overlays, and a local-level drainage graph across
   Y=-64..319 while preserving the v6 hybrid-cave algorithm, and includes seventeen
   deterministic overworld structures (plains/desert/taiga/snow/savanna villages, traveler huts,
   abandoned camps, desert wells, igloos, ruined towers, lumber camps, desert
   temples, jungle ruins, swamp huts, mountain watchtowers, stone circles,
-  abandoned farmsteads). Base cache revision 1 is part of the v19 cache key. Version 14 adds four
+  abandoned farmsteads). Base cache revision 1 is part of the v20 cache key. Version 14 adds four
   deterministic cave biomes, large chambers/rifts, cave surface materials,
   supported cave flora, dripstone, crystals, and volcanic decoration while
   retaining neutral transition caves. Version 13 seals the wall/roof
@@ -52,7 +52,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 274 serialized
+  types, and 894 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -60,7 +60,7 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 292-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 310-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -177,7 +177,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-The v15 content remains available in current v19 worlds. Old generation versions
+The v15 content remains available in current v20 worlds. Old generation versions
 are incompatible; current compatibility rules are described below.
 Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
 
@@ -208,7 +208,7 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-Only generation v19 worlds can load. v14/v15 and other previous or future
+Only generation v20 worlds can load. v14/v15 and other previous or future
 versions stay listed as incompatible, retaining their untouched files. No world
 migration remains. The v16 update retained save format v12, seed layout 5, terrain heights, cave-carving
 algorithms, tree/structure anchors and Heaven generation v8. The v17 update below
@@ -246,7 +246,7 @@ changes Heaven and block encoding while retaining Overworld generation output.
   using `/gamerule DayNightDuration <seconds>` with cheats enabled; v2-v13 default
   to 1200 seconds. Save v13 introduced 16-bit IDs, retained in v14; packed light remains byte-sized.
   Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
-  Old metadata remains readable/listed; worlds outside global generation v19
+  Old metadata remains readable/listed; worlds outside global generation v20
   remain incompatible and are never migrated or rewritten by refused loads.
   Seed layout, Overworld generation output and application VERSION are unchanged.
 
@@ -323,7 +323,7 @@ remain listed and refused without rewriting or migration.
 - Save v17 persists food, growth/cooldowns, reputation and demand for metadata and
   chunk entities; v2–v16 remain readable with defaults. No offline growth or cooldown
   catch-up. No raids, zombie curing, gossip simulation, or automatic construction.
-  Only global v19 worlds load; refused older/future worlds are never rewritten.
+  Only global v20 worlds load; refused older/future worlds are never rewritten.
   Heaven v9, terrain/cave algorithms, existing IDs and application VERSION remain unchanged.
 
 ## Classic fishing
@@ -365,7 +365,7 @@ remain listed and refused without rewriting or migration.
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v17 (introduced in v15); v2–v14 retain readable defaults and
+are world-wide and persisted in save v18 (introduced in v15); v2–v14 retain readable defaults and
 existing duration values. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
@@ -375,3 +375,30 @@ ABI 1 supports optional compiled-in examples, desktop native plugins and portabl
 data packages; frozen block/item/recipe registries, shared material atlases, controlled
 gameplay events/operations, environment colors and HUD. Save v16 resolves namespaced
 content and checks exact gameplay package requirements. [Installation and SDK](plugins.md).
+
+## Doors and buttons (generation v20)
+
+Six wood families (oak, birch, spruce, jungle, acacia, skyroot) have distinct
+planks, two-block doors and buttons; iron doors and stone buttons complete
+the feature. New states append after the existing 274 non-air IDs. Ordinary
+wood recipes accept all plank families; six same-family planks or iron ingots
+make three doors. One plank or stone makes a button. Wooden doors support
+direct use; iron doors only respond to button power. Buttons support wall,
+floor and ceiling placement and do not block movement. Stone pulses last
+20 game ticks, wooden pulses 30; arrows can hold wooden buttons.
+
+Local power reaches adjacent doors and doors adjacent to the button's full
+solid support block. Signals from multiple buttons combine; no wires, levers,
+pressure plates, pistons or recursive conduction are introduced. Save v18
+stores remaining button ticks; unloaded chunks pause and resume simulation.
+Simultaneous pulse releases have a 256-transition tick budget; excess due
+releases remain queued for following ticks.
+
+All village homes/workshops and enclosed hut, igloo, farmstead, tower, temple
+and ruins-room entrances have wooden doors. Village wood is oak for plains
+and desert, spruce for taiga/snow, and acacia for savanna. Open shelters and
+ruined gateways remain open. Villager navigation plans around the open door
+panel, opens doors before passage, and closes doors it opened when the route
+is clear. Iron doors are not openable by villagers. Global generation v20
+retains seed layout 5, terrain/caves and Heaven v9; v19 files remain untouched
+and incompatible.

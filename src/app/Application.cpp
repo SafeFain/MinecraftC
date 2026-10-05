@@ -250,6 +250,9 @@ private:
             });
         m_sessionFeedback.setRainVolume =
             [this](float volume) { m_audio.setRainVolume(volume); };
+        m_sessionFeedback.playBlockInteraction=[this](bool metal,bool opening,bool button) {
+            m_audio.playBlockInteraction(metal,opening,button);
+        };
         m_sessionFeedback.playFishing = [this](FishingEventKind kind) {
             switch (kind) {
                 case FishingEventKind::Cast: m_audio.playFishing(FishingSound::Cast); break;

@@ -22,6 +22,7 @@ struct CraftingRecipe {
     std::array<ItemId, 9> ingredients{};
     ItemStack output;
     bool allowMirror = true;
+    bool allowPlankVariants = true;
 };
 
 struct SmeltingRecipe {

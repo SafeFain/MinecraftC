@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 #include <cstdint>
 #include <filesystem>
 #include <vector>
@@ -75,6 +77,7 @@ struct DeadEntityRender {
 
 class EntityManager {
 public:
+    bool arrowTouchesButton(const glm::ivec3& position) const;
     explicit EntityManager(World& world) : m_world(world) {}
 
     const EntityAiStats& aiStats() const { return m_aiStats; }
@@ -137,6 +140,8 @@ public:
 private:
     EntityAiStats m_aiStats;
     double m_aiTime = 0;
+    std::map<std::tuple<int,int,int>,double> m_openedVillageDoors;
+    void openNavigationDoors(Entity& entity, const glm::dvec3& destination);
     std::map<std::pair<int,int>,const Chunk*> m_aiChunks;
     std::unordered_map<uint64_t,size_t> m_aiEntityIndices;
     std::map<std::tuple<int,int,int>,std::vector<uint64_t>> m_aiBuckets;
@@ -155,7 +160,8 @@ private:
     std::vector<AiArrow> m_aiArrows;
     std::vector<AiExplosion> m_aiExplosions;
     GroundNavigation::Terrain navigationTerrain(
-        std::map<std::pair<int,int>,uint64_t>* revisions = nullptr) const;
+        std::map<std::pair<int,int>,uint64_t>* revisions = nullptr,
+        bool canOpenWoodDoors = false) const;
     void prepareAiFrame(float dt);
     void scheduleNavigation(const glm::dvec3& playerPosition);
     void requestNavigation(Entity& entity, const GroundNavigation::Goal& goal,

@@ -13,6 +13,7 @@ namespace GroundNavigation {
 struct Terrain {
     std::function<BlockId(int,int,int)> block;
     std::function<bool(int,int)> loaded;
+    bool canOpenWoodDoors = false;
 };
 struct Goal {
     glm::dvec3 position{0};

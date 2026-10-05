@@ -57,7 +57,7 @@ int main(int argc,char** argv) {
         require(isValidBlockId(block)&&isValidItemId(item)&&getItemProps(item).placedBlock==block,"registered content usable");
         require(getLightEmission(crystalBlock)==9,"custom light emission");
         const auto category=creativeInventoryItemsIn(CreativeItemCategory::BuildingBlocks);require(std::find(category.begin(),category.end(),item)!=category.end(),"custom items appear in creative catalog");
-        std::array<ItemId,9> grid{};grid[0]=ItemId::STONE;const auto* recipe=findCraftingRecipe(grid,1,1);require(recipe&&recipe->output.id==item&&recipe->output.count==4,"custom recipe actually selected");
+        std::array<ItemId,9> grid{};grid[0]=ItemId::COBBLESTONE;const auto* recipe=findCraftingRecipe(grid,1,1);require(recipe&&recipe->output.id==item&&recipe->output.count==4,"custom recipe actually selected");
         rejects([&]{Plugins::registerBlock({});},"frozen registry rejects mutation");
         const auto atlas=buildBlockAtlasData(paths.assetRoot);
         require(atlas.texture.mipLevels.size()==4&&atlas.normalTexture.mipLevels.size()==4,"plugin atlas has tile-safe mip chain");

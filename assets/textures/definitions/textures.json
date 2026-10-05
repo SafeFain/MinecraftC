@@ -240,7 +240,25 @@
     "cartography_table": "constructed",
     "brewing_stand": "constructed",
     "smoker": "constructed",
-    "stonecutter": "constructed"
+    "stonecutter": "constructed",
+    "birch_planks": "wood",
+    "spruce_planks": "wood",
+    "jungle_planks": "wood",
+    "acacia_planks": "wood",
+    "oak_door_bottom": "wood",
+    "oak_door_top": "wood",
+    "birch_door_bottom": "wood",
+    "birch_door_top": "wood",
+    "spruce_door_bottom": "wood",
+    "spruce_door_top": "wood",
+    "jungle_door_bottom": "wood",
+    "jungle_door_top": "wood",
+    "acacia_door_bottom": "wood",
+    "acacia_door_top": "wood",
+    "skyroot_door_bottom": "wood",
+    "skyroot_door_top": "wood",
+    "iron_door_bottom": "wood",
+    "iron_door_top": "wood"
   },
   "family_specs": {
     "soil": {

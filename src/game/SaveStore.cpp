@@ -435,6 +435,8 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
     append(payload, static_cast<uint8_t>(entity.value.type));
     if (entity.value.type == BlockEntityType::Chest) {
         for (const auto& stack : entity.value.chest) appendStack(payload, stack);
+    } else if (entity.value.type == BlockEntityType::Button) {
+        append(payload, entity.value.buttonRemaining);
     } else {
         appendStack(payload, entity.value.input);
         appendStack(payload, entity.value.fuel);
@@ -452,11 +454,14 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     if (entity.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid block entity position");
     const uint8_t type = reader.read<uint8_t>();
-    if (type > static_cast<uint8_t>(BlockEntityType::Furnace))
+    if (type > static_cast<uint8_t>(version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
         throw std::runtime_error("Invalid block entity type");
     entity.value.type = static_cast<BlockEntityType>(type);
     if (entity.value.type == BlockEntityType::Chest) {
         for (auto& stack : entity.value.chest) stack = readStack(reader);
+    } else if (entity.value.type == BlockEntityType::Button) {
+        entity.value.buttonRemaining = reader.read<uint16_t>();
+        if (entity.value.buttonRemaining > 30) throw std::runtime_error("Invalid button timer");
     } else {
         entity.value.input = readStack(reader);
         entity.value.fuel = readStack(reader);

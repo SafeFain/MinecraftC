@@ -158,6 +158,24 @@
     "cartography_table": {"all": "cartography_table"},
     "brewing_stand": {"all": "brewing_stand"},
     "smoker": {"all": "smoker"},
-    "stonecutter": {"all": "stonecutter"}
+    "stonecutter": {"all": "stonecutter"},
+    "birch_planks": {"all": "birch_planks"},
+    "spruce_planks": {"all": "spruce_planks"},
+    "jungle_planks": {"all": "jungle_planks"},
+    "acacia_planks": {"all": "acacia_planks"},
+    "oak_door": {"all": "oak_door_bottom"},
+    "oak_button": {"all": "oak_planks"},
+    "birch_door": {"all": "birch_door_bottom"},
+    "birch_button": {"all": "birch_planks"},
+    "spruce_door": {"all": "spruce_door_bottom"},
+    "spruce_button": {"all": "spruce_planks"},
+    "jungle_door": {"all": "jungle_door_bottom"},
+    "jungle_button": {"all": "jungle_planks"},
+    "acacia_door": {"all": "acacia_door_bottom"},
+    "acacia_button": {"all": "acacia_planks"},
+    "skyroot_door": {"all": "skyroot_door_bottom"},
+    "skyroot_button": {"all": "skyroot_planks"},
+    "iron_door": {"all": "iron_door_bottom"},
+    "stone_button": {"all": "stone"}
   }
 }

@@ -51,7 +51,7 @@ void EntityManager::refreshPoiIndex() {
 
 std::optional<GroundNavigation::Goal> EntityManager::poiGoal(
     const Entity& entity,const glm::ivec3& poi) const {
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,true);
     std::vector<glm::dvec3> positions;
     static constexpr int offsets[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
     for (const auto& offset:offsets) {
@@ -76,7 +76,7 @@ std::optional<glm::dvec3> EntityManager::poiStand(const Entity& entity,const glm
 bool EntityManager::interactablePoi(const Entity& entity,const glm::ivec3& poi) {
     const glm::dvec3 center=glm::dvec3(poi)+glm::dvec3(.5,.5,.5);
     if (glm::distance(entity.position,center)>=1.6 || !entity.ai.grounded) return false;
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,true);
     if (!GroundNavigation::clear(terrain,entitySize(entity),entity.position)) return false;
     // Stop at the near surface of the POI so the POI itself does not count as a wall.
     const glm::dvec3 origin=entity.position+glm::dvec3(0,.6,0);
@@ -137,7 +137,7 @@ void EntityManager::requestPoiClaim(Entity& entity) {
         if(glm::distance(entity.position,goal->position)>40) {
             const auto delta=goal->position-entity.position;
             const auto step=entity.position+delta*(32.0/glm::length(delta));
-            if(auto stand=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+            if(auto stand=GroundNavigation::stand(navigationTerrain(nullptr,true),entitySize(entity),
                 std::floor(step.x)+.5,std::floor(step.z)+.5,step.y,8,8)) {
                 ai.destination={*stand,.5,.6};ai.hasDestination=true;ai.speed=.75f;
                 requestNavigation(entity,ai.destination,NavigationPurpose::Move);
@@ -201,7 +201,7 @@ void EntityManager::tickVillageLife(float dt,uint64_t worldTick) {
     m_villageLifeTimer+=dt;
     if(m_villageLifeTimer<1 || m_entities.empty())return;
     m_villageLifeTimer=0;
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,true);
     const bool grief=m_world.gameRules().boolean(GameRuleId::MobGriefing);
     const bool spawning=m_world.gameRules().boolean(GameRuleId::SpawnMobs);
     const auto tick=worldTick%24000;
@@ -345,7 +345,7 @@ void EntityManager::tickVillageLife(float dt,uint64_t worldTick) {
     const auto size=renderSize(EntityType::IronGolem);
     for(int radius=2;radius<=8;radius+=2)for(int direction=0;direction<4;++direction) {
         static constexpr int offsets[4][2]={{1,0},{0,1},{-1,0},{0,-1}};
-        const auto position=GroundNavigation::stand(terrain,size,
+        const auto position=GroundNavigation::stand(navigationTerrain(),size,
             std::floor(center.x)+.5+offsets[direction][0]*radius,
             std::floor(center.z)+.5+offsets[direction][1]*radius,center.y,8,8);
         if(position && spawnMob(EntityType::IronGolem,*position)) {

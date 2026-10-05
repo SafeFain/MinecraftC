@@ -270,7 +270,11 @@ enum class BlockId : uint16_t {
     CLOUDBERRY_BUSH,
     HANGING_CLOUD_VINE,
     BARREL, LECTERN, CARTOGRAPHY_TABLE, BREWING_STAND, SMOKER, STONECUTTER,
-    COUNT        = 275,
+    BIRCH_PLANKS = 275, SPRUCE_PLANKS, JUNGLE_PLANKS, ACACIA_PLANKS,
+    // 64 states per door: facing, hinge, open, powered, half.
+    DOOR_FIRST = 279,
+    BUTTON_FIRST = DOOR_FIRST + 7 * 64,
+    COUNT = BUTTON_FIRST + 7 * 24,
     POPPY        = FLOWER
 };
 
@@ -298,7 +302,9 @@ enum class RenderShape : uint8_t {
     Slab,
     Stair,
     Spike,
-    CeilingCross
+    CeilingCross,
+    Door,
+    Button
 };
 
 enum class BedPart : uint8_t { Foot, Head };
@@ -449,6 +455,11 @@ enum class BlockTexture : uint16_t {
     CaveGlowshroom,
     Moonstone, Skystone, AetherMoss, GlimmerSilt, StarCrystalOre, SkyrootPlanks, CloudstoneBricks, SunstoneBricks, MoonstoneBricks, StarCrystalLamp, SkyFern, DawnBell, Moonflower, GlimmerReed, CloudberryBush, HangingCloudVine,
     Barrel, Lectern, CartographyTable, BrewingStand, Smoker, Stonecutter,
+    BirchPlanks, SprucePlanks, JunglePlanks, AcaciaPlanks,
+    OakDoorBottom, OakDoorTop, BirchDoorBottom, BirchDoorTop,
+    SpruceDoorBottom, SpruceDoorTop, JungleDoorBottom, JungleDoorTop,
+    AcaciaDoorBottom, AcaciaDoorTop, SkyrootDoorBottom, SkyrootDoorTop,
+    IronDoorBottom, IronDoorTop,
     Count
 };
 
@@ -561,3 +572,24 @@ extern const std::array<std::array<int, 6>, 6> FACE_INDICES;
 
 // Wireframe cube — 12 line segments = 24 vertices
 extern const std::array<glm::vec3, 24> WIRE_CUBE_VERTICES;
+
+// State IDs remain in chunk memory and saves, just like beds and stairs.
+enum class DoorMaterial : uint8_t { Oak, Birch, Spruce, Jungle, Acacia, Skyroot, Iron };
+struct DoorState {
+    DoorMaterial material = DoorMaterial::Oak;
+    BedDirection direction = BedDirection::North;
+    bool rightHinge = false, open = false, powered = false, upper = false;
+};
+struct ButtonState {
+    DoorMaterial material = DoorMaterial::Oak; // Iron denotes stone buttons.
+    FaceDir attachment = FaceDir::BACK; // face normal pointing away from support
+    BedDirection direction = BedDirection::North;
+    bool pressed = false;
+};
+bool decodeDoor(BlockId id, DoorState& state);
+BlockId doorBlock(const DoorState& state);
+bool decodeButton(BlockId id, ButtonState& state);
+BlockId buttonBlock(const ButtonState& state);
+glm::ivec3 faceOffset(FaceDir face);
+BlockCollisionBoxes blockSelectionBoxes(BlockId id);
+BlockId woodPlanks(DoorMaterial material);

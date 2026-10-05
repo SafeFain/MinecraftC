@@ -5,6 +5,22 @@
   "generation_failures": {},
   "generator_version": 5,
   "items": {
+    "acacia_button": {
+      "generator": "item_sprite",
+      "index": 305,
+      "source": "items/acacia_button.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 38
+    },
+    "acacia_door": {
+      "generator": "item_sprite",
+      "index": 304,
+      "source": "items/acacia_door.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 38
+    },
     "acacia_leaves": {
       "generator": "block_item_icon",
       "index": 64,
@@ -20,6 +36,14 @@
       "source_kind": "generated",
       "x": 7,
       "y": 7
+    },
+    "acacia_planks": {
+      "generator": "block_item_icon",
+      "index": 295,
+      "source": "items/acacia_planks.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 36
     },
     "acacia_sapling": {
       "generator": "block_item_icon",
@@ -141,6 +165,22 @@
       "x": 3,
       "y": 28
     },
+    "birch_button": {
+      "generator": "item_sprite",
+      "index": 299,
+      "source": "items/birch_button.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 37
+    },
+    "birch_door": {
+      "generator": "item_sprite",
+      "index": 298,
+      "source": "items/birch_door.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 37
+    },
     "birch_leaves": {
       "generator": "block_item_icon",
       "index": 58,
@@ -156,6 +196,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 7
+    },
+    "birch_planks": {
+      "generator": "block_item_icon",
+      "index": 292,
+      "source": "items/birch_planks.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 36
     },
     "birch_sapling": {
       "generator": "block_item_icon",
@@ -1141,6 +1189,14 @@
       "x": 3,
       "y": 12
     },
+    "iron_door": {
+      "generator": "item_sprite",
+      "index": 308,
+      "source": "items/iron_door.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 38
+    },
     "iron_helmet": {
       "generator": "item_sprite",
       "index": 98,
@@ -1213,6 +1269,22 @@
       "x": 5,
       "y": 3
     },
+    "jungle_button": {
+      "generator": "item_sprite",
+      "index": 303,
+      "source": "items/jungle_button.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 37
+    },
+    "jungle_door": {
+      "generator": "item_sprite",
+      "index": 302,
+      "source": "items/jungle_door.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 37
+    },
     "jungle_fern": {
       "generator": "block_item_icon",
       "index": 249,
@@ -1236,6 +1308,14 @@
       "source_kind": "generated",
       "x": 5,
       "y": 7
+    },
+    "jungle_planks": {
+      "generator": "block_item_icon",
+      "index": 294,
+      "source": "items/jungle_planks.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 36
     },
     "jungle_sapling": {
       "generator": "block_item_icon",
@@ -1404,6 +1484,22 @@
       "source_kind": "generated",
       "x": 3,
       "y": 30
+    },
+    "oak_button": {
+      "generator": "item_sprite",
+      "index": 297,
+      "source": "items/oak_button.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 37
+    },
+    "oak_door": {
+      "generator": "item_sprite",
+      "index": 296,
+      "source": "items/oak_door.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 37
     },
     "oak_leaves": {
       "generator": "block_item_icon",
@@ -1821,6 +1917,22 @@
       "x": 6,
       "y": 33
     },
+    "skyroot_button": {
+      "generator": "item_sprite",
+      "index": 307,
+      "source": "items/skyroot_button.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 38
+    },
+    "skyroot_door": {
+      "generator": "item_sprite",
+      "index": 306,
+      "source": "items/skyroot_door.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 38
+    },
     "skyroot_leaves": {
       "generator": "block_item_icon",
       "index": 149,
@@ -1901,6 +2013,22 @@
       "x": 4,
       "y": 16
     },
+    "spruce_button": {
+      "generator": "item_sprite",
+      "index": 301,
+      "source": "items/spruce_button.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 37
+    },
+    "spruce_door": {
+      "generator": "item_sprite",
+      "index": 300,
+      "source": "items/spruce_door.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 37
+    },
     "spruce_leaves": {
       "generator": "block_item_icon",
       "index": 60,
@@ -1916,6 +2044,14 @@
       "source_kind": "generated",
       "x": 3,
       "y": 7
+    },
+    "spruce_planks": {
+      "generator": "block_item_icon",
+      "index": 293,
+      "source": "items/spruce_planks.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 36
     },
     "spruce_sapling": {
       "generator": "block_item_icon",
@@ -2012,6 +2148,14 @@
       "source_kind": "generated",
       "x": 6,
       "y": 22
+    },
+    "stone_button": {
+      "generator": "item_sprite",
+      "index": 309,
+      "source": "items/stone_button.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 38
     },
     "stone_hoe": {
       "generator": "item_sprite",
@@ -2348,7 +2492,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 37,
+  "rows": 39,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

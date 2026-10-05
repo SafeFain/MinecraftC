@@ -2,5 +2,5 @@
   "materials": [{"key": "example_content:blue_brick", "color": [0.2, 0.5, 0.9, 1]}],
   "blocks": [{"key": "example_content:blue_brick", "name": "Blue Brick", "hardness": 1.5, "materials": "example_content:blue_brick", "drop": "example_content:blue_brick"}],
   "items": [{"key": "example_content:blue_brick", "name": "Blue Brick", "placed_block": "example_content:blue_brick", "material": "example_content:blue_brick", "category": 0}],
-  "recipes": [{"key": "example_content:blue_brick", "width": 1, "height": 1, "ingredients": ["minecraftc:stone"], "output": "example_content:blue_brick", "count": 4}]
+  "recipes": [{"key": "example_content:blue_brick", "width": 1, "height": 1, "ingredients": ["minecraftc:cobblestone"], "output": "example_content:blue_brick", "count": 4}]
 }

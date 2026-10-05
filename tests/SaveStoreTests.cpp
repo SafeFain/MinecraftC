@@ -56,7 +56,7 @@ void stripV17EntityFields(std::vector<uint8_t>& bytes,
 }
 
 void stripV16Envelope(std::vector<uint8_t>& bytes) {
-    require(bytes.size()>=36 && bytes[8]==17,"fixture starts in save v17");
+    require(bytes.size()>=36 && bytes[8]==SAVE_FORMAT_VERSION,"fixture starts in current save format");
     require(std::all_of(bytes.begin()+24,bytes.begin()+36,[](uint8_t b){return b==0;}),"vanilla fixture has three empty plugin tables");
     bytes.erase(bytes.begin()+24,bytes.begin()+36);
 }

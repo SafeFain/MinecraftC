@@ -36,7 +36,7 @@ std::optional<double> projectileBlockHit(
         for (int y = first.y; y <= last.y; ++y)
             for (int z = first.z; z <= last.z; ++z)
                 for (int x = first.x; x <= last.x; ++x) {
-                    const auto boxes = blockCollisionBoxes(blockAt(x, y, z));
+                    const auto boxes = blockSelectionBoxes(blockAt(x, y, z));
                     const glm::dvec3 block(x, y, z);
                     for (uint8_t i = 0; i < boxes.count; ++i) {
                         const auto candidate = projectileAabbHit(origin, velocity,

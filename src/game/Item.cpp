@@ -525,6 +525,21 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     set(ItemId::ROASTED_GLOWSHROOM, {"Roasted Glowshroom", ItemKind::Food, 64, 0,
         ToolKind::None, ToolTier::None, 0, 0, 4, 2.0f});
 
+    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "Skyroot", "Iron"};
+    for (uint8_t i=0;i<7;++i) {
+        DoorState door; door.material=static_cast<DoorMaterial>(i);
+        ButtonState button; button.material=door.material;
+        set(static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+i),
+            {std::string(names[i])+" Door", ItemKind::Block, 64, 0,
+             ToolKind::None, ToolTier::None, 0,0,0,0,doorBlock(door)});
+        set(static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+i),
+            {std::string(i==6?"Stone":names[i])+" Button", ItemKind::Block, 64, 0,
+             ToolKind::None, ToolTier::None, 0,0,0,0,buttonBlock(button)});
+        if(i>0 && i<5) set(plankItem(door.material),
+            {std::string(names[i])+" Planks", ItemKind::Block,64,0,
+             ToolKind::None,ToolTier::None,0,0,0,0,woodPlanks(door.material)});
+    }
+
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
     return items;
@@ -536,6 +551,10 @@ const auto REGISTRY = buildRegistry();
 // inventory tests: every serialized item appears in exactly one category and
 // all category sizes are asserted there.
 CreativeItemCategory categoryFor(ItemId id) {
+    if (id >= ItemId::BIRCH_PLANKS && id <= ItemId::ACACIA_PLANKS)
+        return CreativeItemCategory::BuildingBlocks;
+    if (id >= ItemId::OAK_DOOR && id <= ItemId::STONE_BUTTON)
+        return CreativeItemCategory::Functional;
     switch (id) {
         // ── Building Blocks ─────────────────────────────────────────────
         case ItemId::GRASS_BLOCK: case ItemId::DIRT: case ItemId::STONE:
@@ -834,6 +853,11 @@ const ItemProperties& getItemProps(ItemId id) {
 }
 
 ItemId itemForBlock(BlockId id) {
+    DoorState door; ButtonState button;
+    if(decodeDoor(id,door)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+static_cast<uint8_t>(door.material));
+    if(decodeButton(id,button)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+static_cast<uint8_t>(button.material));
+    if(id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS)
+        return static_cast<ItemId>(static_cast<uint16_t>(ItemId::BIRCH_PLANKS)+static_cast<uint16_t>(id)-static_cast<uint16_t>(BlockId::BIRCH_PLANKS));
     if (const auto* block = Plugins::pluginBlock(id)) return block->drop;
     if (isBed(id)) return ItemId::WHITE_BED;
     ArchitecturalBlockState architectural;
@@ -1059,4 +1083,15 @@ std::optional<ItemId> itemFromCommandName(std::string_view name) {
         if (itemCommandName(id) == name) return id;
     }
     return std::nullopt;
+}
+
+ItemId plankItem(DoorMaterial material) {
+    constexpr ItemId items[] = {ItemId::OAK_PLANKS, ItemId::BIRCH_PLANKS,
+        ItemId::SPRUCE_PLANKS,ItemId::JUNGLE_PLANKS,ItemId::ACACIA_PLANKS,
+        ItemId::SKYROOT_PLANKS,ItemId::STONE};
+    return items[static_cast<uint8_t>(material)];
+}
+bool isWoodPlankItem(ItemId id) {
+    return id==ItemId::OAK_PLANKS || id==ItemId::SKYROOT_PLANKS ||
+        (id>=ItemId::BIRCH_PLANKS && id<=ItemId::ACACIA_PLANKS);
 }

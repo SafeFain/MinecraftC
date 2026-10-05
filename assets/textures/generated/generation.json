@@ -1,6 +1,14 @@
 {
   "generator_version": 5,
   "materials": {
+    "acacia_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "297b8bdb56438342716abeb910654d35ac2d27d650c904497f2452e7a78c1bcd"
+    },
+    "acacia_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "c30ace8152a532878b64ceca9f9a857d9705361eaa8e943c3e8d8dab790907b9"
+    },
     "acacia_leaves": {
       "effective_seed": 213785369,
       "sha256": "2b3c9df65b00b2423ec7f9fc337346ca6e78e333c2f33d27b85ac0c386f08e28"
@@ -12,6 +20,10 @@
     "acacia_log_top": {
       "effective_seed": 213785369,
       "sha256": "afb55f1132421911bde94f04baa7f4be4e8870adbadbc41f2e43eff08594658f"
+    },
+    "acacia_planks": {
+      "effective_seed": 213785369,
+      "sha256": "dfa1c4eb6f7ea08d07e4fef4978121f8e5f926211e7d233d9550edb62464d924"
     },
     "acacia_sapling": {
       "effective_seed": 213785369,
@@ -73,6 +85,14 @@
       "effective_seed": 213785369,
       "sha256": "48234039a048b73638ac2839f61ddddfb228a10a33d4eb369e96d374795e2c5b"
     },
+    "birch_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "654850caf380f7e89fc3bb5100986ad78c201b0bed1afef5e1108a7173fb7921"
+    },
+    "birch_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "3575ffe9e52ba3dbcc4d6b0b05189f4bf2b8c42ade020c72d30f47a25209b17d"
+    },
     "birch_leaves": {
       "effective_seed": 213785369,
       "sha256": "e9e7e0a31cf99c15ecc068ba953118c9365a1a4542e4c36b8566bd984a35d231"
@@ -84,6 +104,10 @@
     "birch_log_top": {
       "effective_seed": 213785369,
       "sha256": "7888ece06fc27897cbf7c2da0a9a78b4aa782b8bfdbbd324c90a8670569a2789"
+    },
+    "birch_planks": {
+      "effective_seed": 213785369,
+      "sha256": "24ddb104a18abc4dd5d08903c344486dd82f388038d77b49c6c55ba7f07518f9"
     },
     "birch_sapling": {
       "effective_seed": 213785369,
@@ -489,6 +513,14 @@
       "effective_seed": 213785369,
       "sha256": "c49b99c00038357be4ff5de4b5e76d7745fd72c0a112d21ff671aff8a9843b4a"
     },
+    "iron_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "9fd47a869c343ad2485323346ff748d4a25614926669948ae6fd682febe9ce73"
+    },
+    "iron_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "a7d4aa9aef306a68c09b596406ac8e8e1b9f7d94dd090b4f09acacc7d79d980c"
+    },
     "iron_ore": {
       "effective_seed": 213785369,
       "sha256": "e88bdc2ab86d54a048a673b80fa22c60f4236416216f6fcca2c12939eeb8434d"
@@ -496,6 +528,14 @@
     "iron_stained_rock": {
       "effective_seed": 213785369,
       "sha256": "ac40c4bbdb62b923e60ca2b918ff549f3214336ae6d136cddac0da19640debde"
+    },
+    "jungle_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "342b1463e1e87216f28e391c75a8d16aaed1611032d61b52fe8646274d8ecea9"
+    },
+    "jungle_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "57ee7f37350e8de6600e8bd0038cd31b3169a179e25a64301eafd8842c94362a"
     },
     "jungle_fern": {
       "effective_seed": 213785369,
@@ -512,6 +552,10 @@
     "jungle_log_top": {
       "effective_seed": 213785369,
       "sha256": "5de3a7e9aba930782de176cece8384a587adb2a47908b88a66fd58f18be5ab4f"
+    },
+    "jungle_planks": {
+      "effective_seed": 213785369,
+      "sha256": "a16d90676c9b3ed17de0b202dc3a5ad2b4b1f6a9f8cacbbfec96dd3a46669bf4"
     },
     "jungle_sapling": {
       "effective_seed": 213785369,
@@ -596,6 +640,14 @@
     "nettle": {
       "effective_seed": 213785369,
       "sha256": "a69112de23dc74efa1a68ea77fdb72866a1c0e16b55342d3a20548aa81179746"
+    },
+    "oak_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "04c7a3cffee422d6425f227cfd7119aaeda84b368b64b437abaec7ae0030a250"
+    },
+    "oak_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "13005009b8c043db53c1534f1cd86fcad68b2072fe0c9fb9c5186962e7882862"
     },
     "oak_log": {
       "effective_seed": 213785369,
@@ -729,6 +781,14 @@
       "effective_seed": 213785369,
       "sha256": "3e4a8e62a9b5976be097e9ed8a1dd39e061419315c1a1ab807a8ed398f44f88b"
     },
+    "skyroot_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "e11fc9b7c28bd4e241f6ce3b5b88d5c2d86a6adaf914c444b78c420814f0adc0"
+    },
+    "skyroot_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "5a5c0967a6802b672b12bafea82476cb43f66f8a97b4956bd59006d28f43d381"
+    },
     "skyroot_leaves": {
       "effective_seed": 213785369,
       "sha256": "b5b17573e36b9c84ccd8feb715f7d3f81afcd4c87fac94dacd7a1c46c4ba27a1"
@@ -785,6 +845,14 @@
       "effective_seed": 213785369,
       "sha256": "be944d89d13c98ab240fc4272bd2d350925a83b9c114b8ad115627d0d07adfea"
     },
+    "spruce_door_bottom": {
+      "effective_seed": 213785369,
+      "sha256": "6662cb5f47d77c70f9d39fccc8130f4164bb47bd4dc48b6586b890ff450c7537"
+    },
+    "spruce_door_top": {
+      "effective_seed": 213785369,
+      "sha256": "ba61cb35d89cb86a2faf81986dcc198efc842f10aa5d050c48aead3b2f23214d"
+    },
     "spruce_leaves": {
       "effective_seed": 213785369,
       "sha256": "5f2e21f1f4a03cb87a98c896cf14af35a726a3c15effa5cb36934dea9d57f87b"
@@ -796,6 +864,10 @@
     "spruce_log_top": {
       "effective_seed": 213785369,
       "sha256": "ee3e5296af8ae028ffc41766f1f9821e9f692112374050de6ac06af73ed4ed4a"
+    },
+    "spruce_planks": {
+      "effective_seed": 213785369,
+      "sha256": "9fd1b911c87d965709843e738d303c655ba03bf76cdda263c0699f6947aab2d1"
     },
     "spruce_sapling": {
       "effective_seed": 213785369,

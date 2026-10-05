@@ -61,7 +61,12 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "dry_grass_side", "leaf_litter_side",
     "andesite", "diorite", "gneiss", "marble", "laterite", "red_clay", "cracked_mud", "salt_crust", "clover", "heather", "wild_mint", "nettle", "desert_flower", "small_cactus", "reed_flower", "tundra_moss", "fallen_twigs", "jungle_fern", "cave_moss", "wet_limestone", "gypsum", "amethyst_block", "quartz_block", "iron_stained_rock", "sulfur_rock", "amethyst_cluster", "quartz_cluster", "cave_glowshroom",
     "moonstone", "skystone", "aether_moss", "glimmer_silt", "star_crystal_ore", "skyroot_planks", "cloudstone_bricks", "sunstone_bricks", "moonstone_bricks", "star_crystal_lamp", "sky_fern", "dawn_bell", "moonflower", "glimmer_reed", "cloudberry_bush", "hanging_cloud_vine",
-    "barrel", "lectern", "cartography_table", "brewing_stand", "smoker", "stonecutter"
+    "barrel", "lectern", "cartography_table", "brewing_stand", "smoker", "stonecutter",
+    "birch_planks", "spruce_planks", "jungle_planks", "acacia_planks",
+    "oak_door_bottom", "oak_door_top", "birch_door_bottom", "birch_door_top",
+    "spruce_door_bottom", "spruce_door_top", "jungle_door_bottom", "jungle_door_top",
+    "acacia_door_bottom", "acacia_door_top", "skyroot_door_bottom", "skyroot_door_top",
+    "iron_door_bottom", "iron_door_top"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -120,7 +125,8 @@ bool quotedField(const std::string& object, const char* field, std::string& valu
 
 // ── Block properties table ────────────────────────────────────────────
 
-const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE = {{
+const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TABLE = [] {
+    std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> table = {{
     { BlockId::AIR,          "Air",          glm::vec3(0.0f, 0.0f, 0.0f), false, false },
     { BlockId::GRASS,        "Grass",        glm::vec3(0.34f, 0.68f, 0.24f), true, false },
     { BlockId::DIRT,         "Dirt",         glm::vec3(0.56f, 0.37f, 0.18f), true, false },
@@ -423,7 +429,29 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::SMOKER, "Smoker", glm::vec3(.55f,.44f,.32f), true, false},
     {BlockId::STONECUTTER, "Stonecutter", glm::vec3(.55f,.44f,.32f), true, false},
 
-}};
+    {BlockId::BIRCH_PLANKS, "Birch Planks", glm::vec3(.82f,.75f,.52f), true, false},
+    {BlockId::SPRUCE_PLANKS, "Spruce Planks", glm::vec3(.42f,.29f,.17f), true, false},
+    {BlockId::JUNGLE_PLANKS, "Jungle Planks", glm::vec3(.68f,.46f,.33f), true, false},
+    {BlockId::ACACIA_PLANKS, "Acacia Planks", glm::vec3(.75f,.39f,.22f), true, false},
+    }};
+    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "Skyroot", "Iron"};
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::DOOR_FIRST);
+         raw < static_cast<uint16_t>(BlockId::COUNT); ++raw) {
+        const BlockId id = static_cast<BlockId>(raw);
+        DoorState door; ButtonState button;
+        if (decodeDoor(id, door)) {
+            table[raw] = {id, std::string(names[static_cast<uint8_t>(door.material)]) +
+                " Door State " + std::to_string(raw), glm::vec3(.7f), true, true,
+                RenderShape::Door, RenderLayer::Cutout};
+        } else if (decodeButton(id, button)) {
+            const std::string name = button.material == DoorMaterial::Iron ? "Stone" :
+                names[static_cast<uint8_t>(button.material)];
+            table[raw] = {id, name + " Button State " + std::to_string(raw),
+                glm::vec3(.7f), false, true, RenderShape::Button};
+        }
+    }
+    return table;
+}();
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     if (Plugins::pluginBlock(id)) return BlockTexture::Stone;
@@ -431,6 +459,19 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         const BlockTexture defined = g_definitionFaces[static_cast<size_t>(id)]
                                                        [static_cast<size_t>(face)];
         if (defined != BlockTexture::Count) return defined;
+    }
+    DoorState door; ButtonState button;
+    if (decodeDoor(id, door)) return static_cast<BlockTexture>(
+        static_cast<uint16_t>(BlockTexture::OakDoorBottom) +
+        static_cast<uint8_t>(door.material) * 2 + (door.upper ? 1 : 0));
+    if (decodeButton(id, button)) return getFaceTexture(
+        button.material == DoorMaterial::Iron ? BlockId::STONE : woodPlanks(button.material), face);
+    switch (id) {
+        case BlockId::BIRCH_PLANKS: return BlockTexture::BirchPlanks;
+        case BlockId::SPRUCE_PLANKS: return BlockTexture::SprucePlanks;
+        case BlockId::JUNGLE_PLANKS: return BlockTexture::JunglePlanks;
+        case BlockId::ACACIA_PLANKS: return BlockTexture::AcaciaPlanks;
+        default: break;
     }
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural))
@@ -927,6 +968,21 @@ BlockId architecturalBaseBlock(ArchitecturalMaterial material) {
 BlockCollisionBoxes blockCollisionBoxes(BlockId id) {
     BlockCollisionBoxes result;
     const BlockProperties& props = getBlockProps(id);
+    DoorState door;
+    if (decodeDoor(id, door)) {
+        auto facing = static_cast<uint8_t>(door.direction);
+        if (door.open) facing = (facing + (door.rightHinge ? 1 : 3)) % 4;
+        constexpr float thickness = 3.0f / 16.0f;
+        result.count = 1;
+        auto& box = result.boxes[0];
+        switch (static_cast<BedDirection>(facing)) {
+            case BedDirection::North: box.max.z = thickness; break;
+            case BedDirection::East: box.min.x = 1-thickness; break;
+            case BedDirection::South: box.min.z = 1-thickness; break;
+            case BedDirection::West: box.max.x = thickness; break;
+        }
+        return result;
+    }
     if (!props.solid) return result;
     if (id == BlockId::POINTED_DRIPSTONE_UP ||
         id == BlockId::POINTED_DRIPSTONE_DOWN) {
@@ -1128,6 +1184,10 @@ bool isReplaceableByFluid(BlockId id) {
 }
 
 uint8_t fireEncouragement(BlockId id) {
+    DoorState door; ButtonState button;
+    if((decodeDoor(id,door) && door.material!=DoorMaterial::Iron) ||
+       (decodeButton(id,button) && button.material!=DoorMaterial::Iron) ||
+       (id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS))return 5;
     if (isBiomePlant(id)) return 60;
     if (id == BlockId::LEAF_LITTER_SOIL) return 30;
     if (isBed(id)) return 30;
@@ -1260,3 +1320,70 @@ const BlockProperties& getBlockProps(BlockId id) {
     return BLOCK_TABLE[static_cast<uint16_t>(id)];
 }
 bool isValidBlockId(BlockId id) { return Plugins::validBlock(id); }
+
+bool decodeDoor(BlockId id, DoorState& state) {
+    const uint16_t raw = static_cast<uint16_t>(id);
+    const uint16_t first = static_cast<uint16_t>(BlockId::DOOR_FIRST);
+    if (raw < first || raw >= static_cast<uint16_t>(BlockId::BUTTON_FIRST)) return false;
+    const uint16_t offset = raw-first;
+    state.material = static_cast<DoorMaterial>(offset/64);
+    state.direction = static_cast<BedDirection>(offset%4);
+    state.rightHinge = (offset & 4) != 0;
+    state.open = (offset & 8) != 0;
+    state.powered = (offset & 16) != 0;
+    state.upper = (offset & 32) != 0;
+    return true;
+}
+BlockId doorBlock(const DoorState& s) {
+    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::DOOR_FIRST) +
+        static_cast<uint8_t>(s.material)*64 + static_cast<uint8_t>(s.direction) +
+        (s.rightHinge?4:0) + (s.open?8:0) + (s.powered?16:0) + (s.upper?32:0));
+}
+bool decodeButton(BlockId id, ButtonState& state) {
+    const uint16_t raw = static_cast<uint16_t>(id), first = static_cast<uint16_t>(BlockId::BUTTON_FIRST);
+    if (raw < first || raw >= static_cast<uint16_t>(BlockId::COUNT)) return false;
+    const uint16_t offset = raw-first;
+    state.material = static_cast<DoorMaterial>(offset/24);
+    state.attachment = static_cast<FaceDir>((offset%12)/2);
+    state.pressed = (offset%2)!=0;
+    state.direction = static_cast<BedDirection>((offset%24)/12);
+    return true;
+}
+BlockId buttonBlock(const ButtonState& s) {
+    // Horizontal orientation matters only on floor/ceiling: north-south or east-west.
+    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::BUTTON_FIRST) +
+        static_cast<uint8_t>(s.material)*24 + (static_cast<uint8_t>(s.direction)%2)*12 +
+        static_cast<uint8_t>(s.attachment)*2 + (s.pressed?1:0));
+}
+glm::ivec3 faceOffset(FaceDir face) {
+    switch(face) {
+        case FaceDir::TOP: return {0,1,0}; case FaceDir::BOTTOM: return {0,-1,0};
+        case FaceDir::FRONT: return {0,0,-1}; case FaceDir::BACK: return {0,0,1};
+        case FaceDir::RIGHT: return {1,0,0}; case FaceDir::LEFT: return {-1,0,0};
+    }
+    return {0,0,0};
+}
+BlockId woodPlanks(DoorMaterial material) {
+    constexpr BlockId woods[] = {BlockId::PLANKS, BlockId::BIRCH_PLANKS, BlockId::SPRUCE_PLANKS,
+        BlockId::JUNGLE_PLANKS, BlockId::ACACIA_PLANKS, BlockId::SKYROOT_PLANKS, BlockId::STONE};
+    return woods[static_cast<uint8_t>(material)];
+}
+BlockCollisionBoxes blockSelectionBoxes(BlockId id) {
+    ButtonState button;
+    if (!decodeButton(id, button)) return blockCollisionBoxes(id);
+    BlockCollisionBoxes result;
+    result.count = 1;
+    auto& box = result.boxes[0];
+    box.min = {.3125f,.375f,.3125f}; box.max = {.6875f,.625f,.6875f};
+    const float depth = button.pressed ? .0625f : .125f;
+    const auto normal = faceOffset(button.attachment);
+    const int axis = normal.x ? 0 : normal.y ? 1 : 2;
+    if (axis==1) {
+        box.min.y=.3125f; box.max.y=.6875f;
+        if (static_cast<uint8_t>(button.direction)%2) { box.min.x=.375f;box.max.x=.625f; }
+        else {box.min.z=.375f;box.max.z=.625f;}
+    }
+    if (normal[axis]>0) {box.min[axis]=0;box.max[axis]=depth;}
+    else {box.min[axis]=1-depth;box.max[axis]=1;}
+    return result;
+}

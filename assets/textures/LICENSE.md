@@ -169,3 +169,9 @@ Barrel, Lectern, Cartography Table, Brewing Stand, Smoker and Stonecutter tiles/
 and the iron golem plates/vines/eyes skin and animated model, are original
 MinecraftC deterministic procedural assets. They use no downloaded game assets.
 Their source recipes, tools, seed and provenance are recorded in `ASSET_SOURCES.md`.
+
+## Doors and buttons (2026-10-05)
+
+Door panels, variant planks and door/button icons are original deterministic
+16×16 procedural recipes in tools/texture_generator.py, under the project
+GPL-3.0-only license. No Minecraft texture files are used.

@@ -142,14 +142,17 @@ void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
             if(value!=existing->second.end() && value->second==id)return;
         }
         m_blockOverrides[{cx, cz}][localIndex] = id;
+        registerButtonUnlocked(cx,cz,localIndex,id);
         m_dirtyOverrideChunks.insert({cx, cz});
         m_overridesApplied.insert({cx, cz});
         auto& entities = m_blockEntities[{cx, cz}];
-        if (id == BlockId::CHEST || id == BlockId::FURNACE) {
+        ButtonState button;
+        if (id == BlockId::CHEST || id == BlockId::FURNACE || decodeButton(id, button)) {
             if (entities.count(localIndex) == 0) {
                 BlockEntity entity;
-                entity.type = id == BlockId::CHEST
-                    ? BlockEntityType::Chest : BlockEntityType::Furnace;
+                entity.type = id == BlockId::CHEST ? BlockEntityType::Chest :
+                    id == BlockId::FURNACE ? BlockEntityType::Furnace : BlockEntityType::Button;
+                entity.buttonRemaining = button.pressed ? (button.material==DoorMaterial::Iron?20:30) : 0;
                 entities.emplace(localIndex, entity);
                 m_dirtyBlockEntityChunks.insert({cx, cz});
             }
@@ -169,6 +172,7 @@ void WorldPersistence::installLoadedChunkDataUnlocked(
             !isValidBlockId(entry.block) ||
             isDerivedFluidState(entry.block)) continue;
         cached[entry.localIndex] = entry.block;
+        registerButtonUnlocked(cx,cz,entry.localIndex,entry.block);
     }
     auto& target = m_blockEntities[key];
     for (const auto& entity : entities) target[entity.localIndex] = entity.value;
@@ -191,6 +195,7 @@ void WorldPersistence::applySavedOverridesUnlocked(int cx, int cz) {
         for (const auto& entry : m_saveStore->loadChunkOverrides(cx, cz)) {
             if (isDerivedFluidState(entry.block)) {++pruned;continue;}
             cached[entry.localIndex] = entry.block;
+            registerButtonUnlocked(cx,cz,entry.localIndex,entry.block);
         }
     }
     if(pruned>0){m_dirtyOverrideChunks.insert(key);LOG_INFO(
@@ -251,6 +256,12 @@ void WorldPersistence::loadBlockEntities(int cx, int cz) {
         for (const auto& persisted : m_saveStore->loadBlockEntities(cx, cz))
             target[persisted.localIndex] = persisted.value;
     }
+    if(const auto chunk=m_chunks.findUnlocked(cx,cz))
+        for(const auto& [index,entity]:m_blockEntities[key]) {
+            if(entity.type==BlockEntityType::Button)
+                registerButtonUnlocked(cx,cz,index,chunk->getBlock(index%16,
+                    Config::WORLD_MIN_Y+static_cast<int>(index/256),(index/16)%16));
+        }
     m_blockEntitiesApplied.insert(key);
 }
 
@@ -345,4 +356,31 @@ void WorldPersistence::tickBlockEntities() {
             if (changed) m_dirtyBlockEntityChunks.insert(key);
         }
     });
+}
+
+
+void WorldPersistence::registerButtonUnlocked(int cx,int cz,uint32_t index,BlockId id) {
+    ButtonState state;
+    if(decodeButton(id,state) && state.pressed)m_pressedButtons.emplace(cx,cz,index);
+    else m_pressedButtons.erase({cx,cz,index});
+}
+std::vector<glm::ivec3> WorldPersistence::tickButtons() {
+    std::vector<glm::ivec3> due;
+    m_chunks.withUnique([&](ChunkStore& store) {
+        for(const auto& [cx,cz,index]:m_pressedButtons) {
+            const Chunk* chunk=store.findUnlocked(cx,cz);
+            if(!chunk || !chunk->generated.load())continue;
+            const auto found=m_blockEntities.find({cx,cz});
+            if(found==m_blockEntities.end())continue;
+            const auto entry=found->second.find(index);
+            if(entry==found->second.end() || entry->second.type!=BlockEntityType::Button)continue;
+            auto& entity=entry->second;
+            if(entity.buttonRemaining>0) {
+                --entity.buttonRemaining;m_dirtyBlockEntityChunks.insert({cx,cz});
+            }
+            if(entity.buttonRemaining==0 && due.size()<Config::BUTTON_TRANSITIONS_PER_TICK)
+                due.emplace_back(cx*16+static_cast<int>(index%16),Config::WORLD_MIN_Y+static_cast<int>(index/256),cz*16+static_cast<int>((index/16)%16));
+        }
+    });
+    return due;
 }

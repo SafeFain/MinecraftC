@@ -463,9 +463,10 @@ struct ChunkMesh {
                     const BlockId id = static_cast<BlockId>(blocks[localIdx(x, y, z)]);
                     const RenderShape shape = getBlockProps(id).shape;
                     if (shape != RenderShape::Slab && shape != RenderShape::Stair &&
-                        shape != RenderShape::Spike)
+                        shape != RenderShape::Spike && shape != RenderShape::Door &&
+                        shape != RenderShape::Button)
                         continue;
-                    const BlockCollisionBoxes geometry = blockCollisionBoxes(id);
+                    const BlockCollisionBoxes geometry = blockSelectionBoxes(id);
                     ArchitecturalBlockState architecture;
                     decodeArchitecturalBlock(id, architecture);
                     const glm::vec2 sampled = normalizedLight(x, y, z);

@@ -5,6 +5,9 @@
 #include <glm/glm.hpp>
 
 namespace Config {
+    // Bound door-power/mesh work when many pulses finish together.
+    constexpr size_t BUTTON_TRANSITIONS_PER_TICK = 256;
+
     constexpr size_t PLUGIN_MAX_OPERATIONS = 1024;
     constexpr size_t PLUGIN_MAX_HUD_COMMANDS = 1024;
 

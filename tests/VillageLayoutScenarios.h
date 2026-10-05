@@ -33,9 +33,18 @@ inline void testVillageLayouts() {
             }
             require(beds==layout.buildings.size()*2 && stations.size()==(tier==0?7u:tier==1?10u:13u),
                 "generated village beds or professions disagree with shared layout");
+            const auto clearForVillager=[&](BlockId id) {
+                DoorState door;
+                if(decodeDoor(id,door)) {
+                    require(door.material!=DoorMaterial::Iron,"villages must have usable wooden doors");
+                    door.open=true;
+                    return !pointInsideBlockCollision(doorBlock(door),glm::vec3(.5f));
+                }
+                return !isSolid(id);
+            };
             const auto walkable=[&](int x,int z) {
                 return std::abs(x)<=radius && std::abs(z)<=radius &&
-                    !isSolid(at(x,101,z)) && !isSolid(at(x,102,z)) && isSolid(at(x,100,z));
+                    clearForVillager(at(x,101,z)) && clearForVillager(at(x,102,z)) && isSolid(at(x,100,z));
             };
             std::queue<std::pair<int,int>> queue;std::set<std::pair<int,int>> visited;
             queue.push({0,5});visited.insert({0,5});

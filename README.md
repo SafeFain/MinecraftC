@@ -53,7 +53,7 @@ Android's 2100000000 limit. The Apple short version remains `X.Y.Z`.
   players, entities, and worlds.
 - Classic fishing with craftable durable rods, visible bobbers and lines, manual
   bite/reel timing, fish/junk/open-water treasure, and edible/cookable cod and salmon.
-- JSON-driven block, 292-item, and entity atlases with a deterministic 16x16
+- JSON-driven block, 310-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
 - Ten localized interfaces and an About screen listing third-party repositories
@@ -194,8 +194,8 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v17 uses little-endian 16-bit block IDs and can read v2-v16 desktop
-metadata. The current world generation version is v19 (Heaven v9). Generation v11 adds
+one exists. Save format v18 uses little-endian 16-bit block IDs and can read v2-v17 desktop
+metadata. The current world generation version is v20 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
 and fixed five-level profession trading. Generation v12 makes both physical
@@ -203,7 +203,7 @@ village variants substantially more common while retaining their biome,
 spacing, terrain-fit, and deterministic placement checks. Generation v13 seals
 the wall-to-roof courses of village houses and traveler huts, keeps hut
 decorations outside the wall, and closes the igloo's diagonal lower shell.
-Only generation v19 worlds can load. All previous and future generation versions
+Only generation v20 worlds can load. All previous and future generation versions
 remain on disk and are shown as incompatible; there is no automatic migration.
 Generation v14 adds deterministic
 Verdant Grotto, Dripstone Karst, Crystal Hollow, Volcanic Depths, and neutral
@@ -247,7 +247,7 @@ Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
-new standard names and classic aliases. Rules persist per world in save v17 (introduced in v15); missing
+new standard names and classic aliases. Rules persist per world in save v18 (introduced in v15); missing
 or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
 
 Run `./build-local/minecraftc --version` to print the version without opening a
@@ -332,3 +332,17 @@ Official builtin plugins and user data/native packages can extend blocks, items,
 interaction, environment colors and HUD. Enable them through the main menu’s Plugins page
 and restart. See [plugin installation and SDK](docs/plugins.md) for platform support,
 examples and world compatibility. `--safe-mode` starts with optional plugins disabled.
+
+### Doors and buttons (generation v20 / save v18)
+
+Oak, birch, spruce, jungle, acacia and skyroot planks make matching doors and
+buttons. Six matching planks or iron ingots in two columns make three doors;
+one plank or stone makes one button. Ordinary wood recipes accept all planks.
+Wooden doors can be used directly; iron doors require a button. Stone pulses
+last one second and wooden pulses 1.5 seconds; arrows can hold wooden buttons.
+Buttons power adjacent doors and doors adjacent to their attached full solid
+block, without wires or further redstone propagation. Villagers open wooden
+doors on their routes and close doors they opened after passing. Enclosed
+structure entrances now have doors, with village styles choosing matching wood.
+Generation v19 saves remain listed as incompatible and are never rewritten.
+Save v18 preserves button timers; unloaded chunks pause their timers.

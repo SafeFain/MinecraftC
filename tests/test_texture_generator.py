@@ -125,9 +125,9 @@ class TextureGeneratorTests(unittest.TestCase):
 
     def test_village_workstation_materials_preserve_slots(self):
         names=list(tg.VILLAGE_FUNCTIONAL)
-        self.assertEqual(tg.NAMES[232:],names)
+        self.assertEqual(tg.NAMES[232:238],names)
         definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
-        self.assertEqual(list(definitions["items"])[286:],names)
+        self.assertEqual(list(definitions["items"])[286:292],names)
         fingerprints=set()
         with tempfile.TemporaryDirectory() as directory:
             for name in names:
@@ -138,6 +138,21 @@ class TextureGeneratorTests(unittest.TestCase):
                 self.assertFalse(tg.validate_texture(path),name)
                 fingerprints.add(tuple(pixels))
         self.assertEqual(len(fingerprints),6)
+
+    def test_doors_and_variant_planks_are_distinct_and_deterministic(self):
+        self.assertEqual(tg.NAMES[238:],list(tg.VARIANT_PLANKS)+list(tg.DOOR_TEXTURES))
+        fingerprints=set()
+        with tempfile.TemporaryDirectory() as directory:
+            for name in tg.NAMES[238:]:
+                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
+                self.assertEqual(len(pixels),256)
+                self.assertTrue(all(pixel[3] in (0,255) for pixel in pixels))
+                path=Path(directory)/(name+".png")
+                tg.write_png(path,16,16,pixels)
+                self.assertFalse(tg.validate_texture(path),name)
+                fingerprints.add(tuple(pixels))
+        self.assertEqual(len(fingerprints),18)
 
     def item_definitions(self):
         root = Path(__file__).resolve().parents[1]

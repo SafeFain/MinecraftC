@@ -1072,17 +1072,27 @@ int main(int argc,char** argv) {
                     "igloo center interior is not air");
             require(at(ix, ibase + 4, iz) == BlockId::SNOW,
                     "igloo dome cap is missing");
-            int openEntrances = 0;
+            int doorEntrances = 0;
             int intactWalls = 0;
             for (const auto& direction : std::array<std::pair<int, int>, 4>{
                      std::pair<int, int>{0, -3}, {3, 0}, {0, 3}, {-3, 0}}) {
                 const BlockId wall = at(ix + direction.first, ibase + 1,
                                         iz + direction.second);
-                openEntrances += wall == BlockId::AIR ? 1 : 0;
+                DoorState door,upper;
+                if(decodeDoor(wall,door)) {
+                    require(!door.upper && !door.open && door.material==DoorMaterial::Spruce &&
+                        decodeDoor(at(ix+direction.first,ibase+2,iz+direction.second),upper) &&
+                        upper.upper && upper.material==door.material && upper.direction==door.direction,
+                        "rotated igloo door pair or material mismatch");
+                    const auto outward=bedDirectionOffset(door.direction);
+                    require(outward.x*3==direction.first && outward.z*3==direction.second,
+                        "rotated igloo door does not face its entrance");
+                    ++doorEntrances;
+                }
                 intactWalls += wall == BlockId::SNOW ? 1 : 0;
             }
-            require(openEntrances >= 1 && intactWalls >= 1,
-                    "rotated igloo lacks an open entrance or intact outer wall");
+            require(doorEntrances == 1 && intactWalls >= 1,
+                    "rotated igloo lacks its door entrance or intact outer wall");
             checkedIglooMaterials = true;
         }
         if (placement.type == StructureType::DesertWell && !checkedWellMaterials) {

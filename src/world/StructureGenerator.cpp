@@ -59,6 +59,7 @@ struct VillageStyle {
     BlockId floor;
     BlockId path;
     BlockId foundation;
+    DoorMaterial door = DoorMaterial::Oak;
 };
 
 constexpr VillageStyle kPlainsVillage{
@@ -67,6 +68,13 @@ constexpr VillageStyle kPlainsVillage{
 constexpr VillageStyle kDesertVillage{
     BlockId::TERRACOTTA, BlockId::TERRACOTTA, BlockId::RED_SAND,
     BlockId::SAND, BlockId::SAND, BlockId::TERRACOTTA};
+
+// Install complete state pairs after carving entrances. Facing is world-relative.
+void buildDoor(const StructureGenerator::StructureWriter& write,int x,int y,int z,
+               BedDirection direction,DoorMaterial material,bool rightHinge=false) {
+    DoorState state;state.material=material;state.direction=direction;state.rightHinge=rightHinge;
+    write(x,y,z,doorBlock(state));state.upper=true;write(x,y+1,z,doorBlock(state));
+}
 
 void drawRoad(const StructureGenerator::StructureWriter& write, int x0, int z0,
               int x1, int z1, int base, BlockId path,
@@ -153,8 +161,9 @@ void buildHouse(const StructureGenerator::StructureWriter& write, int hx, int hz
     }
     const int doorX = hx + doorDx * halfX;
     const int doorZ = hz + doorDz * halfZ;
-    write(doorX, base + 1, doorZ, BlockId::AIR);
-    write(doorX, base + 2, doorZ, BlockId::AIR);
+    buildDoor(write,doorX,base+1,doorZ,doorDx>0?BedDirection::East:
+        doorDx<0?BedDirection::West:doorDz>0?BedDirection::South:BedDirection::North,
+        style.door,(variant&1u)!=0);
     if (doorDx != 0) {
         write(hx, base + 2, hz-halfZ, BlockId::GLASS);
         write(hx, base + 2, hz+halfZ, BlockId::GLASS);
@@ -253,6 +262,9 @@ void buildVillage(const StructurePlacement& placement,
     else if(placement.type==StructureType::SavannaVillage)
         style={BlockId::OCHRE_TERRACOTTA,BlockId::ACACIA_WOOD,BlockId::PLANKS,
                BlockId::PLANKS,BlockId::COARSE_DIRT,BlockId::COBBLESTONE};
+    if(placement.type==StructureType::TaigaVillage || placement.type==StructureType::SnowVillage)
+        style.door=DoorMaterial::Spruce;
+    else if(placement.type==StructureType::SavannaVillage)style.door=DoorMaterial::Acacia;
     const auto layout=VillageLayout::create(placement,surface);
     for(const auto& p:layout.roads) {
         const int natural=surface?surface(p.x,p.z):p.y;
@@ -264,6 +276,11 @@ void buildVillage(const StructurePlacement& placement,
         const auto& b=layout.buildings[i];
         const StructureGenerator::StructureWriter houseWrite=[&](int x,int y,int z,BlockId id) {
             const auto point=b.point(x-b.x,y,z-b.z);
+            DoorState door;
+            if(b.rotation && decodeDoor(id,door)) {
+                door.direction=static_cast<BedDirection>((static_cast<uint8_t>(door.direction)+1)%4);
+                id=doorBlock(door);
+            }
             ArchitecturalBlockState state;
             if(b.rotation && decodeArchitecturalBlock(id,state) && state.shape==RenderShape::Stair) {
                 const auto offset=bedDirectionOffset(state.direction);
@@ -353,8 +370,7 @@ void buildHut(const StructurePlacement& placement,
             }
         }
     }
-    write(cx, base + 1, cz + 3, BlockId::AIR);
-    write(cx, base + 2, cz + 3, BlockId::AIR);
+    buildDoor(write,cx,base+1,cz+3,BedDirection::South,DoorMaterial::Oak);
     write(cx - 3, base + 2, cz, BlockId::GLASS);
     write(cx + 3, base + 2, cz, BlockId::GLASS);
     // Deep eaves, ridge and offset chimney make the hut readable at range.
@@ -527,8 +543,7 @@ void buildIgloo(const StructurePlacement& placement,
         }
     }
     // South-facing entrance.
-    write(cx, base + 1, cz - 3, BlockId::AIR);
-    write(cx, base + 2, cz - 3, BlockId::AIR);
+    buildDoor(write,cx,base+1,cz-3,BedDirection::North,DoorMaterial::Spruce);
     // Snow floor with a white-wool rug.
     fillBox(write, cx - 2, base, cz - 2, cx + 2, base, cz + 2, BlockId::SNOW);
     fillBox(write, cx - 1, base, cz - 1, cx + 1, base, cz + 1,
@@ -598,6 +613,7 @@ void buildTower(const StructurePlacement& placement,
     for (int dx=-4; dx<=4; dx+=2)
         write(cx+dx, base+1, cz+4,
               slabBlock(ArchitecturalMaterial::Cobblestone, BlockHalf::Bottom));
+    buildDoor(write,cx,base+1,cz-3,BedDirection::North,DoorMaterial::Oak);
 }
 
 void buildLumberCamp(const StructurePlacement& placement,
@@ -710,6 +726,8 @@ void buildDesertTemple(const StructurePlacement& p,
     const int crest = (p.variant & 1u) ? -1 : 1;
     write(x+crest, y+12, z, BlockId::CHISELED_STONE_BRICKS);
     write(x-crest, y+11, z, BlockId::TERRACOTTA);
+    for(int dx=-1;dx<=1;++dx)
+        buildDoor(write,x+dx,y+1,z-8,BedDirection::North,DoorMaterial::Oak,dx==1);
 }
 
 void buildJungleRuins(const StructurePlacement& p,
@@ -743,8 +761,7 @@ void buildJungleRuins(const StructurePlacement& p,
     for (int dy = 1; dy <= 4; ++dy)
         fillRing(write, x+2, y+dy, z-1, x+6, z+4, BlockId::MOSSY_STONE_BRICKS);
     fillBox(write, x+2, y+5, z-1, x+6, y+5, z+4, BlockId::STONE_BRICKS);
-    write(x+2, y+1, z+1, BlockId::AIR);
-    write(x+2, y+2, z+1, BlockId::AIR);
+    buildDoor(write,x+2,y+1,z+1,BedDirection::West,DoorMaterial::Jungle);
     write(x+5, y+1, z+3, BlockId::CHEST);
     write(x+4, y+3, z+3, BlockId::TORCH);
     for (int i = 0; i < 6; ++i) {
@@ -781,8 +798,7 @@ void buildSwampHut(const StructurePlacement& p,
                   stairBlock(ArchitecturalMaterial::Planks, BlockHalf::Bottom,
                              BedDirection::South));
     }
-    write(x, y+4, z-2, BlockId::AIR);
-    write(x, y+5, z-2, BlockId::AIR);
+    buildDoor(write,x,y+4,z-2,BedDirection::North,DoorMaterial::Oak);
     write(x-3, y+5, z, BlockId::GLASS);
     write(x+3, y+5, z, BlockId::GLASS);
     write(x-2, y+4, z+1, BlockId::CHEST);
@@ -804,7 +820,7 @@ void buildMountainWatchtower(const StructurePlacement& p,
     }
     for (int level = 4; level <= 16; level += 4)
         fillBox(write, x-3, y+level, z-3, x+3, y+level, z+3, BlockId::PLANKS);
-    for (int dy = 1; dy <= 2; ++dy) write(x, y+dy, z+4, BlockId::AIR);
+    buildDoor(write,x,y+1,z+4,BedDirection::South,DoorMaterial::Oak);
     for (int level = 2; level <= 14; level += 4) {
         for (const int dx : {-4, 4}) write(x+dx, y+level, z, BlockId::GLASS);
         write(x, y+level, z-4, BlockId::GLASS);
@@ -879,8 +895,7 @@ void buildAbandonedFarmstead(const StructurePlacement& p,
             write(x-4+dx, y+dy, z+dz, h%7 == 0 ? BlockId::COBBLESTONE : BlockId::PLANKS);
         }
     }
-    write(x-4, y+1, z+1, BlockId::AIR);
-    write(x-4, y+2, z+1, BlockId::AIR);
+    buildDoor(write,x-4,y+1,z+1,BedDirection::South,DoorMaterial::Oak);
     write(x-8, y+2, z-3, BlockId::GLASS);
     write(x, y+2, z-3, BlockId::GLASS);
     write(x-6, y+1, z-5, BlockId::CHEST);
@@ -1019,6 +1034,8 @@ void buildCloudspireTower(const StructurePlacement& placement,
     write(cx,base+height+2,cz,BlockId::CLOUDSTONE);
     write(cx,base+height+3,cz,BlockId::STAR_CRYSTAL);
     write(cx+1,base+1,cz+1,BlockId::CHEST);
+    write(cx,base+3,cz-3,BlockId::SUNSTONE);
+    buildDoor(write,cx,base+1,cz-3,BedDirection::North,DoorMaterial::Skyroot);
 }
 
 void buildSkywayShrine(const StructurePlacement& placement,
@@ -1493,6 +1510,12 @@ void StructureGenerator::build(const StructurePlacement& placement,
     const StructureWriter transformedWrite = [&](int x, int y, int z,
                                                    BlockId id) {
         const auto [dx, dz] = transformOffset(x - centerX, z - centerZ);
+        DoorState door;
+        if(decodeDoor(id,door)) {
+            door.direction=transformDirection(door.direction);
+            if(mirror)door.rightHinge=!door.rightHinge;
+            id=doorBlock(door);
+        }
         ArchitecturalBlockState architecture;
         if (decodeArchitecturalBlock(id, architecture) &&
             architecture.shape == RenderShape::Stair) {

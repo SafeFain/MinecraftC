@@ -18,7 +18,9 @@ std::set<std::tuple<int,int,int>> walkStructure(
         for (int y = static_cast<int>(std::floor(py)); y <= std::floor(py+playerHeight-0.001); ++y)
             for (int z = static_cast<int>(std::floor(pz-halfWidth)); z <= std::floor(pz+halfWidth-0.001); ++z)
                 for (int x = static_cast<int>(std::floor(px-halfWidth)); x <= std::floor(px+halfWidth-0.001); ++x) {
-                    const auto boxes = blockCollisionBoxes(blockAt(x,y,z));
+                    BlockId id=blockAt(x,y,z); DoorState door;
+                    if(decodeDoor(id,door) && door.material!=DoorMaterial::Iron) {door.open=true;id=doorBlock(door);}
+                    const auto boxes = blockCollisionBoxes(id);
                     for (uint8_t i = 0; i < boxes.count; ++i) {
                         const auto& box = boxes.boxes[i];
                         if (px+halfWidth > x+box.min.x+0.001 && px-halfWidth < x+box.max.x-0.001 &&
@@ -110,7 +112,7 @@ void requireStructureAccess(const StructurePlacement& p, const BlockAt& blockAt)
 inline void testNewStructureBlueprints() {
     static_assert(static_cast<uint8_t>(StructureType::SkywayShrine) == 12);
     static_assert(static_cast<uint8_t>(StructureLootProfile::OriginSkywayShrine) == 11);
-    static_assert(WorldGenContext::GENERATION_VERSION == 19);
+    static_assert(WorldGenContext::GENERATION_VERSION == 20);
     for (const auto& fixture : NEW_STRUCTURE_FIXTURES) {
         for (int base : {Config::WORLD_MIN_Y+5, Config::WORLD_MAX_Y-fixture.height-1}) {
             StructurePlacement limit;

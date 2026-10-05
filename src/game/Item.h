@@ -316,6 +316,9 @@ enum class ItemId : uint16_t {
     COOKED_COD,
     COOKED_SALMON,
     BARREL, LECTERN, CARTOGRAPHY_TABLE, BREWING_STAND, SMOKER, STONECUTTER,
+    BIRCH_PLANKS, SPRUCE_PLANKS, JUNGLE_PLANKS, ACACIA_PLANKS,
+    OAK_DOOR, BIRCH_DOOR, SPRUCE_DOOR, JUNGLE_DOOR, ACACIA_DOOR, SKYROOT_DOOR, IRON_DOOR,
+    OAK_BUTTON, BIRCH_BUTTON, SPRUCE_BUTTON, JUNGLE_BUTTON, ACACIA_BUTTON, SKYROOT_BUTTON, STONE_BUTTON,
     COUNT,
     POPPY = FLOWER
 };
@@ -435,3 +438,6 @@ std::vector<ItemId> creativeInventoryItems();
 CreativeItemCategory creativeInventoryCategory(ItemId id);
 const std::vector<ItemId>& creativeInventoryItemsIn(CreativeItemCategory category);
 const CreativeCategoryInfo& creativeCategoryInfo(CreativeItemCategory category);
+
+bool isWoodPlankItem(ItemId id);
+ItemId plankItem(DoorMaterial material);

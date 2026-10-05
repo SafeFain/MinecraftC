@@ -47,7 +47,9 @@
     "brick": {},
     "dye": {},
     "fishing_rod": {},
-    "fish": {}
+    "fish": {},
+    "door": {},
+    "button": {}
   },
   "handle_palette": [
     [
@@ -906,6 +908,168 @@
         240,
         190,
         111
+      ]
+    ],
+    "oak_wood": [
+      [
+        68,
+        53,
+        33
+      ],
+      [
+        117,
+        91,
+        57
+      ],
+      [
+        153,
+        119,
+        74
+      ],
+      [
+        181,
+        140,
+        88
+      ],
+      [
+        202,
+        156,
+        98
+      ]
+    ],
+    "birch_wood": [
+      [
+        80,
+        74,
+        51
+      ],
+      [
+        138,
+        128,
+        88
+      ],
+      [
+        181,
+        167,
+        115
+      ],
+      [
+        213,
+        197,
+        136
+      ],
+      [
+        238,
+        220,
+        152
+      ]
+    ],
+    "spruce_wood": [
+      [
+        42,
+        29,
+        16
+      ],
+      [
+        72,
+        50,
+        27
+      ],
+      [
+        95,
+        66,
+        36
+      ],
+      [
+        112,
+        78,
+        43
+      ],
+      [
+        125,
+        87,
+        48
+      ]
+    ],
+    "jungle_wood": [
+      [
+        66,
+        45,
+        32
+      ],
+      [
+        114,
+        77,
+        55
+      ],
+      [
+        149,
+        101,
+        73
+      ],
+      [
+        176,
+        119,
+        86
+      ],
+      [
+        197,
+        133,
+        96
+      ]
+    ],
+    "acacia_wood": [
+      [
+        74,
+        37,
+        21
+      ],
+      [
+        128,
+        64,
+        36
+      ],
+      [
+        167,
+        84,
+        47
+      ],
+      [
+        197,
+        99,
+        56
+      ],
+      [
+        220,
+        110,
+        62
+      ]
+    ],
+    "skyroot_wood": [
+      [
+        72,
+        58,
+        40
+      ],
+      [
+        124,
+        100,
+        68
+      ],
+      [
+        162,
+        130,
+        90
+      ],
+      [
+        191,
+        154,
+        106
+      ],
+      [
+        213,
+        172,
+        118
       ]
     ]
   },
@@ -2155,12 +2319,116 @@
       "template": "fish",
       "material": "cooked_fish"
     },
-    "barrel": {"generator": "block_item_icon", "block": "barrel"},
-    "lectern": {"generator": "block_item_icon", "block": "lectern"},
-    "cartography_table": {"generator": "block_item_icon", "block": "cartography_table"},
-    "brewing_stand": {"generator": "block_item_icon", "block": "brewing_stand"},
-    "smoker": {"generator": "block_item_icon", "block": "smoker"},
-    "stonecutter": {"generator": "block_item_icon", "block": "stonecutter"}
+    "barrel": {
+      "generator": "block_item_icon",
+      "block": "barrel"
+    },
+    "lectern": {
+      "generator": "block_item_icon",
+      "block": "lectern"
+    },
+    "cartography_table": {
+      "generator": "block_item_icon",
+      "block": "cartography_table"
+    },
+    "brewing_stand": {
+      "generator": "block_item_icon",
+      "block": "brewing_stand"
+    },
+    "smoker": {
+      "generator": "block_item_icon",
+      "block": "smoker"
+    },
+    "stonecutter": {
+      "generator": "block_item_icon",
+      "block": "stonecutter"
+    },
+    "birch_planks": {
+      "generator": "block_item_icon",
+      "block": "birch_planks"
+    },
+    "spruce_planks": {
+      "generator": "block_item_icon",
+      "block": "spruce_planks"
+    },
+    "jungle_planks": {
+      "generator": "block_item_icon",
+      "block": "jungle_planks"
+    },
+    "acacia_planks": {
+      "generator": "block_item_icon",
+      "block": "acacia_planks"
+    },
+    "oak_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "oak_wood"
+    },
+    "oak_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "oak_wood"
+    },
+    "birch_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "birch_wood"
+    },
+    "birch_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "birch_wood"
+    },
+    "spruce_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "spruce_wood"
+    },
+    "spruce_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "spruce_wood"
+    },
+    "jungle_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "jungle_wood"
+    },
+    "jungle_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "jungle_wood"
+    },
+    "acacia_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "acacia_wood"
+    },
+    "acacia_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "acacia_wood"
+    },
+    "skyroot_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "skyroot_wood"
+    },
+    "skyroot_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "skyroot_wood"
+    },
+    "iron_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "iron"
+    },
+    "stone_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "stone"
+    }
   },
   "documentation": {
     "template_schema": {

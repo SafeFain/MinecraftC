@@ -168,6 +168,7 @@ void GameSession::handleMouseButton(int button, ButtonAction action, bool plugin
     const bool use=button==MouseButton::Right&&action==ButtonAction::Press&&!player.isSpectator();
     if(use&&!pluginUseApproved&&!pluginUse())return;
     struct UseEnd { GameSession& session; bool use; ~UseEnd(){if(use)session.pluginUse(true);} } useEnd{*this,use};
+    if(use && !playerDead && !isSleeping() && player.tryUseInteractiveBlock())return;
     validateFishingRod();
     if (button == MouseButton::Right && player.activeItem().id == ItemId::FISHING_ROD) {
         if (action == ButtonAction::Press && player.isMouseLocked() &&
@@ -554,6 +555,9 @@ void GameSession::updatePlaying(
         } else if (feedback.playerDied) feedback.playerDied();
     }
 
+    for(const auto& sound:world.takeInteractionSounds())
+        if(feedback.playBlockInteraction && glm::distance(glm::dvec3(sound.position),player.getPosition())<16)
+            feedback.playBlockInteraction(sound.metal,sound.opening,sound.button);
     survivalWorldTickRemainder += dt * 20.0f;
     size_t fluidUpdatesRemaining = Config::FLUID_UPDATES_PER_FRAME;
     const auto fluidDeadline = std::chrono::steady_clock::now() +
@@ -566,6 +570,9 @@ void GameSession::updatePlaying(
         if (dimension == DimensionId::Overworld) weather.tick(worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather));
         if (dimension == DimensionId::Overworld) tickLightning(feedback);
         world.tickBlockEntities();
+        world.tickInteractiveBlocks([&](const glm::ivec3& p){return entities.arrowTouchesButton(p);});
+        for(const auto& [p,stack]:world.takeSupportDrops())
+            entities.spawnItem(glm::dvec3(p)+glm::dvec3(.5),stack);
         const size_t fluidBudget = std::min(
             Config::FLUID_UPDATES_PER_TICK, fluidUpdatesRemaining);
         // Consume the shared frame allowance before dispatch. The scheduler

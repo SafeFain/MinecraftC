@@ -215,7 +215,19 @@
     },
     "hanging_cloud_vine": {
       "emission": 0.8,
-      "emission_roles": [4, 5, 6]
+      "emission_roles": [
+        4,
+        5,
+        6
+      ]
+    },
+    "iron_door_bottom": {
+      "metallic": 0.85,
+      "roughness": 0.4
+    },
+    "iron_door_top": {
+      "metallic": 0.85,
+      "roughness": 0.4
     }
   }
 }

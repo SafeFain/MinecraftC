@@ -26,6 +26,7 @@ public:
     // ── Input ───────────────────────────────────────────────────────
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
     void handleMovement(const InputState& input, float dt);
+    bool tryUseInteractiveBlock();
     void handleMouseButton(int button, ButtonAction action);
 
     // ── Update ──────────────────────────────────────────────────────

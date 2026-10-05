@@ -4,7 +4,7 @@
 #include <cmath>
 
 GroundNavigation::Terrain EntityManager::navigationTerrain(
-    std::map<std::pair<int,int>,uint64_t>* revisions) const {
+    std::map<std::pair<int,int>,uint64_t>* revisions, bool canOpenWoodDoors) const {
     auto chunkAt=[this,revisions](int x,int z) -> const Chunk* {
         const auto key=std::make_pair(World::worldToChunkX(x),World::worldToChunkZ(z));
         const auto found=m_aiChunks.find(key);
@@ -20,7 +20,8 @@ GroundNavigation::Terrain EntityManager::navigationTerrain(
             const Chunk* chunk=chunkAt(x,z);
             return chunk ? chunk->getBlock(x-chunk->worldX(),y,z-chunk->worldZ()) : BlockId::AIR;
         },
-        [chunkAt](int x,int z) { return chunkAt(x,z)!=nullptr; }
+        [chunkAt](int x,int z) { return chunkAt(x,z)!=nullptr; },
+        canOpenWoodDoors
     };
 }
 
@@ -40,6 +41,25 @@ void EntityManager::prepareAiFrame(float dt) {
     m_aiChunks.clear();
     for (const Chunk* chunk:m_world.getActiveChunks())
         if (chunk->generated.load()) m_aiChunks.emplace(std::make_pair(chunk->cx,chunk->cz),chunk);
+    for(auto it=m_openedVillageDoors.begin();it!=m_openedVillageDoors.end();) {
+        const auto [x,y,z]=it->first;
+        if(!m_aiChunks.count({World::worldToChunkX(x),World::worldToChunkZ(z)})) {++it;continue;}
+        DoorState door;
+        if(!decodeDoor(m_world.getBlock(x,y,z),door) || !door.open) {
+            it=m_openedVillageDoors.erase(it);continue;
+        }
+        bool occupied=false;
+        for(const auto& villager:m_entities) {
+            if(villager.type!=EntityType::Villager || villager.health<=0)continue;
+            const auto size=entitySize(villager);
+            if(villager.position.x+size.x*.5>x-.25 && villager.position.x-size.x*.5<x+1.25 &&
+               villager.position.z+size.z*.5>z-.25 && villager.position.z-size.z*.5<z+1.25 &&
+               villager.position.y+size.y>y && villager.position.y<y+2) {occupied=true;break;}
+        }
+        if(occupied || m_aiTime<it->second || door.powered) {++it;continue;}
+        m_world.setDoorOpen({x,y,z},false);
+        it=m_openedVillageDoors.erase(it);
+    }
     m_aiEntityIndices.clear();
     m_aiBuckets.clear();
     for (size_t i=0;i<m_entities.size();++i) {
@@ -128,7 +148,7 @@ void EntityManager::requestNavigation(Entity& entity,const GroundNavigation::Goa
     const auto delta=goal.position-entity.position;
     if(purpose==NavigationPurpose::Move && glm::length(delta)>40) {
         const auto intermediate=entity.position+delta*(32.0/glm::length(delta));
-        if(auto stand=GroundNavigation::stand(navigationTerrain(),entitySize(entity),
+        if(auto stand=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
             std::floor(intermediate.x)+.5,std::floor(intermediate.z)+.5,intermediate.y,8,8))
             request.goal={*stand,.5,.6};
     }
@@ -156,7 +176,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         auto& request=best->second;
         request.origin=entity->position;
         request.search=std::make_unique<GroundNavigation::Search>(
-            navigationTerrain(&request.revisions),entitySize(*entity),
+            navigationTerrain(&request.revisions,entity->type==EntityType::Villager),entitySize(*entity),
             request.origin,request.goal);
         ++active;
     }
@@ -172,7 +192,8 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         if (selected==m_navigation.end()) break;
         m_searchCursor=selected->first;
         auto& request=selected->second;
-        const size_t used=request.search->advance(navigationTerrain(&request.revisions),
+        const size_t used=request.search->advance(navigationTerrain(&request.revisions,
+            aiEntity(selected->first) && aiEntity(selected->first)->type==EntityType::Villager),
                                                  std::min(Config::AI_SEARCH_SLICE_NODES,remaining));
         remaining-=used;
         m_aiStats.pathNodes+=used;
@@ -236,7 +257,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
 void EntityManager::followNavigation(Entity& entity,float dt) {
     auto& ai=entity.ai;
     if (!ai.hasDestination || ai.speed<=0) return;
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,entity.type==EntityType::Villager);
     const glm::vec3 size=entitySize(entity);
     if (GroundNavigation::reached(entity.position,ai.destination)) {
         cancelNavigation(entity);
@@ -247,6 +268,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
     const double distance=glm::distance(entity.position,ai.destination.position);
     if (ai.path.empty() && distance<=1.5 &&
         GroundNavigation::traverse(terrain,size,entity.position,ai.destination.position)) {
+        openNavigationDoors(entity,ai.destination.position);
         const glm::dvec3 delta=ai.destination.position-entity.position;
         const double horizontal=std::hypot(delta.x,delta.z);
         if (horizontal>.01) moveWithTerrain(entity,
@@ -263,6 +285,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
            std::abs(entity.position.y-ai.path[ai.waypoint].y)<.15) ++ai.waypoint;
     if (ai.waypoint>=ai.path.size()) return;
     const glm::dvec3 waypoint=ai.path[ai.waypoint];
+    openNavigationDoors(entity,waypoint);
     const glm::dvec3 delta=waypoint-entity.position;
     const double horizontal=std::hypot(delta.x,delta.z);
     if (ai.grounded && waypoint.y>entity.position.y+Config::AI_STEP_HEIGHT+.01) {
@@ -357,4 +380,36 @@ void EntityManager::integrateVelocity(Entity& entity,float dt) {
     const float drag=std::pow(.12f,dt);
     entity.velocity.x*=drag;
     entity.velocity.z*=drag;
+}
+
+void EntityManager::openNavigationDoors(Entity& entity,const glm::dvec3& destination) {
+    if(entity.type!=EntityType::Villager)return;
+    const glm::ivec3 center(glm::floor(entity.position));
+    glm::dvec2 segment(destination.x-entity.position.x,destination.z-entity.position.z);
+    const double length=glm::length(segment);
+    if(length<.001)return;
+    if(length>1.5)segment*=1.5/length;
+    for(int dx=-2;dx<=2;++dx)for(int dz=-2;dz<=2;++dz)for(int dy=0;dy<=1;++dy) {
+        const glm::ivec3 p=center+glm::ivec3(dx,dy,dz);
+        if(!m_aiChunks.count({World::worldToChunkX(p.x),World::worldToChunkZ(p.z)}))continue;
+        DoorState door;
+        if(!decodeDoor(m_world.getBlock(p.x,p.y,p.z),door) || door.upper ||
+           door.material==DoorMaterial::Iron || door.open)continue;
+        const glm::dvec2 relative(p.x+.5-entity.position.x,p.z+.5-entity.position.z);
+        const double t=glm::clamp(glm::dot(relative,segment)/glm::dot(segment,segment),0.,1.);
+        if(glm::length(relative-segment*t)>.65)continue;
+        const auto key=std::make_pair(World::worldToChunkX(p.x),World::worldToChunkZ(p.z));
+        const auto chunk=m_aiChunks.find(key);
+        const uint64_t before=chunk==m_aiChunks.end()?0:chunk->second->blockRevision();
+        if(m_world.setDoorOpen(p,true)) {
+            m_openedVillageDoors[{p.x,p.y,p.z}]=m_aiTime+1.;
+            if(chunk!=m_aiChunks.end()) {
+                // Our own door edit must not invalidate the path we are following.
+                for(auto& mob:m_entities) if(mob.ai.pathRevisions.count(key) && mob.ai.pathRevisions[key]==before)
+                    mob.ai.pathRevisions[key]=chunk->second->blockRevision();
+                for(auto& [id,request]:m_navigation) if(request.revisions.count(key) && request.revisions[key]==before)
+                    request.revisions[key]=chunk->second->blockRevision();
+            }
+        }
+    }
 }

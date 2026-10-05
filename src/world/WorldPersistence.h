@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
+#include <tuple>
 #include <functional>
 #include <glm/glm.hpp>
 #include <unordered_map>
@@ -85,6 +87,8 @@ public:
     // Advance furnace/crafting state for all loaded block entities.
     // Locks internally.
     void tickBlockEntities();
+    // Only button entities in generated chunks tick; unloaded timers pause.
+    std::vector<glm::ivec3> tickButtons();
 
     // Read-only iteration over overrides of generated chunks, with the
     // chunk lock held. fn(key, localIndex, block).
@@ -99,6 +103,7 @@ public:
         m_pendingOverrideSaves.clear();
         m_overridesApplied.clear();
         m_blockEntities.clear();
+        m_pressedButtons.clear();
         m_dirtyBlockEntityChunks.clear();
         m_pendingBlockEntitySaves.clear();
         m_blockEntitiesApplied.clear();
@@ -107,7 +112,12 @@ public:
 
     // Mark a chunk's saved state as loaded (unload bookkeeping).
     void markOverridesApplied(int cx, int cz) { m_overridesApplied.emplace(cx, cz); }
-    void eraseBlockEntities(int cx, int cz) { m_blockEntities.erase({cx, cz}); }
+    void eraseBlockEntities(int cx, int cz) {
+        m_blockEntities.erase({cx,cz});
+        for(auto it=m_pressedButtons.lower_bound({cx,cz,0});
+            it!=m_pressedButtons.end() && std::get<0>(*it)==cx && std::get<1>(*it)==cz;)
+            it=m_pressedButtons.erase(it);
+    }
     void eraseBlockEntitiesApplied(int cx, int cz) {
         m_blockEntitiesApplied.erase({cx, cz});
     }
@@ -136,6 +146,8 @@ private:
                 static_cast<uint32_t>(p.second));
         }
     };
+    std::set<std::tuple<int,int,uint32_t>> m_pressedButtons;
+    void registerButtonUnlocked(int cx,int cz,uint32_t index,BlockId id);
     using OverrideMap = std::unordered_map<uint32_t, BlockId>;
     using BlockEntityMap = std::unordered_map<uint32_t, BlockEntity>;
 

@@ -19,6 +19,8 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+
+
     static_assert(static_cast<uint16_t>(BlockId::BLACK_WOOL) == 200);
     static_assert(static_cast<uint16_t>(ItemId::BONE_MEAL) == 208);
     for (uint16_t raw = 201; raw <= 224; ++raw) {
@@ -84,7 +86,7 @@ int main() {
             static_cast<uint16_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint16_t>(BlockId::COUNT) == 275 &&
+            static_cast<uint16_t>(BlockId::COUNT) == 895 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -133,7 +135,8 @@ int main() {
             creativeItems[231] == ItemId::BEACH_GRASS &&
             creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
             creativeItems[285] == ItemId::COOKED_SALMON &&
-            creativeItems.back() == ItemId::STONECUTTER,
+            creativeItems[291] == ItemId::STONECUTTER &&
+            creativeItems.back() == ItemId::STONE_BUTTON,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -154,11 +157,11 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 111 &&
+                CreativeItemCategory::BuildingBlocks)] == 115 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Nature)] == 61 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Functional)] == 20 &&
+                CreativeItemCategory::Functional)] == 34 &&
             categoryCounts[static_cast<size_t>(
                 CreativeItemCategory::Tools)] == 23 &&
             categoryCounts[static_cast<size_t>(

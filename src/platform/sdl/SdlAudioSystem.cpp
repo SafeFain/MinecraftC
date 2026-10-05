@@ -56,6 +56,8 @@ struct AudioSystem::Impl {
     std::atomic<unsigned> explosionTriggers{0};
     std::atomic<int> combatTrigger{-1};
     std::atomic<int> fishingTrigger{-1};
+    std::atomic<int> blockTrigger{-1};
+    float blockEnvelope=0,blockPhase=0,blockFrequency=0,blockDecay=0,blockNoise=0;
     float fishingEnvelope = 0, fishingPhase = 0, fishingFrequency = 0;
     float fishingDecay = 0, fishingNoise = 0;
     float rainVolume = 0.0f;
@@ -161,6 +163,15 @@ struct AudioSystem::Impl {
             thunderEnvelope = thunderVolume.load();
         if (explosionTriggers.exchange(0) > 0)
             explosionEnvelope = explosionVolume.load();
+        const int requestedBlock=blockTrigger.exchange(-1);
+        if(requestedBlock>=0) {
+            const bool metal=(requestedBlock&1)!=0, opening=(requestedBlock&2)!=0,
+                       button=(requestedBlock&4)!=0;
+            blockFrequency=button?(opening?1150.f:850.f):metal?(opening?410.f:270.f):(opening?175.f:125.f);
+            blockEnvelope=button?.12f:.22f;blockPhase=0;
+            blockDecay=button?.994f:metal?.997f:.998f;
+            blockNoise=button?.25f:metal?.3f:.58f;
+        }
         const int requestedFishing = fishingTrigger.exchange(-1);
         if (requestedFishing >= 0) {
             static constexpr float frequency[] = {900, 180, 620, 320};
@@ -307,14 +318,19 @@ struct AudioSystem::Impl {
                 noise() * fishingNoise) * fishingEnvelope;
             fishingEnvelope *= fishingDecay;
             if (fishingEnvelope < .0001f) fishingEnvelope = 0;
+            blockPhase+=6.283185307f*blockFrequency/SAMPLE_RATE;
+            if(blockPhase>6.283185307f)blockPhase-=6.283185307f;
+            const float blockSound=(std::sin(blockPhase)*(1-blockNoise)+noise()*blockNoise)*blockEnvelope;
+            blockEnvelope*=blockDecay;
+            if(blockEnvelope<.0001f)blockEnvelope=0;
             samples[frame * 2] = std::clamp(masterGain * (
                 left + (rainLeft + thunder * leftPan) * weatherGain +
-                    (explosion * explosionLeft + (combat + fishing) * .707f) * soundEffectsGain),
+                    (explosion * explosionLeft + (combat + fishing + blockSound) * .707f) * soundEffectsGain),
                 -1.0f, 1.0f);
             samples[frame * 2 + 1] =
                 std::clamp(masterGain * (right +
                                (rainRight + thunder * rightPan) * weatherGain +
-                               (explosion * explosionRight + (combat + fishing) * .707f) *
+                               (explosion * explosionRight + (combat + fishing + blockSound) * .707f) *
                                    soundEffectsGain),
                            -1.0f, 1.0f);
         }
@@ -498,3 +514,8 @@ void AudioSystem::playCombat(CombatSound sound) {
 }
 
 bool AudioSystem::available() const { return m_impl->initialized; }
+
+void AudioSystem::playBlockInteraction(bool metal,bool opening,bool button) {
+    if(!m_impl->initialized)return;
+    m_impl->blockTrigger=(metal?1:0)+(opening?2:0)+(button?4:0);
+}
