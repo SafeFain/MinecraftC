@@ -1369,7 +1369,7 @@ void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunk
     }
 }
 
-void LodTerrainSystem::enqueueRequests() {
+void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
     if (!m_threadPool || !m_generator || m_cacheRoot.empty()) return;
     const LodWorkBudget budget = lodWorkBudget(m_settings.aggressiveness);
     auto enqueuePass = [&](bool replacements) {
@@ -1388,6 +1388,12 @@ void LodTerrainSystem::enqueueRequests() {
                         found->second->distance2 = request.distance2;
                         if (found->second->queued || found->second->pendingMesh ||
                             (!found->second->dirty && found->second->resident))
+                            continue;
+                        // A valid empty tile is coverage too. Loading must not
+                        // rebuild it merely because it has no GPU geometry.
+                        if (!allowRefinements && found->second->resident &&
+                            (found->second->mesh.gpuReady ||
+                             found->second->mesh.indexCount == 0))
                             continue;
                     }
                     const bool hasRenderableMesh = found != m_tiles.end() &&
@@ -1487,12 +1493,13 @@ void LodTerrainSystem::enqueueRequests() {
     // each level retain their near-to-far ordering. Stale exact refinements
     // keep their old GPU mesh and must never starve a newly visible tile.
     enqueuePass(false);
-    enqueuePass(true);
+    if (allowRefinements) enqueuePass(true);
 }
 
 void LodTerrainSystem::update(const glm::dvec3& playerPosition,
                               int nearDistanceChunks,
-                              const std::vector<Chunk*>& activeChunks) {
+                              const std::vector<Chunk*>& activeChunks,
+                              bool allowRefinements) {
     if (!m_settings.enabled || !m_generator) return;
     m_playerPosition = playerPosition;
     const int cx = static_cast<int>(std::floor(playerPosition.x / Config::CHUNK_SIZE_X));
@@ -1549,11 +1556,11 @@ void LodTerrainSystem::update(const glm::dvec3& playerPosition,
                 return a.key.level < b.key.level;
             })->key.level;
     }
-    enqueueRequests();
+    enqueueRequests(allowRefinements);
     // Exact extraction is a refinement lane. Fill only capacity left after
     // missing/dirty LOD requests so exploration cannot permanently starve the
     // moving far-terrain frontier, especially on the one-worker preset.
-    observeExactChunks(activeChunks);
+    if (allowRefinements) observeExactChunks(activeChunks);
 }
 
 void LodTerrainSystem::invalidateTilesForChunk(int cx, int cz) {
@@ -1573,7 +1580,8 @@ void LodTerrainSystem::invalidateTilesForChunk(int cx, int cz) {
     }
 }
 
-void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
+void LodTerrainSystem::processCompleted(IGameRenderer* renderer,
+                                        bool allowRefinements) {
     if (renderer) m_renderer = renderer;
     const LodWorkBudget budget = lodWorkBudget(m_settings.aggressiveness);
     const auto deadline = std::chrono::steady_clock::now() +
@@ -1680,7 +1688,7 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer) {
     }
     // Selection bounds resident memory. Evicting a selected, unfinished tile
     // here would immediately request it again and can prevent coverage forever.
-    enqueueRequests();
+    enqueueRequests(allowRefinements);
     rebuildSubmissions();
 }
 

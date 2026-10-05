@@ -47,6 +47,9 @@
 #include <unordered_map>
 
 struct GameSessionTestAccess {
+    static void waitWorkers(GameSession& session) {
+        session.threadPool.waitIdle();
+    }
     static void markPlayerDead(GameSession& session) {
         session.playerDead = true;
     }
@@ -448,7 +451,17 @@ int main(int argc,char** argv) {
         recordUi = false;
         require(loadWorld(harness.session, harness.stub, harness.clock),
                 "distant terrain completes the final loading phase");
+        const auto exactCache = harness.root / "saves" / id /
+            "lod" / "r5" / "d_0" / "exact";
+        require(!std::filesystem::exists(exactCache) ||
+                    std::filesystem::is_empty(exactCache),
+                "loading does not wait for background exact LOD cache extraction");
         harness.flow.completeLoading();
+        harness.session.updatePlaying(0.0f, &harness.stub, {});
+        GameSessionTestAccess::waitWorkers(harness.session);
+        require(std::filesystem::exists(exactCache) &&
+                    !std::filesystem::is_empty(exactCache),
+                "playing resumes exact LOD cache extraction in the background");
         harness.flow.backToMainMenu();
         harness.flow.startGame(id, false);
         require(!harness.session.loadingSnapshot().newWorld &&

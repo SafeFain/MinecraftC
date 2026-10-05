@@ -452,8 +452,11 @@ bool GameSession::advanceLoading(
         world.processCompletedMeshes(
             renderer, Config::LOADING_MESH_UPLOADS_PER_FRAME,
             Config::LOADING_MESH_UPLOAD_BYTES_PER_FRAME);
-        world.updateLod(player.getPosition());
-        world.processCompletedLod(renderer);
+        // Coverage opens the loading gate. Exact-cache extraction and stale
+        // mesh refinements resume in updatePlaying; continuously feeding them
+        // here keeps the shared worker pool busy even after coverage is 100%.
+        world.updateLod(player.getPosition(), false);
+        world.processCompletedLod(renderer, false);
     }
     const auto progress = world.loadingProgress();
     if (!loadingGenerationComplete || !world.streamingTargetReady() ||

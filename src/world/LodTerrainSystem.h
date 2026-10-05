@@ -111,8 +111,10 @@ public:
     void reset(WorldGenerator* generator);
     void configure(const LodSettings& settings);
     void update(const glm::dvec3& playerPosition, int nearDistanceChunks,
-                const std::vector<Chunk*>& activeChunks);
-    void processCompleted(IGameRenderer* renderer);
+                const std::vector<Chunk*>& activeChunks,
+                bool allowRefinements = true);
+    void processCompleted(IGameRenderer* renderer,
+                          bool allowRefinements = true);
     void releaseGpuMeshes(bool retainCpuGeometry = false);
 
     const std::vector<LodRenderSubmission>& submissions() const {
@@ -203,7 +205,7 @@ private:
     size_t m_gpuBytes = 0;
 
     void rebuildSelection();
-    void enqueueRequests();
+    void enqueueRequests(bool allowRefinements = true);
     void observeExactChunks(const std::vector<Chunk*>& activeChunks);
     void rebuildSubmissions();
     void invalidateTilesForChunk(int cx, int cz);

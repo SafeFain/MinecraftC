@@ -207,14 +207,16 @@ public:
     }
 
     void configureLod(const LodSettings& settings) { m_lod.configure(settings); }
-    void updateLod(const glm::dvec3& playerPosition) {
+    void updateLod(const glm::dvec3& playerPosition,
+                   bool allowRefinements = true) {
         m_lod.update(playerPosition, Config::RENDER_DISTANCE,
-                     m_chunks.activeChunks());
+                     m_chunks.activeChunks(), allowRefinements);
     }
     bool lodCoverageReady() const { return m_lod.coverageReady(); }
     float lodCoverageFraction() const { return m_lod.coverageFraction(); }
-    void processCompletedLod(IGameRenderer* renderer) {
-        m_lod.processCompleted(renderer);
+    void processCompletedLod(IGameRenderer* renderer,
+                             bool allowRefinements = true) {
+        m_lod.processCompleted(renderer, allowRefinements);
     }
     const std::vector<LodRenderSubmission>& lodSubmissions() const {
         return m_lod.submissions();

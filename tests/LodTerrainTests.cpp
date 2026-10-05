@@ -707,6 +707,26 @@ int main() {
         }
         require(coverage.coverageReady() && !coverage.submissions().empty(),
                 "LOD loading never reaches GPU-ready coverage");
+        Chunk live(-7, -3);
+        live.setBlock(8, 64, 8, BlockId::STONE);
+        live.generated = true;
+        live.lifecycle = Chunk::LifecycleState::Renderable;
+        coverage.update(position, 8, {&live}, false);
+        pool.waitIdle();
+        coverage.processCompleted(&renderer, false);
+        require(coverage.coverageReady() && coverage.tasksInFlight() == 0 &&
+                    !coverage.hasExactChunk(live.cx, live.cz),
+                "ready LOD coverage stops loading work without extracting exact caches");
+        coverage.update(position, 8, {&live});
+        pool.waitIdle();
+        coverage.processCompleted(&renderer, false);
+        require(coverage.hasExactChunk(live.cx, live.cz),
+                "normal LOD updates resume exact cache extraction");
+        coverage.update(position, 8, {&live}, false);
+        pool.waitIdle();
+        coverage.processCompleted(&renderer, false);
+        require(coverage.coverageReady() && coverage.tasksInFlight() == 0,
+                "dirty but visible LOD refinements cannot extend the loading tail");
         for (const LodRenderSubmission& submission : coverage.submissions()) {
             const float grid = std::max(submission.worldOriginAndGrids.y,
                                         submission.worldOriginAndGrids.w);
