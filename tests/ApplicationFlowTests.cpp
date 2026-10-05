@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -306,7 +307,11 @@ void checkDroppedItems(const std::filesystem::path& assets) {
 // render target is fully loaded or the budget is exhausted.
 bool loadWorld(GameSession& session, StubRenderer& stub, RuntimeClock& clock) {
     for (int i = 0; i < 2000; ++i) {
-        if (session.advanceLoading(&stub, clock.now())) return true;
+        if (session.advanceLoading(&stub, clock.now())) {
+            require(session.loadingSnapshot().fraction == 1.0f,
+                    "completed loading fills the overall progress bar");
+            return true;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return false;
@@ -396,6 +401,62 @@ int main(int argc,char** argv) {
             std::cerr << "FAILED: no SDL video driver can create a window\n";
             return 1;
         }
+    }
+
+    {
+        Harness harness(root / "loading-phases", *window);
+        const int oldRenderDistance = Config::RENDER_DISTANCE;
+        Config::RENDER_DISTANCE = 2;
+        harness.session.configureLod(
+            {false, 16, LodAggressiveness::PowerSaver, LodPrecision::Low});
+        const std::string id = harness.session.createWorld(
+            "Loading phases", 42, GameMode::Creative, Difficulty::Peaceful,
+            true, WorldType::Superflat);
+        harness.flow.startGame(id, true);
+        require(harness.session.loadingSnapshot().phase ==
+                    GameSession::LoadingPhase::Chunks,
+                "initial loading shows the chunk generation phase");
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "near chunks load with distant terrain disabled");
+        require(harness.session.loadingSnapshot().phase ==
+                    GameSession::LoadingPhase::PreparingChunks,
+                "disabled LOD does not introduce a distant-terrain phase");
+
+        // Introduce a cold LOD selection after near meshes are complete so
+        // the final loading stage is exercised independently of worker timing.
+        harness.session.configureLod(
+            {true, 16, LodAggressiveness::PowerSaver, LodPrecision::Low});
+        require(!harness.session.advanceLoading(&harness.stub, harness.clock.now()),
+                "the loading gate still waits for distant terrain coverage");
+        const auto loading = harness.session.loadingSnapshot();
+        require(loading.progress.total > 0 &&
+                    loading.progress.completed == loading.progress.total &&
+                    loading.phase == GameSession::LoadingPhase::DistantTerrain,
+                "completed near chunks switch the status to distant terrain");
+        require(loading.phaseFraction < 1.0f &&
+                    loading.phaseFraction == harness.session.worldState().lodCoverageFraction() &&
+                    std::abs(loading.fraction -
+                        (0.9f + loading.phaseFraction * 0.1f)) < 0.00001f,
+                "the distant-terrain percentage matches the final progress segment");
+        recordUi = true;
+        drawnLabels.clear();
+        harness.ui.render(harness.session, harness.settings, harness.inputs,
+                          *window, GameState::LoadingWorld, false);
+        require(drawnLabels.count("loading.lod") == 1 &&
+                    drawnLabels.count("loading.preparing") == 0,
+                "the loading UI identifies distant terrain instead of completed chunks");
+        recordUi = false;
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "distant terrain completes the final loading phase");
+        harness.flow.completeLoading();
+        harness.flow.backToMainMenu();
+        harness.flow.startGame(id, false);
+        require(!harness.session.loadingSnapshot().newWorld &&
+                    harness.session.loadingSnapshot().phase == GameSession::LoadingPhase::Chunks,
+                "reopening a save starts with the cached chunk loading phase");
+        require(loadWorld(harness.session, harness.stub, harness.clock),
+                "existing-world loading retains complete LOD coverage");
+        Config::RENDER_DISTANCE = oldRenderDistance;
     }
 
     {

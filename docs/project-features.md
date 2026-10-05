@@ -28,7 +28,9 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   toggles and scales Bloom, AO, sun shafts, reflections, atmosphere, material
   motion, ambient particles, and GI.
 - New and existing worlds show loading progress until the selected render radius is
-  ready. New worlds persist spawn caches; compatible caches bypass later generation.
+  ready. After chunk preparation, enabled far-terrain LOD has a separate loading
+  status with its coverage percentage. New worlds persist spawn caches; compatible
+  caches bypass later generation.
 - One world seed deterministically controls terrain, biome, cave, ore, surface
   decoration, tree, and overworld-structure placement.
 - Generation version 19 retains 15 fixed-anchor, boundary-blended macro terrain

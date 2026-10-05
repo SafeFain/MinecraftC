@@ -27,15 +27,22 @@ GameSession::GameSession(const std::filesystem::path& savesDirectory)
 GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
     const StreamingProgress progress = loadingGenerationComplete
         ? world.loadingProgress() : world.generationProgress();
-    const float phaseFraction = progress.total == 0 ? 0.0f :
+    const float chunkFraction = progress.total == 0 ? 0.0f :
         static_cast<float>(progress.completed) /
         static_cast<float>(progress.total);
+    const float lodFraction = world.lodCoverageFraction();
+    LoadingPhase phase = loadingGenerationComplete
+        ? LoadingPhase::PreparingChunks : LoadingPhase::Chunks;
+    if (loadingGenerationComplete && progress.total > 0 &&
+        progress.completed == progress.total && world.lodEnabled())
+        phase = LoadingPhase::DistantTerrain;
     return {progress,
         loadingGenerationComplete
-            ? 0.75f + phaseFraction * 0.15f +
-                  world.lodCoverageFraction() * 0.10f
-            : phaseFraction * 0.75f,
-        loadingGenerationComplete, loadingNewWorld, loadingReason};
+            ? 0.75f + chunkFraction * 0.15f + lodFraction * 0.10f
+            : chunkFraction * 0.75f,
+        phase, phase == LoadingPhase::DistantTerrain
+            ? lodFraction : chunkFraction,
+        loadingNewWorld, loadingReason};
 }
 
 std::vector<WorldSummary> GameSession::listWorlds() const {

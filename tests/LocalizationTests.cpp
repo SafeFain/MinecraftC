@@ -36,6 +36,11 @@ int main() {
             "Simplified Chinese strings load");
     require(localization.format("loading.chunks", {"2", "9"}) == "2 / 9 个区块",
             "localized positional formatting");
+    require(localization.format("loading.lod", {"42"}) == "正在加载远景 LOD：42%",
+            "distant-terrain loading formats the coverage percentage");
+    for (const Language language : languagesByEnglishName())
+        require(localization.hasTranslation(language, "loading.lod"),
+                "distant-terrain loading is translated in every language");
     require(localization.hasTranslation(Language::English, "menu.create.world_type") &&
             localization.hasTranslation(Language::SimplifiedChinese,
                                          "menu.create.world_type") &&

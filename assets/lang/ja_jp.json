@@ -236,6 +236,7 @@
   "loading.generating": "チャンクを生成中: {0} / {1}",
   "loading.cached": "チャンクを読み込み中: {0} / {1}",
   "loading.preparing": "チャンクを準備中: {0} / {1}",
+  "loading.lod": "遠景地形 LOD を読み込み中: {0}%",
   "death.title": "あなたは死にました",
   "death.respawn": "Enterでリスポーン",
   "window.fly": "飛行",

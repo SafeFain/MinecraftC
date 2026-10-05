@@ -241,6 +241,7 @@
   "loading.generating": "Generating chunks: {0} / {1}",
   "loading.cached": "Loading chunks: {0} / {1}",
   "loading.preparing": "Preparing chunks: {0} / {1}",
+  "loading.lod": "Loading distant terrain LOD: {0}%",
   "death.title": "YOU DIED",
   "death.respawn": "Press Enter to respawn",
   "window.fly": "FLY",

@@ -236,6 +236,7 @@
   "loading.generating": "Génération des tronçons : {0} / {1}",
   "loading.cached": "Chargement des tronçons : {0} / {1}",
   "loading.preparing": "Préparation des tronçons : {0} / {1}",
+  "loading.lod": "Chargement du terrain lointain (LOD) : {0}%",
   "death.title": "VOUS ÊTES MORT",
   "death.respawn": "Appuyez sur Entrée pour réapparaître",
   "window.fly": "VOL",

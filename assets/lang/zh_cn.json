@@ -241,6 +241,7 @@
   "loading.generating": "正在生成区块：{0} / {1}",
   "loading.cached": "正在加载区块：{0} / {1}",
   "loading.preparing": "正在准备区块：{0} / {1}",
+  "loading.lod": "正在加载远景 LOD：{0}%",
   "death.title": "你死了",
   "death.respawn": "按 Enter 键重生",
   "window.fly": "飞行",

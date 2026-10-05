@@ -220,11 +220,17 @@ void GameUiController::render(
         else if (loading.reason == GameSession::LoadingReason::ReturningOverworld)
             loadingTitleKey = "loading.return_overworld";
         const std::string title = localization.text(loadingTitleKey);
-        const std::string status = localization.format(
-            loading.preparing ? "loading.preparing" :
-            (loading.newWorld ? "loading.generating"
-                               : "loading.cached"), {
-            std::to_string(progress.completed), std::to_string(progress.total)});
+        const std::string status =
+            loading.phase == GameSession::LoadingPhase::DistantTerrain
+            ? localization.format("loading.lod", {
+                std::to_string(static_cast<int>(
+                    std::clamp(loading.phaseFraction, 0.0f, 1.0f) * 100.0f))})
+            : localization.format(
+                loading.phase == GameSession::LoadingPhase::PreparingChunks
+                    ? "loading.preparing" :
+                (loading.newWorld ? "loading.generating"
+                                   : "loading.cached"), {
+                std::to_string(progress.completed), std::to_string(progress.total)});
         const float barWidth=std::max(1.0f,std::min(420.0f,uiWidth-80.0f));
         const float panelW = barWidth + 64.0f;
         const float panelX = (uiWidth - panelW) * 0.5f;

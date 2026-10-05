@@ -46,6 +46,12 @@ public:
         ReturningOverworld
     };
 
+    enum class LoadingPhase : uint8_t {
+        Chunks,
+        PreparingChunks,
+        DistantTerrain
+    };
+
     struct Feedback {
         std::function<void(float)> setRainVolume;
         std::function<void(float, float)> playExplosion;
@@ -73,7 +79,8 @@ public:
     struct LoadingSnapshot {
         StreamingProgress progress;
         float fraction = 0.0f;
-        bool preparing = false;
+        LoadingPhase phase = LoadingPhase::Chunks;
+        float phaseFraction = 0.0f;
         bool newWorld = false;
         LoadingReason reason = LoadingReason::World;
     };

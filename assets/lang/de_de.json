@@ -236,6 +236,7 @@
   "loading.generating": "Chunks werden generiert: {0} / {1}",
   "loading.cached": "Chunks werden geladen: {0} / {1}",
   "loading.preparing": "Chunks werden vorbereitet: {0} / {1}",
+  "loading.lod": "Entferntes Gelände (LOD) wird geladen: {0}%",
   "death.title": "DU BIST GESTORBEN",
   "death.respawn": "Enter drücken, um wiederzubeleben",
   "window.fly": "FLIEGEN",

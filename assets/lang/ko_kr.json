@@ -236,6 +236,7 @@
   "loading.generating": "청크 생성 중: {0} / {1}",
   "loading.cached": "청크 불러오는 중: {0} / {1}",
   "loading.preparing": "청크 준비 중: {0} / {1}",
+  "loading.lod": "원거리 지형 LOD 불러오는 중: {0}%",
   "death.title": "당신은 죽었습니다",
   "death.respawn": "Enter를 눌러 부활",
   "window.fly": "비행",

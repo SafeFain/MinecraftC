@@ -236,6 +236,7 @@
   "loading.generating": "توليد المقاطع: {0} / {1}",
   "loading.cached": "تحميل المقاطع: {0} / {1}",
   "loading.preparing": "تحضير المقاطع: {0} / {1}",
+  "loading.lod": "تحميل التضاريس البعيدة (LOD): {0}%",
   "death.title": "لقد مت",
   "death.respawn": "اضغط Enter للعودة للحياة",
   "window.fly": "الطيران",

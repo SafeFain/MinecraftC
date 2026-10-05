@@ -236,6 +236,7 @@
   "loading.generating": "Генерация чанков: {0} / {1}",
   "loading.cached": "Загрузка чанков: {0} / {1}",
   "loading.preparing": "Подготовка чанков: {0} / {1}",
+  "loading.lod": "Загрузка дальнего ландшафта (LOD): {0}%",
   "death.title": "ВЫ ПОГИБЛИ",
   "death.respawn": "Нажмите Enter, чтобы возродиться",
   "window.fly": "ПОЛЁТ",

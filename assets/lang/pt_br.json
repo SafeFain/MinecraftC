@@ -236,6 +236,7 @@
   "loading.generating": "Gerando chunks: {0} / {1}",
   "loading.cached": "Carregando chunks: {0} / {1}",
   "loading.preparing": "Preparando chunks: {0} / {1}",
+  "loading.lod": "Carregando terreno distante (LOD): {0}%",
   "death.title": "VOCÊ MORREU",
   "death.respawn": "Pressione Enter para renascer",
   "window.fly": "VOAR",
