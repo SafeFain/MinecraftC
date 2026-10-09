@@ -43,8 +43,10 @@ public:
     // Rebuild the active-chunk list sorted near-to-far from (pcx, pcz).
     // Main thread only; the list is read lock-free by renderers.
     void rebuildActiveChunks(int pcx, int pcz,
-                             const std::unordered_set<uint64_t>* visible = nullptr);
+                             const std::unordered_set<uint64_t>* visible = nullptr,
+                             const std::unordered_set<uint64_t>* simulation = nullptr);
     const std::vector<Chunk*>& activeChunks() const { return m_activeChunks; }
+    const std::vector<Chunk*>& simulationChunks() const { return m_simulationChunks; }
     size_t size() const;
 
     // Locked iteration. The callback receives this store; use only the
@@ -90,6 +92,7 @@ private:
 
     ChunkMap m_chunks;
     std::vector<Chunk*> m_activeChunks;
+    std::vector<Chunk*> m_simulationChunks;
     mutable std::shared_mutex m_mutex;
     SaveStore* m_saveStore = nullptr;
 };

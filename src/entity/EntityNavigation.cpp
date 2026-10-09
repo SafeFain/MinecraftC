@@ -39,7 +39,7 @@ bool EntityManager::revisionsCurrent(
 void EntityManager::prepareAiFrame(float dt) {
     m_aiTime+=dt;
     m_aiChunks.clear();
-    for (const Chunk* chunk:m_world.getActiveChunks())
+    for (const Chunk* chunk:m_world.getSimulationChunks())
         if (chunk->generated.load()) m_aiChunks.emplace(std::make_pair(chunk->cx,chunk->cz),chunk);
     for(auto it=m_openedVillageDoors.begin();it!=m_openedVillageDoors.end();) {
         const auto [x,y,z]=it->first;

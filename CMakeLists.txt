@@ -197,7 +197,8 @@ foreach(BACKEND_SOURCE IN LISTS MINECRAFTC_SDL_BACKEND_SOURCES
 endforeach()
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeDynamicLibrary.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeDynamicLibrary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeNetworkSocket.cpp")
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlMain.cpp")
 list(REMOVE_ITEM SOURCES
@@ -211,6 +212,7 @@ list(REMOVE_ITEM SOURCES
 add_library(minecraftc_platform STATIC
     src/platform/native/NativePlatform.cpp
     src/platform/native/NativeDynamicLibrary.cpp
+    src/platform/native/NativeNetworkSocket.cpp
     src/platform/native/NativeCrashHandler.cpp
     src/platform/sdl/SdlPlatformPaths.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
@@ -219,7 +221,7 @@ target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
 target_link_libraries(minecraftc_platform PRIVATE ${MINECRAFTC_SDL_TARGET})
 if(WIN32)
-    target_link_libraries(minecraftc_platform PUBLIC shell32 ole32)
+    target_link_libraries(minecraftc_platform PUBLIC shell32 ole32 ws2_32)
 endif()
 
 add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
@@ -1545,4 +1547,33 @@ if(Python3_Interpreter_FOUND)
                 --output ${CMAKE_SOURCE_DIR}/assets/textures/generated
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Building bright-comfortable texture previews and visual report")
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
+    add_executable(network_tests tests/NetworkTests.cpp
+        src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
+        src/network/PlayerProfile.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/world/Block.cpp)
+    target_include_directories(network_tests PRIVATE src)
+    target_link_libraries(network_tests PRIVATE minecraftc_platform glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(network_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(network_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME lan_protocol_and_tcp COMMAND network_tests)
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
+    add_executable(inventory_transaction_tests tests/InventoryTransactionTests.cpp
+        src/game/InventoryTransaction.cpp src/game/InventoryInteraction.cpp
+        src/game/InventoryModel.cpp src/game/Item.cpp src/game/SurvivalRules.cpp
+        src/world/Block.cpp)
+    target_include_directories(inventory_transaction_tests PRIVATE src)
+    target_link_libraries(inventory_transaction_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(inventory_transaction_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(inventory_transaction_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME authoritative_inventory_transactions COMMAND inventory_transaction_tests)
 endif()

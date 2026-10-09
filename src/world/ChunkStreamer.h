@@ -133,6 +133,15 @@ private:
 // reporting, and base-cache persistence. Block access and lighting/persistence
 // side effects go through the owning World; the chunk lock is the
 // ChunkStore's, taken per pass.
+struct StreamingInterest {
+    int chunkX = 0;
+    int chunkZ = 0;
+    int radius = 2;
+    bool operator==(const StreamingInterest& other) const {
+        return chunkX == other.chunkX && chunkZ == other.chunkZ && radius == other.radius;
+    }
+};
+
 class ChunkStreamer {
 public:
     ChunkStreamer(IChunkStreamingWorld& world, ChunkStore& chunks,
@@ -142,6 +151,10 @@ public:
 
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
+
+    // The local render target remains independent of guest interests. All
+    // interests share the existing bounded load/generation/retirement budgets.
+    void setAdditionalInterests(std::vector<StreamingInterest> interests);
 
     // Update chunk loading/unloading around the player position.
     void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0,
@@ -168,7 +181,7 @@ public:
     takePrefetchedChunkEntities(int cx, int cz);
     uint64_t streamingRevision() const { return m_streamingRevision; }
     bool streamingTargetReady() const {
-        return m_streamCursor >= m_visibleChunkCount &&
+        return m_visibleChunksVisited >= m_visibleChunkCount &&
                !m_streamCleanupPending;
     }
     int centerChunkX() const { return m_centerChunkX; }
@@ -201,6 +214,9 @@ private:
 
     int m_chunksPerFrame = 16;  // First frame loads more
     bool m_firstUpdate = true;
+    std::vector<StreamingInterest> m_additionalInterests;
+    bool m_interestsChanged = false;
+    int priorityDistance(int chunkX, int chunkZ) const;
     int m_centerChunkX = 0;
     int m_centerChunkZ = 0;
     int m_streamCenterChunkX = std::numeric_limits<int>::max();
@@ -214,6 +230,7 @@ private:
     std::unordered_set<uint64_t> m_boundaryLightingChunks;
     std::deque<std::pair<int, int>> m_warmChunkOrder;
     size_t m_streamCursor = 0;
+    size_t m_visibleChunksVisited = 0;
     bool m_streamCleanupPending = false;
     uint64_t m_streamingRevision = 0;
     std::atomic<int> m_generationTasksInFlight{0};

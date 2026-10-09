@@ -448,7 +448,7 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
 void FluidScheduler::randomTickLava(uint64_t tick) {
     // Three deterministic samples per 16-block section match the default
     // randomTickSpeed without depending on worker order or platform RNG.
-    for (const Chunk* chunk : m_world.getActiveChunks()) {
+    for (const Chunk* chunk : m_world.getSimulationChunks()) {
         if (chunk == nullptr || !chunk->generated.load()) continue;
         for (int section = Config::WORLD_MIN_Y; section < Config::WORLD_MAX_Y;
              section += 16) {

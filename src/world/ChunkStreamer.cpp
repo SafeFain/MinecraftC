@@ -1,5 +1,8 @@
 #include "world/ChunkStreamer.h"
 
+#include <stdexcept>
+#include <tuple>
+
 #include "core/RuntimeClock.h"
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
@@ -52,6 +55,8 @@ void ChunkStreamer::drainCacheWrites() {
 
 void ChunkStreamer::clear() {
     drainCacheWrites();
+    m_additionalInterests.clear();
+    m_interestsChanged = false;
     m_firstUpdate = true;
     m_chunksPerFrame = 16;
     m_streamCenterChunkX = std::numeric_limits<int>::max();
@@ -62,6 +67,7 @@ void ChunkStreamer::clear() {
     m_visibleChunkSet.clear();
     m_visibleChunkCount = 0;
     m_streamCursor = 0;
+    m_visibleChunksVisited = 0;
     m_streamCleanupPending = false;
     m_pendingBlocks.clear();
     m_warmChunkSet.clear();
@@ -88,6 +94,38 @@ void ChunkStreamer::queueGenerationCompletion(int cx, int cz) {
     m_generationCompletions.emplace_back(cx, cz);
 }
 
+void ChunkStreamer::setAdditionalInterests(std::vector<StreamingInterest> interests) {
+    if (interests.size() > 7) throw std::invalid_argument("Too many guest streaming interests");
+    for (const auto& interest : interests) {
+        if (interest.radius < 2 || interest.radius > 16 ||
+            std::abs(static_cast<int64_t>(interest.chunkX)) > 1875000 ||
+            std::abs(static_cast<int64_t>(interest.chunkZ)) > 1875000)
+            throw std::invalid_argument("Invalid guest streaming interest");
+    }
+    std::sort(interests.begin(), interests.end(), [](const auto& a, const auto& b) {
+        return std::tie(a.chunkX, a.chunkZ, a.radius) < std::tie(b.chunkX, b.chunkZ, b.radius);
+    });
+    interests.erase(std::unique(interests.begin(), interests.end()), interests.end());
+    if (interests != m_additionalInterests) {
+        m_additionalInterests = std::move(interests);
+        m_interestsChanged = true;
+    }
+}
+
+int ChunkStreamer::priorityDistance(int chunkX, int chunkZ) const {
+    const auto distance = [chunkX, chunkZ](int centerX, int centerZ) {
+        const int64_t dx = static_cast<int64_t>(chunkX) - centerX;
+        const int64_t dz = static_cast<int64_t>(chunkZ) - centerZ;
+        return dx * dx + dz * dz;
+    };
+    int64_t result = distance(m_centerChunkX, m_centerChunkZ);
+    for (const auto& interest : m_additionalInterests)
+        result = std::min(result, distance(interest.chunkX, interest.chunkZ));
+    // Worker priority is a signed int; clamp rather than overflowing when
+    // players explore distant areas of the same world.
+    return static_cast<int>(std::min<int64_t>(result, 100000000));
+}
+
 void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                            const glm::dvec3& playerVelocity) {
     int pcx = worldToChunk(playerPos.x, Config::CHUNK_SIZE_X);
@@ -97,8 +135,9 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
 
     const bool targetChanged = pcx != m_streamCenterChunkX ||
         pcz != m_streamCenterChunkZ ||
-        Config::RENDER_DISTANCE != m_streamRenderDistance;
+        Config::RENDER_DISTANCE != m_streamRenderDistance || m_interestsChanged;
     if (targetChanged) {
+        m_interestsChanged = false;
         m_streamCenterChunkX = pcx;
         m_streamCenterChunkZ = pcz;
         m_streamRenderDistance = Config::RENDER_DISTANCE;
@@ -118,13 +157,21 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
             }
         }
         m_visibleChunkCount = m_desiredChunks.size();
+        for (const auto& interest : m_additionalInterests) {
+            for (int dx = -interest.radius; dx <= interest.radius; ++dx) {
+                for (int dz = -interest.radius; dz <= interest.radius; ++dz) {
+                    if (dx * dx + dz * dz > interest.radius * interest.radius) continue;
+                    const int cx = interest.chunkX + dx, cz = interest.chunkZ + dz;
+                    if (m_desiredChunkSet.insert(packedChunkKey(cx, cz)).second)
+                        m_desiredChunks.emplace_back(cx, cz);
+                }
+            }
+        }
         std::sort(m_desiredChunks.begin(), m_desiredChunks.end(),
-            [pcx, pcz](const auto& a, const auto& b) {
-                const int64_t adx = static_cast<int64_t>(a.first) - pcx;
-                const int64_t adz = static_cast<int64_t>(a.second) - pcz;
-                const int64_t bdx = static_cast<int64_t>(b.first) - pcx;
-                const int64_t bdz = static_cast<int64_t>(b.second) - pcz;
-                return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+            [this](const auto& a, const auto& b) {
+                const int da = priorityDistance(a.first, a.second);
+                const int db = priorityDistance(b.first, b.second);
+                return da != db ? da < db : a < b;
             });
 
         // Add a very small forward prefetch strip outside the visible circle.
@@ -154,11 +201,12 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
             }
         }
         m_streamCursor = 0;
+        m_visibleChunksVisited = 0;
         m_streamCleanupPending = true;
         ++m_streamEpoch;
     }
 
-    bool activeChanged = false;
+    bool activeChanged = targetChanged;
     if (m_streamCleanupPending) {
         m_chunks.withUnique([&](ChunkStore& store) {
             std::vector<std::pair<int,int>> toRemove;
@@ -242,6 +290,8 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
     int loaded = 0;
     while (m_streamCursor < m_desiredChunks.size() && loaded < loadBudget) {
         const auto key = m_desiredChunks[m_streamCursor++];
+        if (m_visibleChunkSet.count(packedChunkKey(key.first, key.second)))
+            ++m_visibleChunksVisited;
         if (!m_chunks.contains(key.first, key.second)) {
             m_chunks.get(key.first, key.second);
             ++loaded;
@@ -266,7 +316,9 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
         // out-of-range chunk is not reported as gone before its override and
         // entity snapshots have been handed to the save queue.
         m_chunks.rebuildActiveChunks(
-            pcx, pcz, m_streamCleanupPending ? nullptr : &m_visibleChunkSet);
+            pcx, pcz, m_streamCleanupPending ? nullptr : &m_visibleChunkSet,
+            m_streamCleanupPending ? nullptr :
+                (m_additionalInterests.empty() ? &m_visibleChunkSet : &m_desiredChunkSet));
         ++m_streamingRevision;
     }
 }
@@ -503,11 +555,9 @@ void ChunkStreamer::enqueueGeneration() {
         });
         if (ungenerated.empty()) return;
         std::sort(ungenerated.begin(), ungenerated.end(), [this](const auto& a, const auto& b) {
-            const int64_t adx = static_cast<int64_t>(a.first) - m_centerChunkX;
-            const int64_t adz = static_cast<int64_t>(a.second) - m_centerChunkZ;
-            const int64_t bdx = static_cast<int64_t>(b.first) - m_centerChunkX;
-            const int64_t bdz = static_cast<int64_t>(b.second) - m_centerChunkZ;
-            return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+            const int da = priorityDistance(a.first, a.second);
+            const int db = priorityDistance(b.first, b.second);
+            return da != db ? da < db : a < b;
         });
 
         // Build a set for fast lookup
@@ -564,9 +614,7 @@ void ChunkStreamer::enqueueGeneration() {
         WorldGenerator* genPtr = &m_generator;
         int regionDistance2 = std::numeric_limits<int>::max();
         for (const Chunk* chunk : reg.chunks) {
-            const int dx = chunk->cx - m_centerChunkX;
-            const int dz = chunk->cz - m_centerChunkZ;
-            regionDistance2 = std::min(regionDistance2, dx * dx + dz * dz);
+            regionDistance2 = std::min(regionDistance2, priorityDistance(chunk->cx, chunk->cz));
         }
 
         ++m_generationTasksInFlight;
@@ -689,9 +737,7 @@ void ChunkStreamer::enqueueGeneration() {
             ChunkStreamer* streamerPtr = this;
             ++m_generationTasksInFlight;
             ++scheduledTasks;
-            const int dx = cx - m_centerChunkX;
-            const int dz = cz - m_centerChunkZ;
-            const int distance2 = dx * dx + dz * dz;
+            const int distance2 = priorityDistance(cx, cz);
             m_threadPool->enqueuePriority([streamerPtr, chunkPtr, genPtr, neighborQuery, blockSetter, structureSetter]() {
                 struct Completion {
                     std::atomic<int>& count;
@@ -916,9 +962,8 @@ StreamingProgress ChunkStreamer::generationProgress() const {
     StreamingProgress progress;
     m_chunks.withShared([&](ChunkStore& store) {
         progress.total = m_visibleChunkCount;
-        for (size_t i = 0; i < m_visibleChunkCount &&
-             i < m_desiredChunks.size(); ++i) {
-            const auto& key = m_desiredChunks[i];
+        for (const auto& key : m_desiredChunks) {
+            if (!m_visibleChunkSet.count(packedChunkKey(key.first, key.second))) continue;
             const Chunk* chunk = store.findUnlocked(key.first, key.second);
             if (chunk != nullptr && chunk->generated.load()) {
                 ++progress.completed;
@@ -939,9 +984,8 @@ StreamingProgress ChunkStreamer::loadingProgress() const {
     StreamingProgress progress;
     m_chunks.withShared([&](ChunkStore& store) {
         progress.total = m_visibleChunkCount;
-        for (size_t i = 0; i < m_visibleChunkCount &&
-             i < m_desiredChunks.size(); ++i) {
-            const auto& key = m_desiredChunks[i];
+        for (const auto& key : m_desiredChunks) {
+            if (!m_visibleChunkSet.count(packedChunkKey(key.first, key.second))) continue;
             const Chunk* chunk = store.findUnlocked(key.first, key.second);
             if (chunk == nullptr) continue;
             if (chunk->generated.load()) {

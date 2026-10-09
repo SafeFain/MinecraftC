@@ -1,4 +1,5 @@
 #include "world/ChunkStore.h"
+#include <tuple>
 
 #include "Config.h"
 #include "world/Chunk.h"
@@ -67,14 +68,22 @@ void ChunkStore::clear() {
 void ChunkStore::clearUnlocked() {
     m_chunks.clear();
     m_activeChunks.clear();
+    m_simulationChunks.clear();
 }
 
 void ChunkStore::rebuildActiveChunks(
-    int pcx, int pcz, const std::unordered_set<uint64_t>* visible) {
+    int pcx, int pcz, const std::unordered_set<uint64_t>* visible,
+    const std::unordered_set<uint64_t>* simulation) {
     std::shared_lock lock(m_mutex);
     m_activeChunks.clear();
+    m_simulationChunks.clear();
     m_activeChunks.reserve(m_chunks.size());
     for (auto& [key, chunk] : m_chunks) {
+        const uint64_t simulationKey =
+            (static_cast<uint64_t>(static_cast<uint32_t>(key.first)) << 32) |
+            static_cast<uint32_t>(key.second);
+        if (simulation == nullptr || simulation->count(simulationKey))
+            m_simulationChunks.push_back(chunk.get());
         if (visible != nullptr) {
             const uint64_t packed =
                 (static_cast<uint64_t>(static_cast<uint32_t>(key.first)) << 32) |
@@ -83,6 +92,10 @@ void ChunkStore::rebuildActiveChunks(
         }
         m_activeChunks.push_back(chunk.get());
     }
+    std::sort(m_simulationChunks.begin(), m_simulationChunks.end(),
+              [](const Chunk* a, const Chunk* b) {
+                  return std::tie(a->cx, a->cz) < std::tie(b->cx, b->cz);
+              });
     std::sort(m_activeChunks.begin(), m_activeChunks.end(),
               [pcx, pcz](const Chunk* a, const Chunk* b) {
                   const int64_t adx = static_cast<int64_t>(a->cx) - pcx;
@@ -91,6 +104,7 @@ void ChunkStore::rebuildActiveChunks(
                   const int64_t bdz = static_cast<int64_t>(b->cz) - pcz;
                   return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
               });
+    if (simulation == visible) m_simulationChunks = m_activeChunks;
 }
 
 size_t ChunkStore::size() const {

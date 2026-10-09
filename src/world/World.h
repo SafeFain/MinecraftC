@@ -158,6 +158,10 @@ public:
                          WorldType worldType = WorldType::Normal,
                          DimensionId dimension = DimensionId::Overworld);
 
+    void setAdditionalStreamingInterests(std::vector<StreamingInterest> interests) {
+        m_streamer.setAdditionalInterests(std::move(interests));
+    }
+
     // Update chunk loading/unloading around player position
     void update(const glm::dvec3& playerPosition, int loadBudgetOverride = 0,
                 const glm::dvec3& playerVelocity = glm::dvec3(0.0)) {
@@ -261,6 +265,9 @@ public:
     // ── Rendering ────────────────────────────────────────────────────
     const std::vector<Chunk*>& getActiveChunks() const {
         return m_chunks.activeChunks();
+    }
+    const std::vector<Chunk*>& getSimulationChunks() const {
+        return m_chunks.simulationChunks();
     }
     bool isGeneratedAt(int worldX, int worldZ) const {
         return generatedAt(worldX, worldZ);

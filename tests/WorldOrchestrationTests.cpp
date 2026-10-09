@@ -1309,7 +1309,41 @@ void testHeavenStarstepResolution() {
 
 #include "WorldDoorScenarios.h"
 
+void testGuestStreamingInterests() {
+    const int previousDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 2;
+    World world;
+    world.setAdditionalStreamingInterests({{-100, -100, 2}, {100, 100, 2}});
+    world.update({.5, 64, .5}, 3);
+    require(world.getSimulationChunks().size() == 3, "guest streaming exceeded shared load budget");
+    const auto contains = [&](int cx, int cz) {
+        for (const auto* chunk : world.getSimulationChunks())
+            if (chunk->cx == cx && chunk->cz == cz) return true;
+        return false;
+    };
+    require(contains(0, 0) && contains(-100, -100) && contains(100, 100),
+            "guest near chunks were starved by host render radius");
+    require(!world.streamingTargetReady(), "guest allocations prematurely completed local loading");
+    for (auto* chunk : world.getSimulationChunks())
+        if (chunk->cx != 0 || chunk->cz != 0) chunk->generated = true;
+    require(world.generationProgress().completed == 0,
+            "guest generation inflated local loading progress");
+    for (int i = 0; i < 20; ++i) world.update({.5, 64, .5}, 3);
+    require(world.generationProgress().total == 13,
+            "guest interests changed local rendering/loading target");
+    world.setAdditionalStreamingInterests({});
+    for (int i = 0; i < 20; ++i) world.update({.5, 64, .5}, 3);
+    require(!contains(-100, -100) && !contains(100, 100),
+            "departed guest chunks were retained indefinitely");
+    bool rejected = false;
+    try { world.setAdditionalStreamingInterests({{0, 0, 17}}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected, "invalid guest render radius accepted");
+    Config::RENDER_DISTANCE = previousDistance;
+}
+
 int main() {
+    testGuestStreamingInterests();
     testDoorsAndButtons();
     testChunkStreaming();
     testAsyncGeneratedCacheRoundTrip();

@@ -100,7 +100,7 @@ void EntityManager::syncChunks() {
         return;
     }
     std::set<std::pair<int,int>> active;
-    for (const Chunk* chunk : m_world.getActiveChunks())
+    for (const Chunk* chunk : m_world.getSimulationChunks())
         if (chunk->generated.load()) active.insert({chunk->cx,chunk->cz});
     for (const auto& key : m_loadedChunks) if (!active.count(key)) {
         // Unchanged or empty chunks already match their on-disk snapshot.

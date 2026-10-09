@@ -22,7 +22,10 @@ RULES = {
     ),
     "native": re.compile(
         r"(?:#\s*include\s*[<\"](?:windows\.h|shlobj\.h|unistd\.h|pwd\.h|"
-        r"mach-o/dyld\.h)[>\"]|\b(?:GetModuleFileNameW|SHGetKnownFolderPath|"
+        r"mach-o/dyld\.h|winsock2\.h|ws2tcpip\.h|sys/socket\.h|sys/select\.h|"
+        r"netinet/(?:in|tcp)\.h|arpa/inet\.h|poll\.h|dns_sd\.h)[>\"]|"
+        r"\b(?:WSAStartup|WSACleanup|WSAGetLastError|closesocket|ioctlsocket|"
+        r"inet_pton|inet_ntop|setsockopt|getsockopt|GetModuleFileNameW|SHGetKnownFolderPath|"
         r"MoveFileExW|getpwuid_r|readlink)\s*\()"
     ),
 }
