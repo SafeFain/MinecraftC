@@ -1,4 +1,5 @@
 #include "world/Block.h"
+#include "world/Chunk.h"
 #include "game/Item.h"
 #include "renderer/BlockAtlasData.h"
 
@@ -42,9 +43,18 @@ int main() {
     for (int x = -40; x < 40; ++x) for (int z = -18; z < 18; ++z) {
         const auto variant = materialVariant(stoneSequence,x,-7,z,0);
         selected[variant] = true;
-        require(variant == materialVariant(stoneSequence,(x-32)+32,-7,(z+16)-16,0),
-                "world coordinate hashing changed across chunk-local reconstruction");
     }
+    // Independent wire-sized golden values, including signed coordinates and faces.
+    MaterialSequence reference; reference.seed=0x12345678; reference.variants=4;
+    require(materialVariant(reference,0,0,0,0)==3, "signed world material hash matches independent golden");
+    require(materialVariant(reference,-1,-7,16,0)==2, "signed world material hash matches independent golden");
+    require(materialVariant(reference,16,319,-17,3)==2, "signed world material hash matches independent golden");
+    require(materialVariant(reference,-32,-64,31,5)==3, "signed world material hash matches independent golden");
+    require(materialVariant(reference,2147483647,-64,-2147483648,1)==2, "signed world material hash matches independent golden");
+    const Chunk negative(-1,-1), origin(0,-1);
+    require(materialVariant(reference,negative.worldX()+15,64,negative.worldZ()+8,3)==3 &&
+            materialVariant(reference,origin.worldX(),64,origin.worldZ()+8,3)==3,
+            "actual chunk origins reconstruct negative border material cells");
     for (bool visible : selected) require(visible, "hash never selected a declared variant");
     require(atlas.normalTexture.format == TextureFormat::Rgba8Unorm &&
             atlas.propertyTexture.format == TextureFormat::Rgba8Unorm &&

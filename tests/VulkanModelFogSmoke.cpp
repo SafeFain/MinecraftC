@@ -96,8 +96,27 @@ int main(int argc, char** argv) {
                     throw std::runtime_error("actual distance no longer applies model fog");
             }
         }
+        // Four asymmetric texels exercise the uploaded UV attribute and shader
+        // sampling, so neither a constant UV nor a vertical flip can pass.
+        for (int texel=0;texel<4;++texel) {
+            auto asset=makeModel(model::AlphaMode::Opaque);
+            asset->materials[0].baseColor=glm::vec4(1);
+            asset->materials[0].image=0;
+            model::ImageData image;image.width=2;image.height=2;
+            image.pixels={255,0,0,255, 0,255,0,255, 0,0,255,255, 255,255,255,255};
+            asset->images.push_back(image);
+            for(auto& vertex:asset->primitives[0].vertices)
+                vertex.uv={.25f+.5f*(texel%2),.25f+.5f*(texel/2)};
+            const auto color=capture(renderer,renderer.modelRenderer().upload(asset),RenderEnvironment{},0);
+            if(texel<3) {
+                for(int channel=0;channel<3;++channel)
+                    if(channel==texel ? color[channel]<60 : color[channel]>color[texel]*.3f)
+                        throw std::runtime_error("asymmetric texture UV sampled wrong texel");
+            } else if(glm::any(glm::lessThan(color,glm::vec3(60))))
+                throw std::runtime_error("white texture UV sampled wrong texel");
+        }
         std::cout << "PASS Vulkan model fog: both dimensions, opaque/mask/blend, "
-                     "Y=-64..319, camera translation and distant fog\n";
+                     "Y=-64..319, camera translation, distant fog and asymmetric UV sampling\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

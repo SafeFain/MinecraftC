@@ -209,6 +209,10 @@ int main() {
     require(valid && valid.asset->skins[0].joints.size() == 2, "valid skin failed");
     require(valid.asset->primitives.size() == 1 && valid.asset->primitives[0].indices.size() == 3,
             "indexed triangle was not converted");
+    const auto& vertices = valid.asset->primitives[0].vertices;
+    require(vertices.size() == 3 && vertices[0].uv == glm::vec2(0,0) &&
+            vertices[1].uv == glm::vec2(1,0) && vertices[2].uv == glm::vec2(0,1),
+            "real loader preserves asymmetric source UV coordinates");
     require(valid.asset->primitives[0].skin == 0,
             "node skin was not handed off to its unique mesh primitive");
     require(valid.asset->images.size() == 1 && valid.asset->images[0].width == 1,
@@ -267,7 +271,7 @@ int main() {
             "shared mesh primitive retained a node-specific skin");
 
     const char* entityModels[] = {"cow", "pig", "sheep", "chicken",
-        "zombie", "skeleton", "spider", "blastling"};
+        "zombie", "skeleton", "spider", "blastling", "villager", "zombie_villager", "iron_golem"};
     for (const char* name : entityModels) {
         const auto loaded = model::loadGltf(
             std::filesystem::path(MINECRAFTC_SOURCE_DIR) /

@@ -608,7 +608,7 @@ int main(int argc,char** argv) {
                 "UI virtual controller restores background input hint");
     }
 
-    for (const auto size:{glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+    for (const auto size:{glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240),glm::ivec2(240,320)}) {
         InventoryModel inventory;inventory.slot(1)={ItemId::DIRT,8,0};
         SurvivalInventoryScreen screen(inventory);
         UIRenderer ui;Localization localization;ui.setLocalization(localization);
@@ -671,7 +671,7 @@ int main(int argc,char** argv) {
         recordUi=false;
     }
 
-    for (const auto size : {glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+    for (const auto size : {glm::ivec2(960,600),glm::ivec2(320,640),glm::ivec2(640,240),glm::ivec2(240,320)}) {
         ClientSettings settings;settings.language=Language::English;
         Localization localization;localization.setLanguage(settings.language);
         int changes=0;
@@ -1125,7 +1125,7 @@ int main(int argc,char** argv) {
         UIRenderer inertUi;
         Localization inertLocalization;
         inertUi.setLocalization(inertLocalization);
-        for (auto dimensions:{glm::ivec2(640,480),glm::ivec2(320,640),glm::ivec2(640,240)}) {
+        for (auto dimensions:{glm::ivec2(640,480),glm::ivec2(320,640),glm::ivec2(640,240),glm::ivec2(240,320)}) {
             harness.session.inventory().slot(0)={ItemId::STONE,64,0};
             harness.session.inventory().slot(9)={ItemId::DIRT,8,0};
         // Find the actual rendered item center, independent of theme/layout.

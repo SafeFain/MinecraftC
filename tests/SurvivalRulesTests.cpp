@@ -1,5 +1,6 @@
 #include "game/SurvivalRules.h"
 #include "game/InventoryModel.h"
+#include "game/SurvivalBlockLogic.h"
 #include "world/FluidLogic.h"
 #include "world/BiomeBlockLogic.h"
 
@@ -108,6 +109,21 @@ int main() {
     static_assert(static_cast<uint16_t>(ItemId::POINTED_DRIPSTONE) == 176);
     static_assert(static_cast<uint16_t>(ItemId::SULFUR_CRUST) == 181);
     static_assert(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER) == 182);
+    for (uint16_t raw=201;raw<=224;++raw) {
+        const auto block=static_cast<BlockId>(raw);
+        const bool rock=(raw>=208 && raw<=211) || raw==213;
+        const auto drops=getBlockDrops(block,{ItemId::WOODEN_PICKAXE,1,0});
+        require(drops.size()==1 && drops[0].id==itemForBlock(block) && drops[0].count==1,
+                "all natural blocks drop one corresponding item");
+        require(!rock || getBlockDrops(block,{}).empty(),"natural rocks require a pickaxe");
+        if(raw>=214) require(!getBlockDrops(block,{}).empty(),"natural plants can be harvested by hand");
+    }
+    require(nextFarmlandState(BlockId::FARMLAND_2,BlockId::AIR,true,0)==BlockId::FARMLAND_7 &&
+            nextFarmlandState(BlockId::FARMLAND,BlockId::AIR,false,0)==BlockId::DIRT,
+            "water hydrates farmland and dry unused soil reverts");
+    require(nextCropState(BlockId::WHEAT_3,BlockId::FARMLAND_7,30)==BlockId::WHEAT_4 &&
+            nextCropState(BlockId::WHEAT_3,BlockId::FARMLAND,30)==BlockId::WHEAT_3,
+            "hydrated crops use the faster deterministic growth interval");
     for (const auto& mapping : {
              std::pair{BlockId::LIMESTONE, ItemId::LIMESTONE},
              std::pair{BlockId::BASALT, ItemId::BASALT},

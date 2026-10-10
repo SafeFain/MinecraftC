@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import importlib.util
+import sys
+import tempfile
 import hashlib
 import math
 import struct
@@ -48,6 +51,20 @@ for filename, (bpm, beats, digest) in EXPECTED.items():
     require(stereo_delta > 0.002, f"{filename} collapsed to mono")
     require(seam < 0.015, f"{filename} has an audible loop discontinuity")
 
-require((ROOT / "tools" / "audio_generator.py").is_file(),
-        "music assets have no reproducible generator")
-print("music assets are deterministic, stereo, bounded, and loop-safe")
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location("audio_generator", ROOT / "tools/audio_generator.py")
+generator = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(generator)
+samplers = [generator.menu_sample, generator.menu_spark_sample, generator.gameplay_sample,
+            generator.overworld_solitude_sample, generator.overworld_horizon_sample,
+            generator.overworld_nightfall_sample, generator.heaven_sample, generator.heaven_sanctum_sample]
+with tempfile.TemporaryDirectory(prefix="minecraftc-audio-test-") as directory:
+    for (filename, (bpm, _, _)), sampler in zip(EXPECTED.items(), samplers):
+        first, second = Path(directory) / "first.wav", Path(directory) / "second.wav"
+        generator.write_track(first, bpm, 1, sampler)
+        generator.write_track(second, bpm, 1, sampler)
+        require(first.read_bytes() == second.read_bytes(), f"{filename} regeneration is nondeterministic")
+        with wave.open(str(first), "rb") as generated, wave.open(str(ROOT / "assets/audio" / filename), "rb") as reference:
+            require(generated.readframes(generated.getnframes()) == reference.readframes(generated.getnframes()),
+                    f"{filename} generator differs from checked-in PCM reference")
+print("music assets and regenerated PCM are deterministic, stereo, bounded, and loop-safe")

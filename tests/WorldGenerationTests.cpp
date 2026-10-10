@@ -13,6 +13,7 @@
 #include "Config.h"
 
 #include <cstdlib>
+#include <chrono>
 #include <array>
 #include <algorithm>
 #include <cmath>
@@ -39,12 +40,8 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 #include "OverworldStructureScenarios.h"
 #include "VillageLayoutScenarios.h"
 
-int main(int argc,char** argv) {
-    if(argc==2 && std::string(argv[1])=="--village-layout-tests") {
-        testVillageLayouts();std::cout<<"Village layout tests passed\n";return 0;
-    }
+void testOverworld() {
     testNewStructureBlueprints();
-    testVillageLayouts();
     testBiomeSurfaceEcology();
     testEcologyFormations();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
@@ -1609,6 +1606,19 @@ int main(int argc,char** argv) {
                     flatRegionChunks.front()->getBlock(3, y, 11),
                 "superflat singleton differs from region output");
 
+    std::cout << "biomes=" << observedBiomes.size()
+              << "/" << allBiomes.size()
+              << " archetypes=" << observedArchetypes.size()
+              << "/" << allArchetypes.size()
+              << " rivers=" << riverColumns
+              << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
+              << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]
+              << " badlands=" << biomeCounts[static_cast<size_t>(Biome::BADLANDS)]
+              << " trees=" << regionSet.size()
+              << " ores=" << totalOres << '/' << sampledHostBlocks << '\n';
+}
+
+void testHeaven() {
     // Heaven uses a separate deterministic island field.  Its void remains
     // air at the world bottom, columns are bounded floating islands rather
     // than a continuous plane, and region/singleton generation agree.
@@ -1913,6 +1923,12 @@ int main(int argc,char** argv) {
             require(count > 0,
                     "Heaven v7 exploration window missed a biome or layer");
 
+    const auto floorDiv16 = [](int value) {return value >= 0 ? value / 16 : (value - 15) / 16;};
+    std::set<std::pair<int,int>> densityChunks;
+    for(int biome=0;biome<WorldGenerator::HEAVEN_BIOME_COUNT;++biome)
+        for(int cz=0;cz<16;++cz) for(int cx=0;cx<4;++cx)
+            densityChunks.emplace(cx+floorDiv16(biome%2==0?0:64),cz+floorDiv16((biome/2)*256-106));
+    std::map<std::pair<int,int>,std::vector<uint16_t>> surveyedBlocks;
     std::array<bool, 10> heavenMaterials{};
     std::array<bool,16> newHeavenMaterials{};
     size_t boundedPools=0;
@@ -1930,6 +1946,7 @@ int main(int argc,char** argv) {
         for (int cx = -16; cx <= 16; ++cx) {
             Chunk chunk(cx, cz);
             heaven.generate(chunk);
+            if(densityChunks.count({cx,cz})) chunk.copyRawBlocks(surveyedBlocks[{cx,cz}]);
             for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
                 for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
                     for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
@@ -2056,9 +2073,6 @@ int main(int argc,char** argv) {
     // (mod 8): even bands sit in x∈[0,62), odd bands in x∈[62,128), and the
     // z window of one band spans 256 blocks; a biomeAt guard skips boundary
     // columns.
-    const auto floorDiv16 = [](int value) {
-        return value >= 0 ? value / 16 : (value - 15) / 16;
-    };
     for (int biome = 0; biome < WorldGenerator::HEAVEN_BIOME_COUNT; ++biome) {
         const int regionX0 = biome % 2 == 0 ? 0 : 64;
         const int regionZ0 = (biome / 2) * 256 - 106;
@@ -2068,7 +2082,9 @@ int main(int argc,char** argv) {
                 Chunk chunk(
                     cx + floorDiv16(regionX0),
                     cz + floorDiv16(regionZ0));
-                heaven.generate(chunk);
+                const auto cached=surveyedBlocks.find({chunk.cx,chunk.cz});
+                if(cached!=surveyedBlocks.end()) chunk.loadRawBlocks(cached->second);
+                else heaven.generate(chunk);
                 for (int z = 0; z < Config::CHUNK_SIZE_Z; z += 2) {
                     for (int x = 0; x < Config::CHUNK_SIZE_X; x += 2) {
                         const int wx = regionX0 + cx * 16 + x;
@@ -2104,14 +2120,19 @@ int main(int argc,char** argv) {
     }
     require(foundFallenLog, "Heaven v7 window missed a fallen skyroot log");
 
-    std::cout << "biomes=" << observedBiomes.size()
-              << "/" << allBiomes.size()
-              << " archetypes=" << observedArchetypes.size()
-              << "/" << allArchetypes.size()
-              << " rivers=" << riverColumns
-              << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
-              << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]
-              << " badlands=" << biomeCounts[static_cast<size_t>(Biome::BADLANDS)]
-              << " trees=" << regionSet.size()
-              << " ores=" << totalOres << '/' << sampledHostBlocks << '\n';
+}
+
+
+int main(int argc,char** argv) {
+    const std::string scenario=argc==2 ? argv[1] : "--all";
+    const auto run=[](const char* name,void (*test)()) {
+        const auto start=std::chrono::steady_clock::now();
+        test();
+        std::cout<<name<<" seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<'\n';
+    };
+    if(scenario=="--village-layout-tests") run("village",testVillageLayouts);
+    else if(scenario=="--overworld-tests") run("overworld",testOverworld);
+    else if(scenario=="--heaven-tests") run("heaven",testHeaven);
+    else if(scenario=="--all") {run("overworld",testOverworld);run("heaven",testHeaven);}
+    else {std::cerr<<"Unknown world generation scenario\n";return 2;}
 }

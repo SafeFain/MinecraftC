@@ -1,3 +1,4 @@
+import shutil
 import hashlib
 import json
 import struct
@@ -15,6 +16,22 @@ import texture_generator as tg
 
 
 class TextureGeneratorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture_directory = tempfile.TemporaryDirectory(prefix="minecraftc-texture-fixtures-")
+        cls.addClassCleanup(cls.fixture_directory.cleanup)
+        cls.generated = {}
+
+    def generate_fixture(self, output, seed, locks=None):
+        # Cache immutable generated source files; each test gets a private copy
+        # so overrides/corruption cannot contaminate another test's fixture.
+        key = (seed, tuple(sorted((locks or {}).items())))
+        if key not in self.generated:
+            source = Path(self.fixture_directory.name) / str(len(self.generated))
+            tg.generate(source, seed, locks)
+            self.generated[key] = source
+        shutil.copytree(self.generated[key], output, dirs_exist_ok=True)
+
     def test_stardew_vine_emission_follows_beads_not_color(self):
         from texture_recipes import generate_material, material_maps
         name = "hanging_cloud_vine"
@@ -47,15 +64,10 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(tg.NAMES[216:232], names)
         self.assertEqual(len(names),16)
         fingerprints=set()
-        with tempfile.TemporaryDirectory() as directory:
-            for index,name in enumerate(names):
-                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
-                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
-                self.assertEqual({p[3] for p in pixels},{0,255} if index>=10 else {255})
-                fingerprints.add(tuple(pixels))
-                path=Path(directory)/(name+'.png')
-                tg.write_png(path,16,16,pixels)
-                self.assertFalse(tg.validate_texture(path),name)
+        for index,name in enumerate(names):
+            pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+            self.assertEqual({p[3] for p in pixels},{0,255} if index>=10 else {255})
+            fingerprints.add(tuple(pixels))
         self.assertEqual(len(fingerprints),16)
 
     def test_v16_ecology_materials_and_plants(self):
@@ -63,18 +75,13 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(len(names),28)
         self.assertEqual(tg.NAMES[188:216],names)
         fingerprints=set()
-        with tempfile.TemporaryDirectory() as directory:
-            for name in names:
-                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
-                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
-                fingerprints.add(tuple(pixels))
-                if name in tg.ECOLOGY_PLANTS:
-                    self.assertEqual({p[3] for p in pixels},{0,255})
-                else:
-                    self.assertEqual({p[3] for p in pixels},{255})
-                path=Path(directory)/(name+'.png')
-                tg.write_png(path,16,16,pixels)
-                self.assertFalse(tg.validate_texture(path),name)
+        for name in names:
+            pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+            fingerprints.add(tuple(pixels))
+            if name in tg.ECOLOGY_PLANTS:
+                self.assertEqual({p[3] for p in pixels},{0,255})
+            else:
+                self.assertEqual({p[3] for p in pixels},{255})
         self.assertEqual(len(fingerprints),28)
 
     def test_biome_materials_and_plants(self):
@@ -82,35 +89,24 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(len(names), 24)
         self.assertEqual(tg.NAMES[161], "black_wool")
         self.assertEqual(tg.NAMES[162:186], names)
-        with tempfile.TemporaryDirectory() as directory:
-            fingerprints = set()
-            for name in names:
-                pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
-                self.assertEqual(pixels, tg.generate_texture(name, tg.DEFAULT_SEED))
-                fingerprints.add(tuple(pixels))
-                if name in tg.BIOME_PLANTS:
-                    self.assertTrue(any(p[3] == 0 for p in pixels))
-                    self.assertTrue(any(p[3] == 255 for p in pixels))
-                else:
-                    self.assertTrue(all(p[3] == 255 for p in pixels))
-                path = Path(directory) / (name+".png")
-                tg.write_png(path,16,16,pixels)
-                self.assertFalse(tg.validate_texture(path),name)
-            self.assertEqual(len(fingerprints),24)
+        fingerprints = set()
+        for name in names:
+            pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
+            fingerprints.add(tuple(pixels))
+            if name in tg.BIOME_PLANTS:
+                self.assertTrue(any(p[3] == 0 for p in pixels))
+                self.assertTrue(any(p[3] == 255 for p in pixels))
+            else:
+                self.assertTrue(all(p[3] == 255 for p in pixels))
+        self.assertEqual(len(fingerprints),24)
 
     def test_decoration_materials_are_deterministic_distinct_and_tile_safe(self):
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            fingerprints = set()
-            for name in tg.DECORATION_BASES:
-                pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
-                self.assertEqual(pixels, tg.generate_texture(name, tg.DEFAULT_SEED))
-                self.assertTrue(all(p[3] == 255 for p in pixels))
-                path = output / (name + ".png")
-                tg.write_png(path, 16, 16, pixels)
-                self.assertFalse(tg.validate_texture(path), name)
-                fingerprints.add(tuple(pixels))
-            self.assertEqual(len(fingerprints), 18)
+        fingerprints = set()
+        for name in tg.DECORATION_BASES:
+            pixels = tg.generate_texture(name, tg.DEFAULT_SEED)
+            self.assertTrue(all(p[3] == 255 for p in pixels))
+            fingerprints.add(tuple(pixels))
+        self.assertEqual(len(fingerprints), 18)
         definitions = tg.load_item_icon_definitions(self.item_definitions()[0])
         order = list(definitions["items"])
         self.assertEqual(order[181], "starstep_scepter")
@@ -129,29 +125,19 @@ class TextureGeneratorTests(unittest.TestCase):
         definitions=tg.load_item_icon_definitions(self.item_definitions()[0])
         self.assertEqual(list(definitions["items"])[286:292],names)
         fingerprints=set()
-        with tempfile.TemporaryDirectory() as directory:
-            for name in names:
-                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
-                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
-                path=Path(directory)/(name+".png")
-                tg.write_png(path,16,16,pixels)
-                self.assertFalse(tg.validate_texture(path),name)
-                fingerprints.add(tuple(pixels))
+        for name in names:
+            pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+            fingerprints.add(tuple(pixels))
         self.assertEqual(len(fingerprints),6)
 
     def test_doors_and_variant_planks_are_distinct_and_deterministic(self):
         self.assertEqual(tg.NAMES[238:],list(tg.VARIANT_PLANKS)+list(tg.DOOR_TEXTURES))
         fingerprints=set()
-        with tempfile.TemporaryDirectory() as directory:
-            for name in tg.NAMES[238:]:
-                pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
-                self.assertEqual(pixels,tg.generate_texture(name,tg.DEFAULT_SEED))
-                self.assertEqual(len(pixels),256)
-                self.assertTrue(all(pixel[3] in (0,255) for pixel in pixels))
-                path=Path(directory)/(name+".png")
-                tg.write_png(path,16,16,pixels)
-                self.assertFalse(tg.validate_texture(path),name)
-                fingerprints.add(tuple(pixels))
+        for name in tg.NAMES[238:]:
+            pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
+            self.assertEqual(len(pixels),256)
+            self.assertTrue(all(pixel[3] in (0,255) for pixel in pixels))
+            fingerprints.add(tuple(pixels))
         self.assertEqual(len(fingerprints),18)
 
     def item_definitions(self):
@@ -266,7 +252,7 @@ class TextureGeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second, tempfile.TemporaryDirectory() as overrides, tempfile.TemporaryDirectory() as legacy:
             a, b = Path(first), Path(second)
             for output in (a, b):
-                tg.generate(output, 99)
+                self.generate_fixture(output, 99)
                 tg.build_items_atlas(output, 99, item_defs, block_defs,
                                      Path(overrides), Path(legacy))
             self.assertEqual((a / "items_atlas.png").read_bytes(),
@@ -496,7 +482,7 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(entity_definitions["documentation"]["cross_face"]["projection"], "cube-space")
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
-            tg.generate(output, 21)
+            self.generate_fixture(output, 21)
             tg.build_atlas(output, 21)
             tg.build_visual_report(output, 21)
             atlas = json.loads((output / "atlas.json").read_text())
@@ -510,8 +496,8 @@ class TextureGeneratorTests(unittest.TestCase):
     def test_seed_changes_output_and_atlas_metadata_is_complete(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             a, b = Path(first), Path(second)
-            tg.generate(a, 1)
-            tg.generate(b, 2)
+            self.generate_fixture(a, 1)
+            self.generate_fixture(b, 2)
             self.assertNotEqual((a / "stone.png").read_bytes(),
                                 (b / "stone.png").read_bytes())
             tg.build_atlas(a, 1)
@@ -525,7 +511,10 @@ class TextureGeneratorTests(unittest.TestCase):
             for seed in (*range(32), tg.DEFAULT_SEED, 12345, -1, 2**64-1):
                 for name in tg.NAMES:
                     path=output/f"{name}.png"
-                    tg.write_png(path,16,16,tg.generate_texture(name,seed))
+                    pixels=tg.generate_texture(name,seed)
+                    if seed == tg.DEFAULT_SEED:
+                        self.assertEqual(pixels,tg.generate_texture(name,seed),name)
+                    tg.write_png(path,16,16,pixels)
                     self.assertFalse(tg.validate_texture(path),f"seed {seed}: {name}")
 
     def test_complete_name_domains_and_polished_stone_identity(self):
@@ -610,7 +599,7 @@ class TextureGeneratorTests(unittest.TestCase):
     def test_all_import_sources_are_validated_and_fallback_is_explicit(self):
         item_defs,block_defs=self.item_definitions()
         with tempfile.TemporaryDirectory() as directory:
-            output=Path(directory);tg.generate(output,99)
+            output=Path(directory);self.generate_fixture(output,99)
             overrides=output/"override";overrides.mkdir()
             for w,h,pixels in ((8,32,[(17,31,47,255)]*256),(16,16,[(0,0,0,0)]*256),
                                (16,16,[(17,31,47,128)]*256)):
@@ -681,7 +670,7 @@ class TextureGeneratorTests(unittest.TestCase):
     def test_validator_rejects_non_tiling_edge(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
-            tg.generate(output, 9)
+            self.generate_fixture(output, 9)
             width, height, pixels = tg.read_generated_png(output / "dirt.png")
             pixels[-1] = (255, 0, 255, 255)
             tg.write_png(output / "dirt.png", width, height, pixels)

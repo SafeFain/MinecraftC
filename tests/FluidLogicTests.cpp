@@ -96,15 +96,15 @@ int main() {
     nearest.set({1, 1, 0}, BlockId::AIR);
     for (int x = 2; x <= 4; ++x) nearest.set({x, 1, 0}, BlockId::AIR);
     nearest.set({4, 0, 0}, BlockId::AIR);
+    nearest.set({-1, 1, 0}, BlockId::AIR);
     const auto waterPath = preferredFluidDirectionsByAmount(
         origin, false, 8, false, nearestSample, available);
     require(waterPath.size() == 1 && waterPath.front() == glm::ivec3(1, 0, 0),
             "water uses the four-cell nearest-drop search");
     const auto lavaPath = preferredFluidDirectionsByAmount(
-        origin, true, 8, false, nearestSample, available);
-    require(lavaPath.size() == 1 &&
-                lavaPath.front() == glm::ivec3(1, 0, 0),
-            "Overworld lava uses the shorter two-cell search");
+        origin, true, 8, true, nearestSample, available);
+    require(lavaPath.size() == 2,
+            "falling Overworld lava cannot choose a drop beyond its two-cell search");
 
     Grid corners;
     corners.set({0, 0, 0}, BlockId::WATER);

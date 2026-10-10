@@ -511,17 +511,19 @@ if(BUILD_TESTING)
     add_test(NAME numbered_prerelease_versions
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_project_version.py
                 --cmake ${CMAKE_COMMAND})
-    add_test(NAME release_version_cli COMMAND minecraftc --version)
-    set_tests_properties(release_version_cli PROPERTIES
-        PASS_REGULAR_EXPRESSION "MinecraftC ${MINECRAFTC_VERSION_DISPLAY}")
-    add_test(NAME vulkan_renderer_cli_help COMMAND minecraftc --help)
-    set_tests_properties(vulkan_renderer_cli_help PROPERTIES
-        PASS_REGULAR_EXPRESSION "renderer=vulkan")
-    add_test(NAME removed_opengl_renderer_cli
-        COMMAND minecraftc --renderer=opengl)
-    set_tests_properties(removed_opengl_renderer_cli PROPERTIES
-        WILL_FAIL TRUE
-        TIMEOUT 10)
+    foreach(cli_case version help opengl)
+        if(cli_case STREQUAL "version")
+            set(cli_name release_version_cli)
+        elseif(cli_case STREQUAL "help")
+            set(cli_name vulkan_renderer_cli_help)
+        else()
+            set(cli_name removed_opengl_renderer_cli)
+        endif()
+        add_test(NAME ${cli_name} COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:minecraftc>
+            ${cli_case} ${MINECRAFTC_VERSION_DISPLAY})
+        set_tests_properties(${cli_name} PROPERTIES TIMEOUT 10)
+    endforeach()
     add_test(NAME texture_recipes_sequences_and_workbench
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_texture_recipes.py)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
@@ -611,6 +613,7 @@ if(BUILD_TESTING)
 
     add_executable(asset_definition_tests
         tests/AssetDefinitionTests.cpp
+        src/world/Chunk.cpp
         src/world/Block.cpp
         src/game/Item.cpp
         src/renderer/BlockAtlasData.cpp
@@ -660,7 +663,8 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(worldgen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests)
+    add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --overworld-tests)
+    add_test(NAME heaven_worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --heaven-tests)
     add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
 
     add_executable(lod_terrain_tests
@@ -946,6 +950,18 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_gi_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
+    option(MINECRAFTC_VULKAN_TESTS "Register display-dependent Vulkan readback tests" OFF)
+    if(MINECRAFTC_VULKAN_TESTS)
+        foreach(scene gi model_fog)
+            set_property(TARGET vulkan_${scene}_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
+            add_test(NAME vulkan_${scene}_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py
+                $<TARGET_FILE:vulkan_${scene}_smoke> ${CMAKE_SOURCE_DIR}/assets ${scene})
+            set_tests_properties(vulkan_${scene}_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+        endforeach()
+    endif()
+
     add_executable(vulkan_gi_benchmark EXCLUDE_FROM_ALL
         tests/VulkanGiBenchmark.cpp
         src/debug/Log.cpp
@@ -1063,6 +1079,7 @@ if(BUILD_TESTING)
 
     add_executable(survival_rules_tests
         tests/SurvivalRulesTests.cpp
+        src/game/SurvivalBlockLogic.cpp
         src/game/InventoryModel.cpp
         src/game/SurvivalRules.cpp
         src/game/Item.cpp
@@ -1214,8 +1231,18 @@ if(BUILD_TESTING)
                 ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py)
 
-    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp src/world/Block.cpp)
-    target_include_directories(lighting_logic_tests PRIVATE src)
+    add_executable(thread_pool_tests tests/ThreadPoolTests.cpp src/threading/ThreadPool.cpp src/debug/Log.cpp)
+    target_include_directories(thread_pool_tests PRIVATE src)
+    target_link_libraries(thread_pool_tests PRIVATE minecraftc_platform Threads::Threads)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(thread_pool_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME thread_pool_priority_idle_and_shutdown COMMAND thread_pool_tests)
+    set_tests_properties(thread_pool_priority_idle_and_shutdown PROPERTIES TIMEOUT 15)
+
+    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp src/world/Block.cpp
+        src/world/Chunk.cpp src/world/ChunkStore.cpp src/world/WorldLighting.cpp)
+    target_include_directories(lighting_logic_tests PRIVATE src external/FastNoiseLite)
     target_link_libraries(lighting_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(lighting_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -1594,6 +1621,8 @@ if(BUILD_TESTING)
 
     add_executable(survival_integration_tests
         tests/SurvivalIntegrationTests.cpp
+        src/game/InventoryTransaction.cpp
+        src/game/InventoryInteraction.cpp
         src/game/SurvivalRules.cpp
         src/game/SurvivalSession.cpp
         src/game/SurvivalBlockLogic.cpp

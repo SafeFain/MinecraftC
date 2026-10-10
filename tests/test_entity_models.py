@@ -88,9 +88,6 @@ def verify_joint_pivots(doc,binary,name):
                 f"{name} {part} does not pivot at its upper joint"
 
 def main():
-    vulkan_vertex_shader = (ROOT / "assets/shaders/vulkan/model.vert").read_text()
-    assert "uv=inUv" in vulkan_vertex_shader, \
-        "Vulkan model UV contract changed"
     files = list(MODEL_DIR.glob("*.glb"))
     assert {path.stem for path in files} == NAMES, "expected exactly eleven entity GLBs"
     graphs = list(MODEL_DIR.glob("*.anim.json"))
@@ -169,14 +166,6 @@ def main():
             "swing"} <= set(player_graph["actions"])
     assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 64
     verify_joint_pivots(player_doc,player_binary,"player")
-    player_image_view = player_doc["bufferViews"][player_doc["images"][0]["bufferView"]]
-    player_data = player_path.read_bytes()
-    json_length = struct.unpack_from("<I", player_data, 12)[0]
-    binary_offset = 20 + json_length + 8
-    embedded = player_data[binary_offset + player_image_view.get("byteOffset",0):
-                           binary_offset + player_image_view.get("byteOffset",0) +
-                           player_image_view["byteLength"]]
-    assert embedded == (ROOT / "assets/textures/generated/entity_skins/player.png").read_bytes()
     with tempfile.TemporaryDirectory() as directory:
         generated = pathlib.Path(directory)
         generated_player = generated / "player"

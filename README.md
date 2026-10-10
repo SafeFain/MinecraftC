@@ -273,6 +273,23 @@ git diff --check
 ./build-local/terrain_benchmark 1592615476 9
 ```
 
+The default CTest suite runs CPU and LAN regressions; LAN tests require local
+loopback/multicast socket access. Enable the optional Vulkan readback suite with:
+
+```bash
+cmake -S . -B build-local -DMINECRAFTC_VULKAN_TESTS=ON
+cmake --build build-local -j2
+ctest --test-dir build-local -L vulkan --output-on-failure
+```
+
+These tests check GI and model fog/UV sampling on a real Vulkan device. They use
+an existing display, or Xvfb on headless Linux. Set `MINECRAFTC_TEST_XVFB=1` to
+force Xvfb when the inherited display is unavailable. A missing display and
+missing Xvfb produce an explicit skip; scene failures and Vulkan validation
+errors fail the test. Installed Khronos validation layers are enabled on Linux.
+The two scenes run serially with bounded timeouts. Set
+`-DMINECRAFTC_VULKAN_TESTS=OFF` to return to the default suite.
+
 For GI frame-time measurements and fixed-exposure visual comparisons, see
 [GI benchmark and validation](docs/gi-performance.md).
 

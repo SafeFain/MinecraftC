@@ -9,7 +9,12 @@ int main() {
     try {
         Platform::LanDiscovery host, browser;
         Platform::LanAdvertisement room{"123456789012345678901234567890ab", "Discovery regression", "test-version", 25565, 1, 20, 1, 8, false, "123456"};
+        auto invalidRoom = room; invalidRoom.capacity = 9;
+        require(!host.advertise(invalidRoom), "invalid metadata rejected before socket initialization");
         if (!host.advertise(room) || !browser.browse()) {
+            require(host.error() == "No multicast LAN nic is available" ||
+                    browser.error() == "No multicast LAN nic is available",
+                    "unexpected discovery initialization failure");
             std::cerr << "SKIPPED: no usable multicast LAN interface: " << host.error() << browser.error() << '\n';
             return 77;
         }
