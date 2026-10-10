@@ -28,7 +28,7 @@ std::pair<int,int> entityChunk(const glm::dvec3& position) {
 }
 
 void EntityManager::clear() {
-    m_entities.clear();
+    m_entities.clear(); m_replicaTargets.clear(); m_pvpPlayers.clear(); m_pvpEnabled = false;
     m_navigation.clear();
     m_openedVillageDoors.clear();
     m_aiChunks.clear();
@@ -485,6 +485,8 @@ void EntityManager::spawnAroundPlayer(
     if (!Config::isValidWorldY(surface) || surface + 1 >= Config::WORLD_MAX_Y ||
         m_world.getBlock(x, surface, z) != BlockId::AIR ||
         m_world.getBlock(x, surface + 1, z) != BlockId::AIR) return;
+    for (const auto& view : m_framePlayers)
+        if (!view.player->isSpectator() && glm::distance(glm::dvec3(x+.5, surface, z+.5), view.player->getPosition()) < 18) return;
     if (underground && m_world.hasSkyAccess(x, surface, z)) return;
     if (spawnHostile && !hostileSpawnLightValid(m_world.getBlockLight(x, surface, z))) return;
     const EntityType passiveTypes[] = {
@@ -555,6 +557,7 @@ float EntityManager::damageEntity(Entity& entity, float damage,
             entity.ai.hasTarget = true;
             entity.ai.retaliating = true;
             entity.ai.targetId = playerAttack ? 0 : sourceId;
+            if (playerAttack) entity.ai.targetPlayerId = sourceId;
             entity.ai.lastSeen = *source;
             entity.ai.memoryUntil = m_aiTime + Config::AI_TARGET_MEMORY;
         }
@@ -598,6 +601,22 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
 void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
                            bool playerTargetable, bool playerCanPickup,
                            bool thunderstorm, bool raining, uint64_t worldTick) {
+    update(std::vector<EntityPlayerView>{{0, &player, playerTargetable, playerCanPickup}},
+           dt, isDay, peaceful, thunderstorm, raining, worldTick);
+}
+
+void EntityManager::update(const std::vector<EntityPlayerView>& players, float dt,
+                           bool isDay, bool peaceful, bool thunderstorm,
+                           bool raining, uint64_t worldTick) {
+    m_framePlayers = players;
+    m_framePlayers.erase(std::remove_if(m_framePlayers.begin(), m_framePlayers.end(),
+        [](const EntityPlayerView& view) { return !view.player; }), m_framePlayers.end());
+    std::sort(m_framePlayers.begin(), m_framePlayers.end(),
+        [](const EntityPlayerView& a, const EntityPlayerView& b) { return a.id < b.id; });
+    m_framePlayers.erase(std::unique(m_framePlayers.begin(), m_framePlayers.end(),
+        [](const EntityPlayerView& a, const EntityPlayerView& b) { return a.id == b.id; }), m_framePlayers.end());
+    if (m_framePlayers.empty()) return;
+    struct ClearPlayers { std::vector<EntityPlayerView>& players; ~ClearPlayers() { players.clear(); } } clear{m_framePlayers};
     dt = std::max(0.0f, dt);
     m_aiStats = {};
     for (const auto& entity : m_entities)
@@ -624,7 +643,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
     if (m_naturalSpawningEnabled && m_world.gameRules().boolean(GameRuleId::SpawnMobs)) {
         m_spawnTimer += dt;
         if (m_spawnTimer >= 4.0f) {
-            const glm::dvec3 playerPosition = player.getPosition();
+            const glm::dvec3 playerPosition = m_framePlayers[m_spawnPlayerCursor++ % m_framePlayers.size()].player->getPosition();
             const int px = static_cast<int>(std::floor(playerPosition.x));
             const int py = static_cast<int>(std::floor(playerPosition.y + 1.0));
             const int pz = static_cast<int>(std::floor(playerPosition.z));
@@ -645,7 +664,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         refreshVillageClaims();
         m_villageRefreshSeconds = 0.0f;
     }
-    scheduleNavigation(player.getPosition());
+    scheduleNavigation(m_framePlayers.front().player->getPosition());
 
     for (auto& entity : m_entities) {
         if (entity.health <= 0) continue;
@@ -654,7 +673,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         if (entity.type == EntityType::Arrow) {
-            updateArrow(entity, player, dt);
+            updateArrow(entity, dt);
             continue;
         }
         if (entity.type == EntityType::PrimedTnt) {
@@ -690,9 +709,10 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             } else {
                 entity.position = next;
             }
-            if (playerCanPickup && entity.actionCooldown<=0.0f &&
-                glm::distance(entity.position, player.getPosition()) < 1.6) {
-                if (pickupItemStack(player.inventory(), entity.item)) entity.health = 0.0f;
+            for (const auto& view : m_framePlayers) {
+                if (!view.canPickup || entity.actionCooldown > 0.0f || entity.health <= 0.0f ||
+                    glm::distance(entity.position, view.player->getPosition()) >= 1.6) continue;
+                if (pickupItemStack(view.player->inventory(), entity.item)) entity.health = 0.0f;
             }
             continue;
         }
@@ -732,8 +752,43 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             if (entity.health <= 0.0f) continue;
         }
 
-        updateMobAi(entity, player, dt, isDay,
-                    playerTargetable, worldTick, thunderstorm);
+        const EntityPlayerView* selected = nullptr;
+        if (entity.ai.hasTarget && !entity.ai.targetId) {
+            for (const auto& view : m_framePlayers)
+                if (view.id == entity.ai.targetPlayerId && view.targetable)
+                    selected = &view;
+            if (!selected) {
+                entity.ai.hasTarget = false;
+                entity.ai.targetVisible = false;
+                entity.attackPending = false;
+                cancelNavigation(entity);
+                entity.ai.nextDecision = m_aiTime;
+            }
+        }
+        // Acquire the nearest eligible visible player. Keep the existing target
+        // during wind-up and sight memory so impacts cannot jump between players.
+        if (!selected) {
+            double nearest = std::numeric_limits<double>::max();
+            for (const auto& view : m_framePlayers) {
+                if (!view.targetable) continue;
+                const double distance = glm::distance(entity.position, view.player->getPosition());
+                if (distance < nearest && aiClearSight(entity.position + glm::dvec3(0, 1.2, 0),
+                                                       view.player->getEyePosition())) {
+                    nearest = distance;
+                    selected = &view;
+                }
+            }
+        }
+        const auto& fallback = *std::min_element(m_framePlayers.begin(), m_framePlayers.end(),
+            [&](const EntityPlayerView& a, const EntityPlayerView& b) {
+                return glm::distance(entity.position, a.player->getPosition()) <
+                       glm::distance(entity.position, b.player->getPosition());
+            });
+        const auto& view = selected ? *selected : fallback;
+        updateMobAi(entity, *view.player, dt, isDay,
+                    selected && view.targetable, worldTick, thunderstorm);
+        if (entity.ai.hasTarget && !entity.ai.targetId)
+            entity.ai.targetPlayerId = view.id;
     }
     tickVillageLife(dt,worldTick);
     for (const auto& arrow : m_aiArrows)
@@ -749,7 +804,7 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
             pendingExplosions.push_back(
                 {entity.position, entity.behaviorSeed, 4.0f});
     for (const auto& explosion : pendingExplosions)
-        explode(player, explosion.position, explosion.power, explosion.seed, explosion.mobExplosion);
+        explode(explosion.position, explosion.power, explosion.seed, explosion.mobExplosion);
 
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
@@ -778,6 +833,9 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
 }
 
 void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) {
+    strikeLightning(std::vector<EntityPlayerView>{{0, &player, true, true}}, position);
+}
+void EntityManager::strikeLightning(const std::vector<EntityPlayerView>& players, const glm::ivec3& position) {
     const glm::dvec3 center = glm::dvec3(position) + glm::dvec3(0.5, 0.0, 0.5);
     for (auto& entity : m_entities) {
         if (entity.type == EntityType::Item || entity.type == EntityType::Arrow ||
@@ -787,7 +845,8 @@ void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) 
             entity.burningSeconds = std::max(entity.burningSeconds, 8.0f);
         }
     }
-    if (player.isSurvival() && glm::distance(player.getPosition(), center) <= 3.0) {
+    for (const auto& view : players) if (view.player && view.damageable && view.player->isSurvival() && glm::distance(view.player->getPosition(), center) <= 3.0) {
+        auto& player = *view.player;
         DamageSourceInfo source;
         source.amount = 5.0f;
         source.cause = DamageCause::Lightning;
@@ -866,7 +925,7 @@ bool rayEntityAabb(const glm::dvec3& origin, const glm::vec3& direction,
 
 MeleeAttackResult EntityManager::attackRay(
     const glm::dvec3& origin, const glm::vec3& direction,
-    const MeleeAttackRequest& attack) {
+    const MeleeAttackRequest& attack, uint64_t playerId) {
     MeleeAttackResult result;
     Entity* best = nullptr;
     float bestAlong = attack.reach + 1.0f;
@@ -882,32 +941,47 @@ MeleeAttackResult EntityManager::attackRay(
         best = &entity;
         bestAlong = along;
     }
-    if (!best) return result;
+    Player* otherPlayer = nullptr;
+    for (const auto& view : m_pvpPlayers) {
+        if (!view.player || !view.damageable || view.id == playerId || !view.player->isSurvival() || view.player->survivalStats().dead()) continue;
+        Entity shape; shape.position = view.player->getPosition();
+        float along = 0;
+        if (!rayEntityAabb(origin, direction, shape, {.6f, view.player->currentHeight(), .6f}, attack.reach, along) || along >= bestAlong ||
+            (along > .001f && m_world.raycast(origin, direction, along))) continue;
+        otherPlayer = view.player; bestAlong = along;
+    }
+    if (!best && !otherPlayer) return result;
 
     result.foundTarget = true;
-    result.primaryPosition = best->position +
-        glm::dvec3(0.0, entitySize(*best).y * 0.5, 0.0);
+    const glm::dvec3 primaryPosition = otherPlayer ? otherPlayer->getPosition() : best->position;
+    const glm::vec3 primarySize = otherPlayer ? glm::vec3(.6f, otherPlayer->currentHeight(), .6f) : entitySize(*best);
+    result.primaryPosition = primaryPosition + glm::dvec3(0, primarySize.y * .5f, 0);
     glm::vec3 horizontal(direction.x, 0.0f, direction.z);
     if (glm::length(horizontal) > 0.001f)
         horizontal = glm::normalize(horizontal) *
             (attack.sprintKnockback ? 6.0f : 4.0f);
     horizontal.y = 2.0f;
-    result.primaryDamage = damageEntity(
-        *best, attack.damage, horizontal, true, origin);
+    const auto playerDamage = [&origin](Player& victim, float amount, glm::vec3 impulse) {
+        DamageSourceInfo source; source.amount = amount; source.cause = DamageCause::Melee;
+        source.shieldBlockable = source.hasOrigin = true; source.origin = origin; source.impulse = impulse;
+        return victim.takeDamage(source).appliedDamage;
+    };
+    result.primaryDamage = otherPlayer ? playerDamage(*otherPlayer, attack.damage, horizontal) :
+        damageEntity(*best, attack.damage, horizontal, true, origin, playerId == UINT64_MAX ? 0 : playerId);
     result.primaryDamaged = result.primaryDamage > 0.0f;
 
     if (!attack.sweeping || !result.primaryDamaged) return result;
-    const glm::vec3 bestSize = entitySize(*best);
+    const glm::vec3 bestSize = primarySize;
     const glm::dvec3 sweepMin(
-        best->position.x - bestSize.x * 0.5 - 1.0,
-        best->position.y - 1.0,
-        best->position.z - bestSize.z * 0.5 - 1.0);
+        primaryPosition.x - bestSize.x * 0.5 - 1.0,
+        primaryPosition.y - 1.0,
+        primaryPosition.z - bestSize.z * 0.5 - 1.0);
     const glm::dvec3 sweepMax(
-        best->position.x + bestSize.x * 0.5 + 1.0,
-        best->position.y + bestSize.y + 1.0,
-        best->position.z + bestSize.z * 0.5 + 1.0);
+        primaryPosition.x + bestSize.x * 0.5 + 1.0,
+        primaryPosition.y + bestSize.y + 1.0,
+        primaryPosition.z + bestSize.z * 0.5 + 1.0);
     for (auto& entity : m_entities) {
-        if (&entity == best || !meleeTarget(entity)) continue;
+        if ((!otherPlayer && &entity == best) || !meleeTarget(entity)) continue;
         const glm::dvec3 center = entity.position +
             glm::dvec3(0.0, entitySize(entity).y * 0.5, 0.0);
         if (center.x < sweepMin.x || center.x > sweepMax.x ||
@@ -920,14 +994,26 @@ MeleeAttackResult EntityManager::attackRay(
         if (distance > 0.001f &&
             m_world.raycast(origin, delta / distance, distance).has_value())
             continue;
-        glm::vec3 sweepKnockback(entity.position.x - best->position.x, 0.0f,
-                                 entity.position.z - best->position.z);
+        glm::vec3 sweepKnockback(entity.position.x - primaryPosition.x, 0.0f,
+                                 entity.position.z - primaryPosition.z);
         if (glm::length(sweepKnockback) > 0.001f)
             sweepKnockback = glm::normalize(sweepKnockback) * 4.0f;
         sweepKnockback.y = 2.0f;
         if (damageEntity(entity, CombatRules::SWEEP_DAMAGE,
-                         sweepKnockback, true, origin) > 0.0f)
+                         sweepKnockback, true, origin, playerId == UINT64_MAX ? 0 : playerId) > 0.0f)
             result.sweptPositions.push_back(center);
+    }
+    for (const auto& view : m_pvpPlayers) {
+        if (!view.player || !view.damageable || view.id == playerId || view.player == otherPlayer || !view.player->isSurvival() || view.player->survivalStats().dead()) continue;
+        const auto center = view.player->getPosition() + glm::dvec3(0, view.player->currentHeight() * .5, 0);
+        if (center.x < sweepMin.x || center.x > sweepMax.x || center.y < sweepMin.y || center.y > sweepMax.y ||
+            center.z < sweepMin.z || center.z > sweepMax.z || glm::distance(center, origin) >= 3) continue;
+        const auto delta = glm::vec3(center - origin); const float distance = glm::length(delta);
+        if (distance > .001f && m_world.raycast(origin, delta / distance, distance)) continue;
+        auto impulse = glm::vec3(center - primaryPosition); impulse.y = 0;
+        if (glm::length(impulse) > .001f) impulse = glm::normalize(impulse) * 4.0f;
+        impulse.y = 2;
+        if (playerDamage(*view.player, CombatRules::SWEEP_DAMAGE, impulse) > 0) result.sweptPositions.push_back(center);
     }
     return result;
 }
@@ -949,33 +1035,38 @@ bool EntityManager::hasAttackTarget(
     return false;
 }
 
-void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
+void EntityManager::updateArrow(Entity& arrow, float dt) {
     if (arrow.inGround) {
-        if (arrow.playerOwned && arrow.ageSeconds > 0.5f &&
-            glm::distance(arrow.position,player.getPosition())<1.6) {
-            ItemStack stack{ItemId::ARROW,1,0};
-            if (player.inventory().add(stack)==0) arrow.health=0.0f;
-        }
+        if (arrow.playerOwned && arrow.ageSeconds > 0.5f)
+            for (const auto& view : m_framePlayers) {
+                if (!view.canPickup || glm::distance(arrow.position, view.player->getPosition()) >= 1.6) continue;
+                if (view.player->inventory().add({ItemId::ARROW, 1, 0}) == 0) {
+                    arrow.health = 0.0f;
+                    break;
+                }
+            }
         return;
     }
     const glm::dvec3 start = arrow.position;
     const glm::vec3 initialVelocity = arrow.velocity;
     double contactTime = dt;
     Entity* victim = nullptr;
-    bool hitPlayer = false;
-    if (!arrow.playerOwned) {
-        const auto hit = projectileAabbHit(start, initialVelocity,
-            player.getPosition() + glm::dvec3(-.3, 0, -.3),
-            player.getPosition() + glm::dvec3(.3, player.currentHeight(), .3),
-            contactTime);
-        if (hit) {
-            contactTime = *hit;
-            hitPlayer = true;
+    Player* hitPlayer = nullptr;
+    if (!arrow.playerOwned || m_pvpEnabled) {
+        for (const auto& view : m_framePlayers) {
+            if (!view.damageable || (arrow.playerOwned && view.id == arrow.shooterId) || !view.player->isSurvival() || view.player->survivalStats().dead()) continue;
+            const auto hit = projectileAabbHit(start, initialVelocity,
+                view.player->getPosition() + glm::dvec3(-.3, 0, -.3),
+                view.player->getPosition() + glm::dvec3(.3, view.player->currentHeight(), .3), contactTime);
+            if (hit && (!hitPlayer || *hit < contactTime)) {
+                contactTime = *hit;
+                hitPlayer = view.player;
+            }
         }
     }
     // Test each eligible target once and choose the first contact in flight order.
     for (auto& target : m_entities) {
-        if (!meleeTarget(target) || target.id == arrow.shooterId) continue;
+        if (!meleeTarget(target) || (!arrow.playerOwned && target.id == arrow.shooterId)) continue;
         const glm::vec3 size = entitySize(target);
         const auto hit = projectileAabbHit(start, initialVelocity,
             target.position + glm::dvec3(-size.x * .5, 0, -size.z * .5),
@@ -985,7 +1076,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
                     (!victim || target.id < victim->id)))) {
             contactTime = *hit;
             victim = &target;
-            hitPlayer = false;
+            hitPlayer = nullptr;
         }
     }
     // Stop voxel traversal at the nearest target. Blocks win ties so touching
@@ -995,7 +1086,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
     if (blockHit) {
         contactTime = *blockHit;
         victim = nullptr;
-        hitPlayer = false;
+        hitPlayer = nullptr;
     }
     arrow.position = projectilePosition(start, initialVelocity, contactTime);
     arrow.velocity = projectileVelocityAfter(initialVelocity, static_cast<float>(contactTime));
@@ -1023,15 +1114,17 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
         source.hasOrigin = true;
         source.origin = sourceOrigin;
         source.impulse = knockback;
-        if (player.takeDamage(source).blocked) {
+        if (hitPlayer->takeDamage(source).blocked) {
             arrow.velocity *= -0.2f;
             arrow.playerOwned = true;
+            const auto reflected = std::find_if(m_framePlayers.begin(), m_framePlayers.end(), [hitPlayer](const EntityPlayerView& view) { return view.player == hitPlayer; });
+            arrow.shooterId = reflected == m_framePlayers.end() ? UINT64_MAX : reflected->id;
             if (glm::length(arrow.velocity) > 0.0001f)
                 arrow.facing = glm::normalize(arrow.velocity);
             // Consume the rest of this frame after reflection. Ownership now
             // excludes the player, so this continuation cannot reflect again.
             const float remaining = dt - static_cast<float>(contactTime);
-            if (remaining > 0.0f) updateArrow(arrow, player, remaining);
+            if (remaining > 0.0f) updateArrow(arrow, remaining);
             return;
         }
     } else {
@@ -1041,7 +1134,7 @@ void EntityManager::updateArrow(Entity& arrow, Player& player, float dt) {
     arrow.health = 0.0f;
 }
 
-void EntityManager::explode(Player& player, const glm::dvec3& center,
+void EntityManager::explode(const glm::dvec3& center,
                             float power, uint32_t eventSeed, bool mobExplosion) {
     const float effectRadius = power * 2.0f;
     auto impactAt = [&](const glm::dvec3& target) {
@@ -1072,7 +1165,9 @@ void EntityManager::explode(Player& player, const glm::dvec3& center,
             damageEntity(entity, damage, direction * impact * 3.5f, false, center);
         }
     }
-    if (player.isSurvival()) {
+    for (const auto& view : m_framePlayers) {
+        Player& player = *view.player;
+        if (!view.damageable || !player.isSurvival() || player.survivalStats().dead()) continue;
         const float impact = impactAt(player.getPosition() + glm::dvec3(0.0, 1.0, 0.0));
         if (impact > 0.0f) {
             const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);

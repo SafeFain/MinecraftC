@@ -384,3 +384,14 @@ std::vector<glm::ivec3> WorldPersistence::tickButtons() {
     });
     return due;
 }
+
+std::optional<std::vector<BlockOverride>> WorldPersistence::copyKnownOverrides(int cx, int cz) const {
+    std::optional<std::vector<BlockOverride>> result;
+    m_chunks.withShared([&](const ChunkStore&) {
+        const auto found = m_blockOverrides.find({cx, cz});
+        if (found == m_blockOverrides.end() && !m_overridesApplied.count({cx, cz})) return;
+        result.emplace();
+        if (found != m_blockOverrides.end()) for (const auto& entry : found->second) result->push_back({entry.first, entry.second});
+    });
+    return result;
+}

@@ -996,11 +996,20 @@ void LodTerrainSystem::setSaveStore(SaveStore* store) {
     if (store) scanExactCache();
 }
 
+void LodTerrainSystem::setTransientCacheRoot(const std::filesystem::path& root) {
+    if (m_saveStore) return;
+    if (m_threadPool) m_threadPool->waitIdle();
+    m_cacheRoot = root;
+    m_exactColumnsByX.clear(); m_scannedCacheRoot.clear();
+    if (!root.empty()) scanExactCache();
+}
+
 void LodTerrainSystem::reset(WorldGenerator* generator) {
     if (m_threadPool) m_threadPool->waitIdle();
     releaseGpuMeshes();
     m_tiles.clear();
     m_desired.clear();
+    clearReplicaColumns();
     m_submissions.clear();
     m_exactRevisions.clear();
     m_nearFallbackChunks.clear();
@@ -1243,6 +1252,11 @@ void LodTerrainSystem::rebuildSelection() {
         m_cpuBytes -= std::min(m_cpuBytes, cpuBytes);
         it = m_tiles.erase(it);
     }
+    for (auto it = m_replicaColumns.begin(); it != m_replicaColumns.end();) {
+        if (wanted.count(it->first)) { ++it; continue; }
+        m_replicaBytes -= it->second.data.memoryBytes();
+        it = m_replicaColumns.erase(it);
+    }
     m_selectionDirty = false;
 }
 
@@ -1411,6 +1425,10 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                     found->second->maximumDistance = request.maximumDistance;
                     found->second->distance2 = request.distance2;
                     const uint64_t epoch = m_epoch;
+                    const uint64_t sourceRevision = found->second->sourceRevision;
+                    std::optional<LodTileData> replicaColumns;
+                    const auto correction = m_replicaColumns.find(request.key);
+                    if (correction != m_replicaColumns.end()) replicaColumns = correction->second.data;
                     const int spanLimit = lodVerticalSpanLimit(m_settings.precision);
                     WorldGenerator* generator = m_generator;
                     const auto root = m_cacheRoot;
@@ -1418,7 +1436,7 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                     const LodTileKey key = request.key;
                     ++m_tasksInFlight;
                     auto task = [this, key, epoch, spanLimit, generator,
-                                 root, exact]() {
+                                 root, exact, sourceRevision, replicaColumns = std::move(replicaColumns)]() {
                         struct CompletionGuard {
                             std::atomic<int>& count;
                             ~CompletionGuard() { --count; }
@@ -1442,6 +1460,8 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                                 }
                             }
                             overlayExactChunks(data, key, root, *generator, exact);
+                            if (replicaColumns) for (size_t i = 0; i < data.columns.size(); ++i)
+                                if (replicaColumns->columns[i].exact) data.columns[i] = replicaColumns->columns[i];
                             LodExactNeighborTiles neighbors;
                             const LodExactNeighborTiles* neighborPointer = nullptr;
                             if (key.level == 0 && isFullyExact(data)) {
@@ -1461,11 +1481,11 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                             {
                                 std::lock_guard lock(m_completionMutex);
                                 m_completions.push_back({key, epoch,
-                                    std::move(data), std::move(mesh)});
+                                    std::move(data), std::move(mesh), true, sourceRevision});
                             }
                         } catch (...) {
                             std::lock_guard lock(m_completionMutex);
-                            m_completions.push_back({key, epoch, {}, {}, false});
+                            m_completions.push_back({key, epoch, {}, {}, false, sourceRevision});
                             throw;
                         }
                     };
@@ -1576,7 +1596,19 @@ void LodTerrainSystem::invalidateTilesForChunk(int cx, int cz) {
         if (!containsChunk && !exactNeighborDependency) continue;
         // Stale-while-revalidate: never punch a visible hole while the exact
         // replacement is generated and waiting for its GPU upload budget.
-        tile->dirty = true;
+        invalidateTile(*tile);
+    }
+}
+
+void LodTerrainSystem::invalidateTile(Tile& tile) {
+    tile.dirty = true;
+    ++tile.sourceRevision;
+    // Keep the displayed mesh, but never upload a queued replacement whose
+    // input columns have already been superseded.
+    if (tile.pendingData) {
+        m_cpuBytes -= std::min(m_cpuBytes,
+            tile.pendingData->memoryBytes() + tile.pendingMesh->uploadBytes());
+        tile.pendingData.reset(); tile.pendingMesh.reset();
     }
 }
 
@@ -1630,7 +1662,7 @@ void LodTerrainSystem::processCompleted(IGameRenderer* renderer,
             tile.dirty = true;
             continue;
         }
-        if (completion.epoch != m_epoch) {
+        if (completion.epoch != m_epoch || completion.sourceRevision != tile.sourceRevision) {
             tile.dirty = true;
             continue;
         }
@@ -1800,4 +1832,25 @@ void LodTerrainSystem::releaseGpuMeshes(bool retainCpuGeometry) {
                     tile->pendingMesh->uploadBytes();
         }
     }
+}
+
+std::vector<LodTileKey> LodTerrainSystem::selectedTiles() const {
+    std::vector<LodTileKey> result;
+    for (const auto& request : m_desired) result.push_back(request.key);
+    return result;
+}
+void LodTerrainSystem::clearReplicaColumns() {
+    m_replicaColumns.clear(); m_replicaBytes = 0;
+    for (auto& entry : m_tiles) invalidateTile(*entry.second);
+}
+void LodTerrainSystem::applyReplicaColumns(const LodTileKey& key, uint64_t revision, const LodTileData& data) {
+    if (m_saveStore || !isTileSelected(key)) return;
+    auto found = m_replicaColumns.find(key);
+    if (found != m_replicaColumns.end() && found->second.revision >= revision) return;
+    const auto oldBytes = found == m_replicaColumns.end() ? 0 : found->second.data.memoryBytes();
+    const auto newBytes = data.memoryBytes();
+    if (m_replicaBytes - oldBytes + newBytes > 32 * 1024 * 1024) throw std::runtime_error("LAN LOD correction memory limit exceeded");
+    m_replicaColumns[key] = {revision, data}; m_replicaBytes = m_replicaBytes - oldBytes + newBytes;
+    const auto tile = m_tiles.find(key);
+    if (tile != m_tiles.end()) invalidateTile(*tile->second);
 }

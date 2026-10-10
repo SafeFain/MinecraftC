@@ -29,6 +29,7 @@ constexpr ThirdPartyCredit THIRD_PARTY_CREDITS[] = {
     {"stb_image / stb_truetype", "https://github.com/nothings/stb", "MIT"},
     {"Noto Sans CJK SC", "https://github.com/notofonts/noto-cjk", "SIL OFL 1.1"},
     {"Noto Naskh Arabic", "https://github.com/notofonts/arabic", "SIL OFL 1.1"},
+    {"mjansson/mdns", "https://github.com/mjansson/mdns", "Unlicense / public domain"},
 };
 constexpr int CREDITS_PER_PAGE = 4;
 constexpr int CREDIT_COUNT = sizeof(THIRD_PARTY_CREDITS) / sizeof(ThirdPartyCredit);
@@ -223,6 +224,7 @@ void MainMenu::rebuildButtons() {
                                [this]() { showWorlds(); });
         m_buttons.emplace_back(m_localization.text("menu.home.settings"),
                                m_callbacks.onOpenSettings);
+        if (m_callbacks.onOpenLanJoin) m_buttons.emplace_back(m_localization.text("lan.join_title"), m_callbacks.onOpenLanJoin);
         m_buttons.emplace_back(m_localization.format("menu.home.language",
                                {std::string(languageNativeName(m_settings.language))}),
                                [this]() { showLanguage(); });
@@ -755,6 +757,8 @@ PauseMenu::PauseMenu(
     const MenuCallbacks& callbacks, const Localization& localization) {
     m_buttons.emplace_back(localization.text("menu.pause.resume"), callbacks.onResume);
     m_buttons.emplace_back(localization.text("menu.home.settings"), callbacks.onOpenSettings);
+    if (callbacks.onOpenLanHost && (!callbacks.canHostLan || callbacks.canHostLan()))
+        m_buttons.emplace_back(localization.text("lan.host_title"), callbacks.onOpenLanHost);
     m_buttons.emplace_back(localization.text("menu.pause.back"), callbacks.onBackToMenu);
     m_buttons.emplace_back(localization.text("menu.home.quit"), callbacks.onQuit);
 

@@ -72,6 +72,10 @@ public:
                       bool raining = false) {
         m_simulation.tickSurvival(playerPosition, tick, raining);
     }
+    void tickSurvival(const std::vector<glm::dvec3>& playerPositions, uint64_t tick,
+                      bool raining = false) {
+        m_simulation.tickSurvival(playerPositions, tick, raining);
+    }
     void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick) {
         m_simulation.tickWeather(weather, daytime, tick);
     }
@@ -158,6 +162,16 @@ public:
                          WorldType worldType = WorldType::Normal,
                          DimensionId dimension = DimensionId::Overworld);
 
+    void setLocalRenderEnabled(bool enabled) { m_streamer.setLocalRenderEnabled(enabled); }
+    // Replica clients receive authoritative near terrain and derive lighting /
+    // meshes locally. They never enqueue near generation, persistence or ticks.
+    void setReplicaMode(bool enabled);
+    bool replicaMode() const { return m_replicaMode; }
+    bool installReplicaSnapshot(int cx, int cz, const std::vector<uint16_t>& blocks);
+    bool installReplicaEdits(int cx, int cz, const std::vector<std::pair<uint32_t, BlockId>>& edits);
+    void setBlockMutationCallback(std::function<void(int, int, uint64_t, uint32_t, BlockId, bool)> callback) {
+        m_blockMutationCallback = std::move(callback);
+    }
     void setAdditionalStreamingInterests(std::vector<StreamingInterest> interests) {
         m_streamer.setAdditionalInterests(std::move(interests));
     }
@@ -227,6 +241,11 @@ public:
         m_lod.processCompleted(renderer);
     }
 
+    std::optional<std::vector<BlockOverride>> copyKnownOverrides(int x, int z) const { return m_persistence.copyKnownOverrides(x, z); }
+    std::vector<LodTileKey> selectedLodTiles() const { return m_lod.selectedTiles(); }
+    void applyReplicaLod(const LodTileKey& key, uint64_t revision, const LodTileData& data) { m_lod.applyReplicaColumns(key, revision, data); }
+    void clearReplicaLod() { m_lod.clearReplicaColumns(); }
+    void setReplicaLodCache(const std::filesystem::path& root) { m_lod.setTransientCacheRoot(root); }
     void configureLod(const LodSettings& settings) { m_lod.configure(settings); }
     void updateLod(const glm::dvec3& playerPosition,
                    bool allowRefinements = true) {
@@ -285,7 +304,10 @@ public:
     }
 
 private:
+    bool m_replicaMode = false;
+    std::function<void(int, int, uint64_t, uint32_t, BlockId, bool)> m_blockMutationCallback;
     GameRuleSet m_gameRules;
+    friend struct LanLodTestAccess;
     friend class ChunkMeshPipeline;
     friend class FluidScheduler;
     bool m_pairMutation = false;

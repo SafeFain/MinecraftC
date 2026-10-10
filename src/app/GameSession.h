@@ -1,7 +1,19 @@
-#include "plugins/Runtime.h"
 #pragma once
 
+#include "plugins/Runtime.h"
+
 #include "core/RuntimeClock.h"
+#include "app/DimensionSimulation.h"
+#include "app/LanPlayerRuntime.h"
+#include "network/GameplayProtocol.h"
+#include "network/ChunkProtocol.h"
+#include "network/StateProtocol.h"
+#include "network/EntityProtocol.h"
+#include "network/ChatProtocol.h"
+#include "network/EventProtocol.h"
+#include "core/LanDiscovery.h"
+#include <array>
+#include <chrono>
 #include "entity/EntityManager.h"
 #include "game/SaveStore.h"
 #include "game/FishingSystem.h"
@@ -16,6 +28,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,7 +38,7 @@ class IGameRenderer;
 class Localization;
 struct ParsedCommand;
 
-class GameSession : public IContainerAccess, public ITradeAccess {
+class GameSession : public IContainerAccess, public ITradeAccess, public IInventoryCommands {
 public:
     enum class SleepAction : uint8_t {
         SleepUntilMorning,
@@ -88,13 +101,42 @@ public:
 
     explicit GameSession(const std::filesystem::path& savesDirectory);
 
+    Platform::LanAdvertisement lanAdvertisement() const;
+    std::string lanNickname() const;
+    bool setLanNickname(const std::string& nickname);
+    bool lanPvpEnabled() const { return lanPvp; }
+    void setLanPvp(bool enabled) { lanPvp = enabled; }
+    uint64_t lanStreamEpoch() const { return replicaEpoch; }
+    bool openLanRoom(uint16_t port = Lan::DEFAULT_PORT, size_t capacity = Lan::MAX_PLAYERS,
+                     bool loopbackOnly = false);
+    void closeLanRoom();
+    bool joinLanRoom(const std::string& address, uint16_t port, double now);
+    bool joiningLan() const { return lanJoining; }
+    bool lanWorldReady() const { return replicaWorldInfo && replicaOwnerState; }
+    bool lanConnectionFailed() const { return lanJoining && !lanFailure.empty(); }
+    const std::vector<Lan::PlayerView>& remotePlayers() const { return replicaOthers; }
+    void pollLan(double now);
+    bool hostingLan() const { return lanHost.port() != 0; }
+    uint16_t lanPort() const { return lanHost.port(); }
+    std::vector<Lan::RoomPlayer> roomRoster() const;
+    size_t lanGuestCount() const { return guests.size(); }
+    const std::string& lanError() const { return lanFailure; }
+    static Lan::Compatibility lanCompatibility();
+    bool usesInventoryCommands() const override { return hostingLan() || joiningLan(); }
+    InventoryWindowView inventoryWindow() const override;
+    bool inventoryWindowPending() const override { return lanJoining && !replicaActions.empty(); }
+    void openInventoryWindow(InventoryWindowKind kind, glm::ivec3 position = {}) override;
+    void submitInventoryAction(InventoryAction action) override;
+    void closeInventoryWindow() override;
+    bool sendLanChat(const std::string& text);
+    std::vector<Lan::ChatMessage> takeLanChat();
     void leaveWorld();
     void abortPluginWorld();
     GameMode startWorld(const std::string& worldId, bool newWorld,
                         RuntimeClock::Tick loadingStarted);
     bool advanceLoading(IGameRenderer* renderer, RuntimeClock::Tick now);
     void updatePlaying(float dt, IGameRenderer* renderer,
-                       const Feedback& feedback);
+                       const Feedback& feedback, bool localControl = true);
     bool beginSleepAtBed(const glm::ivec3& bed);
     void chooseSleepAction(SleepAction action, RuntimeClock::Tick loadingStarted,
                            const Feedback& feedback);
@@ -113,12 +155,12 @@ public:
                                  RuntimeClock::Tick now = 0);
     void saveNow(const std::function<void()>& onError);
 
-    const World& worldState() const { return world; }
+    const World& worldState() const { return world(); }
     const Player& playerState() const { return player; }
-    const EntityManager& entityState() const { return entities; }
-    const DayNightCycle& daylightState() const { return dayNightCycle; }
-    const FishingView& fishingState() const { return fishing.view(); }
-    const WeatherSystem& weatherState() const { return weather; }
+    const EntityManager& entityState() const { return entities(); }
+    const DayNightCycle& daylightState() const { return dayNightCycle(); }
+    const FishingView& fishingState() const { return lanJoining ? replicaFishing : fishing.view(); }
+    const WeatherSystem& weatherState() const { return weather(); }
     const ParticleSystem& particleState() const { return particles; }
     const std::vector<LightningEvent>& lightningState() const { return lightningEvents; }
     const WorldMetadata& metadata() const { return worldMetadata; }
@@ -131,7 +173,7 @@ public:
                             WorldType type = WorldType::Normal);
     bool deleteWorld(const std::string& id);
     void setOverworldBedSpawn(const glm::ivec3& bed);
-    bool isNight() const { return dayNightCycle.isNight(); }
+    bool isNight() const { return dayNightCycle().isNight(); }
     void updateDaylight(float dt, bool playing);
     void configureVisuals(const EnhancedVisualSettings& visuals, VisualQuality quality);
     void configureLod(const LodSettings& settings);
@@ -148,6 +190,7 @@ public:
     void setCombatCallback(std::function<void(const CombatFeedback&)> callback);
     void setDefenseCallback(std::function<void(const DamageOutcome&)> callback);
     void setBedCallback(std::function<void(const glm::ivec3&)> callback);
+    void setLocalControl(bool enabled);
     void cancelBowCharge();
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
     void handleMovement(const InputState& input, float dt);
@@ -186,17 +229,110 @@ private:
     void processAutosave(const std::function<void()>& onError);
     void resetTransientState(bool newWorld, uint64_t worldTicks,
                              RuntimeClock::Tick loadingStarted);
-    // These owners are declared in dependency order so destruction runs as
-    // World -> ThreadPool -> dimension SaveStore -> metadata SaveStore.
-    // World drains its streaming I/O while both stores remain alive.
+    // Stores outlive world I/O, and both dimensions outlive their players.
     std::unique_ptr<SaveStore> saveStore;
-    std::unique_ptr<SaveStore> dimensionSaveStore;
     ThreadPool threadPool;
-    World world;
+    DimensionId dimension = DimensionId::Overworld;
+    std::array<std::unique_ptr<DimensionSimulation>, 2> simulations;
     Player player;
-    EntityManager entities;
-    DayNightCycle dayNightCycle;
-    WeatherSystem weather;
+    // Declared after dimensions: all remote Players are destroyed before Worlds.
+    std::map<uint64_t, std::unique_ptr<LanPlayerRuntime>> guests;
+    Lan::Host lanHost;
+    Lan::ChunkJournal chunkJournal;
+    InventoryTransaction hostWindow;
+    InventoryWindowView hostWindowView, replicaWindow;
+    uint64_t hostActionSequence = 0, replicaActionSequence = 0;
+    std::deque<Lan::GameAction> replicaActions;
+    uint64_t replicaActionInFlight = 0;
+    void queueReplicaAction(Lan::GameAction action);
+    void sendReplicaAction();
+    void applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction& action);
+    bool openAuthorityWindow(Player& owner, DimensionSimulation& runtime, InventoryTransaction& transaction,
+                             InventoryWindowView& view, InventoryWindowKind kind, glm::ivec3 position);
+    InventoryWindowView authorityWindow(Player& owner, DimensionSimulation& runtime, InventoryTransaction& transaction, InventoryWindowView& view);
+    void closeAuthorityWindow(Player& owner, DimensionSimulation& runtime, InventoryTransaction& transaction, InventoryWindowView& view);
+    void applyAuthorityInventory(Player& owner, DimensionSimulation& runtime, InventoryTransaction& transaction,
+                                 InventoryWindowView& view, InventoryAction action);
+    struct LodJob { uint64_t peer, epoch, revision, subscription; DimensionId dimension; LodTileKey key; std::future<Lan::Bytes> result; };
+    std::vector<LodJob> lodJobs;
+    uint64_t lodLastPeer = 0;
+    struct ReplicaLodRevision { uint64_t received = 0, required = 1; bool pending = false; };
+    std::unordered_map<LodTileKey, ReplicaLodRevision, LodTileKeyHash> replicaLodRevisions;
+    void requestLanLod(LanPlayerRuntime& guest, const Lan::LodUpdate& request);
+    void sendLanLod();
+    void pollReplicaLod();
+    void invalidateLanLod(DimensionId target, int x, int z);
+    std::deque<Lan::GameEvent> lanEvents;
+    size_t lanEventsSent = 0;
+    std::function<void(const glm::ivec3&, BlockId)> blockBreakFeedback;
+    std::function<void(float)> damageFeedback;
+    std::function<void(const CombatFeedback&)> combatFeedback;
+    std::function<void(const DamageOutcome&)> defenseFeedback;
+    void bindLanFeedback(Player& owner, uint64_t id);
+    void broadcastGameEvent(Lan::GameEvent event, bool ownerOnly = false, bool locally = false);
+    void presentLanEvents(const Feedback& feedback);
+    Lan::Client lanClient;
+    bool lanPvp = false;
+    bool replicaDeathNotified = false, replicaSleepStarted = false, replicaSleepEnded = false;
+    bool hostWantsMorning = false;
+    bool lanJoining = false, replicaWorldInfo = false, replicaOwnerState = false;
+    uint64_t replicaEpoch = 0;
+    Lan::PlayerInput replicaInput;
+    double replicaLastInputSent = -1;
+    std::vector<Lan::PlayerView> replicaOthers;
+    std::vector<Lan::RoomPlayer> replicaRoster;
+    std::deque<Lan::Message> replicaChunks;
+    size_t replicaChunkBytes = 0;
+    std::map<Lan::ChunkAddress, uint64_t> replicaRevisions;
+    std::set<Lan::ChunkAddress> replicaRecovery;
+    FishingView replicaFishing;
+    void pollReplica(double now);
+    void sendReplicaInput(bool force = false);
+    void updateReplica(float dt, IGameRenderer* renderer, const Feedback& feedback);
+    void applyReplicaState(const Lan::AuthorityState& state);
+    void closeReplica();
+    std::unique_ptr<Lan::ProfileStore> guestProfiles;
+    Lan::Identity hostIdentity;
+    std::filesystem::path dataDirectory, replicaLodRoot;
+    std::string lanFailure;
+    double lanNow = 0;
+    std::deque<Lan::ChatMessage> lanChat;
+    double hostChatLast = 0;
+    float hostChatTokens = 5;
+    void broadcastLanChat(const Lan::ChatMessage& message);
+    void enqueueLanChat(Lan::ChatMessage message);
+    void admitLanPlayer(uint64_t id);
+    void removeLanPlayer(uint64_t id);
+    void saveLanPlayer(LanPlayerRuntime& guest);
+    void updateLanInterests();
+    void sendLanChunks();
+    void sendLanStates();
+    void sendLanEntities();
+    void updateLanPlayers(float dt);
+    bool beginLanSleep(uint64_t id, glm::ivec3 bed);
+    void finishLanSleep(LanPlayerRuntime& guest);
+    void updateLanSleep(float dt);
+    bool trySkipLanNight(DimensionId target);
+    void travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false);
+    void simulateDimension(DimensionId id, const std::vector<EntityPlayerView>& views,
+                           float dt, const Feedback& feedback, size_t& fluidRemaining,
+                           std::chrono::steady_clock::time_point fluidDeadline);
+
+    DimensionSimulation& simulation() { return *simulations[static_cast<size_t>(dimension)]; }
+    const DimensionSimulation& simulation() const { return *simulations[static_cast<size_t>(dimension)]; }
+    World& world() { return simulation().world; }
+    const World& world() const { return simulation().world; }
+    EntityManager& entities() { return simulation().entities; }
+    const EntityManager& entities() const { return simulation().entities; }
+    DayNightCycle& dayNightCycle() { return simulation().daylight; }
+    const DayNightCycle& dayNightCycle() const { return simulation().daylight; }
+    WeatherSystem& weather() { return simulation().weather; }
+    const WeatherSystem& weather() const { return simulation().weather; }
+    uint64_t& survivalTicks() { return simulation().ticks; }
+    float& survivalWorldTickRemainder() { return simulation().tickRemainder; }
+    DimensionSimulation& ensureDimension(DimensionId target);
+    void flushDimensions(bool synchronous);
+    LodSettings lodSettings;
     ParticleSystem particles;
     FishingSystem fishing;
     int fishingSlot = -1;
@@ -216,10 +352,8 @@ private:
     float autosaveSeconds = 0.0f;
     bool autosavePending = false;
     bool autosaveEntityTurn = true;
+    size_t autosaveDimensionCursor = 0;
     bool playerDead = false;
-    uint64_t survivalTicks = 0;
-    float survivalWorldTickRemainder = 0.0f;
-    DimensionId dimension = DimensionId::Overworld;
     LoadingReason loadingReason = LoadingReason::World;
     SleepVisualState sleepState = SleepVisualState::Awake;
     glm::ivec3 sleepBed{0};
@@ -235,6 +369,6 @@ private:
     void ensureHeavenSafePosition();
     void finishSleep(const Feedback& feedback);
     void updateSaveMetadata();
-    void tickLightning(const Feedback& feedback);
+    void tickLightning(DimensionSimulation& runtime, const Feedback& feedback);
     void beginPlayerDeath();
 };

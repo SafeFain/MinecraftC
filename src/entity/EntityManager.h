@@ -22,6 +22,8 @@
 #include "game/CombatRules.h"
 #include "player/PlayerPhysics.h"
 
+struct EntitySnapshot;
+struct EntityDeathSnapshot;
 class Player;
 class IGameRenderer;
 class World;
@@ -75,8 +77,19 @@ struct DeadEntityRender {
     float elapsed = 0.0f;
 };
 
+struct EntityPlayerView {
+    uint64_t id = 0;
+    Player* player = nullptr;
+    bool targetable = true;
+    bool canPickup = true;
+    bool damageable = true;
+};
+
 class EntityManager {
 public:
+    void setPvpPlayers(bool enabled, std::vector<EntityPlayerView> players) {
+        m_pvpEnabled = enabled; m_pvpPlayers = enabled ? std::move(players) : std::vector<EntityPlayerView>{};
+    }
     bool arrowTouchesButton(const glm::ivec3& position) const;
     explicit EntityManager(World& world) : m_world(world) {}
 
@@ -95,14 +108,25 @@ public:
                 bool playerTargetable, bool playerCanPickup,
                 bool thunderstorm = false, bool raining = false,
                 uint64_t worldTick = 0);
+    // One simulation pass for a whole dimension; participants have stable room IDs.
+    void update(const std::vector<EntityPlayerView>& players, float dt, bool isDay,
+                bool peaceful, bool thunderstorm = false, bool raining = false,
+                uint64_t worldTick = 0);
+    void strikeLightning(const std::vector<EntityPlayerView>& players, const glm::ivec3& position);
     void strikeLightning(Player& player, const glm::ivec3& position);
     MeleeAttackResult attackRay(const glm::dvec3& origin,
                                 const glm::vec3& direction,
-                                const MeleeAttackRequest& attack);
+                                const MeleeAttackRequest& attack, uint64_t playerId = UINT64_MAX);
     bool hasAttackTarget(const glm::dvec3& origin, const glm::vec3& direction,
                          float reach) const;
     void render(IGameRenderer& renderer, const glm::mat4& viewProjection,
                 const glm::dvec3& renderOrigin) const;
+    void applyReplicaSnapshots(const std::vector<EntitySnapshot>& snapshots, const std::vector<EntityDeathSnapshot>& deaths);
+    void advanceReplicaPresentation(float dt);
+    void shareModels(const EntityManager& source) {
+        m_modelRegistry = source.m_modelRegistry;
+        m_modelRegistry.clearInstances();
+    }
     void initializeModels(const std::filesystem::path& assetRoot,
                           IGameRenderer& renderer);
     const std::vector<Entity>& entities() const { return m_entities; }
@@ -184,8 +208,13 @@ private:
     std::optional<GroundNavigation::Goal> poiGoal(const Entity& entity, const glm::ivec3& poi) const;
     bool poiAvailable(const Entity& entity, const glm::ivec3& poi, bool bed) const;
 
+    std::vector<EntityPlayerView> m_framePlayers;
+    size_t m_spawnPlayerCursor = 0;
+    bool m_pvpEnabled = false;
+    std::vector<EntityPlayerView> m_pvpPlayers;
     World& m_world;
     std::vector<Entity> m_entities;
+    std::map<uint64_t, std::pair<glm::dvec3, glm::vec3>> m_replicaTargets;
     std::vector<DeadEntityRender> m_deadEntityRenders;
     mutable EntityModelRegistry m_modelRegistry;
     uint64_t m_nextId = 1;
@@ -226,8 +255,8 @@ private:
                        const glm::vec3& knockback, bool playerAttack,
                        std::optional<glm::dvec3> source = std::nullopt,
                        uint64_t sourceId = 0);
-    void updateArrow(Entity& entity, Player& player, float dt);
-    void explode(Player& player, const glm::dvec3& center, float power,
+    void updateArrow(Entity& entity, float dt);
+    void explode(const glm::dvec3& center, float power,
                  uint32_t eventSeed, bool mobExplosion = false);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);

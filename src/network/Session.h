@@ -44,6 +44,7 @@ public:
     SessionEvents poll(double now);
     bool send(uint64_t peer, Message message, bool chunks=false);
     void disconnect(uint64_t peer);
+    size_t capacity() const { return m_capacity; }
     uint16_t port() const { return m_listener.localPort(); }
     const std::map<uint64_t,Peer>& peers() const { return m_peers; }
     const std::string& error() const { return m_error; }

@@ -59,5 +59,26 @@ int main() {
     require(cleanupDrops.size()==1 && cleanupDrops[0].id==ItemId::DIAMOND && cleanupDrops[0].count==2 && disconnectWindow.cursor().empty(),
             "Disconnect cleanup lost/duplicated held items or depended on exhausted sequence");
     require(fullInventory.count(ItemId::STONE)==36*64,"Cleanup changed unrelated full storage");
+    auto armorMove = action(window, 8, InventoryOperation::QuickMove, {InventoryArea::Storage, 2});
+    inventory.slot(2) = {ItemId::IRON_HELMET, 1, 0};
+    require(window.apply(inventory, armorMove, context).accepted && inventory.armor()[0].id == ItemId::IRON_HELMET && inventory.slot(2).empty(),
+            "Quick move did not equip matching empty armor slot");
+    auto clone = action(window, 9, InventoryOperation::CreativeClone, {InventoryArea::Storage, 0});
+    require(!window.apply(inventory, clone, context).accepted, "Survival creative clone accepted");
+    context.creative = true; clone.sequence = 10;
+    require(window.apply(inventory, clone, context).accepted && window.cursor().id == ItemId::DIAMOND && window.cursor().count == 64,
+            "Creative clone did not create an authority-owned cursor");
+    InventoryModel packed; InventoryTransaction bulk;
+    packed.slot(0) = {ItemId::OAK_LOG, 1, 0};
+    require(bulk.apply(packed, action(bulk, 1, InventoryOperation::Click), {}).accepted, "Bulk crafting pickup failed");
+    require(bulk.apply(packed, action(bulk, 2, InventoryOperation::Click, {InventoryArea::Crafting, 0}), {}).accepted, "Bulk crafting insertion failed");
+    for (size_t i = 0; i < 36; ++i) packed.slot(i) = {ItemId::STONE, 64, 0};
+    packed.slot(0) = {ItemId::OAK_PLANKS, 63, 0};
+    require(!bulk.apply(packed, action(bulk, 3, InventoryOperation::QuickMove, {InventoryArea::Output, 0}), {}).accepted &&
+            packed.slot(0).count == 63 && bulk.crafting()[0].count == 1,
+            "Partial craft output insertion duplicated output without consuming ingredients");
+    packed.slot(0).count = 60;
+    require(bulk.apply(packed, action(bulk, 4, InventoryOperation::QuickMove, {InventoryArea::Output, 0}), {}).accepted &&
+            packed.slot(0).count == 64 && bulk.crafting()[0].empty(), "Bulk craft did not consume output atomically");
     std::cout<<"Authoritative inventory transaction tests passed\n";
 }

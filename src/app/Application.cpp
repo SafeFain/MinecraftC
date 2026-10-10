@@ -8,6 +8,7 @@
 #include "app/GameSession.h"
 #include "app/GameUiController.h"
 #include "core/Window.h"
+#include "core/LanDiscovery.h"
 #include "core/ApplicationHost.h"
 #include "core/Input.h"
 #include "core/Platform.h"
@@ -30,6 +31,7 @@
 #include "ui/UIRenderer.h"
 #include "ui/Menu.h"
 #include "ui/SettingsMenu.h"
+#include "ui/LanMenu.h"
 #include "ui/Hotbar.h"
 #include "ui/Inventory.h"
 #include "ui/SurvivalInventory.h"
@@ -99,8 +101,11 @@ public:
             case ApplicationEvent::EnterBackground:
                 m_renderer->suspendPresentation();
                 m_backgrounded = true;
+                m_lanDiscovery.stopBrowsing(); m_lanDiscovery.stopAdvertising();
                 m_inputs.touchControls.cancelAll();
                 m_flow.saveCurrentWorld();
+                if (m_session.joiningLan()) m_flow.backToMainMenu();
+                else m_session.closeLanRoom();
                 break;
             case ApplicationEvent::EnterForeground:
                 m_renderer->resumePresentation();
@@ -133,6 +138,7 @@ private:
     Window      m_window;
     std::unique_ptr<IGameRenderer> m_renderer;
     GameSession m_session;
+    Platform::LanDiscovery m_lanDiscovery;
     GameScenePresenter m_scene;
     GameUiController m_ui;
     ApplicationInputController m_inputs;
@@ -322,6 +328,37 @@ private:
         });
 
         // ── Menu callbacks ────────────────────────────────────────────
+        m_ui.menuCallbacks.canHostLan = [this] { return m_session.hasWorldStore() && !m_session.joiningLan(); };
+        const auto showLan = [this](bool host) {
+            if (!host) m_lanDiscovery.browse();
+            LanMenuActions actions; actions.host = host;
+            actions.rooms = [this] { return m_lanDiscovery.rooms(); };
+            actions.refresh = [this] { m_lanDiscovery.stopBrowsing(); m_lanDiscovery.browse(); };
+            actions.hosting = [this] { return m_session.hostingLan(); };
+            actions.nickname = [this](const std::string& name) { return m_session.setLanNickname(name); };
+            actions.status = [this] {
+                if (!m_session.lanError().empty()) return m_session.lanError();
+                if (m_session.hostingLan()) return m_ui.localization.format("lan.room_status", {std::to_string(m_session.lanPort()), std::to_string(m_session.lanGuestCount()+1)});
+                if (!m_lanDiscovery.error().empty()) return m_ui.localization.format("lan.discovery_error", {m_lanDiscovery.error()});
+                return m_ui.localization.text("lan.direct_hint");
+            };
+            actions.join = [this](const std::string& address, uint16_t port) {
+                if (!m_flow.joinLanGame(address, port)) return false;
+                m_lanDiscovery.stopBrowsing(); return true;
+            };
+            actions.open = [this](uint16_t port, size_t capacity) { return m_session.openLanRoom(port, capacity); };
+            actions.close = [this] { m_session.closeLanRoom(); };
+            actions.pvp = [this] { return m_session.lanPvpEnabled(); };
+            actions.setPvp = [this](bool enabled) { m_session.setLanPvp(enabled); };
+            actions.back = [this, host] {
+                if (!host) m_lanDiscovery.stopBrowsing();
+                if (host) m_ui.activeMenu = std::make_unique<PauseMenu>(m_ui.menuCallbacks, m_ui.localization);
+                else m_flow.showMainMenu();
+            };
+            m_ui.activeMenu = std::make_unique<LanMenu>(std::move(actions), m_ui.localization, &m_clipboard, m_session.lanNickname());
+        };
+        m_ui.menuCallbacks.onOpenLanJoin = [showLan] { showLan(false); };
+        m_ui.menuCallbacks.onOpenLanHost = [showLan] { showLan(true); };
         m_ui.menuCallbacks.onOpenPlugins=[this]{m_ui.activeMenu=std::make_unique<PluginMenu>(m_plugins,m_ui.localization,[this]{m_flow.showMainMenu();});};
         m_ui.menuCallbacks.onOpenWorld = [this](const std::string& id) {
             try {m_flow.startGame(id, false);} catch(const std::exception& error){LOG_ERROR(error.what());m_flow.showCommandMessage(error.what());}
@@ -485,7 +522,24 @@ private:
 
     void updateFrameState(float dt, RuntimeClock::Tick now) {
         // ── Update ────────────────────────────────────────────────
-        m_session.updateDaylight(dt, m_flow.state() == GameState::Playing);
+        const auto oldEpoch = m_session.lanStreamEpoch();
+        m_session.pollLan(RuntimeClock::seconds(now));
+        if (m_session.hostingLan()) (void)m_lanDiscovery.advertise(m_session.lanAdvertisement());
+        else m_lanDiscovery.stopAdvertising();
+        m_lanDiscovery.poll(RuntimeClock::seconds(now));
+        for (const auto& message : m_session.takeLanChat()) {
+            if (message.kind == Lan::ChatKind::Message) m_flow.showCommandMessage("<" + message.nickname + "> " + message.text);
+            else m_flow.showCommandMessage(m_ui.localization.format(message.kind == Lan::ChatKind::Joined ? "lan.player_joined" : "lan.player_left", {message.nickname}));
+        }
+        if (m_session.lanConnectionFailed()) {
+            const auto error = m_session.lanError(); m_flow.backToMainMenu();
+            m_flow.showCommandMessage(m_ui.localization.format("lan.disconnected", {error})); return;
+        }
+        if (m_session.joiningLan() && m_session.lanWorldReady()) {
+            m_ui.survivalInventory.setCreativeAccess(m_session.playerState().gameMode() == GameMode::Creative);
+            if (oldEpoch != m_session.lanStreamEpoch() && m_flow.state() != GameState::LoadingWorld) m_flow.beginDimensionLoading();
+        }
+        m_session.updateDaylight(dt, m_flow.state() == GameState::Playing || m_session.hostingLan());
         if (m_flow.state() != GameState::Playing || m_ui.inventoryOpen ||
             m_ui.commandOpen || m_session.isPlayerDead())
             m_session.cancelBowCharge();
@@ -496,14 +550,16 @@ private:
                     m_session.playerState().getForward()))
                 m_flow.closeInventory();
             m_session.updatePlaying(
-                dt, m_renderer.get(), m_sessionFeedback);
+                dt, m_renderer.get(), m_sessionFeedback, !m_window.isMinimized());
             if (m_session.handleVoidFall(now, m_sessionFeedback)) return;
             m_scene.updateCamera(
                 m_session.worldState(), m_session.playerState(), dt, m_session.isPlayerDead(),
                 m_session.isSleeping(), m_session.sleepingBed(),
                 m_session.sleepFacing(), m_session.sleepAnimationProgress());
-        } else if (m_flow.state() == GameState::LoadingWorld) {
-            if (m_session.advanceLoading(m_renderer.get(), now))
+        } else {
+            if (m_session.hostingLan() || (m_session.joiningLan() && m_flow.state() == GameState::Paused))
+                m_session.updatePlaying(dt, m_renderer.get(), m_sessionFeedback, false);
+            if (m_flow.state() == GameState::LoadingWorld && m_session.advanceLoading(m_renderer.get(), now))
                 m_flow.completeLoading();
         }
     }
@@ -535,6 +591,8 @@ private:
         if (m_window.shouldClose() || !m_running) return false;
         const FrameContext frame = beginFramePhases();
         if (m_window.isMinimized()) {
+            m_session.setLocalControl(false);
+            if (Plugins::content().runtimeFault.empty()) updateFrameState(frame.dt, frame.now);
             RuntimeClock::sleepMilliseconds(100);
             m_window.finishEventFrame();
             return !m_window.shouldClose() && m_running;
@@ -553,6 +611,7 @@ private:
         return !m_window.shouldClose() && m_running;
     }
     void cleanup() {
+        m_lanDiscovery.stopBrowsing(); m_lanDiscovery.stopAdvertising();
         if(!Plugins::content().runtimeFault.empty())m_session.abortPluginWorld();
         else {if (!m_savedForTermination) m_flow.saveCurrentWorld();m_session.leaveWorld();}
         m_plugins.shutdown();

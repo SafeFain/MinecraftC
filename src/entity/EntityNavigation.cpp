@@ -1,5 +1,6 @@
 #include "entity/EntityManager.h"
 #include "world/World.h"
+#include "player/Player.h"
 #include <algorithm>
 #include <cmath>
 
@@ -166,8 +167,10 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         for (auto it=m_navigation.begin();it!=m_navigation.end();++it) {
             if (it->second.search) continue;
             // Aging eventually outweighs distance, including a stream of nearby requests.
-            const double score=glm::distance(it->second.origin,playerPosition)-
-                               32.0*(m_aiTime-it->second.queuedAt);
+            double distance = glm::distance(it->second.origin, playerPosition);
+            for (const auto& view : m_framePlayers)
+                distance = std::min(distance, glm::distance(it->second.origin, view.player->getPosition()));
+            const double score = distance - 32.0 * (m_aiTime-it->second.queuedAt);
             if (score<priority) { best=it; priority=score; }
         }
         if (best==m_navigation.end()) break;

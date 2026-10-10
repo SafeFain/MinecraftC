@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <vector>
+#include <map>
 
 class Chunk;
 struct ClientSettings;
@@ -65,6 +66,13 @@ public:
     float titleUpdateSeconds = 0.0f;
 
 private:
+    struct RemotePlayer {
+        PlayerRenderer model;
+        glm::dvec3 position{0};
+        float yaw = 0, pitch = 0;
+        HeldItemUseState use;
+    };
+    std::map<uint64_t, RemotePlayer> remotePlayerModels;
     void appendBowTrajectory(const GameSession& session,
                              const glm::dvec3& renderOrigin);
 };

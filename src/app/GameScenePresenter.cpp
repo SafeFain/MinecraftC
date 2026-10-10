@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 
 void GameScenePresenter::render(
     const GameSession& session, IGameRenderer& renderer,
@@ -191,6 +192,31 @@ void GameScenePresenter::render(
                 glm::vec3(entity.position-renderOrigin),entity.ageSeconds,entity.behaviorSeed,
                 session.worldState().sampleLight(entity.position+glm::dvec3(0,.25,0)));
         }
+        std::set<uint64_t> present;
+        for (const auto& remote : session.remotePlayers()) {
+            present.insert(remote.id);
+            auto found = remotePlayerModels.find(remote.id);
+            if (found == remotePlayerModels.end()) {
+                auto& created = remotePlayerModels[remote.id]; created.model.shareAssets(playerRenderer);
+                created.position = remote.position; created.yaw = remote.yaw; created.pitch = remote.pitch;
+                found = remotePlayerModels.find(remote.id);
+            }
+            auto& visual = found->second;
+            const float blend = session.joiningLan() ? 1 - std::exp(-std::max(0.0f, dt) / .05f) : 1;
+            visual.position = glm::distance(visual.position, remote.position) > 4 ? remote.position : glm::mix(visual.position, remote.position, static_cast<double>(blend));
+            visual.yaw += std::remainder(remote.yaw - visual.yaw, 360.0f) * blend;
+            visual.pitch = glm::mix(visual.pitch, remote.pitch, blend);
+            visual.model.update(remote.visual, dt);
+            visual.use = advanceHeldItemUseState(visual.use, remote.visual.bowCharging, remote.visual.bowCharge, remote.visual.blocking, dt);
+            if (remote.mode == GameMode::Spectator) continue;
+            const auto hands = visual.model.renderThirdPerson(renderer, visual.position, renderOrigin, visual.yaw, visual.pitch, vp,
+                session.worldState().sampleLight(visual.position + glm::dvec3(0, 1.6, 0)), remote.sleepFacing);
+            if (!remote.visual.sleeping) heldItemRenderer.renderThirdPerson(remote.mainhand, vp, hands.right, remote.offhand, hands.left, &visual.use);
+            if (remote.mainhand.id == ItemId::FISHING_ROD)
+                heldItemRenderer.renderFishing(remote.fishing, renderOrigin, HeldItemRenderer::thirdPersonFishingTip(hands.right), vp);
+        }
+        for (auto it = remotePlayerModels.begin(); it != remotePlayerModels.end();)
+            if (!present.count(it->first)) it = remotePlayerModels.erase(it); else ++it;
         glm::vec3 fishingTip(0);
         bool fishingTipVisible=false;
         if (perspective != CameraPerspective::FirstPerson &&
@@ -366,6 +392,7 @@ void GameScenePresenter::initialize(
 }
 
 void GameScenePresenter::resetGraphics() {
+    remotePlayerModels.clear();
     heldItemRenderer.reset();
 }
 
@@ -378,6 +405,7 @@ void GameScenePresenter::resetForWorld(const glm::dvec3& playerPosition) {
     perspective = CameraPerspective::FirstPerson;
     resetPlayerFeedback(playerPosition);
     visibleChunks.clear();
+    remotePlayerModels.clear();
     particleRenderData.clear();
     titleUpdateSeconds = 0.0f;
 }

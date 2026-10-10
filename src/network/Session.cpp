@@ -12,7 +12,7 @@ bool hexToken(const std::string& value) {
     return value.size()==32 && std::all_of(value.begin(),value.end(),[](char c){return (c>='0' && c<='9') || (c>='a' && c<='f');});
 }
 bool applicationMessage(MessageType type) {
-    return type == MessageType::Leave || (type >= MessageType::Input && type <= MessageType::Event);
+    return type == MessageType::Leave || (type >= MessageType::Input && type <= MessageType::LodInvalidate);
 }
 Message hello(const Compatibility& compatible,const Identity& identity) {
     Writer writer;writer.text(compatible.gameVersion,64);writer.u32(compatible.generationVersion);writer.u64(compatible.contentSignature);

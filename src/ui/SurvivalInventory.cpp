@@ -139,6 +139,7 @@ const CraftingRecipe* SurvivalInventoryScreen::visibleRecipe(size_t slot) const 
 
 void SurvivalInventoryScreen::render(
     UIRenderer& ui, int screenWidth, int screenHeight, int mouseX, int mouseY) {
+    syncCommands();
     layout(screenWidth, screenHeight);
     refreshAvailableRecipes();
     m_pointerX = mouseX;
@@ -248,10 +249,16 @@ void SurvivalInventoryScreen::render(
 }
 
 void SurvivalInventoryScreen::clickStack(ItemStack& stack, bool rightClick) {
+    if (command(InventoryOperation::Click, &stack, 0, rightClick)) return;
     InventoryInteraction::click(m_cursor, stack, rightClick);
 }
 
 void SurvivalInventoryScreen::quickMove(int x, int y) {
+    if (commandsEnabled()) {
+        if (contains(m_outputRect, x, y)) { InventoryAction action; action.operation = InventoryOperation::QuickMove; action.slot.area = InventoryArea::Output; m_commands->submitInventoryAction(action); syncCommands(); }
+        else command(InventoryOperation::QuickMove, hoveredStack(x, y));
+        return;
+    }
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){
         auto& source=m_inventory.slot(i);if(source.empty())return;
         if(getItemProps(source.id).kind==ItemKind::Armor)for(size_t a=0;a<InventoryModel::ARMOR_SIZE;++a)
@@ -271,6 +278,7 @@ void SurvivalInventoryScreen::quickMove(int x, int y) {
 }
 
 void SurvivalInventoryScreen::takeCraftingOutput() {
+    if (commandsEnabled()) { InventoryAction action; action.operation = InventoryOperation::Craft; m_commands->submitInventoryAction(action); syncCommands(); return; }
     const ItemStack output = craftingOutput();
     if (output.empty()) return;
     if (!m_cursor.empty() &&
@@ -304,8 +312,11 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
         if (!right) {
             if (const CraftingRecipe* recipe = visibleRecipe(i)) {
                 const uint8_t gridSize = m_craftingTable ? 3 : 2;
-                fillCraftingRecipe(*recipe, m_inventory, m_crafting,
-                                   gridSize, gridSize);
+                if (commandsEnabled()) {
+                    const auto& recipes = craftingRecipes();
+                    const auto found = std::find_if(recipes.begin(), recipes.end(), [recipe](const CraftingRecipe& candidate) { return &candidate == recipe; });
+                    if (found != recipes.end()) { InventoryAction action; action.operation = InventoryOperation::FillRecipe; action.argument = static_cast<uint16_t>(found - recipes.begin()); m_commands->submitInventoryAction(action); syncCommands(); }
+                } else fillCraftingRecipe(*recipe, m_inventory, m_crafting, gridSize, gridSize);
                 refreshAvailableRecipes();
             }
         }
@@ -343,13 +354,14 @@ void SurvivalInventoryScreen::performClick(int button, int mouseX, int mouseY) {
 
 void SurvivalInventoryScreen::onMouseButton(
     int button, ButtonAction action, int mouseX, int mouseY, int mods) {
+    syncCommands();
     m_pointerX=mouseX;m_pointerY=mouseY;
     if(action==ButtonAction::Press){m_gamepadFocus=false;m_focusX=mouseX;m_focusY=mouseY;}
     if (button == MouseButton::Middle && m_creativeAccess) {
         if (action == ButtonAction::Press) {
             if (ItemStack* hovered = hoveredStack(mouseX, mouseY);
                 hovered && !hovered->empty())
-                InventoryInteraction::setCreativeItem(m_cursor, hovered->id);
+                { if (!command(InventoryOperation::CreativeClone, hovered)) InventoryInteraction::setCreativeItem(m_cursor, hovered->id); }
             m_pointerPressed = true;
             m_pressedButton = button;
         } else if (action == ButtonAction::Release) {
@@ -380,14 +392,15 @@ void SurvivalInventoryScreen::onMouseButton(
     const bool dragged = deltaX * deltaX + deltaY * deltaY >= 16;
     const double now=RuntimeClock::seconds(RuntimeClock{}.now());
     if(dragged && m_cursorHeldAtPress && !m_dragTargets.empty()) {
-        InventoryInteraction::distribute(m_cursor,m_dragTargets,
-                                         button==MouseButton::Right);
+        if (commandsEnabled()) gesture(InventoryOperation::Distribute, m_dragTargets, button == MouseButton::Right);
+        else InventoryInteraction::distribute(m_cursor,m_dragTargets, button==MouseButton::Right);
     } else if(!dragged && button==MouseButton::Left && !m_cursor.empty() &&
        m_lastClickSeconds>=0.0 && now-m_lastClickSeconds<=0.30) {
         std::vector<ItemStack*> sources;
         for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
         for(auto& stack:m_crafting)sources.push_back(&stack);
-        InventoryInteraction::gather(m_cursor,sources);
+        if (commandsEnabled()) gesture(InventoryOperation::Gather, sources);
+        else InventoryInteraction::gather(m_cursor,sources);
     } else if (dragged) {
         // Pick up from the press position, then place at the release position.
         performClick(button, m_pressX, m_pressY);
@@ -408,12 +421,12 @@ void SurvivalInventoryScreen::onMouseMove(int x,int y){
         m_creativeAccess && !m_cursor.empty()) {
         for (size_t i = 0; i < m_inventoryRects.size(); ++i)
             if (contains(m_inventoryRects[i], x, y)) {
-                InventoryInteraction::setCreativeItem(m_inventory.slot(i), m_cursor.id);
+                if (!command(InventoryOperation::CreativeGrant, &m_inventory.slot(i), static_cast<uint16_t>(m_cursor.id))) InventoryInteraction::setCreativeItem(m_inventory.slot(i), m_cursor.id);
                 return;
             }
         const size_t count=m_craftingTable?9:4;
         for(size_t i=0;i<count;++i)if(contains(m_craftingRects[i],x,y)){
-            InventoryInteraction::setCreativeItem(m_crafting[i],m_cursor.id);
+            if (!command(InventoryOperation::CreativeGrant, &m_crafting[i], static_cast<uint16_t>(m_cursor.id))) InventoryInteraction::setCreativeItem(m_crafting[i],m_cursor.id);
             return;
         }
         return;
@@ -485,6 +498,7 @@ bool SurvivalInventoryScreen::swapHoveredWithHotbar(int hotbarSlot) {
         return false;
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered) return false;
+    if (command(InventoryOperation::SwapHotbar, hovered, static_cast<uint16_t>(hotbarSlot))) return true;
     ItemStack& hotbar = m_inventory.slot(static_cast<size_t>(hotbarSlot));
     if (hovered == &hotbar) return true;
     for (size_t i = 0; i < m_inventory.armor().size(); ++i)
@@ -497,6 +511,7 @@ bool SurvivalInventoryScreen::swapHoveredWithHotbar(int hotbarSlot) {
 bool SurvivalInventoryScreen::swapHoveredWithOffhand() {
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered) return false;
+    if (command(InventoryOperation::SwapOffhand, hovered)) return true;
     ItemStack& offhand = m_inventory.offhand();
     if (hovered == &offhand) return true;
     std::swap(*hovered, offhand);
@@ -506,6 +521,7 @@ bool SurvivalInventoryScreen::swapHoveredWithOffhand() {
 ItemStack SurvivalInventoryScreen::dropHovered(bool entireStack) {
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered || hovered->empty()) return {};
+    if (command(InventoryOperation::Drop, hovered, 0, entireStack)) return {};
     if (!entireStack) return InventoryInteraction::takeOne(*hovered);
     ItemStack dropped = *hovered;
     hovered->clear();
@@ -520,6 +536,10 @@ bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {
 }
 
 void SurvivalInventoryScreen::onClose() {
+    if (commandsEnabled()) {
+        m_commands->closeInventoryWindow(); m_cursor.clear(); m_crafting = {}; m_availableRecipes.clear();
+        onPointerCancel(); m_gamepadFocus = false; m_recipePage = 0; return;
+    }
     m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};
     m_pointerPressed = false;
     m_pressedButton = -1;
@@ -534,4 +554,28 @@ void SurvivalInventoryScreen::onClose() {
 void SurvivalInventoryScreen::onPointerCancel() {
     m_pointerPressed=false;m_pressedButton=-1;
     m_dragTargets.clear();m_cursorHeldAtPress=false;
+}
+
+void SurvivalInventoryScreen::syncCommands() {
+    if (!commandsEnabled()) return;
+    const auto view = m_commands->inventoryWindow();
+    m_cursor = view.cursor; m_crafting = view.crafting;
+}
+std::optional<InventorySlot> SurvivalInventoryScreen::logicalSlot(const ItemStack* stack) const {
+    for (size_t i = 0; i < 36; ++i) if (stack == &m_inventory.slot(i)) return InventorySlot{InventoryArea::Storage, static_cast<uint8_t>(i)};
+    for (size_t i = 0; i < 4; ++i) if (stack == &m_inventory.armor()[i]) return InventorySlot{InventoryArea::Armor, static_cast<uint8_t>(i)};
+    if (stack == &m_inventory.offhand()) return InventorySlot{InventoryArea::Offhand, 0};
+    for (size_t i = 0; i < 9; ++i) if (stack == &m_crafting[i]) return InventorySlot{InventoryArea::Crafting, static_cast<uint8_t>(i)};
+    return std::nullopt;
+}
+bool SurvivalInventoryScreen::command(InventoryOperation operation, ItemStack* stack, uint16_t argument, bool alternate) {
+    if (!commandsEnabled()) return false;
+    const auto slot = logicalSlot(stack);
+    if (slot) { InventoryAction action; action.operation = operation; action.slot = *slot; action.argument = argument; action.alternate = alternate; m_commands->submitInventoryAction(std::move(action)); }
+    syncCommands(); return true;
+}
+void SurvivalInventoryScreen::gesture(InventoryOperation operation, const std::vector<ItemStack*>& targets, bool alternate) {
+    InventoryAction action; action.operation = operation; action.alternate = alternate;
+    for (auto* target : targets) if (const auto slot = logicalSlot(target)) action.targets.push_back(*slot);
+    m_commands->submitInventoryAction(std::move(action)); syncCommands();
 }

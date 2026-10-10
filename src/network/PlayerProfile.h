@@ -23,6 +23,8 @@ struct PlayerProfile {
     float exhaustion=0;
     uint32_t foodTickTimer=0;
     InventoryModel inventory;
+    ItemStack cursor;
+    std::array<ItemStack, 9> crafting{};
 };
 Bytes encodeProfile(const PlayerProfile& profile);
 PlayerProfile decodeProfile(const Bytes& bytes);
@@ -31,6 +33,7 @@ class ProfileStore {
 public:
     explicit ProfileStore(std::filesystem::path directory) : m_directory(std::move(directory)) {}
     static Identity localIdentity(const std::filesystem::path& dataDirectory);
+    static bool setLocalNickname(const std::filesystem::path& dataDirectory, const std::string& nickname);
     std::optional<PlayerProfile> load(const Identity& identity) const;
     bool accepts(const Identity& identity) const;
     void save(const PlayerProfile& profile) const;

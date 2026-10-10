@@ -334,8 +334,10 @@ void HeldItemRenderer::renderFirstPerson(const ItemStack& item, const ItemStack&
 
 void HeldItemRenderer::renderThirdPerson(const ItemStack& item,
                                          const glm::mat4& vp, const glm::mat4& hand,
-                                         const ItemStack& offhand,const glm::mat4& leftHand) {
+                                         const ItemStack& offhand,const glm::mat4& leftHand, const HeldItemUseState* useState) {
     if(!m_renderer)return;
+    struct Restore { HeldItemUseState& state; HeldItemUseState previous; ~Restore() { state = previous; } } restore{m_use, m_use};
+    if (useState) m_use = *useState;
     if(!item.empty()) {
         const auto cached=meshFor(item.id);
         drawItem(item,vp,hand*glm::scale(glm::mat4(1),

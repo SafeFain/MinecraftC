@@ -38,6 +38,7 @@ public:
 
     // State transitions
     void startGame(const std::string& worldId, bool newWorld);
+    bool joinLanGame(const std::string& address, uint16_t port);
     void completeLoading();
     void beginDimensionLoading();
     void pause();

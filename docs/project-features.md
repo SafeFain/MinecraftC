@@ -102,6 +102,17 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   `/locate structure` queries the nearest deterministic structure in the
   Overworld or Heaven;
   command input supports Java-style Tab/Shift+Tab completion and a touch Tab.
+- Loaded worlds can open 2–8-player LAN rooms with default-off PvP. Main-menu
+  DNS-SD discovery and numeric IPv4/IPv6 joining share paired TCP streams.
+  The host simulates built-in gameplay and validates storage/trade actions;
+  guests predict movement and display authoritative terrain, entities and feedback.
+  Players can occupy Overworld and Heaven independently, retain personal profiles,
+  sleep, die and respawn. Chat and a global roster accompany remote player/item
+  animation. Near chunks require authoritative snapshots; distant seeded LOD
+  receives versioned host edits and uses removable temporary caches. Host pause
+  continues simulation; background closes the room or leaves the client session.
+  Gameplay plugins prevent LAN sessions; visual plugins remain supported.
+  See [LAN guide](lan-multiplayer.md) for platform validation boundaries.
 - Villagers and zombie villagers have spawn eggs and persistent original models.
   Runtime villages include living adult/child villagers with exclusive reachable
   beds; workstation regions merge dynamically. Thirteen professions trade five-level

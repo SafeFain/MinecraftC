@@ -198,7 +198,10 @@ endforeach()
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativePlatform.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeDynamicLibrary.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeNetworkSocket.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeNetworkSocket.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeLanDiscovery.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeLanDiscoveryBonjour.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/native/NativeLanDiscoveryAndroid.cpp")
 list(REMOVE_ITEM SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/sdl/SdlMain.cpp")
 list(REMOVE_ITEM SOURCES
@@ -213,15 +216,22 @@ add_library(minecraftc_platform STATIC
     src/platform/native/NativePlatform.cpp
     src/platform/native/NativeDynamicLibrary.cpp
     src/platform/native/NativeNetworkSocket.cpp
+    src/platform/native/NativeLanDiscovery.cpp
+    src/platform/native/NativeLanDiscoveryBonjour.cpp
+    src/platform/native/NativeLanDiscoveryAndroid.cpp
     src/platform/native/NativeCrashHandler.cpp
     src/platform/sdl/SdlPlatformPaths.cpp)
 target_include_directories(minecraftc_platform PUBLIC src)
+target_include_directories(minecraftc_platform SYSTEM PRIVATE external/mdns)
 target_link_libraries(minecraftc_platform PRIVATE ${CMAKE_DL_LIBS})
 target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
 target_link_libraries(minecraftc_platform PRIVATE ${MINECRAFTC_SDL_TARGET})
+if(APPLE)
+    target_link_libraries(minecraftc_platform PUBLIC "-ldns_sd")
+endif()
 if(WIN32)
-    target_link_libraries(minecraftc_platform PUBLIC shell32 ole32 ws2_32)
+    target_link_libraries(minecraftc_platform PUBLIC shell32 ole32 ws2_32 iphlpapi)
 endif()
 
 add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
@@ -346,6 +356,7 @@ if(APPLE AND NOT IOS)
         BUILD_RPATH "${MINECRAFTC_MOLTENVK_ROOT}/MoltenVK/dynamic/dylib/macOS"
         INSTALL_RPATH "@executable_path/../Frameworks"
         OUTPUT_NAME "MinecraftC"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in"
         MACOSX_BUNDLE_BUNDLE_NAME "MinecraftC"
         MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.SafeFain.MinecraftC"
         MACOSX_BUNDLE_ICON_FILE "minecraftc.icns"
@@ -753,7 +764,8 @@ if(BUILD_TESTING)
         src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
         src/ui/ContainerScreen.cpp src/ui/Hotbar.cpp src/ui/Inventory.cpp
-        src/ui/Menu.cpp src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
+        src/ui/Menu.cpp
+        src/ui/LanMenu.cpp src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
     target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann)
@@ -885,6 +897,28 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_model_fog_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_model_fog_smoke PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
+    # Display-dependent integration scene: run the host and client separately.
+    set(MINECRAFTC_LAN_SMOKE_SOURCES ${SOURCES})
+    list(REMOVE_ITEM MINECRAFTC_LAN_SMOKE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+    add_executable(vulkan_lan_smoke EXCLUDE_FROM_ALL
+        tests/VulkanLanSmoke.cpp ${MINECRAFTC_LAN_SMOKE_SOURCES})
+    target_include_directories(vulkan_lan_smoke PRIVATE
+        src external external/stb external/cgltf external/FastNoiseLite)
+    target_include_directories(vulkan_lan_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
+    target_compile_definitions(vulkan_lan_smoke PRIVATE
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}"
+        MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        VMA_VULKAN_VERSION=1000000)
+    target_link_libraries(vulkan_lan_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform ${CMAKE_DL_LIBS})
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(vulkan_lan_smoke PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(vulkan_lan_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
     add_executable(vulkan_gi_smoke EXCLUDE_FROM_ALL
@@ -1240,11 +1274,27 @@ if(BUILD_TESTING)
         src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp
         tests/SessionFlowTests.cpp
         src/app/GameSession.cpp
+        src/app/GameSessionLan.cpp
+        src/app/GameSessionLanLod.cpp
+        src/app/GameSessionLanEvents.cpp
+        src/app/GameSessionClient.cpp
+        src/app/GameSessionInventory.cpp
+        src/app/GameSessionLanSleep.cpp
+        src/network/Protocol.cpp
+        src/network/Connection.cpp
+        src/network/Session.cpp
+        src/network/PlayerProfile.cpp
+        src/network/GameplayProtocol.cpp
+        src/network/ChunkProtocol.cpp
+        src/network/StateProtocol.cpp
+        src/network/EntityProtocol.cpp
+        src/game/InventoryTransaction.cpp
         src/game/FishingSystem.cpp
         src/core/Input.cpp
         src/core/InputCodes.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityReplication.cpp
         src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
         src/entity/EntityVillageAi.cpp
@@ -1298,6 +1348,7 @@ if(BUILD_TESTING)
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
         src/world/World.cpp
+        src/world/WorldReplication.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
@@ -1312,6 +1363,11 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
+    add_test(NAME lan_game_replica COMMAND session_flow_tests --lan-replica-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(lan_game_replica PROPERTIES TIMEOUT 30)
+    add_test(NAME lan_gameplay_authority COMMAND session_flow_tests --lan-authority-tests)
+    set_tests_properties(lan_gameplay_authority PROPERTIES TIMEOUT 30)
+    add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME game_session_flow COMMAND session_flow_tests)
     add_test(NAME plugin_game_session_integration COMMAND session_flow_tests --plugin-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
@@ -1343,6 +1399,21 @@ if(BUILD_TESTING)
         src/app/GameFlowController.cpp
         src/app/GameScenePresenter.cpp
         src/app/GameSession.cpp
+        src/app/GameSessionLan.cpp
+        src/app/GameSessionLanLod.cpp
+        src/app/GameSessionLanEvents.cpp
+        src/app/GameSessionClient.cpp
+        src/app/GameSessionInventory.cpp
+        src/app/GameSessionLanSleep.cpp
+        src/network/Protocol.cpp
+        src/network/Connection.cpp
+        src/network/Session.cpp
+        src/network/PlayerProfile.cpp
+        src/network/GameplayProtocol.cpp
+        src/network/ChunkProtocol.cpp
+        src/network/StateProtocol.cpp
+        src/network/EntityProtocol.cpp
+        src/game/InventoryTransaction.cpp
         src/game/FishingSystem.cpp
         src/app/GameUiController.cpp
         src/core/Input.cpp
@@ -1350,6 +1421,7 @@ if(BUILD_TESTING)
         src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityReplication.cpp
         src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
         src/entity/EntityVillageAi.cpp
@@ -1397,6 +1469,7 @@ if(BUILD_TESTING)
         src/ui/Hotbar.cpp
         src/ui/Inventory.cpp
         src/ui/Menu.cpp
+        src/ui/LanMenu.cpp
         src/ui/SettingsMenu.cpp
         src/ui/SurvivalInventory.cpp
         src/ui/TouchControls.cpp
@@ -1420,6 +1493,7 @@ if(BUILD_TESTING)
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
         src/world/World.cpp
+        src/world/WorldReplication.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
@@ -1467,6 +1541,7 @@ if(BUILD_TESTING)
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
         src/world/World.cpp
+        src/world/WorldReplication.cpp
         src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
@@ -1550,7 +1625,7 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
-    add_executable(network_tests tests/NetworkTests.cpp
+    add_executable(network_tests tests/NetworkTests.cpp src/network/GameplayProtocol.cpp
         src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
         src/network/PlayerProfile.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/world/Block.cpp)
     target_include_directories(network_tests PRIVATE src)
@@ -1576,4 +1651,28 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
         target_compile_options(inventory_transaction_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     add_test(NAME authoritative_inventory_transactions COMMAND inventory_transaction_tests)
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
+    add_executable(chunk_protocol_tests tests/ChunkProtocolTests.cpp src/network/Protocol.cpp src/network/ChunkProtocol.cpp)
+    target_include_directories(chunk_protocol_tests PRIVATE src)
+    target_link_libraries(chunk_protocol_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(chunk_protocol_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(chunk_protocol_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME lan_chunk_protocol COMMAND chunk_protocol_tests)
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT IOS AND NOT APPLE)
+    add_executable(lan_discovery_tests tests/LanDiscoveryTests.cpp)
+    target_link_libraries(lan_discovery_tests PRIVATE minecraftc_platform)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(lan_discovery_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(lan_discovery_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    add_test(NAME lan_dns_sd_discovery COMMAND lan_discovery_tests)
+    set_tests_properties(lan_dns_sd_discovery PROPERTIES SKIP_RETURN_CODE 77)
 endif()

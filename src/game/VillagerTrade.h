@@ -79,3 +79,17 @@ bool consumeVillagerFood(VillagerData& villager, ItemId item, int count);
 bool willingToBreed(const VillagerData& villager);
 void consumeBreedingFood(VillagerData& villager);
 void advanceVillagerLife(VillagerData& villager, float dt, uint32_t day);
+
+// Bind a request to the complete displayed quote, including stock and level.
+inline uint64_t villagerQuoteRevision(const VillagerData& villager) {
+    uint64_t hash = 1469598103934665603ULL;
+    const auto mix = [&hash](uint64_t value) {
+        for (int i = 0; i < 8; ++i) { hash ^= static_cast<uint8_t>(value); hash *= 1099511628211ULL; value >>= 8; }
+    };
+    mix(static_cast<uint8_t>(villager.profession)); mix(villager.level);
+    mix(villager.experience); mix(villager.offerSeed); mix(static_cast<uint32_t>(villager.reputation));
+    mix(villager.adult());
+    for (auto value : villager.uses) mix(value);
+    for (auto value : villager.demand) mix(value);
+    return hash;
+}

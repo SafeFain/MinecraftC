@@ -108,6 +108,7 @@ public:
 
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
     void setSaveStore(SaveStore* store);
+    void setTransientCacheRoot(const std::filesystem::path& root);
     void reset(WorldGenerator* generator);
     void configure(const LodSettings& settings);
     void update(const glm::dvec3& playerPosition, int nearDistanceChunks,
@@ -132,11 +133,15 @@ public:
     size_t selectedTileCount() const { return m_desired.size(); }
     size_t selectedTileCountAtLevel(uint8_t level) const;
     bool isTileSelected(const LodTileKey& key) const;
+    std::vector<LodTileKey> selectedTiles() const;
+    void applyReplicaColumns(const LodTileKey& key, uint64_t revision, const LodTileData& data);
+    void clearReplicaColumns();
     bool hasExactChunk(int cx, int cz) const;
     float selectedMinimumDistanceAtLevel(uint8_t level) const;
     float selectedMaximumDistance() const;
 
 private:
+    friend struct LanLodTestAccess;
     struct Request {
         LodTileKey key;
         float minimumDistance = 0.0f;
@@ -157,6 +162,7 @@ private:
         bool queued = false;
         bool dirty = false;
         size_t gpuBytes = 0;
+        uint64_t sourceRevision = 0;
         float minimumDistance = 0.0f;
         float maximumDistance = 0.0f;
         float distance2 = 0.0f;
@@ -167,6 +173,7 @@ private:
         LodTileData data;
         ChunkMesh mesh;
         bool success = true;
+        uint64_t sourceRevision = 0;
     };
     struct ExactCompletion {
         int cx = 0;
@@ -175,6 +182,9 @@ private:
         bool persisted = false;
     };
 
+    struct ReplicaColumns { uint64_t revision = 0; LodTileData data; };
+    std::unordered_map<LodTileKey, ReplicaColumns, LodTileKeyHash> m_replicaColumns;
+    size_t m_replicaBytes = 0;
     LodSettings m_settings;
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
@@ -209,6 +219,7 @@ private:
     void observeExactChunks(const std::vector<Chunk*>& activeChunks);
     void rebuildSubmissions();
     void invalidateTilesForChunk(int cx, int cz);
+    void invalidateTile(Tile& tile);
     void scanExactCache();
     std::vector<std::pair<int, int>> exactChunksForTile(
         const LodTileKey& key) const;

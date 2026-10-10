@@ -12,6 +12,32 @@
 #include <fstream>
 #include <iostream>
 
+struct LanLodTestAccess {
+    static bool staleReplacementRejected(LodTerrainSystem& system) {
+        const auto key = system.selectedTiles().front();
+        auto initial = std::make_unique<LodTerrainSystem::Tile>(); initial->key = key;
+        initial->resident = true; initial->mesh.gpuReady = true;
+        system.m_tiles[key] = std::move(initial);
+        LodTileData old; old.at(0,0) = {{{100,100,BlockId::GLASS}}, true};
+        auto oldMesh = buildLodTileMesh(old, 1 << key.level, 6);
+        system.m_completions.push_back({key, system.m_epoch, old, std::move(oldMesh), true, 0});
+        system.processCompleted(nullptr);
+        auto& tile = *system.m_tiles.at(key);
+        if (!tile.pendingMesh) return false;
+        auto corrected = old; corrected.at(0,0).spans.front().block = BlockId::DIAMOND_ORE;
+        system.applyReplicaColumns(key, 2, corrected);
+        if (tile.pendingMesh || !tile.mesh.gpuReady || !tile.dirty) return false;
+        // A worker that finishes after the correction must also be rejected.
+        system.m_completions.push_back({key, system.m_epoch, old, buildLodTileMesh(old, 1 << key.level, 6), true, 0});
+        EntityAiTestRenderer renderer; system.processCompleted(&renderer);
+        if (tile.pendingMesh || !tile.data.at(0,0).spans.empty()) return false;
+        system.m_completions.push_back({key, system.m_epoch, corrected, buildLodTileMesh(corrected, 1 << key.level, 6), true, tile.sourceRevision});
+        system.processCompleted(&renderer);
+        system.releaseGpuMeshes();
+        return tile.data.at(0,0).spans.size() == 1 && tile.data.at(0,0).spans.front().block == BlockId::DIAMOND_ORE;
+    }
+};
+
 namespace {
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -619,6 +645,25 @@ int main() {
     selection.update({0.5, 80.0, 0.5}, 2, {});
     require(selection.selectedMinimumDistanceAtLevel(0) == 0.0f,
             "minimum render distance does not permit a zero-distance LOD overlap");
+
+    for (auto precision : {LodPrecision::Low, LodPrecision::Medium, LodPrecision::High, LodPrecision::Ultra}) {
+        LodTerrainSystem maximum; maximum.reset(&normal);
+        maximum.configure({true,4096,LodAggressiveness::PowerSaver,precision});
+        for (const auto position : {glm::dvec3(.5,80,.5), glm::dvec3(-65536.5,80,-16.5)}) {
+            maximum.update(position,16,{});
+            require(maximum.selectedTileCount() <= 4096 && maximum.selectedMaximumDistance() == 4096.0f * 16,
+                    "maximum LOD selection at each precision fits LAN subscriptions after negative-coordinate movement");
+        }
+    }
+    {
+        LodTerrainSystem replica; replica.reset(&normal);
+        replica.configure({true,16,LodAggressiveness::PowerSaver,LodPrecision::Low}); replica.update({.5,80,.5},2,{});
+        require(LanLodTestAccess::staleReplacementRejected(replica),
+                "superseded pending and in-flight LOD replacements never cross the upload boundary");
+        const auto key = replica.selectedTiles().front(); LodTileData column; column.at(0,0).exact = true;
+        replica.applyReplicaColumns(key,3,column); replica.update({100000.5,80,-100000.5},2,{});
+        require(!replica.isTileSelected(key), "moving interests retire the old corrected tile");
+    }
 
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-lod-terrain-tests";

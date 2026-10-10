@@ -58,7 +58,7 @@ struct GameSessionTestAccess {
         session.player.setPosition(position);
     }
     static void setBlock(GameSession& session, int x, int y, int z, BlockId block) {
-        session.world.setBlock(x, y, z, block);
+        session.world().setBlock(x, y, z, block);
     }
 };
 
@@ -407,6 +407,15 @@ int main(int argc,char** argv) {
     }
 
     {
+        Harness harness(root / "lan-cancellation", *window);
+        require(harness.flow.joinLanGame("127.0.0.1", 9), "direct join enters pending network loading");
+        require(harness.flow.state() == GameState::LoadingWorld && harness.session.joiningLan(), "pending room owns loading state");
+        harness.ui.render(harness.session, harness.settings, harness.inputs, *window, GameState::LoadingWorld, false);
+        require(harness.ui.lanCancelRect.z > 0, "pending LAN loading exposes a pointer cancellation button");
+        harness.router.handleKeyEvent(Key::Escape, 0, ButtonAction::Press, 0);
+        require(harness.flow.state() == GameState::MainMenu && !harness.session.joiningLan(), "Escape cancels connection and releases replica ownership");
+    }
+    {
         Harness harness(root / "loading-phases", *window);
         const int oldRenderDistance = Config::RENDER_DISTANCE;
         Config::RENDER_DISTANCE = 2;
@@ -721,11 +730,13 @@ int main(int argc,char** argv) {
             "https://github.com/nothings/stb",
             "https://github.com/notofonts/noto-cjk",
             "https://github.com/notofonts/arabic",
+            "https://github.com/mjansson/mdns",
         };
         menu.onKeyPress(Key::Left); // Clamp at the first page.
         menu.onScroll(0.0); // No movement must preserve the page.
-        for (size_t page = 0; page < 3; ++page) {
-            for (size_t row = 0; row < 4; ++row) {
+        const auto creditPages = (repositories.size() + 3) / 4;
+        for (size_t page = 0; page < creditPages; ++page) {
+            for (size_t row = 0; row < std::min<size_t>(4, repositories.size() - page * 4); ++row) {
                 menu.onKeyPress(Key::Down);
                 menu.onKeyPress(Key::Enter);
                 require(openedUrl == repositories[page * 4 + row],
@@ -735,7 +746,7 @@ int main(int argc,char** argv) {
                 menu.onKeyPress(Key::Down); // Previous.
                 menu.onKeyPress(Key::Down); // Next.
                 menu.onKeyPress(Key::Enter);
-            } else if (page == 1) {
+            } else if (page + 1 < creditPages) {
                 menu.onScroll(-1.0);
             }
         }
@@ -746,8 +757,8 @@ int main(int argc,char** argv) {
         menu.onKeyPress(Key::Left);
         menu.onKeyPress(Key::Down);
         menu.onKeyPress(Key::Enter);
-        require(openedUrl == repositories[4], "Left returns to the preceding credits page");
-        menu.onScroll(1.0);
+        require(openedUrl == repositories[(creditPages - 2) * 4], "Left returns to the preceding credits page");
+        for (size_t page = 0; page < creditPages - 2; ++page) menu.onScroll(1.0);
         menu.onKeyPress(Key::Down);
         menu.onKeyPress(Key::Enter);
         require(openedUrl == repositories[0], "Scroll up returns to the first credits page");

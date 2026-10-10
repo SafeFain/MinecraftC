@@ -29,6 +29,11 @@ class GameUiController {
 public:
     GameUiController(InventoryModel& inventory, platform::Clipboard& clipboard);
 
+    bool lanCancelContains(double x, double y) const {
+        return lanCancelRect.z > 0 && x >= lanCancelRect.x && y >= lanCancelRect.y &&
+            x <= lanCancelRect.x + lanCancelRect.z && y <= lanCancelRect.y + lanCancelRect.w;
+    }
+    glm::vec4 lanCancelRect{0};
     void tick(float dt);
     void showMessage(const std::string& message);
     void openCommand();

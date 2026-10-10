@@ -16,10 +16,16 @@ bool ContainerScreen::open(IContainerAccess& access, const glm::ivec3& position)
     m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};
     m_access = &access;
     m_position = position;
-    return valid();
+    if (commandsEnabled()) m_commands->openInventoryWindow(InventoryWindowKind::Container, position);
+    return commandsEnabled() || valid();
 }
 
 bool ContainerScreen::valid() const {
+    if (commandsEnabled()) {
+        const auto view = m_commands->inventoryWindow();
+        return m_access && (m_commands->inventoryWindowPending() ||
+            (view.kind == InventoryWindowKind::Container && view.position == m_position && view.container));
+    }
     return m_access && m_access->blockEntityAt(m_position) != nullptr;
 }
 
@@ -78,6 +84,7 @@ void ContainerScreen::moveStack(ItemStack& cursor, ItemStack& slot, bool right) 
 }
 
 void ContainerScreen::quickMove(int x,int y) {
+    if (command(InventoryOperation::QuickMove, hoveredStack(x, y))) return;
     BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(!entity)return;
     for(size_t i=0;i<m_inventoryRects.size();++i)if(contains(m_inventoryRects[i],x,y)){
         auto& source=m_inventory.slot(i);std::vector<ItemStack*> targets;
@@ -96,6 +103,7 @@ void ContainerScreen::quickMove(int x,int y) {
 }
 
 void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int my) {
+    syncCommands();
     layout(width, height);
     m_pointerX=mx;m_pointerY=my;
     if(m_gamepadFocus){updateFocusPosition();mx=m_focusX;my=m_focusY;}
@@ -158,6 +166,7 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
 }
 
 void ContainerScreen::click(int button, int x, int y) {
+    if (command(InventoryOperation::Click, hoveredStack(x, y), 0, button == MouseButton::Right)) return;
     BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
     const bool right = button == MouseButton::Right;
@@ -177,6 +186,7 @@ void ContainerScreen::click(int button, int x, int y) {
 }
 
 void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,int mods) {
+    syncCommands();
     m_pointerX=x;m_pointerY=y;
     if(action==ButtonAction::Press){m_gamepadFocus=false;m_focusX=x;m_focusY=y;}
     if (button!=MouseButton::Left && button!=MouseButton::Right) return;
@@ -186,12 +196,16 @@ void ContainerScreen::onMouseButton(int button,ButtonAction action,int x,int y,i
     if((m_pressMods&KeyModifier::Shift)&&button==MouseButton::Left){quickMove(x,y);m_pressed=false;m_button=-1;return;}
     const int dx=x-m_pressX,dy=y-m_pressY;const bool dragged=dx*dx+dy*dy>=16;
     const double now=RuntimeClock::seconds(RuntimeClock{}.now());
-    if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty())InventoryInteraction::distribute(m_cursor,m_dragTargets,button==MouseButton::Right);
+    if(dragged&&m_cursorHeldAtPress&&!m_dragTargets.empty()) {
+        if (commandsEnabled()) gesture(InventoryOperation::Distribute, m_dragTargets, button == MouseButton::Right);
+        else InventoryInteraction::distribute(m_cursor,m_dragTargets,button==MouseButton::Right);
+    }
     else if(!dragged&&button==MouseButton::Left&&!m_cursor.empty()&&m_lastClickSeconds>=0&&now-m_lastClickSeconds<=.30){
         std::vector<ItemStack*> sources;for(size_t i=0;i<36;++i)sources.push_back(&m_inventory.slot(i));
         BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;if(entity){if(entity->type==BlockEntityType::Chest)for(auto& slot:entity->chest)sources.push_back(&slot);
             else{sources.push_back(&entity->input);sources.push_back(&entity->fuel);sources.push_back(&entity->output);}}
-        InventoryInteraction::gather(m_cursor,sources);
+        if (commandsEnabled()) gesture(InventoryOperation::Gather, sources);
+        else InventoryInteraction::gather(m_cursor,sources);
     } else if (dragged) { click(button,m_pressX,m_pressY);click(button,x,y); } else click(button,x,y);
     m_lastClickSeconds=now;
     m_pressed=false;m_button=-1;
@@ -259,6 +273,7 @@ bool ContainerScreen::swapHoveredWithHotbar(int hotbarSlot) {
         return false;
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered) return false;
+    if (command(InventoryOperation::SwapHotbar, hovered, static_cast<uint16_t>(hotbarSlot))) return true;
     ItemStack& hotbar = m_inventory.slot(static_cast<size_t>(hotbarSlot));
     if (hovered == &hotbar) return true;
     BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
@@ -274,6 +289,7 @@ bool ContainerScreen::swapHoveredWithHotbar(int hotbarSlot) {
 bool ContainerScreen::swapHoveredWithOffhand() {
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered) return false;
+    if (command(InventoryOperation::SwapOffhand, hovered)) return true;
     ItemStack& offhand = m_inventory.offhand();
     if (hovered == &offhand) return true;
     BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
@@ -289,6 +305,7 @@ bool ContainerScreen::swapHoveredWithOffhand() {
 ItemStack ContainerScreen::dropHovered(bool entireStack) {
     ItemStack* hovered = hoveredStack(m_pointerX, m_pointerY);
     if (!hovered || hovered->empty()) return {};
+    if (command(InventoryOperation::Drop, hovered, 0, entireStack)) return {};
     if (!entireStack) return InventoryInteraction::takeOne(*hovered);
     ItemStack dropped = *hovered;
     hovered->clear();
@@ -296,6 +313,7 @@ ItemStack ContainerScreen::dropHovered(bool entireStack) {
 }
 
 void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
+    if (commandsEnabled()) { m_commands->closeInventoryWindow(); m_cursor.clear(); m_access = nullptr; onPointerCancel(); return; }
     if (!m_cursor.empty()) {
         const uint32_t remaining=m_inventory.add(m_cursor);
         if (remaining) { m_cursor.count=static_cast<uint8_t>(remaining);drop(m_cursor); }
@@ -307,4 +325,31 @@ void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
 void ContainerScreen::onPointerCancel() {
     m_pressed=false;m_button=-1;
     m_dragTargets.clear();m_cursorHeldAtPress=false;
+}
+
+void ContainerScreen::syncCommands() {
+    if (commandsEnabled()) m_cursor = m_commands->inventoryWindow().cursor;
+}
+std::optional<InventorySlot> ContainerScreen::logicalSlot(const ItemStack* stack) const {
+    for (size_t i = 0; i < 36; ++i) if (stack == &m_inventory.slot(i)) return InventorySlot{InventoryArea::Storage, static_cast<uint8_t>(i)};
+    const auto* container = m_access ? m_access->blockEntityAt(m_position) : nullptr;
+    if (!container) return std::nullopt;
+    if (container->type == BlockEntityType::Chest) {
+        for (size_t i = 0; i < 27; ++i) if (stack == &container->chest[i]) return InventorySlot{InventoryArea::Container, static_cast<uint8_t>(i)};
+    } else {
+        if (stack == &container->input) return InventorySlot{InventoryArea::Container, 0};
+        if (stack == &container->fuel) return InventorySlot{InventoryArea::Container, 1};
+        if (stack == &container->output) return InventorySlot{InventoryArea::Container, 2};
+    }
+    return std::nullopt;
+}
+bool ContainerScreen::command(InventoryOperation operation, ItemStack* stack, uint16_t argument, bool alternate) {
+    if (!commandsEnabled()) return false;
+    if (const auto slot = logicalSlot(stack)) { InventoryAction action; action.operation = operation; action.slot = *slot; action.argument = argument; action.alternate = alternate; m_commands->submitInventoryAction(std::move(action)); }
+    syncCommands(); return true;
+}
+void ContainerScreen::gesture(InventoryOperation operation, const std::vector<ItemStack*>& targets, bool alternate) {
+    InventoryAction action; action.operation = operation; action.alternate = alternate;
+    for (auto* target : targets) if (const auto slot = logicalSlot(target)) action.targets.push_back(*slot);
+    m_commands->submitInventoryAction(std::move(action)); syncCommands();
 }

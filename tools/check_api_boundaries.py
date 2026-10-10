@@ -23,9 +23,10 @@ RULES = {
     "native": re.compile(
         r"(?:#\s*include\s*[<\"](?:windows\.h|shlobj\.h|unistd\.h|pwd\.h|"
         r"mach-o/dyld\.h|winsock2\.h|ws2tcpip\.h|sys/socket\.h|sys/select\.h|"
-        r"netinet/(?:in|tcp)\.h|arpa/inet\.h|poll\.h|dns_sd\.h)[>\"]|"
+        r"netinet/(?:in|tcp)\.h|arpa/inet\.h|poll\.h|dns_sd\.h|ifaddrs\.h|net/if\.h|iphlpapi\.h|jni\.h|mdns\.h)[>\"]|"
         r"\b(?:WSAStartup|WSACleanup|WSAGetLastError|closesocket|ioctlsocket|"
-        r"inet_pton|inet_ntop|setsockopt|getsockopt|GetModuleFileNameW|SHGetKnownFolderPath|"
+        r"inet_pton|inet_ntop|setsockopt|getsockopt|GetAdaptersAddresses|getifaddrs|freeifaddrs|"
+        r"DNSService[A-Za-z0-9_]+|mdns_[A-Za-z0-9_]+|GetModuleFileNameW|SHGetKnownFolderPath|"
         r"MoveFileExW|getpwuid_r|readlink)\s*\()"
     ),
 }

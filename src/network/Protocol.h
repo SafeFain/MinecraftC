@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace Lan {
-constexpr uint16_t PROTOCOL_VERSION = 1;
+constexpr uint16_t PROTOCOL_VERSION = 2;
 constexpr uint16_t DEFAULT_PORT = 25565;
 constexpr size_t MAX_PLAYERS = 8;
 constexpr size_t MAX_PAYLOAD = 1024 * 1024;
@@ -20,7 +20,7 @@ enum class MessageType : uint16_t {
     Hello = 1, Welcome, Reject, BindChunks, Ping, Pong, Leave,
     Input, Action, ActionResult, PlayerState, EntityState, ChunkRequest,
     ChunkSnapshot, ChunkDelta, Environment, Inventory, Container, Chat,
-    Dimension, Event
+    Dimension, Event, LodRequest, LodColumns, LodInvalidate
 };
 struct Message {
     MessageType type = MessageType::Ping;

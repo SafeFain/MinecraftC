@@ -96,6 +96,8 @@ public:
         std::function<void(const std::pair<int, int>&, uint32_t, BlockId)>;
     void forEachOverride(const OverrideVisitor& fn) const;
 
+    std::optional<std::vector<BlockOverride>> copyKnownOverrides(int cx, int cz) const;
+
     // Drop all persistence state (seed reset / world teardown).
     void clear() {
         m_blockOverrides.clear();

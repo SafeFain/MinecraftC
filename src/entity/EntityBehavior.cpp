@@ -284,8 +284,12 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
 void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDay,
                                bool playerTargetable,uint64_t worldTick,bool thunderstorm) {
     auto& ai=entity.ai;
+    double nearestPlayerDistance = glm::distance(entity.position, player.getPosition());
+    for (const auto& view : m_framePlayers)
+        nearestPlayerDistance = std::min(nearestPlayerDistance,
+            glm::distance(entity.position, view.player->getPosition()));
     if (hostile(entity.type) && shouldHostileDespawn(
-            static_cast<float>(glm::distance(entity.position,player.getPosition())),
+            static_cast<float>(nearestPlayerDistance),
             entity.ageSeconds,aiHash(entity.behaviorSeed+static_cast<uint32_t>(entity.ageSeconds)))) {
         entity.health=0; cancelNavigation(entity); return;
     }
@@ -304,7 +308,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     }
     if (m_aiTime+1e-6>=ai.nextDecision) {
         decideBehavior(entity,player,isDay,playerTargetable,worldTick,thunderstorm);
-        const float interval=glm::distance(entity.position,player.getPosition())<=Config::AI_NEAR_DISTANCE ?
+        const float interval=nearestPlayerDistance<=Config::AI_NEAR_DISTANCE ?
             Config::AI_NEAR_INTERVAL : Config::AI_FAR_INTERVAL;
         ai.nextDecision=m_aiTime+interval;
     }

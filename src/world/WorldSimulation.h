@@ -25,6 +25,8 @@ public:
 
     void tickSurvival(const glm::dvec3& playerPosition, uint64_t tick,
                       bool raining = false);
+    void tickSurvival(const std::vector<glm::dvec3>& playerPositions, uint64_t tick,
+                      bool raining = false);
     void tickWeather(const WeatherSystem& weather, bool daytime, uint64_t tick);
 
     // Drain the TNT ignition list accumulated since the last call.
@@ -32,6 +34,7 @@ public:
 
     // Drop simulation state (seed reset / teardown).
     void clear() {
+        m_playerPositions.clear();
         m_fireAges.clear();
         m_cropScanCursor=0;
         m_tntIgnitions.clear();
@@ -51,7 +54,7 @@ private:
     bool hasWaterForFarmland(const glm::ivec3& position, bool raining) const;
 
     size_t m_cropScanCursor=0;
-    glm::dvec3 m_playerPosition{0.0};
+    std::vector<glm::dvec3> m_playerPositions;
     World& m_world;
     WorldPersistence& m_persistence;
     ChunkStore& m_chunks;

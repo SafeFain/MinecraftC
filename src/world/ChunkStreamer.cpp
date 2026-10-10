@@ -128,6 +128,7 @@ int ChunkStreamer::priorityDistance(int chunkX, int chunkZ) const {
 
 void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                            const glm::dvec3& playerVelocity) {
+    const int renderDistance = std::min(Config::RENDER_DISTANCE, m_renderDistanceLimit);
     int pcx = worldToChunk(playerPos.x, Config::CHUNK_SIZE_X);
     int pcz = worldToChunk(playerPos.z, Config::CHUNK_SIZE_Z);
     m_centerChunkX = pcx;
@@ -135,19 +136,20 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
 
     const bool targetChanged = pcx != m_streamCenterChunkX ||
         pcz != m_streamCenterChunkZ ||
-        Config::RENDER_DISTANCE != m_streamRenderDistance || m_interestsChanged;
+        renderDistance != m_streamRenderDistance || m_interestsChanged;
     if (targetChanged) {
         m_interestsChanged = false;
         m_streamCenterChunkX = pcx;
         m_streamCenterChunkZ = pcz;
-        m_streamRenderDistance = Config::RENDER_DISTANCE;
+        m_streamRenderDistance = renderDistance;
         m_desiredChunks.clear();
         m_desiredChunkSet.clear();
         m_visibleChunkCount = 0;
         m_visibleChunkSet.clear();
-        const int r2 = Config::RENDER_DISTANCE * Config::RENDER_DISTANCE;
-        for (int dx = -Config::RENDER_DISTANCE; dx <= Config::RENDER_DISTANCE; ++dx) {
-            for (int dz = -Config::RENDER_DISTANCE; dz <= Config::RENDER_DISTANCE; ++dz) {
+        const int r2 = renderDistance * renderDistance;
+        if (m_localRenderEnabled)
+        for (int dx = -renderDistance; dx <= renderDistance; ++dx) {
+            for (int dz = -renderDistance; dz <= renderDistance; ++dz) {
                 if (dx * dx + dz * dz > r2) continue;
                 const int cx = pcx + dx;
                 const int cz = pcz + dz;
@@ -180,11 +182,11 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
         // ready while the next movement direction is prepared in the
         // background.
         const glm::dvec2 horizontal(playerVelocity.x, playerVelocity.z);
-        if (glm::length(horizontal) > 0.25) {
+        if (m_localRenderEnabled && glm::length(horizontal) > 0.25) {
             const glm::dvec2 direction = glm::normalize(horizontal);
             const int stepX = direction.x > 0.35 ? 1 : direction.x < -0.35 ? -1 : 0;
             const int stepZ = direction.y > 0.35 ? 1 : direction.y < -0.35 ? -1 : 0;
-            const int ahead = Config::RENDER_DISTANCE + Config::CHUNK_PREFETCH_AHEAD;
+            const int ahead = renderDistance + Config::CHUNK_PREFETCH_AHEAD;
             for (int side = -1; side <= 1; ++side) {
                 int cx = pcx + stepX * ahead;
                 int cz = pcz + stepZ * ahead;
@@ -226,8 +228,8 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                     chunk->baseCacheInProgress.load())
                     cleanupRemaining = true;
                 else if (const bool warmEligible = chunk->generated.load() &&
-                         std::abs(key.first - pcx) <= Config::RENDER_DISTANCE + 2 &&
-                         std::abs(key.second - pcz) <= Config::RENDER_DISTANCE + 2 &&
+                         std::abs(key.first - pcx) <= renderDistance + 2 &&
+                         std::abs(key.second - pcz) <= renderDistance + 2 &&
                          static_cast<int>(m_warmChunkOrder.size()) <
                              Config::CHUNK_WARM_CACHE_LIMIT;
                          warmEligible && warmRetirements +
@@ -316,7 +318,8 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
         // out-of-range chunk is not reported as gone before its override and
         // entity snapshots have been handed to the save queue.
         m_chunks.rebuildActiveChunks(
-            pcx, pcz, m_streamCleanupPending ? nullptr : &m_visibleChunkSet,
+            pcx, pcz, m_streamCleanupPending && m_localRenderEnabled && m_additionalInterests.empty()
+                ? nullptr : &m_visibleChunkSet,
             m_streamCleanupPending ? nullptr :
                 (m_additionalInterests.empty() ? &m_visibleChunkSet : &m_desiredChunkSet));
         ++m_streamingRevision;
@@ -324,6 +327,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
 }
 
 void ChunkStreamer::enqueueCacheReads() {
+    if (m_externalSnapshots) return;
     const int available = Config::CHUNK_CACHE_READ_TASKS_IN_FLIGHT -
         m_cacheReadTasksInFlight.load();
     if (available <= 0) return;
@@ -520,6 +524,7 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
 }
 
 void ChunkStreamer::enqueueGeneration() {
+    if (m_externalSnapshots) return;
     if (!m_threadPool) return;
 
     processCacheCompletions();

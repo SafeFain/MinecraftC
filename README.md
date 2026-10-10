@@ -53,6 +53,8 @@ Android's 2100000000 limit. The Apple short version remains `X.Y.Z`.
   players, entities, and worlds.
 - Classic fishing with craftable durable rods, visible bobbers and lines, manual
   bite/reel timing, fish/junk/open-water treasure, and edible/cookable cod and salmon.
+- LAN cooperative play for 2–8 players, discovered rooms or direct IP connection,
+  independent dimensions and saved guest profiles; [LAN setup and validation](docs/lan-multiplayer.md).
 - JSON-driven block, 310-item, and entity atlases with a deterministic 16x16
   texture pipeline.
 - Keyboard and mouse, controller, and native multi-touch input.
@@ -299,6 +301,7 @@ third-party components and assets that retain their own licenses.
 | Vulkan Memory Allocator 3.3.0 | MIT | `external/VulkanMemoryAllocator/` |
 | FastNoiseLite pinned snapshot | MIT | `external/FastNoiseLite/` |
 | cgltf 1.15 | MIT | `external/cgltf/` |
+| mjansson/mdns pinned snapshot | Unlicense/public domain | `external/mdns/` |
 | nlohmann/json 3.12.0 | MIT | `external/nlohmann/` |
 | stb_image 2.30 | MIT or public domain (MIT used) | `external/stb/stb_image.h` |
 | stb_truetype 1.26 | MIT | `external/stb/stb_truetype.h` |

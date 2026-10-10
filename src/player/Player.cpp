@@ -12,7 +12,23 @@
 #include <algorithm>
 #include <utility>
 
-Player::Player(World& world) : m_world(world) {}
+Player::Player(World& world) : m_world(&world) {}
+
+void Player::bindWorld(World& world, EntityManager* entities) {
+    cancelBowCharge();
+    handleMouseButton(MouseButton::Left, ButtonAction::Release);
+    handleMouseButton(MouseButton::Right, ButtonAction::Release);
+    cancelBowCharge();
+    m_mining = false;
+    m_miningTarget.reset();
+    m_miningProgress = 0;
+    m_blocking = false;
+    m_shieldUseTicks = 0;
+    m_world = &world;
+    m_entities = entities;
+    m_highlightedBlock.reset();
+    teleport(m_position);
+}
 
 void Player::teleport(const glm::dvec3& pos) {
     cancelBowCharge();
@@ -62,6 +78,7 @@ DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
 }
 
 DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
+    if (!m_authority) return {};
     auto e=Plugins::event(MC_DAMAGE_PRE);e.damage=source.amount;
     if(!Plugins::dispatch(e))return {};
     auto adjusted=source;adjusted.amount=e.damage;
@@ -73,7 +90,7 @@ DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
 DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
     DamageOutcome outcome;
     outcome.rawDamage = source.amount;
-    const auto& rules = m_world.gameRules();
+    const auto& rules = m_world->gameRules();
     if ((source.cause == DamageCause::Fall && !rules.boolean(GameRuleId::FallDamage)) ||
         (source.cause == DamageCause::Drowning && !rules.boolean(GameRuleId::DrowningDamage)) ||
         (source.cause == DamageCause::Fire && !rules.boolean(GameRuleId::FireDamage)))
@@ -127,13 +144,28 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
     }
     outcome.appliedDamage = accepted;
     m_survivalStats.damage(accepted);
-    if (source.causesExhaustion) m_survivalStats.addExhaustion(0.1f);
+    if (source.causesExhaustion && m_authority) m_survivalStats.addExhaustion(0.1f);
     m_velocity += source.impulse;
     if (m_damageCallback) m_damageCallback(accepted);
     return outcome;
 }
 
 // ── Input ─────────────────────────────────────────────────────────────
+
+void Player::reconcileReplica(const glm::dvec3& position, const glm::vec3& velocity,
+                               bool grounded, bool flying, PlayerPhysics::Pose pose, bool initial) {
+    if (initial || glm::distance(m_position, position) > 3) teleport(position);
+    else m_position += (position - m_position) * .4;
+    m_velocity = velocity;
+    m_onGround = grounded; m_flying = flying; m_pose = pose;
+}
+
+void Player::setOrientation(float yaw, float pitch) {
+    if (!std::isfinite(yaw) || !std::isfinite(pitch)) return;
+    m_yaw = std::remainder(yaw, 360.0f);
+    m_pitch = std::clamp(pitch, -89.9f, 89.9f);
+    updateDirectionVectors();
+}
 
 void Player::handleMouseDelta(float dx, float dy, float sensitivity, bool invertY) {
     if (!m_mouseLocked) return;
@@ -264,7 +296,7 @@ void Player::handleMovement(const InputState& input, float dt) {
             if (m_gameMode == GameMode::Survival) {
                 const float moved = static_cast<float>(glm::distance(
                     before, glm::dvec2(m_position.x, m_position.z)));
-                m_survivalStats.addExhaustion(moved * 0.01f);
+                if (m_authority) m_survivalStats.addExhaustion(moved * 0.01f);
             }
         } else if (hLen > 0.0f) {
             m_velocity.x = m_velocity.z = 0.0f;
@@ -285,7 +317,7 @@ void Player::handleMovement(const InputState& input, float dt) {
                 const float moved = static_cast<float>(glm::distance(
                     before, glm::dvec2(m_position.x, m_position.z)));
                 const float rate = m_isSprinting ? 0.1f : 0.0f;
-                m_survivalStats.addExhaustion(moved * rate);
+                if (m_authority) m_survivalStats.addExhaustion(moved * rate);
             }
         } else if (!inWater) {
             m_velocity.x = m_velocity.z = 0.0f;
@@ -300,12 +332,13 @@ void Player::handleMovement(const InputState& input, float dt) {
             m_velocity.y = Config::JUMP_SPEED;
             m_onGround = false;
             if (m_gameMode == GameMode::Survival)
-                m_survivalStats.addExhaustion(m_isSprinting ? 0.2f : 0.05f);
+                if (m_authority) m_survivalStats.addExhaustion(m_isSprinting ? 0.2f : 0.05f);
         }
     }
 }
 
 void Player::handleMouseButton(int button, ButtonAction action) {
+    if (!m_authority) return;
     if (!m_mouseLocked) return;
     if (m_gameMode == GameMode::Spectator) return;
     if (button==MouseButton::Right && action==ButtonAction::Press && tryUseInteractiveBlock()) return;
@@ -361,13 +394,13 @@ void Player::handleMouseButton(int button, ButtonAction action) {
             result = m_entities->attackRay(
                 getEyePosition(), m_forward,
                 {m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
-                 damage, critical, sweeping, strong && m_isSprinting});
+                 damage, critical, sweeping, strong && m_isSprinting}, m_roomPlayerId);
         }
         if (result.foundTarget) {
             m_attackTicks = 0.0f;
             m_mining = false;
             if (result.primaryDamaged && m_gameMode == GameMode::Survival) {
-                m_survivalStats.addExhaustion(0.1f);
+                if (m_authority) m_survivalStats.addExhaustion(0.1f);
                 const bool combatTool = properties.tool == ToolKind::Sword ||
                     properties.tool == ToolKind::Axe ||
                     properties.tool == ToolKind::Pickaxe ||
@@ -396,7 +429,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
             return;
         }
 
-        const auto blockHit = m_world.raycast(
+        const auto blockHit = m_world->raycast(
             getEyePosition(), m_forward, Config::REACH_DISTANCE);
         if (!blockHit) {
             m_attackTicks = 0.0f;
@@ -428,11 +461,11 @@ void Player::updateSleeping(float dt) {
     m_landingSpeed = 0.0f;
     PlayerPhysics::tickHurtImmunity(m_hurtImmunity, dt);
     m_attackTicks += dt * 20.0f;
-    if (m_gameMode != GameMode::Survival) return;
+    if (!m_authority || m_gameMode != GameMode::Survival) return;
     m_survivalTickRemainder += dt * 20.0f;
     const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
     if (ticks == 0) return;
-    m_survivalStats.tick(m_difficulty, ticks, m_world.gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
+    m_survivalStats.tick(m_difficulty, ticks, m_world->gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
     updateEnvironment(ticks);
     m_survivalTickRemainder -= static_cast<float>(ticks);
 }
@@ -479,12 +512,12 @@ void Player::update(float dt) {
     m_eyeHeight = PlayerPhysics::approachEyeHeight(
         m_eyeHeight, PlayerPhysics::dimensions(m_pose).eyeHeight, dt);
     updateHighlight();
-    updateMining(dt);
-    if (m_gameMode == GameMode::Survival) {
+    if (m_authority) updateMining(dt);
+    if (m_authority && m_gameMode == GameMode::Survival) {
         m_survivalTickRemainder += dt * 20.0f;
         const uint32_t ticks = static_cast<uint32_t>(m_survivalTickRemainder);
         if (ticks > 0) {
-            m_survivalStats.tick(m_difficulty, ticks, m_world.gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
+            m_survivalStats.tick(m_difficulty, ticks, m_world->gameRules().boolean(GameRuleId::NaturalHealthRegeneration));
             updateEnvironment(ticks);
             m_survivalTickRemainder -= static_cast<float>(ticks);
         }
@@ -514,7 +547,7 @@ std::optional<glm::dvec3> Player::starstepTarget() const {
     if (activeItem().id != ItemId::STARSTEP_SCEPTER ||
         m_starstepCooldown > 0.0f)
         return std::nullopt;
-    const auto destination = m_world.starstepDestination(
+    const auto destination = m_world->starstepDestination(
         getEyePosition(), m_forward);
     if (!destination || checkCollision(destination->x, destination->y,
                                        destination->z))
@@ -556,7 +589,7 @@ void Player::releaseBow() {
         !m_inventory.remove(ItemId::ARROW, 1)) return;
 
     m_entities->spawnArrow(
-        launch->origin, launch->velocity, launch->damage, true);
+        launch->origin, launch->velocity, launch->damage, true, m_roomPlayerId);
     if (m_gameMode == GameMode::Survival) {
         auto& bow = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (++bow.damage >= getItemProps(bow.id).maxDurability) bow.clear();
@@ -667,7 +700,7 @@ void Player::moveAndCollide(const glm::vec3& delta) {
         m_velocity.y = Config::JUMP_SPEED;
         m_onGround = false;
         if (m_gameMode == GameMode::Survival)
-            m_survivalStats.addExhaustion(m_isSprinting ? 0.2f : 0.05f);
+            if (m_authority) m_survivalStats.addExhaustion(m_isSprinting ? 0.2f : 0.05f);
     }
 }
 
@@ -718,7 +751,7 @@ bool Player::checkCollision(double px, double py, double pz, float height) const
     for (int bx = minX; bx <= maxX; ++bx) {
         for (int by = minY; by <= maxY; ++by) {
             for (int bz = minZ; bz <= maxZ; ++bz) {
-                BlockId id = m_world.getBlock(bx, by, bz);
+                BlockId id = m_world->getBlock(bx, by, bz);
                 if (id == BlockId::AIR) continue;
 
                 const BlockProperties& props = getBlockProps(id);
@@ -744,7 +777,7 @@ bool Player::checkCollision(double px, double py, double pz, float height) const
 float Player::findGround() const {
     return PlayerPhysics::findSupportHeight(
         m_position.x, m_position.y, m_position.z,
-        [this](int x, int y, int z) { return m_world.getBlock(x, y, z); });
+        [this](int x, int y, int z) { return m_world->getBlock(x, y, z); });
 }
 
 bool Player::isInWater() const {
@@ -759,7 +792,7 @@ bool Player::isInWater() const {
     for (int x = minX; x <= maxX; ++x)
         for (int z = minZ; z <= maxZ; ++z)
             for (int y = minY; y <= maxY; ++y) {
-                const BlockId block = m_world.getBlock(x, y, z);
+                const BlockId block = m_world->getBlock(x, y, z);
                 if (isWater(block) && m_position.y < y + fluidSurfaceHeight(block) &&
                     m_position.y + height > y) return true;
             }
@@ -770,7 +803,7 @@ bool Player::pointInWater(double x, double y, double z) const {
     const int bx = static_cast<int>(std::floor(x));
     const int by = static_cast<int>(std::floor(y));
     const int bz = static_cast<int>(std::floor(z));
-    const BlockId block = m_world.getBlock(bx, by, bz);
+    const BlockId block = m_world->getBlock(bx, by, bz);
     return isWater(block) && y < by + fluidSurfaceHeight(block);
 }
 
@@ -862,7 +895,7 @@ void Player::applyPhysics(float dt) {
 
     // Clamp Y
     if (m_position.y < static_cast<double>(Config::WORLD_MIN_Y)) {
-        if (!m_world.isHeaven()) {
+        if (!m_world->isHeaven()) {
             m_position.y = static_cast<double>(Config::WORLD_MIN_Y) + 0.01;
             m_velocity.y = 0.0f;
             m_onGround = true;
@@ -883,8 +916,8 @@ void Player::updateEnvironment(uint32_t ticks) {
         static_cast<int>(std::floor(m_position.x)),
         static_cast<int>(std::floor(m_position.y)),
         static_cast<int>(std::floor(m_position.z)));
-    const BlockId eyeBlock = m_world.getBlock(eye.x, eye.y, eye.z);
-    const BlockId feetBlock = m_world.getBlock(feet.x, feet.y, feet.z);
+    const BlockId eyeBlock = m_world->getBlock(eye.x, eye.y, eye.z);
+    const BlockId feetBlock = m_world->getBlock(feet.x, feet.y, feet.z);
     if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE)
         ignite(4.0f);
     if (isWater(feetBlock) || isWater(eyeBlock) || m_rainExposed) {
@@ -949,7 +982,7 @@ void Player::updateHighlight() {
         m_highlightedBlock.reset();
         return;
     }
-    auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
+    auto hit = m_world->raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (hit) {
         m_highlightedBlock = hit->blockPos;
     } else {
@@ -958,31 +991,31 @@ void Player::updateHighlight() {
 }
 
 bool Player::breakBlock() {
-    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
     if(!hit)return false;
     auto e=Plugins::event(MC_BREAK_PRE);e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;
-    e.block=static_cast<uint16_t>(m_world.getBlock(e.x,e.y,e.z));e.item=static_cast<uint16_t>(activeItem().id);
+    e.block=static_cast<uint16_t>(m_world->getBlock(e.x,e.y,e.z));e.item=static_cast<uint16_t>(activeItem().id);
     if(!Plugins::dispatch(e))return false;
     if(!breakBlockImpl())return false;
     e.kind=MC_BREAK_POST;e.cancelled=0;Plugins::dispatch(e);return true;
 }
 
 bool Player::breakBlockImpl() {
-    auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
+    auto hit = m_world->raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (hit) {
         glm::ivec3 breakPos = hit->blockPos;
-        BlockId block = m_world.getBlock(
+        BlockId block = m_world->getBlock(
             hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
         if (block == BlockId::SUNFLOWER_TOP &&
-            m_world.getBlock(breakPos.x, breakPos.y - 1, breakPos.z) ==
+            m_world->getBlock(breakPos.x, breakPos.y - 1, breakPos.z) ==
                 BlockId::SUNFLOWER_BOTTOM) {
             --breakPos.y;
             block = BlockId::SUNFLOWER_BOTTOM;
         }
         if (m_gameMode == GameMode::Survival) {
-            const bool blockDrops = m_world.gameRules().boolean(GameRuleId::BlockDrops);
+            const bool blockDrops = m_world->gameRules().boolean(GameRuleId::BlockDrops);
             if (m_entities) {
-                for (const auto& content : m_world.takeBlockEntityContents(hit->blockPos)) {
+                for (const auto& content : m_world->takeBlockEntityContents(hit->blockPos)) {
                     if (blockDrops)
                         m_entities->spawnItem(glm::dvec3(hit->blockPos) + glm::dvec3(0.5), content);
                 }
@@ -1005,9 +1038,9 @@ bool Player::breakBlockImpl() {
                 if (++mutableTool.damage >= getItemProps(mutableTool.id).maxDurability)
                     mutableTool.clear();
             }
-            m_survivalStats.addExhaustion(0.005f);
+            if (m_authority) m_survivalStats.addExhaustion(0.005f);
         }
-        m_world.setBlock(breakPos.x, breakPos.y, breakPos.z, BlockId::AIR);
+        m_world->setBlock(breakPos.x, breakPos.y, breakPos.z, BlockId::AIR);
         if (m_blockBreakCallback) m_blockBreakCallback(breakPos, block);
         return true;
     }
@@ -1021,7 +1054,7 @@ void Player::updateMining(float dt) {
         m_miningSwingSeconds = std::fmod(m_miningSwingSeconds, 0.30f);
         startSwing();
     }
-    auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
+    auto hit = m_world->raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (!hit) {
         m_miningTarget.reset();
         m_miningProgress = 0.0f;
@@ -1033,7 +1066,7 @@ void Player::updateMining(float dt) {
         m_miningProgress = 0.0f;
         m_miningRequired = 0.0f;
     }
-    const BlockId block = m_world.getBlock(
+    const BlockId block = m_world->getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
     const float required = miningSeconds(
         block, m_inventory.slot(static_cast<size_t>(m_selectedSlot)),
@@ -1054,19 +1087,19 @@ void Player::updateMining(float dt) {
 
 bool Player::tryUseInteractiveBlock() {
     if(!m_mouseLocked || m_gameMode==GameMode::Spectator || m_sneakInput || m_actionCooldown>0) return false;
-    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
-    if(!hit || !(m_world.interactDoor(hit->blockPos) || m_world.activateButton(hit->blockPos)))return false;
+    const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    if(!hit || !(m_world->interactDoor(hit->blockPos) || m_world->activateButton(hit->blockPos)))return false;
     startSwing();m_actionCooldown=.15f;return true;
 }
 
 bool Player::placeBlock() {
     if(!m_sneakInput) {
-        const auto target=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
-        if(target && (m_world.interactDoor(target->blockPos) || m_world.activateButton(target->blockPos))) return true;
+        const auto target=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+        if(target && (m_world->interactDoor(target->blockPos) || m_world->activateButton(target->blockPos))) return true;
     }
     const auto block=getItemProps(activeItem().id).placedBlock;
     if(!block)return placeBlockImpl();
-    const auto hit=m_world.raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
+    const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
     if(!hit)return false;
     const auto position=hit->blockPos+hit->faceNormal;
     auto e=Plugins::event(MC_PLACE_PRE);e.x=position.x;e.y=position.y;e.z=position.z;
@@ -1088,14 +1121,14 @@ bool Player::placeBlockImpl() {
         }
     }
 
-    auto hit = m_world.raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
+    auto hit = m_world->raycast(getEyePosition(), m_forward, Config::REACH_DISTANCE);
     if (!hit) return false;
 
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
-    const BlockId targetedBlock = m_world.getBlock(
+    const BlockId targetedBlock = m_world->getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
-    if (m_world.isHeavenSkywayCore(hit->blockPos)) {
-        const auto destination = m_world.heavenSkywayDestination(
+    if (m_world->isHeavenSkywayCore(hit->blockPos)) {
+        const auto destination = m_world->heavenSkywayDestination(
             hit->blockPos, !m_sneakInput);
         if (destination && !checkCollision(destination->x, destination->y,
                                            destination->z))
@@ -1103,7 +1136,7 @@ bool Player::placeBlockImpl() {
         return true;
     }
     if (isBed(targetedBlock)) {
-        const auto foot = m_world.validBedFoot(hit->blockPos);
+        const auto foot = m_world->validBedFoot(hit->blockPos);
         if (!foot) return false;
         if (m_bedCallback) m_bedCallback(*foot);
         return true;
@@ -1128,9 +1161,9 @@ bool Player::placeBlockImpl() {
         if (targetedBlock == BlockId::TNT && m_entities) {
             m_entities->primeTnt(hit->blockPos);
             used = true;
-        } else if (m_world.getBlock(placePos.x, placePos.y, placePos.z) == BlockId::AIR &&
+        } else if (m_world->getBlock(placePos.x, placePos.y, placePos.z) == BlockId::AIR &&
                    (isSolid(targetedBlock) || isFlammable(targetedBlock))) {
-            m_world.setBlock(placePos.x, placePos.y, placePos.z, BlockId::FIRE);
+            m_world->setBlock(placePos.x, placePos.y, placePos.z, BlockId::FIRE);
             used = true;
         }
         if (used && m_gameMode == GameMode::Survival) {
@@ -1143,7 +1176,7 @@ bool Player::placeBlockImpl() {
     BlockId placed = activeProperties.placedBlock.value_or(BlockId::AIR);
     auto& selectedStack=m_inventory.slot(static_cast<size_t>(m_selectedSlot));
     if(canTillBlock(selectedStack.id,targetedBlock,hit->faceNormal.y)){
-        m_world.setBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z,
+        m_world->setBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z,
                          BlockId::FARMLAND);
         if(m_gameMode==GameMode::Survival&&
            ++selectedStack.damage>=activeProperties.maxDurability)
@@ -1157,9 +1190,9 @@ bool Player::placeBlockImpl() {
         const auto& props = getItemProps(stack.id);
         const BlockId hitBlock = targetedBlock;
         if (stack.id == ItemId::WHEAT_SEEDS && isFarmland(hitBlock) &&
-            hit->faceNormal.y > 0 && m_world.getBlock(
+            hit->faceNormal.y > 0 && m_world->getBlock(
                 placePos.x, placePos.y, placePos.z) == BlockId::AIR) {
-            m_world.setBlock(placePos.x, placePos.y, placePos.z, BlockId::WHEAT_0);
+            m_world->setBlock(placePos.x, placePos.y, placePos.z, BlockId::WHEAT_0);
             if (--stack.count == 0) stack.clear();
             return true;
         }
@@ -1169,15 +1202,15 @@ bool Player::placeBlockImpl() {
             if (hit->faceNormal.y <= 0 ||
                 (hitBlock != BlockId::GRASS && hitBlock != BlockId::DIRT &&
                  hitBlock != BlockId::PODZOL) ||
-                m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR)
+                m_world->getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR)
                 return false;
         }
     }
 
     if (isNaturalDecoration(placed) &&
         (hit->faceNormal.y <= 0 ||
-         m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
-         !supportsNaturalDecoration(placed, m_world.getBlock(
+         m_world->getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
+         !supportsNaturalDecoration(placed, m_world->getBlock(
              placePos.x, placePos.y - 1, placePos.z)))) return false;
 
     DoorState door; ButtonState buttonState;
@@ -1188,14 +1221,14 @@ bool Player::placeBlockImpl() {
         const glm::ivec3 out=bedDirectionOffset(door.direction), right(-out.z,0,out.x);
         DoorState neighbor;
         const auto left=placePos-right, rightPos=placePos+right;
-        const bool leftDoor=decodeDoor(m_world.getBlock(left.x,left.y,left.z),neighbor) &&
+        const bool leftDoor=decodeDoor(m_world->getBlock(left.x,left.y,left.z),neighbor) &&
             neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
-        const bool rightDoor=decodeDoor(m_world.getBlock(rightPos.x,rightPos.y,rightPos.z),neighbor) &&
+        const bool rightDoor=decodeDoor(m_world->getBlock(rightPos.x,rightPos.y,rightPos.z),neighbor) &&
             neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
         const glm::dvec3 local=hit->hitPosition-glm::floor(hit->hitPosition);
         const auto obstructed=[&](const glm::ivec3& p) {
-            return int(isFullCollisionBlock(m_world.getBlock(p.x,p.y,p.z)))+
-                int(isFullCollisionBlock(m_world.getBlock(p.x,p.y+1,p.z)));
+            return int(isFullCollisionBlock(m_world->getBlock(p.x,p.y,p.z)))+
+                int(isFullCollisionBlock(m_world->getBlock(p.x,p.y+1,p.z)));
         };
         const int leftSolid=obstructed(left),rightSolid=obstructed(rightPos);
         door.rightHinge=leftDoor || (!rightDoor && (leftSolid>rightSolid || (leftSolid==rightSolid &&
@@ -1203,7 +1236,7 @@ bool Player::placeBlockImpl() {
         const BlockId bottom=doorBlock(door); door.upper=true;
         if(collidesWithPlayer(placePos,bottom) ||
            collidesWithPlayer(placePos+glm::ivec3(0,1,0),doorBlock(door)) ||
-           !m_world.placeDoor(placePos,door)) return false;
+           !m_world->placeDoor(placePos,door)) return false;
         if(m_gameMode==GameMode::Survival && --selectedStack.count==0) selectedStack.clear();
         return true;
     }
@@ -1212,7 +1245,7 @@ bool Player::placeBlockImpl() {
             if(faceOffset(static_cast<FaceDir>(f))==hit->faceNormal) buttonState.attachment=static_cast<FaceDir>(f);
         const float yawRadians=glm::radians(m_yaw);
         buttonState.direction=bedDirectionFromHorizontal({std::sin(yawRadians),std::cos(yawRadians)});
-        if(!m_world.placeButton(placePos,buttonState)) return false;
+        if(!m_world->placeButton(placePos,buttonState)) return false;
         if(m_gameMode==GameMode::Survival && --selectedStack.count==0) selectedStack.clear();
         return true;
     }
@@ -1245,7 +1278,7 @@ bool Player::placeBlockImpl() {
             const BlockId full = architecturalBaseBlock(
                 selectedArchitecture.material);
             if (collidesWithPlayer(hit->blockPos, full)) return false;
-            m_world.setBlock(hit->blockPos.x, hit->blockPos.y,
+            m_world->setBlock(hit->blockPos.x, hit->blockPos.y,
                              hit->blockPos.z, full);
             if (m_gameMode == GameMode::Survival && --selectedStack.count == 0)
                 selectedStack.clear();
@@ -1272,7 +1305,7 @@ bool Player::placeBlockImpl() {
         const glm::ivec3 headPos = placePos + bedDirectionOffset(direction);
         if (collidesWithPlayer(placePos, bedBlock(BedPart::Foot, direction)) ||
             collidesWithPlayer(headPos, bedBlock(BedPart::Head, direction)) ||
-            !m_world.placeBed(placePos, direction)) {
+            !m_world->placeBed(placePos, direction)) {
             return false;
         }
         if (m_gameMode == GameMode::Survival) {
@@ -1284,20 +1317,20 @@ bool Player::placeBlockImpl() {
 
     if (!collidesWithPlayer(placePos, placed)) {
         if (placed == BlockId::SUNFLOWER_BOTTOM) {
-            const BlockId soil = m_world.getBlock(
+            const BlockId soil = m_world->getBlock(
                 placePos.x, placePos.y - 1, placePos.z);
             if (hit->faceNormal.y <= 0 ||
                 (soil != BlockId::GRASS && soil != BlockId::DIRT &&
                  soil != BlockId::PODZOL) ||
                 placePos.y + 1 >= Config::WORLD_MAX_Y ||
-                m_world.getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
-                m_world.getBlock(placePos.x, placePos.y + 1, placePos.z) != BlockId::AIR ||
+                m_world->getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
+                m_world->getBlock(placePos.x, placePos.y + 1, placePos.z) != BlockId::AIR ||
                 collidesWithPlayer(placePos + glm::ivec3(0, 1, 0)))
                 return false;
-            m_world.setBlock(placePos.x, placePos.y + 1, placePos.z,
+            m_world->setBlock(placePos.x, placePos.y + 1, placePos.z,
                              BlockId::SUNFLOWER_TOP);
         }
-        m_world.setBlock(placePos.x, placePos.y, placePos.z, placed);
+        m_world->setBlock(placePos.x, placePos.y, placePos.z, placed);
         if (m_gameMode == GameMode::Survival) {
             auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
             if (--stack.count == 0) stack.clear();
@@ -1322,4 +1355,13 @@ bool Player::collidesWithPlayer(const glm::ivec3& blockPos, BlockId block) const
             return true;
     }
     return false;
+}
+
+void Player::applyReplicaVisualState(const PlayerVisualState& state) {
+    if (m_authority) return;
+    m_swingSequence = state.swingSequence; m_swingProgress = state.swingProgress;
+    m_blocking = state.blocking; m_bowCharging = state.bowCharging;
+    m_bowChargeSeconds = BOW_FULL_CHARGE_SECONDS * (std::sqrt(1 + 3 * state.bowCharge) - 1);
+    const float speed = getItemProps(activeItem().id).attackSpeed > 0 ? getItemProps(activeItem().id).attackSpeed : CombatRules::DEFAULT_ATTACK_SPEED;
+    m_attackTicks = std::max(0.0f, state.attackStrength * CombatRules::attackCooldownTicks(speed) - .5f);
 }

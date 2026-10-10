@@ -22,6 +22,12 @@ class EntityManager;
 class Player {
 public:
     Player(World& world);
+    void bindWorld(World& world, EntityManager* entities);
+    void setRoomPlayerId(uint64_t id) { m_roomPlayerId = id; }
+    void setOrientation(float yaw, float pitch);
+    void setAuthority(bool enabled) { m_authority = enabled; cancelBowCharge(); m_mining = false; }
+    void reconcileReplica(const glm::dvec3& position, const glm::vec3& velocity,
+                          bool grounded, bool flying, PlayerPhysics::Pose pose, bool initial);
 
     // ── Input ───────────────────────────────────────────────────────
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
@@ -48,15 +54,24 @@ public:
     glm::vec3 velocity() const { return m_velocity; }
 
     std::optional<glm::ivec3> getHighlightedBlock() const { return m_highlightedBlock; }
+    void setReplicaMining(float progress, std::optional<glm::ivec3> target) {
+        if (!m_authority) { m_replicaMiningProgress = progress; m_replicaMiningTarget = target; }
+    }
     float getMiningProgress() const {
+        if (!m_authority) return m_highlightedBlock && m_highlightedBlock == m_replicaMiningTarget ? m_replicaMiningProgress : 0;
         if (!m_mining || !m_miningTarget || m_miningRequired <= 0.0f) return 0.0f;
         return std::min(m_miningProgress / m_miningRequired, 1.0f);
     }
 
     bool isMouseLocked() const { return m_mouseLocked; }
     void setMouseLocked(bool locked) {
+        if (m_mouseLocked && !locked) {
+            m_velocity.x = m_velocity.z = 0;
+            if (m_flying) m_velocity.y = 0;
+            m_isSprinting = false;
+        }
         m_mouseLocked = locked;
-        if (!locked) cancelBowCharge();
+        if (!locked) { cancelBowCharge(); m_mining = false; m_miningTarget.reset(); m_miningProgress = 0; }
     }
     void toggleMouseLock() { setMouseLocked(!m_mouseLocked); }
 
@@ -157,9 +172,11 @@ public:
 
     ItemStack activeItem() const;
     PlayerVisualState visualState() const;
+    void applyReplicaVisualState(const PlayerVisualState& state);
 
 private:
-    World& m_world;
+    bool m_authority = true;
+    World* m_world;
     std::function<void(const glm::ivec3&, BlockId)> m_blockBreakCallback;
     std::function<void(float)> m_damageCallback;
     std::function<void(const CombatFeedback&)> m_combatCallback;
@@ -175,6 +192,7 @@ private:
     float m_starstepCooldown = 0.0f;
 
     // View angles
+    uint64_t m_roomPlayerId = 0;
     float m_yaw = 0.0f;
     float m_pitch = 0.0f;
     float m_eyeHeight = Config::EYE_HEIGHT;
@@ -221,6 +239,8 @@ private:
     float m_shieldUseTicks = 0.0f;
     float m_attackTicks = 100.0f;
     uint32_t m_swingSequence = 0;
+    float m_replicaMiningProgress = 0;
+    std::optional<glm::ivec3> m_replicaMiningTarget;
     float m_swingProgress = 1.0f;
     float m_miningSwingSeconds = 0.0f;
     bool m_bowCharging = false;

@@ -182,3 +182,12 @@ PlayerHandTransforms PlayerRenderer::renderThirdPerson(
     }
     return hands;
 }
+
+void PlayerRenderer::shareAssets(const PlayerRenderer& source) {
+    m_asset = source.m_asset; m_graph = source.m_graph; m_handle = source.m_handle;
+    m_headNode = source.m_headNode; m_rightArmNode = source.m_rightArmNode; m_leftArmNode = source.m_leftArmNode;
+    m_mixer.reset(m_asset.get(), m_graph.get());
+    if (m_graph) m_mixer.play(m_graph->actionFor("idle"));
+    m_instance = {}; m_lastSwingSequence = 0; m_locomotion = "idle";
+    m_bowCharging = m_sleeping = m_prone = false; m_bowCharge = m_shieldRaise = 0;
+}

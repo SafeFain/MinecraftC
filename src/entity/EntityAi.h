@@ -9,7 +9,8 @@ enum class NavigationPurpose { Move, BedClaim, WorkClaim };
 
 struct EntityAiState {
     EntityBehavior behavior = EntityBehavior::Idle;
-    uint64_t targetId = 0; // 0 is the separately owned player; hasTarget disambiguates.
+    uint64_t targetId = 0; // 0 denotes a player target; hasTarget disambiguates.
+    uint64_t targetPlayerId = 0; // Transient room identity, never persisted.
     bool hasTarget = false;
     bool targetVisible = false;
     bool retaliating = false;

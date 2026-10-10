@@ -20,6 +20,7 @@ class PlayerRenderer {
 public:
     void initialize(const std::filesystem::path& assetRoot,
                     IGameRenderer& renderer);
+    void shareAssets(const PlayerRenderer& source);
     void update(const PlayerVisualState& state, float dt);
     PlayerHandTransforms renderThirdPerson(IGameRenderer& renderer,
                                 const glm::dvec3& playerPosition,

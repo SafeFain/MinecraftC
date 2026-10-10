@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "game/InventoryModel.h"
+#include "game/InventoryCommands.h"
 #include "core/InputCodes.h"
 #include "ui/UILayout.h"
 
@@ -31,7 +32,15 @@ public:
     bool creativeAccess() const { return m_creativeAccess; }
     bool creativeCatalogButtonContains(int x, int y) const;
 
+void setInventoryCommands(IInventoryCommands* commands) { m_commands = commands; }
+
 private:
+    IInventoryCommands* m_commands = nullptr;
+    bool commandsEnabled() const { return m_commands && m_commands->usesInventoryCommands(); }
+    void syncCommands();
+    std::optional<InventorySlot> logicalSlot(const ItemStack* stack) const;
+    bool command(InventoryOperation operation, ItemStack* stack, uint16_t argument = 0, bool alternate = false);
+    void gesture(InventoryOperation operation, const std::vector<ItemStack*>& targets, bool alternate = false);
     struct Rect { float x = 0, y = 0, w = 44, h = 44; };
 
     InventoryModel& m_inventory;

@@ -33,6 +33,7 @@ public:
     void clearInstances();
     void uploadAll(model::ModelRenderer& renderer);
     const EntityModelDefinition& definition(EntityType type) const;
+    bool hasModel(EntityType type) const;
     void setLocomotion(EntityType type, uint64_t id, float speed);
     bool playAction(EntityType type, uint64_t id, const std::string& semantic,
                     model::PlayPolicy policy = model::PlayPolicy::Replace);

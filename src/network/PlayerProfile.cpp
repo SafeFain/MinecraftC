@@ -9,7 +9,7 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=1;
+constexpr uint16_t PROFILE_VERSION=2;
 constexpr size_t MAX_PROFILE_BYTES=4096;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
@@ -73,6 +73,7 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     for(const auto& stack:profile.inventory.storage()) writeStack(writer,stack);
     for(const auto& stack:profile.inventory.armor()) writeStack(writer,stack);
     writeStack(writer,profile.inventory.offhand());
+    writeStack(writer,profile.cursor); for (auto item : profile.crafting) writeStack(writer,item);
     const auto hash=checksum(writer.bytes);writer.u64(hash);return std::move(writer.bytes);
 }
 PlayerProfile decodeProfile(const Bytes& bytes) {
@@ -80,7 +81,9 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     Bytes payload(bytes.begin(),bytes.end()-8),trailer(bytes.end()-8,bytes.end());Reader check(trailer);
     if(check.u64()!=checksum(payload)) throw ProtocolError("Player profile checksum mismatch");
     Reader reader(payload);
-    if(reader.u32()!=PROFILE_MAGIC || reader.u16()!=PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
+    if(reader.u32()!=PROFILE_MAGIC) throw ProtocolError("Unsupported player profile format");
+    const auto version=reader.u16();
+    if(version<1 || version>PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
     PlayerProfile profile;profile.identity={reader.text(32),reader.text(32),reader.text(64)};
     profile.mode=static_cast<GameMode>(reader.u8());profile.dimension=static_cast<DimensionId>(reader.u8());
     for(size_t i=0;i<2;++i) {const auto positioned=reader.u8();if(positioned>1) throw ProtocolError("Invalid profile flag");profile.positioned[i]=positioned!=0;for(int axis=0;axis<3;++axis) profile.positions[i][axis]=reader.f64();}
@@ -89,7 +92,9 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();
     for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader);
     for(auto& stack:profile.inventory.armor()) stack=readStack(reader);
-    profile.inventory.offhand()=readStack(reader);reader.finish();validateStats(profile);return profile;
+    profile.inventory.offhand()=readStack(reader);
+    if (version >= 2) { profile.cursor=readStack(reader); for (auto& item : profile.crafting) item=readStack(reader); }
+    reader.finish();validateStats(profile);return profile;
 }
 std::filesystem::path ProfileStore::path(const std::string& id) const {
     if(!validIdentity({id,std::string(32,'0'),"Player"})) throw ProtocolError("Invalid player profile identity");
@@ -99,6 +104,12 @@ Identity ProfileStore::localIdentity(const std::filesystem::path& directory) {
     const auto file=directory/"lan-identity";
     if(std::filesystem::exists(file)) return decodeProfile(readFile(file)).identity;
     PlayerProfile profile;profile.identity={randomToken(),randomToken(),"Player"};writeFile(file,encodeProfile(profile));return profile.identity;
+}
+bool ProfileStore::setLocalNickname(const std::filesystem::path& directory, const std::string& nickname) {
+    auto identity = localIdentity(directory); identity.nickname = nickname;
+    if (!validIdentity(identity)) return false;
+    PlayerProfile profile; profile.identity = identity;
+    writeFile(directory/"lan-identity", encodeProfile(profile)); return true;
 }
 std::optional<PlayerProfile> ProfileStore::load(const Identity& identity) const {
     if(!validIdentity(identity)) throw ProtocolError("Invalid player identity");

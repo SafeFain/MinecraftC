@@ -127,6 +127,19 @@ void GameUiController::render(
         }
         if ((settings.controlMode == ControlMode::Touch || (settings.controlMode == ControlMode::Auto && inputs.touchHudVisible)))
             inputs.touchControls.render(renderer);
+        const auto roster = session.roomRoster();
+        if (!roster.empty()) {
+            const float width = std::min(210.0f, uiWidth * .42f), x = uiWidth - width - 8;
+            const float line = 17, top = uiHeight - 10, height = 26 + line * roster.size();
+            renderer.drawRect(x, top - height, width, height, glm::vec4(0,0,0,.48f));
+            UiTheme::textWithShadow(renderer, localization.format("lan.players", {std::to_string(roster.size())}), x + 8, top - 20, .9f, glm::vec4(1));
+            for (size_t i = 0; i < roster.size(); ++i) {
+                const auto& member = roster[i];
+                const auto label = member.nickname + " · " + localization.text(member.dimension == DimensionId::Heaven ? "lan.heaven" : "lan.overworld");
+                const auto scale = UiTheme::fittedScale(renderer, label, .85f, width - 16);
+                UiTheme::textWithShadow(renderer, label, x + 8, top - 39 - i * line, scale, glm::vec4(.9f,.95f,1,1));
+            }
+        }
         auto pluginHud=Plugins::event(MC_HUD);pluginHud.screen_width=static_cast<float>(uiWidth);pluginHud.screen_height=static_cast<float>(uiHeight);Plugins::dispatch(pluginHud);
         renderer.endUIFrame();
     }
@@ -207,6 +220,7 @@ void GameUiController::render(
         renderer.endUIFrame();
     }
 
+    lanCancelRect = glm::vec4(0);
     if (state == GameState::LoadingWorld) {
         const auto loading = session.loadingSnapshot();
         const auto& progress = loading.progress;
@@ -219,7 +233,7 @@ void GameUiController::render(
             loadingTitleKey = "loading.enter_heaven";
         else if (loading.reason == GameSession::LoadingReason::ReturningOverworld)
             loadingTitleKey = "loading.return_overworld";
-        const std::string title = localization.text(loadingTitleKey);
+        const std::string title = localization.text(session.joiningLan() && !session.lanWorldReady() ? "lan.connecting" : loadingTitleKey);
         const std::string status =
             loading.phase == GameSession::LoadingPhase::DistantTerrain
             ? localization.format("loading.lod", {
@@ -252,6 +266,12 @@ void GameUiController::render(
         const float barY = panelY + 26.0f;
         UiTheme::progressBar(renderer, barX, barY, barWidth, 16.0f, fraction,
                              UiTheme::ACCENT);
+        if (session.joiningLan()) {
+            const float cancelWidth = std::min(260.0f, static_cast<float>(uiWidth - 24));
+            lanCancelRect = {(uiWidth - cancelWidth) * .5f, std::max(4.0f, panelY - 48), cancelWidth, 40};
+            UiTheme::button(renderer, lanCancelRect.x, lanCancelRect.y, lanCancelRect.z, lanCancelRect.w,
+                localization.text("lan.cancel_connect"), lanCancelContains(mouseScreenX, mouseScreenY) ? UiTheme::WidgetState::Hover : UiTheme::WidgetState::Normal);
+        }
         renderer.endUIFrame();
     }
 

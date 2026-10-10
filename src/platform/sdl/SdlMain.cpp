@@ -2,6 +2,10 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_messagebox.h>
+#ifdef __ANDROID__
+#include <SDL3/SDL_system.h>
+#include "platform/native/AndroidLanDiscovery.h"
+#endif
 
 #include "core/ApplicationHost.h"
 #include "debug/Log.h"
@@ -42,6 +46,9 @@ ApplicationEvent translateLifecycle(Uint32 type) {
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv) {
     try {
+#ifdef __ANDROID__
+        Platform::initializeAndroidLanDiscovery(SDL_GetAndroidJNIEnv(), SDL_GetAndroidActivity());
+#endif
         auto app = createApplication(argc, argv);
         if (!app) return SDL_APP_SUCCESS;
         *appstate = app.release();

@@ -16,7 +16,7 @@ struct InventorySlot {
 };
 enum class InventoryOperation : uint8_t {
     Click, QuickMove, SwapHotbar, SwapOffhand, Drop, Gather, Distribute,
-    Craft, FillRecipe, CreativeGrant, Close
+    Craft, FillRecipe, CreativeGrant, Close, CreativeClone
 };
 struct InventoryAction {
     uint64_t sequence=0;
@@ -50,6 +50,8 @@ public:
     // Authority-side disconnect/death cleanup does not depend on a client's
     // last sequence or a container that may already have been destroyed.
     std::vector<ItemStack> close(InventoryModel& inventory);
+// Used only after validated profile decoding, never from a gameplay request.
+    void restoreHeld(ItemStack cursor, const std::array<ItemStack, 9>& crafting) { m_cursor = cursor; m_crafting = crafting; ++m_revision; }
 private:
     uint64_t m_revision=0;
     uint64_t m_sequence=0;

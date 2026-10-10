@@ -80,39 +80,77 @@ const std::string& NetworkSocket::error() const { return m_impl->error; }
 bool NetworkSocket::listen(uint16_t port, bool loopbackOnly) {
     close(); m_impl->error.clear();
     if(!initialize()) { m_impl->error="Cannot initialize network sockets"; return false; }
-    // Dual-stack IPv6 listener accepts IPv4 mapped peers as well.
-    m_impl->descriptor=::socket(AF_INET6,SOCK_STREAM,IPPROTO_TCP);
-    if(m_impl->descriptor==INVALID_DESCRIPTOR) { m_impl->fail(lastError()); return false; }
-    int reuse=1;
+    // Prefer a dual-stack listener; IPv4-only systems still support LAN rooms.
+    for (int family : {AF_INET6, AF_INET}) {
+        m_impl->descriptor = ::socket(family, SOCK_STREAM, IPPROTO_TCP);
+        if (m_impl->descriptor == INVALID_DESCRIPTOR) { m_impl->fail(lastError()); continue; }
+        int reuse = 1;
 #ifdef _WIN32
-    if(setsockopt(m_impl->descriptor,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,reinterpret_cast<const char*>(&reuse),sizeof(reuse))!=0) {
+        const int reuseOption = SO_EXCLUSIVEADDRUSE;
 #else
-    if(setsockopt(m_impl->descriptor,SOL_SOCKET,SO_REUSEADDR,reinterpret_cast<const char*>(&reuse),sizeof(reuse))!=0) {
+        const int reuseOption = SO_REUSEADDR;
 #endif
-        m_impl->fail(lastError()); close(); return false;
+        bool configured = setsockopt(m_impl->descriptor, SOL_SOCKET, reuseOption,
+            reinterpret_cast<const char*>(&reuse), sizeof(reuse)) == 0;
+        sockaddr_storage endpoint{}; AddressLength length;
+        if (family == AF_INET6) {
+            int ipv6Only = 0;
+            configured = configured && setsockopt(m_impl->descriptor, IPPROTO_IPV6, IPV6_V6ONLY,
+                reinterpret_cast<const char*>(&ipv6Only), sizeof(ipv6Only)) == 0;
+            auto& address = *reinterpret_cast<sockaddr_in6*>(&endpoint);
+            address.sin6_family = AF_INET6; address.sin6_port = htons(port);
+            address.sin6_addr = loopbackOnly ? in6addr_loopback : in6addr_any;
+            length = sizeof(address);
+        } else {
+            auto& address = *reinterpret_cast<sockaddr_in*>(&endpoint);
+            address.sin_family = AF_INET; address.sin_port = htons(port);
+            address.sin_addr.s_addr = htonl(loopbackOnly ? INADDR_LOOPBACK : INADDR_ANY);
+            length = sizeof(address);
+        }
+        if (!configured) { m_impl->fail(lastError()); close(); continue; }
+        if (!nonblocking(m_impl->descriptor)) { m_impl->fail(lastError()); close(); return false; }
+        if (::bind(m_impl->descriptor, reinterpret_cast<sockaddr*>(&endpoint), length) != 0) {
+            const int error = lastError(); m_impl->fail(error); close();
+#ifdef _WIN32
+            const bool unavailable = error == WSAEAFNOSUPPORT || error == WSAEADDRNOTAVAIL;
+#else
+            const bool unavailable = error == EAFNOSUPPORT || error == EADDRNOTAVAIL;
+#endif
+            if (family == AF_INET6 && unavailable) continue;
+            return false;
+        }
+        if (::listen(m_impl->descriptor, 16) != 0) { m_impl->fail(lastError()); close(); return false; }
+        m_impl->error.clear(); return true;
     }
-    int ipv6Only=0;
-    if(setsockopt(m_impl->descriptor,IPPROTO_IPV6,IPV6_V6ONLY,reinterpret_cast<const char*>(&ipv6Only),sizeof(ipv6Only))!=0) {
-        m_impl->fail(lastError()); close(); return false;
-    }
-    sockaddr_in6 address{}; address.sin6_family=AF_INET6; address.sin6_port=htons(port);
-    address.sin6_addr=loopbackOnly ? in6addr_loopback : in6addr_any;
-    if(!nonblocking(m_impl->descriptor) || ::bind(m_impl->descriptor,reinterpret_cast<sockaddr*>(&address),sizeof(address))!=0 || ::listen(m_impl->descriptor,16)!=0) {
-        m_impl->fail(lastError()); close(); return false;
-    }
-    return true;
+    return false;
 }
+
 bool NetworkSocket::connect(const std::string& host, uint16_t port) {
     close(); m_impl->error.clear();
     if(!initialize() || host.empty() || !port) { m_impl->error="Invalid network endpoint"; return false; }
+    std::string numericHost = host;
+    uint32_t scope = 0;
+    const auto zone = numericHost.find('%');
+    if (zone != std::string::npos) {
+        const auto suffix = numericHost.substr(zone + 1);
+        if (suffix.empty() || suffix.size() > 10) { m_impl->error = "Invalid IPv6 scope"; return false; }
+        uint64_t value = 0;
+        for (char character : suffix) {
+            if (character < '0' || character > '9') { m_impl->error = "IPv6 scope must be an interface index"; return false; }
+            value = value * 10 + static_cast<unsigned>(character - '0');
+        }
+        if (!value || value > UINT32_MAX) { m_impl->error = "Invalid IPv6 scope"; return false; }
+        scope = static_cast<uint32_t>(value); numericHost.resize(zone);
+    }
     sockaddr_storage address{}; AddressLength size=0;
     auto* ipv4=reinterpret_cast<sockaddr_in*>(&address);
     auto* ipv6=reinterpret_cast<sockaddr_in6*>(&address);
     int family=AF_INET;
-    if(inet_pton(AF_INET,host.c_str(),&ipv4->sin_addr)==1) {
+    if(inet_pton(AF_INET,numericHost.c_str(),&ipv4->sin_addr)==1) {
+        if (scope) { m_impl->error = "IPv4 addresses cannot have a scope"; return false; }
         ipv4->sin_family=AF_INET; ipv4->sin_port=htons(port); size=sizeof(sockaddr_in);
-    } else if(inet_pton(AF_INET6,host.c_str(),&ipv6->sin6_addr)==1) {
-        family=AF_INET6; ipv6->sin6_family=AF_INET6; ipv6->sin6_port=htons(port); size=sizeof(sockaddr_in6);
+    } else if(inet_pton(AF_INET6,numericHost.c_str(),&ipv6->sin6_addr)==1) {
+        family=AF_INET6; ipv6->sin6_family=AF_INET6; ipv6->sin6_port=htons(port); ipv6->sin6_scope_id=scope; size=sizeof(sockaddr_in6);
     } else { m_impl->error="Enter a numeric IPv4 or IPv6 address"; return false; }
     m_impl->descriptor=::socket(family,SOCK_STREAM,IPPROTO_TCP);
     if(m_impl->descriptor==INVALID_DESCRIPTOR) { m_impl->fail(lastError()); return false; }

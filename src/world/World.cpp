@@ -130,6 +130,9 @@ void World::resetForNewSeed(
     m_fluidLightingPositions.clear();
     m_fluidMutationIndices.clear();
     m_currentFluidTick = 0;
+    m_replicaMode = false;
+    m_streamer.setExternalSnapshots(false);
+    m_streamer.setRenderDistanceLimit(std::numeric_limits<int>::max());
     m_persistence.clear();
     m_supportDrops.clear();
     m_pendingDoorPower.clear();
@@ -497,7 +500,7 @@ void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
 
 void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
                              bool recordOverride) {
-    if (!Config::isValidWorldY(worldY)) return;
+    if (m_replicaMode || !Config::isValidWorldY(worldY)) return;
     // Flowing/falling states are derived simulation output. Even public
     // placement calls must not turn them into persisted overrides; only
     // source states and ordinary player blocks belong in saves.
@@ -524,6 +527,8 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
         lx + lz * Config::CHUNK_SIZE_X +
         Config::worldYToStorageY(worldY) *
             Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+    if (m_blockMutationCallback)
+        m_blockMutationCallback(cx, cz, chunk->blockRevision(), localIndex, id, recordOverride);
     if (recordOverride) {
         m_persistence.recordOverride(cx, cz, localIndex, id);
     }

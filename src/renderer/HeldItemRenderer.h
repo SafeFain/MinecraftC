@@ -34,7 +34,8 @@ public:
                        const glm::vec3& tip, const glm::mat4& viewProjection);
     void renderThirdPerson(const ItemStack& item, const glm::mat4& viewProjection,
                            const glm::mat4& handTransform,
-                           const ItemStack& offhand, const glm::mat4& leftHandTransform);
+                           const ItemStack& offhand, const glm::mat4& leftHandTransform,
+                           const HeldItemUseState* useState = nullptr);
     void renderDropped(const ItemStack& item, const glm::mat4& viewProjection,
                        const glm::vec3& position, float ageSeconds, uint32_t phaseSeed,
                        SmoothLightSample light);

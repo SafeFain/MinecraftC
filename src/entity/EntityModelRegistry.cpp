@@ -180,6 +180,11 @@ void EntityModelRegistry::clearInstances() {
     m_seen.clear();
 }
 
+bool EntityModelRegistry::hasModel(EntityType type) const {
+    return std::any_of(m_definitions.begin(), m_definitions.end(),
+        [type](const EntityModelDefinition& definition) { return definition.type == type; });
+}
+
 const EntityModelDefinition& EntityModelRegistry::definition(EntityType type) const {
     for (const auto& definition : m_definitions)
         if (definition.type == type) return definition;

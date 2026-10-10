@@ -149,11 +149,17 @@ public:
         : m_world(world), m_chunks(chunks), m_generator(generator) {}
     ~ChunkStreamer();
 
+    // Called after worker drainage / reset when changing authority roles.
+    void setExternalSnapshots(bool enabled) { m_externalSnapshots = enabled; }
+    void setRenderDistanceLimit(int limit) { m_renderDistanceLimit = limit; m_interestsChanged = true; }
     void setThreadPool(ThreadPool* pool) { m_threadPool = pool; }
     void setSaveStore(SaveStore* store) { m_saveStore = store; }
 
     // The local render target remains independent of guest interests. All
     // interests share the existing bounded load/generation/retirement budgets.
+    void setLocalRenderEnabled(bool enabled) {
+        if (m_localRenderEnabled != enabled) { m_localRenderEnabled = enabled; m_interestsChanged = true; }
+    }
     void setAdditionalInterests(std::vector<StreamingInterest> interests);
 
     // Update chunk loading/unloading around the player position.
@@ -214,6 +220,9 @@ private:
 
     int m_chunksPerFrame = 16;  // First frame loads more
     bool m_firstUpdate = true;
+    bool m_localRenderEnabled = true;
+    bool m_externalSnapshots = false;
+    int m_renderDistanceLimit = std::numeric_limits<int>::max();
     std::vector<StreamingInterest> m_additionalInterests;
     bool m_interestsChanged = false;
     int priorityDistance(int chunkX, int chunkZ) const;

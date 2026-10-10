@@ -70,6 +70,8 @@ void ApplicationInputRouter::beginFrame(RuntimeClock::Tick now,
 
 void ApplicationInputRouter::handleFrameInput(float dt) {
     // ── Handle input ──────────────────────────────────────────
+    m_session.setLocalControl(m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
+        !m_ui.commandOpen && !m_ui.activeMenu && !m_session.isPlayerDead() && !m_window.isMinimized());
     if (m_flow.state() == GameState::Playing && !m_ui.inventoryOpen &&
         !m_ui.commandOpen && !m_ui.activeMenu) {
         double dx, dy;
@@ -312,6 +314,9 @@ void ApplicationInputRouter::handleKeyEvent(
         return;
     }
 
+    if (key == Key::Escape && action == ButtonAction::Press && m_flow.state() == GameState::LoadingWorld && m_session.joiningLan()) {
+        m_flow.backToMainMenu(); return;
+    }
     // ESC handling
     if (key == Key::Escape && action == ButtonAction::Press) {
         // Close inventory first if open
@@ -363,6 +368,10 @@ void ApplicationInputRouter::handleMouseButtonEvent(
         return binding.device == InputDevice::Mouse && binding.code == button;
     };
     m_ui.updateMouseScreenPosition(m_window);
+    if (m_flow.state() == GameState::LoadingWorld && m_session.joiningLan() && button == MouseButton::Left &&
+        action == ButtonAction::Release && m_ui.lanCancelContains(m_ui.mouseScreenX, m_ui.mouseScreenY)) {
+        m_flow.backToMainMenu(); return;
+    }
     if (action == ButtonAction::Press && mouseBound(InputAction::Fullscreen)) {
         auto* settingsMenu = dynamic_cast<SettingsMenu*>(m_ui.activeMenu.get());
         if (!settingsMenu || !settingsMenu->capturingKeyboardMouse()) {
@@ -537,6 +546,10 @@ void ApplicationInputRouter::dispatchTouchCommands(
 void ApplicationInputRouter::dispatchUiTouchButton(
     int button, ButtonAction action, const glm::vec2& position) {
     const int x = static_cast<int>(position.x), y = static_cast<int>(position.y);
+    if (m_flow.state() == GameState::LoadingWorld && m_session.joiningLan() && button == MouseButton::Left &&
+        action == ButtonAction::Release && m_ui.lanCancelContains(x, y)) {
+        m_flow.backToMainMenu(); return;
+    }
     if (m_ui.inventoryOpen && (m_ui.tradeOpen ||
         m_ui.playerInventoryViewOpen(m_session.playerState()) || m_ui.containerOpen)) {
         if (!m_ui.containerOpen && !m_ui.tradeOpen &&
@@ -713,6 +726,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
             if (target == BlockId::CRAFTING_TABLE && m_session.playerState().isSurvival()) {
                 m_flow.openInventory();
                 m_ui.survivalInventory.setCraftingTable(true);
+                m_session.openInventoryWindow(InventoryWindowKind::CraftingTable, hit->blockPos);
                 m_session.pluginUse(true);
                 return;
             }
@@ -776,6 +790,7 @@ void ApplicationInputRouter::updateGamepadUi(RuntimeClock::Tick now) {
         m_inputs.gamepadRepeatTick = now + RuntimeClock::fromSeconds(.35);
     m_inputs.gamepadNavX = navX; m_inputs.gamepadNavY = navY;
     navigate = navigate && (navX || navY);
+    if (pressB && m_flow.state() == GameState::LoadingWorld && m_session.joiningLan()) { m_flow.backToMainMenu(); return; }
     if (navigate || pressA || pressB || pressX || pressY) m_inputs.uiPointerVisible = false;
     if (m_ui.inventoryOpen) {
         if (navigate) {

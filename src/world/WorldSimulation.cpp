@@ -14,7 +14,13 @@
 
 void WorldSimulation::tickSurvival(const glm::dvec3& playerPosition,
                                    uint64_t tick, bool raining) {
-    m_playerPosition = playerPosition;
+    tickSurvival(std::vector<glm::dvec3>{playerPosition}, tick, raining);
+}
+
+void WorldSimulation::tickSurvival(const std::vector<glm::dvec3>& playerPositions,
+                                   uint64_t tick, bool raining) {
+    m_playerPositions = playerPositions;
+    if (m_playerPositions.empty()) return;
     const int64_t speed = m_world.gameRules().integer(GameRuleId::RandomTickSpeed);
     if (speed == 0) return;
     // Generated farms must enter the same random-tick path as planted crops.
@@ -43,9 +49,13 @@ void WorldSimulation::tickSurvival(const glm::dvec3& playerPosition,
             if (!isFarmland(block) && !isSapling(block) &&
                 !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)) return;
             if (!m_chunks.isGenerated(key.first, key.second)) return;
-            const double dx = key.first * 16.0 + 8.0 - playerPosition.x;
-            const double dz = key.second * 16.0 + 8.0 - playerPosition.z;
-            if (dx * dx + dz * dz > Config::RANDOM_TICK_RADIUS * Config::RANDOM_TICK_RADIUS) return;
+            const bool nearPlayer = std::any_of(m_playerPositions.begin(), m_playerPositions.end(),
+                [&](const glm::dvec3& position) {
+                    const double dx = key.first * 16.0 + 8.0 - position.x;
+                    const double dz = key.second * 16.0 + 8.0 - position.z;
+                    return dx * dx + dz * dz <= Config::RANDOM_TICK_RADIUS * Config::RANDOM_TICK_RADIUS;
+                });
+            if (!nearPlayer) return;
             int x = 0, z = 0, y = 0;
             decodeChunkIndex(index, x, z, y);
             sections[{key.first, key.second, (y + 64) / 16}].push_back({
@@ -166,7 +176,10 @@ void WorldSimulation::tickWeather(const WeatherSystem& weather, bool daytime,
     const int64_t fireRadius = m_world.gameRules().integer(GameRuleId::FireSpreadRadiusAroundPlayer);
     for (const FireCell& cell : fires) {
         const glm::ivec3 p = cell.position;
-        if (fireRadius == 0 || (fireRadius > 0 && glm::distance(glm::dvec3(p), m_playerPosition) > static_cast<double>(fireRadius))) continue;
+        if (fireRadius == 0 || (fireRadius > 0 && std::none_of(
+                m_playerPositions.begin(), m_playerPositions.end(), [&](const glm::dvec3& position) {
+                    return glm::distance(glm::dvec3(p), position) <= static_cast<double>(fireRadius);
+                }))) continue;
         if (m_world.getBlock(p.x, p.y, p.z) != BlockId::FIRE) {
             m_fireAges.erase(p);
             continue;

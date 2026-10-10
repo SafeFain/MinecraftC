@@ -32,6 +32,9 @@ struct MenuCallbacks {
     std::function<void(const std::string&, const std::string&, GameMode, WorldType, bool)> onCreateWorld;
     std::function<std::vector<WorldSummary>()> onRefreshWorlds;
     std::function<bool(const std::string&)> onDeleteWorld;
+    std::function<void()> onOpenLanJoin;
+    std::function<void()> onOpenLanHost;
+    std::function<bool()> canHostLan;
     std::function<void()> onResume;
     std::function<void()> onBackToMenu;
     std::function<void()> onQuit;

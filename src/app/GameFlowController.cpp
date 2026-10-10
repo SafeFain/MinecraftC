@@ -28,7 +28,10 @@ GameFlowController::GameFlowController(
     ClientSettings& settings, platform::Clipboard& clipboard)
     : m_session(session), m_ui(ui), m_scene(scene), m_audio(audio),
       m_window(window), m_clock(clock), m_settings(settings),
-      m_clipboard(clipboard) {}
+      m_clipboard(clipboard) {
+    m_ui.survivalInventory.setInventoryCommands(&session);
+    m_ui.containerScreen.setInventoryCommands(&session);
+}
 
 void GameFlowController::startGame(const std::string& worldId, bool newWorld) {
     saveCurrentWorld();
@@ -42,6 +45,7 @@ void GameFlowController::startGame(const std::string& worldId, bool newWorld) {
     m_ui.survivalInventory.setCreativeAccess(mode == GameMode::Creative);
     m_audio.stopRain();
     m_scene.resetForWorld(m_session.playerState().getPosition());
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
     m_ui.activeMenu.reset();
     m_ui.commandOpen = false;
@@ -55,12 +59,14 @@ void GameFlowController::startGame(const std::string& worldId, bool newWorld) {
 
 void GameFlowController::completeLoading() {
     m_state = GameState::Playing;
+    m_session.setLocalControl(true);
     m_window.setCursorLocked(true);
 }
 
 void GameFlowController::beginDimensionLoading() {
     m_audio.setMusicMode(musicModeFor(m_session.activeDimension()));
     m_state = GameState::LoadingWorld;
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
     m_ui.activeMenu.reset();
     m_ui.commandOpen = false;
@@ -72,6 +78,7 @@ void GameFlowController::beginDimensionLoading() {
 void GameFlowController::pause() {
     m_audio.setPaused(true);
     m_state = GameState::Paused;
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
     m_ui.activeMenu = std::make_unique<PauseMenu>(
         m_ui.menuCallbacks, m_ui.localization);
@@ -80,6 +87,7 @@ void GameFlowController::pause() {
 void GameFlowController::resume() {
     m_audio.setPaused(false);
     m_state = GameState::Playing;
+    m_session.setLocalControl(true);
     m_window.setCursorLocked(true);
     m_ui.activeMenu.reset();
 }
@@ -90,13 +98,15 @@ void GameFlowController::backToMainMenu() {
     m_audio.stopRain();
     m_audio.setPaused(false);
     m_state = GameState::MainMenu;
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
     showMainMenu();
 }
 
 void GameFlowController::abortPluginSession(const std::string& error) {
     m_session.abortPluginWorld();m_audio.stopRain();m_audio.setPaused(false);
-    m_state=GameState::MainMenu;m_window.setCursorLocked(false);showMainMenu();showCommandMessage(error);
+    m_state=GameState::MainMenu;m_session.setLocalControl(false);
+    m_window.setCursorLocked(false);showMainMenu();showCommandMessage(error);
 }
 
 void GameFlowController::respawnPlayer() {
@@ -104,20 +114,23 @@ void GameFlowController::respawnPlayer() {
     m_session.respawn(m_clock.now());
     if (wasHeaven) beginDimensionLoading();
     m_scene.resetPlayerFeedback(m_session.playerState().getPosition());
-    if (!wasHeaven) m_window.setCursorLocked(true);
+    if (!wasHeaven) { m_session.setLocalControl(true); m_window.setCursorLocked(true); }
 }
 
 void GameFlowController::openInventory() {
     if (m_session.playerState().isSpectator()) return;
     m_session.cancelBowCharge();
+    m_session.openInventoryWindow(InventoryWindowKind::Player);
     if (m_session.playerState().isSurvival() && !m_ui.inventoryOpen)
         m_ui.survivalInventory.setCraftingTable(false);
     m_ui.openInventory(
         m_session.playerState().gameMode() == GameMode::Creative);
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
 }
 
 void GameFlowController::closeInventory() {
+    const bool closeWindow = m_ui.tradeOpen || (!m_ui.containerOpen && !playerInventoryViewOpen());
     if (m_ui.tradeOpen) {
         m_ui.tradeScreen.close();
     } else if (m_ui.containerOpen) {
@@ -128,18 +141,21 @@ void GameFlowController::closeInventory() {
     m_ui.containerOpen = false;
     m_ui.tradeOpen = false;
     m_ui.inventoryOpen = false;
+    if (closeWindow) m_session.closeInventoryWindow();
+    m_session.setLocalControl(true);
     m_window.setCursorLocked(true);
 }
 
 void GameFlowController::openCommandInput(const std::string& initialText) {
     m_ui.openCommand();
     m_ui.commandInput.setText(initialText);
+    m_session.setLocalControl(false);
     m_window.setCursorLocked(false);
 }
 
 void GameFlowController::closeCommandInput() {
     m_ui.closeCommand();
-    if (m_state == GameState::Playing) m_window.setCursorLocked(true);
+    if (m_state == GameState::Playing) { m_session.setLocalControl(true); m_window.setCursorLocked(true); }
 }
 
 void GameFlowController::executeCommand() {
@@ -147,11 +163,13 @@ void GameFlowController::executeCommand() {
     closeCommandInput();
     if (submitted.empty()) return;
     if (submitted.front() != '/') {
-        showCommandMessage(m_ui.localization.format("message.chat_self", {submitted}));
+        if (m_session.hostingLan() || m_session.joiningLan()) {
+            if (!m_session.sendLanChat(submitted)) showCommandMessage(m_ui.localization.text("lan.chat_failed"));
+        } else showCommandMessage(m_ui.localization.format("message.chat_self", {submitted}));
         return;
     }
 
-    if(Plugins::commandDispatcher() && Plugins::commandDispatcher()(submitted))return;
+    if(!m_session.joiningLan() && Plugins::commandDispatcher() && Plugins::commandDispatcher()(submitted))return;
     const CommandParseResult result = parseCommand(submitted);
     if (result.error) {
         showCommandError(submitted, *result.error);
@@ -171,7 +189,8 @@ void GameFlowController::executeCommand() {
         showCommandMessage(message);
     if (execution.teleported) {
         m_state = GameState::LoadingWorld;
-        m_window.setCursorLocked(false);
+        m_session.setLocalControl(false);
+    m_window.setCursorLocked(false);
         m_scene.resetForWorld(m_session.playerState().getPosition());
     }
 }
@@ -179,6 +198,7 @@ void GameFlowController::executeCommand() {
 void GameFlowController::openPlayerInventoryView() {
     if (m_session.playerState().gameMode() != GameMode::Creative) return;
     m_ui.openPlayerInventoryTab();
+    m_session.openInventoryWindow(InventoryWindowKind::Player);
 }
 
 void GameFlowController::giveCreativeItem(ItemId id, int hotbarSlot) {
@@ -238,4 +258,14 @@ void GameFlowController::showMainMenu() {
     m_ui.activeMenu = std::make_unique<MainMenu>(
         m_ui.menuCallbacks, m_session.listWorlds(), m_settings,
         m_ui.localization, &m_clipboard);
+}
+
+bool GameFlowController::joinLanGame(const std::string& address, uint16_t port) {
+    if (!m_session.joinLanRoom(address, port, RuntimeClock::seconds(m_clock.now()))) return false;
+    m_state = GameState::LoadingWorld; m_ui.activeMenu.reset();
+    m_ui.inventoryOpen = m_ui.tradeOpen = m_ui.containerOpen = false;
+    m_ui.commandOpen = false; m_ui.hotbar.setInventory(&m_session.inventory());
+    m_session.setLocalControl(false);
+    m_window.setCursorLocked(false); m_audio.stopRain(); m_audio.setPaused(false);
+    m_scene.resetForWorld(m_session.playerState().getPosition()); return true;
 }

@@ -1,15 +1,42 @@
 # LAN multiplayer implementation
 
-Status: **In progress. There is no host/join menu or playable multiplayer session
-in the application yet.** This document describes the implemented foundation,
-not a completed user-facing feature. The approved task remains active in PLAN.md.
+Status: **Implemented and validated locally on Linux/software Vulkan.
+Platform build and device coverage are distinguished below.**
+
+## Playing on a LAN
+
+1. Load a compatible world, open Pause → Open to LAN, choose the port and room
+   capacity, then open the room. The default port is TCP 25565, capacity includes
+   the host, and PvP starts disabled. The host can change PvP or close the room.
+2. On another installation, choose LAN Multiplayer from the main menu. Refresh
+   the room list, enter a nickname, then select a compatible room with space.
+   Direct connection accepts the host's numeric IPv4 or IPv6 address and port;
+   IPv6 link-local addresses use a numeric scope suffix such as `%5`.
+3. Wait for the selected terrain, lighting and meshes to finish loading. Escape,
+   gamepad Back or the Cancel button leaves a connecting/loading session. Use
+   the ordinary gameplay controls and chat. Administrative commands belong to
+   the host and retain the world's normal cheats permission.
+
+Discovery uses `_minecraftc._tcp.local.` and multicast UDP 5353. A room uses two
+TCP connections on the chosen host port, separating control from terrain transfer.
+Devices need a mutually reachable local network; a numeric direct connection is
+available when multicast discovery is unavailable. Host pause keeps the room
+running. Sending the host application to the background saves players and closes
+the room; sending a client to the background leaves its session.
+
+The local user-data `lan-identity` file supplies a persistent identity/credential.
+The host keeps guest profiles under each world's `players` directory. Rejoining
+restores that guest's inventory, health, bed spawn and dimension positions.
+Protocol/game/generation incompatibilities and gameplay plugins reject admission.
+Visual plugins remain usable. The vanilla host save stays at v18 with generation
+v20 and Heaven v9; guest sidecars use their independent profile v2 format.
 
 ## Implemented foundation
 
 - `Platform::NetworkSocket` owns nonblocking native TCP handles. IPv4/IPv6 numeric
   connections, a dual-stack listener, bounded reads/writes and closure/error
   handling are isolated inside the native adapter. Windows links Winsock.
-- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v1 uses a
+- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v2 uses a
   little-endian, 20-byte header (magic, protocol, type, length, sequence), a 1 MiB
   payload limit, a 4 MiB connection queue limit and 128 ready-frame limit.
   Scalars reject non-finite values; strings reject NUL and invalid UTF-8.
@@ -23,7 +50,7 @@ not a completed user-facing feature. The approved task remains active in PLAN.md
   increasing counters per channel. Network polling has a per-connection 256 KiB
   I/O allowance per direction. These APIs perform no game or GPU mutation.
 - `Lan::ProfileStore` stores local identity and credential plus checked,
-  atomically replaced per-world player sidecars. Profile v1 contains independent
+  atomically replaced per-world player sidecars. Profile v2 retains v1 reading and adds held cursor/crafting contents. It contains independent
   dimension positions, bed spawn, game mode, survival values and inventory. It
   does not change save v18, block IDs or generation output. Admission validation
   only reads existing profiles; callers save a new profile after actual admission.
@@ -37,25 +64,95 @@ not a completed user-facing feature. The approved task remains active in PLAN.md
 - World streaming accepts up to seven guest interests with radii 2–16 chunks,
   bounded by the existing shared load/generation/retirement windows. CPU
   simulation and local rendered chunk lists are independent. Guest progress
-  cannot satisfy the host's rendering/loading gate. The application does not
-  currently submit guest interests.
+  cannot satisfy the host's rendering/loading gate. GameSession submits interests for independent guest players and retains occupied
+  dimensions while the host travels.
 
-## Integration still required
+## Current application integration
 
-1. Replace the single-player session ownership with per-dimension simulation and
-   separate player runtime state, including independent sleep/death/fishing.
-2. Connect authority-side movement/action validation and multi-player mob targeting,
-   pickup, combat and explosions. Bind inventory windows and trading to requests
-   rather than the current UI's direct writes.
-3. Define and implement actual player/entity/environment/chunk payloads, initial
-   loading, revision recovery, interest subscriptions, LOD edits, interpolation
-   and local movement prediction. Reserved message types are not implementations.
-4. Connect profiles to admission, autosave and disconnect; add host-only command
-   permissions, PvP configuration and the gameplay-plugin exclusion.
-5. Implement DNS-SD discovery, host/join/cancel/room settings, nicknames, chat,
-   remote player rendering, localization, mobile permissions and lifecycle.
-6. Verify playable multi-process and cross-device sessions. Native adapter code
-   alone does not establish Windows/Apple/Android runtime compatibility.
+Main menu → LAN Multiplayer lists discovered rooms and offers direct numeric
+IPv4/IPv6 address, port and nickname entry. Desktop uses pinned mjansson/mdns;
+Apple uses Bonjour and Android uses NSD. Native services and platform metadata
+are implemented; physical/cross-platform validation remains outstanding.
+In a loaded world, Pause → Open to LAN opens/closes a 2–8-player room and controls
+PvP (off by default). Gameplay plugins prevent opening/joining. Host pause and
+loading keep room simulation/polling active. Connection/loading can be cancelled by Escape, gamepad Back or a pointer/touch button. Room chat uses authoritative names, bounded UTF-8 messages and per-player rate limits. Join/leave notices are localized. Background closes a host room or
+leaves a joined room; disconnected clients return to the main menu.
+
+Each dimension retains its world, entities, environment and save ownership.
+Guest movement intent is simulated with server elapsed time; client movement is
+predicted and corrected. Server snapshots carry private owner storage/crafting,
+public other-player views and clocks/weather. Near terrain uses bounded RLE
+snapshots and revision deltas; clients derive lighting/meshes and request full
+recovery on a revision gap. They do not generate/edit/save authoritative near chunks.
+
+Inventory screens submit logical gestures, serialize one pending request at a
+time and wait for acknowledgement. Window IDs, inventory/container fingerprints,
+permissions, reach, destruction and dimension changes reject stale requests.
+Authority handles death/disconnect cursor cleanup, personal profiles, fishing,
+per-player bed occupancy/respawn/travel and per-dimension sleep percentages.
+Player melee/sweep and arrows respect room PvP and identify the shooter separately
+from entity IDs. Host-only administrative commands reject guest local execution.
+
+Entity snapshots carry at most 512 live and 128 dying entities per player interest,
+including item stacks and villager appearance/quotes. Replicas interpolate visual
+instances and never run authoritative entity AI. Other players share model GPU
+assets but retain separate animations, held-item use and fishing lines. Trade
+requests bind inventory/quote revisions and recheck server reach and sight. Live
+game rules and difficulty update clients after bootstrap.
+
+Seeded distant terrain has an owned temporary cache. Selected LOD tile requests
+receive host persistent edits, including cold saved chunks, with versioned
+invalidations and stale-result rejection. Eight client requests, 4096 subscriptions
+and two global server worker jobs bound this lane. Subscription identities reject
+late results after cancel/re-add; superseded CPU replacements never cross the
+GPU upload boundary. Authoritative near terrain
+still never generates locally. Global roster includes both dimensions. Feedback
+events provide combat, fishing, explosions, lightning and interactive block sounds;
+owner mining and held-item visuals are replicated. LAN labels cover all ten languages.
+
+## Platform validation
+
+Linux Release and the explicit `vulkan_lan_smoke` target build locally. Independent
+host/client processes pass full terrain loading, authoritative movement and 100
+joined Vulkan frames at 960×640 and 360×640 under Xvfb/llvmpipe. Captures show the
+remote host and held sword, villager, dropped item, terrain and roster. This is
+software Vulkan coverage; physical GPU and separate-device latency are unmeasured.
+
+Real TCP regression covers near recovery, private inventory/window/trade races,
+chat, mixed mob/item/arrow/TNT presentation, cold negative and coarse distant edits,
+subscription cancellation, stale pending/in-flight meshes, maximum LOD selection,
+guest-only Heaven terrain loading, reconnect, destroyed-bed fallback and manual/
+immediate respawn. The complete final CTest suite passed 63/63 in 537.51s,
+including real local DNS-SD without skips. The last host-loading persistence
+check also passed; host saves guest profiles and terrain while changing dimensions.
+
+| Platform | Local evidence | Remaining coverage |
+|---|---|---|
+| Linux | Release build, real loopback TCP/mDNS, joined software Vulkan | Physical GPUs and separate devices |
+| Windows | MinGW TCP/discovery object compilation and session/protocol syntax | Full MSVC build, Windows runtime/device discovery |
+| Android | SDK 35 Java compilation, NDK arm64 API 29 native/session/SDL-entry syntax | Gradle APK and device lifecycle/discovery |
+| macOS/iOS | Bonjour implementation and service/privacy bundle metadata; earlier public-header API check | Apple SDK builds and device permission/discovery |
+
+An Android SDK/NDK is available locally; Gradle and a wrapper are unavailable.
+An Apple SDK/device is unavailable on this Linux host. Local syntax checks are
+not packaged application or cross-device execution tests. Movement prediction
+uses correction against received authority state; it does not rewind/replay an
+input history. Desktop discovery re-enumerates interfaces when refreshed.
+
+## Reproducing the joined Vulkan check
+
+Build the optional scene, then run its orchestrator on a display:
+
+```bash
+cmake --build build-local --target vulkan_lan_smoke -j2
+python3 tools/lan_vulkan_smoke.py --binary build-local/vulkan_lan_smoke --assets assets
+```
+
+On Linux without a display, prefix the Python command with `xvfb-run -a` and set
+`SDL_VIDEODRIVER=x11`; select the installed Vulkan driver as appropriate. Add
+`--width 360 --height 640` for portrait coverage. Each run creates an isolated
+temporary directory containing host/client logs, saves, movement completion and
+`joined.ppm`; `--output <directory>` retains runs beneath a chosen evidence root.
 
 ## Regression coverage
 
