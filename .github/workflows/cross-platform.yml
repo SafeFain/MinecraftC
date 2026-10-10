@@ -449,12 +449,18 @@ jobs:
       - name: Package unsigned arm64 device IPA
         shell: bash
         run: |
+          # Reuse the pinned sources fetched by the simulator build; device
+          # configuration and compiled dependencies keep their own build tree.
+          test -f build-ios-simulator/_deps/glm-src/CMakeLists.txt
+          test -f build-ios-simulator/_deps/sdl3-src/CMakeLists.txt
           cmake -S . -B build-ios-device -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+            -DFETCHCONTENT_SOURCE_DIR_GLM="$PWD/build-ios-simulator/_deps/glm-src" \
+            -DFETCHCONTENT_SOURCE_DIR_SDL3="$PWD/build-ios-simulator/_deps/sdl3-src" \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
           archive="$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.xcarchive"
           build_settings="$RUNNER_TEMP/minecraftc-ios-device-build-settings.txt"
