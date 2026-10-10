@@ -1,4 +1,5 @@
 #include "app/GameSession.h"
+#include "plugins/PluginManager.h"
 #include "app/GameScenePresenter.h"
 #include "app/GameUiController.h"
 #include "app/ApplicationInputController.h"
@@ -36,6 +37,9 @@ struct GameSessionTestAccess {
         WorldMetadata::PersistedEntity villager; villager.type = static_cast<uint8_t>(EntityType::Villager);
         villager.position = {-2,1.01,6.5}; villager.health = 20; villager.villager.profession = VillagerProfession::Farmer;
         session.entities().loadEntities({villager}); session.entities().spawnItem({2.5,1.3,6.5},{ItemId::EMERALD,2,0});
+        if(!Plugins::content().blocks.empty()) {
+            session.world().setBlock(1,1,5,Plugins::resolveBlock("official_content:crystal_block"));
+        }
         session.dayNightCycle().setPhase(.25f);
     }
     static Player& player(GameSession& session) { return session.player; }
@@ -46,17 +50,26 @@ struct GameSessionTestAccess {
 };
 
 int main(int argc, char** argv) {
-    if (argc != 4 && argc != 6) { std::cerr << "Usage: vulkan_lan_smoke --host|--client <assets> <isolated-run-directory> [width height]\n"; return 2; }
+    if (argc != 4 && argc != 5 && argc != 6 && argc != 7) { std::cerr << "Usage: vulkan_lan_smoke --host|--client <assets> <isolated-run-directory> [width height] [--plugins]\n"; return 2; }
     try {
-        const int width = argc == 6 ? std::stoi(argv[4]) : 960, height = argc == 6 ? std::stoi(argv[5]) : 640;
+        const bool pluginMode=(argc==5||argc==7)&&std::string(argv[argc-1])=="--plugins";
+        require((argc!=5&&argc!=7)||pluginMode,"invalid smoke option");
+        const int width = argc >= 6 ? std::stoi(argv[4]) : 960, height = argc >= 6 ? std::stoi(argv[5]) : 640;
         require(width >= 320 && width <= 1920 && height >= 320 && height <= 1080,"invalid smoke viewport");
         const std::string role = argv[1]; const auto assets = std::filesystem::absolute(argv[2]); const std::filesystem::path root = argv[3];
         std::filesystem::create_directories(root);
+        std::unique_ptr<Plugins::PluginManager> plugins;
+        if(pluginMode) {
+            const auto data=root/(role=="--host"?"host":"client");std::filesystem::create_directories(data);
+            {std::ofstream config(data/"plugins.json");config<<(role=="--host"?"{\"official_content\":true}":"{\"official_content\":true,\"official_atmosphere\":true}");}
+            plugins=std::make_unique<Plugins::PluginManager>(RuntimePaths{assets,data});plugins->initialize();
+        }
         Config::RENDER_DISTANCE = 2;
         const auto started = std::chrono::steady_clock::now();
         auto now = [&] { return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(); };
         if (role == "--host") {
             GameSession session(root / "host" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+            Plugins::contextProvider()=[&]{return session.pluginContext();};
             const auto world = session.createWorld("Rendered LAN",42,GameMode::Survival,Difficulty::Peaceful,true,WorldType::Superflat);
             session.startWorld(world,true,0); GameSessionTestAccess::scene(session); session.setLanNickname("Host");
             require(session.openLanRoom(0,2,true),"listen room failed");
@@ -69,7 +82,7 @@ int main(int argc, char** argv) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(4));
             }
             require(std::filesystem::exists(root / "client-done") && moved,"separate client did not complete authoritative movement/rendering");
-            session.closeLanRoom(); session.leaveWorld(); std::cout << "Separate host accepted and simulated client movement\n";
+            session.closeLanRoom(); session.leaveWorld(); if(plugins)plugins->shutdown(); std::cout << "Separate host accepted and simulated client movement\n";
         } else if (role == "--client") {
             uint16_t port = 0; { std::ifstream input(root / "port"); input >> port; } require(port != 0,"missing host port");
             Window window(width,height,"MinecraftC LAN smoke",Window::SurfaceMode::Vulkan,false,false);
@@ -77,10 +90,12 @@ int main(int argc, char** argv) {
             std::cout << VulkanGiSmokeProbe::deviceDescription(renderer) << '\n';
             GameSession session(root / "client" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low}); session.setLanNickname("Guest");
             session.initializeEntityModels(assets,renderer);
+            Plugins::contextProvider()=[&]{return session.pluginContext();};
             GameScenePresenter presenter; presenter.initialize(renderer,assets);
             SmokeClipboard clipboard; GameUiController ui(GameSessionTestAccess::player(session).inventory(),clipboard);
             ui.localization.load(assets); ui.renderer.initialize(renderer,renderer.getBlockAtlasTexture(),assets); ui.renderer.setLocalization(ui.localization);
             ClientSettings settings; settings.renderClouds = false; settings.guiScale = 1;
+            if(plugins)plugins->operations.hudText=[&](float x,float y,const std::string& text,const glm::vec4& color){ui.renderer.renderTextAlpha(text,x,y,1,glm::vec3(color),color.a);};
             ApplicationInputController inputs;
             require(session.joinLanRoom("::1",port,now()),"replica could not connect");
             int frames = 0; double previous = now(); bool loaded = false;
@@ -102,6 +117,8 @@ int main(int argc, char** argv) {
                 if (capture) {
                     require(session.remotePlayers().size() == 1 && session.entityState().entities().size() == 2 &&
                             !presenter.visibleChunks.empty() && session.roomRoster().size() == 2,"joined scene is missing replicated players/entities/terrain/roster");
+                    if(pluginMode)require(Plugins::content().runtimeFault.empty(),"plugin callbacks failed during Vulkan presentation");
+                    if(pluginMode)require(session.worldState().getBlock(1,1,5)==Plugins::resolveBlock("official_content:crystal_block"),"plugin terrain missing from joined Vulkan scene");
                     const auto rgba = VulkanGiSmokeProbe::readCapture(renderer); require(rgba.size() == static_cast<size_t>(width)*height*4,"invalid Vulkan capture");
                     std::ofstream output(root / "joined.ppm",std::ios::binary); output << "P6\n" << width << ' ' << height << "\n255\n";
                     for (size_t i = 0; i < rgba.size(); i += 4) output.write(reinterpret_cast<const char*>(rgba.data()+i),3);
@@ -110,7 +127,7 @@ int main(int argc, char** argv) {
                 ++frames; std::this_thread::sleep_for(std::chrono::milliseconds(8));
             }
             require(frames == 100,"joined Vulkan scene timed out");
-            renderer.waitIdle(); ui.renderer.resetGraphics(); presenter.resetGraphics(); session.invalidateGpuMeshes(); session.leaveWorld();
+            renderer.waitIdle(); ui.renderer.resetGraphics(); presenter.resetGraphics(); session.invalidateGpuMeshes(); session.leaveWorld(); if(plugins)plugins->shutdown();
             { std::ofstream done(root / "client-done"); done << "100 joined Vulkan frames\n"; }
             std::cout << "Guest rendered replicated host, villager, item, terrain and global roster\n";
         } else throw std::runtime_error("unknown smoke role");

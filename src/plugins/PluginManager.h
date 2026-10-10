@@ -27,7 +27,7 @@ struct Dependency {
     bool optional=false;
 };
 struct Manifest {
-    std::string id,name,version,gameMinimum,gameMaximum,entry,data;
+    std::string id,name,version,gameMinimum,gameMaximum,entry,data,networkCompatibility;
     std::vector<Dependency> dependencies;
     std::vector<std::string> before,after,conflicts;
     bool visual=false, builtin=false, defaultEnabled=true;
@@ -41,6 +41,8 @@ struct PluginInfo {
 };
 struct HostOperations {
     std::function<bool(MC_PlayerSnapshot&)> player;
+    std::function<std::vector<uint64_t>()> players;
+    std::function<bool(uint64_t,MC_PlayerSnapshot&,uint32_t&)> playerById;
     std::function<bool(int32_t,int32_t,int32_t,uint16_t&)> getBlock;
     std::function<bool(int32_t,int32_t,int32_t,uint16_t)> setBlock;
     std::function<bool(uint16_t,uint32_t)> giveItem;
@@ -73,7 +75,7 @@ public:
     int32_t material(MC_PluginContext&,const MC_Material&);
     int32_t recipe(MC_PluginContext&,const MC_Recipe&);
     int32_t subscribe(MC_PluginContext&,uint32_t,int32_t,MC_EventCallback,void*);
-    int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*);
+    int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*,uint32_t flags=0);
     int32_t enqueue(MC_PluginContext&,std::function<bool()>);
     int32_t storage(MC_PluginContext&,bool,bool,const char*,char*,uint32_t);
     uint32_t phase() const {return m_phase;}
@@ -86,7 +88,7 @@ private:
         std::unique_ptr<MC_PluginContext> context;
     };
     struct Listener {size_t plugin;uint32_t kind;int32_t priority;MC_EventCallback callback;void* userdata;};
-    struct Command {size_t plugin;MC_EventCallback callback;void* userdata;};
+    struct Command {size_t plugin;MC_EventCallback callback;void* userdata;uint32_t flags=0;};
     RuntimePaths m_paths;
     MC_Host m_host{};
     std::vector<PluginInfo> m_info;
@@ -101,6 +103,7 @@ private:
     size_t m_hudOperations=0;
     void loadData(MC_PluginContext&,const Json&);
     void validateContent();
+    void buildNetworkDescription();
     void owned(MC_PluginContext&,const std::string&) const;
 };
 const MC_Plugin* builtinContent(uint32_t);

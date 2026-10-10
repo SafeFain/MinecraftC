@@ -95,8 +95,8 @@ bool LanDiscovery::advertise(const LanAdvertisement& room) {
     if (!DiscoveryValidation::valid(room)) { m_impl->error = "Invalid LAN advertisement"; return false; }
     Environment environment; auto* env = environment.env;
     if (!env || !bridge) { m_impl->error = "Android NSD unavailable"; return false; }
-    const std::array<std::string, 9> fields{room.instance, room.name, room.version, std::to_string(room.port),
-        std::to_string(room.protocol), std::to_string(room.generation), std::to_string(room.players), std::to_string(room.capacity), room.pvp ? "1" : "0"};
+    const std::array<std::string, 10> fields{room.instance, room.name, room.version, std::to_string(room.port),
+        std::to_string(room.protocol), std::to_string(room.generation), std::to_string(room.players), std::to_string(room.capacity), room.pvp ? "1" : "0", room.contentSignature};
     const auto stringClass = env->FindClass("java/lang/String");
     const auto array = env->NewObjectArray(fields.size(), stringClass, nullptr);
     for (size_t i = 0; i < fields.size(); ++i) { const auto value = javaString(env, fields[i]); env->SetObjectArrayElement(array, static_cast<jsize>(i), value); env->DeleteLocalRef(value); }
@@ -123,13 +123,13 @@ void LanDiscovery::poll(double now) {
             const auto count = std::min<jsize>(64, env->GetArrayLength(rows));
             for (jsize i = 0; i < count; ++i) {
                 const auto row = static_cast<jobjectArray>(env->GetObjectArrayElement(rows, i));
-                if (row && env->GetArrayLength(row) == 10) {
-                    std::array<std::string, 10> fields;
-                    for (jsize j = 0; j < 10; ++j) { const auto value = static_cast<jstring>(env->GetObjectArrayElement(row, j)); fields[j] = nativeString(env, value); if (value) env->DeleteLocalRef(value); }
+                if (row && env->GetArrayLength(row) == 11) {
+                    std::array<std::string, 11> fields;
+                    for (jsize j = 0; j < 11; ++j) { const auto value = static_cast<jstring>(env->GetObjectArrayElement(row, j)); fields[j] = nativeString(env, value); if (value) env->DeleteLocalRef(value); }
                     LanDiscoveredRoom room; room.instance = fields[0]; room.name = fields[1]; room.version = fields[2]; room.address = fields[3];
                     room.port = static_cast<uint16_t>(DiscoveryValidation::number(fields[4], 65535)); room.protocol = static_cast<uint16_t>(DiscoveryValidation::number(fields[5], 65535));
                     room.generation = DiscoveryValidation::number(fields[6], UINT32_MAX); room.players = static_cast<uint8_t>(DiscoveryValidation::number(fields[7], 8));
-                    room.capacity = static_cast<uint8_t>(DiscoveryValidation::number(fields[8], 8)); room.pvp = fields[9] == "1";
+                    room.capacity = static_cast<uint8_t>(DiscoveryValidation::number(fields[8], 8)); room.pvp = fields[9] == "1"; room.contentSignature = fields[10];
                     if (DiscoveryValidation::valid(room)) m_impl->rooms.push_back(std::move(room));
                 }
                 if (row) env->DeleteLocalRef(row);

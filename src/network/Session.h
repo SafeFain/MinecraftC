@@ -10,6 +10,7 @@ struct Compatibility {
     std::string gameVersion;
     uint32_t generationVersion=0;
     uint64_t contentSignature=0;
+    std::map<std::string,std::string> content;
 };
 struct Identity {
     std::string id;
@@ -40,7 +41,7 @@ struct SessionEvents {
 class Host {
 public:
     bool open(uint16_t port, const Compatibility& compatibility, size_t capacity=MAX_PLAYERS, bool loopbackOnly=false);
-    void close();
+    void close(const std::string& reason={});
     SessionEvents poll(double now);
     bool send(uint64_t peer, Message message, bool chunks=false);
     void disconnect(uint64_t peer);
@@ -74,15 +75,17 @@ public:
     const std::string& error() const { return m_error; }
 private:
     State m_state=State::Idle;
+    Compatibility m_compatibility;
     std::unique_ptr<Connection> m_control,m_chunks;
     std::string m_address,m_error;
     uint16_t m_port=0;
     uint64_t m_peer=0;
     uint64_t m_receivedControl=0,m_receivedChunks=0;
     uint64_t m_sentControl=0,m_sentChunks=0;
-    double m_started=0,m_lastReceive=0,m_lastPing=0;
+    double m_started=0,m_lastReceive=0,m_lastPing=0,m_bulkFailedAt=-1;
     void fail(const std::string& reason);
 };
+uint64_t contentSignature(const std::map<std::string,std::string>& content);
 std::string randomToken();
 bool validIdentity(const Identity& identity);
 }

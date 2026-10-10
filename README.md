@@ -334,7 +334,8 @@ in the creative catalog; for example, `/give stone_bricks 64` requires cheats.
 Official builtin plugins and user data/native packages can extend blocks, items, recipes,
 interaction, environment colors and HUD. Enable them through the main menu’s Plugins page
 and restart. See [plugin installation and SDK](docs/plugins.md) for platform support,
-examples and world compatibility. `--safe-mode` starts with optional plugins disabled.
+examples and world compatibility. LAN rooms support matching gameplay plugins; visual-only
+plugins may differ. Install required plugins locally before joining. `--safe-mode` starts with optional plugins disabled.
 
 ### Doors and buttons (generation v20 / save v18)
 

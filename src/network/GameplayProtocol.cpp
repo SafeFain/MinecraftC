@@ -1,3 +1,4 @@
+#include "network/ContentIds.h"
 #include "network/GameplayProtocol.h"
 #include <cmath>
 
@@ -45,7 +46,7 @@ void slotValid(InventorySlot slot) {
     if (area >= limits.size() || slot.index >= limits[area]) throw ProtocolError("Invalid inventory slot");
 }
 void actionValid(const GameAction& action) {
-    if (!action.sequence || !action.epoch || action.kind > ActionKind::Trade ||
+    if (!action.sequence || !action.epoch || action.kind > ActionKind::PluginCommand ||
         action.windowKind > InventoryWindowKind::Container ||
         action.inventory.operation > InventoryOperation::CreativeClone || action.inventory.targets.size() > 64)
         throw ProtocolError("Invalid game action");
@@ -63,8 +64,9 @@ Bytes encodeGameAction(const GameAction& action) {
     const auto& inventory = action.inventory;
     writer.u64(inventory.revision); writer.u64(inventory.containerRevision);
     writer.u8(static_cast<uint8_t>(inventory.operation)); writer.u8(static_cast<uint8_t>(inventory.slot.area)); writer.u8(inventory.slot.index);
-    writer.u16(inventory.argument); writer.u8(inventory.alternate); writer.u8(static_cast<uint8_t>(inventory.targets.size()));
+    writer.u16(inventory.operation==InventoryOperation::CreativeGrant?encodeItemId(static_cast<ItemId>(inventory.argument)):inventory.argument); writer.u8(inventory.alternate); writer.u8(static_cast<uint8_t>(inventory.targets.size()));
     for (auto target : inventory.targets) { writer.u8(static_cast<uint8_t>(target.area)); writer.u8(target.index); }
+    writer.text(action.command,512);
     return std::move(writer.bytes);
 }
 GameAction decodeGameAction(const Bytes& bytes) {
@@ -76,11 +78,15 @@ GameAction decodeGameAction(const Bytes& bytes) {
     auto& inventory = action.inventory;
     inventory.revision = reader.u64(); inventory.containerRevision = reader.u64();
     inventory.operation = static_cast<InventoryOperation>(reader.u8()); inventory.slot.area = static_cast<InventoryArea>(reader.u8()); inventory.slot.index = reader.u8();
-    inventory.argument = reader.u16(); const auto alternate = reader.u8();
+    inventory.argument = reader.u16();
+    if(inventory.operation==InventoryOperation::CreativeGrant)inventory.argument=static_cast<uint16_t>(decodeItemId(inventory.argument));
+    const auto alternate = reader.u8();
     if (alternate > 1) throw ProtocolError("Invalid action flag");
     inventory.alternate = alternate != 0;
     const auto count = reader.u8(); if (count > 64) throw ProtocolError("Too many inventory targets");
     for (uint8_t i = 0; i < count; ++i) inventory.targets.push_back({static_cast<InventoryArea>(reader.u8()), reader.u8()});
+    action.command=reader.text(512);
+    if(action.kind!=ActionKind::PluginCommand&&!action.command.empty())throw ProtocolError("Unexpected command text");
     reader.finish(); actionValid(action); return action;
 }
 }

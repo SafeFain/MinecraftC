@@ -169,6 +169,8 @@ void GameFlowController::executeCommand() {
         return;
     }
 
+    const auto commandName=submitted.substr(0,submitted.find(' '));
+    if(m_session.joiningLan() && commandName.find(':')!=std::string::npos){if(!m_session.sendPluginCommand(submitted))showCommandMessage(m_ui.localization.text("lan.chat_failed"));return;}
     if(!m_session.joiningLan() && Plugins::commandDispatcher() && Plugins::commandDispatcher()(submitted))return;
     const CommandParseResult result = parseCommand(submitted);
     if (result.error) {

@@ -105,6 +105,8 @@ Manifest Manifest::parse(const Json& j) {
     Manifest m;m.id=j.at("id").text();m.name=j.text("name",m.id);m.version=j.at("version").text();Version::parse(m.version);
     check(validKey(m.id+":test")&&m.id!="minecraftc","Invalid/reserved plugin ID");
     check(j.numeric("api",0)==MC_PLUGIN_ABI,"Unsupported plugin API");
+    m.networkCompatibility=j.text("network_compatibility");
+    check(m.networkCompatibility.size()<=128,"Network compatibility identifier is too long");
     m.visual=j.flag("visual_only",false);m.defaultEnabled=j.flag("enabled_by_default",true);
     m.gameMinimum=j.text("game_min");m.gameMaximum=j.text("game_max");m.data=j.text("data");
     if(j.has("native")) {
@@ -197,6 +199,37 @@ PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
     m_host.config_write=[](MC_PluginContext* c,const char* value){return checked(c,[&]{manager(c).storage(*c,false,true,value,nullptr,0);});};
     m_host.world_data_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,true,false,nullptr,out,cap);});};
     m_host.world_data_write=[](MC_PluginContext* c,const char* value){return checked(c,[&]{manager(c).storage(*c,true,true,value,nullptr,0);});};
+    m_host.query_extension=[](MC_PluginContext* c,const char* name,uint32_t version)->const void* {
+        static const MC_MultiplayerV1 api{
+            sizeof(MC_MultiplayerV1),1,
+            [](MC_PluginContext* ctx,uint32_t* out){return checked(ctx,[&]{check(out,"Missing role output");*out=context().role;});},
+            [](MC_PluginContext* ctx,uint64_t* out,uint32_t capacity,uint32_t* count){return checked(ctx,[&]{
+                auto& m=manager(ctx);check(count&&m.operations.players,"No active player list");const auto ids=m.operations.players();
+                *count=static_cast<uint32_t>(ids.size());if(out){check(capacity>=ids.size(),"Player buffer is too small");std::copy(ids.begin(),ids.end(),out);}});},
+            [](MC_PluginContext* ctx,uint64_t id,MC_PlayerSnapshot* out,uint32_t* dimension){return checked(ctx,[&]{
+                auto& m=manager(ctx);check(out&&out->size>=sizeof(*out)&&dimension&&m.operations.playerById&&m.operations.playerById(id,*out,*dimension),"Player is unavailable");});},
+            [](MC_PluginContext* ctx,uint64_t id,uint16_t item,uint32_t count){return checked(ctx,[&]{
+                auto& m=manager(ctx);check(isValidItemId(static_cast<ItemId>(item))&&item&&count&&count<=4096,"Invalid item/count");
+                MC_PlayerSnapshot snapshot{};snapshot.size=sizeof(snapshot);uint32_t dimension=0;
+                check(m.operations.playerById&&m.operations.playerById(id,snapshot,dimension),"Player is unavailable");
+                auto actor=context();actor.player=id;actor.dimension=dimension;ActorScope scope(actor);
+                m.enqueue(*ctx,[&m,item,count]{return m.operations.giveItem&&m.operations.giveItem(item,count);});});},
+            [](MC_PluginContext* ctx,uint32_t dimension,int32_t x,int32_t y,int32_t z,uint16_t* id){return checked(ctx,[&]{
+                check(dimension<=1,"Invalid dimension");auto actor=context();actor.dimension=dimension;ActorScope scope(actor);
+                auto& m=manager(ctx);check(id&&m.operations.getBlock&&m.operations.getBlock(x,y,z,*id),"Block is unavailable");});},
+            [](MC_PluginContext* ctx,uint32_t dimension,int32_t x,int32_t y,int32_t z,uint16_t id){return checked(ctx,[&]{
+                check(dimension<=1&&validBlock(static_cast<BlockId>(id)),"Invalid dimension/block");
+                auto actor=context();actor.dimension=dimension;ActorScope scope(actor);auto& m=manager(ctx);
+                m.enqueue(*ctx,[&m,x,y,z,id]{return m.operations.setBlock&&m.operations.setBlock(x,y,z,id);});});},
+            [](MC_PluginContext* ctx,const char* name,uint32_t flags,MC_EventCallback callback,void* data){
+                const auto result=checked(ctx,[&]{manager(ctx).addCommand(*ctx,name,callback,data,flags);});
+                if(result&&ctx)ctx->registrationFailed=true;
+                return result;}
+        };
+        const void* result=nullptr;
+        checked(c,[&]{check(name,"Missing extension name");if(std::string(name)==MC_MULTIPLAYER_EXTENSION&&version==1)result=&api;});
+        return result;
+    };
 }
 PluginManager::~PluginManager(){shutdown();}
 void PluginManager::owned(MC_PluginContext& ctx,const std::string& key) const {
@@ -279,21 +312,25 @@ int32_t PluginManager::subscribe(MC_PluginContext& c,uint32_t kind,int32_t prior
     if(m_info[c.index].manifest.visual)check(kind<=MC_SHUTDOWN||kind==MC_ENVIRONMENT||kind==MC_HUD,"Visual-only plugin requested gameplay event");
     m_listeners.push_back({c.index,kind,priority,callback,data});return 0;
 }
-int32_t PluginManager::addCommand(MC_PluginContext& c,const char* name,MC_EventCallback callback,void* data) {
-    const std::string key=required(name);owned(c,key);check(callback&&m_commands.emplace(key,Command{c.index,callback,data}).second,"Invalid/duplicate command");return 0;
+int32_t PluginManager::addCommand(MC_PluginContext& c,const char* name,MC_EventCallback callback,void* data,uint32_t flags) {
+    const std::string key=required(name);owned(c,key);check(flags<=MC_COMMAND_ALLOW_GUEST,"Invalid command permission");check(callback&&m_commands.emplace(key,Command{c.index,callback,data,flags}).second,"Invalid/duplicate command");return 0;
 }
 int32_t PluginManager::enqueue(MC_PluginContext& c,std::function<bool()> operation) {
     check(content().runtimeFault.empty(),"Plugin runtime requires restart");
+    check(context().role!=MC_CLIENT,"Client gameplay mutations are unavailable");
     check(m_world&&m_phase!=MC_ENVIRONMENT&&m_phase!=MC_HUD&&m_phase!=MC_WORLD_CLOSE,"World mutations are unavailable in this phase");
     check(!m_info[c.index].manifest.visual,"Visual-only plugins cannot modify gameplay");
-    check(m_queue.size()<Config::PLUGIN_MAX_OPERATIONS,"Plugin operation queue is full");m_queue.push_back(std::move(operation));return 0;
+    check(m_queue.size()<Config::PLUGIN_MAX_OPERATIONS,"Plugin operation queue is full");const auto actor=context();
+    m_queue.push_back([actor,operation=std::move(operation)]{ActorScope scope(actor);return operation();});return 0;
 }
 int32_t PluginManager::storage(MC_PluginContext& c,bool world,bool write,const char* input,char* output,uint32_t capacity) {
     const auto& info=m_info.at(c.index);std::filesystem::path path;
     if(world) {
         check(m_world&&operations.worldDirectory,"No active world");
         check(!info.manifest.visual,"Visual-only plugins have no persisted world state");
-        path=operations.worldDirectory()/"plugin_data"/(info.manifest.id+".json");
+        check(context().role!=MC_CLIENT,"Client world data is unavailable");
+        const auto root=operations.worldDirectory();check(!root.empty(),"No writable world");
+        path=root/"plugin_data"/(info.manifest.id+".json");
     } else path=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");
     if(write) {std::string text=required(input);check(text.size()<=65536,"Plugin state exceeds size limit");Json::parse(text);if(world)enqueue(c,[path,text]{writeText(path,text);return true;});else writeText(path,text);}
     else {check(output&&capacity,"Invalid read buffer");std::string text="{}";if(std::filesystem::exists(path)){check(std::filesystem::file_size(path)<=65536,"Plugin state exceeds size limit");std::ifstream file(path);check(static_cast<bool>(file),"Cannot read plugin state");text.assign(std::istreambuf_iterator<char>(file),{});}check(text.size()<capacity&&text.size()<=65536,"State buffer is too small");std::copy(text.begin(),text.end(),output);output[text.size()]='\0';}
@@ -314,6 +351,43 @@ void PluginManager::validateContent() {
         if(!entry.second.dropKey.empty())entry.second.drop=resolveItem(entry.second.dropKey);
     }
     for(const auto& entry:content().items)check(materialExists(entry.second.material),"Unknown item material");
+}
+void PluginManager::buildNetworkDescription() {
+    auto& state=content();
+    for(const auto& entry:state.blocks) {
+        const auto& b=entry.second;
+        state.networkDescription["block/"+b.key]=nlohmann::json::array({b.properties.solid,b.properties.transparent,
+            static_cast<int>(b.properties.shape),static_cast<int>(b.properties.layer),b.survival.hardness,
+            static_cast<int>(b.survival.preferredTool),static_cast<int>(b.survival.minimumHarvestTier),
+            b.survival.unbreakable,b.emission,itemKey(b.drop)}).dump();
+    }
+    for(const auto& entry:state.items) {
+        const auto& i=entry.second.properties;
+        state.networkDescription["item/"+entry.second.key]=nlohmann::json::array({static_cast<int>(i.kind),i.maxStack,
+            i.maxDurability,static_cast<int>(i.tool),static_cast<int>(i.tier),i.attackDamage,i.attackSpeed,i.food,
+            i.saturation,i.placedBlock?blockKey(*i.placedBlock):std::string{}}).dump();
+    }
+    auto stack=[](const ItemStack& value){return nlohmann::json::array({itemKey(value.id),value.count,value.damage});};
+    for(const auto& entry:state.crafting) {
+        const auto& r=entry.second;auto inputs=nlohmann::json::array();
+        for(auto id:r.ingredients)inputs.push_back(itemKey(id));
+        state.networkDescription["crafting/"+entry.first]=nlohmann::json::array({r.width,r.height,r.allowMirror,r.allowPlankVariants,inputs,stack(r.output)}).dump();
+    }
+    for(const auto& entry:state.smelting) {
+        const auto& r=entry.second;
+        state.networkDescription["smelting/"+entry.first]=nlohmann::json::array({itemKey(r.input),stack(r.output),r.cookTicks}).dump();
+    }
+    for(const auto& command:m_commands)state.networkDescription["command/"+command.first]=std::to_string(command.second.flags);
+    std::map<uint32_t,nlohmann::json> callbacks;
+    for(const auto& listener:m_listeners)if(!m_info[listener.plugin].manifest.visual) {
+        if(!callbacks.count(listener.kind))callbacks[listener.kind]=nlohmann::json::array();
+        callbacks[listener.kind].push_back(nlohmann::json::array({m_info[listener.plugin].manifest.id,listener.priority}));
+    }
+    for(const auto& entry:callbacks)state.networkDescription["callbacks/"+std::to_string(entry.first)]=entry.second.dump();
+    auto removed=state.removeCrafting;std::sort(removed.begin(),removed.end());
+    if(!removed.empty())state.networkDescription["removed/crafting"]=nlohmann::json(removed).dump();
+    removed=state.removeSmelting;std::sort(removed.begin(),removed.end());
+    if(!removed.empty())state.networkDescription["removed/smelting"]=nlohmann::json(removed).dump();
 }
 void PluginManager::initialize(bool safeMode) {
     check(!m_initialized,"Plugin manager already initialized");m_initialized=true;
@@ -370,6 +444,15 @@ void PluginManager::initialize(bool safeMode) {
             check(!loaded.context->registrationFailed,"Plugin ignored a failed registration");
             validateContent();
             if(!info.manifest.visual)content().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?std::string("builtin-api1-content1"):std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
+            if(!info.manifest.visual) {
+                const auto& m=info.manifest;
+                const auto config=m_paths.dataRoot/"config"/"plugins"/(m.id+".json");
+                const auto value=std::filesystem::exists(config)?([&]{readJson(config);std::ifstream file(config);return nlohmann::json::parse(file);}()):nlohmann::json::object();
+                const std::string behavior=m.builtin?"builtin-api1-content1":m.entry.empty()?"data-api1":
+                    !m.networkCompatibility.empty()?"declared:"+m.networkCompatibility:"package:"+fingerprint(info.root,"");
+                content().networkDescription["plugin/"+m.id]=nlohmann::json::array({m.version,behavior}).dump();
+                content().networkDescription["config/"+m.id]=value.dump();
+            }
             info.status="Loaded";
         }catch(const std::exception& e) {
             info.active=false;info.status=e.what();if(!loaded.context->error.empty())info.status+=" ("+loaded.context->error+")";
@@ -380,10 +463,21 @@ void PluginManager::initialize(bool safeMode) {
         }
     }
     std::stable_sort(m_listeners.begin(),m_listeners.end(),[](const auto& a,const auto& b){return a.priority>b.priority;});
-    freezeContent();m_phase=MC_INITIALIZE;dispatcher()=[this](MC_Event& e){dispatch(e);};commandDispatcher()=[this](const std::string& s){return command(s);};
+    freezeContent();
+    buildNetworkDescription();m_phase=MC_INITIALIZE;dispatcher()=[this](MC_Event& e){dispatch(e);};commandDispatcher()=[this](const std::string& s){return command(s);};
     auto ready=event(MC_INITIALIZE);dispatch(ready);
+    // Initialization may persist default options. Match the configuration that
+    // the loaded plugins actually start with, without changing save fingerprints.
+    for(const auto& info:m_info)if(info.active&&!info.manifest.visual) {
+        const auto path=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");
+        if(std::filesystem::exists(path)) {
+            readJson(path);std::ifstream file(path);
+            content().networkDescription["config/"+info.manifest.id]=nlohmann::json::parse(file).dump();
+        }
+    }
 }
 void PluginManager::dispatch(MC_Event& e) {
+    const ActorScope actorScope({e.player_id,e.dimension,e.role});
     check(!m_dispatching,"Recursive plugin event dispatch");
     if(e.kind==MC_WORLD_CLOSE&&!m_world)return;
     if(e.kind==MC_WORLD_READY)m_world=true;
@@ -392,6 +486,8 @@ void PluginManager::dispatch(MC_Event& e) {
     const bool cancellable=e.kind==MC_BREAK_PRE||e.kind==MC_PLACE_PRE||e.kind==MC_USE_PRE||e.kind==MC_DAMAGE_PRE;
     for(const auto& listener:m_listeners) {
         if(listener.kind!=e.kind||!m_info[listener.plugin].active)continue;
+        if(e.role==MC_CLIENT && !m_info[listener.plugin].manifest.visual &&
+           e.kind!=MC_INITIALIZE && e.kind!=MC_SHUTDOWN && e.kind!=MC_REGISTER && e.kind!=MC_HUD && e.kind!=MC_ENVIRONMENT)continue;
         MC_Event candidate=e;const bool cancelled=e.cancelled!=0;
         try {
             const int32_t result=listener.callback(m_loaded[listener.plugin].context.get(),&candidate,listener.userdata);
@@ -420,9 +516,12 @@ void PluginManager::dispatch(MC_Event& e) {
 }
 bool PluginManager::command(const std::string& line) {
     const auto split=line.find(' ');std::string name=line.substr(0,split);if(!name.empty()&&name[0]=='/')name.erase(0,1);
-    auto it=m_commands.find(name);if(it==m_commands.end())return false;
+    auto it=m_commands.find(name);if(it==m_commands.end()||!m_info[it->second.plugin].active||!content().runtimeFault.empty())return false;
+    if(context().role==MC_CLIENT)return false;
+    if(context().player && !(it->second.flags&MC_COMMAND_ALLOW_GUEST))return false;
     check(m_world&&!m_dispatching,"Plugin command requires a world");
     const std::string arguments=split==std::string::npos?"":line.substr(split+1);auto e=event(MC_COMMAND);e.command=name.c_str();e.arguments=arguments.c_str();
+    if(operations.player){MC_PlayerSnapshot snapshot{};snapshot.size=sizeof(snapshot);if(operations.player(snapshot))for(int i=0;i<3;++i)e.player[i]=snapshot.position[i];}
     const auto phase=m_phase;m_phase=MC_COMMAND;m_dispatching=true;
     int32_t result=-1;
     try {result=it->second.callback(m_loaded[it->second.plugin].context.get(),&e,it->second.userdata);}catch(const std::exception& error){LOG_ERROR(error.what());}
@@ -444,7 +543,7 @@ void PluginManager::shutdown() {
     if(m_shutdown)return;
     m_shutdown=true;
     if(m_initialized){auto e=event(MC_SHUTDOWN);dispatch(e);}
-    dispatcher()={};commandDispatcher()={};discardOperations();m_listeners.clear();m_commands.clear();operations={};
+    dispatcher()={};commandDispatcher()={};contextProvider()={};discardOperations();m_listeners.clear();m_commands.clear();operations={};
     for(auto it=m_loaded.rbegin();it!=m_loaded.rend();++it){if(it->api&&it->api->unload)it->api->unload(it->context.get());it->api=nullptr;it->library.reset();}
 }
 } // namespace Plugins

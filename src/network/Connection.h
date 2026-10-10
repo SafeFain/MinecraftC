@@ -12,6 +12,7 @@ public:
     bool poll();
     bool pop(Message& message);
     void close();
+    void closeWithReason(const std::string& reason);
     bool alive() const { return m_alive; }
     bool connected() { return m_alive && m_socket->connectionStatus()==Platform::SocketStatus::Ready; }
     size_t queuedBytes() const { return m_queuedBytes; }

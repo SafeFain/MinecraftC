@@ -1,3 +1,4 @@
+#include "network/ContentIds.h"
 #include "network/StateProtocol.h"
 #include <cmath>
 #include <set>
@@ -10,13 +11,13 @@ bool boolean(Reader& reader) {
     return value != 0;
 }
 void writeStack(Writer& writer, const ItemStack& stack) {
-    if (static_cast<uint16_t>(stack.id) >= static_cast<uint16_t>(ItemId::COUNT) ||
-        stack.count > getItemProps(stack.id).maxStack || ((stack.id == ItemId::EMPTY) != (stack.count == 0)))
+    if (!isValidItemId(stack.id) ||
+        stack.count > getItemProps(stack.id).maxStack || stack.damage > getItemProps(stack.id).maxDurability || ((stack.id == ItemId::EMPTY) != (stack.count == 0)))
         throw ProtocolError("Invalid state item");
-    writer.u16(static_cast<uint16_t>(stack.id)); writer.u8(stack.count); writer.u16(stack.damage);
+    writer.u16(encodeItemId(stack.id)); writer.u8(stack.count); writer.u16(stack.damage);
 }
 ItemStack readStack(Reader& reader) {
-    const ItemStack stack{static_cast<ItemId>(reader.u16()), reader.u8(), reader.u16()};
+    const ItemStack stack{decodeItemId(reader.u16()), reader.u8(), reader.u16()};
     Writer check; writeStack(check, stack); return stack;
 }
 void positionValid(const glm::dvec3& position) {

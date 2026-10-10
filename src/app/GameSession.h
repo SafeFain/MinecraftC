@@ -206,6 +206,10 @@ public:
                       InventoryModel& inventory) override;
     std::optional<uint64_t> useVillagerRay(float reach);
     bool pluginUse(bool after = false);
+    Plugins::ActorContext pluginContext() const;
+    std::vector<uint64_t> pluginPlayers() const;
+    bool pluginPlayerById(uint64_t,MC_PlayerSnapshot&,uint32_t&) const;
+    bool sendPluginCommand(const std::string&);
     bool pluginPlayer(MC_PlayerSnapshot&) const;
     bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);

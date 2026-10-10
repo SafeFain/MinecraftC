@@ -43,6 +43,7 @@ struct ContentState {
     std::map<std::string,SmeltingRecipe> smelting;
     std::vector<std::string> removeCrafting, removeSmelting;
     std::vector<std::pair<std::string,std::string>> requirements;
+    std::map<std::string,std::string> networkDescription;
     std::array<std::vector<ItemId>,static_cast<size_t>(CreativeItemCategory::Count)> categories;
 };
 inline ContentState& content() {static ContentState state;return state;}

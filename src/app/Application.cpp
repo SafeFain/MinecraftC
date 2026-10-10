@@ -172,6 +172,9 @@ private:
 
         m_plugins.initialize(m_safeMode);
         m_ui.inventory=CreativeInventory{};
+        Plugins::contextProvider()=[this]{return m_session.pluginContext();};
+        m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
+        m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};
         m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};
         m_plugins.operations.getBlock=[this](int32_t x,int32_t y,int32_t z,uint16_t& id){return m_session.pluginGetBlock(x,y,z,id);};
         m_plugins.operations.setBlock=[this](int32_t x,int32_t y,int32_t z,uint16_t id){return m_session.pluginSetBlock(x,y,z,id);};
@@ -528,7 +531,7 @@ private:
         else m_lanDiscovery.stopAdvertising();
         m_lanDiscovery.poll(RuntimeClock::seconds(now));
         for (const auto& message : m_session.takeLanChat()) {
-            if (message.kind == Lan::ChatKind::Message) m_flow.showCommandMessage("<" + message.nickname + "> " + message.text);
+            if (message.kind == Lan::ChatKind::Message) m_flow.showCommandMessage(message.nickname.empty()?message.text:"<" + message.nickname + "> " + message.text);
             else m_flow.showCommandMessage(m_ui.localization.format(message.kind == Lan::ChatKind::Joined ? "lan.player_joined" : "lan.player_left", {message.nickname}));
         }
         if (m_session.lanConnectionFailed()) {

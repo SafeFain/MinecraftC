@@ -9,7 +9,6 @@
 bool GameSession::joinLanRoom(const std::string& address, uint16_t port, double now) {
     lanFailure.clear();
     if (saveStore || hostingLan()) { lanFailure = "Leave the current world before joining"; return false; }
-    if (!Plugins::content().requirements.empty()) { lanFailure = "Gameplay plugins are not supported in LAN sessions"; return false; }
     closeReplica();
     try {
         const auto identity = Lan::ProfileStore::localIdentity(dataDirectory);

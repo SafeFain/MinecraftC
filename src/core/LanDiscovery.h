@@ -12,6 +12,7 @@ struct LanAdvertisement {
     uint32_t generation = 0;
     uint8_t players = 1, capacity = 8;
     bool pvp = false;
+    std::string contentSignature;
 };
 struct LanDiscoveredRoom {
     std::string instance, name, address, version;
@@ -19,6 +20,7 @@ struct LanDiscoveredRoom {
     uint32_t generation = 0;
     uint8_t players = 0, capacity = 0;
     bool pvp = false;
+    std::string contentSignature;
 };
 // Nonblocking DNS-SD _minecraftc._tcp. Discovery failure leaves direct TCP join
 // usable. Results are bounded, expire, and never authorize a connection.

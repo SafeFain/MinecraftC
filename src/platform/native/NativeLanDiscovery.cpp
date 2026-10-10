@@ -1,4 +1,5 @@
 #include "core/LanDiscovery.h"
+#include "LanDiscoveryValidation.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -119,9 +120,9 @@ struct LanDiscovery::Impl {
     // All string backing lives through the synchronous mDNS write.
     template<class Send> void send(const Interface& nic, Send write) const {
         auto record = records(nic);
-        const std::array<std::pair<std::string, std::string>, 7> metadata{{
+        const std::array<std::pair<std::string, std::string>, 8> metadata{{
             {"name", advertisement.name}, {"version", advertisement.version}, {"protocol", std::to_string(advertisement.protocol)},
-            {"generation", std::to_string(advertisement.generation)}, {"players", std::to_string(advertisement.players)},
+            {"content", advertisement.contentSignature}, {"generation", std::to_string(advertisement.generation)}, {"players", std::to_string(advertisement.players)},
             {"capacity", std::to_string(advertisement.capacity)}, {"pvp", advertisement.pvp ? "1" : "0"}}};
         for (const auto& pair : metadata) {
             mdns_record_t txt{}; txt.name = string(instance); txt.type = MDNS_RECORDTYPE_TXT;
@@ -203,6 +204,7 @@ struct LanDiscovery::Impl {
                 if (key == "name" && text(value, 128)) cached.room.name = value;
                 else if (key == "version" && text(value, 64)) cached.room.version = value;
                 else if (key == "protocol") cached.room.protocol = static_cast<uint16_t>(number(value, 65535));
+                else if (key == "content") cached.room.contentSignature = value;
                 else if (key == "generation") cached.room.generation = number(value, UINT32_MAX);
                 else if (key == "players") cached.room.players = static_cast<uint8_t>(number(value, 8));
                 else if (key == "capacity") cached.room.capacity = static_cast<uint8_t>(number(value, 8));
@@ -223,15 +225,14 @@ LanDiscovery::~LanDiscovery() { stopAdvertising(); }
 bool LanDiscovery::browse() { m_impl->browsing = m_impl->initialize(); m_impl->lastQuery = -100; return m_impl->browsing; }
 void LanDiscovery::stopBrowsing() { m_impl->browsing = false; m_impl->cache.clear(); m_impl->hosts.clear(); m_impl->rooms.clear(); m_impl->releaseIdle(); }
 bool LanDiscovery::advertise(const LanAdvertisement& room) {
-    if (room.instance.size() != 32 || !std::all_of(room.instance.begin(), room.instance.end(), [](char c) { return std::isxdigit(static_cast<unsigned char>(c)); }) ||
-        !text(room.name, 128) || !text(room.version, 64) || !room.port || !room.protocol || !room.generation || room.capacity < 2 || room.capacity > 8 || room.players < 1 || room.players > room.capacity) {
+    if (!DiscoveryValidation::valid(room)) {
         m_impl->error = "Invalid LAN advertisement"; return false;
     }
     if (!m_impl->initialize()) return false;
     if (m_impl->advertising && (m_impl->advertisement.instance != room.instance || m_impl->advertisement.port != room.port)) stopAdvertising();
     const auto& old = m_impl->advertisement;
     m_impl->dirty = m_impl->dirty || !m_impl->advertising || old.name != room.name || old.version != room.version || old.protocol != room.protocol ||
-        old.generation != room.generation || old.players != room.players || old.capacity != room.capacity || old.pvp != room.pvp;
+        old.generation != room.generation || old.players != room.players || old.capacity != room.capacity || old.pvp != room.pvp || old.contentSignature != room.contentSignature;
     m_impl->advertisement = room; m_impl->instance = "mc-" + room.instance + "." + SERVICE;
     m_impl->hostname = "mc-" + room.instance + ".local."; m_impl->advertising = true; return true;
 }
@@ -262,9 +263,9 @@ void LanDiscovery::poll(double now) {
     m_impl->rooms.clear();
     for (const auto& entry : m_impl->cache) {
         auto room = entry.second.room; const auto host = m_impl->hosts.find(entry.second.host);
-        if (host == m_impl->hosts.end() || room.name.empty() || room.version.empty() || !room.port || !room.protocol || !room.generation ||
-            room.capacity < 2 || room.capacity > 8 || room.players < 1 || room.players > room.capacity) continue;
-        room.address = host->second.address; m_impl->rooms.push_back(std::move(room));
+        if(host==m_impl->hosts.end())continue;
+        room.address=host->second.address;
+        if(DiscoveryValidation::valid(room))m_impl->rooms.push_back(std::move(room));
     }
 }
 const std::vector<LanDiscoveredRoom>& LanDiscovery::rooms() const { return m_impl->rooms; }

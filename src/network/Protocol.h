@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace Lan {
-constexpr uint16_t PROTOCOL_VERSION = 2;
+constexpr uint16_t PROTOCOL_VERSION = 3;
 constexpr uint16_t DEFAULT_PORT = 25565;
 constexpr size_t MAX_PLAYERS = 8;
 constexpr size_t MAX_PAYLOAD = 1024 * 1024;

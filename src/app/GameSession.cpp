@@ -427,7 +427,7 @@ void GameSession::detachSaveStore() {
 
 void GameSession::leaveWorld() {
     closeLanRoom();
-    if (terrainGenerated) { auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e); }
+    if (terrainGenerated) { const Plugins::ActorScope scope(pluginContext());auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e); }
     if (!Plugins::content().runtimeFault.empty()) { abortPluginWorld(); return; }
     fishing.cancel(); fishingFeedback.clear();
     if (terrainGenerated || saveStore) {
@@ -584,7 +584,7 @@ bool GameSession::advanceLoading(
         return false;
 
     terrainGenerated = true;
-    { auto e=Plugins::event(MC_WORLD_READY);Plugins::dispatch(e); }
+    { const Plugins::ActorScope scope(pluginContext());auto e=Plugins::event(MC_WORLD_READY);Plugins::dispatch(e); }
     const float seconds = static_cast<float>(RuntimeClock::seconds(
         RuntimeClock::elapsed(worldLoadingStarted, now)));
     LOG_INFO("World render target loaded in " << seconds << "s ("
@@ -598,6 +598,7 @@ void GameSession::updatePlaying(
     float dt, IGameRenderer* renderer, const Feedback& feedback, bool localControl) {
     if (!localControl) setLocalControl(false);
     if (lanJoining) { updateReplica(dt, renderer, feedback); return; }
+    const Plugins::ActorScope actorScope(pluginContext());
     auto pluginUpdate=Plugins::event(MC_UPDATE_PRE);pluginUpdate.dt=dt;
     const auto pluginPosition=player.getPosition();for(int i=0;i<3;++i)pluginUpdate.player[i]=pluginPosition[i];
     Plugins::dispatch(pluginUpdate);
@@ -1405,35 +1406,67 @@ void GameSession::saveNow(const std::function<void()>& onError) {
 }
 
 bool GameSession::pluginUse(bool after) {
+    if(lanJoining)return true;
+    const Plugins::ActorScope actor(pluginContext());
     if(!terrainGenerated)return !Plugins::dispatcher();
     auto e=Plugins::event(after?MC_USE_POST:MC_USE_PRE);e.item=static_cast<uint16_t>(player.activeItem().id);
     const auto hit=world().raycast(player.getEyePosition(),player.getForward(),Config::REACH_DISTANCE);
     if(hit){e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;e.block=static_cast<uint16_t>(world().getBlock(e.x,e.y,e.z));}
     return Plugins::dispatch(e);
 }
+Plugins::ActorContext GameSession::pluginContext() const {
+    return {lanJoining?lanClient.peerId():0,static_cast<uint32_t>(dimension),lanJoining?MC_CLIENT:hostingLan()?MC_HOST:MC_LOCAL};
+}
+std::vector<uint64_t> GameSession::pluginPlayers() const {
+    if(!terrainGenerated&&!hostingLan())return {};
+    std::vector<uint64_t> ids;
+    if(lanJoining){for(const auto& member:replicaRoster)ids.push_back(member.id);}
+    else {ids.push_back(0);for(const auto& entry:guests)ids.push_back(entry.first);}
+    return ids;
+}
+bool GameSession::pluginPlayerById(uint64_t id,MC_PlayerSnapshot& out,uint32_t& dim) const {
+    if(!terrainGenerated&&!hostingLan())return false;
+    const Player* selected=nullptr;
+    if((!lanJoining&&id==0)||(lanJoining&&id==lanClient.peerId())){selected=&player;dim=static_cast<uint32_t>(dimension);}
+    else if(!lanJoining) {
+        const auto found=guests.find(id);if(found==guests.end())return false;
+        selected=&found->second->player;dim=static_cast<uint32_t>(found->second->profile.dimension);
+    } else return false;
+    const auto position=selected->getPosition();for(int i=0;i<3;++i)out.position[i]=position[i];
+    out.health=selected->survivalStats().health();out.mode=static_cast<uint32_t>(selected->gameMode());return true;
+}
 bool GameSession::pluginPlayer(MC_PlayerSnapshot& out) const {
-    if(!terrainGenerated)return false;
-    const auto p=player.getPosition();for(int i=0;i<3;++i)out.position[i]=p[i];out.health=player.survivalStats().health();out.mode=static_cast<uint32_t>(player.gameMode());return true;
+    uint32_t dim=0;const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();
+    return pluginPlayerById(actor.player,out,dim);
 }
 bool GameSession::pluginGetBlock(int32_t x,int32_t y,int32_t z,uint16_t& id) {
-    if(!terrainGenerated||y<Config::WORLD_MIN_Y||y>=Config::WORLD_MAX_Y||std::abs(int64_t(x))>100000000||std::abs(int64_t(z))>100000000)return false;
-    const auto value=world().getLoadedBlock(x,y,z);if(!value)return false;
+    if((!terrainGenerated&&!hostingLan())||y<Config::WORLD_MIN_Y||y>=Config::WORLD_MAX_Y||std::abs(int64_t(x))>100000000||std::abs(int64_t(z))>100000000)return false;
+    const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();
+    if(actor.dimension>=simulations.size()||!simulations[actor.dimension])return false;
+    if(!lanJoining&&actor.player&&!guests.count(actor.player))return false;
+    const auto value=simulations[actor.dimension]->world.getLoadedBlock(x,y,z);if(!value)return false;
     id=static_cast<uint16_t>(*value);return true;
 }
 bool GameSession::pluginSetBlock(int32_t x,int32_t y,int32_t z,uint16_t id) {
     uint16_t old=0;if(lanJoining||!isValidBlockId(static_cast<BlockId>(id))||!pluginGetBlock(x,y,z,old))return false;
-    world().setBlock(x,y,z,static_cast<BlockId>(id));return true;
+    const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();
+    simulations[actor.dimension]->world.setBlock(x,y,z,static_cast<BlockId>(id));return true;
 }
 bool GameSession::pluginGiveItem(uint16_t raw,uint32_t count) {
-    const auto id=static_cast<ItemId>(raw);if(lanJoining||!terrainGenerated||!isValidItemId(id)||!raw)return false;
-    InventoryModel candidate=player.inventory();const auto stackSize=getItemProps(id).maxStack;
+    const auto id=static_cast<ItemId>(raw);if(lanJoining||(!terrainGenerated&&!hostingLan())||!isValidItemId(id)||!raw||!count||count>4096)return false;
+    const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();
+    Player* selected=&player;
+    if(actor.player){auto found=guests.find(actor.player);if(found==guests.end())return false;selected=&found->second->player;}
+    InventoryModel candidate=selected->inventory();const auto stackSize=getItemProps(id).maxStack;
     while(count){const auto amount=static_cast<uint8_t>(std::min(count,uint32_t(stackSize)));if(candidate.add({id,amount,0}))return false;count-=amount;}
-    player.inventory()=std::move(candidate);return true;
+    selected->inventory()=std::move(candidate);return true;
 }
 std::filesystem::path GameSession::pluginWorldDirectory() const {return saveStore?saveStore->worldDirectory():std::filesystem::path{};}
 
 void GameSession::abortPluginWorld() {
-    lanHost.close(); guests.clear(); guestProfiles.reset();
+    const Plugins::ActorScope actor(pluginContext());
+    lanHost.close(Plugins::content().runtimeFault); guests.clear(); guestProfiles.reset();
+    if(lanJoining)closeReplica();
     if(terrainGenerated){auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e);}
     // Discard the live session, draining worker/cache work while its stores are
     // alive. No player state, edited chunks or entities are flushed here.

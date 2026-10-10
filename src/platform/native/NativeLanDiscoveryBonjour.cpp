@@ -58,6 +58,7 @@ struct LanDiscovery::Impl {
         auto& room = candidate.room;
         room.port = ntohs(port); room.name = txt(txtLength, data, "name"); room.version = txt(txtLength, data, "version");
         room.protocol = static_cast<uint16_t>(DiscoveryValidation::number(txt(txtLength, data, "protocol"), 65535));
+        room.contentSignature = txt(txtLength, data, "content");
         room.generation = DiscoveryValidation::number(txt(txtLength, data, "generation"), UINT32_MAX);
         room.players = static_cast<uint8_t>(DiscoveryValidation::number(txt(txtLength, data, "players"), 8));
         room.capacity = static_cast<uint8_t>(DiscoveryValidation::number(txt(txtLength, data, "capacity"), 8));
@@ -101,8 +102,8 @@ bool LanDiscovery::browse() {
 void LanDiscovery::stopBrowsing() { release(m_impl->browse); m_impl->cache.clear(); m_impl->rooms.clear(); }
 bool LanDiscovery::advertise(const LanAdvertisement& room) {
     if (!DiscoveryValidation::valid(room)) { m_impl->error = "Invalid LAN advertisement"; return false; }
-    const std::array<std::pair<const char*, std::string>, 7> fields{{{"name", room.name}, {"version", room.version},
-        {"protocol", std::to_string(room.protocol)}, {"generation", std::to_string(room.generation)},
+    const std::array<std::pair<const char*, std::string>, 8> fields{{{"name", room.name}, {"version", room.version},
+        {"content", room.contentSignature}, {"protocol", std::to_string(room.protocol)}, {"generation", std::to_string(room.generation)},
         {"players", std::to_string(room.players)}, {"capacity", std::to_string(room.capacity)}, {"pvp", room.pvp ? "1" : "0"}}};
     TXTRecordRef record; TXTRecordCreate(&record, 0, nullptr);
     for (const auto& field : fields) {

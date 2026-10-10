@@ -20,7 +20,6 @@ typedef enum MC_EventKind {
     MC_UPDATE_PRE, MC_UPDATE_POST, MC_BREAK_PRE, MC_BREAK_POST,
     MC_PLACE_PRE, MC_PLACE_POST, MC_USE_PRE, MC_USE_POST,
     MC_DAMAGE_PRE, MC_DAMAGE_POST, MC_ENVIRONMENT, MC_HUD, MC_COMMAND,
-    MC_PLAYER_JOIN, MC_PLAYER_LEAVE,
     MC_EVENT_COUNT
 } MC_EventKind;
 typedef struct MC_Environment {
@@ -37,9 +36,6 @@ typedef struct MC_Event {
     float screen_width, screen_height;
     const char* command;
     const char* arguments;
-    /* Optional ABI 1 tail; check size before reading. Player 0 is the host. */
-    uint64_t player_id;
-    uint32_t dimension, role;
 } MC_Event;
 typedef int32_t (*MC_EventCallback)(MC_PluginContext*, MC_Event*, void*);
 typedef enum MC_ItemKind { MC_MATERIAL=0, MC_BLOCK_ITEM=1, MC_TOOL=2, MC_WEAPON=3, MC_ARMOR=4, MC_FOOD=5, MC_SPAWN_EGG=6 } MC_ItemKind;
@@ -89,20 +85,6 @@ typedef struct MC_PlayerSnapshot {
     float health;
     uint32_t mode;
 } MC_PlayerSnapshot;
-typedef enum MC_SessionRole { MC_LOCAL=0, MC_HOST=1, MC_CLIENT=2 } MC_SessionRole;
-#define MC_MULTIPLAYER_EXTENSION "minecraftc.multiplayer"
-#define MC_COMMAND_ALLOW_GUEST 1u
-typedef struct MC_MultiplayerV1 {
-    uint32_t size, version;
-    int32_t (*session_role)(MC_PluginContext*,uint32_t*);
-    /* A null IDs buffer returns the required count. Session IDs expire on leave. */
-    int32_t (*players)(MC_PluginContext*,uint64_t*,uint32_t,uint32_t*);
-    int32_t (*player)(MC_PluginContext*,uint64_t,MC_PlayerSnapshot*,uint32_t*);
-    int32_t (*give_item)(MC_PluginContext*,uint64_t,uint16_t,uint32_t);
-    int32_t (*get_block)(MC_PluginContext*,uint32_t,int32_t,int32_t,int32_t,uint16_t*);
-    int32_t (*set_block)(MC_PluginContext*,uint32_t,int32_t,int32_t,int32_t,uint16_t);
-    int32_t (*register_command)(MC_PluginContext*,const char*,uint32_t,MC_EventCallback,void*);
-} MC_MultiplayerV1;
 typedef struct MC_Host {
     uint32_t size, abi;
     void (*log)(MC_PluginContext*,uint32_t,const char*);
@@ -126,7 +108,6 @@ typedef struct MC_Host {
     int32_t (*config_write)(MC_PluginContext*,const char*);
     int32_t (*world_data_read)(MC_PluginContext*,char*,uint32_t);
     int32_t (*world_data_write)(MC_PluginContext*,const char*);
-    const void* (*query_extension)(MC_PluginContext*,const char*,uint32_t);
 } MC_Host;
 typedef struct MC_Plugin {
     uint32_t size, abi;

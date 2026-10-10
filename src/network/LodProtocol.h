@@ -1,6 +1,7 @@
 #pragma once
 
 #include "network/Protocol.h"
+#include "network/ContentIds.h"
 #include "world/LodTerrainSystem.h"
 #include "world/Block.h"
 
@@ -32,8 +33,8 @@ inline Bytes encodeLodUpdate(const LodUpdate& value, bool includeColumns) {
         int top = Config::WORLD_MIN_Y - 1;
         for (const auto& span : column.spans) {
             if (span.bottom <= top || span.bottom > span.top || span.top >= Config::WORLD_MAX_Y ||
-                span.block == BlockId::AIR || span.block >= BlockId::COUNT) throw ProtocolError("Invalid LOD span");
-            w.u16(static_cast<uint16_t>(span.bottom)); w.u16(static_cast<uint16_t>(span.top)); w.u16(static_cast<uint16_t>(span.block)); top = span.top;
+                span.block == BlockId::AIR || !Plugins::validBlock(span.block)) throw ProtocolError("Invalid LOD span");
+            w.u16(static_cast<uint16_t>(span.bottom)); w.u16(static_cast<uint16_t>(span.top)); w.u16(encodeBlockId(static_cast<uint16_t>(span.block))); top = span.top;
         }
     }
     return std::move(w.bytes);
@@ -47,7 +48,7 @@ inline LodUpdate decodeLodUpdate(const Bytes& bytes, bool includeColumns) {
         const auto exact = r.u8(); const auto count = r.u16();
         if (exact > 1 || count > Config::CHUNK_SIZE_Y) throw ProtocolError("Invalid LOD columns");
         column.exact = exact != 0;
-        for (uint16_t i = 0; i < count; ++i) column.spans.push_back({static_cast<int16_t>(r.u16()), static_cast<int16_t>(r.u16()), static_cast<BlockId>(r.u16())});
+        for (uint16_t i = 0; i < count; ++i) column.spans.push_back({static_cast<int16_t>(r.u16()), static_cast<int16_t>(r.u16()), static_cast<BlockId>(decodeBlockId(r.u16()))});
     }
     r.finish(); (void)encodeLodUpdate(value, includeColumns); return value;
 }

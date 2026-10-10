@@ -1,6 +1,7 @@
 #include "network/ChunkProtocol.h"
 #include "Config.h"
 #include "world/Block.h"
+#include "network/ContentIds.h"
 #include <algorithm>
 #include <set>
 
@@ -14,7 +15,7 @@ void addressValid(const ChunkAddress& address) {
         throw ProtocolError("Invalid chunk address");
 }
 void blockValid(uint16_t block) {
-    if (block >= static_cast<uint16_t>(BlockId::COUNT)) throw ProtocolError("Invalid LAN block ID");
+    (void)encodeBlockId(block);
 }
 void writeAddress(Writer& writer, const ChunkAddress& address, uint64_t epoch) {
     addressValid(address);
@@ -39,7 +40,7 @@ Bytes encodeChunkSnapshot(const ChunkSnapshot& value) {
         const auto block = value.blocks[start]; blockValid(block);
         size_t end = start + 1;
         while (end < value.blocks.size() && value.blocks[end] == block) ++end;
-        writer.u32(static_cast<uint32_t>(end - start)); writer.u16(block);
+        writer.u32(static_cast<uint32_t>(end - start)); writer.u16(encodeBlockId(block));
         start = end;
     }
     return std::move(writer.bytes);
@@ -50,7 +51,7 @@ ChunkSnapshot decodeChunkSnapshot(const Bytes& bytes) {
     if (!value.revision) throw ProtocolError("Invalid chunk revision");
     value.blocks.reserve(Config::CHUNK_VOLUME);
     while (value.blocks.size() < Config::CHUNK_VOLUME) {
-        const uint32_t count = reader.u32(); const uint16_t block = reader.u16(); blockValid(block);
+        const uint32_t count = reader.u32(); const uint16_t block = decodeBlockId(reader.u16()); blockValid(block);
         if (!count || count > Config::CHUNK_VOLUME - value.blocks.size()) throw ProtocolError("Invalid block run");
         value.blocks.insert(value.blocks.end(), count, block);
     }
@@ -64,7 +65,7 @@ Bytes encodeChunkDelta(const ChunkDelta& value) {
     std::set<uint32_t> indices;
     for (const auto& edit : value.edits) {
         if (edit.index >= Config::CHUNK_VOLUME || !indices.insert(edit.index).second) throw ProtocolError("Invalid delta index");
-        blockValid(edit.block); writer.u32(edit.index); writer.u16(edit.block);
+        blockValid(edit.block); writer.u32(edit.index); writer.u16(encodeBlockId(edit.block));
     }
     return std::move(writer.bytes);
 }
@@ -76,7 +77,7 @@ ChunkDelta decodeChunkDelta(const Bytes& bytes) {
         throw ProtocolError("Invalid chunk delta");
     value.edits.reserve(count); std::set<uint32_t> indices;
     for (uint32_t i = 0; i < count; ++i) {
-        const uint32_t index = reader.u32(); const uint16_t block = reader.u16(); blockValid(block);
+        const uint32_t index = reader.u32(); const uint16_t block = decodeBlockId(reader.u16()); blockValid(block);
         if (index >= Config::CHUNK_VOLUME || !indices.insert(index).second) throw ProtocolError("Invalid delta index");
         value.edits.push_back({index, block});
     }

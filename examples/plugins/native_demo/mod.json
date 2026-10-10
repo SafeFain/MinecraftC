@@ -3,5 +3,6 @@
   "name": "Native Demo",
   "version": "1.0.0",
   "api": 1,
+  "network_compatibility": "native-demo-behavior-1",
   "native": {"linux": "native_demo.so", "windows": "native_demo.dll", "macos": "native_demo.dylib"}
 }

@@ -5,13 +5,14 @@
 #include "game/GameRules.h"
 
 namespace Lan {
-enum class ActionKind : uint8_t { OpenWindow, Inventory, CloseWindow, PickBlock, Respawn, SleepChoice, Trade };
+enum class ActionKind : uint8_t { OpenWindow, Inventory, CloseWindow, PickBlock, Respawn, SleepChoice, Trade, PluginCommand };
 struct GameAction {
     uint64_t sequence = 0, epoch = 0, window = 0, target = 0;
     ActionKind kind = ActionKind::Inventory;
     InventoryWindowKind windowKind = InventoryWindowKind::Closed;
     glm::ivec3 position{0};
     InventoryAction inventory;
+    std::string command;
 };
 Bytes encodeGameAction(const GameAction& action);
 GameAction decodeGameAction(const Bytes& bytes);

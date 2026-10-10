@@ -1,3 +1,4 @@
+#include "network/ContentIds.h"
 #include "network/EntityProtocol.h"
 #include <cmath>
 #include <set>
@@ -6,11 +7,11 @@ namespace Lan {
 namespace {
 bool flag(Reader& reader) { const auto value = reader.u8(); if (value > 1) throw ProtocolError("Invalid entity flag"); return value != 0; }
 void item(Writer& writer, ItemStack value) {
-    if (static_cast<uint16_t>(value.id) >= static_cast<uint16_t>(ItemId::COUNT) ||
-        value.count > getItemProps(value.id).maxStack || ((value.id == ItemId::EMPTY) != (value.count == 0))) throw ProtocolError("Invalid entity item");
-    writer.u16(static_cast<uint16_t>(value.id)); writer.u8(value.count); writer.u16(value.damage);
+    if (!isValidItemId(value.id) ||
+        value.count > getItemProps(value.id).maxStack || value.damage > getItemProps(value.id).maxDurability || ((value.id == ItemId::EMPTY) != (value.count == 0))) throw ProtocolError("Invalid entity item");
+    writer.u16(encodeItemId(value.id)); writer.u8(value.count); writer.u16(value.damage);
 }
-ItemStack item(Reader& reader) { ItemStack result{static_cast<ItemId>(reader.u16()), reader.u8(), reader.u16()}; Writer check; item(check, result); return result; }
+ItemStack item(Reader& reader) { ItemStack result{decodeItemId(reader.u16()), reader.u8(), reader.u16()}; Writer check; item(check, result); return result; }
 void position(Writer& writer, glm::dvec3 value) {
     for (int i = 0; i < 3; ++i) { if (!std::isfinite(value[i]) || std::abs(value[i]) > 30000000) throw ProtocolError("Invalid entity position"); writer.f64(value[i]); }
 }

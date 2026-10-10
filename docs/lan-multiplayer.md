@@ -27,16 +27,16 @@ the room; sending a client to the background leaves its session.
 The local user-data `lan-identity` file supplies a persistent identity/credential.
 The host keeps guest profiles under each world's `players` directory. Rejoining
 restores that guest's inventory, health, bed spawn and dimension positions.
-Protocol/game/generation incompatibilities and gameplay plugins reject admission.
-Visual plugins remain usable. The vanilla host save stays at v18 with generation
-v20 and Heaven v9; guest sidecars use their independent profile v2 format.
+Protocol/game/generation incompatibilities and mismatching gameplay plugins reject
+admission. Matching gameplay plugins are supported; visual plugins may differ. The vanilla host save stays at v18 with generation
+v20 and Heaven v9; guest sidecars use their independent profile v3 palette format (v1/v2 remain readable).
 
 ## Implemented foundation
 
 - `Platform::NetworkSocket` owns nonblocking native TCP handles. IPv4/IPv6 numeric
   connections, a dual-stack listener, bounded reads/writes and closure/error
   handling are isolated inside the native adapter. Windows links Winsock.
-- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v2 uses a
+- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v3 uses a
   little-endian, 20-byte header (magic, protocol, type, length, sequence), a 1 MiB
   payload limit, a 4 MiB connection queue limit and 128 ready-frame limit.
   Scalars reject non-finite values; strings reject NUL and invalid UTF-8.
@@ -74,7 +74,7 @@ IPv4/IPv6 address, port and nickname entry. Desktop uses pinned mjansson/mdns;
 Apple uses Bonjour and Android uses NSD. Native services and platform metadata
 are implemented; physical/cross-platform validation remains outstanding.
 In a loaded world, Pause → Open to LAN opens/closes a 2–8-player room and controls
-PvP (off by default). Gameplay plugins prevent opening/joining. Host pause and
+PvP (off by default). Gameplay plugins must match across participants; see [plugin LAN compatibility and SDK](plugins.md#lan-multiplayer-and-abi-1-extension). Host pause and
 loading keep room simulation/polling active. Connection/loading can be cancelled by Escape, gamepad Back or a pointer/touch button. Room chat uses authoritative names, bounded UTF-8 messages and per-player rate limits. Join/leave notices are localized. Background closes a host room or
 leaves a joined room; disconnected clients return to the main menu.
 

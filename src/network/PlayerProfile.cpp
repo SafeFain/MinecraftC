@@ -1,5 +1,7 @@
 #include "network/PlayerProfile.h"
 #include "core/Platform.h"
+#include "plugins/ContentRegistry.h"
+#include <set>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -9,21 +11,24 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=2;
-constexpr size_t MAX_PROFILE_BYTES=4096;
+constexpr uint16_t PROFILE_VERSION=3;
+constexpr size_t MAX_PROFILE_BYTES=64*1024;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
     for(const auto byte:bytes) {value^=byte;value*=1099511628211ull;}
     return value;
 }
 void writeStack(Writer& writer,const ItemStack& stack) {
-    if(!isValidItemId(stack.id) || stack.count>getItemProps(stack.id).maxStack ||
+    if(!isValidItemId(stack.id) || stack.count>getItemProps(stack.id).maxStack || stack.damage>getItemProps(stack.id).maxDurability ||
         ((stack.id==ItemId::EMPTY)!=(stack.count==0))) throw ProtocolError("Invalid profile item stack");
     writer.u16(static_cast<uint16_t>(stack.id));writer.u8(stack.count);writer.u16(stack.damage);
 }
-ItemStack readStack(Reader& reader) {
-    const auto id=static_cast<ItemId>(reader.u16());const auto count=reader.u8();const auto damage=reader.u16();
-    if(!isValidItemId(id) || count>getItemProps(id).maxStack || ((id==ItemId::EMPTY)!=(count==0)))
+ItemStack readStack(Reader& reader,const std::map<uint16_t,ItemId>& palette) {
+    const auto raw=reader.u16();
+    auto id=static_cast<ItemId>(raw);
+    if(!palette.empty()) {auto found=palette.find(raw);if(found==palette.end())throw ProtocolError("Unknown profile palette item");id=found->second;}
+    const auto count=reader.u8();const auto damage=reader.u16();
+    if(!isValidItemId(id) || count>getItemProps(id).maxStack || damage>getItemProps(id).maxDurability || ((id==ItemId::EMPTY)!=(count==0)))
         throw ProtocolError("Invalid profile item stack");
     return {id,count,damage};
 }
@@ -64,6 +69,13 @@ void writeFile(const std::filesystem::path& path,const Bytes& bytes) {
 }
 Bytes encodeProfile(const PlayerProfile& profile) {
     validateStats(profile);Writer writer;writer.u32(PROFILE_MAGIC);writer.u16(PROFILE_VERSION);
+    std::set<ItemId> used;
+    auto collect=[&](const ItemStack& stack){used.insert(stack.id);};
+    for(const auto& stack:profile.inventory.storage())collect(stack);
+    for(const auto& stack:profile.inventory.armor())collect(stack);
+    collect(profile.inventory.offhand());collect(profile.cursor);for(const auto& stack:profile.crafting)collect(stack);
+    writer.u16(static_cast<uint16_t>(used.size()));
+    for(auto id:used){writer.u16(static_cast<uint16_t>(id));writer.text(Plugins::itemKey(id),256);}
     writer.text(profile.identity.id,32);writer.text(profile.identity.credential,32);writer.text(profile.identity.nickname,64);
     writer.u8(static_cast<uint8_t>(profile.mode));writer.u8(static_cast<uint8_t>(profile.dimension));
     for(size_t i=0;i<2;++i) {writer.u8(profile.positioned[i]?1:0);for(int axis=0;axis<3;++axis) writer.f64(profile.positions[i][axis]);}
@@ -84,16 +96,27 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     if(reader.u32()!=PROFILE_MAGIC) throw ProtocolError("Unsupported player profile format");
     const auto version=reader.u16();
     if(version<1 || version>PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
+    std::map<uint16_t,ItemId> palette;
+    if(version>=3) {
+        const auto count=reader.u16();if(!count||count>51)throw ProtocolError("Invalid profile palette size");
+        std::set<std::string> keys;
+        for(uint16_t i=0;i<count;++i) {
+            const auto raw=reader.u16();const auto key=reader.text(256);
+            ItemId id;
+            try{id=Plugins::resolveItem(key);}catch(const std::exception&){throw ProtocolError("Missing profile item: "+key);}
+            if(!keys.insert(key).second||!palette.emplace(raw,id).second)throw ProtocolError("Duplicate profile palette item");
+        }
+    }
     PlayerProfile profile;profile.identity={reader.text(32),reader.text(32),reader.text(64)};
     profile.mode=static_cast<GameMode>(reader.u8());profile.dimension=static_cast<DimensionId>(reader.u8());
     for(size_t i=0;i<2;++i) {const auto positioned=reader.u8();if(positioned>1) throw ProtocolError("Invalid profile flag");profile.positioned[i]=positioned!=0;for(int axis=0;axis<3;++axis) profile.positions[i][axis]=reader.f64();}
     const auto bed=reader.u8();if(bed>1) throw ProtocolError("Invalid profile flag");
     if(bed) {glm::ivec3 position;for(int axis=0;axis<3;++axis) {const uint32_t value=reader.u32();position[axis]=value<=INT32_MAX?static_cast<int32_t>(value):static_cast<int32_t>(-1-static_cast<int64_t>(UINT32_MAX-value));}profile.bedSpawn=position;}
     profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();
-    for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader);
-    for(auto& stack:profile.inventory.armor()) stack=readStack(reader);
-    profile.inventory.offhand()=readStack(reader);
-    if (version >= 2) { profile.cursor=readStack(reader); for (auto& item : profile.crafting) item=readStack(reader); }
+    for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader,palette);
+    for(auto& stack:profile.inventory.armor()) stack=readStack(reader,palette);
+    profile.inventory.offhand()=readStack(reader,palette);
+    if (version >= 2) { profile.cursor=readStack(reader,palette); for (auto& item : profile.crafting) item=readStack(reader,palette); }
     reader.finish();validateStats(profile);return profile;
 }
 std::filesystem::path ProfileStore::path(const std::string& id) const {

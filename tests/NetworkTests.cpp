@@ -63,7 +63,7 @@ int main() {
     Connection bounded(std::make_unique<Platform::NetworkSocket>());Bytes payload(MAX_PAYLOAD);
     for(int i=0;i<3;++i) check(bounded.queue({MessageType::ChunkSnapshot,0,payload}),"Send queue rejected valid frame");
     check(!bounded.queue({MessageType::ChunkSnapshot,0,payload}) && !bounded.alive(),"Send queue is unbounded");
-    Host host;Compatibility compatibility{"test",20,123};
+    Host host;Compatibility compatibility{"test",20,123,{}};
     check(host.open(0,compatibility,2,true),"Room open failed");
     Identity identity{randomToken(),randomToken(),"Player"};
     Client first;check(first.join("::1",host.port(),compatibility,identity,0),"Room join failed");
@@ -109,6 +109,36 @@ int main() {
         now+=.001;host.poll(now);incompatible.poll(now);std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     check(incompatible.state()==Client::State::Failed && host.peers().empty(),"Incompatible peer admitted");
+    // Full descriptions, rather than the fast signature alone, gate admission.
+    auto modded=compatibility;modded.content={{"plugin/example","1.0.0:data-api1"},{"config/example","{}"},{"block/example:ore","solid"}};
+    modded.contentSignature=contentSignature(modded.content);
+    host.close();check(host.open(0,modded,2,true),"Modded host opens");
+    int admitted=0;host.admit=[&](const Identity&){++admitted;return true;};
+    for(int scenario=0;scenario<5;++scenario) {
+        auto mismatch=modded;
+        if(scenario==0)mismatch.content.erase("plugin/example");
+        if(scenario==1)mismatch.content["plugin/extra"]="1.0.0";
+        if(scenario==2)mismatch.content["plugin/example"]="2.0.0:data-api1";
+        if(scenario==3)mismatch.content["config/example"]="{\"setting\":1}";
+        if(scenario==4)mismatch.content["block/example:ore"]="nonsolid";
+        Client rejected;check(rejected.join("::1",host.port(),mismatch,identity,now),"Mismatched connection starts");
+        for(int i=0;i<1000&&rejected.state()!=Client::State::Failed;++i) {
+            now+=.001;host.poll(now);rejected.poll(now);std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        check(rejected.state()==Client::State::Failed&&admitted==0&&host.peers().empty(),"Content mismatch rejected before admission despite matching signature");
+        check(rejected.error().find("requirement")!=std::string::npos,"Content mismatch names its requirement");
+    }
+    Client matched;check(matched.join("::1",host.port(),modded,identity,now),"Matching plugin connection starts");
+    for(int i=0;i<1000&&matched.state()!=Client::State::Connected;++i) {
+        now+=.001;host.poll(now);matched.poll(now);std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(matched.state()==Client::State::Connected&&admitted==1,"Matching description admits one player");
+    check(matched.send({MessageType::Input,0,writer.bytes}),"Pending client intent queues before terminal fault");
+    check(matched.send({MessageType::Input,0,writer.bytes}),"Second pending intent queues before terminal fault");
+    host.close("Plugin callback failed: example");
+    for(int i=0;i<50&&matched.state()!=Client::State::Failed;++i){now+=.005;matched.poll(now);std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+    check(matched.state()==Client::State::Failed&&matched.error()=="Plugin callback failed: example","Terminal plugin failure reason delivered");
+    host.admit={};check(host.open(0,compatibility,2,true),"Reopen baseline host");
     Client timeout;check(timeout.join("::1",host.port(),compatibility,identity,now),"Timeout connect failed");
     timeout.poll(now+11);check(timeout.state()==Client::State::Failed,"Handshake deadline ignored");
     host.close();
@@ -119,6 +149,17 @@ int main() {
     profile.bedSpawn=glm::ivec3(-4,70,-8);profile.inventory.slot(0)={ItemId::DIAMOND,12,0};
     auto profileBytes=encodeProfile(profile);auto restored=decodeProfile(profileBytes);
     check(restored.positions[0]==profile.positions[0] && restored.inventory.count(ItemId::DIAMOND)==12 && restored.bedSpawn==profile.bedSpawn,"Player profile roundtrip failed");
+    for(uint16_t version:{uint16_t(1),uint16_t(2)}) {
+        Reader paletteReader(profileBytes);paletteReader.u32();paletteReader.u16();const auto count=paletteReader.u16();
+        for(uint16_t i=0;i<count;++i){paletteReader.u16();paletteReader.text(256);}
+        const size_t offset=profileBytes.size()-paletteReader.remaining();
+        Bytes legacy(profileBytes.begin(),profileBytes.begin()+6);legacy[4]=static_cast<uint8_t>(version);legacy[5]=0;
+        const size_t end=profileBytes.size()-8-(version==1?50:0);
+        legacy.insert(legacy.end(),profileBytes.begin()+offset,profileBytes.begin()+end);
+        uint64_t checksum=14695981039346656037ULL;for(auto byte:legacy){checksum^=byte;checksum*=1099511628211ULL;}
+        Writer trailer;trailer.u64(checksum);legacy.insert(legacy.end(),trailer.bytes.begin(),trailer.bytes.end());
+        check(decodeProfile(legacy).inventory.count(ItemId::DIAMOND)==12,"Legacy profile version remains readable");
+    }
     profileBytes[20]^=1;rejects([&]{decodeProfile(profileBytes);});
     profiles.save(profile);auto reloaded=profiles.load(profile.identity);check(reloaded && reloaded->inventory.count(ItemId::DIAMOND)==12,"Persistent player data missing");
     check(ProfileStore::localIdentity(profileDirectory/"client").id==profile.identity.id,"Local identity changed on restart");

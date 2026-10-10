@@ -14,11 +14,45 @@ bool hexToken(const std::string& value) {
 bool applicationMessage(MessageType type) {
     return type == MessageType::Leave || (type >= MessageType::Input && type <= MessageType::LodInvalidate);
 }
+constexpr size_t MAX_DESCRIPTION=512*1024;
+void writeContent(Writer& writer,const std::map<std::string,std::string>& content) {
+    if(content.size()>8192)throw ProtocolError("Too many compatibility entries");
+    Writer description;description.u32(static_cast<uint32_t>(content.size()));
+    for(const auto& entry:content){description.text(entry.first,512);description.text(entry.second,65535);}
+    if(description.bytes.size()>MAX_DESCRIPTION)throw ProtocolError("Compatibility description is too large");
+    writer.raw(description.bytes);
+}
+std::map<std::string,std::string> readContent(Reader& reader) {
+    const auto start=reader.remaining();const auto count=reader.u32();
+    if(count>8192)throw ProtocolError("Too many compatibility entries");
+    std::map<std::string,std::string> result;
+    for(uint32_t i=0;i<count;++i) {
+        auto key=reader.text(512);auto value=reader.text(65535);
+        if(key.empty()||!result.emplace(key,value).second)throw ProtocolError("Invalid compatibility entry");
+        if(start-reader.remaining()>MAX_DESCRIPTION)throw ProtocolError("Compatibility description is too large");
+    }
+    return result;
+}
+std::string mismatch(const std::map<std::string,std::string>& expected,const std::map<std::string,std::string>& actual) {
+    for(const auto& entry:expected) {
+        auto found=actual.find(entry.first);
+        if(found==actual.end())return "Missing gameplay requirement: "+entry.first;
+        if(found->second!=entry.second)return "Gameplay requirement differs: "+entry.first;
+    }
+    for(const auto& entry:actual)if(!expected.count(entry.first))return "Extra gameplay requirement: "+entry.first;
+    return {};
+}
 Message hello(const Compatibility& compatible,const Identity& identity) {
     Writer writer;writer.text(compatible.gameVersion,64);writer.u32(compatible.generationVersion);writer.u64(compatible.contentSignature);
+    writeContent(writer,compatible.content);
     writer.text(identity.id,32);writer.text(identity.credential,32);writer.text(identity.nickname,64);
     return {MessageType::Hello,0,std::move(writer.bytes)};
 }
+}
+uint64_t contentSignature(const std::map<std::string,std::string>& content) {
+    Writer writer;writeContent(writer,content);uint64_t result=14695981039346656037ULL;
+    for(auto byte:writer.bytes){result^=byte;result*=1099511628211ULL;}
+    return result;
 }
 std::string randomToken() {
     std::random_device random;static constexpr char hex[]="0123456789abcdef";
@@ -36,7 +70,9 @@ bool Host::open(uint16_t port,const Compatibility& compatibility,size_t capacity
     if(!m_listener.listen(port,loopbackOnly)) {m_error=m_listener.error();return false;}
     m_compatibility=compatibility;m_capacity=capacity;return true;
 }
-void Host::close() {m_pending.clear();m_peers.clear();m_departed.clear();m_listener.close();}
+void Host::close(const std::string& reason) {
+    if(!reason.empty())for(auto& entry:m_peers)entry.second.control->closeWithReason(reason);
+    m_pending.clear();m_peers.clear();m_departed.clear();m_listener.close();}
 void Host::reject(Pending& pending,const std::string& reason) {
     Writer writer;writer.text(reason);pending.connection->queue({MessageType::Reject,0,std::move(writer.bytes)});pending.reject=true;
 }
@@ -74,15 +110,19 @@ SessionEvents Host::poll(double now) {
                 Reader reader(message.payload);
                 if(message.type==MessageType::Hello) {
                     const auto version=reader.text(64);const auto generation=reader.u32();const auto signature=reader.u64();
+                    const auto description=readContent(reader);
                     Identity identity{reader.text(32),reader.text(32),reader.text(64)};reader.finish();
-                    if(version!=m_compatibility.gameVersion || generation!=m_compatibility.generationVersion || signature!=m_compatibility.contentSignature)
-                        throw ProtocolError("Incompatible game, generation or content version");
+                    if(version!=m_compatibility.gameVersion || generation!=m_compatibility.generationVersion)
+                        throw ProtocolError("Incompatible game or generation version");
+                    const auto difference=mismatch(m_compatibility.content,description);
+                    if(!difference.empty())throw ProtocolError(difference.substr(0,256));
+                    if(signature!=m_compatibility.contentSignature)throw ProtocolError("Incompatible content signature");
                     if(!validIdentity(identity)) throw ProtocolError("Invalid player identity");
                     if(m_peers.size()+1>=m_capacity) throw ProtocolError("LAN room is full");
                     for(const auto& pair:m_peers) if(pair.second.identity.id==identity.id) throw ProtocolError("Player identity is already connected");
                     if(admit && !admit(identity)) throw ProtocolError("Player credential was rejected");
                     Peer peer;peer.id=m_nextPeer++;peer.identity=std::move(identity);peer.token=randomToken();peer.lastReceive=now;peer.lastPing=now;
-                    Writer writer;writer.u64(peer.id);writer.text(peer.token,32);
+                    Writer writer;writer.u64(peer.id);writer.text(peer.token,32);writeContent(writer,m_compatibility.content);
                     pending.connection->queue({MessageType::Welcome,0,std::move(writer.bytes)});
                     peer.control=std::move(pending.connection);m_peers.emplace(peer.id,std::move(peer));
                     it=m_pending.erase(it);continue;
@@ -124,7 +164,7 @@ SessionEvents Host::poll(double now) {
 }
 void Client::close() {
     m_control.reset();m_chunks.reset();m_state=State::Idle;m_peer=0;
-    m_receivedControl=m_receivedChunks=m_sentControl=m_sentChunks=0;
+    m_receivedControl=m_receivedChunks=m_sentControl=m_sentChunks=0;m_bulkFailedAt=-1;
 }
 void Client::fail(const std::string& reason) {close();m_state=State::Failed;m_error=reason;}
 bool Client::join(const std::string& address,uint16_t port,const Compatibility& compatibility,const Identity& identity,double now) {
@@ -133,6 +173,7 @@ bool Client::join(const std::string& address,uint16_t port,const Compatibility& 
     auto socket=std::make_unique<Platform::NetworkSocket>();
     if(!socket->connect(address,port)) {fail(socket->error());return false;}
     m_address=address;m_port=port;m_started=m_lastReceive=m_lastPing=now;m_state=State::Connecting;
+    m_compatibility=compatibility;
     m_control=std::make_unique<Connection>(std::move(socket));
     try {return m_control->queue(hello(compatibility,identity));} catch(const ProtocolError& error) {fail(error.what());return false;}
 }
@@ -149,16 +190,32 @@ std::vector<Received> Client::poll(double now) {
     std::vector<Received> messages;
     if(m_state==State::Idle || m_state==State::Failed) return messages;
     if(m_state!=State::Connected && now-m_started>HANDSHAKE_TIMEOUT) {fail("LAN connection timed out");return messages;}
-    if(!m_control->poll() || (m_chunks && !m_chunks->poll())) {fail("LAN connection closed");return messages;}
+    const bool controlAlive=m_control->poll();
+    const bool chunksAlive=!m_chunks||m_chunks->poll();
+    if(!chunksAlive&&m_bulkFailedAt<0)m_bulkFailedAt=now;
+    // Independent sockets can report bulk EOF before the terminal control frame.
+    // Give the control stream a short bounded grace period to deliver its reason.
+    if(!controlAlive||(!chunksAlive&&now-m_bulkFailedAt>=.1)) {
+        // A terminal control reason may arrive in the same poll as bulk EOF.
+        Message terminal;
+        for(size_t count=0;count<MAX_MESSAGES_PER_POLL&&m_control->pop(terminal);++count) {
+            if(terminal.type!=MessageType::Reject)continue;
+            try{Reader reader(terminal.payload);auto reason=reader.text();reader.finish();fail(reason);return messages;}
+            catch(const ProtocolError&){break;}
+        }
+        fail("LAN connection closed");return messages;
+    }
     try {
         for(bool chunks:{false,true}) {
-            auto& channel=chunks?m_chunks:m_control;if(!channel) continue;
+            auto& channel=chunks?m_chunks:m_control;if(!channel||(chunks&&!chunksAlive)) continue;
             Message message;
             for(size_t count=0;count<MAX_MESSAGES_PER_POLL && channel->pop(message);++count) {
                 m_lastReceive=now;
                 if(message.type==MessageType::Reject) {Reader reader(message.payload);auto reason=reader.text();reader.finish();fail(reason);return messages;}
                 if(m_state==State::Connecting && !chunks && message.type==MessageType::Welcome && message.sequence==0) {
-                    Reader reader(message.payload);m_peer=reader.u64();auto token=reader.text(32);reader.finish();
+                    Reader reader(message.payload);m_peer=reader.u64();auto token=reader.text(32);const auto description=readContent(reader);reader.finish();
+                    const auto difference=mismatch(m_compatibility.content,description);
+                    if(!difference.empty())throw ProtocolError(difference.substr(0,256));
                     if(!m_peer || !hexToken(token)) throw ProtocolError("Invalid LAN welcome");
                     auto socket=std::make_unique<Platform::NetworkSocket>();if(!socket->connect(m_address,m_port)) {fail(socket->error());return messages;}
                     m_chunks=std::make_unique<Connection>(std::move(socket));Writer writer;writer.u64(m_peer);writer.text(token,32);

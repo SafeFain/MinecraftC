@@ -111,7 +111,8 @@ These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
   animation. Near chunks require authoritative snapshots; distant seeded LOD
   receives versioned host edits and uses removable temporary caches. Host pause
   continues simulation; background closes the room or leaves the client session.
-  Gameplay plugins prevent LAN sessions; visual plugins remain supported.
+  Matching gameplay plugins support LAN sessions with namespaced content mapping,
+  host authority and opt-in guest commands; visual plugins may differ.
   See [LAN guide](lan-multiplayer.md) for platform validation boundaries.
 - Villagers and zombie villagers have spawn eggs and persistent original models.
   Runtime villages include living adult/child villagers with exclusive reachable

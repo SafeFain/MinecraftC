@@ -9,6 +9,18 @@ Connection::Connection(std::unique_ptr<Platform::NetworkSocket> socket) : m_sock
 }
 void Connection::fail(const std::string& error) { m_error=error; close(); }
 void Connection::close() { m_alive=false; if(m_socket) m_socket->close(); m_send.clear(); m_queuedBytes=0; m_sendOffset=0; }
+void Connection::closeWithReason(const std::string& reason) {
+    // Never splice a partially sent frame. If one is in flight the transport
+    // must close normally; otherwise the terminal reason can take priority.
+    if(!m_sendOffset) {
+        m_send.clear();m_queuedBytes=0;
+        Writer writer;
+        try{writer.text(reason.substr(0,256));}
+        catch(const ProtocolError&){writer.bytes.clear();writer.text("Plugin session ended");}
+        if(queue({MessageType::Reject,0,std::move(writer.bytes)}))poll();
+    }
+    close();
+}
 bool Connection::queue(Message message) {
     if(!m_alive) return false;
     try {
@@ -24,15 +36,6 @@ bool Connection::poll() {
     // Per-frame byte budgets bound main-thread I/O, even for a peer that can
     // continuously refill its socket. Decoding and gameplay are separate.
     constexpr size_t budget=256*1024;
-    size_t sent=0;
-    while(!m_send.empty() && sent<budget) {
-        const auto& bytes=m_send.front();
-        auto result=m_socket->send(bytes.data()+m_sendOffset,std::min(bytes.size()-m_sendOffset,budget-sent));
-        if(result.status==Platform::SocketStatus::Pending) break;
-        if(result.status!=Platform::SocketStatus::Ready) { fail(m_socket->error().empty()?"Connection closed":m_socket->error()); return false; }
-        sent+=result.transferred; m_sendOffset+=result.transferred; m_queuedBytes-=result.transferred;
-        if(m_sendOffset==bytes.size()) { m_send.pop_front(); m_sendOffset=0; }
-    }
     std::array<uint8_t,8192> buffer{};
     size_t received=0;
     try {
@@ -48,6 +51,23 @@ bool Connection::poll() {
             received+=result.transferred; m_decoder.feed(buffer.data(),result.transferred);
         }
     } catch(const ProtocolError& error) { fail(error.what()); return false; }
+    // Read the control stream before sending queued intent: otherwise EPIPE
+    // can discard a terminal reason that is already waiting in the socket.
+    if(m_remoteClosed)return true;
+    size_t sent=0;
+    while(!m_send.empty() && sent<budget) {
+        const auto& bytes=m_send.front();
+        auto result=m_socket->send(bytes.data()+m_sendOffset,std::min(bytes.size()-m_sendOffset,budget-sent));
+        if(result.status==Platform::SocketStatus::Pending) break;
+        if(result.status!=Platform::SocketStatus::Ready) {
+            // Frames already read, especially Reject, survive a pending input
+            // send racing the peer's close. Report closure on the next poll.
+            if(received){m_remoteClosed=true;break;}
+            fail(m_socket->error().empty()?"Connection closed":m_socket->error());return false;
+        }
+        sent+=result.transferred; m_sendOffset+=result.transferred; m_queuedBytes-=result.transferred;
+        if(m_sendOffset==bytes.size()) { m_send.pop_front(); m_sendOffset=0; }
+    }
     return true;
 }
 }

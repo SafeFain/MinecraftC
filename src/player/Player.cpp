@@ -69,6 +69,12 @@ void Player::configureRules(GameMode mode, Difficulty difficulty) {
     }
 }
 
+MC_Event Player::pluginEvent(MC_EventKind kind) const {
+    auto e=Plugins::event(kind);e.player_id=m_roomPlayerId;e.dimension=static_cast<uint32_t>(m_world->dimension());
+    if(!m_authority)e.role=MC_CLIENT;
+    for(int i=0;i<3;++i)e.player[i]=m_position[i];
+    return e;
+}
 DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
     DamageSourceInfo source;
     source.amount = amount;
@@ -79,7 +85,7 @@ DamageOutcome Player::takeDamage(float amount, bool bypassArmor) {
 
 DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
     if (!m_authority) return {};
-    auto e=Plugins::event(MC_DAMAGE_PRE);e.damage=source.amount;
+    auto e=pluginEvent(MC_DAMAGE_PRE);e.damage=source.amount;
     if(!Plugins::dispatch(e))return {};
     auto adjusted=source;adjusted.amount=e.damage;
     auto result=takeDamageImpl(adjusted);
@@ -993,7 +999,7 @@ void Player::updateHighlight() {
 bool Player::breakBlock() {
     const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
     if(!hit)return false;
-    auto e=Plugins::event(MC_BREAK_PRE);e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;
+    auto e=pluginEvent(MC_BREAK_PRE);e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;
     e.block=static_cast<uint16_t>(m_world->getBlock(e.x,e.y,e.z));e.item=static_cast<uint16_t>(activeItem().id);
     if(!Plugins::dispatch(e))return false;
     if(!breakBlockImpl())return false;
@@ -1102,7 +1108,7 @@ bool Player::placeBlock() {
     const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
     if(!hit)return false;
     const auto position=hit->blockPos+hit->faceNormal;
-    auto e=Plugins::event(MC_PLACE_PRE);e.x=position.x;e.y=position.y;e.z=position.z;
+    auto e=pluginEvent(MC_PLACE_PRE);e.x=position.x;e.y=position.y;e.z=position.z;
     e.block=static_cast<uint16_t>(*block);e.item=static_cast<uint16_t>(activeItem().id);
     if(!Plugins::dispatch(e))return false;
     if(!placeBlockImpl())return false;

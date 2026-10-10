@@ -20,7 +20,8 @@ Lan::PlayerView playerView(uint64_t id, const std::string& nickname, const Playe
 }
 
 Lan::Compatibility GameSession::lanCompatibility() {
-    return {Config::GAME_VERSION, WorldGenContext::GENERATION_VERSION, 0};
+    const auto& description=Plugins::content().networkDescription;
+    return {Config::GAME_VERSION, WorldGenContext::GENERATION_VERSION, Lan::contentSignature(description), description};
 }
 
 bool GameSession::openLanRoom(uint16_t port, size_t capacity, bool loopbackOnly) {
@@ -28,10 +29,6 @@ bool GameSession::openLanRoom(uint16_t port, size_t capacity, bool loopbackOnly)
     lanFailure.clear();
     if (!saveStore || !terrainGenerated) {
         lanFailure = "World is not ready";
-        return false;
-    }
-    if (!Plugins::content().requirements.empty() || !worldMetadata.pluginRequirements.empty()) {
-        lanFailure = "Gameplay plugins are not supported in LAN sessions";
         return false;
     }
     try {
@@ -83,6 +80,7 @@ void GameSession::admitLanPlayer(uint64_t id) {
     guest->lastInput = lanNow;
     guestProfiles->save(guest->profile);
     guests.emplace(id, std::move(guest));
+    {auto e=guests.at(id)->player.pluginEvent(MC_PLAYER_JOIN);e.role=MC_HOST;Plugins::dispatch(e);}
     bindLanFeedback(guests.at(id)->player, id);
     Lan::WorldInfo info{worldMetadata.displayName, worldMetadata.seed, worldMetadata.generationVersion,
                         worldMetadata.worldType, worldMetadata.difficulty, worldMetadata.gameRules};
@@ -92,6 +90,7 @@ void GameSession::admitLanPlayer(uint64_t id) {
 }
 
 void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
+    if(!Plugins::content().runtimeFault.empty())return;
     auto& profile = guest.profile;
     profile.positions[static_cast<size_t>(profile.dimension)] = guest.player.getPosition();
     profile.positioned[static_cast<size_t>(profile.dimension)] = true;
@@ -109,6 +108,7 @@ void GameSession::removeLanPlayer(uint64_t id) {
     const auto found = guests.find(id);
     if (found == guests.end()) return;
     auto& guest = *found->second;
+    {auto e=guest.player.pluginEvent(MC_PLAYER_LEAVE);e.role=MC_HOST;Plugins::dispatch(e);}
     guest.fishing.cancel();
     auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
     for (const auto& stack : guest.window.close(guest.player.inventory()))
@@ -259,6 +259,7 @@ void GameSession::updateLanPlayers(float dt) {
     static const std::array<InputBinding, INPUT_ACTION_COUNT> noPhysicalBindings{};
     for (auto& entry : guests) {
         auto& guest = *entry.second;
+        const Plugins::ActorScope actor({entry.first,static_cast<uint32_t>(guest.profile.dimension),MC_HOST});
         auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
         const auto position = guest.player.getPosition();
         const int cx = World::worldToChunkX(position.x), cz = World::worldToChunkZ(position.z);
@@ -304,6 +305,14 @@ void GameSession::updateLanPlayers(float dt) {
             for (const auto& binding : std::array<std::pair<uint8_t, int>, 2>{{
                     {Lan::InputButtons::Attack, MouseButton::Left}, {Lan::InputButtons::Use, MouseButton::Right}}}) {
                 if (!(guest.buttons & binding.first) || (guest.appliedButtons & binding.first)) continue;
+                auto useEvent=guest.player.pluginEvent(MC_USE_PRE);
+                const bool use=binding.second==MouseButton::Right&&!guest.player.isSpectator();
+                if(use) {
+                    useEvent.item=static_cast<uint16_t>(guest.player.activeItem().id);
+                    const auto hit=runtime.world.raycast(guest.player.getEyePosition(),guest.player.getForward(),Config::REACH_DISTANCE);
+                    if(hit){useEvent.x=hit->blockPos.x;useEvent.y=hit->blockPos.y;useEvent.z=hit->blockPos.z;useEvent.block=static_cast<uint16_t>(runtime.world.getBlock(useEvent.x,useEvent.y,useEvent.z));}
+                    if(!Plugins::dispatch(useEvent))continue;
+                }
                 if (binding.second == MouseButton::Right && item.id == ItemId::FISHING_ROD) {
                     guest.fishing.update(0, guest.player.getEyePosition(), environment);
                     guest.fishingSlot = guest.player.selectedSlot();
@@ -311,6 +320,7 @@ void GameSession::updateLanPlayers(float dt) {
                     guest.fishing.use(guest.player.getEyePosition(), guest.player.getForward(), guest.player.velocity(), environment);
                     guest.player.animateItemUse();
                 } else guest.player.handleMouseButton(binding.second, ButtonAction::Press);
+                if(use){useEvent.kind=MC_USE_POST;useEvent.cancelled=0;Plugins::dispatch(useEvent);}
             }
             const auto eye = guest.player.getEyePosition();
             const glm::ivec3 eyeBlock(glm::floor(eye));
@@ -541,7 +551,7 @@ bool GameSession::sendLanChat(const std::string& text) {
 
 Platform::LanAdvertisement GameSession::lanAdvertisement() const {
     return {hostIdentity.id, worldMetadata.displayName, Config::GAME_VERSION, lanPort(), Lan::PROTOCOL_VERSION,
-        worldMetadata.generationVersion, static_cast<uint8_t>(guests.size() + 1), static_cast<uint8_t>(lanHost.capacity()), lanPvp};
+        worldMetadata.generationVersion, static_cast<uint8_t>(guests.size() + 1), static_cast<uint8_t>(lanHost.capacity()), lanPvp, std::to_string(lanCompatibility().contentSignature)};
 }
 
 std::vector<Lan::RoomPlayer> GameSession::roomRoster() const {

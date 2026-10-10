@@ -37,6 +37,7 @@ class SaveStore;
 
 class World : private IChunkStreamingWorld {
 public:
+    DimensionId dimension() const { return m_generator.dimension(); }
     void setGameRules(const GameRuleSet& rules) { m_gameRules = rules; }
     const GameRuleSet& gameRules() const { return m_gameRules; }
 

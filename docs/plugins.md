@@ -156,9 +156,59 @@ Visual-only plugins do not contribute a world requirement.
 Builtin-only v2–v15 saves retain their existing readers, generation compatibility
 rules and IDs. Adding a gameplay plugin to an old unmodded world is refused in
 this first version; create a new world with the desired set. Generated caches are
-rebuildable when incompatible. Unmodded terrain remains generation v17.
+rebuildable when incompatible. The current terrain generation is v20; enabling plugins does not change its version.
 
 ABI 1 has no hot reload, arbitrary shaders/render passes, new entity types,
-dimensions, world generation hooks, network protocol, bytecode patching or custom
+dimensions, world generation hooks, arbitrary plugin network messages, bytecode patching or custom
 block-entity schemas. Plugins can compose registered content, recipes, events,
 commands, controlled operations, environment materials and HUD drawing.
+
+## LAN multiplayer and ABI 1 extension
+
+Plugin worlds can open and join the existing LAN rooms. Every participant must
+install and enable the same gameplay plugins and restart before joining. The
+handshake compares plugin versions, gameplay configuration at initialization, registered block/item
+properties, recipes, callback order and command permissions before player admission
+or any guest-profile write. A mismatch names the differing requirement. Visual-only
+plugins and atlas slots may differ. No plugins or native code are downloaded.
+
+Native packages can declare `"network_compatibility": "my-plugin-behavior-1"` in
+`mod.json`. This author-provided identifier promises equivalent gameplay across
+platform builds; update it when behavior changes. Without it, native packages must
+match their package fingerprint. Data packages compare their registered gameplay
+and configuration; builtin plugins carry a fixed behavior identifier. The network
+signature is a discovery hint, not an authentication mechanism. Existing world-save
+fingerprints remain unchanged, including native files and configuration.
+
+LAN protocol 3 uses canonical IDs sorted by namespaced content key and maps them to
+each process's frozen local registry. SDK IDs are never reassigned. Guest profiles
+version 3 persist an item palette; versions 1 and 2 remain readable. Unknown content,
+invalid stacks and incompatible protocol versions are rejected rather than replaced.
+
+Only the host runs gameplay callbacks. Clients may run initialization/shutdown,
+HUD and environment callbacks; visual plugins also receive world lifecycle events.
+Client world-data access and gameplay mutations are unavailable. World plugin data
+stays on the host and is not copied to clients. Gameplay callbacks cannot exchange
+arbitrary custom network payloads in this version.
+
+The original ABI 1 structures keep their field offsets. `MC_Event` adds optional
+`player_id`, `dimension` and `role` tail fields; check `event->size` before using them.
+Player 0 is the host, and guest IDs expire when they leave. New join/leave events run
+on the host. Inside an actor callback, the original `player`, `give_item`, `get_block`
+and `set_block` operations refer to that actor and dimension. Outside callbacks they
+refer to the local host player. Queued operations capture the actor/dimension at
+submission; a departed actor cannot become the host or a different guest.
+
+Discover optional capabilities by checking the host table size before calling
+`query_extension(context, MC_MULTIPLAYER_EXTENSION, 1)`. The `MC_MultiplayerV1` table
+provides role queries, player enumeration, player snapshots, targeted item grants,
+explicit-dimension block access and command registration. Snapshots on a client
+are available only for its own player; enumeration includes the full room roster.
+The C++ `minecraftc::Host::multiplayer()` helper performs the table-size checks.
+
+Old `register_command` calls remain host-only. To opt a command into guest use,
+register it through the extension with `MC_COMMAND_ALLOW_GUEST`. Requests are
+sequenced, rate-limited and executed on the host with the authenticated connection's
+actor context. Builtin administrative commands remain host-only. Callback faults
+end the session and discard queued operations without saving the faulted world;
+peers receive a reason when the transport can deliver its terminal frame.

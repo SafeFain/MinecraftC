@@ -85,6 +85,14 @@ struct GameSessionTestAccess {
         replacement.queued = false;
         return rejected;
     }
+    static World& pluginDimension(GameSession& session,DimensionId id){
+        auto& runtime=session.ensureDimension(id);runtime.world.setThreadPool(nullptr);
+        for(int x=-1;x<=1;++x)for(int z=-1;z<=1;++z){auto* chunk=runtime.world.getChunk(x,z);chunk->generated=true;chunk->lifecycle=Chunk::LifecycleState::Renderable;}
+        return runtime.world;
+    }
+    static void pluginHostLoading(GameSession& session,bool loading){session.terrainGenerated=!loading;}
+    static void pluginRemoveGuest(GameSession& session,uint64_t id){session.removeLanPlayer(id);}
+    static void disconnectReplica(GameSession& session){session.closeReplica();session.terrainGenerated=false;}
     static uint64_t replicaPeer(GameSession& session) { return session.lanClient.peerId(); }
     static void applyLanAction(GameSession& session, LanPlayerRuntime& guest, const Lan::GameAction& action) { session.applyLanAction(guest, action); }
     static void syncReplicaActionSequence(GameSession& client, uint64_t sequence) { client.replicaActionSequence = sequence; }
@@ -231,8 +239,13 @@ std::string Localization::format(
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
+#include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==5&&std::string(argv[1])=="--plugin-lan-tests") {
+        try{return PluginLanIntegration::run(argv[2],argv[3],argv[4]);}
+        catch(const std::exception& error){std::cerr<<"Plugin LAN regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if (argc > 2 && std::string(argv[1]) == "--lan-replica-tests")
         return LanReplicaIntegration::run(argv[2]);
     if (argc > 1 && std::string(argv[1]) == "--lan-authority-tests")

@@ -10,7 +10,7 @@ void World::setReplicaMode(bool enabled) {
 bool World::installReplicaSnapshot(int cx, int cz, const std::vector<uint16_t>& blocks) {
     if (!m_replicaMode || blocks.size() != Config::CHUNK_VOLUME) return false;
     for (auto id : blocks)
-        if (id >= static_cast<uint16_t>(BlockId::COUNT)) return false;
+        if (!isValidBlockId(static_cast<BlockId>(id))) return false;
     Chunk* chunk = m_chunks.find(cx, cz);
     if (!chunk || chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return false;
     std::vector<glm::ivec3> changed;
@@ -46,7 +46,7 @@ bool World::installReplicaEdits(int cx, int cz, const std::vector<std::pair<uint
     if (!chunk || !chunk->generated.load() || chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return false;
     std::set<uint32_t> indices;
     for (const auto& edit : edits)
-        if (edit.first >= Config::CHUNK_VOLUME || static_cast<uint16_t>(edit.second) >= static_cast<uint16_t>(BlockId::COUNT) ||
+        if (edit.first >= Config::CHUNK_VOLUME || !isValidBlockId(edit.second) ||
             !indices.insert(edit.first).second) return false;
     m_lighting.rebuild();
     std::vector<glm::ivec3> changed;

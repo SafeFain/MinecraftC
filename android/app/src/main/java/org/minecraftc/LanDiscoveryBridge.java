@@ -82,7 +82,7 @@ public final class LanDiscoveryBridge {
                             if (address instanceof Inet6Address && numeric.contains("%")) numeric = numeric.substring(0, numeric.indexOf('%')) + "%" + ((Inet6Address) address).getScopeId();
                             Map<String, byte[]> attributes = resolved.getAttributes();
                             rooms.put(service.getServiceName(), new String[]{service.getServiceName(), field(attributes,"name"), field(attributes,"version"), numeric,
-                                Integer.toString(resolved.getPort()), field(attributes,"protocol"), field(attributes,"generation"), field(attributes,"players"), field(attributes,"capacity"), field(attributes,"pvp")});
+                                Integer.toString(resolved.getPort()), field(attributes,"protocol"), field(attributes,"generation"), field(attributes,"players"), field(attributes,"capacity"), field(attributes,"pvp"), field(attributes,"content")});
                             updated.put(service.getServiceName(), SystemClock.elapsedRealtime());
                         }
                     }
@@ -105,7 +105,7 @@ public final class LanDiscoveryBridge {
         return rooms.values().toArray(new String[0][]);
     }
     public static synchronized boolean advertise(String[] values) {
-        if (manager == null || values.length != 9) return false;
+        if (manager == null || values.length != 10) return false;
         if (Arrays.equals(advertisement, values)) return true;
         advertisement = values.clone();
         if (registration != null) { unregister(); return true; }
@@ -115,8 +115,8 @@ public final class LanDiscoveryBridge {
         if (advertisement == null) return true;
         NsdServiceInfo service = new NsdServiceInfo(); service.setServiceName("mc-" + advertisement[0]);
         service.setServiceType("_minecraftc._tcp."); service.setPort(Integer.parseInt(advertisement[3]));
-        String[] keys = {"name", "version", "protocol", "generation", "players", "capacity", "pvp"};
-        int[] indices = {1,2,4,5,6,7,8};
+        String[] keys = {"name", "version", "protocol", "generation", "players", "capacity", "pvp", "content"};
+        int[] indices = {1,2,4,5,6,7,8,9};
         for (int i = 0; i < keys.length; ++i) service.setAttribute(keys[i], advertisement[indices[i]]);
         final String[] submitted = advertisement.clone();
         NsdManager.RegistrationListener listener = new NsdManager.RegistrationListener() {

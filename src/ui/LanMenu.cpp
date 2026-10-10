@@ -3,6 +3,8 @@
 #include "ui/UIStyle.h"
 #include "game/Utf8.h"
 #include "network/Protocol.h"
+#include "network/Session.h"
+#include "plugins/ContentRegistry.h"
 #include "world/WorldGenContext.h"
 #include "game/TextWrap.h"
 #include "core/InputCodes.h"
@@ -68,7 +70,8 @@ void LanMenu::updateLabels() {
             const auto roomIndex = m_roomPage + row; auto& button = m_buttons[index++];
             if (roomIndex >= m_rooms.size()) { button.setLabel(m_localization.text(row == 0 && m_rooms.empty() ? "lan.searching" : "lan.no_room")); button.setDetail({}); button.setEnabled(false); continue; }
             const auto& room = m_rooms[roomIndex];
-            const bool compatible = room.version == Config::GAME_VERSION && room.protocol == Lan::PROTOCOL_VERSION && room.generation == WorldGenContext::GENERATION_VERSION;
+            const bool compatible = room.version == Config::GAME_VERSION && room.protocol == Lan::PROTOCOL_VERSION && room.generation == WorldGenContext::GENERATION_VERSION &&
+                room.contentSignature == std::to_string(Lan::contentSignature(Plugins::content().networkDescription));
             button.setLabel(room.name + " (" + std::to_string(room.players) + "/" + std::to_string(room.capacity) + ")");
             button.setDetail(!compatible ? m_localization.text("lan.incompatible") : room.players == room.capacity ? m_localization.text("lan.full") : room.address + ":" + std::to_string(room.port));
             button.setEnabled(compatible && room.players < room.capacity);

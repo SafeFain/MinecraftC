@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "world/Block.h"
+#include "plugins/Runtime.h"
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
 #include "game/SurvivalStats.h"
@@ -23,6 +24,7 @@ class Player {
 public:
     Player(World& world);
     void bindWorld(World& world, EntityManager* entities);
+    MC_Event pluginEvent(MC_EventKind kind) const;
     void setRoomPlayerId(uint64_t id) { m_roomPlayerId = id; }
     void setOrientation(float yaw, float pitch);
     void setAuthority(bool enabled) { m_authority = enabled; cancelBowCharge(); m_mining = false; }

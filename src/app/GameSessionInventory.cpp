@@ -31,6 +31,17 @@ bool reachable(const Player& owner, const World& world, glm::ivec3 position) {
     const auto hit = world.raycast(owner.getEyePosition(), owner.getForward(), reach);
     return hit && hit->blockPos == position;
 }
+bool canOpenWindow(const Player& owner,DimensionSimulation& runtime,InventoryWindowKind kind,glm::ivec3 position) {
+    if (owner.isSpectator() || owner.survivalStats().dead() || kind == InventoryWindowKind::Closed) return false;
+    if (kind != InventoryWindowKind::Player) {
+        if (!reachable(owner, runtime.world, position)) return false;
+        const auto block = runtime.world.getLoadedBlock(position.x, position.y, position.z);
+        if (kind == InventoryWindowKind::CraftingTable && block != BlockId::CRAFTING_TABLE) return false;
+        if (kind == InventoryWindowKind::Container && block != BlockId::CHEST && block != BlockId::FURNACE) return false;
+        if (kind == InventoryWindowKind::Container && !runtime.world.getBlockEntity(position)) return false;
+    }
+    return true;
+}
 void drops(Player& owner, EntityManager& entities, const std::vector<ItemStack>& items) {
     for (auto item : items) entities.spawnItem(owner.getEyePosition() + glm::dvec3(owner.getForward()) * .65,
         item, owner.getForward() * 4.5f + glm::vec3(0, 1.5f, 0), .8f);
@@ -45,14 +56,7 @@ void GameSession::closeAuthorityWindow(Player& owner, DimensionSimulation& runti
 bool GameSession::openAuthorityWindow(Player& owner, DimensionSimulation& runtime,
                                      InventoryTransaction& transaction, InventoryWindowView& view,
                                      InventoryWindowKind kind, glm::ivec3 position) {
-    if (owner.isSpectator() || owner.survivalStats().dead() || kind == InventoryWindowKind::Closed) return false;
-    if (kind != InventoryWindowKind::Player) {
-        if (!reachable(owner, runtime.world, position)) return false;
-        const auto block = runtime.world.getLoadedBlock(position.x, position.y, position.z);
-        if (kind == InventoryWindowKind::CraftingTable && block != BlockId::CRAFTING_TABLE) return false;
-        if (kind == InventoryWindowKind::Container && block != BlockId::CHEST && block != BlockId::FURNACE) return false;
-        if (kind == InventoryWindowKind::Container && !runtime.world.getBlockEntity(position)) return false;
-    }
+    if(!canOpenWindow(owner,runtime,kind,position))return false;
     closeAuthorityWindow(owner, runtime, transaction, view);
     view.kind = kind; view.position = position;
     owner.cancelBowCharge();
@@ -147,9 +151,28 @@ void GameSession::applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction&
     guest.actionAcknowledged = action.sequence; guest.lastStateSent = -1;
     if (action.epoch != guest.chunkEpoch) return;
     auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
-    if (action.kind == Lan::ActionKind::OpenWindow) {
-        if (!guest.loading && !guest.dead)
-            (void)openAuthorityWindow(guest.player, runtime, guest.window, guest.windowView, action.windowKind, action.position);
+    const auto actorEvent=guest.player.pluginEvent(MC_USE_PRE);
+    const Plugins::ActorScope actor({actorEvent.player_id,actorEvent.dimension,MC_HOST});
+    if (action.kind == Lan::ActionKind::PluginCommand) {
+        if(guest.loading||guest.dead||guest.sleep||action.command.empty()||action.command.front()!='/')return;
+        guest.chatTokens=std::min(5.0f,guest.chatTokens+static_cast<float>(std::max(0.0,lanNow-guest.chatLast)));
+        guest.chatLast=lanNow;if(guest.chatTokens<1)return;guest.chatTokens-=1;
+        const bool accepted=Plugins::commandDispatcher()&&Plugins::commandDispatcher()(action.command);
+        if(!accepted) {
+            const Lan::ChatMessage message{Lan::ChatKind::Message,"","Plugin command unavailable or restricted to the host"};
+            (void)lanHost.send(actorEvent.player_id,{Lan::MessageType::Chat,0,Lan::encodeChat(message)});
+        }
+    } else if (action.kind == Lan::ActionKind::OpenWindow) {
+        if (!guest.loading && !guest.dead && !guest.sleep && !guest.player.isSpectator()) {
+            auto e=guest.player.pluginEvent(MC_USE_PRE);e.item=static_cast<uint16_t>(guest.player.activeItem().id);
+            e.x=action.position.x;e.y=action.position.y;e.z=action.position.z;
+            e.block=static_cast<uint16_t>(runtime.world.getBlock(e.x,e.y,e.z));
+            if(!canOpenWindow(guest.player,runtime,action.windowKind,action.position))return;
+            const bool use=action.windowKind!=InventoryWindowKind::Player;
+            if(use&&!Plugins::dispatch(e))return;
+            if(!openAuthorityWindow(guest.player,runtime,guest.window,guest.windowView,action.windowKind,action.position))return;
+            if(use){e.kind=MC_USE_POST;e.cancelled=0;Plugins::dispatch(e);}
+        }
     } else if (action.kind == Lan::ActionKind::CloseWindow) {
         if (action.window == guest.windowView.id) closeAuthorityWindow(guest.player, runtime, guest.window, guest.windowView);
     } else if (action.kind == Lan::ActionKind::Inventory) {
@@ -195,4 +218,10 @@ void GameSession::applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction&
             applyAuthorityInventory(guest.player, runtime, guest.window, guest.windowView, grant);
         }
     }
+}
+
+bool GameSession::sendPluginCommand(const std::string& command) {
+    if(!lanJoining||!lanWorldReady()||lanClient.state()!=Lan::Client::State::Connected||replicaActions.size()>=32||command.empty()||command.size()>512||command.front()!='/')return false;
+    try{Lan::Writer validate;validate.text(command,512);}catch(const Lan::ProtocolError&){return false;}
+    Lan::GameAction action;action.kind=Lan::ActionKind::PluginCommand;action.command=command;queueReplicaAction(std::move(action));return true;
 }
