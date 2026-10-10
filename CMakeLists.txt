@@ -227,9 +227,8 @@ target_link_libraries(minecraftc_platform PRIVATE ${CMAKE_DL_LIBS})
 target_compile_definitions(minecraftc_platform PRIVATE
     MINECRAFTC_INSTALL_DATADIR="${CMAKE_INSTALL_DATADIR}")
 target_link_libraries(minecraftc_platform PRIVATE ${MINECRAFTC_SDL_TARGET})
-if(APPLE)
-    target_link_libraries(minecraftc_platform PUBLIC "-ldns_sd")
-endif()
+# Apple provides Bonjour/DNS-SD through the implicitly linked libSystem;
+# macOS and iOS SDKs do not provide a separate libdns_sd to link.
 if(WIN32)
     target_link_libraries(minecraftc_platform PUBLIC shell32 ole32 ws2_32 iphlpapi)
 endif()
