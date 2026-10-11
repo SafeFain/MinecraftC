@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "world/World.h"
 #include "world/VoxelRaycast.h"
 #include "world/BiomeLocator.h"
@@ -113,7 +114,8 @@ World::World()
 }
 
 void World::resetForNewSeed(
-    uint64_t newSeed, WorldType worldType, DimensionId dimension) {
+    uint64_t newSeed, WorldType worldType, DimensionId dimension,Plugins::GenerationConfig config) {
+    Plugins::validateGeneration(config,static_cast<uint32_t>(dimension));
     if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
     m_lod.reset(nullptr);
@@ -142,7 +144,7 @@ void World::resetForNewSeed(
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
-    new (&m_generator) WorldGenerator(newSeed, worldType, dimension);
+    new (&m_generator) WorldGenerator(newSeed, worldType, dimension,std::move(config));
     m_lod.reset(&m_generator);
     Config::WORLD_SEED = newSeed;
 }
@@ -319,7 +321,7 @@ std::optional<glm::ivec2> World::locateBiome(
 
 std::optional<glm::ivec3> World::locateStructure(
     StructureType type, int worldX, int worldZ) const {
-    if (m_generator.worldType() != WorldType::Normal) return {};
+    if (m_generator.customGenerator() || m_generator.worldType() != WorldType::Normal) return {};
     const auto location = m_generator.isHeaven()
         ? m_generator.locateNearestHeavenStructure(type, worldX, worldZ)
         : m_generator.getStructureGenerator().locateNearest(
@@ -329,7 +331,7 @@ std::optional<glm::ivec3> World::locateStructure(
 }
 
 glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
-    if (m_generator.isHeaven()) {
+    if (m_generator.isHeaven()&&!m_generator.customGenerator()) {
         const glm::ivec3 spawn = m_generator.heavenSpawnBlock();
         return {spawn.x + 0.5, spawn.y + 1.01, spawn.z + 0.5};
     }

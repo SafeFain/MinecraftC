@@ -1,6 +1,7 @@
 #pragma once
 
 #include "network/Protocol.h"
+#include "plugins/ContentRegistry.h"
 #include "game/InventoryCommands.h"
 #include "game/GameRuleRegistry.h"
 #include "game/GameRules.h"
@@ -17,6 +18,7 @@ struct WorldInfo {
     WorldType type = WorldType::Normal;
     Difficulty difficulty = Difficulty::Normal;
     GameRuleSet rules;
+    std::array<Plugins::GenerationConfig,2> generation;
 };
 struct PlayerView {
     uint64_t id = 0;

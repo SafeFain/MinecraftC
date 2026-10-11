@@ -25,9 +25,15 @@ namespace {
 using DataHandle = std::unique_ptr<cgltf_data, decltype(&cgltf_free)>;
 
 cgltf_result assetRead(const cgltf_memory_options* memory,
-                       const cgltf_file_options*,const char* path,
+                       const cgltf_file_options* files,const char* path,
                        cgltf_size* size,void** data) {
-    try { const auto bytes=AssetStore::readPath(std::filesystem::u8path(path));
+    try {
+        if(files->user_data) {
+            const auto& root=*static_cast<const std::filesystem::path*>(files->user_data);
+            const auto relative=std::filesystem::relative(std::filesystem::u8path(path),root);
+            if(!AssetStore::validPath(relative.generic_u8string()))return cgltf_result_file_not_found;
+        }
+        const auto bytes=AssetStore::readPath(std::filesystem::u8path(path));
         const cgltf_size requested=*size;
         if(requested&&bytes.size()<requested)return cgltf_result_data_too_short;
         void* result=memory->alloc_func?memory->alloc_func(memory->user_data,bytes.size()):std::malloc(bytes.size());
@@ -460,8 +466,9 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
 } // namespace
 
 LoadResult loadGltf(const std::filesystem::path& path) {
+    auto directory=std::filesystem::absolute(path).parent_path();
     cgltf_options options{};
-    options.file.read=&assetRead;options.file.release=&assetRelease;
+    options.file.read=&assetRead;options.file.release=&assetRelease;options.file.user_data=&directory;
     cgltf_data* parsed = nullptr;
     const std::string nativePath = path.string();
     cgltf_result result = cgltf_parse_file(&options, nativePath.c_str(), &parsed);

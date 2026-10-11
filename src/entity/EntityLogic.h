@@ -6,13 +6,22 @@
 #include <glm/glm.hpp>
 
 #include "game/Item.h"
+#include "plugins/ContentRegistry.h"
 #include "game/GameRules.h"
 #include "world/CaveGenerator.h"
 
-enum class EntityType : uint8_t {
+enum class EntityType : uint16_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
     Arrow, PrimedTnt, Villager, ZombieVillager, IronGolem
 };
+
+inline EntityType entityTemplate(EntityType type) {
+    if(const auto* definition=Plugins::entityContent(static_cast<uint16_t>(type)))return static_cast<EntityType>(definition->base);
+    return type;
+}
+inline bool registeredMob(EntityType type) {
+    return type!=EntityType::Item&&type!=EntityType::Arrow&&type!=EntityType::PrimedTnt&&Plugins::validEntity(static_cast<uint16_t>(type));
+}
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };
 

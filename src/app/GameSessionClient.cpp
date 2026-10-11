@@ -119,7 +119,7 @@ void GameSession::pollReplica(double now) {
                 const auto info = Lan::decodeWorldInfo(message.payload);
                 if (info.generationVersion != WorldGenContext::GENERATION_VERSION) throw Lan::ProtocolError("Incompatible world generation");
                 worldMetadata = WorldMetadata{}; worldMetadata.displayName = info.name; worldMetadata.seed = info.seed;
-                worldMetadata.generationVersion = info.generationVersion; worldMetadata.worldType = info.type;
+                worldMetadata.generationVersion = info.generationVersion; worldMetadata.worldType = info.type;worldMetadata.generation=info.generation;
                 worldMetadata.difficulty = info.difficulty; worldMetadata.gameRules = info.rules;
                 replicaWorldInfo = true;
             } else if (message.type == Lan::MessageType::PlayerState) applyReplicaState(Lan::decodeAuthorityState(message.payload));

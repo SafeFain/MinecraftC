@@ -210,7 +210,8 @@ void EntityManager::tickVillageLife(float dt,uint64_t worldTick) {
     const size_t count=m_entities.size();
     for(size_t n=0;n<count && actors.size()<Config::VILLAGE_ACTIONS_PER_SECOND;++n) {
         const auto& e=m_entities[(m_villageLifeCursor+n)%count];
-        if(e.type==EntityType::Villager && e.health>0)actors.push_back(e.id);
+        const auto* extension=Plugins::entityContent(static_cast<uint16_t>(e.type));
+        if(e.type==EntityType::Villager && e.health>0 && (!extension||!extension->callback))actors.push_back(e.id);
         if(n+1==count || actors.size()==Config::VILLAGE_ACTIONS_PER_SECOND)m_villageLifeCursor=(m_villageLifeCursor+n+1)%count;
     }
     // Mutations that append entities happen here, after the main update loop.

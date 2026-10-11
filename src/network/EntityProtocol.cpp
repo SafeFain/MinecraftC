@@ -1,10 +1,19 @@
 #include "network/ContentIds.h"
 #include "network/EntityProtocol.h"
+#include "plugins/Json.h"
 #include <cmath>
 #include <set>
 
 namespace Lan {
 namespace {
+uint16_t entityType(const std::string& key) {
+    try{return Plugins::resolveEntity(key);}catch(const std::exception& error){throw ProtocolError(error.what());}
+}
+void entityStateValid(uint16_t type,const std::string& state,uint32_t revision) {
+    const auto* definition=Plugins::entityContent(type);
+    if(state.size()>MC_ENTITY_STATE_LIMIT||revision!=(definition?definition->stateVersion:0))throw ProtocolError("Invalid entity state revision/size");
+    try{Plugins::Json::parse(state);}catch(const std::exception& error){throw ProtocolError(error.what());}
+}
 bool flag(Reader& reader) { const auto value = reader.u8(); if (value > 1) throw ProtocolError("Invalid entity flag"); return value != 0; }
 void item(Writer& writer, ItemStack value) {
     if (!isValidItemId(value.id) ||
@@ -36,29 +45,33 @@ VillagerData villager(Reader& reader) {
     Writer check; villager(check, result); return result;
 }
 void entity(Writer& writer, const EntitySnapshot& value) {
-    if (!value.id || value.type > EntityType::IronGolem || value.health <= 0 || value.health > 10000 || value.age < 0 || value.hurt < 0 || value.burning < 0)
+    if (!value.id || !Plugins::validEntity(static_cast<uint16_t>(value.type)) || value.health <= 0 || value.health > 10000 || value.age < 0 || value.hurt < 0 || value.burning < 0)
         throw ProtocolError("Invalid entity snapshot");
-    writer.u64(value.id); writer.u8(static_cast<uint8_t>(value.type)); position(writer, value.position);
+    writer.u64(value.id); writer.text(Plugins::entityKey(static_cast<uint16_t>(value.type))); position(writer, value.position);
     vector(writer, value.velocity); vector(writer, value.locomotion); vector(writer, value.facing);
     writer.f32(value.health); writer.f32(value.age); writer.f32(value.hurt); writer.f32(value.burning); item(writer, value.item); writer.u32(value.seed);
     writer.u8(value.inGround); writer.u8(value.playerOwned); writer.u8(value.sleeping); writer.u8(value.attacking);
     if (value.type == EntityType::Villager || value.type == EntityType::ZombieVillager) villager(writer, value.villager);
+    entityStateValid(static_cast<uint16_t>(value.type),value.pluginState,value.pluginStateVersion);writer.text(value.pluginState,MC_ENTITY_STATE_LIMIT);writer.u32(value.pluginStateVersion);
 }
 EntitySnapshot entity(Reader& reader) {
-    EntitySnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(reader.u8()); result.position = position(reader);
+    EntitySnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(entityType(reader.text())); result.position = position(reader);
     result.velocity = vector(reader); result.locomotion = vector(reader); result.facing = vector(reader);
     result.health = reader.f32(); result.age = reader.f32(); result.hurt = reader.f32(); result.burning = reader.f32(); result.item = item(reader); result.seed = reader.u32();
     result.inGround = flag(reader); result.playerOwned = flag(reader); result.sleeping = flag(reader); result.attacking = flag(reader);
     if (result.type == EntityType::Villager || result.type == EntityType::ZombieVillager) result.villager = villager(reader);
+    result.pluginState=reader.text(MC_ENTITY_STATE_LIMIT);result.pluginStateVersion=reader.u32();
+    const auto* definition=Plugins::entityContent(static_cast<uint16_t>(result.type));
+    if(definition&&definition->stateVersion!=result.pluginStateVersion)throw ProtocolError("Entity state revision mismatch");
     Writer check; entity(check, result); return result;
 }
 void death(Writer& writer, const EntityDeathSnapshot& value) {
-    if (!value.id || value.type > EntityType::IronGolem || !deathPresentationVisible(value.elapsed)) throw ProtocolError("Invalid entity death snapshot");
-    writer.u64(value.id); writer.u8(static_cast<uint8_t>(value.type)); position(writer, value.position);
+    if (!value.id || !Plugins::validEntity(static_cast<uint16_t>(value.type)) || !deathPresentationVisible(value.elapsed)) throw ProtocolError("Invalid entity death snapshot");
+    writer.u64(value.id); writer.text(Plugins::entityKey(static_cast<uint16_t>(value.type))); position(writer, value.position);
     vector(writer, value.velocity); vector(writer, value.facing); writer.u32(value.seed); writer.f32(value.elapsed);
 }
 EntityDeathSnapshot death(Reader& reader) {
-    EntityDeathSnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(reader.u8()); result.position = position(reader);
+    EntityDeathSnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(entityType(reader.text())); result.position = position(reader);
     result.velocity = vector(reader); result.facing = vector(reader); result.seed = reader.u32(); result.elapsed = reader.f32();
     Writer check; death(check, result); return result;
 }

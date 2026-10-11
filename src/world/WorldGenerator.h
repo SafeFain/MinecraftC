@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/Noise.h"
+#include "plugins/Extensions.h"
 #include "world/BiomeMap.h"
 #include "world/HeightPipeline.h"
 #include "world/CaveGenerator.h"
@@ -76,7 +77,8 @@ public:
 
     explicit WorldGenerator(uint64_t seed = 1234567890ULL,
                              WorldType worldType = WorldType::Normal,
-                             DimensionId dimension = DimensionId::Overworld);
+                             DimensionId dimension = DimensionId::Overworld,
+                             Plugins::GenerationConfig config = {});
 
     // ── Singleton chunk generation (fallback) ────────────────────────────
     void generate(Chunk& chunk,
@@ -88,11 +90,13 @@ public:
                         int padding, std::vector<Chunk*>& chunks,
                         std::vector<RegionGenerationData::PendingBlock>& pendingOut);
 
+    std::vector<MC_DecorationBlock> pluginModifierBlocks(int x,int z,int width=1,int depth=1) const;
+
     // ── Queries ──────────────────────────────────────────────────────────
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
     CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const {
-        return isHeaven() || m_worldType == WorldType::Superflat
+        return customGenerator() || isHeaven() || m_worldType == WorldType::Superflat
             ? CaveBiome::Neutral
             : m_caveGenerator.biomeAt(worldX, worldY, worldZ);
     }
@@ -124,7 +128,15 @@ public:
         return isHeaven() ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
     }
+    const Plugins::GenerationConfig& generationConfig() const {return m_pluginConfig;}
+    bool customGenerator() const {return !m_pluginConfig.generator.empty();}
+    BlockId samplePluginBlock(int x,int y,int z) const;
+    std::array<uint16_t,Config::CHUNK_SIZE_Y> samplePluginColumnBlocks(int,int) const;
     uint32_t chunkCacheVersion() const {
+        if(customGenerator()||!m_pluginConfig.modifiers.empty()) {
+            const auto hash=Plugins::generationFingerprint(m_pluginConfig);
+            return static_cast<uint32_t>(hash^(hash>>32));
+        }
         return isHeaven() ? HEAVEN_CHUNK_CACHE_VERSION :
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
@@ -145,6 +157,10 @@ public:
     uint64_t        getSeed() const     { return m_seed; }
 
 private:
+    SurfaceColumn pluginColumn(int,int) const;
+    void generatePluginChunk(Chunk&) const;
+    void applyPluginModifiers(Chunk&) const;
+    Plugins::GenerationConfig m_pluginConfig;
     uint64_t m_seed;
     WorldType m_worldType = WorldType::Normal;
     DimensionId m_dimension = DimensionId::Overworld;

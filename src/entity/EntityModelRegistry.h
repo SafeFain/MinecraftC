@@ -50,7 +50,7 @@ public:
 
 private:
     Loader m_loader;
-    std::array<EntityModelDefinition, 11> m_definitions;
+    std::vector<EntityModelDefinition> m_definitions;
     std::map<std::filesystem::path, std::shared_ptr<const model::ModelAsset>> m_cache;
     std::shared_ptr<const model::ModelAsset> m_placeholder;
     struct InstanceEntry {

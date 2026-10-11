@@ -18,6 +18,9 @@ public:
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
 
+    bool pluginDraw(size_t,const MC_RenderDraw&) override;
+    bool pluginSceneDraw(size_t,uint64_t,MC_RenderHandle) override;
+    bool pluginUpdateBuffer(size_t,MC_RenderHandle,const void*,uint32_t) override;
     RenderDeviceCapabilities capabilities() const override;
     RenderMeshHandle createMesh(const MeshData& data) override;
     void destroyMesh(RenderMeshHandle handle) override;

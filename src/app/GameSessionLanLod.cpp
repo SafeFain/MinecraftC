@@ -45,8 +45,8 @@ std::map<ChunkKey, ColumnSource> captureSources(const World& world, const LodTil
     return sources;
 }
 Lan::Bytes buildColumns(Lan::LodUpdate update, std::map<ChunkKey, ColumnSource> sources,
-                       std::filesystem::path storeRoot, uint64_t seed, WorldType type) {
-    SaveStore store(std::move(storeRoot)); WorldGenerator generator(seed, type, update.dimension);
+                       std::filesystem::path storeRoot, uint64_t seed, WorldType type,Plugins::GenerationConfig config) {
+    SaveStore store(std::move(storeRoot)); WorldGenerator generator(seed, type, update.dimension,std::move(config));
     const int cell = 1 << update.key.level;
     for (auto& entry : sources) {
         auto& source = entry.second;
@@ -147,8 +147,8 @@ void GameSession::sendLanLod() {
             if (store) {
                 Lan::LodUpdate update; update.dimension = guest.profile.dimension; update.epoch = guest.chunkEpoch; update.key = chosen->first; update.revision = chosen->second.revision;
                 auto sources = captureSources(runtime.world, update.key);
-                const auto root = store->worldDirectory(); const auto seed = worldMetadata.seed; const auto type = worldMetadata.worldType;
-                auto future = threadPool.enqueue([update, sources = std::move(sources), root, seed, type]() mutable { return buildColumns(update, std::move(sources), root, seed, type); });
+                const auto root = store->worldDirectory(); const auto seed = worldMetadata.seed; const auto type = worldMetadata.worldType; const auto config=worldMetadata.generation[static_cast<size_t>(update.dimension)];
+                auto future = threadPool.enqueue([update, sources = std::move(sources), root, seed, type,config]() mutable { return buildColumns(update, std::move(sources), root, seed, type,config); });
                 lodJobs.push_back({peer->first, update.epoch, update.revision, chosen->second.generation, update.dimension, update.key, std::move(future)});
                 chosen->second.queued = true;
             }

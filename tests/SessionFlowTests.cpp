@@ -236,12 +236,17 @@ std::string Localization::format(
 
 #include "GameRuleIntegration.h"
 #include "PluginSessionIntegration.h"
+#include "PluginExtensionIntegration.h"
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==5&&std::string(argv[1])=="--extension-tests") {
+        try{return PluginExtensionIntegration::run(argv[2],argv[3],argv[4]);}
+        catch(const std::exception& error){std::cerr<<"Plugin extension regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==5&&std::string(argv[1])=="--plugin-lan-tests") {
         try{return PluginLanIntegration::run(argv[2],argv[3],argv[4]);}
         catch(const std::exception& error){std::cerr<<"Plugin LAN regression failed: "<<error.what()<<'\n';return 1;}

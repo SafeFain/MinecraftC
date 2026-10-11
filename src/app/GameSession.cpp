@@ -55,7 +55,7 @@ std::string GameSession::createWorld(const std::string& name, uint64_t seed,
                                      GameMode mode, Difficulty difficulty,
                                      bool cheats, WorldType type) {
     if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
-    return worldCatalog.create(name, seed, mode, difficulty, cheats, type);
+    return worldCatalog.create(name, seed, mode, difficulty, cheats, type,creationGeneration);
 }
 
 bool GameSession::deleteWorld(const std::string& id) {
@@ -361,7 +361,7 @@ DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
             runtime->store = std::make_unique<SaveStore>(
                 saveStore->worldDirectory() / "dimensions" / "heaven");
         SaveStore* store = target == DimensionId::Heaven ? runtime->store.get() : saveStore.get();
-        runtime->world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType, target);
+        runtime->world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType, target,worldMetadata.generation[static_cast<size_t>(target)]);
         runtime->world.setGameRules(worldMetadata.gameRules);
         runtime->world.setSaveStore(store);
         if (lanJoining && !replicaLodRoot.empty()) runtime->world.setReplicaLodCache(
@@ -410,7 +410,7 @@ void GameSession::detachSaveStore() {
     // Drain pending generation/cache/entity I/O before destroying either store.
     for (auto& runtime : simulations) {
         if (!runtime) continue;
-        runtime->world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType);
+        runtime->world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType,DimensionId::Overworld,worldMetadata.generation[0]);
         runtime->world.setSaveStore(nullptr);
         runtime->entities.clear();
         runtime->entities.setSaveStore(nullptr);
@@ -1470,6 +1470,21 @@ void GameSession::abortPluginWorld() {
     if(terrainGenerated){auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e);}
     // Discard the live session, draining worker/cache work while its stores are
     // alive. No player state, edited chunks or entities are flushed here.
-    world().resetForNewSeed(worldMetadata.seed,worldMetadata.worldType,dimension);
+    world().resetForNewSeed(worldMetadata.seed,worldMetadata.worldType,dimension,worldMetadata.generation[static_cast<size_t>(dimension)]);
     entities().clear();fishing.cancel();detachSaveStore();terrainGenerated=false;
+}
+
+bool GameSession::pluginSpawnEntity(uint32_t dim,uint16_t type,const double* p) {
+    if(lanJoining||!terrainGenerated||dim>=simulations.size()||!simulations[dim]||(Plugins::context().player&&!guests.count(Plugins::context().player)))return false;
+    return simulations[dim]->entities.spawnMob(static_cast<EntityType>(type),{p[0],p[1],p[2]});
+}
+bool GameSession::pluginEntitySnapshot(uint32_t dim,uint64_t id,MC_EntitySnapshot& out,std::string& state) {
+    if(!terrainGenerated||dim>=simulations.size()||!simulations[dim])return false;
+    return simulations[dim]->entities.pluginSnapshot(id,out,state);
+}
+bool GameSession::pluginRemoveEntity(uint32_t dim,uint64_t id) {
+    return !lanJoining&&terrainGenerated&&(!Plugins::context().player||guests.count(Plugins::context().player))&&dim<simulations.size()&&simulations[dim]&&simulations[dim]->entities.pluginRemove(id);
+}
+bool GameSession::pluginEntityIntent(uint32_t dim,uint64_t id,const MC_EntityIntent& intent) {
+    return !lanJoining&&terrainGenerated&&(!Plugins::context().player||guests.count(Plugins::context().player))&&dim<simulations.size()&&simulations[dim]&&simulations[dim]->entities.pluginIntent(id,intent);
 }

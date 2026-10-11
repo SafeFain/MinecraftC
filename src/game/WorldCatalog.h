@@ -29,7 +29,8 @@ public:
     std::string create(const std::string& displayName, uint64_t seed,
                        GameMode mode, Difficulty difficulty,
                        bool cheatsEnabled = false,
-                       WorldType worldType = WorldType::Normal) const;
+                       WorldType worldType = WorldType::Normal,
+                       const std::array<Plugins::GenerationConfig,2>& generation = {}) const;
     SaveStore open(const std::string& id) const;
     bool deleteWorld(const std::string& id) const;
 

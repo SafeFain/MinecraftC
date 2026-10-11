@@ -63,7 +63,8 @@ plugin's content, commands and subscriptions and blocks required dependents.
 
 [`examples/plugins/example_content`](../examples/plugins/example_content) is a
 complete portable package. Its JSON has `materials`, `blocks`, `items` and
-`recipes` arrays. New keys must be `plugin_id:local_name`, using lowercase letters,
+`recipes` arrays. Optional entity/generator/render arrays are described in the
+[extension reference](plugin-extensions.md). New keys must be `plugin_id:local_name`, using lowercase letters,
 numbers, underscores, slashes, dots or hyphens. Registries freeze before play.
 Runtime IDs start at 4096; never persist them in plugin configuration.
 
@@ -81,7 +82,7 @@ translucent), `alpha`, `hardness`, `preferred_tool`, `minimum_tier`, `unbreakabl
 `name`, `material`, optional `placed_block`, `kind`, `category`, `max_stack`,
 `durability`, `tool`, `tier`, `food`, `saturation`, `attack_damage`, `attack_speed`.
 See the SDK enums for numeric values. ABI 1 supports material/block/food items and
-existing melee tool types; armor and spawn eggs are rejected.
+existing melee tool types; armor is rejected. Spawn eggs use the entity extension.
 
 Recipes take `key`, `ingredients`, `output`, `count`, `width`, `height`, `mirror`,
 `smelting` and `cook_ticks`. `operation` is 0 add, 1 replace, 2 remove; patching
@@ -98,8 +99,9 @@ Include [`sdk/minecraftc/plugin.h`](../sdk/minecraftc/plugin.h) (C) or `plugin.h
 structure with matching manifest identity. Initialize every descriptor's `size`.
 All strings are UTF-8, borrowed during a call; the host copies registration data.
 No STL objects, exceptions or allocations cross ownership boundaries. Host calls
-and callbacks run on the main thread; plugins must marshal their own worker
-results back before using the host. Return zero on success; use `last_error` for
+and gameplay/render callbacks run on the main thread; plugins must marshal their own
+worker results back before using the host. Pure world-generation extension callbacks
+run on workers and have no main-thread host access. Return zero on success; use `last_error` for
 failed host calls. Never throw across the ABI.
 
 Build the runnable example independently:
@@ -153,22 +155,25 @@ listed with a compatibility reason. Restore the matching package/configuration t
 open it. No automatic migration or missing-block substitution is provided.
 Visual-only plugins do not contribute a world requirement.
 
-Builtin-only v2–v15 saves retain their existing readers, generation compatibility
+Builtin-only v2–v18 saves retain their existing readers, generation compatibility
 rules and IDs. Adding a gameplay plugin to an old unmodded world is refused in
 this first version; create a new world with the desired set. Generated caches are
 rebuildable when incompatible. The current terrain generation is v20; enabling plugins does not change its version.
 
-ABI 1 has no hot reload, arbitrary shaders/render passes, new entity types,
-dimensions, world generation hooks, arbitrary plugin network messages, bytecode patching or custom
-block-entity schemas. Plugins can compose registered content, recipes, events,
-commands, controlled operations, environment materials and HUD drawing.
+ABI 1 now exposes optional version 1 entity, world-generation and render tables.
+Plugins can register/override mobs, select per-dimension generators and modifiers,
+and create Vulkan-owned shader resources and replaceable render stages.
+[Extension contracts and examples](plugin-extensions.md) document these APIs.
+Save v19 stores stable entity keys/state and generation choices; v2–v18 retain readers.
+No hot reload, additional dimensions, raw Vulkan access, arbitrary plugin network
+messages, bytecode patching or custom block-entity schemas are provided.
 
 ## LAN multiplayer and ABI 1 extension
 
 Plugin worlds can open and join the existing LAN rooms. Every participant must
 install and enable the same gameplay plugins and restart before joining. The
-handshake compares plugin versions, gameplay configuration at initialization, registered block/item
-properties, recipes, callback order and command permissions before player admission
+handshake compares plugin versions, gameplay configuration at initialization, registered block/item/entity
+properties, generator/modifier revisions, recipes, callback order and command permissions before player admission
 or any guest-profile write. A mismatch names the differing requirement. Visual-only
 plugins and atlas slots may differ. No plugins or native code are downloaded.
 
@@ -180,7 +185,7 @@ and configuration; builtin plugins carry a fixed behavior identifier. The networ
 signature is a discovery hint, not an authentication mechanism. Existing world-save
 fingerprints remain unchanged, including native files and configuration.
 
-LAN protocol 3 uses canonical IDs sorted by namespaced content key and maps them to
+LAN protocol 4 uses canonical IDs sorted by namespaced content key and maps them to
 each process's frozen local registry. SDK IDs are never reassigned. Guest profiles
 version 3 persist an item palette; versions 1 and 2 remain readable. Unknown content,
 invalid stacks and incompatible protocol versions are rejected rather than replaced.

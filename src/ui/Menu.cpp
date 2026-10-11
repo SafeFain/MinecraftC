@@ -1,6 +1,7 @@
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "plugins/ContentRegistry.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
@@ -127,6 +128,7 @@ MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> wor
       m_worlds(std::move(worlds)) {
     m_worldName.setClipboard(clipboard);
     m_seedText.setClipboard(clipboard);
+    for(auto& p:m_parameters)p.setClipboard(clipboard);
     m_seedText.setFilter([](uint32_t codepoint,const std::string& current){
         return (codepoint>='0'&&codepoint<='9')||(codepoint=='-'&&current.empty());
     });
@@ -153,6 +155,7 @@ void MainMenu::showCreate() {
     m_seedText.setText({});
     m_createMode = GameMode::Survival;
     m_createWorldType = WorldType::Normal;
+    m_generation={};for(auto& p:m_parameters)p.setText("{}");
     m_createCheats = false;
     m_field = Field::Name;
     rebuildButtons();
@@ -324,7 +327,26 @@ void MainMenu::rebuildButtons() {
                 m_createCheats = !m_createCheats;
                 rebuildButtons();
             });
+        const bool extensions=!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty();
+        if(extensions)for(uint32_t dimension=0;dimension<2;++dimension) {
+            const auto& selected=m_generation[dimension];
+            std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
+            m_buttons.emplace_back(m_localization.format(dimension==0?"menu.create.generator_overworld":"menu.create.generator_heaven",{name}),[this,dimension]{
+                std::vector<std::string> keys{std::string{}};for(const auto& g:Plugins::content().extensions.generators)if(g.second.dimension==dimension)keys.push_back(g.first);
+                auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);g.generator=keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
+                g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
+            m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{selectField(dimension==0?Field::Parameters0:Field::Parameters1);});
+            m_buttons.back().setDetail(m_parameters[dimension].text());
+            for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==dimension) {
+                const auto key=m.first;const bool active=std::any_of(selected.modifiers.begin(),selected.modifiers.end(),[&](const auto& value){return value.first==key;});
+                m_buttons.emplace_back(key+": "+m_localization.text(active?"common.on":"common.off"),[this,dimension,key]{auto& entries=m_generation[dimension].modifiers;
+                    auto it=std::find_if(entries.begin(),entries.end(),[&](const auto& value){return value.first==key;});
+                    if(it==entries.end())entries.emplace_back(key,Plugins::content().extensions.modifiers.at(key).revision);else entries.erase(it);rebuildButtons();});
+            }
+        }
         m_buttons.emplace_back(m_localization.text("menu.create.confirm"), [this]() {
+            for(size_t d=0;d<2;++d)m_generation[d].parameters=m_parameters[d].text();
+            if(m_callbacks.onGenerationConfig)m_callbacks.onGenerationConfig(m_generation);
             m_callbacks.onCreateWorld(
                 m_worldName.text(), m_seedText.text(), m_createMode,
                 m_createWorldType, m_createCheats);
@@ -375,7 +397,9 @@ void MainMenu::rebuildButtons() {
 void MainMenu::selectField(Field field) {
     m_field = field;
     rebuildButtons();
-    m_selectedIdx = field == Field::Name ? 0 : 3;
+    m_selectedIdx = field == Field::Name ? 0 : field==Field::Seed?3:field==Field::Parameters0?6:8;
+    if(field==Field::Parameters1)for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==0)++m_selectedIdx;
+    if(static_cast<size_t>(m_selectedIdx)>=m_buttons.size())m_selectedIdx=0;
     m_buttons[0].setSelected(false);
     m_buttons[m_selectedIdx].setSelected(true);
 }
@@ -440,8 +464,8 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
         }
     } else if (m_page==Page::Create || m_page==Page::Language) {
         const bool languagePage=m_page==Page::Language;
-        const bool twoColumns=!languagePage && w>=440;
-        const int rows=languagePage?static_cast<int>(m_buttons.size()):twoColumns?5:7;
+        const bool twoColumns=!languagePage && w>=440 && m_buttons.size()==7;
+        const int rows=languagePage?static_cast<int>(m_buttons.size()):twoColumns?5:static_cast<int>(m_buttons.size());
         const float gap=8;
         if (m_formRows!=rows) m_formSelection=-1;
         m_formRows=rows;
@@ -578,18 +602,18 @@ void MainMenu::onKeyPress(int key, int mods) {
         return;
     }
     if (m_page == Page::Create && key == Key::Tab) {
-        selectField(m_field == Field::Name ? Field::Seed : Field::Name);
+        selectField(m_field == Field::Name ? Field::Seed : m_field==Field::Seed&&(!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty())?Field::Parameters0:m_field==Field::Parameters0?Field::Parameters1:Field::Name);
         return;
     }
     if (m_page == Page::Create && key == Key::Backspace) {
-        TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
+        TextEditBuffer& value = fieldBuffer();
         value.backspace();
         rebuildButtons();
         selectField(m_field);
         return;
     }
     if (m_page == Page::Create) {
-        TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
+        TextEditBuffer& value = fieldBuffer();
         const bool selecting = (mods & KeyModifier::Shift) != 0;
         const bool control = (mods & KeyModifier::Control) != 0;
         bool edited = true;
@@ -645,7 +669,7 @@ void MainMenu::onKeyPress(int key, int mods) {
 
 void MainMenu::onChar(unsigned int codepoint) {
     if (m_page != Page::Create || codepoint < 32) return;
-    TextEditBuffer& value = m_field == Field::Name ? m_worldName : m_seedText;
+    TextEditBuffer& value = fieldBuffer();
     if (m_field == Field::Seed) {
         const char character = static_cast<char>(codepoint);
         if ((character == '-' && value.text().empty()) ||

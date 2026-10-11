@@ -1,4 +1,5 @@
 #include "plugins/ContentRegistry.h"
+#include "plugins/Json.h"
 #include "game/SaveStore.h"
 #include "Config.h"
 #include "core/Platform.h"
@@ -339,7 +340,7 @@ ItemStack readStack(Reader& reader) {
 }
 
 void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) {
-    append(payload, entity.type);
+    append(payload,static_cast<uint8_t>(entity.type<MC_BUILTIN_ENTITY_COUNT?entity.type:255));
     append(payload, entity.position);
     append(payload, entity.velocity);
     append(payload, entity.health);
@@ -369,6 +370,10 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
     for(auto value:entity.villager.demand)append(payload,value);
     append(payload,entity.villager.reputationDay);
     append(payload,entity.villager.tradesToday);
+    appendString(payload,Plugins::entityKey(entity.type));
+    if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
+    Plugins::Json::parse(entity.pluginState);
+    appendString(payload,entity.pluginState);append(payload,entity.pluginStateVersion);
 }
 
 WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
@@ -424,8 +429,21 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
             stack.id!=ItemId::WHEAT && stack.id!=ItemId::WHEAT_SEEDS)
             throw std::runtime_error("Save contains invalid villager food");
     }
+    if(version>=19) {
+        const auto key=reader.readString();entity.pluginState=reader.readString();entity.pluginStateVersion=reader.read<uint32_t>();
+        if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
+        Plugins::Json::parse(entity.pluginState);
+        const auto old=entity.type;
+        if(!reader.inspectOnly)entity.type=Plugins::resolveEntity(key);
+        if(old!=255 && key!="minecraftc:entity_"+std::to_string(old))throw std::runtime_error("Entity key mismatch");
+        if(!reader.inspectOnly) {
+            const auto* e=Plugins::entityContent(entity.type);
+            if(e && entity.pluginStateVersion!=e->stateVersion)throw std::runtime_error("Entity state version mismatch");
+        }
+    }
     // Appended entity types are legal only in the versions that introduced them.
-    if (entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager))
+    if ((version<19 && entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager)) ||
+        (version>=19&&!reader.inspectOnly&&!Plugins::validEntity(entity.type)))
         throw std::runtime_error("Save contains invalid entity type");
     return entity;
 }
@@ -552,6 +570,14 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         if (findGameRule(rule.name)) throw std::runtime_error("Unknown game rule conflicts with registry");
         appendRule(rule.name, rule.value);
     }
+    for(uint32_t dimension=0;dimension<2;++dimension) {
+        const auto& g=metadata.generation[dimension];Plugins::validateGeneration(g,dimension);
+        if(g.parameters.size()>4096||g.modifiers.size()>64)throw std::runtime_error("Generation configuration too large");
+        Plugins::Json::parse(g.parameters);
+        appendString(payload,g.generator);appendString(payload,g.revision);appendString(payload,g.parameters);
+        append(payload,static_cast<uint16_t>(g.modifiers.size()));
+        for(const auto& m:g.modifiers){appendString(payload,m.first);appendString(payload,m.second);}
+    }
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
@@ -655,6 +681,14 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
             } else metadata.gameRules.unknown.push_back({name, value});
         }
     }
+    if(checked.version>=19)for(uint32_t dimension=0;dimension<2;++dimension) {
+        auto& g=metadata.generation[dimension];g.generator=reader.readString();g.revision=reader.readString();g.parameters=reader.readString();
+        if(g.parameters.size()>4096)throw std::runtime_error("Generation parameters too large");
+        Plugins::Json::parse(g.parameters);
+        const auto count=reader.read<uint16_t>();if(count>64)throw std::runtime_error("Too many generation modifiers");
+        for(uint16_t i=0;i<count;++i){auto key=reader.readString();auto revision=reader.readString();g.modifiers.emplace_back(key,revision);}
+        if(!inspection)Plugins::validateGeneration(g,dimension);
+    }
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
     // fully decoded above, so safely ignore that tail; v10 remains strict.
@@ -737,7 +771,7 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
 
 void SaveStore::saveGeneratedChunk(
     int chunkX, int chunkZ, const std::vector<uint16_t>& blocks,
-    uint32_t generationVersion) const {
+    uint32_t generationVersion,uint64_t generationFingerprint) const {
     if (blocks.size() != static_cast<size_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid generated chunk size");
     for (const uint16_t block : blocks)
@@ -748,6 +782,7 @@ void SaveStore::saveGeneratedChunk(
     append(payload, static_cast<int32_t>(chunkX));
     append(payload, static_cast<int32_t>(chunkZ));
     append(payload, generationVersion);
+    append(payload,generationFingerprint);
     append(payload, static_cast<uint32_t>(blocks.size()));
     const Bytes compressed = encodeChunkRle(blocks);
     if (compressed.size() + sizeof(uint8_t) + sizeof(uint32_t) < blocks.size() * sizeof(uint16_t)) {
@@ -765,7 +800,7 @@ void SaveStore::saveGeneratedChunk(
 }
 
 std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
-    int chunkX, int chunkZ, uint32_t generationVersion) const {
+    int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint) const {
     const auto path = generatedChunkPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return std::nullopt;
     try {
@@ -774,6 +809,8 @@ std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
         if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ ||
             reader.read<uint32_t>() != generationVersion)
             return std::nullopt;
+        if(checked.version>=19&&reader.read<uint64_t>()!=generationFingerprint)return std::nullopt;
+        if(checked.version<19&&generationFingerprint)return std::nullopt;
         const uint32_t size = reader.read<uint32_t>();
         if (size != static_cast<uint32_t>(Config::CHUNK_VOLUME)) return std::nullopt;
         std::vector<uint16_t> blocks;
@@ -811,9 +848,9 @@ std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
 }
 
 ChunkLoadBundle SaveStore::loadChunkLoadBundle(
-    int chunkX, int chunkZ, uint32_t generationVersion) const {
+    int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint) const {
     ChunkLoadBundle bundle;
-    bundle.generated = loadGeneratedChunk(chunkX, chunkZ, generationVersion);
+    bundle.generated = loadGeneratedChunk(chunkX, chunkZ, generationVersion,generationFingerprint);
     try { bundle.overrides = loadChunkOverrides(chunkX, chunkZ); }
     catch (...) { bundle.overrides.clear(); }
     try { bundle.blockEntities = loadBlockEntities(chunkX, chunkZ); }

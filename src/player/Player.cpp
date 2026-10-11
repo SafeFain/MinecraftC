@@ -1150,14 +1150,16 @@ bool Player::placeBlockImpl() {
 
     const ItemId activeItem = selectedItem;
     const auto& activeProperties = getItemProps(activeItem);
-    if (m_gameMode == GameMode::Creative && activeProperties.spawnEggMob) {
+    const auto* pluginEgg=Plugins::pluginItem(activeItem);
+    const bool hasPluginEgg=pluginEgg&&pluginEgg->spawnEntity!=MC_INVALID_ID;
+    if (m_gameMode == GameMode::Creative && (activeProperties.spawnEggMob||hasPluginEgg)) {
         if (m_entities) {
             const glm::dvec3 spawnPosition(
                 static_cast<double>(placePos.x) + 0.5,
                 static_cast<double>(placePos.y),
                 static_cast<double>(placePos.z) + 0.5);
             m_entities->spawnMob(
-                entityTypeForSpawnEgg(*activeProperties.spawnEggMob),
+                hasPluginEgg?static_cast<EntityType>(pluginEgg->spawnEntity):entityTypeForSpawnEgg(*activeProperties.spawnEggMob),
                 spawnPosition);
         }
         return m_entities != nullptr;

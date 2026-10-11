@@ -168,9 +168,11 @@ public:
     bool hasWorldStore() const { return saveStore != nullptr; }
     LoadingSnapshot loadingSnapshot() const;
     std::vector<WorldSummary> listWorlds() const;
+    std::array<Plugins::GenerationConfig,2> creationGeneration;
     std::string createWorld(const std::string& name, uint64_t seed,
                             GameMode mode, Difficulty difficulty, bool cheats,
                             WorldType type = WorldType::Normal);
+    void setCreationGeneration(std::array<Plugins::GenerationConfig,2> g) {creationGeneration=std::move(g);}
     bool deleteWorld(const std::string& id);
     void setOverworldBedSpawn(const glm::ivec3& bed);
     bool isNight() const { return dayNightCycle().isNight(); }
@@ -215,6 +217,10 @@ public:
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);
     bool pluginGiveItem(uint16_t,uint32_t);
     std::filesystem::path pluginWorldDirectory() const;
+    bool pluginSpawnEntity(uint32_t,uint16_t,const double*);
+    bool pluginEntitySnapshot(uint32_t,uint64_t,MC_EntitySnapshot&,std::string&);
+    bool pluginRemoveEntity(uint32_t,uint64_t);
+    bool pluginEntityIntent(uint32_t,uint64_t,const MC_EntityIntent&);
     void giveCreativeItem(ItemId item, int hotbarSlot);
     void dropSelectedItem(int hotbarSlot, bool entireStack);
     void dropInventoryItem(ItemStack stack);

@@ -15,6 +15,8 @@ struct EntitySnapshot {
     uint32_t seed = 0;
     bool inGround = false, playerOwned = false, sleeping = false, attacking = false;
     VillagerData villager;
+    std::string pluginState="{}";
+    uint32_t pluginStateVersion=0;
 };
 struct EntityDeathSnapshot {
     uint64_t id = 0;

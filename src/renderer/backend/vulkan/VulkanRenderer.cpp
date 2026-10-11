@@ -673,6 +673,7 @@ void VulkanRenderer::renderCompatibilityEntityCube(
         compatibilityCube = createMesh(mesh);
     }
     DrawCommand command;
+    command.extensionStage=MC_RENDER_ENTITIES;
     command.mesh = compatibilityCube;
     command.material = m_entityMaterial;
     command.model = glm::translate(glm::mat4(1.0f), position) *
@@ -775,3 +776,7 @@ void VulkanRenderer::queueUiBatch(const std::vector<UiMeshVertex>& vertices,
     m_impl->submittedUi.push_back(std::move(batch));
     m_impl->drawQueued = true;
 }
+
+bool VulkanRenderer::pluginDraw(size_t owner,const MC_RenderDraw& draw) {return m_impl&&m_impl->pluginBackend&&m_impl->pluginBackend->draw(owner,draw);}
+bool VulkanRenderer::pluginSceneDraw(size_t owner,uint64_t index,MC_RenderHandle pipeline) {return m_impl&&m_impl->pluginBackend&&m_impl->pluginBackend->sceneDraw(owner,index,pipeline);}
+bool VulkanRenderer::pluginUpdateBuffer(size_t owner,MC_RenderHandle handle,const void* data,uint32_t bytes) {return m_impl&&m_impl->pluginBackend&&m_impl->pluginBackend->updateBuffer(owner,handle,data,bytes);}

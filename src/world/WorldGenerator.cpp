@@ -1,5 +1,6 @@
 #include "world/BiomeBlockLogic.h"
 #include "world/WorldGenerator.h"
+#include "plugins/ContentRegistry.h"
 #include "world/VillageLayout.h"
 #include "world/BiomeBlockLogic.h"
 #include "Config.h"
@@ -134,8 +135,9 @@ int hashPercent(uint64_t seed, int x, int y, int z) {
 } // namespace
 
 WorldGenerator::WorldGenerator(
-    uint64_t seed, WorldType worldType, DimensionId dimension)
-    : m_seed(dimensionSeed(seed, dimension))
+    uint64_t seed, WorldType worldType, DimensionId dimension,Plugins::GenerationConfig config)
+    : m_pluginConfig(std::move(config))
+    , m_seed(dimensionSeed(seed, dimension))
     , m_worldType(worldType)
     , m_dimension(dimension)
     , m_noise(m_seed)
@@ -145,7 +147,8 @@ WorldGenerator::WorldGenerator(
     , m_oreGenerator(m_noise, m_seed)
     , m_structureGenerator(m_seed, m_heightPipeline)
 {
-    if (isHeaven()) {
+    Plugins::validateGeneration(m_pluginConfig,static_cast<uint32_t>(dimension));
+    if (isHeaven()&&!customGenerator()) {
         m_heavenSpawnBlock = findHeavenSpawnBlock();
         m_originSkyway = findOriginSkyway();
     }
@@ -272,6 +275,7 @@ WorldGenerator::heavenSkywayForCell(int cellX, int cellZ) const {
 
 std::optional<glm::dvec3> WorldGenerator::heavenSkywayDestination(
     const glm::ivec3& core, bool upward) const {
+    if(customGenerator())return {};
     if (!isHeaven()) return {};
     std::optional<HeavenSkyway> skyway;
     if (core.x == m_originSkyway.worldX && core.z == m_originSkyway.worldZ)
@@ -303,6 +307,7 @@ std::optional<glm::dvec3> WorldGenerator::heavenSkywayDestination(
 // ═══════════════════════════════════════════════════════════════════════════
 
 int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
+    if(customGenerator())return pluginColumn(worldX,worldZ).height;
     if (isHeaven()) return sampleHeavenIsland(worldX, worldZ).top;
     if (m_worldType == WorldType::Superflat)
         return Config::WORLD_MIN_Y + 3;
@@ -313,6 +318,7 @@ int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
 }
 
 HeightBiome WorldGenerator::queryHeightBiome(int worldX, int worldZ) const {
+    if(customGenerator()){const auto c=pluginColumn(worldX,worldZ);return {c.height,c.biome};}
     if (isHeaven()) {
         const HeavenIslandColumn island = sampleHeavenIsland(worldX, worldZ);
         return {island.top, heavenCompatBiome(island.biome)};
@@ -336,6 +342,7 @@ SurfaceColumn WorldGenerator::superflatColumn() {
 }
 
 SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const {
+    if(customGenerator())return pluginColumn(worldX,worldZ);
     if (isHeaven()) {
         const HeavenIslandColumn island = sampleHeavenIsland(worldX, worldZ);
         SurfaceColumn column;
@@ -354,7 +361,7 @@ SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const 
 
 std::vector<TreeGenerator::TreePlacement> WorldGenerator::sampleLodTrees(
     int worldOriginX, int worldOriginZ, int width, int depth) const {
-    if (isHeaven() || m_worldType == WorldType::Superflat ||
+    if (customGenerator() || isHeaven() || m_worldType == WorldType::Superflat ||
         width <= 0 || depth <= 0) return {};
 
     std::vector<TreeGenerator::TreePlacement> result =
@@ -499,6 +506,7 @@ WorldGenerator::HeavenIslandColumn WorldGenerator::sampleHeavenLayer(
 std::array<WorldGenerator::HeavenIslandColumn,
            WorldGenerator::HEAVEN_LAYER_COUNT>
 WorldGenerator::sampleHeavenLayers(int worldX, int worldZ) const {
+    if(customGenerator()) {const auto c=pluginColumn(worldX,worldZ);std::array<HeavenIslandColumn,HEAVEN_LAYER_COUNT> result{};result[0]={c.height>=Config::WORLD_MIN_Y,HeavenBiome::DawnMeadow,c.height,Config::WORLD_MIN_Y};return result;}
     std::array<HeavenIslandColumn, HEAVEN_LAYER_COUNT> layers;
     for (int layer = 0; layer < HEAVEN_LAYER_COUNT; ++layer)
         layers[static_cast<size_t>(layer)] =
@@ -1426,6 +1434,9 @@ void WorldGenerator::generateRegion(
     int originCX, int originCZ, int regionSizeChunks, int padding,
     std::vector<Chunk*>& chunks,
     std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
+    if(customGenerator()) {
+        pendingOut.clear();for(auto* chunk:chunks)if(chunk)generatePluginChunk(*chunk);return;
+    }
     if (isHeaven()) {
         pendingOut.clear();
         const StructureSetter structureSetter =
@@ -1441,6 +1452,7 @@ void WorldGenerator::generateRegion(
             chunk->generationInProgress = false;
             chunk->markDirty();
         }
+        for(auto* chunk:chunks)if(chunk)applyPluginModifiers(*chunk);
         return;
     }
     if (m_worldType == WorldType::Superflat) {
@@ -1452,12 +1464,14 @@ void WorldGenerator::generateRegion(
             chunk->markDirty();
         }
         pendingOut.clear();
+        for(auto* chunk:chunks)if(chunk)applyPluginModifiers(*chunk);
         return;
     }
     RegionGenerator regionGenerator(
         m_heightPipeline, m_caveGenerator, m_treeGenerator, m_oreGenerator, m_seed);
     regionGenerator.generateRegion(originCX, originCZ, regionSizeChunks, padding,
                                    chunks, pendingOut);
+    for(auto* chunk:chunks)if(chunk)applyPluginModifiers(*chunk);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1468,12 +1482,15 @@ void WorldGenerator::generate(Chunk& chunk,
                                const NeighborQuery& neighborQuery,
                                const BlockSetter& blockSetter,
                                const StructureSetter& structureSetter) {
+    if(customGenerator()){generatePluginChunk(chunk);return;}
     if (isHeaven()) {
         populateHeaven(chunk, *this, structureSetter);
+        applyPluginModifiers(chunk);
         return;
     }
     if (m_worldType == WorldType::Superflat) {
         populateSuperflat(chunk);
+        applyPluginModifiers(chunk);
         return;
     }
     (void)neighborQuery;
@@ -1738,6 +1755,7 @@ void WorldGenerator::generate(Chunk& chunk,
     }
 
     chunk.markDirty();
+    applyPluginModifiers(chunk);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1921,6 +1939,7 @@ void WorldGenerator::placeTree(Chunk& chunk, int x, int baseY, int z,
 
 std::vector<WorldGenerator::VillageSpawnRequest>
 WorldGenerator::villageSpawnsForChunk(int chunkX, int chunkZ) const {
+    if(customGenerator())return {};
     std::vector<VillageSpawnRequest> requests;
     if (m_dimension != DimensionId::Overworld ||
         m_worldType != WorldType::Normal) return requests;

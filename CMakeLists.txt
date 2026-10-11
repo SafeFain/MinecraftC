@@ -171,6 +171,11 @@ target_include_directories(minecraftc_assets PUBLIC src)
 target_link_libraries(minecraftc_assets PUBLIC ${MINECRAFTC_SDL_TARGET})
 link_libraries(minecraftc_assets)
 
+# Header-only JSON is shared by persistence, network and plugin validation.
+add_library(minecraftc_json INTERFACE)
+target_include_directories(minecraftc_json INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/external")
+link_libraries(minecraftc_json)
+
 # ── Main executable ────────────────────────────────────────────────────
 
 file(GLOB_RECURSE SOURCES
@@ -186,6 +191,7 @@ set(MINECRAFTC_VULKAN_BACKEND_SOURCES
     src/renderer/backend/vulkan/VulkanHelpers.cpp
     src/renderer/backend/vulkan/VulkanModelBackend.cpp
     src/renderer/backend/vulkan/VulkanPipelineFactory.cpp
+    src/renderer/backend/vulkan/VulkanPluginBackend.cpp
     src/renderer/backend/vulkan/VulkanRenderer.cpp
     src/renderer/backend/vulkan/VulkanResources.cpp
     src/renderer/backend/vulkan/VulkanUIRenderer.cpp
@@ -453,7 +459,7 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
     endif()
     install(FILES LICENSE README.md packaging/README-release.md
             DESTINATION .)
-    install(FILES docs/plugins.md DESTINATION docs)
+    install(FILES docs/plugins.md docs/plugin-extensions.md DESTINATION docs)
     install(DIRECTORY sdk/ DESTINATION sdk)
     install(DIRECTORY examples/plugins/ DESTINATION examples/plugins)
     if(WIN32)
@@ -478,7 +484,7 @@ else()
             DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
     endif()
     install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
-    install(FILES docs/plugins.md DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
+    install(FILES docs/plugins.md docs/plugin-extensions.md DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
     install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/sdk)
     install(DIRECTORY examples/plugins/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples/plugins)
@@ -648,7 +654,7 @@ if(BUILD_TESTING)
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -685,7 +691,7 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/StructureGenerator.cpp
         src/world/TreeGenerator.cpp
-        src/world/WorldGenerator.cpp)
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp)
     target_include_directories(lod_terrain_tests PRIVATE
         src external/FastNoiseLite)
     target_link_libraries(lod_terrain_tests PRIVATE glm::glm minecraftc_platform)
@@ -713,7 +719,7 @@ if(BUILD_TESTING)
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -754,7 +760,7 @@ if(BUILD_TESTING)
     add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
 
     add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
-        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
         tests/VulkanUiSmoke.cpp
         src/core/Input.cpp src/core/InputCodes.cpp src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
@@ -768,7 +774,7 @@ if(BUILD_TESTING)
         src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
         src/ui/ContainerScreen.cpp src/ui/Hotbar.cpp src/ui/Inventory.cpp
         src/ui/Menu.cpp
-        src/ui/LanMenu.cpp src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
+        src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
     target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann)
@@ -818,7 +824,7 @@ if(BUILD_TESTING)
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -1025,7 +1031,7 @@ if(BUILD_TESTING)
     add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
 
     add_executable(plugin_tests tests/PluginTests.cpp
-        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         src/world/Block.cpp src/world/Chunk.cpp
         src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
         src/game/SaveStore.cpp src/game/WorldCatalog.cpp
@@ -1041,6 +1047,19 @@ if(BUILD_TESTING)
         target_compile_options(plugin_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        foreach(extension_demo entity_demo terrain_demo render_demo)
+            add_library(plugin_${extension_demo} MODULE examples/plugins/${extension_demo}/plugin.cpp)
+            target_include_directories(plugin_${extension_demo} PRIVATE sdk)
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(plugin_${extension_demo} PRIVATE -Wall -Wextra -Wpedantic)
+            elseif(MSVC)
+                target_compile_options(plugin_${extension_demo} PRIVATE /W4 /permissive- /utf-8)
+            endif()
+            set_target_properties(plugin_${extension_demo} PROPERTIES PREFIX "" OUTPUT_NAME ${extension_demo})
+            if(APPLE)
+                set_target_properties(plugin_${extension_demo} PROPERTIES SUFFIX ".dylib")
+            endif()
+        endforeach()
         add_library(plugin_native_demo MODULE examples/plugins/native_demo/plugin.cpp)
         add_library(plugin_bad_abi MODULE tests/PluginBadEntry.cpp)
         target_compile_definitions(plugin_bad_abi PRIVATE MC_BAD_ABI=1)
@@ -1297,7 +1316,7 @@ if(BUILD_TESTING)
     add_test(NAME application_input_routing COMMAND input_routing_tests)
 
     add_executable(session_flow_tests
-        src/plugins/PluginManager.cpp src/plugins/BuiltinPlugins.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         tests/SessionFlowTests.cpp
         src/app/GameSession.cpp
         src/app/GameSessionLan.cpp
@@ -1321,7 +1340,7 @@ if(BUILD_TESTING)
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
         src/entity/EntityReplication.cpp
-        src/entity/EntityBehavior.cpp
+        src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
         src/entity/EntityVillageAi.cpp
         src/entity/GroundNavigation.cpp
@@ -1375,7 +1394,7 @@ if(BUILD_TESTING)
         src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(session_flow_tests PRIVATE
@@ -1402,6 +1421,20 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    if(NOT ANDROID AND NOT IOS)
+        add_dependencies(session_flow_tests plugin_entity_demo plugin_terrain_demo)
+        add_dependencies(vulkan_ui_smoke plugin_render_demo)
+        if(MINECRAFTC_VULKAN_TESTS)
+            set_property(TARGET vulkan_ui_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
+            add_test(NAME plugin_vulkan_extensions_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets plugins $<TARGET_FILE:plugin_render_demo>)
+            set_tests_properties(plugin_vulkan_extensions_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+        endif()
+        add_test(NAME plugin_entity_worldgen_extensions COMMAND session_flow_tests --extension-tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_entity_demo> $<TARGET_FILE:plugin_terrain_demo>)
+    endif()
     add_test(NAME plugin_game_session_integration COMMAND session_flow_tests --plugin-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(gamerule_integration PROPERTIES TIMEOUT 120)
@@ -1455,7 +1488,7 @@ if(BUILD_TESTING)
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
         src/entity/EntityReplication.cpp
-        src/entity/EntityBehavior.cpp
+        src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
         src/entity/EntityVillageAi.cpp
         src/entity/GroundNavigation.cpp
@@ -1527,7 +1560,7 @@ if(BUILD_TESTING)
         src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(application_flow_tests PRIVATE
@@ -1575,7 +1608,7 @@ if(BUILD_TESTING)
         src/world/StructureGenerator.cpp
         src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/WorldGenerator.cpp
+        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(world_orchestration_tests PRIVATE

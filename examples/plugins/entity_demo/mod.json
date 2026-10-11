@@ -1,0 +1,13 @@
+{
+  "id": "entity_demo",
+  "name": "Entity Demo",
+  "version": "1.0.0",
+  "api": 1,
+  "visual_only": false,
+  "network_compatibility": "entity_demo-behavior-1",
+  "native": {
+    "linux": "entity_demo.so",
+    "windows": "entity_demo.dll",
+    "macos": "entity_demo.dylib"
+  }
+}

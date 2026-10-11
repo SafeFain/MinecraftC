@@ -727,5 +727,8 @@
   "lan.discovery_error": "ルーム検索を利用できません：{0}",
   "lan.players": "プレイヤー · {0}",
   "lan.overworld": "オーバーワールド",
-  "lan.heaven": "天界"
+  "lan.heaven": "天界",
+  "menu.create.generator_overworld": "オーバーワールド生成器: {0}",
+  "menu.create.generator_heaven": "天界生成器: {0}",
+  "menu.create.generator_parameters": "生成パラメーター（JSON）"
 }

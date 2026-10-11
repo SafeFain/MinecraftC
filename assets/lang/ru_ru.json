@@ -727,5 +727,8 @@
   "lan.discovery_error": "Поиск комнат недоступен: {0}",
   "lan.players": "Игроки · {0}",
   "lan.overworld": "Обычный мир",
-  "lan.heaven": "Небеса"
+  "lan.heaven": "Небеса",
+  "menu.create.generator_overworld": "Генератор основного мира: {0}",
+  "menu.create.generator_heaven": "Генератор небес: {0}",
+  "menu.create.generator_parameters": "Параметры генератора (JSON)"
 }

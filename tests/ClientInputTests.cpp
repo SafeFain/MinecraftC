@@ -248,11 +248,15 @@ int main(){
     std::filesystem::create_directories(root/"assets");
     {std::ofstream text(root/"assets"/"sample.txt",std::ios::binary);text<<"hello";}
     {std::ofstream empty(root/"assets"/"empty.bin",std::ios::binary);}
+    {std::ofstream package(root/"custom-model.bin",std::ios::binary);package<<"package";}
     {AssetStore assets(root/"assets");
         require(assets.readText("sample.txt")=="hello"&&assets.readBinary("empty.bin").empty(),
                 "title storage reads text and empty binary assets");
         require(assets.readBinary("empty.bin").empty(),
                 "empty assets remain readable without exposing backend IO streams");
+        require(AssetStore::readTextPath(root/"custom-model.bin")=="package","explicit user-package assets load outside Title Storage");
+        bool escaped=false;try{assets.readBinary("../custom-model.bin");}catch(const std::exception&){escaped=true;}
+        require(escaped,"relative Title Storage access remains confined");
         bool missing=false;try{assets.readBinary("missing.bin");}catch(const std::exception&){missing=true;}
         require(missing,"missing title assets report failure");}
     ClientSettings settings;

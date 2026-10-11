@@ -590,5 +590,8 @@
   "lan.discovery_error": "Room discovery unavailable: {0}",
   "lan.players": "Players · {0}",
   "lan.overworld": "Overworld",
-  "lan.heaven": "Heaven"
+  "lan.heaven": "Heaven",
+  "menu.create.generator_overworld": "Overworld generator: {0}",
+  "menu.create.generator_heaven": "Heaven generator: {0}",
+  "menu.create.generator_parameters": "Generator parameters (JSON)"
 }

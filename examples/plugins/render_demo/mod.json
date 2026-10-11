@@ -1,0 +1,13 @@
+{
+  "id": "render_demo",
+  "name": "Render Demo",
+  "version": "1.0.0",
+  "api": 1,
+  "visual_only": true,
+  "network_compatibility": "render_demo-behavior-1",
+  "native": {
+    "linux": "render_demo.so",
+    "windows": "render_demo.dll",
+    "macos": "render_demo.dylib"
+  }
+}

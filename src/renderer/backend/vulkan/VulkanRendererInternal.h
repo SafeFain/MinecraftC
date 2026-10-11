@@ -11,6 +11,7 @@
 #include "renderer/BlockAtlasData.h"
 #include "renderer/CloudRenderData.h"
 #include "renderer/backend/vulkan/VulkanHelpers.h"
+#include "renderer/backend/vulkan/VulkanPluginBackend.h"
 #include "renderer/backend/vulkan/VulkanIndexRebase.h"
 #include "renderer/backend/vulkan/VulkanPipelineFactory.h"
 #include "renderer/backend/vulkan/VulkanResources.h"
@@ -287,6 +288,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         LOG_INFO("VulkanRenderer initialized with VMA");
     }
 
+    std::unique_ptr<vkp::VulkanPluginBackend> pluginBackend;
     ~Impl() { cleanup(); }
 
     Buffer materialSequences;
@@ -2229,6 +2231,61 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         frame.revision = cloudRevision;
     }
 
+    void preparePlugins(uint32_t imageIndex) {
+        if(Plugins::content().extensions.renderPasses.empty())return;
+        try {
+            if(!pluginBackend)pluginBackend=std::make_unique<vkp::VulkanPluginBackend>(device,allocator,commandPool,graphicsQueue);
+            std::array<std::vector<vkp::PluginSceneSubmission>,MC_RENDER_STAGE_COUNT> scenes;
+            auto basic=[&](const DrawCommand& draw) {
+                const auto it=meshes.find(draw.mesh.value);if(it==meshes.end())return;
+                const auto& mesh=it->second;const bool arena=mesh.arenaPage!=std::numeric_limits<uint32_t>::max();
+                vkp::PluginSceneSubmission p;p.vertex=arena?chunkArenaPages[mesh.arenaPage].vertex.handle:mesh.vertex.handle;p.index=arena?chunkArenaPages[mesh.arenaPage].index.handle:mesh.index.handle;
+                p.count=draw.indexCount?draw.indexCount:mesh.indexCount;p.first=draw.firstIndex+(arena?static_cast<uint32_t>(mesh.indexOffset/4):0);p.base=arena?static_cast<int32_t>(mesh.vertexOffset/sizeof(MeshVertex)):0;
+                p.stride=mesh.layout==MeshVertexLayout::Chunk?sizeof(MeshVertex):sizeof(BasicMeshVertex);p.uvOffset=mesh.layout==MeshVertexLayout::Chunk?28:12;
+                p.transform=(draw.useCustomViewProjection?draw.viewProjection:submittedFrame.projection*submittedFrame.view)*draw.model;p.tint=draw.tint;p.lod=draw.lod;
+                const auto material=materials.find(draw.material.value);const auto stage=material!=materials.end()&&material->second.desc.pipeline==MaterialPipeline::ChunkTranslucent?static_cast<uint32_t>(MC_RENDER_TRANSLUCENT):draw.extensionStage;
+                scenes.at(stage).push_back(p);
+            };
+            for(const auto& draw:submittedLodDraws)basic(draw);
+            for(const auto& draw:submittedDraws)basic(draw);
+            const bool entityPass=std::any_of(Plugins::content().extensions.renderPasses.begin(),Plugins::content().extensions.renderPasses.end(),[](const auto& p){return p.stage==MC_RENDER_ENTITIES;});
+            auto model=[&](const ModelPassSubmission& submission,ModelResource& resource,ModelPrimitive& primitive,const model::Material& material) {
+                if(!entityPass)return;
+                vkp::PluginSceneSubmission p;p.vertex=primitive.vertex.handle;p.index=primitive.index.handle;p.count=primitive.indexCount;p.stride=sizeof(model::Vertex);p.uvOffset=offsetof(model::Vertex,uv);
+                glm::mat4 node(1);if(submission.draw.instance&&primitive.node>=0&&static_cast<size_t>(primitive.node)<submission.draw.instance->pose.global.size()&&primitive.skin<0)node=submission.draw.instance->pose.global[primitive.node];
+                p.transform=submission.viewProjection*submission.draw.transform*node;p.tint=submission.draw.tint*material.baseColor;
+                if(primitive.skin>=0&&submission.draw.instance&&static_cast<size_t>(primitive.skin)<submission.draw.instance->jointPalettes.size()) {
+                    const auto& palette=submission.draw.instance->jointPalettes[static_cast<size_t>(primitive.skin)];
+                    const auto& source=resource.asset->primitives[static_cast<size_t>(&primitive-resource.primitives.data())];
+                    p.posedVertices.reserve(source.vertices.size());
+                    for(const auto& vertex:source.vertices) {
+                        glm::mat4 skin(0);
+                        for(int j=0;j<4;++j)skin+=vertex.weights[j]*(vertex.joints[j]<palette.size()?palette[vertex.joints[j]]:glm::mat4(1));
+                        const auto position=glm::vec3(skin*glm::vec4(vertex.position,1));
+                        p.posedVertices.push_back({{position.x,position.y,position.z},{vertex.uv.x,vertex.uv.y}});
+                    }
+                }
+                scenes[MC_RENDER_ENTITIES].push_back(std::move(p));
+            };
+            forEachModelPrimitive(submittedModelOpaque,false,model);forEachModelPrimitive(submittedModelBlend,true,model);
+            if(shadowUpdateQueued&&shadowCascades.count>0) {
+                const auto config=shadowConfig(shadow.shadowQuality);const int columns=config.cascadeCount==1?1:2;
+                for(int cascade=0;cascade<shadowCascades.count;++cascade)for(const auto& submission:submittedShadowChunks) {
+                    if(!submission.mesh||!submission.mesh->gpuReady||!submission.mesh->shadowCasterIndexCount)continue;
+                    DrawCommand draw;draw.mesh=submission.mesh->renderHandle;draw.model=submission.model;draw.indexCount=static_cast<uint32_t>(submission.mesh->shadowCasterIndexCount);draw.firstIndex=static_cast<uint32_t>(submission.mesh->shadowCasterIndexOffset);draw.viewProjection=shadowCascades.lightViewProjection[cascade];draw.useCustomViewProjection=true;draw.extensionStage=MC_RENDER_SHADOWS;
+                    const auto previous=scenes[MC_RENDER_SHADOWS].size();basic(draw);if(scenes[MC_RENDER_SHADOWS].size()==previous)continue;auto& p=scenes[MC_RENDER_SHADOWS].back();p.viewport={static_cast<float>((cascade%columns)*config.resolution),static_cast<float>((cascade/columns)*config.resolution),static_cast<float>(config.resolution),static_cast<float>(config.resolution),0,1};p.scissor={{(cascade%columns)*config.resolution,(cascade/columns)*config.resolution},{static_cast<uint32_t>(config.resolution),static_cast<uint32_t>(config.resolution)}};
+                }
+            }
+            pluginBackend->prepare(static_cast<uint32_t>(currentFrame),swapchain.swapchainExtent.width,swapchain.swapchainExtent.height,static_cast<double>(RuntimeClock{}.now())*1e-9,submittedFrame.projection*submittedFrame.view,postProcess.worldOrigin,swapchain.sceneImageViews.at(imageIndex),swapchain.postSampler,scenes);
+            pluginBackend->validate(swapchain.renderPass,swapchain.presentRenderPass,shadow.shadowRenderPass,swapchain.sampleCount,swapchain.voxelGiEnabled?3u:swapchain.surfaceDataEnabled?2u:1u);
+        }catch(const std::exception& error){Plugins::content().runtimeFault=std::string("Plugin rendering failed: ")+error.what();}
+    }
+    bool pluginReplaces(uint32_t stage) const {return Plugins::content().runtimeFault.empty()&&pluginBackend&&pluginBackend->replaces(stage);}
+    void pluginSceneStage(VkCommandBuffer command,uint32_t stage,int phase=0) {
+        if(!pluginBackend||!Plugins::content().runtimeFault.empty())return;
+        const auto colors=swapchain.voxelGiEnabled?3u:swapchain.surfaceDataEnabled?2u:1u;
+        pluginBackend->record(command,swapchain.renderPass,swapchain.sampleCount,stage,colors,false,phase);
+    }
     void recordCommandBuffer(uint32_t imageIndex) {
         VkCommandBuffer command = swapchain.commandBuffers[imageIndex];
         require(vkResetCommandBuffer(command, 0), "vkResetCommandBuffer");
@@ -2243,6 +2300,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         timestamp(command, 1);
         recordVoxelGiInjection(command);
         timestamp(command, 2);
+        if(pluginBackend&&Plugins::content().runtimeFault.empty())pluginBackend->targets(command);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
         timestamp(command, 3);
@@ -2418,7 +2476,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                                                (cascade/columns)*config.resolution},
                     {static_cast<uint32_t>(config.resolution),static_cast<uint32_t>(config.resolution)}};
                 vkCmdSetViewport(command,0,1,&shadowViewport);vkCmdSetScissor(command,0,1,&shadowScissor);
-                for(const ShadowChunkSubmission& submission:submittedShadowChunks){
+                if(!pluginReplaces(MC_RENDER_SHADOWS))for(const ShadowChunkSubmission& submission:submittedShadowChunks){
                     if(!submission.mesh||!submission.mesh->gpuReady||
                        submission.mesh->shadowCasterIndexCount==0)continue;
                     if(!shadowIntersectsAabb(shadowCascades.lightViewProjection[cascade],
@@ -2447,6 +2505,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     ++performance.drawCalls;
                 }
             }
+            if(pluginBackend&&Plugins::content().runtimeFault.empty())pluginBackend->record(command,shadow.shadowRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_SHADOWS,0,true);
             vkCmdEndRenderPass(command);
         }
     }
@@ -2479,7 +2538,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdSetViewport(command, 0, 1, &viewport);
         vkCmdSetScissor(command, 0, 1, &scissor);
         const VkDeviceSize offset = 0;
-        if (skyQueued) {
+        pluginSceneStage(command,MC_RENDER_SKY);
+        if (skyQueued&&!pluginReplaces(MC_RENDER_SKY)) {
             vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               swapchain.skyPipeline);
             vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -2599,7 +2659,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             ++performance.drawCalls;
         }
         };
-        drawBasicSubmissions(submittedLodDraws);
+        if(!pluginReplaces(MC_RENDER_TERRAIN))drawBasicSubmissions(submittedLodDraws);
+        pluginSceneStage(command,MC_RENDER_TERRAIN,1);
+        boundPipeline=VK_NULL_HANDLE;boundMaterialSet=VK_NULL_HANDLE;boundVertexBuffer=boundIndexBuffer=VK_NULL_HANDLE;
         if (!submittedLodDraws.empty() || cloudsQueued) {
             std::array<VkClearAttachment, 3> clears{};
             uint32_t clearCount = 1;
@@ -2634,7 +2696,20 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         // including when the player flies through or above the cloud layer.
         drawClouds(submittedFrame.projection * submittedFrame.view, cloudNearRegion);
         if (cloudsQueued) boundPipeline = VK_NULL_HANDLE;
-        drawBasicSubmissions(submittedDraws);
+        if(!pluginBackend)drawBasicSubmissions(submittedDraws);
+        else {
+            std::vector<DrawCommand> retained;retained.reserve(submittedDraws.size());
+            for(const auto& draw:submittedDraws) {
+                const auto material=materials.find(draw.material.value);
+                const auto stage=material!=materials.end()&&material->second.desc.pipeline==MaterialPipeline::ChunkTranslucent?static_cast<uint32_t>(MC_RENDER_TRANSLUCENT):draw.extensionStage;
+                if(!pluginReplaces(stage))retained.push_back(draw);
+            }
+            drawBasicSubmissions(retained);
+        }
+        pluginSceneStage(command,MC_RENDER_TERRAIN,2);
+        pluginSceneStage(command,MC_RENDER_TRANSLUCENT);
+        pluginSceneStage(command,MC_RENDER_ENTITIES);
+        boundPipeline=VK_NULL_HANDLE;boundMaterialSet=VK_NULL_HANDLE;boundVertexBuffer=boundIndexBuffer=VK_NULL_HANDLE;
         uint32_t modelUniformIndex = 0;
         VkPipeline boundModelPipeline = VK_NULL_HANDLE;
         VkDescriptorSet boundModelMaterial = VK_NULL_HANDLE;
@@ -2700,8 +2775,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     ++performance.drawCalls;
                 });
         };
-        drawModels(submittedModelOpaque, false);
-        drawModels(submittedModelBlend, true);
+        if(!pluginReplaces(MC_RENDER_ENTITIES)){drawModels(submittedModelOpaque, false);drawModels(submittedModelBlend, true);}
         if(!submittedParticles.empty()){
             const auto material=materials.find(particleMaterial.value);
             if(material!=materials.end()){
@@ -3040,7 +3114,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const PostConstants postConstants = buildPostConstants();
         vkCmdPushConstants(command, swapchain.postPipelineLayout,
             VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(postConstants), &postConstants);
-        vkCmdDraw(command, 3, 1, 0, 0);
+        if(!pluginReplaces(MC_RENDER_POST))vkCmdDraw(command, 3, 1, 0, 0);
+        if(pluginBackend&&Plugins::content().runtimeFault.empty())pluginBackend->record(command,swapchain.presentRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_POST,1);
         ++performance.drawCalls;
         ++performance.pipelineBinds;
         ++performance.descriptorBinds;
@@ -3117,6 +3192,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             RuntimeClock::elapsed(mark, clock.now())) * 1000.0;
         swapchain.imagesInFlight[imageIndex] = frameSync.fences[currentFrame];
         mark = clock.now();
+        preparePlugins(imageIndex);
         prepareSkyBuffer();
         prepareChunkBuffer();
         prepareCloudBuffer();
@@ -3182,6 +3258,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         if (window.isMinimized() || window.width() <= 0 || window.height() <= 0)
             return;
         require(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
+        if(pluginBackend)pluginBackend->invalidate();
         // Destroy the previous bundle before creating a replacement: some
         // drivers reject a second swapchain on the same surface while the
         // old one is still alive.
@@ -3192,6 +3269,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     void suspendPresentation() {
         if (presentationSuspended) return;
         if (device) require(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
+        if(pluginBackend)pluginBackend->invalidate();
         swapchain = vkp::VulkanSwapchainBundle{};
         if (surface && instance) vkDestroySurfaceKHR(instance, surface, nullptr);
         surface = VK_NULL_HANDLE;
@@ -3229,6 +3307,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
 
     void cleanup() {
         if (device) vkDeviceWaitIdle(device);
+        pluginBackend.reset();
         for (auto& pool : timingPools) {
             if (pool) vkDestroyQueryPool(device, pool, nullptr);
             pool = VK_NULL_HANDLE;

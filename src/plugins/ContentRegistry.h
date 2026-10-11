@@ -1,5 +1,8 @@
 #pragma once
 #include "world/Block.h"
+#include "plugins/Extensions.h"
+#include "plugins/Json.h"
+#include <set>
 #include "game/SurvivalRules.h"
 #include <map>
 #include <cctype>
@@ -24,6 +27,7 @@ struct ItemContent {
     ItemProperties properties;
     CreativeItemCategory category=CreativeItemCategory::Materials;
     uint16_t tile=0;
+    uint16_t spawnEntity=MC_INVALID_ID;
 };
 struct MaterialContent {
     std::string key;
@@ -33,6 +37,7 @@ struct MaterialContent {
     uint16_t tile=0;
 };
 struct ContentState {
+    ExtensionContent extensions;
     bool frozen=false;
     uint64_t revision=0;
     std::string runtimeFault;
@@ -122,6 +127,41 @@ inline ItemId resolveItem(const std::string& key) {
     auto id=itemFromCommandName(key.rfind("minecraftc:",0)==0?key.substr(11):key);
     if(id)return *id;
     throw std::runtime_error("Unknown item: "+key);
+}
+inline const EntityContent* entityContent(uint16_t id) {
+    auto it=content().extensions.entities.find(id);
+    return it==content().extensions.entities.end()?nullptr:&it->second;
+}
+inline bool validEntity(uint16_t id) {return id<MC_BUILTIN_ENTITY_COUNT||entityContent(id);}
+inline std::string entityKey(uint16_t id) {
+    if(id<MC_BUILTIN_ENTITY_COUNT)return "minecraftc:entity_"+std::to_string(id);
+    if(const auto* e=entityContent(id))return e->key;
+    throw std::runtime_error("Unknown entity type");
+}
+inline uint16_t resolveEntity(const std::string& key) {
+    const auto builtin=builtinKeyId(key,"minecraftc:entity_",MC_BUILTIN_ENTITY_COUNT);
+    if(builtin!=INVALID_CONTENT_ID)return builtin;
+    for(const auto& e:content().extensions.entities)if(e.second.key==key)return e.first;
+    throw std::runtime_error("Unknown entity type: "+key);
+}
+inline void validateGeneration(const GenerationConfig& config,uint32_t dimension) {
+    if(dimension>1||config.parameters.size()>4096||config.modifiers.size()>64)
+        throw std::runtime_error("Invalid generator configuration limits");
+    if(Json::parse(config.parameters).type!=Json::Type::Object)
+        throw std::runtime_error("Generator parameters must be a JSON object");
+    if(config.generator.empty()&&!config.revision.empty())throw std::runtime_error("Builtin generator has no plugin revision");
+    std::set<std::string> selected;
+    for(const auto& m:config.modifiers)if(!selected.insert(m.first).second)throw std::runtime_error("Duplicate generator modifier");
+    if(!config.generator.empty()) {
+        auto g=content().extensions.generators.find(config.generator);
+        if(g==content().extensions.generators.end()||g->second.dimension!=dimension||g->second.revision!=config.revision)
+            throw std::runtime_error("Missing/incompatible generator: "+config.generator);
+    }
+    for(const auto& m:config.modifiers) {
+        auto it=content().extensions.modifiers.find(m.first);
+        if(it==content().extensions.modifiers.end()||it->second.dimension!=dimension||it->second.revision!=m.second)
+            throw std::runtime_error("Missing/incompatible modifier: "+m.first);
+    }
 }
 inline void freezeContent() {
     for(auto& entry:content().blocks)entry.second.properties.name=entry.second.name.c_str();

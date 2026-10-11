@@ -196,7 +196,7 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v18 uses little-endian 16-bit block IDs and can read v2-v17 desktop
+one exists. Save format v19 uses little-endian 16-bit block IDs and can read v2-v18 desktop
 metadata. The current world generation version is v20 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
@@ -249,7 +249,7 @@ Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
-new standard names and classic aliases. Rules persist per world in save v18 (introduced in v15); missing
+new standard names and classic aliases. Rules persist per world in save v19 (introduced in v15); missing
 or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
 
 Run `./build-local/minecraftc --version` to print the version without opening a
@@ -349,6 +349,7 @@ in the creative catalog; for example, `/give stone_bricks 64` requires cheats.
 ### Game plugins
 
 Official builtin plugins and user data/native packages can extend blocks, items, recipes,
+entities, terrain generators and Vulkan render stages (see [extension SDK](docs/plugin-extensions.md)),
 interaction, environment colors and HUD. Enable them through the main menu’s Plugins page
 and restart. See [plugin installation and SDK](docs/plugins.md) for platform support,
 examples and world compatibility. LAN rooms support matching gameplay plugins; visual-only

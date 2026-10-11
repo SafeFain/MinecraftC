@@ -1,0 +1,13 @@
+{
+  "id": "terrain_demo",
+  "name": "Terrain Demo",
+  "version": "1.0.0",
+  "api": 1,
+  "visual_only": false,
+  "network_compatibility": "terrain_demo-behavior-1",
+  "native": {
+    "linux": "terrain_demo.so",
+    "windows": "terrain_demo.dll",
+    "macos": "terrain_demo.dylib"
+  }
+}

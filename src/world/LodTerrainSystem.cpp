@@ -21,7 +21,7 @@
 #include <type_traits>
 
 namespace {
-constexpr uint32_t CACHE_REVISION = 5;
+constexpr uint32_t CACHE_REVISION = 6;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
 
 using Bytes = std::vector<uint8_t>;
@@ -110,6 +110,7 @@ bool writeTileFile(const std::filesystem::path& path, const LodTileKey& key,
     append<uint32_t>(file, CACHE_REVISION);
     append<uint64_t>(file, generator.getSeed());
     append<uint32_t>(file, generator.generationVersion());
+    append<uint64_t>(file,Plugins::generationFingerprint(generator.generationConfig()));
     append<uint8_t>(file, static_cast<uint8_t>(generator.worldType()));
     append<uint8_t>(file, static_cast<uint8_t>(generator.dimension()));
     append<int32_t>(file, key.x);
@@ -146,14 +147,15 @@ bool readTileFile(const std::filesystem::path& path, const LodTileKey& expected,
     uint64_t seed = 0, expectedHash = 0;
     uint8_t worldType = 0, dimension = 0, level = 0;
     int32_t x = 0, z = 0;
+    uint64_t generationFingerprint=0;
     if (!read(file, cursor, revision) || !read(file, cursor, seed) ||
-        !read(file, cursor, generation) || !read(file, cursor, worldType) ||
+        !read(file, cursor, generation) || !read(file,cursor,generationFingerprint) || !read(file, cursor, worldType) ||
         !read(file, cursor, dimension) || !read(file, cursor, x) ||
         !read(file, cursor, z) || !read(file, cursor, level) ||
         !read(file, cursor, size) || !read(file, cursor, expectedHash))
         return false;
     if (revision != CACHE_REVISION || seed != generator.getSeed() ||
-        generation != generator.generationVersion() ||
+        generation != generator.generationVersion() || generationFingerprint!=Plugins::generationFingerprint(generator.generationConfig()) ||
         worldType != static_cast<uint8_t>(generator.worldType()) ||
         dimension != static_cast<uint8_t>(generator.dimension()) ||
         x != expected.x || z != expected.z || level != expected.level ||
@@ -364,6 +366,26 @@ bool decodeLodTilePayload(const std::vector<uint8_t>& payload,
     return decodeTile(payload, tile);
 }
 
+namespace {
+void applyPluginLodModifiers(const WorldGenerator& generator,int x,int z,LodColumn& column) {
+    const auto decorations=generator.pluginModifierBlocks(x,z);
+    if(decorations.empty())return;
+    std::array<BlockId,Config::CHUNK_SIZE_Y> blocks{};
+    for(const auto& span:column.spans)
+        for(int y=std::max<int>(span.bottom,Config::WORLD_MIN_Y);y<=std::min<int>(span.top,Config::WORLD_MAX_Y-1);++y)
+            blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]=span.block;
+    for(const auto& b:decorations)blocks[static_cast<size_t>(b.y-Config::WORLD_MIN_Y)]=static_cast<BlockId>(b.block);
+    column.spans.clear();
+    for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
+        const auto block=blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)];
+        if(block==BlockId::AIR)continue;
+        if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)
+            column.spans.back().top=static_cast<int16_t>(y);
+        else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
+    }
+}
+}
+
 LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                     const LodTileKey& key) {
     LodTileData tile;
@@ -375,6 +397,15 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             int wx = originX + x * cellSize + cellSize / 2;
             int wz = originZ + z * cellSize + cellSize / 2;
             LodColumn& column = tile.at(x, z);
+            if(generator.customGenerator()) {
+                const auto pluginBlocks=generator.samplePluginColumnBlocks(wx,wz);
+                for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
+                    const auto block=static_cast<BlockId>(pluginBlocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]);if(block==BlockId::AIR)continue;
+                    if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)column.spans.back().top=static_cast<int16_t>(y);
+                    else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
+                }
+                continue;
+            }
             if (generator.isHeaven()) {
                 for (const auto& island : generator.sampleHeavenLayers(wx, wz)) {
                     if (!island.present) continue;
@@ -580,6 +611,9 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             }
         }
     }
+    if(!generator.customGenerator()&&!generator.generationConfig().modifiers.empty())
+        for(int z=0;z<LodTileData::SIDE;++z)for(int x=0;x<LodTileData::SIDE;++x)
+            applyPluginLodModifiers(generator,originX+x*cellSize+cellSize/2,originZ+z*cellSize+cellSize/2,tile.at(x,z));
     return tile;
 }
 
@@ -681,6 +715,15 @@ LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
             const int wx = originX + cellX * cellSize + cellSize / 2;
             const int wz = originZ + cellZ * cellSize + cellSize / 2;
             LodColumn& column = edges[static_cast<size_t>(side)][static_cast<size_t>(i)];
+            if(generator.customGenerator()) {
+                const auto pluginBlocks=generator.samplePluginColumnBlocks(wx,wz);
+                for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
+                    const auto block=static_cast<BlockId>(pluginBlocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]);if(block==BlockId::AIR)continue;
+                    if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)column.spans.back().top=static_cast<int16_t>(y);
+                    else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
+                }
+                continue;
+            }
             if (generator.isHeaven()) {
                 for (const auto& island : generator.sampleHeavenLayers(wx, wz)) {
                     if (island.present)
@@ -716,6 +759,12 @@ LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
             }
         }
     }
+    if(!generator.customGenerator()&&!generator.generationConfig().modifiers.empty())
+        for(int i=0;i<LodTileData::SIDE;++i)for(int side=0;side<4;++side) {
+            const int x=side==2?LodTileData::SIDE:side==3?-1:i;
+            const int z=side==0?-1:side==1?LodTileData::SIDE:i;
+            applyPluginLodModifiers(generator,originX+x*cellSize+cellSize/2,originZ+z*cellSize+cellSize/2,edges[side][i]);
+        }
     return edges;
 }
 

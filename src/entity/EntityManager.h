@@ -65,6 +65,11 @@ struct Entity {
     bool sleeping = false;
     EntityAiState ai;
     uint64_t shooterId = 0;
+    std::string pluginState="{}";
+    uint32_t pluginStateVersion=0;
+    glm::vec3 pluginMovement{0};
+    uint64_t pluginAttack=UINT64_MAX;
+    double pluginIntentUntil=0;
 };
 
 struct DeadEntityRender {
@@ -101,6 +106,9 @@ public:
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned, uint64_t shooterId = 0);
     bool spawnMob(EntityType type, const glm::dvec3& position);
+    bool pluginSnapshot(uint64_t,MC_EntitySnapshot&,std::string&) const;
+    bool pluginRemove(uint64_t);
+    bool pluginIntent(uint64_t,const MC_EntityIntent&);
     void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
                   bool removeBlock = true);
     std::vector<glm::dvec3> takeExplosionEvents();
@@ -244,6 +252,8 @@ private:
     std::vector<LogicalVillage> m_logicalVillages;
     float m_villageRefreshSeconds = 0.0f;
 
+    void pluginEvent(Entity&,uint32_t);
+    bool pluginAi(Entity&,float);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile,
                            bool underground);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);

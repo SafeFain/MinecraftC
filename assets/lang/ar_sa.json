@@ -727,5 +727,8 @@
   "lan.discovery_error": "البحث عن الغرف غير متاح: {0}",
   "lan.players": "اللاعبون · {0}",
   "lan.overworld": "العالم الرئيسي",
-  "lan.heaven": "السماء"
+  "lan.heaven": "السماء",
+  "menu.create.generator_overworld": "مولد العالم الأساسي: {0}",
+  "menu.create.generator_heaven": "مولد السماء: {0}",
+  "menu.create.generator_parameters": "معلمات التوليد (JSON)"
 }

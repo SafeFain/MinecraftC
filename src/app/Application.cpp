@@ -173,6 +173,13 @@ private:
         m_plugins.initialize(m_safeMode);
         m_ui.inventory=CreativeInventory{};
         Plugins::contextProvider()=[this]{return m_session.pluginContext();};
+        m_plugins.renderDraw=[this](size_t owner,const MC_RenderDraw& draw){return m_renderer->pluginDraw(owner,draw);};
+        m_plugins.renderScene=[this](size_t owner,uint64_t index,MC_RenderHandle pipeline){return m_renderer->pluginSceneDraw(owner,index,pipeline);};
+        m_plugins.renderBuffer=[this](size_t owner,MC_RenderHandle handle,const void* data,uint32_t bytes){return m_renderer->pluginUpdateBuffer(owner,handle,data,bytes);};
+        m_plugins.spawnEntity=[this](uint32_t d,uint16_t t,const double* p){return m_session.pluginSpawnEntity(d,t,p);};
+        m_plugins.entitySnapshot=[this](uint32_t d,uint64_t id,MC_EntitySnapshot& out,std::string& state){return m_session.pluginEntitySnapshot(d,id,out,state);};
+        m_plugins.removeEntity=[this](uint32_t d,uint64_t id){return m_session.pluginRemoveEntity(d,id);};
+        m_plugins.entityIntent=[this](uint32_t d,uint64_t id,const MC_EntityIntent& intent){return m_session.pluginEntityIntent(d,id,intent);};
         m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
         m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};
         m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};
@@ -378,6 +385,7 @@ private:
                 return false;
             }
         };
+        m_ui.menuCallbacks.onGenerationConfig=[this](const auto& g){m_session.setCreationGeneration(g);};
         m_ui.menuCallbacks.onCreateWorld =
             [this](const std::string& name, const std::string& seedText,
                    GameMode mode, WorldType worldType, bool cheatsEnabled) {
@@ -600,6 +608,7 @@ private:
             m_window.finishEventFrame();
             return !m_window.shouldClose() && m_running;
         }
+        m_plugins.pollFaults();
         m_router.handleFrameInput(frame.dt);
         if(Plugins::content().runtimeFault.empty())updateFrameState(frame.dt, frame.now);
         if(!Plugins::content().runtimeFault.empty()) {

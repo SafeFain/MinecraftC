@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/RenderDevice.h"
+#include "minecraftc/extensions.h"
 #include "renderer/Frustum.h"
 #include "renderer/ParticleSystem.h"
 #include "renderer/RenderEnvironment.h"
@@ -27,6 +28,9 @@ namespace model { class ModelRenderer; }
 class IGameRenderer : public IRenderDevice {
 public:
     using IRenderDevice::beginFrame;
+    virtual bool pluginDraw(size_t,const MC_RenderDraw&) {return false;}
+    virtual bool pluginSceneDraw(size_t,uint64_t,MC_RenderHandle) {return false;}
+    virtual bool pluginUpdateBuffer(size_t,MC_RenderHandle,const void*,uint32_t) {return false;}
     virtual void initialize(Window& window,
                             const std::filesystem::path& assetRoot) = 0;
     virtual void reinitialize(const std::filesystem::path& assetRoot) = 0;

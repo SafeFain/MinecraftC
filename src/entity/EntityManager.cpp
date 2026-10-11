@@ -60,11 +60,11 @@ std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const 
     saved.reserve(m_entities.size());
     for (const auto& entity : m_entities) {
         saved.push_back({
-            static_cast<uint8_t>(entity.type), entity.position, entity.velocity,
+            static_cast<uint16_t>(entity.type), entity.position, entity.velocity,
             entity.health, entity.ageSeconds, entity.item, entity.behaviorSeed,
             static_cast<uint8_t>((entity.inGround ? 1 : 0) |
                                  (entity.playerOwned ? 2 : 0)), entity.projectileDamage
-            , entity.villager
+            , entity.villager, entity.pluginState,entity.pluginStateVersion
         });
     }
     return saved;
@@ -86,6 +86,7 @@ void EntityManager::loadEntities(
         entity.playerOwned = (source.flags & 2) != 0;
         entity.projectileDamage = source.projectileDamage;
         entity.villager = source.villager;
+        entity.pluginState=source.pluginState;entity.pluginStateVersion=source.pluginStateVersion;
         m_entities.push_back(entity);
     }
 }
@@ -110,10 +111,10 @@ void EntityManager::syncChunks() {
             m_pendingEntitySaves.count(key) != 0) {
             std::vector<WorldMetadata::PersistedEntity> saved;
             for (const auto& entity : m_entities) if (entityChunk(entity.position)==key) {
-                saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
+                saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                     entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                     static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                    entity.projectileDamage, entity.villager});
+                    entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion});
             }
             m_saveStore->saveChunkEntities(key.first,key.second,saved);
         }
@@ -158,12 +159,12 @@ void EntityManager::syncChunks() {
                 std::vector<WorldMetadata::PersistedEntity> populated;
                 for (const Entity& entity : m_entities) {
                     if (entityChunk(entity.position) != key) continue;
-                    populated.push_back({static_cast<uint8_t>(entity.type),
+                    populated.push_back({static_cast<uint16_t>(entity.type),
                         entity.position,entity.velocity,entity.health,
                         entity.ageSeconds,entity.item,entity.behaviorSeed,
                         static_cast<uint8_t>((entity.inGround?1:0) |
                                              (entity.playerOwned?2:0)),
-                        entity.projectileDamage,entity.villager});
+                        entity.projectileDamage,entity.villager,entity.pluginState,entity.pluginStateVersion});
                 }
                 // Persist the merged entities first. If a crash interrupts this
                 // sequence, the absent revision marker safely retries and merges
@@ -205,10 +206,10 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
         const auto key = *m_pendingEntitySaves.begin();
         std::vector<WorldMetadata::PersistedEntity> saved;
         for(const auto& entity:m_entities) if(entityChunk(entity.position)==key)
-            saved.push_back({static_cast<uint8_t>(entity.type),entity.position,entity.velocity,
+            saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage, entity.villager});
+                entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion});
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_pendingEntitySaves.erase(key);
         ++savedFiles;
@@ -281,7 +282,8 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
     entity.type = type;
     entity.position = position;
     entity.behaviorSeed = hash32(static_cast<uint32_t>(entity.id));
-    switch (type) {
+    if(!registeredMob(type))return false;
+    switch (entityTemplate(type)) {
         case EntityType::Cow:
         case EntityType::Pig:
         case EntityType::Sheep: entity.health = 10.0f; break;
@@ -300,7 +302,11 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
         case EntityType::PrimedTnt: return false;
         case EntityType::Item: return false;
     }
+    if(const auto* definition=Plugins::entityContent(static_cast<uint16_t>(type))) {
+        entity.health=definition->health;entity.pluginStateVersion=definition->stateVersion;
+    }
     if (collides(entity, position)) return false;
+    pluginEvent(entity,MC_ENTITY_SPAWN);
     m_entities.push_back(entity);
     m_aiEntityIndices[entity.id]=m_entities.size()-1;
     m_dirtyEntityChunks.insert(entityChunk(position));
@@ -308,6 +314,7 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
 }
 
 bool EntityManager::hostile(EntityType type) {
+    if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return e->hostile;
     return type == EntityType::Zombie || type == EntityType::Skeleton ||
            type == EntityType::Spider || type == EntityType::Blastling ||
            type == EntityType::ZombieVillager;
@@ -504,6 +511,11 @@ void EntityManager::spawnAroundPlayer(
     if (type == EntityType::Zombie &&
         naturalZombieBecomesVillager(hash32(random ^ 0x5a17u)))
         type = EntityType::ZombieVillager;
+    std::vector<EntityType> pluginTypes;
+    for(const auto& e:Plugins::content().extensions.entities)if(e.second.natural&&e.second.hostile==spawnHostile)pluginTypes.push_back(static_cast<EntityType>(e.first));
+    if(!pluginTypes.empty()) {
+        const auto choice=random%static_cast<uint32_t>(4+pluginTypes.size());if(choice>=4)type=pluginTypes[choice-4];
+    }
     spawnMob(type, glm::dvec3(x + 0.5, static_cast<double>(surface), z + 0.5));
 }
 
@@ -565,11 +577,10 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     if (!hostile(entity.type) && entity.type!=EntityType::IronGolem)
         entity.ai.panicUntil = m_aiTime + Config::AI_PANIC_SECONDS;
     entity.hurtFlashSeconds = 0.2f;
-    if ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
-        entity.type == EntityType::Villager ||
-        entity.type == EntityType::ZombieVillager || entity.type==EntityType::IronGolem)
+    if (registeredMob(entity.type))
         m_modelRegistry.playAction(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
+    pluginEvent(entity,MC_ENTITY_DAMAGE);
     if (playerAttack && entity.type == EntityType::Spider)
         entity.spiderProvoked = true;
     return accepted;
@@ -733,9 +744,9 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
                 m_world.getBlock(x, static_cast<int>(std::floor(
                     entity.position.y + entitySize(entity).y * 0.5)), z) ==
                     BlockId::FIRE;
-            const bool undead = entity.type == EntityType::Zombie ||
-                                entity.type == EntityType::Skeleton ||
-                                entity.type == EntityType::ZombieVillager;
+            const bool undead = entityTemplate(entity.type) == EntityType::Zombie ||
+                                entityTemplate(entity.type) == EntityType::Skeleton ||
+                                entityTemplate(entity.type) == EntityType::ZombieVillager;
             const bool ignited = fireContact ||
                 (undead && isDay && !thunderstorm && exposed);
             const bool extinguished = inWater || wetByRain;
@@ -785,7 +796,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
                        glm::distance(entity.position, b.player->getPosition());
             });
         const auto& view = selected ? *selected : fallback;
-        updateMobAi(entity, *view.player, dt, isDay,
+        if(!pluginAi(entity,dt))updateMobAi(entity, *view.player, dt, isDay,
                     selected && view.targetable, worldTick, thunderstorm);
         if (entity.ai.hasTarget && !entity.ai.targetId)
             entity.ai.targetPlayerId = view.id;
@@ -813,7 +824,8 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             m_navigation.erase(entity.id);
             deadMobs.push_back(entity);
         }
-    for (const auto& entity : deadMobs) {
+    for (auto& entity : deadMobs) {
+        pluginEvent(entity,MC_ENTITY_DEATH);
         if (entity.type != EntityType::Arrow) {
             m_modelRegistry.playAction(entity.type, entity.id, "death");
             m_deadEntityRenders.push_back({entity.id, entity.type,
@@ -859,6 +871,10 @@ void EntityManager::strikeLightning(const std::vector<EntityPlayerView>& players
 
 void EntityManager::dropMobLoot(const Entity& entity) {
     if (!m_world.gameRules().boolean(GameRuleId::MobDrops)) return;
+    if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(entity.type))) {
+        if(!e->drop.empty()&&e->dropCount)spawnItem(entity.position,{Plugins::resolveItem(e->drop),static_cast<uint8_t>(e->dropCount),0});
+        return;
+    }
     std::vector<ItemStack> loot;
     switch (entity.type) {
         case EntityType::Cow:
@@ -887,10 +903,7 @@ void EntityManager::dropMobLoot(const Entity& entity) {
 
 namespace {
 bool meleeTarget(const Entity& entity) {
-    return ((entity.type >= EntityType::Cow && entity.type <= EntityType::Blastling) ||
-            entity.type == EntityType::Villager ||
-            entity.type == EntityType::ZombieVillager || entity.type==EntityType::IronGolem) &&
-        entity.health > 0.0f;
+    return registeredMob(entity.type)&&entity.health>0;
 }
 
 bool rayEntityAabb(const glm::dvec3& origin, const glm::vec3& direction,
@@ -1260,6 +1273,7 @@ glm::vec3 EntityManager::renderColor(EntityType type) {
 }
 
 glm::vec3 EntityManager::renderSize(EntityType type) {
+    if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return {e->size[0],e->size[1],e->size[2]};
     switch (type) {
         case EntityType::Item: return {0.25f, 0.25f, 0.25f};
         case EntityType::Arrow: return {0.08f,0.08f,0.75f};
@@ -1318,17 +1332,7 @@ void EntityManager::render(
         const glm::vec3 size=entitySize(entity);
         const SmoothLightSample light=m_world.sampleLight(
             entity.position+glm::dvec3(0.0,size.y*0.5,0.0));
-        const bool passive = entity.type == EntityType::Cow ||
-                             entity.type == EntityType::Pig ||
-                             entity.type == EntityType::Sheep ||
-                             entity.type == EntityType::Chicken ||
-                             entity.type == EntityType::Villager || entity.type==EntityType::IronGolem;
-        const bool hostileMob = entity.type == EntityType::Zombie ||
-                                entity.type == EntityType::Skeleton ||
-                             entity.type == EntityType::Spider ||
-                             entity.type == EntityType::Blastling ||
-                             entity.type == EntityType::ZombieVillager;
-        if ((passive || hostileMob) && renderer.capabilities().gameplay) {
+        if (m_modelRegistry.hasModel(entity.type) && renderer.capabilities().gameplay) {
             m_modelRegistry.queue(entity.type, entity.id, entity.position,
                 entity.facing, entity.behaviorSeed,
                 renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(),
@@ -1338,7 +1342,7 @@ void EntityManager::render(
                     (entity.type==EntityType::Villager || entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
             continue;
         }
-        if ((!passive && !hostileMob) || !renderer.capabilities().gameplay) {
+        if (!m_modelRegistry.hasModel(entity.type) || !renderer.capabilities().gameplay) {
             const float facingLength = std::hypot(entity.facing.x, entity.facing.z);
             const float yaw = facingLength > 0.001f
                 ? std::atan2(-entity.facing.x, -entity.facing.z)

@@ -727,5 +727,8 @@
   "lan.discovery_error": "방 검색을 사용할 수 없습니다: {0}",
   "lan.players": "플레이어 · {0}",
   "lan.overworld": "오버월드",
-  "lan.heaven": "천국"
+  "lan.heaven": "천국",
+  "menu.create.generator_overworld": "오버월드 생성기: {0}",
+  "menu.create.generator_heaven": "천상 생성기: {0}",
+  "menu.create.generator_parameters": "생성기 매개변수 (JSON)"
 }

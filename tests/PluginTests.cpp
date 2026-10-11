@@ -48,10 +48,22 @@ int main(int argc,char** argv) {
                 std::filesystem::copy_file(argv[i],root/"mods"/id/"plugin.bin");
             }
         }
+        write(root/"mods"/"extension_data"/"mod.json",R"({"id":"extension_data","version":"1.0.0","api":1,"data":"content.json"})");
+        write(root/"mods"/"extension_data"/"content.json",R"({"entities":[{"key":"extension_data:mob","name":"Test mob","health":28,"template_type":1,"size":[0.8,1.2,0.8]}],"generators":[{"key":"extension_data:flat","name":"Test plateau","revision":"1","height":40,"water_level":39,"surface":"minecraftc:grass","fill":"minecraftc:stone"}]})");
+        write(root/"mods"/"extension_bad"/"mod.json",R"({"id":"extension_bad","version":"1.0.0","api":1,"data":"content.json"})");
+        write(root/"mods"/"extension_bad"/"content.json",R"({"entities":[{"key":"extension_bad:first","name":"Rollback","template_type":1,"health":10},{"key":"extension_bad:invalid","name":"Invalid","template_type":1,"health":-1}]})");
+        write(root/"mods"/"render_bad"/"mod.json",R"({"id":"render_bad","version":"1.0.0","api":1,"data":"content.json"})");
+        write(root/"mods"/"render_bad"/"content.json",R"({"entities":[{"key":"render_bad:first","name":"Rollback","template_type":1,"health":10}],"render_resources":[{"key":"render_bad:shader","kind":"shader","path":"bad.spv"}]})");
+        write(root/"mods"/"render_bad"/"bad.spv","not-a-valid-spirv!!!!");
         RuntimePaths paths{MINECRAFTC_SOURCE_DIR "/assets",root};
         Plugins::PluginManager manager(paths);manager.initialize();
         const auto& plugins=manager.plugins();
-        for(const auto& p:plugins)if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
+        for(const auto& p:plugins)if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
+        const auto dataMob=Plugins::resolveEntity("extension_data:mob");require(dataMob>=4096&&Plugins::entityContent(dataMob)->health==28,"data entity registry");
+        rejects([]{Plugins::resolveEntity("extension_bad:first");},"extension registration failure rolls back all types");
+        rejects([]{Plugins::resolveEntity("render_bad:first");},"invalid shader rolls back prior gameplay registration");
+        require(Plugins::content().extensions.generators.count("extension_data:flat"),"data generator registry");
+        require(Plugins::content().networkDescription.count("entity/extension_data:mob")&&Plugins::content().networkDescription.count("generator/extension_data:flat"),"extensions participate in network handshake");
         const auto block=Plugins::resolveBlock("example_content:blue_brick"),crystalBlock=Plugins::resolveBlock("official_content:crystal_block");
         const auto item=Plugins::resolveItem("example_content:blue_brick"),crystal=Plugins::resolveItem("official_content:crystal");
         require(isValidBlockId(block)&&isValidItemId(item)&&getItemProps(item).placedBlock==block,"registered content usable");

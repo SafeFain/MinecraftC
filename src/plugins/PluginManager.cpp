@@ -227,7 +227,7 @@ PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
                 return result;}
         };
         const void* result=nullptr;
-        checked(c,[&]{check(name,"Missing extension name");if(std::string(name)==MC_MULTIPLAYER_EXTENSION&&version==1)result=&api;});
+        checked(c,[&]{check(name,"Missing extension name");if(std::string(name)==MC_MULTIPLAYER_EXTENSION&&version==1)result=&api;else result=manager(c).extension(c,name,version);});
         return result;
     };
 }
@@ -343,6 +343,31 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     each("blocks",[&](const Json& j){MC_Block b{};b.size=sizeof(b);std::string key=j.at("key").text(),name=j.at("name").text(),drop=j.text("drop");b.key=key.c_str();b.name=name.c_str();b.drop_item=drop.c_str();b.hardness=static_cast<float>(j.numeric("hardness",1));b.alpha=static_cast<float>(j.numeric("alpha",1));b.solid=j.flag("solid",true);b.cross=j.flag("cross",false);b.layer=integer(j,"layer",0);b.emission=integer(j,"emission",0);b.preferred_tool=integer(j,"preferred_tool",integer(j,"tool",0));b.minimum_tier=integer(j,"minimum_tier",integer(j,"tier",0));b.unbreakable=j.flag("unbreakable",false);std::fill(b.color,b.color+3,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==3,"Block color requires three numbers");for(size_t i=0;i<3;++i){check(c.array[i].type==Json::Type::Number,"Invalid block color");b.color[i]=static_cast<float>(c.array[i].number);}}std::array<std::string,6> faces;const auto& mats=j.at("materials");if(mats.type==Json::Type::String)faces.fill(mats.text());else {check(mats.type==Json::Type::Array&&mats.array.size()==6,"Block needs six materials");for(size_t i=0;i<6;++i)faces[i]=mats.array[i].text();}for(size_t i=0;i<6;++i)b.materials[i]=faces[i].c_str();uint16_t id=0;block(ctx,b,id);});
     each("items",[&](const Json& j){MC_Item item{};item.size=sizeof(item);std::string key=j.at("key").text(),name=j.at("name").text(),mat=j.at("material").text(),placed=j.text("placed_block");item.key=key.c_str();item.name=name.c_str();item.material=mat.c_str();item.placed_block=placed.c_str();item.kind=integer(j,"kind",placed.empty()?0:1);item.category=integer(j,"category",placed.empty()?6:0);item.max_stack=integer(j,"max_stack",64);item.durability=integer(j,"durability",0);item.tool=integer(j,"tool",0);item.tier=integer(j,"tier",0);item.food=integer(j,"food",0);item.saturation=static_cast<float>(j.numeric("saturation",0));item.attack_damage=static_cast<float>(j.numeric("attack_damage",0));item.attack_speed=static_cast<float>(j.numeric("attack_speed",0));uint16_t id=0;this->item(ctx,item,id);});
     each("recipes",[&](const Json& j){MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
+    if(data.has("entities"))check(data.at("entities").type==Json::Type::Array,"Expected entity array");
+    if(data.has("generators"))check(data.at("generators").type==Json::Type::Array,"Expected generator array");
+    if(data.has("entities"))for(const auto& value:data.at("entities").array) {
+        MC_EntityDefinition d{};d.size=sizeof(d);const auto key=value.at("key").text(),name=value.text("name",key),target=value.text("target"),model=value.text("model"),drop=value.text("drop_item");
+        d.key=key.c_str();d.name=name.c_str();d.target=target.c_str();d.model=model.c_str();d.drop_item=drop.c_str();
+        d.template_type=integer(value,"template_type",1);d.health=static_cast<float>(value.numeric("health",10));
+        d.speed=static_cast<float>(value.numeric("speed",2));d.attack_damage=static_cast<float>(value.numeric("attack_damage",2));
+        d.hostile=value.flag("hostile",false);d.natural_spawn=value.flag("natural_spawn",false);d.drop_count=integer(value,"drop_count",drop.empty()?0:1);
+        d.state_version=integer(value,"state_version",0);
+        for(int i=0;i<3;++i)d.size_xyz[i]=i==1?1:.6f;
+        if(value.has("size")){const auto& values=value.at("size");check(values.type==Json::Type::Array,"Expected size array");const auto& size=values.array;check(size.size()==3,"Entity size requires three values");for(size_t i=0;i<3;++i){check(size[i].type==Json::Type::Number,"Expected entity size number");d.size_xyz[i]=static_cast<float>(size[i].number);}}
+        uint16_t id=0;entity(ctx,d,id);
+    }
+    if(data.has("generators"))for(const auto& value:data.at("generators").array) {
+        GeneratorContent g;g.key=value.at("key").text();owned(ctx,g.key);g.name=value.text("name",g.key);g.revision=value.at("revision").text();
+        g.dimension=integer(value,"dimension",0);
+        auto coordinate=[&](const char* field,int fallback){const double n=value.numeric(field,fallback);check(std::isfinite(n)&&n>=Config::WORLD_MIN_Y-1&&n<Config::WORLD_MAX_Y&&std::floor(n)==n,"Invalid generator height");return static_cast<int32_t>(n);};
+        g.height=coordinate("height",64);g.water=coordinate("water_level",62);
+        check(g.dimension<=1&&!g.revision.empty()&&g.revision.size()<=128&&Config::isValidWorldY(g.height)&&g.water>=Config::WORLD_MIN_Y-1&&g.water<Config::WORLD_MAX_Y,"Invalid data generator");
+        g.surface=static_cast<uint16_t>(resolveBlock(value.text("surface","minecraftc:grass")));g.fill=static_cast<uint16_t>(resolveBlock(value.text("fill","minecraftc:stone")));
+        check(content().extensions.generators.emplace(g.key,g).second,"Duplicate generator");
+    }
+
+
+    loadRenderData(ctx,data);
 }
 void PluginManager::validateContent() {
     auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
@@ -351,6 +376,7 @@ void PluginManager::validateContent() {
         if(!entry.second.dropKey.empty())entry.second.drop=resolveItem(entry.second.dropKey);
     }
     for(const auto& entry:content().items)check(materialExists(entry.second.material),"Unknown item material");
+    for(const auto& entry:content().extensions.entities)if(!entry.second.drop.empty())resolveItem(entry.second.drop);
 }
 void PluginManager::buildNetworkDescription() {
     auto& state=content();
@@ -365,7 +391,7 @@ void PluginManager::buildNetworkDescription() {
         const auto& i=entry.second.properties;
         state.networkDescription["item/"+entry.second.key]=nlohmann::json::array({static_cast<int>(i.kind),i.maxStack,
             i.maxDurability,static_cast<int>(i.tool),static_cast<int>(i.tier),i.attackDamage,i.attackSpeed,i.food,
-            i.saturation,i.placedBlock?blockKey(*i.placedBlock):std::string{}}).dump();
+            i.saturation,i.placedBlock?blockKey(*i.placedBlock):std::string{},entry.second.spawnEntity==MC_INVALID_ID?std::string{}:entityKey(entry.second.spawnEntity)}).dump();
     }
     auto stack=[](const ItemStack& value){return nlohmann::json::array({itemKey(value.id),value.count,value.damage});};
     for(const auto& entry:state.crafting) {
@@ -388,9 +414,21 @@ void PluginManager::buildNetworkDescription() {
     if(!removed.empty())state.networkDescription["removed/crafting"]=nlohmann::json(removed).dump();
     removed=state.removeSmelting;std::sort(removed.begin(),removed.end());
     if(!removed.empty())state.networkDescription["removed/smelting"]=nlohmann::json(removed).dump();
+    for(const auto& entry:content().extensions.entities) {
+        const auto& e=entry.second;
+        content().networkDescription["entity/"+entityKey(entry.first)]=nlohmann::json::array({e.key,e.base,e.name,e.health,e.size,e.speed,e.damage,e.hostile,e.natural,e.drop,e.dropCount,e.stateVersion,static_cast<bool>(e.callback)}).dump();
+    }
+    for(const auto& entry:content().extensions.generators) {
+        const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({g.dimension,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
+    }
+    for(const auto& entry:content().extensions.modifiers) {
+        const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({m.dimension,m.revision,m.radius}).dump();
+    }
+
 }
 void PluginManager::initialize(bool safeMode) {
     check(!m_initialized,"Plugin manager already initialized");m_initialized=true;
+    {std::lock_guard<std::mutex> lock(generationFaultMutex());generationFault().clear();}
     const uint64_t revision=content().revision;content()=ContentState{};content().revision=revision;
     const auto config=m_paths.dataRoot/"plugins.json";
     if(std::filesystem::exists(config))try {const auto j=readJson(config);for(const auto& p:j.object){check(p.second.type==Json::Type::Boolean,"Plugin enable setting must be boolean");m_enabled[p.first]=p.second.boolean;}}catch(const std::exception& e){LOG_WARN("Ignoring invalid plugin enable settings: "<<e.what());}
@@ -463,6 +501,8 @@ void PluginManager::initialize(bool safeMode) {
         }
     }
     std::stable_sort(m_listeners.begin(),m_listeners.end(),[](const auto& a,const auto& b){return a.priority>b.priority;});
+    std::stable_sort(content().extensions.renderPasses.begin(),content().extensions.renderPasses.end(),
+        [](const auto& a,const auto& b){return a.priority>b.priority;});
     freezeContent();
     buildNetworkDescription();m_phase=MC_INITIALIZE;dispatcher()=[this](MC_Event& e){dispatch(e);};commandDispatcher()=[this](const std::string& s){return command(s);};
     auto ready=event(MC_INITIALIZE);dispatch(ready);
@@ -477,6 +517,7 @@ void PluginManager::initialize(bool safeMode) {
     }
 }
 void PluginManager::dispatch(MC_Event& e) {
+    pollFaults();
     const ActorScope actorScope({e.player_id,e.dimension,e.role});
     check(!m_dispatching,"Recursive plugin event dispatch");
     if(e.kind==MC_WORLD_CLOSE&&!m_world)return;
@@ -534,6 +575,11 @@ void PluginManager::flushOperations() {
     for(auto& operation:queue)try{if(!operation())LOG_WARN("Plugin operation rejected by session");}catch(const std::exception& e){LOG_WARN("Plugin operation failed: "<<e.what());}
 }
 void PluginManager::discardOperations(){m_queue.clear();}
+void PluginManager::pollFaults() {
+    check(hostThread(),"Fault polling is main-thread only");
+    std::lock_guard<std::mutex> lock(generationFaultMutex());
+    if(!generationFault().empty()){content().runtimeFault=generationFault();generationFault().clear();discardOperations();}
+}
 void PluginManager::setEnabled(size_t i,bool enabled) {
     const auto& p=m_info.at(i);m_enabled[p.manifest.id]=enabled;
     writeText(m_paths.dataRoot/"plugins.json",nlohmann::json(m_enabled).dump(2)+"\n");

@@ -1,6 +1,7 @@
 #include "world/ChunkStreamer.h"
 
 #include <stdexcept>
+#include <set>
 #include <tuple>
 
 #include "core/RuntimeClock.h"
@@ -358,6 +359,7 @@ void ChunkStreamer::enqueueCacheReads() {
 
     const auto directory = m_saveStore->worldDirectory();
     const uint32_t cacheVersion = m_generator.chunkCacheVersion();
+    const auto fingerprint=Plugins::generationFingerprint(m_generator.generationConfig());
     const uint64_t epoch = m_streamEpoch;
     for (const auto& key : candidates) {
         bool claimed = false;
@@ -372,7 +374,7 @@ void ChunkStreamer::enqueueCacheReads() {
         if (!claimed) continue;
         ++m_cacheReadTasksInFlight;
         ChunkStreamer* streamer = this;
-        m_cacheIo.enqueue([streamer, directory, key, epoch, cacheVersion] {
+        m_cacheIo.enqueue([streamer, directory, key, epoch, cacheVersion,fingerprint] {
             bool hit = false;
             std::vector<uint16_t> blocks;
             std::vector<BlockOverride> overrides;
@@ -383,7 +385,7 @@ void ChunkStreamer::enqueueCacheReads() {
                 SaveStore loader(directory);
                 ChunkLoadBundle bundle = loader.loadChunkLoadBundle(
                     key.first, key.second,
-                    cacheVersion);
+                    cacheVersion,fingerprint);
                 if (bundle.generated) {
                     hit = true;
                     blocks = std::move(*bundle.generated);
@@ -498,18 +500,19 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
     }
     const auto directory = m_saveStore->worldDirectory();
     const uint32_t cacheVersion = m_generator.chunkCacheVersion();
+    const auto fingerprint=Plugins::generationFingerprint(m_generator.generationConfig());
     const int cx = chunk->cx;
     const int cz = chunk->cz;
     const uint64_t epoch = m_streamEpoch;
     const std::vector<uint16_t> blocks = chunk->baseSnapshot();
     ++m_cacheWriteTasksInFlight;
     ChunkStreamer* streamer = this;
-    m_cacheIo.enqueue([streamer, directory, cx, cz, epoch, blocks, cacheVersion] {
+    m_cacheIo.enqueue([streamer, directory, cx, cz, epoch, blocks, cacheVersion,fingerprint] {
         bool success = false;
         try {
             SaveStore saver(directory);
             saver.saveGeneratedChunk(cx, cz, blocks,
-                                     cacheVersion);
+                                     cacheVersion,fingerprint);
             success = true;
         } catch (...) {
             // Cache writes are best effort; terrain remains deterministic.
@@ -1084,6 +1087,9 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
     Chunk* chunk = store.findUnlocked(cx, cz);
     if (chunk == nullptr || !chunk->generated.load()) return false;
     bool changed = false;
+    std::set<uint32_t> decorated;
+    for(const auto& b:m_generator.pluginModifierBlocks(chunk->worldX(),chunk->worldZ(),16,16))
+        decorated.insert(static_cast<uint32_t>(b.x-chunk->worldX()+(b.z-chunk->worldZ())*16+Config::worldYToStorageY(b.y)*256));
     // Two passes make application order-independent: ordinary leaf
     // decorations first, then overwrite structure blocks unconditionally.
     // A structure can therefore clear AIR or cover leaves regardless of
@@ -1097,6 +1103,9 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
             if (lx < 0 || lx >= 16 || lz < 0 || lz >= 16 ||
                 !Config::isValidWorldY(pb.worldY))
                 continue;
+            // Final plugin decorations own these voxels, including AIR. Delayed
+            // builtin structures must not change them or create stale containers.
+            if(decorated.count(static_cast<uint32_t>(lx+lz*16+Config::worldYToStorageY(pb.worldY)*256)))continue;
             if (!pb.overwrite) {
                 BlockId cur = chunk->getBlock(lx, pb.worldY, lz);
                 bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||

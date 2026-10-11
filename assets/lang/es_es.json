@@ -727,5 +727,8 @@
   "lan.discovery_error": "Búsqueda de salas no disponible: {0}",
   "lan.players": "Jugadores · {0}",
   "lan.overworld": "Mundo principal",
-  "lan.heaven": "Cielo"
+  "lan.heaven": "Cielo",
+  "menu.create.generator_overworld": "Generador del mundo principal: {0}",
+  "menu.create.generator_heaven": "Generador del Cielo: {0}",
+  "menu.create.generator_parameters": "Parámetros del generador (JSON)"
 }

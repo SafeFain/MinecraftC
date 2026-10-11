@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "game/GameRules.h"
+#include "plugins/Extensions.h"
 #include "game/GameRuleRegistry.h"
 #include "game/InventoryModel.h"
 #include "game/Weather.h"
@@ -27,6 +28,7 @@ struct WorldMetadata {
         float dayPhase = 0.04f;
     };
 
+    std::array<Plugins::GenerationConfig,2> generation;
     std::string displayName;
     std::vector<std::pair<std::string,std::string>> pluginRequirements;
     std::string pluginCompatibilityError;
@@ -50,7 +52,7 @@ struct WorldMetadata {
     uint32_t foodTickTimer = 0;
     InventoryModel inventory;
     struct PersistedEntity {
-        uint8_t type = 0;
+        uint16_t type = 0;
         glm::dvec3 position{0.0};
         glm::vec3 velocity{0.0f};
         float health = 0.0f;
@@ -60,6 +62,8 @@ struct WorldMetadata {
         uint8_t flags = 0;
         float projectileDamage = 0.0f;
         VillagerData villager;
+        std::string pluginState="{}";
+        uint32_t pluginStateVersion=0;
     };
     std::vector<PersistedEntity> entities;
     WorldType worldType = WorldType::Normal;
@@ -105,11 +109,11 @@ public:
     std::vector<BlockOverride> loadChunkOverrides(int chunkX, int chunkZ) const;
     void saveGeneratedChunk(int chunkX, int chunkZ,
                             const std::vector<uint16_t>& blocks,
-                            uint32_t generationVersion) const;
+                            uint32_t generationVersion,uint64_t generationFingerprint=0) const;
     std::optional<std::vector<uint16_t>> loadGeneratedChunk(
-        int chunkX, int chunkZ, uint32_t generationVersion) const;
+        int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint=0) const;
     ChunkLoadBundle loadChunkLoadBundle(
-        int chunkX, int chunkZ, uint32_t generationVersion) const;
+        int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint=0) const;
     void saveBlockEntities(int chunkX, int chunkZ,
                            const std::vector<PersistedBlockEntity>& entities) const;
     std::vector<PersistedBlockEntity> loadBlockEntities(int chunkX, int chunkZ) const;

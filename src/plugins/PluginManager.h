@@ -63,6 +63,7 @@ public:
     bool command(const std::string& command);
     void flushOperations();
     void discardOperations();
+    void pollFaults();
     void setEnabled(size_t index,bool enabled);
     const std::vector<PluginInfo>& plugins() const {return m_info;}
     HostOperations operations;
@@ -78,6 +79,20 @@ public:
     int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*,uint32_t flags=0);
     int32_t enqueue(MC_PluginContext&,std::function<bool()>);
     int32_t storage(MC_PluginContext&,bool,bool,const char*,char*,uint32_t);
+    int32_t entity(MC_PluginContext&,const MC_EntityDefinition&,uint16_t&);
+    int32_t generator(MC_PluginContext&,const MC_GeneratorDefinition&);
+    int32_t modifier(MC_PluginContext&,const MC_ModifierDefinition&);
+    int32_t renderResource(MC_PluginContext&,const MC_RenderResource&,MC_RenderHandle&);
+    int32_t renderPass(MC_PluginContext&,const MC_RenderPass&);
+    const void* extension(MC_PluginContext*,const char*,uint32_t);
+    void callbackFault(size_t,const std::string&);
+    std::function<bool(uint32_t,uint16_t,const double*)> spawnEntity;
+    std::function<bool(uint32_t,uint64_t,MC_EntitySnapshot&,std::string&)> entitySnapshot;
+    std::function<bool(uint32_t,uint64_t)> removeEntity;
+    std::function<bool(uint32_t,uint64_t,const MC_EntityIntent&)> entityIntent;
+    std::function<bool(size_t,const MC_RenderDraw&)> renderDraw;
+    std::function<bool(size_t,uint64_t,MC_RenderHandle)> renderScene;
+    std::function<bool(size_t,MC_RenderHandle,const void*,uint32_t)> renderBuffer;
     uint32_t phase() const {return m_phase;}
     bool hostThread() const {return std::this_thread::get_id()==m_thread;}
 private:
@@ -102,6 +117,7 @@ private:
     std::thread::id m_thread=std::this_thread::get_id();
     size_t m_hudOperations=0;
     void loadData(MC_PluginContext&,const Json&);
+    void loadRenderData(MC_PluginContext&,const Json&);
     void validateContent();
     void buildNetworkDescription();
     void owned(MC_PluginContext&,const std::string&) const;

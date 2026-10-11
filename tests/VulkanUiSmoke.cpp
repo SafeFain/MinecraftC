@@ -3,6 +3,7 @@
 #include <fstream>
 #include "core/Window.h"
 #include "entity/EntityManager.h"
+#include "model/ModelRenderer.h"
 #include "game/SessionAccess.h"
 #include "game/Command.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
@@ -44,16 +45,63 @@ struct Access final : IContainerAccess,ITradeAccess {
 int main(int argc,char** argv) {
     if (argc<2 || argc>5) { std::cerr<<"Usage: vulkan_ui_smoke assets [width height] [--capture]\n";return 2; }
     try {
-        const int width=argc>=4?std::stoi(argv[2]):960,height=argc>=4?std::stoi(argv[3]):600;
+        const bool extensions=argc==4&&std::string(argv[2])=="--extensions";
+        const int width=!extensions&&argc>=4?std::stoi(argv[2]):960,height=!extensions&&argc>=4?std::stoi(argv[3]):600;
         const bool capture=argc==5 && std::string(argv[4])=="--capture";
         const auto assets=std::filesystem::absolute(argv[1]);
         const auto pluginRoot=std::filesystem::temp_directory_path()/"minecraftc-plugin-ui-smoke";
+        std::filesystem::remove_all(pluginRoot);
         std::filesystem::create_directories(pluginRoot);
+        if(extensions) {
+            const auto package=pluginRoot/"mods"/"render_demo";std::filesystem::create_directories(package);
+            const auto source=assets.parent_path()/"examples"/"plugins"/"render_demo";
+            for(const auto& entry:std::filesystem::directory_iterator(source))if(entry.is_regular_file()&&entry.path().extension()==".spv")std::filesystem::copy_file(entry.path(),package/entry.path().filename());
+            const auto generation=pluginRoot/"mods"/"worldgen_ui";std::filesystem::create_directories(generation);
+            {std::ofstream manifest(generation/"mod.json");manifest<<R"({"id":"worldgen_ui","version":"1.0.0","api":1,"data":"content.json"})";}
+            {std::ofstream content(generation/"content.json");content<<R"({"generators":[{"key":"worldgen_ui:flat","name":"Plugin Plateau","revision":"1","height":48,"water_level":47}]})";}
+            const auto module=std::filesystem::absolute(argv[3]);std::filesystem::copy_file(module,package/module.filename());
+            std::ofstream manifest(package/"mod.json");manifest<<"{\"id\":\"render_demo\",\"version\":\"1.0.0\",\"api\":1,\"visual_only\":true,\"native\":{\"linux\":\""<<module.filename().string()<<"\",\"windows\":\""<<module.filename().string()<<"\",\"macos\":\""<<module.filename().string()<<"\"}}";
+        }
         {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true}";}
         Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
+        plugins.renderDraw=[&](size_t owner,const MC_RenderDraw& draw){return renderer.pluginDraw(owner,draw);};
+        plugins.renderScene=[&](size_t owner,uint64_t index,MC_RenderHandle pipeline){return renderer.pluginSceneDraw(owner,index,pipeline);};
+        plugins.renderBuffer=[&](size_t owner,MC_RenderHandle handle,const void* data,uint32_t size){return renderer.pluginUpdateBuffer(owner,handle,data,size);};
+        if(extensions) {
+            for(const auto& info:plugins.plugins())if(info.enabled&&!info.active)throw std::runtime_error("Render package failed: "+info.status);
+            const auto passes=Plugins::content().extensions.renderPasses;
+            model::ModelInstance posed;model::ModelHandle posedModel=0;
+            auto image=[&] {std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){FrameData state;state.clearColor={.2f,.4f,.6f,1};renderer.beginFrame(state);
+                if(posedModel){model::ModelDraw model;model.model=posedModel;model.instance=&posed;renderer.modelRenderer().queue(model);renderer.flushModels(glm::mat4(1));}
+                renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
+            Plugins::content().extensions.renderPasses.clear();const auto baseline=image();Plugins::content().extensions.renderPasses=passes;const auto custom=image();
+            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            if(custom==baseline)throw std::runtime_error("Custom SPIR-V post pass did not affect pixels");
+            renderer.resize(width,height);image();renderer.suspendPresentation();renderer.resumePresentation();image();
+            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            MC_RenderHandle scenePipeline=0;size_t owner=0;
+            for(const auto& resource:Plugins::content().extensions.renderResources)if(resource.second.key=="render_demo:offscreen"){scenePipeline=resource.first;owner=resource.second.owner;}
+            if(!scenePipeline)throw std::runtime_error("Scene test pipeline unavailable");
+            Plugins::RenderPassContent entityPass;entityPass.stage=MC_RENDER_ENTITIES;entityPass.replace=true;
+            bool sawScene=false;
+            entityPass.callback=[&](const MC_RenderFrame& frame){for(uint64_t index=0;index<frame.scene_count;++index){sawScene=true;if(!renderer.pluginSceneDraw(owner,index,scenePipeline))throw std::runtime_error("Scene redraw rejected");}};
+            Plugins::content().extensions.renderPasses.push_back(std::move(entityPass));
+            auto model=std::make_shared<model::ModelAsset>();model->materials.emplace_back();
+            model::Primitive triangle;triangle.skin=0;triangle.material=0;
+            for(const auto& position:{glm::vec3(-.4f,-.4f,0),glm::vec3(.4f,-.4f,0),glm::vec3(0,.4f,0)}){model::Vertex vertex;vertex.position=position;triangle.vertices.push_back(vertex);}
+            triangle.indices={0,1,2};model->primitives.push_back(std::move(triangle));
+            model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};
+            posed.jointPalettes={{glm::mat4(1)}};posedModel=renderer.modelRenderer().upload(model);
+            const auto unshifted=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
+            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            if(!sawScene||unshifted==shifted)throw std::runtime_error("Custom scene redraw lost skeletal pose");
+            posedModel=0;Plugins::content().extensions.renderPasses=passes;
+            std::cout<<"Plugin Vulkan posed scene redraw passed\n";
+            std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
+        }
         UIRenderer ui;Localization localization;localization.load(assets);
         ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
         ClientSettings settings;

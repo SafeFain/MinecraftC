@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "game/SaveStore.h"
 #include "Config.h"
 #include "world/WorldGenContext.h"
@@ -35,10 +36,36 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+// Remove only the fields introduced by v19 when constructing genuine old
+// fixtures. The frozen v18 entity record is 168 bytes, before its new tail.
+void stripV19Metadata(std::vector<uint8_t>& bytes,
+                      const std::vector<WorldMetadata::PersistedEntity>& entities) {
+    const std::array<uint8_t,20> generationTail{{0,0,0,0,2,0,'{','}',0,0,0,0,0,0,2,0,'{','}',0,0}};
+    require(bytes.size()>=generationTail.size()&&std::equal(generationTail.begin(),generationTail.end(),bytes.end()-generationTail.size()),"builtin v19 generation tail found");
+    bytes.resize(bytes.size()-generationTail.size());
+    std::vector<std::pair<size_t,size_t>> tails;
+    for(const auto& entity:entities) {
+        std::vector<uint8_t> marker;
+        for(double value:{entity.position.x,entity.position.y,entity.position.z}) {
+            uint64_t bits=0;std::memcpy(&bits,&value,8);
+            for(int i=0;i<8;++i)marker.push_back(static_cast<uint8_t>(bits>>(i*8)));
+        }
+        const auto found=std::search(bytes.begin(),bytes.end(),marker.begin(),marker.end());
+        require(found!=bytes.end()&&found!=bytes.begin()&&*(found-1)==entity.type,"v19 entity marker found");
+        const auto offset=static_cast<size_t>(found-bytes.begin())-1+168;
+        const auto key=Plugins::entityKey(entity.type);
+        require(offset+2<bytes.size()&&bytes[offset]==key.size()&&bytes[offset+1]==0,"v19 entity key tail found");
+        tails.emplace_back(offset,8+key.size()+entity.pluginState.size());
+    }
+    std::sort(tails.rbegin(),tails.rend());
+    for(const auto& tail:tails)bytes.erase(bytes.begin()+tail.first,bytes.begin()+tail.first+tail.second);
+}
+
 // Convert current entity records to the frozen v12-v16 wire layout before
 // lowering a fixture's header version. Position markers are unique in this fixture.
 void stripV17EntityFields(std::vector<uint8_t>& bytes,
                          const std::vector<WorldMetadata::PersistedEntity>& entities) {
+    stripV19Metadata(bytes,entities);
     std::vector<size_t> offsets;
     for(const auto& entity:entities) {
         std::vector<uint8_t> marker;
@@ -232,6 +259,17 @@ int main() {
         require(chunkVillagers.size()==1 && chunkVillagers[0].villager.growthSeconds==1200 &&
             chunkVillagers[0].villager.food[0].count==6 && chunkVillagers[0].villager.reputation==-35,
             "v17 villager lifecycle fields failed chunk roundtrip");
+        const auto v18Directory=root/"legacy-v18";
+        SaveStore(v18Directory).saveMetadata(source);
+        {
+            auto bytes=readBytes(v18Directory/"level.bin");stripV19Metadata(bytes,source.entities);
+            writeLittleEndian(bytes,8,18,4);writeLittleEndian(bytes,12,bytes.size()-24,4);
+            writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            std::ofstream out(v18Directory/"level.bin",std::ios::binary|std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        }
+        const auto v18=SaveStore(v18Directory).loadMetadata();
+        require(v18.entities.size()==3&&v18.entities[2].villager.growthSeconds==1200&&v18.entities[0].pluginState=="{}"&&v18.generation[0].generator.empty(),"v18 retains lifecycle fields and defaults extension fields");
         const auto v16Directory=root/"legacy-v16";
         SaveStore(v16Directory).saveMetadata(source);
         {
@@ -393,6 +431,7 @@ int main() {
             std::ifstream input(legacyPath, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
             require(bytes.size() > 24, "legacy fixture has a complete save header");
+            stripV19Metadata(bytes,legacySource.entities);
             stripV16Envelope(bytes);
             bytes.pop_back(); // v7 has no appended world-type byte.
             writeLittleEndian(bytes, 8, 7, 4);
@@ -414,6 +453,7 @@ int main() {
         {
             std::vector<uint8_t> bytes = readBytes(v10Path);
             require(bytes.size() > 28, "v10 fixture has a food timer tail");
+            stripV19Metadata(bytes,legacySource.entities);
             stripV16Envelope(bytes);
             stripV15Rules(bytes);
             bytes.resize(bytes.size() - 2 * sizeof(uint32_t));
@@ -486,7 +526,7 @@ int main() {
         const auto generatedPath = root / "negative-coordinates" /
             "generated" / "g.-2.-7.bin";
         const auto compressedBytes = readBytes(generatedPath);
-        require(compressedBytes.size() > 53 && compressedBytes[52] == 1,
+        require(compressedBytes.size() > 61 && compressedBytes[60] == 1,
                 "compressible generated cache selects the RLE codec");
         require(!store.loadGeneratedChunk(
                     -2, -7, WorldGenContext::GENERATION_VERSION + 1),
@@ -535,18 +575,18 @@ int main() {
             file.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         };
         auto invalidWide=validWide;
-        writeLittleEndian(invalidWide,59,static_cast<uint16_t>(BlockId::COUNT),2);
+        writeLittleEndian(invalidWide,67,static_cast<uint16_t>(BlockId::COUNT),2);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects an out-of-range 16-bit ID");
         invalidWide=validWide;
-        writeLittleEndian(invalidWide,57,0,2);
+        writeLittleEndian(invalidWide,65,0,2);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects zero-length runs");
         invalidWide=validWide;
         invalidWide.pop_back();
-        writeLittleEndian(invalidWide,53,static_cast<uint32_t>(invalidWide.size()-57),4);
+        writeLittleEndian(invalidWide,61,static_cast<uint32_t>(invalidWide.size()-65),4);
         writeWideFixture(invalidWide);
         require(!store.loadGeneratedChunk(-2,-7,WorldGenContext::GENERATION_VERSION),
                 "checksummed RLE rejects a truncated 16-bit value");
@@ -561,7 +601,7 @@ int main() {
                                  WorldGenContext::GENERATION_VERSION);
         const auto rawFallback = readBytes(root / "negative-coordinates" /
             "generated" / "g.-3.4.bin");
-        require(rawFallback.size() > 52 && rawFallback[52] == 0,
+        require(rawFallback.size() > 60 && rawFallback[60] == 0,
                 "incompressible generated cache selects raw fallback");
         const auto loadedRawFallback = store.loadGeneratedChunk(
             -3, 4, WorldGenContext::GENERATION_VERSION);

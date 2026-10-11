@@ -9,6 +9,8 @@ namespace Config {
     constexpr size_t BUTTON_TRANSITIONS_PER_TICK = 256;
 
     constexpr size_t PLUGIN_MAX_OPERATIONS = 1024;
+    constexpr size_t PLUGIN_RENDER_DATA_BUDGET = 128 * 1024 * 1024;
+    constexpr size_t PLUGIN_RENDER_TARGET_BUDGET = 64 * 1024 * 1024;
     constexpr size_t PLUGIN_MAX_HUD_COMMANDS = 1024;
 
     constexpr float FISHING_CAST_SPEED = 12.0f;

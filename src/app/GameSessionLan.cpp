@@ -83,7 +83,7 @@ void GameSession::admitLanPlayer(uint64_t id) {
     {auto e=guests.at(id)->player.pluginEvent(MC_PLAYER_JOIN);e.role=MC_HOST;Plugins::dispatch(e);}
     bindLanFeedback(guests.at(id)->player, id);
     Lan::WorldInfo info{worldMetadata.displayName, worldMetadata.seed, worldMetadata.generationVersion,
-                        worldMetadata.worldType, worldMetadata.difficulty, worldMetadata.gameRules};
+                        worldMetadata.worldType, worldMetadata.difficulty, worldMetadata.gameRules,worldMetadata.generation};
     if (!lanHost.send(id, {Lan::MessageType::Environment, 0, Lan::encodeWorldInfo(info)}))
         lanHost.disconnect(id);
     else broadcastLanChat({Lan::ChatKind::Joined, peer->second.identity.nickname, {}});
@@ -504,11 +504,18 @@ void GameSession::sendLanEntities() {
         });
         if (visible.size() > Lan::MAX_VISIBLE_ENTITIES) visible.resize(Lan::MAX_VISIBLE_ENTITIES);
         Lan::EntityBatch batch; batch.dimension = guest.profile.dimension; batch.epoch = guest.chunkEpoch; batch.tick = runtime.ticks;
+        // The complete snapshot must fit one protocol frame. Reserve room for
+        // deaths/headers and retain nearest entities when plugin JSON is large.
+        size_t entityBytes=Lan::MAX_PAYLOAD-64*1024;
         for (const auto* entity : visible) {
+            const size_t cost=512+Plugins::entityKey(static_cast<uint16_t>(entity->type)).size()+entity->pluginState.size();
+            if(cost>entityBytes)break;
+            entityBytes-=cost;
             EntitySnapshot snapshot;
             snapshot.id = entity->id; snapshot.type = entity->type; snapshot.position = entity->position;
             snapshot.velocity = entity->velocity; snapshot.locomotion = entity->locomotionVelocity; snapshot.facing = entity->facing;
             snapshot.health = entity->health; snapshot.age = entity->ageSeconds; snapshot.hurt = entity->hurtFlashSeconds; snapshot.burning = entity->burningSeconds;
+            snapshot.pluginState=entity->pluginState;snapshot.pluginStateVersion=entity->pluginStateVersion;
             snapshot.item = entity->item; snapshot.seed = entity->behaviorSeed; snapshot.inGround = entity->inGround;
             snapshot.playerOwned = entity->playerOwned; snapshot.sleeping = entity->sleeping; snapshot.attacking = entity->attackPending;
             snapshot.villager = entity->villager; batch.entities.push_back(std::move(snapshot));

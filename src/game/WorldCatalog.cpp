@@ -1,3 +1,4 @@
+#include "plugins/ContentRegistry.h"
 #include "game/WorldCatalog.h"
 
 #include "world/WorldGenContext.h"
@@ -60,9 +61,10 @@ std::vector<WorldSummary> WorldCatalog::list() const {
 std::string WorldCatalog::create(
     const std::string& displayName, uint64_t seed,
     GameMode mode, Difficulty difficulty, bool cheatsEnabled,
-    WorldType worldType) const {
+    WorldType worldType,const std::array<Plugins::GenerationConfig,2>& generation) const {
     if (static_cast<uint8_t>(worldType) > static_cast<uint8_t>(WorldType::Superflat))
         throw std::runtime_error("Invalid world type");
+    for(uint32_t dimension=0;dimension<2;++dimension)Plugins::validateGeneration(generation[dimension],dimension);
     std::filesystem::create_directories(m_savesDirectory);
     const std::string base = slug(displayName);
     std::string id = base;
@@ -73,6 +75,7 @@ std::string WorldCatalog::create(
     WorldMetadata metadata;
     metadata.displayName = displayName.empty() ? "New World" : displayName;
     metadata.seed = seed;
+    metadata.generation=generation;
     metadata.generationVersion = WorldGenContext::GENERATION_VERSION;
     metadata.gameMode = mode;
     metadata.difficulty = difficulty;

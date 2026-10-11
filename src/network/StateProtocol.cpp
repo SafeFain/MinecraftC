@@ -107,6 +107,10 @@ Bytes encodeWorldInfo(const WorldInfo& value) {
     Writer writer; writer.u8(1); writer.text(value.name, 256); writer.u64(value.seed); writer.u32(value.generationVersion);
     writer.u8(static_cast<uint8_t>(value.type)); writer.u8(static_cast<uint8_t>(value.difficulty));
     writeRules(writer, value.rules);
+    for(uint32_t d=0;d<2;++d){const auto& g=value.generation[d];try{Plugins::validateGeneration(g,d);}catch(const std::exception& error){throw ProtocolError(error.what());}
+        if(g.modifiers.size()>64)throw ProtocolError("Too many modifiers");
+        writer.text(g.generator);writer.text(g.revision);writer.text(g.parameters,4096);writer.u16(static_cast<uint16_t>(g.modifiers.size()));
+        for(const auto& m:g.modifiers){writer.text(m.first);writer.text(m.second);}}
     return std::move(writer.bytes);
 }
 WorldInfo decodeWorldInfo(const Bytes& bytes) {
@@ -115,6 +119,9 @@ WorldInfo decodeWorldInfo(const Bytes& bytes) {
     value.name = reader.text(256); value.seed = reader.u64(); value.generationVersion = reader.u32();
     value.type = static_cast<WorldType>(reader.u8()); value.difficulty = static_cast<Difficulty>(reader.u8());
     value.rules = readRules(reader);
+    for(uint32_t d=0;d<2;++d){auto& g=value.generation[d];g.generator=reader.text();g.revision=reader.text();g.parameters=reader.text(4096);
+        const auto count=reader.u16();if(count>64)throw ProtocolError("Too many modifiers");
+        for(uint16_t i=0;i<count;++i){auto key=reader.text();auto revision=reader.text();g.modifiers.emplace_back(key,revision);}}
     reader.finish(); encodeWorldInfo(value); return value;
 }
 Bytes encodeAuthorityState(const AuthorityState& state) {

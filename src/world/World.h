@@ -161,7 +161,8 @@ public:
     // Next update() + getChunk() calls regenerate the world from scratch.
     void resetForNewSeed(uint64_t newSeed,
                          WorldType worldType = WorldType::Normal,
-                         DimensionId dimension = DimensionId::Overworld);
+                         DimensionId dimension = DimensionId::Overworld,
+                         Plugins::GenerationConfig config = {});
 
     void setLocalRenderEnabled(bool enabled) { m_streamer.setLocalRenderEnabled(enabled); }
     // Replica clients receive authoritative near terrain and derive lighting /

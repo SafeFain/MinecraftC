@@ -47,6 +47,7 @@ std::shared_ptr<const model::ModelAsset> makePlaceholder() {
 
 std::shared_ptr<const model::AnimationGraphAsset> fallbackGraph(
     const model::ModelAsset& asset, EntityType type) {
+    type=entityTemplate(type);
     auto graph = std::make_shared<model::AnimationGraphAsset>();
     graph->layers = {
         {"base", 0, model::LayerBlendMode::Override,
@@ -95,6 +96,7 @@ std::shared_ptr<const model::AnimationGraphAsset> fallbackGraph(
 
 std::string graphContractError(EntityType type,
                                const model::AnimationGraphAsset& graph) {
+    type=entityTemplate(type);
     for (const char* semantic : {"idle", "walk", "hurt", "death"})
         if (!graph.findAction(graph.actionFor(semantic)))
             return std::string("missing required semantic action ") + semantic;
@@ -130,6 +132,14 @@ EntityModelRegistry::EntityModelRegistry(Loader loader)
 
 void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot) {
     const std::filesystem::path root = assetRoot / "models" / "entities";
+    for(const auto& entry:Plugins::content().extensions.entities) {
+        const auto type=static_cast<EntityType>(entry.first);const auto& e=entry.second;
+        auto it=std::find_if(m_definitions.begin(),m_definitions.end(),[&](const auto& d){return d.type==type;});
+        if(it==m_definitions.end()) {
+            const auto base=definition(static_cast<EntityType>(e.base));
+            m_definitions.push_back({type,e.model.empty()?base.filename:e.model,{},{},0,false});
+        } else if(!e.model.empty())it->filename=e.model;
+    }
     for (EntityModelDefinition& definition : m_definitions) {
         const std::filesystem::path path = (root / definition.filename).lexically_normal();
         auto cached = m_cache.find(path);

@@ -734,5 +734,8 @@
   "lan.discovery_error": "无法自动发现房间：{0}",
   "lan.players": "玩家 · {0}",
   "lan.overworld": "主世界",
-  "lan.heaven": "天堂"
+  "lan.heaven": "天堂",
+  "menu.create.generator_overworld": "主世界生成器：{0}",
+  "menu.create.generator_heaven": "天境生成器：{0}",
+  "menu.create.generator_parameters": "生成参数（JSON）"
 }

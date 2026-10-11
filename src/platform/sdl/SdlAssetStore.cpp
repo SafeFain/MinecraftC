@@ -68,7 +68,11 @@ std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path) {
             return s_current->readBinary(path.generic_u8string());
         std::error_code error;
         const auto relative = std::filesystem::relative(path, s_current->m_root, error);
-        if (!error) return s_current->readBinary(relative.generic_u8string());
+        if (!error && validPath(relative.generic_u8string()))
+            return s_current->readBinary(relative.generic_u8string());
+        // Registered user-package assets have explicit absolute paths outside
+        // Title Storage. Relative asset names remain confined to Title Storage.
+        if(!path.is_absolute())throw std::runtime_error("Invalid relative asset path: "+path.u8string());
     }
     SDL_IOStream* stream = SDL_IOFromFile(path.u8string().c_str(), "rb");
     if (!stream) throw std::runtime_error("Could not open asset: " + path.u8string());
