@@ -1,0 +1,5 @@
+{
+  "id": "dimension_demo", "name": "Dimension Demo", "version": "1.0.0", "api": 1,
+  "network_compatibility": "dimension-demo-1",
+  "native": {"linux": "dimension_demo.so", "windows": "dimension_demo.dll", "macos": "dimension_demo.dylib"}
+}

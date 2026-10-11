@@ -155,17 +155,17 @@ listed with a compatibility reason. Restore the matching package/configuration t
 open it. No automatic migration or missing-block substitution is provided.
 Visual-only plugins do not contribute a world requirement.
 
-Builtin-only v2–v18 saves retain their existing readers, generation compatibility
-rules and IDs. Adding a gameplay plugin to an old unmodded world is refused in
-this first version; create a new world with the desired set. Generated caches are
-rebuildable when incompatible. The current terrain generation is v20; enabling plugins does not change its version.
+Worlds now require save format v20. v2–v19 metadata remains inspectable, but opening
+those worlds is refused without rewriting. Create new worlds with the desired
+plugin set; no migration is supplied. Generated caches are rebuildable when
+incompatible. Terrain generation stays v20 and builtin Heaven stays v9.
 
-ABI 1 now exposes optional version 1 entity, world-generation and render tables.
+ABI 1 now exposes optional version 1 entity, world-generation, dimension and render tables.
 Plugins can register/override mobs, select per-dimension generators and modifiers,
 and create Vulkan-owned shader resources and replaceable render stages.
 [Extension contracts and examples](plugin-extensions.md) document these APIs.
-Save v19 stores stable entity keys/state and generation choices; v2–v18 retain readers.
-No hot reload, additional dimensions, raw Vulkan access, arbitrary plugin network
+Save v20 stores stable entity keys/state, generation choices and namespaced dimensions.
+No hot reload, raw Vulkan access, arbitrary plugin network
 messages, bytecode patching or custom block-entity schemas are provided.
 
 ## LAN multiplayer and ABI 1 extension
@@ -185,9 +185,10 @@ and configuration; builtin plugins carry a fixed behavior identifier. The networ
 signature is a discovery hint, not an authentication mechanism. Existing world-save
 fingerprints remain unchanged, including native files and configuration.
 
-LAN protocol 4 uses canonical IDs sorted by namespaced content key and maps them to
+LAN protocol 5 uses canonical IDs sorted by namespaced content key and maps them to
 each process's frozen local registry. SDK IDs are never reassigned. Guest profiles
-version 3 persist an item palette; versions 1 and 2 remain readable. Unknown content,
+version 4 persist an item palette and keyed per-dimension state; versions 1–3 are
+refused without rewriting. Unknown content,
 invalid stacks and incompatible protocol versions are rejected rather than replaced.
 
 Only the host runs gameplay callbacks. Clients may run initialization/shutdown,
@@ -217,3 +218,78 @@ sequenced, rate-limited and executed on the host with the authenticated connecti
 actor context. Builtin administrative commands remain host-only. Callback faults
 end the session and discard queued operations without saving the faulted world;
 peers receive a reason when the transport can deliver its terminal frame.
+
+## Dimension registration (ABI 1, extension version 1)
+
+Query `minecraftc.dimensions` as `MC_DimensionsV1`, or use `minecraftc::Host::dimensions()`.
+Builtin keys `minecraftc:overworld` and `minecraftc:heaven` keep handles 0 and 1.
+Additional dimensions receive launch-local uint32 handles. Persist keys, never handles.
+Builtin definitions cannot be replaced. The registry supports up to 1024 dimensions,
+including builtins, and freezes before opening worlds.
+
+Register a dimension before its generator, then register that generator against the
+returned handle. The default selection, modifier revisions and return targets are
+validated at the end of the owning plugin transaction. Failed registration rolls
+back the entire package. Cross-package references require a manifest dependency;
+visual-only plugins cannot register dimensions. Unknown generators or targets never
+fall back to another dimension. `query` requires the frozen registry and returns
+host-owned descriptor strings valid until shutdown.
+
+`MC_DimensionDefinition` selects normal/fixed clear/rain/thunder weather, disables
+natural spawning optionally, and selects safe-surface or fixed-coordinate spawn.
+A zeroed definition defaults to normal weather, natural spawning, safe-surface
+spawn, same-dimension death respawn and no automatic void return. Generator key,
+generator revision and dimension revision are mandatory for plugin definitions;
+parameters default to `{}` and optional default modifiers use explicit revisions.
+Fixed coordinates describe the player's AABB bottom-center. Safe landings require
+loaded support, clearance and no fluid/fire; search is bounded and failure retains
+the original dimension. Weather and natural spawning still obey relevant world
+rules and difficulty; explicit entity spawning is independent of natural spawning.
+
+First entry uses the spawn policy; later entries restore the player's dimension
+position. Death targets default to the current dimension and prefer a valid target
+bed, then target spawn. Optional void targets prefer the target's last grounded
+safe position, then target spawn. No void target preserves builtin behavior and
+uses void damage in additional dimensions. Each player has independent dimension
+positions, safe positions and beds. All dimensions retain separate clocks/weather.
+
+With cheats enabled, `/dimension list` lists keys and `/dimension <key>` travels the
+local host player. Builtin commands retain the existing host-only LAN policy.
+SDK `travel(context, player_id, dimension)` queues a host-authoritative operation;
+0 identifies the host. Acceptance means queued, not successful arrival. Guests
+cannot redirect another player's operation, and replicas cannot mutate dimensions.
+Host and guest travel share landing validation, loading gates and stream epochs.
+
+Data packages may declare:
+
+```json
+{
+  "dimensions": [{
+    "key": "my_mod:islands", "name": "Islands", "revision": "1",
+    "generator": "my_mod:terrain", "generator_revision": "1",
+    "parameters": "{}", "weather": 1, "natural_spawning": false,
+    "spawn": 0, "death_target": "minecraftc:overworld",
+    "void_target": "minecraftc:overworld"
+  }],
+  "generators": [{
+    "key": "my_mod:terrain", "revision": "1", "dimension": "my_mod:islands",
+    "height": 96, "water_level": -65
+  }]
+}
+```
+
+Weather values are 0 normal, 1 clear, 2 rain, 3 thunder; spawn is 0 safe surface or
+1 fixed with `spawn_position: [x,y,z]`. Optional `modifiers` entries contain `key`
+and `revision`. Numeric generator dimension 0/1 remains supported for older plugins.
+See [native dimension example](../examples/plugins/dimension_demo/README.md).
+
+Save v20 stores dimension keys, policy revisions, generation selections and player
+states. The main world and Heaven retain existing directories; other dimension keys
+use segmented hex-encoded directories. Missing dimensions/plugins/revisions refuse
+loading without writes. LAN v5 sends keys rather than local dimension handles and
+includes canonical dimension policy descriptions in admission fingerprints. Older
+protocols cannot join. Player profile v4 persists dimension-keyed positions/beds;
+older profiles (including the local LAN identity profile) are explicitly refused.
+Additional dimensions use the existing generic terrain/LOD and Overworld environment
+presentation. This extension does not add portals, sky/music APIs, arbitrary spawn
+callbacks or species-specific natural spawn tables.

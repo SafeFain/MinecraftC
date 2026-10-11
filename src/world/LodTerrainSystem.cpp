@@ -1,4 +1,5 @@
 #include "world/LodTerrainSystem.h"
+#include "plugins/ContentRegistry.h"
 
 #include "Config.h"
 #include "core/Platform.h"
@@ -21,7 +22,7 @@
 #include <type_traits>
 
 namespace {
-constexpr uint32_t CACHE_REVISION = 6;
+constexpr uint32_t CACHE_REVISION = 7;
 constexpr char MAGIC[] = {'M', 'C', 'L', 'D'};
 
 using Bytes = std::vector<uint8_t>;
@@ -112,7 +113,8 @@ bool writeTileFile(const std::filesystem::path& path, const LodTileKey& key,
     append<uint32_t>(file, generator.generationVersion());
     append<uint64_t>(file,Plugins::generationFingerprint(generator.generationConfig()));
     append<uint8_t>(file, static_cast<uint8_t>(generator.worldType()));
-    append<uint8_t>(file, static_cast<uint8_t>(generator.dimension()));
+    const auto dimensionKey=Plugins::dimensionKey(generator.dimension());
+    append<uint64_t>(file,checksum(Bytes(dimensionKey.begin(),dimensionKey.end())));
     append<int32_t>(file, key.x);
     append<int32_t>(file, key.z);
     append<uint8_t>(file, key.level);
@@ -145,7 +147,8 @@ bool readTileFile(const std::filesystem::path& path, const LodTileKey& expected,
     size_t cursor = 4;
     uint32_t revision = 0, generation = 0, size = 0;
     uint64_t seed = 0, expectedHash = 0;
-    uint8_t worldType = 0, dimension = 0, level = 0;
+    uint8_t worldType = 0, level = 0;
+    uint64_t dimension = 0;
     int32_t x = 0, z = 0;
     uint64_t generationFingerprint=0;
     if (!read(file, cursor, revision) || !read(file, cursor, seed) ||
@@ -157,7 +160,7 @@ bool readTileFile(const std::filesystem::path& path, const LodTileKey& expected,
     if (revision != CACHE_REVISION || seed != generator.getSeed() ||
         generation != generator.generationVersion() || generationFingerprint!=Plugins::generationFingerprint(generator.generationConfig()) ||
         worldType != static_cast<uint8_t>(generator.worldType()) ||
-        dimension != static_cast<uint8_t>(generator.dimension()) ||
+        dimension != ([&]{const auto key=Plugins::dimensionKey(generator.dimension());return checksum(Bytes(key.begin(),key.end()));}()) ||
         x != expected.x || z != expected.z || level != expected.level ||
         cursor + size != file.size())
         return false;

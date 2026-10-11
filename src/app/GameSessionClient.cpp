@@ -195,7 +195,7 @@ void GameSession::pollReplica(double now) {
             Lan::ChunkAddress address{dimension, chunk->cx, chunk->cz};
             if (!inRange(address) || replicaRevisions.count(address) || replicaRecovery.count(address)) continue;
             if (requested++ >= 2) break;
-            Lan::Writer writer; writer.u8(1); writer.u8(static_cast<uint8_t>(dimension)); writer.u64(replicaEpoch);
+            Lan::Writer writer; writer.u8(1); Lan::writeDimension(writer,dimension); writer.u64(replicaEpoch);
             writer.u32(static_cast<uint32_t>(chunk->cx)); writer.u32(static_cast<uint32_t>(chunk->cz));
             if (lanClient.send({Lan::MessageType::ChunkRequest, 0, std::move(writer.bytes)})) replicaRecovery.insert(address);
         }

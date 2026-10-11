@@ -28,6 +28,21 @@ struct GenerationConfig {
         return generator==b.generator&&revision==b.revision&&parameters==b.parameters&&modifiers==b.modifiers;
     }
 };
+struct DimensionContent {
+    std::string key, name, revision="1", deathTarget, voidTarget;
+    GenerationConfig generation;
+    uint32_t weather=MC_WEATHER_NORMAL, spawn=MC_SPAWN_SAFE_SURFACE;
+    bool natural=true;
+    std::array<double,3> position{{0,65,0}};
+    mutable std::vector<MC_DimensionModifier> modifierView;
+};
+inline std::map<uint32_t,DimensionContent> builtinDimensions() {
+    DimensionContent overworld;overworld.key="minecraftc:overworld";overworld.name="Overworld";
+    DimensionContent heaven;heaven.key="minecraftc:heaven";heaven.name="Heaven";
+    heaven.weather=MC_WEATHER_CLEAR;heaven.natural=false;
+    heaven.deathTarget=overworld.key;heaven.voidTarget=overworld.key;
+    return {{0,overworld},{1,heaven}};
+}
 struct GeneratorContent {
     std::string key, name, revision;
     uint32_t dimension=0;
@@ -65,6 +80,7 @@ struct DeclarativeRenderPass {
     MC_RenderHandle scenePipeline=0;
 };
 struct ExtensionContent {
+    std::map<uint32_t,DimensionContent> dimensions=builtinDimensions();
     std::map<uint16_t,EntityContent> entities;
     std::map<std::string,GeneratorContent> generators;
     std::map<std::string,ModifierContent> modifiers;

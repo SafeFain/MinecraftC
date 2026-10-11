@@ -17,6 +17,7 @@ public:
         return api->query_extension(ctx,key,version);
     }
     const MC_EntitiesV1* entities() const {return static_cast<const MC_EntitiesV1*>(extension(MC_ENTITIES_EXTENSION));}
+    const MC_DimensionsV1* dimensions() const {return static_cast<const MC_DimensionsV1*>(extension(MC_DIMENSIONS_EXTENSION));}
     const MC_WorldgenV1* worldgen() const {return static_cast<const MC_WorldgenV1*>(extension(MC_WORLDGEN_EXTENSION));}
     const MC_RenderV1* render() const {return static_cast<const MC_RenderV1*>(extension(MC_RENDER_EXTENSION));}
     const MC_MultiplayerV1* multiplayer() const {

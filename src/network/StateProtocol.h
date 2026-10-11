@@ -18,7 +18,7 @@ struct WorldInfo {
     WorldType type = WorldType::Normal;
     Difficulty difficulty = Difficulty::Normal;
     GameRuleSet rules;
-    std::array<Plugins::GenerationConfig,2> generation;
+    std::map<uint32_t,Plugins::GenerationConfig> generation{{0,{}},{1,{}}};
 };
 struct PlayerView {
     uint64_t id = 0;

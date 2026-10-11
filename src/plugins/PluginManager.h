@@ -80,6 +80,8 @@ public:
     int32_t enqueue(MC_PluginContext&,std::function<bool()>);
     int32_t storage(MC_PluginContext&,bool,bool,const char*,char*,uint32_t);
     int32_t entity(MC_PluginContext&,const MC_EntityDefinition&,uint16_t&);
+    int32_t dimensionDefinition(MC_PluginContext&,const MC_DimensionDefinition&,uint32_t&);
+    std::function<bool(uint64_t,uint32_t)> travelPlayer;
     int32_t generator(MC_PluginContext&,const MC_GeneratorDefinition&);
     int32_t modifier(MC_PluginContext&,const MC_ModifierDefinition&);
     int32_t renderResource(MC_PluginContext&,const MC_RenderResource&,MC_RenderHandle&);

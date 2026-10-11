@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "Погода в этом измерении фиксирована.",
+  "message.dimension_entered": "Переход в измерение: {0}",
+  "message.dimension_travel_failed": "Переход невозможен: неверная цель или нет безопасного места.",
   "action.0": "Движение вперёд",
   "action.1": "Движение назад",
   "action.2": "Движение влево",

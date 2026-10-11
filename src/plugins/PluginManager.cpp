@@ -215,10 +215,10 @@ PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
                 auto actor=context();actor.player=id;actor.dimension=dimension;ActorScope scope(actor);
                 m.enqueue(*ctx,[&m,item,count]{return m.operations.giveItem&&m.operations.giveItem(item,count);});});},
             [](MC_PluginContext* ctx,uint32_t dimension,int32_t x,int32_t y,int32_t z,uint16_t* id){return checked(ctx,[&]{
-                check(dimension<=1,"Invalid dimension");auto actor=context();actor.dimension=dimension;ActorScope scope(actor);
+                check(validDimension(dimension),"Invalid dimension");auto actor=context();actor.dimension=dimension;ActorScope scope(actor);
                 auto& m=manager(ctx);check(id&&m.operations.getBlock&&m.operations.getBlock(x,y,z,*id),"Block is unavailable");});},
             [](MC_PluginContext* ctx,uint32_t dimension,int32_t x,int32_t y,int32_t z,uint16_t id){return checked(ctx,[&]{
-                check(dimension<=1&&validBlock(static_cast<BlockId>(id)),"Invalid dimension/block");
+                check(validDimension(dimension)&&validBlock(static_cast<BlockId>(id)),"Invalid dimension/block");
                 auto actor=context();actor.dimension=dimension;ActorScope scope(actor);auto& m=manager(ctx);
                 m.enqueue(*ctx,[&m,x,y,z,id]{return m.operations.setBlock&&m.operations.setBlock(x,y,z,id);});});},
             [](MC_PluginContext* ctx,const char* name,uint32_t flags,MC_EventCallback callback,void* data){
@@ -343,6 +343,19 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     each("blocks",[&](const Json& j){MC_Block b{};b.size=sizeof(b);std::string key=j.at("key").text(),name=j.at("name").text(),drop=j.text("drop");b.key=key.c_str();b.name=name.c_str();b.drop_item=drop.c_str();b.hardness=static_cast<float>(j.numeric("hardness",1));b.alpha=static_cast<float>(j.numeric("alpha",1));b.solid=j.flag("solid",true);b.cross=j.flag("cross",false);b.layer=integer(j,"layer",0);b.emission=integer(j,"emission",0);b.preferred_tool=integer(j,"preferred_tool",integer(j,"tool",0));b.minimum_tier=integer(j,"minimum_tier",integer(j,"tier",0));b.unbreakable=j.flag("unbreakable",false);std::fill(b.color,b.color+3,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==3,"Block color requires three numbers");for(size_t i=0;i<3;++i){check(c.array[i].type==Json::Type::Number,"Invalid block color");b.color[i]=static_cast<float>(c.array[i].number);}}std::array<std::string,6> faces;const auto& mats=j.at("materials");if(mats.type==Json::Type::String)faces.fill(mats.text());else {check(mats.type==Json::Type::Array&&mats.array.size()==6,"Block needs six materials");for(size_t i=0;i<6;++i)faces[i]=mats.array[i].text();}for(size_t i=0;i<6;++i)b.materials[i]=faces[i].c_str();uint16_t id=0;block(ctx,b,id);});
     each("items",[&](const Json& j){MC_Item item{};item.size=sizeof(item);std::string key=j.at("key").text(),name=j.at("name").text(),mat=j.at("material").text(),placed=j.text("placed_block");item.key=key.c_str();item.name=name.c_str();item.material=mat.c_str();item.placed_block=placed.c_str();item.kind=integer(j,"kind",placed.empty()?0:1);item.category=integer(j,"category",placed.empty()?6:0);item.max_stack=integer(j,"max_stack",64);item.durability=integer(j,"durability",0);item.tool=integer(j,"tool",0);item.tier=integer(j,"tier",0);item.food=integer(j,"food",0);item.saturation=static_cast<float>(j.numeric("saturation",0));item.attack_damage=static_cast<float>(j.numeric("attack_damage",0));item.attack_speed=static_cast<float>(j.numeric("attack_speed",0));uint16_t id=0;this->item(ctx,item,id);});
     each("recipes",[&](const Json& j){MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
+    each("dimensions",[&](const Json& j){
+        MC_DimensionDefinition d{};d.size=sizeof(d);
+        const auto key=j.at("key").text(),name=j.text("name",key),revision=j.at("revision").text();
+        const auto generator=j.at("generator").text(),genRevision=j.at("generator_revision").text();
+        const auto parameters=j.text("parameters","{}"),death=j.text("death_target"),voidTarget=j.text("void_target");
+        d.key=key.c_str();d.name=name.c_str();d.revision=revision.c_str();d.generator=generator.c_str();d.generator_revision=genRevision.c_str();d.parameters=parameters.c_str();
+        d.weather=integer(j,"weather",0);d.disable_natural_spawning=!j.flag("natural_spawning",true);d.spawn=integer(j,"spawn",0);d.death_target=death.c_str();d.void_target=voidTarget.c_str();
+        if(j.has("spawn_position")){const auto& a=j.at("spawn_position");check(a.type==Json::Type::Array&&a.array.size()==3,"Spawn requires three coordinates");for(int i=0;i<3;++i){check(a.array[i].type==Json::Type::Number,"Invalid spawn coordinate");d.spawn_position[i]=a.array[i].number;}}
+        std::vector<std::string> modifierKeys,modifierRevisions;std::vector<MC_DimensionModifier> modifiers;
+        if(j.has("modifiers")){const auto& values=j.at("modifiers");check(values.type==Json::Type::Array&&values.array.size()<=64,"Invalid default modifiers");for(const auto& m:values.array){modifierKeys.push_back(m.at("key").text());modifierRevisions.push_back(m.at("revision").text());}for(size_t i=0;i<modifierKeys.size();++i)modifiers.push_back({modifierKeys[i].c_str(),modifierRevisions[i].c_str()});}
+        d.modifiers=modifiers.data();d.modifier_count=static_cast<uint32_t>(modifiers.size());
+        uint32_t id;dimensionDefinition(ctx,d,id);
+    });
     if(data.has("entities"))check(data.at("entities").type==Json::Type::Array,"Expected entity array");
     if(data.has("generators"))check(data.at("generators").type==Json::Type::Array,"Expected generator array");
     if(data.has("entities"))for(const auto& value:data.at("entities").array) {
@@ -358,10 +371,10 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     }
     if(data.has("generators"))for(const auto& value:data.at("generators").array) {
         GeneratorContent g;g.key=value.at("key").text();owned(ctx,g.key);g.name=value.text("name",g.key);g.revision=value.at("revision").text();
-        g.dimension=integer(value,"dimension",0);
+        g.dimension=value.has("dimension")&&value.at("dimension").type==Json::Type::String?resolveDimension(value.at("dimension").text()):integer(value,"dimension",0);
         auto coordinate=[&](const char* field,int fallback){const double n=value.numeric(field,fallback);check(std::isfinite(n)&&n>=Config::WORLD_MIN_Y-1&&n<Config::WORLD_MAX_Y&&std::floor(n)==n,"Invalid generator height");return static_cast<int32_t>(n);};
         g.height=coordinate("height",64);g.water=coordinate("water_level",62);
-        check(g.dimension<=1&&!g.revision.empty()&&g.revision.size()<=128&&Config::isValidWorldY(g.height)&&g.water>=Config::WORLD_MIN_Y-1&&g.water<Config::WORLD_MAX_Y,"Invalid data generator");
+        check(validDimension(g.dimension)&&!g.revision.empty()&&g.revision.size()<=128&&Config::isValidWorldY(g.height)&&g.water>=Config::WORLD_MIN_Y-1&&g.water<Config::WORLD_MAX_Y,"Invalid data generator");
         g.surface=static_cast<uint16_t>(resolveBlock(value.text("surface","minecraftc:grass")));g.fill=static_cast<uint16_t>(resolveBlock(value.text("fill","minecraftc:stone")));
         check(content().extensions.generators.emplace(g.key,g).second,"Duplicate generator");
     }
@@ -370,6 +383,12 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     loadRenderData(ctx,data);
 }
 void PluginManager::validateContent() {
+    for(const auto& entry:content().extensions.dimensions) {
+        const auto& d=entry.second;
+        if(entry.first>=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
+        if(!d.deathTarget.empty())resolveDimension(d.deathTarget);
+        if(!d.voidTarget.empty())resolveDimension(d.voidTarget);
+    }
     auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
     for(auto& entry:content().blocks) {
         for(const auto& key:entry.second.materials)check(materialExists(key),"Unknown block material");
@@ -379,6 +398,10 @@ void PluginManager::validateContent() {
     for(const auto& entry:content().extensions.entities)if(!entry.second.drop.empty())resolveItem(entry.second.drop);
 }
 void PluginManager::buildNetworkDescription() {
+    for(const auto& entry:content().extensions.dimensions) {
+        const auto& d=entry.second;
+        content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers}).dump();
+    }
     auto& state=content();
     for(const auto& entry:state.blocks) {
         const auto& b=entry.second;
@@ -419,10 +442,10 @@ void PluginManager::buildNetworkDescription() {
         content().networkDescription["entity/"+entityKey(entry.first)]=nlohmann::json::array({e.key,e.base,e.name,e.health,e.size,e.speed,e.damage,e.hostile,e.natural,e.drop,e.dropCount,e.stateVersion,static_cast<bool>(e.callback)}).dump();
     }
     for(const auto& entry:content().extensions.generators) {
-        const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({g.dimension,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
+        const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({dimensionContent(g.dimension).key,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
     }
     for(const auto& entry:content().extensions.modifiers) {
-        const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({m.dimension,m.revision,m.radius}).dump();
+        const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({dimensionContent(m.dimension).key,m.revision,m.radius}).dump();
     }
 
 }

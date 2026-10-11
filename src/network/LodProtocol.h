@@ -24,8 +24,8 @@ inline void validateLodKey(const LodTileKey& key) {
 }
 inline Bytes encodeLodUpdate(const LodUpdate& value, bool includeColumns) {
     validateLodKey(value.key);
-    if (value.dimension > DimensionId::Heaven || !value.epoch) throw ProtocolError("Invalid LOD stream");
-    Writer w; w.u8(1); w.u8(static_cast<uint8_t>(value.dimension)); w.u64(value.epoch); w.u64(value.revision);
+    if (!Plugins::validDimension(value.dimension) || !value.epoch) throw ProtocolError("Invalid LOD stream");
+    Writer w; w.u8(1); writeDimension(w,value.dimension); w.u64(value.epoch); w.u64(value.revision);
     w.u32(static_cast<uint32_t>(value.key.x)); w.u32(static_cast<uint32_t>(value.key.z)); w.u8(value.key.level);
     if (includeColumns) for (const auto& column : value.columns.columns) {
         if (column.spans.size() > Config::CHUNK_SIZE_Y || (!column.exact && !column.spans.empty())) throw ProtocolError("Invalid LOD column");
@@ -42,7 +42,7 @@ inline Bytes encodeLodUpdate(const LodUpdate& value, bool includeColumns) {
 inline LodUpdate decodeLodUpdate(const Bytes& bytes, bool includeColumns) {
     Reader r(bytes); LodUpdate value;
     if (r.u8() != 1) throw ProtocolError("Unknown LOD schema");
-    value.dimension = static_cast<DimensionId>(r.u8()); value.epoch = r.u64(); value.revision = r.u64();
+    value.dimension = readDimension(r); value.epoch = r.u64(); value.revision = r.u64();
     value.key.x = static_cast<int32_t>(r.u32()); value.key.z = static_cast<int32_t>(r.u32()); value.key.level = r.u8();
     if (includeColumns) for (auto& column : value.columns.columns) {
         const auto exact = r.u8(); const auto count = r.u16();

@@ -14,8 +14,10 @@ struct PlayerProfile {
     Identity identity;
     GameMode mode=GameMode::Survival;
     DimensionId dimension=DimensionId::Overworld;
-    std::array<glm::dvec3,2> positions{{{.5,65,.5},{.5,120,.5}}};
-    std::array<bool,2> positioned{{false,false}};
+    std::map<uint32_t,glm::dvec3> positions{{0,{.5,65,.5}},{1,{.5,120,.5}}};
+    std::map<uint32_t,bool> positioned{{0,false},{1,false}};
+    std::map<uint32_t,glm::dvec3> safePositions;
+    std::map<uint32_t,glm::ivec3> beds;
     std::optional<glm::ivec3> bedSpawn;
     float health=20;
     uint8_t hunger=20;

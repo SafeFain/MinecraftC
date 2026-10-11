@@ -28,7 +28,8 @@ int main() {
     for (size_t size : {size_t(0), size_t(18), bytes.size() - 1}) {
         auto truncated = bytes; truncated.resize(size); rejects([&] { Lan::decodeChunkSnapshot(truncated); });
     }
-    auto bad = bytes; bad[26] = 0xff; bad[27] = 0xff; bad[28] = 0xff; bad[29] = 0xff;
+    constexpr size_t runOffset=1+2+sizeof("minecraftc:heaven")-1+8+4+4+8;
+    auto bad = bytes; for(size_t i=0;i<4;++i)bad[runOffset+i]=0xff;
     rejects([&] { Lan::decodeChunkSnapshot(bad); });
     bytes.push_back(0); rejects([&] { Lan::decodeChunkSnapshot(bytes); });
     Lan::ChunkDelta delta;
@@ -44,7 +45,8 @@ int main() {
               "Every delta edit index and block survives encoding");
     // Frozen little-endian schema 1, Heaven (-1,2), epoch 9, base 77,
     // revision 79, one AIR edit at index 513. Independent of Writer/Reader.
-    const Lan::Bytes fixture={1,1,9,0,0,0,0,0,0,0,255,255,255,255,2,0,0,0,
+    const Lan::Bytes fixture={1,17,0,'m','i','n','e','c','r','a','f','t','c',':','h','e','a','v','e','n',
+        9,0,0,0,0,0,0,0,255,255,255,255,2,0,0,0,
         77,0,0,0,0,0,0,0,79,0,0,0,0,0,0,0,1,0,0,0,1,2,0,0,0,0};
     Lan::ChunkDelta golden;golden.address={DimensionId::Heaven,-1,2};golden.epoch=9;
     golden.base=77;golden.revision=79;golden.edits={{513,0}};

@@ -96,6 +96,41 @@ typedef struct MC_WorldgenV1 {
     int32_t (*register_generator)(MC_PluginContext*,const MC_GeneratorDefinition*);
     int32_t (*register_modifier)(MC_PluginContext*,const MC_ModifierDefinition*);
 } MC_WorldgenV1;
+/* Dimension handles are launch-local. Persist namespaced keys, never handles.
+   Register the dimension before its generator. References resolve at the end
+   of the owning plugin's registration transaction. Zeroed policies use defaults. */
+#define MC_DIMENSIONS_EXTENSION "minecraftc.dimensions"
+#define MC_INVALID_DIMENSION UINT32_MAX
+typedef enum MC_DimensionWeather {
+    MC_WEATHER_NORMAL=0, MC_WEATHER_CLEAR=1, MC_WEATHER_RAIN=2, MC_WEATHER_THUNDER=3
+} MC_DimensionWeather;
+typedef enum MC_DimensionSpawn { MC_SPAWN_SAFE_SURFACE=0, MC_SPAWN_FIXED=1 } MC_DimensionSpawn;
+typedef struct MC_DimensionModifier {const char* key;const char* revision;} MC_DimensionModifier;
+typedef struct MC_DimensionDefinition {
+    uint32_t size;
+    const char* key;
+    const char* name;
+    const char* revision;
+    const char* generator;
+    const char* generator_revision;
+    const char* parameters; /* JSON object; null means {} */
+    uint32_t weather, disable_natural_spawning, spawn;
+    double spawn_position[3]; /* player bottom-center, for MC_SPAWN_FIXED */
+    const char* death_target; /* null/empty: respawn in this dimension */
+    const char* void_target; /* null/empty: ordinary void damage */
+    const MC_DimensionModifier* modifiers;
+    uint32_t modifier_count;
+} MC_DimensionDefinition;
+typedef struct MC_DimensionsV1 {
+    uint32_t size, version;
+    int32_t (*register_dimension)(MC_PluginContext*,const MC_DimensionDefinition*,uint32_t*);
+    uint32_t (*find)(MC_PluginContext*,const char*);
+    /* Strings in a query are host-owned until shutdown. */
+    int32_t (*query)(MC_PluginContext*,uint32_t,MC_DimensionDefinition*);
+    /* Host-authoritative queued operation; player 0 is the local host.
+       Uses entry policy and returns queue acceptance, not travel completion. */
+    int32_t (*travel)(MC_PluginContext*,uint64_t,uint32_t);
+} MC_DimensionsV1;
 typedef uint64_t MC_RenderHandle;
 #define MC_RENDER_SCENE_COLOR UINT64_MAX
 typedef enum MC_RenderStage { MC_RENDER_SKY=0, MC_RENDER_SHADOWS, MC_RENDER_TERRAIN,

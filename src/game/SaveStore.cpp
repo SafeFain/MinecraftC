@@ -535,7 +535,7 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload, static_cast<uint8_t>(metadata.worldType));
     // Dimension state is appended in v10.  This keeps every pre-v10 field at
     // its historical offset and lets older saves continue to load normally.
-    append(payload, static_cast<uint8_t>(metadata.activeDimension));
+    append(payload, static_cast<uint8_t>(metadata.activeDimension==DimensionId::Heaven?1:0));
     append(payload, metadata.overworldDayPhase);
     append(payload, metadata.heaven.playerPosition);
     append(payload, metadata.heaven.safePosition);
@@ -571,22 +571,43 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         appendRule(rule.name, rule.value);
     }
     for(uint32_t dimension=0;dimension<2;++dimension) {
-        const auto& g=metadata.generation[dimension];Plugins::validateGeneration(g,dimension);
+        const auto& g=metadata.generation.at(dimension);Plugins::validateGeneration(g,dimension);
         if(g.parameters.size()>4096||g.modifiers.size()>64)throw std::runtime_error("Generation configuration too large");
         Plugins::Json::parse(g.parameters);
         appendString(payload,g.generator);appendString(payload,g.revision);appendString(payload,g.parameters);
         append(payload,static_cast<uint16_t>(g.modifiers.size()));
         for(const auto& m:g.modifiers){appendString(payload,m.first);appendString(payload,m.second);}
     }
+    // v20 keeps the legacy inspection prefix, then stores authoritative keyed states.
+    appendString(payload,Plugins::dimensionKey(metadata.activeDimension));
+    auto generations=metadata.generation;
+    for(const auto& entry:Plugins::content().extensions.dimensions)if(!generations.count(entry.first))generations[entry.first]=entry.second.generation;
+    append(payload,static_cast<uint32_t>(generations.size()));
+    for(const auto& entry:generations) {
+        const auto id=entry.first;const auto& definition=Plugins::dimensionContent(id);const auto& g=entry.second;
+        Plugins::validateGeneration(g,id);appendString(payload,definition.key);appendString(payload,definition.revision);
+        appendString(payload,g.generator);appendString(payload,g.revision);appendString(payload,g.parameters);
+        append(payload,static_cast<uint16_t>(g.modifiers.size()));for(const auto& modifier:g.modifiers){appendString(payload,modifier.first);appendString(payload,modifier.second);}
+        WorldMetadata::DimensionState state;
+        auto found=metadata.dimensions.find(id);if(found!=metadata.dimensions.end())state=found->second;
+        if(id==0){state.playerPosition=metadata.playerPosition;state.worldTicks=metadata.worldTicks;state.dayPhase=metadata.overworldDayPhase;state.weather=metadata.weather;state.bedSpawn=metadata.bedSpawn;}
+        if(id==1){auto bed=state.bedSpawn;auto weather=state.weather;auto positioned=state.positioned;auto safe=state.safePlayerPosition;state=metadata.heaven;state.bedSpawn=bed;state.weather=weather;state.positioned=positioned;state.safePlayerPosition=found==metadata.dimensions.end()?glm::dvec3(state.safePosition)+glm::dvec3(.5,.01,.5):safe;}
+        append(payload,state.playerPosition);append(payload,state.safePlayerPosition);append(payload,static_cast<uint8_t>(state.hasSafePosition));append(payload,static_cast<uint8_t>(state.positioned));
+        append(payload,state.worldTicks);append(payload,state.dayPhase);
+        append(payload,static_cast<uint8_t>(state.weather.raining));append(payload,static_cast<uint8_t>(state.weather.thundering));append(payload,state.weather.rainTicks);append(payload,state.weather.thunderTicks);append(payload,state.weather.sequence);
+        append(payload,static_cast<uint8_t>(state.bedSpawn.has_value()));if(state.bedSpawn)append(payload,*state.bedSpawn);
+    }
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
+    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v20; legacy worlds are incompatible");
     Reader reader(std::move(checked.payload), checked.version, inspection);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
+    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v20; legacy worlds are incompatible";
     if (checked.version < 16 && !Plugins::content().requirements.empty()) {
         metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
         if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
@@ -688,6 +709,34 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         const auto count=reader.read<uint16_t>();if(count>64)throw std::runtime_error("Too many generation modifiers");
         for(uint16_t i=0;i<count;++i){auto key=reader.readString();auto revision=reader.readString();g.modifiers.emplace_back(key,revision);}
         if(!inspection)Plugins::validateGeneration(g,dimension);
+    }
+    if(checked.version>=20) {
+        auto resolve=[&](const std::string& key,uint32_t fallback) {
+            try{return Plugins::resolveDimension(key);}catch(const std::exception& e){if(!inspection)throw;metadata.pluginCompatibilityError=e.what();return fallback;}
+        };
+        const auto activeKey=reader.readString();
+        const auto count=reader.read<uint32_t>();if(count<2||count>1024)throw std::runtime_error("Invalid dimension count");
+        metadata.generation.clear();std::set<std::string> keys;
+        for(uint32_t index=0;index<count;++index) {
+            const auto key=reader.readString(),revision=reader.readString();if(!keys.insert(key).second)throw std::runtime_error("Duplicate saved dimension");
+            const auto id=resolve(key,1024+index);
+            if(Plugins::validDimension(id)&&revision!=Plugins::dimensionContent(id).revision){metadata.pluginCompatibilityError="Dimension revision mismatch: "+key;if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
+            auto& g=metadata.generation[id];g.generator=reader.readString();g.revision=reader.readString();g.parameters=reader.readString();
+            const auto modifiers=reader.read<uint16_t>();if(modifiers>64||g.parameters.size()>4096)throw std::runtime_error("Invalid saved generation configuration");
+            for(uint16_t i=0;i<modifiers;++i){auto k=reader.readString(),r=reader.readString();g.modifiers.emplace_back(k,r);}
+            if(!inspection)Plugins::validateGeneration(g,id);
+            auto& state=metadata.dimensions[id];state.playerPosition=reader.read<glm::dvec3>();state.safePlayerPosition=reader.read<glm::dvec3>();
+            auto flag=[&]{const auto v=reader.read<uint8_t>();if(v>1)throw std::runtime_error("Invalid dimension flag");return v!=0;};
+            state.hasSafePosition=flag();state.positioned=flag();state.worldTicks=reader.read<uint64_t>();state.dayPhase=reader.read<float>();
+            if(!std::isfinite(state.dayPhase)||state.dayPhase<0||state.dayPhase>=1)throw std::runtime_error("Invalid dimension day phase");
+            for(int axis=0;axis<3;++axis)if(!std::isfinite(state.playerPosition[axis])||std::abs(state.playerPosition[axis])>30000000||!std::isfinite(state.safePlayerPosition[axis])||std::abs(state.safePlayerPosition[axis])>30000000)throw std::runtime_error("Invalid dimension position");
+            state.safePosition=glm::ivec3(glm::floor(state.safePlayerPosition));
+            state.weather.raining=flag();state.weather.thundering=flag();state.weather.rainTicks=reader.read<uint32_t>();state.weather.thunderTicks=reader.read<uint32_t>();state.weather.sequence=reader.read<uint64_t>();
+            if(flag())state.bedSpawn=reader.read<glm::ivec3>();
+        }
+        if(!keys.count(activeKey)||!keys.count("minecraftc:overworld")||!keys.count("minecraftc:heaven"))throw std::runtime_error("Missing saved dimension state");
+        metadata.activeDimension=static_cast<DimensionId>(resolve(activeKey,2048));
+        if(count!=Plugins::content().extensions.dimensions.size()){metadata.pluginCompatibilityError="World dimension registry mismatch";if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
     }
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
@@ -952,6 +1001,7 @@ void SaveStore::validatePluginFiles() const {
         // resolvable names before a session can attach a writable store.
         if (file.path().parent_path().filename() == "generated") continue;
         auto bytes=readChecked(file.path());
+        if(bytes.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v20");
         Reader reader(std::move(bytes.payload),bytes.version);
         (void)reader;
     }

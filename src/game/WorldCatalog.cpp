@@ -47,8 +47,9 @@ std::vector<WorldSummary> WorldCatalog::list() const {
                               metadata.worldTicks, metadata.generationVersion,
                               WorldGenContext::canLoadGeneration(metadata.generationVersion) && metadata.pluginCompatibilityError.empty(),
                               metadata.worldType, metadata.pluginCompatibilityError});
-        } catch (const std::runtime_error&) {
-            // Invalid worlds stay untouched on disk but are not loadable.
+        } catch (const std::runtime_error& error) {
+            if(std::string(error.what())=="Save was made by a newer version")worlds.push_back({id,id,GameMode::Survival,Difficulty::Normal,0,0,0,false,WorldType::Normal,error.what()});
+            // Malformed worlds stay untouched on disk.
         }
     }
     std::sort(worlds.begin(), worlds.end(),
@@ -75,7 +76,8 @@ std::string WorldCatalog::create(
     WorldMetadata metadata;
     metadata.displayName = displayName.empty() ? "New World" : displayName;
     metadata.seed = seed;
-    metadata.generation=generation;
+    for(const auto& entry:Plugins::content().extensions.dimensions)metadata.generation[entry.first]=entry.second.generation;
+    for(uint32_t d=0;d<2;++d)metadata.generation[d]=generation[d];
     metadata.generationVersion = WorldGenContext::GENERATION_VERSION;
     metadata.gameMode = mode;
     metadata.difficulty = difficulty;

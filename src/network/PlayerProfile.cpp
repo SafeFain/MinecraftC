@@ -11,8 +11,8 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=3;
-constexpr size_t MAX_PROFILE_BYTES=64*1024;
+constexpr uint16_t PROFILE_VERSION=4;
+constexpr size_t MAX_PROFILE_BYTES=1024*1024;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
     for(const auto byte:bytes) {value^=byte;value*=1099511628211ull;}
@@ -36,12 +36,15 @@ void validatePosition(const glm::dvec3& position) {
     for(int i=0;i<3;++i) if(!std::isfinite(position[i]) || std::abs(position[i])>30000000.0) throw ProtocolError("Invalid profile position");
 }
 void validateStats(const PlayerProfile& profile) {
-    if(profile.mode>GameMode::Spectator || profile.dimension>DimensionId::Heaven || !validIdentity(profile.identity) ||
+    if(profile.mode>GameMode::Spectator || !Plugins::validDimension(profile.dimension) || !validIdentity(profile.identity) ||
         !std::isfinite(profile.health) || profile.health<0 || profile.health>20 || profile.hunger>20 ||
         !std::isfinite(profile.saturation) || profile.saturation<0 || profile.saturation>20 ||
         !std::isfinite(profile.exhaustion) || profile.exhaustion<0 || profile.exhaustion>40)
         throw ProtocolError("Invalid player profile");
-    for(const auto& position:profile.positions) validatePosition(position);
+    for(const auto& position:profile.positions) {if(!Plugins::validDimension(position.first))throw ProtocolError("Unknown profile dimension");validatePosition(position.second);}
+    for(const auto& entry:profile.safePositions){if(!profile.positions.count(entry.first))throw ProtocolError("Missing profile position");validatePosition(entry.second);}
+    for(const auto& entry:profile.beds){if(!profile.positions.count(entry.first))throw ProtocolError("Missing profile position");validatePosition(glm::dvec3(entry.second));}
+    if(!profile.positions.count(static_cast<uint32_t>(profile.dimension)))throw ProtocolError("Missing active profile dimension");
     if(profile.bedSpawn) validatePosition(glm::dvec3(*profile.bedSpawn));
 }
 Bytes readFile(const std::filesystem::path& path) {
@@ -77,8 +80,18 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     writer.u16(static_cast<uint16_t>(used.size()));
     for(auto id:used){writer.u16(static_cast<uint16_t>(id));writer.text(Plugins::itemKey(id),256);}
     writer.text(profile.identity.id,32);writer.text(profile.identity.credential,32);writer.text(profile.identity.nickname,64);
-    writer.u8(static_cast<uint8_t>(profile.mode));writer.u8(static_cast<uint8_t>(profile.dimension));
-    for(size_t i=0;i<2;++i) {writer.u8(profile.positioned[i]?1:0);for(int axis=0;axis<3;++axis) writer.f64(profile.positions[i][axis]);}
+    writer.u8(static_cast<uint8_t>(profile.mode));writeDimension(writer,profile.dimension);
+    if(profile.positions.size()>1024)throw ProtocolError("Too many profile dimensions");
+    writer.u32(static_cast<uint32_t>(profile.positions.size()));
+    for(const auto& entry:profile.positions) {
+        const auto id=entry.first;writeDimension(writer,static_cast<DimensionId>(id));
+        auto flag=profile.positioned.find(id);writer.u8(flag!=profile.positioned.end()&&flag->second);
+        for(int axis=0;axis<3;++axis)writer.f64(entry.second[axis]);
+        auto safe=profile.safePositions.find(id);writer.u8(safe!=profile.safePositions.end());
+        if(safe!=profile.safePositions.end()){validatePosition(safe->second);for(int axis=0;axis<3;++axis)writer.f64(safe->second[axis]);}
+        auto bed=profile.beds.find(id);writer.u8(bed!=profile.beds.end());
+        if(bed!=profile.beds.end()){validatePosition(glm::dvec3(bed->second));for(int axis=0;axis<3;++axis)writer.u32(static_cast<uint32_t>(bed->second[axis]));}
+    }
     writer.u8(profile.bedSpawn?1:0);
     if(profile.bedSpawn) for(int axis=0;axis<3;++axis) writer.u32(static_cast<uint32_t>((*profile.bedSpawn)[axis]));
     writer.f32(profile.health);writer.u8(profile.hunger);writer.f32(profile.saturation);writer.f32(profile.exhaustion);writer.u32(profile.foodTickTimer);
@@ -95,7 +108,7 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     Reader reader(payload);
     if(reader.u32()!=PROFILE_MAGIC) throw ProtocolError("Unsupported player profile format");
     const auto version=reader.u16();
-    if(version<1 || version>PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
+    if(version!=PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
     std::map<uint16_t,ItemId> palette;
     if(version>=3) {
         const auto count=reader.u16();if(!count||count>51)throw ProtocolError("Invalid profile palette size");
@@ -108,8 +121,16 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
         }
     }
     PlayerProfile profile;profile.identity={reader.text(32),reader.text(32),reader.text(64)};
-    profile.mode=static_cast<GameMode>(reader.u8());profile.dimension=static_cast<DimensionId>(reader.u8());
-    for(size_t i=0;i<2;++i) {const auto positioned=reader.u8();if(positioned>1) throw ProtocolError("Invalid profile flag");profile.positioned[i]=positioned!=0;for(int axis=0;axis<3;++axis) profile.positions[i][axis]=reader.f64();}
+    profile.mode=static_cast<GameMode>(reader.u8());profile.dimension=readDimension(reader);
+    profile.positions.clear();profile.positioned.clear();
+    const auto dimensions=reader.u32();if(dimensions>1024)throw ProtocolError("Too many profile dimensions");
+    for(uint32_t i=0;i<dimensions;++i) {
+        const auto id=static_cast<uint32_t>(readDimension(reader));if(profile.positions.count(id))throw ProtocolError("Duplicate profile dimension");
+        const auto positioned=reader.u8();if(positioned>1)throw ProtocolError("Invalid profile flag");profile.positioned[id]=positioned!=0;
+        for(int axis=0;axis<3;++axis)profile.positions[id][axis]=reader.f64();
+        const auto safe=reader.u8();if(safe>1)throw ProtocolError("Invalid profile flag");if(safe)for(int axis=0;axis<3;++axis)profile.safePositions[id][axis]=reader.f64();
+        const auto bed=reader.u8();if(bed>1)throw ProtocolError("Invalid profile flag");if(bed)for(int axis=0;axis<3;++axis)profile.beds[id][axis]=static_cast<int32_t>(reader.u32());
+    }
     const auto bed=reader.u8();if(bed>1) throw ProtocolError("Invalid profile flag");
     if(bed) {glm::ivec3 position;for(int axis=0;axis<3;++axis) {const uint32_t value=reader.u32();position[axis]=value<=INT32_MAX?static_cast<int32_t>(value):static_cast<int32_t>(-1-static_cast<int64_t>(UINT32_MAX-value));}profile.bedSpawn=position;}
     profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();

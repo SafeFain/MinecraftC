@@ -237,12 +237,17 @@ std::string Localization::format(
 #include "GameRuleIntegration.h"
 #include "PluginSessionIntegration.h"
 #include "PluginExtensionIntegration.h"
+#include "DimensionIntegration.h"
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==4&&std::string(argv[1])=="--dimension-tests") {
+        try{return DimensionIntegration::run(argv[2],argv[3]);}
+        catch(const std::exception& error){std::cerr<<"Dimension regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==5&&std::string(argv[1])=="--extension-tests") {
         try{return PluginExtensionIntegration::run(argv[2],argv[3],argv[4]);}
         catch(const std::exception& error){std::cerr<<"Plugin extension regression failed: "<<error.what()<<'\n';return 1;}
@@ -642,6 +647,10 @@ int main(int argc, char** argv) {
                 "Heaven locate rejects an overworld-only structure");
         GameSessionTestAccess::markTerrainReady(dimensions);
         GameSessionTestAccess::setDay(dimensions);
+        auto& heavenWorld=GameSessionTestAccess::world(dimensions);
+        heavenWorld.update({8.5,128.01,-3.5});heavenWorld.enqueueGeneration();heavenWorld.waitForInitialGeneration(1500);heavenWorld.processCompletedGenerations(false);
+        heavenWorld.setBlock(8,127,-4,BlockId::STONE);
+        heavenWorld.setBlock(8,128,-4,BlockId::AIR);heavenWorld.setBlock(8,129,-4,BlockId::AIR);
         GameSessionTestAccess::setHeavenSafePosition(dimensions, {8, 128, -4});
         GameSessionTestAccess::setPlayerPosition(dimensions,
             {24.5, static_cast<double>(Config::WORLD_MIN_Y - 3), 24.5});

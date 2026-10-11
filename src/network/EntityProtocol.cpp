@@ -77,9 +77,9 @@ EntityDeathSnapshot death(Reader& reader) {
 }
 }
 Bytes encodeEntityBatch(const EntityBatch& batch) {
-    if (batch.dimension > DimensionId::Heaven || !batch.epoch || batch.entities.size() > MAX_VISIBLE_ENTITIES || batch.deaths.size() > MAX_VISIBLE_DEATHS)
+    if (!Plugins::validDimension(batch.dimension) || !batch.epoch || batch.entities.size() > MAX_VISIBLE_ENTITIES || batch.deaths.size() > MAX_VISIBLE_DEATHS)
         throw ProtocolError("Invalid entity batch");
-    Writer writer; writer.u8(1); writer.u8(static_cast<uint8_t>(batch.dimension)); writer.u64(batch.epoch); writer.u64(batch.tick);
+    Writer writer; writer.u8(1); writeDimension(writer,batch.dimension); writer.u64(batch.epoch); writer.u64(batch.tick);
     std::set<uint64_t> ids; writer.u16(static_cast<uint16_t>(batch.entities.size()));
     for (const auto& value : batch.entities) { if (!ids.insert(value.id).second) throw ProtocolError("Duplicate entity ID"); entity(writer, value); }
     writer.u16(static_cast<uint16_t>(batch.deaths.size()));
@@ -89,7 +89,7 @@ Bytes encodeEntityBatch(const EntityBatch& batch) {
 EntityBatch decodeEntityBatch(const Bytes& bytes) {
     Reader reader(bytes); EntityBatch result;
     if (reader.u8() != 1) throw ProtocolError("Unknown entity schema");
-    result.dimension = static_cast<DimensionId>(reader.u8()); result.epoch = reader.u64(); result.tick = reader.u64();
+    result.dimension = readDimension(reader); result.epoch = reader.u64(); result.tick = reader.u64();
     const auto count = reader.u16(); if (count > MAX_VISIBLE_ENTITIES) throw ProtocolError("Too many entities");
     for (uint16_t i = 0; i < count; ++i) result.entities.push_back(entity(reader));
     const auto deaths = reader.u16(); if (deaths > MAX_VISIBLE_DEATHS) throw ProtocolError("Too many entity deaths");

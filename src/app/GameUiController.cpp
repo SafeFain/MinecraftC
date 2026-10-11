@@ -135,7 +135,7 @@ void GameUiController::render(
             UiTheme::textWithShadow(renderer, localization.format("lan.players", {std::to_string(roster.size())}), x + 8, top - 20, .9f, glm::vec4(1));
             for (size_t i = 0; i < roster.size(); ++i) {
                 const auto& member = roster[i];
-                const auto label = member.nickname + " · " + localization.text(member.dimension == DimensionId::Heaven ? "lan.heaven" : "lan.overworld");
+                const auto label = member.nickname + " · " + (member.dimension==DimensionId::Overworld||member.dimension==DimensionId::Heaven?localization.text(member.dimension == DimensionId::Heaven ? "lan.heaven" : "lan.overworld"):Plugins::dimensionContent(member.dimension).name);
                 const auto scale = UiTheme::fittedScale(renderer, label, .85f, width - 16);
                 UiTheme::textWithShadow(renderer, label, x + 8, top - 39 - i * line, scale, glm::vec4(.9f,.95f,1,1));
             }

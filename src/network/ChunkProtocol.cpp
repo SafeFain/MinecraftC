@@ -9,7 +9,7 @@ namespace Lan {
 namespace {
 constexpr size_t MAX_DELTA_EDITS = 4096;
 void addressValid(const ChunkAddress& address) {
-    if (address.dimension > DimensionId::Heaven ||
+    if (!Plugins::validDimension(address.dimension) ||
         std::abs(static_cast<int64_t>(address.x)) > 1875000 ||
         std::abs(static_cast<int64_t>(address.z)) > 1875000)
         throw ProtocolError("Invalid chunk address");
@@ -20,13 +20,13 @@ void blockValid(uint16_t block) {
 void writeAddress(Writer& writer, const ChunkAddress& address, uint64_t epoch) {
     addressValid(address);
     if (!epoch) throw ProtocolError("Invalid chunk stream epoch");
-    writer.u8(1); writer.u8(static_cast<uint8_t>(address.dimension));
+    writer.u8(1); writeDimension(writer,address.dimension);
     writer.u64(epoch); writer.u32(static_cast<uint32_t>(address.x)); writer.u32(static_cast<uint32_t>(address.z));
 }
 ChunkAddress readAddress(Reader& reader, uint64_t& epoch) {
     if (reader.u8() != 1) throw ProtocolError("Unknown chunk schema");
     ChunkAddress address;
-    address.dimension = static_cast<DimensionId>(reader.u8());
+    address.dimension = readDimension(reader);
     epoch = reader.u64(); address.x = static_cast<int32_t>(reader.u32()); address.z = static_cast<int32_t>(reader.u32());
     addressValid(address);
     if (!epoch) throw ProtocolError("Invalid chunk stream epoch");

@@ -41,6 +41,10 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
 void stripV19Metadata(std::vector<uint8_t>& bytes,
                       const std::vector<WorldMetadata::PersistedEntity>& entities) {
     const std::array<uint8_t,20> generationTail{{0,0,0,0,2,0,'{','}',0,0,0,0,0,0,2,0,'{','}',0,0}};
+    // Remove the keyed v20 suffix before constructing historical inspection fixtures.
+    const auto prefix=std::find_end(bytes.begin(),bytes.end(),generationTail.begin(),generationTail.end());
+    require(prefix!=bytes.end(),"builtin generation prefix found");
+    bytes.resize(static_cast<size_t>(prefix-bytes.begin())+generationTail.size());
     require(bytes.size()>=generationTail.size()&&std::equal(generationTail.begin(),generationTail.end(),bytes.end()-generationTail.size()),"builtin v19 generation tail found");
     bytes.resize(bytes.size()-generationTail.size());
     std::vector<std::pair<size_t,size_t>> tails;
@@ -268,8 +272,8 @@ int main() {
             std::ofstream out(v18Directory/"level.bin",std::ios::binary|std::ios::trunc);
             out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         }
-        const auto v18=SaveStore(v18Directory).loadMetadata();
-        require(v18.entities.size()==3&&v18.entities[2].villager.growthSeconds==1200&&v18.entities[0].pluginState=="{}"&&v18.generation[0].generator.empty(),"v18 retains lifecycle fields and defaults extension fields");
+        const auto v18=SaveStore(v18Directory).loadMetadata(true);
+        require(v18.entities.size()==3&&v18.entities[2].villager.growthSeconds==1200&&v18.entities[0].pluginState=="{}"&&v18.generation.at(0).generator.empty(),"v18 retains lifecycle fields and defaults extension fields");
         const auto v16Directory=root/"legacy-v16";
         SaveStore(v16Directory).saveMetadata(source);
         {
@@ -281,7 +285,7 @@ int main() {
             std::ofstream out(v16Directory/"level.bin",std::ios::binary|std::ios::trunc);
             out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         }
-        const auto old=SaveStore(v16Directory).loadMetadata();
+        const auto old=SaveStore(v16Directory).loadMetadata(true);
         require(old.entities.size()==3 && old.entities[2].villager.adult() &&
             old.entities[2].villager.food[0].empty() && old.entities[2].villager.reputation==0,
             "v16 entity defaults changed or legacy entity layout is broken");
@@ -343,7 +347,7 @@ int main() {
             std::ofstream output(v14Directory / "level.bin", std::ios::binary);
             output.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         }
-        const auto v14 = SaveStore(v14Directory).loadMetadata();
+        const auto v14 = SaveStore(v14Directory).loadMetadata(true);
         require(v14.dayNightDurationSeconds == 180 && !v14.gameRules.boolean(GameRuleId::KeepInventory) &&
                 v14.gameRules.integer(GameRuleId::RandomTickSpeed) == 3 && v14.gameRules.unknown.empty(),
                 "v14 preserves duration and fills Java defaults");
@@ -362,17 +366,17 @@ int main() {
             std::ofstream output(v13Path, std::ios::binary | std::ios::trunc);
             output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
         }
-        const auto v13 = SaveStore(v13Directory).loadMetadata();
+        const auto v13 = SaveStore(v13Directory).loadMetadata(true);
         require(v13.dayNightDurationSeconds == 1200 && v13.foodTickTimer == source.foodTickTimer,
                 "v13 retains food timer and defaults duration to twenty minutes");
         SaveStore(v13Directory).saveMetadata(v13);
-        require(SaveStore(v13Directory).loadMetadata().dayNightDurationSeconds == 1200,
+        require(SaveStore(v13Directory).loadMetadata(true).dayNightDurationSeconds == 1200,
                 "legacy duration default survives upgrade to v14");
         WorldMetadata invalidDuration = source;
         invalidDuration.dayNightDurationSeconds = 0;
         SaveStore(v13Directory).saveMetadata(invalidDuration);
         bool invalidDurationRejected = false;
-        try { (void)SaveStore(v13Directory).loadMetadata(); }
+        try { (void)SaveStore(v13Directory).loadMetadata(true); }
         catch (const std::exception&) { invalidDurationRejected = true; }
         require(invalidDurationRejected, "zero saved duration is rejected");
 
@@ -386,7 +390,7 @@ int main() {
             writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
             std::ofstream output(corruptDirectory / "level.bin",std::ios::binary|std::ios::trunc);
             output.write(reinterpret_cast<const char*>(bytes.data()),bytes.size()); output.close();
-            bool failed=false; try { (void)SaveStore(corruptDirectory).loadMetadata(); } catch (const std::exception&) { failed=true; }
+            bool failed=false; try { (void)SaveStore(corruptDirectory).loadMetadata(true); } catch (const std::exception&) { failed=true; }
             require(failed,"malformed typed rule table rejected");
         };
         auto changed = ruleBytes; changed[first+firstName.size()]=9; rejectRules(changed);
@@ -441,9 +445,9 @@ int main() {
             output.write(reinterpret_cast<const char*>(bytes.data()),
                          static_cast<std::streamsize>(bytes.size()));
         }
-        require(SaveStore(legacyDirectory).loadMetadata().seed == source.seed,
+        require(SaveStore(legacyDirectory).loadMetadata(true).seed == source.seed,
                 "existing little-endian v7 metadata remains readable");
-        require(SaveStore(legacyDirectory).loadMetadata().worldType == WorldType::Normal,
+        require(SaveStore(legacyDirectory).loadMetadata(true).worldType == WorldType::Normal,
                 "legacy metadata defaults to normal terrain");
 
         const auto v10Directory = root / "legacy-v10";
@@ -464,7 +468,7 @@ int main() {
             output.write(reinterpret_cast<const char*>(bytes.data()),
                          static_cast<std::streamsize>(bytes.size()));
         }
-        const auto migratedV10 = SaveStore(v10Directory).loadMetadata();
+        const auto migratedV10 = SaveStore(v10Directory).loadMetadata(true);
         require(migratedV10.dayNightDurationSeconds == 1200, "v10 defaults duration to twenty minutes");
         require(migratedV10.foodTickTimer == 0,
                 "v10 metadata defaults the Java food timer to zero");
@@ -472,6 +476,11 @@ int main() {
                 migratedV10.heaven.worldTicks == source.heaven.worldTicks,
                 "v10 dimension state remains readable after migration");
 
+        for(const auto& directory:{v18Directory,v16Directory,v14Directory,v13Directory,legacyDirectory,v10Directory}) {
+            const auto before=readBytes(directory/"level.bin");bool refused=false;
+            try{(void)SaveStore(directory).loadMetadata();}catch(const std::exception&){refused=true;}
+            require(refused&&readBytes(directory/"level.bin")==before,"legacy runtime load refuses without rewriting");
+        }
         std::vector<BlockOverride> overrides = {
             {0, BlockId::AIR},
             {static_cast<uint32_t>(15 + 15 * 16 +

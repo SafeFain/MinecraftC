@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "このディメンションの天候は固定されています。",
+  "message.dimension_entered": "ディメンションに移動しました：{0}",
+  "message.dimension_travel_failed": "移動できません：無効な対象、または安全な場所がありません。",
   "action.0": "前に移動",
   "action.1": "後ろに移動",
   "action.2": "左に移動",

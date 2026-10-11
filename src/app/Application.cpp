@@ -180,6 +180,7 @@ private:
         m_plugins.entitySnapshot=[this](uint32_t d,uint64_t id,MC_EntitySnapshot& out,std::string& state){return m_session.pluginEntitySnapshot(d,id,out,state);};
         m_plugins.removeEntity=[this](uint32_t d,uint64_t id){return m_session.pluginRemoveEntity(d,id);};
         m_plugins.entityIntent=[this](uint32_t d,uint64_t id,const MC_EntityIntent& intent){return m_session.pluginEntityIntent(d,id,intent);};
+        m_plugins.travelPlayer=[this](uint64_t id,uint32_t dim){const bool result=m_session.pluginTravel(id,dim);if(result&&!id)m_flow.beginDimensionLoading();return result;};
         m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
         m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};
         m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};
@@ -297,7 +298,7 @@ private:
         m_sessionFeedback.sleepStarted = [this] {
             m_ui.activeMenu = std::make_unique<SleepMenu>(
                 m_ui.menuCallbacks, m_ui.localization,
-                m_session.activeDimension() == DimensionId::Heaven);
+                m_session.activeDimension() != DimensionId::Overworld);
             m_window.setCursorLocked(false);
         };
         m_sessionFeedback.sleepEnded = [this] {
@@ -321,16 +322,14 @@ private:
         };
         m_session.setBedCallback([this](const glm::ivec3& bed) {
             if (!m_session.isNight()) {
-                if (m_session.activeDimension() == DimensionId::Overworld)
-                    m_session.setOverworldBedSpawn(bed);
+                m_session.setDimensionBedSpawn(bed);
                 m_flow.showCommandMessage(m_ui.localization.text(
-                    m_session.activeDimension() == DimensionId::Overworld
+                    m_session.activeDimension() != DimensionId::Heaven
                         ? "message.respawn_set" : "message.heaven_bed_day"));
                 return;
             }
             if (m_session.beginSleepAtBed(bed)) {
-                if (m_session.activeDimension() == DimensionId::Overworld)
-                    m_session.setOverworldBedSpawn(bed);
+                m_session.setDimensionBedSpawn(bed);
                 if (m_sessionFeedback.sleepStarted) m_sessionFeedback.sleepStarted();
             } else if (m_sessionFeedback.sleepBlocked) {
                 m_sessionFeedback.sleepBlocked();

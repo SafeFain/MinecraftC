@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "Das Wetter in dieser Dimension ist festgelegt.",
+  "message.dimension_entered": "Dimension betreten: {0}",
+  "message.dimension_travel_failed": "Dimensionswechsel fehlgeschlagen: ungültiges Ziel oder kein sicherer Landeplatz.",
   "action.0": "Vorwärts bewegen",
   "action.1": "Rückwärts bewegen",
   "action.2": "Nach links bewegen",

@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "La météo est fixe dans cette dimension.",
+  "message.dimension_entered": "Dimension rejointe : {0}",
+  "message.dimension_travel_failed": "Impossible de rejoindre la dimension : destination invalide ou aucun point sûr.",
   "action.0": "Avancer",
   "action.1": "Reculer",
   "action.2": "Aller à gauche",

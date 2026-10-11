@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "此维度的天气固定。",
+  "message.dimension_entered": "已进入维度：{0}",
+  "message.dimension_travel_failed": "无法进入维度：目标无效或没有安全落点。",
   "action.0": "向前移动",
   "action.1": "向后移动",
   "action.2": "向左移动",

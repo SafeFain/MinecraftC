@@ -60,16 +60,39 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
     }
     entries.emplace(id,std::move(e));return 0;
 }
+int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_DimensionDefinition& d,uint32_t& id) {
+    require(d.size>=sizeof(d),"Dimension descriptor size mismatch");owned(ctx,text(d.key));
+    DimensionContent value;value.key=d.key;value.name=text(d.name);value.revision=text(d.revision);
+    require(value.name.size()<=256&&value.revision.size()<=128,"Dimension name/revision too long");
+    value.generation.generator=text(d.generator);value.generation.revision=text(d.generator_revision);
+    value.generation.parameters=d.parameters?d.parameters:"{}";
+    auto reference=[&](const std::string& key){require(validKey(key),"Invalid dimension reference");const auto name=key.substr(0,key.find(':'));if(name=="minecraftc"||name==m_info.at(ctx.index).manifest.id)return;const auto& dependencies=m_info.at(ctx.index).manifest.dependencies;require(std::any_of(dependencies.begin(),dependencies.end(),[&](const Dependency& dependency){return dependency.id==name;}),"Cross-plugin dimension reference requires dependency");};
+    reference(value.generation.generator);
+    require(d.modifier_count<=64&&(!d.modifier_count||d.modifiers),"Invalid default modifiers");
+    for(uint32_t i=0;i<d.modifier_count;++i){const auto key=text(d.modifiers[i].key);reference(key);value.generation.modifiers.emplace_back(key,text(d.modifiers[i].revision));}
+
+    require(d.weather<=MC_WEATHER_THUNDER&&d.disable_natural_spawning<=1&&d.spawn<=MC_SPAWN_FIXED,"Invalid dimension policy");
+    value.weather=d.weather;value.natural=!d.disable_natural_spawning;value.spawn=d.spawn;
+    for(int axis=0;axis<3;++axis){require(std::isfinite(d.spawn_position[axis])&&std::abs(d.spawn_position[axis])<=30000000,"Invalid spawn position");value.position[axis]=d.spawn_position[axis];}
+    if(value.spawn==MC_SPAWN_FIXED)require(value.position[1]>=Config::WORLD_MIN_Y&&value.position[1]<Config::WORLD_MAX_Y-2,"Spawn outside build height");
+    value.deathTarget=d.death_target?d.death_target:"";value.voidTarget=d.void_target?d.void_target:"";
+    if(!value.deathTarget.empty())reference(value.deathTarget);
+    if(!value.voidTarget.empty())reference(value.voidTarget);
+    auto& entries=content().extensions.dimensions;
+    for(const auto& entry:entries)require(entry.second.key!=value.key,"Duplicate dimension");
+    require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");id=static_cast<uint32_t>(entries.size());
+    entries.emplace(id,std::move(value));return 0;
+}
 int32_t PluginManager::generator(MC_PluginContext& ctx,const MC_GeneratorDefinition& d) {
     require(d.size>=sizeof(d),"Generator descriptor size mismatch");owned(ctx,text(d.key));
-    require(d.dimension<=1&&d.column&&d.voxel,"Generator requires column and voxel callbacks");
+    require(validDimension(d.dimension)&&d.column&&d.voxel,"Generator requires column and voxel callbacks");
     GeneratorContent g;g.key=d.key;g.name=text(d.name);g.revision=text(d.revision);
     require(g.revision.size()<=128,"Generator revision too long");g.dimension=d.dimension;g.column=d.column;g.voxel=d.voxel;g.userdata=d.userdata;
     require(content().extensions.generators.emplace(g.key,g).second,"Duplicate generator");return 0;
 }
 int32_t PluginManager::modifier(MC_PluginContext& ctx,const MC_ModifierDefinition& d) {
     require(d.size>=sizeof(d),"Modifier descriptor size mismatch");owned(ctx,text(d.key));
-    require(d.dimension<=1&&d.radius<=64&&d.decorate,"Invalid modifier");
+    require(validDimension(d.dimension)&&d.radius<=64&&d.decorate,"Invalid modifier");
     ModifierContent m;m.key=d.key;m.revision=text(d.revision);require(m.revision.size()<=128,"Modifier revision too long");
     m.dimension=d.dimension;m.radius=d.radius;m.decorate=d.decorate;m.userdata=d.userdata;
     require(content().extensions.modifiers.emplace(m.key,m).second,"Duplicate modifier");return 0;
@@ -145,7 +168,7 @@ const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t
             auto& m=owner(c);m.enqueue(*c,[&m,dim,type,copy]{return m.spawnEntity&&m.spawnEntity(dim,type,copy.data());});});},
         [](MC_PluginContext* c,uint32_t dim,uint64_t id,MC_EntitySnapshot* out,char* state,uint32_t cap){return call(c,[&]{require(dim<=1&&out&&out->size>=sizeof(*out),"Invalid entity snapshot arguments");auto& m=owner(c);std::string data;
             require(m.entitySnapshot&&m.entitySnapshot(dim,id,*out,data),"Entity unavailable");require(state&&cap>data.size(),"Entity state buffer too small");std::memcpy(state,data.c_str(),data.size()+1);out->state=state;});},
-        [](MC_PluginContext* c,uint32_t dim,uint64_t id){return call(c,[&]{require(dim<=1,"Invalid dimension");auto& m=owner(c);m.enqueue(*c,[&m,dim,id]{return m.removeEntity&&m.removeEntity(dim,id);});});},
+        [](MC_PluginContext* c,uint32_t dim,uint64_t id){return call(c,[&]{require(validDimension(dim),"Invalid dimension");auto& m=owner(c);m.enqueue(*c,[&m,dim,id]{return m.removeEntity&&m.removeEntity(dim,id);});});},
         [](MC_PluginContext* c,uint32_t dim,uint64_t id,const MC_EntityIntent* intent){return call(c,[&]{require(dim<=1&&intent&&intent->size>=sizeof(*intent),"Invalid entity intent");auto copy=*intent;std::string state=intent->state?intent->state:"";require(state.size()<=MC_ENTITY_STATE_LIMIT,"Entity state too large");if(!state.empty())Json::parse(state);
             for(float v:copy.movement)require(std::isfinite(v)&&std::abs(v)<=32,"Invalid entity movement");
             require(copy.jump<=1,"Invalid jump flag");auto& m=owner(c);
@@ -165,7 +188,14 @@ const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t
         [](MC_PluginContext* c,const MC_RenderDraw* d){return call(c,[&]{auto& m=owner(c);require(d&&d->size>=sizeof(*d)&&m.renderDraw&&m.renderDraw(c->index,*d),"Render draw unavailable/invalid");});},
         [](MC_PluginContext* c,uint64_t index,MC_RenderHandle pipeline){return call(c,[&]{auto& m=owner(c);require(m.renderScene&&m.renderScene(c->index,index,pipeline),"Scene submission unavailable/invalid");});},
         [](MC_PluginContext* c,MC_RenderHandle buffer,const void* data,uint32_t size){return call(c,[&]{auto& m=owner(c);require(data&&m.renderBuffer&&m.renderBuffer(c->index,buffer,data,size),"Render buffer unavailable/invalid");});}};
+    static const MC_DimensionsV1 dimensions{sizeof(MC_DimensionsV1),1,
+        [](MC_PluginContext* c,const MC_DimensionDefinition* d,uint32_t* id){return call(c,[&]{require(d&&id,"Missing dimension arguments");owner(c).dimensionDefinition(*c,*d,*id);},true);},
+        [](MC_PluginContext* c,const char* key)->uint32_t {uint32_t result=MC_INVALID_DIMENSION;call(c,[&]{result=resolveDimension(text(key));});return result;},
+        [](MC_PluginContext* c,uint32_t id,MC_DimensionDefinition* out){return call(c,[&]{require(content().frozen&&out&&out->size>=sizeof(*out),"Dimension query requires frozen registry and sized output");const auto& d=dimensionContent(id);
+            *out={};out->size=sizeof(*out);out->key=d.key.c_str();out->name=d.name.c_str();out->revision=d.revision.c_str();out->generator=d.generation.generator.c_str();out->generator_revision=d.generation.revision.c_str();out->parameters=d.generation.parameters.c_str();out->weather=d.weather;out->disable_natural_spawning=!d.natural;out->spawn=d.spawn;std::copy(d.position.begin(),d.position.end(),out->spawn_position);out->death_target=d.deathTarget.c_str();out->void_target=d.voidTarget.c_str();if(d.modifierView.empty())for(const auto& m:d.generation.modifiers)d.modifierView.push_back({m.first.c_str(),m.second.c_str()});out->modifiers=d.modifierView.data();out->modifier_count=static_cast<uint32_t>(d.modifierView.size());});},
+        [](MC_PluginContext* c,uint64_t player,uint32_t dim){return call(c,[&]{require(validDimension(dim),"Invalid dimension");auto& m=owner(c);require(context().player==0||context().player==player,"Cannot travel another player as guest");m.enqueue(*c,[&m,player,dim]{return m.travelPlayer&&m.travelPlayer(player,dim);});});}};
     const std::string key=name;
+    if(key==MC_DIMENSIONS_EXTENSION)return &dimensions;
     if(key==MC_ENTITIES_EXTENSION)return &entities;
     if(key==MC_WORLDGEN_EXTENSION)return &worldgen;
     if(key==MC_RENDER_EXTENSION)return &render;

@@ -149,16 +149,13 @@ int main() {
     profile.bedSpawn=glm::ivec3(-4,70,-8);profile.inventory.slot(0)={ItemId::DIAMOND,12,0};
     auto profileBytes=encodeProfile(profile);auto restored=decodeProfile(profileBytes);
     check(restored.positions[0]==profile.positions[0] && restored.inventory.count(ItemId::DIAMOND)==12 && restored.bedSpawn==profile.bedSpawn,"Player profile roundtrip failed");
-    for(uint16_t version:{uint16_t(1),uint16_t(2)}) {
-        Reader paletteReader(profileBytes);paletteReader.u32();paletteReader.u16();const auto count=paletteReader.u16();
-        for(uint16_t i=0;i<count;++i){paletteReader.u16();paletteReader.text(256);}
-        const size_t offset=profileBytes.size()-paletteReader.remaining();
-        Bytes legacy(profileBytes.begin(),profileBytes.begin()+6);legacy[4]=static_cast<uint8_t>(version);legacy[5]=0;
-        const size_t end=profileBytes.size()-8-(version==1?50:0);
-        legacy.insert(legacy.end(),profileBytes.begin()+offset,profileBytes.begin()+end);
+    for(uint16_t version:{uint16_t(1),uint16_t(2),uint16_t(3)}) {
+        Bytes legacy(profileBytes.begin(),profileBytes.end()-8);legacy[4]=static_cast<uint8_t>(version);legacy[5]=0;
         uint64_t checksum=14695981039346656037ULL;for(auto byte:legacy){checksum^=byte;checksum*=1099511628211ULL;}
         Writer trailer;trailer.u64(checksum);legacy.insert(legacy.end(),trailer.bytes.begin(),trailer.bytes.end());
-        check(decodeProfile(legacy).inventory.count(ItemId::DIAMOND)==12,"Legacy profile version remains readable");
+        bool refused=false;
+        try{decodeProfile(legacy);}catch(const ProtocolError& error){refused=std::string(error.what())=="Unsupported player profile format";}
+        check(refused,"Legacy profile version must be explicitly refused");
     }
     profileBytes[20]^=1;rejects([&]{decodeProfile(profileBytes);});
     profiles.save(profile);auto reloaded=profiles.load(profile.identity);check(reloaded && reloaded->inventory.count(ItemId::DIAMOND)==12,"Persistent player data missing");

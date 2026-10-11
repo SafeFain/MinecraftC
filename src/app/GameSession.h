@@ -149,6 +149,7 @@ public:
     bool handleVoidFall(RuntimeClock::Tick loadingStarted, const Feedback& feedback);
     bool switchDimension(DimensionId target, RuntimeClock::Tick loadingStarted);
     DimensionId activeDimension() const { return dimension; }
+    bool worldLoadingPending() const { return !terrainGenerated && (saveStore || lanJoining); }
     void respawn(RuntimeClock::Tick loadingStarted = 0);
     CommandResult executeCommand(const ParsedCommand& command,
                                  const Localization& localization,
@@ -174,7 +175,7 @@ public:
                             WorldType type = WorldType::Normal);
     void setCreationGeneration(std::array<Plugins::GenerationConfig,2> g) {creationGeneration=std::move(g);}
     bool deleteWorld(const std::string& id);
-    void setOverworldBedSpawn(const glm::ivec3& bed);
+    void setDimensionBedSpawn(const glm::ivec3& bed);
     bool isNight() const { return dayNightCycle().isNight(); }
     void updateDaylight(float dt, bool playing);
     void configureVisuals(const EnhancedVisualSettings& visuals, VisualQuality quality);
@@ -213,6 +214,7 @@ public:
     bool pluginPlayerById(uint64_t,MC_PlayerSnapshot&,uint32_t&) const;
     bool sendPluginCommand(const std::string&);
     bool pluginPlayer(MC_PlayerSnapshot&) const;
+    bool pluginTravel(uint64_t,uint32_t);
     bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);
     bool pluginGiveItem(uint16_t,uint32_t);
@@ -243,7 +245,7 @@ private:
     std::unique_ptr<SaveStore> saveStore;
     ThreadPool threadPool;
     DimensionId dimension = DimensionId::Overworld;
-    std::array<std::unique_ptr<DimensionSimulation>, 2> simulations;
+    std::vector<std::unique_ptr<DimensionSimulation>> simulations;
     Player player;
     // Declared after dimensions: all remote Players are destroyed before Worlds.
     std::map<uint64_t, std::unique_ptr<LanPlayerRuntime>> guests;
@@ -323,7 +325,7 @@ private:
     void finishLanSleep(LanPlayerRuntime& guest);
     void updateLanSleep(float dt);
     bool trySkipLanNight(DimensionId target);
-    void travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false);
+    bool travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false);
     void simulateDimension(DimensionId id, const std::vector<EntityPlayerView>& views,
                            float dt, const Feedback& feedback, size_t& fluidRemaining,
                            std::chrono::steady_clock::time_point fluidDeadline);
@@ -341,6 +343,8 @@ private:
     uint64_t& survivalTicks() { return simulation().ticks; }
     float& survivalWorldTickRemainder() { return simulation().tickRemainder; }
     DimensionSimulation& ensureDimension(DimensionId target);
+    std::optional<glm::dvec3> dimensionLanding(DimensionId, std::optional<glm::dvec3> preferred = {}, std::optional<glm::ivec3> bed = {});
+    DimensionId deathDimension(DimensionId) const;
     void flushDimensions(bool synchronous);
     LodSettings lodSettings;
     ParticleSystem particles;

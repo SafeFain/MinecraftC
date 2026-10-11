@@ -147,6 +147,7 @@ WorldGenerator::WorldGenerator(
     , m_oreGenerator(m_noise, m_seed)
     , m_structureGenerator(m_seed, m_heightPipeline)
 {
+    if(static_cast<uint32_t>(dimension)>=2&&m_pluginConfig==Plugins::GenerationConfig{})m_pluginConfig=Plugins::dimensionContent(dimension).generation;
     Plugins::validateGeneration(m_pluginConfig,static_cast<uint32_t>(dimension));
     if (isHeaven()&&!customGenerator()) {
         m_heavenSpawnBlock = findHeavenSpawnBlock();

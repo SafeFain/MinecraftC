@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "الطقس ثابت في هذا البعد.",
+  "message.dimension_entered": "تم الدخول إلى البعد: {0}",
+  "message.dimension_travel_failed": "تعذر دخول البعد: وجهة غير صالحة أو لا توجد نقطة آمنة.",
   "action.0": "التقدم للأمام",
   "action.1": "الرجوع للخلف",
   "action.2": "التحرك لليسار",

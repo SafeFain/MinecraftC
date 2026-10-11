@@ -97,7 +97,7 @@ Generator/modifier keys, author revisions, parameter bytes and order contribute 
 full cache identities; old base/LOD caches are rebuilt on a mismatch. Bump the
 registration's revision whenever its deterministic output changes. Plugin output
 has its own saved identity: unchanged builtin generation remains v20/Heaven v9.
-No additional dimensions or automatic generation migration are introduced.
+Additional dimensions use the [dimension registration extension](plugins.md#dimension-registration-abi-1-extension-version-1). No automatic generation migration is supplied.
 
 A portable flat generator is configured as:
 
@@ -183,10 +183,10 @@ and links only the SDK headers.
 
 ## Compatibility and regression checks
 
-Save v19 adds stable entity keys/state and both dimensions' generation choices.
-Builtin v2–v18 saves remain readable under the existing generation/plugin requirement
-rules. LAN protocol 4 adds stable entity/state replication and generator configuration;
-protocol 3 peers are incompatible. Registrations and author behavior identifiers
+Save v20 stores stable entity keys/state and keyed dimension generation/policy state.
+Builtin v2–v19 metadata is inspectable, but worlds require v20 to open; refusals never
+rewrite files. LAN protocol 5 adds dimension keys to entity/state/terrain replication
+and the complete world generation table; older peers are incompatible. Registrations and author behavior identifiers
 participate in the existing exact gameplay handshake. Visual-only render packages
 can differ across peers, while entity/generator registrations require gameplay scope.
 The original ABI 1 table offsets and legacy native-entry support remain unchanged.

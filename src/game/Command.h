@@ -33,11 +33,13 @@ enum class CommandType {
     Weather,
     LocateBiome,
     LocateStructure,
-    Give
+    Give,
+    Dimension
 };
 
 struct ParsedCommand {
     CommandType type = CommandType::Help;
+    std::string dimensionKey;
     GameMode gameMode = GameMode::Survival;
     TeleportTarget teleport;
     ItemId item = ItemId::EMPTY;
@@ -123,6 +125,10 @@ inline CommandParseResult parseCommand(const std::string& input) {
             if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
         }
         parsed.type = CommandType::Help;
+    } else if (name == "/dimension") {
+        if(tokens.size()<2)return expected(input,tokens,1,"list|<dimension>");
+        if(tokens.size()>2)return expected(input,tokens,2,"<end>");
+        parsed.type=CommandType::Dimension;parsed.dimensionKey=tokens[1].text;
     } else if (name == "/give") {
         if (tokens.size() < 2) return expected(input, tokens, 1, "<item>");
         const auto item = itemFromCommandName(tokens[1].text);

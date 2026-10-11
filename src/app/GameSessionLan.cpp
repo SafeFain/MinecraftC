@@ -164,7 +164,7 @@ void GameSession::pollLan(double now) {
             if (received.message.type == Lan::MessageType::ChunkRequest) {
                 Lan::Reader reader(received.message.payload);
                 if (reader.u8() != 1) throw Lan::ProtocolError("Unknown chunk request schema");
-                const auto requestedDimension = static_cast<DimensionId>(reader.u8());
+                const auto requestedDimension = Lan::readDimension(reader);
                 const uint64_t epoch = reader.u64();
                 const int x = static_cast<int32_t>(reader.u32()), z = static_cast<int32_t>(reader.u32());
                 reader.finish();
@@ -267,17 +267,13 @@ void GameSession::updateLanPlayers(float dt) {
         for (int dx = -1; dx <= 1; ++dx) for (int dz = -1; dz <= 1; ++dz)
             ready = ready && runtime.world.isGeneratedAt((cx + dx) * 16, (cz + dz) * 16);
         guest.loading = !ready;
-        if (ready && guest.pendingRespawn) {
-            guest.pendingRespawn = false;
-            const auto bed = guest.profile.bedSpawn ? runtime.world.validBedFoot(*guest.profile.bedSpawn) : std::nullopt;
-            const auto spawn = bed ? *bed : worldMetadata.worldSpawn;
-            const double height = bed ? blockCollisionHeight(runtime.world.getBlock(spawn.x, spawn.y, spawn.z)) + .001 : 1.01;
-            guest.player.setPosition(glm::dvec3(spawn) + glm::dvec3(.5, height, .5));
-            if (!bed) guest.profile.bedSpawn.reset();
-            guest.loading = !runtime.world.isGeneratedAt(spawn.x, spawn.z);
-        }
-        if (guest.profile.dimension == DimensionId::Heaven && guest.player.getPosition().y < Config::WORLD_MIN_Y - 32) {
-            travelLanPlayer(guest, DimensionId::Overworld); continue;
+        if(guest.player.onGround())guest.profile.safePositions[static_cast<uint32_t>(guest.profile.dimension)]=guest.player.getPosition();
+        const auto& definition=Plugins::dimensionContent(guest.profile.dimension);
+        if(!definition.voidTarget.empty()&&guest.player.getPosition().y<Config::WORLD_MIN_Y-2) {
+            const auto target=static_cast<DimensionId>(Plugins::resolveDimension(definition.voidTarget));
+            const auto targetId=static_cast<uint32_t>(target);auto safe=guest.profile.safePositions.find(targetId);
+            if(safe!=guest.profile.safePositions.end()){guest.profile.positions[targetId]=safe->second;guest.profile.positioned[targetId]=true;}
+            if(travelLanPlayer(guest,target))continue;
         }
         if (guest.dead || guest.loading || guest.windowView.kind != InventoryWindowKind::Closed || guest.sleep != 0 || lanNow - guest.lastInput > 1) {
             guest.input.clearVirtual();
@@ -358,19 +354,21 @@ void GameSession::simulateDimension(DimensionId id, const std::vector<EntityPlay
                                     float dt, const Feedback& feedback, size_t& fluidRemaining,
                                     std::chrono::steady_clock::time_point fluidDeadline) {
     auto& runtime = *simulations[static_cast<size_t>(id)];
-    const bool overworld = id == DimensionId::Overworld;
+    const auto& policy=Plugins::dimensionContent(id);
+    if(policy.weather!=MC_WEATHER_NORMAL)runtime.weather.setWeather(static_cast<WeatherType>(policy.weather-1));
     runtime.entities.update(views, dt, runtime.daylight.isDay(), worldMetadata.difficulty == Difficulty::Peaceful,
-                            overworld && runtime.weather.thundering(), overworld && runtime.weather.raining(), runtime.ticks);
+                            runtime.weather.thundering(), runtime.weather.raining(), runtime.ticks);
     std::vector<glm::dvec3> positions;
     for (const auto& view : views) positions.push_back(view.player->getPosition());
     runtime.tickRemainder += dt * 20;
     while (runtime.tickRemainder >= 1) {
         ++runtime.ticks;
         runtime.tickRemainder -= 1;
-        if (overworld) {
+        if (policy.weather==MC_WEATHER_NORMAL) {
             runtime.weather.tick(worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather));
-            tickLightning(runtime, feedback);
+
         }
+        tickLightning(runtime,feedback);
         auto& world = runtime.world;
         world.tickBlockEntities();
         world.tickInteractiveBlocks([&](const glm::ivec3& p) { return runtime.entities.arrowTouchesButton(p); });
@@ -380,7 +378,7 @@ void GameSession::simulateDimension(DimensionId id, const std::vector<EntityPlay
         fluidRemaining -= budget;
         world.tickFluids(runtime.ticks, FluidTickBudget{budget, fluidDeadline});
         world.tickSurvival(positions, runtime.ticks, runtime.weather.raining());
-        if (overworld && runtime.ticks % 20 == 0)
+        if (runtime.ticks % 20 == 0)
             world.tickWeather(runtime.weather, runtime.daylight.isDay(), runtime.ticks);
         for (const auto& position : world.takeTntIgnitions())
             runtime.entities.primeTnt(position, 4, false);

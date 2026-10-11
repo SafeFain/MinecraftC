@@ -110,11 +110,11 @@ void GameFlowController::abortPluginSession(const std::string& error) {
 }
 
 void GameFlowController::respawnPlayer() {
-    const bool wasHeaven = m_session.activeDimension() == DimensionId::Heaven;
     m_session.respawn(m_clock.now());
-    if (wasHeaven) beginDimensionLoading();
+    const bool loading=m_session.worldLoadingPending();
+    if (loading) beginDimensionLoading();
     m_scene.resetPlayerFeedback(m_session.playerState().getPosition());
-    if (!wasHeaven) { m_session.setLocalControl(true); m_window.setCursorLocked(true); }
+    if (!loading) { m_session.setLocalControl(true); m_window.setCursorLocked(true); }
 }
 
 void GameFlowController::openInventory() {

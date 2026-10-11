@@ -377,8 +377,8 @@ remain listed and refused without rewriting or migration.
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v19 (introduced in v15); v2–v14 retain readable defaults and
-existing duration values. Missing/partial mechanics are explicit in feedback.
+are world-wide and persisted in save v20 (introduced in v15); legacy metadata remains
+inspectable, but opening worlds requires v20. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
 ### Plugin loader
@@ -388,8 +388,11 @@ data packages; frozen block/item/recipe registries, shared material atlases, con
 gameplay events/operations, environment colors and HUD. Versioned extensions register
 new/overridden mobs with models, AI and instance state, selected per-dimension terrain
 generators/modifiers, and Vulkan-owned resources with replaceable render stages.
-Save v19 and LAN protocol 4 retain stable entity keys/state and generator choices;
-legacy v2–v18 readers and unchanged builtin generation remain.
+Dimension registration supplies namespaced identities, default generators, weather,
+natural spawning, entry/respawn and void-return policies. SDK travel and `/dimension`
+commands use host authority. Save v20 and LAN protocol 5 retain keyed dimension state
+and stable entity keys/generation choices. Older saves are inspection-only; builtin
+generation remains v20/Heaven v9.
 [Installation and SDK](plugins.md), [extension contracts/examples](plugin-extensions.md).
 
 ## Doors and buttons (generation v20)

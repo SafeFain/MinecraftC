@@ -66,7 +66,7 @@ PlayerView readPlayer(Reader& reader) {
     Writer check; writePlayer(check, player); return player;
 }
 void stateValid(const AuthorityState& state) {
-    if (state.sleepState > 3 || state.dimension > DimensionId::Heaven || !state.epoch || state.others.size() > 7 || state.roster.size() > MAX_PLAYERS ||
+    if (state.sleepState > 3 || !Plugins::validDimension(state.dimension) || !state.epoch || state.others.size() > 7 || state.roster.size() > MAX_PLAYERS ||
         state.dayDuration < 1 || state.health < 0 || state.health > 20 || state.hunger > 20 ||
         state.saturation < 0 || state.saturation > 20 || state.exhaustion < 0 || state.exhaustion > 40)
         throw ProtocolError("Invalid authority state");
@@ -75,7 +75,7 @@ void stateValid(const AuthorityState& state) {
     std::set<uint64_t> rosterIds;
     Writer names;
     for (const auto& member : state.roster) {
-        if (member.dimension > DimensionId::Heaven || member.nickname.empty() || !rosterIds.insert(member.id).second)
+        if (!Plugins::validDimension(member.dimension) || member.nickname.empty() || !rosterIds.insert(member.id).second)
             throw ProtocolError("Invalid room roster");
         names.text(member.nickname, 64);
     }
@@ -103,11 +103,13 @@ GameRuleSet readRules(Reader& reader) {
 }
 }
 Bytes encodeWorldInfo(const WorldInfo& value) {
+    if(value.generation.size()!=Plugins::content().extensions.dimensions.size())throw ProtocolError("Dimension table mismatch");
     if (value.type > WorldType::Superflat || value.difficulty > Difficulty::Hard) throw ProtocolError("Invalid world description");
     Writer writer; writer.u8(1); writer.text(value.name, 256); writer.u64(value.seed); writer.u32(value.generationVersion);
     writer.u8(static_cast<uint8_t>(value.type)); writer.u8(static_cast<uint8_t>(value.difficulty));
     writeRules(writer, value.rules);
-    for(uint32_t d=0;d<2;++d){const auto& g=value.generation[d];try{Plugins::validateGeneration(g,d);}catch(const std::exception& error){throw ProtocolError(error.what());}
+    writer.u32(static_cast<uint32_t>(value.generation.size()));
+    for(const auto& entry:value.generation){const auto d=entry.first;const auto& g=entry.second;writeDimension(writer,static_cast<DimensionId>(d));writer.text(Plugins::dimensionContent(d).revision);try{Plugins::validateGeneration(g,d);}catch(const std::exception& error){throw ProtocolError(error.what());}
         if(g.modifiers.size()>64)throw ProtocolError("Too many modifiers");
         writer.text(g.generator);writer.text(g.revision);writer.text(g.parameters,4096);writer.u16(static_cast<uint16_t>(g.modifiers.size()));
         for(const auto& m:g.modifiers){writer.text(m.first);writer.text(m.second);}}
@@ -119,7 +121,9 @@ WorldInfo decodeWorldInfo(const Bytes& bytes) {
     value.name = reader.text(256); value.seed = reader.u64(); value.generationVersion = reader.u32();
     value.type = static_cast<WorldType>(reader.u8()); value.difficulty = static_cast<Difficulty>(reader.u8());
     value.rules = readRules(reader);
-    for(uint32_t d=0;d<2;++d){auto& g=value.generation[d];g.generator=reader.text();g.revision=reader.text();g.parameters=reader.text(4096);
+    const auto dimensionCount=reader.u32();if(dimensionCount!=Plugins::content().extensions.dimensions.size())throw ProtocolError("Dimension table mismatch");
+    value.generation.clear();
+    for(uint32_t index=0;index<dimensionCount;++index){const auto d=static_cast<uint32_t>(readDimension(reader));if(value.generation.count(d)||reader.text()!=Plugins::dimensionContent(d).revision)throw ProtocolError("Dimension revision mismatch");auto& g=value.generation[d];g.generator=reader.text();g.revision=reader.text();g.parameters=reader.text(4096);
         const auto count=reader.u16();if(count>64)throw ProtocolError("Too many modifiers");
         for(uint16_t i=0;i<count;++i){auto key=reader.text();auto revision=reader.text();g.modifiers.emplace_back(key,revision);}}
     reader.finish(); encodeWorldInfo(value); return value;
@@ -127,7 +131,7 @@ WorldInfo decodeWorldInfo(const Bytes& bytes) {
 Bytes encodeAuthorityState(const AuthorityState& state) {
     stateValid(state);
     if (state.difficulty > Difficulty::Hard) throw ProtocolError("Invalid difficulty");
-    Writer writer; writer.u8(1); writer.u8(static_cast<uint8_t>(state.dimension));
+    Writer writer; writer.u8(1); writeDimension(writer,state.dimension);
     writer.u64(state.epoch); writer.u64(state.tick); writer.u64(state.inputAcknowledged); writer.f32(state.phase); writer.u32(state.dayDuration);
     writer.u8(static_cast<uint8_t>(state.difficulty)); writeRules(writer, state.rules);
     writer.u8(state.weather.raining); writer.u8(state.weather.thundering); writer.u32(state.weather.rainTicks); writer.u32(state.weather.thunderTicks); writer.u64(state.weather.sequence);
@@ -138,7 +142,7 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
     writePlayer(writer, state.self);
     writer.u8(static_cast<uint8_t>(state.others.size())); for (const auto& player : state.others) writePlayer(writer, player);
     writer.u8(static_cast<uint8_t>(state.roster.size()));
-    for (const auto& member : state.roster) { writer.u64(member.id); writer.text(member.nickname, 64); writer.u8(static_cast<uint8_t>(member.dimension)); }
+    for (const auto& member : state.roster) { writer.u64(member.id); writer.text(member.nickname, 64); writeDimension(writer,member.dimension); }
     for (const auto& stack : state.inventory.storage()) writeStack(writer, stack);
     for (const auto& stack : state.inventory.armor()) writeStack(writer, stack);
     writeStack(writer, state.inventory.offhand());
@@ -158,7 +162,7 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
 AuthorityState decodeAuthorityState(const Bytes& bytes) {
     Reader reader(bytes); AuthorityState state;
     if (reader.u8() != 1) throw ProtocolError("Unknown authority schema");
-    state.dimension = static_cast<DimensionId>(reader.u8()); state.epoch = reader.u64(); state.tick = reader.u64(); state.inputAcknowledged = reader.u64();
+    state.dimension = readDimension(reader); state.epoch = reader.u64(); state.tick = reader.u64(); state.inputAcknowledged = reader.u64();
     state.phase = reader.f32(); state.dayDuration = reader.u32();
     state.difficulty = static_cast<Difficulty>(reader.u8()); state.rules = readRules(reader);
     if (state.difficulty > Difficulty::Hard) throw ProtocolError("Invalid difficulty");
@@ -173,7 +177,7 @@ AuthorityState decodeAuthorityState(const Bytes& bytes) {
     for (uint8_t i = 0; i < count; ++i) state.others.push_back(readPlayer(reader));
     const auto rosterCount = reader.u8(); if (rosterCount > MAX_PLAYERS) throw ProtocolError("Room roster too large");
     for (uint8_t i = 0; i < rosterCount; ++i) {
-        RoomPlayer member; member.id = reader.u64(); member.nickname = reader.text(64); member.dimension = static_cast<DimensionId>(reader.u8()); state.roster.push_back(std::move(member));
+        RoomPlayer member; member.id = reader.u64(); member.nickname = reader.text(64); member.dimension = readDimension(reader); state.roster.push_back(std::move(member));
     }
     for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) state.inventory.slot(i) = readStack(reader);
     for (auto& stack : state.inventory.armor()) stack = readStack(reader);

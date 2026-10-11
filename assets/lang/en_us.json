@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "Weather is fixed in this dimension.",
+  "message.dimension_entered": "Entered dimension: {0}",
+  "message.dimension_travel_failed": "Unable to enter dimension: invalid target or no safe landing.",
   "action.0": "Move Forward",
   "action.1": "Move Backward",
   "action.2": "Move Left",

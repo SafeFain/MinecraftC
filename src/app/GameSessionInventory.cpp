@@ -189,7 +189,7 @@ void GameSession::applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction&
         (void)runtime.entities.tradeWith(action.target, static_cast<uint8_t>(action.inventory.argument), guest.player.inventory());
         guest.lastEntitiesSent = -1;
     } else if (action.kind == Lan::ActionKind::Respawn) {
-        if (guest.dead) travelLanPlayer(guest, DimensionId::Overworld, true);
+        if (guest.dead) travelLanPlayer(guest, deathDimension(guest.profile.dimension), true);
     } else if (action.kind == Lan::ActionKind::SleepChoice) {
         if ((guest.sleep != 1 && guest.sleep != 2) || action.inventory.argument > 2) return;
         const auto choice = static_cast<SleepAction>(action.inventory.argument);

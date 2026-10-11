@@ -5,7 +5,7 @@
 namespace Lan {
 namespace {
 void validate(const PlayerInput& value) {
-    if ((value.dimension != DimensionId::Overworld && value.dimension != DimensionId::Heaven) ||
+    if (!Plugins::validDimension(value.dimension) ||
         !std::isfinite(value.forward) || std::abs(value.forward) > 1 ||
         !std::isfinite(value.strafe) || std::abs(value.strafe) > 1 ||
         !std::isfinite(value.yaw) || std::abs(value.yaw) > 360 ||
@@ -19,7 +19,7 @@ Bytes encodePlayerInput(const PlayerInput& value) {
     validate(value);
     Writer writer;
     writer.u8(1);
-    writer.u8(static_cast<uint8_t>(value.dimension));
+    writeDimension(writer,value.dimension);
     writer.f32(value.forward); writer.f32(value.strafe);
     writer.f32(value.yaw); writer.f32(value.pitch);
     writer.u8(value.selected); writer.u8(value.buttons); writer.u8(value.radius); writer.u16(value.lodRadius);
@@ -29,7 +29,7 @@ PlayerInput decodePlayerInput(const Bytes& bytes) {
     Reader reader(bytes);
     if (reader.u8() != 1) throw ProtocolError("Unknown player input schema");
     PlayerInput value;
-    value.dimension = static_cast<DimensionId>(reader.u8());
+    value.dimension = readDimension(reader);
     value.forward = reader.f32(); value.strafe = reader.f32();
     value.yaw = reader.f32(); value.pitch = reader.f32();
     value.selected = reader.u8(); value.buttons = reader.u8(); value.radius = reader.u8(); value.lodRadius = reader.u16();

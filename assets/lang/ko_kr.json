@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "이 차원의 날씨는 고정되어 있습니다.",
+  "message.dimension_entered": "차원에 들어왔습니다: {0}",
+  "message.dimension_travel_failed": "차원 이동 실패: 대상이 잘못되었거나 안전한 위치가 없습니다.",
   "action.0": "앞으로 이동",
   "action.1": "뒤로 이동",
   "action.2": "왼쪽으로 이동",

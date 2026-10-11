@@ -1,4 +1,7 @@
 {
+  "message.dimension_weather_fixed": "El clima de esta dimensión es fijo.",
+  "message.dimension_entered": "Dimensión visitada: {0}",
+  "message.dimension_travel_failed": "No se puede entrar: destino no válido o sin un lugar seguro.",
   "action.0": "Avanzar",
   "action.1": "Retroceder",
   "action.2": "Moverse a la izquierda",

@@ -20,15 +20,19 @@
 struct WorldMetadata {
     struct DimensionState {
         glm::dvec3 playerPosition{0.0, 120.0, 0.0};
-        glm::ivec3 safePosition{0, 120, 0};
+        glm::ivec3 safePosition{0, 120, 0}; // builtin inspection prefix
+        glm::dvec3 safePlayerPosition{0.5,120.01,0.5};
         bool hasSafePosition = false;
+        bool positioned = false;
+        WeatherSaveState weather;
+        std::optional<glm::ivec3> bedSpawn;
         uint64_t worldTicks = 0;
         // DayNightCycle deliberately stores a plain phase here so the save
         // layer does not depend on renderer headers.
         float dayPhase = 0.04f;
     };
 
-    std::array<Plugins::GenerationConfig,2> generation;
+    std::map<uint32_t,Plugins::GenerationConfig> generation{{0,{}},{1,{}}};
     std::string displayName;
     std::vector<std::pair<std::string,std::string>> pluginRequirements;
     std::string pluginCompatibilityError;
@@ -70,6 +74,7 @@ struct WorldMetadata {
     DimensionId activeDimension = DimensionId::Overworld;
     float overworldDayPhase = 0.04f;
     DimensionState heaven;
+    std::map<uint32_t,DimensionState> dimensions;
 };
 
 struct BlockOverride {

@@ -901,7 +901,7 @@ void Player::applyPhysics(float dt) {
 
     // Clamp Y
     if (m_position.y < static_cast<double>(Config::WORLD_MIN_Y)) {
-        if (!m_world->isHeaven()) {
+        if (m_world->dimension()==DimensionId::Overworld) {
             m_position.y = static_cast<double>(Config::WORLD_MIN_Y) + 0.01;
             m_velocity.y = 0.0f;
             m_onGround = true;
@@ -914,6 +914,11 @@ void Player::applyPhysics(float dt) {
 }
 
 void Player::updateEnvironment(uint32_t ticks) {
+    if(static_cast<uint32_t>(m_world->dimension())>=2&&m_position.y<Config::WORLD_MIN_Y-2&&Plugins::dimensionContent(m_world->dimension()).voidTarget.empty()) {
+        m_environmentDamageTicks+=ticks;
+        if(m_environmentDamageTicks>=10){DamageSourceInfo source;source.amount=4;source.cause=DamageCause::Generic;source.armorApplies=false;source.causesExhaustion=false;takeDamage(source);m_environmentDamageTicks=0;}
+        return;
+    }
     const glm::ivec3 eye(
         static_cast<int>(std::floor(getEyePosition().x)),
         static_cast<int>(std::floor(getEyePosition().y)),

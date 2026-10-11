@@ -1,4 +1,5 @@
 #pragma once
+#include "plugins/ContentRegistry.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -8,7 +9,7 @@
 #include <vector>
 
 namespace Lan {
-constexpr uint16_t PROTOCOL_VERSION = 4;
+constexpr uint16_t PROTOCOL_VERSION = 5;
 constexpr uint16_t DEFAULT_PORT = 25565;
 constexpr size_t MAX_PLAYERS = 8;
 constexpr size_t MAX_PAYLOAD = 1024 * 1024;
@@ -60,6 +61,14 @@ private:
     size_t m_offset = 0;
     void require(size_t count) const;
 };
+inline void writeDimension(Writer& writer,DimensionId dimension) {
+    if(!Plugins::validDimension(dimension))throw ProtocolError("Unknown dimension");
+    writer.text(Plugins::dimensionKey(dimension),256);
+}
+inline DimensionId readDimension(Reader& reader) {
+    try{return static_cast<DimensionId>(Plugins::resolveDimension(reader.text(256)));}
+    catch(const std::exception& error){throw ProtocolError(error.what());}
+}
 Bytes encode(const Message& message);
 // Incremental bounded TCP parser. The caller drains ready frames before feeding
 // more data; partial frames survive reads without assuming socket boundaries.

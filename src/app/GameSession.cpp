@@ -19,7 +19,7 @@
 #include <chrono>
 
 GameSession::GameSession(const std::filesystem::path& savesDirectory)
-    : simulations{{std::make_unique<DimensionSimulation>(), nullptr}},
+    : simulations([]{std::vector<std::unique_ptr<DimensionSimulation>> v(2);v[0]=std::make_unique<DimensionSimulation>();return v;}()),
       player(world()), dataDirectory(savesDirectory.parent_path()), worldCatalog(savesDirectory) {
     world().setThreadPool(&threadPool);
     player.setEntityManager(&entities());
@@ -62,7 +62,8 @@ bool GameSession::deleteWorld(const std::string& id) {
     return worldCatalog.deleteWorld(id);
 }
 
-void GameSession::setOverworldBedSpawn(const glm::ivec3& bed) {
+void GameSession::setDimensionBedSpawn(const glm::ivec3& bed) {
+    worldMetadata.dimensions[static_cast<uint32_t>(dimension)].bedSpawn=bed;
     if (dimension == DimensionId::Overworld) worldMetadata.bedSpawn = bed;
 }
 
@@ -96,7 +97,7 @@ void GameSession::setToggleSneak(bool enabled) { player.setToggleSneak(enabled);
 void GameSession::initializeEntityModels(
     const std::filesystem::path& assetRoot, IGameRenderer& renderer) {
     simulations[0]->entities.initializeModels(assetRoot, renderer);
-    if (simulations[1]) simulations[1]->entities.shareModels(simulations[0]->entities);
+    for(size_t id=1;id<simulations.size();++id)if(simulations[id])simulations[id]->entities.shareModels(simulations[0]->entities);
 }
 
 void GameSession::invalidateGpuMeshes() {
@@ -349,7 +350,9 @@ void GameSession::dropContainerRemainder(ItemStack stack) {
 }
 
 DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
-    auto& runtime = simulations.at(static_cast<size_t>(target));
+    if(!Plugins::validDimension(target))throw std::runtime_error("Unknown dimension");
+    const auto index=static_cast<size_t>(target);if(simulations.size()<=index)simulations.resize(index+1);
+    auto& runtime = simulations.at(index);
     if (!runtime) {
         runtime = std::make_unique<DimensionSimulation>();
         runtime->world.setThreadPool(&threadPool);
@@ -357,28 +360,28 @@ DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
         runtime->entities.shareModels(simulations[0]->entities);
     }
     if (!runtime->initialized) {
-        if (target == DimensionId::Heaven && saveStore)
+        if (target != DimensionId::Overworld && saveStore)
             runtime->store = std::make_unique<SaveStore>(
-                saveStore->worldDirectory() / "dimensions" / "heaven");
-        SaveStore* store = target == DimensionId::Heaven ? runtime->store.get() : saveStore.get();
+                saveStore->worldDirectory() / "dimensions" / Plugins::dimensionDirectory(target));
+        SaveStore* store = target != DimensionId::Overworld ? runtime->store.get() : saveStore.get();
         runtime->world.resetForNewSeed(worldMetadata.seed, worldMetadata.worldType, target,worldMetadata.generation[static_cast<size_t>(target)]);
         runtime->world.setGameRules(worldMetadata.gameRules);
         runtime->world.setSaveStore(store);
         if (lanJoining && !replicaLodRoot.empty()) runtime->world.setReplicaLodCache(
             replicaLodRoot / "r5" / ("d_" + std::to_string(static_cast<int>(target))));
         runtime->entities.setSaveStore(store);
-        runtime->entities.setNaturalSpawningEnabled(target == DimensionId::Overworld);
+        runtime->entities.setNaturalSpawningEnabled(Plugins::dimensionContent(target).natural);
         if (target == DimensionId::Overworld) {
             runtime->entities.loadEntities(worldMetadata.entities);
             runtime->ticks = worldMetadata.worldTicks;
             runtime->daylight.setPhase(worldMetadata.overworldDayPhase);
             runtime->weather.reset(worldMetadata.seed, worldMetadata.weather);
         } else {
-            runtime->ticks = worldMetadata.heaven.worldTicks;
-            runtime->daylight.setPhase(worldMetadata.heaven.dayPhase);
-            runtime->weather.reset(worldMetadata.seed, WeatherSaveState{});
-            runtime->weather.setWeather(WeatherType::Clear);
+            const auto& state=worldMetadata.dimensions[static_cast<uint32_t>(target)];
+            runtime->ticks=state.worldTicks;runtime->daylight.setPhase(state.dayPhase);runtime->weather.reset(worldMetadata.seed,state.weather);
         }
+        const auto policy=Plugins::dimensionContent(target).weather;
+        if(policy!=MC_WEATHER_NORMAL)runtime->weather.setWeather(static_cast<WeatherType>(policy-1));
         runtime->initialized = true;
         if (hostingLan()) runtime->world.setBlockMutationCallback([this, target](int x, int z, uint64_t revision, uint32_t slot, BlockId block, bool persistent) {
             chunkJournal.record({target, x, z}, revision, {slot, static_cast<uint16_t>(block)});
@@ -389,7 +392,7 @@ DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
 }
 
 SaveStore* GameSession::activeDataStore() const {
-    return dimension == DimensionId::Heaven ? simulation().store.get() : saveStore.get();
+    return dimension != DimensionId::Overworld ? simulation().store.get() : saveStore.get();
 }
 
 void GameSession::flushDimensions(bool synchronous) {
@@ -420,7 +423,7 @@ void GameSession::detachSaveStore() {
     dimension = DimensionId::Overworld;
     player.bindWorld(world(), &entities());
     player.setAuthority(true);
-    simulations[1].reset();
+    simulations.resize(1);simulations.resize(2);
     saveStore.reset();
     updateLanInterests();
 }
@@ -475,6 +478,7 @@ GameMode GameSession::startWorld(
         worldMetadata.foodTickTimer);
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
     loadActiveDimensionState();
+    if(static_cast<uint32_t>(dimension)>=2){const auto landing=dimensionLanding(dimension,player.getPosition());if(!landing)throw std::runtime_error("Dimension has no safe landing");player.setPosition(*landing);}
     if (dimension == DimensionId::Heaven && !worldMetadata.heaven.hasSafePosition) {
         const glm::dvec3 spawn = world().findSafeSpawn();
         player.setPosition(spawn);
@@ -704,7 +708,7 @@ void GameSession::updatePlaying(
                 for (const auto& stack : takeDeathDrops(guest.player.inventory()))
                     runtime.entities.spawnItem(guest.player.getPosition() + glm::dvec3(0, .5, 0), stack);
             if (worldMetadata.gameRules.boolean(GameRuleId::ImmediateRespawn))
-                travelLanPlayer(guest, DimensionId::Overworld, true);
+                travelLanPlayer(guest, deathDimension(guest.profile.dimension), true);
         }
     }
     for (size_t index = 0; index < simulations.size(); ++index) if (simulations[index]) {
@@ -728,6 +732,7 @@ void GameSession::updatePlaying(
             feedback.playerDeathMessage();
         if (worldMetadata.gameRules.boolean(GameRuleId::ImmediateRespawn)) {
             respawn(RuntimeClock{}.now());
+            if(worldLoadingPending()&&feedback.dimensionLoading)feedback.dimensionLoading();
         } else if (feedback.playerDied) feedback.playerDied();
     }
 
@@ -743,8 +748,7 @@ void GameSession::updatePlaying(
     world().updateLod(player.getPosition());
     world().processCompletedLod(renderer);
 
-    if (dimension == DimensionId::Heaven) weather().setWeather(WeatherType::Clear);
-    if (dimension == DimensionId::Heaven) saveActiveDimensionState();
+    saveActiveDimensionState();
     pluginUpdate.kind=MC_UPDATE_POST;Plugins::dispatch(pluginUpdate);
     if (!Plugins::content().runtimeFault.empty()) return;
     autosaveSeconds += dt;
@@ -767,8 +771,8 @@ GameSession::CommandResult GameSession::executeCommand(
         gameRuleDefinition(command.gameRule.id).support != GameRuleSupport::Implemented;
     if (worldMetadata.cheatsEnabled && command.type != CommandType::Help && !query &&
         worldMetadata.gameRules.boolean(GameRuleId::LogAdminCommands))
-        LOG_INFO("Executed local command " << (std::array<const char*, 9>{
-            "/help", "/gamemode", "/tp", "/time", "/gamerule", "/weather", "/locate biome", "/locate structure", "/give"
+        LOG_INFO("Executed local command " << (std::array<const char*, 10>{
+            "/help", "/gamemode", "/tp", "/time", "/gamerule", "/weather", "/locate biome", "/locate structure", "/give", "/dimension"
         }.at(static_cast<size_t>(command.type))));
     if (worldMetadata.cheatsEnabled && !feedbackEnabled && !query &&
         command.type != CommandType::Help && !feedbackToggle) {
@@ -812,6 +816,7 @@ GameSession::CommandResult GameSession::executeCommandImpl(
         message("/gamerule <rule> [<value>]");
         message("/help gamerule [<rule>]");
         message("/weather clear|rain|thunder");
+        message("/dimension list|<dimension>");
         message("/locate biome <biome>");
         message(localization.text("message.help_biomes"));
         message("/locate structure <structure>");
@@ -820,6 +825,14 @@ GameSession::CommandResult GameSession::executeCommandImpl(
     }
     if (!worldMetadata.cheatsEnabled) {
         message(localization.text("message.cheats_disabled"));
+        return result;
+    }
+    if(command.type==CommandType::Dimension) {
+        if(command.dimensionKey=="list"){for(const auto& entry:Plugins::content().extensions.dimensions)message(entry.second.key+" · "+entry.second.name);return result;}
+        try{const auto target=static_cast<DimensionId>(Plugins::resolveDimension(command.dimensionKey));
+            if(switchDimension(target,now)){result.teleported=true;message(localization.format("message.dimension_entered",{command.dimensionKey}));}
+            else message(localization.text("message.dimension_travel_failed"));
+        }catch(const std::exception&){message(localization.text("message.dimension_travel_failed"));}
         return result;
     }
     if (command.type == CommandType::Give) {
@@ -894,8 +907,8 @@ GameSession::CommandResult GameSession::executeCommandImpl(
         return result;
     }
     if (command.type == CommandType::Weather) {
-        if (dimension == DimensionId::Heaven) {
-            message(localization.text("message.heaven_weather_clear"));
+        if (Plugins::dimensionContent(dimension).weather!=MC_WEATHER_NORMAL && command.weather!=static_cast<WeatherType>(Plugins::dimensionContent(dimension).weather-1)) {
+            message(localization.text("message.dimension_weather_fixed"));
             return result;
         }
         weather().setWeather(command.weather);
@@ -1002,7 +1015,7 @@ void GameSession::chooseSleepAction(
             return;
         }
         if (worldMetadata.gameRules.boolean(GameRuleId::AdvanceTime)) dayNightCycle().resetMorning();
-        if (dimension == DimensionId::Overworld && worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather))
+        if (Plugins::dimensionContent(dimension).weather==MC_WEATHER_NORMAL && worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather))
             weather().setWeather(WeatherType::Clear);
     }
     if (action == SleepAction::TravelToHeaven) {
@@ -1023,7 +1036,13 @@ void GameSession::cancelSleep(const Feedback& feedback) {
 
 bool GameSession::switchDimension(
     DimensionId target, RuntimeClock::Tick loadingStarted) {
-    if (lanJoining || !saveStore || target == dimension) return false;
+    if (lanJoining || !saveStore || target == dimension || !Plugins::validDimension(target)) return false;
+    const auto id=static_cast<uint32_t>(target);auto& state=worldMetadata.dimensions[id];
+    std::optional<glm::dvec3> preferred;
+    if(state.positioned)preferred=state.playerPosition;
+    else if(target==DimensionId::Overworld)preferred=worldMetadata.playerPosition;
+    else if(target==DimensionId::Heaven&&worldMetadata.heaven.hasSafePosition)preferred=worldMetadata.heaven.playerPosition;
+    const auto landing=dimensionLanding(target,preferred);if(!landing)return false;
     if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     saveActiveDimensionState();
     updateSaveMetadata();
@@ -1032,18 +1051,10 @@ bool GameSession::switchDimension(
     dimension = target;
     worldMetadata.activeDimension = target;
     loadingReason = target == DimensionId::Heaven
-        ? LoadingReason::EnteringHeaven : LoadingReason::ReturningOverworld;
+        ? LoadingReason::EnteringHeaven : (target==DimensionId::Overworld?LoadingReason::ReturningOverworld:LoadingReason::World);
     player.bindWorld(world(), &entities());
     loadActiveDimensionState();
-    if (target == DimensionId::Heaven &&
-        !worldMetadata.heaven.hasSafePosition) {
-        // Match direct world loading: choose the deterministic island spawn
-        // before constructing the first streaming target. Otherwise loading
-        // begins around the placeholder position and shifts near completion.
-        const glm::dvec3 spawn = world().findSafeSpawn();
-        player.setPosition(spawn);
-        worldMetadata.heaven.playerPosition = spawn;
-    }
+    player.setPosition(*landing);
     resetTransientState(false, survivalTicks(), loadingStarted);
     sleepState = SleepVisualState::Awake;
     player.setSleepingVisual(false, 0.0f);
@@ -1058,36 +1069,24 @@ bool GameSession::switchDimension(
 
 bool GameSession::handleVoidFall(
     RuntimeClock::Tick loadingStarted, const Feedback& feedback) {
-    if (dimension != DimensionId::Heaven ||
-        player.getPosition().y >= static_cast<double>(Config::WORLD_MIN_Y - 2))
-        return false;
-    glm::dvec3 heavenReturnPosition{0.0};
-    if (worldMetadata.heaven.hasSafePosition) {
-        const glm::ivec3& safe = worldMetadata.heaven.safePosition;
-        heavenReturnPosition = {safe.x + 0.5, safe.y + 0.01, safe.z + 0.5};
-    } else {
-        heavenReturnPosition = world().findSafeSpawn();
-    }
-    if (!switchDimension(DimensionId::Overworld, loadingStarted)) return false;
-    // switchDimension saves the position that triggered the void return.
-    // Replace it with the last grounded Heaven location so the next visit
-    // cannot resume below the world and immediately fall out again.
-    worldMetadata.heaven.playerPosition = heavenReturnPosition;
-    if (feedback.dimensionLoading) feedback.dimensionLoading();
-    const std::optional<glm::ivec3> bed = loadValidOverworldBed();
-    if (bed) {
-        const float support = blockCollisionHeight(
-            world().getBlock(bed->x, bed->y, bed->z));
-        player.setPosition(glm::dvec3(bed->x + 0.5, bed->y + support + 0.001,
-                                      bed->z + 0.5));
-    } else {
-        player.setPosition(world().findSafeSpawn());
-    }
-    world().update(player.getPosition());
-    world().enqueueGeneration();
-    updateSaveMetadata();
-    if (saveStore) saveStore->saveMetadata(worldMetadata);
-    if (feedback.sleepEnded) feedback.sleepEnded();
+    const auto source=dimension;const auto& definition=Plugins::dimensionContent(source);
+    if(definition.voidTarget.empty()||player.getPosition().y>=Config::WORLD_MIN_Y-2)return false;
+    const auto target=static_cast<DimensionId>(Plugins::resolveDimension(definition.voidTarget));
+    auto& sourceState=worldMetadata.dimensions[static_cast<uint32_t>(source)];
+    if(source==DimensionId::Heaven&&worldMetadata.heaven.hasSafePosition&&sourceState.safePosition!=worldMetadata.heaven.safePosition){sourceState.safePosition=worldMetadata.heaven.safePosition;sourceState.safePlayerPosition=glm::dvec3(sourceState.safePosition)+glm::dvec3(.5,.01,.5);sourceState.hasSafePosition=true;}
+    auto& targetState=worldMetadata.dimensions[static_cast<uint32_t>(target)];
+    std::optional<glm::dvec3> preferred;
+    if(targetState.hasSafePosition)preferred=targetState.safePlayerPosition;
+    const auto landing=dimensionLanding(target,preferred);if(!landing)return false;
+    if(target!=source&&!switchDimension(target,loadingStarted))return false;
+    player.setPosition(*landing);
+    if(sourceState.hasSafePosition)sourceState.playerPosition=sourceState.safePlayerPosition;
+    if(source==DimensionId::Heaven)worldMetadata.heaven.playerPosition=sourceState.playerPosition;
+    if(target==source)resetTransientState(false,survivalTicks(),loadingStarted);
+    world().update(player.getPosition());world().enqueueGeneration();updateSaveMetadata();
+    if(saveStore)saveStore->saveMetadata(worldMetadata);
+    if(feedback.dimensionLoading)feedback.dimensionLoading();
+    if(feedback.sleepEnded)feedback.sleepEnded();
     return true;
 }
 
@@ -1104,10 +1103,17 @@ void GameSession::beginPlayerDeath() {
 
 void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
     if (lanJoining) { Lan::GameAction action; action.kind = Lan::ActionKind::Respawn; queueReplicaAction(action); return; }
-    const bool wasHeaven = dimension == DimensionId::Heaven;
-    if (wasHeaven)
-        (void)switchDimension(DimensionId::Overworld, loadingStarted);
-    const std::optional<glm::ivec3> validBed = wasHeaven
+    const auto source=dimension;const auto target=deathDimension(source);
+    if(target!=DimensionId::Overworld) {
+        const auto bed=worldMetadata.dimensions[static_cast<uint32_t>(target)].bedSpawn;
+        const auto landing=dimensionLanding(target,{},bed);if(!landing)return;
+        if(target!=dimension&&!switchDimension(target,loadingStarted))return;
+        player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.extinguish();player.resetDamageImmunity();
+        resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();return;
+    }
+    const bool returning = source!=DimensionId::Overworld;
+    if (returning&&!switchDimension(target, loadingStarted))return;
+    const std::optional<glm::ivec3> validBed = returning
         ? loadValidOverworldBed()
         : (worldMetadata.bedSpawn
             ? world().validBedFoot(*worldMetadata.bedSpawn) : std::nullopt);
@@ -1173,7 +1179,7 @@ void GameSession::tickLightning(DimensionSimulation& runtime, const Feedback& fe
         const glm::ivec3 strike(x, strikeY, z);
         std::vector<EntityPlayerView> affected;
         if (&runtime == &simulation()) affected.push_back({0, &player, !playerDead, !playerDead, terrainGenerated});
-        for (auto& entry : guests) if (entry.second->profile.dimension == DimensionId::Overworld)
+        for (auto& entry : guests) if (entry.second->profile.dimension == runtime.world.dimension())
             affected.push_back({entry.first, &entry.second->player, !entry.second->dead, !entry.second->dead, !entry.second->loading});
         runtime.entities.strikeLightning(affected, strike);
         const glm::dvec3 delta = glm::dvec3(strike) - player.getPosition();
@@ -1188,7 +1194,7 @@ void GameSession::tickLightning(DimensionSimulation& runtime, const Feedback& fe
         if (world.getBlock(x, strikeY, z) == BlockId::AIR ||
             world.getBlock(x, strikeY, z) == BlockId::SNOW_LAYER)
             world.setBlock(x, strikeY, z, BlockId::FIRE);
-        Lan::GameEvent remote; remote.kind = Lan::EventKind::Lightning; remote.dimension = DimensionId::Overworld; remote.position = strike;
+        Lan::GameEvent remote; remote.kind = Lan::EventKind::Lightning; remote.dimension = runtime.world.dimension(); remote.position = strike;
         broadcastGameEvent(remote);
         if (&runtime == &simulation()) {
             lightningEvents.push_back({glm::dvec3(strike), 0.5f});
@@ -1218,11 +1224,14 @@ void GameSession::resetTransientState(
 }
 
 void GameSession::saveActiveDimensionState() {
+    auto& state=worldMetadata.dimensions[static_cast<uint32_t>(dimension)];
+    state.playerPosition=player.getPosition();state.positioned=true;state.worldTicks=survivalTicks();state.dayPhase=dayNightCycle().phase();state.weather=weather().saveState();
+    if(player.onGround()&&player.getPosition().y>=Config::WORLD_MIN_Y){state.safePlayerPosition=player.getPosition();state.safePosition=glm::ivec3(glm::floor(player.getPosition()));state.hasSafePosition=true;}
     if (dimension == DimensionId::Overworld) {
         worldMetadata.playerPosition = player.getPosition();
         worldMetadata.worldTicks = survivalTicks();
         worldMetadata.overworldDayPhase = dayNightCycle().phase();
-    } else {
+    } else if(dimension==DimensionId::Heaven) {
         worldMetadata.heaven.playerPosition = player.getPosition();
         worldMetadata.heaven.worldTicks = survivalTicks();
         worldMetadata.heaven.dayPhase = dayNightCycle().phase();
@@ -1238,6 +1247,10 @@ void GameSession::saveActiveDimensionState() {
 }
 
 void GameSession::loadActiveDimensionState() {
+    if(static_cast<uint32_t>(dimension)>=2) {
+        const auto& state=worldMetadata.dimensions[static_cast<uint32_t>(dimension)];
+        player.setPosition(state.playerPosition);return;
+    }
     if (dimension == DimensionId::Overworld) {
         player.setPosition(worldMetadata.playerPosition);
     } else {
@@ -1315,6 +1328,7 @@ void GameSession::ensureHeavenSafePosition() {
         static_cast<int>(std::floor(candidate.y)),
         static_cast<int>(std::floor(candidate.z)));
     worldMetadata.heaven.hasSafePosition = true;
+    auto& state=worldMetadata.dimensions[1];state.safePlayerPosition=candidate;state.safePosition=worldMetadata.heaven.safePosition;state.hasSafePosition=true;
 }
 
 void GameSession::updateSaveMetadata() {
@@ -1334,6 +1348,7 @@ void GameSession::updateSaveMetadata() {
         worldMetadata.heaven.worldTicks = simulations[1]->ticks;
         worldMetadata.heaven.dayPhase = simulations[1]->daylight.phase();
     }
+    for(size_t id=0;id<simulations.size();++id)if(simulations[id]&&simulations[id]->initialized){auto& state=worldMetadata.dimensions[static_cast<uint32_t>(id)];state.worldTicks=simulations[id]->ticks;state.dayPhase=simulations[id]->daylight.phase();state.weather=simulations[id]->weather.saveState();}
     worldMetadata.entities.clear();
 }
 
@@ -1488,4 +1503,54 @@ bool GameSession::pluginRemoveEntity(uint32_t dim,uint64_t id) {
 }
 bool GameSession::pluginEntityIntent(uint32_t dim,uint64_t id,const MC_EntityIntent& intent) {
     return !lanJoining&&terrainGenerated&&(!Plugins::context().player||guests.count(Plugins::context().player))&&dim<simulations.size()&&simulations[dim]&&simulations[dim]->entities.pluginIntent(id,intent);
+}
+
+DimensionId GameSession::deathDimension(DimensionId source) const {
+    const auto& target=Plugins::dimensionContent(source).deathTarget;
+    return target.empty()?source:static_cast<DimensionId>(Plugins::resolveDimension(target));
+}
+
+std::optional<glm::dvec3> GameSession::dimensionLanding(DimensionId target,std::optional<glm::dvec3> preferred,std::optional<glm::ivec3> bed) {
+    auto& runtime=ensureDimension(target);auto& terrain=runtime.world;const auto& definition=Plugins::dimensionContent(target);
+    auto valid=[&](glm::dvec3 p) {
+        for(int i=0;i<3;++i)if(!std::isfinite(p[i])||std::abs(p[i])>30000000)return false;
+        if(p.y<Config::WORLD_MIN_Y||p.y+Config::PLAYER_HEIGHT>=Config::WORLD_MAX_Y)return false;
+        terrain.update(p);terrain.enqueueGeneration();
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::milliseconds(1500);
+        while(!terrain.isGeneratedAt(static_cast<int>(std::floor(p.x)),static_cast<int>(std::floor(p.z)))&&std::chrono::steady_clock::now()<deadline){terrain.waitForInitialGeneration(10);terrain.processCompletedGenerations(false);terrain.enqueueGeneration();}
+        const glm::dvec3 lo=p-glm::dvec3(Config::PLAYER_WIDTH/2,0,Config::PLAYER_WIDTH/2),hi=p+glm::dvec3(Config::PLAYER_WIDTH/2,Config::PLAYER_HEIGHT,Config::PLAYER_WIDTH/2);
+        bool support=false;
+        for(int z=static_cast<int>(std::floor(lo.z));z<=static_cast<int>(std::floor(hi.z));++z)for(int x=static_cast<int>(std::floor(lo.x));x<=static_cast<int>(std::floor(hi.x));++x){
+            if(!terrain.isGeneratedAt(x,z))return false;
+            bool columnSupport=false;
+            for(int y=static_cast<int>(std::floor(p.y-.05));y<=static_cast<int>(std::floor(hi.y));++y){
+                const auto block=terrain.getBlock(x,y,z);if(isFluid(block)||block==BlockId::FIRE)return false;
+                const auto boxes=blockCollisionBoxes(block);
+                for(uint8_t b=0;b<boxes.count;++b){const auto min=glm::dvec3(x,y,z)+glm::dvec3(boxes.boxes[b].min),max=glm::dvec3(x,y,z)+glm::dvec3(boxes.boxes[b].max);
+                    if(hi.x>min.x&&lo.x<max.x&&hi.z>min.z&&lo.z<max.z){if(hi.y>min.y&&lo.y<max.y-0.0001)return false;if(p.y>=max.y&&p.y-max.y<.05)columnSupport=true;}}
+            }
+            if(!columnSupport)return false;
+            support=true;
+        }
+        return support;
+    };
+    if(bed){terrain.update(glm::dvec3(*bed));terrain.enqueueGeneration();terrain.waitForInitialGeneration(1500);terrain.processCompletedGenerations(false);const auto foot=terrain.validBedFoot(*bed);if(foot){const auto p=glm::dvec3(*foot)+glm::dvec3(.5,blockCollisionHeight(terrain.getBlock(foot->x,foot->y,foot->z))+.001,.5);if(valid(p))return p;}}
+    if(preferred&&valid(*preferred))return preferred;
+    glm::dvec3 candidate=definition.spawn==MC_SPAWN_FIXED?glm::dvec3(definition.position[0],definition.position[1],definition.position[2]):
+        (target==DimensionId::Overworld?glm::dvec3(worldMetadata.worldSpawn)+glm::dvec3(.5,.01,.5):terrain.findSafeSpawn());
+    if(valid(candidate))return candidate;
+    if(definition.spawn==MC_SPAWN_SAFE_SURFACE) {
+        candidate.y=terrain.getSurfaceY(static_cast<int>(std::floor(candidate.x)),static_cast<int>(std::floor(candidate.z)))+1.01;
+        if(valid(candidate))return candidate;
+    }
+    // Edits may invalidate the generated surface. Search a small loaded apron.
+    if(definition.spawn==MC_SPAWN_SAFE_SURFACE)for(int radius=1;radius<=4;++radius)for(int dz=-radius;dz<=radius;++dz)for(int dx=-radius;dx<=radius;++dx){if(std::abs(dx)!=radius&&std::abs(dz)!=radius)continue;const int x=static_cast<int>(std::floor(candidate.x))+dx,z=static_cast<int>(std::floor(candidate.z))+dz;if(!terrain.isGeneratedAt(x,z))continue;glm::dvec3 p(x+.5,terrain.getSurfaceY(x,z)+1.01,z+.5);if(valid(p))return p;}
+    return {};
+}
+
+bool GameSession::pluginTravel(uint64_t id,uint32_t target) {
+    if(lanJoining||!terrainGenerated||!Plugins::validDimension(target))return false;
+    if(!id)return switchDimension(static_cast<DimensionId>(target),RuntimeClock{}.now());
+    auto it=guests.find(id);if(it==guests.end())return false;
+    return travelLanPlayer(*it->second,static_cast<DimensionId>(target));
 }

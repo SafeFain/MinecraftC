@@ -1,5 +1,6 @@
 #pragma once
 #include "world/Block.h"
+#include "game/GameRules.h"
 #include "plugins/Extensions.h"
 #include "plugins/Json.h"
 #include <set>
@@ -144,9 +145,32 @@ inline uint16_t resolveEntity(const std::string& key) {
     for(const auto& e:content().extensions.entities)if(e.second.key==key)return e.first;
     throw std::runtime_error("Unknown entity type: "+key);
 }
+inline bool validDimension(uint32_t id) {return content().extensions.dimensions.count(id)!=0;}
+inline bool validDimension(DimensionId id) {return validDimension(static_cast<uint32_t>(id));}
+inline const DimensionContent& dimensionContent(uint32_t id) {
+    auto it=content().extensions.dimensions.find(id);
+    if(it==content().extensions.dimensions.end())throw std::runtime_error("Unknown dimension handle");
+    return it->second;
+}
+inline const DimensionContent& dimensionContent(DimensionId id) {return dimensionContent(static_cast<uint32_t>(id));}
+inline uint32_t resolveDimension(const std::string& key) {
+    for(const auto& entry:content().extensions.dimensions)if(entry.second.key==key)return entry.first;
+    throw std::runtime_error("Missing dimension: "+key);
+}
+inline std::string dimensionKey(DimensionId id) {return dimensionContent(id).key;}
+inline std::string dimensionDirectory(DimensionId id) {
+    if(id==DimensionId::Overworld)return "";
+    if(id==DimensionId::Heaven)return "heaven";
+    // Hex encoding is injective and cannot introduce separators or traversal.
+    std::string result="d_";const char* hex="0123456789abcdef";
+    for(unsigned char c:dimensionKey(id)){result+=hex[c>>4];result+=hex[c&15];}
+    for(size_t i=122;i<result.size();i+=123)result.insert(i,"/");
+    return result;
+}
 inline void validateGeneration(const GenerationConfig& config,uint32_t dimension) {
-    if(dimension>1||config.parameters.size()>4096||config.modifiers.size()>64)
+    if(!validDimension(dimension)||config.parameters.size()>4096||config.modifiers.size()>64)
         throw std::runtime_error("Invalid generator configuration limits");
+    if(dimension>=2&&config.generator.empty())throw std::runtime_error("Plugin dimension requires a generator");
     if(Json::parse(config.parameters).type!=Json::Type::Object)
         throw std::runtime_error("Generator parameters must be a JSON object");
     if(config.generator.empty()&&!config.revision.empty())throw std::runtime_error("Builtin generator has no plugin revision");
