@@ -19,6 +19,96 @@ template<class F> int32_t call(MC_PluginContext* c,F f,bool registration=false) 
     catch(const std::exception& e){c->error=e.what();if(registration)c->registrationFailed=true;return -1;}
 }
 }
+int32_t PluginManager::blockFamily(MC_PluginContext& ctx,const MC_BlockFamily& d,uint16_t& id) {
+    require(d.size>=sizeof(d)&&d.kind>=MC_SLAB_FAMILY&&d.kind<=MC_BUTTON_FAMILY,"Invalid block family descriptor");
+    require(d.manual_open<=1&&d.villager_open<=1&&d.arrow_trigger<=1,"Invalid family flags");
+    require(d.kind!=MC_BUTTON_FAMILY||(d.release_ticks>0&&d.release_ticks<=65535),"Button duration must be 1..65535 ticks");
+    require(!d.block.cross&&d.block.solid==(d.kind==MC_BUTTON_FAMILY?0u:1u),"Invalid template collision flags");
+    const auto key=text(d.block.key);owned(ctx,key);
+    const std::string full=d.full_block?d.full_block:"";
+    require(d.kind!=MC_SLAB_FAMILY||validKey(full),"Slab requires full_block key");
+    const uint32_t count=d.kind==MC_SLAB_FAMILY?2:d.kind==MC_STAIR_FAMILY?8:d.kind==MC_DOOR_FAMILY?64:24;
+    require(FIRST_CONTENT_ID+content().blocks.size()+count<=INVALID_CONTENT_ID,"Block registry full");
+    for(uint32_t n=0;n<count;++n) {
+        const auto stateKey=n?key+"/state/"+std::to_string(n):key;
+        require(validKey(stateKey),"State key exceeds key limit");
+        for(const auto& b:content().blocks)require(b.second.key!=stateKey,"Duplicate state key");
+    }
+    for(uint32_t n=0;n<count;++n) {
+        MC_Block b=d.block;const std::string stateKey=n?key+"/state/"+std::to_string(n):key;b.key=stateKey.c_str();
+        uint16_t raw;block(ctx,b,raw);if(!n)id=raw;
+        auto& state=content().blocks.at(raw);state.family=id;state.familyKind=d.kind;state.stateIndex=n;
+        state.properties.shape=d.kind==MC_SLAB_FAMILY?RenderShape::Slab:d.kind==MC_STAIR_FAMILY?RenderShape::Stair:d.kind==MC_DOOR_FAMILY?RenderShape::Door:RenderShape::Button;
+        state.fullBlock=full;state.manualOpen=d.manual_open;state.villagerOpen=d.villager_open;
+        state.releaseTicks=d.release_ticks;state.arrowTrigger=d.arrow_trigger;
+    }
+    return 0;
+}
+int32_t PluginManager::blockGeometry(MC_PluginContext& ctx,const MC_BlockGeometry& d) {
+    require(d.size>=sizeof(d),"Invalid geometry descriptor");owned(ctx,text(d.block));
+    auto id=resolveBlock(d.block);auto& b=content().blocks.at(static_cast<uint16_t>(id));
+    require(!b.family,"Template geometry cannot be overridden");
+    auto group=[](const MC_BlockBox* boxes,uint32_t count)->std::optional<BlockCollisionBoxes> {
+        require(count<=MC_MAX_BLOCK_BOXES&&(!count||boxes),"Invalid box count/buffer");
+        if(!boxes)return {};
+        BlockCollisionBoxes out;out.count=static_cast<uint8_t>(count);
+        for(uint32_t i=0;i<count;++i)for(int axis=0;axis<3;++axis) {
+            const float lo=boxes[i].min[axis],hi=boxes[i].max[axis];
+            require(std::isfinite(lo)&&std::isfinite(hi)&&lo>=0&&hi<=1&&lo<hi,"Invalid block box bounds");
+            out.boxes[i].min[axis]=lo;out.boxes[i].max[axis]=hi;
+        }
+        return out;
+    };
+    auto collision=group(d.collision,d.collision_count),selection=group(d.selection,d.selection_count),model=group(d.model,d.model_count);
+    if(collision&&collision->count>1) {
+        // Full-volume unions must obey the same support, spawning and power rules as cubes.
+        std::array<std::vector<float>,3> cuts;
+        for(int axis=0;axis<3;++axis){cuts[axis]={0,1};for(uint8_t i=0;i<collision->count;++i){cuts[axis].push_back(collision->boxes[i].min[axis]);cuts[axis].push_back(collision->boxes[i].max[axis]);}std::sort(cuts[axis].begin(),cuts[axis].end());cuts[axis].erase(std::unique(cuts[axis].begin(),cuts[axis].end()),cuts[axis].end());}
+        bool full=true;
+        for(size_t x=0;full&&x+1<cuts[0].size();++x)for(size_t y=0;full&&y+1<cuts[1].size();++y)for(size_t z=0;full&&z+1<cuts[2].size();++z) {
+            const glm::dvec3 point((double(cuts[0][x])+cuts[0][x+1])*.5,(double(cuts[1][y])+cuts[1][y+1])*.5,(double(cuts[2][z])+cuts[2][z+1])*.5);
+            bool covered=false;for(uint8_t i=0;i<collision->count;++i){const auto& box=collision->boxes[i];covered=covered||(glm::all(glm::greaterThanEqual(point,glm::dvec3(box.min)))&&glm::all(glm::lessThanEqual(point,glm::dvec3(box.max))));}
+            full=covered;
+        }
+        if(full){BlockCollisionBoxes cube;cube.count=1;collision=cube;}
+    }
+    require(!model||model->count,"Box model cannot be empty");
+    if(collision){b.collision=collision;b.properties.solid=collision->count!=0;}
+    if(selection)b.selection=selection;
+    if(model){b.model=model;b.properties.shape=RenderShape::Boxes;}
+    return 0;
+}
+namespace {
+MC_BlockState describeState(BlockId id) {
+    require(validBlock(id),"Unknown block");MC_BlockState out{};out.size=sizeof(out);
+    DoorState door;ButtonState button;ArchitecturalBlockState arch;
+    if(decodeDoor(id,door)) {
+        out.kind=MC_DOOR_FAMILY;auto base=door;base.direction=BedDirection::North;base.rightHinge=base.open=base.powered=base.upper=false;
+        out.family=static_cast<uint16_t>(doorBlock(base));out.direction=static_cast<uint8_t>(door.direction);out.half=door.upper;
+        out.right_hinge=door.rightHinge;out.open=door.open;out.powered=door.powered;
+    } else if(decodeButton(id,button)) {
+        out.kind=MC_BUTTON_FAMILY;auto base=button;base.direction=BedDirection::North;base.attachment=FaceDir::TOP;base.pressed=false;
+        out.family=static_cast<uint16_t>(buttonBlock(base));out.direction=static_cast<uint8_t>(button.direction);out.attachment=static_cast<uint8_t>(button.attachment);out.pressed=button.pressed;
+    } else if(decodeArchitecturalBlock(id,arch)) {
+        out.kind=arch.shape==RenderShape::Slab?MC_SLAB_FAMILY:MC_STAIR_FAMILY;auto base=arch;base.half=BlockHalf::Bottom;base.direction=BedDirection::North;
+        out.family=static_cast<uint16_t>(architecturalStateBlock(base));out.half=arch.half==BlockHalf::Top;out.direction=static_cast<uint8_t>(arch.direction);
+    } else require(false,"Block has no state family");
+    return out;
+}
+BlockId composeState(const MC_BlockState& s) {
+    require(s.size>=sizeof(s)&&s.direction<4&&s.half<=1&&s.right_hinge<=1&&s.open<=1&&s.powered<=1&&s.attachment<6&&s.pressed<=1,"Invalid block state");
+    const auto base=describeState(static_cast<BlockId>(s.family));require(base.family==s.family&&base.kind==s.kind,"Invalid family handle/kind");
+    const auto id=static_cast<BlockId>(s.family);DoorState door;ButtonState button;ArchitecturalBlockState arch;
+    if(decodeDoor(id,door)) {
+        require(!s.attachment&&!s.pressed,"Unused door fields must be zero");door.direction=static_cast<BedDirection>(s.direction);door.upper=s.half;door.rightHinge=s.right_hinge;door.open=s.open;door.powered=s.powered;return doorBlock(door);
+    }
+    if(decodeButton(id,button)) {
+        require(!s.half&&!s.right_hinge&&!s.open&&!s.powered,"Unused button fields must be zero");button.direction=static_cast<BedDirection>(s.direction);button.attachment=static_cast<FaceDir>(s.attachment);button.pressed=s.pressed;return buttonBlock(button);
+    }
+    require(!s.right_hinge&&!s.open&&!s.powered&&!s.attachment&&!s.pressed&&(s.kind!=MC_SLAB_FAMILY||!s.direction),"Unused architectural fields must be zero");
+    decodeArchitecturalBlock(id,arch);arch.half=static_cast<BlockHalf>(s.half);arch.direction=static_cast<BedDirection>(s.direction);return architecturalStateBlock(arch);
+}
+}
 void PluginManager::callbackFault(size_t i,const std::string& reason) {
     m_info.at(i).active=false;m_info.at(i).status=reason+"; restart required";
     content().runtimeFault="Plugin "+m_info.at(i).manifest.id+": "+reason;
@@ -161,6 +251,14 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
 }
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(version!=1)return nullptr;
+    static const MC_BlockShapesV1 shapes{sizeof(MC_BlockShapesV1),1,
+        [](MC_PluginContext* c,const MC_BlockFamily* d,uint16_t* id){return call(c,[&]{require(d&&id,"Missing family arguments");owner(c).blockFamily(*c,*d,*id);},true);},
+        [](MC_PluginContext* c,const MC_BlockGeometry* d){return call(c,[&]{require(d,"Missing geometry arguments");owner(c).blockGeometry(*c,*d);},true);},
+        [](MC_PluginContext* c,uint16_t id,MC_BlockState* out){return call(c,[&]{require(out&&out->size>=sizeof(*out),"Invalid state output");*out=describeState(static_cast<BlockId>(id));});},
+        [](MC_PluginContext* c,const MC_BlockState* state,uint16_t* out){return call(c,[&]{require(state&&out,"Missing state arguments");*out=static_cast<uint16_t>(composeState(*state));});},
+        [](MC_PluginContext* c,uint16_t id,uint32_t group,MC_BlockBox* out,uint32_t capacity,uint32_t* count){return call(c,[&]{require(validBlock(static_cast<BlockId>(id))&&group<=2&&count,"Invalid boxes query");const auto block=static_cast<BlockId>(id);const auto boxes=group==0?blockCollisionBoxes(block):group==1?blockSelectionBoxes(block):blockModelBoxes(block);*count=boxes.count;if(!out)return;require(capacity>=boxes.count,"Box buffer too small");for(uint32_t i=0;i<boxes.count;++i)for(int axis=0;axis<3;++axis){out[i].min[axis]=boxes.boxes[i].min[axis];out[i].max[axis]=boxes.boxes[i].max[axis];}});},
+        [](MC_PluginContext* c,uint32_t dim,int32_t x,int32_t y,int32_t z,uint32_t open){return call(c,[&]{require(validDimension(dim)&&open<=1&&Config::isValidWorldY(y),"Invalid door operation");auto& m=owner(c);m.enqueue(*c,[&m,dim,x,y,z,open]{return m.blockInteraction&&m.blockInteraction(dim,x,y,z,false,open);});});},
+        [](MC_PluginContext* c,uint32_t dim,int32_t x,int32_t y,int32_t z){return call(c,[&]{require(validDimension(dim)&&Config::isValidWorldY(y),"Invalid button operation");auto& m=owner(c);m.enqueue(*c,[&m,dim,x,y,z]{return m.blockInteraction&&m.blockInteraction(dim,x,y,z,true,true);});});}};
     static const MC_EntitiesV1 entities{sizeof(MC_EntitiesV1),1,
         [](MC_PluginContext* c,const MC_EntityDefinition* d,uint16_t* id){return call(c,[&]{require(d&&id,"Missing entity arguments");owner(c).entity(*c,*d,*id);},true);},
         [](MC_PluginContext* c,const char* key)->uint16_t{uint16_t id=MC_INVALID_ID;call(c,[&]{id=resolveEntity(text(key));});return id;},
@@ -195,6 +293,7 @@ const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t
             *out={};out->size=sizeof(*out);out->key=d.key.c_str();out->name=d.name.c_str();out->revision=d.revision.c_str();out->generator=d.generation.generator.c_str();out->generator_revision=d.generation.revision.c_str();out->parameters=d.generation.parameters.c_str();out->weather=d.weather;out->disable_natural_spawning=!d.natural;out->spawn=d.spawn;std::copy(d.position.begin(),d.position.end(),out->spawn_position);out->death_target=d.deathTarget.c_str();out->void_target=d.voidTarget.c_str();if(d.modifierView.empty())for(const auto& m:d.generation.modifiers)d.modifierView.push_back({m.first.c_str(),m.second.c_str()});out->modifiers=d.modifierView.data();out->modifier_count=static_cast<uint32_t>(d.modifierView.size());});},
         [](MC_PluginContext* c,uint64_t player,uint32_t dim){return call(c,[&]{require(validDimension(dim),"Invalid dimension");auto& m=owner(c);require(context().player==0||context().player==player,"Cannot travel another player as guest");m.enqueue(*c,[&m,player,dim]{return m.travelPlayer&&m.travelPlayer(player,dim);});});}};
     const std::string key=name;
+    if(key==MC_BLOCK_SHAPES_EXTENSION)return &shapes;
     if(key==MC_DIMENSIONS_EXTENSION)return &dimensions;
     if(key==MC_ENTITIES_EXTENSION)return &entities;
     if(key==MC_WORLDGEN_EXTENSION)return &worldgen;

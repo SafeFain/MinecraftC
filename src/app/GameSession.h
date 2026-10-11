@@ -214,6 +214,7 @@ public:
     bool pluginPlayerById(uint64_t,MC_PlayerSnapshot&,uint32_t&) const;
     bool sendPluginCommand(const std::string&);
     bool pluginPlayer(MC_PlayerSnapshot&) const;
+    bool pluginBlockInteraction(uint32_t,int32_t,int32_t,int32_t,bool,bool);
     bool pluginTravel(uint64_t,uint32_t);
     bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);

@@ -479,7 +479,7 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
         for (auto& stack : entity.value.chest) stack = readStack(reader);
     } else if (entity.value.type == BlockEntityType::Button) {
         entity.value.buttonRemaining = reader.read<uint16_t>();
-        if (entity.value.buttonRemaining > 30) throw std::runtime_error("Invalid button timer");
+        if (version < 20 && entity.value.buttonRemaining > 30) throw std::runtime_error("Invalid button timer");
     } else {
         entity.value.input = readStack(reader);
         entity.value.fuel = readStack(reader);

@@ -137,7 +137,7 @@ public:
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
     bool placeDoor(const glm::ivec3& bottom, DoorState state);
-    bool setDoorOpen(const glm::ivec3& position, bool open);
+    bool setDoorOpen(const glm::ivec3& position, bool open, bool villager = false);
     bool interactDoor(const glm::ivec3& position);
     bool placeButton(const glm::ivec3& position, ButtonState state);
     bool activateButton(const glm::ivec3& position);

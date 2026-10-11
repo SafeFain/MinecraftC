@@ -1,0 +1,7 @@
+{
+  "id": "block_shapes_data",
+  "name": "Portable Block Shapes",
+  "version": "1.0.0",
+  "api": 1,
+  "data": "content.json"
+}

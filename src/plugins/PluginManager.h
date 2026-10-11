@@ -79,6 +79,9 @@ public:
     int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*,uint32_t flags=0);
     int32_t enqueue(MC_PluginContext&,std::function<bool()>);
     int32_t storage(MC_PluginContext&,bool,bool,const char*,char*,uint32_t);
+    int32_t blockFamily(MC_PluginContext&,const MC_BlockFamily&,uint16_t&);
+    int32_t blockGeometry(MC_PluginContext&,const MC_BlockGeometry&);
+    std::function<bool(uint32_t,int32_t,int32_t,int32_t,bool,bool)> blockInteraction;
     int32_t entity(MC_PluginContext&,const MC_EntityDefinition&,uint16_t&);
     int32_t dimensionDefinition(MC_PluginContext&,const MC_DimensionDefinition&,uint32_t&);
     std::function<bool(uint64_t,uint32_t)> travelPlayer;

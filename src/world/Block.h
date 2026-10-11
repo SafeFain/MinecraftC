@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <optional>
+#include <vector>
 #include <glm/glm.hpp>
 
 // ── Block ID enum ─────────────────────────────────────────────────────
@@ -304,7 +305,8 @@ enum class RenderShape : uint8_t {
     Spike,
     CeilingCross,
     Door,
-    Button
+    Button,
+    Boxes
 };
 
 enum class BedPart : uint8_t { Foot, Head };
@@ -315,6 +317,7 @@ enum class ArchitecturalMaterial : uint8_t {
 enum class BlockHalf : uint8_t { Bottom, Top };
 
 struct ArchitecturalBlockState {
+    uint16_t family = 0;
     ArchitecturalMaterial material = ArchitecturalMaterial::Planks;
     RenderShape shape = RenderShape::Cube;
     BlockHalf half = BlockHalf::Bottom;
@@ -327,7 +330,7 @@ struct BlockCollisionBox {
 };
 
 struct BlockCollisionBoxes {
-    std::array<BlockCollisionBox, 2> boxes{};
+    std::array<BlockCollisionBox, 16> boxes{};
     uint8_t count = 0;
 };
 
@@ -576,11 +579,13 @@ extern const std::array<glm::vec3, 24> WIRE_CUBE_VERTICES;
 // State IDs remain in chunk memory and saves, just like beds and stairs.
 enum class DoorMaterial : uint8_t { Oak, Birch, Spruce, Jungle, Acacia, Skyroot, Iron };
 struct DoorState {
+    uint16_t family = 0;
     DoorMaterial material = DoorMaterial::Oak;
     BedDirection direction = BedDirection::North;
     bool rightHinge = false, open = false, powered = false, upper = false;
 };
 struct ButtonState {
+    uint16_t family = 0;
     DoorMaterial material = DoorMaterial::Oak; // Iron denotes stone buttons.
     FaceDir attachment = FaceDir::BACK; // face normal pointing away from support
     BedDirection direction = BedDirection::North;
@@ -593,3 +598,17 @@ BlockId buttonBlock(const ButtonState& state);
 glm::ivec3 faceOffset(FaceDir face);
 BlockCollisionBoxes blockSelectionBoxes(BlockId id);
 BlockId woodPlanks(DoorMaterial material);
+
+BlockId architecturalStateBlock(const ArchitecturalBlockState& state);
+BlockId architecturalFullBlock(const ArchitecturalBlockState& state);
+bool sameArchitecturalFamily(const ArchitecturalBlockState&, const ArchitecturalBlockState&);
+bool sameDoorFamily(const DoorState&, const DoorState&);
+bool doorManualOpen(const DoorState&);
+bool doorVillagerOpen(const DoorState&);
+bool buttonArrowTrigger(const ButtonState&);
+uint32_t buttonReleaseTicks(const ButtonState&);
+BlockCollisionBoxes blockModelBoxes(BlockId id);
+
+struct BlockModelFace {BlockCollisionBox box;FaceDir face;};
+std::vector<BlockModelFace> blockModelFaces(BlockId id);
+bool blockSupportsFace(BlockId id, FaceDir face);

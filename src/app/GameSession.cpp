@@ -1463,6 +1463,13 @@ bool GameSession::pluginGetBlock(int32_t x,int32_t y,int32_t z,uint16_t& id) {
     const auto value=simulations[actor.dimension]->world.getLoadedBlock(x,y,z);if(!value)return false;
     id=static_cast<uint16_t>(*value);return true;
 }
+bool GameSession::pluginBlockInteraction(uint32_t dim,int32_t x,int32_t y,int32_t z,bool button,bool open) {
+    if(lanJoining||dim>=simulations.size()||!simulations[dim]||!Config::isValidWorldY(y))return false;
+    const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();
+    if(actor.player&&(actor.dimension!=dim||!guests.count(actor.player)))return false;
+    auto& terrain=simulations[dim]->world;if(!terrain.getLoadedBlock(x,y,z))return false;
+    return button?terrain.activateButton({x,y,z}):terrain.setDoorOpen({x,y,z},open);
+}
 bool GameSession::pluginSetBlock(int32_t x,int32_t y,int32_t z,uint16_t id) {
     uint16_t old=0;if(lanJoining||!isValidBlockId(static_cast<BlockId>(id))||!pluginGetBlock(x,y,z,old))return false;
     const auto actor=Plugins::scopedContext()?Plugins::context():pluginContext();

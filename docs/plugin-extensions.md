@@ -1,9 +1,9 @@
-# Entity, generation and rendering extensions
+# Entity, generation, rendering and block shape extensions
 
 The loader keeps the original ABI 1 tables and discovers these optional version 1
 interfaces through `MC_Host::query_extension`. Include
 [`extensions.h`](../sdk/minecraftc/extensions.h), or use the size-checked C++
-`Host::entities()`, `Host::worldgen()` and `Host::render()` helpers.
+`Host::entities()`, `Host::worldgen()`, `Host::render()` and `Host::blockShapes()` helpers.
 Unsupported names/versions return null. Set every descriptor's `size` and check
 return codes. Registrations are copied, transactional and frozen before play.
 Native desktop packages can use all interfaces; compiled-in packages use the same
@@ -181,6 +181,73 @@ sampled overlay. Compile shader edits with `glslc effect.vert -o effect.vert.spv
 `glslc effect.frag -o effect.frag.spv`. Each example builds independently with CMake
 and links only the SDK headers.
 
+## Block shapes and state families
+
+Query `minecraftc.block_shapes` version 1 (`Host::blockShapes()` in C++).
+The extension leaves the ABI 1 host and `MC_Block` layouts unchanged. Native
+and data registrations freeze with other content; visual-only packages cannot
+register shape gameplay. A failed registration rolls back the owning package.
+
+`MC_BlockFamily` embeds an ordinary `MC_Block` and a template kind. Templates
+allocate 2 slab, 8 straight stair, 64 door or 24 button block states. Each state
+has a stable namespaced key: the default uses the family key, others append
+`/state/N`. Treat these keys as generated content; do not register conflicting
+keys or persist runtime IDs. Material, survival and drop properties are shared.
+Plugin template and box-model items use their block geometry and face materials
+when held or dropped; builtin item models retain their existing appearance.
+Items reference the default state's key; placement chooses the facing/half and
+attachment. Slabs require `full_block`, a namespaced full cube to merge into.
+This may reference a block registered later in the same package.
+
+Door parameters `manual_open` and `villager_open` are independent. Buttons use
+`release_ticks` (1–65535 ticks at 20 Hz) and `arrow_trigger`; arrow occupancy
+retains a pressed button, restarting its configured countdown when checked at
+expiry. Repeated manual activation does not extend an existing pulse. Defaults
+for JSON are both door permissions enabled, 30 ticks and arrow triggering
+allowed. Native descriptors set flags/duration explicitly. Doors must be solid;
+buttons must be non-solid; templates cannot override their geometry.
+
+Data arrays `block_families` use ordinary block fields plus `kind` (`slab`,
+`stair`, `door`, `button`) and the above parameters. They load after ordinary
+`blocks`, before `items`. `block_geometry` entries identify an ordinary plugin
+`block` and optionally provide `collision`, `selection` and `model` arrays.
+Each box is `[minX,minY,minZ,maxX,maxY,maxZ]`; finite bounds must satisfy
+`0 <= min < max <= 1`, with at most 16 boxes per group. A model array explicitly
+selects box rendering and must be nonempty. Overlapping model boxes render their
+union's exterior, using the block's face materials, alpha and render layer.
+
+`MC_BlockGeometry` uses copied `MC_BlockBox` arrays. Omitted/null groups preserve
+existing geometry; an explicit empty collision group disables collision, and an
+empty selection group disables selection. A collision declaration determines
+`solid` from whether it has boxes. Collision unions filling the complete voxel
+normalize to a single cube so full-block support, spawning and power rules agree;
+selection/model groups remain independent. Without an explicit selection group, selection
+uses the resulting collision boxes. Without a model group, the existing cube or
+cross rendering is retained; physical and visible shapes can intentionally differ.
+
+`state`/`compose` query and construct state IDs for builtin and plugin templates.
+Composition does not modify a world; use the semantic operations for runtime
+door/button interactions and their paired states, timers and power.
+`MC_BlockState.family` is the default-state handle; half encodes top slab/stair or
+upper door. Unused fields must be zero. Button floor/ceiling directions normalize
+to the existing two axes. `boxes` queries collision/selection/model geometry;
+pass a null output to obtain the count. Model queries return a full box for cubes and standard box decompositions for
+templates; legacy cross planes have no box model decomposition.
+
+`set_door_open` and `press_button` take dimension and position and queue host
+operations. Door opening respects `manual_open`; powering remains host-derived.
+Operations preserve two-block door identity and normal button timers/power.
+Clients cannot mutate; a guest callback cannot target another dimension. Accepted
+queue operations may be rejected at execution if the block or session changed;
+these rejections are logged, matching other queued host mutations.
+
+See [native example](../examples/plugins/block_shapes_demo/README.md) and
+[portable example](../examples/plugins/block_shapes_data/README.md).
+No generic property engine, dynamic collision callbacks, curved stairs or
+expanded redstone network is included. Builtin numeric IDs and generation output
+are unchanged; existing save palettes and canonical LAN IDs carry every state.
+Family policies and geometry participate in the gameplay handshake.
+
 ## Compatibility and regression checks
 
 Save v20 stores stable entity keys/state and keyed dimension generation/policy state.
@@ -192,7 +259,7 @@ can differ across peers, while entity/generator registrations require gameplay s
 The original ABI 1 table offsets and legacy native-entry support remain unchanged.
 
 CPU tests include `plugin_loader_content_events_and_persistence` and
-`plugin_entity_worldgen_extensions`. Configure `MINECRAFTC_VULKAN_TESTS=ON` to include
+`plugin_entity_worldgen_extensions` and `plugin_block_shapes_registration_and_runtime`. Configure `MINECRAFTC_VULKAN_TESTS=ON` to include
 `plugin_vulkan_extensions_readback`, GI and model/fog readback tests. GPU checks use a
 real Vulkan device (software Vulkan is supported) and a display/Xvfb, skip with code
 77 only when a display cannot be supplied, and reject installed validation-layer

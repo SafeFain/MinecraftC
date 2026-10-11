@@ -108,6 +108,19 @@ public:
            block==BlockId::ACACIA_WOOD||getBlockProps(block).shape==RenderShape::Cross||
            getBlockProps(block).shape==RenderShape::CeilingCross)
             face=FaceDir::FRONT;
+        const auto shape=getBlockProps(block).shape;
+        if(shape==RenderShape::Slab||shape==RenderShape::Stair||shape==RenderShape::Door||shape==RenderShape::Button||shape==RenderShape::Boxes) {
+            int horizontal=0;ArchitecturalBlockState architecture;
+            if(shape==RenderShape::Stair&&decodeArchitecturalBlock(block,architecture)&&static_cast<uint8_t>(architecture.direction)%2==0)horizontal=2;
+            const auto boxes=blockModelBoxes(block);const int tile=static_cast<int>(getFaceTextureIndex(block,horizontal==2?FaceDir::RIGHT:FaceDir::FRONT));
+            const float side=static_cast<float>(m_blockAtlasTilesPerSide),inset=.5f/(16*side);
+            for(uint8_t i=0;i<boxes.count;++i) {
+                const auto& box=boxes.boxes[i];const bool top=shape==RenderShape::Button;
+                const float lo=top?box.min.z:box.min.y,hi=top?box.max.z:box.max.y;
+                quad(x+w*box.min[horizontal],y+h*lo,w*(box.max[horizontal]-box.min[horizontal]),h*(hi-lo),{tile%m_blockAtlasTilesPerSide/side+inset,tile/m_blockAtlasTilesPerSide/side+inset,(tile%m_blockAtlasTilesPerSide+1)/side-inset,(tile/m_blockAtlasTilesPerSide+1)/side-inset},glm::vec4(1),m_blockMaterial);
+            }
+            return;
+        }
         const int tile=static_cast<int>(getFaceTextureIndex(block,face));
         const int side=m_blockAtlasTilesPerSide;const float s=static_cast<float>(side);
         const float inset=.5f/(16.0f*s);
@@ -117,6 +130,10 @@ public:
     void drawItemIcon(float x,float y,float w,float h,const ItemStack& stack)override{
         if(stack.empty())return;
         if(const auto* item=Plugins::pluginItem(stack.id)) {
+            if(item->properties.placedBlock) {
+                const auto shape=getBlockProps(*item->properties.placedBlock).shape;
+                if(shape==RenderShape::Slab||shape==RenderShape::Stair||shape==RenderShape::Door||shape==RenderShape::Button||shape==RenderShape::Boxes){drawBlockIcon(x,y,w,h,*item->properties.placedBlock);return;}
+            }
             drawAtlasIcon(x,y,w,h,item->tile,glm::vec4(1));return;
         }
         std::string name=getItemProps(stack.id).name;

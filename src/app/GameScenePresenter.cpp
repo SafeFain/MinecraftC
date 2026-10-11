@@ -264,7 +264,7 @@ void GameScenePresenter::render(
                 static_cast<float>(highlighted->z - renderOrigin.z));
             const BlockId highlightedBlock = session.worldState().getBlock(
                 highlighted->x, highlighted->y, highlighted->z);
-            const BlockCollisionBoxes boxes = blockCollisionBoxes(highlightedBlock);
+            const BlockCollisionBoxes boxes = blockSelectionBoxes(highlightedBlock);
             if (boxes.count == 0) {
                 renderer.renderWireframe(pos, glm::vec3(1.0f), vp);
             } else {

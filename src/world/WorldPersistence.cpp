@@ -152,7 +152,7 @@ void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
                 BlockEntity entity;
                 entity.type = id == BlockId::CHEST ? BlockEntityType::Chest :
                     id == BlockId::FURNACE ? BlockEntityType::Furnace : BlockEntityType::Button;
-                entity.buttonRemaining = button.pressed ? (button.material==DoorMaterial::Iron?20:30) : 0;
+                entity.buttonRemaining = button.pressed ? (buttonReleaseTicks(button)) : 0;
                 entities.emplace(localIndex, entity);
                 m_dirtyBlockEntityChunks.insert({cx, cz});
             }

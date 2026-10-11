@@ -340,7 +340,34 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     auto each=[&](const char* key,auto apply){if(!data.has(key))return;check(data.at(key).type==Json::Type::Array,"Content field must be an array");for(const auto& value:data.at(key).array)apply(value);};
     auto integer=[](const Json& j,const char* key,uint32_t fallback)->uint32_t {const double v=j.numeric(key,fallback);check(v>=0&&v<=65535&&std::floor(v)==v,"Expected bounded integer");return static_cast<uint32_t>(v);};
     each("materials",[&](const Json& j){MC_Material m{};m.size=sizeof(m);std::string key=j.at("key").text(),image=j.text("image"),normal=j.text("normal"),properties=j.text("properties");m.key=key.c_str();m.image=image.c_str();m.normal=normal.c_str();m.properties=properties.c_str();m.replace=j.flag("replace",false);std::fill(m.color,m.color+4,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==4,"Material color requires four numbers");for(size_t i=0;i<4;++i){check(c.array[i].type==Json::Type::Number,"Invalid color");m.color[i]=static_cast<float>(c.array[i].number);}}material(ctx,m);});
-    each("blocks",[&](const Json& j){MC_Block b{};b.size=sizeof(b);std::string key=j.at("key").text(),name=j.at("name").text(),drop=j.text("drop");b.key=key.c_str();b.name=name.c_str();b.drop_item=drop.c_str();b.hardness=static_cast<float>(j.numeric("hardness",1));b.alpha=static_cast<float>(j.numeric("alpha",1));b.solid=j.flag("solid",true);b.cross=j.flag("cross",false);b.layer=integer(j,"layer",0);b.emission=integer(j,"emission",0);b.preferred_tool=integer(j,"preferred_tool",integer(j,"tool",0));b.minimum_tier=integer(j,"minimum_tier",integer(j,"tier",0));b.unbreakable=j.flag("unbreakable",false);std::fill(b.color,b.color+3,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==3,"Block color requires three numbers");for(size_t i=0;i<3;++i){check(c.array[i].type==Json::Type::Number,"Invalid block color");b.color[i]=static_cast<float>(c.array[i].number);}}std::array<std::string,6> faces;const auto& mats=j.at("materials");if(mats.type==Json::Type::String)faces.fill(mats.text());else {check(mats.type==Json::Type::Array&&mats.array.size()==6,"Block needs six materials");for(size_t i=0;i<6;++i)faces[i]=mats.array[i].text();}for(size_t i=0;i<6;++i)b.materials[i]=faces[i].c_str();uint16_t id=0;block(ctx,b,id);});
+    auto loadBlock=[&](const Json& j,bool family){MC_Block b{};b.size=sizeof(b);std::string key=j.at("key").text(),name=j.at("name").text(),drop=j.text("drop");b.key=key.c_str();b.name=name.c_str();b.drop_item=drop.c_str();b.hardness=static_cast<float>(j.numeric("hardness",1));b.alpha=static_cast<float>(j.numeric("alpha",1));b.solid=j.flag("solid",true);b.cross=j.flag("cross",false);b.layer=integer(j,"layer",0);b.emission=integer(j,"emission",0);b.preferred_tool=integer(j,"preferred_tool",integer(j,"tool",0));b.minimum_tier=integer(j,"minimum_tier",integer(j,"tier",0));b.unbreakable=j.flag("unbreakable",false);std::fill(b.color,b.color+3,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==3,"Block color requires three numbers");for(size_t i=0;i<3;++i){check(c.array[i].type==Json::Type::Number,"Invalid block color");b.color[i]=static_cast<float>(c.array[i].number);}}std::array<std::string,6> faces;const auto& mats=j.at("materials");if(mats.type==Json::Type::String)faces.fill(mats.text());else {check(mats.type==Json::Type::Array&&mats.array.size()==6,"Block needs six materials");for(size_t i=0;i<6;++i)faces[i]=mats.array[i].text();}for(size_t i=0;i<6;++i)b.materials[i]=faces[i].c_str();uint16_t id=0;
+        if(!family)block(ctx,b,id);
+        else {
+            MC_BlockFamily d{};d.size=sizeof(d);d.block=b;const auto kind=j.at("kind").text();
+            d.kind=kind=="slab"?MC_SLAB_FAMILY:kind=="stair"?MC_STAIR_FAMILY:kind=="door"?MC_DOOR_FAMILY:kind=="button"?MC_BUTTON_FAMILY:0;
+            const auto full=j.text("full_block");d.full_block=full.c_str();d.manual_open=j.flag("manual_open",true);d.villager_open=j.flag("villager_open",true);
+            d.release_ticks=integer(j,"release_ticks",30);d.arrow_trigger=j.flag("arrow_trigger",true);
+            if(!j.has("solid"))d.block.solid=d.kind==MC_BUTTON_FAMILY?0:1;
+            blockFamily(ctx,d,id);
+        }
+    };
+    each("blocks",[&](const Json& j){loadBlock(j,false);});
+    each("block_families",[&](const Json& j){loadBlock(j,true);});
+    each("block_geometry",[&](const Json& j){
+        const auto key=j.at("block").text();MC_BlockGeometry d{};d.size=sizeof(d);d.block=key.c_str();
+        std::array<std::vector<MC_BlockBox>,3> groups;MC_BlockBox empty{};
+        const char* names[]={"collision","selection","model"};
+        for(size_t group=0;group<3;++group)if(j.has(names[group])) {
+            const auto& boxes=j.at(names[group]);check(boxes.type==Json::Type::Array&&boxes.array.size()<=MC_MAX_BLOCK_BOXES,"Invalid box group");
+            for(const auto& box:boxes.array) {
+                check(box.type==Json::Type::Array&&box.array.size()==6,"Box requires six bounds");MC_BlockBox b{};
+                for(size_t axis=0;axis<3;++axis){check(box.array[axis].type==Json::Type::Number&&box.array[axis+3].type==Json::Type::Number,"Invalid box coordinate");b.min[axis]=static_cast<float>(box.array[axis].number);b.max[axis]=static_cast<float>(box.array[axis+3].number);}groups[group].push_back(b);
+            }
+            const auto* buffer=groups[group].empty()?&empty:groups[group].data();const auto count=static_cast<uint32_t>(groups[group].size());
+            if(group==0){d.collision=buffer;d.collision_count=count;}else if(group==1){d.selection=buffer;d.selection_count=count;}else{d.model=buffer;d.model_count=count;}
+        }
+        blockGeometry(ctx,d);
+    });
     each("items",[&](const Json& j){MC_Item item{};item.size=sizeof(item);std::string key=j.at("key").text(),name=j.at("name").text(),mat=j.at("material").text(),placed=j.text("placed_block");item.key=key.c_str();item.name=name.c_str();item.material=mat.c_str();item.placed_block=placed.c_str();item.kind=integer(j,"kind",placed.empty()?0:1);item.category=integer(j,"category",placed.empty()?6:0);item.max_stack=integer(j,"max_stack",64);item.durability=integer(j,"durability",0);item.tool=integer(j,"tool",0);item.tier=integer(j,"tier",0);item.food=integer(j,"food",0);item.saturation=static_cast<float>(j.numeric("saturation",0));item.attack_damage=static_cast<float>(j.numeric("attack_damage",0));item.attack_speed=static_cast<float>(j.numeric("attack_speed",0));uint16_t id=0;this->item(ctx,item,id);});
     each("recipes",[&](const Json& j){MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
     each("dimensions",[&](const Json& j){
@@ -391,6 +418,9 @@ void PluginManager::validateContent() {
     }
     auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
     for(auto& entry:content().blocks) {
+        if(entry.second.familyKind==MC_SLAB_FAMILY) {
+            const auto full=resolveBlock(entry.second.fullBlock);check(isFullCollisionBlock(full)&&getBlockProps(full).shape==RenderShape::Cube,"Slab full_block must be a full cube");
+        }
         for(const auto& key:entry.second.materials)check(materialExists(key),"Unknown block material");
         if(!entry.second.dropKey.empty())entry.second.drop=resolveItem(entry.second.dropKey);
     }
@@ -409,6 +439,9 @@ void PluginManager::buildNetworkDescription() {
             static_cast<int>(b.properties.shape),static_cast<int>(b.properties.layer),b.survival.hardness,
             static_cast<int>(b.survival.preferredTool),static_cast<int>(b.survival.minimumHarvestTier),
             b.survival.unbreakable,b.emission,itemKey(b.drop)}).dump();
+        auto boxes=[](const std::optional<BlockCollisionBoxes>& group){nlohmann::json result=nullptr;if(group){result=nlohmann::json::array();for(uint8_t i=0;i<group->count;++i){const auto& box=group->boxes[i];result.push_back({box.min.x,box.min.y,box.min.z,box.max.x,box.max.y,box.max.z});}}return result;};
+        if(b.family||b.collision||b.selection||b.model)
+            state.networkDescription["shape/"+b.key]=nlohmann::json::array({b.familyKind,b.family?blockKey(static_cast<BlockId>(b.family)):"",b.stateIndex,b.fullBlock,b.manualOpen,b.villagerOpen,b.releaseTicks,b.arrowTrigger,boxes(b.collision),boxes(b.selection),boxes(b.model)}).dump();
     }
     for(const auto& entry:state.items) {
         const auto& i=entry.second.properties;

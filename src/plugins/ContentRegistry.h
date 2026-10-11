@@ -15,6 +15,11 @@ namespace Plugins {
 constexpr uint16_t FIRST_CONTENT_ID=4096;
 constexpr uint16_t INVALID_CONTENT_ID=65535;
 struct BlockContent {
+    uint16_t family=0;
+    uint32_t familyKind=0, stateIndex=0, releaseTicks=30;
+    bool manualOpen=true, villagerOpen=true, arrowTrigger=true;
+    std::string fullBlock;
+    std::optional<BlockCollisionBoxes> collision, selection, model;
     std::string key, name, dropKey;
     BlockProperties properties;
     BlockSurvivalProperties survival;

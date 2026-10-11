@@ -853,12 +853,12 @@ const ItemProperties& getItemProps(ItemId id) {
 }
 
 ItemId itemForBlock(BlockId id) {
+    if (const auto* block = Plugins::pluginBlock(id)) return block->drop;
     DoorState door; ButtonState button;
     if(decodeDoor(id,door)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+static_cast<uint8_t>(door.material));
     if(decodeButton(id,button)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+static_cast<uint8_t>(button.material));
     if(id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS)
         return static_cast<ItemId>(static_cast<uint16_t>(ItemId::BIRCH_PLANKS)+static_cast<uint16_t>(id)-static_cast<uint16_t>(BlockId::BIRCH_PLANKS));
-    if (const auto* block = Plugins::pluginBlock(id)) return block->drop;
     if (isBed(id)) return ItemId::WHITE_BED;
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural)) {

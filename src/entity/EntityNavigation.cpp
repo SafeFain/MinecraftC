@@ -58,7 +58,7 @@ void EntityManager::prepareAiFrame(float dt) {
                villager.position.y+size.y>y && villager.position.y<y+2) {occupied=true;break;}
         }
         if(occupied || m_aiTime<it->second || door.powered) {++it;continue;}
-        m_world.setDoorOpen({x,y,z},false);
+        m_world.setDoorOpen({x,y,z},false,true);
         it=m_openedVillageDoors.erase(it);
     }
     m_aiEntityIndices.clear();
@@ -397,14 +397,14 @@ void EntityManager::openNavigationDoors(Entity& entity,const glm::dvec3& destina
         if(!m_aiChunks.count({World::worldToChunkX(p.x),World::worldToChunkZ(p.z)}))continue;
         DoorState door;
         if(!decodeDoor(m_world.getBlock(p.x,p.y,p.z),door) || door.upper ||
-           door.material==DoorMaterial::Iron || door.open)continue;
+           !doorVillagerOpen(door) || door.open)continue;
         const glm::dvec2 relative(p.x+.5-entity.position.x,p.z+.5-entity.position.z);
         const double t=glm::clamp(glm::dot(relative,segment)/glm::dot(segment,segment),0.,1.);
         if(glm::length(relative-segment*t)>.65)continue;
         const auto key=std::make_pair(World::worldToChunkX(p.x),World::worldToChunkZ(p.z));
         const auto chunk=m_aiChunks.find(key);
         const uint64_t before=chunk==m_aiChunks.end()?0:chunk->second->blockRevision();
-        if(m_world.setDoorOpen(p,true)) {
+        if(m_world.setDoorOpen(p,true,true)) {
             m_openedVillageDoors[{p.x,p.y,p.z}]=m_aiTime+1.;
             if(chunk!=m_aiChunks.end()) {
                 // Our own door edit must not invalidate the path we are following.

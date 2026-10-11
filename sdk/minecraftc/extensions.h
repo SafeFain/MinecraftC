@@ -4,6 +4,42 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#define MC_BLOCK_SHAPES_EXTENSION "minecraftc.block_shapes"
+#define MC_MAX_BLOCK_BOXES 16u
+typedef enum MC_BlockFamilyKind { MC_SLAB_FAMILY=1, MC_STAIR_FAMILY=2, MC_DOOR_FAMILY=3, MC_BUTTON_FAMILY=4 } MC_BlockFamilyKind;
+typedef struct MC_BlockBox { float min[3], max[3]; } MC_BlockBox;
+/* Null groups preserve existing geometry; a non-null empty group removes it.
+   Model boxes select box rendering. Registration copies all arrays. */
+typedef struct MC_BlockGeometry {
+    uint32_t size;
+    const char* block;
+    const MC_BlockBox *collision, *selection, *model;
+    uint32_t collision_count, selection_count, model_count;
+} MC_BlockGeometry;
+typedef struct MC_BlockFamily {
+    uint32_t size, kind;
+    MC_Block block;
+    const char* full_block; /* Required for slab merging; may refer to a later block. */
+    uint32_t manual_open, villager_open, release_ticks, arrow_trigger;
+} MC_BlockFamily;
+/* direction: N/E/S/W=0..3; half: lower/upper=0/1;
+   attachment uses top,bottom,front,back,right,left=0..5. Unused fields must be 0. */
+typedef struct MC_BlockState {
+    uint32_t size, kind;
+    uint16_t family;
+    uint32_t direction, half, right_hinge, open, powered, attachment, pressed;
+} MC_BlockState;
+typedef struct MC_BlockShapesV1 {
+    uint32_t size, version;
+    int32_t (*register_family)(MC_PluginContext*,const MC_BlockFamily*,uint16_t*);
+    int32_t (*register_geometry)(MC_PluginContext*,const MC_BlockGeometry*);
+    int32_t (*state)(MC_PluginContext*,uint16_t,MC_BlockState*);
+    int32_t (*compose)(MC_PluginContext*,const MC_BlockState*,uint16_t*);
+    /* group: 0 collision, 1 selection, 2 model; null output queries count. */
+    int32_t (*boxes)(MC_PluginContext*,uint16_t,uint32_t,MC_BlockBox*,uint32_t,uint32_t*);
+    int32_t (*set_door_open)(MC_PluginContext*,uint32_t,int32_t,int32_t,int32_t,uint32_t);
+    int32_t (*press_button)(MC_PluginContext*,uint32_t,int32_t,int32_t,int32_t);
+} MC_BlockShapesV1;
 #define MC_ENTITIES_EXTENSION "minecraftc.entities"
 #define MC_WORLDGEN_EXTENSION "minecraftc.worldgen"
 #define MC_RENDER_EXTENSION "minecraftc.render"

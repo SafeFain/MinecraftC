@@ -33,7 +33,7 @@ bool clear(const Terrain& terrain, const glm::vec3& size,
             if (avoidHazards && hazard(block)) return false;
             DoorState door;
             BlockId collision=block;
-            if(terrain.canOpenWoodDoors && decodeDoor(block,door) && door.material!=DoorMaterial::Iron) {
+            if(terrain.canOpenWoodDoors && decodeDoor(block,door) && doorVillagerOpen(door)) {
                 door.open=true;collision=doorBlock(door);
             }
             const auto boxes=blockCollisionBoxes(collision);

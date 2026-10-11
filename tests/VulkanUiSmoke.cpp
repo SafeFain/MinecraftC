@@ -51,7 +51,11 @@ int main(int argc,char** argv) {
         const auto assets=std::filesystem::absolute(argv[1]);
         const auto pluginRoot=std::filesystem::temp_directory_path()/"minecraftc-plugin-ui-smoke";
         std::filesystem::remove_all(pluginRoot);
-        std::filesystem::create_directories(pluginRoot);
+        std::filesystem::create_directories(pluginRoot/"mods");
+        std::filesystem::copy(assets.parent_path()/"examples"/"plugins"/"block_shapes_data",pluginRoot/"mods"/"block_shapes_data",std::filesystem::copy_options::recursive);
+        const auto legacy=pluginRoot/"mods"/"legacy_icon";std::filesystem::create_directories(legacy);
+        {std::ofstream manifest(legacy/"mod.json");manifest<<R"({"id":"legacy_icon","version":"1.0.0","api":1,"data":"content.json"})";}
+        {std::ofstream content(legacy/"content.json");content<<R"({"blocks":[{"key":"legacy_icon:cube","name":"Legacy cube","materials":"stone"}],"items":[{"key":"legacy_icon:item","name":"Independent icon","material":"dirt","placed_block":"legacy_icon:cube","kind":1}]})";}
         if(extensions) {
             const auto package=pluginRoot/"mods"/"render_demo";std::filesystem::create_directories(package);
             const auto source=assets.parent_path()/"examples"/"plugins"/"render_demo";
@@ -157,6 +161,30 @@ int main(int argc,char** argv) {
         }
         localization.setLanguage(Language::English);
         draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});
+        const auto iconPasses=Plugins::content().extensions.renderPasses;Plugins::content().extensions.renderPasses.clear();
+        auto iconImage=[&](const std::function<void()>& render) {
+            for(int frame=0;frame<3;++frame) {
+                if(frame==2)VulkanGiSmokeProbe::requestCapture(renderer);
+                FrameData state;state.clearColor={0,0,0,1};renderer.beginFrame(state);
+                ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
+            }
+            renderer.waitIdle();auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+            if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Shape icon capture unavailable");
+            return pixels;
+        };
+        auto shapeImage=[&](BlockId block){return iconImage([&]{ui.drawBlockIcon(16,16,64,64,block);});};
+        const auto slabImage=shapeImage(Plugins::resolveBlock("block_shapes_data:slab"));
+        const auto cubeImage=shapeImage(BlockId::STONE);
+        if(slabImage==cubeImage)throw std::runtime_error("Slab icon did not render partial geometry");
+        shapeImage(Plugins::resolveBlock("block_shapes_data:stair"));shapeImage(Plugins::resolveBlock("block_shapes_data:door"));
+        shapeImage(Plugins::resolveBlock("block_shapes_data:button"));shapeImage(Plugins::resolveBlock("block_shapes_data:box"));
+        const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::pluginItem(legacyItem)->tile;
+        const auto itemPixels=iconImage([&]{ui.drawItemIcon(16,16,64,64,{legacyItem,1,0});});
+        const auto materialPixels=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,legacyTile,glm::vec4(1));});
+        if(itemPixels!=materialPixels)throw std::runtime_error("Legacy cube item lost its independent icon material");
+        Plugins::content().extensions.renderPasses=iconPasses;
+        std::cout<<"Plugin block shape Vulkan icon readback passed\n";
+
         main.onKeyPress(Key::Down);main.onKeyPress(Key::Down);main.onKeyPress(Key::Enter);
         for (const auto language : languagesByEnglishName()) {
             settings.language=language;localization.setLanguage(language);

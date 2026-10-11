@@ -564,11 +564,11 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     }
     DoorState oldDoor, newDoor;
     if (!m_pairMutation && decodeDoor(previous,oldDoor) &&
-        (!decodeDoor(id,newDoor) || newDoor.material!=oldDoor.material || newDoor.upper!=oldDoor.upper)) {
+        (!decodeDoor(id,newDoor) || !sameDoorFamily(newDoor,oldDoor) || newDoor.upper!=oldDoor.upper)) {
         const glm::ivec3 partner=position+glm::ivec3(0,oldDoor.upper?-1:1,0);
         DoorState other;
         if(decodeDoor(getBlock(partner.x,partner.y,partner.z),other) &&
-           other.material==oldDoor.material && other.upper!=oldDoor.upper)
+           sameDoorFamily(other,oldDoor) && other.upper!=oldDoor.upper)
             setBlockInternal(partner.x,partner.y,partner.z,BlockId::AIR,recordOverride);
     }
     ButtonState oldButton;
@@ -628,7 +628,8 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
             const BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
             if (id == BlockId::AIR) return false;
             const BlockProperties& props = getBlockProps(id);
-            if (props.solid || props.shape==RenderShape::Button) {
+            if (props.solid || props.shape==RenderShape::Button ||
+                (Plugins::pluginBlock(id)&&Plugins::pluginBlock(id)->selection)) {
                 const BlockCollisionBoxes boxes = blockSelectionBoxes(id);
                 double nearest = maxDistance + 1.0;
                 glm::ivec3 nearestFace(0);
@@ -663,16 +664,7 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
 bool World::supportsFace(const glm::ivec3& p, FaceDir outward) const {
     if(!generatedAt(p.x,p.z)) return false;
     const BlockId support=getBlock(p.x,p.y,p.z);
-    if(getBlockProps(support).shape==RenderShape::Door)return false;
-    const auto boxes=blockCollisionBoxes(support);
-    const glm::ivec3 normal=faceOffset(outward);
-    const int axis=normal.x?0:normal.y?1:2, u=(axis+1)%3,v=(axis+2)%3;
-    for(uint8_t i=0;i<boxes.count;++i) {
-        const auto& box=boxes.boxes[i];
-        if(box.min[u]==0 && box.max[u]==1 && box.min[v]==0 && box.max[v]==1 &&
-           (normal[axis]>0?box.max[axis]==1:box.min[axis]==0)) return true;
-    }
-    return false;
+    return blockSupportsFace(support,outward);
 }
 bool World::placeDoor(const glm::ivec3& p, DoorState state) {
     if(p.y<Config::WORLD_MIN_Y+1 || p.y+1>=Config::WORLD_MAX_Y ||
@@ -686,13 +678,13 @@ bool World::placeDoor(const glm::ivec3& p, DoorState state) {
     refreshDoorPower(p);
     return true;
 }
-bool World::setDoorOpen(const glm::ivec3& target, bool open) {
+bool World::setDoorOpen(const glm::ivec3& target, bool open, bool villager) {
     DoorState state;
-    if(!decodeDoor(getBlock(target.x,target.y,target.z),state) || state.material==DoorMaterial::Iron) return false;
+    if(!decodeDoor(getBlock(target.x,target.y,target.z),state) || !(villager?doorVillagerOpen(state):doorManualOpen(state))) return false;
     const glm::ivec3 bottom=target-glm::ivec3(0,state.upper?1:0,0);
     DoorState upper;
     if(!decodeDoor(getBlock(bottom.x,bottom.y+1,bottom.z),upper) || !upper.upper ||
-       upper.material!=state.material) return false;
+       !sameDoorFamily(upper,state)) return false;
     if(state.open==open) return true;
     state.upper=false;state.open=open;
     m_pairMutation=true;
@@ -705,7 +697,7 @@ bool World::setDoorOpen(const glm::ivec3& target, bool open) {
 bool World::interactDoor(const glm::ivec3& p) {
     DoorState state;
     if(!decodeDoor(getBlock(p.x,p.y,p.z),state)) return false;
-    if(state.material!=DoorMaterial::Iron) setDoorOpen(p,!state.open);
+    if(doorManualOpen(state)) setDoorOpen(p,!state.open);
     return true; // iron doors consume use without placing the held item
 }
 bool World::placeButton(const glm::ivec3& p, ButtonState state) {
@@ -719,7 +711,7 @@ bool World::activateButton(const glm::ivec3& p) {
     if(state.pressed) return true;
     state.pressed=true;setBlock(p.x,p.y,p.z,buttonBlock(state));
     if(auto* entity=m_persistence.getBlockEntity(p))
-        entity->buttonRemaining=state.material==DoorMaterial::Iron?20:30;
+        entity->buttonRemaining=buttonReleaseTicks(state);
     updateButtonPower(p,state);
     m_interactionSounds.push_back({p,state.material==DoorMaterial::Iron,true,true});
     return true;
@@ -797,8 +789,8 @@ void World::tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& 
     for(const glm::ivec3& p:m_persistence.tickButtons()) {
         ButtonState button;
         if(!decodeButton(getBlock(p.x,p.y,p.z),button)) continue;
-        if(button.material!=DoorMaterial::Iron && arrowPresent(p)) {
-            if(auto* entity=m_persistence.getBlockEntity(p)) entity->buttonRemaining=30;
+        if(buttonArrowTrigger(button) && arrowPresent(p)) {
+            if(auto* entity=m_persistence.getBlockEntity(p)) entity->buttonRemaining=static_cast<uint16_t>(buttonReleaseTicks(button));
             continue;
         }
         button.pressed=false;setBlock(p.x,p.y,p.z,buttonBlock(button));
@@ -812,7 +804,7 @@ void World::activateButtonsAtArrow(const glm::dvec3& arrow) {
         const glm::ivec3 p=cell+glm::ivec3(x,y,z);
         if(!generatedAt(p.x,p.z)) continue;
         ButtonState state;
-        if(!decodeButton(getBlock(p.x,p.y,p.z),state) || state.material==DoorMaterial::Iron) continue;
+        if(!decodeButton(getBlock(p.x,p.y,p.z),state) || !buttonArrowTrigger(state)) continue;
         state.pressed=false;
         const auto box=blockSelectionBoxes(buttonBlock(state)).boxes[0];
         const glm::dvec3 local=arrow-glm::dvec3(p);

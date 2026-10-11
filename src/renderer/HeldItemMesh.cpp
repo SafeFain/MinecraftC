@@ -34,3 +34,15 @@ MeshData buildHeldCubeMesh(const std::array<int, 6>& tiles, int tilesPerSide,
     }
     return mesh;
 }
+
+MeshData buildHeldBlockShapeMesh(BlockId block,int tilesPerSide) {
+    MeshData mesh;
+    const auto cube=buildHeldCubeMesh({static_cast<int>(getFaceTextureIndex(block,FaceDir::FRONT)),static_cast<int>(getFaceTextureIndex(block,FaceDir::BACK)),static_cast<int>(getFaceTextureIndex(block,FaceDir::LEFT)),static_cast<int>(getFaceTextureIndex(block,FaceDir::RIGHT)),static_cast<int>(getFaceTextureIndex(block,FaceDir::TOP)),static_cast<int>(getFaceTextureIndex(block,FaceDir::BOTTOM))},tilesPerSide,true);
+    for(const auto& surface:blockModelFaces(block)) {
+        const int face=surface.face==FaceDir::FRONT?0:surface.face==FaceDir::BACK?1:surface.face==FaceDir::LEFT?2:surface.face==FaceDir::RIGHT?3:surface.face==FaceDir::TOP?4:5;
+        const auto& box=surface.box;const auto offset=static_cast<uint32_t>(mesh.vertices.size());
+        for(int i=0;i<4;++i){auto vertex=cube.vertices[face*4+i];vertex.position=(vertex.position+glm::vec3(.5f))*(box.max-box.min)+box.min-glm::vec3(.5f);mesh.vertices.push_back(vertex);}
+        for(uint32_t index:{0u,1u,2u,0u,2u,3u})mesh.indices.push_back(offset+index);
+    }
+    return mesh;
+}

@@ -1,0 +1,1 @@
+{"id":"block_shapes_demo","name":"Block Shapes SDK Demo","version":"1.0.0","api":1,"native":{"linux":"block_shapes_demo.so","windows":"block_shapes_demo.dll","macos":"block_shapes_demo.dylib"}}

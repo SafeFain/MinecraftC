@@ -917,6 +917,13 @@ constexpr uint8_t ARCHITECTURAL_STRIDE = 10;
 }
 
 bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
+    state.family=0;
+    if(const auto* b=Plugins::pluginBlock(id)) {
+        if(b->familyKind!=MC_SLAB_FAMILY&&b->familyKind!=MC_STAIR_FAMILY)return false;
+        state.family=b->family;state.shape=b->familyKind==MC_SLAB_FAMILY?RenderShape::Slab:RenderShape::Stair;
+        state.half=(b->familyKind==MC_SLAB_FAMILY?b->stateIndex:b->stateIndex/4)?BlockHalf::Top:BlockHalf::Bottom;
+        state.direction=static_cast<BedDirection>(b->familyKind==MC_SLAB_FAMILY?0:b->stateIndex%4);return true;
+    }
     const uint16_t raw = static_cast<uint16_t>(id);
     if (raw < ARCHITECTURAL_FIRST ||
         raw >= ARCHITECTURAL_FIRST + ARCHITECTURAL_STRIDE *
@@ -967,6 +974,7 @@ BlockId architecturalBaseBlock(ArchitecturalMaterial material) {
 
 BlockCollisionBoxes blockCollisionBoxes(BlockId id) {
     BlockCollisionBoxes result;
+    if(const auto* b=Plugins::pluginBlock(id))if(b->collision)return *b->collision;
     const BlockProperties& props = getBlockProps(id);
     DoorState door;
     if (decodeDoor(id, door)) {
@@ -1083,7 +1091,10 @@ uint8_t getLightDampening(BlockId id) {
         getBlockProps(id).shape == RenderShape::Slab ||
         getBlockProps(id).shape == RenderShape::Stair ||
         getBlockProps(id).shape == RenderShape::Spike ||
-        getBlockProps(id).shape == RenderShape::CeilingCross) return 0;
+        getBlockProps(id).shape == RenderShape::Door ||
+        getBlockProps(id).shape == RenderShape::Button ||
+        getBlockProps(id).shape == RenderShape::CeilingCross ||
+        (getBlockProps(id).shape == RenderShape::Boxes&&!isFullCollisionBlock(id))) return 0;
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
         id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
@@ -1185,15 +1196,15 @@ bool isReplaceableByFluid(BlockId id) {
 
 uint8_t fireEncouragement(BlockId id) {
     DoorState door; ButtonState button;
-    if((decodeDoor(id,door) && door.material!=DoorMaterial::Iron) ||
-       (decodeButton(id,button) && button.material!=DoorMaterial::Iron) ||
+    if((decodeDoor(id,door) && !door.family && door.material!=DoorMaterial::Iron) ||
+       (decodeButton(id,button) && !button.family && button.material!=DoorMaterial::Iron) ||
        (id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS))return 5;
     if (isBiomePlant(id)) return 60;
     if (id == BlockId::LEAF_LITTER_SOIL) return 30;
     if (isBed(id)) return 30;
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id,architectural) &&
-        architectural.material==ArchitecturalMaterial::Planks) return 5;
+        !architectural.family && architectural.material==ArchitecturalMaterial::Planks) return 5;
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
@@ -1322,6 +1333,13 @@ const BlockProperties& getBlockProps(BlockId id) {
 bool isValidBlockId(BlockId id) { return Plugins::validBlock(id); }
 
 bool decodeDoor(BlockId id, DoorState& state) {
+    state.family=0;
+    if(const auto* b=Plugins::pluginBlock(id)) {
+        if(b->familyKind!=MC_DOOR_FAMILY)return false;
+        state.family=b->family;const auto n=b->stateIndex;
+        state.direction=static_cast<BedDirection>(n%4);state.rightHinge=n&4;state.open=n&8;state.powered=n&16;state.upper=n&32;
+        state.material=DoorMaterial::Oak;return true;
+    }
     const uint16_t raw = static_cast<uint16_t>(id);
     const uint16_t first = static_cast<uint16_t>(BlockId::DOOR_FIRST);
     if (raw < first || raw >= static_cast<uint16_t>(BlockId::BUTTON_FIRST)) return false;
@@ -1335,11 +1353,19 @@ bool decodeDoor(BlockId id, DoorState& state) {
     return true;
 }
 BlockId doorBlock(const DoorState& s) {
+    if(s.family)return static_cast<BlockId>(s.family+static_cast<uint8_t>(s.direction)+(s.rightHinge?4:0)+(s.open?8:0)+(s.powered?16:0)+(s.upper?32:0));
     return static_cast<BlockId>(static_cast<uint16_t>(BlockId::DOOR_FIRST) +
         static_cast<uint8_t>(s.material)*64 + static_cast<uint8_t>(s.direction) +
         (s.rightHinge?4:0) + (s.open?8:0) + (s.powered?16:0) + (s.upper?32:0));
 }
 bool decodeButton(BlockId id, ButtonState& state) {
+    state.family=0;
+    if(const auto* b=Plugins::pluginBlock(id)) {
+        if(b->familyKind!=MC_BUTTON_FAMILY)return false;
+        state.family=b->family;state.material=DoorMaterial::Oak;
+        state.attachment=static_cast<FaceDir>((b->stateIndex%12)/2);state.pressed=b->stateIndex%2;
+        state.direction=static_cast<BedDirection>(b->stateIndex/12);return true;
+    }
     const uint16_t raw = static_cast<uint16_t>(id), first = static_cast<uint16_t>(BlockId::BUTTON_FIRST);
     if (raw < first || raw >= static_cast<uint16_t>(BlockId::COUNT)) return false;
     const uint16_t offset = raw-first;
@@ -1350,6 +1376,7 @@ bool decodeButton(BlockId id, ButtonState& state) {
     return true;
 }
 BlockId buttonBlock(const ButtonState& s) {
+    if(s.family)return static_cast<BlockId>(s.family+(static_cast<uint8_t>(s.direction)%2)*12+static_cast<uint8_t>(s.attachment)*2+(s.pressed?1:0));
     // Horizontal orientation matters only on floor/ceiling: north-south or east-west.
     return static_cast<BlockId>(static_cast<uint16_t>(BlockId::BUTTON_FIRST) +
         static_cast<uint8_t>(s.material)*24 + (static_cast<uint8_t>(s.direction)%2)*12 +
@@ -1369,6 +1396,7 @@ BlockId woodPlanks(DoorMaterial material) {
     return woods[static_cast<uint8_t>(material)];
 }
 BlockCollisionBoxes blockSelectionBoxes(BlockId id) {
+    if(const auto* b=Plugins::pluginBlock(id))if(b->selection)return *b->selection;
     ButtonState button;
     if (!decodeButton(id, button)) return blockCollisionBoxes(id);
     BlockCollisionBoxes result;
@@ -1386,4 +1414,71 @@ BlockCollisionBoxes blockSelectionBoxes(BlockId id) {
     if (normal[axis]>0) {box.min[axis]=0;box.max[axis]=depth;}
     else {box.min[axis]=1-depth;box.max[axis]=1;}
     return result;
+}
+
+BlockId architecturalStateBlock(const ArchitecturalBlockState& s) {
+    if(s.family)return static_cast<BlockId>(s.family+(s.shape==RenderShape::Slab?(s.half==BlockHalf::Top?1:0):(s.half==BlockHalf::Top?4:0)+static_cast<uint8_t>(s.direction)));
+    return s.shape==RenderShape::Slab?slabBlock(s.material,s.half):stairBlock(s.material,s.half,s.direction);
+}
+BlockId architecturalFullBlock(const ArchitecturalBlockState& s) {
+    if(s.family)return Plugins::resolveBlock(Plugins::pluginBlock(static_cast<BlockId>(s.family))->fullBlock);
+    return architecturalBaseBlock(s.material);
+}
+bool sameArchitecturalFamily(const ArchitecturalBlockState& a,const ArchitecturalBlockState& b) {return a.family==b.family&&(a.family||a.material==b.material)&&a.shape==b.shape;}
+bool sameDoorFamily(const DoorState& a,const DoorState& b) {return a.family==b.family&&(a.family||a.material==b.material);}
+bool doorManualOpen(const DoorState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->manualOpen:s.material!=DoorMaterial::Iron;}
+bool doorVillagerOpen(const DoorState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->villagerOpen:s.material!=DoorMaterial::Iron;}
+bool buttonArrowTrigger(const ButtonState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->arrowTrigger:s.material!=DoorMaterial::Iron;}
+uint32_t buttonReleaseTicks(const ButtonState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->releaseTicks:s.material==DoorMaterial::Iron?20:30;}
+BlockCollisionBoxes blockModelBoxes(BlockId id) {
+    if(const auto* b=Plugins::pluginBlock(id))if(b->model)return *b->model;
+    if(getBlockProps(id).shape==RenderShape::Cube){BlockCollisionBoxes boxes;boxes.count=1;return boxes;}
+    return blockSelectionBoxes(id);
+}
+
+std::vector<BlockModelFace> blockModelFaces(BlockId id) {
+    const auto geometry=blockModelBoxes(id);std::vector<BlockModelFace> result;
+    for(uint8_t index=0;index<geometry.count;++index)for(uint8_t f=0;f<6;++f) {
+        const auto face=static_cast<FaceDir>(f);const auto normal=faceOffset(face);const auto& bounds=geometry.boxes[index];
+        const int axis=normal.x?0:normal.y?1:2,u=axis==0?1:0,v=axis==2?1:2;
+        std::vector<float> uc{bounds.min[u],bounds.max[u]},vc{bounds.min[v],bounds.max[v]};
+        for(uint8_t other=0;other<geometry.count;++other) {
+            const auto& b=geometry.boxes[other];
+            for(float edge:{b.min[u],b.max[u]})if(edge>bounds.min[u]&&edge<bounds.max[u])uc.push_back(edge);
+            for(float edge:{b.min[v],b.max[v]})if(edge>bounds.min[v]&&edge<bounds.max[v])vc.push_back(edge);
+        }
+        std::sort(uc.begin(),uc.end());uc.erase(std::unique(uc.begin(),uc.end()),uc.end());
+        std::sort(vc.begin(),vc.end());vc.erase(std::unique(vc.begin(),vc.end()),vc.end());
+        const float plane=normal[axis]>0?bounds.max[axis]:bounds.min[axis];
+        for(size_t ui=0;ui+1<uc.size();++ui)for(size_t vi=0;vi+1<vc.size();++vi) {
+            const float pu=(uc[ui]+uc[ui+1])*.5f,pv=(vc[vi]+vc[vi+1])*.5f;bool covered=false;
+            for(uint8_t other=0;other<geometry.count;++other)if(other!=index) {
+                const auto& b=geometry.boxes[other];
+                if(pu<=b.min[u]||pu>=b.max[u]||pv<=b.min[v]||pv>=b.max[v])continue;
+                const bool extends=normal[axis]>0?(b.min[axis]<=plane&&b.max[axis]>plane):(b.min[axis]<plane&&b.max[axis]>=plane);
+                const bool duplicate=other<index&&(normal[axis]>0?b.max[axis]==plane:b.min[axis]==plane);
+                covered=covered||extends||duplicate;
+            }
+            if(!covered){auto box=bounds;box.min[u]=uc[ui];box.max[u]=uc[ui+1];box.min[v]=vc[vi];box.max[v]=vc[vi+1];result.push_back({box,face});}
+        }
+    }
+    return result;
+}
+bool blockSupportsFace(BlockId id,FaceDir face) {
+    if(getBlockProps(id).shape==RenderShape::Door)return false;
+    const auto geometry=blockCollisionBoxes(id);const auto normal=faceOffset(face);
+    const int axis=normal.x?0:normal.y?1:2,u=(axis+1)%3,v=(axis+2)%3;
+    std::vector<float> uc{0,1},vc{0,1};
+    auto boundary=[&](const BlockCollisionBox& box){return normal[axis]>0?box.max[axis]==1:box.min[axis]==0;};
+    for(uint8_t i=0;i<geometry.count;++i)if(boundary(geometry.boxes[i])) {
+        const auto& b=geometry.boxes[i];uc.push_back(b.min[u]);uc.push_back(b.max[u]);vc.push_back(b.min[v]);vc.push_back(b.max[v]);
+    }
+    std::sort(uc.begin(),uc.end());uc.erase(std::unique(uc.begin(),uc.end()),uc.end());
+    std::sort(vc.begin(),vc.end());vc.erase(std::unique(vc.begin(),vc.end()),vc.end());
+    for(size_t ui=0;ui+1<uc.size();++ui)for(size_t vi=0;vi+1<vc.size();++vi) {
+        const float pu=(uc[ui]+uc[ui+1])*.5f,pv=(vc[vi]+vc[vi+1])*.5f;bool covered=false;
+        for(uint8_t i=0;i<geometry.count;++i){const auto& b=geometry.boxes[i];covered=covered||(boundary(b)&&pu>=b.min[u]&&pu<=b.max[u]&&pv>=b.min[v]&&pv<=b.max[v]);}
+        if(!covered)return false;
+    }
+    return true;
 }

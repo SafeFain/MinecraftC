@@ -464,9 +464,9 @@ struct ChunkMesh {
                     const RenderShape shape = getBlockProps(id).shape;
                     if (shape != RenderShape::Slab && shape != RenderShape::Stair &&
                         shape != RenderShape::Spike && shape != RenderShape::Door &&
-                        shape != RenderShape::Button)
+                        shape != RenderShape::Button && shape != RenderShape::Boxes)
                         continue;
-                    const BlockCollisionBoxes geometry = blockSelectionBoxes(id);
+                    const BlockCollisionBoxes geometry = blockModelBoxes(id);
                     ArchitecturalBlockState architecture;
                     decodeArchitecturalBlock(id, architecture);
                     const glm::vec2 sampled = normalizedLight(x, y, z);
@@ -485,10 +485,10 @@ struct ChunkMesh {
                             chunkWorldX + x + off.x, y + off.y,
                             chunkWorldZ + z + off.z);
                         const BlockProperties& neighbor = getBlockProps(neighborId);
-                        if (!neighbor.solid ||
+                        if ((!neighbor.solid && neighbor.shape!=RenderShape::Boxes) ||
                             neighbor.layer != RenderLayer::Opaque) return false;
                         const BlockCollisionBoxes neighborBoxes =
-                            blockCollisionBoxes(neighborId);
+                            blockModelBoxes(neighborId);
                         const size_t neighborCount = std::min<size_t>(
                             neighborBoxes.count, neighborBoxes.boxes.size());
                         const int normalAxis = face == FaceDir::TOP ||
@@ -496,8 +496,8 @@ struct ChunkMesh {
                             (face == FaceDir::FRONT || face == FaceDir::BACK ? 2 : 0);
                         const int uAxis = normalAxis == 0 ? 1 : 0;
                         const int vAxis = normalAxis == 2 ? 1 : 2;
-                        std::array<float, 6> uCuts{};
-                        std::array<float, 6> vCuts{};
+                        std::array<float, 34> uCuts{};
+                        std::array<float, 34> vCuts{};
                         int uCount = 2, vCount = 2;
                         uCuts[0] = box.min[uAxis]; uCuts[1] = box.max[uAxis];
                         vCuts[0] = box.min[vAxis]; vCuts[1] = box.max[vAxis];
@@ -608,8 +608,8 @@ struct ChunkMesh {
                         }
                         continue;
                     }
-                    auto emitBoxFace = [&](uint8_t boxIndex, FaceDir face) {
-                        BlockCollisionBox box=geometry.boxes[boxIndex];
+                    auto emitBoxFace = [&](uint8_t boxIndex, FaceDir face, const BlockCollisionBox* fragment=nullptr) {
+                        BlockCollisionBox box=fragment?*fragment:geometry.boxes[boxIndex];
                         if (shape==RenderShape::Stair) {
                             const bool fullHalfFace=boxIndex==0&&
                                 ((architecture.half==BlockHalf::Bottom&&
@@ -665,18 +665,23 @@ struct ChunkMesh {
                         const glm::vec2 uv[4]={{1,1},{1,0},{0,0},{0,1}};
                         for (int i = 0; i < 4; ++i)
                             vertices.push_back({p[i].x,p[i].y,p[i].z,1.0f,
-                                sampled.x,sampled.y,1.0f,uv[i].x,uv[i].y,tile,
+                                sampled.x,sampled.y,getBlockProps(id).alpha,uv[i].x,uv[i].y,tile,
                                 static_cast<float>(face)});
+                        auto& indices=getBlockProps(id).layer==RenderLayer::Translucent?translucentIndices:opaqueIndices;
                         for (unsigned int index : {0u,1u,2u,0u,2u,3u}) {
-                            opaqueIndices.push_back(base + index);
-                            shadowIndices.push_back(base + index);
+                            indices.push_back(base + index);
+                            if(getBlockProps(id).layer!=RenderLayer::Translucent)shadowIndices.push_back(base + index);
                         }
                     };
-                    for (uint8_t box = 0; box < geometry.count; ++box)
-                        for (FaceDir face : {FaceDir::TOP, FaceDir::BOTTOM,
-                                             FaceDir::FRONT, FaceDir::BACK,
-                                             FaceDir::RIGHT, FaceDir::LEFT})
-                            emitBoxFace(box, face);
+                    if(shape==RenderShape::Boxes) {
+                        for(const auto& surface:blockModelFaces(id))emitBoxFace(0,surface.face,&surface.box);
+                    } else {
+                        for (uint8_t box = 0; box < geometry.count; ++box)
+                            for (FaceDir face : {FaceDir::TOP, FaceDir::BOTTOM,
+                                                 FaceDir::FRONT, FaceDir::BACK,
+                                                 FaceDir::RIGHT, FaceDir::LEFT})
+                                emitBoxFace(box, face);
+                    }
                 }
             }
         }

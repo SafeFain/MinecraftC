@@ -175,6 +175,13 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::BOTTOM))},
                        m_blockTiles,true);
         block=true;
+    }else if(props.placedBlock && Plugins::pluginBlock(*props.placedBlock) &&
+             (getBlockProps(*props.placedBlock).shape==RenderShape::Slab ||
+              getBlockProps(*props.placedBlock).shape==RenderShape::Stair ||
+              getBlockProps(*props.placedBlock).shape==RenderShape::Door ||
+              getBlockProps(*props.placedBlock).shape==RenderShape::Button ||
+              getBlockProps(*props.placedBlock).shape==RenderShape::Boxes)) {
+        mesh=buildHeldBlockShapeMesh(*props.placedBlock,m_blockTiles);block=true;
     }else if(const auto* item=Plugins::pluginItem(id)) {
         const float s=static_cast<float>(m_blockTiles);const int tile=item->tile;
         const float u0=(tile%m_blockTiles+.5f/16)/s,u1=(tile%m_blockTiles+1-.5f/16)/s;

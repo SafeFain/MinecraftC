@@ -1,0 +1,225 @@
+{
+  "blocks": [
+    {
+      "key": "block_shapes_data:box",
+      "name": "Box model",
+      "materials": "stone",
+      "drop": "block_shapes_data:box",
+      "layer": 2,
+      "alpha": 0.5
+    },
+    {
+      "key": "block_shapes_data:empty",
+      "name": "Non-colliding model",
+      "materials": "stone"
+    },
+    {
+      "key": "block_shapes_data:union_support",
+      "name": "Composite support",
+      "materials": "stone"
+    }
+  ],
+  "block_families": [
+    {
+      "key": "block_shapes_data:slab",
+      "name": "slab",
+      "kind": "slab",
+      "materials": "stone",
+      "full_block": "minecraftc:stone",
+      "drop": "block_shapes_data:slab",
+      "release_ticks": 5,
+      "layer": 0
+    },
+    {
+      "key": "block_shapes_data:stair",
+      "name": "stair",
+      "kind": "stair",
+      "materials": "stone",
+      "full_block": "minecraftc:stone",
+      "drop": "block_shapes_data:stair",
+      "release_ticks": 5,
+      "layer": 0
+    },
+    {
+      "key": "block_shapes_data:door",
+      "name": "door",
+      "kind": "door",
+      "materials": "stone",
+      "full_block": "minecraftc:stone",
+      "drop": "block_shapes_data:door",
+      "release_ticks": 5,
+      "layer": 1
+    },
+    {
+      "key": "block_shapes_data:button",
+      "name": "button",
+      "kind": "button",
+      "materials": "stone",
+      "full_block": "minecraftc:stone",
+      "drop": "block_shapes_data:button",
+      "release_ticks": 5,
+      "layer": 0
+    },
+    {
+      "key": "block_shapes_data:locked_door",
+      "name": "Villager-only door",
+      "kind": "door",
+      "materials": "stone",
+      "manual_open": false,
+      "villager_open": true,
+      "drop": "block_shapes_data:locked_door"
+    },
+    {
+      "key": "block_shapes_data:slow_button",
+      "name": "Slow button",
+      "kind": "button",
+      "materials": "stone",
+      "release_ticks": 80,
+      "arrow_trigger": false,
+      "drop": "block_shapes_data:slow_button"
+    }
+  ],
+  "block_geometry": [
+    {
+      "block": "block_shapes_data:box",
+      "collision": [
+        [
+          0,
+          0,
+          0,
+          0.5,
+          0.5,
+          1
+        ]
+      ],
+      "selection": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "model": [
+        [
+          0,
+          0,
+          0,
+          0.75,
+          1,
+          1
+        ],
+        [
+          0.25,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    {
+      "block": "block_shapes_data:empty",
+      "collision": [],
+      "selection": [
+        [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    },
+    {
+      "block": "block_shapes_data:union_support",
+      "collision": [
+        [
+          0,
+          0,
+          0,
+          0.5,
+          1,
+          1
+        ],
+        [
+          0.5,
+          0,
+          0,
+          1,
+          1,
+          1
+        ]
+      ]
+    }
+  ],
+  "items": [
+    {
+      "key": "block_shapes_data:slab",
+      "name": "slab",
+      "material": "stone",
+      "placed_block": "block_shapes_data:slab",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:stair",
+      "name": "stair",
+      "material": "stone",
+      "placed_block": "block_shapes_data:stair",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:door",
+      "name": "door",
+      "material": "stone",
+      "placed_block": "block_shapes_data:door",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:button",
+      "name": "button",
+      "material": "stone",
+      "placed_block": "block_shapes_data:button",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:box",
+      "name": "box",
+      "material": "stone",
+      "placed_block": "block_shapes_data:box",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:locked_door",
+      "name": "locked_door",
+      "material": "stone",
+      "placed_block": "block_shapes_data:locked_door",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    },
+    {
+      "key": "block_shapes_data:slow_button",
+      "name": "slow_button",
+      "material": "stone",
+      "placed_block": "block_shapes_data:slow_button",
+      "kind": 1,
+      "category": 0,
+      "max_stack": 64
+    }
+  ]
+}

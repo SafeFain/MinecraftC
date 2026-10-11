@@ -356,6 +356,11 @@ and restart. See [plugin installation and SDK](docs/plugins.md) for platform sup
 examples and world compatibility. LAN rooms support matching gameplay plugins; visual-only
 plugins may differ. Install required plugins locally before joining. `--safe-mode` starts with optional plugins disabled.
 
+Plugin authors can also register slab, stair, door and button state families and
+fixed collision/selection boxes with optional box models. See the
+[block shape SDK reference](docs/plugin-extensions.md#block-shapes-and-state-families)
+and [portable example](examples/plugins/block_shapes_data/README.md).
+
 ### Doors and buttons (generation v20 / save v18)
 
 Oak, birch, spruce, jungle, acacia and skyroot planks make matching doors and

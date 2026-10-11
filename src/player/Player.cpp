@@ -1235,9 +1235,9 @@ bool Player::placeBlockImpl() {
         DoorState neighbor;
         const auto left=placePos-right, rightPos=placePos+right;
         const bool leftDoor=decodeDoor(m_world->getBlock(left.x,left.y,left.z),neighbor) &&
-            neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
+            sameDoorFamily(neighbor,door) && neighbor.direction==door.direction && !neighbor.upper;
         const bool rightDoor=decodeDoor(m_world->getBlock(rightPos.x,rightPos.y,rightPos.z),neighbor) &&
-            neighbor.material==door.material && neighbor.direction==door.direction && !neighbor.upper;
+            sameDoorFamily(neighbor,door) && neighbor.direction==door.direction && !neighbor.upper;
         const glm::dvec3 local=hit->hitPosition-glm::floor(hit->hitPosition);
         const auto obstructed=[&](const glm::ivec3& p) {
             return int(isFullCollisionBlock(m_world->getBlock(p.x,p.y,p.z)))+
@@ -1285,11 +1285,10 @@ bool Player::placeBlockImpl() {
         if (selectedArchitecture.shape == RenderShape::Slab &&
             decodeArchitecturalBlock(targetedBlock, targetedArchitecture) &&
             targetedArchitecture.shape == RenderShape::Slab &&
-            targetedArchitecture.material == selectedArchitecture.material &&
+            sameArchitecturalFamily(targetedArchitecture, selectedArchitecture) &&
             ((targetedArchitecture.half == BlockHalf::Bottom && mergeLowerSlab) ||
              (targetedArchitecture.half == BlockHalf::Top && mergeUpperSlab))) {
-            const BlockId full = architecturalBaseBlock(
-                selectedArchitecture.material);
+            const BlockId full = architecturalFullBlock(selectedArchitecture);
             if (collidesWithPlayer(hit->blockPos, full)) return false;
             m_world->setBlock(hit->blockPos.x, hit->blockPos.y,
                              hit->blockPos.z, full);
@@ -1301,12 +1300,14 @@ bool Player::placeBlockImpl() {
             (hit->faceNormal.y == 0 && localHitY > 0.5)
             ? BlockHalf::Top : BlockHalf::Bottom;
         if (selectedArchitecture.shape == RenderShape::Slab) {
-            placed = slabBlock(selectedArchitecture.material, half);
+            selectedArchitecture.half=half;
+            placed = architecturalStateBlock(selectedArchitecture);
         } else {
             const float yawRadians = glm::radians(m_yaw);
             const BedDirection direction = bedDirectionFromHorizontal(
                 glm::vec2(std::sin(yawRadians), std::cos(yawRadians)));
-            placed = stairBlock(selectedArchitecture.material, half, direction);
+            selectedArchitecture.half=half;selectedArchitecture.direction=direction;
+            placed = architecturalStateBlock(selectedArchitecture);
         }
     }
 

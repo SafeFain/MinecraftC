@@ -63,7 +63,7 @@ plugin's content, commands and subscriptions and blocks required dependents.
 
 [`examples/plugins/example_content`](../examples/plugins/example_content) is a
 complete portable package. Its JSON has `materials`, `blocks`, `items` and
-`recipes` arrays. Optional entity/generator/render arrays are described in the
+`recipes` arrays. Optional block-family/geometry and entity/generator/render arrays are described in the
 [extension reference](plugin-extensions.md). New keys must be `plugin_id:local_name`, using lowercase letters,
 numbers, underscores, slashes, dots or hyphens. Registries freeze before play.
 Runtime IDs start at 4096; never persist them in plugin configuration.

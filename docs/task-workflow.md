@@ -1,7 +1,7 @@
 # Recoverable Task Workflow
 
 These rules complement AGENTS.md. Task state and evidence remain local under the
-existing ignore rules; this workflow does not authorize Git commits or publication.
+existing ignore rules; automatic Git commits and pushes follow the completion policy below.
 
 ## Start or resume
 
@@ -12,8 +12,8 @@ existing ignore rules; this workflow does not authorize Git commits or publicati
 3. For a new task, initialize one plan with goals, non-goals, decisions, stages,
    files, risks, checks and completion criteria; record the matching objective,
    actual state and next actions in PROGRESS.md and TASKS.md.
-4. Record the current user instruction and its authorized scope. Do not infer
-   permission to commit, push, rebase, reset, delete branches or delete documents.
+4. Record the current user instruction and its authorized scope. Apply the Git
+   completion policy; do not infer permission to rebase, reset, delete branches or delete documents.
 5. Save a checkpoint before substantive code edits:
 
 ```bash
@@ -67,7 +67,8 @@ Snapshots reflect their actual capture time; never fabricate earlier checkpoints
 5. Add exactly one row for the archive in TASKS.md; preserve diagnosis-only, local-only,
    historical or other validation boundaries in its status. Promote lasting rules to AGENTS.md.
 6. Rotate PLAN.md / PROGRESS.md to idle entries and set TASKS.md Active Task to none.
-   Preserve CLAUDE.md and every state entry; do not delete or commit them implicitly.
+   Preserve CLAUDE.md and every state entry; do not delete them or force-add ignored
+   local task records to a commit without an explicit request.
 7. Run `python3 tools/task_state.py check` and `git diff --check`, then capture the
    archived checkpoint. Keep AGENTS.md / PLAN.md / PROGRESS.md within 300/250/150 lines.
 
@@ -75,6 +76,25 @@ The checker rejects missing/duplicate archive indexes, missing archive files/met
 inconsistent activity titles/status and overlong root state files. It does not prove
 historical authorization, functional correctness or that claimed checks were actually run.
 It is an explicit local-workspace tool, not a CI dependency on ignored context files.
+
+## Git completion policy
+
+- The user authorizes automatic commit and push once all goals in the current
+  requested scope are complete, required validation has passed, and task records
+  have been finalized. No additional confirmation is needed under these conditions.
+- Completion means the entire user objective, including all stages and subtasks,
+  not merely one turn, one task execution, a checkpoint, or a partial deliverable.
+  Do not commit or push when work is paused, interrupted, blocked, or still has
+  unfinished goals or required checks. Preserve changes and recovery checkpoints.
+- Commit only changes belonging to the completed scope; preserve unrelated dirty
+  work. A standalone rule/documentation update does not authorize committing or
+  pushing an unfinished implementation already present in the workspace.
+- Inspect staged changes and the branch/upstream before committing and pushing.
+  Push to the established destination without force; if no destination is known
+  or a push fails, retain local work and report the exact remaining limitation.
+- Rebase, reset, branch deletion, force pushes, tags and releases require separate
+  explicit authorization. More specific user instructions such as “do not commit”
+  override automatic completion behavior.
 
 ## Historical evidence gaps
 

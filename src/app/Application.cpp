@@ -180,6 +180,7 @@ private:
         m_plugins.entitySnapshot=[this](uint32_t d,uint64_t id,MC_EntitySnapshot& out,std::string& state){return m_session.pluginEntitySnapshot(d,id,out,state);};
         m_plugins.removeEntity=[this](uint32_t d,uint64_t id){return m_session.pluginRemoveEntity(d,id);};
         m_plugins.entityIntent=[this](uint32_t d,uint64_t id,const MC_EntityIntent& intent){return m_session.pluginEntityIntent(d,id,intent);};
+        m_plugins.blockInteraction=[this](uint32_t dim,int32_t x,int32_t y,int32_t z,bool button,bool open){return m_session.pluginBlockInteraction(dim,x,y,z,button,open);};
         m_plugins.travelPlayer=[this](uint64_t id,uint32_t dim){const bool result=m_session.pluginTravel(id,dim);if(result&&!id)m_flow.beginDimensionLoading();return result;};
         m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
         m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};

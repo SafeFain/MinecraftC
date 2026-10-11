@@ -395,6 +395,16 @@ and stable entity keys/generation choices. Older saves are inspection-only; buil
 generation remains v20/Heaven v9.
 [Installation and SDK](plugins.md), [extension contracts/examples](plugin-extensions.md).
 
+### Plugin block shapes
+
+Gameplay plugins can register slab, straight stair, door and button state families
+through ABI 1 `minecraftc.block_shapes` or portable JSON. Standard placement,
+collision, selection, door pairing, configurable manual/villager opening, button
+release/arrow behavior and local power share builtin host logic. Ordinary plugin
+blocks support up to 16 fixed AABBs per collision/selection/model group, including
+optional union box models. Stable per-state keys persist through save palettes and
+LAN mappings. See [SDK reference](plugin-extensions.md#block-shapes-and-state-families).
+
 ## Doors and buttons (generation v20)
 
 Six wood families (oak, birch, spruce, jungle, acacia, skyroot) have distinct

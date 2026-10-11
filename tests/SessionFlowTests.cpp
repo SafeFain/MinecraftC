@@ -238,12 +238,17 @@ std::string Localization::format(
 #include "PluginSessionIntegration.h"
 #include "PluginExtensionIntegration.h"
 #include "DimensionIntegration.h"
+#include "BlockShapesIntegration.h"
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==4&&std::string(argv[1])=="--shape-tests") {
+        try{return BlockShapesIntegration::run(argv[2],argv[3]);}
+        catch(const std::exception& error){std::cerr<<"Shape regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==4&&std::string(argv[1])=="--dimension-tests") {
         try{return DimensionIntegration::run(argv[2],argv[3]);}
         catch(const std::exception& error){std::cerr<<"Dimension regression failed: "<<error.what()<<'\n';return 1;}
