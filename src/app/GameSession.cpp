@@ -1415,7 +1415,8 @@ bool GameSession::pluginUse(bool after) {
     return Plugins::dispatch(e);
 }
 Plugins::ActorContext GameSession::pluginContext() const {
-    return {lanJoining?lanClient.peerId():0,static_cast<uint32_t>(dimension),lanJoining?MC_CLIENT:hostingLan()?MC_HOST:MC_LOCAL};
+    return {lanJoining?lanClient.peerId():0, static_cast<uint32_t>(dimension),
+            static_cast<uint32_t>(lanJoining?MC_CLIENT:hostingLan()?MC_HOST:MC_LOCAL)};
 }
 std::vector<uint64_t> GameSession::pluginPlayers() const {
     if(!terrainGenerated&&!hostingLan())return {};
