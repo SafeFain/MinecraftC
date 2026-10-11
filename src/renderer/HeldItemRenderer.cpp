@@ -1,5 +1,7 @@
 #include "plugins/ContentRegistry.h"
 #include "renderer/HeldItemRenderer.h"
+#include "model/ModelAnimation.h"
+#include <glm/gtc/type_ptr.hpp>
 
 #include "core/AssetStore.h"
 #include "player/PlayerVisual.h"
@@ -136,6 +138,8 @@ void HeldItemRenderer::reset() {
     if (!m_renderer) return;
     for (const auto& entry : m_meshes) if(entry.second.handle)m_renderer->destroyMesh(entry.second.handle);
     m_meshes.clear();
+    for(const auto& pair:m_pluginModels)for(const auto& p:pair.second){if(p.mesh)m_renderer->destroyMesh(p.mesh);if(p.material)m_renderer->destroyMaterial(p.material);if(p.texture)m_renderer->destroyTexture(p.texture);}
+    m_pluginModels.clear();
     if(m_fishingCube)m_renderer->destroyMesh(m_fishingCube);
     if(m_fishingMaterial)m_renderer->destroyMaterial(m_fishingMaterial);
     if(m_fishingTexture)m_renderer->destroyTexture(m_fishingTexture);
@@ -218,6 +222,7 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
 void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
     const glm::vec3& position, float ageSeconds, uint32_t phaseSeed, SmoothLightSample light) {
     if (!m_renderer || item.empty()) return;
+    if(drawPluginModel(item,vp,glm::translate(glm::mat4(1),position+glm::vec3(0,.08f+std::sin(ageSeconds*2)*.025f,0))*glm::rotate(glm::mat4(1),ageSeconds,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(.35f)),false,true))return;
     const CachedMesh cached=meshFor(item.id);
     if (!cached.handle) return;
     const float phase=static_cast<float>(phaseSeed%628u)*.01f;
@@ -249,6 +254,7 @@ void HeldItemRenderer::updateUseState(bool charging, float charge, bool blocking
 void HeldItemRenderer::drawItem(const ItemStack& item, const glm::mat4& vp,
                                 const glm::mat4& transform, bool firstPerson) {
     if(item.empty())return;
+    if(drawPluginModel(item,vp,transform,firstPerson))return;
     const CachedMesh cached=meshFor(item.id);
     if(!cached.handle)return;
     DrawCommand held;
@@ -399,4 +405,22 @@ void HeldItemRenderer::renderFishing(const FishingView& fishing, const glm::dvec
         }
         previous=p;
     }
+}
+
+bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp,const glm::mat4& transform,bool first,bool dropped){
+    const auto raw=static_cast<uint16_t>(item.id);const auto found=Plugins::content().extensions.heldModels.find(raw);if(found==Plugins::content().extensions.heldModels.end())return false;
+    auto cached=m_pluginModels.find(raw);
+    if(cached==m_pluginModels.end()) {
+        auto inserted=m_pluginModels.emplace(raw,std::vector<ModelPart>{});auto& parts=inserted.first->second;const auto& asset=*found->second.asset;const auto pose=model::bindPose(asset);
+        try{for(size_t nodeIndex=0;nodeIndex<asset.nodes.size();++nodeIndex){const auto& node=asset.nodes[nodeIndex];for(int index:node.primitives){const auto& primitive=asset.primitives.at(static_cast<size_t>(index));MeshData mesh;mesh.indices=primitive.indices;const auto palette=node.skin>=0?model::jointMatrices(asset,pose,static_cast<size_t>(node.skin)):std::vector<glm::mat4>{};
+            for(const auto& v:primitive.vertices){glm::vec4 position(v.position,1);if(!palette.empty()){glm::mat4 skin(0);for(int n=0;n<4;++n)if(v.joints[n]<palette.size())skin+=palette[v.joints[n]]*v.weights[n];position=skin*position;}else position=pose.global[nodeIndex]*position;mesh.vertices.push_back({glm::vec3(position),v.uv});}
+            parts.emplace_back();auto& part=parts.back();part.mesh=m_renderer->createMesh(mesh);TextureData texture;texture.width=texture.height=1;texture.pixels={255,255,255,255};const model::Material* material=primitive.material>=0?&asset.materials.at(static_cast<size_t>(primitive.material)):nullptr;
+            if(material){part.color=material->baseColor;if(material->image>=0){const auto& image=asset.images.at(static_cast<size_t>(material->image));texture.width=image.width;texture.height=image.height;texture.pixels=image.pixels;}}
+            part.texture=m_renderer->createTexture(texture,TextureSamplerDesc{});MaterialDesc desc;desc.baseColorTexture=part.texture;desc.backfaceCull=!material||!material->doubleSided;desc.alphaCutoff=material&&material->alphaMode==model::AlphaMode::Mask?material->alphaCutoff:.01f;part.material=m_renderer->createMaterial(desc);
+        }}}
+        catch(...){for(const auto& part:parts){if(part.mesh)m_renderer->destroyMesh(part.mesh);if(part.material)m_renderer->destroyMaterial(part.material);if(part.texture)m_renderer->destroyTexture(part.texture);}m_pluginModels.erase(raw);throw;}
+        cached=inserted.first;
+    }
+    const glm::mat4 grip=dropped?glm::mat4(1):glm::make_mat4(first?found->second.first.data():found->second.third.data());
+    for(const auto& part:cached->second){DrawCommand draw;draw.mesh=part.mesh;draw.material=part.material;draw.model=transform*grip;draw.tint=part.color;draw.viewProjection=vp;draw.useCustomViewProjection=true;m_renderer->draw(draw);}return true;
 }

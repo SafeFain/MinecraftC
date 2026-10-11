@@ -33,6 +33,7 @@ struct WorldMetadata {
     };
 
     std::map<uint32_t,Plugins::GenerationConfig> generation{{0,{}},{1,{}}};
+    std::map<uint32_t,std::pair<uint32_t,uint32_t>> timePolicies; // cycle override, advancing policy
     std::string displayName;
     std::vector<std::pair<std::string,std::string>> pluginRequirements;
     std::string pluginCompatibilityError;

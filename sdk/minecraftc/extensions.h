@@ -117,6 +117,7 @@ typedef struct MC_GeneratorDefinition {
     MC_VoxelCallback voxel;
     void* userdata;
 } MC_GeneratorDefinition;
+#include "capabilities.h"
 typedef struct MC_DecorationBlock { int32_t x,y,z; uint16_t block; } MC_DecorationBlock;
 typedef int32_t (*MC_DecorationCallback)(const MC_GenerationContext*,int32_t,int32_t,MC_DecorationBlock*,uint32_t,uint32_t*,void*);
 typedef struct MC_ModifierDefinition {

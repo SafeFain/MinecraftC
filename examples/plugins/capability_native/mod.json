@@ -1,0 +1,11 @@
+{
+  "id": "capability_native",
+  "version": "1.0.0",
+  "api": 1,
+  "network_compatibility": "capabilities-1",
+  "native": {
+    "linux": "capability_native.so",
+    "windows": "capability_native.dll",
+    "macos": "capability_native.dylib"
+  }
+}

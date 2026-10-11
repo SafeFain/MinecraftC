@@ -250,7 +250,8 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
     };content().extensions.renderPasses.push_back(std::move(p));return 0;
 }
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
-    if(version!=1)return nullptr;
+    if(const auto* result=capability(name,version))return result;
+    if(version!=1||!name)return nullptr;
     static const MC_BlockShapesV1 shapes{sizeof(MC_BlockShapesV1),1,
         [](MC_PluginContext* c,const MC_BlockFamily* d,uint16_t* id){return call(c,[&]{require(d&&id,"Missing family arguments");owner(c).blockFamily(*c,*d,*id);},true);},
         [](MC_PluginContext* c,const MC_BlockGeometry* d){return call(c,[&]{require(d,"Missing geometry arguments");owner(c).blockGeometry(*c,*d);},true);},

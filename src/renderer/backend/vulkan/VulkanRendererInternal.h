@@ -75,7 +75,8 @@ using vkp::VoxelGiScreenUniforms;
 using vkp::VoxelGiInjectConstants;
 using vkp::ModelUniforms;
 
-static_assert(sizeof(ParticleRenderData) == 32);
+static_assert(sizeof(ParticleRenderData) == 48);
+static_assert(offsetof(ParticleRenderData,color)==32);
 static_assert(offsetof(ParticleRenderData, position) == 0);
 static_assert(offsetof(ParticleRenderData, kind) == 12);
 static_assert(offsetof(ParticleRenderData, phase) == 16);

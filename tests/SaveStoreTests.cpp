@@ -263,6 +263,14 @@ int main() {
         require(chunkVillagers.size()==1 && chunkVillagers[0].villager.growthSeconds==1200 &&
             chunkVillagers[0].villager.food[0].count==6 && chunkVillagers[0].villager.reputation==-35,
             "v17 villager lifecycle fields failed chunk roundtrip");
+        const auto v20Directory=root/"legacy-v20";SaveStore(v20Directory).saveMetadata(source);
+        auto v20Bytes=readBytes(v20Directory/"level.bin");
+        require(source.timePolicies.empty()&&v20Bytes.size()>28,"v20 fixture has empty v21 time tail");v20Bytes.resize(v20Bytes.size()-4);
+        writeLittleEndian(v20Bytes,8,20,4);writeLittleEndian(v20Bytes,12,v20Bytes.size()-24,4);writeLittleEndian(v20Bytes,16,payloadChecksum(v20Bytes,24),8);
+        {std::ofstream out(v20Directory/"level.bin",std::ios::binary|std::ios::trunc);out.write(reinterpret_cast<const char*>(v20Bytes.data()),v20Bytes.size());}
+        const auto v20=SaveStore(v20Directory).loadMetadata(true);require(v20.seed==source.seed&&!v20.pluginCompatibilityError.empty(),"v20 inspection retains metadata and reports refusal");
+        bool refusedV20=false;try{SaveStore(v20Directory).loadMetadata();}catch(const std::exception&){refusedV20=true;}
+        require(refusedV20&&readBytes(v20Directory/"level.bin")==v20Bytes,"v20 opening refuses without rewriting bytes");
         const auto v18Directory=root/"legacy-v18";
         SaveStore(v18Directory).saveMetadata(source);
         {

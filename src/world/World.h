@@ -81,6 +81,8 @@ public:
         m_simulation.tickWeather(weather, daytime, tick);
     }
     void tickBlockEntities() { m_persistence.tickBlockEntities(); }
+    void scheduleResource(const glm::ivec3& p,BlockId id,uint32_t ticks){m_persistence.scheduleResource(p,id,ticks);}
+    const WorldGenerator& generator() const {return m_generator;}
     FluidTickStats tickFluids(uint64_t tick,
                               const FluidTickBudget& budget) {
         m_currentFluidTick = tick;
@@ -348,7 +350,8 @@ private:
     void applySavedChunkDataUnlocked(int cx, int cz) override;
     void registerGeneratedBlockEntityUnlocked(
         int cx, int cz, uint32_t localIndex, BlockId id,
-        StructureLootProfile lootProfile, uint64_t lootSeed) override;
+        StructureLootProfile lootProfile, uint64_t lootSeed,
+        const RegionGenerationData::PendingBlock* metadata = nullptr) override;
     void markStreamingLightDirty() override;
     void scheduleStreamingFluid(const glm::ivec3& position) override;
     void rebuildStreamingLightingIfDirty() override;

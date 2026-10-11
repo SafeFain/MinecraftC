@@ -42,7 +42,8 @@ public:
     virtual void applySavedChunkDataUnlocked(int cx, int cz) = 0;
     virtual void registerGeneratedBlockEntityUnlocked(
         int cx, int cz, uint32_t localIndex, BlockId id,
-        StructureLootProfile lootProfile, uint64_t lootSeed) = 0;
+        StructureLootProfile lootProfile, uint64_t lootSeed,
+        const RegionGenerationData::PendingBlock* metadata = nullptr) = 0;
     virtual void markStreamingLightDirty() = 0;
     virtual void scheduleStreamingFluid(const glm::ivec3& position) = 0;
     virtual void rebuildStreamingLightingIfDirty() = 0;
@@ -261,6 +262,7 @@ private:
         std::vector<PersistedBlockEntity> blockEntities;
         std::vector<WorldMetadata::PersistedEntity> entities;
         uint32_t entityPopulationVersion = 0;
+        std::vector<RegionGenerationData::PendingBlock> pluginStructures;
     };
     struct CacheWriteCompletion {
         int cx = 0;

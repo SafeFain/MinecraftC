@@ -457,9 +457,9 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
     sky.inverseViewProjection = glm::inverse(
         clipSpaceCorrection() * viewProjection);
     sky.cameraPosition = glm::vec4(cameraPosition, 0.0f);
-    sky.sunDirection = glm::vec4(environment.sunDirection, 0.0f);
-    sky.moonDirection = glm::vec4(environment.moonDirection, 0.0f);
-    sky.zenithColor = glm::vec4(environment.zenithColor, 0.0f);
+    sky.sunDirection = glm::vec4(environment.sunDirection, environment.sunSize);
+    sky.moonDirection = glm::vec4(environment.moonDirection, environment.moonSize);
+    sky.zenithColor = glm::vec4(environment.zenithColor, environment.daylight);
     sky.horizonColor = glm::vec4(environment.horizonColor, 0.0f);
     sky.weather = {environment.starIntensity, environment.rainIntensity,
                    environment.thunderIntensity,
@@ -469,7 +469,7 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
         m_visualQuality, m_enhancedVisualSettings);
     sky.options = {renderClouds && visual.voxelClouds ? 1.0f : 0.0f,
                    environment.skyStyle == RenderSkyStyle::Heaven ? 1.0f : 0.0f,
-                   visual.cirrusClouds ? 1.0f : 0.0f,
+                   renderClouds && visual.cirrusClouds ? 1.0f : 0.0f,
                    enhanced.atmosphereStrength};
     m_impl->skyQueued = true;
     m_impl->drawQueued = true;

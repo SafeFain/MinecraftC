@@ -196,8 +196,8 @@ middle-click cloning and middle-button drag filling.
 | iOS | Application-private preference directory |
 
 Desktop builds prefer a legacy `saves/` directory in the launch directory when
-one exists. Save format v20 uses little-endian 16-bit block IDs and namespaced dimension states.
-Only v20 worlds can be opened; v2–v19 metadata remains inspectable in the world list
+one exists. Save format v21 uses little-endian 16-bit block IDs and namespaced dimension states.
+Only v21 worlds can be opened; v2–v20 metadata remains inspectable in the world list
 but these worlds are incompatible and are never upgraded or rewritten on refusal. The current world generation version is v20 (Heaven v9). Generation v11 adds
 mountain emerald ore, staffed plains/desert villages, seven villager
 workstations, dynamic bed/workstation village claims, infection, spawn eggs,
@@ -250,7 +250,7 @@ Scepter provides a reusable 96-block safe-surface jump. Command arguments
 support Tab/Shift+Tab completion; touch mode shows a virtual Tab while the
 command input is open.
 GameRule commands cover all 59 Java 1.21.11 rules plus `DayNightDuration`, accepting
-new standard names and classic aliases. Rules persist per world in save v20 (introduced in v15); missing
+new standard names and classic aliases. Rules persist per world in save v21 (introduced in v15); missing
 or partial mechanics are stated in help and feedback. See [the rule reference](docs/game-rules.md).
 
 Run `./build-local/minecraftc --version` to print the version without opening a
@@ -351,7 +351,9 @@ in the creative catalog; for example, `/give stone_bricks 64` requires cheats.
 
 Official builtin plugins and user data/native packages can extend blocks, items, recipes,
 entities, terrain generators and Vulkan render stages (see [extension SDK](docs/plugin-extensions.md)),
-interaction, environment colors and HUD. Enable them through the main menu’s Plugins page
+interaction, environment colors and HUD. Optional [capability interfaces](docs/plugin-capabilities.md)
+add behavior, structures/loot, host actions and client preview, time/sky/clouds, particles,
+held glTF models and WAV playlists. Enable them through the main menu’s Plugins page
 and restart. See [plugin installation and SDK](docs/plugins.md) for platform support,
 examples and world compatibility. LAN rooms support matching gameplay plugins; visual-only
 plugins may differ. Install required plugins locally before joining. `--safe-mode` starts with optional plugins disabled.

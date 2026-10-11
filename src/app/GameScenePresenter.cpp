@@ -1,5 +1,6 @@
 #include "plugins/Runtime.h"
 #include "app/GameScenePresenter.h"
+#include "plugins/EnvironmentPresentation.h"
 
 #include "Config.h"
 #include "app/GameSession.h"
@@ -45,6 +46,8 @@ void GameScenePresenter::render(
         if (session.worldState().isHeaven())
             environment = applyHeavenEnvironment(environment);
 
+        bool renderClouds=settings.renderClouds;
+        environment=Plugins::applyEnvironment(environment,static_cast<uint32_t>(session.activeDimension()),renderClouds);
         auto pluginEnvironment=Plugins::event(MC_ENVIRONMENT);
         auto copyColor=[](float* destination,const glm::vec3& source){for(int i=0;i<3;++i)destination[i]=source[i];};
         copyColor(pluginEnvironment.environment.zenith,environment.zenithColor);copyColor(pluginEnvironment.environment.horizon,environment.horizonColor);
@@ -58,7 +61,7 @@ void GameScenePresenter::render(
         renderer.beginFrame();
         renderer.renderSky(
             environment, glm::inverse(vp), camera.m_position,
-            settings.renderClouds);
+            renderClouds);
         renderer.setEnvironment(environment, camera.m_position);
         renderer.setViewProjection(vp);
         renderer.setFrustum(frustum);
@@ -81,7 +84,7 @@ void GameScenePresenter::render(
         if (hasLod) {
             const float lodFar = std::max(
                 session.worldState().lodDistanceChunks() * Config::CHUNK_SIZE_X + 64.0f,
-                settings.renderClouds ? Config::CLOUD_LOD_DISTANCE * 1.5f : 0.0f);
+                renderClouds ? Config::CLOUD_LOD_DISTANCE * 1.5f : 0.0f);
             lodVp = glm::perspective(
                 glm::radians(camera.fovDeg()), window.aspectRatio(),
                 8.0f, lodFar) * view;
@@ -97,7 +100,7 @@ void GameScenePresenter::render(
                     visibleLod.push_back(&lod);
             }
         }
-        if (settings.renderClouds) {
+        if (renderClouds) {
             // Clouds extend to their own horizon even without terrain LOD. Use
             // the far-terrain projection when present so their depths agree.
             const glm::mat4 cloudVp = visibleLod.empty() ? glm::perspective(
@@ -247,6 +250,12 @@ void GameScenePresenter::render(
             heldItemRenderer.renderFishing(session.fishingState(),renderOrigin,fishingTip,vp);
         session.particleState().buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
+        if (particleRenderData.size() < ParticleSystem::MAX_PARTICLES) {
+            if (const auto target = session.playerState().pluginTarget()) {
+                particleRenderData.push_back({glm::vec3(*target-renderOrigin)+glm::vec3(0,.05f,0),
+                    static_cast<float>(ParticleKind::Trajectory),0,0,.35f,0});
+            }
+        }
         const float particleIntensity = session.worldState().isHeaven()
             ? 0.80f : session.weatherState().rainGradient();
         renderer.renderParticles(

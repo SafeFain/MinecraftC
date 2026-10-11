@@ -133,6 +133,9 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
     if (state.difficulty > Difficulty::Hard) throw ProtocolError("Invalid difficulty");
     Writer writer; writer.u8(1); writeDimension(writer,state.dimension);
     writer.u64(state.epoch); writer.u64(state.tick); writer.u64(state.inputAcknowledged); writer.f32(state.phase); writer.u32(state.dayDuration);
+    if(state.cycleOverride>86400000||state.advancing>2||state.actionCooldowns.size()>256)throw ProtocolError("Invalid plugin player policy");
+    writer.u32(state.cycleOverride);writer.u32(state.advancing);writer.u16(static_cast<uint16_t>(state.actionCooldowns.size()));
+    for(const auto& pair:state.actionCooldowns){if(!Plugins::content().extensions.actions.count(pair.first)||!std::isfinite(pair.second)||pair.second<0||pair.second>3600)throw ProtocolError("Invalid action cooldown");writer.text(pair.first);writer.f32(pair.second);}
     writer.u8(static_cast<uint8_t>(state.difficulty)); writeRules(writer, state.rules);
     writer.u8(state.weather.raining); writer.u8(state.weather.thundering); writer.u32(state.weather.rainTicks); writer.u32(state.weather.thunderTicks); writer.u64(state.weather.sequence);
     writer.u8(state.dead); writer.u8(state.loading); writer.u8(state.sleepState);
@@ -164,6 +167,7 @@ AuthorityState decodeAuthorityState(const Bytes& bytes) {
     if (reader.u8() != 1) throw ProtocolError("Unknown authority schema");
     state.dimension = readDimension(reader); state.epoch = reader.u64(); state.tick = reader.u64(); state.inputAcknowledged = reader.u64();
     state.phase = reader.f32(); state.dayDuration = reader.u32();
+    state.cycleOverride=reader.u32();state.advancing=reader.u32();const auto cooldowns=reader.u16();if(cooldowns>256)throw ProtocolError("Too many cooldowns");for(uint16_t i=0;i<cooldowns;++i){const auto key=reader.text();const auto remaining=reader.f32();if(!state.actionCooldowns.emplace(key,remaining).second)throw ProtocolError("Duplicate cooldown");}
     state.difficulty = static_cast<Difficulty>(reader.u8()); state.rules = readRules(reader);
     if (state.difficulty > Difficulty::Hard) throw ProtocolError("Invalid difficulty");
     state.weather.raining = boolean(reader); state.weather.thundering = boolean(reader);

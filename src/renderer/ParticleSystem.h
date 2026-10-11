@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include "game/Weather.h"
+#include "minecraftc/extensions.h"
 #include "game/GameRules.h"
 #include "world/Block.h"
 #include "world/Biome.h"
@@ -16,7 +17,7 @@ class World;
 enum class ParticleKind : uint8_t {
     Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
     HeavenPollen, HeavenSparkle, CriticalHit, SweepAttack, OverworldMote,
-    Firefly, CaveSpore, CaveDust, CaveEmber
+    Firefly, CaveSpore, CaveDust, CaveEmber, Plugin
 };
 
 inline bool supportsFireflies(Biome biome) {
@@ -65,6 +66,7 @@ struct ParticleRenderData {
     float texture = 0.0f;
     float size = 1.0f;
     float rotation = 0.0f;
+    glm::vec4 color{1.0f};
 };
 
 class ParticleSystem {
@@ -88,6 +90,7 @@ public:
     void emitCriticalHit(const glm::dvec3& position);
     void emitFishingSplash(const glm::dvec3& position, bool bite);
     void emitSweepAttack(const glm::dvec3& position);
+    bool emitPlugin(const MC_ParticleEmission&);
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(
         const glm::dvec3& renderOrigin) const;
@@ -108,10 +111,13 @@ private:
         float size = 1.0f;
         float rotation = 0.0f;
         float angularVelocity = 0.0f;
+        float gravity=0;
+        glm::vec4 color{1.0f};
     };
 
     std::vector<Particle> m_particles;
     uint64_t m_randomState = 1;
+    uint32_t m_pluginEmitted=0;
     float m_weatherEmission = 0.0f;
     float m_skyMoteEmission = 0.0f;
     float m_pollenEmission = 0.0f;

@@ -39,6 +39,8 @@ struct AuthorityState {
     uint64_t epoch = 1, tick = 0, inputAcknowledged = 0;
     float phase = 0;
     uint32_t dayDuration = 1200;
+    uint32_t cycleOverride=0, advancing=0;
+    std::map<std::string,float> actionCooldowns;
     Difficulty difficulty = Difficulty::Normal;
     GameRuleSet rules;
     WeatherSaveState weather;

@@ -377,8 +377,8 @@ remain listed and refused without rewriting or migration.
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v20 (introduced in v15); legacy metadata remains
-inspectable, but opening worlds requires v20. Missing/partial mechanics are explicit in feedback.
+are world-wide and persisted in save v21 (introduced in v15); legacy metadata remains
+inspectable, but opening worlds requires v21. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
 ### Plugin loader
@@ -390,10 +390,14 @@ new/overridden mobs with models, AI and instance state, selected per-dimension t
 generators/modifiers, and Vulkan-owned resources with replaceable render stages.
 Dimension registration supplies namespaced identities, default generators, weather,
 natural spawning, entry/respawn and void-return policies. SDK travel and `/dimension`
-commands use host authority. Save v20 and LAN protocol 5 retain keyed dimension state
+commands use host authority. Save v21 and LAN protocol 6 retain keyed dimension state
 and stable entity keys/generation choices. Older saves are inspection-only; builtin
 generation remains v20/Heaven v9.
 [Installation and SDK](plugins.md), [extension contracts/examples](plugin-extensions.md).
+Optional [gameplay/presentation capabilities](plugin-capabilities.md) add block/item behavior,
+deterministic cross-chunk structures and loot metadata, host actions with preview/cooldown/wear,
+dimension time overrides, complete environment parameters, colored particles, static held glTF
+models and WAV playlists. Builtin Heaven remains in core; no migration is included.
 
 ### Plugin block shapes
 

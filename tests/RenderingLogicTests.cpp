@@ -548,13 +548,14 @@ int main() {
     static_assert(offsetof(MeshVertex, u) == 28);
     static_assert(offsetof(MeshVertex, tile) == 36);
     static_assert(offsetof(MeshVertex, face) == 40);
-    static_assert(sizeof(ParticleRenderData) == 32);
+    static_assert(sizeof(ParticleRenderData) == 48);
     static_assert(offsetof(ParticleRenderData, position) == 0);
     static_assert(offsetof(ParticleRenderData, kind) == 12);
     static_assert(offsetof(ParticleRenderData, phase) == 16);
     static_assert(offsetof(ParticleRenderData, texture) == 20);
     static_assert(offsetof(ParticleRenderData, size) == 24);
     static_assert(offsetof(ParticleRenderData, rotation) == 28);
+    static_assert(offsetof(ParticleRenderData, color) == 32);
     static_assert(sizeof(CloudInstance) == 28);
     static_assert(offsetof(CloudInstance, x) == 0);
     static_assert(offsetof(CloudInstance, width) == 12);

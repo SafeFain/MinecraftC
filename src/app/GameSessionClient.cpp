@@ -32,6 +32,7 @@ void GameSession::closeReplica() {
         if (error) LOG_WARN("Could not remove transient LAN LOD cache: " << error.message());
         replicaLodRoot.clear();
     }
+    player.setRoomPlayerId(0);player.clearPluginCooldowns();
     lanClient.close(); lanJoining = false; replicaWorldInfo = replicaOwnerState = false;
     replicaLodRevisions.clear();
     for (auto& runtime : simulations) if (runtime) runtime->world.clearReplicaLod();
@@ -64,7 +65,7 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
         dimension = state.dimension;
         ensureDimension(dimension);
         world().setReplicaMode(true); entities().setNaturalSpawningEnabled(false);
-        player.bindWorld(world(), &entities()); player.setAuthority(false);
+        player.bindWorld(world(), &entities()); player.setAuthority(false);player.setRoomPlayerId(lanClient.peerId());
         updateLanInterests();
         replicaEpoch = state.epoch; replicaRevisions.clear(); replicaRecovery.clear();
         replicaLodRevisions.clear(); world().clearReplicaLod();
@@ -76,6 +77,7 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
     simulation().ticks = state.tick; simulation().daylight.setPhase(state.phase);
     simulation().weather.reset(worldMetadata.seed, state.weather);
     worldMetadata.dayNightDurationSeconds = state.dayDuration; worldMetadata.activeDimension = dimension;
+    worldMetadata.timePolicies[static_cast<uint32_t>(dimension)]={state.cycleOverride,state.advancing};player.setPluginCooldowns(state.actionCooldowns);
     worldMetadata.gameRules = state.rules; worldMetadata.difficulty = state.difficulty;
     for (auto& runtime : simulations) if (runtime) runtime->world.setGameRules(state.rules);
     if (player.gameMode() != state.self.mode || player.difficulty() != state.difficulty || initial) player.configureRules(state.self.mode, worldMetadata.difficulty);
@@ -127,6 +129,9 @@ void GameSession::pollReplica(double now) {
             else if (message.type == Lan::MessageType::Event) {
                 auto event = Lan::decodeGameEvent(message.payload);
                 if (event.dimension == dimension && event.epoch == replicaEpoch && lanEvents.size() < 256) lanEvents.push_back(std::move(event));
+            }
+            else if(message.type==Lan::MessageType::PluginParticle){
+                Lan::Reader reader(message.payload);const auto dim=Lan::readDimension(reader);const auto epoch=reader.u64();const auto key=reader.text();MC_ParticleEmission e{};e.size=sizeof(e);e.dimension=static_cast<uint32_t>(dim);e.local_only=1;e.particle=key.c_str();e.count=reader.u32();for(double& v:e.position){v=reader.f64();if(!std::isfinite(v)||std::abs(v)>30000000)throw Lan::ProtocolError("Invalid particle position");}reader.finish();if(!e.count||e.count>128)throw Lan::ProtocolError("Invalid particle count");if(dim==dimension&&epoch==replicaEpoch&&Plugins::content().extensions.particles.count(key))particles.emitPlugin(e);
             }
             else if (message.type == Lan::MessageType::LodInvalidate) {
                 const auto update = Lan::decodeLodUpdate(message.payload, false);

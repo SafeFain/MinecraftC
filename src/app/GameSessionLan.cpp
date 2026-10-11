@@ -449,6 +449,8 @@ void GameSession::sendLanStates() {
         state.inputAcknowledged = guest.appliedInputSequence; state.phase = runtime.daylight.phase();
         state.rules = worldMetadata.gameRules; state.difficulty = worldMetadata.difficulty;
         state.dayDuration = worldMetadata.dayNightDurationSeconds; state.weather = runtime.weather.saveState();
+        const auto policy=worldMetadata.timePolicies.find(static_cast<uint32_t>(guest.profile.dimension));if(policy!=worldMetadata.timePolicies.end()){state.cycleOverride=policy->second.first;state.advancing=policy->second.second;}
+        state.actionCooldowns=guest.player.pluginCooldowns();
         state.dead = guest.dead; state.loading = guest.loading;
         state.sleepState = guest.sleep; state.bed = guest.bed; state.sleepFacing = guest.sleepFacing;
         state.self = playerView(entry.first, guest.profile.identity.nickname, guest.player, guest.fishing.view(), guest.sleepFacing);

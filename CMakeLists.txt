@@ -760,8 +760,10 @@ if(BUILD_TESTING)
     add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
 
     add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
         tests/VulkanUiSmoke.cpp
+        src/renderer/HeldItemRenderer.cpp src/renderer/HeldItemMesh.cpp src/renderer/HeldToolModel.cpp
+        src/model/ModelAnimation.cpp src/model/GltfLoader.cpp
         src/core/Input.cpp src/core/InputCodes.cpp src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
         src/game/ArabicShaper.cpp src/game/ClientSettings.cpp
@@ -777,7 +779,7 @@ if(BUILD_TESTING)
         src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
-    target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann)
+    target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann external/cgltf)
     target_include_directories(vulkan_ui_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_ui_smoke PRIVATE
         MINECRAFTC_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
@@ -1030,14 +1032,14 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
 
-    add_executable(plugin_tests tests/PluginTests.cpp
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
+    add_executable(plugin_tests tests/PluginTests.cpp src/model/GltfLoader.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         src/world/Block.cpp src/world/Chunk.cpp
         src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
         src/game/SaveStore.cpp src/game/WorldCatalog.cpp
         src/renderer/BlockAtlasData.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
         src/debug/Log.cpp)
-    target_include_directories(plugin_tests PRIVATE src external external/stb)
+    target_include_directories(plugin_tests PRIVATE src external external/stb external/cgltf)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
@@ -1047,7 +1049,7 @@ if(BUILD_TESTING)
         target_compile_options(plugin_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        foreach(extension_demo entity_demo terrain_demo render_demo dimension_demo block_shapes_demo)
+        foreach(extension_demo entity_demo terrain_demo render_demo dimension_demo block_shapes_demo capability_native)
             add_library(plugin_${extension_demo} MODULE examples/plugins/${extension_demo}/plugin.cpp)
             target_include_directories(plugin_${extension_demo} PRIVATE sdk)
             if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1316,7 +1318,7 @@ if(BUILD_TESTING)
     add_test(NAME application_input_routing COMMAND input_routing_tests)
 
     add_executable(session_flow_tests
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
+        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         tests/SessionFlowTests.cpp
         src/app/GameSession.cpp
         src/app/GameSessionLan.cpp
@@ -1429,10 +1431,18 @@ if(BUILD_TESTING)
             add_test(NAME plugin_vulkan_extensions_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets plugins $<TARGET_FILE:plugin_render_demo>)
+            add_test(NAME plugin_vulkan_capabilities_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets capabilities)
+            set_tests_properties(plugin_vulkan_capabilities_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
             set_tests_properties(plugin_vulkan_extensions_readback PROPERTIES
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
         endif()
-        add_dependencies(session_flow_tests plugin_block_shapes_demo)
+        add_dependencies(session_flow_tests plugin_block_shapes_demo plugin_capability_native)
+        add_test(NAME plugin_gameplay_presentation_capabilities COMMAND session_flow_tests --capability-tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_capability_native>)
+        set_tests_properties(plugin_gameplay_presentation_capabilities PROPERTIES TIMEOUT 180)
         add_test(NAME plugin_block_shapes_registration_and_runtime COMMAND session_flow_tests --shape-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_block_shapes_demo>)
         set_tests_properties(plugin_block_shapes_registration_and_runtime PROPERTIES TIMEOUT 180)

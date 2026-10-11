@@ -91,6 +91,31 @@ public:
     int32_t renderPass(MC_PluginContext&,const MC_RenderPass&);
     const void* extension(MC_PluginContext*,const char*,uint32_t);
     void callbackFault(size_t,const std::string&);
+    const void* capability(const char*,uint32_t);
+    void blockBehavior(MC_PluginContext&,const MC_BlockBehavior&);
+    void itemBehavior(MC_PluginContext&,const MC_ItemBehavior&);
+    void lootTable(MC_PluginContext&,const MC_LootTable&);
+    void structure(MC_PluginContext&,const MC_StructureDefinition&);
+    void playerAction(MC_PluginContext&,const MC_PlayerAction&);
+    void environmentProfile(MC_PluginContext&,const MC_EnvironmentProfile&);
+    void particleType(MC_PluginContext&,const MC_ParticleDefinition&);
+    void heldModel(MC_PluginContext&,const MC_HeldModel&);
+    void playlist(MC_PluginContext&,const MC_MusicPlaylist&);
+    void validateCapabilities();
+    void describeCapabilities();
+    void loadCapabilities(MC_PluginContext&,const Json&);
+    void reference(MC_PluginContext&,const std::string&) const;
+    std::function<bool(uint32_t,const std::string&,int32_t,int32_t,uint32_t,MC_LocatedStructure&)> locateStructure;
+    std::function<bool(uint64_t,const std::string&,bool,MC_ActionTarget&)> actionTarget;
+    std::function<bool(uint64_t,const std::string&)> executeAction;
+    std::function<uint64_t(uint64_t)> actionState;
+    std::function<bool(uint64_t,const std::string&,float&)> actionCooldown;
+    std::function<bool(uint64_t,uint32_t,const double*)> teleportPlayer;
+    std::function<bool(uint32_t,MC_DimensionTime&)> dimensionTime;
+    std::function<bool(const MC_DimensionTime&)> setDimensionTime;
+    std::function<bool(const MC_ParticleEmission&)> emitParticle;
+    uint64_t submitAction(MC_PluginContext&,const MC_ActionRequest&);
+    MC_ActionResult actionResult(MC_PluginContext&,uint64_t) const;
     std::function<bool(uint32_t,uint16_t,const double*)> spawnEntity;
     std::function<bool(uint32_t,uint64_t,MC_EntitySnapshot&,std::string&)> entitySnapshot;
     std::function<bool(uint32_t,uint64_t)> removeEntity;
@@ -99,6 +124,7 @@ public:
     std::function<bool(size_t,uint64_t,MC_RenderHandle)> renderScene;
     std::function<bool(size_t,MC_RenderHandle,const void*,uint32_t)> renderBuffer;
     uint32_t phase() const {return m_phase;}
+    bool readOnly() const {return m_readOnly;}
     bool hostThread() const {return std::this_thread::get_id()==m_thread;}
 private:
     struct Loaded {
@@ -118,9 +144,14 @@ private:
     std::vector<std::function<bool()>> m_queue;
     std::map<std::string,bool> m_enabled;
     uint32_t m_phase=MC_REGISTER;
+    bool m_readOnly=false;
     bool m_initialized=false,m_shutdown=false,m_dispatching=false,m_world=false;
     std::thread::id m_thread=std::this_thread::get_id();
     size_t m_hudOperations=0;
+    uint32_t m_particleEmitted=0;
+    uint64_t m_nextAction=1;
+    struct ActionReceipt {size_t owner=0;uint32_t status=MC_ACTION_PENDING;};
+    std::map<uint64_t,ActionReceipt> m_actionResults;
     void loadData(MC_PluginContext&,const Json&);
     void loadRenderData(MC_PluginContext&,const Json&);
     void validateContent();

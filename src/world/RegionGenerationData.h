@@ -96,6 +96,7 @@ struct RegionGenerationData {
         bool    needsBlockEntity = false;
         StructureLootProfile lootProfile = StructureLootProfile::None;
         uint64_t lootSeed = 0;
+        std::string lootKey{}, lootRevision{}, structureKey{}, structureRevision{};
     };
     std::vector<PendingBlock> pendingBlocks;
 };

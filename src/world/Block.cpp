@@ -1183,6 +1183,7 @@ bool isFlower(BlockId id) {
 }
 
 bool isReplaceableByFluid(BlockId id) {
+    if(const auto* b=Plugins::blockBehavior(id))return b->replaceable;
     // Java's flowing-fluid passability admits non-collision blocks, with
     // sugar cane (REEDS) as the notable plant exception.  Crops and torches
     // are destroyed by the incoming fluid; solid farmland and beds are not.
@@ -1195,6 +1196,7 @@ bool isReplaceableByFluid(BlockId id) {
 }
 
 uint8_t fireEncouragement(BlockId id) {
+    if(const auto* b=Plugins::blockBehavior(id))return static_cast<uint8_t>(b->encouragement);
     DoorState door; ButtonState button;
     if((decodeDoor(id,door) && !door.family && door.material!=DoorMaterial::Iron) ||
        (decodeButton(id,button) && !button.family && button.material!=DoorMaterial::Iron) ||
@@ -1240,6 +1242,7 @@ uint8_t fireEncouragement(BlockId id) {
 }
 
 uint8_t burnOdds(BlockId id) {
+    if(const auto* b=Plugins::blockBehavior(id))return static_cast<uint8_t>(b->flammability);
     if (isBiomePlant(id)) return 100;
     if (id == BlockId::LEAF_LITTER_SOIL) return 20;
     const uint8_t encouragement = fireEncouragement(id);

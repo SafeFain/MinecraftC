@@ -1,4 +1,10 @@
 #include "plugins/PluginManager.h"
+#include "plugins/EnvironmentPresentation.h"
+#include "renderer/HeldItemRenderer.h"
+#include "renderer/ParticleSystem.h"
+#include "audio/AudioSystem.h"
+#include "core/AssetStore.h"
+#include <glm/gtc/matrix_transform.hpp>
 #include "ui/PluginMenu.h"
 #include <fstream>
 #include "core/Window.h"
@@ -45,6 +51,7 @@ struct Access final : IContainerAccess,ITradeAccess {
 int main(int argc,char** argv) {
     if (argc<2 || argc>5) { std::cerr<<"Usage: vulkan_ui_smoke assets [width height] [--capture]\n";return 2; }
     try {
+        const bool capabilities=argc==3&&std::string(argv[2])=="--capabilities";
         const bool extensions=argc==4&&std::string(argv[2])=="--extensions";
         const int width=!extensions&&argc>=4?std::stoi(argv[2]):960,height=!extensions&&argc>=4?std::stoi(argv[3]):600;
         const bool capture=argc==5 && std::string(argv[4])=="--capture";
@@ -66,7 +73,8 @@ int main(int argc,char** argv) {
             const auto module=std::filesystem::absolute(argv[3]);std::filesystem::copy_file(module,package/module.filename());
             std::ofstream manifest(package/"mod.json");manifest<<"{\"id\":\"render_demo\",\"version\":\"1.0.0\",\"api\":1,\"visual_only\":true,\"native\":{\"linux\":\""<<module.filename().string()<<"\",\"windows\":\""<<module.filename().string()<<"\",\"macos\":\""<<module.filename().string()<<"\"}}";
         }
-        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true}";}
+        if(capabilities)std::filesystem::copy(assets.parent_path()/"examples/plugins/capability_demo",pluginRoot/"mods/capability_demo",std::filesystem::copy_options::recursive);
+        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true}";}
         Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
@@ -105,6 +113,27 @@ int main(int argc,char** argv) {
             posedModel=0;Plugins::content().extensions.renderPasses=passes;
             std::cout<<"Plugin Vulkan posed scene redraw passed\n";
             std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
+        }
+        if(capabilities) {
+            const auto dimension=Plugins::resolveDimension("capability_demo:islands");
+            bool clouds=true;const auto environment=Plugins::applyEnvironment(DayNightCycle{}.evaluate(),dimension,clouds);
+            if(clouds||environment.skyStyle!=RenderSkyStyle::Heaven)throw std::runtime_error("Capability sky profile missing");
+            AssetStore store(assets);AudioSystem audio;audio.initialize(&store);
+            Plugins::contextProvider()=[dimension]{return Plugins::ActorContext{0,dimension,MC_LOCAL};};audio.setMusicMode(AudioMusicMode::Overworld);
+            HeldItemRenderer held;held.initialize(renderer,assets);
+            const auto& type=Plugins::content().extensions.particles.at("capability_demo:spark");
+            std::vector<ParticleRenderData> particles;
+            for(int i=0;i<8;++i){ParticleRenderData p;p.position={.6f+(i%4)*.1f,(i/4)*.1f,0};p.kind=static_cast<float>(ParticleKind::Plugin);p.texture=Plugins::materialTile(type.material);p.size=type.definition.scale;p.phase=.5f;p.color={type.definition.color[0],type.definition.color[1],type.definition.color[2],type.definition.color[3]};particles.push_back(p);}
+            const glm::vec3 camera(0,0,3);const auto vp=glm::perspective(glm::radians(55.0f),window.aspectRatio(),.05f,100.0f)*glm::lookAt(camera,glm::vec3(0),glm::vec3(0,1,0));
+            auto captureScene=[&](int content){std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){renderer.beginFrame();renderer.setEnvironment(environment,camera);renderer.setViewProjection(vp);if(content<0)renderer.renderSky(environment,glm::inverse(vp),camera,clouds);
+                if(content>0&&(content&1))held.renderDropped({Plugins::resolveItem("capability_demo:staff"),1,0},vp,{0,0,0},0,0,{1,0});
+                if(content>0&&(content&2))renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},0);
+                renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
+            captureScene(-1);const auto baseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);if(baseline==modelImage||baseline==particleImage)throw std::runtime_error("Plugin held model/particles did not independently affect Vulkan pixels");
+            for(auto& p:particles)p.color={1,0,0,1};
+            if(captureScene(2)==particleImage)throw std::runtime_error("Particle RGBA did not reach Vulkan fragments");
+            renderer.resize(width,height);captureScene(3);renderer.suspendPresentation();renderer.resumePresentation();captureScene(3);
+            held.reset();Plugins::contextProvider()={};std::cout<<"Plugin sky/cloud, held GLB, colored particles, WAV initialization and Vulkan rebuild/resume passed\n";
         }
         UIRenderer ui;Localization localization;localization.load(assets);
         ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);

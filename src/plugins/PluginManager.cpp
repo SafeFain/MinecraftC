@@ -192,9 +192,9 @@ PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
     m_host.set_block=[](MC_PluginContext* c,int32_t x,int32_t y,int32_t z,uint16_t id){return checked(c,[&]{auto& m=manager(c);check(validBlock(static_cast<BlockId>(id)),"Invalid block");m.enqueue(*c,[&m,x,y,z,id]{return m.operations.setBlock&&m.operations.setBlock(x,y,z,id);});});};
     m_host.give_item=[](MC_PluginContext* c,uint16_t id,uint32_t count){return checked(c,[&]{auto& m=manager(c);check(isValidItemId(static_cast<ItemId>(id))&&id&&count>0&&count<=4096,"Invalid item/count");m.enqueue(*c,[&m,id,count]{return m.operations.giveItem&&m.operations.giveItem(id,count);});});};
     m_host.register_command=[](MC_PluginContext* c,const char* name,MC_EventCallback f,void* u){const int32_t result=checked(c,[&]{manager(c).addCommand(*c,name,f,u);});if(result&&c)c->registrationFailed=true;return result;};
-    m_host.hud_rect=[](MC_PluginContext* c,float x,float y,float w,float h,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(m.m_phase==MC_HUD&&color&&m.operations.hudRect,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");m.operations.hudRect(x,y,w,h,{color[0],color[1],color[2],color[3]});});};
-    m_host.hud_text=[](MC_PluginContext* c,float x,float y,const char* text,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(m.m_phase==MC_HUD&&color&&text&&m.operations.hudText,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::string(text).size()<=4096,"Invalid HUD text");m.operations.hudText(x,y,text,{color[0],color[1],color[2],color[3]});});};
-    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");auto it=content().materials.find(required(key));check(it!=content().materials.end(),"Unknown HUD material");uint16_t tile=it->second.tile;m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
+    m_host.hud_rect=[](MC_PluginContext* c,float x,float y,float w,float h,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudRect,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");m.operations.hudRect(x,y,w,h,{color[0],color[1],color[2],color[3]});});};
+    m_host.hud_text=[](MC_PluginContext* c,float x,float y,const char* text,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&text&&m.operations.hudText,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::string(text).size()<=4096,"Invalid HUD text");m.operations.hudText(x,y,text,{color[0],color[1],color[2],color[3]});});};
+    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");auto it=content().materials.find(required(key));check(it!=content().materials.end(),"Unknown HUD material");uint16_t tile=it->second.tile;m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
     m_host.config_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,false,false,nullptr,out,cap);});};
     m_host.config_write=[](MC_PluginContext* c,const char* value){return checked(c,[&]{manager(c).storage(*c,false,true,value,nullptr,0);});};
     m_host.world_data_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,true,false,nullptr,out,cap);});};
@@ -316,6 +316,7 @@ int32_t PluginManager::addCommand(MC_PluginContext& c,const char* name,MC_EventC
     const std::string key=required(name);owned(c,key);check(flags<=MC_COMMAND_ALLOW_GUEST,"Invalid command permission");check(callback&&m_commands.emplace(key,Command{c.index,callback,data,flags}).second,"Invalid/duplicate command");return 0;
 }
 int32_t PluginManager::enqueue(MC_PluginContext& c,std::function<bool()> operation) {
+    check(!m_readOnly,"Read-only callback cannot mutate state");
     check(content().runtimeFault.empty(),"Plugin runtime requires restart");
     check(context().role!=MC_CLIENT,"Client gameplay mutations are unavailable");
     check(m_world&&m_phase!=MC_ENVIRONMENT&&m_phase!=MC_HUD&&m_phase!=MC_WORLD_CLOSE,"World mutations are unavailable in this phase");
@@ -332,7 +333,7 @@ int32_t PluginManager::storage(MC_PluginContext& c,bool world,bool write,const c
         const auto root=operations.worldDirectory();check(!root.empty(),"No writable world");
         path=root/"plugin_data"/(info.manifest.id+".json");
     } else path=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");
-    if(write) {std::string text=required(input);check(text.size()<=65536,"Plugin state exceeds size limit");Json::parse(text);if(world)enqueue(c,[path,text]{writeText(path,text);return true;});else writeText(path,text);}
+    if(write) {check(!m_readOnly,"Read-only callback cannot write state");std::string text=required(input);check(text.size()<=65536,"Plugin state exceeds size limit");Json::parse(text);if(world)enqueue(c,[path,text]{writeText(path,text);return true;});else writeText(path,text);}
     else {check(output&&capacity,"Invalid read buffer");std::string text="{}";if(std::filesystem::exists(path)){check(std::filesystem::file_size(path)<=65536,"Plugin state exceeds size limit");std::ifstream file(path);check(static_cast<bool>(file),"Cannot read plugin state");text.assign(std::istreambuf_iterator<char>(file),{});}check(text.size()<capacity&&text.size()<=65536,"State buffer is too small");std::copy(text.begin(),text.end(),output);output[text.size()]='\0';}
     return 0;
 }
@@ -407,9 +408,11 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     }
 
 
+    loadCapabilities(ctx,data);
     loadRenderData(ctx,data);
 }
 void PluginManager::validateContent() {
+    validateCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
         if(entry.first>=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
@@ -428,6 +431,7 @@ void PluginManager::validateContent() {
     for(const auto& entry:content().extensions.entities)if(!entry.second.drop.empty())resolveItem(entry.second.drop);
 }
 void PluginManager::buildNetworkDescription() {
+    describeCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
         content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers}).dump();
@@ -579,6 +583,7 @@ void PluginManager::dispatch(MC_Event& e) {
     if(e.kind==MC_WORLD_CLOSE&&!m_world)return;
     if(e.kind==MC_WORLD_READY)m_world=true;
     if(e.kind==MC_HUD)m_hudOperations=0;
+    if(e.kind==MC_UPDATE_PRE||e.kind==MC_WORLD_READY)m_particleEmitted=0;
     const auto previous=m_phase;m_phase=e.kind;m_dispatching=true;
     const bool cancellable=e.kind==MC_BREAK_PRE||e.kind==MC_PLACE_PRE||e.kind==MC_USE_PRE||e.kind==MC_DAMAGE_PRE;
     for(const auto& listener:m_listeners) {
@@ -630,7 +635,7 @@ void PluginManager::flushOperations() {
     check(!m_dispatching,"Cannot flush within plugin callback");auto queue=std::move(m_queue);m_queue.clear();
     for(auto& operation:queue)try{if(!operation())LOG_WARN("Plugin operation rejected by session");}catch(const std::exception& e){LOG_WARN("Plugin operation failed: "<<e.what());}
 }
-void PluginManager::discardOperations(){m_queue.clear();}
+void PluginManager::discardOperations(){m_queue.clear();for(auto& pair:m_actionResults)if(pair.second.status==MC_ACTION_PENDING)pair.second.status=MC_ACTION_FAILED;}
 void PluginManager::pollFaults() {
     check(hostThread(),"Fault polling is main-thread only");
     std::lock_guard<std::mutex> lock(generationFaultMutex());
@@ -642,6 +647,7 @@ void PluginManager::setEnabled(size_t i,bool enabled) {
     m_info[i].enabled=enabled;m_info[i].status="Restart required";
 }
 void PluginManager::shutdown() {
+    actionDispatcher()={};targetDispatcher()={};
     if(m_shutdown)return;
     m_shutdown=true;
     if(m_initialized){auto e=event(MC_SHUTDOWN);dispatch(e);}

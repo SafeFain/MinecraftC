@@ -17,6 +17,7 @@ struct RenderEnvironment {
     float dayPhase = 0.0f;
     float daylight = 1.0f;
     float starIntensity = 0.0f;
+    float sunSize=1.0f, moonSize=1.0f;
     float ambientIntensity = 1.0f;
     float directIntensity = 1.0f;
     glm::vec3 sunDirection{0.0f, 1.0f, 0.0f};

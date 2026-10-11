@@ -2,6 +2,7 @@
 
 layout(location=0) in vec4 inPositionKind;
 layout(location=1) in vec4 inParticleParams;
+layout(location=2) in vec4 inTint;
 layout(push_constant) uniform ParticleUniforms {
     mat4 viewProjection;
     vec4 cameraRightTime;
@@ -12,6 +13,7 @@ layout(location=0) out float kind;
 layout(location=1) out vec2 uv;
 layout(location=2) flat out float textureIndex;
 layout(location=3) flat out float phase;
+layout(location=4) flat out vec4 tint;
 
 const vec2 corners[6]=vec2[6](
     vec2(-0.5,0.0),vec2(0.5,0.0),vec2(0.5,1.0),
@@ -19,6 +21,7 @@ const vec2 corners[6]=vec2[6](
 
 void main(){
     kind=inPositionKind.w;
+    tint=inTint;
     phase=inParticleParams.x;
     float width=kind<0.5?inParticleParams.z:(kind<1.5?0.18:
         (kind<2.5?0.16:(kind<3.5?inParticleParams.z:

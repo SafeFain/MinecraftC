@@ -3,6 +3,7 @@
 #include "app/GameSession.h"
 
 #include "Config.h"
+#include "player/PluginLanding.h"
 #include "debug/Log.h"
 #include "game/SurvivalSession.h"
 #include "game/InventoryInteraction.h"
@@ -76,8 +77,10 @@ void GameSession::updateDaylight(float dt, bool playing) {
             guests.begin(), guests.end(), [index](const auto& entry) {
                 return static_cast<size_t>(entry.second->profile.dimension) == index;
             });
-        if (occupied) simulations[index]->daylight.update(dt, worldMetadata.dayNightDurationSeconds,
-                worldMetadata.gameRules.boolean(GameRuleId::AdvanceTime));
+        const auto policy=worldMetadata.timePolicies.find(static_cast<uint32_t>(index));
+        const uint32_t cycle=policy==worldMetadata.timePolicies.end()||!policy->second.first?worldMetadata.dayNightDurationSeconds:policy->second.first;
+        const uint32_t advancing=policy==worldMetadata.timePolicies.end()?0:policy->second.second;
+        if (occupied) simulations[index]->daylight.update(dt,cycle,advancing==2||(advancing==0&&worldMetadata.gameRules.boolean(GameRuleId::AdvanceTime)));
     }
 }
 
@@ -410,6 +413,7 @@ void GameSession::flushDimensions(bool synchronous) {
 void GameSession::detachSaveStore() {
     closeLanRoom();
     closeReplica();
+    player.clearPluginCooldowns();
     // Drain pending generation/cache/entity I/O before destroying either store.
     for (auto& runtime : simulations) {
         if (!runtime) continue;
@@ -457,6 +461,7 @@ GameMode GameSession::startWorld(
     RuntimeClock::Tick loadingStarted) {
     if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
     if (saveStore) detachSaveStore();
+    player.clearPluginCooldowns();
     auto selectedStore = std::make_unique<SaveStore>(worldCatalog.open(worldId));
     auto selectedMetadata = selectedStore->loadMetadata();
     selectedStore->validatePluginFiles();
@@ -939,6 +944,7 @@ GameSession::CommandResult GameSession::executeCommandImpl(
     }
     if (command.type == CommandType::LocateStructure) {
         const glm::dvec3 position = player.getPosition();
+        if(!command.pluginStructure.empty()){const auto found=world().generator().locatePluginStructure(command.pluginStructure,static_cast<int>(std::floor(position.x)),static_cast<int>(std::floor(position.z)));if(!found){message(localization.text("message.locate_structure_not_found"));return result;}message(localization.format("message.locate_found",{command.pluginStructure,std::to_string(found->anchor[0]),std::to_string(found->anchor[2]),std::to_string(int(glm::distance(glm::dvec2(position.x,position.z),glm::dvec2(found->anchor[0],found->anchor[2]))))}));return result;}
         const auto location = world().locateStructure(
             command.structure, static_cast<int>(std::floor(position.x)),
             static_cast<int>(std::floor(position.z)));
@@ -1560,4 +1566,63 @@ bool GameSession::pluginTravel(uint64_t id,uint32_t target) {
     if(!id)return switchDimension(static_cast<DimensionId>(target),RuntimeClock{}.now());
     auto it=guests.find(id);if(it==guests.end())return false;
     return travelLanPlayer(*it->second,static_cast<DimensionId>(target));
+}
+
+Player* GameSession::pluginActor(uint64_t id,uint32_t& dim){
+    if(!terrainGenerated&&!hostingLan()&&!(lanJoining&&lanWorldReady()))return nullptr;
+    if((!lanJoining&&id==0)||(lanJoining&&id==lanClient.peerId())){dim=static_cast<uint32_t>(dimension);return &player;}
+    if(lanJoining)return nullptr;
+    const auto found=guests.find(id);if(found==guests.end())return nullptr;dim=static_cast<uint32_t>(found->second->profile.dimension);return &found->second->player;
+}
+uint64_t GameSession::pluginActionState(uint64_t id){uint32_t dim=0;const auto* p=pluginActor(id,dim);if(!p)return 0;const auto item=p->activeItem();return 1+(uint64_t(dim)<<32)+(uint64_t(p->selectedSlot())<<24)+(uint64_t(item.id)<<8)+item.count;}
+bool GameSession::pluginActionCooldown(uint64_t id,const std::string& key,float& out){uint32_t dim=0;auto* p=pluginActor(id,dim);if(!p||!Plugins::content().extensions.actions.count(key))return false;out=p->pluginCooldown(key);return true;}
+bool GameSession::pluginActionTarget(uint64_t id,const std::string& key,bool preview,MC_ActionTarget& out){
+    uint32_t dim=0;auto* p=pluginActor(id,dim);const auto found=Plugins::content().extensions.actions.find(key);if(!p||found==Plugins::content().extensions.actions.end()||dim>=simulations.size()||!simulations[dim]||p->isSpectator()||(p->gameMode()==GameMode::Survival&&p->survivalStats().health()<=0)||(!preview&&lanJoining))return false;
+    const auto& action=found->second;out={};out.size=sizeof(out);out.dimension=dim;
+    if(p->pluginCooldown(key)>0)return true;
+    const auto* item=Plugins::itemBehavior(p->activeItem().id);
+    if(item&&!item->dimension.empty()&&Plugins::resolveDimension(item->dimension)!=dim)return true;
+    bool bound=item&&item->action==key;
+    auto& terrain=simulations[dim]->world;
+    if(!bound){const auto hit=terrain.raycast(p->getEyePosition(),p->getForward(),Config::REACH_DISTANCE);if(hit){const auto* b=Plugins::blockBehavior(terrain.getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z));bound=b&&b->action==key;}}
+    if(!bound)return true;
+    if(p->gameMode()==GameMode::Survival&&action.durability&&!getItemProps(p->activeItem().id).maxDurability)return true;
+    if(action.kind==MC_ACTION_TRAVEL){out.dimension=Plugins::resolveDimension(action.dimension);out.valid=out.dimension!=dim;return true;}
+    if(action.target){MC_ActionView view{};view.size=sizeof(view);view.dimension=dim;view.player_id=id;view.item=static_cast<uint16_t>(p->activeItem().id);const auto eye=p->getEyePosition(),position=p->getPosition();const auto direction=p->getForward();for(int i=0;i<3;++i){view.position[i]=position[i];view.eye[i]=eye[i];view.forward[i]=direction[i];}view.reader=&terrain;view.block=[](void* reader,int32_t x,int32_t y,int32_t z,uint16_t* block)->int32_t{if(!block||!Config::isValidWorldY(y)||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return -1;const auto value=static_cast<World*>(reader)->getLoadedBlock(x,y,z);if(!value)return -1;*block=static_cast<uint16_t>(*value);return 0;};if(!action.target(view,out))return false;}
+    else {const auto hit=terrain.raycast(p->getEyePosition(),p->getForward(),action.range);if(hit&&hit->faceNormal.y>0){out.valid=1;out.position[0]=hit->blockPos.x+.5;out.position[1]=hit->blockPos.y+blockCollisionHeight(terrain.getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z))+.001;out.position[2]=hit->blockPos.z+.5;}}
+    if(out.size<sizeof(out)||out.valid>1||out.dimension!=dim)return false;
+    const glm::dvec3 target(out.position[0],out.position[1],out.position[2]);
+    if(out.valid&&(!pluginSafeLanding(terrain,target)||glm::distance(p->getPosition(),target)>action.range))out.valid=0;
+    return true;
+}
+bool GameSession::pluginExecuteAction(uint64_t id,const std::string& key){
+    if(lanJoining)return false;
+    uint32_t dim=0;auto* p=pluginActor(id,dim);if(!p)return false;
+    MC_ActionTarget target{};target.size=sizeof(target);if(!pluginActionTarget(id,key,false,target)||!target.valid)return false;
+    const auto& action=Plugins::content().extensions.actions.at(key);
+    const bool done=action.kind==MC_ACTION_TRAVEL?pluginTravel(id,target.dimension):pluginTeleport(id,target.dimension,target.position);
+    if(done)p->completePluginAction(key,action.cooldown,action.durability);
+    return done;
+}
+bool GameSession::pluginTeleport(uint64_t id,uint32_t dim,const double* position){
+    uint32_t current=0;auto* p=pluginActor(id,current);if(lanJoining||!p||current!=dim||!position||!pluginSafeLanding(simulations[dim]->world,{position[0],position[1],position[2]}))return false;p->teleport({position[0],position[1],position[2]});return true;
+}
+bool GameSession::pluginDimensionTime(uint32_t dim,MC_DimensionTime& out){
+    if((!terrainGenerated&&!hostingLan()&&!(lanJoining&&lanWorldReady()))||dim>=simulations.size()||!simulations[dim])return false;
+    out={sizeof(out),dim,0,0,simulations[dim]->daylight.phase()};const auto found=worldMetadata.timePolicies.find(dim);if(found!=worldMetadata.timePolicies.end()){out.cycle_seconds=found->second.first;out.advancing=found->second.second;}return true;
+}
+bool GameSession::pluginSetDimensionTime(const MC_DimensionTime& time){
+    if(lanJoining||!terrainGenerated||time.dimension>=simulations.size()||!simulations[time.dimension])return false;
+    worldMetadata.timePolicies[time.dimension]={time.cycle_seconds,time.advancing};simulations[time.dimension]->daylight.setPhase(time.phase);return true;
+}
+bool GameSession::pluginLocateStructure(uint32_t dim,const std::string& key,int32_t x,int32_t z,uint32_t range,MC_LocatedStructure& out){
+    if((!terrainGenerated&&!hostingLan()&&!(lanJoining&&lanWorldReady()))||dim>=simulations.size()||!simulations[dim])return false;
+    const auto found=simulations[dim]->world.generator().locatePluginStructure(key,x,z,range);if(!found)return false;out=*found;return true;
+}
+
+bool GameSession::pluginEmitParticle(const MC_ParticleEmission& e){
+    if((!terrainGenerated&&!hostingLan())||!e.particle||!Plugins::content().extensions.particles.count(e.particle)||(!e.local_only&&lanJoining))return false;
+    if(e.dimension==static_cast<uint32_t>(dimension)&&!particles.emitPlugin(e))return false;
+    if(!e.local_only)for(const auto& entry:guests){const auto& guest=*entry.second;if(e.dimension!=static_cast<uint32_t>(guest.profile.dimension))continue;Lan::Writer writer;Lan::writeDimension(writer,guest.profile.dimension);writer.u64(guest.chunkEpoch);writer.text(e.particle);writer.u32(e.count);for(double v:e.position)writer.f64(v);lanHost.send(entry.first,{Lan::MessageType::PluginParticle,0,std::move(writer.bytes)});}
+    return true;
 }

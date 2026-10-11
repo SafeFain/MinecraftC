@@ -1,4 +1,6 @@
 #include "audio/AudioSystem.h"
+#include "plugins/ContentRegistry.h"
+#include "plugins/Runtime.h"
 
 #include "core/AssetStore.h"
 #include "debug/Log.h"
@@ -31,6 +33,10 @@ struct AudioSystem::Impl {
     std::array<MusicTrack, 2> menuMusic;
     std::array<MusicTrack, 4> overworldMusic;
     std::array<MusicTrack, 2> heavenMusic;
+    struct PluginPlaylist {std::vector<MusicTrack> tracks;bool menu=false,random=false;uint32_t dimension=0;float gap=0;size_t index=0;uint64_t randomState=1;uint32_t gapFrames=0;};
+    std::vector<PluginPlaylist> pluginPlaylists;
+    std::atomic<int> pluginTarget{-1};
+    int observedPlugin=-1;
     std::atomic<AudioMusicMode> musicTarget{AudioMusicMode::Menu};
     std::atomic<float> masterVolume{1.0f};
     std::atomic<float> musicVolume{1.0f};
@@ -106,7 +112,9 @@ struct AudioSystem::Impl {
     }
 
     static MusicTrack loadMusic(const AssetStore& assets, const char* path) {
-        const std::vector<uint8_t> encoded = assets.readBinary(path);
+        return decodeMusic(assets.readBinary(path));
+    }
+    static MusicTrack decodeMusic(const std::vector<uint8_t>& encoded,bool bounded=false) {
         SDL_IOStream* input = SDL_IOFromConstMem(encoded.data(), encoded.size());
         if (!input) throw std::runtime_error(SDL_GetError());
         SDL_AudioSpec sourceSpec{};
@@ -114,6 +122,8 @@ struct AudioSystem::Impl {
         Uint32 sourceBytes = 0;
         if (!SDL_LoadWAV_IO(input, true, &sourceSpec, &source, &sourceBytes))
             throw std::runtime_error(SDL_GetError());
+        if(bounded){const int bytesPerSample=SDL_AUDIO_BYTESIZE(sourceSpec.format);const double seconds=sourceSpec.freq>0&&sourceSpec.channels>0&&bytesPerSample>0?double(sourceBytes)/(double(sourceSpec.freq)*sourceSpec.channels*bytesPerSample):1e30;
+            if(seconds*(SAMPLE_RATE/2)*CHANNELS*sizeof(int16_t)>64*1024*1024){SDL_free(source);throw std::runtime_error("decoded plugin music exceeds 64 MiB");}}
         const SDL_AudioSpec targetSpec{SDL_AUDIO_S16LE, CHANNELS, SAMPLE_RATE / 2};
         Uint8* converted = nullptr;
         int convertedBytes = 0;
@@ -227,6 +237,8 @@ struct AudioSystem::Impl {
                     for (MusicTrack& track : heavenMusic) track.outputCursor = 0;
                 }
             }
+            const int pluginIndex=pluginTarget.load();
+            if(pluginIndex!=observedPlugin){observedPlugin=pluginIndex;if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];p.index=p.random?randomTrack(p.randomState,p.tracks.size()):0;p.gapFrames=0;for(auto& t:p.tracks)t.outputCursor=0;}}
             const float menuTarget = requestedMusic == AudioMusicMode::Menu ? 1.0f : 0.0f;
             const float overworldTarget = requestedMusic == AudioMusicMode::Overworld
                 ? 1.0f : 0.0f;
@@ -238,7 +250,8 @@ struct AudioSystem::Impl {
             heavenMusicGain += (heavenTarget - heavenMusicGain) * 0.000035f;
             float left = 0.0f;
             float right = 0.0f;
-            if (requestedMusic == AudioMusicMode::Menu) {
+            if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];if(p.gapFrames)--p.gapFrames;else if(mixTrack(p.tracks[p.index],.70f*musicGain,left,right)){p.index=p.random?randomTrack(p.randomState,p.tracks.size()):(p.index+1)%p.tracks.size();p.gapFrames=static_cast<uint32_t>(p.gap*SAMPLE_RATE);}}
+            else if (requestedMusic == AudioMusicMode::Menu) {
                 if (mixTrack(menuMusic[menuTrackIndex],
                              menuMusicGain * 0.72f * musicGain,
                              left, right))
@@ -392,6 +405,8 @@ bool AudioSystem::initialize(const AssetStore* assets) {
             m_impl->heavenMusic = {};
         }
     }
+    size_t pluginMusicBytes=0;
+    for(const auto& pair:Plugins::content().extensions.playlists){const auto& registered=pair.second;try{Impl::PluginPlaylist p;p.menu=registered.menu;p.dimension=registered.dimension;p.random=registered.random;p.gap=registered.gap;size_t bytes=0;for(const auto& path:registered.tracks){auto track=Impl::decodeMusic(AssetStore::readPath(path),true);bytes+=track.samples.size()*sizeof(int16_t);if(pluginMusicBytes+bytes>128*1024*1024)throw std::runtime_error("decoded plugin music exceeds global 128 MiB budget");p.tracks.push_back(std::move(track));}m_impl->pluginPlaylists.push_back(std::move(p));pluginMusicBytes+=bytes;}catch(const std::exception& e){LOG_WARN("Plugin playlist unavailable: "<<registered.key<<": "<<e.what());}}
     const uint64_t randomSeed = static_cast<uint64_t>(SDL_GetTicksNS()) ^
         (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(m_impl.get())) << 1);
     m_impl->menuRandomState = randomSeed ^ 0x8a5cd789635d2dffULL;
@@ -406,6 +421,7 @@ bool AudioSystem::initialize(const AssetStore* assets) {
         m_impl->overworldRandomState, m_impl->overworldMusic.size());
     m_impl->heavenTrackIndex = Impl::randomTrack(
         m_impl->heavenRandomState, m_impl->heavenMusic.size());
+    setMusicMode(m_impl->musicTarget.load());
     const SDL_AudioSpec spec{SDL_AUDIO_F32, Impl::CHANNELS, Impl::SAMPLE_RATE};
     m_impl->stream = SDL_OpenAudioDeviceStream(
         SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, Impl::callback, m_impl.get());
@@ -458,6 +474,9 @@ bool AudioSystem::paused() const {
 }
 
 void AudioSystem::setMusicMode(AudioMusicMode mode) {
+    int selected=-1;const auto dim=Plugins::context().dimension;
+    for(size_t i=0;i<m_impl->pluginPlaylists.size();++i){const auto& p=m_impl->pluginPlaylists[i];if((mode==AudioMusicMode::Menu&&p.menu)||(mode!=AudioMusicMode::Menu&&!p.menu&&p.dimension==dim)){selected=static_cast<int>(i);break;}}
+    m_impl->pluginTarget.store(selected);
     m_impl->musicTarget = mode;
 }
 

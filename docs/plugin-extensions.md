@@ -250,13 +250,16 @@ Family policies and geometry participate in the gameplay handshake.
 
 ## Compatibility and regression checks
 
-Save v20 stores stable entity keys/state and keyed dimension generation/policy state.
-Builtin v2–v19 metadata is inspectable, but worlds require v20 to open; refusals never
-rewrite files. LAN protocol 5 adds dimension keys to entity/state/terrain replication
+Save v21 stores stable entity keys/state and keyed dimension generation/policy state.
+Builtin v2–v20 metadata is inspectable, but worlds require v21 to open; refusals never
+rewrite files. LAN protocol 6 retains dimension keys to entity/state/terrain replication
 and the complete world generation table; older peers are incompatible. Registrations and author behavior identifiers
 participate in the existing exact gameplay handshake. Visual-only render packages
 can differ across peers, while entity/generator registrations require gameplay scope.
 The original ABI 1 table offsets and legacy native-entry support remain unchanged.
+
+The [gameplay and presentation extensions](plugin-capabilities.md) add behavior, structures/loot,
+actions/previews, time/environment, particles, held models and playlists.
 
 CPU tests include `plugin_loader_content_events_and_persistence` and
 `plugin_entity_worldgen_extensions` and `plugin_block_shapes_registration_and_runtime`. Configure `MINECRAFTC_VULKAN_TESTS=ON` to include

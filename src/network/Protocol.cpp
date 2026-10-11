@@ -32,7 +32,7 @@ bool validUtf8(const std::string& value) {
 }
 bool validType(uint16_t type) {
     return type >= static_cast<uint16_t>(MessageType::Hello) &&
-           type <= static_cast<uint16_t>(MessageType::LodInvalidate);
+           type <= static_cast<uint16_t>(MessageType::PluginParticle);
 }
 }
 void Writer::u8(uint8_t value) { bytes.push_back(value); }

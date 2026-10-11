@@ -191,6 +191,7 @@ void Player::handleMovement(const InputState& input, float dt) {
 
     // ── Double-tap SPACE to toggle flight ──────────────────────────
     bool spaceDown = input.held(InputAction::Jump);
+    m_pluginClimbUp=spaceDown;
 
     if (spaceDown && !m_spaceWasDown) {
         // Space just pressed — check for double-tap
@@ -477,6 +478,7 @@ void Player::updateSleeping(float dt) {
 }
 
 void Player::update(float dt) {
+    for(auto it=m_pluginCooldowns.begin();it!=m_pluginCooldowns.end();){it->second=std::max(0.0f,it->second-dt);if(it->second==0)it=m_pluginCooldowns.erase(it);else ++it;}
     if (m_sleeping) {
         updateSleeping(dt);
         return;
@@ -851,7 +853,9 @@ void Player::applyPhysics(float dt) {
 
     const bool inWater = m_gameMode != GameMode::Spectator && isInWater();
     float dy = 0.0f;
-    if (inWater) {
+    if(pluginClimbing()) {
+        m_fallDistance=0;m_velocity.y=m_pluginClimbUp?2.5f:m_sneakInput?0.0f:std::max(m_velocity.y,-2.0f);dy=m_velocity.y*dt;
+    } else if (inWater) {
         m_fallDistance = 0.0f;
         if (!m_swimming)
             m_velocity.y -= Config::WATER_GRAVITY_PER_TICK *
@@ -929,6 +933,10 @@ void Player::updateEnvironment(uint32_t ticks) {
         static_cast<int>(std::floor(m_position.z)));
     const BlockId eyeBlock = m_world->getBlock(eye.x, eye.y, eye.z);
     const BlockId feetBlock = m_world->getBlock(feet.x, feet.y, feet.z);
+    float contact=0;
+    const double half=Config::PLAYER_WIDTH/2.0;
+    for(int z=int(std::floor(m_position.z-half));z<=int(std::floor(m_position.z+half));++z)for(int x=int(std::floor(m_position.x-half));x<=int(std::floor(m_position.x+half));++x)for(int y=feet.y;y<=int(std::floor(m_position.y+PlayerPhysics::dimensions(m_pose).height));++y)if(const auto* b=Plugins::blockBehavior(m_world->getBlock(x,y,z)))contact=std::max(contact,b->damage);
+    if(contact>0){m_pluginDamageTicks+=ticks;if(m_pluginDamageTicks>=10){DamageSourceInfo source;source.amount=contact;source.cause=DamageCause::Generic;takeDamage(source);m_pluginDamageTicks%=10;}}else m_pluginDamageTicks=0;
     if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE)
         ignite(4.0f);
     if (isWater(feetBlock) || isWater(eyeBlock) || m_rainExposed) {
@@ -1112,7 +1120,8 @@ bool Player::placeBlock() {
     if(!block)return placeBlockImpl();
     const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
     if(!hit)return false;
-    const auto position=hit->blockPos+hit->faceNormal;
+    auto position=hit->blockPos+hit->faceNormal;
+    if(const auto* behavior=Plugins::blockBehavior(m_world->getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z)))if(behavior->replaceable)position=hit->blockPos;
     auto e=pluginEvent(MC_PLACE_PRE);e.x=position.x;e.y=position.y;e.z=position.z;
     e.block=static_cast<uint16_t>(*block);e.item=static_cast<uint16_t>(activeItem().id);
     if(!Plugins::dispatch(e))return false;
@@ -1121,6 +1130,10 @@ bool Player::placeBlock() {
 }
 
 bool Player::placeBlockImpl() {
+    if(const auto* b=Plugins::itemBehavior(activeItem().id)) {
+        if(!b->dimension.empty()&&Plugins::resolveDimension(b->dimension)!=static_cast<uint32_t>(m_world->dimension()))return false;
+        if(!b->action.empty())return Plugins::actionDispatcher()&&Plugins::actionDispatcher()(m_roomPlayerId,b->action);
+    }
     const ItemId selectedItem =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id;
     if (m_gameMode == GameMode::Survival) {
@@ -1138,6 +1151,17 @@ bool Player::placeBlockImpl() {
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
     const BlockId targetedBlock = m_world->getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+    if(const auto* b=Plugins::blockBehavior(targetedBlock)) {
+        if(!b->action.empty())return Plugins::actionDispatcher()&&Plugins::actionDispatcher()(m_roomPlayerId,b->action);
+        if(!b->harvest.empty()) {
+            InventoryModel inventory=m_inventory;
+            if(inventory.add({Plugins::resolveItem(b->harvest),static_cast<uint8_t>(b->harvestCount),0}))return false;
+            m_world->setBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z,Plugins::resolveBlock(b->replacement));
+            if(b->resetTicks)m_world->scheduleResource(hit->blockPos,targetedBlock,b->resetTicks);
+            m_inventory=std::move(inventory);return true;
+        }
+    }
+    if(const auto* b=Plugins::blockBehavior(targetedBlock))if(b->replaceable&&getItemProps(selectedItem).placedBlock)placePos=hit->blockPos;
     if (m_world->isHeavenSkywayCore(hit->blockPos)) {
         const auto destination = m_world->heavenSkywayDestination(
             hit->blockPos, !m_sneakInput);
@@ -1263,6 +1287,10 @@ bool Player::placeBlockImpl() {
         return true;
     }
 
+    if(const auto* behavior=Plugins::blockBehavior(placed)) {
+        const auto support=placePos+glm::ivec3(0,behavior->support==2?1:-1,0);
+        if(behavior->support&&!blockSupportsFace(m_world->getBlock(support.x,support.y,support.z),behavior->support==2?FaceDir::BOTTOM:FaceDir::TOP))return false;
+    }
     ArchitecturalBlockState selectedArchitecture;
     if (activeItem == ItemId::POINTED_DRIPSTONE) {
         if (hit->faceNormal.y == 0) return false;
@@ -1378,4 +1406,16 @@ void Player::applyReplicaVisualState(const PlayerVisualState& state) {
     m_bowChargeSeconds = BOW_FULL_CHARGE_SECONDS * (std::sqrt(1 + 3 * state.bowCharge) - 1);
     const float speed = getItemProps(activeItem().id).attackSpeed > 0 ? getItemProps(activeItem().id).attackSpeed : CombatRules::DEFAULT_ATTACK_SPEED;
     m_attackTicks = std::max(0.0f, state.attackStrength * CombatRules::attackCooldownTicks(speed) - .5f);
+}
+
+bool Player::pluginClimbing() const{
+    if(m_gameMode==GameMode::Spectator)return false;
+    const auto p=glm::ivec3(glm::floor(m_position));
+    for(int y=p.y;y<=int(std::floor(m_position.y+PlayerPhysics::dimensions(m_pose).height));++y)if(const auto* b=Plugins::blockBehavior(m_world->getBlock(p.x,y,p.z)))if(b->climbable)return true;
+    return false;
+}
+std::optional<glm::dvec3> Player::pluginTarget() const{
+    const auto* b=Plugins::itemBehavior(activeItem().id);if(!b||b->action.empty()||!Plugins::targetDispatcher())return {};
+    MC_ActionTarget target{};target.size=sizeof(target);if(!Plugins::targetDispatcher()(m_roomPlayerId,b->action,true,target)||!target.valid||target.dimension!=static_cast<uint32_t>(m_world->dimension()))return {};
+    return glm::dvec3(target.position[0],target.position[1],target.position[2]);
 }

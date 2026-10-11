@@ -93,6 +93,8 @@ struct GameSessionTestAccess {
     static void pluginHostLoading(GameSession& session,bool loading){session.terrainGenerated=!loading;}
     static void pluginRemoveGuest(GameSession& session,uint64_t id){session.removeLanPlayer(id);}
     static void disconnectReplica(GameSession& session){session.closeReplica();session.terrainGenerated=false;}
+    static void tickDaylight(GameSession& session,float dt){session.updateDaylight(dt,true);}
+    static size_t particleCount(const GameSession& session){return session.particles.size();}
     static uint64_t replicaPeer(GameSession& session) { return session.lanClient.peerId(); }
     static void applyLanAction(GameSession& session, LanPlayerRuntime& guest, const Lan::GameAction& action) { session.applyLanAction(guest, action); }
     static void syncReplicaActionSequence(GameSession& client, uint64_t sequence) { client.replicaActionSequence = sequence; }
@@ -239,12 +241,17 @@ std::string Localization::format(
 #include "PluginExtensionIntegration.h"
 #include "DimensionIntegration.h"
 #include "BlockShapesIntegration.h"
+#include "PluginCapabilitiesIntegration.h"
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==4&&std::string(argv[1])=="--capability-tests") {
+        try{return PluginCapabilitiesIntegration::run(argv[2],argv[3]);}
+        catch(const std::exception& error){std::cerr<<"Capability regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==4&&std::string(argv[1])=="--shape-tests") {
         try{return BlockShapesIntegration::run(argv[2],argv[3]);}
         catch(const std::exception& error){std::cerr<<"Shape regression failed: "<<error.what()<<'\n';return 1;}

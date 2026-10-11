@@ -197,9 +197,10 @@ void World::applySavedChunkDataUnlocked(int cx, int cz) {
 
 void World::registerGeneratedBlockEntityUnlocked(
     int cx, int cz, uint32_t localIndex, BlockId id,
-    StructureLootProfile lootProfile, uint64_t lootSeed) {
+    StructureLootProfile lootProfile, uint64_t lootSeed,
+    const RegionGenerationData::PendingBlock* metadata) {
     m_persistence.registerGeneratedBlockEntityUnlocked(
-        cx, cz, localIndex, id, lootProfile, lootSeed);
+        cx, cz, localIndex, id, lootProfile, lootSeed, metadata);
 }
 
 void World::markStreamingLightDirty() {
@@ -771,6 +772,10 @@ void World::validateInteractiveNeighbors(const glm::ivec3& p) {
             invalid=!supportsFace(bottom-glm::ivec3(0,1,0),FaceDir::TOP);
         } else if(decodeButton(id,button))
             invalid=!supportsFace(q-faceOffset(button.attachment),button.attachment);
+        else if(const auto* behavior=Plugins::blockBehavior(id)) {
+            if(behavior->support){const auto offset=glm::ivec3(0,behavior->support==2?1:-1,0);const auto support=getLoadedBlock(q.x,q.y+offset.y,q.z);
+                if(support)invalid=!blockSupportsFace(*support,behavior->support==2?FaceDir::BOTTOM:FaceDir::TOP);}
+        }
         if(invalid) {
             if(gameRules().boolean(GameRuleId::BlockDrops)) m_supportDrops.push_back({q,{itemForBlock(id),1,0}});
             setBlock(q.x,q.y,q.z,BlockId::AIR);
@@ -786,6 +791,7 @@ void World::tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& 
         else ++it;
     }
     for(const auto& p:ready)refreshDoorPower(p);
+    for(const auto& resource:m_persistence.tickResources())setBlock(resource.first.x,resource.first.y,resource.first.z,resource.second);
     for(const glm::ivec3& p:m_persistence.tickButtons()) {
         ButtonState button;
         if(!decodeButton(getBlock(p.x,p.y,p.z),button)) continue;

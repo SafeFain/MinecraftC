@@ -5,6 +5,7 @@
 #include <optional>
 #include <functional>
 #include <utility>
+#include <map>
 
 #include "world/Block.h"
 #include "plugins/Runtime.h"
@@ -173,6 +174,12 @@ public:
     }
 
     ItemStack activeItem() const;
+    float pluginCooldown(const std::string& key) const {const auto it=m_pluginCooldowns.find(key);return it==m_pluginCooldowns.end()?0:it->second;}
+    void completePluginAction(const std::string& key,float cooldown,uint32_t wear){if(m_gameMode==GameMode::Survival&&wear){auto& s=m_inventory.slot(static_cast<size_t>(m_selectedSlot));const auto maximum=getItemProps(s.id).maxDurability;if(uint32_t(s.damage)+wear>=maximum)s.clear();else s.damage=static_cast<uint16_t>(s.damage+wear);}m_pluginCooldowns[key]=cooldown;startSwing();}
+    const std::map<std::string,float>& pluginCooldowns() const {return m_pluginCooldowns;}
+    void setPluginCooldowns(std::map<std::string,float> values){m_pluginCooldowns=std::move(values);}
+    void clearPluginCooldowns(){m_pluginCooldowns.clear();}
+    std::optional<glm::dvec3> pluginTarget() const;
     PlayerVisualState visualState() const;
     void applyReplicaVisualState(const PlayerVisualState& state);
 
@@ -276,6 +283,10 @@ private:
     DamageOutcome takeDamageImpl(const DamageSourceInfo&);
     bool placeBlock();
     bool useStarstepScepter();
+    bool pluginClimbing() const;
+    std::map<std::string,float> m_pluginCooldowns;
+    uint32_t m_pluginDamageTicks=0;
+    bool m_pluginClimbUp=false;
     void beginBowCharge();
     void releaseBow();
     void startSwing();

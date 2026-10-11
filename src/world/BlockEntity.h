@@ -2,10 +2,11 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 #include "game/InventoryModel.h"
 
-enum class BlockEntityType : uint8_t { Chest = 0, Furnace = 1, Button = 2 };
+enum class BlockEntityType : uint8_t { Chest = 0, Furnace = 1, Button = 2, Resource = 3 };
 
 struct BlockEntity {
     BlockEntityType type = BlockEntityType::Chest;
@@ -18,6 +19,11 @@ struct BlockEntity {
     uint16_t cookProgress = 0;
     uint16_t cookTotal = 200;
     uint16_t buttonRemaining = 0;
+    std::string lootKey, lootRevision, structureKey, structureRevision;
+    uint64_t lootSeed=0;
+    bool lootInitialized=false;
+    uint32_t resourceRemaining=0;
+    uint16_t resourceBlock=0;
 };
 
 struct PersistedBlockEntity {

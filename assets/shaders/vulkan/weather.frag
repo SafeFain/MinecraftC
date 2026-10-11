@@ -4,6 +4,7 @@ layout(location=0) in float kind;
 layout(location=1) in vec2 uv;
 layout(location=2) flat in float textureIndex;
 layout(location=3) flat in float phase;
+layout(location=4) flat in vec4 tint;
 layout(push_constant) uniform ParticleUniforms {
     mat4 viewProjection;
     vec4 cameraRightTime;
@@ -36,7 +37,8 @@ vec3 heavenPalette(float index){
 
 void main(){
     vec4 color;
-    if(kind<0.5){
+    if(kind>15.5){color=atlasFragment()*tint;color.a*=1.0-clamp(phase,0.0,1.0);}
+    else if(kind<0.5){
         color=atlasFragment();
         color.rgb=mix(color.rgb,vec3(0.58,0.72,0.90),0.32);
         color.a*=0.86*frame.cameraUpIntensity.w;

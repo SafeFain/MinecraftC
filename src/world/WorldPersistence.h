@@ -15,6 +15,7 @@
 #include "world/Block.h"
 #include "world/BlockEntity.h"
 #include "world/Structure.h"
+#include "world/RegionGenerationData.h"
 
 class ChunkStore;
 class SaveStore;
@@ -52,7 +53,8 @@ public:
                                               uint32_t localIndex, BlockId id,
                                               StructureLootProfile lootProfile =
                                                   StructureLootProfile::None,
-                                              uint64_t lootSeed = 0);
+                                              uint64_t lootSeed = 0,
+                                              const RegionGenerationData::PendingBlock* metadata = nullptr);
 
     // Apply saved overrides for a freshly generated chunk.
     // Caller must hold the ChunkStore lock.
@@ -89,6 +91,8 @@ public:
     void tickBlockEntities();
     // Only button entities in generated chunks tick; unloaded timers pause.
     std::vector<glm::ivec3> tickButtons();
+    void scheduleResource(const glm::ivec3&,BlockId,uint32_t);
+    std::vector<std::pair<glm::ivec3,BlockId>> tickResources();
 
     // Read-only iteration over overrides of generated chunks, with the
     // chunk lock held. fn(key, localIndex, block).

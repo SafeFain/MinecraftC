@@ -453,6 +453,11 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
     append(payload, static_cast<uint8_t>(entity.value.type));
     if (entity.value.type == BlockEntityType::Chest) {
         for (const auto& stack : entity.value.chest) appendStack(payload, stack);
+        appendString(payload,entity.value.lootKey);appendString(payload,entity.value.lootRevision);
+        appendString(payload,entity.value.structureKey);appendString(payload,entity.value.structureRevision);
+        append(payload,entity.value.lootSeed);append(payload,static_cast<uint8_t>(entity.value.lootInitialized));
+    } else if (entity.value.type == BlockEntityType::Resource) {
+        append(payload,entity.value.resourceRemaining);appendString(payload,Plugins::blockKey(static_cast<BlockId>(entity.value.resourceBlock)));
     } else if (entity.value.type == BlockEntityType::Button) {
         append(payload, entity.value.buttonRemaining);
     } else {
@@ -472,11 +477,15 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     if (entity.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid block entity position");
     const uint8_t type = reader.read<uint8_t>();
-    if (type > static_cast<uint8_t>(version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
+    if (type > static_cast<uint8_t>(version >= 21 ? BlockEntityType::Resource : version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
         throw std::runtime_error("Invalid block entity type");
     entity.value.type = static_cast<BlockEntityType>(type);
     if (entity.value.type == BlockEntityType::Chest) {
         for (auto& stack : entity.value.chest) stack = readStack(reader);
+        if(version>=21){auto& e=entity.value;e.lootKey=reader.readString();e.lootRevision=reader.readString();e.structureKey=reader.readString();e.structureRevision=reader.readString();e.lootSeed=reader.read<uint64_t>();const auto flag=reader.read<uint8_t>();if(flag>1)throw std::runtime_error("Invalid loot flag");e.lootInitialized=flag;
+            if(!e.lootKey.empty()){const auto& tables=Plugins::content().extensions.loot;const auto found=tables.find(e.lootKey);if(found==tables.end()||found->second.revision!=e.lootRevision||!e.lootInitialized)throw std::runtime_error("Incompatible chest loot metadata");}
+            if(!e.structureKey.empty()){const auto& structures=Plugins::content().extensions.structures;const auto found=structures.find(e.structureKey);if(found==structures.end()||found->second.revision!=e.structureRevision)throw std::runtime_error("Incompatible chest structure metadata");}}
+    } else if(entity.value.type==BlockEntityType::Resource){entity.value.resourceRemaining=reader.read<uint32_t>();entity.value.resourceBlock=static_cast<uint16_t>(Plugins::resolveBlock(reader.readString()));if(entity.value.resourceRemaining>72000)throw std::runtime_error("Invalid resource timer");
     } else if (entity.value.type == BlockEntityType::Button) {
         entity.value.buttonRemaining = reader.read<uint16_t>();
         if (version < 20 && entity.value.buttonRemaining > 30) throw std::runtime_error("Invalid button timer");
@@ -597,17 +606,19 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         append(payload,static_cast<uint8_t>(state.weather.raining));append(payload,static_cast<uint8_t>(state.weather.thundering));append(payload,state.weather.rainTicks);append(payload,state.weather.thunderTicks);append(payload,state.weather.sequence);
         append(payload,static_cast<uint8_t>(state.bedSpawn.has_value()));if(state.bedSpawn)append(payload,*state.bedSpawn);
     }
+    append(payload,static_cast<uint32_t>(metadata.timePolicies.size()));
+    for(const auto& entry:metadata.timePolicies){appendString(payload,Plugins::dimensionContent(entry.first).key);append(payload,entry.second.first);append(payload,entry.second.second);}
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
-    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v20; legacy worlds are incompatible");
+    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v21; legacy worlds are incompatible");
     Reader reader(std::move(checked.payload), checked.version, inspection);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
-    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v20; legacy worlds are incompatible";
+    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v21; legacy worlds are incompatible";
     if (checked.version < 16 && !Plugins::content().requirements.empty()) {
         metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
         if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
@@ -738,6 +749,7 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         metadata.activeDimension=static_cast<DimensionId>(resolve(activeKey,2048));
         if(count!=Plugins::content().extensions.dimensions.size()){metadata.pluginCompatibilityError="World dimension registry mismatch";if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
     }
+    if(checked.version>=21){const auto count=reader.read<uint32_t>();if(count>1024)throw std::runtime_error("Too many time policies");for(uint32_t i=0;i<count;++i){const auto key=reader.readString();uint32_t id=1024+i;try{id=Plugins::resolveDimension(key);}catch(...){if(!inspection)throw;}const auto cycle=reader.read<uint32_t>(),advancing=reader.read<uint32_t>();if(cycle>86400000||advancing>2||!metadata.timePolicies.emplace(id,std::make_pair(cycle,advancing)).second)throw std::runtime_error("Invalid time policy");}}
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
     // fully decoded above, so safely ignore that tail; v10 remains strict.
@@ -1001,7 +1013,7 @@ void SaveStore::validatePluginFiles() const {
         // resolvable names before a session can attach a writable store.
         if (file.path().parent_path().filename() == "generated") continue;
         auto bytes=readChecked(file.path());
-        if(bytes.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v20");
+        if(bytes.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v21");
         Reader reader(std::move(bytes.payload),bytes.version);
         (void)reader;
     }

@@ -381,6 +381,7 @@ void ChunkStreamer::enqueueCacheReads() {
             std::vector<PersistedBlockEntity> blockEntities;
             std::vector<WorldMetadata::PersistedEntity> entities;
             uint32_t entityPopulationVersion = 0;
+            std::vector<RegionGenerationData::PendingBlock> structures;
             try {
                 SaveStore loader(directory);
                 ChunkLoadBundle bundle = loader.loadChunkLoadBundle(
@@ -389,12 +390,14 @@ void ChunkStreamer::enqueueCacheReads() {
                 if (bundle.generated) {
                     hit = true;
                     blocks = std::move(*bundle.generated);
+                    structures=streamer->m_generator.pluginStructureBlocks(key.first*16,key.second*16);
                 }
                 overrides = std::move(bundle.overrides);
                 blockEntities = std::move(bundle.blockEntities);
                 entities = std::move(bundle.entities);
                 entityPopulationVersion = bundle.entityPopulationVersion;
             } catch (...) {
+                hit=false;
                 // A corrupt cache is equivalent to a miss; deterministic
                 // generation will repair it when the chunk is published.
             }
@@ -403,7 +406,7 @@ void ChunkStreamer::enqueueCacheReads() {
                 streamer->m_cacheCompletions.push_back(
                     {key.first, key.second, epoch, hit, std::move(blocks),
                      std::move(overrides), std::move(blockEntities),
-                     std::move(entities), entityPopulationVersion});
+                     std::move(entities), entityPopulationVersion,std::move(structures)});
             }
             --streamer->m_cacheReadTasksInFlight;
         });
@@ -432,6 +435,7 @@ void ChunkStreamer::processCacheCompletions() {
             chunk->cacheHit = result.hit;
             if (result.hit) {
                 chunk->loadRawBlocks(result.blocks);
+                chunk->pluginStructures=std::move(result.pluginStructures);
                 chunk->generated = true;
                 chunk->generationInProgress = false;
                 chunk->lifecycle = Chunk::LifecycleState::LocalLighting;
@@ -875,6 +879,10 @@ void ChunkStreamer::processCompletedGenerations(bool rebuildLightingNow,
             if (!chunk->generated.load()) continue;
             const bool firstApply =
                 !m_world.overridesAppliedUnlocked(key.first, key.second);
+            if(firstApply) {
+                const auto& structures=chunk->pluginStructures;
+                auto& pending=m_pendingBlocks[key];pending.insert(pending.end(),structures.begin(),structures.end());
+            }
             const bool pendingChanged = applyPendingBlocksUnlocked(
                 key.first, key.second, store);
             if (!firstApply && !pendingChanged) continue;
@@ -1088,8 +1096,9 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
     if (chunk == nullptr || !chunk->generated.load()) return false;
     bool changed = false;
     std::set<uint32_t> decorated;
-    for(const auto& b:m_generator.pluginModifierBlocks(chunk->worldX(),chunk->worldZ(),16,16))
+    for(const auto& b:m_generator.pluginModifierBlocks(chunk->worldX(),chunk->worldZ(),16,16,false))
         decorated.insert(static_cast<uint32_t>(b.x-chunk->worldX()+(b.z-chunk->worldZ())*16+Config::worldYToStorageY(b.y)*256));
+    for(const auto& b:chunk->pluginStructures)decorated.insert(static_cast<uint32_t>(b.worldX-chunk->worldX()+(b.worldZ-chunk->worldZ())*16+Config::worldYToStorageY(b.worldY)*256));
     // Two passes make application order-independent: ordinary leaf
     // decorations first, then overwrite structure blocks unconditionally.
     // A structure can therefore clear AIR or cover leaves regardless of
@@ -1105,7 +1114,7 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
                 continue;
             // Final plugin decorations own these voxels, including AIR. Delayed
             // builtin structures must not change them or create stale containers.
-            if(decorated.count(static_cast<uint32_t>(lx+lz*16+Config::worldYToStorageY(pb.worldY)*256)))continue;
+            if(pb.structureKey.empty()&&decorated.count(static_cast<uint32_t>(lx+lz*16+Config::worldYToStorageY(pb.worldY)*256)))continue;
             if (!pb.overwrite) {
                 BlockId cur = chunk->getBlock(lx, pb.worldY, lz);
                 bool leaf = cur == BlockId::LEAVES || cur == BlockId::BIRCH_LEAVES ||
@@ -1138,7 +1147,7 @@ bool ChunkStreamer::applyPendingBlocksUnlocked(int cx, int cz,
                     Config::worldYToStorageY(pb.worldY) *
                         Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
                 m_world.registerGeneratedBlockEntityUnlocked(
-                    cx, cz, localIndex, pb.id, pb.lootProfile, pb.lootSeed);
+                    cx, cz, localIndex, pb.id, pb.lootProfile, pb.lootSeed, &pb);
             }
         }
     }

@@ -28,8 +28,9 @@ The local user-data `lan-identity` file supplies a persistent identity/credentia
 The host keeps guest profiles under each world's `players` directory. Rejoining
 restores that guest's inventory, health, bed spawn and dimension positions.
 Protocol/game/generation incompatibilities and mismatching gameplay plugins reject
-admission. Matching gameplay plugins are supported; visual plugins may differ. The vanilla host save stays at v18 with generation
-v20 and Heaven v9; guest sidecars use their independent profile v3 palette format (v1/v2 remain readable).
+admission. Matching gameplay plugins are supported; visual plugins may differ. The host uses save v21 with generation
+v20 and Heaven v9; LAN v6 carries dimension keys, action cooldowns/time policies and scoped particles.
+Guest sidecars use profile v4 palettes and keyed dimension state; older profiles are refused without writes.
 
 ## Implemented foundation
 

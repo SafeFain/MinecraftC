@@ -1,4 +1,5 @@
 #include "world/WorldPersistence.h"
+#include "plugins/ContentRegistry.h"
 
 #include "Config.h"
 #include "debug/Log.h"
@@ -121,14 +122,21 @@ void WorldPersistence::forEachOverride(const OverrideVisitor& fn) const {
 
 void WorldPersistence::registerGeneratedBlockEntityUnlocked(
     int cx, int cz, uint32_t localIndex, BlockId id,
-    StructureLootProfile lootProfile, uint64_t lootSeed) {
+    StructureLootProfile lootProfile, uint64_t lootSeed,
+    const RegionGenerationData::PendingBlock* metadata) {
     if (id != BlockId::CHEST && id != BlockId::FURNACE) return;
     auto& entities = m_blockEntities[{cx, cz}];
     if (entities.count(localIndex) != 0) return;
     BlockEntity entity;
     entity.type = id == BlockId::CHEST ? BlockEntityType::Chest
                                        : BlockEntityType::Furnace;
-    populateGeneratedLoot(entity,lootProfile,lootSeed);
+    entity.lootSeed=lootSeed;
+    if(metadata){entity.lootKey=metadata->lootKey;entity.lootRevision=metadata->lootRevision;entity.structureKey=metadata->structureKey;entity.structureRevision=metadata->structureRevision;}
+    if(!entity.lootKey.empty()) {
+        const auto& table=Plugins::content().extensions.loot.at(entity.lootKey);
+        for(size_t i=0;i<table.entries.size();++i){const auto& entry=table.entries[i];const uint64_t h=WorldGenContext::mix(lootSeed^(uint64_t(i)+1)*0x9E3779B97F4A7C15ULL);if(h%100>=entry.chance)continue;const auto amount=entry.minimum+((h>>8)%(entry.maximum-entry.minimum+1));if(!amount)continue;size_t slot=(h>>24)%entity.chest.size();for(size_t probe=0;probe<entity.chest.size();++probe){auto& target=entity.chest[(slot+probe)%entity.chest.size()];if(target.empty()){target={Plugins::resolveItem(entry.item),static_cast<uint8_t>(amount),0};break;}}}
+    } else populateGeneratedLoot(entity,lootProfile,lootSeed);
+    entity.lootInitialized=entity.type==BlockEntityType::Chest;
     entities.emplace(localIndex, entity);
     m_dirtyBlockEntityChunks.insert({cx, cz});
 }
@@ -146,6 +154,8 @@ void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
         m_dirtyOverrideChunks.insert({cx, cz});
         m_overridesApplied.insert({cx, cz});
         auto& entities = m_blockEntities[{cx, cz}];
+        const auto timer=entities.find(localIndex);
+        if(timer!=entities.end()&&timer->second.type==BlockEntityType::Resource){entities.erase(timer);m_dirtyBlockEntityChunks.insert({cx,cz});}
         ButtonState button;
         if (id == BlockId::CHEST || id == BlockId::FURNACE || decodeButton(id, button)) {
             if (entities.count(localIndex) == 0) {
@@ -394,4 +404,13 @@ std::optional<std::vector<BlockOverride>> WorldPersistence::copyKnownOverrides(i
         if (found != m_blockOverrides.end()) for (const auto& entry : found->second) result->push_back({entry.first, entry.second});
     });
     return result;
+}
+
+void WorldPersistence::scheduleResource(const glm::ivec3& p,BlockId id,uint32_t ticks){
+    const int cx=worldToChunkX(p.x),cz=worldToChunkZ(p.z);
+    m_chunks.withUnique([&](ChunkStore&){BlockEntity e;e.type=BlockEntityType::Resource;e.resourceRemaining=ticks;e.resourceBlock=static_cast<uint16_t>(id);m_blockEntities[{cx,cz}][localIndexFor(p,cx,cz)]=e;m_dirtyBlockEntityChunks.insert({cx,cz});});
+}
+std::vector<std::pair<glm::ivec3,BlockId>> WorldPersistence::tickResources(){
+    std::vector<std::pair<glm::ivec3,BlockId>> due;
+    m_chunks.withUnique([&](ChunkStore& store){for(auto& pair:m_blockEntities){const auto& key=pair.first;const auto* chunk=store.findUnlocked(key.first,key.second);if(!chunk||!chunk->generated.load())continue;for(auto it=pair.second.begin();it!=pair.second.end();){auto& e=it->second;if(e.type!=BlockEntityType::Resource){++it;continue;}if(e.resourceRemaining)--e.resourceRemaining;m_dirtyBlockEntityChunks.insert(key);if(!e.resourceRemaining&&due.size()<64){const auto index=it->first;due.push_back({{key.first*16+int(index%16),Config::WORLD_MIN_Y+int(index/256),key.second*16+int((index/16)%16)},static_cast<BlockId>(e.resourceBlock)});it=pair.second.erase(it);}else ++it;}}});return due;
 }

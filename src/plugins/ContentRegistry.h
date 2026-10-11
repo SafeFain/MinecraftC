@@ -66,6 +66,8 @@ inline bool validKey(const std::string& key) {
     }
     return true;
 }
+inline const BlockBehaviorContent* blockBehavior(BlockId id){const auto& entries=content().extensions.blockBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
+inline const ItemBehaviorContent* itemBehavior(ItemId id){const auto& entries=content().extensions.itemBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
 inline bool validBlock(BlockId id) {
     auto raw=static_cast<uint16_t>(id);return raw<static_cast<uint16_t>(BlockId::COUNT)||content().blocks.count(raw);
 }

@@ -1156,11 +1156,12 @@ void VulkanPipelineFactory::createSecondaryPipelines(
                  VK_SHADER_STAGE_FRAGMENT_BIT, fragment, "main", nullptr}}};
             const VkVertexInputBindingDescription binding{
                 0, sizeof(ParticleRenderData), VK_VERTEX_INPUT_RATE_INSTANCE};
-            const std::array<VkVertexInputAttributeDescription, 2> attributes{{
+            const std::array<VkVertexInputAttributeDescription, 3> attributes{{
                 {0, 0, VK_FORMAT_R32G32B32A32_SFLOAT,
                  offsetof(ParticleRenderData, position)},
                 {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT,
-                 offsetof(ParticleRenderData, phase)}}};
+                 offsetof(ParticleRenderData, phase)},
+                {2,0,VK_FORMAT_R32G32B32A32_SFLOAT,offsetof(ParticleRenderData,color)}}};
             VkPipelineVertexInputStateCreateInfo vertexInput{};
             vertexInput.sType =
                 VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

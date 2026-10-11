@@ -1,0 +1,1347 @@
+{
+  "materials": [
+    {
+      "key": "capability_demo:crystal",
+      "color": [
+        0.35,
+        0.75,
+        1,
+        1
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "key": "capability_demo:vine",
+      "name": "Climbing vine",
+      "materials": "capability_demo:crystal",
+      "solid": false,
+      "cross": true,
+      "layer": 1,
+      "hardness": 1
+    },
+    {
+      "key": "capability_demo:resource",
+      "name": "Harvest crystal",
+      "materials": "capability_demo:crystal",
+      "solid": false,
+      "cross": true,
+      "layer": 1,
+      "hardness": 1
+    },
+    {
+      "key": "capability_demo:spent",
+      "name": "Spent crystal",
+      "materials": "capability_demo:crystal",
+      "solid": false,
+      "cross": true,
+      "layer": 1,
+      "hardness": 1
+    }
+  ],
+  "items": [
+    {
+      "key": "capability_demo:staff",
+      "name": "Blink staff",
+      "material": "capability_demo:crystal",
+      "kind": 2,
+      "category": 3,
+      "max_stack": 1,
+      "durability": 64
+    },
+    {
+      "key": "capability_demo:charm",
+      "name": "Plateau travel charm",
+      "material": "capability_demo:crystal",
+      "kind": 2,
+      "category": 3,
+      "max_stack": 1,
+      "durability": 64
+    },
+    {
+      "key": "capability_demo:vine",
+      "name": "Vine",
+      "material": "capability_demo:crystal",
+      "kind": 1,
+      "max_stack": 64,
+      "placed_block": "capability_demo:vine"
+    },
+    {
+      "key": "capability_demo:resource",
+      "name": "Resource",
+      "material": "capability_demo:crystal",
+      "kind": 1,
+      "max_stack": 64,
+      "placed_block": "capability_demo:resource"
+    },
+    {
+      "key": "capability_demo:spent",
+      "name": "Spent",
+      "material": "capability_demo:crystal",
+      "kind": 1,
+      "max_stack": 64,
+      "placed_block": "capability_demo:spent"
+    }
+  ],
+  "dimensions": [
+    {
+      "key": "capability_demo:islands",
+      "name": "Capability plateau",
+      "revision": "1",
+      "generator": "capability_demo:flat",
+      "generator_revision": "1",
+      "weather": 1
+    }
+  ],
+  "generators": [
+    {
+      "key": "capability_demo:flat",
+      "revision": "1",
+      "dimension": "capability_demo:islands",
+      "height": 64,
+      "water_level": -65
+    }
+  ],
+  "block_behaviors": [
+    {
+      "block": "capability_demo:vine",
+      "climbable": true,
+      "replaceable": true,
+      "support": 2,
+      "fire_encouragement": 30,
+      "fire_flammability": 60
+    },
+    {
+      "block": "capability_demo:resource",
+      "harvest_item": "minecraftc:coal",
+      "harvest_count": 2,
+      "harvest_replacement": "capability_demo:spent",
+      "harvest_reset_ticks": 100
+    },
+    {
+      "block": "capability_demo:spent",
+      "replaceable": true,
+      "contact_damage": 1
+    }
+  ],
+  "player_actions": [
+    {
+      "key": "capability_demo:blink",
+      "kind": 0,
+      "range": 32,
+      "cooldown": 3,
+      "durability": 1
+    },
+    {
+      "key": "capability_demo:visit",
+      "kind": 1,
+      "dimension": "capability_demo:islands",
+      "range": 32,
+      "cooldown": 3,
+      "durability": 1
+    }
+  ],
+  "item_behaviors": [
+    {
+      "item": "capability_demo:staff",
+      "action": "capability_demo:blink"
+    },
+    {
+      "item": "capability_demo:charm",
+      "action": "capability_demo:visit"
+    }
+  ],
+  "loot_tables": [
+    {
+      "key": "capability_demo:supplies",
+      "revision": "1",
+      "entries": [
+        {
+          "item": "minecraftc:coal",
+          "minimum": 2,
+          "maximum": 4,
+          "chance": 100
+        }
+      ]
+    }
+  ],
+  "structures": [
+    {
+      "key": "capability_demo:bridge",
+      "name": "Crystal bridge",
+      "revision": "1",
+      "dimension": "capability_demo:islands",
+      "cell_size": 128,
+      "chance": 100,
+      "radius": 18,
+      "height": 3,
+      "terrain_tolerance": 0,
+      "seed_domain": "0x43504142494c4954",
+      "blocks": [
+        {
+          "x": -18,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -17,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -16,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -15,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -14,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -13,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -12,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -11,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -10,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -9,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -8,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -7,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -6,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -5,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -4,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -3,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 9,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 10,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 11,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 12,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 13,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 14,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 15,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "z": -2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -18,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -17,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -16,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -15,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -14,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -13,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -12,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -11,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -10,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -9,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -8,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -7,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -6,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -5,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -4,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -3,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 9,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 10,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 11,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 12,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 13,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 14,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 15,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "z": -1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -18,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -17,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -16,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -15,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -14,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -13,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -12,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -11,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -10,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -9,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -8,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -7,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -6,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -5,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -4,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -3,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 9,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 10,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 11,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 12,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 13,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 14,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 15,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "z": 0,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -18,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -17,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -16,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -15,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -14,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -13,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -12,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -11,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -10,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -9,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -8,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -7,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -6,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -5,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -4,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -3,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 9,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 10,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 11,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 12,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 13,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 14,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 15,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "z": 1,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -18,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -17,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -16,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -15,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -14,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -13,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -12,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -11,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -10,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -9,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -8,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -7,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -6,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -5,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -4,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -3,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -2,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 5,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 8,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 9,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 10,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 11,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 12,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 13,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 14,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 15,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 16,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 18,
+          "y": 0,
+          "z": 2,
+          "block": "minecraftc:stone"
+        },
+        {
+          "x": 17,
+          "y": 1,
+          "z": 0,
+          "block": "minecraftc:chest",
+          "loot": "capability_demo:supplies"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "key": "capability_demo:sky",
+      "dimension": "capability_demo:islands",
+      "sky_style": 1,
+      "clouds": false,
+      "sun_size": 0.8,
+      "moon_size": 1.3
+    }
+  ],
+  "particles": [
+    {
+      "key": "capability_demo:spark",
+      "material": "capability_demo:crystal",
+      "color": [
+        0.4,
+        0.8,
+        1,
+        0.8
+      ],
+      "velocity": [
+        0,
+        0.3,
+        0
+      ],
+      "lifetime": 2,
+      "scale": 0.12
+    }
+  ],
+  "held_models": [
+    {
+      "item": "capability_demo:staff",
+      "path": "staff.glb"
+    }
+  ],
+  "playlists": [
+    {
+      "key": "capability_demo:music",
+      "dimension": "capability_demo:islands",
+      "tracks": [
+        "chime.wav"
+      ],
+      "random": true,
+      "gap_seconds": 2
+    }
+  ]
+}

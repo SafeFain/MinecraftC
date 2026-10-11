@@ -13,6 +13,7 @@
 #include "game/GameRuleRegistry.h"
 #include "game/Item.h"
 #include "game/Weather.h"
+#include "plugins/ContentRegistry.h"
 #include "world/Biome.h"
 #include "world/Structure.h"
 
@@ -52,6 +53,7 @@ struct ParsedCommand {
     WeatherType weather = WeatherType::Clear;
     Biome biome = Biome::PLAINS;
     StructureType structure = StructureType::Village;
+    std::string pluginStructure;
 };
 
 enum class CommandErrorKind { UnknownCommand, Expected };
@@ -215,11 +217,10 @@ inline CommandParseResult parseCommand(const std::string& input) {
             parsed.biome = *biome;
         } else {
             const auto structure = parseStructureCommandName(tokens[2].text);
-            if (!structure)
-                return expected(input, tokens, 2,
-                                "a valid structure (see /help)");
+            const auto plugin=Plugins::content().extensions.structures.find(tokens[2].text);
+            if (!structure&&plugin==Plugins::content().extensions.structures.end())return expected(input,tokens,2,"a valid structure (see /help)");
             parsed.type = CommandType::LocateStructure;
-            parsed.structure = *structure;
+            if(structure)parsed.structure=*structure;else parsed.pluginStructure=tokens[2].text;
         }
         if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
     } else {
@@ -301,6 +302,7 @@ inline std::vector<CommandSuggestion> commandSuggestions(
                    before[1].text == "structure") {
             for (const StructureType type : STRUCTURE_TYPES)
                 add(structureCommandName(type));
+            for(const auto& pair:Plugins::content().extensions.structures)add(pair.first);
         }
     }
 

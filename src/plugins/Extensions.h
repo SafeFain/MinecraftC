@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+namespace model {struct ModelAsset;}
 namespace Plugins {
 struct EntityContent {
     std::string key, name, drop;
@@ -79,7 +80,63 @@ struct DeclarativeRenderPass {
     std::vector<MC_RenderDraw> draws;
     MC_RenderHandle scenePipeline=0;
 };
+struct BlockBehaviorContent {
+    bool climbable=false, replaceable=false;
+    uint32_t support=0, encouragement=0, flammability=0, harvestCount=0, resetTicks=0;
+    float damage=0;
+    std::string harvest, replacement, action;
+};
+struct ItemBehaviorContent {std::string action, dimension;};
+struct LootContent {
+    struct Entry {std::string item;uint32_t minimum=0,maximum=0,chance=0;};
+    std::string key,revision;
+    std::vector<Entry> entries;
+};
+struct StructureContent {
+    struct Block {int32_t x=0,y=0,z=0;uint16_t id=0;std::string loot;};
+    std::string key,name,revision;
+    uint32_t dimension=0,cell=64,chance=10,radius=8,height=16,tolerance=2;
+    uint64_t domain=0;
+    std::vector<Block> blocks;
+    std::vector<std::string> namespaces;
+    MC_StructureCallback build=nullptr;
+    void* userdata=nullptr;
+};
+struct ActionContent {
+    std::string key,dimension;
+    uint32_t kind=0,durability=0;
+    float range=32,cooldown=0;
+    std::function<bool(const MC_ActionView&,MC_ActionTarget&)> target;
+};
+struct EnvironmentContent {
+    std::string key;
+    MC_EnvironmentParameters parameters{};
+    uint32_t overrides=0;
+    std::function<void(MC_EnvironmentParameters&)> callback;
+};
+struct ParticleContent {std::string key,material;MC_ParticleDefinition definition{};size_t owner=0;};
+struct HeldModelContent {
+    std::shared_ptr<const model::ModelAsset> asset;
+    std::filesystem::path path;
+    std::array<float,16> first{},third{};
+};
+struct PlaylistContent {
+    std::string key;
+    uint32_t dimension=0;
+    bool menu=false,random=true;
+    float gap=0;
+    std::vector<std::filesystem::path> tracks;
+};
 struct ExtensionContent {
+    std::map<uint16_t,BlockBehaviorContent> blockBehaviors;
+    std::map<uint16_t,ItemBehaviorContent> itemBehaviors;
+    std::map<std::string,LootContent> loot;
+    std::map<std::string,StructureContent> structures;
+    std::map<std::string,ActionContent> actions;
+    std::map<uint32_t,EnvironmentContent> environments;
+    std::map<std::string,ParticleContent> particles;
+    std::map<uint16_t,HeldModelContent> heldModels;
+    std::map<std::string,PlaylistContent> playlists;
     std::map<uint32_t,DimensionContent> dimensions=builtinDimensions();
     std::map<uint16_t,EntityContent> entities;
     std::map<std::string,GeneratorContent> generators;

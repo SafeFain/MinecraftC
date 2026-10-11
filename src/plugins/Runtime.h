@@ -1,5 +1,5 @@
 #pragma once
-#include "minecraftc/plugin.h"
+#include "minecraftc/extensions.h"
 #include <functional>
 #include <string>
 
@@ -17,6 +17,8 @@ public:
     ActorScope(const ActorScope&)=delete;
     ActorScope& operator=(const ActorScope&)=delete;
 };
+inline std::function<bool(uint64_t,const std::string&)>& actionDispatcher(){static std::function<bool(uint64_t,const std::string&)> f;return f;}
+inline std::function<bool(uint64_t,const std::string&,bool,MC_ActionTarget&)>& targetDispatcher(){static std::function<bool(uint64_t,const std::string&,bool,MC_ActionTarget&)> f;return f;}
 using Dispatcher=std::function<void(MC_Event&)>;
 inline Dispatcher& dispatcher() { static Dispatcher value; return value; }
 inline bool dispatch(MC_Event& event) {

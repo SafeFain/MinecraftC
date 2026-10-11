@@ -1,4 +1,5 @@
 #include "renderer/ParticleSystem.h"
+#include "plugins/EnvironmentPresentation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +9,7 @@
 #include "world/World.h"
 
 void ParticleSystem::clear() {
-    m_particles.clear();
+    m_particles.clear();m_pluginEmitted=0;
     m_weatherEmission = 0.0f;
     m_skyMoteEmission = 0.0f;
     m_pollenEmission = 0.0f;
@@ -360,11 +361,13 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         }
     }
 
+    m_pluginEmitted=0;
     for (auto& particle : m_particles) {
         particle.age += dt;
         if (particle.kind == ParticleKind::Lightning) continue;
 
-        if (particle.kind == ParticleKind::BlockDebris) {
+        if(particle.kind==ParticleKind::Plugin){particle.velocity.y-=particle.gravity*dt;particle.phase=particle.age/particle.lifetime;}
+        else if (particle.kind == ParticleKind::BlockDebris) {
             particle.velocity.y -= 18.0f * dt;
             particle.velocity *= std::pow(0.18f, dt);
             particle.rotation += particle.angularVelocity * dt;
@@ -573,7 +576,7 @@ void ParticleSystem::buildRenderData(
         const glm::dvec3 relative = particle.position - renderOrigin;
         result.push_back({glm::vec3(relative), static_cast<float>(particle.kind),
                           particle.phase, particle.texture, particle.size,
-                          particle.rotation});
+                          particle.rotation,particle.color});
     }
 }
 
@@ -589,4 +592,10 @@ void ParticleSystem::emitFishingSplash(const glm::dvec3& position, bool bite) {
         p.size = bite ? .14f : .09f;
         m_particles.push_back(p);
     }
+}
+
+bool ParticleSystem::emitPlugin(const MC_ParticleEmission& e){
+    if(!e.particle||!e.count||e.count>128||m_pluginEmitted+e.count>128||m_particles.size()+e.count>MAX_PARTICLES)return false;
+    const auto found=Plugins::content().extensions.particles.find(e.particle);if(found==Plugins::content().extensions.particles.end())return false;const auto& d=found->second.definition;const auto tile=Plugins::materialTile(found->second.material);
+    for(uint32_t i=0;i<e.count;++i){Particle p;p.kind=ParticleKind::Plugin;p.position={e.position[0],e.position[1],e.position[2]};p.velocity={d.velocity[0],d.velocity[1],d.velocity[2]};p.velocity+=glm::vec3(randomFloat()-.5f,randomFloat()-.5f,randomFloat()-.5f)*.2f;p.lifetime=d.lifetime;p.size=d.scale;p.gravity=d.gravity;p.color={d.color[0],d.color[1],d.color[2],d.color[3]};p.texture=tile;m_particles.push_back(p);}m_pluginEmitted+=e.count;return true;
 }

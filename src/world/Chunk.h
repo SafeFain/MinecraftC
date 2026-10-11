@@ -11,6 +11,7 @@
 #include "Config.h"
 #include "world/Block.h"
 #include "world/ChunkMesh.h"
+#include "world/RegionGenerationData.h"
 
 enum class ChunkLifecycleState : uint8_t {
     Requested,
@@ -28,6 +29,9 @@ public:
     using LifecycleState = ChunkLifecycleState;
 
     Chunk(int cx, int cz);
+
+    // Pure structure output is published with generated blocks, never rebuilt under the store lock.
+    std::vector<RegionGenerationData::PendingBlock> pluginStructures;
 
     // Chunk coordinates
     int cx, cz;

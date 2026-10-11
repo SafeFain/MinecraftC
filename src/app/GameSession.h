@@ -216,6 +216,16 @@ public:
     bool pluginPlayer(MC_PlayerSnapshot&) const;
     bool pluginBlockInteraction(uint32_t,int32_t,int32_t,int32_t,bool,bool);
     bool pluginTravel(uint64_t,uint32_t);
+    Player* pluginActor(uint64_t,uint32_t&);
+    bool pluginActionTarget(uint64_t,const std::string&,bool,MC_ActionTarget&);
+    bool pluginExecuteAction(uint64_t,const std::string&);
+    bool pluginActionCooldown(uint64_t,const std::string&,float&);
+    uint64_t pluginActionState(uint64_t);
+    bool pluginTeleport(uint64_t,uint32_t,const double*);
+    bool pluginDimensionTime(uint32_t,MC_DimensionTime&);
+    bool pluginSetDimensionTime(const MC_DimensionTime&);
+    bool pluginLocateStructure(uint32_t,const std::string&,int32_t,int32_t,uint32_t,MC_LocatedStructure&);
+    bool pluginEmitParticle(const MC_ParticleEmission&);
     bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);
     bool pluginGiveItem(uint16_t,uint32_t);

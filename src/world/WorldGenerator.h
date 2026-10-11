@@ -90,8 +90,11 @@ public:
                         int padding, std::vector<Chunk*>& chunks,
                         std::vector<RegionGenerationData::PendingBlock>& pendingOut);
 
-    std::vector<MC_DecorationBlock> pluginModifierBlocks(int x,int z,int width=1,int depth=1) const;
+    std::vector<MC_DecorationBlock> pluginModifierBlocks(int x,int z,int width=1,int depth=1,bool includeStructures=true) const;
 
+    std::vector<RegionGenerationData::PendingBlock> pluginStructureBlocks(int,int,int=16,int=16) const;
+    std::optional<MC_LocatedStructure> locatePluginStructure(const std::string&,int,int,uint32_t=8192) const;
+    uint64_t pluginStructureFingerprint() const;
     // ── Queries ──────────────────────────────────────────────────────────
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
@@ -133,8 +136,9 @@ public:
     BlockId samplePluginBlock(int x,int y,int z) const;
     std::array<uint16_t,Config::CHUNK_SIZE_Y> samplePluginColumnBlocks(int,int) const;
     uint32_t chunkCacheVersion() const {
-        if(customGenerator()||!m_pluginConfig.modifiers.empty()) {
-            const auto hash=Plugins::generationFingerprint(m_pluginConfig);
+        const auto structures=pluginStructureFingerprint();
+        if(structures||customGenerator()||!m_pluginConfig.modifiers.empty()) {
+            const auto hash=Plugins::generationFingerprint(m_pluginConfig)^structures;
             return static_cast<uint32_t>(hash^(hash>>32));
         }
         return isHeaven() ? HEAVEN_CHUNK_CACHE_VERSION :

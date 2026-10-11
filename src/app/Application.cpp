@@ -182,6 +182,16 @@ private:
         m_plugins.entityIntent=[this](uint32_t d,uint64_t id,const MC_EntityIntent& intent){return m_session.pluginEntityIntent(d,id,intent);};
         m_plugins.blockInteraction=[this](uint32_t dim,int32_t x,int32_t y,int32_t z,bool button,bool open){return m_session.pluginBlockInteraction(dim,x,y,z,button,open);};
         m_plugins.travelPlayer=[this](uint64_t id,uint32_t dim){const bool result=m_session.pluginTravel(id,dim);if(result&&!id)m_flow.beginDimensionLoading();return result;};
+        m_plugins.locateStructure=[this](uint32_t dim,const std::string& key,int32_t x,int32_t z,uint32_t range,MC_LocatedStructure& out){return m_session.pluginLocateStructure(dim,key,x,z,range,out);};
+        m_plugins.actionTarget=[this](uint64_t id,const std::string& key,bool preview,MC_ActionTarget& out){return m_session.pluginActionTarget(id,key,preview,out);};
+        m_plugins.actionState=[this](uint64_t id){return m_session.pluginActionState(id);};
+        m_plugins.executeAction=[this](uint64_t id,const std::string& key){const auto before=m_session.activeDimension();const bool done=m_session.pluginExecuteAction(id,key);if(done&&!id&&before!=m_session.activeDimension())m_flow.beginDimensionLoading();return done;};
+        Plugins::actionDispatcher()=m_plugins.executeAction;Plugins::targetDispatcher()=m_plugins.actionTarget;
+        m_plugins.actionCooldown=[this](uint64_t id,const std::string& key,float& out){return m_session.pluginActionCooldown(id,key,out);};
+        m_plugins.teleportPlayer=[this](uint64_t id,uint32_t dim,const double* p){return m_session.pluginTeleport(id,dim,p);};
+        m_plugins.dimensionTime=[this](uint32_t dim,MC_DimensionTime& out){return m_session.pluginDimensionTime(dim,out);};
+        m_plugins.setDimensionTime=[this](const MC_DimensionTime& t){return m_session.pluginSetDimensionTime(t);};
+        m_plugins.emitParticle=[this](const MC_ParticleEmission& e){return m_session.pluginEmitParticle(e);};
         m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
         m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};
         m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};

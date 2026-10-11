@@ -66,7 +66,7 @@ void main(){
     vec4 farPoint=sky.inverseViewProjection*vec4(vNdc,1.0,1.0);
     vec3 ray=normalize(farPoint.xyz/farPoint.w-sky.cameraPosition.xyz);
     float heaven=sky.options.y>0.5?1.0:0.0;
-    float daylight=smoothstep(-0.12,0.18,sky.sunDirection.y);
+    float daylight=clamp(sky.zenithColor.a,0.0,1.0);
     float height=smoothstep(-0.08,0.72,ray.y);
     vec3 color=mix(sky.horizonColor.rgb,sky.zenithColor.rgb,height);
     float celestial=1.0-sky.weather.y;
@@ -85,8 +85,8 @@ void main(){
             pow(max(1.0-abs(ray.y),0.0),5.0)*0.17*celestial;
         color=mix(color,color*extinction+scatter,enhanced*0.58);
     }
-    float sun=smoothstep(0.99915,0.99972,dot(ray,sky.sunDirection.xyz))*celestial;
-    float sunGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),96.0);
+    float sun=smoothstep(1.0-0.00085*max(0.0001,sky.sunDirection.w*sky.sunDirection.w),1.0-0.00028*max(0.0001,sky.sunDirection.w*sky.sunDirection.w),dot(ray,sky.sunDirection.xyz))*celestial*step(0.0001,sky.sunDirection.w);
+    float sunGlow=pow(max(dot(ray,sky.sunDirection.xyz),0.0),96.0)*step(0.0001,sky.sunDirection.w);
     float forwardHaze=pow(max(dot(ray,sky.sunDirection.xyz),0.0),8.0)*
         smoothstep(-0.10,0.24,sky.sunDirection.y);
     color+=vec3(1.0,0.55,0.20)*forwardHaze*0.10*celestial;
@@ -102,15 +102,15 @@ void main(){
             enhanced*animatedHaze;
         color+=vec3(1.0,0.84,0.58)*sunGlow*0.16*enhanced*celestial;
     }
-    float moon=smoothstep(0.99945,0.99978,dot(ray,sky.moonDirection.xyz))*celestial;
-    float moonHalo=pow(max(dot(ray,sky.moonDirection.xyz),0.0),180.0)*celestial*sky.weather.x;
+    float moon=smoothstep(1.0-0.00055*max(0.0001,sky.moonDirection.w*sky.moonDirection.w),1.0-0.00022*max(0.0001,sky.moonDirection.w*sky.moonDirection.w),dot(ray,sky.moonDirection.xyz))*celestial*step(0.0001,sky.moonDirection.w);
+    float moonHalo=pow(max(dot(ray,sky.moonDirection.xyz),0.0),180.0)*celestial*sky.weather.x*step(0.0001,sky.moonDirection.w);
     color+=vec3(0.30,0.40,0.72)*moonHalo*0.14;
     color+=vec3(0.24,0.34,0.68)*moonHalo*0.10*enhanced;
     color=mix(color,vec3(0.72,0.80,1.0),moon*sky.weather.x);
     float starFace=0.0;vec2 starUv=cubeSkyUv(ray,starFace);
     float horizonFade=smoothstep(-0.015,0.20,ray.y);
     float clearNight=sky.weather.x*pow(max(celestial,0.0),1.7);
-    float moonOcclusion=1.0-smoothstep(0.9965,0.99955,dot(ray,sky.moonDirection.xyz));
+    float moonOcclusion=1.0-smoothstep(1.0-0.0035*max(.0001,sky.moonDirection.w*sky.moonDirection.w),1.0-0.00045*max(.0001,sky.moonDirection.w*sky.moonDirection.w),dot(ray,sky.moonDirection.xyz))*step(0.0001,sky.moonDirection.w);
     vec3 milkyNormal=normalize(vec3(0.28,0.91,-0.30));
     float latitude=abs(dot(ray,milkyNormal));
     float band=exp(-latitude*latitude*76.0);

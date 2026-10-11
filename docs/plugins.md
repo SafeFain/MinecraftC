@@ -64,7 +64,8 @@ plugin's content, commands and subscriptions and blocks required dependents.
 [`examples/plugins/example_content`](../examples/plugins/example_content) is a
 complete portable package. Its JSON has `materials`, `blocks`, `items` and
 `recipes` arrays. Optional block-family/geometry and entity/generator/render arrays are described in the
-[extension reference](plugin-extensions.md). New keys must be `plugin_id:local_name`, using lowercase letters,
+[extension reference](plugin-extensions.md); behavior/structures/actions/environment/presentation arrays
+are described in the [capability guide](plugin-capabilities.md). New keys must be `plugin_id:local_name`, using lowercase letters,
 numbers, underscores, slashes, dots or hyphens. Registries freeze before play.
 Runtime IDs start at 4096; never persist them in plugin configuration.
 
@@ -155,7 +156,7 @@ listed with a compatibility reason. Restore the matching package/configuration t
 open it. No automatic migration or missing-block substitution is provided.
 Visual-only plugins do not contribute a world requirement.
 
-Worlds now require save format v20. v2–v19 metadata remains inspectable, but opening
+Worlds now require save format v21. v2–v20 metadata remains inspectable, but opening
 those worlds is refused without rewriting. Create new worlds with the desired
 plugin set; no migration is supplied. Generated caches are rebuildable when
 incompatible. Terrain generation stays v20 and builtin Heaven stays v9.
@@ -164,7 +165,7 @@ ABI 1 now exposes optional version 1 entity, world-generation, dimension and ren
 Plugins can register/override mobs, select per-dimension generators and modifiers,
 and create Vulkan-owned shader resources and replaceable render stages.
 [Extension contracts and examples](plugin-extensions.md) document these APIs.
-Save v20 stores stable entity keys/state, generation choices and namespaced dimensions.
+Save v21 stores stable entity keys/state, generation choices and namespaced dimensions.
 No hot reload, raw Vulkan access, arbitrary plugin network
 messages, bytecode patching or custom block-entity schemas are provided.
 
@@ -185,7 +186,7 @@ and configuration; builtin plugins carry a fixed behavior identifier. The networ
 signature is a discovery hint, not an authentication mechanism. Existing world-save
 fingerprints remain unchanged, including native files and configuration.
 
-LAN protocol 5 uses canonical IDs sorted by namespaced content key and maps them to
+LAN protocol 6 uses canonical IDs sorted by namespaced content key and maps them to
 each process's frozen local registry. SDK IDs are never reassigned. Guest profiles
 version 4 persist an item palette and keyed per-dimension state; versions 1–3 are
 refused without rewriting. Unknown content,
@@ -283,13 +284,13 @@ Weather values are 0 normal, 1 clear, 2 rain, 3 thunder; spawn is 0 safe surface
 and `revision`. Numeric generator dimension 0/1 remains supported for older plugins.
 See [native dimension example](../examples/plugins/dimension_demo/README.md).
 
-Save v20 stores dimension keys, policy revisions, generation selections and player
+Save v21 stores dimension keys, policy revisions, generation selections and player
 states. The main world and Heaven retain existing directories; other dimension keys
 use segmented hex-encoded directories. Missing dimensions/plugins/revisions refuse
-loading without writes. LAN v5 sends keys rather than local dimension handles and
+loading without writes. LAN v6 sends keys rather than local dimension handles and
 includes canonical dimension policy descriptions in admission fingerprints. Older
 protocols cannot join. Player profile v4 persists dimension-keyed positions/beds;
 older profiles (including the local LAN identity profile) are explicitly refused.
 Additional dimensions use the existing generic terrain/LOD and Overworld environment
-presentation. This extension does not add portals, sky/music APIs, arbitrary spawn
-callbacks or species-specific natural spawn tables.
+presentation. Dimension registration does not add portals, arbitrary spawn callbacks or species-specific natural spawn tables.
+Optional [gameplay and presentation capabilities](plugin-capabilities.md) add sky, clouds, particles, held models and playlists.

@@ -70,6 +70,9 @@ private:
     uint32_t m_itemHeight = 0;
     std::unordered_map<uint16_t, CachedMesh> m_meshes;
 
+    struct ModelPart {RenderMeshHandle mesh{};RenderTextureHandle texture{};RenderMaterialHandle material{};glm::vec4 color{1};};
+    std::unordered_map<uint16_t,std::vector<ModelPart>> m_pluginModels;
+    bool drawPluginModel(const ItemStack&,const glm::mat4&,const glm::mat4&,bool,bool=false);
     CachedMesh meshFor(ItemId item);
     void drawItem(const ItemStack& item, const glm::mat4& vp,
                   const glm::mat4& transform, bool firstPerson);
