@@ -243,7 +243,8 @@ add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
 target_include_directories(minecraftc_platform_sdl PRIVATE src)
 target_compile_definitions(minecraftc_platform_sdl PRIVATE
     MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-target_link_libraries(minecraftc_platform_sdl PRIVATE ${MINECRAFTC_SDL_TARGET})
+target_link_libraries(minecraftc_platform_sdl PRIVATE
+    ${MINECRAFTC_SDL_TARGET} glm::glm)
 target_link_libraries(minecraftc_platform_sdl PRIVATE
     ${MINECRAFTC_VULKAN_TARGET})
 add_library(minecraftc_render_vulkan STATIC
