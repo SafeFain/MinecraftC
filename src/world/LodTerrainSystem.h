@@ -86,6 +86,7 @@ struct LodRenderSubmission {
 
 LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                                     const LodTileKey& key);
+LodNeighborEdges sampleApproximateLodNeighborEdges(const WorldGenerator&,const LodTileKey&);
 LodTileData extractExactLodChunk(const std::vector<uint16_t>& blocks);
 std::vector<uint8_t> encodeLodTilePayload(const LodTileData& tile);
 bool decodeLodTilePayload(const std::vector<uint8_t>& payload,

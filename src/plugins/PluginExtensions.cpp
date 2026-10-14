@@ -187,6 +187,24 @@ int32_t PluginManager::modifier(MC_PluginContext& ctx,const MC_ModifierDefinitio
     m.dimension=d.dimension;m.radius=d.radius;m.decorate=d.decorate;m.userdata=d.userdata;
     require(content().extensions.modifiers.emplace(m.key,m).second,"Duplicate modifier");return 0;
 }
+int32_t PluginManager::generatorV2(MC_PluginContext& ctx,const MC_GeneratorDefinitionV2& d) {
+    require(d.size>=sizeof(d),"Generator V2 descriptor size mismatch");
+    const std::string revision=(d.terrain_lod||d.decoration_lod)?text(d.lod_revision):"";
+    require(revision.size()<=128,"LOD revision too long");
+    generator(ctx,d.base);
+    auto& g=content().extensions.generators.at(d.base.key);
+    g.batch=d.batch;g.terrainLod=d.terrain_lod;g.decorationLod=d.decoration_lod;g.lodRevision=revision;
+    return 0;
+}
+int32_t PluginManager::modifierV2(MC_PluginContext& ctx,const MC_ModifierDefinitionV2& d) {
+    require(d.size>=sizeof(d),"Modifier V2 descriptor size mismatch");
+    const std::string revision=d.decoration_lod?text(d.lod_revision):"";
+    require(revision.size()<=128,"LOD revision too long");
+    modifier(ctx,d.base);
+    auto& m=content().extensions.modifiers.at(d.base.key);
+    m.decorationLod=d.decoration_lod;m.lodRevision=revision;
+    return 0;
+}
 int32_t PluginManager::renderResource(MC_PluginContext& ctx,const MC_RenderResource& d,MC_RenderHandle& id) {
     require(d.size>=sizeof(d)&&d.kind<=MC_RENDER_PIPELINE,"Invalid render resource");
     const auto key=text(d.key);require(m_phase==MC_REGISTER&&!content().frozen,"Render registration is closed");
@@ -251,7 +269,14 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
 }
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(const auto* result=capability(name,version))return result;
-    if(version!=1||!name)return nullptr;
+    if(!name)return nullptr;
+    if(version==2&&std::string(name)==MC_WORLDGEN_EXTENSION) {
+        static const MC_WorldgenV2 worldgen{sizeof(MC_WorldgenV2),2,
+            [](MC_PluginContext* c,const MC_GeneratorDefinitionV2* d){return call(c,[&]{require(d,"Missing generator");owner(c).generatorV2(*c,*d);},true);},
+            [](MC_PluginContext* c,const MC_ModifierDefinitionV2* d){return call(c,[&]{require(d,"Missing modifier");owner(c).modifierV2(*c,*d);},true);}};
+        return &worldgen;
+    }
+    if(version!=1)return nullptr;
     static const MC_BlockShapesV1 shapes{sizeof(MC_BlockShapesV1),1,
         [](MC_PluginContext* c,const MC_BlockFamily* d,uint16_t* id){return call(c,[&]{require(d&&id,"Missing family arguments");owner(c).blockFamily(*c,*d,*id);},true);},
         [](MC_PluginContext* c,const MC_BlockGeometry* d){return call(c,[&]{require(d,"Missing geometry arguments");owner(c).blockGeometry(*c,*d);},true);},

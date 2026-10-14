@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <memory>
 #include <tuple>
 
 namespace {
@@ -32,12 +33,87 @@ BlockId WorldGenerator::samplePluginBlock(int x,int y,int z) const {
     return static_cast<BlockId>(block);
 }
 void WorldGenerator::generatePluginChunk(Chunk& chunk) const {
-    for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
-        const int wx=chunk.cx*16+x,wz=chunk.cz*16+z;(void)pluginColumn(wx,wz);
-        for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)chunk.setBlock(x,y,z,samplePluginBlock(wx,y,wz));
-
+    generatePluginChunks({&chunk});
+}
+void WorldGenerator::generatePluginChunks(const std::vector<Chunk*>& chunks) const {
+    const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
+    std::vector<Chunk*> targets;
+    for(auto* chunk:chunks)if(chunk)targets.push_back(chunk);
+    if(targets.empty())return;
+    std::set<std::pair<int,int>> positions;
+    int minX=targets.front()->cx,maxX=minX,minZ=targets.front()->cz,maxZ=minZ;
+    for(auto* chunk:targets) {
+        if(!positions.emplace(chunk->cx,chunk->cz).second)Plugins::failGeneration(g.key);
+        minX=std::min(minX,chunk->cx);maxX=std::max(maxX,chunk->cx);
+        minZ=std::min(minZ,chunk->cz);maxZ=std::max(maxZ,chunk->cz);
     }
-    applyPluginModifiers(chunk);chunk.generated.store(true);
+    const int64_t width=(int64_t(maxX)-minX+1)*16,depth=(int64_t(maxZ)-minZ+1)*16;
+    const bool rectangle=width<=MC_MAX_GENERATION_SIDE&&depth<=MC_MAX_GENERATION_SIDE&&
+        int64_t(targets.size())==(width/16)*(depth/16);
+    MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
+    auto sampleVolume=[&](int x,int z,uint32_t w,uint32_t d) {
+        const uint32_t count=w*d*Config::CHUNK_SIZE_Y;
+        // An unwritten slot is invalid, rather than silently becoming AIR.
+        std::vector<uint16_t> blocks(count,MC_INVALID_ID);
+        MC_GenerationVolume volume{sizeof(MC_GenerationVolume),x,Config::WORLD_MIN_Y,z,w,Config::CHUNK_SIZE_Y,d};
+        try{if(g.batch(&context,&volume,blocks.data(),count,g.userdata))Plugins::failGeneration(g.key);}
+        catch(...){Plugins::failGeneration(g.key);}
+        for(auto b:blocks)if(!Plugins::validBlock(static_cast<BlockId>(b)))Plugins::failGeneration(g.key);
+        return blocks;
+    };
+    std::vector<uint16_t> region;
+    if(g.batch&&rectangle)region=sampleVolume(minX*16,minZ*16,static_cast<uint32_t>(width),static_cast<uint32_t>(depth));
+    // Stage the complete request, including modifiers and metadata, before
+    // publishing any target. Faults leave targets and their flags untouched.
+    std::vector<std::unique_ptr<Chunk>> staged;
+    for(auto* target:targets) {
+        auto chunk=std::make_unique<Chunk>(target->cx,target->cz);
+        if(g.batch) {
+            const auto local=rectangle?std::vector<uint16_t>{}:sampleVolume(chunk->worldX(),chunk->worldZ(),16,16);
+            for(int y=0;y<Config::CHUNK_SIZE_Y;++y)for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
+                const size_t index=rectangle?size_t(chunk->worldX()-minX*16+x)+
+                    size_t(chunk->worldZ()-minZ*16+z)*size_t(width)+size_t(y)*size_t(width)*size_t(depth):
+                    size_t(x+z*16+y*256);
+                chunk->blockAt(x,y+Config::WORLD_MIN_Y,z)=rectangle?region[index]:local[index];
+            }
+            chunk->finishBulkBlockEdit();
+        } else {
+            for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
+                const int wx=chunk->worldX()+x,wz=chunk->worldZ()+z;(void)pluginColumn(wx,wz);
+                for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
+                    chunk->setBlock(x,y,z,samplePluginBlock(wx,y,wz));
+            }
+        }
+        applyPluginModifiers(*chunk);staged.push_back(std::move(chunk));
+    }
+    for(size_t i=0;i<targets.size();++i) {
+        std::vector<uint16_t> blocks;staged[i]->copyRawBlocks(blocks);
+        targets[i]->loadRawBlocks(blocks);
+        targets[i]->pluginStructures=std::move(staged[i]->pluginStructures);
+    }
+    for(auto* chunk:targets){chunk->generated.store(true);chunk->generationInProgress.store(false);}
+}
+namespace {
+std::vector<MC_DecorationBlock> modifierBlocks(const Plugins::ModifierContent& m,
+    const MC_GenerationContext& context,int x,int z,int width,int depth) {
+    std::vector<MC_DecorationBlock> result;
+    const int radius=static_cast<int>(m.radius);
+    for(int az=cell(z-radius);az<=cell(z+depth-1+radius);++az)
+        for(int ax=cell(x-radius);ax<=cell(x+width-1+radius);++ax) {
+            std::array<MC_DecorationBlock,4096> output{};uint32_t count=0;
+            try {
+                if(m.decorate(&context,ax*16,az*16,output.data(),static_cast<uint32_t>(output.size()),&count,m.userdata))Plugins::failGeneration(m.key);
+            }catch(...){Plugins::failGeneration(m.key);}
+            if(count>output.size())Plugins::failGeneration(m.key);
+            for(uint32_t i=0;i<count;++i) {
+                const auto& b=output[i];
+                if(std::abs(int64_t(b.x)-ax*16)>radius||std::abs(int64_t(b.z)-az*16)>radius||
+                   !Config::isValidWorldY(b.y)||!Plugins::validBlock(static_cast<BlockId>(b.block)))Plugins::failGeneration(m.key);
+                if(b.x>=x&&b.x<x+width&&b.z>=z&&b.z<z+depth)result.push_back(b);
+            }
+        }
+    return result;
+}
 }
 std::vector<MC_DecorationBlock> WorldGenerator::pluginModifierBlocks(int x,int z,int width,int depth,bool includeStructures) const {
     std::vector<MC_DecorationBlock> result;
@@ -45,21 +121,8 @@ std::vector<MC_DecorationBlock> WorldGenerator::pluginModifierBlocks(int x,int z
     // Canonical anchors and modifier order are independent of chunk/LOD batching.
     for(const auto& selected:m_pluginConfig.modifiers) {
         const auto& m=Plugins::content().extensions.modifiers.at(selected.first);
-        const int radius=static_cast<int>(m.radius);
-        for(int az=cell(z-radius);az<=cell(z+depth-1+radius);++az)
-            for(int ax=cell(x-radius);ax<=cell(x+width-1+radius);++ax) {
-                std::array<MC_DecorationBlock,4096> output{};uint32_t count=0;
-                try {
-                    if(m.decorate(&context,ax*16,az*16,output.data(),static_cast<uint32_t>(output.size()),&count,m.userdata))Plugins::failGeneration(m.key);
-                }catch(...){Plugins::failGeneration(m.key);}
-                if(count>output.size())Plugins::failGeneration(m.key);
-                for(uint32_t i=0;i<count;++i) {
-                    const auto& b=output[i];
-                    if(std::abs(int64_t(b.x)-ax*16)>radius||std::abs(int64_t(b.z)-az*16)>radius||
-                       !Config::isValidWorldY(b.y)||!Plugins::validBlock(static_cast<BlockId>(b.block)))Plugins::failGeneration(m.key);
-                    if(b.x>=x&&b.x<x+width&&b.z>=z&&b.z<z+depth)result.push_back(b);
-                }
-            }
+        const auto blocks=modifierBlocks(m,context,x,z,width,depth);
+        result.insert(result.end(),blocks.begin(),blocks.end());
     }
     if(includeStructures)for(const auto& b:pluginStructureBlocks(x,z,width,depth))result.push_back({b.worldX,b.worldY,b.worldZ,static_cast<uint16_t>(b.id)});
     return result;
@@ -134,4 +197,95 @@ uint64_t WorldGenerator::pluginStructureFingerprint() const{
         if(description!=Plugins::content().networkDescription.end())h=WorldGenContext::mix(h^keyHash(description->second));
     }
     return found?(h?h:1):0;
+}
+
+uint64_t WorldGenerator::lodSamplingFingerprint() const {
+    uint64_t h=Plugins::generationFingerprint(m_pluginConfig)^pluginStructureFingerprint();
+    auto add=[&](const std::string& value){h=WorldGenContext::mix(h^keyHash(value));};
+    // Invalidate plugin approximations from the previous builtin-only policy.
+    if(customGenerator()||!m_pluginConfig.modifiers.empty())
+        h=WorldGenContext::mix(h^0x6c6f6473616d7032ULL);
+    if(customGenerator()) {
+        const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
+        if(g.batch||g.terrainLod||g.decorationLod) {
+            add(g.lodRevision);h=WorldGenContext::mix(h^uint64_t(bool(g.batch))^
+                (uint64_t(bool(g.terrainLod))<<1)^(uint64_t(bool(g.decorationLod))<<2));
+        }
+    }
+    for(const auto& selected:m_pluginConfig.modifiers) {
+        const auto& m=Plugins::content().extensions.modifiers.at(selected.first);
+        if(m.decorationLod){add(m.key);add(m.lodRevision);h=WorldGenContext::mix(h^0x6c6f646d6f647632ULL);}
+    }
+    return h;
+}
+std::vector<MC_LodSpan> WorldGenerator::samplePluginLodColumn(int x,int z,int cellSize,
+    const std::vector<MC_LodSpan>& base) const {
+    if(cellSize<1||cellSize>8192||(cellSize&(cellSize-1)))Plugins::failGeneration("LOD cell");
+    const int wx=x+cellSize/2,wz=z+cellSize/2;
+    MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
+    MC_LodCell cellRequest{sizeof(MC_LodCell),x,z,static_cast<uint32_t>(cellSize)};
+    // Compose sparse intervals directly. Work depends on spans/overwrites,
+    // rather than world height, when all capabilities are provided.
+    std::vector<MC_LodSpan> spans=base;
+    auto overwrite=[&](const MC_LodSpan& b) {
+        std::vector<MC_LodSpan> next;
+        for(const auto& s:spans) {
+            if(s.top<b.bottom||s.bottom>b.top)next.push_back(s);
+            else {
+                if(s.bottom<b.bottom)next.push_back({s.bottom,b.bottom-1,s.block});
+                if(s.top>b.top)next.push_back({b.top+1,s.top,s.block});
+            }
+        }
+        if(b.block)next.push_back(b);
+        std::sort(next.begin(),next.end(),[](const auto& a,const auto& b){return a.bottom<b.bottom;});
+        spans.clear();
+        for(const auto& s:next) {
+            if(!spans.empty()&&spans.back().block==s.block&&spans.back().top+1==s.bottom)spans.back().top=s.top;
+            else spans.push_back(s);
+        }
+    };
+    // Native approximate decoration may overlap its base. Canonicalize its
+    // paint order before adding plugin overlays, just as the legacy dense
+    // modifier composition did, without scanning all 384 heights.
+    if(!customGenerator()) {
+        auto native=std::move(spans);spans.clear();
+        for(const auto& s:native)overwrite(s);
+    }
+    auto callback=[&](MC_LodCallback f,void* userdata,const std::string& key,bool terrain) {
+        std::array<MC_LodSpan,MC_MAX_LOD_SPANS> out{};
+        for(auto& s:out)s.block=MC_INVALID_ID;
+        uint32_t count=UINT32_MAX;
+        try{if(f(&context,&cellRequest,out.data(),static_cast<uint32_t>(out.size()),&count,userdata))Plugins::failGeneration(key);}
+        catch(...){Plugins::failGeneration(key);}
+        if(count>out.size())Plugins::failGeneration(key);
+        for(uint32_t i=0;i<count;++i) {
+            const auto& s=out[i];
+            if(s.bottom>s.top||!Config::isValidWorldY(s.bottom)||!Config::isValidWorldY(s.top)||
+                !Plugins::validBlock(static_cast<BlockId>(s.block))||
+                (terrain&&(!s.block||(i&&out[i-1].top>=s.bottom))))Plugins::failGeneration(key);
+        }
+        if(terrain)spans.assign(out.begin(),out.begin()+count);
+        else for(uint32_t i=0;i<count;++i)overwrite(out[i]);
+    };
+    if(customGenerator()) {
+        const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
+        spans.clear();
+        if(g.terrainLod)callback(g.terrainLod,g.userdata,g.key,true);
+        else {
+            for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
+                const auto block=static_cast<uint16_t>(samplePluginBlock(wx,y,wz));
+                if(!block)continue;
+                if(!spans.empty()&&spans.back().block==block&&spans.back().top==y-1)spans.back().top=y;
+                else spans.push_back({y,y,block});
+            }
+        }
+        if(g.decorationLod)callback(g.decorationLod,g.userdata,g.key,false);
+    }
+    for(const auto& selected:m_pluginConfig.modifiers) {
+        const auto& m=Plugins::content().extensions.modifiers.at(selected.first);
+        if(m.decorationLod)callback(m.decorationLod,m.userdata,m.key,false);
+        else for(const auto& b:modifierBlocks(m,context,wx,wz,1,1))overwrite({b.y,b.y,b.block});
+    }
+    for(const auto& b:pluginStructureBlocks(wx,wz,1,1))overwrite({b.worldY,b.worldY,static_cast<uint16_t>(b.id)});
+    return spans;
 }

@@ -291,6 +291,7 @@ loading without writes. LAN v6 sends keys rather than local dimension handles an
 includes canonical dimension policy descriptions in admission fingerprints. Older
 protocols cannot join. Player profile v4 persists dimension-keyed positions/beds;
 older profiles (including the local LAN identity profile) are explicitly refused.
-Additional dimensions use the existing generic terrain/LOD and Overworld environment
-presentation. Dimension registration does not add portals, arbitrary spawn callbacks or species-specific natural spawn tables.
+Additional dimensions use generic terrain/LOD and Overworld environment presentation.
+The optional [worldgen V2 interface](plugin-extensions.md#batch-and-multilayer-lod-worldgen-extension-version-2)
+adds batch generation and multilayer/decorative LOD sampling. Dimension registration does not add portals, arbitrary spawn callbacks or species-specific natural spawn tables.
 Optional [gameplay and presentation capabilities](plugin-capabilities.md) add sky, clouds, particles, held models and playlists.

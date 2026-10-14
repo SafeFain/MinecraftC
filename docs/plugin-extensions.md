@@ -1,9 +1,10 @@
 # Entity, generation, rendering and block shape extensions
 
-The loader keeps the original ABI 1 tables and discovers these optional version 1
+The loader keeps the original ABI 1 tables and discovers optional versioned
 interfaces through `MC_Host::query_extension`. Include
 [`extensions.h`](../sdk/minecraftc/extensions.h), or use the size-checked C++
-`Host::entities()`, `Host::worldgen()`, `Host::render()` and `Host::blockShapes()` helpers.
+`Host::entities()`, `Host::worldgen()`, `Host::worldgenV2()`, `Host::render()` and
+`Host::blockShapes()` helpers.
 Unsupported names/versions return null. Set every descriptor's `size` and check
 return codes. Registrations are copied, transactional and frozen before play.
 Native desktop packages can use all interfaces; compiled-in packages use the same
@@ -115,6 +116,59 @@ A portable flat generator is configured as:
 callbacks, `{ "base_height": 48 }` parameters and markers spanning chunk boundaries.
 Data flat definitions use their registered heights/materials; parameters are passed
 to native callbacks, and do not alter the data flat algorithm.
+
+### Batch and multilayer LOD (worldgen extension version 2)
+
+Query `MC_WORLDGEN_EXTENSION` with version 2 (`Host::worldgenV2()`) to obtain
+`MC_WorldgenV2`. Version 1 tables/descriptors and `Host::worldgen()` remain available.
+V2 registrations embed the original required column/voxel or decoration definition;
+all added callbacks are optional. The frozen registry owns copied revision strings.
+See [five-layer native example](../examples/plugins/worldgen_v2_demo/README.md).
+
+`batch` receives an `MC_GenerationVolume` and host-owned `uint16_t` buffer. Fill
+**every** slot using `x + z*width + y*width*depth`, where x/y/z are local offsets.
+World coordinates are volume origin plus offsets. Current requests cover Y=-64..319
+and at most 48 blocks per horizontal axis. Complete rectangular regions up to 3×3
+chunks use one callback; missing/null/sparse chunks use individual chunk requests.
+Results must equal `voxel` at every coordinate, before host modifiers/structures.
+Missing batch callbacks retain point generation. The host validates and stages the
+entire request (including modifiers and structure metadata) before publishing targets.
+
+`terrain_lod` and `decoration_lod` receive a world-aligned `MC_LodCell` origin and
+power-of-two cell size. Return at most `MC_MAX_LOD_SPANS` (384) inclusive world-Y
+intervals through the host buffer/count. Terrain spans are sorted, disjoint, non-air
+and contain valid block IDs. Decoration spans overwrite in returned order, including
+AIR to clear terrain. Adjacent equal materials are merged during composition.
+For one-block cells, terrain plus generator decoration must equal exact voxel output.
+Larger cells may choose representative features: for example, retain a thin tree
+or crystal within a fine cell and omit it in coarse cells. Keep this choice pure and
+independent of tile boundaries, request order and scheduling. Empty output is valid.
+
+Composition order is generator terrain, generator decoration, selected modifiers in
+configured order, then existing host structures. Each V2 modifier's `decoration_lod`
+replaces its own exact-decoration fallback, and must match `decorate` for size-one
+cells. Missing callbacks retain existing center-point/voxel fallbacks. Builtin
+terrain may also use V2 modifiers. Tiles and neighbor edges share the same sampling
+function; exact loaded/edited columns retain their existing override behavior.
+Fine cells up to two blocks retain custom crossed plants under the same mesh
+policy as builtin Heaven plants; coarse cells omit noncolliding plant shapes.
+
+All callbacks obey the existing concurrent worker contract: coordinates, seed and
+immutable parameters only; no `MC_PluginContext`, main-thread APIs or GPU access.
+Nonzero returns, exceptions, missing volume slots, invalid IDs, out-of-range or
+invalid intervals/counts end generation through the existing fault channel. They
+never trigger a silent retry through another generation algorithm. Native plugins
+must respect the supplied buffer capacities; the SDK does not sandbox native writes.
+
+A nonempty `lod_revision` (at most 128 bytes) is required when LOD callbacks are
+registered. Change it when approximation policy changes; change the original
+generator/modifier revision for exact output changes. LOD cache identity includes
+these revisions, capability flags, generation selections and structure identity.
+Derived exact column caches retain their exact generation/structure identity, so
+LOD-only changes keep player edits available for far terrain and neighbor meshes.
+LAN admission includes the new revisions/capabilities; save/LAN formats and builtin
+Overworld/Heaven generation versions remain unchanged. Existing native package and
+save compatibility checks still apply.
 
 ## Rendering
 

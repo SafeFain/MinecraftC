@@ -103,15 +103,22 @@ bool decodeTile(const Bytes& payload, LodTileData& tile) {
     return cursor == payload.size();
 }
 
+uint64_t cacheSamplingIdentity(const WorldGenerator& generator,bool exact) {
+    // Exact edited columns describe world data, independently of the distant
+    // approximation policy. Retain them across LOD-only revision changes.
+    return exact?Plugins::generationFingerprint(generator.generationConfig())^
+        generator.pluginStructureFingerprint():generator.lodSamplingFingerprint();
+}
+
 bool writeTileFile(const std::filesystem::path& path, const LodTileKey& key,
-                   const WorldGenerator& generator, const LodTileData& tile) {
+                   const WorldGenerator& generator, const LodTileData& tile,bool exact=false) {
     const Bytes payload = encodeTile(tile);
     Bytes file;
     file.insert(file.end(), std::begin(MAGIC), std::end(MAGIC));
     append<uint32_t>(file, CACHE_REVISION);
     append<uint64_t>(file, generator.getSeed());
     append<uint32_t>(file, generator.generationVersion());
-    append<uint64_t>(file,Plugins::generationFingerprint(generator.generationConfig()));
+    append<uint64_t>(file,cacheSamplingIdentity(generator,exact));
     append<uint8_t>(file, static_cast<uint8_t>(generator.worldType()));
     const auto dimensionKey=Plugins::dimensionKey(generator.dimension());
     append<uint64_t>(file,checksum(Bytes(dimensionKey.begin(),dimensionKey.end())));
@@ -138,7 +145,7 @@ bool writeTileFile(const std::filesystem::path& path, const LodTileKey& key,
 }
 
 bool readTileFile(const std::filesystem::path& path, const LodTileKey& expected,
-                  const WorldGenerator& generator, LodTileData& tile) {
+                  const WorldGenerator& generator, LodTileData& tile,bool exact=false) {
     std::ifstream input(path, std::ios::binary);
     if (!input) return false;
     Bytes file((std::istreambuf_iterator<char>(input)), {});
@@ -158,7 +165,7 @@ bool readTileFile(const std::filesystem::path& path, const LodTileKey& expected,
         !read(file, cursor, size) || !read(file, cursor, expectedHash))
         return false;
     if (revision != CACHE_REVISION || seed != generator.getSeed() ||
-        generation != generator.generationVersion() || generationFingerprint!=Plugins::generationFingerprint(generator.generationConfig()) ||
+        generation != generator.generationVersion() || generationFingerprint!=cacheSamplingIdentity(generator,exact) ||
         worldType != static_cast<uint8_t>(generator.worldType()) ||
         dimension != ([&]{const auto key=Plugins::dimensionKey(generator.dimension());return checksum(Bytes(key.begin(),key.end()));}()) ||
         x != expected.x || z != expected.z || level != expected.level ||
@@ -188,7 +195,7 @@ LodExactNeighborTiles readExactNeighbors(const std::filesystem::path& root,
         LodTileData tile;
         const int nx = cx + offset[0];
         const int nz = cz + offset[1];
-        if (readTileFile(exactPath(root, nx, nz), {nx, nz, 0}, generator, tile))
+        if (readTileFile(exactPath(root, nx, nz), {nx, nz, 0}, generator, tile,true))
             result[i].emplace(std::move(tile));
     }
     return result;
@@ -226,7 +233,9 @@ bool isLodTreeFoliage(BlockId block) {
            block == BlockId::CACTUS_BLOCK;
 }
 
-bool isFineHeavenDecoration(BlockId block) {
+bool isFineLodDecoration(BlockId block) {
+    if(const auto* custom=Plugins::pluginBlock(block))
+        return custom->properties.shape==RenderShape::Cross||custom->properties.shape==RenderShape::CeilingCross;
     return block == BlockId::STARFLOWER || block == BlockId::CLOUD_BLOOM ||
            block == BlockId::GLOWSHROOM ||
            (block >= BlockId::SKY_FERN && block <= BlockId::HANGING_CLOUD_VINE);
@@ -256,7 +265,7 @@ void overlayExactChunks(LodTileData& tile, const LodTileKey& key,
     const int originZ = key.z * LodTileData::SIDE * cellSize;
     for (const auto& [cx, cz] : exactChunks) {
         LodTileData exact;
-        if (!readTileFile(exactPath(root, cx, cz), {cx, cz, 0}, generator, exact))
+        if (!readTileFile(exactPath(root, cx, cz), {cx, cz, 0}, generator, exact,true))
             continue;
         const int chunkX = cx * Config::CHUNK_SIZE_X;
         const int chunkZ = cz * Config::CHUNK_SIZE_Z;
@@ -370,22 +379,12 @@ bool decodeLodTilePayload(const std::vector<uint8_t>& payload,
 }
 
 namespace {
-void applyPluginLodModifiers(const WorldGenerator& generator,int x,int z,LodColumn& column) {
-    const auto decorations=generator.pluginModifierBlocks(x,z);
-    if(decorations.empty())return;
-    std::array<BlockId,Config::CHUNK_SIZE_Y> blocks{};
-    for(const auto& span:column.spans)
-        for(int y=std::max<int>(span.bottom,Config::WORLD_MIN_Y);y<=std::min<int>(span.top,Config::WORLD_MAX_Y-1);++y)
-            blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]=span.block;
-    for(const auto& b:decorations)blocks[static_cast<size_t>(b.y-Config::WORLD_MIN_Y)]=static_cast<BlockId>(b.block);
+void samplePluginLod(const WorldGenerator& generator,int x,int z,int cellSize,LodColumn& column) {
+    std::vector<MC_LodSpan> base;
+    for(const auto& s:column.spans)base.push_back({s.bottom,s.top,static_cast<uint16_t>(s.block)});
+    const auto sampled=generator.samplePluginLodColumn(x,z,cellSize,base);
     column.spans.clear();
-    for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
-        const auto block=blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)];
-        if(block==BlockId::AIR)continue;
-        if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)
-            column.spans.back().top=static_cast<int16_t>(y);
-        else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
-    }
+    for(const auto& s:sampled)column.spans.push_back({static_cast<int16_t>(s.bottom),static_cast<int16_t>(s.top),static_cast<BlockId>(s.block)});
 }
 }
 
@@ -401,12 +400,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             int wz = originZ + z * cellSize + cellSize / 2;
             LodColumn& column = tile.at(x, z);
             if(generator.customGenerator()) {
-                const auto pluginBlocks=generator.samplePluginColumnBlocks(wx,wz);
-                for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
-                    const auto block=static_cast<BlockId>(pluginBlocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]);if(block==BlockId::AIR)continue;
-                    if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)column.spans.back().top=static_cast<int16_t>(y);
-                    else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
-                }
+                samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
             if (generator.isHeaven()) {
@@ -475,7 +469,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     // Fine Heaven tiles retain representative, generation-matched surface
     // features. Four samples per axis bound the work independently of the
     // cell size while making narrow trees, crystals and flowers visible.
-    if (generator.isHeaven() && cellSize <= 8) {
+    if (!generator.customGenerator() && generator.isHeaven() && cellSize <= 8) {
         const int sampleCount = std::min(cellSize, 4);
         for (int z = 0; z < LodTileData::SIDE; ++z) {
             for (int x = 0; x < LodTileData::SIDE; ++x) {
@@ -553,7 +547,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     // Preserve deterministic tree silhouettes in the two finest approximate
     // levels. Individual trees are intentionally omitted once a cell exceeds
     // eight blocks so a canopy can never become a giant distant cube.
-    if (!generator.isHeaven() && cellSize <= 8) {
+    if (!generator.customGenerator() && !generator.isHeaven() && cellSize <= 8) {
         struct TreeOverlay {
             int bottom = Config::WORLD_MIN_Y;
             int top = Config::WORLD_MIN_Y - 1;
@@ -616,7 +610,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     }
     if(!generator.customGenerator()&&!generator.generationConfig().modifiers.empty())
         for(int z=0;z<LodTileData::SIDE;++z)for(int x=0;x<LodTileData::SIDE;++x)
-            applyPluginLodModifiers(generator,originX+x*cellSize+cellSize/2,originZ+z*cellSize+cellSize/2,tile.at(x,z));
+            samplePluginLod(generator,originX+x*cellSize,originZ+z*cellSize,cellSize,tile.at(x,z));
     return tile;
 }
 
@@ -703,7 +697,9 @@ bool isFullyExact(const LodTileData& data) {
         [](const LodColumn& column) { return column.exact; });
 }
 
-LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
+} // namespace
+
+LodNeighborEdges sampleApproximateLodNeighborEdges(const WorldGenerator& generator,
                                      const LodTileKey& key) {
     LodNeighborEdges edges;
     const int cellSize = 1 << key.level;
@@ -719,12 +715,7 @@ LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
             const int wz = originZ + cellZ * cellSize + cellSize / 2;
             LodColumn& column = edges[static_cast<size_t>(side)][static_cast<size_t>(i)];
             if(generator.customGenerator()) {
-                const auto pluginBlocks=generator.samplePluginColumnBlocks(wx,wz);
-                for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y) {
-                    const auto block=static_cast<BlockId>(pluginBlocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]);if(block==BlockId::AIR)continue;
-                    if(!column.spans.empty()&&column.spans.back().block==block&&column.spans.back().top==y-1)column.spans.back().top=static_cast<int16_t>(y);
-                    else column.spans.push_back({static_cast<int16_t>(y),static_cast<int16_t>(y),block});
-                }
+                samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
             if (generator.isHeaven()) {
@@ -766,11 +757,12 @@ LodNeighborEdges sampleNeighborEdges(const WorldGenerator& generator,
         for(int i=0;i<LodTileData::SIDE;++i)for(int side=0;side<4;++side) {
             const int x=side==2?LodTileData::SIDE:side==3?-1:i;
             const int z=side==0?-1:side==1?LodTileData::SIDE:i;
-            applyPluginLodModifiers(generator,originX+x*cellSize+cellSize/2,originZ+z*cellSize+cellSize/2,edges[side][i]);
+            samplePluginLod(generator,originX+x*cellSize,originZ+z*cellSize,cellSize,edges[side][i]);
         }
     return edges;
 }
 
+namespace {
 BlockId exactColumnBlock(const LodColumn& column, int y) {
     for (const LodSpan& span : column.spans) {
         if (y < span.bottom) break;
@@ -933,7 +925,7 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                 if (spanIndex < first && !properties.solid &&
                     !isFluid(span.block)) continue;
                 if (cellSize > 1 && !properties.solid && !isFluid(span.block) &&
-                    !(cellSize <= 2 && isFineHeavenDecoration(span.block)))
+                    !(cellSize <= 2 && isFineLodDecoration(span.block)))
                     continue;
                 const float x0 = static_cast<float>(x * cellSize);
                 const float x1 = static_cast<float>((x + 1) * cellSize);
@@ -1414,7 +1406,7 @@ void LodTerrainSystem::observeExactChunks(const std::vector<Chunk*>& activeChunk
             try {
                 LodTileData data = extractExactLodChunk(blocks);
                 const bool persisted = writeTileFile(
-                    exactPath(root, cx, cz), {cx, cz, 0}, *generator, data);
+                    exactPath(root, cx, cz), {cx, cz, 0}, *generator, data,true);
                 std::lock_guard lock(m_completionMutex);
                 m_exactCompletions.push_back(
                     {cx, cz, revision, persisted});
@@ -1495,16 +1487,17 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                         } guard{m_tasksInFlight};
                         try {
                             LodTileData data;
+                            std::optional<LodTileData> generatedTile;
                             if (!readTileFile(tilePath(root, key), key,
                                               *generator, data)) {
                                 data = buildApproximateLodTile(*generator, key);
-                                writeTileFile(tilePath(root, key), key,
-                                              *generator, data);
+                                generatedTile=data;
                             }
                             // Older r4 approximate tiles stored only a short
                             // surface slab. Repair them in memory as well so
                             // existing worlds get continuous coverage.
-                            if (!generator->isHeaven()) {
+                            if (!generator->isHeaven()&&!generator->customGenerator()&&
+                                generator->generationConfig().modifiers.empty()) {
                                 for (LodColumn& column : data.columns) {
                                     if (!column.exact && !column.spans.empty())
                                         column.spans.front().bottom =
@@ -1524,12 +1517,15 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                             LodNeighborEdges edges;
                             const LodNeighborEdges* edgePointer = nullptr;
                             if (key.level > 0 || !isFullyExact(data)) {
-                                edges = sampleNeighborEdges(*generator, key);
+                                edges = sampleApproximateLodNeighborEdges(*generator, key);
                                 edgePointer = &edges;
                             }
                             ChunkMesh mesh = buildLodTileMesh(
                                 data, 1 << key.level, spanLimit, neighborPointer,
                                 edgePointer, true);
+                            // A neighbor callback fault must not leave a newly
+                            // written tile from an incomplete sampling request.
+                            if(generatedTile)writeTileFile(tilePath(root,key),key,*generator,*generatedTile);
                             {
                                 std::lock_guard lock(m_completionMutex);
                                 m_completions.push_back({key, epoch,
@@ -1872,7 +1868,7 @@ void LodTerrainSystem::releaseGpuMeshes(bool retainCpuGeometry) {
                 const LodNeighborEdges* edgePointer = nullptr;
                 if (m_generator && (key.level > 0 ||
                                     !isFullyExact(tile->data))) {
-                    edges = sampleNeighborEdges(*m_generator, key);
+                    edges = sampleApproximateLodNeighborEdges(*m_generator, key);
                     edgePointer = &edges;
                 }
                 tile->mesh = buildLodTileMesh(tile->data, 1 << key.level,

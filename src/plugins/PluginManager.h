@@ -86,6 +86,8 @@ public:
     int32_t dimensionDefinition(MC_PluginContext&,const MC_DimensionDefinition&,uint32_t&);
     std::function<bool(uint64_t,uint32_t)> travelPlayer;
     int32_t generator(MC_PluginContext&,const MC_GeneratorDefinition&);
+    int32_t generatorV2(MC_PluginContext&,const MC_GeneratorDefinitionV2&);
+    int32_t modifierV2(MC_PluginContext&,const MC_ModifierDefinitionV2&);
     int32_t modifier(MC_PluginContext&,const MC_ModifierDefinition&);
     int32_t renderResource(MC_PluginContext&,const MC_RenderResource&,MC_RenderHandle&);
     int32_t renderPass(MC_PluginContext&,const MC_RenderPass&);

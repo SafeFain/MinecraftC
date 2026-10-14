@@ -1436,7 +1436,7 @@ void WorldGenerator::generateRegion(
     std::vector<Chunk*>& chunks,
     std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
     if(customGenerator()) {
-        pendingOut.clear();for(auto* chunk:chunks)if(chunk)generatePluginChunk(*chunk);return;
+        pendingOut.clear();generatePluginChunks(chunks);return;
     }
     if (isHeaven()) {
         pendingOut.clear();

@@ -133,6 +133,48 @@ typedef struct MC_WorldgenV1 {
     int32_t (*register_generator)(MC_PluginContext*,const MC_GeneratorDefinition*);
     int32_t (*register_modifier)(MC_PluginContext*,const MC_ModifierDefinition*);
 } MC_WorldgenV1;
+/* Worldgen V2 is queried with MC_WORLDGEN_EXTENSION, version 2. V1 layouts
+   remain frozen. Point column/voxel callbacks are the exact authority. */
+#define MC_MAX_LOD_SPANS 384u
+#define MC_MAX_GENERATION_SIDE 48u
+typedef struct MC_GenerationVolume {
+    uint32_t size;
+    int32_t x, y, z;
+    uint32_t width, height, depth;
+} MC_GenerationVolume;
+/* Fill every slot: x + z*width + y*width*depth (local coordinates).
+   Host owns the buffer; outputs must equal voxel() before modifiers/structures. */
+typedef int32_t (*MC_BatchVoxelCallback)(const MC_GenerationContext*,const MC_GenerationVolume*,uint16_t*,uint32_t,void*);
+typedef struct MC_LodCell {
+    uint32_t size;
+    int32_t x, z; /* world-aligned cell origin, including negative coordinates */
+    uint32_t cell_size; /* power of two; independent of tile/request order */
+} MC_LodCell;
+typedef struct MC_LodSpan { int32_t bottom, top; uint16_t block; } MC_LodSpan;
+/* Inclusive world Y, at most MC_MAX_LOD_SPANS. Terrain is sorted, disjoint,
+   non-air. Decorations overwrite in returned order; AIR clears. At size 1,
+   terrain + decorations must equal the corresponding exact point output.
+   Larger cells may retain representative narrow features, without depending
+   on a tile boundary. All callbacks obey the pure/concurrent contract above. */
+typedef int32_t (*MC_LodCallback)(const MC_GenerationContext*,const MC_LodCell*,MC_LodSpan*,uint32_t,uint32_t*,void*);
+typedef struct MC_GeneratorDefinitionV2 {
+    uint32_t size;
+    MC_GeneratorDefinition base;
+    const char* lod_revision; /* required when either LOD callback is present */
+    MC_BatchVoxelCallback batch;
+    MC_LodCallback terrain_lod, decoration_lod;
+} MC_GeneratorDefinitionV2;
+typedef struct MC_ModifierDefinitionV2 {
+    uint32_t size;
+    MC_ModifierDefinition base;
+    const char* lod_revision; /* required when decoration_lod is present */
+    MC_LodCallback decoration_lod; /* replaces this modifier's exact LOD fallback */
+} MC_ModifierDefinitionV2;
+typedef struct MC_WorldgenV2 {
+    uint32_t size, version;
+    int32_t (*register_generator)(MC_PluginContext*,const MC_GeneratorDefinitionV2*);
+    int32_t (*register_modifier)(MC_PluginContext*,const MC_ModifierDefinitionV2*);
+} MC_WorldgenV2;
 /* Dimension handles are launch-local. Persist namespaced keys, never handles.
    Register the dimension before its generator. References resolve at the end
    of the owning plugin's registration transaction. Zeroed policies use defaults. */

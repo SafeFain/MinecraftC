@@ -95,6 +95,10 @@ public:
     std::vector<RegionGenerationData::PendingBlock> pluginStructureBlocks(int,int,int=16,int=16) const;
     std::optional<MC_LocatedStructure> locatePluginStructure(const std::string&,int,int,uint32_t=8192) const;
     uint64_t pluginStructureFingerprint() const;
+    uint64_t lodSamplingFingerprint() const;
+    std::vector<MC_LodSpan> samplePluginLodColumn(int x,int z,int cellSize,
+        const std::vector<MC_LodSpan>& base={}) const;
+    void generatePluginChunks(const std::vector<Chunk*>& chunks) const;
     // ── Queries ──────────────────────────────────────────────────────────
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;

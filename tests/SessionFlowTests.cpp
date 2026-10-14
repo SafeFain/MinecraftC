@@ -24,6 +24,23 @@
 #include <thread>
 
 struct LanLodTestAccess {
+    static void observeExact(LodTerrainSystem& system,Chunk& chunk) {system.observeExactChunks({&chunk});}
+    static void requestOnlyTile(LodTerrainSystem& system,const LodTileKey& key) {
+        system.m_desired.clear();system.m_desired.push_back({key,0,256,0});system.enqueueRequests();
+    }
+    static bool residentExactMatches(const LodTerrainSystem& system,const LodTileKey& key,const std::vector<uint16_t>& blocks) {
+        const auto found=system.m_tiles.find(key);
+        return found!=system.m_tiles.end()&&found->second->resident&&
+            encodeLodTilePayload(found->second->data)==encodeLodTilePayload(extractExactLodChunk(blocks));
+    }
+    static bool residentApproximationsMatch(const LodTerrainSystem& system,const WorldGenerator& generator) {
+        for(const auto& entry:system.m_tiles) {
+            if(!entry.second->resident)continue;
+            const auto expected=buildApproximateLodTile(generator,entry.first);
+            if(encodeLodTilePayload(expected)!=encodeLodTilePayload(entry.second->data))return false;
+        }
+        return true;
+    }
     static uint64_t revision(const World& world, const LodTileKey& key) {
         const auto found = world.m_lod.m_replicaColumns.find(key);
         return found == world.m_lod.m_replicaColumns.end() ? 0 : found->second.revision;
@@ -239,6 +256,7 @@ std::string Localization::format(
 #include "GameRuleIntegration.h"
 #include "PluginSessionIntegration.h"
 #include "PluginExtensionIntegration.h"
+#include "WorldgenV2Integration.h"
 #include "DimensionIntegration.h"
 #include "BlockShapesIntegration.h"
 #include "PluginCapabilitiesIntegration.h"
@@ -259,6 +277,10 @@ int main(int argc, char** argv) {
     if(argc==4&&std::string(argv[1])=="--dimension-tests") {
         try{return DimensionIntegration::run(argv[2],argv[3]);}
         catch(const std::exception& error){std::cerr<<"Dimension regression failed: "<<error.what()<<'\n';return 1;}
+    }
+    if(argc==5&&std::string(argv[1])=="--worldgen-v2-tests") {
+        try{return WorldgenV2Integration::run(argv[2],argv[3],argv[4]);}
+        catch(const std::exception& error){std::cerr<<"Worldgen V2 regression failed: "<<error.what()<<'\n';return 1;}
     }
     if(argc==5&&std::string(argv[1])=="--extension-tests") {
         try{return PluginExtensionIntegration::run(argv[2],argv[3],argv[4]);}

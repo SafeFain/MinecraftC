@@ -480,9 +480,11 @@ void PluginManager::buildNetworkDescription() {
     }
     for(const auto& entry:content().extensions.generators) {
         const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({dimensionContent(g.dimension).key,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
+        if(g.batch||g.terrainLod||g.decorationLod)content().networkDescription["generator/"+g.key]=nlohmann::json::array({content().networkDescription["generator/"+g.key],g.lodRevision,bool(g.batch),bool(g.terrainLod),bool(g.decorationLod)}).dump();
     }
     for(const auto& entry:content().extensions.modifiers) {
         const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({dimensionContent(m.dimension).key,m.revision,m.radius}).dump();
+        if(m.decorationLod)content().networkDescription["modifier/"+m.key]=nlohmann::json::array({content().networkDescription["modifier/"+m.key],m.lodRevision,true}).dump();
     }
 
 }

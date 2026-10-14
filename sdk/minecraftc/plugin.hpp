@@ -25,6 +25,7 @@ public:
     const MC_EntitiesV1* entities() const {return static_cast<const MC_EntitiesV1*>(extension(MC_ENTITIES_EXTENSION));}
     const MC_DimensionsV1* dimensions() const {return static_cast<const MC_DimensionsV1*>(extension(MC_DIMENSIONS_EXTENSION));}
     const MC_WorldgenV1* worldgen() const {return static_cast<const MC_WorldgenV1*>(extension(MC_WORLDGEN_EXTENSION));}
+    const MC_WorldgenV2* worldgenV2() const {return static_cast<const MC_WorldgenV2*>(extension(MC_WORLDGEN_EXTENSION,2));}
     const MC_RenderV1* render() const {return static_cast<const MC_RenderV1*>(extension(MC_RENDER_EXTENSION));}
     const MC_MultiplayerV1* multiplayer() const {
         if(api->size<offsetof(MC_Host,query_extension)+sizeof(api->query_extension)||!api->query_extension)return nullptr;

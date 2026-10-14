@@ -50,14 +50,18 @@ struct GeneratorContent {
     MC_ColumnCallback column=nullptr;
     MC_VoxelCallback voxel=nullptr;
     void* userdata=nullptr;
+    std::string lodRevision;
+    MC_BatchVoxelCallback batch=nullptr;
+    MC_LodCallback terrainLod=nullptr, decorationLod=nullptr;
     // Data generators use these immutable values instead of callbacks.
     int32_t height=64, water=62;
     uint16_t surface=0, fill=0;
 };
 struct ModifierContent {
-    std::string key, revision;
+    std::string key, revision, lodRevision;
     uint32_t dimension=0,radius=0;
     MC_DecorationCallback decorate=nullptr;
+    MC_LodCallback decorationLod=nullptr;
     void* userdata=nullptr;
 };
 struct RenderResourceContent {
