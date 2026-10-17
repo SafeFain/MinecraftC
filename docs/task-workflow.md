@@ -1,7 +1,7 @@
 # Recoverable Task Workflow
 
 These rules complement AGENTS.md. Task state and evidence remain local under the
-existing ignore rules; automatic Git commits and pushes follow the completion policy below.
+existing ignore rules; automatic local Git commits follow the completion policy below.
 
 ## Start or resume
 
@@ -79,22 +79,23 @@ It is an explicit local-workspace tool, not a CI dependency on ignored context f
 
 ## Git completion policy
 
-- The user authorizes automatic commit and push once all goals in the current
+- The user authorizes an automatic local commit once all goals in the current
   requested scope are complete, required validation has passed, and task records
   have been finalized. No additional confirmation is needed under these conditions.
 - Completion means the entire user objective, including all stages and subtasks,
   not merely one turn, one task execution, a checkpoint, or a partial deliverable.
-  Do not commit or push when work is paused, interrupted, blocked, or still has
-  unfinished goals or required checks. Preserve changes and recovery checkpoints.
-- Commit only changes belonging to the completed scope; preserve unrelated dirty
-  work. A standalone rule/documentation update does not authorize committing or
-  pushing an unfinished implementation already present in the workspace.
-- Inspect staged changes and the branch/upstream before committing and pushing.
-  Push to the established destination without force; if no destination is known
-  or a push fails, retain local work and report the exact remaining limitation.
+  Do not commit when work is paused, interrupted, blocked, or still has unfinished
+  goals or required checks. Preserve changes and recovery checkpoints.
+- Include user changes as well as agent changes in the completion commit, including
+  pre-existing tracked modifications and non-ignored untracked files. Preserve their
+  contents; do not discard or rewrite user work to prepare the commit. Existing
+  ignore rules for local task records and generated files continue to apply.
+- Inspect the complete staged changes and current branch before committing.
+  If the commit fails, retain local work and report the exact remaining limitation.
+- Do not push automatically. Push only when the user explicitly requests it.
 - Rebase, reset, branch deletion, force pushes, tags and releases require separate
   explicit authorization. More specific user instructions such as “do not commit”
-  override automatic completion behavior.
+  or an explicit exclusion of files override automatic completion behavior.
 
 ## Historical evidence gaps
 
