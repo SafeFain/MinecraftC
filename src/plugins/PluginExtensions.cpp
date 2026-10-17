@@ -173,6 +173,14 @@ int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_Dimens
     require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");id=static_cast<uint32_t>(entries.size());
     entries.emplace(id,std::move(value));return 0;
 }
+int32_t PluginManager::dimensionDefinitionV2(MC_PluginContext& ctx,const MC_DimensionDefinitionV2& d,uint32_t& id) {
+    require(d.size>=sizeof(d)&&d.sample_spawn,"Dimension V2 requires spawn callback");
+    auto base=d.base;base.spawn=MC_SPAWN_SAFE_SURFACE;
+    dimensionDefinition(ctx,base,id);
+    auto& value=content().extensions.dimensions.at(id);
+    value.spawn=MC_SPAWN_SAMPLED;value.sampleSpawn=d.sample_spawn;value.spawnUserdata=d.userdata;
+    return 0;
+}
 int32_t PluginManager::generator(MC_PluginContext& ctx,const MC_GeneratorDefinition& d) {
     require(d.size>=sizeof(d),"Generator descriptor size mismatch");owned(ctx,text(d.key));
     require(validDimension(d.dimension)&&d.column&&d.voxel,"Generator requires column and voxel callbacks");
@@ -270,6 +278,12 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(const auto* result=capability(name,version))return result;
     if(!name)return nullptr;
+    if(version==2&&std::string(name)==MC_DIMENSIONS_EXTENSION) {
+        static const MC_DimensionsV2 dimensions{sizeof(MC_DimensionsV2),2,
+            [](MC_PluginContext* c,const MC_DimensionDefinitionV2* d,uint32_t* id){return call(c,[&]{require(d&&id,"Missing dimension V2 arguments");owner(c).dimensionDefinitionV2(*c,*d,*id);},true);},
+            static_cast<const MC_DimensionsV1*>(extension(nullptr,MC_DIMENSIONS_EXTENSION,1))};
+        return &dimensions;
+    }
     if(version==2&&std::string(name)==MC_WORLDGEN_EXTENSION) {
         static const MC_WorldgenV2 worldgen{sizeof(MC_WorldgenV2),2,
             [](MC_PluginContext* c,const MC_GeneratorDefinitionV2* d){return call(c,[&]{require(d,"Missing generator");owner(c).generatorV2(*c,*d);},true);},

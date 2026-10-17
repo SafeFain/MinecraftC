@@ -356,6 +356,7 @@ private:
     DimensionSimulation& ensureDimension(DimensionId target);
     std::optional<glm::dvec3> dimensionLanding(DimensionId, std::optional<glm::dvec3> preferred = {}, std::optional<glm::ivec3> bed = {});
     DimensionId deathDimension(DimensionId) const;
+    bool enterDimension(DimensionId, RuntimeClock::Tick, const glm::dvec3& validatedLanding);
     void flushDimensions(bool synchronous);
     LodSettings lodSettings;
     ParticleSystem particles;

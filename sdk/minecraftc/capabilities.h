@@ -52,7 +52,7 @@ typedef struct MC_StructureContext {
     MC_GenerationContext generation;
     int32_t anchor[3];
     uint64_t variant;
-    /* Read-only terrain authority; valid only during build. */
+    /* Read-only terrain authority; valid only during the structure callback. */
     int32_t (*surface)(void*,int32_t,int32_t,MC_SurfaceSample*);
     void* reader;
 } MC_StructureContext;
@@ -81,6 +81,37 @@ typedef struct MC_StructuresV1 {
     /* Bounded search, reads terrain samples without loading chunks. */
     int32_t (*locate)(MC_PluginContext*,uint32_t,const char*,int32_t,int32_t,uint32_t,MC_LocatedStructure*);
 } MC_StructuresV1;
+/* V2 placements are final accepted instances, not suggestions for V1's terrain
+   or reservation rules. Each anchor belongs to the requested floor-divided
+   cell. Return at most MC_MAX_STRUCTURE_INSTANCES in any order. Callbacks are
+   pure/concurrent; context.surface reads undecorated terrain only. */
+#define MC_MAX_STRUCTURE_INSTANCES 16u
+typedef struct MC_StructureInstance {
+    int32_t anchor[3];
+    uint64_t variant;
+    int32_t order;
+} MC_StructureInstance;
+typedef int32_t (*MC_StructurePlacementCallback)(const MC_StructureContext*,int32_t,int32_t,MC_StructureInstance*,uint32_t,uint32_t*,void*);
+typedef struct MC_StructureBlockV2 {
+    MC_StructureBlock base;
+    uint64_t loot_seed; /* Exact value, including zero. */
+} MC_StructureBlockV2;
+typedef int32_t (*MC_StructureCallbackV2)(const MC_StructureContext*,MC_StructureBlockV2*,uint32_t,uint32_t*,void*);
+typedef struct MC_StructureDefinitionV2 {
+    uint32_t size, dimension;
+    const char *key, *name, *revision;
+    uint32_t cell_size, radius;
+    int32_t min_y, max_y; /* Inclusive relative Y; span <= world height. */
+    int32_t order; /* Ascending, then key; V1 has order zero. */
+    MC_StructurePlacementCallback placements;
+    MC_StructureCallbackV2 build;
+    void* userdata;
+} MC_StructureDefinitionV2;
+typedef struct MC_StructuresV2 {
+    uint32_t size, version;
+    int32_t (*register_structure)(MC_PluginContext*,const MC_StructureDefinitionV2*);
+    const MC_StructuresV1* v1;
+} MC_StructuresV2;
 /* Read-only action callbacks run on the main thread both for preview and host
    execution. Clients never supply an authoritative destination. */
 typedef struct MC_ActionView {

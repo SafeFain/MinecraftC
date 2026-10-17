@@ -1,14 +1,15 @@
 # 天境插件化剩余工作调查
 
 调查日期：2026-10-17；源码基线：main / 468a4eb。
-范围：调查与现有 Windows 构建的定向验证，不实施运行时代码迁移。
+原调查范围：源码调查与现有 Windows 构建的定向验证。
+后续实施：已补强前两个 P0 的通用接口与运行时路径，Windows Release 构建与完整 CTest 72/72 已通过；不实施官方内容迁出。
 本文更新 10/11 原始工程量评估和 10/12 复评；历史记录保留原结论。
 
 ## 当前结论
 
 通用插件基础已经较完整，但当前不存在实际的 official_heaven 提供者。
 天境仍由宿主无条件提供，不能把“支持第三方浮岛示例”当作“天境已插件化”。
-下一步应闭合出生、结构和玩法语义，再迁出内容；无需重做整个插件框架。
+出生与结构已增加 V2 通用接口；下一步闭合方块/物品语义和动作上下文，再迁出内容；无需重做整个插件框架。
 默认目标为官方内置插件、保持 Heaven v9 / 全局 v20 输出，沿用旧格式拒载策略。
 旧世界自动迁移、独立桌面动态库交付不属于这一默认范围。
 
@@ -21,15 +22,15 @@
 - 10/14 的 worldgen V2：区块/48×48 区域批量体素、多层 terrain spans、装饰 LOD、
   缓存身份与纯并发约束。见 sdk/minecraftc/extensions.h:134–183。
 
-已有接口仍有下述适配缺口。tests/WorldgenV2Integration.h 的 heavenComparison
+本次完成的补强与剩余适配缺口列于下表。tests/WorldgenV2Integration.h 的 heavenComparison
 明确是把内置结果送入通用路径的测试适配器，没有迁出运行时天境，也不是迁移性能基准。
 
 ## 必须完成的工作
 
 | 优先级 | 工作 | 当前证据及具体交付 |
 |---|---|---|
-| P0 | 种子相关出生策略 | extensions.h 的 MC_DimensionSpawn 只有 fixed/safe_surface；GameSession.cpp:1552 使用固定点/表面及邻近搜索，不能表达 WorldGenerator::findHeavenSpawnBlock 的主岛层选择。补纯出生采样，接入本地、LAN 和重新进入维度路径。 |
-| P0 | 结构位置、跨度、元数据等价 | PluginGeneration.cpp:147 的 candidate 固定 key/hash/cell、最高表面和角点接受；PluginCapabilities.cpp:57 限制 height≤128 且相对 Y 非负。原 Skyway 跨 -88..+88，起源神殿须靠近出生点。补自定义候选/接受及垂直范围，或提供完整的生成结构输出路线，并统一定位、variant、loot seed、覆盖顺序。 |
+| P0（已完成） | 种子相关出生策略 | MC_DimensionsV2 提供纯 sample_spawn，沿用生成器派生种子和实际参数。共用落地验证接入本地、LAN 旅行/档案重入、重生和重载，保留床位/历史位置优先级且不回退最高岛层。见 docs/plugins.md 的 Seeded dimension spawn。 |
+| P0（已完成） | 结构位置、跨度、元数据等价 | MC_StructuresV2 提供最终接受的网格所属实例、有符号相对 Y、显式 variant/order/loot seed。生成、定位、LOD 共用实例来源和最终覆盖元数据；含原生 V2 夹具与 Heaven v9 对照。见 docs/plugin-capabilities.md。 |
 | P0 | 方块/物品语义 | capabilities.h 的 MC_BlockBehavior 没有光衰减、燃料、破坏掉落规则和基底/木板/叶片标签。Block.cpp:1088 的叶片衰减、SurvivalRules.cpp:604 的矿石/浆果掉落、:764 的燃料、Item.cpp:1094 的木板判断和 BiomeBlockLogic.h 的基底白名单仍使用内置 ID。扩展通用属性并接入实际消费者。使用采收不能代替破坏掉落。 |
 | P0 | Skyway 与权杖上下文 | MC_ActionView 只有 actor 位姿/item/loaded-block reader，缺潜行、使用方式及宿主命中块/面；Player.cpp:1165 仍以 !m_sneakInput 选 Skyway 上下方向。扩充只读上下文及必要的 seed/分层采样服务，LAN 执行时重验。权杖已有通用传送框架，主要剩具体算法/模型迁移及等价验证。 |
 | P0 | 可选官方提供者与保存门禁 | Extensions.h:40 无条件注册 Heaven；BuiltinPlugins.cpp 只有两个示例，PluginManager.cpp:497/526 写死对应选择，且未设置内置包资源根。SaveStore.cpp:748 仍强制保存维度包含 minecraftc:heaven。应由官方提供者控制维度/内容可用性，处理保留槽位、资源根、默认启用和依赖拒载；禁用后无入口/配方/内容，拒载零写入。 |
@@ -39,7 +40,7 @@
 | P1 | 集成验收与打包 | 建立启停/安全模式/缺包/版本错配零写入、保存重载、LAN、同种子/负坐标/region-singleton/跨界结构、多层 LOD 与性能、Vulkan 表现和五平台打包回归。iOS/Android 优先使用内置同接口插件。 |
 
 V2 batch 的签名仅输出 uint16_t 方块，没有结构/loot 元数据输出缓冲；
-当前结构元数据仍由宿主 pluginStructureBlocks 产生。
+结构元数据统一由宿主 pluginStructureBlocks 产生；本次选择 structures V2 自定义实例/构建路线，未额外增加 batch 元数据通道。
 因此不能靠把结构方块塞进 batch 就认定结构迁移完成；/locate 和宝箱权杖必须一致。
 也不要求同时实现“自定义结构策略”和“批量元数据”两套方案，应选择最小完整路径。
 
@@ -48,7 +49,9 @@ V2 batch 的签名仅输出 uint16_t 方块，没有结构/loot 元数据输出�
 不默认增加旧世界升级要求；若需要兼容，应单独设计全文件映射/备份/验证。
 仅移动算法且输出一致可以保留版本；任意输出变化必须明确生成版本决策。
 
-## 推荐顺序与剩余估算
+## 原调查推荐顺序与估算（补强前基线）
+
+以下保留原调查顺序和工时，不是完成前两个 P0 后的重新估算；已完成项以当前表格为准。
 
 1. 固定 v9 输出/出生/结构与玩法对照，先处理本次暴露的测试基线问题。
 2. 完成出生与结构整条路径、方块物品语义、动作上下文；并确定官方包身份与启停/存档策略。
@@ -61,7 +64,7 @@ V2 batch 的签名仅输出 uint16_t 方块，没有结构/loot 元数据输出�
 跨平台设备/CI 等待、未知回归修复、旧档升级或独立动态库产品化另计。
 不能直接沿用 10/11 的 25–40 人日，也不能因 V2 已做就忽略真正的内容搬迁。
 
-## 本次验证与边界
+## 原调查验证与边界（历史结果）
 
 未修改运行时代码，未重新构建；使用 cmake-build-windows 的现有 Release 程序。
 默认 python/python3 为不可执行 WindowsApps 别名，任务工具使用 bundled Python。
@@ -73,3 +76,12 @@ V2 batch 的签名仅输出 uint16_t 方块，没有结构/loot 元数据输出�
 
 未运行完整 CTest、全新构建、Vulkan smoke、其他平台、迁移原型或天境迁移性能对比。
 本次 4/7 不等于插件平台已通过完整验收。日志保留在本地任务 evidence。
+
+## 前两个 P0 后续实施验证
+
+新增 `plugin_seeded_spawn_and_structure_v2`，覆盖原生 ABI 查询/回滚、纯出生及多实例结构、负坐标/跨界、并发、LOD、失败原子发布、落地/重入/重生/LAN、revision 拒载与元数据持久化。
+Heaven 对照使用不可变原生参考适配器，验证 v9 出生、起源/普通 Skyway、三类地标几何、variant、loot seed 和宝箱内容；不代表 official_heaven 或 P1 内容迁移已完成。
+原有三个失败在沙箱重现后，同一现有程序原生执行 3/3 通过；本次采用原生构建/CTest，未改弱测试。
+首轮定向 4/4；最终跨维度床位优先回归通过。完整 Release 构建及最终增量构建通过；原生完整 CTest 单轮 72/72 通过（641.97 秒）。
+跨维度重生和虚空返回复用已验证落点，避免二次选点破坏床位/安全位置优先级。V1 ABI、存档格式、Heaven v9 / 全局 v20 保持不变。
+差异空白与任务状态检查通过。构建仍有数值转换、变量遮蔽和 CRT 弃用等警告；未运行其他平台或可选 Vulkan 图像测试，本次未改渲染/UI。

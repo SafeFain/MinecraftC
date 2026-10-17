@@ -183,7 +183,7 @@ typedef struct MC_WorldgenV2 {
 typedef enum MC_DimensionWeather {
     MC_WEATHER_NORMAL=0, MC_WEATHER_CLEAR=1, MC_WEATHER_RAIN=2, MC_WEATHER_THUNDER=3
 } MC_DimensionWeather;
-typedef enum MC_DimensionSpawn { MC_SPAWN_SAFE_SURFACE=0, MC_SPAWN_FIXED=1 } MC_DimensionSpawn;
+typedef enum MC_DimensionSpawn { MC_SPAWN_SAFE_SURFACE=0, MC_SPAWN_FIXED=1, MC_SPAWN_SAMPLED=2 } MC_DimensionSpawn;
 typedef struct MC_DimensionModifier {const char* key;const char* revision;} MC_DimensionModifier;
 typedef struct MC_DimensionDefinition {
     uint32_t size;
@@ -210,6 +210,22 @@ typedef struct MC_DimensionsV1 {
        Uses entry policy and returns queue acceptance, not travel completion. */
     int32_t (*travel)(MC_PluginContext*,uint64_t,uint32_t);
 } MC_DimensionsV1;
+
+/* V1 layouts are frozen. Spawn callbacks are pure/concurrent, with the same
+   already-derived seed and actual parameters as the selected generator.
+   Return 0 on success; output is player bottom-center, never a surface height. */
+typedef int32_t (*MC_DimensionSpawnCallback)(const MC_GenerationContext*,double*,void*);
+typedef struct MC_DimensionDefinitionV2 {
+    uint32_t size;
+    MC_DimensionDefinition base;
+    MC_DimensionSpawnCallback sample_spawn; /* Required; base.spawn is ignored. */
+    void* userdata;
+} MC_DimensionDefinitionV2;
+typedef struct MC_DimensionsV2 {
+    uint32_t size, version;
+    int32_t (*register_dimension)(MC_PluginContext*,const MC_DimensionDefinitionV2*,uint32_t*);
+    const MC_DimensionsV1* v1;
+} MC_DimensionsV2;
 typedef uint64_t MC_RenderHandle;
 #define MC_RENDER_SCENE_COLOR UINT64_MAX
 typedef enum MC_RenderStage { MC_RENDER_SKY=0, MC_RENDER_SHADOWS, MC_RENDER_TERRAIN,

@@ -435,6 +435,7 @@ void PluginManager::buildNetworkDescription() {
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
         content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers}).dump();
+        if(d.sampleSpawn) {auto description=nlohmann::json::parse(content().networkDescription["dimension/"+d.key]);description.push_back("sampled-v2");content().networkDescription["dimension/"+d.key]=description.dump();}
     }
     auto& state=content();
     for(const auto& entry:state.blocks) {

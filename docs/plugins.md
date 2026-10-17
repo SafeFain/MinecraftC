@@ -293,5 +293,38 @@ protocols cannot join. Player profile v4 persists dimension-keyed positions/beds
 older profiles (including the local LAN identity profile) are explicitly refused.
 Additional dimensions use generic terrain/LOD and Overworld environment presentation.
 The optional [worldgen V2 interface](plugin-extensions.md#batch-and-multilayer-lod-worldgen-extension-version-2)
-adds batch generation and multilayer/decorative LOD sampling. Dimension registration does not add portals, arbitrary spawn callbacks or species-specific natural spawn tables.
+adds batch generation and multilayer/decorative LOD sampling. V1 dimension registration does not add portals, arbitrary spawn callbacks or species-specific natural spawn tables.
 Optional [gameplay and presentation capabilities](plugin-capabilities.md) add sky, clouds, particles, held models and playlists.
+
+
+### Seeded dimension spawn (extension version 2)
+
+Query `minecraftc.dimensions` version 2 as `MC_DimensionsV2`, or call
+`minecraftc::Host::dimensionsV2()`. The `v1` member exposes the frozen query,
+find and authoritative travel operations. Register `MC_DimensionDefinitionV2`
+with a sized V1 base, a required `sample_spawn` and immutable userdata.
+The host sets the queried spawn policy to `MC_SPAWN_SAMPLED`; `base.spawn` is
+ignored for this registration. V1 registration still accepts only fixed or
+safe-surface policies and its layout is unchanged.
+
+The pure callback receives `MC_GenerationContext`: the same already-derived
+seed and actual parameters used by the selected generator, with borrowed
+read-only strings. Fill three doubles with the player's bottom-center and
+return zero. Do not derive the dimension seed again, read loaded chunks, mutate
+host state or depend on callback order. Keep userdata alive and thread-safe
+until plugin shutdown. Non-finite, unwritten, out-of-world output or callback
+failure is a generation error; unsafe physical landings refuse travel.
+
+Local travel, respawn, saved-world reopening, LAN travel and saved LAN profile
+admission share the host landing validation. A valid bed (for respawn) or valid
+saved position takes precedence. Otherwise the sampled position must have full
+footprint support, clear body/head space and no fluid/fire. A sampled landing
+never falls back to the highest surface, preserving lower island layers after
+terrain edits. V1 fixed/safe-surface behavior remains unchanged.
+
+The dimension revision identifies the spawn algorithm and immutable policy;
+change it when behavior changes. Sampled policy/callback presence enters the
+LAN description; a mismatched saved dimension revision refuses before writes.
+No save-format or builtin generation-version change is introduced. See the
+[native fixture](../examples/plugins/worldgen_policy_v2/README.md) and
+[structure V2 contract](plugin-capabilities.md#accepted-structures-extension-version-2).

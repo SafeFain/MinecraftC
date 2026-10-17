@@ -30,7 +30,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     MC_PluginContext context{};context.manager=&plugins;context.index=index;
     const minecraftc::Host host(&plugins.host(),&context);
     check(host.behaviors()&&host.structures()&&host.playerActions()&&host.environment()&&host.presentation(),"five extension tables");
-    check(!host.extension(MC_STRUCTURES_EXTENSION,2),"unknown extension version rejected");
+    check(host.extension(MC_STRUCTURES_EXTENSION,2)&&!host.extension(MC_STRUCTURES_EXTENSION,3),"structure V2 and unknown extension version");
     const auto vine=Plugins::resolveBlock("capability_demo:vine"),resource=Plugins::resolveBlock("capability_demo:resource"),spent=Plugins::resolveBlock("capability_demo:spent");
     check(Plugins::blockBehavior(vine)->climbable&&isReplaceableByFluid(vine)&&fireEncouragement(vine)==30&&burnOdds(vine)==60,"block physical/fire behavior");
     const auto dim=static_cast<DimensionId>(Plugins::resolveDimension("capability_demo:islands"));

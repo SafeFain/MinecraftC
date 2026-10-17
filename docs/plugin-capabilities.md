@@ -1,7 +1,8 @@
 # Plugin gameplay and presentation capabilities
 
-ABI 1 remains unchanged. Include `minecraftc/extensions.h` and query extension version 1
-through `MC_Host::query_extension`. C++ helpers live in `minecraftc/plugin.hpp`.
+ABI 1 remains unchanged. Include `minecraftc/extensions.h` and query extensions
+through `MC_Host::query_extension` (version 1 unless specified below).
+C++ helpers live in `minecraftc/plugin.hpp`.
 The declarations are in [capabilities.h](../sdk/minecraftc/capabilities.h).
 Unknown names/versions return null; every descriptor/output buffer needs its `size` field.
 Successful calls return 0; failures return -1 and expose the reason through `last_error`.
@@ -68,6 +69,47 @@ Only chest voxels may reference loot. Generated chests store loot key/revision, 
 key/revision, seed and initialized state. An already registered or restored chest never refills.
 Save v21 persists these values, resource timers and dimension time overrides. v2–v20 metadata
 can be inspected, but opening incompatible saves refuses without writes; no migration occurs.
+
+## Accepted structures (extension version 2)
+
+Query `minecraftc.structures` version 2 as `MC_StructuresV2`, or use
+`structuresV2()`. Its `v1` member retains the frozen V1 table, including loot
+registration and locate. V1 descriptors, acceptance and output are unchanged.
+Register `MC_StructureDefinitionV2` with pure `placements` and `build` callbacks.
+This native interface does not change the V1 JSON template schema.
+
+`placements` receives the already-derived dimension seed, actual generation
+parameters, undecorated terrain reader and signed cell coordinates. Cell size
+is 16–1024. Return up to 16 final accepted instances per cell, each with an
+anchor, variant and order. Anchor X/Z must belong to that cell under mathematical
+floor division; Y must be in the world. The provider owns terrain acceptance,
+retry and reservations, including interactions with its other structures.
+The host does not reapply V1 chance, corner checks or footprint competition to
+V2 instances; V1 reservations only compete with other V1 definitions.
+Generation and locate enumerate the same instances without loading chunks.
+
+Relative X/Z must fit radius 0–64. Inclusive signed `min_y`/`max_y` each lie in
+[-383,383], span at most 384 blocks, and may cross the anchor in both directions.
+For example, Skyway platforms need -88 through +90 including their standing
+volumes. Emitted absolute Y outside [-64,319] is clipped, matching native
+Heaven; horizontal world coordinates outside ±30000000 are rejected.
+
+Writes sort ascending by definition `(order,key)`, then instance
+`(order,cellZ,cellX,anchorX,anchorY,anchorZ,variant)`, then callback output order.
+Duplicate instance identities in one cell are rejected; duplicate block
+coordinates are allowed. Later writes own both the voxel and its metadata,
+including AIR clearing an earlier chest. Only final voxel owners enter the
+streaming metadata channel. `MC_StructureBlockV2.loot_seed` is exact, including
+zero; V1 retains its automatic variant/position hash. Count remains bounded by
+16384 blocks per instance. Callback strings remain valid until output copying.
+
+Definition revision, bounds, ordering and callback presence participate in LAN
+identity and structure/cache fingerprints. Change revision whenever callback
+algorithms or immutable inputs change. Keep callbacks thread-safe and free of
+host mutations. Errors, unwritten/invalid blocks, foreign undeclared content and
+buffer overflow counts fail generation before a staged request is published.
+
+See [native V2 fixture](../examples/plugins/worldgen_policy_v2/README.md).
 
 ## Host-authorized actions and client preview
 

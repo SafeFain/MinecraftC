@@ -1049,6 +1049,11 @@ bool GameSession::switchDimension(
     else if(target==DimensionId::Overworld)preferred=worldMetadata.playerPosition;
     else if(target==DimensionId::Heaven&&worldMetadata.heaven.hasSafePosition)preferred=worldMetadata.heaven.playerPosition;
     const auto landing=dimensionLanding(target,preferred);if(!landing)return false;
+    return enterDimension(target,loadingStarted,*landing);
+}
+
+bool GameSession::enterDimension(DimensionId target,RuntimeClock::Tick loadingStarted,const glm::dvec3& validatedLanding) {
+    if(lanJoining||!saveStore||target==dimension||!Plugins::validDimension(target))return false;
     if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     saveActiveDimensionState();
     updateSaveMetadata();
@@ -1060,7 +1065,7 @@ bool GameSession::switchDimension(
         ? LoadingReason::EnteringHeaven : (target==DimensionId::Overworld?LoadingReason::ReturningOverworld:LoadingReason::World);
     player.bindWorld(world(), &entities());
     loadActiveDimensionState();
-    player.setPosition(*landing);
+    player.setPosition(validatedLanding);
     resetTransientState(false, survivalTicks(), loadingStarted);
     sleepState = SleepVisualState::Awake;
     player.setSleepingVisual(false, 0.0f);
@@ -1084,7 +1089,7 @@ bool GameSession::handleVoidFall(
     std::optional<glm::dvec3> preferred;
     if(targetState.hasSafePosition)preferred=targetState.safePlayerPosition;
     const auto landing=dimensionLanding(target,preferred);if(!landing)return false;
-    if(target!=source&&!switchDimension(target,loadingStarted))return false;
+    if(target!=source&&!enterDimension(target,loadingStarted,*landing))return false;
     player.setPosition(*landing);
     if(sourceState.hasSafePosition)sourceState.playerPosition=sourceState.safePlayerPosition;
     if(source==DimensionId::Heaven)worldMetadata.heaven.playerPosition=sourceState.playerPosition;
@@ -1113,7 +1118,7 @@ void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
     if(target!=DimensionId::Overworld) {
         const auto bed=worldMetadata.dimensions[static_cast<uint32_t>(target)].bedSpawn;
         const auto landing=dimensionLanding(target,{},bed);if(!landing)return;
-        if(target!=dimension&&!switchDimension(target,loadingStarted))return;
+        if(target!=dimension&&!enterDimension(target,loadingStarted,*landing))return;
         player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.extinguish();player.resetDamageImmunity();
         resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();return;
     }
@@ -1549,6 +1554,10 @@ std::optional<glm::dvec3> GameSession::dimensionLanding(DimensionId target,std::
     };
     if(bed){terrain.update(glm::dvec3(*bed));terrain.enqueueGeneration();terrain.waitForInitialGeneration(1500);terrain.processCompletedGenerations(false);const auto foot=terrain.validBedFoot(*bed);if(foot){const auto p=glm::dvec3(*foot)+glm::dvec3(.5,blockCollisionHeight(terrain.getBlock(foot->x,foot->y,foot->z))+.001,.5);if(valid(p))return p;}}
     if(preferred&&valid(*preferred))return preferred;
+    if(definition.sampleSpawn) {
+        const auto sampled=terrain.generator().sampleDimensionSpawn();
+        return sampled&&valid(*sampled)?sampled:std::nullopt;
+    }
     glm::dvec3 candidate=definition.spawn==MC_SPAWN_FIXED?glm::dvec3(definition.position[0],definition.position[1],definition.position[2]):
         (target==DimensionId::Overworld?glm::dvec3(worldMetadata.worldSpawn)+glm::dvec3(.5,.01,.5):terrain.findSafeSpawn());
     if(valid(candidate))return candidate;

@@ -84,6 +84,7 @@ public:
     std::function<bool(uint32_t,int32_t,int32_t,int32_t,bool,bool)> blockInteraction;
     int32_t entity(MC_PluginContext&,const MC_EntityDefinition&,uint16_t&);
     int32_t dimensionDefinition(MC_PluginContext&,const MC_DimensionDefinition&,uint32_t&);
+    int32_t dimensionDefinitionV2(MC_PluginContext&,const MC_DimensionDefinitionV2&,uint32_t&);
     std::function<bool(uint64_t,uint32_t)> travelPlayer;
     int32_t generator(MC_PluginContext&,const MC_GeneratorDefinition&);
     int32_t generatorV2(MC_PluginContext&,const MC_GeneratorDefinitionV2&);
@@ -98,6 +99,7 @@ public:
     void itemBehavior(MC_PluginContext&,const MC_ItemBehavior&);
     void lootTable(MC_PluginContext&,const MC_LootTable&);
     void structure(MC_PluginContext&,const MC_StructureDefinition&);
+    void structureV2(MC_PluginContext&,const MC_StructureDefinitionV2&);
     void playerAction(MC_PluginContext&,const MC_PlayerAction&);
     void environmentProfile(MC_PluginContext&,const MC_EnvironmentProfile&);
     void particleType(MC_PluginContext&,const MC_ParticleDefinition&);

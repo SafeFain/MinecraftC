@@ -64,6 +64,21 @@ void PluginManager::structure(MC_PluginContext& c,const MC_StructureDefinition& 
     require(content().extensions.structures.size()<128,"Too many structures");
     require(content().extensions.structures.emplace(s.key,std::move(s)).second,"Duplicate structure");
 }
+void PluginManager::structureV2(MC_PluginContext& c,const MC_StructureDefinitionV2& d){
+    require(d.size>=sizeof(d)&&d.placements&&d.build,"Structure V2 requires placement and build callbacks");
+    owned(c,str(d.key));reference(c,dimensionContent(d.dimension).key);
+    require(d.cell_size>=16&&d.cell_size<=1024&&d.radius<=64&&
+        d.min_y>=1-Config::CHUNK_SIZE_Y&&d.max_y<Config::CHUNK_SIZE_Y&&d.min_y<=d.max_y&&
+        int64_t(d.max_y)-d.min_y<Config::CHUNK_SIZE_Y,"Invalid structure V2 bounds");
+    StructureContent s;s.key=d.key;s.name=str(d.name);s.revision=str(d.revision);
+    require(s.name.size()<=256&&s.revision.size()<=128,"Structure string too long");
+    s.namespaces={"minecraftc",m_info.at(c.index).manifest.id};
+    for(const auto& dep:m_info.at(c.index).manifest.dependencies)s.namespaces.push_back(dep.id);
+    s.dimension=d.dimension;s.cell=d.cell_size;s.radius=d.radius;s.minY=d.min_y;s.maxY=d.max_y;s.order=d.order;
+    s.placements=d.placements;s.buildV2=d.build;s.userdata=d.userdata;
+    require(content().extensions.structures.size()<128,"Too many structures");
+    require(content().extensions.structures.emplace(s.key,std::move(s)).second,"Duplicate structure");
+}
 void PluginManager::playerAction(MC_PluginContext& c,const MC_PlayerAction& d){
     require(d.size>=sizeof(d)&&d.kind<=MC_ACTION_TRAVEL&&d.durability<=65535,"Invalid action");owned(c,str(d.key));number(d.range,.1f,256);number(d.cooldown,0,3600);
     ActionContent a;a.key=d.key;a.dimension=optional(d.dimension);a.kind=d.kind;a.range=d.range;a.cooldown=d.cooldown;a.durability=d.durability;
@@ -119,7 +134,7 @@ void PluginManager::describeCapabilities(){
     for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;n["behavior/block/"+blockKey(static_cast<BlockId>(pair.first))]=J::array({b.climbable,b.replaceable,b.support,b.encouragement,b.flammability,b.damage,b.harvest,b.harvestCount,b.replacement,b.resetTicks,b.action}).dump();}
     for(const auto& pair:e.itemBehaviors)n["behavior/item/"+itemKey(static_cast<ItemId>(pair.first))]=J::array({pair.second.action,pair.second.dimension}).dump();
     for(const auto& pair:e.loot){J entries=J::array();for(const auto& b:pair.second.entries)entries.push_back({b.item,b.minimum,b.maximum,b.chance});n["loot/"+pair.first]=J::array({pair.second.revision,entries}).dump();}
-    for(const auto& pair:e.structures){const auto& s=pair.second;J blocks=J::array();for(const auto& b:s.blocks)blocks.push_back({b.x,b.y,b.z,blockKey(static_cast<BlockId>(b.id)),b.loot});n["structure/"+pair.first]=J::array({dimensionContent(s.dimension).key,s.revision,s.cell,s.chance,s.radius,s.height,s.tolerance,s.domain,blocks,s.build!=nullptr}).dump();}
+    for(const auto& pair:e.structures){const auto& s=pair.second;J blocks=J::array();for(const auto& b:s.blocks)blocks.push_back({b.x,b.y,b.z,blockKey(static_cast<BlockId>(b.id)),b.loot});n["structure/"+pair.first]=J::array({dimensionContent(s.dimension).key,s.revision,s.cell,s.chance,s.radius,s.height,s.tolerance,s.domain,blocks,s.build!=nullptr}).dump();if(s.placements){auto description=J::parse(n["structure/"+pair.first]);description.push_back(J::array({"placements-v2",s.minY,s.maxY,s.order,s.buildV2!=nullptr}));n["structure/"+pair.first]=description.dump();}}
     for(const auto& pair:e.actions){const auto& a=pair.second;n["action/"+pair.first]=J::array({a.kind,a.dimension,a.range,a.cooldown,a.durability,bool(a.target)}).dump();}
 }
 uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest& d){
@@ -130,6 +145,12 @@ uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest&
 }
 MC_ActionResult PluginManager::actionResult(MC_PluginContext& c,uint64_t id) const{const auto it=m_actionResults.find(id);require(it!=m_actionResults.end()&&it->second.owner==c.index,"Unknown action receipt");return {sizeof(MC_ActionResult),it->second.status,id};}
 const void* PluginManager::capability(const char* name,uint32_t version){
+    if(name&&version==2&&std::string(name)==MC_STRUCTURES_EXTENSION) {
+        static const MC_StructuresV2 structures{sizeof(MC_StructuresV2),2,
+            [](MC_PluginContext* c,const MC_StructureDefinitionV2* d){return call(c,[&]{require(d,"Missing structure V2");manager(c).structureV2(*c,*d);},true);},
+            static_cast<const MC_StructuresV1*>(capability(MC_STRUCTURES_EXTENSION,1))};
+        return &structures;
+    }
     if(!name||version!=1)return nullptr;
     static const MC_BehaviorsV1 behaviors{sizeof(MC_BehaviorsV1),1,
         [](MC_PluginContext* c,const MC_BlockBehavior* d){return call(c,[&]{require(d,"Missing behavior");manager(c).blockBehavior(*c,*d);},true);},

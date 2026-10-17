@@ -332,6 +332,7 @@ std::optional<glm::ivec3> World::locateStructure(
 }
 
 glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
+    if(const auto sampled=m_generator.sampleDimensionSpawn())return *sampled;
     if (m_generator.isHeaven()&&!m_generator.customGenerator()) {
         const glm::ivec3 spawn = m_generator.heavenSpawnBlock();
         return {spawn.x + 0.5, spawn.y + 1.01, spawn.z + 0.5};

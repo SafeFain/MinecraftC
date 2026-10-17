@@ -9,6 +9,17 @@
 namespace {
 int cell(int x){const int q=x/16;return x%16<0?q-1:q;}
 }
+std::optional<glm::dvec3> WorldGenerator::sampleDimensionSpawn() const {
+    const auto& d=Plugins::dimensionContent(m_dimension);
+    if(!d.sampleSpawn)return {};
+    MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
+    double p[3]{NAN,NAN,NAN};
+    try{if(d.sampleSpawn(&context,p,d.spawnUserdata))Plugins::failGeneration(d.key);}
+    catch(...){Plugins::failGeneration(d.key);}
+    for(double v:p)if(!std::isfinite(v)||std::abs(v)>30000000)Plugins::failGeneration(d.key);
+    if(p[1]<Config::WORLD_MIN_Y||p[1]+Config::PLAYER_HEIGHT>=Config::WORLD_MAX_Y)Plugins::failGeneration(d.key);
+    return glm::dvec3(p[0],p[1],p[2]);
+}
 SurfaceColumn WorldGenerator::pluginColumn(int x,int z) const {
     const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
     MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
@@ -144,7 +155,7 @@ std::array<uint16_t,Config::CHUNK_SIZE_Y> WorldGenerator::samplePluginColumnBloc
 namespace {
 int floorCell(int x,int size){const int q=x/size;return x%size<0?q-1:q;}
 uint64_t keyHash(const std::string& key){uint64_t h=1469598103934665603ULL;for(unsigned char c:key){h^=c;h*=1099511628211ULL;}return h;}
-struct PluginAnchor {int x=0,y=0,z=0;uint64_t variant=0;};
+struct PluginAnchor {int x=0,y=0,z=0;uint64_t variant=0;int32_t order=0;};
 std::optional<PluginAnchor> candidate(const WorldGenerator& g,const Plugins::StructureContent& s,int cx,int cz){
     const uint64_t v=WorldGenContext::hashPosition(g.getSeed()^s.domain^keyHash(s.key),cx,0,cz);
     if(v%100>=s.chance)return {};
@@ -159,34 +170,127 @@ std::optional<PluginAnchor> candidate(const WorldGenerator& g,const Plugins::Str
 }
 bool accepted(const WorldGenerator& g,const Plugins::StructureContent& s,const PluginAnchor& a){
     // A total priority order resolves reservations without scheduling or recursion.
-    for(const auto& pair:Plugins::content().extensions.structures){const auto& other=pair.second;if(other.dimension!=s.dimension)continue;const int radius=static_cast<int>(s.radius+other.radius);
+    for(const auto& pair:Plugins::content().extensions.structures){const auto& other=pair.second;if(other.dimension!=s.dimension||other.placements)continue;const int radius=static_cast<int>(s.radius+other.radius);
         for(int cz=floorCell(a.z-radius,other.cell);cz<=floorCell(a.z+radius,other.cell);++cz)for(int cx=floorCell(a.x-radius,other.cell);cx<=floorCell(a.x+radius,other.cell);++cx){const auto b=candidate(g,other,cx,cz);if(!b||std::abs(int64_t(b->x)-a.x)>radius||std::abs(int64_t(b->z)-a.z)>radius)continue;if(other.key==s.key&&b->x==a.x&&b->z==a.z)continue;
             if(std::tie(b->variant,other.key,b->x,b->z)<std::tie(a.variant,s.key,a.x,a.z))return false;}}
     return true;
 }
 }
+namespace {
+MC_StructureContext structureContext(const WorldGenerator& g,const Plugins::StructureContent& s,
+    const std::string& parameters,const PluginAnchor& a={}) {
+    MC_StructureContext c{};c.size=sizeof(c);
+    c.generation={sizeof(MC_GenerationContext),s.dimension,g.getSeed(),parameters.c_str()};
+    c.anchor[0]=a.x;c.anchor[1]=a.y;c.anchor[2]=a.z;c.variant=a.variant;
+    c.reader=const_cast<WorldGenerator*>(&g);
+    c.surface=[](void* reader,int32_t x,int32_t z,MC_SurfaceSample* out)->int32_t {
+        if(!out||out->size<sizeof(*out)||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return -1;
+        const auto v=static_cast<WorldGenerator*>(reader)->sampleTerrainColumn(x,z);
+        *out={sizeof(*out),v.height,v.waterLevel,static_cast<uint32_t>(v.biome)};return 0;
+    };
+    return c;
+}
+std::vector<PluginAnchor> structureAnchors(const WorldGenerator& g,const Plugins::StructureContent& s,
+    const std::string& parameters,int cx,int cz) {
+    if(!s.placements){const auto a=candidate(g,s,cx,cz);return a&&accepted(g,s,*a)?std::vector<PluginAnchor>{*a}:std::vector<PluginAnchor>{};}
+    auto c=structureContext(g,s,parameters);
+    std::array<MC_StructureInstance,MC_MAX_STRUCTURE_INSTANCES> out{};uint32_t count=0;
+    for(auto& value:out)value.anchor[1]=INT32_MIN;
+    try{if(s.placements(&c,cx,cz,out.data(),uint32_t(out.size()),&count,s.userdata)||count>out.size())Plugins::failGeneration(s.key);}
+    catch(...){Plugins::failGeneration(s.key);}
+    std::vector<PluginAnchor> result;std::set<std::tuple<int,int,int,uint64_t>> seen;
+    for(uint32_t i=0;i<count;++i){const auto& a=out[i];
+        if(std::abs(int64_t(a.anchor[0]))>30000000||std::abs(int64_t(a.anchor[2]))>30000000||
+            floorCell(a.anchor[0],s.cell)!=cx||floorCell(a.anchor[2],s.cell)!=cz||
+            !Config::isValidWorldY(a.anchor[1])||
+            !seen.emplace(a.anchor[0],a.anchor[1],a.anchor[2],a.variant).second)Plugins::failGeneration(s.key);
+        result.push_back({a.anchor[0],a.anchor[1],a.anchor[2],a.variant,a.order});
+    }
+    return result;
+}
+}
 std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureBlocks(int x,int z,int width,int depth) const{
+    if(width<=0||depth<=0||int64_t(x)+width-1>30000000||int64_t(z)+depth-1>30000000||x< -30000000||z< -30000000)Plugins::failGeneration("structure bounds");
+    struct Placement {const Plugins::StructureContent* structure;PluginAnchor anchor;int cx,cz;};
+    std::vector<Placement> placements;bool v2=false;
+    for(const auto& pair:Plugins::content().extensions.structures){const auto& s=pair.second;
+        if(s.dimension!=static_cast<uint32_t>(m_dimension))continue;
+        v2=v2||s.placements;const int r=static_cast<int>(s.radius);
+        for(int cz=floorCell(z-r,s.cell);cz<=floorCell(z+depth-1+r,s.cell);++cz)
+            for(int cx=floorCell(x-r,s.cell);cx<=floorCell(x+width-1+r,s.cell);++cx)
+                for(const auto& a:structureAnchors(*this,s,m_pluginConfig.parameters,cx,cz))placements.push_back({&s,a,cx,cz});
+    }
+    std::sort(placements.begin(),placements.end(),[](const Placement& a,const Placement& b){
+        return std::tie(a.structure->order,a.structure->key,a.anchor.order,a.cz,a.cx,a.anchor.x,a.anchor.y,a.anchor.z,a.anchor.variant)<
+            std::tie(b.structure->order,b.structure->key,b.anchor.order,b.cz,b.cx,b.anchor.x,b.anchor.y,b.anchor.z,b.anchor.variant);
+    });
     std::vector<RegionGenerationData::PendingBlock> result;
-    for(const auto& pair:Plugins::content().extensions.structures){const auto& s=pair.second;if(s.dimension!=static_cast<uint32_t>(m_dimension))continue;const int r=static_cast<int>(s.radius);
-        for(int cz=floorCell(z-r,s.cell);cz<=floorCell(z+depth-1+r,s.cell);++cz)for(int cx=floorCell(x-r,s.cell);cx<=floorCell(x+width-1+r,s.cell);++cx){const auto a=candidate(*this,s,cx,cz);if(!a||!accepted(*this,s,*a))continue;
-            std::vector<Plugins::StructureContent::Block> blocks=s.blocks;
-            if(s.build){std::set<std::tuple<int32_t,int32_t,int32_t>> positions;std::vector<MC_StructureBlock> out(MC_MAX_STRUCTURE_BLOCKS);uint32_t count=0;MC_StructureContext c{};c.size=sizeof(c);c.generation={sizeof(MC_GenerationContext),s.dimension,m_seed,m_pluginConfig.parameters.c_str()};c.anchor[0]=a->x;c.anchor[1]=a->y;c.anchor[2]=a->z;c.variant=a->variant;c.reader=const_cast<WorldGenerator*>(this);
-                c.surface=[](void* reader,int32_t x,int32_t z,MC_SurfaceSample* out)->int32_t{if(!out||out->size<sizeof(*out)||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return -1;const auto v=static_cast<WorldGenerator*>(reader)->sampleTerrainColumn(x,z);*out={sizeof(*out),v.height,v.waterLevel,static_cast<uint32_t>(v.biome)};return 0;};
-                try{if(s.build(&c,out.data(),static_cast<uint32_t>(out.size()),&count,s.userdata)||count>out.size())Plugins::failGeneration(s.key);for(uint32_t i=0;i<count;++i){const auto& b=out[i];if(!positions.emplace(b.x,b.y,b.z).second)Plugins::failGeneration(s.key);const std::string loot=b.loot?b.loot:"";if(std::abs(int64_t(b.x))>r||std::abs(int64_t(b.z))>r||b.y<0||uint32_t(b.y)>=s.height||!Plugins::validBlock(static_cast<BlockId>(b.block))||(!loot.empty()&&(b.block!=static_cast<uint16_t>(BlockId::CHEST)||!Plugins::content().extensions.loot.count(loot))))Plugins::failGeneration(s.key);const auto key=Plugins::blockKey(static_cast<BlockId>(b.block));if(std::find(s.namespaces.begin(),s.namespaces.end(),key.substr(0,key.find(':')))==s.namespaces.end())Plugins::failGeneration(s.key);if(!loot.empty()&&std::find(s.namespaces.begin(),s.namespaces.end(),loot.substr(0,loot.find(':')))==s.namespaces.end())Plugins::failGeneration(s.key);blocks.push_back({b.x,b.y,b.z,b.block,loot});}}
-                catch(...){Plugins::failGeneration(s.key);}}
-            for(const auto& b:blocks){const int wx=a->x+b.x,wz=a->z+b.z;if(wx<x||wx>=x+width||wz<z||wz>=z+depth)continue;RegionGenerationData::PendingBlock p;p.worldX=wx;p.worldY=a->y+b.y;p.worldZ=wz;p.id=static_cast<BlockId>(b.id);p.overwrite=true;p.needsBlockEntity=p.id==BlockId::CHEST||p.id==BlockId::FURNACE;p.lootSeed=WorldGenContext::hashPosition(a->variant,wx,p.worldY,wz);p.lootKey=b.loot;if(!b.loot.empty())p.lootRevision=Plugins::content().extensions.loot.at(b.loot).revision;p.structureKey=s.key;p.structureRevision=s.revision;result.push_back(std::move(p));}
-        }}
+    for(const auto& placement:placements){const auto& s=*placement.structure;const auto& a=placement.anchor;
+        std::vector<Plugins::StructureContent::Block> blocks=s.blocks;
+        if(s.build||s.buildV2){
+            auto c=structureContext(*this,s,m_pluginConfig.parameters,a);uint32_t count=0;
+            std::vector<MC_StructureBlock> old;std::vector<MC_StructureBlockV2> out;
+            if(s.buildV2){out.resize(MC_MAX_STRUCTURE_BLOCKS);for(auto& b:out)b.base.block=MC_INVALID_ID;}
+            else old.resize(MC_MAX_STRUCTURE_BLOCKS);
+            try {
+                const int status=s.buildV2?s.buildV2(&c,out.data(),MC_MAX_STRUCTURE_BLOCKS,&count,s.userdata):
+                    s.build(&c,old.data(),MC_MAX_STRUCTURE_BLOCKS,&count,s.userdata);
+                if(status||count>MC_MAX_STRUCTURE_BLOCKS)Plugins::failGeneration(s.key);
+                std::set<std::tuple<int32_t,int32_t,int32_t>> positions;
+                for(uint32_t i=0;i<count;++i){const auto& b=s.buildV2?out[i].base:old[i];
+                    if(!s.buildV2&&!positions.emplace(b.x,b.y,b.z).second)Plugins::failGeneration(s.key);
+                    const std::string loot=b.loot?b.loot:"";
+                    if(std::abs(int64_t(b.x))>s.radius||std::abs(int64_t(b.z))>s.radius||
+                        (s.buildV2?(b.y<s.minY||b.y>s.maxY):(b.y<0||uint32_t(b.y)>=s.height))||
+                        !Plugins::validBlock(static_cast<BlockId>(b.block))||
+                        (!loot.empty()&&(b.block!=static_cast<uint16_t>(BlockId::CHEST)||!Plugins::content().extensions.loot.count(loot))))Plugins::failGeneration(s.key);
+                    const auto key=Plugins::blockKey(static_cast<BlockId>(b.block));
+                    for(const auto& k:{key,loot})if(!k.empty()&&std::find(s.namespaces.begin(),s.namespaces.end(),k.substr(0,k.find(':')))==s.namespaces.end())Plugins::failGeneration(s.key);
+                    blocks.push_back({b.x,b.y,b.z,b.block,loot,s.buildV2?out[i].loot_seed:0});
+                }
+            }catch(...){Plugins::failGeneration(s.key);}
+        }
+        for(const auto& b:blocks){
+            const int64_t wx=int64_t(a.x)+b.x,wy=int64_t(a.y)+b.y,wz=int64_t(a.z)+b.z;
+            // Legacy Heaven clips upper Skyway platforms at the build limit.
+            if(wy<Config::WORLD_MIN_Y||wy>=Config::WORLD_MAX_Y)continue;
+            if(std::abs(wx)>30000000||std::abs(wz)>30000000)Plugins::failGeneration(s.key);
+            if(wx<x||wx>=int64_t(x)+width||wz<z||wz>=int64_t(z)+depth)continue;
+            RegionGenerationData::PendingBlock p;p.worldX=int(wx);p.worldY=int(wy);p.worldZ=int(wz);p.id=static_cast<BlockId>(b.id);p.overwrite=true;
+            p.needsBlockEntity=p.id==BlockId::CHEST||p.id==BlockId::FURNACE;
+            p.lootSeed=s.buildV2?b.lootSeed:WorldGenContext::hashPosition(a.variant,int(wx),p.worldY,int(wz));
+            p.lootKey=b.loot;if(!b.loot.empty())p.lootRevision=Plugins::content().extensions.loot.at(b.loot).revision;
+            p.structureKey=s.key;p.structureRevision=s.revision;result.push_back(std::move(p));
+        }
+    }
+    if(v2){
+        // Publish only the final owner of a voxel, including AIR and its metadata.
+        // Thus an earlier chest cannot survive or seed a later chest's contents.
+        std::set<std::tuple<int,int,int>> seen;
+        std::vector<RegionGenerationData::PendingBlock> final;
+        for(auto i=result.rbegin();i!=result.rend();++i)if(seen.emplace(i->worldX,i->worldY,i->worldZ).second)final.push_back(std::move(*i));
+        std::reverse(final.begin(),final.end());return final;
+    }
     return result;
 }
 std::optional<MC_LocatedStructure> WorldGenerator::locatePluginStructure(const std::string& key,int x,int z,uint32_t range) const{
-    const auto found=Plugins::content().extensions.structures.find(key);if(found==Plugins::content().extensions.structures.end()||found->second.dimension!=static_cast<uint32_t>(m_dimension)||range>8192)return {};
-    const auto& s=found->second;if(!s.chance)return {};std::optional<MC_LocatedStructure> best;int64_t distance=int64_t(range)*range;const int originX=floorCell(x,s.cell),originZ=floorCell(z,s.cell),rings=static_cast<int>(range/s.cell)+2;
-    auto visit=[&](int dx,int dz){const auto a=candidate(*this,s,originX+dx,originZ+dz);if(!a)return;const int64_t ax=int64_t(a->x)-x,az=int64_t(a->z)-z,d=ax*ax+az*az;if(d>distance||!accepted(*this,s,*a))return;if(d==distance&&best&&std::tie(a->x,a->z)>=std::tie(best->anchor[0],best->anchor[2]))return;distance=d;MC_LocatedStructure v{};v.size=sizeof(v);v.dimension=s.dimension;v.anchor[0]=a->x;v.anchor[1]=a->y;v.anchor[2]=a->z;v.variant=a->variant;best=v;};
+    const auto found=Plugins::content().extensions.structures.find(key);
+    if(found==Plugins::content().extensions.structures.end()||found->second.dimension!=static_cast<uint32_t>(m_dimension)||range>8192||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return {};
+    const auto& s=found->second;if(!s.placements&&!s.chance)return {};
+    std::optional<MC_LocatedStructure> best;int64_t distance=int64_t(range)*range;
+    const int originX=floorCell(x,s.cell),originZ=floorCell(z,s.cell),rings=static_cast<int>(range/s.cell)+2;
+    auto visit=[&](int dx,int dz){for(const auto& a:structureAnchors(*this,s,m_pluginConfig.parameters,originX+dx,originZ+dz)){
+        const int64_t ax=int64_t(a.x)-x,az=int64_t(a.z)-z,d=ax*ax+az*az;
+        if(d>distance)continue;
+        if(d==distance&&best&&std::tie(a.x,a.z,a.y,a.variant)>=std::tie(best->anchor[0],best->anchor[2],best->anchor[1],best->variant))continue;
+        distance=d;MC_LocatedStructure v{};v.size=sizeof(v);v.dimension=s.dimension;
+        v.anchor[0]=a.x;v.anchor[1]=a.y;v.anchor[2]=a.z;v.variant=a.variant;best=v;
+    }};
     for(int ring=0;ring<=rings;++ring){
         if(!ring)visit(0,0);
         else {for(int dx=-ring;dx<=ring;++dx){visit(dx,-ring);visit(dx,ring);}for(int dz=-ring+1;dz<ring;++dz){visit(-ring,dz);visit(ring,dz);}}
-        // Unvisited cells lie beyond this conservative lower distance bound.
-        const int64_t lower=int64_t(std::max(0,ring-1))*s.cell;if(best&&lower*lower>distance)break;}
+        const int64_t lower=int64_t(std::max(0,ring-1))*s.cell;if(best&&lower*lower>distance)break;
+    }
     return best;
 }
 uint64_t WorldGenerator::pluginStructureFingerprint() const{

@@ -72,6 +72,13 @@ void GameSession::admitLanPlayer(uint64_t id) {
     }
     profile.identity.nickname = peer->second.identity.nickname;
     auto& runtime = ensureDimension(profile.dimension);
+    if(Plugins::dimensionContent(profile.dimension).sampleSpawn) {
+        const auto target=static_cast<uint32_t>(profile.dimension);
+        const auto landing=dimensionLanding(profile.dimension,profile.positioned[target]?
+            std::optional<glm::dvec3>(profile.positions[target]):std::nullopt);
+        if(!landing)throw std::runtime_error("Dimension has no safe landing");
+        profile.positions[target]=*landing;profile.positioned[target]=true;
+    }
     auto guest = std::make_unique<LanPlayerRuntime>(runtime.world, runtime.entities, std::move(profile));
     guest->player.configureRules(guest->profile.mode, worldMetadata.difficulty);
     guest->player.setRoomPlayerId(id);

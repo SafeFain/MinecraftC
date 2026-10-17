@@ -35,6 +35,8 @@ struct DimensionContent {
     uint32_t weather=MC_WEATHER_NORMAL, spawn=MC_SPAWN_SAFE_SURFACE;
     bool natural=true;
     std::array<double,3> position{{0,65,0}};
+    MC_DimensionSpawnCallback sampleSpawn=nullptr;
+    void* spawnUserdata=nullptr;
     mutable std::vector<MC_DimensionModifier> modifierView;
 };
 inline std::map<uint32_t,DimensionContent> builtinDimensions() {
@@ -97,13 +99,16 @@ struct LootContent {
     std::vector<Entry> entries;
 };
 struct StructureContent {
-    struct Block {int32_t x=0,y=0,z=0;uint16_t id=0;std::string loot;};
+    struct Block {int32_t x=0,y=0,z=0;uint16_t id=0;std::string loot;uint64_t lootSeed=0;};
     std::string key,name,revision;
     uint32_t dimension=0,cell=64,chance=10,radius=8,height=16,tolerance=2;
     uint64_t domain=0;
     std::vector<Block> blocks;
     std::vector<std::string> namespaces;
     MC_StructureCallback build=nullptr;
+    int32_t minY=0,maxY=0,order=0;
+    MC_StructurePlacementCallback placements=nullptr;
+    MC_StructureCallbackV2 buildV2=nullptr;
     void* userdata=nullptr;
 };
 struct ActionContent {

@@ -18,12 +18,14 @@ public:
     }
     const MC_BehaviorsV1* behaviors() const {return static_cast<const MC_BehaviorsV1*>(extension(MC_BEHAVIORS_EXTENSION));}
     const MC_StructuresV1* structures() const {return static_cast<const MC_StructuresV1*>(extension(MC_STRUCTURES_EXTENSION));}
+    const MC_StructuresV2* structuresV2() const {return static_cast<const MC_StructuresV2*>(extension(MC_STRUCTURES_EXTENSION,2));}
     const MC_PlayerActionsV1* playerActions() const {return static_cast<const MC_PlayerActionsV1*>(extension(MC_PLAYER_ACTIONS_EXTENSION));}
     const MC_EnvironmentV1* environment() const {return static_cast<const MC_EnvironmentV1*>(extension(MC_ENVIRONMENT_EXTENSION));}
     const MC_PresentationV1* presentation() const {return static_cast<const MC_PresentationV1*>(extension(MC_PRESENTATION_EXTENSION));}
     const MC_BlockShapesV1* blockShapes() const {return static_cast<const MC_BlockShapesV1*>(extension(MC_BLOCK_SHAPES_EXTENSION));}
     const MC_EntitiesV1* entities() const {return static_cast<const MC_EntitiesV1*>(extension(MC_ENTITIES_EXTENSION));}
     const MC_DimensionsV1* dimensions() const {return static_cast<const MC_DimensionsV1*>(extension(MC_DIMENSIONS_EXTENSION));}
+    const MC_DimensionsV2* dimensionsV2() const {return static_cast<const MC_DimensionsV2*>(extension(MC_DIMENSIONS_EXTENSION,2));}
     const MC_WorldgenV1* worldgen() const {return static_cast<const MC_WorldgenV1*>(extension(MC_WORLDGEN_EXTENSION));}
     const MC_WorldgenV2* worldgenV2() const {return static_cast<const MC_WorldgenV2*>(extension(MC_WORLDGEN_EXTENSION,2));}
     const MC_RenderV1* render() const {return static_cast<const MC_RenderV1*>(extension(MC_RENDER_EXTENSION));}

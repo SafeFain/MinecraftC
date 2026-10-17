@@ -53,6 +53,8 @@ struct LanLodTestAccess {
     }
 };
 struct GameSessionTestAccess {
+    static void dimensionBed(GameSession& session,uint32_t id,std::optional<glm::ivec3> bed) { session.worldMetadata.dimensions[id].bedSpawn=bed; }
+    static void dimensionPosition(GameSession& session,uint32_t id,glm::dvec3 p) { auto& state=session.worldMetadata.dimensions[id];state.playerPosition=p;state.positioned=true; }
     static void prepareLanScene(GameSession& session) {
         flatRuleScene(session);
         session.worldMetadata.gameMode = GameMode::Survival;
@@ -257,6 +259,7 @@ std::string Localization::format(
 #include "PluginSessionIntegration.h"
 #include "PluginExtensionIntegration.h"
 #include "WorldgenV2Integration.h"
+#include "GenerationPolicyV2Integration.h"
 #include "DimensionIntegration.h"
 #include "BlockShapesIntegration.h"
 #include "PluginCapabilitiesIntegration.h"
@@ -266,6 +269,10 @@ std::string Localization::format(
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    if(argc==5&&std::string(argv[1])=="--policy-v2-tests") {
+        try{return GenerationPolicyV2Integration::run(argv[2],argv[3],argv[4]);}
+        catch(const std::exception& error){std::cerr<<"Generation policy V2 failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==4&&std::string(argv[1])=="--capability-tests") {
         try{return PluginCapabilitiesIntegration::run(argv[2],argv[3]);}
         catch(const std::exception& error){std::cerr<<"Capability regression failed: "<<error.what()<<'\n';return 1;}
