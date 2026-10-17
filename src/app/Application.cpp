@@ -186,6 +186,7 @@ private:
         m_plugins.actionTarget=[this](uint64_t id,const std::string& key,bool preview,MC_ActionTarget& out){return m_session.pluginActionTarget(id,key,preview,out);};
         m_plugins.actionState=[this](uint64_t id){return m_session.pluginActionState(id);};
         m_plugins.executeAction=[this](uint64_t id,const std::string& key){const auto before=m_session.activeDimension();const bool done=m_session.pluginExecuteAction(id,key);if(done&&!id&&before!=m_session.activeDimension())m_flow.beginDimensionLoading();return done;};
+        Plugins::useDispatcher()=[this](uint64_t id,const std::string& key){return m_session.pluginUseAction(id,key);};
         Plugins::actionDispatcher()=m_plugins.executeAction;Plugins::targetDispatcher()=m_plugins.actionTarget;
         m_plugins.actionCooldown=[this](uint64_t id,const std::string& key,float& out){return m_session.pluginActionCooldown(id,key,out);};
         m_plugins.teleportPlayer=[this](uint64_t id,uint32_t dim,const double* p){return m_session.pluginTeleport(id,dim,p);};

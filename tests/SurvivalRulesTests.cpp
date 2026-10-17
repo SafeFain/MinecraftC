@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "game/SurvivalRules.h"
 #include "game/InventoryModel.h"
 #include "game/SurvivalBlockLogic.h"
@@ -19,6 +20,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    installHeavenFixture();
     for(uint8_t material=0;material<7;++material) {
         const ItemId ingredient=material==6?ItemId::IRON_INGOT:plankItem(static_cast<DoorMaterial>(material));
         std::array<ItemId,9> grid{};

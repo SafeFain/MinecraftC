@@ -1,3 +1,6 @@
+#include "HeavenContentFixture.h"
+#include "model/GltfLoader.h"
+#include <glm/gtc/matrix_transform.hpp>
 #include "core/Window.h"
 #include "player/PlayerRenderer.h"
 #include "renderer/HeldItemRenderer.h"
@@ -9,6 +12,7 @@
 // Opt-in display-dependent scene harness. Capture mode pauses after each scene
 // so an external screen grab can inspect actual Vulkan output.
 int main(int argc,char** argv) {
+    installHeavenFixture();
     if(argc<2 || argc>5)return 2;
     try {
         bool capture=false,portrait=false,fishingOnly=false,droppedOnly=false;
@@ -22,6 +26,12 @@ int main(int argc,char** argv) {
         const int width=portrait ? 480 : 960;
         const float aspect=static_cast<float>(width)/720;
         const auto root=std::filesystem::absolute(argv[1]);
+        const auto loaded=model::loadGltf(root/"plugins/official_heaven/starstep.gltf");
+        if(!loaded)throw std::runtime_error(loaded.error);
+        Plugins::HeldModelContent scepter;scepter.asset=loaded.asset;
+        const auto first=glm::mat4(1),third=glm::rotate(glm::mat4(1),glm::radians(-120.f),glm::vec3(1,0,0));
+        for(int i=0;i<16;++i){scepter.first[i]=first[i/4][i%4];scepter.third[i]=third[i/4][i%4];}
+        Plugins::content().extensions.heldModels.emplace(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER),scepter);
         Window window(width,720,"MinecraftC held tool smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,root);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);

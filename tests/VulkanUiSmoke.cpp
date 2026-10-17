@@ -51,7 +51,9 @@ struct Access final : IContainerAccess,ITradeAccess {
 int main(int argc,char** argv) {
     if (argc<2 || argc>5) { std::cerr<<"Usage: vulkan_ui_smoke assets [width height] [--capture]\n";return 2; }
     try {
-        const bool capabilities=argc==3&&std::string(argv[2])=="--capabilities";
+        const bool heavenModel=argc==3&&std::string(argv[2])=="--heaven-model";
+        const bool heavenOff=argc==3&&std::string(argv[2])=="--heaven-off";
+        const bool capabilities=heavenModel||(argc==3&&std::string(argv[2])=="--capabilities");
         const bool extensions=argc==4&&std::string(argv[2])=="--extensions";
         const int width=!extensions&&argc>=4?std::stoi(argv[2]):960,height=!extensions&&argc>=4?std::stoi(argv[3]):600;
         const bool capture=argc==5 && std::string(argv[4])=="--capture";
@@ -74,8 +76,9 @@ int main(int argc,char** argv) {
             std::ofstream manifest(package/"mod.json");manifest<<"{\"id\":\"render_demo\",\"version\":\"1.0.0\",\"api\":1,\"visual_only\":true,\"native\":{\"linux\":\""<<module.filename().string()<<"\",\"windows\":\""<<module.filename().string()<<"\",\"macos\":\""<<module.filename().string()<<"\"}}";
         }
         if(capabilities)std::filesystem::copy(assets.parent_path()/"examples/plugins/capability_demo",pluginRoot/"mods/capability_demo",std::filesystem::copy_options::recursive);
-        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true}";}
+        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true,\"official_heaven\":"<<(heavenOff?"false":"true")<<"}";}
         Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
+        if(Plugins::validDimension(1)==heavenOff)throw std::runtime_error("Official provider enabled state mismatch");
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
@@ -126,7 +129,7 @@ int main(int argc,char** argv) {
             for(int i=0;i<8;++i){ParticleRenderData p;p.position={.6f+(i%4)*.1f,(i/4)*.1f,0};p.kind=static_cast<float>(ParticleKind::Plugin);p.texture=Plugins::materialTile(type.material);p.size=type.definition.scale;p.phase=.5f;p.color={type.definition.color[0],type.definition.color[1],type.definition.color[2],type.definition.color[3]};particles.push_back(p);}
             const glm::vec3 camera(0,0,3);const auto vp=glm::perspective(glm::radians(55.0f),window.aspectRatio(),.05f,100.0f)*glm::lookAt(camera,glm::vec3(0),glm::vec3(0,1,0));
             auto captureScene=[&](int content){std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){renderer.beginFrame();renderer.setEnvironment(environment,camera);renderer.setViewProjection(vp);if(content<0)renderer.renderSky(environment,glm::inverse(vp),camera,clouds);
-                if(content>0&&(content&1))held.renderDropped({Plugins::resolveItem("capability_demo:staff"),1,0},vp,{0,0,0},0,0,{1,0});
+                if(content>0&&(content&1))held.renderDropped({heavenModel?ItemId::STARSTEP_SCEPTER:Plugins::resolveItem("capability_demo:staff"),1,0},vp,{0,0,0},0,0,{1,0});
                 if(content>0&&(content&2))renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},0);
                 renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
             captureScene(-1);const auto baseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);if(baseline==modelImage||baseline==particleImage)throw std::runtime_error("Plugin held model/particles did not independently affect Vulkan pixels");
@@ -146,6 +149,7 @@ int main(int argc,char** argv) {
         callbacks.onCreateWorld=[](const std::string&,const std::string&,GameMode,WorldType,bool){};
         callbacks.onOpenWorld=[](const std::string&){};
         callbacks.onDeleteWorld=[](const std::string&){return true;};
+        int sleepChoice=-1;callbacks.onSleepAction=[&](int choice){sleepChoice=choice;};
         std::vector<WorldSummary> worlds;
         for (int i=0;i<6;++i) {
             WorldSummary world;world.id=std::to_string(i);world.displayName="Mountain valley "+std::to_string(i+1);
@@ -154,6 +158,8 @@ int main(int argc,char** argv) {
         MainMenu main(callbacks,worlds,settings,localization,nullptr);
         SettingsMenu options(settings,[]{},[]{},localization);
         PauseMenu pause(callbacks,localization);SleepMenu sleep(callbacks,localization,false);
+        sleep.onKeyPress(Key::Down);sleep.onKeyPress(Key::Down);sleep.onKeyPress(Key::Enter);
+        if(sleepChoice!=(heavenOff?0:2))throw std::runtime_error("Sleep menu Heaven entry did not follow provider state");
         CreativeInventory creative;SurvivalInventoryScreen survival(items);
         ContainerScreen container(items);container.open(access,{0,0,0});
         VillagerTradeScreen trades(items);trades.open(access,1);

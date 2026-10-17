@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "world/HeightPipeline.h"
 #include "world/Noise.h"
 #include "world/TreeGenerator.h"
@@ -2124,6 +2125,7 @@ void testHeaven() {
 
 
 int main(int argc,char** argv) {
+    installHeavenFixture();
     const std::string scenario=argc==2 ? argv[1] : "--all";
     const auto run=[](const char* name,void (*test)()) {
         const auto start=std::chrono::steady_clock::now();

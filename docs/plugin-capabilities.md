@@ -41,6 +41,33 @@ Blocks can bind a special use action. Items can bind an action and restrict use 
 Only owned registered blocks/items can receive behavior. Existing interaction PRE cancellation
 still runs before plugin behavior.
 
+### Behavior V2
+
+Query version 2 as `MC_BehaviorsV2` (`behaviorsV2()`); its `v1` pointer retains
+the frozen V1 table and descriptor layouts. V2 wraps the V1 behavior and adds
+an explicit `fields` mask. An absent field inherits the ordinary behavior;
+present zero light/fuel/tags or an empty drop list are intentional overrides.
+
+- `MC_BLOCK_LIGHT`: light dampening 0–15, used by real chunk lighting.
+- `MC_BLOCK_TAGS` / `MC_ITEM_TAGS`: `MC_TAG_*` bit flags for leaves, planks,
+  fertile/sandy/natural-rock substrates, Heaven soil groups and plants. Leaves
+  affect face data and default light dampening; item planks match plank-variant recipes.
+- `MC_BLOCK_SUBSTRATE`: accept any matching `substrate_tags` below a plant.
+  Generation, manual placement and resident support changes share this predicate.
+- `MC_BLOCK_DROPS`: up to 16 break-drop entries, separate from use harvesting.
+  Existing unbreakable/tool-tier checks run first. A rule succeeds when
+  `randomValue % denominator < numerator`; its count is
+  `minimum + randomValue % (maximum-minimum+1)`. No additional RNG is consumed.
+  Denominators must be nonzero, probabilities bounded, and counts fit the item stack.
+- `MC_ITEM_FUEL`: furnace fuel ticks 0–65535, checked before plank/tool defaults.
+
+JSON uses the same validators through `light_dampening`, integer `tags`,
+`substrate_tags`, `fuel_ticks`, and `break_drops` (entries contain `item`,
+`minimum`, `maximum`, `numerator`, `denominator`). All fields participate in LAN
+identity; invalid registration rolls back the package. Reserved Heaven bindings
+are available only to the compiled-in official owner, preserving V1 namespace rules
+for external plugins.
+
 ## Structures and chest loot
 
 Structures use a dimension key/handle, revision, seed domain and square cell policy.
@@ -132,6 +159,33 @@ There are at most 256 action definitions. The explicit `teleport` API queues a h
 safe same-dimension move. Dimension switching remains available through the dimensions API.
 LAN v6 synchronizes host cooldown/time state; right-use already routes through host actor input.
 Client preview and its target marker use the local replica and never consume items or cooldown.
+
+### Action V2
+
+Query version 2 as `MC_PlayerActionsV2` (`playerActionsV2()`). It retains the V1
+table and adds `MC_PlayerActionV2` with a read-only `MC_ActionViewV2` callback.
+The view contains effective sneak intent (including toggle sneak), item/block
+use source, preview/execution phase, and the host-computed hit position, block and face.
+The generation context uses the generator's already-derived seed and actual parameters.
+Layer sampling is exact and does not load chunks; native Heaven returns five stable
+slots including absent layers, other generators return contiguous terrain spans.
+Block flags expose full/empty collision without allowing world mutation. All readers
+are callback-lifetime only, bounded, and reject unavailable loaded blocks.
+
+V2 targets report `handled` independently from `valid`, so a recognized Skyway
+endpoint consumes use without teleporting or charging costs. Execution recomputes
+the current target, including LAN actor sneak intent and hit; preview coordinates
+are never authoritative. Item durability also participates in queued-action validation.
+V2 optionally measures range from the eye, applies a general use cooldown, selects
+the standard tool hold pose and requests a valid/invalid target marker.
+These registration values participate in LAN identity.
+
+`official_heaven` registers its Skyway and Starstep callbacks through this interface.
+Skyway geometry and actions share a pure anchor policy. Starstep retains the original
+96-block eye ray and ordered 3×3 candidate search, 3-second cooldown and one Survival
+durability cost, with the host's shared safe-landing checks applied before execution.
+Its original five-box mesh and face palette are exported to embedded-image glTF by
+`tools/heaven_model.py`, registered through the existing held-model capability.
 
 ## Environment and presentation
 

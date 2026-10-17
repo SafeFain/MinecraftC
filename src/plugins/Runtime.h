@@ -19,6 +19,7 @@ public:
 };
 inline std::function<bool(uint64_t,const std::string&)>& actionDispatcher(){static std::function<bool(uint64_t,const std::string&)> f;return f;}
 inline std::function<bool(uint64_t,const std::string&,bool,MC_ActionTarget&)>& targetDispatcher(){static std::function<bool(uint64_t,const std::string&,bool,MC_ActionTarget&)> f;return f;}
+inline std::function<bool(uint64_t,const std::string&)>& useDispatcher(){static std::function<bool(uint64_t,const std::string&)> f;return f;}
 using Dispatcher=std::function<void(MC_Event&)>;
 inline Dispatcher& dispatcher() { static Dispatcher value; return value; }
 inline bool dispatch(MC_Event& event) {

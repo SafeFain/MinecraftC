@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "EntityAiTestRenderer.h"
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
@@ -103,6 +104,7 @@ float meshMaximumY(const ChunkMesh& mesh) {
 }
 
 int main() {
+    installHeavenFixture();
     WorldGenerator normal(123456789ULL, WorldType::Normal, DimensionId::Overworld);
     const LodTileKey negative{-3, 2, 2};
     const LodTileData first = buildApproximateLodTile(normal, negative);

@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "world/Block.h"
 #include "world/Chunk.h"
 #include "game/Item.h"
@@ -22,6 +23,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    installHeavenFixture();
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");

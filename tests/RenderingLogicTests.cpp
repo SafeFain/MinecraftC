@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "renderer/RenderEnvironment.h"
 #include "Config.h"
 #include "renderer/Camera.h"
@@ -127,6 +128,7 @@ void verifyCloudLodSurfaces(const std::vector<CloudInstance>& clouds,
 }
 
 int main() {
+    installHeavenFixture();
     const VisualQualityConfig lowVisual = visualQualityConfig(VisualQuality::Low);
     const VisualQualityConfig mediumVisual = visualQualityConfig(VisualQuality::Medium);
     const VisualQualityConfig highVisual = visualQualityConfig(VisualQuality::High);
@@ -460,7 +462,7 @@ int main() {
     checkTool(ItemId::FISHING_ROD,ToolKind::FishingRod,ToolTier::None);
     checkTool(ItemId::SHIELD,ToolKind::Shield,ToolTier::None);
     checkTool(ItemId::FLINT_AND_STEEL,ToolKind::None,ToolTier::None);
-    checkTool(ItemId::STARSTEP_SCEPTER,ToolKind::None,ToolTier::None);
+    require(!hasHeldToolModel(ItemId::STARSTEP_SCEPTER,ToolKind::None),"scepter model must be supplied by official provider");
     const auto bowModel=checkTool(ItemId::BOW,ToolKind::Bow,ToolTier::None);
     require(bowModel.ranges.size()==8,"bow components missing");
     require(!hasHeldToolModel(ItemId::BREAD,ToolKind::None) &&

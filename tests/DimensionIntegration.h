@@ -93,7 +93,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     }
     plugins.travelPlayer={};
     Config::RENDER_DISTANCE=distance;
-    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==2,"safe mode retains only builtin dimensions");safe.shutdown();
+    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==1&&!Plugins::validDimension(1),"safe mode retains only the host Overworld");safe.shutdown();
     std::filesystem::remove_all(root);std::cout<<"Dimension registry/runtime integration passed\n";return 0;
 }
 }

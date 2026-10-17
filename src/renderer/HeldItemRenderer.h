@@ -72,7 +72,8 @@ private:
 
     struct ModelPart {RenderMeshHandle mesh{};RenderTextureHandle texture{};RenderMaterialHandle material{};glm::vec4 color{1};};
     std::unordered_map<uint16_t,std::vector<ModelPart>> m_pluginModels;
-    bool drawPluginModel(const ItemStack&,const glm::mat4&,const glm::mat4&,bool,bool=false);
+    std::unordered_map<uint16_t,glm::mat4> m_pluginDropTransforms;
+    bool drawPluginModel(const ItemStack&,const glm::mat4&,const glm::mat4&,bool,bool=false,glm::vec4=glm::vec4(1));
     CachedMesh meshFor(ItemId item);
     void drawItem(const ItemStack& item, const glm::mat4& vp,
                   const glm::mat4& transform, bool firstPerson);

@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 // Application orchestration tests: drives GameFlowController (and, in later
 // stages, ApplicationInputRouter) with real offscreen-SDL collaborators — a
 // temp-dir GameSession, a concrete GameUiController/GameScenePresenter, and
@@ -381,6 +382,7 @@ struct Harness {
 }
 
 int main(int argc,char** argv) {
+    installHeavenFixture();
     if (argc==3 && std::string(argv[1])=="--dropped-item-tests") {
         checkDroppedItems(argv[2]);return 0;
     }

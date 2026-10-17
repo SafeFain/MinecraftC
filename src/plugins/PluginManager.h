@@ -97,10 +97,13 @@ public:
     const void* capability(const char*,uint32_t);
     void blockBehavior(MC_PluginContext&,const MC_BlockBehavior&);
     void itemBehavior(MC_PluginContext&,const MC_ItemBehavior&);
+    void blockBehaviorV2(MC_PluginContext&,const MC_BlockBehaviorV2&);
+    void itemBehaviorV2(MC_PluginContext&,const MC_ItemBehaviorV2&);
     void lootTable(MC_PluginContext&,const MC_LootTable&);
     void structure(MC_PluginContext&,const MC_StructureDefinition&);
     void structureV2(MC_PluginContext&,const MC_StructureDefinitionV2&);
     void playerAction(MC_PluginContext&,const MC_PlayerAction&);
+    void playerActionV2(MC_PluginContext&,const MC_PlayerActionV2&);
     void environmentProfile(MC_PluginContext&,const MC_EnvironmentProfile&);
     void particleType(MC_PluginContext&,const MC_ParticleDefinition&);
     void heldModel(MC_PluginContext&,const MC_HeldModel&);
@@ -164,4 +167,10 @@ private:
 };
 const MC_Plugin* builtinContent(uint32_t);
 const MC_Plugin* builtinAtmosphere(uint32_t);
+struct BuiltinPluginDescriptor {
+    const char *id,*name,*revision,*resources;
+    bool visual,enabled;
+    const MC_Plugin* (*query)(uint32_t);
+};
+const std::vector<BuiltinPluginDescriptor>& builtinPlugins();
 }

@@ -1085,7 +1085,26 @@ uint8_t getLightEmission(BlockId id) {
     return id == BlockId::FIRE || isLava(id) ? 15 : 0;
 }
 
+uint32_t blockSemanticTags(BlockId id) {
+    if(const auto* b=Plugins::blockBehavior(id))if(b->fields&MC_BLOCK_TAGS)return b->tags;
+    uint32_t tags=0;
+    if(id==BlockId::LEAVES||id==BlockId::BIRCH_LEAVES||id==BlockId::SPRUCE_LEAVES||id==BlockId::JUNGLE_LEAVES||id==BlockId::ACACIA_LEAVES)tags|=MC_TAG_LEAVES;
+    if(id==BlockId::GRASS||id==BlockId::DIRT||id==BlockId::PODZOL||id==BlockId::MOSS||id==BlockId::COARSE_DIRT||id==BlockId::ROOTED_DIRT||id==BlockId::LEAF_LITTER_SOIL||id==BlockId::PEAT||id==BlockId::MUD||id==BlockId::SILT||id==BlockId::LATERITE||id==BlockId::RED_CLAY||id==BlockId::CAVE_MOSS)tags|=MC_TAG_FERTILE;
+    if(id==BlockId::SAND||id==BlockId::RED_SAND||id==BlockId::BLACK_SAND)tags|=MC_TAG_SAND;
+    if(id==BlockId::PLANKS||(id>=BlockId::BIRCH_PLANKS&&id<=BlockId::ACACIA_PLANKS))tags|=MC_TAG_PLANKS;
+    if(id==BlockId::STONE||id==BlockId::DEEPSLATE||id==BlockId::GRANITE||id==BlockId::LIMESTONE||id==BlockId::BASALT||id==BlockId::TUFF||id==BlockId::CALCITE||id==BlockId::DRIPSTONE_BLOCK||id==BlockId::SHALE||id==BlockId::CORAL_ROCK||(id>=BlockId::ANDESITE&&id<=BlockId::MARBLE)||(id>=BlockId::WET_LIMESTONE&&id<=BlockId::SULFUR_ROCK))tags|=MC_TAG_NATURAL_ROCK;
+    return tags;
+}
+bool hasNaturalRockTag(BlockId id){return (blockSemanticTags(id)&MC_TAG_NATURAL_ROCK)!=0;}
+bool isSemanticPlant(BlockId id){if(const auto* b=Plugins::blockBehavior(id))return ((b->fields&MC_BLOCK_TAGS)&&(b->tags&MC_TAG_PLANT))||(b->fields&MC_BLOCK_SUBSTRATE)!=0;return false;}
+bool isLeafBlock(BlockId id){return (blockSemanticTags(id)&MC_TAG_LEAVES)!=0;}
+std::optional<bool> semanticPlantSupport(BlockId plant,BlockId soil){
+    if(const auto* b=Plugins::blockBehavior(plant))if(b->fields&MC_BLOCK_SUBSTRATE)return (blockSemanticTags(soil)&b->substrate)!=0;
+    return {};
+}
+
 uint8_t getLightDampening(BlockId id) {
+    if(const auto* b=Plugins::blockBehavior(id))if(b->fields&MC_BLOCK_LIGHT)return static_cast<uint8_t>(b->light);
     if (id == BlockId::AIR || id == BlockId::GLASS || isBed(id) ||
         getBlockProps(id).shape == RenderShape::Cross ||
         getBlockProps(id).shape == RenderShape::Slab ||
@@ -1098,7 +1117,7 @@ uint8_t getLightDampening(BlockId id) {
     if (id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
         id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
         id == BlockId::ACACIA_LEAVES || id == BlockId::SNOW_LAYER ||
-        id == BlockId::SKYROOT_LEAVES || isLava(id)) return 1;
+        isLeafBlock(id) || isLava(id)) return 1;
     if (isWater(id) || id == BlockId::ICE) return 2;
     return getBlockProps(id).transparent ? 0 : 15;
 }
@@ -1330,7 +1349,7 @@ const std::array<glm::vec3, 24> WIRE_CUBE_VERTICES = {{
 
 const BlockProperties& getBlockProps(BlockId id) {
     if (const auto* block = Plugins::pluginBlock(id)) return block->properties;
-    if (!isValidBlockId(id)) throw std::out_of_range("Invalid block ID");
+    if (static_cast<uint16_t>(id)>=static_cast<uint16_t>(BlockId::COUNT)) throw std::out_of_range("Invalid block ID");
     return BLOCK_TABLE[static_cast<uint16_t>(id)];
 }
 bool isValidBlockId(BlockId id) { return Plugins::validBlock(id); }

@@ -141,8 +141,6 @@ public:
         return m_bowCharging ? bowChargeStrength(m_bowChargeSeconds) : 0.0f;
     }
     std::optional<ProjectileLaunch> bowLaunchPreview() const;
-    std::optional<glm::dvec3> starstepTarget() const;
-    float starstepCooldown() const { return m_starstepCooldown; }
     float attackStrength() const;
     bool hasChargedAttackTarget() const;
     void cancelBowCharge() { m_bowCharging = false; m_bowChargeSeconds = 0.0f; }
@@ -173,6 +171,9 @@ public:
         }
     }
 
+    bool sneakInput() const {return m_sneakInput;}
+    float actionUseCooldown() const {return m_actionCooldown;}
+    void setActionUseCooldown(float seconds){m_actionCooldown=std::max(m_actionCooldown,seconds);}
     ItemStack activeItem() const;
     float pluginCooldown(const std::string& key) const {const auto it=m_pluginCooldowns.find(key);return it==m_pluginCooldowns.end()?0:it->second;}
     void completePluginAction(const std::string& key,float cooldown,uint32_t wear){if(m_gameMode==GameMode::Survival&&wear){auto& s=m_inventory.slot(static_cast<size_t>(m_selectedSlot));const auto maximum=getItemProps(s.id).maxDurability;if(uint32_t(s.damage)+wear>=maximum)s.clear();else s.damage=static_cast<uint16_t>(s.damage+wear);}m_pluginCooldowns[key]=cooldown;startSwing();}
@@ -198,7 +199,6 @@ private:
     glm::vec2 m_visualHorizontalVelocity{0.0f};
     bool m_visualPositionInitialized = false;
     float m_landingSpeed = 0.0f;
-    float m_starstepCooldown = 0.0f;
 
     // View angles
     uint64_t m_roomPlayerId = 0;
@@ -282,7 +282,6 @@ private:
     bool placeBlockImpl();
     DamageOutcome takeDamageImpl(const DamageSourceInfo&);
     bool placeBlock();
-    bool useStarstepScepter();
     bool pluginClimbing() const;
     std::map<std::string,float> m_pluginCooldowns;
     uint32_t m_pluginDamageTicks=0;

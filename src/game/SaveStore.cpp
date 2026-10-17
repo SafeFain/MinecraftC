@@ -317,6 +317,7 @@ CheckedBytes readChecked(const std::filesystem::path& path) {
 }
 
 void appendStack(Bytes& payload, const ItemStack& stack) {
+    if(!Plugins::availableItem(stack.id))throw std::runtime_error("Cannot save unavailable item");
     append(payload, static_cast<uint16_t>(stack.id));
     append(payload, stack.count);
     append(payload, stack.damage);
@@ -580,7 +581,8 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         appendRule(rule.name, rule.value);
     }
     for(uint32_t dimension=0;dimension<2;++dimension) {
-        const auto& g=metadata.generation.at(dimension);Plugins::validateGeneration(g,dimension);
+        const auto found=metadata.generation.find(dimension);const auto g=found==metadata.generation.end()?Plugins::GenerationConfig{}:found->second;
+        if(Plugins::validDimension(dimension))Plugins::validateGeneration(g,dimension);else if(!(g==Plugins::GenerationConfig{}))throw std::runtime_error("Generation for disabled dimension");
         if(g.parameters.size()>4096||g.modifiers.size()>64)throw std::runtime_error("Generation configuration too large");
         Plugins::Json::parse(g.parameters);
         appendString(payload,g.generator);appendString(payload,g.revision);appendString(payload,g.parameters);
@@ -589,7 +591,8 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     }
     // v20 keeps the legacy inspection prefix, then stores authoritative keyed states.
     appendString(payload,Plugins::dimensionKey(metadata.activeDimension));
-    auto generations=metadata.generation;
+    std::map<uint32_t,Plugins::GenerationConfig> generations;
+    for(const auto& entry:metadata.generation)if(Plugins::validDimension(entry.first))generations.emplace(entry);else if(!(entry.second==Plugins::GenerationConfig{}))throw std::runtime_error("Unknown saved dimension");
     for(const auto& entry:Plugins::content().extensions.dimensions)if(!generations.count(entry.first))generations[entry.first]=entry.second.generation;
     append(payload,static_cast<uint32_t>(generations.size()));
     for(const auto& entry:generations) {
@@ -719,14 +722,14 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         Plugins::Json::parse(g.parameters);
         const auto count=reader.read<uint16_t>();if(count>64)throw std::runtime_error("Too many generation modifiers");
         for(uint16_t i=0;i<count;++i){auto key=reader.readString();auto revision=reader.readString();g.modifiers.emplace_back(key,revision);}
-        if(!inspection)Plugins::validateGeneration(g,dimension);
+        if(!inspection&&Plugins::validDimension(dimension))Plugins::validateGeneration(g,dimension);
     }
     if(checked.version>=20) {
         auto resolve=[&](const std::string& key,uint32_t fallback) {
             try{return Plugins::resolveDimension(key);}catch(const std::exception& e){if(!inspection)throw;metadata.pluginCompatibilityError=e.what();return fallback;}
         };
         const auto activeKey=reader.readString();
-        const auto count=reader.read<uint32_t>();if(count<2||count>1024)throw std::runtime_error("Invalid dimension count");
+        const auto count=reader.read<uint32_t>();if(count<1||count>1024)throw std::runtime_error("Invalid dimension count");
         metadata.generation.clear();std::set<std::string> keys;
         for(uint32_t index=0;index<count;++index) {
             const auto key=reader.readString(),revision=reader.readString();if(!keys.insert(key).second)throw std::runtime_error("Duplicate saved dimension");
@@ -745,7 +748,7 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
             state.weather.raining=flag();state.weather.thundering=flag();state.weather.rainTicks=reader.read<uint32_t>();state.weather.thunderTicks=reader.read<uint32_t>();state.weather.sequence=reader.read<uint64_t>();
             if(flag())state.bedSpawn=reader.read<glm::ivec3>();
         }
-        if(!keys.count(activeKey)||!keys.count("minecraftc:overworld")||!keys.count("minecraftc:heaven"))throw std::runtime_error("Missing saved dimension state");
+        if(!keys.count(activeKey)||!keys.count("minecraftc:overworld"))throw std::runtime_error("Missing saved dimension state");
         metadata.activeDimension=static_cast<DimensionId>(resolve(activeKey,2048));
         if(count!=Plugins::content().extensions.dimensions.size()){metadata.pluginCompatibilityError="World dimension registry mismatch";if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
     }

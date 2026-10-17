@@ -17,9 +17,11 @@ public:
         return api->query_extension(ctx,key,version);
     }
     const MC_BehaviorsV1* behaviors() const {return static_cast<const MC_BehaviorsV1*>(extension(MC_BEHAVIORS_EXTENSION));}
+    const MC_BehaviorsV2* behaviorsV2() const {return static_cast<const MC_BehaviorsV2*>(extension(MC_BEHAVIORS_EXTENSION,2));}
     const MC_StructuresV1* structures() const {return static_cast<const MC_StructuresV1*>(extension(MC_STRUCTURES_EXTENSION));}
     const MC_StructuresV2* structuresV2() const {return static_cast<const MC_StructuresV2*>(extension(MC_STRUCTURES_EXTENSION,2));}
     const MC_PlayerActionsV1* playerActions() const {return static_cast<const MC_PlayerActionsV1*>(extension(MC_PLAYER_ACTIONS_EXTENSION));}
+    const MC_PlayerActionsV2* playerActionsV2() const {return static_cast<const MC_PlayerActionsV2*>(extension(MC_PLAYER_ACTIONS_EXTENSION,2));}
     const MC_EnvironmentV1* environment() const {return static_cast<const MC_EnvironmentV1*>(extension(MC_ENVIRONMENT_EXTENSION));}
     const MC_PresentationV1* presentation() const {return static_cast<const MC_PresentationV1*>(extension(MC_PRESENTATION_EXTENSION));}
     const MC_BlockShapesV1* blockShapes() const {return static_cast<const MC_BlockShapesV1*>(extension(MC_BLOCK_SHAPES_EXTENSION));}

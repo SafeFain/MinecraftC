@@ -120,6 +120,24 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(clientSession.playerState().activeItem().damage==1&&clientSession.playerState().pluginCooldown("capability_native:blink")>0,"host cooldown/wear reaches replica");
         MC_DimensionTime clientTime{};clientTime.size=sizeof(clientTime);check(clientSession.pluginDimensionTime(0,clientTime)&&clientTime.cycle_seconds==45&&clientTime.advancing==1,"time override reaches replica");
         clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Release);
+        // V2 is exercised through real guest input; toggle sneak remains latched
+        // after release, and the host derives the destination from that intent.
+        const auto contextStaff=Plugins::resolveItem("capability_native:context_staff");
+        guest.player.inventory().slot(0)={contextStaff,1,0};guest.player.setPosition({.5,1.01,.5});
+        GameSessionTestAccess::tickLanPlayers(hostSession,.2f); // Polling alone does not advance the previous use cooldown.
+        for(int i=0;i<100&&clientSession.playerState().activeItem().id!=contextStaff;++i)pump();
+        check(clientSession.playerState().activeItem().id==contextStaff,"V2 LAN item replica");
+        InputState sneak;std::array<InputBinding,INPUT_ACTION_COUNT> emptyBindings{};
+        clientSession.setToggleSneak(true);sneak.setVirtual(InputAction::Sneak,1);sneak.update(emptyBindings);clientSession.handleMovement(sneak,0);
+        sneak.beginFrame();sneak.clearVirtual();sneak.update(emptyBindings);clientSession.handleMovement(sneak,0);
+        check(clientSession.playerState().sneakInput(),"toggle sneak lost intent after release");
+        for(int i=0;i<20;++i)pump();
+        GameSessionTestAccess::tickLanPlayers(hostSession,.05f); // Observe Use released before the next press edge.
+        check(!clientSession.pluginExecuteAction(peer,"capability_native:context"),"client executed V2 authority action");
+        clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);for(int i=0;i<20;++i)pump();GameSessionTestAccess::tickLanPlayers(hostSession,.05f);
+        check(guest.player.sneakInput()&&guest.player.getPosition().x==-1.5,"LAN V2 used key release or old preview instead of latched intent");
+        clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Release);clientSession.setToggleSneak(false);sneak.beginFrame();sneak.update(emptyBindings);clientSession.handleMovement(sneak,0);
+        for(int i=0;i<20;++i)pump();GameSessionTestAccess::tickLanPlayers(hostSession,.05f);
         MC_ParticleEmission networkEmission{sizeof(networkEmission),0,3,0,"capability_native:spark",{2.5,2,0}};
         const auto before=GameSessionTestAccess::particleCount(clientSession);check(hostSession.pluginEmitParticle(networkEmission),"host world particle emission");for(int i=0;i<30;++i)pump();
         check(GameSessionTestAccess::particleCount(clientSession)==before+3,"dimension-scoped particles reach LAN client");

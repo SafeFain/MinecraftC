@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "game/WorldCatalog.h"
 #include "world/WorldGenContext.h"
 
@@ -15,6 +16,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    installHeavenFixture();
     const auto root = std::filesystem::temp_directory_path() /
         ("minecraftc-catalog-test-" + std::to_string(
             static_cast<unsigned long long>(std::rand())));

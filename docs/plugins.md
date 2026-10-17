@@ -23,6 +23,20 @@ The builtin examples are disabled by default:
 - `official_content`: crystal block, crystal items, crafting and a use callback.
 - `official_atmosphere`: environment colors and a HUD label, marked visual-only.
 
+`official_heaven` is enabled by default. It owns the optional Heaven dimension,
+reserved Heaven block/item slots, gameplay semantics, Skyway and Starstep actions,
+and the packaged Starstep model under `assets/plugins/official_heaven/`.
+Disabling it (or using safe mode) removes Heaven travel, content, crafting and smelting
+from gameplay after restart. Serialized numbers and keys remain reserved; external
+packages cannot claim the official identity or dimension handle 1.
+
+Worlds require the exact gameplay plugin set and package fingerprint. The addition
+of this provider makes worlds saved with the previous plugin set incompatible.
+They remain listed, refuse opening without writes, and are not migrated. Worlds
+created with Heaven disabled contain only the dimensions currently registered.
+Enabling Heaven later also changes that world's required set. Terrain generation
+remains global v20 / Heaven v9; save v21 and numeric content IDs are unchanged.
+
 Desktop Linux, Windows and macOS can load native shared libraries. Android/iOS
 accept data packages and compiled-in code plugins; external native libraries are
 unsupported. Native plugins execute trusted code in the game's process. This ABI
@@ -223,8 +237,10 @@ peers receive a reason when the transport can deliver its terminal frame.
 ## Dimension registration (ABI 1, extension version 1)
 
 Query `minecraftc.dimensions` as `MC_DimensionsV1`, or use `minecraftc::Host::dimensions()`.
-Builtin keys `minecraftc:overworld` and `minecraftc:heaven` keep handles 0 and 1.
+The host's `minecraftc:overworld` keeps handle 0. `official_heaven` publishes
+`minecraftc:heaven` at reserved handle 1 only when successfully enabled.
 Additional dimensions receive launch-local uint32 handles. Persist keys, never handles.
+Their handles start at 2 even when Heaven is absent.
 Builtin definitions cannot be replaced. The registry supports up to 1024 dimensions,
 including builtins, and freezes before opening worlds.
 

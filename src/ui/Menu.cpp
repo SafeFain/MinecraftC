@@ -329,6 +329,7 @@ void MainMenu::rebuildButtons() {
             });
         const bool extensions=!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty();
         if(extensions)for(uint32_t dimension=0;dimension<2;++dimension) {
+            if(!Plugins::validDimension(dimension))continue;
             const auto& selected=m_generation[dimension];
             std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
             m_buttons.emplace_back(m_localization.format(dimension==0?"menu.create.generator_overworld":"menu.create.generator_heaven",{name}),[this,dimension]{
@@ -865,7 +866,7 @@ SleepMenu::SleepMenu(
         [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(0); });
     m_buttons.emplace_back(localization.text("sleep.leave_bed"),
         [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(1); });
-    if (!heaven) {
+    if (!heaven && Plugins::validDimension(DimensionId::Heaven)) {
         m_buttons.emplace_back(localization.text("sleep.travel_heaven"),
             [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(2); });
     }

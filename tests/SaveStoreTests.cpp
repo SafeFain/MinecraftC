@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "plugins/ContentRegistry.h"
 #include "game/SaveStore.h"
 #include "Config.h"
@@ -110,6 +111,7 @@ void writeLittleEndian(std::vector<uint8_t>& bytes, size_t offset,
 }
 
 int main() {
+    installHeavenFixture();
     const auto root = std::filesystem::temp_directory_path() /
         ("minecraftc-save-test-" + std::to_string(
             static_cast<unsigned long long>(std::rand())));

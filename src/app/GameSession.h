@@ -217,7 +217,8 @@ public:
     bool pluginBlockInteraction(uint32_t,int32_t,int32_t,int32_t,bool,bool);
     bool pluginTravel(uint64_t,uint32_t);
     Player* pluginActor(uint64_t,uint32_t&);
-    bool pluginActionTarget(uint64_t,const std::string&,bool,MC_ActionTarget&);
+    bool pluginActionTarget(uint64_t,const std::string&,bool,MC_ActionTarget&,bool* handled=nullptr);
+    bool pluginUseAction(uint64_t,const std::string&);
     bool pluginExecuteAction(uint64_t,const std::string&);
     bool pluginActionCooldown(uint64_t,const std::string&,float&);
     uint64_t pluginActionState(uint64_t);

@@ -45,6 +45,19 @@ void PluginManager::itemBehavior(MC_PluginContext& c,const MC_ItemBehavior& d){
     if(!b.dimension.empty())reference(c,b.dimension);
     require(content().extensions.itemBehaviors.emplace(static_cast<uint16_t>(resolveItem(d.item)),b).second,"Duplicate item behavior");
 }
+void PluginManager::blockBehaviorV2(MC_PluginContext& c,const MC_BlockBehaviorV2& d){
+    require(d.size>=sizeof(d)&&d.fields<=15&&d.light_dampening<=15&&d.tags<=255&&d.substrate_tags<=255&&d.drop_count<=16&&(!d.drop_count||d.drops),"Invalid block semantics");
+    std::vector<BlockBehaviorContent::Drop> drops;
+    for(uint32_t i=0;i<d.drop_count;++i){const auto& r=d.drops[i];reference(c,str(r.item));require(r.minimum<=r.maximum&&r.maximum<=64&&r.denominator&&r.numerator<=r.denominator,"Invalid break drop");drops.push_back({r.item,r.minimum,r.maximum,r.numerator,r.denominator});}
+    blockBehavior(c,d.base);
+    auto& b=content().extensions.blockBehaviors.at(static_cast<uint16_t>(resolveBlock(d.base.block)));
+    b.fields=d.fields;b.light=d.light_dampening;b.tags=d.tags;b.substrate=d.substrate_tags;b.drops=std::move(drops);
+}
+void PluginManager::itemBehaviorV2(MC_PluginContext& c,const MC_ItemBehaviorV2& d){
+    require(d.size>=sizeof(d)&&d.fields<=3&&d.fuel_ticks<=65535&&d.tags<=255,"Invalid item semantics");
+    itemBehavior(c,d.base);auto& b=content().extensions.itemBehaviors.at(static_cast<uint16_t>(resolveItem(d.base.item)));
+    b.fields=d.fields;b.fuel=d.fuel_ticks;b.tags=d.tags;
+}
 void PluginManager::lootTable(MC_PluginContext& c,const MC_LootTable& d){
     require(d.size>=sizeof(d)&&d.entries&&d.count&&d.count<=256,"Invalid loot table");owned(c,str(d.key));
     LootContent l;l.key=d.key;l.revision=str(d.revision);require(l.revision.size()<=128,"Loot revision too long");
@@ -88,6 +101,13 @@ void PluginManager::playerAction(MC_PluginContext& c,const MC_PlayerAction& d){
     require(content().extensions.actions.size()<256,"Too many player actions");
     require(content().extensions.actions.emplace(a.key,std::move(a)).second,"Duplicate action");
 }
+void PluginManager::playerActionV2(MC_PluginContext& c,const MC_PlayerActionV2& d){
+    require(d.size>=sizeof(d)&&d.target&&!d.base.target&&d.base.kind==MC_ACTION_TELEPORT&&d.range_from_eye<=1&&d.tool_pose<=1&&d.invalid_marker<=1,"Invalid action V2");number(d.use_cooldown,0,3600);
+    playerAction(c,d.base);auto& a=content().extensions.actions.at(d.base.key);
+    a.rangeFromEye=d.range_from_eye!=0;a.toolPose=d.tool_pose!=0;a.invalidMarker=d.invalid_marker!=0;a.useCooldown=d.use_cooldown;
+    const auto f=d.target;const auto u=d.base.userdata;const auto index=c.index;
+    a.targetV2=[this,f,u,index](const MC_ActionViewV2& v,MC_ActionTargetV2& t){if(!m_info[index].active)return false;const auto phase=m_phase;const auto readonly=m_readOnly;m_phase=MC_HUD;m_readOnly=true;bool ok=false;try{if(f(&v,&t,u))callbackFault(index,"Action V2 callback failed");else ok=true;}catch(...){callbackFault(index,"Exception across action V2 ABI");}m_phase=phase;m_readOnly=readonly;return ok;};
+}
 void PluginManager::environmentProfile(MC_PluginContext& c,const MC_EnvironmentProfile& d){
     require(d.size>=sizeof(d)&&d.parameters.size>=sizeof(d.parameters)&&validDimension(d.dimension),"Invalid environment profile");
     require(m_phase==MC_REGISTER&&!content().frozen,"Environment registration closed");const auto key=str(d.key);require(validKey(key)&&key.rfind(m_info.at(c.index).manifest.id+":",0)==0,"Environment key must use own namespace");
@@ -122,6 +142,7 @@ void PluginManager::playlist(MC_PluginContext& c,const MC_MusicPlaylist& d){
 }
 void PluginManager::validateCapabilities(){
     const auto& e=content().extensions;
+    for(const auto& pair:e.blockBehaviors)for(const auto& d:pair.second.drops)require(resolveItem(d.item)!=ItemId::EMPTY&&d.maximum<=getItemProps(resolveItem(d.item)).maxStack,"Invalid break drop stack");
     for(const auto& pair:e.loot)for(const auto& b:pair.second.entries){const auto id=resolveItem(b.item);require(id!=ItemId::EMPTY&&b.maximum<=getItemProps(id).maxStack,"Invalid loot item stack");}
     for(const auto& pair:e.structures)for(const auto& b:pair.second.blocks)if(!b.loot.empty())require(e.loot.count(b.loot),"Unknown structure loot table");
     for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;if(!b.harvest.empty()){require(resolveItem(b.harvest)!=ItemId::EMPTY,"Empty harvest item");require(b.harvestCount<=getItemProps(resolveItem(b.harvest)).maxStack,"Harvest stack too large");const auto replacement=resolveBlock(b.replacement);require(!b.resetTicks||replacement!=static_cast<BlockId>(pair.first),"Reset requires distinct replacement");}if(!b.action.empty())require(e.actions.count(b.action),"Unknown block action");}
@@ -131,11 +152,13 @@ void PluginManager::validateCapabilities(){
 }
 void PluginManager::describeCapabilities(){
     const auto& e=content().extensions;auto& n=content().networkDescription;using J=nlohmann::json;
+    for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;J drops=J::array();for(const auto& d:b.drops)drops.push_back({d.item,d.minimum,d.maximum,d.numerator,d.denominator});if(b.fields)n["semantics/block/"+blockKey(static_cast<BlockId>(pair.first))]=J::array({b.fields,b.light,b.tags,b.substrate,drops}).dump();}
+    for(const auto& pair:e.itemBehaviors){const auto& b=pair.second;if(b.fields)n["semantics/item/"+itemKey(static_cast<ItemId>(pair.first))]=J::array({b.fields,b.fuel,b.tags}).dump();}
     for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;n["behavior/block/"+blockKey(static_cast<BlockId>(pair.first))]=J::array({b.climbable,b.replaceable,b.support,b.encouragement,b.flammability,b.damage,b.harvest,b.harvestCount,b.replacement,b.resetTicks,b.action}).dump();}
     for(const auto& pair:e.itemBehaviors)n["behavior/item/"+itemKey(static_cast<ItemId>(pair.first))]=J::array({pair.second.action,pair.second.dimension}).dump();
     for(const auto& pair:e.loot){J entries=J::array();for(const auto& b:pair.second.entries)entries.push_back({b.item,b.minimum,b.maximum,b.chance});n["loot/"+pair.first]=J::array({pair.second.revision,entries}).dump();}
     for(const auto& pair:e.structures){const auto& s=pair.second;J blocks=J::array();for(const auto& b:s.blocks)blocks.push_back({b.x,b.y,b.z,blockKey(static_cast<BlockId>(b.id)),b.loot});n["structure/"+pair.first]=J::array({dimensionContent(s.dimension).key,s.revision,s.cell,s.chance,s.radius,s.height,s.tolerance,s.domain,blocks,s.build!=nullptr}).dump();if(s.placements){auto description=J::parse(n["structure/"+pair.first]);description.push_back(J::array({"placements-v2",s.minY,s.maxY,s.order,s.buildV2!=nullptr}));n["structure/"+pair.first]=description.dump();}}
-    for(const auto& pair:e.actions){const auto& a=pair.second;n["action/"+pair.first]=J::array({a.kind,a.dimension,a.range,a.cooldown,a.durability,bool(a.target)}).dump();}
+    for(const auto& pair:e.actions){const auto& a=pair.second;if(a.targetV2)n["action-v2/"+pair.first]=J::array({a.rangeFromEye,a.toolPose,a.invalidMarker,a.useCooldown}).dump();n["action/"+pair.first]=J::array({a.kind,a.dimension,a.range,a.cooldown,a.durability,bool(a.target)}).dump();}
 }
 uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest& d){
     require(!m_readOnly,"Read-only callback cannot request an action");
@@ -145,6 +168,17 @@ uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest&
 }
 MC_ActionResult PluginManager::actionResult(MC_PluginContext& c,uint64_t id) const{const auto it=m_actionResults.find(id);require(it!=m_actionResults.end()&&it->second.owner==c.index,"Unknown action receipt");return {sizeof(MC_ActionResult),it->second.status,id};}
 const void* PluginManager::capability(const char* name,uint32_t version){
+    if(name&&version==2&&std::string(name)==MC_PLAYER_ACTIONS_EXTENSION){
+        static const MC_PlayerActionsV2 actions{sizeof(MC_PlayerActionsV2),2,
+            [](MC_PluginContext* c,const MC_PlayerActionV2* d){return call(c,[&]{require(d,"Missing action V2");manager(c).playerActionV2(*c,*d);},true);},
+            static_cast<const MC_PlayerActionsV1*>(capability(MC_PLAYER_ACTIONS_EXTENSION,1))};return &actions;
+    }
+    if(name&&version==2&&std::string(name)==MC_BEHAVIORS_EXTENSION){
+        static const MC_BehaviorsV2 behaviors{sizeof(MC_BehaviorsV2),2,
+            [](MC_PluginContext* c,const MC_BlockBehaviorV2* d){return call(c,[&]{require(d,"Missing behavior V2");manager(c).blockBehaviorV2(*c,*d);},true);},
+            [](MC_PluginContext* c,const MC_ItemBehaviorV2* d){return call(c,[&]{require(d,"Missing item behavior V2");manager(c).itemBehaviorV2(*c,*d);},true);},
+            static_cast<const MC_BehaviorsV1*>(capability(MC_BEHAVIORS_EXTENSION,1))};return &behaviors;
+    }
     if(name&&version==2&&std::string(name)==MC_STRUCTURES_EXTENSION) {
         static const MC_StructuresV2 structures{sizeof(MC_StructuresV2),2,
             [](MC_PluginContext* c,const MC_StructureDefinitionV2* d){return call(c,[&]{require(d,"Missing structure V2");manager(c).structureV2(*c,*d);},true);},

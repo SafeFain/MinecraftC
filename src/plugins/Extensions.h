@@ -41,10 +41,7 @@ struct DimensionContent {
 };
 inline std::map<uint32_t,DimensionContent> builtinDimensions() {
     DimensionContent overworld;overworld.key="minecraftc:overworld";overworld.name="Overworld";
-    DimensionContent heaven;heaven.key="minecraftc:heaven";heaven.name="Heaven";
-    heaven.weather=MC_WEATHER_CLEAR;heaven.natural=false;
-    heaven.deathTarget=overworld.key;heaven.voidTarget=overworld.key;
-    return {{0,overworld},{1,heaven}};
+    return {{0,overworld}};
 }
 struct GeneratorContent {
     std::string key, name, revision;
@@ -87,12 +84,15 @@ struct DeclarativeRenderPass {
     MC_RenderHandle scenePipeline=0;
 };
 struct BlockBehaviorContent {
+    struct Drop {std::string item;uint32_t minimum=0,maximum=0,numerator=0,denominator=1;};
+    uint32_t fields=0,light=0,tags=0,substrate=0;
+    std::vector<Drop> drops;
     bool climbable=false, replaceable=false;
     uint32_t support=0, encouragement=0, flammability=0, harvestCount=0, resetTicks=0;
     float damage=0;
     std::string harvest, replacement, action;
 };
-struct ItemBehaviorContent {std::string action, dimension;};
+struct ItemBehaviorContent {std::string action, dimension;uint32_t fields=0,fuel=0,tags=0;};
 struct LootContent {
     struct Entry {std::string item;uint32_t minimum=0,maximum=0,chance=0;};
     std::string key,revision;
@@ -112,6 +112,9 @@ struct StructureContent {
     void* userdata=nullptr;
 };
 struct ActionContent {
+    std::function<bool(const MC_ActionViewV2&,MC_ActionTargetV2&)> targetV2;
+    bool rangeFromEye=false,toolPose=false,invalidMarker=false;
+    float useCooldown=0;
     std::string key,dimension;
     uint32_t kind=0,durability=0;
     float range=32,cooldown=0;

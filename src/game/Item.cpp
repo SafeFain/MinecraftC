@@ -801,7 +801,7 @@ std::array<std::vector<ItemId>, categoryCount> buildCategoryItems() {
     for (size_t raw = 1; raw < itemCount; ++raw) {
         const ItemId id = static_cast<ItemId>(raw);
         const auto& props = getItemProps(id);
-        if (props.name.empty() || props.maxStack == 0) continue;
+        if (props.name.empty() || props.maxStack == 0 || !Plugins::availableItem(id)) continue;
         const auto category = categoryFor(id);
         if (category != CreativeItemCategory::Count)
             buckets[static_cast<size_t>(category)].push_back(id);
@@ -843,11 +843,11 @@ const CreativeCategoryInfo& creativeCategoryInfo(CreativeItemCategory category) 
 }
 
 bool isValidItemId(ItemId id) {
-    return static_cast<size_t>(id) < itemCount || Plugins::pluginItem(id);
+    return (static_cast<size_t>(id) < itemCount && Plugins::availableItem(id)) || Plugins::pluginItem(id);
 }
 
 const ItemProperties& getItemProps(ItemId id) {
-    if (!isValidItemId(id)) throw std::out_of_range("Invalid serialized item id");
+    if (static_cast<size_t>(id)>=itemCount&&!Plugins::pluginItem(id)) throw std::out_of_range("Invalid serialized item id");
     if (const auto* item = Plugins::pluginItem(id)) return item->properties;
     return REGISTRY[static_cast<size_t>(id)];
 }
@@ -1056,7 +1056,7 @@ std::vector<ItemId> creativeInventoryItems() {
     for (size_t raw = 1; raw < itemCount; ++raw) {
         const ItemId id = static_cast<ItemId>(raw);
         const auto& props = getItemProps(id);
-        if (!props.name.empty() && props.maxStack > 0) items.push_back(id);
+        if (!props.name.empty() && props.maxStack > 0 && Plugins::availableItem(id)) items.push_back(id);
     }
     for (const auto& entry : Plugins::content().items) items.push_back(static_cast<ItemId>(entry.first));
     return items;
@@ -1080,7 +1080,7 @@ std::optional<ItemId> itemFromCommandName(std::string_view name) {
         if (entry.second.key == name) return static_cast<ItemId>(entry.first);
     for (size_t i = 1; i < itemCount; ++i) {
         const auto id = static_cast<ItemId>(i);
-        if (itemCommandName(id) == name) return id;
+        if (Plugins::availableItem(id) && itemCommandName(id) == name) return id;
     }
     return std::nullopt;
 }
@@ -1092,6 +1092,7 @@ ItemId plankItem(DoorMaterial material) {
     return items[static_cast<uint8_t>(material)];
 }
 bool isWoodPlankItem(ItemId id) {
-    return id==ItemId::OAK_PLANKS || id==ItemId::SKYROOT_PLANKS ||
+    if(const auto* b=Plugins::itemBehavior(id))if(b->fields&MC_ITEM_TAGS)return (b->tags&MC_TAG_PLANKS)!=0;
+    return id==ItemId::OAK_PLANKS ||
         (id>=ItemId::BIRCH_PLANKS && id<=ItemId::ACACIA_PLANKS);
 }

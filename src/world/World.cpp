@@ -15,6 +15,7 @@
 #include "world/BlockLightLogic.h"
 #include "world/FluidLogic.h"
 #include "world/WorldGenContext.h"
+#include "world/BiomeBlockLogic.h"
 
 #include <cmath>
 #include <algorithm>
@@ -776,6 +777,7 @@ void World::validateInteractiveNeighbors(const glm::ivec3& p) {
         else if(const auto* behavior=Plugins::blockBehavior(id)) {
             if(behavior->support){const auto offset=glm::ivec3(0,behavior->support==2?1:-1,0);const auto support=getLoadedBlock(q.x,q.y+offset.y,q.z);
                 if(support)invalid=!blockSupportsFace(*support,behavior->support==2?FaceDir::BOTTOM:FaceDir::TOP);}
+            if(behavior->fields&MC_BLOCK_SUBSTRATE){const auto soil=getLoadedBlock(q.x,q.y-1,q.z);if(soil)invalid=invalid||!supportsBiomePlant(id,*soil);}
         }
         if(invalid) {
             if(gameRules().boolean(GameRuleId::BlockDrops)) m_supportDrops.push_back({q,{itemForBlock(id),1,0}});

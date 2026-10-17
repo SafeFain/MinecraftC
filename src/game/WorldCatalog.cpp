@@ -65,7 +65,7 @@ std::string WorldCatalog::create(
     WorldType worldType,const std::array<Plugins::GenerationConfig,2>& generation) const {
     if (static_cast<uint8_t>(worldType) > static_cast<uint8_t>(WorldType::Superflat))
         throw std::runtime_error("Invalid world type");
-    for(uint32_t dimension=0;dimension<2;++dimension)Plugins::validateGeneration(generation[dimension],dimension);
+    for(uint32_t dimension=0;dimension<2;++dimension){if(Plugins::validDimension(dimension))Plugins::validateGeneration(generation[dimension],dimension);else if(!(generation[dimension]==Plugins::GenerationConfig{}))throw std::runtime_error("Disabled dimension generation");}
     std::filesystem::create_directories(m_savesDirectory);
     const std::string base = slug(displayName);
     std::string id = base;
@@ -77,7 +77,7 @@ std::string WorldCatalog::create(
     metadata.displayName = displayName.empty() ? "New World" : displayName;
     metadata.seed = seed;
     for(const auto& entry:Plugins::content().extensions.dimensions)metadata.generation[entry.first]=entry.second.generation;
-    for(uint32_t d=0;d<2;++d)metadata.generation[d]=generation[d];
+    for(uint32_t d=0;d<2;++d)if(Plugins::validDimension(d))metadata.generation[d]=generation[d];
     metadata.generationVersion = WorldGenContext::GENERATION_VERSION;
     metadata.gameMode = mode;
     metadata.difficulty = difficulty;

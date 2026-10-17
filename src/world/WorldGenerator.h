@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/Noise.h"
+#include "plugins/HeavenSkywayPolicy.h"
 #include "plugins/Extensions.h"
 #include "world/BiomeMap.h"
 #include "world/HeightPipeline.h"
@@ -61,12 +62,7 @@ public:
         bool replacesSurface = false;
         HeavenBiome biome = HeavenBiome::DawnMeadow;
     };
-    struct HeavenSkyway {
-        int worldX = 0;
-        int worldZ = 0;
-        int mainFloorY = 0;
-        bool origin = false;
-    };
+    using HeavenSkyway = HeavenPolicy::HeavenSkyway;
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
     // Callback for structure blocks outside the current chunk.  Unlike

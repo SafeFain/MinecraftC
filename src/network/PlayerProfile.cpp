@@ -146,7 +146,18 @@ std::filesystem::path ProfileStore::path(const std::string& id) const {
 }
 Identity ProfileStore::localIdentity(const std::filesystem::path& directory) {
     const auto file=directory/"lan-identity";
-    if(std::filesystem::exists(file)) return decodeProfile(readFile(file)).identity;
+    // The account identity is shared across worlds/plugin sets. Read only its
+    // checksummed identity prefix; world-owned profiles still decode strictly.
+    if(std::filesystem::exists(file)) {
+        const auto bytes=readFile(file);if(bytes.size()<14)throw ProtocolError("Invalid identity file");
+        Bytes payload(bytes.begin(),bytes.end()-8),trailer(bytes.end()-8,bytes.end());Reader check(trailer);
+        if(check.u64()!=checksum(payload))throw ProtocolError("Identity checksum mismatch");
+        Reader reader(payload);if(reader.u32()!=PROFILE_MAGIC||reader.u16()!=PROFILE_VERSION)throw ProtocolError("Unsupported identity format");
+        const auto count=reader.u16();if(!count||count>51)throw ProtocolError("Invalid identity palette");
+        for(uint16_t i=0;i<count;++i){reader.u16();reader.text(256);}
+        Identity identity;identity.id=reader.text(32);identity.credential=reader.text(32);identity.nickname=reader.text(64);
+        if(!validIdentity(identity))throw ProtocolError("Invalid local identity");return identity;
+    }
     PlayerProfile profile;profile.identity={randomToken(),randomToken(),"Player"};writeFile(file,encodeProfile(profile));return profile.identity;
 }
 bool ProfileStore::setLocalNickname(const std::filesystem::path& directory, const std::string& nickname) {

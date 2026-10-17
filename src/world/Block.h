@@ -473,11 +473,11 @@ extern const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BL
 const BlockProperties& getBlockProps(BlockId id);
 bool isValidBlockId(BlockId id);
 
-inline bool isLeafBlock(BlockId id) {
-    return id == BlockId::LEAVES || id == BlockId::BIRCH_LEAVES ||
-           id == BlockId::SPRUCE_LEAVES || id == BlockId::JUNGLE_LEAVES ||
-           id == BlockId::ACACIA_LEAVES || id == BlockId::SKYROOT_LEAVES;
-}
+uint32_t blockSemanticTags(BlockId id);
+bool isLeafBlock(BlockId id);
+bool isSemanticPlant(BlockId id);
+bool hasNaturalRockTag(BlockId id);
+std::optional<bool> semanticPlantSupport(BlockId plant, BlockId soil);
 
 // Face data uses additive bands so shaders can retain leaf lighting while
 // distinguishing foliage that must preserve its authored cutout silhouette.

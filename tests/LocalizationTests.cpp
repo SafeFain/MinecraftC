@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "game/ArabicShaper.h"
 #include "game/Localization.h"
 #include "game/Utf8.h"
@@ -26,6 +27,7 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    installHeavenFixture();
     const std::filesystem::path root = MINECRAFTC_SOURCE_DIR;
     Localization localization;
     localization.load(root / "assets");

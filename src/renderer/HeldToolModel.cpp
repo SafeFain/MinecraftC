@@ -50,8 +50,7 @@ glm::mat4 rod(glm::vec3 a, glm::vec3 b, float thickness) {
 }
 
 bool hasHeldToolModel(ItemId id, ToolKind tool) {
-    return tool != ToolKind::None || id == ItemId::FLINT_AND_STEEL ||
-        id == ItemId::STARSTEP_SCEPTER;
+    return tool != ToolKind::None || id == ItemId::FLINT_AND_STEEL;
 }
 
 TextureData buildHeldToolTexture() {
@@ -118,12 +117,6 @@ HeldToolModel buildHeldToolModel(ItemId id, ToolKind tool, ToolTier tier) {
         add({.08f,.14f,0},{.34f,.08f,.10f},Iron);
         add({.21f,.01f,0},{.08f,.26f,.10f},Iron);
         add({.08f,-.10f,0},{.26f,.08f,.10f},Iron);
-    } else if(id==ItemId::STARSTEP_SCEPTER) {
-        add({0,.24f,0},{.10f,1.05f,.10f},Handle);
-        add({0,.72f,0},{.26f,.10f,.26f},Gold);
-        add({0,.90f,0},{.20f,.28f,.20f},Crystal);
-        add({0,1.07f,0},{.12f,.10f,.12f},Diamond);
-        add({0,-.20f,0},{.14f,.10f,.14f},Gold);
     } else {
         add(tool==ToolKind::Sword ? glm::vec3(0,-.01f,0) : glm::vec3(0,.14f,0),
             tool==ToolKind::Sword ? glm::vec3(.10f,.58f,.10f) : glm::vec3(.10f,.78f,.10f),Handle);

@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "world/BiomeBlockLogic.h"
 #include "game/InventoryModel.h"
 #include "game/VillagerTrade.h"
@@ -19,6 +20,7 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    installHeavenFixture();
 
 
     static_assert(static_cast<uint16_t>(BlockId::BLACK_WOOL) == 200);

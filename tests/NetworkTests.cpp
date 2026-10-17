@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "core/NetworkSocket.h"
 #include "network/Connection.h"
 #include "network/Protocol.h"
@@ -16,6 +17,7 @@ void check(bool passed,const char* message) { if(!passed) { std::cerr<<message<<
 template<class F> void rejects(F function) { bool rejected=false; try { function(); } catch(const Lan::ProtocolError&) { rejected=true; } check(rejected,"Invalid message accepted"); }
 }
 int main() {
+    installHeavenFixture();
     using namespace Lan;
     Writer writer; writer.u8(255);writer.u16(0x1234);writer.u32(0x12345678);writer.u64(UINT64_MAX);writer.f32(-1.25f);writer.f64(-4096.5);writer.text("局域网");
     Reader reader(writer.bytes);

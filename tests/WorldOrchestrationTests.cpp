@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 // World orchestration tests: exercise the World facade's state transitions
 // (chunk streaming, async generation handoff, persistence queues, mesh
 // revision handoff, fluid ticks, seed reset) through the public API. These
@@ -1343,6 +1344,7 @@ void testGuestStreamingInterests() {
 }
 
 int main() {
+    installHeavenFixture();
     testGuestStreamingInterests();
     testDoorsAndButtons();
     testChunkStreaming();

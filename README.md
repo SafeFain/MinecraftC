@@ -358,6 +358,13 @@ and restart. See [plugin installation and SDK](docs/plugins.md) for platform sup
 examples and world compatibility. LAN rooms support matching gameplay plugins; visual-only
 plugins may differ. Install required plugins locally before joining. `--safe-mode` starts with optional plugins disabled.
 
+Heaven is supplied by the default-enabled `official_heaven` builtin provider.
+Disabling it and restarting removes its dimension, travel entry, content and recipes.
+Worlds require the exact gameplay plugin set: changing this switch, missing resources,
+or a package revision mismatch leaves affected saves listed as incompatible and refuses
+opening without rewriting them. Saves from before the provider was introduced are
+also incompatible; no automatic migration is performed. Generation remains v20 / Heaven v9.
+
 Plugin authors can also register slab, stair, door and button state families and
 fixed collision/selection boxes with optional box models. See the
 [block shape SDK reference](docs/plugin-extensions.md#block-shapes-and-state-families)

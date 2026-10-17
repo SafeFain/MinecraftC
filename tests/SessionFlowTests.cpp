@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"
 #include "EntityAiIntegration.h"
@@ -53,6 +54,12 @@ struct LanLodTestAccess {
     }
 };
 struct GameSessionTestAccess {
+    static void prepareActionScene(GameSession& session,DimensionId dimension,uint64_t seed){
+        session.worldMetadata.seed=seed;auto& runtime=session.ensureDimension(dimension);
+        runtime.world.setThreadPool(nullptr);session.dimension=dimension;
+        session.player.bindWorld(runtime.world,&runtime.entities);session.player.configureRules(GameMode::Survival,Difficulty::Normal);
+        runtime.entities.setNaturalSpawningEnabled(false);session.terrainGenerated=true;
+    }
     static void dimensionBed(GameSession& session,uint32_t id,std::optional<glm::ivec3> bed) { session.worldMetadata.dimensions[id].bedSpawn=bed; }
     static void dimensionPosition(GameSession& session,uint32_t id,glm::dvec3 p) { auto& state=session.worldMetadata.dimensions[id];state.playerPosition=p;state.positioned=true; }
     static void prepareLanScene(GameSession& session) {
@@ -263,12 +270,18 @@ std::string Localization::format(
 #include "DimensionIntegration.h"
 #include "BlockShapesIntegration.h"
 #include "PluginCapabilitiesIntegration.h"
+#include "HeavenRemainingP0Integration.h"
 #include "MultiplayerSimulationIntegration.h"
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
 
 int main(int argc, char** argv) {
+    installHeavenFixture();
+    if(argc==4&&std::string(argv[1])=="--remaining-p0-tests"){
+        try{return HeavenRemainingP0::run(argv[2],argv[3]);}
+        catch(const std::exception& error){std::cerr<<"Remaining P0 regression failed: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==5&&std::string(argv[1])=="--policy-v2-tests") {
         try{return GenerationPolicyV2Integration::run(argv[2],argv[3],argv[4]);}
         catch(const std::exception& error){std::cerr<<"Generation policy V2 failed: "<<error.what()<<'\n';return 1;}
@@ -313,6 +326,7 @@ int main(int argc, char** argv) {
         { EntityAiScenarios::villageLife(argv[2]); return EntityAiScenarios::integration(argv[2]); }
     if (argc > 2 && std::string(argv[1]) == "--ai-benchmark")
         return EntityAiScenarios::benchmark(argv[2]);
+    if(argc!=1){std::cerr<<"Unknown session test arguments\n";return 2;}
     const auto root = std::filesystem::temp_directory_path() /
                       "minecraftc-session-flow-test";
     std::filesystem::remove_all(root);

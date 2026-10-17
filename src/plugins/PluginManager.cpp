@@ -234,7 +234,12 @@ PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
 PluginManager::~PluginManager(){shutdown();}
 void PluginManager::owned(MC_PluginContext& ctx,const std::string& key) const {
     check(m_phase==MC_REGISTER&&!content().frozen,"Registration is closed");
-    check(validKey(key)&&key.rfind(m_info.at(ctx.index).manifest.id+":",0)==0,"Content must use its plugin namespace");
+    const auto& info=m_info.at(ctx.index);
+    const auto block=builtinKeyId(key,"minecraftc:block_",static_cast<uint16_t>(BlockId::COUNT));
+    const auto item=builtinKeyId(key,"minecraftc:item_",static_cast<uint16_t>(ItemId::COUNT));
+    const bool reserved=info.manifest.builtin&&info.manifest.id=="official_heaven"&&
+        ((block!=INVALID_CONTENT_ID&&heavenBlockSlot(static_cast<BlockId>(block)))||(item!=INVALID_CONTENT_ID&&heavenItemSlot(static_cast<ItemId>(item))));
+    check(validKey(key)&&(key.rfind(info.manifest.id+":",0)==0||reserved),"Content must use its plugin namespace or trusted reserved slot");
     check(!m_info.at(ctx.index).manifest.visual,"Visual-only plugins cannot register gameplay content");
 }
 int32_t PluginManager::block(MC_PluginContext& ctx,const MC_Block& v,uint16_t& out) {
@@ -495,8 +500,13 @@ void PluginManager::initialize(bool safeMode) {
     const uint64_t revision=content().revision;content()=ContentState{};content().revision=revision;
     const auto config=m_paths.dataRoot/"plugins.json";
     if(std::filesystem::exists(config))try {const auto j=readJson(config);for(const auto& p:j.object){check(p.second.type==Json::Type::Boolean,"Plugin enable setting must be boolean");m_enabled[p.first]=p.second.boolean;}}catch(const std::exception& e){LOG_WARN("Ignoring invalid plugin enable settings: "<<e.what());}
-    auto addBuiltin=[&](const char* id,const char* name,bool visual){PluginInfo p;p.manifest.id=id;p.manifest.name=name;p.manifest.version="1.0.0";p.manifest.builtin=true;p.manifest.visual=visual;p.manifest.defaultEnabled=false;p.enabled=!safeMode&&m_enabled.count(id)&&m_enabled.at(id);if(!p.enabled)p.status="Disabled";m_info.push_back(std::move(p));};
-    addBuiltin("official_content","Official Content Example",false);addBuiltin("official_atmosphere","Official Atmosphere Example",true);
+    for(const auto& descriptor:builtinPlugins()){
+        PluginInfo p;p.manifest.id=descriptor.id;p.manifest.name=descriptor.name;p.manifest.version="1.0.0";
+        p.manifest.builtin=true;p.manifest.visual=descriptor.visual;p.manifest.defaultEnabled=descriptor.enabled;
+        if(*descriptor.resources)p.root=m_paths.assetRoot/descriptor.resources;
+        p.enabled=!safeMode&&(m_enabled.count(descriptor.id)?m_enabled.at(descriptor.id):descriptor.enabled);
+        if(!p.enabled)p.status="Disabled";m_info.push_back(std::move(p));
+    }
     const auto directory=m_paths.dataRoot/"mods";std::filesystem::create_directories(directory);
     std::vector<std::filesystem::path> directories;
     for(const auto& entry:std::filesystem::directory_iterator(directory))if(entry.is_directory())directories.push_back(entry.path());
@@ -507,6 +517,7 @@ void PluginManager::initialize(bool safeMode) {
             check(!std::filesystem::is_symlink(root),"Plugin package directory cannot be a symlink");
             p.manifest=Manifest::parse(readJson(containedPath(root,"mod.json")));
             check(p.manifest.id==root.filename().string(),"Package directory must match plugin ID");
+            check(std::none_of(builtinPlugins().begin(),builtinPlugins().end(),[&](const auto& d){return p.manifest.id==d.id;}),"Reserved built-in plugin identity");
             p.enabled=!safeMode&&(m_enabled.count(p.manifest.id)?m_enabled.at(p.manifest.id):p.manifest.defaultEnabled);
             if(!p.enabled)p.status="Disabled";
             else if(!p.manifest.entry.empty()&&(!Platform::DynamicLibrary::supported()||p.manifest.entry=="!unsupported"))p.status="Native entry unsupported on this platform";
@@ -523,8 +534,9 @@ void PluginManager::initialize(bool safeMode) {
         if(!dependenciesActive){info.status="Blocked by failed dependency";continue;}
         auto before=content();const size_t listeners=m_listeners.size();const auto commands=m_commands;
         auto& loaded=m_loaded[i];loaded.context=std::make_unique<MC_PluginContext>();loaded.context->manager=this;loaded.context->index=i;
+        const auto builtinRevision=[&](){for(const auto& d:builtinPlugins())if(info.manifest.id==d.id&&info.manifest.builtin)return std::string(d.revision);return std::string{};}();
         try {
-            if(info.manifest.builtin)loaded.api=info.manifest.visual?builtinAtmosphere(MC_PLUGIN_ABI):builtinContent(MC_PLUGIN_ABI);
+            if(info.manifest.builtin){const auto& entries=builtinPlugins();auto descriptor=std::find_if(entries.begin(),entries.end(),[&](const auto& d){return info.manifest.id==d.id;});check(descriptor!=entries.end(),"Unknown built-in plugin");loaded.api=descriptor->query(MC_PLUGIN_ABI);}
             else if(!info.manifest.entry.empty()) {
                 loaded.library=std::make_unique<Platform::DynamicLibrary>(containedPath(info.root,info.manifest.entry));
                 auto query=reinterpret_cast<MC_PluginQuery>(loaded.library->symbol("MCPlugin_Query"));check(query,"Missing MCPlugin_Query entry point");loaded.api=query(MC_PLUGIN_ABI);
@@ -544,12 +556,12 @@ void PluginManager::initialize(bool safeMode) {
             if(!info.manifest.data.empty())loadData(*loaded.context,readJson(containedPath(info.root,info.manifest.data)));
             check(!loaded.context->registrationFailed,"Plugin ignored a failed registration");
             validateContent();
-            if(!info.manifest.visual)content().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?std::string("builtin-api1-content1"):std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
+            if(!info.manifest.visual)content().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?builtinRevision:std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
             if(!info.manifest.visual) {
                 const auto& m=info.manifest;
                 const auto config=m_paths.dataRoot/"config"/"plugins"/(m.id+".json");
                 const auto value=std::filesystem::exists(config)?([&]{readJson(config);std::ifstream file(config);return nlohmann::json::parse(file);}()):nlohmann::json::object();
-                const std::string behavior=m.builtin?"builtin-api1-content1":m.entry.empty()?"data-api1":
+                const std::string behavior=m.builtin?builtinRevision+(info.root.empty()?std::string{}:":"+fingerprint(info.root,"")):m.entry.empty()?"data-api1":
                     !m.networkCompatibility.empty()?"declared:"+m.networkCompatibility:"package:"+fingerprint(info.root,"");
                 content().networkDescription["plugin/"+m.id]=nlohmann::json::array({m.version,behavior}).dump();
                 content().networkDescription["config/"+m.id]=value.dump();
@@ -650,7 +662,7 @@ void PluginManager::setEnabled(size_t i,bool enabled) {
     m_info[i].enabled=enabled;m_info[i].status="Restart required";
 }
 void PluginManager::shutdown() {
-    actionDispatcher()={};targetDispatcher()={};
+    actionDispatcher()={};targetDispatcher()={};useDispatcher()={};
     if(m_shutdown)return;
     m_shutdown=true;
     if(m_initialized){auto e=event(MC_SHUTDOWN);dispatch(e);}

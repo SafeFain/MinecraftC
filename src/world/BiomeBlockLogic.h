@@ -1,22 +1,17 @@
 #pragma once
 
 #include "world/Block.h"
+#include "minecraftc/extensions.h"
 
 inline bool isBiomePlant(BlockId block) {
-    return (block >= BlockId::SKY_FERN && block <= BlockId::CLOUDBERRY_BUSH) ||
-        (block >= BlockId::FERN && block <= BlockId::BEACH_GRASS) ||
+    if(isSemanticPlant(block))return true;
+    return (block >= BlockId::FERN && block <= BlockId::BEACH_GRASS) ||
         (block >= BlockId::CLOVER && block <= BlockId::JUNGLE_FERN) ||
         block == BlockId::CAVE_GLOWSHROOM;
 }
 
 inline bool isNaturalRock(BlockId block) {
-    return block == BlockId::STONE || block == BlockId::DEEPSLATE ||
-        block == BlockId::GRANITE || block == BlockId::LIMESTONE ||
-        block == BlockId::BASALT || block == BlockId::TUFF ||
-        block == BlockId::CALCITE || block == BlockId::DRIPSTONE_BLOCK ||
-        block == BlockId::SHALE || block == BlockId::CORAL_ROCK ||
-        (block >= BlockId::ANDESITE && block <= BlockId::MARBLE) ||
-        (block >= BlockId::WET_LIMESTONE && block <= BlockId::SULFUR_ROCK);
+    return hasNaturalRockTag(block);
 }
 
 inline bool isCrystalCluster(BlockId block) {
@@ -30,23 +25,11 @@ inline bool isNaturalDecoration(BlockId block) {
 // Generation and manual placement share substrate rules. These plants occupy
 // air, never water; riverbank proximity is a generation constraint only.
 inline bool supportsBiomePlant(BlockId plant, BlockId soil) {
+    if(const auto support=semanticPlantSupport(plant,soil))return *support;
     if (!isBiomePlant(plant)) return false;
-    const bool fertile = soil == BlockId::GRASS || soil == BlockId::DIRT ||
-        soil == BlockId::PODZOL || soil == BlockId::MOSS ||
-        soil == BlockId::COARSE_DIRT || soil == BlockId::ROOTED_DIRT ||
-        soil == BlockId::LEAF_LITTER_SOIL || soil == BlockId::PEAT ||
-        soil == BlockId::MUD || soil == BlockId::SILT ||
-        soil == BlockId::LATERITE || soil == BlockId::RED_CLAY ||
-        soil == BlockId::CAVE_MOSS;
-    const bool sandy = soil == BlockId::SAND || soil == BlockId::RED_SAND ||
-        soil == BlockId::BLACK_SAND;
-    if (plant >= BlockId::SKY_FERN && plant <= BlockId::CLOUDBERRY_BUSH) {
-        if (plant == BlockId::MOONFLOWER)
-            return soil == BlockId::MOONSTONE || soil == BlockId::AETHER_MOSS ||
-                soil == BlockId::AETHER_GRASS || soil == BlockId::AETHER_SOIL;
-        return soil == BlockId::AETHER_GRASS || soil == BlockId::AETHER_SOIL ||
-            soil == BlockId::AETHER_MOSS || soil == BlockId::GLIMMER_SILT;
-    }
+    const auto tags=blockSemanticTags(soil);
+    const bool fertile=(tags&MC_TAG_FERTILE)!=0;
+    const bool sandy=(tags&MC_TAG_SAND)!=0;
     if (plant == BlockId::CAVE_GLOWSHROOM)
         return soil == BlockId::CAVE_MOSS || soil == BlockId::MOSS ||
             soil == BlockId::MUD || soil == BlockId::CLAY;

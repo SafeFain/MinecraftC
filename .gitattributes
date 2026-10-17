@@ -1,2 +1,5 @@
 # Generated action graphs are compared byte-for-byte with generator output.
 /assets/models/**/*.anim.json text eol=lf
+# Official package identity hashes its resource bytes on every platform.
+/assets/plugins/official_heaven/*.gltf text eol=lf
+/assets/plugins/official_heaven/*.md text eol=lf

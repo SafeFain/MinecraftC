@@ -30,6 +30,36 @@ typedef struct MC_BehaviorsV1 {
     int32_t (*register_block)(MC_PluginContext*,const MC_BlockBehavior*);
     int32_t (*register_item)(MC_PluginContext*,const MC_ItemBehavior*);
 } MC_BehaviorsV1;
+
+/* V1 layouts are frozen. Flags distinguish absence from explicit zero/empty.
+   Tags describe semantics, never numeric ID ranges. Support accepts any tag. */
+enum { MC_TAG_LEAVES=1u, MC_TAG_PLANKS=2u, MC_TAG_FERTILE=4u,
+       MC_TAG_SAND=8u, MC_TAG_HEAVEN_SOIL=16u, MC_TAG_MOON_SOIL=32u,
+       MC_TAG_NATURAL_ROCK=64u, MC_TAG_PLANT=128u };
+enum { MC_BLOCK_LIGHT=1u, MC_BLOCK_TAGS=2u, MC_BLOCK_DROPS=4u, MC_BLOCK_SUBSTRATE=8u };
+enum { MC_ITEM_FUEL=1u, MC_ITEM_TAGS=2u };
+typedef struct MC_BreakDrop {
+    const char* item;
+    uint32_t minimum, maximum, numerator, denominator;
+} MC_BreakDrop;
+typedef struct MC_BlockBehaviorV2 {
+    uint32_t size;
+    MC_BlockBehavior base;
+    uint32_t fields, light_dampening, tags, substrate_tags;
+    const MC_BreakDrop* drops;
+    uint32_t drop_count;
+} MC_BlockBehaviorV2;
+typedef struct MC_ItemBehaviorV2 {
+    uint32_t size;
+    MC_ItemBehavior base;
+    uint32_t fields, fuel_ticks, tags;
+} MC_ItemBehaviorV2;
+typedef struct MC_BehaviorsV2 {
+    uint32_t size, version;
+    int32_t (*register_block)(MC_PluginContext*,const MC_BlockBehaviorV2*);
+    int32_t (*register_item)(MC_PluginContext*,const MC_ItemBehaviorV2*);
+    const MC_BehaviorsV1* v1;
+} MC_BehaviorsV2;
 typedef struct MC_LootEntry {
     const char* item;
     uint32_t minimum, maximum, chance; /* chance: 0..100 */
@@ -158,6 +188,36 @@ typedef struct MC_PlayerActionsV1 {
     /* Explicit host-authorized teleport; loaded safe landing required. */
     int32_t (*teleport)(MC_PluginContext*,uint64_t,uint32_t,const double*);
 } MC_PlayerActionsV1;
+
+/* Read services are borrowed for this callback only, never load chunks and
+   cannot mutate the world. Layer slots are stable, including absent layers. */
+typedef struct MC_ActionLayer {int32_t bottom,top;uint32_t present,biome;} MC_ActionLayer;
+typedef struct MC_ActionViewV2 {
+    uint32_t size;
+    MC_ActionView base;
+    uint32_t sneaking, source, phase, hit_valid; /* source: 0 item, 1 block; phase: 0 preview, 1 execution (use press) */
+    int32_t hit[3], face[3];
+    uint16_t hit_block;
+    MC_GenerationContext generation;
+    double spawn[3];
+    uint32_t builtin_generation;
+    int32_t (*layers)(void*,int32_t,int32_t,MC_ActionLayer*,uint32_t,uint32_t*);
+    int32_t (*block_flags)(void*,uint16_t,uint32_t*); /* full collision 1, empty collision 2 */
+} MC_ActionViewV2;
+typedef struct MC_ActionTargetV2 {MC_ActionTarget base;uint32_t handled;} MC_ActionTargetV2;
+typedef int32_t (*MC_ActionTargetCallbackV2)(const MC_ActionViewV2*,MC_ActionTargetV2*,void*);
+typedef struct MC_PlayerActionV2 {
+    uint32_t size;
+    MC_PlayerAction base;
+    MC_ActionTargetCallbackV2 target;
+    uint32_t range_from_eye, tool_pose, invalid_marker;
+    float use_cooldown;
+} MC_PlayerActionV2;
+typedef struct MC_PlayerActionsV2 {
+    uint32_t size,version;
+    int32_t (*register_action)(MC_PluginContext*,const MC_PlayerActionV2*);
+    const MC_PlayerActionsV1* v1;
+} MC_PlayerActionsV2;
 /* advancing: 0 inherit world rule, 1 paused, 2 advance. cycle_seconds 0 inherits. */
 typedef struct MC_DimensionTime {
     uint32_t size, dimension, cycle_seconds, advancing;

@@ -607,9 +607,12 @@ std::vector<ItemStack> getBlockDrops(
     const auto& tool = toolStack.empty() ? getItemProps(ItemId::EMPTY)
                                          : getItemProps(toolStack.id);
     if (blockProps.unbreakable || !canHarvest(blockProps, tool)) return {};
+    if(const auto* b=Plugins::blockBehavior(block))if(b->fields&MC_BLOCK_DROPS){
+        std::vector<ItemStack> drops;
+        for(const auto& d:b->drops)if(randomValue%d.denominator<d.numerator){const auto count=d.minimum+randomValue%(d.maximum-d.minimum+1);if(count)drops.push_back({Plugins::resolveItem(d.item),static_cast<uint8_t>(count),0});}
+        return drops;
+    }
     switch (block) {
-        case BlockId::STAR_CRYSTAL_ORE: return {{ItemId::STAR_CRYSTAL_SHARD, 2, 0}};
-        case BlockId::CLOUDBERRY_BUSH: return {{ItemId::CLOUDBERRY, 2, 0}};
         case BlockId::STONE: return {{ItemId::COBBLESTONE, 1, 0}};
         case BlockId::COAL_ORE: return {{ItemId::COAL, 1, 0}};
         case BlockId::IRON_ORE: return {{ItemId::RAW_IRON, 1, 0}};
@@ -696,7 +699,9 @@ const std::vector<CraftingRecipe>& craftingRecipes() {
         for (size_t i=0; i<RECIPES.size(); ++i) {
             const auto key="minecraftc:crafting_"+std::to_string(i);
             const auto& removed=Plugins::content().removeCrafting;
-            if (std::find(removed.begin(),removed.end(),key)==removed.end()) merged.push_back(RECIPES[i]);
+            const auto& recipe=RECIPES[i];bool available=Plugins::availableItem(recipe.output.id);
+            for(const auto id:recipe.ingredients)available=available&&Plugins::availableItem(id);
+            if (available&&std::find(removed.begin(),removed.end(),key)==removed.end()) merged.push_back(recipe);
         }
         for (const auto& entry:Plugins::content().crafting) merged.push_back(entry.second);
         revision=Plugins::content().revision;
@@ -756,18 +761,19 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
     for (size_t i=0;i<SMELTING.size();++i) {
         const auto key="minecraftc:smelting_"+std::to_string(i);
         const auto& removed=Plugins::content().removeSmelting;
-        if (SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
+        if (Plugins::availableItem(input)&&Plugins::availableItem(SMELTING[i].output.id)&&SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
     }
     return nullptr;
 }
 
 uint16_t fuelTicks(ItemId fuel) {
+    if(const auto* b=Plugins::itemBehavior(fuel))if(b->fields&MC_ITEM_FUEL)return static_cast<uint16_t>(b->fuel);
     if(isWoodPlankItem(fuel)) return 300;
-    if(fuel>=ItemId::OAK_DOOR && fuel<=ItemId::SKYROOT_DOOR)return 200;
-    if(fuel>=ItemId::OAK_BUTTON && fuel<=ItemId::SKYROOT_BUTTON)return 100;
+    if(fuel>=ItemId::OAK_DOOR && fuel<=ItemId::ACACIA_DOOR)return 200;
+    if(fuel>=ItemId::OAK_BUTTON && fuel<=ItemId::ACACIA_BUTTON)return 100;
     if (fuel == ItemId::COAL) return 1600;
     if (fuel == ItemId::STICK) return 100;
-    if (fuel == ItemId::OAK_PLANKS || fuel == ItemId::SKYROOT_PLANKS) return 300;
+    if (fuel == ItemId::OAK_PLANKS) return 300;
     const auto& props = getItemProps(fuel);
     if (props.tool != ToolKind::None && props.tier == ToolTier::Wood) return 200;
     return 0;

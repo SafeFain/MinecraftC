@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "network/ChunkProtocol.h"
 #include "network/LodProtocol.h"
 #include "network/EventProtocol.h"
@@ -13,6 +14,7 @@ template<class F> void rejects(F function) {
     throw std::runtime_error("Malformed chunk payload accepted");
 }
 int main() {
+    Plugins::publishHeavenDimension();
     Lan::ChunkSnapshot snapshot;
     snapshot.address = {DimensionId::Heaven, -1234, 5678};
     snapshot.epoch = 9; snapshot.revision = 77;

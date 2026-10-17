@@ -170,7 +170,7 @@ int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_Dimens
     if(!value.voidTarget.empty())reference(value.voidTarget);
     auto& entries=content().extensions.dimensions;
     for(const auto& entry:entries)require(entry.second.key!=value.key,"Duplicate dimension");
-    require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");id=static_cast<uint32_t>(entries.size());
+    require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");id=2;while(entries.count(id))++id;require(id<Config::PLUGIN_MAX_DIMENSIONS,"Dimension handle limit");
     entries.emplace(id,std::move(value));return 0;
 }
 int32_t PluginManager::dimensionDefinitionV2(MC_PluginContext& ctx,const MC_DimensionDefinitionV2& d,uint32_t& id) {

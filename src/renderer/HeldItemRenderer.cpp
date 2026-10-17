@@ -139,7 +139,7 @@ void HeldItemRenderer::reset() {
     for (const auto& entry : m_meshes) if(entry.second.handle)m_renderer->destroyMesh(entry.second.handle);
     m_meshes.clear();
     for(const auto& pair:m_pluginModels)for(const auto& p:pair.second){if(p.mesh)m_renderer->destroyMesh(p.mesh);if(p.material)m_renderer->destroyMaterial(p.material);if(p.texture)m_renderer->destroyTexture(p.texture);}
-    m_pluginModels.clear();
+    m_pluginModels.clear();m_pluginDropTransforms.clear();
     if(m_fishingCube)m_renderer->destroyMesh(m_fishingCube);
     if(m_fishingMaterial)m_renderer->destroyMaterial(m_fishingMaterial);
     if(m_fishingTexture)m_renderer->destroyTexture(m_fishingTexture);
@@ -161,6 +161,11 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
     const uint16_t key=static_cast<uint16_t>(id);
     if(const auto found=m_meshes.find(key);found!=m_meshes.end())return found->second;
     const auto& props=getItemProps(id);
+    if(Plugins::content().extensions.heldModels.count(key)){
+        const auto* behavior=Plugins::itemBehavior(id);bool tool=false;
+        if(behavior&&!behavior->action.empty()){const auto action=Plugins::content().extensions.actions.find(behavior->action);tool=action!=Plugins::content().extensions.actions.end()&&action->second.toolPose;}
+        CachedMesh result{{},false,tool,{}};m_meshes.emplace(key,result);return result;
+    }
     MeshData mesh;bool block=false;
     if(hasHeldToolModel(id,props.tool)) {
         HeldToolModel model=buildHeldToolModel(id,props.tool,props.tier);
@@ -222,8 +227,15 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
 void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
     const glm::vec3& position, float ageSeconds, uint32_t phaseSeed, SmoothLightSample light) {
     if (!m_renderer || item.empty()) return;
-    if(drawPluginModel(item,vp,glm::translate(glm::mat4(1),position+glm::vec3(0,.08f+std::sin(ageSeconds*2)*.025f,0))*glm::rotate(glm::mat4(1),ageSeconds,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(.35f)),false,true))return;
     const CachedMesh cached=meshFor(item.id);
+    if(cached.toolModel&&Plugins::content().extensions.heldModels.count(static_cast<uint16_t>(item.id))){
+        const float phase=static_cast<float>(phaseSeed%628u)*.01f;
+        const auto pose=glm::translate(glm::mat4(1),position+glm::vec3(0,.25f+.035f*std::sin(ageSeconds*2.5f+phase),0))*glm::rotate(glm::mat4(1),ageSeconds*1.5f+phase,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(.4f));
+        const float sky=std::pow(std::clamp(light.sky,0.f,1.f),1.20f),block=std::pow(std::clamp(light.block,0.f,1.f),1.35f);
+        const glm::vec4 tint(glm::max(glm::max(glm::vec3(sky),glm::vec3(1,.72f,.38f)*block),glm::vec3(.025f)),1);
+        if(drawPluginModel(item,vp,pose,false,true,tint))return;
+    }
+    if(drawPluginModel(item,vp,glm::translate(glm::mat4(1),position+glm::vec3(0,.08f+std::sin(ageSeconds*2)*.025f,0))*glm::rotate(glm::mat4(1),ageSeconds,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(.35f)),false,true))return;
     if (!cached.handle) return;
     const float phase=static_cast<float>(phaseSeed%628u)*.01f;
     const glm::mat4 pose=glm::translate(glm::mat4(1),position+
@@ -407,7 +419,7 @@ void HeldItemRenderer::renderFishing(const FishingView& fishing, const glm::dvec
     }
 }
 
-bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp,const glm::mat4& transform,bool first,bool dropped){
+bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp,const glm::mat4& transform,bool first,bool dropped,glm::vec4 tint){
     const auto raw=static_cast<uint16_t>(item.id);const auto found=Plugins::content().extensions.heldModels.find(raw);if(found==Plugins::content().extensions.heldModels.end())return false;
     auto cached=m_pluginModels.find(raw);
     if(cached==m_pluginModels.end()) {
@@ -421,6 +433,19 @@ bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp
         catch(...){for(const auto& part:parts){if(part.mesh)m_renderer->destroyMesh(part.mesh);if(part.material)m_renderer->destroyMaterial(part.material);if(part.texture)m_renderer->destroyTexture(part.texture);}m_pluginModels.erase(raw);throw;}
         cached=inserted.first;
     }
-    const glm::mat4 grip=dropped?glm::mat4(1):glm::make_mat4(first?found->second.first.data():found->second.third.data());
-    for(const auto& part:cached->second){DrawCommand draw;draw.mesh=part.mesh;draw.material=part.material;draw.model=transform*grip;draw.tint=part.color;draw.viewProjection=vp;draw.useCustomViewProjection=true;m_renderer->draw(draw);}return true;
+    glm::mat4 grip=dropped?glm::mat4(1):glm::make_mat4(first?found->second.first.data():found->second.third.data());
+    const auto* behavior=Plugins::itemBehavior(item.id);const auto action=behavior?Plugins::content().extensions.actions.find(behavior->action):Plugins::content().extensions.actions.end();
+    if(dropped&&action!=Plugins::content().extensions.actions.end()&&action->second.toolPose){
+        auto normalized=m_pluginDropTransforms.find(raw);
+        if(normalized==m_pluginDropTransforms.end()){
+            const auto& asset=*found->second.asset;const auto pose=model::bindPose(asset);
+            glm::vec3 lo(std::numeric_limits<float>::max()),hi(std::numeric_limits<float>::lowest());
+            for(size_t n=0;n<asset.nodes.size();++n)for(const auto index:asset.nodes[n].primitives)for(const auto& v:asset.primitives.at(static_cast<size_t>(index)).vertices){const auto p=glm::vec3(pose.global[n]*glm::vec4(v.position,1));lo=glm::min(lo,p);hi=glm::max(hi,p);}
+            const auto extent=hi-lo;
+            const auto normalization=glm::scale(glm::mat4(1),glm::vec3(1/std::max({extent.x,extent.y,extent.z,.001f})))*glm::translate(glm::mat4(1),-(lo+hi)*.5f);
+            normalized=m_pluginDropTransforms.emplace(raw,normalization).first;
+        }
+        grip=normalized->second;
+    }
+    for(const auto& part:cached->second){DrawCommand draw;draw.mesh=part.mesh;draw.material=part.material;draw.model=transform*grip;draw.tint=part.color*tint;draw.viewProjection=vp;draw.useCustomViewProjection=true;m_renderer->draw(draw);}return true;
 }

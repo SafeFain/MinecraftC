@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
@@ -10,6 +11,7 @@
 #include <stdexcept>
 
 int main(int argc, char** argv) {
+    installHeavenFixture();
     if (argc < 2 || argc > 3) {
         std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview|--ecology|--ecology-preview|--heaven|--heaven-preview|--heaven-island]\n";
         return 2;

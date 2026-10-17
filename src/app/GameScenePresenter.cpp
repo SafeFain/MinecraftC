@@ -250,8 +250,12 @@ void GameScenePresenter::render(
             heldItemRenderer.renderFishing(session.fishingState(),renderOrigin,fishingTip,vp);
         session.particleState().buildRenderData(renderOrigin, particleRenderData);
         appendBowTrajectory(session, renderOrigin);
-        if (particleRenderData.size() < ParticleSystem::MAX_PARTICLES) {
-            if (const auto target = session.playerState().pluginTarget()) {
+        const auto* activeBehavior=Plugins::itemBehavior(session.playerState().activeItem().id);
+        const auto activeAction=activeBehavior?Plugins::content().extensions.actions.find(activeBehavior->action):Plugins::content().extensions.actions.end();
+        const bool markedAction=activeAction!=Plugins::content().extensions.actions.end()&&activeAction->second.invalidMarker;
+        const auto actionPreview=session.playerState().pluginTarget();
+        if (!markedAction && particleRenderData.size() < ParticleSystem::MAX_PARTICLES) {
+            if (const auto target = actionPreview) {
                 particleRenderData.push_back({glm::vec3(*target-renderOrigin)+glm::vec3(0,.05f,0),
                     static_cast<float>(ParticleKind::Trajectory),0,0,.35f,0});
             }
@@ -284,17 +288,16 @@ void GameScenePresenter::render(
                 }
             }
         }
-        if (const auto target = session.playerState().starstepTarget()) {
+        if (const auto target = markedAction?actionPreview:std::optional<glm::dvec3>{}) {
             const glm::vec3 marker(
                 static_cast<float>(target->x - 0.4 - renderOrigin.x),
                 static_cast<float>(target->y - 0.01),
                 static_cast<float>(target->z - 0.4 - renderOrigin.z));
             renderer.renderWireframe(marker, glm::vec3(0.8f, 0.08f, 0.8f), vp,
                                      glm::vec3(0.15f, 0.9f, 0.95f));
-        } else if (session.playerState().activeItem().id == ItemId::STARSTEP_SCEPTER &&
-                   session.playerState().starstepCooldown() <= 0.0f) {
+        } else if (markedAction && session.playerState().pluginCooldown(activeAction->first)<=0.0f) {
             const auto invalid = session.worldState().raycast(
-                session.playerState().getEyePosition(), session.playerState().getForward(), 96.0f);
+                session.playerState().getEyePosition(), session.playerState().getForward(), activeAction->second.range);
             if (invalid) {
                 const glm::vec3 marker(
                     static_cast<float>(invalid->blockPos.x - renderOrigin.x),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "network/Session.h"
+#include "plugins/ContentRegistry.h"
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
 #include <array>
@@ -14,8 +15,8 @@ struct PlayerProfile {
     Identity identity;
     GameMode mode=GameMode::Survival;
     DimensionId dimension=DimensionId::Overworld;
-    std::map<uint32_t,glm::dvec3> positions{{0,{.5,65,.5}},{1,{.5,120,.5}}};
-    std::map<uint32_t,bool> positioned{{0,false},{1,false}};
+    std::map<uint32_t,glm::dvec3> positions=[] {std::map<uint32_t,glm::dvec3> result;for(const auto& d:Plugins::content().extensions.dimensions)result[d.first]={.5,d.first==1?120.:65.,.5};return result;}();
+    std::map<uint32_t,bool> positioned;
     std::map<uint32_t,glm::dvec3> safePositions;
     std::map<uint32_t,glm::ivec3> beds;
     std::optional<glm::ivec3> bedSpawn;

@@ -2,6 +2,7 @@
 #include "world/Block.h"
 #include "game/GameRules.h"
 #include "plugins/Extensions.h"
+#include "plugins/BuiltinOwnership.h"
 #include "plugins/Json.h"
 #include <set>
 #include "game/SurvivalRules.h"
@@ -58,6 +59,8 @@ struct ContentState {
     std::array<std::vector<ItemId>,static_cast<size_t>(CreativeItemCategory::Count)> categories;
 };
 inline ContentState& content() {static ContentState state;return state;}
+inline bool availableBlock(BlockId id){return !heavenBlockSlot(id)||content().extensions.dimensions.count(1)!=0;}
+inline bool availableItem(ItemId id){return !heavenItemSlot(id)||content().extensions.dimensions.count(1)!=0;}
 inline bool validKey(const std::string& key) {
     auto colon=key.find(':');if(colon==std::string::npos||colon==0||colon+1==key.size()||key.size()>256)return false;
     for(size_t i=0;i<key.size();++i) {
@@ -69,7 +72,7 @@ inline bool validKey(const std::string& key) {
 inline const BlockBehaviorContent* blockBehavior(BlockId id){const auto& entries=content().extensions.blockBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
 inline const ItemBehaviorContent* itemBehavior(ItemId id){const auto& entries=content().extensions.itemBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
 inline bool validBlock(BlockId id) {
-    auto raw=static_cast<uint16_t>(id);return raw<static_cast<uint16_t>(BlockId::COUNT)||content().blocks.count(raw);
+    auto raw=static_cast<uint16_t>(id);return (raw<static_cast<uint16_t>(BlockId::COUNT)&&availableBlock(id))||content().blocks.count(raw);
 }
 inline const BlockContent* pluginBlock(BlockId id) {
     if(static_cast<uint16_t>(id)<FIRST_CONTENT_ID)return nullptr;
@@ -120,18 +123,18 @@ inline uint16_t builtinKeyId(const std::string& key,const char* prefix,uint16_t 
 inline BlockId resolveBlock(const std::string& key) {
     for(const auto& entry:content().blocks)if(entry.second.key==key)return static_cast<BlockId>(entry.first);
     const uint16_t raw=builtinKeyId(key,"minecraftc:block_",static_cast<uint16_t>(BlockId::COUNT));
-    if(raw!=INVALID_CONTENT_ID)return static_cast<BlockId>(raw);
+    if(raw!=INVALID_CONTENT_ID){const auto id=static_cast<BlockId>(raw);if(!availableBlock(id))throw std::runtime_error("Block provider unavailable");return id;}
     std::string name=key.rfind("minecraftc:",0)==0?key.substr(11):key;
     for(uint16_t i=0;i<static_cast<uint16_t>(BlockId::COUNT);++i) {
         std::string normalized;for(unsigned char c:BLOCK_TABLE[i].name)normalized+=c==' '?'_':static_cast<char>(std::tolower(c));
-        if(name==normalized)return static_cast<BlockId>(i);
+        if(name==normalized&&availableBlock(static_cast<BlockId>(i)))return static_cast<BlockId>(i);
     }
     throw std::runtime_error("Unknown block: "+key);
 }
 inline ItemId resolveItem(const std::string& key) {
     for(const auto& entry:content().items)if(entry.second.key==key)return static_cast<ItemId>(entry.first);
     const uint16_t raw=builtinKeyId(key,"minecraftc:item_",static_cast<uint16_t>(ItemId::COUNT));
-    if(raw!=INVALID_CONTENT_ID)return static_cast<ItemId>(raw);
+    if(raw!=INVALID_CONTENT_ID){const auto id=static_cast<ItemId>(raw);if(!availableItem(id))throw std::runtime_error("Item provider unavailable");return id;}
     auto id=itemFromCommandName(key.rfind("minecraftc:",0)==0?key.substr(11):key);
     if(id)return *id;
     throw std::runtime_error("Unknown item: "+key);

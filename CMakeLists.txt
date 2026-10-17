@@ -466,7 +466,7 @@ elseif(MINECRAFTC_PORTABLE_LAYOUT)
     endif()
     install(FILES LICENSE README.md packaging/README-release.md
             DESTINATION .)
-    install(FILES docs/plugins.md docs/plugin-extensions.md DESTINATION docs)
+    install(FILES docs/plugins.md docs/plugin-extensions.md docs/plugin-capabilities.md DESTINATION docs)
     install(DIRECTORY sdk/ DESTINATION sdk)
     install(DIRECTORY examples/plugins/ DESTINATION examples/plugins)
     if(WIN32)
@@ -491,7 +491,7 @@ else()
             DESTINATION ${CMAKE_INSTALL_DATADIR}/minecraftc/assets)
     endif()
     install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
-    install(FILES docs/plugins.md docs/plugin-extensions.md DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
+    install(FILES docs/plugins.md docs/plugin-extensions.md docs/plugin-capabilities.md DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
     install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     install(DIRECTORY sdk/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/sdk)
     install(DIRECTORY examples/plugins/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples/plugins)
@@ -657,7 +657,7 @@ if(BUILD_TESTING)
     add_test(NAME cavegen_determinism_and_boundaries COMMAND cavegen_tests)
 
     add_executable(worldgen_tests
-        tests/WorldGenerationTests.cpp
+        tests/WorldGenerationTests.cpp src/game/Item.cpp
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
@@ -742,7 +742,7 @@ if(BUILD_TESTING)
     endif()
 
     add_executable(rendering_logic_tests
-        tests/RenderingLogicTests.cpp
+        tests/RenderingLogicTests.cpp src/game/Item.cpp
         src/renderer/Camera.cpp
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
@@ -820,7 +820,7 @@ if(BUILD_TESTING)
 
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
     add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
-        tests/VulkanDecorationSmoke.cpp
+        tests/VulkanDecorationSmoke.cpp src/game/Item.cpp
         src/debug/Log.cpp
         src/model/ModelRenderer.cpp
         src/renderer/BlockAtlasData.cpp
@@ -1462,6 +1462,9 @@ if(BUILD_TESTING)
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
         endif()
         add_dependencies(session_flow_tests plugin_block_shapes_demo plugin_capability_native)
+        add_test(NAME plugin_heaven_remaining_p0 COMMAND session_flow_tests --remaining-p0-tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_capability_native>)
+        set_tests_properties(plugin_heaven_remaining_p0 PROPERTIES TIMEOUT 180)
         add_test(NAME plugin_gameplay_presentation_capabilities COMMAND session_flow_tests --capability-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_capability_native>)
         set_tests_properties(plugin_gameplay_presentation_capabilities PROPERTIES TIMEOUT 180)

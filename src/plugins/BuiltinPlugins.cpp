@@ -1,5 +1,9 @@
 #include "plugins/PluginManager.h"
 #include "minecraftc/plugin.hpp"
+#include "plugins/OfficialHeavenContent.h"
+#include "plugins/OfficialHeavenActions.h"
+#include <limits>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace {
 struct Demo {const MC_Host* host;MC_PluginContext* context;};
@@ -42,8 +46,36 @@ int32_t atmosphereLoad(const MC_Host* host,MC_PluginContext* ctx) {
 }
 const MC_Plugin contentPlugin{sizeof(MC_Plugin),MC_PLUGIN_ABI,"official_content","1.0.0",contentLoad,nullptr};
 const MC_Plugin atmospherePlugin{sizeof(MC_Plugin),MC_PLUGIN_ABI,"official_atmosphere","1.0.0",atmosphereLoad,nullptr};
+
+int32_t heavenLoad(const MC_Host* host,MC_PluginContext* ctx){
+    Plugins::publishHeavenDimension();
+    auto& manager=*static_cast<Plugins::PluginManager*>(ctx->manager);
+    const auto* actions=static_cast<const MC_PlayerActionsV2*>(host->query_extension(ctx,MC_PLAYER_ACTIONS_EXTENSION,2));
+    const auto* behaviors=static_cast<const MC_BehaviorsV2*>(host->query_extension(ctx,MC_BEHAVIORS_EXTENSION,2));
+    if(!actions||!behaviors)return -1;
+    MC_PlayerActionV2 a{};a.size=sizeof(a);a.base.size=sizeof(a.base);a.base.key="official_heaven:skyway";a.base.range=256;a.target=Plugins::skywayTarget;
+    if(actions->register_action(ctx,&a))return -1;
+    a.base.key="official_heaven:starstep";a.base.range=96;a.base.cooldown=3;a.base.durability=1;a.target=Plugins::starstepTarget;a.range_from_eye=a.tool_pose=a.invalid_marker=1;a.use_cooldown=.15f;
+    if(actions->register_action(ctx,&a))return -1;
+    bool failed=false;
+    Plugins::heavenSemantics([&](const MC_BlockBehaviorV2& d){failed=behaviors->register_block(ctx,&d)!=0||failed;},[&](const MC_ItemBehaviorV2& d){failed=behaviors->register_item(ctx,&d)!=0||failed;});
+    if(failed)return -1;
+    MC_HeldModel model{};model.size=sizeof(model);const auto item=Plugins::itemKey(ItemId::STARSTEP_SCEPTER);model.item=item.c_str();model.path="starstep.gltf";
+    const glm::mat4 first(1),third=glm::rotate(glm::mat4(1),glm::radians(-120.f),glm::vec3(1,0,0));
+    for(int i=0;i<16;++i){model.first_person[i]=first[i/4][i%4];model.third_person[i]=third[i/4][i%4];}
+    manager.heldModel(*ctx,model);return 0;
+}
+const MC_Plugin heavenPlugin{sizeof(MC_Plugin),MC_PLUGIN_ABI,"official_heaven","1.0.0",heavenLoad,nullptr};
+const MC_Plugin* builtinHeaven(uint32_t abi){return abi==MC_PLUGIN_ABI?&heavenPlugin:nullptr;}
 }
 namespace Plugins {
 const MC_Plugin* builtinContent(uint32_t abi){return abi==MC_PLUGIN_ABI?&contentPlugin:nullptr;}
 const MC_Plugin* builtinAtmosphere(uint32_t abi){return abi==MC_PLUGIN_ABI?&atmospherePlugin:nullptr;}
+const std::vector<BuiltinPluginDescriptor>& builtinPlugins(){
+    static const std::vector<BuiltinPluginDescriptor> entries{
+        {"official_content","Official Content Example","builtin-api1-content1","",false,false,builtinContent},
+        {"official_atmosphere","Official Atmosphere Example","builtin-api1-content1","",true,false,builtinAtmosphere},
+        {"official_heaven","Heaven","heaven-v9-content1-actions2","plugins/official_heaven",false,true,builtinHeaven}};
+    return entries;
+}
 }
