@@ -6,6 +6,7 @@
 #include "threading/ThreadPool.h"
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <future>
 #include <map>
@@ -49,11 +50,12 @@ struct HeavenReference {
     std::map<std::pair<int,int>,std::vector<uint16_t>> chunks;
     std::map<std::tuple<int,int,int>,LodTileData> tiles;
 };
-inline int floorDiv(int x,int d) {const int q=x/d;return x%d<0?q-1:q;}
+// Avoid MSVC 14.51 /O2 miscompiling quotient/remainder adjustment in bulk loops.
+inline int floorDiv(int x,int d) {return x<0?(x+1)/d-1:x/d;}
 inline void heavenComparison() {
     HeavenReference reference;
     for(int z=-3;z<0;++z)for(int x=-3;x<0;++x) {
-        Chunk c(x,z);reference.generator.generate(c);c.copyRawBlocks(reference.chunks[{x,z}]);
+        auto c=std::make_unique<Chunk>(x,z);reference.generator.generate(*c);c->copyRawBlocks(reference.chunks[{x,z}]);
     }
     reference.tiles[{-1,-1,0}]=extractExactLodChunk(reference.chunks.at({-1,-1}));
     for(int level:{1,3,4}) {
@@ -125,6 +127,10 @@ inline void heavenComparison() {
     Plugins::content().extensions.generators.erase(g.key);
 }
 inline int run(const std::filesystem::path& assets,const std::filesystem::path& module,const std::filesystem::path& badModule) {
+    for(int divisor:{1,2,3,16,48,256})for(unsigned offset=0;offset<256;++offset) {
+        const int value=-128+int(offset);
+        check(floorDiv(value,divisor)==int(std::floor(double(value)/divisor)),"negative reference cell division mismatch");
+    }
     const auto root=std::filesystem::temp_directory_path()/"minecraftc-worldgen-v2-tests";
     std::filesystem::remove_all(root);const auto package=root/"mods"/"worldgen_v2_demo";
     std::filesystem::create_directories(package);std::filesystem::copy_file(module,package/module.filename());
@@ -152,7 +158,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
             check(column[size_t(y-Config::WORLD_MIN_Y)]==uint16_t(chunk->getBlock(x,y,z)),"point/bulk/modifier disagreement");
     }
-    g.batch=nullptr;Chunk legacy(-1,-1);generator.generate(legacy);legacy.copyRawBlocks(out);check(expected==out,"V1 generation fallback mismatch");
+    // Chunk owns large voxel/light arrays; keep fixtures off the Windows stack.
+    g.batch=nullptr;auto legacy=std::make_unique<Chunk>(-1,-1);generator.generate(*legacy);legacy->copyRawBlocks(out);check(expected==out,"V1 generation fallback mismatch");
     const auto legacyBegin=std::chrono::steady_clock::now();
     generator.generateRegion(-3,-3,3,6,chunks,pending);
     const auto legacyTime=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-legacyBegin).count();
@@ -163,10 +170,10 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     const uint32_t batches=counters.batch;
     generator.generatePluginChunks({owned.front().get(),nullptr,owned.back().get()});
     check(counters.batch==batches+2,"sparse request did not use per-chunk batches");
-    auto concurrent=[&]{Chunk c(-1,-1);generator.generate(c);std::vector<uint16_t> b;c.copyRawBlocks(b);return b;};
+    auto concurrent=[&]{auto c=std::make_unique<Chunk>(-1,-1);generator.generate(*c);std::vector<uint16_t> b;c->copyRawBlocks(b);return b;};
     auto a=std::async(std::launch::async,concurrent),b=std::async(std::launch::async,concurrent);
     check(a.get()==expected&&b.get()==expected,"concurrent generation mismatch");
-    WorldGenerator other(13,WorldType::Normal,DimensionId::Overworld,config);Chunk different(-1,-1);other.generate(different);different.copyRawBlocks(out);
+    WorldGenerator other(13,WorldType::Normal,DimensionId::Overworld,config);auto different=std::make_unique<Chunk>(-1,-1);other.generate(*different);different->copyRawBlocks(out);
     check(out!=expected,"different seed did not vary bulk terrain");
     counters.voxel=0;counters.terrain=0;counters.decoration=0;
     for(uint8_t level:{uint8_t(0),uint8_t(1),uint8_t(3),uint8_t(4)}) {
@@ -219,12 +226,12 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         bool refused=false;try{buildApproximateLodTile(generator,{0,0,0});}catch(...){refused=true;}check(refused,"invalid LOD spans accepted");
     }
     g.terrainLod=savedTerrain;
-    Chunk edited(-1,-1);generator.generate(edited);edited.setBlock(8,10,8,BlockId::DIAMOND_ORE);
-    std::vector<uint16_t> editedBlocks;edited.copyRawBlocks(editedBlocks);
+    auto edited=std::make_unique<Chunk>(-1,-1);generator.generate(*edited);edited->setBlock(8,10,8,BlockId::DIAMOND_ORE);
+    std::vector<uint16_t> editedBlocks;edited->copyRawBlocks(editedBlocks);
     {
         SaveStore store(root/"exact-cache");ThreadPool pool(1);LodTerrainSystem system;
         system.setSaveStore(&store);system.reset(&generator);system.setThreadPool(&pool);
-        LanLodTestAccess::observeExact(system,edited);pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
+        LanLodTestAccess::observeExact(system,*edited);pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
         check(system.hasExactChunk(-1,-1),"edited exact column cache was not saved");
     }
     g.lodRevision="new-approximation";
@@ -241,9 +248,9 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         if(v->x>0)return -1;
         auto& c=*static_cast<Counters*>(u);return c.original.batch(ctx,v,out,cap,c.original.userdata);
     };
-    Chunk early(0,0),late(4,0);bool refused=false;
-    try{generator.generatePluginChunks({&early,&late});}catch(...){refused=true;}
-    check(refused&&!early.generated&&!late.generated&&early.getBlock(1,0,1)==BlockId::AIR,"late bulk fault published a partial request");
+    auto early=std::make_unique<Chunk>(0,0),late=std::make_unique<Chunk>(4,0);bool refused=false;
+    try{generator.generatePluginChunks({early.get(),late.get()});}catch(...){refused=true;}
+    check(refused&&!early->generated&&!late->generated&&early->getBlock(1,0,1)==BlockId::AIR,"late bulk fault published a partial request");
     g.batch=savedBatch;
     auto cacheRun=[&](const std::filesystem::path& path) {
         SaveStore store(path);ThreadPool pool(1);LodTerrainSystem system;
@@ -292,11 +299,11 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     generator.generateRegion(-3,-3,3,6,chunks,pending);
     bool foundChest=false;
     for(auto* c:chunks) {
-        Chunk single(c->cx,c->cz);generator.generate(single);
-        std::vector<uint16_t> a,b;c->copyRawBlocks(a);single.copyRawBlocks(b);
-        check(a==b&&c->pluginStructures.size()==single.pluginStructures.size(),"bulk structure overwrite/metadata mismatch");
+        auto single=std::make_unique<Chunk>(c->cx,c->cz);generator.generate(*single);
+        std::vector<uint16_t> a,b;c->copyRawBlocks(a);single->copyRawBlocks(b);
+        check(a==b&&c->pluginStructures.size()==single->pluginStructures.size(),"bulk structure overwrite/metadata mismatch");
         for(size_t i=0;i<c->pluginStructures.size();++i) {
-            const auto& x=c->pluginStructures[i];const auto& y=single.pluginStructures[i];
+            const auto& x=c->pluginStructures[i];const auto& y=single->pluginStructures[i];
             check(x.structureKey==y.structureKey&&x.structureRevision==y.structureRevision&&x.lootKey==y.lootKey&&
                 x.lootRevision==y.lootRevision&&x.lootSeed==y.lootSeed,"bulk structure/loot identity mismatch");
             if(x.id==BlockId::CHEST){foundChest=true;check(x.needsBlockEntity&&x.lootKey==loot.key,"bulk chest metadata missing");}
@@ -328,8 +335,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         system.update({0.5,80,0.5},8,{});pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
         check(system.residentTileCount()>0&&LanLodTestAccess::residentApproximationsMatch(system,builtinModified),
             "builtin height-field repair undid a plugin modifier's AIR clearing");
-        Chunk c(-1,-1);builtinModified.generate(c);const auto spans=builtinModified.samplePluginLodColumn(-16,-16,1);
-        for(int y=-64;y<320;++y)check(at(spans,y)==uint16_t(c.getBlock(0,y,0)),"builtin modifier point/LOD authority mismatch");
+        auto c=std::make_unique<Chunk>(-1,-1);builtinModified.generate(*c);const auto spans=builtinModified.samplePluginLodColumn(-16,-16,1);
+        for(int y=-64;y<320;++y)check(at(spans,y)==uint16_t(c->getBlock(0,y,0)),"builtin modifier point/LOD authority mismatch");
     }
     Plugins::content().extensions.modifiers.erase(clearing.key);
     heavenComparison();

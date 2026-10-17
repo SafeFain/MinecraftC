@@ -4,6 +4,8 @@
 /build-vulkan/
 /cmake-build-*/
 /install-local/
+/.vs/
+/out/
 /android/.deps/
 /android/.gradle/
 /android/app/.cxx/

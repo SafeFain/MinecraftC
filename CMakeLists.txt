@@ -162,6 +162,12 @@ endif()
 set_source_files_properties(src/plugins/PluginManager.cpp PROPERTIES
     COMPILE_DEFINITIONS "MINECRAFTC_PLUGIN_GAME_VERSION=\"${MINECRAFTC_PLUGIN_GAME_VERSION}\"")
 
+# Project sources and tests contain UTF-8 literals; keep their encoding independent
+# of the Windows system code page without changing third-party target options.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sdk")
 
 add_library(minecraftc_assets STATIC

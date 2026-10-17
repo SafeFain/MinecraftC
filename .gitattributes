@@ -1,0 +1,2 @@
+# Generated action graphs are compared byte-for-byte with generator output.
+/assets/models/**/*.anim.json text eol=lf

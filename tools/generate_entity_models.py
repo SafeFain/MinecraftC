@@ -367,7 +367,8 @@ def write_action_graph(path,name):
                            "fade_out":.12,"events":[{"name":event,"time":event_time}]}
     graph={"version":1,"bindings":{key:key for key in actions},
            "layers":layers,"actions":actions}
-    path.write_text(json.dumps(graph,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+    # Generated assets must retain identical UTF-8/LF bytes on every platform.
+    path.write_bytes((json.dumps(graph,sort_keys=True,indent=2)+"\n").encode("utf-8"))
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("--output",type=pathlib.Path,required=True);parser.add_argument("--fixtures",type=pathlib.Path);parser.add_argument("--player-output",type=pathlib.Path)

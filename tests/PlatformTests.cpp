@@ -40,8 +40,8 @@ RuntimePathInputs baseInputs(const fs::path& root) {
 
 int main() {
     const fs::path root = fs::temp_directory_path() /
-        ("minecraftc-platform-test-" + std::to_string(
-            static_cast<unsigned long long>(std::rand())) + "-路径");
+        fs::u8path("minecraftc-platform-test-" + std::to_string(
+            static_cast<unsigned long long>(std::rand())) + u8"-路径");
     fs::remove_all(root);
 
     try {
@@ -98,7 +98,7 @@ int main() {
         }
         require(missingAssetsRejected, "missing runtime assets produce a startup error");
 
-        const fs::path destination = root / "replace" / "状态.txt";
+        const fs::path destination = root / "replace" / fs::u8path(u8"状态.txt");
         fs::create_directories(destination.parent_path());
         std::ofstream(destination) << "old";
         fs::path source = destination;

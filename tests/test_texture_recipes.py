@@ -86,7 +86,15 @@ class MaterialRecipeTests(unittest.TestCase):
         interpreters={sys.executable}
         for name in ('python3','python3.11','python3.12','python3.14'):
             found=shutil.which(name)
-            if found:interpreters.add(found)
+            if not found:continue
+            # Windows app aliases can exist on PATH without an installed Python.
+            try:
+                probe=subprocess.run([found,'-c','import sys;print(sys.version_info.major)'],
+                                     capture_output=True,text=True,timeout=5)
+            except (OSError,subprocess.TimeoutExpired):
+                continue
+            if probe.returncode==0 and probe.stdout.strip()=='3':
+                interpreters.add(found)
         for executable in sorted(interpreters):
             self.assertEqual(subprocess.check_output([executable,'-c',script],cwd=root),baseline,executable)
 
