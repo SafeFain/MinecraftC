@@ -49,14 +49,15 @@ std::filesystem::path materializeBuiltinResources(const std::filesystem::path& p
     uint64_t hash=1469598103934665603ULL;
     for(const auto byte:manifest){hash^=byte;hash*=1099511628211ULL;}
     std::ostringstream key;key<<std::hex<<hash;
-    const auto root=std::filesystem::absolute(dataRoot/".cache"/"builtin_plugins"/id/key.str());
+    // Resolve trusted system aliases (e.g. macOS /var), but never cache symlinks.
+    const auto trustedRoot=std::filesystem::canonical(dataRoot);
+    const auto root=trustedRoot/".cache"/"builtin_plugins"/id/key.str();
     files.emplace("resources.sha256.json",std::move(manifest));
     for(const auto& file:files) {
         const auto destination=root/file.first;
-        for(auto parent=destination;!parent.empty();parent=parent.parent_path()) {
+        for(auto parent=destination;parent!=trustedRoot;parent=parent.parent_path()) {
             check(!std::filesystem::is_symlink(std::filesystem::symlink_status(parent)),
                   "Builtin resource cache cannot contain symlinks");
-            if(parent==parent.root_path())break;
         }
         if(std::filesystem::is_regular_file(destination)&&std::filesystem::file_size(destination)==file.second.size()) {
             std::ifstream existing(destination,std::ios::binary);

@@ -80,7 +80,37 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
     cachedAgain.shutdown();write(cached/"content.json","damaged cache");
     Plugins::PluginManager repaired({{},root/"packaged"});repaired.initialize();
     check(Plugins::content().requirements==desktopRequirements,"Builtin cache repair changed package identity");
-    repaired.shutdown();std::filesystem::remove_all(root);
+    repaired.shutdown();
+    // System data-directory aliases are trusted; links inside the cache are not.
+    std::error_code linkError;
+    std::filesystem::create_directory_symlink(root/"packaged",root/"packaged-alias",linkError);
+#ifdef _WIN32
+    // Windows may require a privilege unavailable to the test account.
+    const bool linkUnavailable=linkError==std::errc::permission_denied||
+        linkError==std::errc::operation_not_permitted||linkError.value()==1314;
+#else
+    const bool linkUnavailable=false;
+#endif
+    check(!linkError||linkUnavailable,"Cannot create data-directory alias fixture");
+    if(!linkError) {
+        Plugins::PluginManager aliased({{},root/"packaged-alias"});aliased.initialize();
+        check(Plugins::content().requirements==desktopRequirements,"Data-directory alias changed plugin identity");
+        for(const auto& info:aliased.plugins())if(info.manifest.id=="official_heaven")
+            check(info.active&&info.root==cached,"Data-directory alias did not reuse canonical cache");
+        aliased.shutdown();
+        const auto linkedData=root/"linked-cache";
+        const auto target=root/"cache-link-target";
+        std::filesystem::create_directories(linkedData);
+        std::filesystem::create_directories(target);
+        std::filesystem::create_directory_symlink(target,linkedData/".cache");
+        Plugins::PluginManager unsafe({{},linkedData});unsafe.initialize();
+        bool rejected=false;
+        for(const auto& info:unsafe.plugins())if(info.manifest.id=="official_heaven")
+            rejected=!info.active&&info.status=="Builtin resource cache cannot contain symlinks";
+        check(rejected&&std::filesystem::is_empty(target),"Builtin cache followed an internal symlink");
+        unsafe.shutdown();
+    } else std::cout<<"Cache symlink fixtures skipped: "<<linkError.message()<<'\n';
+    std::filesystem::remove_all(root);
     std::cout<<"P1 native registration/localization/identity/material/rollback/safe-mode passed\n";return 0;
 }
 }
