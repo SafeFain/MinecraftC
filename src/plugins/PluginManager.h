@@ -74,6 +74,7 @@ public:
     int32_t block(MC_PluginContext&,const MC_Block&,uint16_t&);
     int32_t item(MC_PluginContext&,const MC_Item&,uint16_t&);
     int32_t material(MC_PluginContext&,const MC_Material&);
+    void materialSequence(MC_PluginContext&,const MC_MaterialSequenceDefinition&);
     int32_t recipe(MC_PluginContext&,const MC_Recipe&);
     int32_t subscribe(MC_PluginContext&,uint32_t,int32_t,MC_EventCallback,void*);
     int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*,uint32_t flags=0);
@@ -85,9 +86,14 @@ public:
     int32_t entity(MC_PluginContext&,const MC_EntityDefinition&,uint16_t&);
     int32_t dimensionDefinition(MC_PluginContext&,const MC_DimensionDefinition&,uint32_t&);
     int32_t dimensionDefinitionV2(MC_PluginContext&,const MC_DimensionDefinitionV2&,uint32_t&);
+    int32_t dimensionDefinitionV3(MC_PluginContext&,const MC_DimensionDefinitionV3&,uint32_t&);
+    void bedTravel(MC_PluginContext&,const MC_DimensionTravelEntry&);
+    void localizationBundle(MC_PluginContext&,const char*);
+    void localizedName(MC_PluginContext&,const char*,const char*);
     std::function<bool(uint64_t,uint32_t)> travelPlayer;
     int32_t generator(MC_PluginContext&,const MC_GeneratorDefinition&);
     int32_t generatorV2(MC_PluginContext&,const MC_GeneratorDefinitionV2&);
+    int32_t generatorV3(MC_PluginContext&,const MC_GeneratorDefinitionV3&);
     int32_t modifierV2(MC_PluginContext&,const MC_ModifierDefinitionV2&);
     int32_t modifier(MC_PluginContext&,const MC_ModifierDefinition&);
     int32_t renderResource(MC_PluginContext&,const MC_RenderResource&,MC_RenderHandle&);
@@ -102,10 +108,16 @@ public:
     void lootTable(MC_PluginContext&,const MC_LootTable&);
     void structure(MC_PluginContext&,const MC_StructureDefinition&);
     void structureV2(MC_PluginContext&,const MC_StructureDefinitionV2&);
+    void structureCoarseLod(MC_PluginContext&,const char*,uint32_t);
     void playerAction(MC_PluginContext&,const MC_PlayerAction&);
     void playerActionV2(MC_PluginContext&,const MC_PlayerActionV2&);
+    void playerActionV3(MC_PluginContext&,const MC_PlayerActionV3&);
     void environmentProfile(MC_PluginContext&,const MC_EnvironmentProfile&);
+    void environmentProfileV2(MC_PluginContext&,const MC_EnvironmentProfileV2&);
     void particleType(MC_PluginContext&,const MC_ParticleDefinition&);
+    void particleTypeV2(MC_PluginContext&,const MC_ParticleDefinitionV2&);
+    void ambientDefinition(MC_PluginContext&,const MC_AmbientDefinition&);
+    void itemIcon(MC_PluginContext&,const MC_ItemIcon&);
     void heldModel(MC_PluginContext&,const MC_HeldModel&);
     void playlist(MC_PluginContext&,const MC_MusicPlaylist&);
     void validateCapabilities();
@@ -121,6 +133,7 @@ public:
     std::function<bool(uint32_t,MC_DimensionTime&)> dimensionTime;
     std::function<bool(const MC_DimensionTime&)> setDimensionTime;
     std::function<bool(const MC_ParticleEmission&)> emitParticle;
+    std::function<bool(const MC_ParticleInstanceV2&)> emitParticleV2;
     uint64_t submitAction(MC_PluginContext&,const MC_ActionRequest&);
     MC_ActionResult actionResult(MC_PluginContext&,uint64_t) const;
     std::function<bool(uint32_t,uint16_t,const double*)> spawnEntity;

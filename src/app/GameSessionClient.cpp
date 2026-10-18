@@ -70,7 +70,7 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
         replicaEpoch = state.epoch; replicaRevisions.clear(); replicaRecovery.clear();
         replicaLodRevisions.clear(); world().clearReplicaLod();
         resetTransientState(false, state.tick, RuntimeClock{}.now());
-        loadingReason = dimension == DimensionId::Heaven ? LoadingReason::EnteringHeaven : LoadingReason::World;
+        loadingReason = dimension != DimensionId::Overworld ? LoadingReason::Dimension : LoadingReason::World;
         player.setOrientation(state.self.yaw, state.self.pitch);
     }
     if (state.tick < simulation().ticks) throw Lan::ProtocolError("Authority clock moved backwards");

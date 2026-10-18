@@ -201,10 +201,6 @@ LodExactNeighborTiles readExactNeighbors(const std::filesystem::path& root,
     return result;
 }
 
-BlockId heavenSurface(WorldGenerator::HeavenBiome biome) {
-    return WorldGenerator::heavenSurfaceBlock(biome);
-}
-
 BlockId lodTreeFoliage(TreeType type) {
     switch (type) {
         case TreeType::BIRCH: return BlockId::BIRCH_LEAVES;
@@ -403,14 +399,6 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
                 samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
-            if (generator.isHeaven()) {
-                for (const auto& island : generator.sampleHeavenLayers(wx, wz)) {
-                    if (!island.present) continue;
-                    column.spans.push_back({static_cast<int16_t>(island.bottom),
-                        static_cast<int16_t>(island.top), heavenSurface(island.biome)});
-                }
-                continue;
-            }
             SurfaceColumn sample = generator.sampleTerrainColumn(wx, wz);
             // Narrow rivers and shallow pools often miss the single center
             // sample even though they cover a visible part of a fine LOD cell.
@@ -466,88 +454,10 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
         }
     }
 
-    // Fine Heaven tiles retain representative, generation-matched surface
-    // features. Four samples per axis bound the work independently of the
-    // cell size while making narrow trees, crystals and flowers visible.
-    if (!generator.customGenerator() && generator.isHeaven() && cellSize <= 8) {
-        const int sampleCount = std::min(cellSize, 4);
-        for (int z = 0; z < LodTileData::SIDE; ++z) {
-            for (int x = 0; x < LodTileData::SIDE; ++x) {
-                const int centerX = originX + x * cellSize + cellSize / 2;
-                const int centerZ = originZ + z * cellSize + cellSize / 2;
-                const auto centerLayers = generator.sampleHeavenLayers(centerX, centerZ);
-                std::array<std::vector<WorldGenerator::HeavenLodFeature>,
-                           WorldGenerator::HEAVEN_LAYER_COUNT> selected;
-                for (int sampleZ = 0; sampleZ < sampleCount; ++sampleZ) {
-                    for (int sampleX = 0; sampleX < sampleCount; ++sampleX) {
-                        const int wx = originX + x * cellSize +
-                            (sampleX * cellSize + cellSize / 2) / sampleCount;
-                        const int wz = originZ + z * cellSize +
-                            (sampleZ * cellSize + cellSize / 2) / sampleCount;
-                        std::array<std::vector<WorldGenerator::HeavenLodFeature>,
-                                   WorldGenerator::HEAVEN_LAYER_COUNT> sampled;
-                        for (const auto& feature :
-                             generator.sampleHeavenLodFeatures(wx, wz)) {
-                            const auto& centerLayer = centerLayers[
-                                static_cast<size_t>(feature.layer)];
-                            if (centerLayer.biome == feature.biome)
-                                sampled[static_cast<size_t>(feature.layer)].push_back(
-                                    feature);
-                        }
-                        for (int layer = 0;
-                             layer < WorldGenerator::HEAVEN_LAYER_COUNT; ++layer) {
-                            if (!centerLayers[static_cast<size_t>(layer)].present ||
-                                !selected[static_cast<size_t>(layer)].empty() ||
-                                sampled[static_cast<size_t>(layer)].empty())
-                                continue;
-                            selected[static_cast<size_t>(layer)] =
-                                std::move(sampled[static_cast<size_t>(layer)]);
-                        }
-                    }
-                }
-
-                LodColumn& column = tile.at(x, z);
-                for (int layer = 0; layer < WorldGenerator::HEAVEN_LAYER_COUNT;
-                     ++layer) {
-                    const auto& features = selected[static_cast<size_t>(layer)];
-                    if (features.empty()) continue;
-                    const int surfaceTop = centerLayers[static_cast<size_t>(layer)].top;
-                    for (const auto& feature : features) {
-                        if (feature.replacesSurface) {
-                            const auto found = std::find_if(
-                                column.spans.begin(), column.spans.end(),
-                                [surfaceTop](const LodSpan& span) {
-                                    return span.top == surfaceTop;
-                                });
-                            if (found != column.spans.end()) {
-                                if (found->bottom < surfaceTop) {
-                                    found->top = static_cast<int16_t>(surfaceTop-1);
-                                    column.spans.push_back({static_cast<int16_t>(surfaceTop),
-                                        static_cast<int16_t>(surfaceTop),feature.block});
-                                } else found->block=feature.block;
-                            }
-                            continue;
-                        }
-                        const int bottom = surfaceTop + feature.bottomOffset;
-                        const int top = std::min(Config::WORLD_MAX_Y - 1,
-                            surfaceTop + feature.topOffset);
-                        if (bottom <= top)
-                            column.spans.push_back({static_cast<int16_t>(bottom),
-                                static_cast<int16_t>(top), feature.block});
-                    }
-                }
-                std::sort(column.spans.begin(), column.spans.end(),
-                    [](const LodSpan& a, const LodSpan& b) {
-                        return a.bottom < b.bottom;
-                    });
-            }
-        }
-    }
-
     // Preserve deterministic tree silhouettes in the two finest approximate
     // levels. Individual trees are intentionally omitted once a cell exceeds
     // eight blocks so a canopy can never become a giant distant cube.
-    if (!generator.customGenerator() && !generator.isHeaven() && cellSize <= 8) {
+    if (!generator.customGenerator() && cellSize <= 8) {
         struct TreeOverlay {
             int bottom = Config::WORLD_MIN_Y;
             int top = Config::WORLD_MIN_Y - 1;
@@ -718,14 +628,7 @@ LodNeighborEdges sampleApproximateLodNeighborEdges(const WorldGenerator& generat
                 samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
-            if (generator.isHeaven()) {
-                for (const auto& island : generator.sampleHeavenLayers(wx, wz)) {
-                    if (island.present)
-                        column.spans.push_back({static_cast<int16_t>(island.bottom),
-                            static_cast<int16_t>(island.top),
-                            heavenSurface(island.biome)});
-                }
-            } else {
+            {
                 SurfaceColumn sample = generator.sampleTerrainColumn(wx, wz);
                 if (cellSize > 1 && cellSize <= 16 &&
                     sample.waterLevel <= sample.height) {
@@ -1496,7 +1399,7 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                             // Older r4 approximate tiles stored only a short
                             // surface slab. Repair them in memory as well so
                             // existing worlds get continuous coverage.
-                            if (!generator->isHeaven()&&!generator->customGenerator()&&
+                            if (!generator->customGenerator()&&
                                 generator->generationConfig().modifiers.empty()) {
                                 for (LodColumn& column : data.columns) {
                                     if (!column.exact && !column.spans.empty())

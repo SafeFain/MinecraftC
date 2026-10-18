@@ -539,6 +539,8 @@ if(BUILD_TESTING)
     endforeach()
     add_test(NAME texture_recipes_sequences_and_workbench
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_texture_recipes.py)
+    add_test(NAME official_provider_package_resources
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_official_package.py)
     add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
@@ -670,6 +672,7 @@ if(BUILD_TESTING)
         src/world/BiomeMap.cpp
         src/world/Block.cpp
     )
+    target_sources(worldgen_tests PRIVATE tests/reference/heaven_v9/FrozenHeavenV9.cpp)
     target_include_directories(worldgen_tests PRIVATE
         src external/FastNoiseLite)
     target_link_libraries(worldgen_tests PRIVATE glm::glm)
@@ -678,6 +681,7 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --overworld-tests)
     add_test(NAME heaven_worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --heaven-tests)
+    add_test(NAME heaven_p1_independent_migration_reference COMMAND worldgen_tests --heaven-migration-tests)
     add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
 
     add_executable(lod_terrain_tests
@@ -950,6 +954,7 @@ if(BUILD_TESTING)
         src/renderer/StbImageImpl.cpp
         src/world/Block.cpp
         src/world/Chunk.cpp)
+    target_sources(vulkan_gi_smoke PRIVATE src/game/Item.cpp)
     target_include_directories(vulkan_gi_smoke PRIVATE src external/stb)
     target_include_directories(vulkan_gi_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_gi_smoke PRIVATE
@@ -1007,6 +1012,7 @@ if(BUILD_TESTING)
         tests/VoxelGiTests.cpp
         src/world/Block.cpp
         src/world/Chunk.cpp)
+    target_sources(voxel_gi_tests PRIVATE src/game/Item.cpp)
     target_include_directories(voxel_gi_tests PRIVATE src)
     target_link_libraries(voxel_gi_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1119,6 +1125,9 @@ if(BUILD_TESTING)
         target_compile_options(survival_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME survival_mining_crafting_and_smelting COMMAND survival_rules_tests)
+    add_test(NAME heaven_p1_independent_content_reference
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_heaven_content_reference.py
+                $<TARGET_FILE:survival_rules_tests>)
 
     add_executable(fluid_logic_tests
         tests/FluidLogicTests.cpp
@@ -1430,7 +1439,23 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    target_sources(session_flow_tests PRIVATE
+        src/renderer/BlockAtlasData.cpp
+        tests/reference/heaven_v9/FrozenParticleSystem.cpp
+        tests/reference/heaven_v9/FrozenHeavenV9.cpp)
+    add_test(NAME heaven_p1_independent_particle_reference
+        COMMAND session_flow_tests --heaven-particle-migration)
     if(NOT ANDROID AND NOT IOS)
+        foreach(p1_fixture_kind RANGE 0 2)
+            add_library(plugin_heaven_p1_${p1_fixture_kind} MODULE tests/HeavenP1Fixture.cpp)
+            target_include_directories(plugin_heaven_p1_${p1_fixture_kind} PRIVATE sdk)
+            target_compile_definitions(plugin_heaven_p1_${p1_fixture_kind} PRIVATE P1_FIXTURE_KIND=${p1_fixture_kind})
+            set_target_properties(plugin_heaven_p1_${p1_fixture_kind} PROPERTIES PREFIX "")
+            add_dependencies(session_flow_tests plugin_heaven_p1_${p1_fixture_kind})
+        endforeach()
+        add_test(NAME heaven_p1_native_registration_and_rollback COMMAND session_flow_tests --heaven-p1-tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_heaven_p1_0>
+            $<TARGET_FILE:plugin_heaven_p1_1> $<TARGET_FILE:plugin_heaven_p1_2>)
         add_library(plugin_worldgen_v2_bad_registration MODULE examples/plugins/worldgen_v2_demo/plugin.cpp)
         target_include_directories(plugin_worldgen_v2_bad_registration PRIVATE sdk)
         target_compile_definitions(plugin_worldgen_v2_bad_registration PRIVATE MC_WORLDGEN_BAD_REGISTRATION=1)
@@ -1456,6 +1481,13 @@ if(BUILD_TESTING)
             add_test(NAME plugin_vulkan_capabilities_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets capabilities)
+            foreach(heaven_scene heaven_model heaven_off)
+                add_test(NAME plugin_vulkan_${heaven_scene}_readback COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                    ${CMAKE_SOURCE_DIR}/assets ${heaven_scene})
+                set_tests_properties(plugin_vulkan_${heaven_scene}_readback PROPERTIES
+                    LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+            endforeach()
             set_tests_properties(plugin_vulkan_capabilities_readback PROPERTIES
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
             set_tests_properties(plugin_vulkan_extensions_readback PROPERTIES
@@ -1607,6 +1639,7 @@ if(BUILD_TESTING)
         src/world/WorldSimulation.cpp)
     target_include_directories(application_flow_tests PRIVATE
         src external external/FastNoiseLite external/cgltf external/stb)
+    target_sources(application_flow_tests PRIVATE src/renderer/BlockAtlasData.cpp)
     target_compile_definitions(application_flow_tests PRIVATE
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(application_flow_tests PRIVATE
@@ -1785,4 +1818,29 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS AND NOT APPLE)
     endif()
     add_test(NAME lan_dns_sd_discovery COMMAND lan_discovery_tests)
     set_tests_properties(lan_dns_sd_discovery PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+
+if(BUILD_TESTING)
+    add_library(minecraftc_heaven_test_support STATIC
+        tests/HeavenGeneratorQueryAdapters.cpp tests/HeavenWorldQueryAdapters.cpp
+        src/plugins/official_heaven/HeavenGenerator.cpp
+        src/plugins/official_heaven/HeavenProvider.cpp
+        src/plugins/official_heaven/HeavenDefinitions.cpp
+        src/plugins/official_heaven/HeavenAmbient.cpp
+        src/plugins/official_heaven/HeavenEnvironment.cpp
+        src/world/Noise.cpp src/world/Chunk.cpp)
+    target_include_directories(minecraftc_heaven_test_support PRIVATE src external/FastNoiseLite)
+    target_link_libraries(minecraftc_heaven_test_support PRIVATE glm::glm)
+    target_compile_definitions(minecraftc_heaven_test_support PRIVATE MINECRAFTC_HEAVEN_TEST_QUERIES=1)
+    if(MSVC)
+        target_compile_options(minecraftc_heaven_test_support PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    get_property(heaven_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(heaven_test_target IN LISTS heaven_test_targets)
+        get_target_property(heaven_test_type ${heaven_test_target} TYPE)
+        if(heaven_test_type STREQUAL "EXECUTABLE" AND NOT heaven_test_target STREQUAL "minecraftc")
+            target_compile_definitions(${heaven_test_target} PRIVATE MINECRAFTC_HEAVEN_TEST_QUERIES=1)
+            target_link_libraries(${heaven_test_target} PRIVATE minecraftc_heaven_test_support)
+        endif()
+    endforeach()
 endif()

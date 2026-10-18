@@ -8,14 +8,21 @@ inline void publishHeavenDimension(){
     d.natural=false;d.deathTarget=d.voidTarget="minecraftc:overworld";
     if(!content().extensions.dimensions.emplace(1,std::move(d)).second)throw std::runtime_error("Heaven slot already owned");
 }
-// The static owner keeps reserved definitions until the full P1 content move.
-// Both production registration and explicit standalone test fixtures use these descriptors.
+// Production registration and standalone tests share provider-owned policies.
 template<class Block,class Item> void heavenSemantics(Block block,Item item){
     for(uint16_t raw=0;raw<static_cast<uint16_t>(BlockId::COUNT);++raw){
         const auto id=static_cast<BlockId>(raw);if(!heavenBlockSlot(id))continue;
         const auto key=blockKey(id);MC_BlockBehaviorV2 d{};d.size=sizeof(d);d.base.size=sizeof(d.base);d.base.block=key.c_str();
-        d.base.replaceable=isReplaceableByFluid(id);d.base.fire_encouragement=fireEncouragement(id);d.base.fire_flammability=burnOdds(id);
-        d.fields=MC_BLOCK_TAGS|MC_BLOCK_LIGHT;d.light_dampening=id==BlockId::SKYROOT_LEAVES?1:getLightDampening(id);
+        const auto& properties=getBlockProps(id);
+        d.fields=MC_BLOCK_TAGS|MC_BLOCK_LIGHT;
+        d.light_dampening=properties.transparent||properties.shape!=RenderShape::Cube?0:15;
+        if(id==BlockId::SKYROOT_LEAVES){d.light_dampening=1;d.base.fire_encouragement=30;d.base.fire_flammability=60;}
+        if(id==BlockId::SKYROOT_WOOD||id==BlockId::SKYROOT_PLANKS){d.base.fire_encouragement=5;d.base.fire_flammability=5;}
+        DoorState door;ButtonState button;
+        if(decodeDoor(id,door)||decodeButton(id,button)){d.base.fire_encouragement=5;d.base.fire_flammability=20;}
+        if(id==BlockId::STARFLOWER||id==BlockId::CLOUD_BLOOM||id==BlockId::GLOWSHROOM){d.base.replaceable=1;d.base.fire_encouragement=60;d.base.fire_flammability=100;}
+        if(id==BlockId::STARFLOWER||id==BlockId::CLOUD_BLOOM||id==BlockId::GLOWSHROOM||
+           (id>=BlockId::SKY_FERN&&id<=BlockId::HANGING_CLOUD_VINE))d.tags|=MC_TAG_FLOWER;
         if(id==BlockId::SKYROOT_LEAVES)d.tags|=MC_TAG_LEAVES;
         if(id==BlockId::SKYROOT_PLANKS)d.tags|=MC_TAG_PLANKS;
         if(id==BlockId::AETHER_GRASS||id==BlockId::AETHER_SOIL||id==BlockId::AETHER_MOSS)d.tags|=MC_TAG_HEAVEN_SOIL|MC_TAG_MOON_SOIL;
@@ -28,6 +35,7 @@ template<class Block,class Item> void heavenSemantics(Block block,Item item){
             drop={dropKey.c_str(),2,2,1,1};d.drops=&drop;d.drop_count=1;
         }
         if(id==BlockId::STAR_CRYSTAL)d.base.action="official_heaven:skyway";
+        if(id==BlockId::HANGING_CLOUD_VINE)d.base.support=2;
         block(d);
     }
     for(uint16_t raw=1;raw<static_cast<uint16_t>(ItemId::COUNT);++raw){

@@ -86,7 +86,7 @@ GameAction decodeGameAction(const Bytes& bytes) {
     const auto count = reader.u8(); if (count > 64) throw ProtocolError("Too many inventory targets");
     for (uint8_t i = 0; i < count; ++i) inventory.targets.push_back({static_cast<InventoryArea>(reader.u8()), reader.u8()});
     action.command=reader.text(512);
-    if(action.kind!=ActionKind::PluginCommand&&!action.command.empty())throw ProtocolError("Unexpected command text");
+    if(action.kind!=ActionKind::PluginCommand&&!(action.kind==ActionKind::SleepChoice&&action.inventory.argument==2)&&!action.command.empty())throw ProtocolError("Unexpected command text");
     reader.finish(); actionValid(action); return action;
 }
 }

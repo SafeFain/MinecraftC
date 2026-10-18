@@ -46,7 +46,7 @@ void PluginManager::itemBehavior(MC_PluginContext& c,const MC_ItemBehavior& d){
     require(content().extensions.itemBehaviors.emplace(static_cast<uint16_t>(resolveItem(d.item)),b).second,"Duplicate item behavior");
 }
 void PluginManager::blockBehaviorV2(MC_PluginContext& c,const MC_BlockBehaviorV2& d){
-    require(d.size>=sizeof(d)&&d.fields<=15&&d.light_dampening<=15&&d.tags<=255&&d.substrate_tags<=255&&d.drop_count<=16&&(!d.drop_count||d.drops),"Invalid block semantics");
+    require(d.size>=sizeof(d)&&d.fields<=15&&d.light_dampening<=15&&d.tags<=511&&d.substrate_tags<=511&&d.drop_count<=16&&(!d.drop_count||d.drops),"Invalid block semantics");
     std::vector<BlockBehaviorContent::Drop> drops;
     for(uint32_t i=0;i<d.drop_count;++i){const auto& r=d.drops[i];reference(c,str(r.item));require(r.minimum<=r.maximum&&r.maximum<=64&&r.denominator&&r.numerator<=r.denominator,"Invalid break drop");drops.push_back({r.item,r.minimum,r.maximum,r.numerator,r.denominator});}
     blockBehavior(c,d.base);
@@ -92,6 +92,11 @@ void PluginManager::structureV2(MC_PluginContext& c,const MC_StructureDefinition
     require(content().extensions.structures.size()<128,"Too many structures");
     require(content().extensions.structures.emplace(s.key,std::move(s)).second,"Duplicate structure");
 }
+void PluginManager::structureCoarseLod(MC_PluginContext& c,const char* key,uint32_t policy) {
+    owned(c,str(key));require(policy<=1,"Invalid structure coarse LOD policy");
+    auto found=content().extensions.structures.find(key);require(found!=content().extensions.structures.end(),"Unknown structure LOD binding");
+    found->second.omitCoarseLod=policy!=0;
+}
 void PluginManager::playerAction(MC_PluginContext& c,const MC_PlayerAction& d){
     require(d.size>=sizeof(d)&&d.kind<=MC_ACTION_TRAVEL&&d.durability<=65535,"Invalid action");owned(c,str(d.key));number(d.range,.1f,256);number(d.cooldown,0,3600);
     ActionContent a;a.key=d.key;a.dimension=optional(d.dimension);a.kind=d.kind;a.range=d.range;a.cooldown=d.cooldown;a.durability=d.durability;
@@ -108,6 +113,18 @@ void PluginManager::playerActionV2(MC_PluginContext& c,const MC_PlayerActionV2& 
     const auto f=d.target;const auto u=d.base.userdata;const auto index=c.index;
     a.targetV2=[this,f,u,index](const MC_ActionViewV2& v,MC_ActionTargetV2& t){if(!m_info[index].active)return false;const auto phase=m_phase;const auto readonly=m_readOnly;m_phase=MC_HUD;m_readOnly=true;bool ok=false;try{if(f(&v,&t,u))callbackFault(index,"Action V2 callback failed");else ok=true;}catch(...){callbackFault(index,"Exception across action V2 ABI");}m_phase=phase;m_readOnly=readonly;return ok;};
 }
+void PluginManager::playerActionV3(MC_PluginContext& c,const MC_PlayerActionV3& d){
+    require(d.size>=sizeof(d)&&d.target&&!d.base.target,"Invalid action V3");
+    auto policy=d.base;policy.target=[](const MC_ActionViewV2*,MC_ActionTargetV2*,void*)->int32_t{return -1;};
+    playerActionV2(c,policy);auto& a=content().extensions.actions.at(d.base.base.key);a.targetV2={};
+    const auto f=d.target;const auto u=d.base.base.userdata;const auto index=c.index;
+    a.targetV3=[this,f,u,index](const MC_ActionViewV3& v,MC_ActionTargetV2& t){
+        if(!m_info[index].active)return false;
+        const auto phase=m_phase;const auto readonly=m_readOnly;m_phase=MC_HUD;m_readOnly=true;bool ok=false;
+        try{if(f(&v,&t,u))callbackFault(index,"Action V3 callback failed");else ok=true;}catch(...){callbackFault(index,"Exception across action V3 ABI");}
+        m_phase=phase;m_readOnly=readonly;return ok;
+    };
+}
 void PluginManager::environmentProfile(MC_PluginContext& c,const MC_EnvironmentProfile& d){
     require(d.size>=sizeof(d)&&d.parameters.size>=sizeof(d.parameters)&&validDimension(d.dimension),"Invalid environment profile");
     require(m_phase==MC_REGISTER&&!content().frozen,"Environment registration closed");const auto key=str(d.key);require(validKey(key)&&key.rfind(m_info.at(c.index).manifest.id+":",0)==0,"Environment key must use own namespace");
@@ -117,14 +134,55 @@ void PluginManager::environmentProfile(MC_PluginContext& c,const MC_EnvironmentP
     if(!(d.override_parameters&2)){validated.sun_direction[1]=validated.light_direction[1]=1;validated.moon_direction[1]=-1;}
     require(validEnvironment(validated),"Invalid static environment values");
     EnvironmentContent e;e.key=key;e.parameters=p;e.parameters.dimension=d.dimension;e.overrides=d.override_parameters;require(e.overrides<=7,"Invalid environment overrides");
+    // Compatibility for the V1 layered-style selector; V2 supplies explicit flags.
+    if(p.sky_style==1)e.skyFlags=MC_SKY_NO_ATMOSPHERE|MC_SKY_NO_LOW_CLOUDS|MC_SKY_NO_VOXEL_CLOUDS|MC_SKY_NO_LIGHT_SHAFTS;
     if(d.callback){const auto f=d.callback;const auto u=d.userdata;const auto index=c.index;auto* ctx=&c;e.callback=[this,f,u,index,ctx](MC_EnvironmentParameters& p){if(!m_info[index].active)return;const auto previous=m_phase;m_phase=MC_ENVIRONMENT;try{if(f(ctx,&p,u))callbackFault(index,"Environment callback failed");}catch(...){callbackFault(index,"Exception across environment ABI");}m_phase=previous;};}
     require(content().extensions.environments.emplace(d.dimension,std::move(e)).second,"Conflicting dimension environment");
+}
+void PluginManager::environmentProfileV2(MC_PluginContext& c,const MC_EnvironmentProfileV2& d) {
+    require(d.size>=sizeof(d)&&d.sky.size>=sizeof(d.sky),"Invalid environment V2 descriptor");
+    for(const auto& v:d.sky.layers)for(float value:v)number(value,-1024,1024);
+    for(int index:{0,6}) {
+        number(d.sky.layers[index][3],0,1);
+        if(d.sky.layers[index][3]>0) {
+            const auto& mask=d.sky.layers[index+1];require(mask[0]<mask[1]&&mask[2]<mask[3],"Invalid sky layer mask");
+            number(d.sky.layers[index+5][index==0?0:1],.001f,16);
+        }
+    }
+    require(d.override_particle_intensity<=1,"Invalid particle intensity override");number(d.particle_intensity,0,1);
+    if(d.sky_flags>15)throw std::runtime_error("Invalid sky policy flags: "+std::to_string(d.sky_flags));
+    number(d.grade_strength,0,1);for(float value:d.grade_color)number(value,0,4);
+    environmentProfile(c,d.base);auto& profile=content().extensions.environments.at(d.base.dimension);
+    if(d.override_particle_intensity)profile.particleIntensity=d.particle_intensity;
+    profile.skyFlags=d.sky_flags;profile.gradeStrength=d.grade_strength;
+    if(d.grade_strength>0)std::copy(std::begin(d.grade_color),std::end(d.grade_color),profile.gradeColor.begin());
+    for(size_t i=0;i<MC_SKY_LAYER_VECTORS;++i)std::copy(std::begin(d.sky.layers[i]),std::end(d.sky.layers[i]),profile.skyLayers[i].begin());
 }
 void PluginManager::particleType(MC_PluginContext& c,const MC_ParticleDefinition& d){
     require(d.size>=sizeof(d),"Invalid particle descriptor");require(m_phase==MC_REGISTER&&!content().frozen,"Particle registration closed");const auto key=str(d.key);require(validKey(key)&&key.rfind(m_info.at(c.index).manifest.id+":",0)==0,"Particle key must use own namespace");
     number(d.lifetime,.01f,60);number(d.scale,.001f,4);number(d.gravity,-100,100);for(float x:d.color)number(x,0,1);for(float x:d.velocity)number(x,-100,100);
     ParticleContent p;p.key=key;p.material=str(d.material);p.definition=d;p.definition.key=p.definition.material=nullptr;p.owner=c.index;
     require(content().extensions.particles.size()<256&&content().extensions.particles.emplace(key,p).second,"Duplicate/too many particles");
+}
+void PluginManager::particleTypeV2(MC_PluginContext& c,const MC_ParticleDefinitionV2& d) {
+    require(d.size>=sizeof(d)&&d.shape<=3&&d.collision<=1,"Invalid particle V2 descriptor");
+    for(const auto& axis:d.drift){for(int i=0;i<3;++i)number(axis[i],-100,100);require(axis[3]==0||axis[3]==1,"Invalid drift wave");}
+    particleType(c,d.base);auto& p=content().extensions.particles.at(d.base.key);p.advanced=true;p.collision=d.collision!=0;p.shape=d.shape;
+    for(int axis=0;axis<3;++axis)std::copy(std::begin(d.drift[axis]),std::end(d.drift[axis]),p.drift[size_t(axis)].begin());
+}
+void PluginManager::ambientDefinition(MC_PluginContext& c,const MC_AmbientDefinition& d) {
+    require(d.size>=sizeof(d)&&validDimension(d.dimension)&&d.state_bytes<=4096&&d.replace_native<=1&&d.update,"Invalid ambient descriptor");
+    const auto key=str(d.key);owned(c,key);reference(c,dimensionContent(d.dimension).key);
+    AmbientContent a;a.owner=c.index;a.key=key;a.dimension=d.dimension;a.stateBytes=d.state_bytes;a.replaceNative=d.replace_native!=0;
+    const auto callback=d.update;const auto userdata=d.userdata;const auto index=c.index;
+    a.update=[this,callback,userdata,index](const MC_AmbientContext& view,void* state) {
+        if(!m_info[index].active||!content().runtimeFault.empty())return false;
+        const auto previous=m_phase;m_phase=MC_ENVIRONMENT;bool success=false;
+        try{success=callback(&view,state,userdata)==0;if(!success)callbackFault(index,"Ambient callback failed");}
+        catch(...){callbackFault(index,"Exception across ambient ABI");}
+        m_phase=previous;return success;
+    };
+    require(content().extensions.ambient.size()<64&&content().extensions.ambient.emplace(key,std::move(a)).second,"Duplicate/too many ambient emitters");
 }
 void PluginManager::heldModel(MC_PluginContext& c,const MC_HeldModel& d){
     require(d.size>=sizeof(d),"Invalid held model");owned(c,str(d.item));const auto id=static_cast<uint16_t>(resolveItem(d.item));
@@ -156,9 +214,13 @@ void PluginManager::describeCapabilities(){
     for(const auto& pair:e.itemBehaviors){const auto& b=pair.second;if(b.fields)n["semantics/item/"+itemKey(static_cast<ItemId>(pair.first))]=J::array({b.fields,b.fuel,b.tags}).dump();}
     for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;n["behavior/block/"+blockKey(static_cast<BlockId>(pair.first))]=J::array({b.climbable,b.replaceable,b.support,b.encouragement,b.flammability,b.damage,b.harvest,b.harvestCount,b.replacement,b.resetTicks,b.action}).dump();}
     for(const auto& pair:e.itemBehaviors)n["behavior/item/"+itemKey(static_cast<ItemId>(pair.first))]=J::array({pair.second.action,pair.second.dimension}).dump();
+    for(const auto& pair:e.structures)if(pair.second.omitCoarseLod)n["structure-lod/"+pair.first]="omit-coarse-v1";
+    for(const auto& pair:e.environments)n["sky-layers/"+pair.second.key]=J::array({pair.second.skyLayers,pair.second.particleIntensity,pair.second.skyFlags,pair.second.gradeColor,pair.second.gradeStrength}).dump();
+    for(const auto& pair:e.ambient)n["ambient/"+pair.first]=J::array({dimensionContent(pair.second.dimension).key,pair.second.stateBytes,pair.second.replaceNative}).dump();
+    for(const auto& pair:e.particles)if(pair.second.advanced)n["particle-v2/"+pair.first]=J::array({pair.second.shape,pair.second.collision,pair.second.drift}).dump();
     for(const auto& pair:e.loot){J entries=J::array();for(const auto& b:pair.second.entries)entries.push_back({b.item,b.minimum,b.maximum,b.chance});n["loot/"+pair.first]=J::array({pair.second.revision,entries}).dump();}
     for(const auto& pair:e.structures){const auto& s=pair.second;J blocks=J::array();for(const auto& b:s.blocks)blocks.push_back({b.x,b.y,b.z,blockKey(static_cast<BlockId>(b.id)),b.loot});n["structure/"+pair.first]=J::array({dimensionContent(s.dimension).key,s.revision,s.cell,s.chance,s.radius,s.height,s.tolerance,s.domain,blocks,s.build!=nullptr}).dump();if(s.placements){auto description=J::parse(n["structure/"+pair.first]);description.push_back(J::array({"placements-v2",s.minY,s.maxY,s.order,s.buildV2!=nullptr}));n["structure/"+pair.first]=description.dump();}}
-    for(const auto& pair:e.actions){const auto& a=pair.second;if(a.targetV2)n["action-v2/"+pair.first]=J::array({a.rangeFromEye,a.toolPose,a.invalidMarker,a.useCooldown}).dump();n["action/"+pair.first]=J::array({a.kind,a.dimension,a.range,a.cooldown,a.durability,bool(a.target)}).dump();}
+    for(const auto& pair:e.actions){const auto& a=pair.second;if(a.contextual())n[(a.targetV3?"action-v3/":"action-v2/")+pair.first]=J::array({a.rangeFromEye,a.toolPose,a.invalidMarker,a.useCooldown}).dump();n["action/"+pair.first]=J::array({a.kind,a.dimension,a.range,a.cooldown,a.durability,bool(a.target)}).dump();}
 }
 uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest& d){
     require(!m_readOnly,"Read-only callback cannot request an action");
@@ -168,6 +230,11 @@ uint64_t PluginManager::submitAction(MC_PluginContext& c,const MC_ActionRequest&
 }
 MC_ActionResult PluginManager::actionResult(MC_PluginContext& c,uint64_t id) const{const auto it=m_actionResults.find(id);require(it!=m_actionResults.end()&&it->second.owner==c.index,"Unknown action receipt");return {sizeof(MC_ActionResult),it->second.status,id};}
 const void* PluginManager::capability(const char* name,uint32_t version){
+    if(name&&version==3&&std::string(name)==MC_PLAYER_ACTIONS_EXTENSION){
+        static const MC_PlayerActionsV3 actions{sizeof(MC_PlayerActionsV3),3,
+            [](MC_PluginContext* c,const MC_PlayerActionV3* d){return call(c,[&]{require(d,"Missing action V3");manager(c).playerActionV3(*c,*d);},true);},
+            static_cast<const MC_PlayerActionsV2*>(capability(MC_PLAYER_ACTIONS_EXTENSION,2))};return &actions;
+    }
     if(name&&version==2&&std::string(name)==MC_PLAYER_ACTIONS_EXTENSION){
         static const MC_PlayerActionsV2 actions{sizeof(MC_PlayerActionsV2),2,
             [](MC_PluginContext* c,const MC_PlayerActionV2* d){return call(c,[&]{require(d,"Missing action V2");manager(c).playerActionV2(*c,*d);},true);},
@@ -184,6 +251,29 @@ const void* PluginManager::capability(const char* name,uint32_t version){
             [](MC_PluginContext* c,const MC_StructureDefinitionV2* d){return call(c,[&]{require(d,"Missing structure V2");manager(c).structureV2(*c,*d);},true);},
             static_cast<const MC_StructuresV1*>(capability(MC_STRUCTURES_EXTENSION,1))};
         return &structures;
+    }
+    if(name&&version==2&&std::string(name)==MC_PRESENTATION_EXTENSION) {
+        static const MC_PresentationV2 presentation{sizeof(MC_PresentationV2),2,
+            [](MC_PluginContext* c,const MC_ParticleDefinitionV2* d){return call(c,[&]{require(d,"Missing particle V2");manager(c).particleTypeV2(*c,*d);},true);},
+            [](MC_PluginContext* c,const MC_ParticleInstanceV2* d){return call(c,[&]{auto& m=manager(c);require(d&&d->size>=sizeof(*d)&&validDimension(d->dimension)&&d->particle,"Invalid particle V2 emission");const auto found=content().extensions.particles.find(d->particle);require(found!=content().extensions.particles.end()&&found->second.owner==c->index,"Unknown/foreign particle");require(!m.readOnly()&&(m.phase()==MC_HUD||m.phase()==MC_ENVIRONMENT||m.phase()==MC_UPDATE_PRE||m.phase()==MC_UPDATE_POST),"Local particles require frame callback");require(m.emitParticleV2&&m.emitParticleV2(*d),"Particle V2 emission unavailable");});},
+            [](MC_PluginContext* c,const MC_AmbientDefinition* d){return call(c,[&]{require(d,"Missing ambient definition");manager(c).ambientDefinition(*c,*d);},true);},
+            static_cast<const MC_PresentationV1*>(capability(MC_PRESENTATION_EXTENSION,1)),
+            [](MC_PluginContext* c,const MC_ItemIcon* d){return call(c,[&]{require(d,"Missing item icon");manager(c).itemIcon(*c,*d);},true);}};return &presentation;
+    }
+    if(name&&version==2&&std::string(name)==MC_ENVIRONMENT_EXTENSION) {
+        static const MC_EnvironmentV2 environment{sizeof(MC_EnvironmentV2),2,
+            [](MC_PluginContext* c,const MC_EnvironmentProfileV2* d){return call(c,[&]{require(d,"Missing environment V2");manager(c).environmentProfileV2(*c,*d);},true);},
+            static_cast<const MC_EnvironmentV1*>(capability(MC_ENVIRONMENT_EXTENSION,1))};return &environment;
+    }
+    if(name&&version==1&&std::string(name)==MC_MATERIAL_SEQUENCES_EXTENSION) {
+        static const MC_MaterialSequencesV1 materials{sizeof(MC_MaterialSequencesV1),1,
+            [](MC_PluginContext* c,const MC_MaterialSequenceDefinition* d){return call(c,[&]{require(d,"Missing material sequence");manager(c).materialSequence(*c,*d);},true);}};
+        return &materials;
+    }
+    if(name&&version==3&&std::string(name)==MC_STRUCTURES_EXTENSION) {
+        static const MC_StructuresV3 structures{sizeof(MC_StructuresV3),3,
+            [](MC_PluginContext* c,const char* key,uint32_t policy){return call(c,[&]{manager(c).structureCoarseLod(*c,key,policy);},true);},
+            static_cast<const MC_StructuresV2*>(capability(MC_STRUCTURES_EXTENSION,2))};return &structures;
     }
     if(!name||version!=1)return nullptr;
     static const MC_BehaviorsV1 behaviors{sizeof(MC_BehaviorsV1),1,

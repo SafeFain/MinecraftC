@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "renderer/VoxelGi.h"
 
 #include <cmath>
@@ -212,6 +213,7 @@ void checkDirectionalAttributes() {
 }
 
 int main() {
+    installHeavenFixture();
     checkUpdatePolicyAndRegions();
     checkResumableCoarseBuild();
     checkDirectionalAttributes();

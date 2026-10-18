@@ -326,6 +326,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     vkp::VulkanSwapchainBundle swapchain;
     size_t currentFrame = 0;
     bool swapchainDirty = false;
+    bool independentBlend = false;
     bool firstFrameLogged = false;
     FrameData submittedFrame{};
     std::vector<DrawCommand> submittedDraws;
@@ -412,7 +413,9 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     RendererPerformanceStats performance{};
 
     VoxelGiConfig effectiveVoxelGiConfig() const {
-        return diagnosticGiConfig.value_or(voxelGiConfig(visualQuality, enhancedVisualSettings));
+        auto config = diagnosticGiConfig.value_or(voxelGiConfig(visualQuality, enhancedVisualSettings));
+        config.enabled = config.enabled && independentBlend;
+        return config;
     }
 
     void recordDiagnosticCapture(VkCommandBuffer command, uint32_t imageIndex) {
@@ -796,12 +799,17 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 physicalDevice, portabilitySubset))
             extensions.push_back(portabilitySubset);
 #endif
+        VkPhysicalDeviceFeatures supported{}, enabled{};
+        vkGetPhysicalDeviceFeatures(physicalDevice, &supported);
+        independentBlend = supported.independentBlend == VK_TRUE;
+        enabled.independentBlend = supported.independentBlend;
         VkDeviceCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         info.queueCreateInfoCount = static_cast<uint32_t>(queues.size());
         info.pQueueCreateInfos = queues.data();
         info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         info.ppEnabledExtensionNames = extensions.data();
+        info.pEnabledFeatures = &enabled;
         require(vkCreateDevice(physicalDevice, &info, nullptr, &device), "vkCreateDevice");
         vkGetDeviceQueue(device, graphicsFamily, 0, &graphicsQueue);
         vkGetDeviceQueue(device, presentFamily, 0, &presentQueue);
@@ -1668,7 +1676,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         const EnhancedVisualConfig enhanced = enhancedVisualConfig(
             visualQuality, enhancedVisualSettings);
         params.bloomLevels = enhanced.bloomLevels;
-        params.screenEffectDivisor = enhanced.screenEffectDivisor;
+        params.screenEffectDivisor = independentBlend ? enhanced.screenEffectDivisor : 0;
         params.requestedSampleCount = requestedSampleCount;
         params.maxSampleCount = maxSampleCount;
         params.shaderRoot = assetRoot / "shaders" / "vulkan";
@@ -2453,6 +2461,21 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void recordShadowPass(VkCommandBuffer command) {
+        // Chunk descriptors expose this sampled image even without shadow casters.
+        // Initialize its contents and readable layout before the first scene.
+        if (!shadow.imageInitialized) {
+            const ShadowConfig config = shadowConfig(shadow.shadowQuality);
+            const int columns = config.cascadeCount == 1 ? 1 : 2;
+            VkClearValue clear{}; clear.depthStencil = {1.0f, 0};
+            VkRenderPassBeginInfo pass{}; pass.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            pass.renderPass = shadow.shadowRenderPass; pass.framebuffer = shadow.shadowFramebuffer;
+            pass.renderArea.extent = {uint32_t(config.resolution * columns),
+                uint32_t(config.resolution * ((config.cascadeCount + columns - 1) / columns))};
+            pass.clearValueCount = 1; pass.pClearValues = &clear;
+            vkCmdBeginRenderPass(command, &pass, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdEndRenderPass(command);
+            shadow.imageInitialized = true;
+        }
         if (shadowUpdateQueued && shadowCascades.count > 0 &&
             !submittedShadowChunks.empty() && shadowAtlasSet) {
             const ShadowConfig config=shadowConfig(shadow.shadowQuality);
@@ -2872,13 +2895,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             postProcess.environment.daylight};
         result.celestial = {
             postProcess.environment.sunDirection,
-            postProcess.environment.skyStyle == RenderSkyStyle::Heaven
-                ? 1.0f : 0.0f};
+            postProcess.environment.gradeStrength};
+        result.gradeScreen={postProcess.environment.gradeColor,0};
         if (swapchain.surfaceDataEnabled) {
-            result.screenQuality = {
-                static_cast<float>(enhanced.aoDirections),
-                static_cast<float>(enhanced.aoSteps),
-                static_cast<float>(enhanced.lightShaftSamples),
+            result.gradeScreen = {
+                postProcess.environment.gradeColor,
                 static_cast<float>(enhanced.screenEffectDivisor) *
                     (swapchain.voxelGiEnabled ? -1.0f : 1.0f)};
             result.reflection = {
@@ -2897,8 +2918,15 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             postProcess.environment.sunDirection.y > -0.03f;
         const glm::vec2 sunNdc = sunVisible
             ? glm::vec2(sunClip) / sunClip.w : glm::vec2(-4.0f);
+        // Exact integer packing keeps grading and screen quality inside the
+        // portable 128-byte push-constant limit shared by all post passes.
+        const uint32_t screenPolicy=(sunVisible?1u:0u)|
+            ((uint32_t(enhanced.aoDirections)&15u)<<1u)|
+            ((uint32_t(enhanced.aoSteps)&7u)<<5u)|
+            ((uint32_t(enhanced.lightShaftSamples)&31u)<<8u)|
+            ((postProcess.environment.skyFlags&SkyNoLightShafts)?8192u:0u);
         result.sunScreen = {sunNdc * 0.5f + 0.5f,
-                            sunVisible ? 1.0f : 0.0f,
+                            static_cast<float>(screenPolicy),
                             enhanced.lightShaftStrength};
         return result;
     }
@@ -3224,14 +3252,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &swapchain.commandBuffers[imageIndex];
         submit.signalSemaphoreCount = 1;
-        submit.pSignalSemaphores = &frameSync.renderFinished[currentFrame];
+        submit.pSignalSemaphores = &swapchain.renderFinished[imageIndex];
         require(vkQueueSubmit(graphicsQueue, 1, &submit, frameSync.fences[currentFrame]),
                 "vkQueueSubmit");
         if (timingPools[currentFrame]) timingSamples[currentFrame] = ++timingSequence;
         VkPresentInfoKHR present{};
         present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &frameSync.renderFinished[currentFrame];
+        present.pWaitSemaphores = &swapchain.renderFinished[imageIndex];
         present.swapchainCount = 1;
         present.pSwapchains = &swapchain.handle;
         present.pImageIndices = &imageIndex;

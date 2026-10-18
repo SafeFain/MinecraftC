@@ -95,9 +95,9 @@ int main(int argc,char** argv) {
         // Simulate a different runtime allocation while keeping the same installed
         // package set. Every durable file must resolve names independently.
         auto remapBlocks=Plugins::content().blocks;Plugins::content().blocks.clear();std::map<uint16_t,uint16_t> blockIds,itemIds;
-        for(auto& entry:remapBlocks){const uint16_t id=static_cast<uint16_t>(entry.first+100);blockIds[entry.first]=id;entry.second.properties.id=static_cast<BlockId>(id);Plugins::content().blocks.emplace(id,std::move(entry.second));}
+        for(auto& entry:remapBlocks){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?100:0));blockIds[entry.first]=id;entry.second.properties.id=static_cast<BlockId>(id);Plugins::content().blocks.emplace(id,std::move(entry.second));}
         auto remapItems=Plugins::content().items;Plugins::content().items.clear();
-        for(auto& entry:remapItems){const uint16_t id=static_cast<uint16_t>(entry.first+200);itemIds[entry.first]=id;if(entry.second.properties.placedBlock)entry.second.properties.placedBlock=static_cast<BlockId>(blockIds.at(static_cast<uint16_t>(*entry.second.properties.placedBlock)));Plugins::content().items.emplace(id,std::move(entry.second));}
+        for(auto& entry:remapItems){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?200:0));itemIds[entry.first]=id;if(entry.second.properties.placedBlock)entry.second.properties.placedBlock=static_cast<BlockId>(blockIds.at(static_cast<uint16_t>(*entry.second.properties.placedBlock)));Plugins::content().items.emplace(id,std::move(entry.second));}
         for(auto& entry:Plugins::content().blocks)if(entry.second.drop!=ItemId::EMPTY)entry.second.drop=static_cast<ItemId>(itemIds.at(static_cast<uint16_t>(entry.second.drop)));
         Plugins::freezeContent();const auto changedItem=Plugins::resolveItem("example_content:blue_brick");const auto changedBlock=Plugins::resolveBlock("example_content:blue_brick");
         auto loaded=store.loadMetadata();require(loaded.inventory.slot(0).id==changedItem&&loaded.entities[0].item.id==changedItem,"inventory and entity IDs remapped by name");

@@ -233,46 +233,17 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, naturalBlocks[i].second});
     }
 
-    const std::array<std::pair<ItemId, BlockId>, 10> heavenBlocks{{
-        {ItemId::AETHER_GRASS, BlockId::AETHER_GRASS},
-        {ItemId::AETHER_SOIL, BlockId::AETHER_SOIL},
-        {ItemId::CLOUDSTONE, BlockId::CLOUDSTONE},
-        {ItemId::SUNSTONE, BlockId::SUNSTONE},
-        {ItemId::SKYROOT_LOG, BlockId::SKYROOT_WOOD},
-        {ItemId::SKYROOT_LEAVES, BlockId::SKYROOT_LEAVES},
-        {ItemId::STAR_CRYSTAL, BlockId::STAR_CRYSTAL},
-        {ItemId::STARFLOWER, BlockId::STARFLOWER},
-        {ItemId::CLOUD_BLOOM, BlockId::CLOUD_BLOOM},
-        {ItemId::GLOWSHROOM, BlockId::GLOWSHROOM}
-    }};
-    const std::array<const char*, 10> heavenNames{{
-        "Aether Grass", "Aether Soil", "Cloudstone", "Sunstone",
-        "Skyroot Log", "Skyroot Leaves", "Star Crystal", "Starflower",
-        "Cloud Bloom", "Glowshroom"
-    }};
-    for (size_t i = 0; i < heavenBlocks.size(); ++i) {
-        set(heavenBlocks[i].first,
-            {heavenNames[i], ItemKind::Block, 64, 0, ToolKind::None,
-             ToolTier::None, 0, 0, 0, 0, heavenBlocks[i].second});
-    }
-
-    const std::array<std::pair<ItemId, BlockId>, 10> architecturalBlocks{{
+    const std::array<std::pair<ItemId, BlockId>, 6> architecturalBlocks{{
         {ItemId::OAK_PLANKS_SLAB, BlockId::PLANKS_SLAB_BOTTOM},
         {ItemId::OAK_PLANKS_STAIRS, BlockId::PLANKS_STAIRS_BOTTOM_NORTH},
         {ItemId::COBBLESTONE_SLAB, BlockId::COBBLESTONE_SLAB_BOTTOM},
         {ItemId::COBBLESTONE_STAIRS, BlockId::COBBLESTONE_STAIRS_BOTTOM_NORTH},
         {ItemId::TERRACOTTA_SLAB, BlockId::TERRACOTTA_SLAB_BOTTOM},
         {ItemId::TERRACOTTA_STAIRS, BlockId::TERRACOTTA_STAIRS_BOTTOM_NORTH},
-        {ItemId::SUNSTONE_SLAB, BlockId::SUNSTONE_SLAB_BOTTOM},
-        {ItemId::SUNSTONE_STAIRS, BlockId::SUNSTONE_STAIRS_BOTTOM_NORTH},
-        {ItemId::CLOUDSTONE_SLAB, BlockId::CLOUDSTONE_SLAB_BOTTOM},
-        {ItemId::CLOUDSTONE_STAIRS, BlockId::CLOUDSTONE_STAIRS_BOTTOM_NORTH},
     }};
-    const std::array<const char*, 10> architecturalNames{{
+    const std::array<const char*, 6> architecturalNames{{
         "Oak Planks Slab", "Oak Planks Stairs", "Cobblestone Slab",
-        "Cobblestone Stairs", "Terracotta Slab", "Terracotta Stairs",
-        "Sunstone Slab", "Sunstone Stairs", "Cloudstone Slab",
-        "Cloudstone Stairs"
+        "Cobblestone Stairs", "Terracotta Slab", "Terracotta Stairs"
     }};
     for (size_t i = 0; i < architecturalBlocks.size(); ++i) {
         set(architecturalBlocks[i].first,
@@ -329,8 +300,7 @@ std::array<ItemProperties, itemCount> buildRegistry() {
              ToolTier::None, 0, 0, 0, 0, caveBlocks[i].second});
     }
 
-    set(ItemId::STARSTEP_SCEPTER,
-        {"Starstep Scepter", ItemKind::Tool, 1, 192});
+
 
     set(ItemId::STONE_BRICKS, {"Stone Bricks", ItemKind::Block, 64, 0,
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STONE_BRICKS});
@@ -483,50 +453,31 @@ std::array<ItemProperties, itemCount> buildRegistry() {
         ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CAVE_GLOWSHROOM});
 
 
-    set(ItemId::MOONSTONE, {"Moonstone", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONSTONE});
-    set(ItemId::SKYSTONE, {"Skystone", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKYSTONE});
-    set(ItemId::AETHER_MOSS, {"Aether Moss", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::AETHER_MOSS});
-    set(ItemId::GLIMMER_SILT, {"Glimmer Silt", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GLIMMER_SILT});
-    set(ItemId::STAR_CRYSTAL_ORE, {"Star Crystal Ore", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STAR_CRYSTAL_ORE});
-    set(ItemId::SKYROOT_PLANKS, {"Skyroot Planks", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKYROOT_PLANKS});
-    set(ItemId::CLOUDSTONE_BRICKS, {"Cloudstone Bricks", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CLOUDSTONE_BRICKS});
-    set(ItemId::SUNSTONE_BRICKS, {"Sunstone Bricks", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SUNSTONE_BRICKS});
-    set(ItemId::MOONSTONE_BRICKS, {"Moonstone Bricks", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONSTONE_BRICKS});
-    set(ItemId::STAR_CRYSTAL_LAMP, {"Star Crystal Lamp", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::STAR_CRYSTAL_LAMP});
-    set(ItemId::SKY_FERN, {"Sky Fern", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::SKY_FERN});
-    set(ItemId::DAWN_BELL, {"Dawn Bell", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DAWN_BELL});
-    set(ItemId::MOONFLOWER, {"Moonflower", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::MOONFLOWER});
-    set(ItemId::GLIMMER_REED, {"Glimmer Reed", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::GLIMMER_REED});
-    set(ItemId::CLOUDBERRY_BUSH, {"Cloudberry Bush", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CLOUDBERRY_BUSH});
-    set(ItemId::HANGING_CLOUD_VINE, {"Hanging Cloud Vine", ItemKind::Block, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::HANGING_CLOUD_VINE});
-    set(ItemId::STAR_CRYSTAL_SHARD, {"Star Crystal Shard"});
-    set(ItemId::CLOUDBERRY, {"Cloudberry", ItemKind::Food, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 2, 0.4f});
-    set(ItemId::ROASTED_CLOUDBERRY, {"Roasted Cloudberry", ItemKind::Food, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 4, 1.2f});
-    set(ItemId::CLOUDBERRY_BREAD, {"Cloudberry Bread", ItemKind::Food, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 7, 6.0f});
-    set(ItemId::ROASTED_GLOWSHROOM, {"Roasted Glowshroom", ItemKind::Food, 64, 0,
-        ToolKind::None, ToolTier::None, 0, 0, 4, 2.0f});
 
-    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "Skyroot", "Iron"};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "", "Iron"};
     for (uint8_t i=0;i<7;++i) {
+        if(i==5)continue;
         DoorState door; door.material=static_cast<DoorMaterial>(i);
         ButtonState button; button.material=door.material;
         set(static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+i),
@@ -551,6 +502,7 @@ const auto REGISTRY = buildRegistry();
 // inventory tests: every serialized item appears in exactly one category and
 // all category sizes are asserted there.
 CreativeItemCategory categoryFor(ItemId id) {
+    if(const auto* item=Plugins::pluginItem(id))return item->category;
     if (id >= ItemId::BIRCH_PLANKS && id <= ItemId::ACACIA_PLANKS)
         return CreativeItemCategory::BuildingBlocks;
     if (id >= ItemId::OAK_DOOR && id <= ItemId::STONE_BUTTON)
@@ -569,14 +521,9 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::LIMESTONE: case ItemId::BASALT: case ItemId::TUFF:
         case ItemId::COARSE_DIRT: case ItemId::MUD: case ItemId::PACKED_ICE:
         case ItemId::BLACK_SAND: case ItemId::GRANITE:
-        case ItemId::AETHER_GRASS: case ItemId::AETHER_SOIL:
-        case ItemId::CLOUDSTONE: case ItemId::SUNSTONE:
-        case ItemId::SKYROOT_LOG: case ItemId::STAR_CRYSTAL:
         case ItemId::OAK_PLANKS_SLAB: case ItemId::OAK_PLANKS_STAIRS:
         case ItemId::COBBLESTONE_SLAB: case ItemId::COBBLESTONE_STAIRS:
         case ItemId::TERRACOTTA_SLAB: case ItemId::TERRACOTTA_STAIRS:
-        case ItemId::SUNSTONE_SLAB: case ItemId::SUNSTONE_STAIRS:
-        case ItemId::CLOUDSTONE_SLAB: case ItemId::CLOUDSTONE_STAIRS:
         case ItemId::EMERALD_ORE: case ItemId::DEEPSLATE_EMERALD_ORE:
         case ItemId::DRIPSTONE_BLOCK: case ItemId::CALCITE:
         case ItemId::SULFUR_CRUST:
@@ -626,17 +573,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::QUARTZ_BLOCK:
         case ItemId::IRON_STAINED_ROCK:
         case ItemId::SULFUR_ROCK:
-        case ItemId::MOONSTONE:
-        case ItemId::SKYSTONE:
-        case ItemId::AETHER_MOSS:
-        case ItemId::GLIMMER_SILT:
-        case ItemId::STAR_CRYSTAL_ORE:
-        case ItemId::SKYROOT_PLANKS:
-        case ItemId::CLOUDSTONE_BRICKS:
-        case ItemId::SUNSTONE_BRICKS:
-        case ItemId::MOONSTONE_BRICKS:
-        case ItemId::STAR_CRYSTAL_LAMP:
-            return CreativeItemCategory::BuildingBlocks;
+        return CreativeItemCategory::BuildingBlocks;
 
         // ── Nature & Decoration ─────────────────────────────────────────
         case ItemId::OAK_LEAVES: case ItemId::WATER: case ItemId::CACTUS:
@@ -649,8 +586,6 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::ACACIA_SAPLING: case ItemId::DANDELION:
         case ItemId::BLUE_ORCHID: case ItemId::ALLIUM:
         case ItemId::OXEYE_DAISY: case ItemId::SUNFLOWER:
-        case ItemId::SKYROOT_LEAVES: case ItemId::STARFLOWER:
-        case ItemId::CLOUD_BLOOM: case ItemId::GLOWSHROOM:
         case ItemId::POINTED_DRIPSTONE: case ItemId::HANGING_ROOTS:
         case ItemId::GLOW_FERN: case ItemId::RESONANT_CRYSTAL:
         case ItemId::FERN:
@@ -677,13 +612,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::AMETHYST_CLUSTER:
         case ItemId::QUARTZ_CLUSTER:
         case ItemId::CAVE_GLOWSHROOM:
-        case ItemId::SKY_FERN:
-        case ItemId::DAWN_BELL:
-        case ItemId::MOONFLOWER:
-        case ItemId::GLIMMER_REED:
-        case ItemId::CLOUDBERRY_BUSH:
-        case ItemId::HANGING_CLOUD_VINE:
-            return CreativeItemCategory::Nature;
+        return CreativeItemCategory::Nature;
 
         // ── Functional Blocks ───────────────────────────────────────────
         case ItemId::CRAFTING_TABLE: case ItemId::FURNACE: case ItemId::CHEST:
@@ -713,7 +642,6 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::DIAMOND_PICKAXE: case ItemId::DIAMOND_AXE:
         case ItemId::DIAMOND_SHOVEL: case ItemId::DIAMOND_HOE:
         case ItemId::FLINT_AND_STEEL:
-        case ItemId::STARSTEP_SCEPTER:
         case ItemId::FISHING_ROD:
             return CreativeItemCategory::Tools;
 
@@ -740,11 +668,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::RAW_COD: case ItemId::RAW_SALMON:
         case ItemId::COOKED_COD: case ItemId::COOKED_SALMON:
         case ItemId::ROTTEN_FLESH:
-        case ItemId::CLOUDBERRY:
-        case ItemId::ROASTED_CLOUDBERRY:
-        case ItemId::CLOUDBERRY_BREAD:
-        case ItemId::ROASTED_GLOWSHROOM:
-            return CreativeItemCategory::Food;
+        return CreativeItemCategory::Food;
 
         // ── Materials ───────────────────────────────────────────────────
         case ItemId::CLAY_BALL:
@@ -761,8 +685,7 @@ CreativeItemCategory categoryFor(ItemId id) {
         case ItemId::FEATHER: case ItemId::LEATHER: case ItemId::BONE:
         case ItemId::WHEAT_SEEDS: case ItemId::WHEAT: case ItemId::FLINT:
         case ItemId::GUNPOWDER:
-        case ItemId::EMERALD: case ItemId::STAR_CRYSTAL_SHARD:
-            return CreativeItemCategory::Materials;
+        case ItemId::EMERALD: return CreativeItemCategory::Materials;
 
         // ── Spawn Eggs ──────────────────────────────────────────────────
         case ItemId::COW_SPAWN_EGG: case ItemId::PIG_SPAWN_EGG:
@@ -1011,16 +934,7 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::PACKED_ICE): return ItemId::PACKED_ICE;
         case static_cast<uint16_t>(BlockId::BLACK_SAND): return ItemId::BLACK_SAND;
         case static_cast<uint16_t>(BlockId::GRANITE): return ItemId::GRANITE;
-        case static_cast<uint16_t>(BlockId::AETHER_GRASS): return ItemId::AETHER_GRASS;
-        case static_cast<uint16_t>(BlockId::AETHER_SOIL): return ItemId::AETHER_SOIL;
-        case static_cast<uint16_t>(BlockId::CLOUDSTONE): return ItemId::CLOUDSTONE;
-        case static_cast<uint16_t>(BlockId::SUNSTONE): return ItemId::SUNSTONE;
-        case static_cast<uint16_t>(BlockId::SKYROOT_WOOD): return ItemId::SKYROOT_LOG;
-        case static_cast<uint16_t>(BlockId::SKYROOT_LEAVES): return ItemId::SKYROOT_LEAVES;
-        case static_cast<uint16_t>(BlockId::STAR_CRYSTAL): return ItemId::STAR_CRYSTAL;
-        case static_cast<uint16_t>(BlockId::STARFLOWER): return ItemId::STARFLOWER;
-        case static_cast<uint16_t>(BlockId::CLOUD_BLOOM): return ItemId::CLOUD_BLOOM;
-        case static_cast<uint16_t>(BlockId::GLOWSHROOM): return ItemId::GLOWSHROOM;
+
         case static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK): return ItemId::DRIPSTONE_BLOCK;
         case static_cast<uint16_t>(BlockId::POINTED_DRIPSTONE_UP):
         case static_cast<uint16_t>(BlockId::POINTED_DRIPSTONE_DOWN):
@@ -1030,22 +944,8 @@ ItemId itemForBlock(BlockId id) {
         case static_cast<uint16_t>(BlockId::GLOW_FERN): return ItemId::GLOW_FERN;
         case static_cast<uint16_t>(BlockId::RESONANT_CRYSTAL): return ItemId::RESONANT_CRYSTAL;
         case static_cast<uint16_t>(BlockId::SULFUR_CRUST): return ItemId::SULFUR_CRUST;
-        case static_cast<uint16_t>(BlockId::MOONSTONE): return ItemId::MOONSTONE;
-        case static_cast<uint16_t>(BlockId::SKYSTONE): return ItemId::SKYSTONE;
-        case static_cast<uint16_t>(BlockId::AETHER_MOSS): return ItemId::AETHER_MOSS;
-        case static_cast<uint16_t>(BlockId::GLIMMER_SILT): return ItemId::GLIMMER_SILT;
-        case static_cast<uint16_t>(BlockId::STAR_CRYSTAL_ORE): return ItemId::STAR_CRYSTAL_ORE;
-        case static_cast<uint16_t>(BlockId::SKYROOT_PLANKS): return ItemId::SKYROOT_PLANKS;
-        case static_cast<uint16_t>(BlockId::CLOUDSTONE_BRICKS): return ItemId::CLOUDSTONE_BRICKS;
-        case static_cast<uint16_t>(BlockId::SUNSTONE_BRICKS): return ItemId::SUNSTONE_BRICKS;
-        case static_cast<uint16_t>(BlockId::MOONSTONE_BRICKS): return ItemId::MOONSTONE_BRICKS;
-        case static_cast<uint16_t>(BlockId::STAR_CRYSTAL_LAMP): return ItemId::STAR_CRYSTAL_LAMP;
-        case static_cast<uint16_t>(BlockId::SKY_FERN): return ItemId::SKY_FERN;
-        case static_cast<uint16_t>(BlockId::DAWN_BELL): return ItemId::DAWN_BELL;
-        case static_cast<uint16_t>(BlockId::MOONFLOWER): return ItemId::MOONFLOWER;
-        case static_cast<uint16_t>(BlockId::GLIMMER_REED): return ItemId::GLIMMER_REED;
-        case static_cast<uint16_t>(BlockId::CLOUDBERRY_BUSH): return ItemId::CLOUDBERRY_BUSH;
-        case static_cast<uint16_t>(BlockId::HANGING_CLOUD_VINE): return ItemId::HANGING_CLOUD_VINE;
+
+
         default: return ItemId::EMPTY;
     }
 }
@@ -1058,12 +958,12 @@ std::vector<ItemId> creativeInventoryItems() {
         const auto& props = getItemProps(id);
         if (!props.name.empty() && props.maxStack > 0 && Plugins::availableItem(id)) items.push_back(id);
     }
-    for (const auto& entry : Plugins::content().items) items.push_back(static_cast<ItemId>(entry.first));
+    for (const auto& entry : Plugins::content().items) if(entry.first>=Plugins::FIRST_CONTENT_ID) items.push_back(static_cast<ItemId>(entry.first));
     return items;
 }
 
 const std::string& itemCommandName(ItemId id) {
-    if (const auto* item = Plugins::pluginItem(id)) return item->key;
+    if (const auto* item = Plugins::pluginItem(id)) return item->command.empty()?item->key:item->command;
     static const auto names = [] {
         std::array<std::string, itemCount> result{};
         for (size_t i = 1; i < result.size(); ++i) {
@@ -1077,7 +977,7 @@ const std::string& itemCommandName(ItemId id) {
 
 std::optional<ItemId> itemFromCommandName(std::string_view name) {
     for (const auto& entry : Plugins::content().items)
-        if (entry.second.key == name) return static_cast<ItemId>(entry.first);
+        if (entry.second.key == name||(!entry.second.command.empty()&&entry.second.command==name)) return static_cast<ItemId>(entry.first);
     for (size_t i = 1; i < itemCount; ++i) {
         const auto id = static_cast<ItemId>(i);
         if (Plugins::availableItem(id) && itemCommandName(id) == name) return id;

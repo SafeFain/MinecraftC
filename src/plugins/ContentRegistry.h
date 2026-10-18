@@ -16,6 +16,7 @@ namespace Plugins {
 constexpr uint16_t FIRST_CONTENT_ID=4096;
 constexpr uint16_t INVALID_CONTENT_ID=65535;
 struct BlockContent {
+    bool tilesReady=false;
     uint16_t family=0;
     uint32_t familyKind=0, stateIndex=0, releaseTicks=30;
     bool manualOpen=true, villagerOpen=true, arrowTrigger=true;
@@ -30,13 +31,16 @@ struct BlockContent {
     ItemId drop=ItemId::EMPTY;
 };
 struct ItemContent {
-    std::string key, material;
+    std::filesystem::path icon;
+    std::string key, material,command;
     ItemProperties properties;
     CreativeItemCategory category=CreativeItemCategory::Materials;
     uint16_t tile=0;
     uint16_t spawnEntity=MC_INVALID_ID;
 };
 struct MaterialContent {
+    uint32_t variants=1,frames=1,fpsMilli=0,seed=0;
+    std::vector<std::filesystem::path> images,normals,propertyFrames;
     std::string key;
     std::filesystem::path image, normal, properties;
     glm::vec4 color{1.0f};
@@ -44,6 +48,16 @@ struct MaterialContent {
     uint16_t tile=0;
 };
 struct ContentState {
+    std::array<uint8_t,65536> validBlocks=[] {
+        std::array<uint8_t,65536> mask{};
+        for(uint16_t i=0;i<static_cast<uint16_t>(BlockId::COUNT);++i)mask[i]=!heavenBlockSlot(static_cast<BlockId>(i));
+        return mask;
+    }();
+    std::array<uint8_t,65536> validItems=[] {
+        std::array<uint8_t,65536> mask{};
+        for(uint16_t i=0;i<static_cast<uint16_t>(ItemId::COUNT);++i)mask[i]=!heavenItemSlot(static_cast<ItemId>(i));
+        return mask;
+    }();
     ExtensionContent extensions;
     bool frozen=false;
     uint64_t revision=0;
@@ -59,8 +73,8 @@ struct ContentState {
     std::array<std::vector<ItemId>,static_cast<size_t>(CreativeItemCategory::Count)> categories;
 };
 inline ContentState& content() {static ContentState state;return state;}
-inline bool availableBlock(BlockId id){return !heavenBlockSlot(id)||content().extensions.dimensions.count(1)!=0;}
-inline bool availableItem(ItemId id){return !heavenItemSlot(id)||content().extensions.dimensions.count(1)!=0;}
+inline bool availableBlock(BlockId id){const auto raw=static_cast<uint16_t>(id);return raw>=FIRST_CONTENT_ID?content().blocks.count(raw)!=0:content().validBlocks[raw]!=0;}
+inline bool availableItem(ItemId id){const auto raw=static_cast<uint16_t>(id);return raw>=FIRST_CONTENT_ID?content().items.count(raw)!=0:content().validItems[raw]!=0;}
 inline bool validKey(const std::string& key) {
     auto colon=key.find(':');if(colon==std::string::npos||colon==0||colon+1==key.size()||key.size()>256)return false;
     for(size_t i=0;i<key.size();++i) {
@@ -72,14 +86,12 @@ inline bool validKey(const std::string& key) {
 inline const BlockBehaviorContent* blockBehavior(BlockId id){const auto& entries=content().extensions.blockBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
 inline const ItemBehaviorContent* itemBehavior(ItemId id){const auto& entries=content().extensions.itemBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}
 inline bool validBlock(BlockId id) {
-    auto raw=static_cast<uint16_t>(id);return (raw<static_cast<uint16_t>(BlockId::COUNT)&&availableBlock(id))||content().blocks.count(raw);
+    return availableBlock(id);
 }
 inline const BlockContent* pluginBlock(BlockId id) {
-    if(static_cast<uint16_t>(id)<FIRST_CONTENT_ID)return nullptr;
     auto it=content().blocks.find(static_cast<uint16_t>(id));return it==content().blocks.end()?nullptr:&it->second;
 }
 inline const ItemContent* pluginItem(ItemId id) {
-    if(static_cast<uint16_t>(id)<FIRST_CONTENT_ID)return nullptr;
     auto it=content().items.find(static_cast<uint16_t>(id));return it==content().items.end()?nullptr:&it->second;
 }
 inline void mutableContent(const std::string& key) {
@@ -89,20 +101,33 @@ inline void mutableContent(const std::string& key) {
 inline BlockId registerBlock(BlockContent value) {
     mutableContent(value.key);
     for(const auto& entry:content().blocks)if(entry.second.key==value.key)throw std::runtime_error("Duplicate block: "+value.key);
-    const uint32_t raw=FIRST_CONTENT_ID+static_cast<uint32_t>(content().blocks.size());
+    uint32_t raw=FIRST_CONTENT_ID;
+    const std::string prefix="minecraftc:block_";
+    if(value.key.rfind(prefix,0)==0) {
+        raw=static_cast<uint32_t>(std::stoul(value.key.substr(prefix.size())));
+        if(raw>=static_cast<uint16_t>(BlockId::COUNT)||!heavenBlockSlot(static_cast<BlockId>(raw)))throw std::runtime_error("Unowned reserved block slot");
+    } else while(content().blocks.count(static_cast<uint16_t>(raw)))++raw;
+    if(content().blocks.count(static_cast<uint16_t>(raw)))throw std::runtime_error("Duplicate reserved block slot");
     if(raw>=INVALID_CONTENT_ID)throw std::runtime_error("Block registry capacity exceeded");
     auto id=static_cast<BlockId>(raw);value.properties.id=id;
     auto it=content().blocks.emplace(static_cast<uint16_t>(raw),std::move(value)).first;
+    content().validBlocks[raw]=1;
     it->second.properties.name=it->second.name.c_str();return id;
 }
 inline ItemId registerItem(ItemContent value) {
     mutableContent(value.key);
     for(const auto& entry:content().items)if(entry.second.key==value.key)throw std::runtime_error("Duplicate item: "+value.key);
-    const uint32_t raw=FIRST_CONTENT_ID+static_cast<uint32_t>(content().items.size());
+    uint32_t raw=FIRST_CONTENT_ID;
+    const std::string prefix="minecraftc:item_";
+    if(value.key.rfind(prefix,0)==0) {
+        raw=static_cast<uint32_t>(std::stoul(value.key.substr(prefix.size())));
+        if(raw>=static_cast<uint16_t>(ItemId::COUNT)||!heavenItemSlot(static_cast<ItemId>(raw)))throw std::runtime_error("Unowned reserved item slot");
+    } else while(content().items.count(static_cast<uint16_t>(raw)))++raw;
+    if(content().items.count(static_cast<uint16_t>(raw)))throw std::runtime_error("Duplicate reserved item slot");
     if(raw>=INVALID_CONTENT_ID)throw std::runtime_error("Item registry capacity exceeded");
     if(value.properties.maxStack==0||value.properties.maxStack>64)throw std::runtime_error("Invalid stack size");
     const auto id=static_cast<ItemId>(raw);
-    content().items.emplace(static_cast<uint16_t>(raw),std::move(value));return id;
+    content().items.emplace(static_cast<uint16_t>(raw),std::move(value));content().validItems[raw]=1;return id;
 }
 inline std::string blockKey(BlockId id) {
     if(const auto* b=pluginBlock(id))return b->key;
@@ -180,7 +205,7 @@ inline std::string dimensionDirectory(DimensionId id) {
 inline void validateGeneration(const GenerationConfig& config,uint32_t dimension) {
     if(!validDimension(dimension)||config.parameters.size()>4096||config.modifiers.size()>64)
         throw std::runtime_error("Invalid generator configuration limits");
-    if(dimension>=2&&config.generator.empty())throw std::runtime_error("Plugin dimension requires a generator");
+    if(dimension!=0&&config.generator.empty())throw std::runtime_error("Plugin dimension requires a generator");
     if(Json::parse(config.parameters).type!=Json::Type::Object)
         throw std::runtime_error("Generator parameters must be a JSON object");
     if(config.generator.empty()&&!config.revision.empty())throw std::runtime_error("Builtin generator has no plugin revision");
@@ -200,7 +225,7 @@ inline void validateGeneration(const GenerationConfig& config,uint32_t dimension
 inline void freezeContent() {
     for(auto& entry:content().blocks)entry.second.properties.name=entry.second.name.c_str();
     for(auto& category:content().categories)category.clear();
-    for(const auto& entry:content().items)content().categories.at(static_cast<size_t>(entry.second.category)).push_back(static_cast<ItemId>(entry.first));
+    for(const auto& entry:content().items)if(entry.first>=FIRST_CONTENT_ID)content().categories.at(static_cast<size_t>(entry.second.category)).push_back(static_cast<ItemId>(entry.first));
     ++content().revision;
     content().frozen=true;
 }

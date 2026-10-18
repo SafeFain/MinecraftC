@@ -135,7 +135,7 @@ void GameUiController::render(
             UiTheme::textWithShadow(renderer, localization.format("lan.players", {std::to_string(roster.size())}), x + 8, top - 20, .9f, glm::vec4(1));
             for (size_t i = 0; i < roster.size(); ++i) {
                 const auto& member = roster[i];
-                const auto label = member.nickname + " · " + (member.dimension==DimensionId::Overworld||member.dimension==DimensionId::Heaven?localization.text(member.dimension == DimensionId::Heaven ? "lan.heaven" : "lan.overworld"):Plugins::dimensionContent(member.dimension).name);
+                const auto label = member.nickname + " · " + localization.dimensionName(member.dimension);
                 const auto scale = UiTheme::fittedScale(renderer, label, .85f, width - 16);
                 UiTheme::textWithShadow(renderer, label, x + 8, top - 39 - i * line, scale, glm::vec4(.9f,.95f,1,1));
             }
@@ -228,12 +228,8 @@ void GameUiController::render(
         renderer.beginUIFrame(uiWidth, uiHeight);
         UiTheme::dirtBackground(renderer, static_cast<float>(uiWidth),
                                 static_cast<float>(uiHeight));
-        const char* loadingTitleKey = "loading.title";
-        if (loading.reason == GameSession::LoadingReason::EnteringHeaven)
-            loadingTitleKey = "loading.enter_heaven";
-        else if (loading.reason == GameSession::LoadingReason::ReturningOverworld)
-            loadingTitleKey = "loading.return_overworld";
-        const std::string title = localization.text(session.joiningLan() && !session.lanWorldReady() ? "lan.connecting" : loadingTitleKey);
+        const std::string title = session.joiningLan()&&!session.lanWorldReady()?localization.text("lan.connecting"):
+            localization.format("loading.enter_dimension",{localization.dimensionName(session.activeDimension())});
         const std::string status =
             loading.phase == GameSession::LoadingPhase::DistantTerrain
             ? localization.format("loading.lod", {

@@ -1,0 +1,74 @@
+#pragma once
+
+#include "world/Block.h"
+#include "minecraftc/extensions.h"
+
+inline bool isBiomePlant(BlockId block) {
+    if(isSemanticPlant(block))return true;
+    return (block >= BlockId::FERN && block <= BlockId::BEACH_GRASS) ||
+        (block >= BlockId::CLOVER && block <= BlockId::JUNGLE_FERN) ||
+        block == BlockId::CAVE_GLOWSHROOM;
+}
+
+inline bool isNaturalRock(BlockId block) {
+    return hasNaturalRockTag(block);
+}
+
+inline bool isCrystalCluster(BlockId block) {
+    return block == BlockId::AMETHYST_CLUSTER || block == BlockId::QUARTZ_CLUSTER;
+}
+
+inline bool isNaturalDecoration(BlockId block) {
+    return isBiomePlant(block) || isCrystalCluster(block);
+}
+
+// Generation and manual placement share substrate rules. These plants occupy
+// air, never water; riverbank proximity is a generation constraint only.
+inline bool supportsBiomePlant(BlockId plant, BlockId soil) {
+    if(const auto support=semanticPlantSupport(plant,soil))return *support;
+    if (!isBiomePlant(plant)) return false;
+    const auto tags=blockSemanticTags(soil);
+    const bool fertile=(tags&MC_TAG_FERTILE)!=0;
+    const bool sandy=(tags&MC_TAG_SAND)!=0;
+    if (plant == BlockId::CAVE_GLOWSHROOM)
+        return soil == BlockId::CAVE_MOSS || soil == BlockId::MOSS ||
+            soil == BlockId::MUD || soil == BlockId::CLAY;
+    if (plant == BlockId::DESERT_FLOWER || plant == BlockId::SMALL_CACTUS)
+        return sandy || soil == BlockId::LATERITE || soil == BlockId::COARSE_DIRT;
+    if (plant == BlockId::TUNDRA_MOSS || plant == BlockId::HEATHER)
+        return fertile || soil == BlockId::PERMAFROST || soil == BlockId::DRY_GRASS_BLOCK;
+    if (plant == BlockId::REED_FLOWER || plant == BlockId::WILD_MINT)
+        return fertile || soil == BlockId::CLAY;
+    if (plant == BlockId::FALLEN_TWIGS)
+        return fertile || soil == BlockId::DRY_GRASS_BLOCK;
+    if (plant == BlockId::DEAD_BUSH)
+        return sandy || soil == BlockId::COARSE_DIRT ||
+            soil == BlockId::DRY_GRASS_BLOCK || soil == BlockId::TERRACOTTA ||
+            soil == BlockId::OCHRE_TERRACOTTA || soil == BlockId::WHITE_TERRACOTTA;
+    if (plant == BlockId::DRY_GRASS)
+        return fertile || soil == BlockId::DRY_GRASS_BLOCK;
+    if (plant == BlockId::BEACH_GRASS) return sandy || soil == BlockId::GRAVEL;
+    if (plant == BlockId::CATTAIL)
+        return fertile || soil == BlockId::CLAY || soil == BlockId::SAND;
+    if (plant == BlockId::ALPINE_FLOWER)
+        return fertile || soil == BlockId::PERMAFROST || soil == BlockId::GRANITE;
+    return fertile;
+}
+
+inline bool supportsNaturalDecoration(BlockId block, BlockId soil) {
+    return isCrystalCluster(block) ? isNaturalRock(soil) : supportsBiomePlant(block, soil);
+}
+
+inline bool isBiomeSoil(BlockId block) {
+    return (block >= BlockId::ROOTED_DIRT && block <= BlockId::PERMAFROST) ||
+        block == BlockId::VOLCANIC_ASH ||
+        (block >= BlockId::LATERITE && block <= BlockId::SALT_CRUST) ||
+        block == BlockId::CAVE_MOSS;
+}
+
+inline bool isBiomeRock(BlockId block) {
+    return (block >= BlockId::SHALE && block <= BlockId::WHITE_TERRACOTTA) ||
+        block == BlockId::CORAL_ROCK ||
+        (block >= BlockId::ANDESITE && block <= BlockId::MARBLE) ||
+        (block >= BlockId::WET_LIMESTONE && block <= BlockId::SULFUR_ROCK);
+}

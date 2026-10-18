@@ -3,8 +3,8 @@
 #include "plugins/ContentRegistry.h"
 #include <limits>
 namespace Plugins {
-inline int32_t skywayTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,void*){
-    if(v->base.dimension!=1||!v->builtin_generation||!v->hit_valid||v->source!=1||v->hit_block!=static_cast<uint16_t>(BlockId::STAR_CRYSTAL))return 0;
+inline int32_t skywayTargetPolicy(const MC_ActionViewV2* v,MC_ActionTargetV2* out){
+    if(!v->hit_valid||v->source!=1||v->hit_block!=static_cast<uint16_t>(BlockId::STAR_CRYSTAL))return 0;
     struct Column {bool present=false;int top=0;};bool failed=false;
     auto sample=[&](int x,int z){if(std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return Column{};MC_ActionLayer layers[5]{};uint32_t count=0;if(v->layers(v->base.reader,x,z,layers,5,&count)||count!=5){failed=true;return Column{};}return Column{layers[2].present!=0,layers[2].top};};
     const auto spawn=glm::ivec3(v->spawn[0],v->spawn[1],v->spawn[2]);
@@ -17,8 +17,8 @@ inline int32_t skywayTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,void
     if(target){out->base.valid=1;for(int i=0;i<3;++i)out->base.position[i]=(*target)[i];}
     return 0;
 }
-inline int32_t starstepTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,void*){
-    out->handled=1;if(v->base.dimension!=1||!v->hit_valid)return 0;
+inline int32_t starstepTargetPolicy(const MC_ActionViewV2* v,MC_ActionTargetV2* out){
+    out->handled=1;if(!v->hit_valid)return 0;
     double best=std::numeric_limits<double>::max();
     const auto flags=[&](int x,int y,int z,uint32_t& result){uint16_t block=0;return !v->base.block(v->base.reader,x,y,z,&block)&&!v->block_flags(v->base.reader,block,&result);};
     for(int dz=-1;dz<=1;++dz)for(int dx=-1;dx<=1;++dx){
@@ -32,5 +32,21 @@ inline int32_t starstepTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,vo
         best=distance;out->base.valid=1;for(int i=0;i<3;++i)out->base.position[i]=candidate[i];
     }
     return 0;
+}
+// V2 entry points remain for historical contract tests. Runtime uses explicit
+// provider/dimension identities rather than the legacy builtin flag.
+inline int32_t skywayTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,void*) {
+    return v->base.dimension==1&&v->builtin_generation?skywayTargetPolicy(v,out):0;
+}
+inline int32_t starstepTarget(const MC_ActionViewV2* v,MC_ActionTargetV2* out,void*) {
+    if(v->base.dimension!=1){out->handled=1;return 0;}return starstepTargetPolicy(v,out);
+}
+inline int32_t skywayTargetV3(const MC_ActionViewV3* v,MC_ActionTargetV2* out,void*) {
+    if(!v||v->size<sizeof(*v)||!v->generation_provider||std::string(v->generation_provider)!="official_heaven:heaven")return 0;
+    return skywayTargetPolicy(&v->base,out);
+}
+inline int32_t starstepTargetV3(const MC_ActionViewV3* v,MC_ActionTargetV2* out,void*) {
+    if(!v||v->size<sizeof(*v)||!v->dimension_key||std::string(v->dimension_key)!="minecraftc:heaven"){out->handled=1;return 0;}
+    return starstepTargetPolicy(&v->base,out);
 }
 }

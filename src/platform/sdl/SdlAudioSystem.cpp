@@ -32,12 +32,13 @@ struct AudioSystem::Impl {
     };
     std::array<MusicTrack, 2> menuMusic;
     std::array<MusicTrack, 4> overworldMusic;
-    std::array<MusicTrack, 2> heavenMusic;
     struct PluginPlaylist {std::vector<MusicTrack> tracks;bool menu=false,random=false;uint32_t dimension=0;float gap=0;size_t index=0;uint64_t randomState=1;uint32_t gapFrames=0;};
     std::vector<PluginPlaylist> pluginPlaylists;
     std::atomic<int> pluginTarget{-1};
     int observedPlugin=-1;
+    float pluginMusicGain=0;
     std::atomic<AudioMusicMode> musicTarget{AudioMusicMode::Menu};
+    std::atomic<uint32_t> musicDimension{0};
     std::atomic<float> masterVolume{1.0f};
     std::atomic<float> musicVolume{1.0f};
     std::atomic<float> weatherVolume{1.0f};
@@ -45,13 +46,10 @@ struct AudioSystem::Impl {
     AudioMusicMode observedMusicMode = AudioMusicMode::Menu;
     uint64_t menuRandomState = 0x8a5cd789635d2dffULL;
     uint64_t overworldRandomState = 0xd1b54a32d192ed03ULL;
-    uint64_t heavenRandomState = 0x94d049bb133111ebULL;
     size_t menuTrackIndex = 0;
     size_t overworldTrackIndex = 0;
-    size_t heavenTrackIndex = 0;
     float menuMusicGain = 0.0f;
     float overworldMusicGain = 0.0f;
-    float heavenMusicGain = 0.0f;
     std::atomic<float> rainTarget{0.0f};
     std::atomic<bool> rainReset{false};
     std::atomic<float> thunderPan{0.0f};
@@ -223,7 +221,6 @@ struct AudioSystem::Impl {
                 // mode. Reset all gains, then fade only the requested track in.
                 menuMusicGain = 0.0f;
                 overworldMusicGain = 0.0f;
-                heavenMusicGain = 0.0f;
                 if (requestedMusic == AudioMusicMode::Menu) {
                     menuTrackIndex = randomTrack(menuRandomState, menuMusic.size());
                     for (MusicTrack& track : menuMusic) track.outputCursor = 0;
@@ -231,26 +228,20 @@ struct AudioSystem::Impl {
                     overworldTrackIndex = randomTrack(
                         overworldRandomState, overworldMusic.size());
                     for (MusicTrack& track : overworldMusic) track.outputCursor = 0;
-                } else {
-                    heavenTrackIndex = randomTrack(
-                        heavenRandomState, heavenMusic.size());
-                    for (MusicTrack& track : heavenMusic) track.outputCursor = 0;
                 }
             }
             const int pluginIndex=pluginTarget.load();
-            if(pluginIndex!=observedPlugin){observedPlugin=pluginIndex;if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];p.index=p.random?randomTrack(p.randomState,p.tracks.size()):0;p.gapFrames=0;for(auto& t:p.tracks)t.outputCursor=0;}}
+            if(pluginIndex!=observedPlugin){pluginMusicGain=0;observedPlugin=pluginIndex;if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];p.index=p.random?randomTrack(p.randomState,p.tracks.size()):0;p.gapFrames=0;for(auto& t:p.tracks)t.outputCursor=0;}}
             const float menuTarget = requestedMusic == AudioMusicMode::Menu ? 1.0f : 0.0f;
             const float overworldTarget = requestedMusic == AudioMusicMode::Overworld
-                ? 1.0f : 0.0f;
-            const float heavenTarget = requestedMusic == AudioMusicMode::Heaven
                 ? 1.0f : 0.0f;
             menuMusicGain += (menuTarget - menuMusicGain) * 0.000035f;
             overworldMusicGain +=
                 (overworldTarget - overworldMusicGain) * 0.000035f;
-            heavenMusicGain += (heavenTarget - heavenMusicGain) * 0.000035f;
+            pluginMusicGain+=((pluginIndex>=0?1.f:0.f)-pluginMusicGain)*.000035f;
             float left = 0.0f;
             float right = 0.0f;
-            if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];if(p.gapFrames)--p.gapFrames;else if(mixTrack(p.tracks[p.index],.70f*musicGain,left,right)){p.index=p.random?randomTrack(p.randomState,p.tracks.size()):(p.index+1)%p.tracks.size();p.gapFrames=static_cast<uint32_t>(p.gap*SAMPLE_RATE);}}
+            if(pluginIndex>=0){auto& p=pluginPlaylists[static_cast<size_t>(pluginIndex)];if(p.gapFrames)--p.gapFrames;else if(mixTrack(p.tracks[p.index],.70f*pluginMusicGain*musicGain,left,right)){p.index=p.random?randomTrack(p.randomState,p.tracks.size()):(p.index+1)%p.tracks.size();p.gapFrames=static_cast<uint32_t>(p.gap*SAMPLE_RATE);}}
             else if (requestedMusic == AudioMusicMode::Menu) {
                 if (mixTrack(menuMusic[menuTrackIndex],
                              menuMusicGain * 0.72f * musicGain,
@@ -261,11 +252,6 @@ struct AudioSystem::Impl {
                              overworldMusicGain * 0.68f * musicGain, left, right))
                     overworldTrackIndex = randomTrack(
                         overworldRandomState, overworldMusic.size());
-            } else {
-                if (mixTrack(heavenMusic[heavenTrackIndex],
-                             heavenMusicGain * 0.70f * musicGain, left, right))
-                    heavenTrackIndex = randomTrack(
-                        heavenRandomState, heavenMusic.size());
             }
 
             rainVolume += (rainTarget.load() - rainVolume) * 0.0008f;
@@ -393,16 +379,11 @@ bool AudioSystem::initialize(const AssetStore* assets) {
                 Impl::loadMusic(*assets, "audio/overworld_horizon.wav");
             m_impl->overworldMusic[3] =
                 Impl::loadMusic(*assets, "audio/overworld_nightfall.wav");
-            m_impl->heavenMusic[0] =
-                Impl::loadMusic(*assets, "audio/heaven_ether.wav");
-            m_impl->heavenMusic[1] =
-                Impl::loadMusic(*assets, "audio/heaven_sanctum.wav");
         } catch (const std::exception& error) {
             LOG_WARN("Music assets unavailable; continuing without music: " <<
                      error.what());
             m_impl->menuMusic = {};
             m_impl->overworldMusic = {};
-            m_impl->heavenMusic = {};
         }
     }
     size_t pluginMusicBytes=0;
@@ -411,16 +392,12 @@ bool AudioSystem::initialize(const AssetStore* assets) {
         (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(m_impl.get())) << 1);
     m_impl->menuRandomState = randomSeed ^ 0x8a5cd789635d2dffULL;
     m_impl->overworldRandomState = randomSeed ^ 0xd1b54a32d192ed03ULL;
-    m_impl->heavenRandomState = randomSeed ^ 0x94d049bb133111ebULL;
     if (m_impl->menuRandomState == 0) m_impl->menuRandomState = 1;
     if (m_impl->overworldRandomState == 0) m_impl->overworldRandomState = 1;
-    if (m_impl->heavenRandomState == 0) m_impl->heavenRandomState = 1;
     m_impl->menuTrackIndex = Impl::randomTrack(
         m_impl->menuRandomState, m_impl->menuMusic.size());
     m_impl->overworldTrackIndex = Impl::randomTrack(
         m_impl->overworldRandomState, m_impl->overworldMusic.size());
-    m_impl->heavenTrackIndex = Impl::randomTrack(
-        m_impl->heavenRandomState, m_impl->heavenMusic.size());
     setMusicMode(m_impl->musicTarget.load());
     const SDL_AudioSpec spec{SDL_AUDIO_F32, Impl::CHANNELS, Impl::SAMPLE_RATE};
     m_impl->stream = SDL_OpenAudioDeviceStream(
@@ -443,10 +420,7 @@ bool AudioSystem::initialize(const AssetStore* assets) {
              (Impl::playlistAvailable(m_impl->menuMusic) ? "2/2" : "unavailable") <<
              ", overworld music=" <<
              (Impl::playlistAvailable(m_impl->overworldMusic)
-                  ? "4/4" : "unavailable") <<
-             ", Heaven music=" <<
-             (Impl::playlistAvailable(m_impl->heavenMusic)
-                  ? "2/2" : "unavailable") << ")");
+                  ? "4/4" : "unavailable") << ", plugin playlists=" << m_impl->pluginPlaylists.size() << ")");
     return true;
 }
 
@@ -473,16 +447,18 @@ bool AudioSystem::paused() const {
     return m_impl->paused;
 }
 
-void AudioSystem::setMusicMode(AudioMusicMode mode) {
-    int selected=-1;const auto dim=Plugins::context().dimension;
+void AudioSystem::setMusicMode(AudioMusicMode mode,uint32_t dim) {
+    int selected=-1;
     for(size_t i=0;i<m_impl->pluginPlaylists.size();++i){const auto& p=m_impl->pluginPlaylists[i];if((mode==AudioMusicMode::Menu&&p.menu)||(mode!=AudioMusicMode::Menu&&!p.menu&&p.dimension==dim)){selected=static_cast<int>(i);break;}}
     m_impl->pluginTarget.store(selected);
+    m_impl->musicDimension.store(dim);
     m_impl->musicTarget = mode;
 }
 
 AudioMusicMode AudioSystem::musicMode() const {
     return m_impl->musicTarget.load();
 }
+uint32_t AudioSystem::musicDimension() const {return m_impl->musicDimension.load();}
 
 void AudioSystem::setVolumes(float master, float music, float weather,
                              float soundEffects) {

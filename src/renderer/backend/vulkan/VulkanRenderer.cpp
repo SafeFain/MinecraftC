@@ -468,9 +468,10 @@ void VulkanRenderer::renderSky(const RenderEnvironment& environment,
     const EnhancedVisualConfig enhanced = enhancedVisualConfig(
         m_visualQuality, m_enhancedVisualSettings);
     sky.options = {renderClouds && visual.voxelClouds ? 1.0f : 0.0f,
-                   environment.skyStyle == RenderSkyStyle::Heaven ? 1.0f : 0.0f,
+                   static_cast<float>(environment.skyFlags),
                    renderClouds && visual.cirrusClouds ? 1.0f : 0.0f,
                    enhanced.atmosphereStrength};
+    sky.layers=environment.skyLayers;
     m_impl->skyQueued = true;
     m_impl->drawQueued = true;
 }
@@ -733,7 +734,7 @@ void VulkanRenderer::renderClouds(const glm::dvec3& playerPosition,
                                   const glm::mat4& viewProjection,
                                   uint64_t worldSeed, float timeSeconds,
                                   int renderDistanceBlocks) {
-    if (m_environment.skyStyle == RenderSkyStyle::Heaven) return;
+    if (m_environment.skyFlags&SkyNoVoxelClouds) return;
     if (!m_impl || !m_impl->frameBegun)
         throw std::logic_error("Vulkan clouds require an active frame");
     if (!visualQualityConfig(m_visualQuality).voxelClouds) return;

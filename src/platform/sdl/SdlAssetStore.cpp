@@ -95,3 +95,8 @@ std::string AssetStore::readTextPath(const std::filesystem::path& path) {
     return {bytes.begin(), bytes.end()};
 }
 
+std::vector<uint8_t> AssetStore::readTitleBinary(std::string_view relative) {
+    if (!s_current) throw std::runtime_error("No active title storage");
+    return s_current->readBinary(relative);
+}
+

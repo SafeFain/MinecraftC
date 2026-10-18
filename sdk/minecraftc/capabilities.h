@@ -6,6 +6,19 @@
 #define MC_PLAYER_ACTIONS_EXTENSION "minecraftc.player_actions"
 #define MC_ENVIRONMENT_EXTENSION "minecraftc.environment"
 #define MC_PRESENTATION_EXTENSION "minecraftc.presentation"
+#define MC_MATERIAL_SEQUENCES_EXTENSION "minecraftc.material_sequences"
+typedef struct MC_MaterialSequenceDefinition {
+    uint32_t size;
+    MC_Material base;
+    uint32_t variants,frames,fps_milli,seed;
+    const char* const* images;
+    const char* const* normals;
+    const char* const* properties;
+} MC_MaterialSequenceDefinition;
+typedef struct MC_MaterialSequencesV1 {
+    uint32_t size,version;
+    int32_t (*register_sequence)(MC_PluginContext*,const MC_MaterialSequenceDefinition*);
+} MC_MaterialSequencesV1;
 #define MC_MAX_STRUCTURE_BLOCKS 16384u
 /* Zeroed behavior is inert. Support: 0 none, 1 below, 2 above. */
 typedef struct MC_BlockBehavior {
@@ -35,7 +48,7 @@ typedef struct MC_BehaviorsV1 {
    Tags describe semantics, never numeric ID ranges. Support accepts any tag. */
 enum { MC_TAG_LEAVES=1u, MC_TAG_PLANKS=2u, MC_TAG_FERTILE=4u,
        MC_TAG_SAND=8u, MC_TAG_HEAVEN_SOIL=16u, MC_TAG_MOON_SOIL=32u,
-       MC_TAG_NATURAL_ROCK=64u, MC_TAG_PLANT=128u };
+       MC_TAG_NATURAL_ROCK=64u, MC_TAG_PLANT=128u, MC_TAG_FLOWER=256u };
 enum { MC_BLOCK_LIGHT=1u, MC_BLOCK_TAGS=2u, MC_BLOCK_DROPS=4u, MC_BLOCK_SUBSTRATE=8u };
 enum { MC_ITEM_FUEL=1u, MC_ITEM_TAGS=2u };
 typedef struct MC_BreakDrop {
@@ -142,6 +155,13 @@ typedef struct MC_StructuresV2 {
     int32_t (*register_structure)(MC_PluginContext*,const MC_StructureDefinitionV2*);
     const MC_StructuresV1* v1;
 } MC_StructuresV2;
+/* V3 retains V2 geometry/metadata. Coarse policy: 0 exact-center fallback
+   (the V2 default), 1 omit above size 1 when the generator owns silhouettes. */
+typedef struct MC_StructuresV3 {
+    uint32_t size,version;
+    int32_t (*set_coarse_lod_policy)(MC_PluginContext*,const char* structure,uint32_t policy);
+    const MC_StructuresV2* v2;
+} MC_StructuresV3;
 /* Read-only action callbacks run on the main thread both for preview and host
    execution. Clients never supply an authoritative destination. */
 typedef struct MC_ActionView {
@@ -218,6 +238,23 @@ typedef struct MC_PlayerActionsV2 {
     int32_t (*register_action)(MC_PluginContext*,const MC_PlayerActionV2*);
     const MC_PlayerActionsV1* v1;
 } MC_PlayerActionsV2;
+typedef struct MC_ActionViewV3 {
+    uint32_t size;
+    MC_ActionViewV2 base;
+    const char* dimension_key;
+    const char* generation_provider; /* Empty for native generation. Borrowed. */
+} MC_ActionViewV3;
+typedef int32_t (*MC_ActionTargetCallbackV3)(const MC_ActionViewV3*,MC_ActionTargetV2*,void*);
+typedef struct MC_PlayerActionV3 {
+    uint32_t size;
+    MC_PlayerActionV2 base; /* V2 target must be null. */
+    MC_ActionTargetCallbackV3 target;
+} MC_PlayerActionV3;
+typedef struct MC_PlayerActionsV3 {
+    uint32_t size,version;
+    int32_t (*register_action)(MC_PluginContext*,const MC_PlayerActionV3*);
+    const MC_PlayerActionsV2* v2;
+} MC_PlayerActionsV3;
 /* advancing: 0 inherit world rule, 1 paused, 2 advance. cycle_seconds 0 inherits. */
 typedef struct MC_DimensionTime {
     uint32_t size, dimension, cycle_seconds, advancing;
@@ -246,6 +283,30 @@ typedef struct MC_EnvironmentV1 {
     int32_t (*time)(MC_PluginContext*,uint32_t,MC_DimensionTime*);
     int32_t (*set_time)(MC_PluginContext*,const MC_DimensionTime*);
 } MC_EnvironmentV1;
+/* Generic cloud-sea / aurora layers. Twelve vec4 parameters, in order:
+   sea motion(scale,dx,dz,opacity), mask(horizon low/high,noise low/high),
+   day/night colors, noise(octave scale,offset,first weight,second weight),
+   view(minimum ray denominator,0,0,0), followed by aurora motion, mask,
+   two colors, noise(first scale,second scale,offset,first weight),
+   view(ray bias,minimum denominator,hue frequency,minimum night).
+   Zero opacity disables a layer. All inputs must be finite. */
+#define MC_SKY_LAYER_VECTORS 12u
+enum {MC_SKY_NO_ATMOSPHERE=1u,MC_SKY_NO_LOW_CLOUDS=2u,MC_SKY_NO_VOXEL_CLOUDS=4u,MC_SKY_NO_LIGHT_SHAFTS=8u};
+typedef struct MC_SkyParameters {uint32_t size;float layers[MC_SKY_LAYER_VECTORS][4];} MC_SkyParameters;
+typedef struct MC_EnvironmentProfileV2 {
+    uint32_t size;
+    MC_EnvironmentProfile base;
+    MC_SkyParameters sky;
+    uint32_t override_particle_intensity;
+    float particle_intensity;
+    uint32_t sky_flags;
+    float grade_color[3],grade_strength;
+} MC_EnvironmentProfileV2;
+typedef struct MC_EnvironmentV2 {
+    uint32_t size,version;
+    int32_t (*register_profile)(MC_PluginContext*,const MC_EnvironmentProfileV2*);
+    const MC_EnvironmentV1* v1;
+} MC_EnvironmentV2;
 typedef struct MC_ParticleDefinition {
     uint32_t size;
     const char* key;
@@ -277,4 +338,48 @@ typedef struct MC_PresentationV1 {
     int32_t (*register_held_model)(MC_PluginContext*,const MC_HeldModel*);
     int32_t (*register_playlist)(MC_PluginContext*,const MC_MusicPlaylist*);
 } MC_PresentationV1;
+/* V2 keeps V1 layouts frozen. Drift axes are {frequency,phase_multiplier,
+   acceleration,wave}; wave 0 is sine, 1 cosine. Shape: 0 atlas, 1 glow,
+   2 soft tuft, 3 four-point sparkle. Collision: 0 free motion, 1 world. */
+typedef struct MC_ParticleDefinitionV2 {
+    uint32_t size;
+    MC_ParticleDefinition base;
+    uint32_t shape,collision;
+    float drift[3][4];
+} MC_ParticleDefinitionV2;
+typedef struct MC_ParticleInstanceV2 {
+    uint32_t size,dimension;
+    const char* particle;
+    double position[3];
+    float velocity[3],color[4],lifetime,scale,phase,rotation,angular_velocity;
+} MC_ParticleInstanceV2;
+typedef struct MC_AmbientContext {
+    uint32_t size,dimension,capacity;
+    MC_GenerationContext generation;
+    double viewer[3];
+    float dt,daylight;
+    uint64_t seed;
+    void* reader;
+    uint64_t (*random_bits)(void*);
+    void (*mix_random)(void*,uint64_t);
+    int32_t (*emit)(void*,const MC_ParticleInstanceV2*);
+    const char* generation_provider;
+    int32_t (*layers)(void*,int32_t,int32_t,MC_GenerationLayer*,uint32_t,uint32_t*);
+} MC_AmbientContext;
+typedef int32_t (*MC_AmbientCallback)(const MC_AmbientContext*,void* state,void* userdata);
+typedef struct MC_AmbientDefinition {
+    uint32_t size,dimension,state_bytes,replace_native;
+    const char* key;
+    MC_AmbientCallback update;
+    void* userdata;
+} MC_AmbientDefinition;
+typedef struct MC_ItemIcon {uint32_t size;const char* item;const char* path;} MC_ItemIcon;
+typedef struct MC_PresentationV2 {
+    uint32_t size,version;
+    int32_t (*register_particle)(MC_PluginContext*,const MC_ParticleDefinitionV2*);
+    int32_t (*emit)(MC_PluginContext*,const MC_ParticleInstanceV2*);
+    int32_t (*register_ambient)(MC_PluginContext*,const MC_AmbientDefinition*);
+    const MC_PresentationV1* v1;
+    int32_t (*register_item_icon)(MC_PluginContext*,const MC_ItemIcon*);
+} MC_PresentationV2;
 #endif

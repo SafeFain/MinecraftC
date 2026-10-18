@@ -30,7 +30,7 @@ enum class GameState {
 struct MenuCallbacks {
     std::function<void(const std::string&)> onOpenWorld;
     std::function<void(const std::string&, const std::string&, GameMode, WorldType, bool)> onCreateWorld;
-    std::function<void(const std::array<Plugins::GenerationConfig,2>&)> onGenerationConfig;
+    std::function<void(const std::map<uint32_t,Plugins::GenerationConfig>&)> onGenerationConfig;
     std::function<std::vector<WorldSummary>()> onRefreshWorlds;
     std::function<bool(const std::string&)> onDeleteWorld;
     std::function<void()> onOpenLanJoin;
@@ -46,6 +46,7 @@ struct MenuCallbacks {
     // Sleep actions use stable integer values so the UI layer remains
     // independent of GameSession's gameplay headers.
     std::function<void(int)> onSleepAction;
+    std::function<void(const std::string&)> onBedTravel;
 };
 
 // ── Button ────────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ public:
 
 private:
     enum class Page { Home, Worlds, Create, Language, About };
-    enum class Field { Name, Seed, Parameters0, Parameters1 };
+    enum class Field { Name, Seed, Parameters };
 
     MenuCallbacks m_callbacks;
     ClientSettings& m_settings;
@@ -165,9 +166,12 @@ private:
     Field m_field = Field::Name;
     TextEditBuffer m_worldName{{}, 32};
     TextEditBuffer m_seedText{{}, 20};
-    std::array<Plugins::GenerationConfig,2> m_generation;
-    std::array<TextEditBuffer,2> m_parameters{{TextEditBuffer{"{}",4096},TextEditBuffer{"{}",4096}}};
-    TextEditBuffer& fieldBuffer() {return m_field==Field::Name?m_worldName:m_field==Field::Seed?m_seedText:m_parameters[m_field==Field::Parameters0?0:1];}
+    std::map<uint32_t,Plugins::GenerationConfig> m_generation;
+    std::map<uint32_t,TextEditBuffer> m_parameters;
+    std::map<uint32_t,int> m_parameterRows;
+    uint32_t m_parameterDimension=0;
+    platform::Clipboard* m_clipboard=nullptr;
+    TextEditBuffer& fieldBuffer() {return m_field==Field::Name?m_worldName:m_field==Field::Seed?m_seedText:m_parameters.at(m_parameterDimension);}
     GameMode m_createMode = GameMode::Survival;
     WorldType m_createWorldType = WorldType::Normal;
     bool m_createCheats = false;
@@ -220,7 +224,7 @@ private:
 class SleepMenu : public Menu {
 public:
     SleepMenu(const MenuCallbacks& callbacks, const Localization& localization,
-              bool heaven);
+              DimensionId dimension);
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;

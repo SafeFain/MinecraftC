@@ -253,10 +253,14 @@ void writeAtomic(const std::filesystem::path& path, const Bytes& body) {
     Bytes payload;
     append(payload, static_cast<uint32_t>(Plugins::content().requirements.size()));
     for(const auto& p:Plugins::content().requirements){appendString(payload,p.first);appendString(payload,p.second);}
-    append(payload,static_cast<uint32_t>(Plugins::content().blocks.size()));
-    for(const auto& p:Plugins::content().blocks){append(payload,p.first);appendString(payload,p.second.key);}
-    append(payload,static_cast<uint32_t>(Plugins::content().items.size()));
-    for(const auto& p:Plugins::content().items){append(payload,p.first);appendString(payload,p.second.key);}
+    // Reserved serialized slots retain their historical implicit identity.
+    // Only launch-local allocations belong in the v21 remapping palettes.
+    const auto palette=[&](const auto& entries) {
+        const auto first=entries.lower_bound(Plugins::FIRST_CONTENT_ID);
+        append(payload,static_cast<uint32_t>(std::distance(first,entries.end())));
+        for(auto entry=first;entry!=entries.end();++entry){append(payload,entry->first);appendString(payload,entry->second.key);}
+    };
+    palette(Plugins::content().blocks);palette(Plugins::content().items);
     payload.insert(payload.end(),body.begin(),body.end());
     if(payload.size()>MAX_PAYLOAD)throw std::runtime_error("Save payload exceeds limit");
     std::filesystem::create_directories(path.parent_path());
@@ -580,9 +584,12 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         if (findGameRule(rule.name)) throw std::runtime_error("Unknown game rule conflicts with registry");
         appendRule(rule.name, rule.value);
     }
+    // Historical inspection slots may remain implicit; keyed records below
+    // are authoritative and always validate registered generator selections.
     for(uint32_t dimension=0;dimension<2;++dimension) {
         const auto found=metadata.generation.find(dimension);const auto g=found==metadata.generation.end()?Plugins::GenerationConfig{}:found->second;
-        if(Plugins::validDimension(dimension))Plugins::validateGeneration(g,dimension);else if(!(g==Plugins::GenerationConfig{}))throw std::runtime_error("Generation for disabled dimension");
+        if(Plugins::validDimension(dimension)){if(!(g==Plugins::GenerationConfig{}))Plugins::validateGeneration(g,dimension);}
+        else if(!(g==Plugins::GenerationConfig{}))throw std::runtime_error("Generation for disabled dimension");
         if(g.parameters.size()>4096||g.modifiers.size()>64)throw std::runtime_error("Generation configuration too large");
         Plugins::Json::parse(g.parameters);
         appendString(payload,g.generator);appendString(payload,g.revision);appendString(payload,g.parameters);
@@ -722,7 +729,8 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         Plugins::Json::parse(g.parameters);
         const auto count=reader.read<uint16_t>();if(count>64)throw std::runtime_error("Too many generation modifiers");
         for(uint16_t i=0;i<count;++i){auto key=reader.readString();auto revision=reader.readString();g.modifiers.emplace_back(key,revision);}
-        if(!inspection&&Plugins::validDimension(dimension))Plugins::validateGeneration(g,dimension);
+        if(!inspection&&Plugins::validDimension(dimension)&&
+           (checked.version<20||!(g==Plugins::GenerationConfig{})))Plugins::validateGeneration(g,dimension);
     }
     if(checked.version>=20) {
         auto resolve=[&](const std::string& key,uint32_t fallback) {

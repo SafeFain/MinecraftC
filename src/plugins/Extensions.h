@@ -30,6 +30,8 @@ struct GenerationConfig {
     }
 };
 struct DimensionContent {
+    uint64_t seedDomain=0;
+    std::string nameKey;
     std::string key, name, revision="1", deathTarget, voidTarget;
     GenerationConfig generation;
     uint32_t weather=MC_WEATHER_NORMAL, spawn=MC_SPAWN_SAFE_SURFACE;
@@ -39,8 +41,12 @@ struct DimensionContent {
     void* spawnUserdata=nullptr;
     mutable std::vector<MC_DimensionModifier> modifierView;
 };
+struct DimensionTravelContent {
+    uint32_t source=0,target=0;
+    std::string key,nameKey;
+};
 inline std::map<uint32_t,DimensionContent> builtinDimensions() {
-    DimensionContent overworld;overworld.key="minecraftc:overworld";overworld.name="Overworld";
+    DimensionContent overworld;overworld.key="minecraftc:overworld";overworld.name="Overworld";overworld.nameKey="lan.overworld";
     return {{0,overworld}};
 }
 struct GeneratorContent {
@@ -51,6 +57,7 @@ struct GeneratorContent {
     void* userdata=nullptr;
     std::string lodRevision;
     MC_BatchVoxelCallback batch=nullptr;
+    MC_GenerationLayersCallback layers=nullptr;
     MC_LodCallback terrainLod=nullptr, decorationLod=nullptr;
     // Data generators use these immutable values instead of callbacks.
     int32_t height=64, water=62;
@@ -99,6 +106,7 @@ struct LootContent {
     std::vector<Entry> entries;
 };
 struct StructureContent {
+    bool omitCoarseLod=false;
     struct Block {int32_t x=0,y=0,z=0;uint16_t id=0;std::string loot;uint64_t lootSeed=0;};
     std::string key,name,revision;
     uint32_t dimension=0,cell=64,chance=10,radius=8,height=16,tolerance=2;
@@ -112,6 +120,7 @@ struct StructureContent {
     void* userdata=nullptr;
 };
 struct ActionContent {
+    std::function<bool(const MC_ActionViewV3&,MC_ActionTargetV2&)> targetV3;
     std::function<bool(const MC_ActionViewV2&,MC_ActionTargetV2&)> targetV2;
     bool rangeFromEye=false,toolPose=false,invalidMarker=false;
     float useCooldown=0;
@@ -119,14 +128,32 @@ struct ActionContent {
     uint32_t kind=0,durability=0;
     float range=32,cooldown=0;
     std::function<bool(const MC_ActionView&,MC_ActionTarget&)> target;
+    bool contextual() const {return bool(targetV2)||bool(targetV3);}
 };
 struct EnvironmentContent {
+    uint32_t skyFlags=0;
+    std::array<float,3> gradeColor{{1,1,1}};
+    float gradeStrength=0;
+    float particleIntensity=-1;
+    std::array<std::array<float,4>,MC_SKY_LAYER_VECTORS> skyLayers{};
     std::string key;
     MC_EnvironmentParameters parameters{};
     uint32_t overrides=0;
     std::function<void(MC_EnvironmentParameters&)> callback;
 };
-struct ParticleContent {std::string key,material;MC_ParticleDefinition definition{};size_t owner=0;};
+struct ParticleContent {
+    std::string key,material;MC_ParticleDefinition definition{};size_t owner=0;
+    bool advanced=false,collision=true;
+    uint32_t shape=0;
+    std::array<std::array<float,4>,3> drift{};
+};
+struct AmbientContent {
+    size_t owner=0;
+    std::string key;
+    uint32_t dimension=0,stateBytes=0;
+    bool replaceNative=false;
+    std::function<bool(const MC_AmbientContext&,void*)> update;
+};
 struct HeldModelContent {
     std::shared_ptr<const model::ModelAsset> asset;
     std::filesystem::path path;
@@ -140,6 +167,11 @@ struct PlaylistContent {
     std::vector<std::filesystem::path> tracks;
 };
 struct ExtensionContent {
+    std::map<uint32_t,std::string> legacyStructureAliases;
+    std::map<std::string,DimensionTravelContent> bedTravel;
+    std::map<std::string,std::map<std::string,std::string>> translations;
+    std::map<std::string,std::string> nameKeys;
+    std::map<std::string,std::string> translationAliases;
     std::map<uint16_t,BlockBehaviorContent> blockBehaviors;
     std::map<uint16_t,ItemBehaviorContent> itemBehaviors;
     std::map<std::string,LootContent> loot;
@@ -147,6 +179,7 @@ struct ExtensionContent {
     std::map<std::string,ActionContent> actions;
     std::map<uint32_t,EnvironmentContent> environments;
     std::map<std::string,ParticleContent> particles;
+    std::map<std::string,AmbientContent> ambient;
     std::map<uint16_t,HeldModelContent> heldModels;
     std::map<std::string,PlaylistContent> playlists;
     std::map<uint32_t,DimensionContent> dimensions=builtinDimensions();

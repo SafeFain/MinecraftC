@@ -20,6 +20,8 @@ public:
     const std::filesystem::path& root() const { return m_root; }
     static std::vector<uint8_t> readPath(const std::filesystem::path& path);
     static std::string readTextPath(const std::filesystem::path& path);
+    // Explicitly addresses the active read-only packaged asset namespace.
+    static std::vector<uint8_t> readTitleBinary(std::string_view relative);
 
 private:
     struct Impl;

@@ -23,6 +23,7 @@ struct CraftingRecipe {
     ItemStack output;
     bool allowMirror = true;
     bool allowPlankVariants = true;
+    uint32_t sortOrder=UINT32_MAX;
 };
 
 struct SmeltingRecipe {

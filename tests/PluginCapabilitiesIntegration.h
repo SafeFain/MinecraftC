@@ -30,7 +30,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     MC_PluginContext context{};context.manager=&plugins;context.index=index;
     const minecraftc::Host host(&plugins.host(),&context);
     check(host.behaviors()&&host.structures()&&host.playerActions()&&host.environment()&&host.presentation(),"five extension tables");
-    check(host.extension(MC_STRUCTURES_EXTENSION,2)&&!host.extension(MC_STRUCTURES_EXTENSION,3),"structure V2 and unknown extension version");
+    check(host.extension(MC_STRUCTURES_EXTENSION,2)&&host.extension(MC_STRUCTURES_EXTENSION,3)&&!host.extension(MC_STRUCTURES_EXTENSION,4),"structure V2 and unknown extension version");
     const auto vine=Plugins::resolveBlock("capability_demo:vine"),resource=Plugins::resolveBlock("capability_demo:resource"),spent=Plugins::resolveBlock("capability_demo:spent");
     check(Plugins::blockBehavior(vine)->climbable&&isReplaceableByFluid(vine)&&fireEncouragement(vine)==30&&burnOdds(vine)==60,"block physical/fire behavior");
     const auto dim=static_cast<DimensionId>(Plugins::resolveDimension("capability_demo:islands"));
@@ -79,7 +79,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     input.clearVirtual();input.update(bindings);p.handleMovement(input,.05f);p.teleport({.5,1.01,.5});world.setBlock(0,1,0,spent);world.setBlock(0,2,0,BlockId::AIR);const auto health=p.survivalStats().health();for(int i=0;i<12;++i)p.update(.05f);check(p.survivalStats().health()<health,"contact damage enters survival damage path");
     world.setBlock(0,1,0,BlockId::AIR);
     world.setBlock(4,1,0,spent);world.scheduleResource({4,1,0},resource,1);world.setBlock(4,1,0,BlockId::CHEST);world.tickInteractiveBlocks([](const glm::ivec3&){return false;});check(world.getBlock(4,1,0)==BlockId::CHEST&&world.getBlockEntity({4,1,0})->type==BlockEntityType::Chest,"container edit cancels resource reset and creates correct entity");
-    const auto env=DayNightCycle{}.evaluate();bool clouds=true;const auto changed=Plugins::applyEnvironment(env,static_cast<uint32_t>(dim),clouds);check(!clouds&&changed.skyStyle==RenderSkyStyle::Heaven&&changed.moonSize==1.3f,"dimension sky/cloud profile");
+    const auto env=DayNightCycle{}.evaluate();bool clouds=true;const auto changed=Plugins::applyEnvironment(env,static_cast<uint32_t>(dim),clouds);check(!clouds&&changed.skyStyle==RenderSkyStyle::Layered&&changed.moonSize==1.3f,"dimension sky/cloud profile");
     world.setBlock(5,0,0,BlockId::PLANKS_SLAB_BOTTOM);check(pluginSafeLanding(world,{5.5,.51,.5}),"full-foot landing accepts slab support height");
     world.setBlock(5,0,0,BlockId::PLANKS_STAIRS_BOTTOM_NORTH);check(!pluginSafeLanding(world,{5.5,1.01,.5}),"partial stair face cannot authorize unsupported foot area");world.setBlock(5,0,0,BlockId::STONE);
     auto rules=world.gameRules();rules.set(GameRuleId::AdvanceTime,GameRuleValue::boolean(false));GameSessionTestAccess::setRules(session,rules);
@@ -87,7 +87,10 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     timePolicy.advancing=2;check(host.environment()->set_time(&context,&timePolicy)==0,"advancing override queued");plugins.flushOperations();GameSessionTestAccess::tickDaylight(session,.1f);check(std::abs(session.daylightState().phase()-.255f)<.00001f,"dimension duration/advance override world rule");
     timePolicy.advancing=0;timePolicy.cycle_seconds=0;check(host.environment()->set_time(&context,&timePolicy)==0,"inherited clock queued");plugins.flushOperations();GameSessionTestAccess::tickDaylight(session,.1f);check(session.daylightState().phase()==.25f,"inherited clock follows paused world rule");
     ParticleSystem particles;MC_ParticleEmission emission{};emission.size=sizeof(emission);emission.particle="capability_demo:spark";emission.count=3;check(particles.emitPlugin(emission)&&particles.size()==3,"host particle emission");check(!particles.emitPlugin(MC_ParticleEmission{sizeof(emission),0,129,1,emission.particle,{0,0,0}}),"particle emission bound");const auto render=particles.buildRenderData({0,0,0});check(render[0].color.b==1&&render[0].color.a==.8f,"particle colors reach rendering");
-    check(Plugins::content().extensions.heldModels.at(static_cast<uint16_t>(staff)).asset&&Plugins::content().extensions.playlists.size()==2,"held model/playlists loaded");
+    const auto& playlists=Plugins::content().extensions.playlists;
+    check(Plugins::content().extensions.heldModels.at(static_cast<uint16_t>(staff)).asset&&playlists.size()==3&&
+        playlists.count("capability_demo:music")&&playlists.count("capability_native:music")&&
+        playlists.at("official_heaven:music").dimension==1&&playlists.at("official_heaven:music").tracks.size()==2,"held model/registered dimension playlists loaded");
     Lan::AuthorityState state;state.self.id=1;state.cycleOverride=45;state.advancing=1;state.actionCooldowns[request.action]=1.5f;const auto wire=Lan::decodeAuthorityState(Lan::encodeAuthorityState(state));check(wire.cycleOverride==45&&wire.advancing==1&&wire.actionCooldowns.at(request.action)==1.5f,"LAN authoritative time/cooldowns roundtrip");
     check(Plugins::content().networkDescription.count("structure/capability_demo:bridge")&&Plugins::content().networkDescription.count("action/capability_native:blink"),"gameplay capability handshake");
     Config::RENDER_DISTANCE=2;

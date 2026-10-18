@@ -117,6 +117,8 @@ typedef struct MC_GeneratorDefinition {
     MC_VoxelCallback voxel;
     void* userdata;
 } MC_GeneratorDefinition;
+#define MC_MAX_GENERATION_LAYERS 64u
+typedef struct MC_GenerationLayer {int32_t bottom,top;uint32_t present,biome;} MC_GenerationLayer;
 #include "capabilities.h"
 typedef struct MC_DecorationBlock { int32_t x,y,z; uint16_t block; } MC_DecorationBlock;
 typedef int32_t (*MC_DecorationCallback)(const MC_GenerationContext*,int32_t,int32_t,MC_DecorationBlock*,uint32_t,uint32_t*,void*);
@@ -175,6 +177,19 @@ typedef struct MC_WorldgenV2 {
     int32_t (*register_generator)(MC_PluginContext*,const MC_GeneratorDefinitionV2*);
     int32_t (*register_modifier)(MC_PluginContext*,const MC_ModifierDefinitionV2*);
 } MC_WorldgenV2;
+/* Logical layers are independent of decorations and LOD aggregation. Slots
+   remain stable, including absent layers. Same pure/concurrent contract as V2. */
+typedef int32_t (*MC_GenerationLayersCallback)(const MC_GenerationContext*,int32_t,int32_t,MC_GenerationLayer*,uint32_t,uint32_t*,void*);
+typedef struct MC_GeneratorDefinitionV3 {
+    uint32_t size;
+    MC_GeneratorDefinitionV2 base;
+    MC_GenerationLayersCallback layers;
+} MC_GeneratorDefinitionV3;
+typedef struct MC_WorldgenV3 {
+    uint32_t size,version;
+    int32_t (*register_generator)(MC_PluginContext*,const MC_GeneratorDefinitionV3*);
+    const MC_WorldgenV2* v2;
+} MC_WorldgenV3;
 /* Dimension handles are launch-local. Persist namespaced keys, never handles.
    Register the dimension before its generator. References resolve at the end
    of the owning plugin's registration transaction. Zeroed policies use defaults. */
@@ -226,6 +241,32 @@ typedef struct MC_DimensionsV2 {
     int32_t (*register_dimension)(MC_PluginContext*,const MC_DimensionDefinitionV2*,uint32_t*);
     const MC_DimensionsV1* v1;
 } MC_DimensionsV2;
+
+#define MC_LOCALIZATION_EXTENSION "minecraftc.localization"
+/* Bundles contain <language_code>.json dictionaries with owner-namespaced keys.
+   en_us.json is required. Missing selected-language entries fall back to English. */
+typedef struct MC_LocalizationV1 {
+    uint32_t size,version;
+    int32_t (*register_bundle)(MC_PluginContext*,const char* directory);
+    int32_t (*register_name)(MC_PluginContext*,const char* content_key,const char* name_key);
+} MC_LocalizationV1;
+typedef struct MC_DimensionDefinitionV3 {
+    uint32_t size;
+    MC_DimensionDefinitionV2 base;
+    const char* name_key;
+    uint64_t seed_domain; /* 0 uses the unmodified world seed. */
+} MC_DimensionDefinitionV3;
+typedef struct MC_DimensionTravelEntry {
+    uint32_t size,source,target;
+    const char* key;
+    const char* name_key;
+} MC_DimensionTravelEntry;
+typedef struct MC_DimensionsV3 {
+    uint32_t size,version;
+    int32_t (*register_dimension)(MC_PluginContext*,const MC_DimensionDefinitionV3*,uint32_t*);
+    int32_t (*register_bed_travel)(MC_PluginContext*,const MC_DimensionTravelEntry*);
+    const MC_DimensionsV2* v2;
+} MC_DimensionsV3;
 typedef uint64_t MC_RenderHandle;
 #define MC_RENDER_SCENE_COLOR UINT64_MAX
 typedef enum MC_RenderStage { MC_RENDER_SKY=0, MC_RENDER_SHADOWS, MC_RENDER_TERRAIN,

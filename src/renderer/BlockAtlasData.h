@@ -4,6 +4,7 @@
 #include "renderer/VoxelGiMaterial.h"
 
 #include <filesystem>
+#include <unordered_map>
 
 // std430-compatible, little-endian wire fields are decoded explicitly on load.
 struct MaterialSequence {
@@ -38,5 +39,6 @@ struct BlockAtlasData {
 // alpha-weighted linear-light tile downsampling, so filtering cannot bleed across
 // slots. V4 semantic normal/property maps are linear; legacy atlases synthesize them.
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot);
+void appendPluginItemIcons(TextureData&,std::unordered_map<std::string,int>&,int columns,int& rows);
 
 VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas);

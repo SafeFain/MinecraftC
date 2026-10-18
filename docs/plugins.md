@@ -24,11 +24,20 @@ The builtin examples are disabled by default:
 - `official_atmosphere`: environment colors and a HUD label, marked visual-only.
 
 `official_heaven` is enabled by default. It owns the optional Heaven dimension,
-reserved Heaven block/item slots, gameplay semantics, Skyway and Starstep actions,
-and the packaged Starstep model under `assets/plugins/official_heaven/`.
+reserved Heaven block/item slots, recipes, v9 generation and LOD, gameplay semantics,
+Skyway and Starstep actions, translations, sky/ambient policies, music, material
+sequences, item icons and the Starstep model under `assets/plugins/official_heaven/`.
 Disabling it (or using safe mode) removes Heaven travel, content, crafting and smelting
 from gameplay after restart. Serialized numbers and keys remain reserved; external
 packages cannot claim the official identity or dimension handle 1.
+
+On platforms with a virtual Title Storage asset root (Android/iOS), builtin
+resource inventories are read through the same packaged asset API and materialized
+under `<user-data>/.cache/builtin_plugins/<id>/<inventory-key>/`. The complete
+inventory is read before cache publication; intact files retain their timestamps
+and damaged files are replaced atomically. This preserves package-relative model,
+image and audio paths and the same content fingerprint as desktop installations.
+The provider remains statically linked on mobile; this cache contains resources.
 
 Worlds require the exact gameplay plugin set and package fingerprint. The addition
 of this provider makes worlds saved with the previous plugin set incompatible.
@@ -36,6 +45,61 @@ They remain listed, refuse opening without writes, and are not migrated. Worlds
 created with Heaven disabled contain only the dimensions currently registered.
 Enabling Heaven later also changes that world's required set. Terrain generation
 remains global v20 / Heaven v9; save v21 and numeric content IDs are unchanged.
+
+## Registered localization, travel and presentation
+
+Query extension versions independently; ABI 1 and the existing versioned descriptor
+layouts remain unchanged. All registrations below participate in the owning package's
+transaction and disappear when it fails, is disabled or is excluded by safe mode.
+
+- `minecraftc.localization`, version 1 (`MC_LocalizationV1`), registers a
+  package-relative directory of `xx_xx.json` dictionaries. Keys must use the
+  registering package's namespace. `en_us.json` is required; lookup uses the current
+  language, then English. Content names bind a content key to a translation key.
+  The official package also supplies aliases for historical host translation keys.
+- `minecraftc.dimensions`, version 3 (`MC_DimensionsV3`), embeds the V2 definition
+  and adds a localized name and seed domain. The host derives the generation seed
+  once before invoking callbacks; zero leaves the world seed unchanged. Bed travel
+  entries name explicit source and target handles and a localized label. Menus use
+  the registered dimensions; LAN travel is revalidated by the server.
+- `minecraftc.worldgen`, version 3, extends V2 with pure logical-layer sampling.
+  A callback returns at most `MC_MAX_GENERATION_LAYERS` inclusive vertical spans,
+  preserving absent slots and biome identifiers independently of decoration LOD.
+  A surface height matching a present layer also uses that layer's bottom as its
+  density lower bound; generators without this callback retain the world-bottom default.
+  `minecraftc.player_actions`, version 3, adds dimension and selected generator
+  keys to the read-only V2 action view. Actions can select provider behavior
+  without a host builtin-generation flag.
+- `minecraftc.material_sequences`, version 1, registers package-contained 16x16
+  color/normal/property frames with variant count, frame count, animation rate and
+  selection seed. The shared host atlas still owns layout, tile-safe mipmaps and
+  GPU lifetime. Provider item icons use `MC_PresentationV2::register_item_icon`;
+  existing logical item slots retain their positions and held-item silhouettes.
+- `minecraftc.structures`, version 3, reuses V2 placement/build and loot metadata.
+  Its coarse LOD policy optionally omits structures above cell size 1 when the
+  generator supplies its own coarse silhouettes. The V2 default remains exact
+  center sampling; no second batch metadata channel is introduced.
+- `minecraftc.presentation`, version 2, adds explicit initial particle phase,
+  rotation, angular velocity, color and per-axis sine/cosine acceleration, generic
+  shapes and collision policy. Local ambient callbacks receive a bounded emission
+  budget and borrowed read services. State is host-owned, bounded and cleared on
+  dimension changes; callback failures use the normal plugin fault path.
+- `minecraftc.environment`, version 2, retains the V1 environment callback and
+  adds generic sky-layer parameters. `MC_SkyParameters` documents the twelve vec4
+  slots for cloud-sea and aurora motion, masks, colors, noise and viewing behavior.
+  Celestial size, direction, weather and cloud suppression retain V1 parameters.
+  V2 also registers independent atmosphere/low-cloud/voxel-cloud/light-shaft flags,
+  color grade and particle intensity. Selecting a sky drawing style does not
+  implicitly select these policies. The Vulkan post-process retains its 128-byte
+  push-constant contract; quality counts and shaft flags share an exact integer
+  bitfield carried in a float, while grading uses explicit RGB/strength values.
+
+Authoring dictionaries import package-owned source definitions through asset-relative
+`imports`. The texture workbench preserves the original owner on writeback; applying
+an export or building the repository atlas synchronizes package material frames and
+item icons. Shared generated atlases remain derived caches. Runtime content policy
+comes from the enabled package, and reserved numbers retain their historical implicit
+save/wire identity rather than entering dynamic content palettes.
 
 Desktop Linux, Windows and macOS can load native shared libraries. Android/iOS
 accept data packages and compiled-in code plugins; external native libraries are

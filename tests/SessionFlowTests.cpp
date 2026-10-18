@@ -275,9 +275,19 @@ std::string Localization::format(
 #include "LanAuthorityIntegration.h"
 #include "LanReplicaIntegration.h"
 #include "PluginLanIntegration.h"
+#include "HeavenParticleMigration.h"
+#include "HeavenP1Integration.h"
 
 int main(int argc, char** argv) {
     installHeavenFixture();
+    if(argc==6&&std::string(argv[1])=="--heaven-p1-tests") {
+        try{return HeavenP1Integration::run(argv[2],{{argv[3],argv[4],argv[5]}});}
+        catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
+    }
+    if(argc==2&&std::string(argv[1])=="--heaven-particle-migration") {
+        try{return HeavenParticleMigration::run();}
+        catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
+    }
     if(argc==4&&std::string(argv[1])=="--remaining-p0-tests"){
         try{return HeavenRemainingP0::run(argv[2],argv[3]);}
         catch(const std::exception& error){std::cerr<<"Remaining P0 regression failed: "<<error.what()<<'\n';return 1;}

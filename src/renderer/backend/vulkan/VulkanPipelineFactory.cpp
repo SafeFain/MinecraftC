@@ -1450,7 +1450,7 @@ void VulkanPipelineFactory::createSecondaryPipelines(
             dynamic.dynamicStateCount = dynamicStates.size();
             dynamic.pDynamicStates = dynamicStates.data();
             VkPushConstantRange range{};
-            range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             range.size = sizeof(WireUniforms);
             VkPipelineLayoutCreateInfo layout{};
             layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

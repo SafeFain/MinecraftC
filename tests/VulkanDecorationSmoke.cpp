@@ -1,3 +1,4 @@
+#include "plugins/official_heaven/HeavenEnvironment.h"
 #include "HeavenContentFixture.h"
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
@@ -89,7 +90,7 @@ int main(int argc, char** argv) {
         const auto view = glm::lookAt(camera, lookAt, glm::vec3(0,1,0));
         const auto vp = glm::perspective(glm::radians(70.0f), window.aspectRatio(),
                                          0.1f, 128.0f) * view;
-        const RenderEnvironment environment = heaven ? applyHeavenEnvironment(DayNightCycle{}.evaluate()) :
+        const RenderEnvironment environment = heaven ? OfficialHeaven::environment(DayNightCycle{}.evaluate()) :
             DayNightCycle{}.evaluate();
         for (int frame = 0; frame < frames; ++frame) {
             renderer.beginFrame();

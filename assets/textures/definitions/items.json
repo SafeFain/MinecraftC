@@ -1,175 +1,761 @@
 {
   "version": 1,
   "items": {
-    "grass_block": {"texture": "grass_top"}, "dirt": {"texture": "dirt"},
-    "stone": {"texture": "stone"}, "oak_log": {"texture": "oak_log"},
-    "oak_leaves": {"texture": "leaves"}, "sand": {"texture": "sand"},
-    "bedrock": {"texture": "bedrock"}, "water": {"texture": "water"},
-    "snow": {"texture": "snow"}, "oak_planks": {"texture": "oak_planks"},
-    "deepslate": {"texture": "deepslate"}, "cactus": {"texture": "cactus_side"},
-    "coal_ore": {"texture": "coal_ore"}, "iron_ore": {"texture": "iron_ore"},
-    "gold_ore": {"texture": "gold_ore"}, "diamond_ore": {"texture": "diamond_ore"},
-    "lava": {"texture": "lava"}, "ice": {"texture": "ice"},
-    "gravel": {"texture": "gravel"}, "clay": {"texture": "clay"},
-    "red_sand": {"texture": "red_sand"}, "terracotta": {"texture": "terracotta"},
-    "podzol": {"texture": "podzol_top"}, "moss": {"texture": "moss"},
-    "tall_grass": {"texture": "tall_grass"}, "poppy": {"texture": "flower"},
-    "reeds": {"texture": "reeds"}, "birch_log": {"texture": "birch_log"},
-    "birch_leaves": {"texture": "birch_leaves"}, "spruce_log": {"texture": "spruce_log"},
-    "spruce_leaves": {"texture": "spruce_leaves"}, "jungle_log": {"texture": "jungle_log"},
-    "jungle_leaves": {"texture": "jungle_leaves"}, "acacia_log": {"texture": "acacia_log"},
-    "acacia_leaves": {"texture": "acacia_leaves"}, "cobblestone": {"texture": "cobblestone"},
-    "crafting_table": {"texture": "crafting_table"}, "furnace": {"texture": "furnace"},
-    "chest": {"texture": "chest"}, "torch": {"texture": "torch"},
-    "white_wool": {"texture": "white_wool"}, "white_bed": {"texture": "white_bed"},
-    "farmland": {"texture": "farmland"}, "oak_sapling": {"texture": "oak_sapling"},
-    "birch_sapling": {"texture": "birch_sapling"}, "spruce_sapling": {"texture": "spruce_sapling"},
-    "jungle_sapling": {"texture": "jungle_sapling"}, "acacia_sapling": {"texture": "acacia_sapling"},
-    "glass": {"texture": "glass"}, "tnt": {"texture": "tnt"},
-    "obsidian": {"texture": "obsidian"}, "dandelion": {"texture": "dandelion"},
-    "blue_orchid": {"texture": "blue_orchid"}, "allium": {"texture": "allium"},
-    "oxeye_daisy": {"texture": "oxeye_daisy"}, "sunflower": {"texture": "sunflower_bottom"},
-    "limestone": {"texture": "limestone"}, "basalt": {"texture": "basalt"},
-    "tuff": {"texture": "tuff"}, "coarse_dirt": {"texture": "coarse_dirt"},
-    "mud": {"texture": "mud"}, "packed_ice": {"texture": "packed_ice"},
-    "black_sand": {"texture": "black_sand"}, "granite": {"texture": "granite"},
-    "aether_grass": {"texture": "aether_grass_top"}, "aether_soil": {"texture": "aether_soil"},
-    "cloudstone": {"texture": "cloudstone"}, "sunstone": {"texture": "sunstone"},
-    "skyroot_log": {"texture": "skyroot_log"}, "skyroot_leaves": {"texture": "skyroot_leaves"},
-    "star_crystal": {"texture": "star_crystal"}, "starflower": {"texture": "starflower"},
-    "cloud_bloom": {"texture": "cloud_bloom"}, "glowshroom": {"texture": "glowshroom"},
-    "dripstone_block": {"texture": "dripstone_block"},
-    "pointed_dripstone": {"texture": "pointed_dripstone"},
-    "calcite": {"texture": "calcite"}, "hanging_roots": {"texture": "hanging_roots"},
-    "glow_fern": {"texture": "glow_fern"},
-    "resonant_crystal": {"texture": "resonant_crystal"},
-    "sulfur_crust": {"texture": "sulfur_crust"},
-    "oak_planks_slab": {"texture": "oak_planks"},
-    "oak_planks_stairs": {"texture": "oak_planks"},
-    "cobblestone_slab": {"texture": "cobblestone"},
-    "cobblestone_stairs": {"texture": "cobblestone"},
-    "terracotta_slab": {"texture": "terracotta"},
-    "terracotta_stairs": {"texture": "terracotta"},
-    "sunstone_slab": {"texture": "sunstone"},
-    "sunstone_stairs": {"texture": "sunstone"},
-    "cloudstone_slab": {"texture": "cloudstone"},
-    "cloudstone_stairs": {"texture": "cloudstone"},
-    "emerald_ore": {"texture": "emerald_ore"},
-    "deepslate_emerald_ore": {"texture": "deepslate_emerald_ore"},
-    "composter": {"texture": "composter"},
-    "fletching_table": {"texture": "fletching_table"}, "loom": {"texture": "loom"},
-    "cauldron": {"texture": "cauldron"}, "blast_furnace": {"texture": "blast_furnace"},
-    "smithing_table": {"texture": "smithing_table"}, "grindstone": {"texture": "grindstone"},
-    "copper_ore": {"texture": "copper_ore", "future": true},
-    "stone_bricks": {"texture": "stone_bricks"},
-    "mossy_stone_bricks": {"texture": "mossy_stone_bricks"},
-    "cracked_stone_bricks": {"texture": "cracked_stone_bricks"},
-    "chiseled_stone_bricks": {"texture": "chiseled_stone_bricks"},
-    "bricks": {"texture": "bricks"},
-    "polished_granite": {"texture": "polished_granite"},
-    "polished_basalt": {"texture": "polished_basalt"},
-    "polished_limestone": {"texture": "polished_limestone"},
-    "polished_tuff": {"texture": "polished_tuff"},
-    "deepslate_bricks": {"texture": "deepslate_bricks"},
-    "sandstone": {"texture": "sandstone"},
-    "cut_sandstone": {"texture": "cut_sandstone"},
-    "smooth_sandstone": {"texture": "smooth_sandstone"},
-    "red_wool": {"texture": "red_wool"},
-    "yellow_wool": {"texture": "yellow_wool"},
-    "blue_wool": {"texture": "blue_wool"},
-    "green_wool": {"texture": "green_wool"},
-    "black_wool": {"texture": "black_wool"},
-    "rooted_dirt": {"texture": "rooted_dirt"},
-    "leaf_litter_soil": {"texture": "leaf_litter_soil"},
-    "peat": {"texture": "peat"},
-    "silt": {"texture": "silt"},
-    "dry_grass_block": {"texture": "dry_grass_block"},
-    "permafrost": {"texture": "permafrost"},
-    "blue_ice": {"texture": "blue_ice"},
-    "shale": {"texture": "shale"},
-    "red_sandstone": {"texture": "red_sandstone"},
-    "ochre_terracotta": {"texture": "ochre_terracotta"},
-    "white_terracotta": {"texture": "white_terracotta"},
-    "volcanic_ash": {"texture": "volcanic_ash"},
-    "coral_rock": {"texture": "coral_rock"},
-    "fern": {"texture": "fern"},
-    "dead_bush": {"texture": "dead_bush"},
-    "dry_grass": {"texture": "dry_grass"},
-    "brown_mushroom": {"texture": "brown_mushroom"},
-    "red_mushroom": {"texture": "red_mushroom"},
-    "lavender": {"texture": "lavender"},
-    "bellflower": {"texture": "bellflower"},
-    "alpine_flower": {"texture": "alpine_flower"},
-    "tropical_flower": {"texture": "tropical_flower"},
-    "cattail": {"texture": "cattail"},
-    "beach_grass": {"texture": "beach_grass"},
-    "andesite": {"texture": "andesite"},
-    "diorite": {"texture": "diorite"},
-    "gneiss": {"texture": "gneiss"},
-    "marble": {"texture": "marble"},
-    "laterite": {"texture": "laterite"},
-    "red_clay": {"texture": "red_clay"},
-    "cracked_mud": {"texture": "cracked_mud"},
-    "salt_crust": {"texture": "salt_crust"},
-    "clover": {"texture": "clover"},
-    "heather": {"texture": "heather"},
-    "wild_mint": {"texture": "wild_mint"},
-    "nettle": {"texture": "nettle"},
-    "desert_flower": {"texture": "desert_flower"},
-    "small_cactus": {"texture": "small_cactus"},
-    "reed_flower": {"texture": "reed_flower"},
-    "tundra_moss": {"texture": "tundra_moss"},
-    "fallen_twigs": {"texture": "fallen_twigs"},
-    "jungle_fern": {"texture": "jungle_fern"},
-    "cave_moss": {"texture": "cave_moss"},
-    "wet_limestone": {"texture": "wet_limestone"},
-    "gypsum": {"texture": "gypsum"},
-    "amethyst_block": {"texture": "amethyst_block"},
-    "quartz_block": {"texture": "quartz_block"},
-    "iron_stained_rock": {"texture": "iron_stained_rock"},
-    "sulfur_rock": {"texture": "sulfur_rock"},
-    "amethyst_cluster": {"texture": "amethyst_cluster"},
-    "quartz_cluster": {"texture": "quartz_cluster"},
-    "cave_glowshroom": {"texture": "cave_glowshroom"},
-    "moonstone": {"texture": "moonstone"},
-    "skystone": {"texture": "skystone"},
-    "aether_moss": {"texture": "aether_moss"},
-    "glimmer_silt": {"texture": "glimmer_silt"},
-    "star_crystal_ore": {"texture": "star_crystal_ore"},
-    "skyroot_planks": {"texture": "skyroot_planks"},
-    "cloudstone_bricks": {"texture": "cloudstone_bricks"},
-    "sunstone_bricks": {"texture": "sunstone_bricks"},
-    "moonstone_bricks": {"texture": "moonstone_bricks"},
-    "star_crystal_lamp": {"texture": "star_crystal_lamp"},
-    "sky_fern": {"texture": "sky_fern"},
-    "dawn_bell": {"texture": "dawn_bell"},
-    "moonflower": {"texture": "moonflower"},
-    "glimmer_reed": {"texture": "glimmer_reed"},
-    "cloudberry_bush": {"texture": "cloudberry_bush"},
-    "hanging_cloud_vine": {"texture": "hanging_cloud_vine"},
-    "barrel": {"texture": "barrel"},
-    "lectern": {"texture": "lectern"},
-    "cartography_table": {"texture": "cartography_table"},
-    "brewing_stand": {"texture": "brewing_stand"},
-    "smoker": {"texture": "smoker"},
-    "stonecutter": {"texture": "stonecutter"},
-    "birch_planks": {"texture": "birch_planks"},
-    "spruce_planks": {"texture": "spruce_planks"},
-    "jungle_planks": {"texture": "jungle_planks"},
-    "acacia_planks": {"texture": "acacia_planks"},
-    "oak_door": {"texture": "oak_door_bottom"},
-    "oak_button": {"texture": "oak_planks"},
-    "birch_door": {"texture": "birch_door_bottom"},
-    "birch_button": {"texture": "birch_planks"},
-    "spruce_door": {"texture": "spruce_door_bottom"},
-    "spruce_button": {"texture": "spruce_planks"},
-    "jungle_door": {"texture": "jungle_door_bottom"},
-    "jungle_button": {"texture": "jungle_planks"},
-    "acacia_door": {"texture": "acacia_door_bottom"},
-    "acacia_button": {"texture": "acacia_planks"},
-    "skyroot_door": {"texture": "skyroot_door_bottom"},
-    "skyroot_button": {"texture": "skyroot_planks"},
-    "iron_door": {"texture": "iron_door_bottom"},
-    "stone_button": {"texture": "stone"}
+    "grass_block": {
+      "texture": "grass_top"
+    },
+    "dirt": {
+      "texture": "dirt"
+    },
+    "stone": {
+      "texture": "stone"
+    },
+    "oak_log": {
+      "texture": "oak_log"
+    },
+    "oak_leaves": {
+      "texture": "leaves"
+    },
+    "sand": {
+      "texture": "sand"
+    },
+    "bedrock": {
+      "texture": "bedrock"
+    },
+    "water": {
+      "texture": "water"
+    },
+    "snow": {
+      "texture": "snow"
+    },
+    "oak_planks": {
+      "texture": "oak_planks"
+    },
+    "deepslate": {
+      "texture": "deepslate"
+    },
+    "cactus": {
+      "texture": "cactus_side"
+    },
+    "coal_ore": {
+      "texture": "coal_ore"
+    },
+    "iron_ore": {
+      "texture": "iron_ore"
+    },
+    "gold_ore": {
+      "texture": "gold_ore"
+    },
+    "diamond_ore": {
+      "texture": "diamond_ore"
+    },
+    "lava": {
+      "texture": "lava"
+    },
+    "ice": {
+      "texture": "ice"
+    },
+    "gravel": {
+      "texture": "gravel"
+    },
+    "clay": {
+      "texture": "clay"
+    },
+    "red_sand": {
+      "texture": "red_sand"
+    },
+    "terracotta": {
+      "texture": "terracotta"
+    },
+    "podzol": {
+      "texture": "podzol_top"
+    },
+    "moss": {
+      "texture": "moss"
+    },
+    "tall_grass": {
+      "texture": "tall_grass"
+    },
+    "poppy": {
+      "texture": "flower"
+    },
+    "reeds": {
+      "texture": "reeds"
+    },
+    "birch_log": {
+      "texture": "birch_log"
+    },
+    "birch_leaves": {
+      "texture": "birch_leaves"
+    },
+    "spruce_log": {
+      "texture": "spruce_log"
+    },
+    "spruce_leaves": {
+      "texture": "spruce_leaves"
+    },
+    "jungle_log": {
+      "texture": "jungle_log"
+    },
+    "jungle_leaves": {
+      "texture": "jungle_leaves"
+    },
+    "acacia_log": {
+      "texture": "acacia_log"
+    },
+    "acacia_leaves": {
+      "texture": "acacia_leaves"
+    },
+    "cobblestone": {
+      "texture": "cobblestone"
+    },
+    "crafting_table": {
+      "texture": "crafting_table"
+    },
+    "furnace": {
+      "texture": "furnace"
+    },
+    "chest": {
+      "texture": "chest"
+    },
+    "torch": {
+      "texture": "torch"
+    },
+    "white_wool": {
+      "texture": "white_wool"
+    },
+    "white_bed": {
+      "texture": "white_bed"
+    },
+    "farmland": {
+      "texture": "farmland"
+    },
+    "oak_sapling": {
+      "texture": "oak_sapling"
+    },
+    "birch_sapling": {
+      "texture": "birch_sapling"
+    },
+    "spruce_sapling": {
+      "texture": "spruce_sapling"
+    },
+    "jungle_sapling": {
+      "texture": "jungle_sapling"
+    },
+    "acacia_sapling": {
+      "texture": "acacia_sapling"
+    },
+    "glass": {
+      "texture": "glass"
+    },
+    "tnt": {
+      "texture": "tnt"
+    },
+    "obsidian": {
+      "texture": "obsidian"
+    },
+    "dandelion": {
+      "texture": "dandelion"
+    },
+    "blue_orchid": {
+      "texture": "blue_orchid"
+    },
+    "allium": {
+      "texture": "allium"
+    },
+    "oxeye_daisy": {
+      "texture": "oxeye_daisy"
+    },
+    "sunflower": {
+      "texture": "sunflower_bottom"
+    },
+    "limestone": {
+      "texture": "limestone"
+    },
+    "basalt": {
+      "texture": "basalt"
+    },
+    "tuff": {
+      "texture": "tuff"
+    },
+    "coarse_dirt": {
+      "texture": "coarse_dirt"
+    },
+    "mud": {
+      "texture": "mud"
+    },
+    "packed_ice": {
+      "texture": "packed_ice"
+    },
+    "black_sand": {
+      "texture": "black_sand"
+    },
+    "granite": {
+      "texture": "granite"
+    },
+    "dripstone_block": {
+      "texture": "dripstone_block"
+    },
+    "pointed_dripstone": {
+      "texture": "pointed_dripstone"
+    },
+    "calcite": {
+      "texture": "calcite"
+    },
+    "hanging_roots": {
+      "texture": "hanging_roots"
+    },
+    "glow_fern": {
+      "texture": "glow_fern"
+    },
+    "resonant_crystal": {
+      "texture": "resonant_crystal"
+    },
+    "sulfur_crust": {
+      "texture": "sulfur_crust"
+    },
+    "oak_planks_slab": {
+      "texture": "oak_planks"
+    },
+    "oak_planks_stairs": {
+      "texture": "oak_planks"
+    },
+    "cobblestone_slab": {
+      "texture": "cobblestone"
+    },
+    "cobblestone_stairs": {
+      "texture": "cobblestone"
+    },
+    "terracotta_slab": {
+      "texture": "terracotta"
+    },
+    "terracotta_stairs": {
+      "texture": "terracotta"
+    },
+    "emerald_ore": {
+      "texture": "emerald_ore"
+    },
+    "deepslate_emerald_ore": {
+      "texture": "deepslate_emerald_ore"
+    },
+    "composter": {
+      "texture": "composter"
+    },
+    "fletching_table": {
+      "texture": "fletching_table"
+    },
+    "loom": {
+      "texture": "loom"
+    },
+    "cauldron": {
+      "texture": "cauldron"
+    },
+    "blast_furnace": {
+      "texture": "blast_furnace"
+    },
+    "smithing_table": {
+      "texture": "smithing_table"
+    },
+    "grindstone": {
+      "texture": "grindstone"
+    },
+    "copper_ore": {
+      "texture": "copper_ore",
+      "future": true
+    },
+    "stone_bricks": {
+      "texture": "stone_bricks"
+    },
+    "mossy_stone_bricks": {
+      "texture": "mossy_stone_bricks"
+    },
+    "cracked_stone_bricks": {
+      "texture": "cracked_stone_bricks"
+    },
+    "chiseled_stone_bricks": {
+      "texture": "chiseled_stone_bricks"
+    },
+    "bricks": {
+      "texture": "bricks"
+    },
+    "polished_granite": {
+      "texture": "polished_granite"
+    },
+    "polished_basalt": {
+      "texture": "polished_basalt"
+    },
+    "polished_limestone": {
+      "texture": "polished_limestone"
+    },
+    "polished_tuff": {
+      "texture": "polished_tuff"
+    },
+    "deepslate_bricks": {
+      "texture": "deepslate_bricks"
+    },
+    "sandstone": {
+      "texture": "sandstone"
+    },
+    "cut_sandstone": {
+      "texture": "cut_sandstone"
+    },
+    "smooth_sandstone": {
+      "texture": "smooth_sandstone"
+    },
+    "red_wool": {
+      "texture": "red_wool"
+    },
+    "yellow_wool": {
+      "texture": "yellow_wool"
+    },
+    "blue_wool": {
+      "texture": "blue_wool"
+    },
+    "green_wool": {
+      "texture": "green_wool"
+    },
+    "black_wool": {
+      "texture": "black_wool"
+    },
+    "rooted_dirt": {
+      "texture": "rooted_dirt"
+    },
+    "leaf_litter_soil": {
+      "texture": "leaf_litter_soil"
+    },
+    "peat": {
+      "texture": "peat"
+    },
+    "silt": {
+      "texture": "silt"
+    },
+    "dry_grass_block": {
+      "texture": "dry_grass_block"
+    },
+    "permafrost": {
+      "texture": "permafrost"
+    },
+    "blue_ice": {
+      "texture": "blue_ice"
+    },
+    "shale": {
+      "texture": "shale"
+    },
+    "red_sandstone": {
+      "texture": "red_sandstone"
+    },
+    "ochre_terracotta": {
+      "texture": "ochre_terracotta"
+    },
+    "white_terracotta": {
+      "texture": "white_terracotta"
+    },
+    "volcanic_ash": {
+      "texture": "volcanic_ash"
+    },
+    "coral_rock": {
+      "texture": "coral_rock"
+    },
+    "fern": {
+      "texture": "fern"
+    },
+    "dead_bush": {
+      "texture": "dead_bush"
+    },
+    "dry_grass": {
+      "texture": "dry_grass"
+    },
+    "brown_mushroom": {
+      "texture": "brown_mushroom"
+    },
+    "red_mushroom": {
+      "texture": "red_mushroom"
+    },
+    "lavender": {
+      "texture": "lavender"
+    },
+    "bellflower": {
+      "texture": "bellflower"
+    },
+    "alpine_flower": {
+      "texture": "alpine_flower"
+    },
+    "tropical_flower": {
+      "texture": "tropical_flower"
+    },
+    "cattail": {
+      "texture": "cattail"
+    },
+    "beach_grass": {
+      "texture": "beach_grass"
+    },
+    "andesite": {
+      "texture": "andesite"
+    },
+    "diorite": {
+      "texture": "diorite"
+    },
+    "gneiss": {
+      "texture": "gneiss"
+    },
+    "marble": {
+      "texture": "marble"
+    },
+    "laterite": {
+      "texture": "laterite"
+    },
+    "red_clay": {
+      "texture": "red_clay"
+    },
+    "cracked_mud": {
+      "texture": "cracked_mud"
+    },
+    "salt_crust": {
+      "texture": "salt_crust"
+    },
+    "clover": {
+      "texture": "clover"
+    },
+    "heather": {
+      "texture": "heather"
+    },
+    "wild_mint": {
+      "texture": "wild_mint"
+    },
+    "nettle": {
+      "texture": "nettle"
+    },
+    "desert_flower": {
+      "texture": "desert_flower"
+    },
+    "small_cactus": {
+      "texture": "small_cactus"
+    },
+    "reed_flower": {
+      "texture": "reed_flower"
+    },
+    "tundra_moss": {
+      "texture": "tundra_moss"
+    },
+    "fallen_twigs": {
+      "texture": "fallen_twigs"
+    },
+    "jungle_fern": {
+      "texture": "jungle_fern"
+    },
+    "cave_moss": {
+      "texture": "cave_moss"
+    },
+    "wet_limestone": {
+      "texture": "wet_limestone"
+    },
+    "gypsum": {
+      "texture": "gypsum"
+    },
+    "amethyst_block": {
+      "texture": "amethyst_block"
+    },
+    "quartz_block": {
+      "texture": "quartz_block"
+    },
+    "iron_stained_rock": {
+      "texture": "iron_stained_rock"
+    },
+    "sulfur_rock": {
+      "texture": "sulfur_rock"
+    },
+    "amethyst_cluster": {
+      "texture": "amethyst_cluster"
+    },
+    "quartz_cluster": {
+      "texture": "quartz_cluster"
+    },
+    "cave_glowshroom": {
+      "texture": "cave_glowshroom"
+    },
+    "barrel": {
+      "texture": "barrel"
+    },
+    "lectern": {
+      "texture": "lectern"
+    },
+    "cartography_table": {
+      "texture": "cartography_table"
+    },
+    "brewing_stand": {
+      "texture": "brewing_stand"
+    },
+    "smoker": {
+      "texture": "smoker"
+    },
+    "stonecutter": {
+      "texture": "stonecutter"
+    },
+    "birch_planks": {
+      "texture": "birch_planks"
+    },
+    "spruce_planks": {
+      "texture": "spruce_planks"
+    },
+    "jungle_planks": {
+      "texture": "jungle_planks"
+    },
+    "acacia_planks": {
+      "texture": "acacia_planks"
+    },
+    "oak_door": {
+      "texture": "oak_door_bottom"
+    },
+    "oak_button": {
+      "texture": "oak_planks"
+    },
+    "birch_door": {
+      "texture": "birch_door_bottom"
+    },
+    "birch_button": {
+      "texture": "birch_planks"
+    },
+    "spruce_door": {
+      "texture": "spruce_door_bottom"
+    },
+    "spruce_button": {
+      "texture": "spruce_planks"
+    },
+    "jungle_door": {
+      "texture": "jungle_door_bottom"
+    },
+    "jungle_button": {
+      "texture": "jungle_planks"
+    },
+    "acacia_door": {
+      "texture": "acacia_door_bottom"
+    },
+    "acacia_button": {
+      "texture": "acacia_planks"
+    },
+    "iron_door": {
+      "texture": "iron_door_bottom"
+    },
+    "stone_button": {
+      "texture": "stone"
+    }
+  },
+  "imports": [
+    "plugins/official_heaven/textures/definitions/items.json"
+  ],
+  "entry_order": {
+    "items": [
+      "grass_block",
+      "dirt",
+      "stone",
+      "oak_log",
+      "oak_leaves",
+      "sand",
+      "bedrock",
+      "water",
+      "snow",
+      "oak_planks",
+      "deepslate",
+      "cactus",
+      "coal_ore",
+      "iron_ore",
+      "gold_ore",
+      "diamond_ore",
+      "lava",
+      "ice",
+      "gravel",
+      "clay",
+      "red_sand",
+      "terracotta",
+      "podzol",
+      "moss",
+      "tall_grass",
+      "poppy",
+      "reeds",
+      "birch_log",
+      "birch_leaves",
+      "spruce_log",
+      "spruce_leaves",
+      "jungle_log",
+      "jungle_leaves",
+      "acacia_log",
+      "acacia_leaves",
+      "cobblestone",
+      "crafting_table",
+      "furnace",
+      "chest",
+      "torch",
+      "white_wool",
+      "white_bed",
+      "farmland",
+      "oak_sapling",
+      "birch_sapling",
+      "spruce_sapling",
+      "jungle_sapling",
+      "acacia_sapling",
+      "glass",
+      "tnt",
+      "obsidian",
+      "dandelion",
+      "blue_orchid",
+      "allium",
+      "oxeye_daisy",
+      "sunflower",
+      "limestone",
+      "basalt",
+      "tuff",
+      "coarse_dirt",
+      "mud",
+      "packed_ice",
+      "black_sand",
+      "granite",
+      "aether_grass",
+      "aether_soil",
+      "cloudstone",
+      "sunstone",
+      "skyroot_log",
+      "skyroot_leaves",
+      "star_crystal",
+      "starflower",
+      "cloud_bloom",
+      "glowshroom",
+      "dripstone_block",
+      "pointed_dripstone",
+      "calcite",
+      "hanging_roots",
+      "glow_fern",
+      "resonant_crystal",
+      "sulfur_crust",
+      "oak_planks_slab",
+      "oak_planks_stairs",
+      "cobblestone_slab",
+      "cobblestone_stairs",
+      "terracotta_slab",
+      "terracotta_stairs",
+      "sunstone_slab",
+      "sunstone_stairs",
+      "cloudstone_slab",
+      "cloudstone_stairs",
+      "emerald_ore",
+      "deepslate_emerald_ore",
+      "composter",
+      "fletching_table",
+      "loom",
+      "cauldron",
+      "blast_furnace",
+      "smithing_table",
+      "grindstone",
+      "copper_ore",
+      "stone_bricks",
+      "mossy_stone_bricks",
+      "cracked_stone_bricks",
+      "chiseled_stone_bricks",
+      "bricks",
+      "polished_granite",
+      "polished_basalt",
+      "polished_limestone",
+      "polished_tuff",
+      "deepslate_bricks",
+      "sandstone",
+      "cut_sandstone",
+      "smooth_sandstone",
+      "red_wool",
+      "yellow_wool",
+      "blue_wool",
+      "green_wool",
+      "black_wool",
+      "rooted_dirt",
+      "leaf_litter_soil",
+      "peat",
+      "silt",
+      "dry_grass_block",
+      "permafrost",
+      "blue_ice",
+      "shale",
+      "red_sandstone",
+      "ochre_terracotta",
+      "white_terracotta",
+      "volcanic_ash",
+      "coral_rock",
+      "fern",
+      "dead_bush",
+      "dry_grass",
+      "brown_mushroom",
+      "red_mushroom",
+      "lavender",
+      "bellflower",
+      "alpine_flower",
+      "tropical_flower",
+      "cattail",
+      "beach_grass",
+      "andesite",
+      "diorite",
+      "gneiss",
+      "marble",
+      "laterite",
+      "red_clay",
+      "cracked_mud",
+      "salt_crust",
+      "clover",
+      "heather",
+      "wild_mint",
+      "nettle",
+      "desert_flower",
+      "small_cactus",
+      "reed_flower",
+      "tundra_moss",
+      "fallen_twigs",
+      "jungle_fern",
+      "cave_moss",
+      "wet_limestone",
+      "gypsum",
+      "amethyst_block",
+      "quartz_block",
+      "iron_stained_rock",
+      "sulfur_rock",
+      "amethyst_cluster",
+      "quartz_cluster",
+      "cave_glowshroom",
+      "moonstone",
+      "skystone",
+      "aether_moss",
+      "glimmer_silt",
+      "star_crystal_ore",
+      "skyroot_planks",
+      "cloudstone_bricks",
+      "sunstone_bricks",
+      "moonstone_bricks",
+      "star_crystal_lamp",
+      "sky_fern",
+      "dawn_bell",
+      "moonflower",
+      "glimmer_reed",
+      "cloudberry_bush",
+      "hanging_cloud_vine",
+      "barrel",
+      "lectern",
+      "cartography_table",
+      "brewing_stand",
+      "smoker",
+      "stonecutter",
+      "birch_planks",
+      "spruce_planks",
+      "jungle_planks",
+      "acacia_planks",
+      "oak_door",
+      "oak_button",
+      "birch_door",
+      "birch_button",
+      "spruce_door",
+      "spruce_button",
+      "jungle_door",
+      "jungle_button",
+      "acacia_door",
+      "acacia_button",
+      "skyroot_door",
+      "skyroot_button",
+      "iron_door",
+      "stone_button"
+    ]
   }
 }

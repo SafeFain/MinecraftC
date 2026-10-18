@@ -1,6 +1,7 @@
 #include "world/Chunk.h"
 #include <algorithm>
 #include <stdexcept>
+#include <bitset>
 
 Chunk::Chunk(int cx, int cz) : cx(cx), cz(cz) {
     // blocks already zero-initialized (AIR)
@@ -8,12 +9,24 @@ Chunk::Chunk(int cx, int cz) : cx(cx), cz(cz) {
         std::fill(std::begin(column), std::end(column), Config::WORLD_MIN_Y - 1);
 }
 
+void Chunk::publishGeneratedBlocks(const Chunk& source) {
+    std::unique_lock lock(m_dataMutex);
+    m_blocks=source.m_blocks;
+    ++m_blockRevision;++m_dataRevision;m_dirty=true;
+    for(int x=0;x<Config::CHUNK_SIZE_X;++x)
+        for(int z=0;z<Config::CHUNK_SIZE_Z;++z)recalcColumnMax(x,z);
+}
+
 void Chunk::loadRawBlocks(const std::vector<uint16_t>& blocks) {
     if (blocks.size() != m_blocks.size())
         throw std::runtime_error("Generated chunk cache has the wrong size");
-    for (const uint16_t block : blocks)
+    std::bitset<65536> checked;
+    for (const uint16_t block : blocks) {
+        if(checked.test(block))continue;
         if (!isValidBlockId(static_cast<BlockId>(block)))
             throw std::runtime_error("Generated chunk has an invalid block ID");
+        checked.set(block);
+    }
     std::unique_lock lock(m_dataMutex);
     std::copy(blocks.begin(), blocks.end(), m_blocks.begin());
     ++m_blockRevision;

@@ -12,6 +12,7 @@ layout(set=0,binding=0) uniform SkyUniforms {
     vec4 horizonColor;
     vec4 weather;
     vec4 options;
+    vec4 layers[12];
 } sky;
 
 float hash31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
@@ -65,13 +66,13 @@ vec3 starLayer(vec2 skyUv,float face,float density,float threshold,
 void main(){
     vec4 farPoint=sky.inverseViewProjection*vec4(vNdc,1.0,1.0);
     vec3 ray=normalize(farPoint.xyz/farPoint.w-sky.cameraPosition.xyz);
-    float heaven=sky.options.y>0.5?1.0:0.0;
+    uint skyFlags=uint(sky.options.y+0.5);
     float daylight=clamp(sky.zenithColor.a,0.0,1.0);
     float height=smoothstep(-0.08,0.72,ray.y);
     vec3 color=mix(sky.horizonColor.rgb,sky.zenithColor.rgb,height);
     float celestial=1.0-sky.weather.y;
     float enhanced=sky.options.w;
-    if(enhanced>0.001&&heaven<0.5){
+    if(enhanced>0.001&&(skyFlags&1u)==0u){
         float mu=dot(ray,normalize(sky.sunDirection.xyz));
         float rayleigh=0.75*(1.0+mu*mu);
         float g=0.76;
@@ -123,23 +124,23 @@ void main(){
     stars+=starLayer(starUv,starFace,96.0,0.966,1.0,sky.weather.w);
     stars+=starLayer(starUv,starFace,52.0,0.975,1.34,sky.weather.w)*1.18;
     color+=stars*clearNight*horizonFade*moonOcclusion;
-    if(heaven>0.5&&sky.options.x>0.5){
-        vec2 seaUv=ray.xz/max(abs(ray.y),0.12)*0.16+
-            vec2(sky.weather.w*0.0022,-sky.weather.w*0.0008);
-        float seaNoise=cloudNoise(seaUv)*0.64+cloudNoise(seaUv*2.18+23.0)*0.36;
-        float seaHorizon=1.0-smoothstep(-0.42,0.04,ray.y);
-        float seaBreakup=smoothstep(0.40,0.72,seaNoise);
-        vec3 seaColor=mix(vec3(0.70,0.86,0.96),vec3(0.94,0.90,0.74),daylight);
-        color=mix(color,seaColor,seaBreakup*seaHorizon*0.82);
+    if(sky.layers[0].w>0.0&&sky.options.x>0.5){
+        vec2 seaUv=ray.xz/max(abs(ray.y),sky.layers[5].x)*sky.layers[0].x+
+            vec2(sky.weather.w*sky.layers[0].y,sky.weather.w*sky.layers[0].z);
+        float seaNoise=cloudNoise(seaUv)*sky.layers[4].z+cloudNoise(seaUv*sky.layers[4].x+sky.layers[4].y)*sky.layers[4].w;
+        float seaHorizon=1.0-smoothstep(sky.layers[1].x,sky.layers[1].y,ray.y);
+        float seaBreakup=smoothstep(sky.layers[1].z,sky.layers[1].w,seaNoise);
+        vec3 seaColor=mix(sky.layers[3].rgb,sky.layers[2].rgb,daylight);
+        color=mix(color,seaColor,seaBreakup*seaHorizon*sky.layers[0].w);
     }
-    if(heaven>0.5&&clearNight>0.05&&sky.options.x>0.5&&sky.options.z>0.5){
-        vec2 auroraUv=ray.xz/max(ray.y+0.55,0.18)*0.75+
-            vec2(sky.weather.w*0.0012,-sky.weather.w*0.0004);
-        float curtain=cloudNoise(auroraUv*1.3)*0.62+
-            cloudNoise(auroraUv*2.7+11.0)*0.38;
-        curtain=smoothstep(0.58,0.82,curtain)*smoothstep(0.04,0.42,ray.y)*clearNight;
-        color+=mix(vec3(0.18,0.92,0.78),vec3(0.66,0.38,1.0),
-            0.5+0.5*sin(sky.weather.w*0.04))*curtain*0.18;
+    if(sky.layers[6].w>0.0&&clearNight>sky.layers[11].w&&sky.options.x>0.5&&sky.options.z>0.5){
+        vec2 auroraUv=ray.xz/max(ray.y+sky.layers[11].x,sky.layers[11].y)*sky.layers[6].x+
+            vec2(sky.weather.w*sky.layers[6].y,sky.weather.w*sky.layers[6].z);
+        float curtain=cloudNoise(auroraUv*sky.layers[10].x)*sky.layers[10].w+
+            cloudNoise(auroraUv*sky.layers[10].y+sky.layers[10].z)*(1.0-sky.layers[10].w);
+        curtain=smoothstep(sky.layers[7].x,sky.layers[7].y,curtain)*smoothstep(sky.layers[7].z,sky.layers[7].w,ray.y)*clearNight;
+        color+=mix(sky.layers[8].rgb,sky.layers[9].rgb,
+            0.5+0.5*sin(sky.weather.w*sky.layers[11].z))*curtain*sky.layers[6].w;
     }
     if(sky.options.x>0.5&&sky.options.z>0.5&&ray.y>0.04){
         vec2 cirrusUv=ray.xz/max(ray.y+0.20,0.10);
@@ -151,7 +152,7 @@ void main(){
             (1.0-sky.weather.y);
         color+=vec3(0.42,0.48,0.56)*wisps*0.16;
     }
-    if(sky.options.x>0.5&&ray.y>0.025&&heaven<0.5){
+    if(sky.options.x>0.5&&ray.y>0.025&&(skyFlags&2u)==0u){
         vec2 uv=ray.xz/max(ray.y,0.06)*0.42+
             vec2(sky.weather.w*0.012,sky.weather.w*0.004);
         float noise=cloudNoise(uv)*0.65+cloudNoise(uv*2.07+13.0)*0.35;

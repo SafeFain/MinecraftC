@@ -1,3 +1,4 @@
+#include "HeavenContentFixture.h"
 #include "core/Window.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
@@ -388,6 +389,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
 int main(int argc,char** argv) {
     if (argc != 2 && argc != 3) return 2;
     try {
+        installHeavenFixture();
         const auto assets = std::filesystem::absolute(argv[1]);
         const auto evidence=argc==3?std::filesystem::absolute(argv[2]):std::filesystem::path{};
         if(!evidence.empty())std::filesystem::create_directories(evidence);

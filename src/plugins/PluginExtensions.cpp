@@ -170,7 +170,11 @@ int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_Dimens
     if(!value.voidTarget.empty())reference(value.voidTarget);
     auto& entries=content().extensions.dimensions;
     for(const auto& entry:entries)require(entry.second.key!=value.key,"Duplicate dimension");
-    require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");id=2;while(entries.count(id))++id;require(id<Config::PLUGIN_MAX_DIMENSIONS,"Dimension handle limit");
+    require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");
+    const auto& provider=m_info.at(ctx.index).manifest;
+    if(provider.builtin&&provider.id=="official_heaven"&&value.key=="minecraftc:heaven")id=1;
+    else {id=2;while(entries.count(id))++id;}
+    require(id<Config::PLUGIN_MAX_DIMENSIONS&&!entries.count(id),"Dimension handle limit/duplicate reservation");
     entries.emplace(id,std::move(value));return 0;
 }
 int32_t PluginManager::dimensionDefinitionV2(MC_PluginContext& ctx,const MC_DimensionDefinitionV2& d,uint32_t& id) {
@@ -180,6 +184,50 @@ int32_t PluginManager::dimensionDefinitionV2(MC_PluginContext& ctx,const MC_Dime
     auto& value=content().extensions.dimensions.at(id);
     value.spawn=MC_SPAWN_SAMPLED;value.sampleSpawn=d.sample_spawn;value.spawnUserdata=d.userdata;
     return 0;
+}
+int32_t PluginManager::dimensionDefinitionV3(MC_PluginContext& ctx,const MC_DimensionDefinitionV3& d,uint32_t& id) {
+    require(d.size>=sizeof(d),"Dimension V3 descriptor size mismatch");
+    const auto name=text(d.name_key);const auto prefix=m_info.at(ctx.index).manifest.id+":";
+    require(validKey(name)&&name.rfind(prefix,0)==0,"Dimension name key must use own namespace");
+    if(d.base.sample_spawn)dimensionDefinitionV2(ctx,d.base,id);
+    else dimensionDefinition(ctx,d.base.base,id);
+    auto& value=content().extensions.dimensions.at(id);value.nameKey=name;value.seedDomain=d.seed_domain;
+    return 0;
+}
+void PluginManager::bedTravel(MC_PluginContext& ctx,const MC_DimensionTravelEntry& d) {
+    require(d.size>=sizeof(d)&&validDimension(d.source)&&validDimension(d.target)&&d.source!=d.target,"Invalid bed travel entry");
+    const auto key=text(d.key),name=text(d.name_key);owned(ctx,key);
+    const auto prefix=m_info.at(ctx.index).manifest.id+":";
+    require(validKey(name)&&name.rfind(prefix,0)==0,"Travel name key must use own namespace");
+    reference(ctx,dimensionContent(d.source).key);reference(ctx,dimensionContent(d.target).key);
+    require(content().extensions.bedTravel.size()<128&&content().extensions.bedTravel.emplace(key,DimensionTravelContent{d.source,d.target,key,name}).second,"Duplicate/too many travel entries");
+}
+void PluginManager::localizationBundle(MC_PluginContext& ctx,const char* directory) {
+    require(m_phase==MC_REGISTER&&!content().frozen,"Localization registration closed");
+    const auto& info=m_info.at(ctx.index);const auto root=containedPath(info.root,text(directory));
+    require(std::filesystem::is_directory(root),"Localization bundle must be a directory");
+    const auto prefix=info.manifest.id+":";bool english=false;size_t entries=0;
+    for(const auto& entry:std::filesystem::directory_iterator(root)) {
+        require(!entry.is_symlink(),"Language files cannot be symlinks");
+        if(!entry.is_regular_file()||entry.path().extension()!=".json")continue;
+        const auto language=entry.path().stem().string();
+        require(language.size()==5&&language[2]=='_'&&std::all_of(language.begin(),language.end(),[](char c){return (c>='a'&&c<='z')||c=='_';}),"Invalid language code");
+        require(std::filesystem::file_size(entry.path())<=1024*1024,"Language bundle file too large");
+        std::ifstream file(entry.path(),std::ios::binary);require(bool(file),"Cannot read language bundle");
+        const auto data=Json::parse(std::string(std::istreambuf_iterator<char>(file),{}));require(data.type==Json::Type::Object,"Language dictionary must be an object");
+        for(const auto& value:data.object) {
+            require(++entries<=65536&&validKey(value.first)&&value.first.rfind(prefix,0)==0,"Language key must use own namespace/entry limit");
+            require(value.second.type==Json::Type::String&&value.second.string.size()<=16384,"Invalid language value");
+            require(content().extensions.translations[language].emplace(value.first,value.second.string).second,"Duplicate language key");
+        }
+        english=english||language=="en_us";
+    }
+    require(english,"Localization bundle requires en_us.json");
+}
+void PluginManager::localizedName(MC_PluginContext& ctx,const char* contentKey,const char* nameKey) {
+    const auto key=text(contentKey),name=text(nameKey);owned(ctx,key);
+    require(validKey(name)&&name.rfind(m_info.at(ctx.index).manifest.id+":",0)==0,"Localized name must use own namespace");
+    reference(ctx,key);require(content().extensions.nameKeys.emplace(key,name).second,"Duplicate localized content name");
 }
 int32_t PluginManager::generator(MC_PluginContext& ctx,const MC_GeneratorDefinition& d) {
     require(d.size>=sizeof(d),"Generator descriptor size mismatch");owned(ctx,text(d.key));
@@ -203,6 +251,10 @@ int32_t PluginManager::generatorV2(MC_PluginContext& ctx,const MC_GeneratorDefin
     auto& g=content().extensions.generators.at(d.base.key);
     g.batch=d.batch;g.terrainLod=d.terrain_lod;g.decorationLod=d.decoration_lod;g.lodRevision=revision;
     return 0;
+}
+int32_t PluginManager::generatorV3(MC_PluginContext& ctx,const MC_GeneratorDefinitionV3& d) {
+    require(d.size>=sizeof(d)&&d.layers,"Invalid generator V3");
+    generatorV2(ctx,d.base);content().extensions.generators.at(d.base.base.key).layers=d.layers;return 0;
 }
 int32_t PluginManager::modifierV2(MC_PluginContext& ctx,const MC_ModifierDefinitionV2& d) {
     require(d.size>=sizeof(d),"Modifier V2 descriptor size mismatch");
@@ -278,11 +330,30 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(const auto* result=capability(name,version))return result;
     if(!name)return nullptr;
+    if(version==1&&std::string(name)==MC_LOCALIZATION_EXTENSION) {
+        static const MC_LocalizationV1 localization{sizeof(MC_LocalizationV1),1,
+            [](MC_PluginContext* c,const char* directory){return call(c,[&]{owner(c).localizationBundle(*c,directory);},true);},
+            [](MC_PluginContext* c,const char* key,const char* nameKey){return call(c,[&]{owner(c).localizedName(*c,key,nameKey);},true);}};
+        return &localization;
+    }
+    if(version==3&&std::string(name)==MC_DIMENSIONS_EXTENSION) {
+        static const MC_DimensionsV3 dimensions{sizeof(MC_DimensionsV3),3,
+            [](MC_PluginContext* c,const MC_DimensionDefinitionV3* d,uint32_t* id){return call(c,[&]{require(d&&id,"Missing dimension V3 arguments");owner(c).dimensionDefinitionV3(*c,*d,*id);},true);},
+            [](MC_PluginContext* c,const MC_DimensionTravelEntry* d){return call(c,[&]{require(d,"Missing travel entry");owner(c).bedTravel(*c,*d);},true);},
+            static_cast<const MC_DimensionsV2*>(extension(nullptr,MC_DIMENSIONS_EXTENSION,2))};
+        return &dimensions;
+    }
     if(version==2&&std::string(name)==MC_DIMENSIONS_EXTENSION) {
         static const MC_DimensionsV2 dimensions{sizeof(MC_DimensionsV2),2,
             [](MC_PluginContext* c,const MC_DimensionDefinitionV2* d,uint32_t* id){return call(c,[&]{require(d&&id,"Missing dimension V2 arguments");owner(c).dimensionDefinitionV2(*c,*d,*id);},true);},
             static_cast<const MC_DimensionsV1*>(extension(nullptr,MC_DIMENSIONS_EXTENSION,1))};
         return &dimensions;
+    }
+    if(version==3&&std::string(name)==MC_WORLDGEN_EXTENSION) {
+        static const MC_WorldgenV3 worldgen{sizeof(MC_WorldgenV3),3,
+            [](MC_PluginContext* c,const MC_GeneratorDefinitionV3* d){return call(c,[&]{require(d,"Missing generator V3");owner(c).generatorV3(*c,*d);},true);},
+            static_cast<const MC_WorldgenV2*>(extension(nullptr,MC_WORLDGEN_EXTENSION,2))};
+        return &worldgen;
     }
     if(version==2&&std::string(name)==MC_WORLDGEN_EXTENSION) {
         static const MC_WorldgenV2 worldgen{sizeof(MC_WorldgenV2),2,

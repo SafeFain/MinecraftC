@@ -21,7 +21,7 @@ inline bool validEnvironment(const MC_EnvironmentParameters& p){
 }
 inline RenderEnvironment applyEnvironment(RenderEnvironment e,uint32_t dim,bool& clouds){
     const auto found=content().extensions.environments.find(dim);if(found==content().extensions.environments.end())return e;
-    const auto& profile=found->second;auto p=environmentParameters(e,dim);const auto& base=profile.parameters;p.sky_style=base.sky_style;p.clouds=base.clouds;p.sun_size=base.sun_size;p.moon_size=base.moon_size;
+    const auto& profile=found->second;e.particleIntensity=profile.particleIntensity;e.skyFlags=profile.skyFlags;e.gradeStrength=profile.gradeStrength;e.gradeColor={profile.gradeColor[0],profile.gradeColor[1],profile.gradeColor[2]};for(size_t i=0;i<e.skyLayers.size();++i)for(int j=0;j<4;++j)e.skyLayers[i][j]=profile.skyLayers[i][size_t(j)];auto p=environmentParameters(e,dim);const auto& base=profile.parameters;p.sky_style=base.sky_style;p.clouds=base.clouds;p.sun_size=base.sun_size;p.moon_size=base.moon_size;
     if(profile.overrides&1)p.colors=base.colors;
     if(profile.overrides&2){p.day_phase=base.day_phase;p.daylight=base.daylight;p.star_intensity=base.star_intensity;std::copy(std::begin(base.sun_direction),std::end(base.sun_direction),p.sun_direction);std::copy(std::begin(base.moon_direction),std::end(base.moon_direction),p.moon_direction);std::copy(std::begin(base.light_direction),std::end(base.light_direction),p.light_direction);}
     if(profile.overrides&4){p.rain=base.rain;p.thunder=base.thunder;p.lightning=base.lightning;}

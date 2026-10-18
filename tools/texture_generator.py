@@ -146,13 +146,8 @@ DOOR_TEXTURES = tuple(w+"_door_"+h for w in DOOR_WOODS for h in ("bottom","top")
 NAMES += list(VARIANT_PLANKS) + list(DOOR_TEXTURES)
 
 def _read_definition(path):
-    try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise ValueError(f"cannot load definition {path}: {error}") from error
-    if not isinstance(data, dict):
-        raise ValueError(f"definition {path} must be an object")
-    return data
+    from asset_definitions import load_definition
+    return load_definition(path)
 
 
 DEFINITION_ROOT = Path(__file__).resolve().parents[1] / "assets/textures/definitions"
@@ -2706,6 +2701,9 @@ def main(argv=None):
             from texture_recipes import build_sequence_preview
             build_sequence_preview(sys.modules[__name__],args.output)
         if args.visual_report: build_visual_report(args.output,args.seed)
+        if args.output.resolve()==Path("assets/textures/generated").resolve() and (args.build_atlas or args.build_items_atlas or args.preview):
+            from plugin_asset_export import export_packages
+            export_packages(sys.modules[__name__],args.output,Path("assets/plugins"))
     except (OSError,ValueError) as error: print(error,file=sys.stderr); return 1
     return 0
 

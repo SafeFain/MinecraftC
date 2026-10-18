@@ -26,8 +26,12 @@ def require(condition, message):
         raise SystemExit(f"FAILED: {message}")
 
 
+def asset_path(filename):
+    return ROOT / ("assets/plugins/official_heaven/audio" if filename.startswith("heaven_") else "assets/audio") / filename
+
+
 for filename, (bpm, beats, digest) in EXPECTED.items():
-    path = ROOT / "assets" / "audio" / filename
+    path = asset_path(filename)
     require(path.is_file(), f"missing music asset {filename}")
     require(hashlib.sha256(path.read_bytes()).hexdigest() == digest,
             f"{filename} differs from its deterministic generated asset")
@@ -64,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix="minecraftc-audio-test-") as directory:
         generator.write_track(first, bpm, 1, sampler)
         generator.write_track(second, bpm, 1, sampler)
         require(first.read_bytes() == second.read_bytes(), f"{filename} regeneration is nondeterministic")
-        with wave.open(str(first), "rb") as generated, wave.open(str(ROOT / "assets/audio" / filename), "rb") as reference:
+        with wave.open(str(first), "rb") as generated, wave.open(str(asset_path(filename)), "rb") as reference:
             require(generated.readframes(generated.getnframes()) == reference.readframes(generated.getnframes()),
                     f"{filename} generator differs from checked-in PCM reference")
 print("music assets and regenerated PCM are deterministic, stereo, bounded, and loop-safe")

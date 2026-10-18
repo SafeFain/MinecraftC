@@ -19,7 +19,11 @@ void require(bool condition, const char* message) {
 }
 }
 
-int main() {
+#include "HeavenContentExport.h"
+int main(int argc,char** argv) {
+    if(argc==3&&std::string(argv[1])=="--export-heaven") {
+        installHeavenFixture();exportHeavenContent(argv[2]);return 0;
+    }
     installHeavenFixture();
     for(uint8_t material=0;material<7;++material) {
         const ItemId ingredient=material==6?ItemId::IRON_INGOT:plankItem(static_cast<DoorMaterial>(material));

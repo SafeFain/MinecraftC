@@ -64,9 +64,6 @@ VulkanFrameSync VulkanFrameSync::create(VkDevice device) {
         require(vkCreateSemaphore(device, &semaphoreInfo, nullptr,
                                   &result.imageAvailable[i]),
                 "vkCreateSemaphore");
-        require(vkCreateSemaphore(device, &semaphoreInfo, nullptr,
-                                  &result.renderFinished[i]),
-                "vkCreateSemaphore");
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -80,13 +77,10 @@ void VulkanFrameSync::destroy() {
     if (!m_device) return;
     for (size_t i = 0; i < FRAMES_IN_FLIGHT; ++i) {
         if (fences[i]) vkDestroyFence(m_device, fences[i], nullptr);
-        if (renderFinished[i])
-            vkDestroySemaphore(m_device, renderFinished[i], nullptr);
         if (imageAvailable[i])
             vkDestroySemaphore(m_device, imageAvailable[i], nullptr);
     }
     fences.fill(VK_NULL_HANDLE);
-    renderFinished.fill(VK_NULL_HANDLE);
     imageAvailable.fill(VK_NULL_HANDLE);
 }
 
@@ -94,11 +88,9 @@ VulkanFrameSync::~VulkanFrameSync() { destroy(); }
 
 VulkanFrameSync::VulkanFrameSync(VulkanFrameSync&& other) noexcept
     : fences(other.fences),
-      renderFinished(other.renderFinished),
       imageAvailable(other.imageAvailable),
       m_device(other.m_device) {
     other.fences.fill(VK_NULL_HANDLE);
-    other.renderFinished.fill(VK_NULL_HANDLE);
     other.imageAvailable.fill(VK_NULL_HANDLE);
     other.m_device = VK_NULL_HANDLE;
 }
@@ -107,11 +99,9 @@ VulkanFrameSync& VulkanFrameSync::operator=(VulkanFrameSync&& other) noexcept {
     if (this == &other) return *this;
     destroy();
     fences = other.fences;
-    renderFinished = other.renderFinished;
     imageAvailable = other.imageAvailable;
     m_device = other.m_device;
     other.fences.fill(VK_NULL_HANDLE);
-    other.renderFinished.fill(VK_NULL_HANDLE);
     other.imageAvailable.fill(VK_NULL_HANDLE);
     other.m_device = VK_NULL_HANDLE;
     return *this;
@@ -123,6 +113,7 @@ void VulkanShadowResources::attach(VkDevice device, VmaAllocator allocator) {
 }
 
 void VulkanShadowResources::destroyImage() {
+    imageInitialized = false;
     if (!m_device) return;
     if (shadowFramebuffer) vkDestroyFramebuffer(m_device, shadowFramebuffer, nullptr);
     shadowFramebuffer = VK_NULL_HANDLE;
@@ -709,6 +700,12 @@ VulkanSwapchainBundle VulkanSwapchainBundle::create(const CreateParams& params) 
                                      result.commandBuffers.data()),
             "vkAllocateCommandBuffers");
     result.imagesInFlight.assign(result.images.size(), VK_NULL_HANDLE);
+    result.renderFinished.assign(result.images.size(), VK_NULL_HANDLE);
+    VkSemaphoreCreateInfo presentSemaphore{};
+    presentSemaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (auto& semaphore : result.renderFinished)
+        require(vkCreateSemaphore(params.device, &presentSemaphore, nullptr, &semaphore),
+                "vkCreateSemaphore(present)");
 
     LOG_INFO("Vulkan swapchain: " << extent.width << "x" << extent.height
              << ", " << imageCount << " images, format "
@@ -923,6 +920,9 @@ void VulkanSwapchainBundle::destroy() {
     imageViews.clear();
     images.clear();
     imagesInFlight.clear();
+    for (auto semaphore : renderFinished)
+        if (semaphore) vkDestroySemaphore(m_device, semaphore, nullptr);
+    renderFinished.clear();
     if (handle) vkDestroySwapchainKHR(m_device, handle, nullptr);
     handle = VK_NULL_HANDLE;
 }
@@ -1025,6 +1025,7 @@ VulkanSwapchainBundle::VulkanSwapchainBundle(
       presentFramebuffers(std::move(other.presentFramebuffers)),
       commandBuffers(std::move(other.commandBuffers)),
       imagesInFlight(std::move(other.imagesInFlight)),
+      renderFinished(std::move(other.renderFinished)),
       m_device(other.m_device),
       m_allocator(other.m_allocator),
       m_commandPool(other.m_commandPool),
@@ -1136,6 +1137,7 @@ VulkanSwapchainBundle& VulkanSwapchainBundle::operator=(
     presentFramebuffers = std::move(other.presentFramebuffers);
     commandBuffers = std::move(other.commandBuffers);
     imagesInFlight = std::move(other.imagesInFlight);
+    renderFinished = std::move(other.renderFinished);
     m_device = other.m_device;
     m_allocator = other.m_allocator;
     m_commandPool = other.m_commandPool;

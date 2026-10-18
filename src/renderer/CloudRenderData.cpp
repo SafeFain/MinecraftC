@@ -78,7 +78,7 @@ std::vector<CloudInstance> buildCloudInstances(uint64_t worldSeed,
                                                CloudLayerStyle style) {
     if (radius < 1 || radius > MAX_CLOUD_RADIUS)
         throw std::invalid_argument("Cloud radius is outside the supported range");
-    if (style == CloudLayerStyle::Heaven) return {};
+    if (style == CloudLayerStyle::Suppressed) return {};
     const int diameter = radius * 2 + 1;
     std::vector<float> density(static_cast<size_t>(diameter * diameter));
     for (int z = 0; z < diameter; ++z) {
@@ -135,7 +135,7 @@ std::vector<CloudInstance> buildCloudLodInstances(uint64_t worldSeed,
     int centerX, int centerZ, int radius, CloudLayerStyle style) {
     if (radius < 1 || radius > MAX_CLOUD_RADIUS)
         throw std::invalid_argument("Cloud radius is outside the supported range");
-    if (style == CloudLayerStyle::Heaven) return {};
+    if (style == CloudLayerStyle::Suppressed) return {};
 
     struct Cell { int x, z, size; uint8_t layers; };
     std::vector<Cell> cells;

@@ -51,9 +51,9 @@ int main(){
         audio.setMusicMode(AudioMusicMode::Overworld);
         require(audio.musicMode()==AudioMusicMode::Overworld,
                 "overworld music mode can be selected");
-        audio.setMusicMode(AudioMusicMode::Heaven);
-        require(audio.musicMode()==AudioMusicMode::Heaven,
-                "Heaven music mode is separate from Overworld music");
+        audio.setMusicMode(AudioMusicMode::Overworld,42);
+        require(audio.musicMode()==AudioMusicMode::Overworld&&audio.musicDimension()==42,
+                "registered dimension music selection retains the explicit target");
         audio.setVolumes(.75f,.5f,.25f,1.5f);
         require(audio.masterVolume()==.75f&&audio.musicVolume()==.5f&&
                 audio.weatherVolume()==.25f&&audio.soundEffectsVolume()==1.0f,

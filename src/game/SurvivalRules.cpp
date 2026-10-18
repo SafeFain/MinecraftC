@@ -55,36 +55,21 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::ICE, 0.5f, ToolKind::Pickaxe);
     set(BlockId::GRAVEL, 0.6f, ToolKind::Shovel);
-    for (BlockId id : {BlockId::CLAY, BlockId::RED_SAND, BlockId::FARMLAND,
-                       BlockId::FARMLAND_1, BlockId::FARMLAND_2,
-                       BlockId::FARMLAND_3, BlockId::FARMLAND_4,
-                       BlockId::FARMLAND_5, BlockId::FARMLAND_6,
-                       BlockId::FARMLAND_7})
+    for(BlockId id : {BlockId::CLAY, BlockId::RED_SAND, BlockId::FARMLAND, BlockId::FARMLAND_1, BlockId::FARMLAND_2, BlockId::FARMLAND_3, BlockId::FARMLAND_4, BlockId::FARMLAND_5, BlockId::FARMLAND_6, BlockId::FARMLAND_7})
         set(id, 0.6f, ToolKind::Shovel);
-    for (BlockId id : {BlockId::TERRACOTTA, BlockId::COBBLESTONE,
-                       BlockId::FURNACE})
+    for(BlockId id : {BlockId::TERRACOTTA, BlockId::COBBLESTONE, BlockId::FURNACE})
         set(id, 2.0f, ToolKind::Pickaxe, ToolTier::Wood);
-    for (BlockId id : {BlockId::PODZOL, BlockId::MOSS}) set(id, 0.6f, ToolKind::Shovel);
-    for (BlockId id : {BlockId::TALL_GRASS, BlockId::FLOWER, BlockId::REEDS,
-                       BlockId::TORCH, BlockId::WHEAT_0, BlockId::WHEAT_1,
-                       BlockId::WHEAT_2, BlockId::WHEAT_3, BlockId::WHEAT_4,
-                       BlockId::WHEAT_5, BlockId::WHEAT_6, BlockId::WHEAT_7})
+    for(BlockId id : {BlockId::PODZOL, BlockId::MOSS})
+        set(id, 0.6f, ToolKind::Shovel);
+    for(BlockId id : {BlockId::TALL_GRASS, BlockId::FLOWER, BlockId::REEDS, BlockId::TORCH, BlockId::WHEAT_0, BlockId::WHEAT_1, BlockId::WHEAT_2, BlockId::WHEAT_3, BlockId::WHEAT_4, BlockId::WHEAT_5, BlockId::WHEAT_6, BlockId::WHEAT_7})
         set(id, 0.0f);
-    for (BlockId id : {BlockId::OAK_SAPLING, BlockId::BIRCH_SAPLING,
-                       BlockId::SPRUCE_SAPLING, BlockId::JUNGLE_SAPLING,
-                       BlockId::ACACIA_SAPLING})
+    for(BlockId id : {BlockId::OAK_SAPLING, BlockId::BIRCH_SAPLING, BlockId::SPRUCE_SAPLING, BlockId::JUNGLE_SAPLING, BlockId::ACACIA_SAPLING})
         set(id, 0.0f);
-    for (BlockId id : {BlockId::BIRCH_WOOD, BlockId::SPRUCE_WOOD,
-                       BlockId::JUNGLE_WOOD, BlockId::ACACIA_WOOD,
-                       BlockId::CRAFTING_TABLE, BlockId::CHEST,
-                       BlockId::COMPOSTER, BlockId::FLETCHING_TABLE,
-                       BlockId::LOOM})
+    for(BlockId id : {BlockId::BIRCH_WOOD, BlockId::SPRUCE_WOOD, BlockId::JUNGLE_WOOD, BlockId::ACACIA_WOOD, BlockId::CRAFTING_TABLE, BlockId::CHEST, BlockId::COMPOSTER, BlockId::FLETCHING_TABLE, BlockId::LOOM})
         set(id, 2.0f, ToolKind::Axe);
-    for (BlockId id : {BlockId::CAULDRON, BlockId::BLAST_FURNACE,
-                       BlockId::SMITHING_TABLE, BlockId::GRINDSTONE, BlockId::BARREL, BlockId::LECTERN, BlockId::CARTOGRAPHY_TABLE, BlockId::BREWING_STAND, BlockId::SMOKER, BlockId::STONECUTTER})
+    for(BlockId id : {BlockId::CAULDRON, BlockId::BLAST_FURNACE, BlockId::SMITHING_TABLE, BlockId::GRINDSTONE, BlockId::BARREL, BlockId::LECTERN, BlockId::CARTOGRAPHY_TABLE, BlockId::BREWING_STAND, BlockId::SMOKER, BlockId::STONECUTTER})
         set(id, 3.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    for (BlockId id : {BlockId::BIRCH_LEAVES, BlockId::SPRUCE_LEAVES,
-                       BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
+    for(BlockId id : {BlockId::BIRCH_LEAVES, BlockId::SPRUCE_LEAVES, BlockId::JUNGLE_LEAVES, BlockId::ACACIA_LEAVES})
         set(id, 0.2f);
     set(BlockId::WHITE_WOOL, 0.8f);
     set(BlockId::STONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
@@ -168,65 +153,62 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::GLASS, 0.3f);
     set(BlockId::TNT, 0.0f);
     set(BlockId::OBSIDIAN, 50.0f, ToolKind::Pickaxe, ToolTier::Diamond);
-    for (BlockId id : {BlockId::DANDELION, BlockId::BLUE_ORCHID, BlockId::ALLIUM,
-                       BlockId::OXEYE_DAISY, BlockId::SUNFLOWER_BOTTOM,
-                       BlockId::SUNFLOWER_TOP}) set(id, 0.0f);
+    for(BlockId id : {BlockId::DANDELION, BlockId::BLUE_ORCHID, BlockId::ALLIUM, BlockId::OXEYE_DAISY, BlockId::SUNFLOWER_BOTTOM, BlockId::SUNFLOWER_TOP})
+        set(id, 0.0f);
     for (uint16_t raw = static_cast<uint16_t>(BlockId::FLOWING_WATER_1);
          raw <= static_cast<uint16_t>(BlockId::FLOWING_LAVA_7); ++raw)
         set(static_cast<BlockId>(raw), -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::FALLING_WATER, -1.0f, ToolKind::None, ToolTier::None, true);
     set(BlockId::FALLING_LAVA, -1.0f, ToolKind::None, ToolTier::None, true);
-    for (BlockId id : {BlockId::LIMESTONE, BlockId::BASALT, BlockId::TUFF,
-                       BlockId::PACKED_ICE, BlockId::GRANITE})
+    for(BlockId id : {BlockId::LIMESTONE, BlockId::BASALT, BlockId::TUFF, BlockId::PACKED_ICE, BlockId::GRANITE})
         set(id, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    for (BlockId id : {BlockId::COARSE_DIRT, BlockId::MUD, BlockId::BLACK_SAND})
+    for(BlockId id : {BlockId::COARSE_DIRT, BlockId::MUD, BlockId::BLACK_SAND})
         set(id, 0.6f, ToolKind::Shovel);
-    set(BlockId::AETHER_GRASS, 0.6f, ToolKind::Shovel);
-    set(BlockId::AETHER_SOIL, 0.5f, ToolKind::Shovel);
-    set(BlockId::CLOUDSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SUNSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SKYROOT_WOOD, 2.0f, ToolKind::Axe);
-    set(BlockId::SKYROOT_LEAVES, 0.2f);
-    set(BlockId::STAR_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::STARFLOWER, 0.0f);
-    set(BlockId::CLOUD_BLOOM, 0.0f);
-    set(BlockId::GLOWSHROOM, 0.0f);
-    for (BlockId id : {BlockId::DRIPSTONE_BLOCK, BlockId::CALCITE,
-                       BlockId::SULFUR_CRUST})
+
+
+
+
+
+
+
+
+
+
+    for(BlockId id : {BlockId::DRIPSTONE_BLOCK, BlockId::CALCITE, BlockId::SULFUR_CRUST})
         set(id, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
     set(BlockId::POINTED_DRIPSTONE_UP, 0.8f, ToolKind::Pickaxe,
         ToolTier::Wood);
     set(BlockId::POINTED_DRIPSTONE_DOWN, 0.8f, ToolKind::Pickaxe,
         ToolTier::Wood);
-    for (BlockId id : {BlockId::HANGING_ROOTS, BlockId::GLOW_FERN})
+    for(BlockId id : {BlockId::HANGING_ROOTS, BlockId::GLOW_FERN})
         set(id, 0.0f);
     set(BlockId::RESONANT_CRYSTAL, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
     for (uint16_t raw=static_cast<uint16_t>(BlockId::PLANKS_SLAB_BOTTOM);
          raw<static_cast<uint16_t>(BlockId::COUNT);++raw) {
         const BlockId id=static_cast<BlockId>(raw);
         ArchitecturalBlockState state;
-        if(!decodeArchitecturalBlock(id,state))continue;
+        if(!decodeArchitecturalBlock(id,state)||Plugins::heavenBlockSlot(id))continue;
         if(state.material==ArchitecturalMaterial::Planks)
             set(id,2.0f,ToolKind::Axe);
         else
             set(id,1.5f,ToolKind::Pickaxe,ToolTier::Wood);
     }
-    set(BlockId::MOONSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SKYSTONE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::AETHER_MOSS, 0.6f, ToolKind::Shovel);
-    set(BlockId::GLIMMER_SILT, 0.6f, ToolKind::Shovel);
-    set(BlockId::STAR_CRYSTAL_ORE, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SKYROOT_PLANKS, 2.0f, ToolKind::Axe);
-    set(BlockId::CLOUDSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SUNSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::MOONSTONE_BRICKS, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::STAR_CRYSTAL_LAMP, 1.5f, ToolKind::Pickaxe, ToolTier::Wood);
-    set(BlockId::SKY_FERN, 0.0f);
-    set(BlockId::DAWN_BELL, 0.0f);
-    set(BlockId::MOONFLOWER, 0.0f);
-    set(BlockId::GLIMMER_REED, 0.0f);
-    set(BlockId::CLOUDBERRY_BUSH, 0.0f);
-    set(BlockId::HANGING_CLOUD_VINE, 0.0f);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     return values;
 }
 
@@ -289,8 +271,7 @@ std::vector<CraftingRecipe> buildRecipes() {
                        log==ItemId::BIRCH_LOG?DoorMaterial::Birch:
                        log==ItemId::SPRUCE_LOG?DoorMaterial::Spruce:
                        log==ItemId::JUNGLE_LOG?DoorMaterial::Jungle:DoorMaterial::Acacia),4,0},false));
-    recipes.push_back(shaped(1, 1, {ItemId::SKYROOT_LOG},
-                             {ItemId::SKYROOT_PLANKS, 4, 0}, false));
+    recipes.emplace_back(); // reserved legacy recipe slot
     recipes.push_back(shaped(1, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS},
                              {ItemId::STICK, 4, 0}, false));
     recipes.push_back(shaped(2, 2, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS,
@@ -331,11 +312,7 @@ std::vector<CraftingRecipe> buildRecipes() {
                              {ItemId::SHIELD, 1, 0}, false));
     recipes.push_back(shaped(2, 1, {ItemId::FLINT, ItemId::IRON_INGOT},
                              {ItemId::FLINT_AND_STEEL, 1, 0}));
-    recipes.push_back(shaped(3, 3, {
-        E, ItemId::STAR_CRYSTAL, E,
-        ItemId::STAR_CRYSTAL, ItemId::SUNSTONE, ItemId::STAR_CRYSTAL,
-        E, ItemId::CLOUDSTONE, E},
-        {ItemId::STARSTEP_SCEPTER, 1, 0}, false));
+    recipes.emplace_back(); // reserved legacy recipe slot
     recipes.push_back(shaped(2, 2, {
         ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE,
         ItemId::POINTED_DRIPSTONE, ItemId::POINTED_DRIPSTONE},
@@ -394,16 +371,13 @@ std::vector<CraftingRecipe> buildRecipes() {
     recipes.push_back(shaped(3,2,{E,ItemId::IRON_INGOT,E,ItemId::STONE,
         ItemId::STONE,ItemId::STONE},{ItemId::STONECUTTER,1,0},false));
 
-    const std::array<std::tuple<ItemId, ItemId, ItemId>, 5> architecture{{
+    const std::array<std::tuple<ItemId, ItemId, ItemId>, 3> architecture{{
         {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS_SLAB,
          ItemId::OAK_PLANKS_STAIRS},
         {ItemId::COBBLESTONE, ItemId::COBBLESTONE_SLAB,
          ItemId::COBBLESTONE_STAIRS},
         {ItemId::TERRACOTTA, ItemId::TERRACOTTA_SLAB,
          ItemId::TERRACOTTA_STAIRS},
-        {ItemId::SUNSTONE, ItemId::SUNSTONE_SLAB, ItemId::SUNSTONE_STAIRS},
-        {ItemId::CLOUDSTONE, ItemId::CLOUDSTONE_SLAB,
-         ItemId::CLOUDSTONE_STAIRS},
     }};
     for (const auto& [material, slab, stairs] : architecture) {
         recipes.push_back(shaped(3, 1, {material, material, material},
@@ -413,6 +387,7 @@ std::vector<CraftingRecipe> buildRecipes() {
                                         material, material, material},
                                  {stairs, 4, 0}, true));
     }
+    recipes.resize(recipes.size()+4); // reserved legacy architecture recipe slots
     addToolSet(recipes, ItemId::OAK_PLANKS, ItemId::WOODEN_PICKAXE);
     addToolSet(recipes, ItemId::COBBLESTONE, ItemId::STONE_PICKAXE);
     addToolSet(recipes, ItemId::IRON_INGOT, ItemId::IRON_PICKAXE);
@@ -464,17 +439,15 @@ std::vector<CraftingRecipe> buildRecipes() {
         recipes.push_back(shaped(2, 1, {color.second, ItemId::BONE_MEAL},
             {ItemId::WHITE_WOOL, 1, 0}));
     }
-    recipes.push_back(shaped(2, 2, {ItemId::CLOUDSTONE, ItemId::CLOUDSTONE, ItemId::CLOUDSTONE, ItemId::CLOUDSTONE}, {ItemId::CLOUDSTONE_BRICKS, 4, 0}, false));
-    recipes.push_back(shaped(2, 2, {ItemId::SUNSTONE, ItemId::SUNSTONE, ItemId::SUNSTONE, ItemId::SUNSTONE}, {ItemId::SUNSTONE_BRICKS, 4, 0}, false));
-    recipes.push_back(shaped(2, 2, {ItemId::MOONSTONE, ItemId::MOONSTONE, ItemId::MOONSTONE, ItemId::MOONSTONE}, {ItemId::MOONSTONE_BRICKS, 4, 0}, false));
-    recipes.push_back(shaped(2, 2, {ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD, ItemId::STAR_CRYSTAL_SHARD}, {ItemId::STAR_CRYSTAL, 1, 0}, false));
-    recipes.push_back(shaped(1, 1, {ItemId::STAR_CRYSTAL}, {ItemId::STAR_CRYSTAL_SHARD, 4, 0}, false));
-    recipes.push_back(shaped(3, 3, {E, ItemId::CLOUDSTONE_BRICKS, E,
-        ItemId::CLOUDSTONE_BRICKS, ItemId::STAR_CRYSTAL, ItemId::CLOUDSTONE_BRICKS,
-        E, ItemId::CLOUDSTONE_BRICKS, E}, {ItemId::STAR_CRYSTAL_LAMP, 1, 0}, false));
-    recipes.push_back(shaped(3, 1, {ItemId::CLOUDBERRY, ItemId::BREAD, ItemId::CLOUDBERRY},
-        {ItemId::CLOUDBERRY_BREAD, 1, 0}, false));
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
+    recipes.emplace_back(); // reserved legacy recipe slot
     for(uint8_t i=0;i<7;++i) {
+        if(i==5){recipes.resize(recipes.size()+2);continue;}
         const ItemId ingredient=i==6?ItemId::IRON_INGOT:plankItem(static_cast<DoorMaterial>(i));
         auto door=shaped(2,3,{ingredient,ingredient,ingredient,ingredient,ingredient,ingredient},
             {static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+i),3,0});
@@ -563,8 +536,8 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
 const std::array<SmeltingRecipe, 19> SMELTING = {{
-    {ItemId::CLOUDBERRY, {ItemId::ROASTED_CLOUDBERRY, 1, 0}, 200},
-    {ItemId::GLOWSHROOM, {ItemId::ROASTED_GLOWSHROOM, 1, 0}, 200},
+    {},
+    {},
     {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
     {ItemId::STONE_BRICKS, {ItemId::CRACKED_STONE_BRICKS, 1, 0}, 200},
     {ItemId::SANDSTONE, {ItemId::SMOOTH_SANDSTONE, 1, 0}, 200},
@@ -699,11 +672,13 @@ const std::vector<CraftingRecipe>& craftingRecipes() {
         for (size_t i=0; i<RECIPES.size(); ++i) {
             const auto key="minecraftc:crafting_"+std::to_string(i);
             const auto& removed=Plugins::content().removeCrafting;
-            const auto& recipe=RECIPES[i];bool available=Plugins::availableItem(recipe.output.id);
+            const auto& recipe=RECIPES[i];bool available=recipe.output.id!=ItemId::EMPTY&&Plugins::availableItem(recipe.output.id);
             for(const auto id:recipe.ingredients)available=available&&Plugins::availableItem(id);
-            if (available&&std::find(removed.begin(),removed.end(),key)==removed.end()) merged.push_back(recipe);
+            bool supplied=false;for(const auto& provider:Plugins::content().crafting)if(provider.second.sortOrder==i){supplied=true;break;}
+            if (available&&!supplied&&std::find(removed.begin(),removed.end(),key)==removed.end()) {auto ordered=recipe;ordered.sortOrder=uint32_t(i);merged.push_back(ordered);}
         }
         for (const auto& entry:Plugins::content().crafting) merged.push_back(entry.second);
+        std::stable_sort(merged.begin(),merged.end(),[](const auto& a,const auto& b){return a.sortOrder<b.sortOrder;});
         revision=Plugins::content().revision;
     }
     return merged;
@@ -761,7 +736,7 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
     for (size_t i=0;i<SMELTING.size();++i) {
         const auto key="minecraftc:smelting_"+std::to_string(i);
         const auto& removed=Plugins::content().removeSmelting;
-        if (Plugins::availableItem(input)&&Plugins::availableItem(SMELTING[i].output.id)&&SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
+        if (SMELTING[i].output.id!=ItemId::EMPTY&&Plugins::availableItem(input)&&Plugins::availableItem(SMELTING[i].output.id)&&SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
     }
     return nullptr;
 }

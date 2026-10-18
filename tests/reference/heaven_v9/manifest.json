@@ -1,0 +1,65 @@
+{
+  "commit": "988fbd4fbacfaadeb8d8c07449566244e5c42f78",
+  "files": {
+    "src/world/WorldGenerator.h": {
+      "snapshot": "src__world__WorldGenerator.h.ref",
+      "sha256": "5b43aae28a5669e75e53e1336788c5d0df23e91c8ca28f1d16bde7e3e1fc4af5"
+    },
+    "src/world/WorldGenerator.cpp": {
+      "snapshot": "src__world__WorldGenerator.cpp.ref",
+      "sha256": "d7b36c3bb83e7ba29b5a9929b25d0c9aaf8fc13855863d164ea42bb1da689020"
+    },
+    "src/world/LodTerrainSystem.cpp": {
+      "snapshot": "src__world__LodTerrainSystem.cpp.ref",
+      "sha256": "f1cc983eb198df156cefe7077a167718473c9be6376ecd61a3905c2898d56bcb"
+    },
+    "src/world/StructureGenerator.cpp": {
+      "snapshot": "src__world__StructureGenerator.cpp.ref",
+      "sha256": "33cc10b6909d1b7e473f12fa70f8af28b9d9092a8ba79d151153da1c72ad777e"
+    },
+    "src/world/WorldPersistence.cpp": {
+      "snapshot": "src__world__WorldPersistence.cpp.ref",
+      "sha256": "4a46b6da12e02c985d7251e628ec1fa72e27201b9a64648fad248eebd6f09e8c"
+    },
+    "src/renderer/ParticleSystem.cpp": {
+      "snapshot": "src__renderer__ParticleSystem.cpp.ref",
+      "sha256": "8169d7e4eee4d0be10c07b84039cf6717d737cabe980d62bc053d6919aa9de20"
+    },
+    "src/renderer/RenderEnvironment.h": {
+      "snapshot": "src__renderer__RenderEnvironment.h.ref",
+      "sha256": "c9b83618b1d2ecf301dfb52669268d787ac3a672295197e2c0319914ba26fd49"
+    },
+    "assets/shaders/vulkan/sky.frag": {
+      "snapshot": "assets__shaders__vulkan__sky.frag.ref",
+      "sha256": "d83e08402e929b63072df8d2b0a96be4a8085ee35c5b961951c46f54edfa0d5c"
+    },
+    "assets/shaders/vulkan/weather.frag": {
+      "snapshot": "assets__shaders__vulkan__weather.frag.ref",
+      "sha256": "398308c4dc0a1dc59d6718c22274728d9ece76d7187c783a03843dd1419bfa2f"
+    },
+    "src/renderer/ParticleSystem.h": {
+      "snapshot": "src__renderer__ParticleSystem.h.ref",
+      "sha256": "3666cd700328df36b33563451eacda650e5724447dc6189f56470ca00a8d0ed4"
+    },
+    "assets/shaders/vulkan/post.frag": {
+      "snapshot": "assets__shaders__vulkan__post.frag.ref",
+      "sha256": "35015d11816e5d3ea6816a5382e46412ef1a5cb7b072a4aa4efcecdc548dc424"
+    },
+    "assets/shaders/vulkan/screen_effect_common.glsl": {
+      "snapshot": "assets__shaders__vulkan__screen_effect_common.glsl.ref",
+      "sha256": "3763595d7233e485c2ef7da1db8b0b4f36ed8c5266980b82fd9d789ce4d76dc4"
+    },
+    "src/plugins/HeavenSkywayPolicy.h": {
+      "snapshot": "src__plugins__HeavenSkywayPolicy.h.ref",
+      "sha256": "5581acc143d59781b8983a65f541dc82bb35503116e852d614385782041597ba"
+    },
+    "src/plugins/OfficialHeavenContent.h": {
+      "snapshot": "src__plugins__OfficialHeavenContent.h.ref",
+      "sha256": "1646fa147c0a9b683687f47a3c17756249576b6ac8320051d977ef2368d47166"
+    },
+    "src/world/BiomeBlockLogic.h": {
+      "snapshot": "src__world__BiomeBlockLogic.h.ref",
+      "sha256": "783d5372036de8a7e8214e316c8cbc8289f329b4dd28896789269e55657c907b"
+    }
+  }
+}

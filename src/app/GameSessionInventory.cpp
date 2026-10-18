@@ -193,8 +193,11 @@ void GameSession::applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction&
     } else if (action.kind == Lan::ActionKind::SleepChoice) {
         if ((guest.sleep != 1 && guest.sleep != 2) || action.inventory.argument > 2) return;
         const auto choice = static_cast<SleepAction>(action.inventory.argument);
-        if (choice == SleepAction::TravelToHeaven && guest.profile.dimension == DimensionId::Overworld)
-            travelLanPlayer(guest, DimensionId::Heaven);
+        if (choice == SleepAction::BedTravel) {
+            const auto entry=Plugins::content().extensions.bedTravel.find(action.command);
+            if(entry==Plugins::content().extensions.bedTravel.end()||entry->second.source!=static_cast<uint32_t>(guest.profile.dimension)||!Plugins::validDimension(entry->second.target))return;
+            travelLanPlayer(guest,static_cast<DimensionId>(entry->second.target));
+        }
         else if (choice == SleepAction::SleepUntilMorning) {
             guest.wantsMorning = true;
             (void)trySkipLanNight(guest.profile.dimension);

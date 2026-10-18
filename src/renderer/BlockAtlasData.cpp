@@ -66,12 +66,18 @@ void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
     // One texel cannot represent both foliage and air. Keep the averaged
     // terminal mip for distant canopies and the opaque-leaf fallback shader.
     if (size == 1) return;
-    constexpr std::array<BlockTexture, 6> leaves{{
-        BlockTexture::Leaves, BlockTexture::BirchLeaves,
-        BlockTexture::SpruceLeaves, BlockTexture::JungleLeaves,
-        BlockTexture::AcaciaLeaves, BlockTexture::SkyrootLeaves}};
-    for (BlockTexture texture : leaves) {
-        const auto& sequence = sequences.at(getAtlasTextureIndex(texture));
+    std::vector<uint32_t> leaves;
+    for (auto texture : {BlockTexture::Leaves, BlockTexture::BirchLeaves,
+            BlockTexture::SpruceLeaves, BlockTexture::JungleLeaves, BlockTexture::AcaciaLeaves})
+        leaves.push_back(getAtlasTextureIndex(texture));
+    for (const auto& entry : Plugins::content().extensions.blockBehaviors)
+        if (entry.second.tags & MC_TAG_LEAVES)
+            for (int face = 0; face < 6; ++face)
+                leaves.push_back(getFaceTextureIndex(static_cast<BlockId>(entry.first), static_cast<FaceDir>(face)));
+    std::sort(leaves.begin(), leaves.end());
+    leaves.erase(std::unique(leaves.begin(), leaves.end()), leaves.end());
+    for (uint32_t slotIndex : leaves) {
+        const auto& sequence = sequences.at(slotIndex);
         for (uint32_t sample = 0; sample < sequence.variants * sequence.frames; ++sample) {
         const uint32_t slot = sequence.slots[sample];
         const uint32_t tx = slot % tiles, ty = slot / tiles;
@@ -168,13 +174,17 @@ uint8_t roughnessForTexture(BlockTexture texture) {
         case BlockTexture::BirchLeaves:
         case BlockTexture::SpruceLeaves:
         case BlockTexture::JungleLeaves:
-        case BlockTexture::AcaciaLeaves:
-        case BlockTexture::SkyrootLeaves: return 232;
+        case BlockTexture::AcaciaLeaves: return 232;
         default: return 202;
     }
 }
 
 uint8_t materialRoughness(size_t slot) {
+    for (const auto& entry : Plugins::content().extensions.blockBehaviors)
+        if (entry.second.tags & MC_TAG_LEAVES)
+            for (int face = 0; face < 6; ++face)
+                if (getFaceTextureIndex(static_cast<BlockId>(entry.first), static_cast<FaceDir>(face)) == slot)
+                    return 232;
     for (size_t index = 0; index < static_cast<size_t>(BlockTexture::Count);
          ++index) {
         const auto texture = static_cast<BlockTexture>(index);
@@ -413,15 +423,26 @@ void appendPluginMaterials(BlockAtlasData& atlas) {
     for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)
         indices[getBlockTextureAssetName(static_cast<BlockTexture>(i))]=getAtlasTextureIndex(static_cast<BlockTexture>(i));
     uint32_t next=oldCapacity;
+    std::map<std::string,uint32_t> replacementTail;
     for(auto& entry:registry.materials) {
         auto found=indices.find(entry.first);
         if(found!=indices.end()) {
             if(!entry.second.replace)throw std::runtime_error("Material requires explicit replacement");
             entry.second.tile=found->second;
+            const auto& sequence=atlas.sequences.at(found->second);
+            const auto& material=entry.second;
+            if(!material.images.empty()&&(sequence.variants!=material.variants||sequence.frames!=material.frames)) {
+                // A legacy/derived host cache does not define a provider's layout.
+                // Preserve the logical foundation slot and append its extra frames.
+                replacementTail.emplace(entry.first,next);
+                next+=material.variants*material.frames-1;
+                if(next>=65535)throw std::runtime_error("Plugin sequence capacity exceeded");
+            }
         } else {
             if(entry.second.replace)throw std::runtime_error("Unknown replacement material: "+entry.first);
             if(next>=65535)throw std::runtime_error("Plugin atlas capacity exceeded");
-            entry.second.tile=static_cast<uint16_t>(next++);
+            entry.second.tile=static_cast<uint16_t>(next);next+=entry.second.images.empty()?1:entry.second.variants*entry.second.frames;
+            if(next>=65535)throw std::runtime_error("Plugin sequence capacity exceeded");
             indices[entry.first]=entry.second.tile;
         }
     }
@@ -440,11 +461,22 @@ void appendPluginMaterials(BlockAtlasData& atlas) {
     repack(atlas.texture,{255,255,255,0});repack(atlas.normalTexture,{128,128,255,255});repack(atlas.propertyTexture,{255,0,0,255});
     atlas.tilesPerSide=side;atlas.sequences.resize(size_t(side)*side);
     for(uint32_t i=oldCapacity;i<side*side;++i)atlas.sequences[i].slots.fill(i);
+    for(const auto& entry:registry.materials)if(!entry.second.images.empty()) {
+        const auto& m=entry.second;auto& sequence=atlas.sequences.at(m.tile);
+        if(m.replace) {
+            if(const auto tail=replacementTail.find(entry.first);tail!=replacementTail.end()) {
+                sequence.slots.fill(m.tile);
+                for(uint32_t i=1;i<m.variants*m.frames;++i)sequence.slots[i]=tail->second+i-1;
+            }
+        } else for(uint32_t i=0;i<m.variants*m.frames;++i)sequence.slots[i]=m.tile+i;
+        sequence.variants=m.variants;sequence.frames=m.frames;sequence.fpsMilli=m.fpsMilli;sequence.seed=m.seed;
+    }
     auto tileImage=[](const std::filesystem::path& path,std::array<uint8_t,4> color) {
         std::vector<uint8_t> result(TILE_SIZE*TILE_SIZE*4);
         if(path.empty()) {for(size_t p=0;p<result.size();p+=4)std::copy(color.begin(),color.end(),result.begin()+static_cast<std::ptrdiff_t>(p));return result;}
         // Plugin files live outside title storage and have already passed containment checks.
         std::ifstream file(path,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+        stbi_set_flip_vertically_on_load(0);
         int w=0,h=0,c=0;stbi_uc* decoded=stbi_load_from_memory(bytes.data(),static_cast<int>(bytes.size()),&w,&h,&c,4);
         if(!decoded||w!=16||h!=16){stbi_image_free(decoded);throw std::runtime_error("Plugin material must be a 16x16 PNG: "+path.string());}
         result.assign(decoded,decoded+TILE_SIZE*TILE_SIZE*4);stbi_image_free(decoded);return result;
@@ -461,9 +493,15 @@ void appendPluginMaterials(BlockAtlasData& atlas) {
         bool emissive=false;for(const auto& block:registry.blocks)for(const auto& material:block.second.materials)if(material==m.key&&block.second.emission)emissive=true;
         auto properties=tileImage(m.properties,{255,0,static_cast<uint8_t>(emissive?255:0),255});
         const auto& sequence=atlas.sequences.at(m.tile);
-        for(uint32_t i=0;i<sequence.variants*sequence.frames;++i) {insert(atlas.texture,sequence.slots[i],rgb);insert(atlas.normalTexture,sequence.slots[i],normal);insert(atlas.propertyTexture,sequence.slots[i],properties);}
+        for(uint32_t i=0;i<sequence.variants*sequence.frames;++i) {
+            const auto image=m.images.empty()?rgb:tileImage(m.images.at(i),color);
+            const auto n=m.normals.empty()?normal:tileImage(m.normals.at(i),{128,128,255,255});
+            const auto p=m.propertyFrames.empty()?properties:tileImage(m.propertyFrames.at(i),{255,0,static_cast<uint8_t>(emissive?255:0),255});
+            insert(atlas.texture,sequence.slots[i],image);insert(atlas.normalTexture,sequence.slots[i],n);insert(atlas.propertyTexture,sequence.slots[i],p);
+        }
     }
     for(auto& entry:registry.blocks)for(size_t i=0;i<6;++i)if(entry.second.tiles[i]!=indices.at(entry.second.materials[i]))entry.second.tiles[i]=indices.at(entry.second.materials[i]);
+    for(auto& entry:registry.blocks)entry.second.tilesReady=true;
     for(auto& entry:registry.items)if(entry.second.tile!=indices.at(entry.second.material))entry.second.tile=indices.at(entry.second.material);
     auto mips=[&](TextureData& texture,bool linear) {
         uint32_t tileSize=TILE_SIZE;auto level=texture.pixels;
@@ -517,4 +555,26 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
             result[b].emission = emissionColor / peak * (getLightEmission(id) / 15.0f);
     }
     return result;
+}
+
+void appendPluginItemIcons(TextureData& atlas,std::unordered_map<std::string,int>& indices,int columns,int& rows) {
+    if(columns<=0||rows<=0||atlas.width!=uint32_t(columns*16)||atlas.height!=uint32_t(rows*16))throw std::runtime_error("Invalid item atlas dimensions");
+    int next=columns*rows;
+    for(const auto& entry:Plugins::content().items) {
+        const auto& item=entry.second;if(item.icon.empty())continue;
+        const auto legacy=indices.find(item.command);const int slot=legacy==indices.end()?next++:legacy->second;
+        if(slot<0||slot>=256*256||columns>256||slot/columns>=256)throw std::runtime_error("Item icon atlas capacity exceeded");
+        const int requiredRows=slot/columns+1;
+        if(requiredRows>rows){rows=requiredRows;atlas.height=uint32_t(rows*16);atlas.pixels.resize(size_t(atlas.width)*atlas.height*4);}
+        indices[item.key]=slot;
+        std::ifstream file(item.icon,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+        stbi_set_flip_vertically_on_load(0);int w=0,h=0,channels=0;
+        stbi_uc* pixels=stbi_load_from_memory(bytes.data(),int(bytes.size()),&w,&h,&channels,4);
+        if(!pixels||w!=16||h!=16){stbi_image_free(pixels);throw std::runtime_error("Invalid registered item icon");}
+        for(int y=0;y<16;++y) {
+            const size_t offset=(size_t(slot/columns*16+y)*atlas.width+slot%columns*16)*4;
+            std::copy_n(pixels+y*16*4,16*4,atlas.pixels.begin()+std::ptrdiff_t(offset));
+        }
+        stbi_image_free(pixels);
+    }
 }

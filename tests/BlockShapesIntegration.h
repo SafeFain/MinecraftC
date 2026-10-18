@@ -73,7 +73,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     SaveStore palette(root/"palette");palette.saveMetadata(metadata);palette.saveChunkOverrides(-1,-1,{{0,architecturalStateBlock(a)}});
     std::vector<uint16_t> raw;chunk.copyRawBlocks(raw);const auto wire=Lan::encodeChunkSnapshot({{DimensionId::Overworld,-1,-1},1,1,raw});
     auto blocks=Plugins::content().blocks;Plugins::content().blocks.clear();
-    for(auto& entry:blocks){const auto id=static_cast<uint16_t>(entry.first+500);entry.second.properties.id=static_cast<BlockId>(id);if(entry.second.family)entry.second.family+=500;Plugins::content().blocks.emplace(id,std::move(entry.second));}
+    for(auto& entry:blocks){const auto id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?500:0));entry.second.properties.id=static_cast<BlockId>(id);if(entry.second.family>=Plugins::FIRST_CONTENT_ID)entry.second.family+=500;Plugins::content().blocks.emplace(id,std::move(entry.second));}
     for(auto& entry:Plugins::content().items)if(entry.second.properties.placedBlock&&static_cast<uint16_t>(*entry.second.properties.placedBlock)>=Plugins::FIRST_CONTENT_ID)entry.second.properties.placedBlock=static_cast<BlockId>(static_cast<uint16_t>(*entry.second.properties.placedBlock)+500);
     Plugins::freezeContent();
     check(static_cast<uint16_t>(palette.loadChunkOverrides(-1,-1)[0].block)==static_cast<uint16_t>(architecturalStateBlock(a))+500,"save palette state remapping");

@@ -19,6 +19,13 @@ Gameplay definitions participate in save requirements and LAN admission fingerpr
 | `minecraftc.environment` | `environment()` | `environments` |
 | `minecraftc.presentation` | `presentation()` | `particles`, `held_models`, `playlists` |
 
+The frozen V1/V2 contracts below remain available. New independently queried
+Environment V2, Presentation V2, Structures V3 and Player Actions V3 contracts,
+plus Localization V1, Dimensions V3, Worldgen V3 and material sequences, are
+documented in [the SDK version guide](plugins.md#registered-localization-travel-and-presentation). They carry
+provider-owned sky policy, full particle motion, logical island layers and
+registered localized travel without extending older structure layouts.
+
 See the complete [data example](../examples/plugins/capability_demo/content.json) and
 [native example](../examples/plugins/capability_native/plugin.cpp). The data example is
 opt-in in the plugin menu; restarting freezes its registered content.

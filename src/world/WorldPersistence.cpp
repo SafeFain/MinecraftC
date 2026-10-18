@@ -60,20 +60,6 @@ std::vector<LootEntry> lootEntries(StructureLootProfile profile) {
             {ItemId::GOLD_INGOT,1,2,12}};
         case P::LumberCamp: return {{ItemId::SPRUCE_LOG,3,10,95},{ItemId::STICK,3,12,90},
             {ItemId::SPRUCE_SAPLING,1,4,75},{ItemId::WOODEN_AXE,1,1,25}};
-        case P::XiguangRuin: return {{ItemId::SUNSTONE,3,9,100},
-            {ItemId::STAR_CRYSTAL,3,7,90},{ItemId::STARFLOWER,1,4,70},
-            {ItemId::CLOUD_BLOOM,1,3,50}};
-        case P::StarCrystalGeode: return {{ItemId::STAR_CRYSTAL,2,6,100},
-            {ItemId::CLOUDSTONE,2,7,80},{ItemId::STARFLOWER,1,4,60}};
-        case P::CloudspireTower: return {{ItemId::CLOUDSTONE,2,6,100},
-            {ItemId::SUNSTONE,1,4,70},{ItemId::STAR_CRYSTAL,1,2,35},
-            {ItemId::CLOUD_BLOOM,1,3,45}};
-        case P::SkywayShrine: return {{ItemId::STARSTEP_SCEPTER,1,1,25},
-            {ItemId::STAR_CRYSTAL,2,5,100},{ItemId::SUNSTONE,2,6,90},
-            {ItemId::CLOUDSTONE,3,8,100}};
-        case P::OriginSkywayShrine: return {{ItemId::STARSTEP_SCEPTER,1,1,100},
-            {ItemId::STAR_CRYSTAL,2,5,100},{ItemId::SUNSTONE,2,6,100},
-            {ItemId::CLOUDSTONE,3,8,100}};
         default:return{};
     }
 }
@@ -83,15 +69,6 @@ void populateGeneratedLoot(BlockEntity& entity, StructureLootProfile profile,
     if(entity.type!=BlockEntityType::Chest||profile==StructureLootProfile::None)
         return;
     std::vector<LootEntry> entries=lootEntries(profile);
-    if (profile >= StructureLootProfile::XiguangRuin &&
-        profile <= StructureLootProfile::OriginSkywayShrine) {
-        entries.push_back({ItemId::STAR_CRYSTAL_SHARD, 2, 5, 85});
-        entries.push_back({ItemId::CLOUDBERRY, 2, 4, 70});
-        const ItemId brick = profile == StructureLootProfile::XiguangRuin
-            ? ItemId::SUNSTONE_BRICKS : profile == StructureLootProfile::StarCrystalGeode
-            ? ItemId::MOONSTONE_BRICKS : ItemId::CLOUDSTONE_BRICKS;
-        entries.push_back({brick, 3, 8, 80});
-    }
     for(size_t i=0;i<entries.size();++i) {
         const LootEntry& entry=entries[i];
         const uint64_t h=WorldGenContext::mix(seed^

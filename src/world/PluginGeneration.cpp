@@ -1,13 +1,28 @@
 #include "world/WorldGenerator.h"
+#include "world/BiomeBlockLogic.h"
 #include "plugins/ContentRegistry.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
 #include <memory>
 #include <tuple>
+#include <bitset>
+#include <unordered_set>
 
 namespace {
 int cell(int x){const int q=x/16;return x%16<0?q-1:q;}
+template<class Changes,class Read,class Write>
+void reconcileStructureSupport(const Changes& changes,Read read,Write write) {
+    for(const auto& b:changes)for(int offset:{2,1,0,-1,-2}) {
+        const int y=b.worldY+offset;
+        if(!Config::isValidWorldY(y))continue;
+        const auto id=read(b.worldX,y,b.worldZ);
+        const auto* behavior=Plugins::blockBehavior(id);
+        if((isSemanticPlant(id)&&!supportsBiomePlant(id,read(b.worldX,y-1,b.worldZ)))||
+           (behavior&&behavior->support==2&&read(b.worldX,y+1,b.worldZ)==BlockId::AIR))
+            write(b.worldX,y,b.worldZ,BlockId::AIR);
+    }
+}
 }
 std::optional<glm::dvec3> WorldGenerator::sampleDimensionSpawn() const {
     const auto& d=Plugins::dimensionContent(m_dimension);
@@ -30,7 +45,34 @@ SurfaceColumn WorldGenerator::pluginColumn(int x,int z) const {
         sample.water_level<Config::WORLD_MIN_Y-1||sample.water_level>=Config::WORLD_MAX_Y||sample.biome>=static_cast<uint32_t>(BIOME_COUNT))Plugins::failGeneration(g.key);
     SurfaceColumn column;column.height=column.nominalHeight=sample.height;column.waterLevel=sample.water_level;
     column.biome=static_cast<Biome>(sample.biome);column.densityMinY=Config::WORLD_MIN_Y;column.densityMaxY=sample.height;
+    if(g.layers&&sample.height>=Config::WORLD_MIN_Y)
+        for(const auto& layer:sampleGenerationLayers(x,z))
+            if(layer.present&&layer.top==sample.height){column.densityMinY=layer.bottom;break;}
     return column;
+}
+std::vector<MC_GenerationLayer> WorldGenerator::sampleGenerationLayers(int x,int z) const {
+    if(customGenerator()) {
+        const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
+        if(g.layers) {
+            MC_GenerationContext context{sizeof(context),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
+            std::array<MC_GenerationLayer,MC_MAX_GENERATION_LAYERS> layers{};uint32_t count=UINT32_MAX;
+            try{if(g.layers(&context,x,z,layers.data(),uint32_t(layers.size()),&count,g.userdata))Plugins::failGeneration(g.key);}
+            catch(...){Plugins::failGeneration(g.key);}
+            if(count>layers.size())Plugins::failGeneration(g.key);
+            for(uint32_t i=0;i<count;++i) {
+                const auto& layer=layers[i];
+                if(layer.present>1||(layer.present&&(!Config::isValidWorldY(layer.bottom)||!Config::isValidWorldY(layer.top)||layer.bottom>layer.top)))Plugins::failGeneration(g.key);
+            }
+            return {layers.begin(),layers.begin()+count};
+        }
+        std::vector<MC_GenerationLayer> result;
+        for(const auto& span:samplePluginLodColumn(x,z,1)) {
+            if(!result.empty()&&result.back().top+1==span.bottom)result.back().top=span.top;
+            else result.push_back({span.bottom,span.top,1,0});
+        }
+        return result;
+    }
+    return {{Config::WORLD_MIN_Y,sampleTerrainColumn(x,z).height,1,0}};
 }
 BlockId WorldGenerator::samplePluginBlock(int x,int y,int z) const {
     const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
@@ -69,23 +111,41 @@ void WorldGenerator::generatePluginChunks(const std::vector<Chunk*>& chunks) con
         MC_GenerationVolume volume{sizeof(MC_GenerationVolume),x,Config::WORLD_MIN_Y,z,w,Config::CHUNK_SIZE_Y,d};
         try{if(g.batch(&context,&volume,blocks.data(),count,g.userdata))Plugins::failGeneration(g.key);}
         catch(...){Plugins::failGeneration(g.key);}
-        for(auto b:blocks)if(!Plugins::validBlock(static_cast<BlockId>(b)))Plugins::failGeneration(g.key);
+        std::bitset<65536> checked;
+        for(auto b:blocks) {
+            if(checked.test(b))continue;
+            if(!Plugins::validBlock(static_cast<BlockId>(b)))Plugins::failGeneration(g.key);
+            checked.set(b);
+        }
         return blocks;
     };
     std::vector<uint16_t> region;
     if(g.batch&&rectangle)region=sampleVolume(minX*16,minZ*16,static_cast<uint32_t>(width),static_cast<uint32_t>(depth));
     // Stage the complete request, including modifiers and metadata, before
     // publishing any target. Faults leave targets and their flags untouched.
-    std::vector<std::unique_ptr<Chunk>> staged;
+    // Reuse unpublished storage without retaining unbounded request-sized pools.
+    // A checked-out pool is unavailable to a reentrant callback on this thread.
+    thread_local std::vector<std::unique_ptr<Chunk>> spare;
+    struct Staging {
+        std::vector<std::unique_ptr<Chunk>>& spare;
+        std::vector<std::unique_ptr<Chunk>> chunks;
+        ~Staging(){for(auto& chunk:chunks)if(spare.size()<9)spare.push_back(std::move(chunk));}
+    } staged{spare,{}};
+    spare.reserve(9);staged.chunks.reserve(targets.size());
     for(auto* target:targets) {
-        auto chunk=std::make_unique<Chunk>(target->cx,target->cz);
+        std::unique_ptr<Chunk> chunk;
+        if(spare.empty())chunk=std::make_unique<Chunk>(target->cx,target->cz);
+        else {chunk=std::move(spare.back());spare.pop_back();chunk->cx=target->cx;chunk->cz=target->cz;}
         if(g.batch) {
             const auto local=rectangle?std::vector<uint16_t>{}:sampleVolume(chunk->worldX(),chunk->worldZ(),16,16);
-            for(int y=0;y<Config::CHUNK_SIZE_Y;++y)for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
-                const size_t index=rectangle?size_t(chunk->worldX()-minX*16+x)+
+            if(!rectangle||targets.size()==1)
+                std::copy_n((rectangle?region:local).data(),Config::CHUNK_VOLUME,&chunk->blockAt(0,Config::WORLD_MIN_Y,0));
+            else
+            for(int y=0;y<Config::CHUNK_SIZE_Y;++y)for(int z=0;z<16;++z) {
+                const size_t index=rectangle?size_t(chunk->worldX()-minX*16)+
                     size_t(chunk->worldZ()-minZ*16+z)*size_t(width)+size_t(y)*size_t(width)*size_t(depth):
-                    size_t(x+z*16+y*256);
-                chunk->blockAt(x,y+Config::WORLD_MIN_Y,z)=rectangle?region[index]:local[index];
+                    size_t(z*16+y*256);
+                std::copy_n((rectangle?region:local).data()+index,16,&chunk->blockAt(0,y+Config::WORLD_MIN_Y,z));
             }
             chunk->finishBulkBlockEdit();
         } else {
@@ -95,12 +155,11 @@ void WorldGenerator::generatePluginChunks(const std::vector<Chunk*>& chunks) con
                     chunk->setBlock(x,y,z,samplePluginBlock(wx,y,wz));
             }
         }
-        applyPluginModifiers(*chunk);staged.push_back(std::move(chunk));
+        applyPluginModifiers(*chunk);staged.chunks.push_back(std::move(chunk));
     }
     for(size_t i=0;i<targets.size();++i) {
-        std::vector<uint16_t> blocks;staged[i]->copyRawBlocks(blocks);
-        targets[i]->loadRawBlocks(blocks);
-        targets[i]->pluginStructures=std::move(staged[i]->pluginStructures);
+        targets[i]->publishGeneratedBlocks(*staged.chunks[i]);
+        targets[i]->pluginStructures=std::move(staged.chunks[i]->pluginStructures);
     }
     for(auto* chunk:targets){chunk->generated.store(true);chunk->generationInProgress.store(false);}
 }
@@ -139,16 +198,39 @@ std::vector<MC_DecorationBlock> WorldGenerator::pluginModifierBlocks(int x,int z
     return result;
 }
 void WorldGenerator::applyPluginModifiers(Chunk& chunk) const {
-    for(const auto& b:pluginModifierBlocks(chunk.worldX(),chunk.worldZ(),16,16,false))
-        chunk.setBlock(b.x-chunk.worldX(),b.y,b.z-chunk.worldZ(),static_cast<BlockId>(b.block));
+    // This chunk is exclusively owned by generation. Avoid taking
+    // a mutex and rescanning column maxima for each structural AIR overwrite;
+    // publication rebuilds maxima after the complete validated edit.
+    const auto write=[&](int x,int y,int z,BlockId id){
+        chunk.blockAt(x-chunk.worldX(),y,z-chunk.worldZ())=static_cast<uint16_t>(id);
+    };
+    const auto modifiers=pluginModifierBlocks(chunk.worldX(),chunk.worldZ(),16,16,false);
     chunk.pluginStructures=pluginStructureBlocks(chunk.worldX(),chunk.worldZ());
-    for(const auto& b:chunk.pluginStructures)chunk.setBlock(b.worldX-chunk.worldX(),b.worldY,b.worldZ-chunk.worldZ(),b.id);
+    if(modifiers.empty()&&chunk.pluginStructures.empty())return;
+    for(const auto& b:modifiers)write(b.x,b.y,b.z,static_cast<BlockId>(b.block));
+    for(const auto& b:chunk.pluginStructures)write(b.worldX,b.worldY,b.worldZ,b.id);
+    // Structural overwrites can remove a plant's substrate or a hanging
+    // decoration's attachment. Reconcile only the touched neighborhoods.
+    reconcileStructureSupport(chunk.pluginStructures,
+        [&](int x,int y,int z){return Config::isValidWorldY(y)?static_cast<BlockId>(chunk.blockAt(x-chunk.worldX(),y,z-chunk.worldZ())):BlockId::AIR;},write);
+    chunk.finishBulkBlockEdit();
+    // Native terrain also uses this path; retain its column maxima after edits.
+    for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
+        int y=Config::WORLD_MAX_Y-1;
+        while(y>=Config::WORLD_MIN_Y&&!chunk.blockAt(x,y,z))--y;
+        chunk.setColumnMaxY(x,z,y);
+    }
 }
 std::array<uint16_t,Config::CHUNK_SIZE_Y> WorldGenerator::samplePluginColumnBlocks(int x,int z) const {
     std::array<uint16_t,Config::CHUNK_SIZE_Y> blocks{};
     for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
         blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]=static_cast<uint16_t>(samplePluginBlock(x,y,z));
-    for(const auto& b:pluginModifierBlocks(x,z))blocks[static_cast<size_t>(b.y-Config::WORLD_MIN_Y)]=b.block;
+    for(const auto& b:pluginModifierBlocks(x,z,1,1,false))blocks[static_cast<size_t>(b.y-Config::WORLD_MIN_Y)]=b.block;
+    const auto structures=pluginStructureBlocks(x,z,1,1);
+    for(const auto& b:structures)blocks[static_cast<size_t>(b.worldY-Config::WORLD_MIN_Y)]=static_cast<uint16_t>(b.id);
+    reconcileStructureSupport(structures,
+        [&](int,int y,int){return Config::isValidWorldY(y)?static_cast<BlockId>(blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]):BlockId::AIR;},
+        [&](int,int y,int,BlockId id){blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]=static_cast<uint16_t>(id);});
     return blocks;
 }
 
@@ -209,16 +291,20 @@ std::vector<PluginAnchor> structureAnchors(const WorldGenerator& g,const Plugins
     return result;
 }
 }
-std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureBlocks(int x,int z,int width,int depth) const{
+std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureBlocks(int x,int z,int width,int depth,bool coarse) const{
     if(width<=0||depth<=0||int64_t(x)+width-1>30000000||int64_t(z)+depth-1>30000000||x< -30000000||z< -30000000)Plugins::failGeneration("structure bounds");
     struct Placement {const Plugins::StructureContent* structure;PluginAnchor anchor;int cx,cz;};
     std::vector<Placement> placements;bool v2=false;
     for(const auto& pair:Plugins::content().extensions.structures){const auto& s=pair.second;
-        if(s.dimension!=static_cast<uint32_t>(m_dimension))continue;
+        if(s.dimension!=static_cast<uint32_t>(m_dimension)||(coarse&&s.omitCoarseLod))continue;
         v2=v2||s.placements;const int r=static_cast<int>(s.radius);
         for(int cz=floorCell(z-r,s.cell);cz<=floorCell(z+depth-1+r,s.cell);++cz)
             for(int cx=floorCell(x-r,s.cell);cx<=floorCell(x+width-1+r,s.cell);++cx)
-                for(const auto& a:structureAnchors(*this,s,m_pluginConfig.parameters,cx,cz))placements.push_back({&s,a,cx,cz});
+                for(const auto& a:structureAnchors(*this,s,m_pluginConfig.parameters,cx,cz)) {
+                    if(int64_t(a.x)+r<x||int64_t(a.x)-r>=int64_t(x)+width||
+                       int64_t(a.z)+r<z||int64_t(a.z)-r>=int64_t(z)+depth)continue;
+                    placements.push_back({&s,a,cx,cz});
+                }
     }
     std::sort(placements.begin(),placements.end(),[](const Placement& a,const Placement& b){
         return std::tie(a.structure->order,a.structure->key,a.anchor.order,a.cz,a.cx,a.anchor.x,a.anchor.y,a.anchor.z,a.anchor.variant)<
@@ -237,6 +323,7 @@ std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureB
                     s.build(&c,old.data(),MC_MAX_STRUCTURE_BLOCKS,&count,s.userdata);
                 if(status||count>MC_MAX_STRUCTURE_BLOCKS)Plugins::failGeneration(s.key);
                 std::set<std::tuple<int32_t,int32_t,int32_t>> positions;
+                std::bitset<65536> checkedNamespaces;
                 for(uint32_t i=0;i<count;++i){const auto& b=s.buildV2?out[i].base:old[i];
                     if(!s.buildV2&&!positions.emplace(b.x,b.y,b.z).second)Plugins::failGeneration(s.key);
                     const std::string loot=b.loot?b.loot:"";
@@ -244,8 +331,9 @@ std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureB
                         (s.buildV2?(b.y<s.minY||b.y>s.maxY):(b.y<0||uint32_t(b.y)>=s.height))||
                         !Plugins::validBlock(static_cast<BlockId>(b.block))||
                         (!loot.empty()&&(b.block!=static_cast<uint16_t>(BlockId::CHEST)||!Plugins::content().extensions.loot.count(loot))))Plugins::failGeneration(s.key);
-                    const auto key=Plugins::blockKey(static_cast<BlockId>(b.block));
-                    for(const auto& k:{key,loot})if(!k.empty()&&std::find(s.namespaces.begin(),s.namespaces.end(),k.substr(0,k.find(':')))==s.namespaces.end())Plugins::failGeneration(s.key);
+                    const auto validateNamespace=[&](const std::string& k){if(!k.empty()&&std::find(s.namespaces.begin(),s.namespaces.end(),k.substr(0,k.find(':')))==s.namespaces.end())Plugins::failGeneration(s.key);};
+                    if(!checkedNamespaces.test(b.block)){validateNamespace(Plugins::blockKey(static_cast<BlockId>(b.block)));checkedNamespaces.set(b.block);}
+                    validateNamespace(loot);
                     blocks.push_back({b.x,b.y,b.z,b.block,loot,s.buildV2?out[i].loot_seed:0});
                 }
             }catch(...){Plugins::failGeneration(s.key);}
@@ -266,9 +354,14 @@ std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureB
     if(v2){
         // Publish only the final owner of a voxel, including AIR and its metadata.
         // Thus an earlier chest cannot survive or seed a later chest's contents.
-        std::set<std::tuple<int,int,int>> seen;
+        std::unordered_set<uint64_t> seen;seen.reserve(result.size());
         std::vector<RegionGenerationData::PendingBlock> final;
-        for(auto i=result.rbegin();i!=result.rend();++i)if(seen.emplace(i->worldX,i->worldY,i->worldZ).second)final.push_back(std::move(*i));
+        for(auto i=result.rbegin();i!=result.rend();++i) {
+            // Validated world X/Z fit 26 bits each; storage Y fits nine bits.
+            const uint64_t key=((uint64_t(i->worldX+30000000)<<26)|uint32_t(i->worldZ+30000000))<<9|
+                uint32_t(i->worldY-Config::WORLD_MIN_Y);
+            if(seen.emplace(key).second)final.push_back(std::move(*i));
+        }
         std::reverse(final.begin(),final.end());return final;
     }
     return result;
@@ -390,6 +483,10 @@ std::vector<MC_LodSpan> WorldGenerator::samplePluginLodColumn(int x,int z,int ce
         if(m.decorationLod)callback(m.decorationLod,m.userdata,m.key,false);
         else for(const auto& b:modifierBlocks(m,context,wx,wz,1,1))overwrite({b.y,b.y,b.block});
     }
-    for(const auto& b:pluginStructureBlocks(wx,wz,1,1))overwrite({b.worldY,b.worldY,static_cast<uint16_t>(b.id)});
+    const auto structures=pluginStructureBlocks(wx,wz,1,1,cellSize>1);
+    for(const auto& b:structures)overwrite({b.worldY,b.worldY,static_cast<uint16_t>(b.id)});
+    if(cellSize==1)reconcileStructureSupport(structures,
+        [&](int,int y,int){for(const auto& s:spans)if(y>=s.bottom&&y<=s.top)return static_cast<BlockId>(s.block);return BlockId::AIR;},
+        [&](int,int y,int,BlockId id){overwrite({y,y,static_cast<uint16_t>(id)});});
     return spans;
 }

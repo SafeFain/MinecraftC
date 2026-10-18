@@ -43,8 +43,6 @@ void GameScenePresenter::render(
         RenderEnvironment environment = applyWeather(
             session.daylightState().evaluate(), session.weatherState().rainGradient(),
             session.weatherState().thunderGradient(), lightningFlash);
-        if (session.worldState().isHeaven())
-            environment = applyHeavenEnvironment(environment);
 
         bool renderClouds=settings.renderClouds;
         environment=Plugins::applyEnvironment(environment,static_cast<uint32_t>(session.activeDimension()),renderClouds);
@@ -69,8 +67,8 @@ void GameScenePresenter::render(
         const glm::dvec3 playerPosition = session.playerState().getPosition();
         const glm::dvec3 renderOrigin(
             playerPosition.x, 0.0, playerPosition.z);
-        const uint64_t giSceneId = session.metadata().seed ^
-            (session.worldState().isHeaven() ? 0x9e3779b97f4a7c15ull : 0ull);
+        uint64_t giSceneId=session.metadata().seed;
+        for(unsigned char c:Plugins::dimensionKey(session.activeDimension()))giSceneId=(giSceneId^c)*1099511628211ULL;
         renderer.beginVoxelGiFrame(
             renderOrigin + glm::dvec3(camera.m_position), giSceneId);
         for (const Chunk* chunk : session.worldState().getActiveChunks())
@@ -260,8 +258,8 @@ void GameScenePresenter::render(
                     static_cast<float>(ParticleKind::Trajectory),0,0,.35f,0});
             }
         }
-        const float particleIntensity = session.worldState().isHeaven()
-            ? 0.80f : session.weatherState().rainGradient();
+        const float particleIntensity = environment.particleIntensity>=0
+            ? environment.particleIntensity : session.weatherState().rainGradient();
         renderer.renderParticles(
             particleRenderData, vp,
             camera.right,

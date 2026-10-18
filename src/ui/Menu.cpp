@@ -128,7 +128,7 @@ MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> wor
       m_worlds(std::move(worlds)) {
     m_worldName.setClipboard(clipboard);
     m_seedText.setClipboard(clipboard);
-    for(auto& p:m_parameters)p.setClipboard(clipboard);
+    m_clipboard=clipboard;
     m_seedText.setFilter([](uint32_t codepoint,const std::string& current){
         return (codepoint>='0'&&codepoint<='9')||(codepoint=='-'&&current.empty());
     });
@@ -155,7 +155,12 @@ void MainMenu::showCreate() {
     m_seedText.setText({});
     m_createMode = GameMode::Survival;
     m_createWorldType = WorldType::Normal;
-    m_generation={};for(auto& p:m_parameters)p.setText("{}");
+    m_generation.clear();m_parameters.clear();
+    for(const auto& entry:Plugins::content().extensions.dimensions) {
+        m_generation[entry.first]=entry.second.generation;
+        auto& buffer=m_parameters.try_emplace(entry.first,entry.second.generation.parameters,4096).first->second;
+        buffer.setClipboard(m_clipboard);
+    }
     m_createCheats = false;
     m_field = Field::Name;
     rebuildButtons();
@@ -328,15 +333,17 @@ void MainMenu::rebuildButtons() {
                 rebuildButtons();
             });
         const bool extensions=!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty();
-        if(extensions)for(uint32_t dimension=0;dimension<2;++dimension) {
-            if(!Plugins::validDimension(dimension))continue;
+        m_parameterRows.clear();
+        if(extensions)for(const auto& entry:Plugins::content().extensions.dimensions) {
+            const uint32_t dimension=entry.first;
             const auto& selected=m_generation[dimension];
             std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
-            m_buttons.emplace_back(m_localization.format(dimension==0?"menu.create.generator_overworld":"menu.create.generator_heaven",{name}),[this,dimension]{
-                std::vector<std::string> keys{std::string{}};for(const auto& g:Plugins::content().extensions.generators)if(g.second.dimension==dimension)keys.push_back(g.first);
+            m_buttons.emplace_back(m_localization.format("menu.create.generator_dimension",{m_localization.dimensionName(dimension),name}),[this,dimension]{
+                std::vector<std::string> keys;if(dimension==0)keys.emplace_back();for(const auto& g:Plugins::content().extensions.generators)if(g.second.dimension==dimension)keys.push_back(g.first);
                 auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);g.generator=keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
                 g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
-            m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{selectField(dimension==0?Field::Parameters0:Field::Parameters1);});
+            m_parameterRows[dimension]=static_cast<int>(m_buttons.size());
+            m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{m_parameterDimension=dimension;selectField(Field::Parameters);});
             m_buttons.back().setDetail(m_parameters[dimension].text());
             for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==dimension) {
                 const auto key=m.first;const bool active=std::any_of(selected.modifiers.begin(),selected.modifiers.end(),[&](const auto& value){return value.first==key;});
@@ -346,7 +353,7 @@ void MainMenu::rebuildButtons() {
             }
         }
         m_buttons.emplace_back(m_localization.text("menu.create.confirm"), [this]() {
-            for(size_t d=0;d<2;++d)m_generation[d].parameters=m_parameters[d].text();
+            for(auto& entry:m_generation)entry.second.parameters=m_parameters.at(entry.first).text();
             if(m_callbacks.onGenerationConfig)m_callbacks.onGenerationConfig(m_generation);
             m_callbacks.onCreateWorld(
                 m_worldName.text(), m_seedText.text(), m_createMode,
@@ -398,8 +405,7 @@ void MainMenu::rebuildButtons() {
 void MainMenu::selectField(Field field) {
     m_field = field;
     rebuildButtons();
-    m_selectedIdx = field == Field::Name ? 0 : field==Field::Seed?3:field==Field::Parameters0?6:8;
-    if(field==Field::Parameters1)for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==0)++m_selectedIdx;
+    m_selectedIdx = field==Field::Name?0:field==Field::Seed?3:m_parameterRows.at(m_parameterDimension);
     if(static_cast<size_t>(m_selectedIdx)>=m_buttons.size())m_selectedIdx=0;
     m_buttons[0].setSelected(false);
     m_buttons[m_selectedIdx].setSelected(true);
@@ -603,7 +609,11 @@ void MainMenu::onKeyPress(int key, int mods) {
         return;
     }
     if (m_page == Page::Create && key == Key::Tab) {
-        selectField(m_field == Field::Name ? Field::Seed : m_field==Field::Seed&&(!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty())?Field::Parameters0:m_field==Field::Parameters0?Field::Parameters1:Field::Name);
+        std::vector<std::pair<Field,uint32_t>> fields{{Field::Name,0},{Field::Seed,0}};
+        for(const auto& entry:m_parameterRows)fields.emplace_back(Field::Parameters,entry.first);
+        size_t index=0;for(size_t i=0;i<fields.size();++i)if(fields[i].first==m_field&&(m_field!=Field::Parameters||fields[i].second==m_parameterDimension))index=i;
+        index=(index+((mods&KeyModifier::Shift)?fields.size()-1:1))%fields.size();
+        m_parameterDimension=fields[index].second;selectField(fields[index].first);
         return;
     }
     if (m_page == Page::Create && key == Key::Backspace) {
@@ -861,14 +871,17 @@ void PauseMenu::onMouseButton(int button, ButtonAction action, double x, double 
 
 SleepMenu::SleepMenu(
     const MenuCallbacks& callbacks, const Localization& localization,
-    bool heaven) {
+    DimensionId dimension) {
     m_buttons.emplace_back(localization.text("sleep.until_morning"),
         [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(0); });
     m_buttons.emplace_back(localization.text("sleep.leave_bed"),
         [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(1); });
-    if (!heaven && Plugins::validDimension(DimensionId::Heaven)) {
-        m_buttons.emplace_back(localization.text("sleep.travel_heaven"),
-            [callbacks]() { if (callbacks.onSleepAction) callbacks.onSleepAction(2); });
+    for(const auto& entry:Plugins::content().extensions.bedTravel) {
+        const auto& travel=entry.second;
+        if(travel.source!=static_cast<uint32_t>(dimension)||!Plugins::validDimension(travel.target))continue;
+        m_buttons.emplace_back(localization.text(travel.nameKey),[callbacks,key=travel.key]() {
+            if(callbacks.onBedTravel)callbacks.onBedTravel(key);
+        });
     }
     if (!m_buttons.empty()) m_buttons[0].setSelected(true);
 }

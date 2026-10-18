@@ -193,6 +193,7 @@ private:
         m_plugins.dimensionTime=[this](uint32_t dim,MC_DimensionTime& out){return m_session.pluginDimensionTime(dim,out);};
         m_plugins.setDimensionTime=[this](const MC_DimensionTime& t){return m_session.pluginSetDimensionTime(t);};
         m_plugins.emitParticle=[this](const MC_ParticleEmission& e){return m_session.pluginEmitParticle(e);};
+        m_plugins.emitParticleV2=[this](const MC_ParticleInstanceV2& e){return m_session.pluginEmitParticleV2(e);};
         m_plugins.operations.players=[this]{return m_session.pluginPlayers();};
         m_plugins.operations.playerById=[this](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return m_session.pluginPlayerById(id,out,dimension);};
         m_plugins.operations.player=[this](MC_PlayerSnapshot& p){return m_session.pluginPlayer(p);};
@@ -310,7 +311,7 @@ private:
         m_sessionFeedback.sleepStarted = [this] {
             m_ui.activeMenu = std::make_unique<SleepMenu>(
                 m_ui.menuCallbacks, m_ui.localization,
-                m_session.activeDimension() != DimensionId::Overworld);
+                m_session.activeDimension());
             m_window.setCursorLocked(false);
         };
         m_sessionFeedback.sleepEnded = [this] {
@@ -335,9 +336,7 @@ private:
         m_session.setBedCallback([this](const glm::ivec3& bed) {
             if (!m_session.isNight()) {
                 m_session.setDimensionBedSpawn(bed);
-                m_flow.showCommandMessage(m_ui.localization.text(
-                    m_session.activeDimension() != DimensionId::Heaven
-                        ? "message.respawn_set" : "message.heaven_bed_day"));
+                m_flow.showCommandMessage(m_ui.localization.text("message.respawn_set"));
                 return;
             }
             if (m_session.beginSleepAtBed(bed)) {
@@ -438,10 +437,14 @@ private:
             (void)m_window.openUrl(url);
         };
         m_ui.menuCallbacks.onSleepAction = [this](int action) {
-            if (action < 0 || action > 2) return;
+            if (action < 0 || action > 1) return;
             m_session.chooseSleepAction(
                 static_cast<GameSession::SleepAction>(action),
                 m_runtimeClock.now(), m_sessionFeedback);
+        };
+
+        m_ui.menuCallbacks.onBedTravel=[this](const std::string& key) {
+            m_session.chooseBedTravel(key,m_runtimeClock.now(),m_sessionFeedback);
         };
 
         m_ui.menuCallbacks.onOpenSettings = [this]() {

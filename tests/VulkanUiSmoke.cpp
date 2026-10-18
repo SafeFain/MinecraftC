@@ -118,23 +118,44 @@ int main(int argc,char** argv) {
             std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
         }
         if(capabilities) {
-            const auto dimension=Plugins::resolveDimension("capability_demo:islands");
-            bool clouds=true;const auto environment=Plugins::applyEnvironment(DayNightCycle{}.evaluate(),dimension,clouds);
-            if(clouds||environment.skyStyle!=RenderSkyStyle::Heaven)throw std::runtime_error("Capability sky profile missing");
+            const auto dimension=heavenModel?1u:Plugins::resolveDimension("capability_demo:islands");
+            bool clouds=true;auto environment=Plugins::applyEnvironment(DayNightCycle{}.evaluate(),dimension,clouds);
+            if(environment.skyStyle!=RenderSkyStyle::Layered||(!heavenModel&&clouds)||
+               (heavenModel&&!(environment.skyFlags&SkyNoVoxelClouds)))throw std::runtime_error("Capability sky profile missing");
             AssetStore store(assets);AudioSystem audio;audio.initialize(&store);
-            Plugins::contextProvider()=[dimension]{return Plugins::ActorContext{0,dimension,MC_LOCAL};};audio.setMusicMode(AudioMusicMode::Overworld);
+            Plugins::contextProvider()=[dimension]{return Plugins::ActorContext{0,dimension,MC_LOCAL};};audio.setMusicMode(AudioMusicMode::Overworld,dimension);
+            if(heavenModel){renderer.setVisualQuality(VisualQuality::Medium);renderer.setEnhancedVisuals(true);}
             HeldItemRenderer held;held.initialize(renderer,assets);
             const auto& type=Plugins::content().extensions.particles.at("capability_demo:spark");
             std::vector<ParticleRenderData> particles;
-            for(int i=0;i<8;++i){ParticleRenderData p;p.position={.6f+(i%4)*.1f,(i/4)*.1f,0};p.kind=static_cast<float>(ParticleKind::Plugin);p.texture=Plugins::materialTile(type.material);p.size=type.definition.scale;p.phase=.5f;p.color={type.definition.color[0],type.definition.color[1],type.definition.color[2],type.definition.color[3]};particles.push_back(p);}
+            for(int i=0;i<8;++i){
+                const auto& visual=heavenModel?Plugins::content().extensions.particles.at(std::array<const char*,3>{{"official_heaven:mote","official_heaven:pollen","official_heaven:sparkle"}}[size_t(i%3)]):type;
+                ParticleRenderData p;p.position={.6f+(i%4)*.1f,(i/4)*.1f,0};p.kind=visual.shape?float(5+visual.shape):static_cast<float>(ParticleKind::Plugin);
+                p.texture=Plugins::materialTile(visual.material);p.size=visual.definition.scale;p.phase=.5f;p.color={visual.definition.color[0],visual.definition.color[1],visual.definition.color[2],visual.definition.color[3]};particles.push_back(p);
+            }
             const glm::vec3 camera(0,0,3);const auto vp=glm::perspective(glm::radians(55.0f),window.aspectRatio(),.05f,100.0f)*glm::lookAt(camera,glm::vec3(0),glm::vec3(0,1,0));
             auto captureScene=[&](int content){std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){renderer.beginFrame();renderer.setEnvironment(environment,camera);renderer.setViewProjection(vp);if(content<0)renderer.renderSky(environment,glm::inverse(vp),camera,clouds);
                 if(content>0&&(content&1))held.renderDropped({heavenModel?ItemId::STARSTEP_SCEPTER:Plugins::resolveItem("capability_demo:staff"),1,0},vp,{0,0,0},0,0,{1,0});
-                if(content>0&&(content&2))renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},0);
-                renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
-            captureScene(-1);const auto baseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);if(baseline==modelImage||baseline==particleImage)throw std::runtime_error("Plugin held model/particles did not independently affect Vulkan pixels");
+                if(content>0&&(content&2))renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},environment.particleIntensity>=0?environment.particleIntensity:1.f);
+                PostProcessState post;post.environment=environment;post.inverseViewProjection=glm::inverse(vp);post.cameraPosition=camera;
+                renderer.finishScene(post);if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
+            captureScene(-1);const auto baseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);if(baseline==modelImage)throw std::runtime_error("Plugin held model did not affect Vulkan pixels");if(baseline==particleImage)throw std::runtime_error("Plugin particles did not affect Vulkan pixels");
+            if(heavenModel){const auto all=particles;for(int shape=1;shape<=3;++shape){particles.clear();for(const auto& p:all)if(p.kind==float(5+shape))particles.push_back(p);
+                if(captureScene(2)==baseline)throw std::runtime_error("Official ambient particle shape did not reach Vulkan pixels");}particles=all;}
             for(auto& p:particles)p.color={1,0,0,1};
             if(captureScene(2)==particleImage)throw std::runtime_error("Particle RGBA did not reach Vulkan fragments");
+            if(heavenModel) {
+                DayNightCycle cycle;cycle.setPhase(.125f);environment=Plugins::applyEnvironment(cycle.evaluate(),dimension,clouds);
+                const auto day=captureScene(-1);
+                const auto gradedModel=captureScene(1);
+                const auto grade=environment.gradeStrength;environment.gradeStrength=0;
+                if(captureScene(1)==gradedModel)throw std::runtime_error("Registered Heaven grade did not affect Vulkan pixels");
+                environment.gradeStrength=grade;cycle.setPhase(.75f);environment=Plugins::applyEnvironment(cycle.evaluate(),dimension,clouds);
+                const auto night=captureScene(-1);
+                const auto brightness=[](const auto& pixels){uint64_t sum=0;for(size_t i=0;i<pixels.size();i+=4)sum+=uint64_t(pixels[i])+pixels[i+1]+pixels[i+2];return double(sum);};
+                if(brightness(day)<brightness(night)*1.05)throw std::runtime_error("Registered Heaven day/night sky brightness did not reach Vulkan pixels");
+                std::cout<<"Official Heaven day/night sky and registered color-grade Vulkan readback passed\n";
+            }
             renderer.resize(width,height);captureScene(3);renderer.suspendPresentation();renderer.resumePresentation();captureScene(3);
             held.reset();Plugins::contextProvider()={};std::cout<<"Plugin sky/cloud, held GLB, colored particles, WAV initialization and Vulkan rebuild/resume passed\n";
         }
@@ -150,6 +171,7 @@ int main(int argc,char** argv) {
         callbacks.onOpenWorld=[](const std::string&){};
         callbacks.onDeleteWorld=[](const std::string&){return true;};
         int sleepChoice=-1;callbacks.onSleepAction=[&](int choice){sleepChoice=choice;};
+        callbacks.onBedTravel=[&](const std::string& key){if(key=="official_heaven:bed_travel")sleepChoice=2;};
         std::vector<WorldSummary> worlds;
         for (int i=0;i<6;++i) {
             WorldSummary world;world.id=std::to_string(i);world.displayName="Mountain valley "+std::to_string(i+1);
@@ -157,7 +179,7 @@ int main(int argc,char** argv) {
         }
         MainMenu main(callbacks,worlds,settings,localization,nullptr);
         SettingsMenu options(settings,[]{},[]{},localization);
-        PauseMenu pause(callbacks,localization);SleepMenu sleep(callbacks,localization,false);
+        PauseMenu pause(callbacks,localization);SleepMenu sleep(callbacks,localization,DimensionId::Overworld);
         sleep.onKeyPress(Key::Down);sleep.onKeyPress(Key::Down);sleep.onKeyPress(Key::Enter);
         if(sleepChoice!=(heavenOff?0:2))throw std::runtime_error("Sleep menu Heaven entry did not follow provider state");
         CreativeInventory creative;SurvivalInventoryScreen survival(items);
@@ -193,6 +215,7 @@ int main(int argc,char** argv) {
         for(const auto language:languagesByEnglishName()) {
             localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[]{});
             draw("plugins-"+std::string(languageCode(language)),[&]{pluginMenu.render(ui,width,height);});
+            draw("registered-travel-"+std::string(languageCode(language)),[&]{sleep.render(ui,width,height);},3);
         }
         localization.setLanguage(Language::English);
         draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});

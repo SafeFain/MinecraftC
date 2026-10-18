@@ -1,3 +1,4 @@
+#include "plugins/official_heaven/HeavenEnvironment.h"
 #include "core/Window.h"
 #include "model/ModelRenderer.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
             const auto model = renderer.modelRenderer().upload(makeModel(mode));
             for (bool heaven : {false, true}) {
                 RenderEnvironment environment;
-                if (heaven) environment = applyHeavenEnvironment(environment);
+                if (heaven) environment = OfficialHeaven::environment(environment);
                 const auto reference = capture(renderer, model, environment, 0);
                 if (reference.g < reference.r + 20 || reference.g < reference.b + 20)
                     throw std::runtime_error("reference model did not retain its green color");

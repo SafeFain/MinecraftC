@@ -17,7 +17,7 @@ layout(push_constant) uniform PostConstants {
     vec4 texelTime;
     vec4 environment;
     vec4 celestial;
-    vec4 screenQuality;
+    vec4 gradeScreen;
     vec4 reflection;
     vec4 sunScreen;
 } post;
@@ -140,7 +140,7 @@ void main(){
     }
     vec3 hdr=texture(sceneColor,clamp(uv,vec2(0.0),vec2(1.0))).rgb;
     ivec2 surfaceSize=textureSize(surfaceData,0);
-    vec4 surface=post.screenQuality.w<0.0?
+    vec4 surface=post.gradeScreen.w<0.0?
         texelFetch(surfaceData,clamp(ivec2(vUv*vec2(surfaceSize)),ivec2(0),surfaceSize-1),0):
         texture(surfaceData,vUv);
     if(post.effects.w>0.001&&post.reflection.w>0.001&&surface.z< -0.01){
@@ -158,9 +158,9 @@ void main(){
         hdr=mix(refracted*vec3(0.82,0.94,0.97),reflected,
                 clamp(fresnel*post.reflection.w,0.0,0.88));
     }
-    if(abs(post.screenQuality.w)>0.5){
-        vec4 screen=post.screenQuality.w<0.0?guidedGi(vUv,surface):texture(screenEffects,vUv);
-        if(post.screenQuality.w<0.0){
+    if(abs(post.gradeScreen.w)>0.5){
+        vec4 screen=post.gradeScreen.w<0.0?guidedGi(vUv,surface):texture(screenEffects,vUv);
+        if(post.gradeScreen.w<0.0){
             if(surface.z>0.01&&surface.w<1.9)
                 hdr*=mix(1.0,screen.a,0.82*post.exposureBloom.w);
             hdr+=screen.rgb;
@@ -223,7 +223,7 @@ void main(){
         grade=mix(grade,cool,(1.0-post.environment.w)*0.32+storm*0.28);
         grade=mix(grade,vec3(1.015,1.018,1.025),
             post.environment.z*0.22);
-        grade=mix(grade,vec3(1.018,1.008,0.982),post.celestial.w*0.36);
+        grade=mix(grade,post.gradeScreen.rgb,post.celestial.w);
         color*=mix(vec3(1.0),grade,enhanced);
         luminance=dot(color,vec3(.2126,.7152,.0722));
         float saturation=0.06*enhanced*(1.0-post.environment.x*0.5);

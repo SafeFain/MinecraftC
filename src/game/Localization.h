@@ -10,6 +10,7 @@
 #include "core/Input.h"
 #include "game/Item.h"
 #include "game/Language.h"
+#include "game/GameRules.h"
 
 class Localization {
 public:
@@ -21,6 +22,8 @@ public:
     std::string format(
         std::string_view key, std::initializer_list<std::string> arguments) const;
     std::string itemName(ItemId item) const;
+    std::string dimensionName(uint32_t dimension) const;
+    std::string dimensionName(DimensionId dimension) const { return dimensionName(static_cast<uint32_t>(dimension)); }
     std::string actionName(InputAction action) const;
     std::string bindingName(const InputBinding& binding) const;
     bool hasTranslation(Language language, std::string_view key) const;

@@ -1,4 +1,7 @@
 #include "world/StructureGenerator.h"
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
+#include "plugins/official_heaven/HeavenGenerator.h"
+#endif
 
 #include "Config.h"
 #include "world/HeightPipeline.h"
@@ -918,143 +921,6 @@ void buildAbandonedFarmstead(const StructurePlacement& p,
     write(x+4, y+2, z-6, BlockId::WOOD);
 }
 
-void buildXiguangRuin(const StructurePlacement& placement,
-                      const StructureGenerator::StructureWriter& write) {
-    const int cx=(placement.minX+placement.maxX)/2;
-    const int cz=(placement.minZ+placement.maxZ)/2;
-    const int base=placement.baseY;
-    const uint64_t variant=placement.variant;
-    // Raised radial sanctuary with four independently ruined gateways.
-    for (int dz=-6; dz<=6; ++dz) for (int dx=-6; dx<=6; ++dx) {
-        const int d2=dx*dx+dz*dz;
-        if (d2<=36) write(cx+dx,base+1,cz+dz,
-            d2>24 ? slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom)
-                  : BlockId::SUNSTONE);
-    }
-    for (const BedDirection direction : {BedDirection::North,BedDirection::East,
-                                         BedDirection::South,BedDirection::West}) {
-        const glm::ivec3 out=bedDirectionOffset(direction);
-        const glm::ivec3 side(-out.z,0,out.x);
-        for (int step=6; step<=9; ++step)
-            write(cx+out.x*step,base+1,cz+out.z*step,
-                  slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom));
-        const int intact=3+static_cast<int>(WorldGenContext::hashPosition(
-            variant,out.x,2,out.z)%4u);
-        for (const int s : {-2,2}) for (int y=2; y<=intact; ++y)
-            write(cx+out.x*7+side.x*s,base+y,cz+out.z*7+side.z*s,
-                  BlockId::SUNSTONE);
-        for (int s=-2; s<=2; ++s)
-            if ((variant+s+static_cast<int>(direction))%5!=0)
-                write(cx+out.x*7+side.x*s,base+intact,
-                      cz+out.z*7+side.z*s,
-                      slabBlock(ArchitecturalMaterial::Sunstone,BlockHalf::Bottom));
-    }
-    for (int y=2; y<=4; ++y) write(cx,base+y,cz,BlockId::SUNSTONE);
-    write(cx,base+5,cz,BlockId::STAR_CRYSTAL);
-    write(cx+2,base+2,cz,BlockId::CHEST);
-    for (int i=0;i<12;++i) {
-        const uint64_t h=WorldGenContext::hashPosition(variant,cx+i,7,cz-i);
-        const int dx=static_cast<int>((h>>8)%19)-9;
-        const int dz=static_cast<int>((h>>24)%19)-9;
-        write(cx+dx,base+1,cz+dz,(h&1u)?BlockId::SUNSTONE:BlockId::MOSS);
-    }
-}
-
-void buildStarCrystalGeode(const StructurePlacement& placement,
-                           const StructureGenerator::StructureWriter& write) {
-    const int cx=(placement.minX+placement.maxX)/2;
-    const int cz=(placement.minZ+placement.maxZ)/2;
-    const int base=placement.baseY;
-    const uint64_t variant=placement.variant;
-    // Cracked hollow shell; south side and roof deliberately remain open.
-    for(int dy=0;dy<=7;++dy) for(int dz=-5;dz<=5;++dz)
-        for(int dx=-5;dx<=5;++dx) {
-            const int d2=dx*dx+dz*dz+(dy-3)*(dy-3);
-            if(d2<17||d2>29) continue;
-            const uint64_t h=WorldGenContext::hashPosition(variant,dx,dy,dz);
-            if ((dz<-3&&std::abs(dx)<=1&&dy<=3) || h%13u==0) continue;
-            write(cx+dx,base+dy,cz+dz,
-                  h%5u==0?BlockId::MOSS:BlockId::CLOUDSTONE);
-        }
-    fillBox(write,cx-3,base,cz-3,cx+3,base,cz+3,BlockId::MOSS);
-    for(int dy=1;dy<=5;++dy)
-        write(cx,base+dy,cz,BlockId::STAR_CRYSTAL);
-    for (const auto& p : std::array<glm::ivec3,4>{{
-            {-2,1,1},{2,1,-1},{1,1,2},{-1,1,-2}}}) {
-        write(cx+p.x,base+p.y,cz+p.z,BlockId::STAR_CRYSTAL);
-        write(cx+p.x,base+p.y+1,cz+p.z,BlockId::STAR_CRYSTAL);
-    }
-    write(cx+3,base+1,cz+1,BlockId::CHEST);
-}
-
-void buildCloudspireTower(const StructurePlacement& placement,
-                          const StructureGenerator::StructureWriter& write) {
-    const int cx=(placement.minX+placement.maxX)/2;
-    const int cz=(placement.minZ+placement.maxZ)/2;
-    const int base=placement.baseY;
-    const int height=18+static_cast<int>(placement.variant%7u);
-    fillBox(write,cx-4,base,cz-4,cx+4,base,cz+4,BlockId::SUNSTONE);
-    constexpr std::array<std::pair<int,int>,8> stairPath{{
-        {0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}}};
-    for(int y=1;y<=height;++y) {
-        const int radius=y>height-5?2:3;
-        fillRing(write,cx-radius,base+y,cz-radius,cx+radius,cz+radius,
-                 y%5==0?BlockId::CLOUDSTONE:BlockId::SUNSTONE);
-        if(y<=3){write(cx,base+y,cz-3,BlockId::AIR);}
-        if(y==6||y==12) {
-            for(int dz=-5;dz<=5;++dz) for(int dx=-5;dx<=5;++dx) {
-                const int edge=std::max(std::abs(dx),std::abs(dz));
-                if(edge>=2)
-                    write(cx+dx,base+y,cz+dz,
-                          slabBlock(ArchitecturalMaterial::Cloudstone,
-                                    BlockHalf::Bottom));
-                if(edge==5)
-                    write(cx+dx,base+y+1,cz+dz,
-                          slabBlock(ArchitecturalMaterial::Cloudstone,
-                                    BlockHalf::Bottom));
-            }
-        }
-        const size_t phase=static_cast<size_t>(y-1)%stairPath.size();
-        const auto [sx,sz]=stairPath[phase];
-        const auto [nx,nz]=stairPath[(phase+1)%stairPath.size()];
-        const BedDirection direction = nz < sz ? BedDirection::North :
-            nx > sx ? BedDirection::East :
-            nz > sz ? BedDirection::South : BedDirection::West;
-        write(cx+sx,base+y,cz+sz,stairBlock(
-            ArchitecturalMaterial::Sunstone,BlockHalf::Bottom,
-            direction));
-    }
-    fillBox(write,cx-3,base+height+1,cz-3,cx+3,base+height+1,cz+3,
-            slabBlock(ArchitecturalMaterial::Cloudstone,BlockHalf::Bottom));
-    for (const glm::ivec3& o : std::array<glm::ivec3,4>{{
-            {3,0,0},{-3,0,0},{0,0,3},{0,0,-3}}}) {
-        write(cx+o.x,base+height+2,cz+o.z,BlockId::SUNSTONE);
-        write(cx+o.x,base+height+3,cz+o.z,BlockId::STAR_CRYSTAL);
-    }
-    write(cx,base+height+2,cz,BlockId::CLOUDSTONE);
-    write(cx,base+height+3,cz,BlockId::STAR_CRYSTAL);
-    write(cx+1,base+1,cz+1,BlockId::CHEST);
-    write(cx,base+3,cz-3,BlockId::SUNSTONE);
-    buildDoor(write,cx,base+1,cz-3,BedDirection::North,DoorMaterial::Skyroot);
-}
-
-void buildSkywayShrine(const StructurePlacement& placement,
-                       const StructureGenerator::StructureWriter& write) {
-    const int cx = (placement.minX + placement.maxX) / 2;
-    const int cz = (placement.minZ + placement.maxZ) / 2;
-    const int base = placement.baseY;
-    for (int dz = -3; dz <= 3; ++dz) {
-        for (int dx = -3; dx <= 3; ++dx) {
-            const bool alternate = ((dx + dz +
-                static_cast<int>(placement.variant & 1u)) & 1) != 0;
-            write(cx + dx, base, cz + dz,
-                  alternate ? BlockId::CLOUDSTONE : BlockId::SUNSTONE);
-        }
-    }
-    write(cx, base + 1, cz, BlockId::STAR_CRYSTAL);
-    write(cx + 2, base + 1, cz, BlockId::CHEST);
-}
-
 } // namespace
 
 StructureGenerator::StructureGenerator(uint64_t seed,
@@ -1482,6 +1348,12 @@ bool StructureGenerator::reservationAt(int worldX, int worldZ) const {
 void StructureGenerator::build(const StructurePlacement& placement,
                                const StructureWriter& write,
                                const SurfaceSampler& surfaceSampler) {
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
+    // Historical enum fixtures; runtime structures use registered builders.
+    if(isHeavenStructure(placement.type)) {
+        OfficialHeaven::HeavenGenerator::buildLandmark(placement,write);return;
+    }
+#endif
     const int centerX = (placement.minX + placement.maxX) / 2;
     const int centerZ = (placement.minZ + placement.maxZ) / 2;
     if(isVillageStructure(placement.type)) {
@@ -1586,18 +1458,6 @@ void StructureGenerator::build(const StructurePlacement& placement,
             break;
         case StructureType::AbandonedFarmstead:
             buildAbandonedFarmstead(placement, transformedWrite);
-            break;
-        case StructureType::XiguangRuin:
-            buildXiguangRuin(placement, transformedWrite);
-            break;
-        case StructureType::StarCrystalGeode:
-            buildStarCrystalGeode(placement, transformedWrite);
-            break;
-        case StructureType::CloudspireTower:
-            buildCloudspireTower(placement, transformedWrite);
-            break;
-        case StructureType::SkywayShrine:
-            buildSkywayShrine(placement, transformedWrite);
             break;
         default:
             break;

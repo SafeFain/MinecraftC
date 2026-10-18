@@ -16,11 +16,11 @@ enum CloudFace : uint32_t {
     CloudNegativeY = 1u << 5,
 };
 
-// Backend-neutral cloud profile. Heaven uses the analytic horizon cloud sea
+// Backend-neutral cloud profile. Suppressed layers use analytic sky effects
 // in the sky shader and therefore must not enqueue ordinary voxel cloud cells.
 enum class CloudLayerStyle : uint8_t {
     Overworld,
-    Heaven
+    Suppressed
 };
 
 constexpr uint32_t CLOUD_ALL_FACES = (1u << 6) - 1u;

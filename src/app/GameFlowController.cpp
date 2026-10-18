@@ -16,10 +16,7 @@
 #include <glm/glm.hpp>
 
 namespace {
-AudioMusicMode musicModeFor(DimensionId dimension) {
-    return dimension == DimensionId::Heaven
-        ? AudioMusicMode::Heaven : AudioMusicMode::Overworld;
-}
+AudioMusicMode musicModeFor(DimensionId) { return AudioMusicMode::Overworld; }
 }
 
 GameFlowController::GameFlowController(
@@ -37,7 +34,7 @@ void GameFlowController::startGame(const std::string& worldId, bool newWorld) {
     saveCurrentWorld();
     const GameMode mode = m_session.startWorld(
         worldId, newWorld, m_clock.now());
-    m_audio.setMusicMode(musicModeFor(m_session.activeDimension()));
+    m_audio.setMusicMode(musicModeFor(m_session.activeDimension()),static_cast<uint32_t>(m_session.activeDimension()));
 
     m_state = GameState::LoadingWorld;
     m_ui.hotbar.setInventory(mode == GameMode::Spectator
@@ -64,7 +61,7 @@ void GameFlowController::completeLoading() {
 }
 
 void GameFlowController::beginDimensionLoading() {
-    m_audio.setMusicMode(musicModeFor(m_session.activeDimension()));
+    m_audio.setMusicMode(musicModeFor(m_session.activeDimension()),static_cast<uint32_t>(m_session.activeDimension()));
     m_state = GameState::LoadingWorld;
     m_session.setLocalControl(false);
     m_window.setCursorLocked(false);

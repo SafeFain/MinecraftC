@@ -16,7 +16,7 @@ struct ContentIds {
         revision=c.revision;blockCount=c.blocks.size();itemCount=c.items.size();
         auto build=[](const auto& values,auto& encode,auto& decode) {
             encode.clear();decode.clear();std::map<std::string,uint16_t> keys;
-            for(const auto& entry:values)keys.emplace(entry.second.key,entry.first);
+            for(const auto& entry:values)if(entry.first>=Plugins::FIRST_CONTENT_ID)keys.emplace(entry.second.key,entry.first);
             uint32_t next=Plugins::FIRST_CONTENT_ID;
             for(const auto& entry:keys) {
                 if(next>=Plugins::INVALID_CONTENT_ID)throw ProtocolError("Network content palette is too large");

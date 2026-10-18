@@ -27,8 +27,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     const uint32_t id=Plugins::resolveDimension("worldgen_policy_v2:layered");const auto dim=static_cast<DimensionId>(id);
     check(id>=2,"native V2 dimension registration");
     check(plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,1)&&plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,2)&&
-        !plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,3)&&plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,1)&&
-        plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,2)&&!plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,3),"version negotiation");
+        plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,3)&&!plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,4)&&plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,1)&&
+        plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,2)&&plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,3)&&!plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,4),"version negotiation");
     WorldGenerator g(12,WorldType::Normal,dim),same(12,WorldType::Normal,dim),other(13,WorldType::Normal,dim);
     const auto spawn=g.sampleDimensionSpawn();check(spawn&&*spawn==glm::dvec3(.5,101.01,.5)&&same.sampleDimensionSpawn()==spawn&&other.sampleDimensionSpawn()!=spawn,"pure seeded lower-layer spawn and actual parameters");
     check(g.sampleTerrainColumn(0,0).height==240,"fixture highest surface differs from spawn layer");

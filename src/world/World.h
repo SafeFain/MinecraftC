@@ -125,7 +125,9 @@ public:
     CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const;
     // 0..7 palette index of the exclusive Heaven biome at a column, for the
     // ambient particle tinting; returns 0 outside the Heaven dimension.
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
     int heavenBiomePaletteIndex(int worldX, int worldZ) const;
+#endif
     std::optional<glm::ivec2> locateBiome(Biome biome, int worldX,
                                           int worldZ) const;
     std::optional<glm::ivec3> locateStructure(
@@ -278,6 +280,7 @@ public:
     std::optional<RaycastHit> raycast(const glm::dvec3& origin,
                                       const glm::vec3& direction,
                                       float maxDistance) const;
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
     std::optional<glm::dvec3> heavenSkywayDestination(
         const glm::ivec3& core, bool upward) const;
     bool isHeavenSkywayCore(const glm::ivec3& core) const;
@@ -285,6 +288,7 @@ public:
         const glm::dvec3& origin, const glm::vec3& direction,
         float maxDistance = 96.0f) const;
 
+#endif
     // ── Rendering ────────────────────────────────────────────────────
     const std::vector<Chunk*>& getActiveChunks() const {
         return m_chunks.activeChunks();
@@ -295,7 +299,9 @@ public:
     bool isGeneratedAt(int worldX, int worldZ) const {
         return generatedAt(worldX, worldZ);
     }
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
     bool isHeaven() const { return m_generator.isHeaven(); }
+#endif
     uint64_t streamingRevision() const { return m_streamer.streamingRevision(); }
     bool streamingTargetReady() const { return m_streamer.streamingTargetReady(); }
 

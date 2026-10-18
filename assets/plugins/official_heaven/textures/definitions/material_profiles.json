@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "materials": {
+    "sunstone": {
+      "emission": 0.4
+    },
+    "star_crystal": {
+      "emission": 0.85
+    },
+    "starflower": {
+      "emission": 0.45
+    },
+    "cloud_bloom": {
+      "emission": 0.35
+    },
+    "glowshroom": {
+      "emission": 0.6
+    },
+    "star_crystal_lamp": {
+      "emission": 1.0,
+      "pattern": "crystal",
+      "roughness": 0.3
+    },
+    "moonflower": {
+      "emission": 0.26666666666666666
+    },
+    "hanging_cloud_vine": {
+      "emission": 0.8,
+      "emission_roles": [
+        4,
+        5,
+        6
+      ]
+    }
+  }
+}

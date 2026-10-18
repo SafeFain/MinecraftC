@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <exception>
 #include <iostream>
 #include <string>
 
@@ -22,7 +23,7 @@ void require(bool condition, const char* message) {
 }
 }
 
-int main() {
+int testAssets() {
     installHeavenFixture();
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
@@ -94,9 +95,19 @@ int main() {
     legacyMetadata.replace(legacyMetadata.find("sequence_blob"), 13, "unused_sequence");
     { std::ofstream file(fixtureTextures / "atlas.json"); file << legacyMetadata; }
     const auto legacyAtlas = buildBlockAtlasData(fixtureRoot);
-    for (size_t slot = 0; slot < legacyAtlas.sequences.size(); ++slot)
-        require(legacyAtlas.sequences[slot].variants == 1 && legacyAtlas.sequences[slot].frames == 1 &&
-                legacyAtlas.sequences[slot].slots[0] == slot, "legacy atlas did not synthesize identity sequences");
+    for (size_t slot = 0; slot < legacyAtlas.sequences.size(); ++slot) {
+        const Plugins::MaterialContent* replacement=nullptr;
+        for(const auto& entry:Plugins::content().materials)
+            if(entry.second.tile==slot&&!entry.second.images.empty())replacement=&entry.second;
+        const auto& sequence=legacyAtlas.sequences[slot];
+        require(sequence.slots[0]==slot,"legacy atlas changed a foundation slot");
+        if(replacement) {
+            require(sequence.variants==replacement->variants&&sequence.frames==replacement->frames,
+                    "provider sequence must override legacy host cache layout");
+            for(uint32_t i=0;i<sequence.variants*sequence.frames;++i)
+                require(sequence.slots[i]<legacyAtlas.sequences.size(),"provider legacy frames escaped atlas");
+        } else require(sequence.variants==1&&sequence.frames==1,"legacy atlas did not synthesize identity sequences");
+    }
     { std::ofstream file(fixtureTextures / "atlas.json"); file << currentMetadata; }
     { std::ofstream file(fixtureTextures / "atlas_sequences.bin", std::ios::binary); file << "invalid"; }
     bool rejected = false;
@@ -324,13 +335,21 @@ int main() {
     }
     const auto highAtlas=std::filesystem::temp_directory_path() /
         ("minecraftc-high-atlas-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".json");
-    { std::ofstream out(highAtlas); out << R"({"textures":{"star_crystal_lamp":{"index":300}}})"; }
+    { std::ofstream out(highAtlas); out << R"({"textures":{"stone":{"index":300}}})"; }
     require(loadTextureAssetDefinitions(highAtlas,
         root+"/assets/textures/definitions/blocks.json",
         root+"/assets/textures/definitions/items.json") &&
-        getFaceTextureIndex(BlockId::STAR_CRYSTAL_LAMP,FaceDir::TOP)==300,
+        getFaceTextureIndex(BlockId::STONE,FaceDir::TOP)==300,
         "atlas slots above 255 must not narrow");
     std::filesystem::remove(highAtlas);
     std::cout << "Asset definition tests passed\n";
     return 0;
+}
+
+int main() {
+    try { return testAssets(); }
+    catch (const std::exception& error) {
+        std::cerr << "Asset definition tests failed: " << error.what() << '\n';
+        return 1;
+    }
 }

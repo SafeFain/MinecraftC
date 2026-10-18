@@ -1,13 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <cstdint>
 
 class AssetStore;
 
 enum class AudioMusicMode {
     Menu,
-    Overworld,
-    Heaven
+    Overworld
 };
 
 enum class FishingSound { Cast, Splash, Bite, Reel };
@@ -27,8 +27,9 @@ public:
     bool initialize(const AssetStore* assets = nullptr);
     void setPaused(bool paused);
     bool paused() const;
-    void setMusicMode(AudioMusicMode mode);
+    void setMusicMode(AudioMusicMode mode,uint32_t dimension=0);
     AudioMusicMode musicMode() const;
+    uint32_t musicDimension() const;
     void setVolumes(float master, float music, float weather, float soundEffects);
     float masterVolume() const;
     float musicVolume() const;

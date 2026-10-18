@@ -317,9 +317,9 @@ int main() {
                     CaveAmbientKind::None,
             "cave ambient biome, dimension, shelter, or quality gate failed");
     const CloudView heavenCloudView = cloudView(
-        {0.0, 128.0, 0.0}, 0.0f, 128, CloudLayerStyle::Heaven);
-    require(buildCloudInstances(17, 0, 0, 2, CloudLayerStyle::Heaven).empty() &&
-                heavenCloudView.style == CloudLayerStyle::Heaven,
+        {0.0, 128.0, 0.0}, 0.0f, 128, CloudLayerStyle::Suppressed);
+    require(buildCloudInstances(17, 0, 0, 2, CloudLayerStyle::Suppressed).empty() &&
+                heavenCloudView.style == CloudLayerStyle::Suppressed,
             "Heaven cloud profile did not suppress voxel cells");
     static_assert(static_cast<int>(ParticleKind::RainSplash) == 4,
                   "particle kind values are part of the shader contract");
@@ -327,8 +327,8 @@ int main() {
                   "trajectory marker must use the shader's marker branch");
     static_assert(static_cast<int>(ParticleKind::SkyMote) == 6,
                   "Heaven light dust must use the mote shader branch");
-    static_assert(static_cast<int>(ParticleKind::HeavenPollen) == 7 &&
-                      static_cast<int>(ParticleKind::HeavenSparkle) == 8,
+    static_assert(static_cast<int>(ParticleKind::SoftTuft) == 7 &&
+                      static_cast<int>(ParticleKind::Sparkle) == 8,
                   "Heaven ambient kinds append after the mote branch");
     static_assert(static_cast<int>(ParticleKind::OverworldMote) == 11 &&
                       static_cast<int>(ParticleKind::Firefly) == 12,
@@ -337,14 +337,14 @@ int main() {
                       static_cast<int>(ParticleKind::CaveDust) == 14 &&
                       static_cast<int>(ParticleKind::CaveEmber) == 15,
                   "cave ambient kinds must match the weather shader branches");
-    static_assert(ParticleSystem::MAX_SKY_MOTES_PER_UPDATE == 8 &&
-                      ParticleSystem::MAX_POLLEN_PER_UPDATE == 4 &&
-                      ParticleSystem::MAX_SPARKLE_PER_UPDATE == 6 &&
-                      ParticleSystem::MAX_SKY_MOTES_PER_UPDATE <
+    static_assert(OfficialHeaven::MAX_SKY_MOTES_PER_UPDATE == 8 &&
+                      OfficialHeaven::MAX_POLLEN_PER_UPDATE == 4 &&
+                      OfficialHeaven::MAX_SPARKLE_PER_UPDATE == 6 &&
+                      OfficialHeaven::MAX_SKY_MOTES_PER_UPDATE <
                           ParticleSystem::MAX_PARTICLES &&
-                      ParticleSystem::MAX_POLLEN_PER_UPDATE <
+                      OfficialHeaven::MAX_POLLEN_PER_UPDATE <
                           ParticleSystem::MAX_PARTICLES &&
-                      ParticleSystem::MAX_SPARKLE_PER_UPDATE <
+                      OfficialHeaven::MAX_SPARKLE_PER_UPDATE <
                           ParticleSystem::MAX_PARTICLES,
                   "Heaven ambient particles must stay within the shared particle budget");
     VisualExposure exposure;
@@ -633,7 +633,7 @@ int main() {
                 "Cloud LOD exceeded its bounded instance budget");
         verifyCloudLodSurfaces(lod, buildCloudInstances(77, -17, -31, radius), radius);
     }
-    require(buildCloudLodInstances(77, 0, 0, 12, CloudLayerStyle::Heaven).empty(),
+    require(buildCloudLodInstances(77, 0, 0, 12, CloudLayerStyle::Suppressed).empty(),
             "Cloud LOD leaked ordinary clouds into Heaven");
     for (int radius : {0, MAX_CLOUD_RADIUS + 1}) {
         bool rejected = false;
@@ -896,8 +896,8 @@ int main() {
             "overcast weather did not hide stars");
     require(flash.ambientIntensity > thunder.ambientIntensity,
             "lightning flash did not brighten the environment");
-    const RenderEnvironment heavenNoon = applyHeavenEnvironment(noon);
-    require(heavenNoon.skyStyle == RenderSkyStyle::Heaven &&
+    const RenderEnvironment heavenNoon = OfficialHeaven::environment(noon);
+    require(heavenNoon.skyStyle == RenderSkyStyle::Layered &&
                 heavenNoon.zenithColor.b > noon.zenithColor.b &&
                 heavenNoon.horizonColor.r > noon.horizonColor.r &&
                 heavenNoon.directIntensity < noon.directIntensity,
@@ -906,8 +906,8 @@ int main() {
     heavenNight.daylight = 0.0f;
     heavenNight.starIntensity = 1.0f;
     heavenNight.sunDirection = {0.0f, -1.0f, 0.0f};
-    heavenNight = applyHeavenEnvironment(heavenNight);
-    require(heavenNight.skyStyle == RenderSkyStyle::Heaven &&
+    heavenNight = OfficialHeaven::environment(heavenNight);
+    require(heavenNight.skyStyle == RenderSkyStyle::Layered &&
                 heavenNight.zenithColor.b > heavenNight.zenithColor.r * 2.0f &&
                 heavenNight.starIntensity >= 1.0f,
             "Heaven night sky did not retain the indigo starfield contract");

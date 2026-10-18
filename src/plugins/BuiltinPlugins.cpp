@@ -1,6 +1,10 @@
 #include "plugins/PluginManager.h"
 #include "minecraftc/plugin.hpp"
 #include "plugins/OfficialHeavenContent.h"
+#include "plugins/official_heaven/HeavenPresentation.h"
+#include "plugins/official_heaven/HeavenEnvironment.h"
+#include "plugins/official_heaven/HeavenDefinitions.h"
+#include "plugins/official_heaven/HeavenProvider.h"
 #include "plugins/OfficialHeavenActions.h"
 #include <limits>
 #include <glm/gtc/matrix_transform.hpp>
@@ -48,18 +52,53 @@ const MC_Plugin contentPlugin{sizeof(MC_Plugin),MC_PLUGIN_ABI,"official_content"
 const MC_Plugin atmospherePlugin{sizeof(MC_Plugin),MC_PLUGIN_ABI,"official_atmosphere","1.0.0",atmosphereLoad,nullptr};
 
 int32_t heavenLoad(const MC_Host* host,MC_PluginContext* ctx){
-    Plugins::publishHeavenDimension();
     auto& manager=*static_cast<Plugins::PluginManager*>(ctx->manager);
-    const auto* actions=static_cast<const MC_PlayerActionsV2*>(host->query_extension(ctx,MC_PLAYER_ACTIONS_EXTENSION,2));
+    const auto* dimensions=static_cast<const MC_DimensionsV3*>(host->query_extension(ctx,MC_DIMENSIONS_EXTENSION,3));
+    const auto* localization=static_cast<const MC_LocalizationV1*>(host->query_extension(ctx,MC_LOCALIZATION_EXTENSION,1));
+    if(!dimensions||!localization)return -1;
+    MC_DimensionDefinitionV3 d{};d.size=sizeof(d);d.base.size=sizeof(d.base);d.base.base.size=sizeof(d.base.base);
+    d.base.base.key="minecraftc:heaven";d.base.base.name="Heaven";d.base.base.revision="1";
+    d.base.base.generator="official_heaven:heaven";d.base.base.generator_revision="9";
+    d.base.base.weather=MC_WEATHER_CLEAR;d.base.base.disable_natural_spawning=1;
+    d.base.base.death_target=d.base.base.void_target="minecraftc:overworld";
+    d.base.sample_spawn=OfficialHeaven::sampleSpawn;d.name_key="official_heaven:dimension.heaven";d.seed_domain=OfficialHeaven::HeavenGenerator::SEED_DOMAIN;
+    uint32_t id=MC_INVALID_DIMENSION;if(dimensions->register_dimension(ctx,&d,&id)||id!=1)return -1;
+    OfficialHeaven::loadDefinitions(manager.plugins().at(ctx->index).root);
+    if(localization->register_bundle(ctx,"lang"))return -1;
+    MC_DimensionTravelEntry travel{sizeof(travel),0,1,"official_heaven:bed_travel","official_heaven:travel.heaven"};
+    if(dimensions->register_bed_travel(ctx,&travel))return -1;
+    const auto* actions=static_cast<const MC_PlayerActionsV3*>(host->query_extension(ctx,MC_PLAYER_ACTIONS_EXTENSION,3));
     const auto* behaviors=static_cast<const MC_BehaviorsV2*>(host->query_extension(ctx,MC_BEHAVIORS_EXTENSION,2));
     if(!actions||!behaviors)return -1;
-    MC_PlayerActionV2 a{};a.size=sizeof(a);a.base.size=sizeof(a.base);a.base.key="official_heaven:skyway";a.base.range=256;a.target=Plugins::skywayTarget;
-    if(actions->register_action(ctx,&a))return -1;
-    a.base.key="official_heaven:starstep";a.base.range=96;a.base.cooldown=3;a.base.durability=1;a.target=Plugins::starstepTarget;a.range_from_eye=a.tool_pose=a.invalid_marker=1;a.use_cooldown=.15f;
-    if(actions->register_action(ctx,&a))return -1;
+    MC_PlayerActionV3 definition{};definition.size=sizeof(definition);auto& a=definition.base;a.size=sizeof(a);a.base.size=sizeof(a.base);a.base.key="official_heaven:skyway";a.base.range=256;definition.target=Plugins::skywayTargetV3;
+    if(actions->register_action(ctx,&definition))return -1;
+    a.base.key="official_heaven:starstep";a.base.range=96;a.base.cooldown=3;a.base.durability=1;definition.target=Plugins::starstepTargetV3;a.range_from_eye=a.tool_pose=a.invalid_marker=1;a.use_cooldown=.15f;
+    if(actions->register_action(ctx,&definition))return -1;
+    auto& dimension=Plugins::content().extensions.dimensions.at(1);
+    dimension.seedDomain=OfficialHeaven::HeavenGenerator::SEED_DOMAIN;
+    dimension.generation={"official_heaven:heaven","9","{}",{}};
+    dimension.spawn=MC_SPAWN_SAMPLED;dimension.sampleSpawn=OfficialHeaven::sampleSpawn;
     bool failed=false;
+    const auto* worldgen=static_cast<const MC_WorldgenV3*>(host->query_extension(ctx,MC_WORLDGEN_EXTENSION,3));
+    const auto* structures=static_cast<const MC_StructuresV3*>(host->query_extension(ctx,MC_STRUCTURES_EXTENSION,3));
+    if(!worldgen||!structures)return -1;
+    OfficialHeaven::describeGeneration([&](const auto& d){failed=worldgen->register_generator(ctx,&d)!=0||failed;},
+        [&](const auto& d){failed=structures->v2->register_structure(ctx,&d)!=0||failed;failed=structures->set_coarse_lod_policy(ctx,d.key,1)!=0||failed;},
+        [&](const auto& d){failed=structures->v2->v1->register_loot(ctx,&d)!=0||failed;});
+    OfficialHeaven::installStructureAliases();
     Plugins::heavenSemantics([&](const MC_BlockBehaviorV2& d){failed=behaviors->register_block(ctx,&d)!=0||failed;},[&](const MC_ItemBehaviorV2& d){failed=behaviors->register_item(ctx,&d)!=0||failed;});
     if(failed)return -1;
+    const auto* presentation=static_cast<const MC_PresentationV2*>(host->query_extension(ctx,MC_PRESENTATION_EXTENSION,2));
+    if(!presentation)return -1;
+    if(OfficialHeaven::registerAssets(host,ctx,manager.plugins().at(ctx->index).root))return -1;
+    for(const auto& particle:OfficialHeaven::particleDefinitions())if(presentation->register_particle(ctx,&particle))return -1;
+    const auto ambient=OfficialHeaven::ambientDefinition();if(presentation->register_ambient(ctx,&ambient))return -1;
+    const auto* environments=static_cast<const MC_EnvironmentV2*>(host->query_extension(ctx,MC_ENVIRONMENT_EXTENSION,2));
+    if(!environments)return -1;const auto environment=OfficialHeaven::environmentDefinition();
+    if(environments->register_profile(ctx,&environment))return -1;
+    const char* tracks[]={"audio/heaven_ether.wav","audio/heaven_sanctum.wav"};
+    const MC_MusicPlaylist music{sizeof(music),1,0,1,"official_heaven:music",tracks,2,0};
+    if(presentation->v1->register_playlist(ctx,&music))return -1;
     MC_HeldModel model{};model.size=sizeof(model);const auto item=Plugins::itemKey(ItemId::STARSTEP_SCEPTER);model.item=item.c_str();model.path="starstep.gltf";
     const glm::mat4 first(1),third=glm::rotate(glm::mat4(1),glm::radians(-120.f),glm::vec3(1,0,0));
     for(int i=0;i<16;++i){model.first_person[i]=first[i/4][i%4];model.third_person[i]=third[i/4][i%4];}
@@ -75,7 +114,7 @@ const std::vector<BuiltinPluginDescriptor>& builtinPlugins(){
     static const std::vector<BuiltinPluginDescriptor> entries{
         {"official_content","Official Content Example","builtin-api1-content1","",false,false,builtinContent},
         {"official_atmosphere","Official Atmosphere Example","builtin-api1-content1","",true,false,builtinAtmosphere},
-        {"official_heaven","Heaven","heaven-v9-content1-actions2","plugins/official_heaven",false,true,builtinHeaven}};
+        {"official_heaven","Heaven","heaven-v9-content2-p1","plugins/official_heaven",false,true,builtinHeaven}};
     return entries;
 }
 }

@@ -94,6 +94,8 @@ jobs:
           run_smoke vulkan-demo "Vulkan first frame presented"
       - name: Package Linux release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz" "$RELEASE_DIR"
+      - name: Verify official provider resources
+        run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-linux-x86_64.tar.gz"
       - name: Upload Linux package
         uses: actions/upload-artifact@v7
         with:
@@ -175,6 +177,8 @@ jobs:
       - name: Package Windows release
         shell: pwsh
         run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-x86_64.zip"
+      - name: Verify official provider resources
+        run: python tools/check_official_package.py "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-x86_64.zip"
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
@@ -263,6 +267,8 @@ jobs:
           run_smoke vulkan "Vulkan first frame presented"
       - name: Package macOS release
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-macos-universal.tar.gz" "$RELEASE_DIR"
+      - name: Verify official provider resources
+        run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-macos-universal.tar.gz"
       - name: Upload macOS package
         uses: actions/upload-artifact@v7
         with:
@@ -608,6 +614,8 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             build-ios-simulator/Release-iphonesimulator/MinecraftC.app \
             "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-simulator-arm64.zip"
+      - name: Verify official provider resources
+        run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.ipa"
       - name: Upload unsigned iOS device IPA
         uses: actions/upload-artifact@v7
         with:
@@ -616,6 +624,8 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - name: Verify official provider resources
+        run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-simulator-arm64.zip"
       - name: Upload iOS Simulator package
         uses: actions/upload-artifact@v7
         with:
@@ -676,6 +686,8 @@ jobs:
           ! "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
             -d "$RUNNER_TEMP/libmain.so" | grep -E 'lib(GLES|EGL)'
           cp "$source_apk" "$release_apk"
+      - name: Verify official provider resources
+        run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-android-arm64-unsigned.apk"
       - name: Upload unsigned Android package
         uses: actions/upload-artifact@v7
         with:

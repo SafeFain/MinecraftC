@@ -1,7 +1,9 @@
 #pragma once
 
 #include "world/Noise.h"
-#include "plugins/HeavenSkywayPolicy.h"
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
+#include "plugins/official_heaven/HeavenGenerator.h"
+#endif
 #include "plugins/Extensions.h"
 #include "world/BiomeMap.h"
 #include "world/HeightPipeline.h"
@@ -35,34 +37,14 @@ public:
         glm::dvec3 position{0.0};
         uint32_t seed = 0;
     };
-    enum class HeavenBiome : uint8_t {
-        DawnMeadow,
-        SkyrootGrove,
-        SunstoneHeights,
-        StarCrystalGarden,
-        CloudbloomFields,
-        SkystoneBarrens,
-        GlimmerFen,
-        MoonpearlTerrace
-    };
-    static constexpr int HEAVEN_BIOME_COUNT = 8;
-    static constexpr int HEAVEN_LAYER_COUNT = 5;
-
-    struct HeavenIslandColumn {
-        bool present = false;
-        HeavenBiome biome = HeavenBiome::DawnMeadow;
-        int top = Config::WORLD_MIN_Y - 1;
-        int bottom = Config::WORLD_MIN_Y;
-    };
-    struct HeavenLodFeature {
-        int layer = 0;
-        int bottomOffset = 1;
-        int topOffset = 1;
-        BlockId block = BlockId::AIR;
-        bool replacesSurface = false;
-        HeavenBiome biome = HeavenBiome::DawnMeadow;
-    };
-    using HeavenSkyway = HeavenPolicy::HeavenSkyway;
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
+    // Compatibility query types; implementation belongs to the optional provider.
+    using HeavenBiome=OfficialHeaven::HeavenGenerator::HeavenBiome;
+    using HeavenIslandColumn=OfficialHeaven::HeavenGenerator::HeavenIslandColumn;
+    using HeavenLodFeature=OfficialHeaven::HeavenGenerator::HeavenLodFeature;
+    using HeavenSkyway=OfficialHeaven::HeavenGenerator::HeavenSkyway;
+    static constexpr int HEAVEN_BIOME_COUNT=8,HEAVEN_LAYER_COUNT=5;
+#endif
     // Callback for setting blocks outside the current chunk (tree leaves at edges)
     using BlockSetter = std::function<void(int worldX, int worldY, int worldZ, BlockId id)>;
     // Callback for structure blocks outside the current chunk.  Unlike
@@ -88,10 +70,11 @@ public:
 
     std::vector<MC_DecorationBlock> pluginModifierBlocks(int x,int z,int width=1,int depth=1,bool includeStructures=true) const;
 
-    std::vector<RegionGenerationData::PendingBlock> pluginStructureBlocks(int,int,int=16,int=16) const;
+    std::vector<RegionGenerationData::PendingBlock> pluginStructureBlocks(int,int,int=16,int=16,bool coarse=false) const;
     std::optional<MC_LocatedStructure> locatePluginStructure(const std::string&,int,int,uint32_t=8192) const;
     uint64_t pluginStructureFingerprint() const;
     std::optional<glm::dvec3> sampleDimensionSpawn() const;
+    std::vector<MC_GenerationLayer> sampleGenerationLayers(int x,int z) const;
     uint64_t lodSamplingFingerprint() const;
     std::vector<MC_LodSpan> samplePluginLodColumn(int x,int z,int cellSize,
         const std::vector<MC_LodSpan>& base={}) const;
@@ -100,7 +83,7 @@ public:
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
     CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const {
-        return customGenerator() || isHeaven() || m_worldType == WorldType::Superflat
+        return customGenerator() || m_worldType == WorldType::Superflat
             ? CaveBiome::Neutral
             : m_caveGenerator.biomeAt(worldX, worldY, worldZ);
     }
@@ -111,6 +94,7 @@ public:
         int chunkX, int chunkZ) const;
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
     bool isHeaven() const { return m_dimension == DimensionId::Heaven; }
     static BlockId heavenSurfaceBlock(HeavenBiome biome);
     std::vector<HeavenLodFeature> sampleHeavenEcologyFeatures(int worldX, int worldZ) const;
@@ -122,14 +106,15 @@ public:
     std::optional<LocatedStructure> locateNearestHeavenStructure(
         StructureType type, int worldX, int worldZ,
         int maximumDistance = 8192) const;
-    glm::ivec3 heavenSpawnBlock() const { return m_heavenSpawnBlock; }
-    HeavenSkyway originHeavenSkyway() const { return m_originSkyway; }
+    glm::ivec3 heavenSpawnBlock() const;
+    HeavenSkyway originHeavenSkyway() const;
     std::optional<HeavenSkyway> heavenSkywayForCell(
         int cellX, int cellZ) const;
     std::optional<glm::dvec3> heavenSkywayDestination(
         const glm::ivec3& core, bool upward) const;
+#endif
     uint32_t generationVersion() const {
-        return isHeaven() ? HEAVEN_GENERATION_VERSION :
+        return m_dimension==DimensionId::Heaven ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
     }
     const Plugins::GenerationConfig& generationConfig() const {return m_pluginConfig;}
@@ -142,7 +127,7 @@ public:
             const auto hash=Plugins::generationFingerprint(m_pluginConfig)^structures;
             return static_cast<uint32_t>(hash^(hash>>32));
         }
-        return isHeaven() ? HEAVEN_CHUNK_CACHE_VERSION :
+        return m_dimension==DimensionId::Heaven ? HEAVEN_CHUNK_CACHE_VERSION :
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
@@ -175,8 +160,6 @@ private:
     TreeGenerator  m_treeGenerator;
     OreGenerator   m_oreGenerator;
     StructureGenerator m_structureGenerator;
-    glm::ivec3 m_heavenSpawnBlock{0, 200, 0};
-    HeavenSkyway m_originSkyway{5, 0, 200, true};
 
     // Tree placement helper — handles all tree types
     void placeTree(Chunk& chunk, int localX, int baseY, int localZ,
@@ -191,6 +174,7 @@ private:
     static SurfaceColumn superflatColumn();
     static void populateSuperflat(Chunk& chunk);
 
+#ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
     HeavenIslandColumn sampleHeavenIsland(int worldX, int worldZ) const;
     HeavenIslandColumn sampleHeavenLayer(
         int worldX, int worldZ, int layer) const;
@@ -198,6 +182,5 @@ private:
         StructureType type, int cellX, int cellZ) const;
     glm::ivec3 findHeavenSpawnBlock(int maximumRadius = 512) const;
     HeavenSkyway findOriginSkyway() const;
-    static void populateHeaven(Chunk& chunk, WorldGenerator& generator,
-                               const StructureSetter& structureSetter = {});
+#endif
 };

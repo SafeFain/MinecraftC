@@ -77,7 +77,8 @@ class Workbench:
                 if path.name in {'recipes.json','export.json'}:continue
                 if path.is_dir():shutil.copytree(path,target/path.name,dirs_exist_ok=True)
                 else:shutil.copy2(path,target/path.name)
-            (ROOT/'assets/textures/definitions/recipes.json').write_text(json.dumps(self.document,indent=2)+'\n')
+            __import__('asset_definitions').write_owned_definition(ROOT/'assets/textures/definitions/recipes.json',self.document)
+            __import__('plugin_asset_export').export_packages(tg,target,ROOT/'assets/plugins')
         return {'exported':str(output),'applied':request.get('apply') is True}
 
 

@@ -472,8 +472,8 @@ GameMode GameSession::startWorld(
     dimension = newWorld ? DimensionId::Overworld : worldMetadata.activeDimension;
     ensureDimension(dimension);
     player.bindWorld(world(), &entities());
-    loadingReason = dimension == DimensionId::Heaven
-        ? LoadingReason::EnteringHeaven : LoadingReason::World;
+    loadingReason = dimension != DimensionId::Overworld
+        ? LoadingReason::Dimension : LoadingReason::World;
     const GameMode mode = worldMetadata.gameMode;
     player.configureRules(mode, worldMetadata.difficulty);
     player.inventory() = worldMetadata.inventory;
@@ -484,10 +484,10 @@ GameMode GameSession::startWorld(
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
     loadActiveDimensionState();
     if(static_cast<uint32_t>(dimension)>=2){const auto landing=dimensionLanding(dimension,player.getPosition());if(!landing)throw std::runtime_error("Dimension has no safe landing");player.setPosition(*landing);}
-    if (dimension == DimensionId::Heaven && !worldMetadata.heaven.hasSafePosition) {
+    if (dimension != DimensionId::Overworld && !worldMetadata.dimensions[static_cast<uint32_t>(dimension)].hasSafePosition) {
         const glm::dvec3 spawn = world().findSafeSpawn();
         player.setPosition(spawn);
-        worldMetadata.heaven.playerPosition = spawn;
+        worldMetadata.dimensions[static_cast<uint32_t>(dimension)].playerPosition = spawn;
     }
     resetTransientState(
         newWorld, survivalTicks(), loadingStarted);
@@ -560,8 +560,8 @@ bool GameSession::advanceLoading(
                 worldMetadata.weather = weather().saveState();
                 saveStore->saveMetadata(worldMetadata);
             }
-            if (dimension == DimensionId::Heaven && !lanJoining) {
-                ensureHeavenSafePosition();
+            if (dimension != DimensionId::Overworld && !lanJoining) {
+                ensureDimensionSafePosition();
                 updateSaveMetadata();
                 if (saveStore) saveStore->saveMetadata(worldMetadata);
             }
@@ -1000,7 +1000,7 @@ void GameSession::finishSleep(const Feedback& /*feedback*/) {
 }
 
 void GameSession::chooseSleepAction(
-    SleepAction action, RuntimeClock::Tick loadingStarted,
+    SleepAction action, RuntimeClock::Tick /*loadingStarted*/,
     const Feedback& feedback) {
     if (lanJoining) {
         Lan::GameAction command; command.kind = Lan::ActionKind::SleepChoice;
@@ -1009,11 +1009,7 @@ void GameSession::chooseSleepAction(
     if (sleepState != SleepVisualState::Choosing &&
         sleepState != SleepVisualState::Entering)
         return;
-    if (action == SleepAction::TravelToHeaven &&
-        (dimension != DimensionId::Overworld||!Plugins::validDimension(DimensionId::Heaven))) {
-        finishSleep(feedback);
-        return;
-    }
+    if(action==SleepAction::BedTravel)return;
     if (action == SleepAction::SleepUntilMorning) {
         if (hostingLan()) { hostWantsMorning = true; (void)trySkipLanNight(dimension); return; }
         if (worldMetadata.gameRules.integer(GameRuleId::PlayersSleepingPercentage) > 100) {
@@ -1024,14 +1020,19 @@ void GameSession::chooseSleepAction(
         if (Plugins::dimensionContent(dimension).weather==MC_WEATHER_NORMAL && worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather))
             weather().setWeather(WeatherType::Clear);
     }
-    if (action == SleepAction::TravelToHeaven) {
-        finishSleep(feedback);
-        if (switchDimension(DimensionId::Heaven, loadingStarted) &&
-            feedback.dimensionLoading)
-            feedback.dimensionLoading();
-        return;
-    }
     finishSleep(feedback);
+}
+
+void GameSession::chooseBedTravel(const std::string& key,RuntimeClock::Tick now,const Feedback& feedback) {
+    const auto found=Plugins::content().extensions.bedTravel.find(key);
+    if(found==Plugins::content().extensions.bedTravel.end()||found->second.source!=static_cast<uint32_t>(dimension)||
+       !Plugins::validDimension(found->second.target)||(sleepState!=SleepVisualState::Choosing&&sleepState!=SleepVisualState::Entering))return;
+    if(lanJoining) {
+        Lan::GameAction action;action.kind=Lan::ActionKind::SleepChoice;action.inventory.argument=static_cast<uint16_t>(SleepAction::BedTravel);
+        action.command=key;queueReplicaAction(action);return;
+    }
+    const auto target=static_cast<DimensionId>(found->second.target);finishSleep(feedback);
+    if(switchDimension(target,now)&&feedback.dimensionLoading)feedback.dimensionLoading();
 }
 
 void GameSession::cancelSleep(const Feedback& feedback) {
@@ -1061,8 +1062,7 @@ bool GameSession::enterDimension(DimensionId target,RuntimeClock::Tick loadingSt
     ensureDimension(target);
     dimension = target;
     worldMetadata.activeDimension = target;
-    loadingReason = target == DimensionId::Heaven
-        ? LoadingReason::EnteringHeaven : (target==DimensionId::Overworld?LoadingReason::ReturningOverworld:LoadingReason::World);
+    loadingReason = LoadingReason::Dimension;
     player.bindWorld(world(), &entities());
     loadActiveDimensionState();
     player.setPosition(validatedLanding);
@@ -1246,11 +1246,8 @@ void GameSession::saveActiveDimensionState() {
         worldMetadata.heaven.playerPosition = player.getPosition();
         worldMetadata.heaven.worldTicks = survivalTicks();
         worldMetadata.heaven.dayPhase = dayNightCycle().phase();
-        if (player.onGround()) {
-            worldMetadata.heaven.safePosition = glm::ivec3(
-                static_cast<int>(std::floor(player.getPosition().x)),
-                static_cast<int>(std::floor(player.getPosition().y)),
-                static_cast<int>(std::floor(player.getPosition().z)));
+        if (state.hasSafePosition) {
+            worldMetadata.heaven.safePosition = state.safePosition;
             worldMetadata.heaven.hasSafePosition = true;
         }
     }
@@ -1300,7 +1297,7 @@ std::optional<glm::ivec3> GameSession::loadValidOverworldBed() {
     return std::nullopt;
 }
 
-void GameSession::ensureHeavenSafePosition() {
+void GameSession::ensureDimensionSafePosition() {
     auto safe = [](const World& target, const glm::dvec3& position) {
         const int x = static_cast<int>(std::floor(position.x));
         const int y = static_cast<int>(std::floor(position.y));
@@ -1312,11 +1309,8 @@ void GameSession::ensureHeavenSafePosition() {
     };
 
     glm::dvec3 candidate = player.getPosition();
-    if (worldMetadata.heaven.hasSafePosition) {
-        const glm::ivec3& saved = worldMetadata.heaven.safePosition;
-        candidate = glm::dvec3(saved.x + 0.5, saved.y + 0.01,
-                               saved.z + 0.5);
-    }
+    auto& state=worldMetadata.dimensions[static_cast<uint32_t>(dimension)];
+    if (!safe(world(),candidate)&&state.hasSafePosition) candidate=state.safePlayerPosition;
     if (!safe(world(), candidate)) candidate = player.getPosition();
     if (!safe(world(), candidate)) candidate = world().findSafeSpawn();
     if (!safe(world(), candidate)) {
@@ -1333,13 +1327,9 @@ void GameSession::ensureHeavenSafePosition() {
         candidate = {x + 0.5, y + 0.01, z + 0.5};
     }
     player.setPosition(candidate);
-    worldMetadata.heaven.playerPosition = candidate;
-    worldMetadata.heaven.safePosition = glm::ivec3(
-        static_cast<int>(std::floor(candidate.x)),
-        static_cast<int>(std::floor(candidate.y)),
-        static_cast<int>(std::floor(candidate.z)));
-    worldMetadata.heaven.hasSafePosition = true;
-    auto& state=worldMetadata.dimensions[1];state.safePlayerPosition=candidate;state.safePosition=worldMetadata.heaven.safePosition;state.hasSafePosition=true;
+    state.playerPosition=candidate;state.safePlayerPosition=candidate;
+    state.safePosition=glm::ivec3(glm::floor(candidate));state.hasSafePosition=true;
+    saveActiveDimensionState();
 }
 
 void GameSession::updateSaveMetadata() {
@@ -1598,7 +1588,7 @@ bool GameSession::pluginActionTarget(uint64_t id,const std::string& key,bool pre
     if(!itemBound){if(!hit)return true;const auto* b=Plugins::blockBehavior(terrain.getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z));if(!b||b->action!=key)return true;}
     if(p->gameMode()==GameMode::Survival&&action.durability&&!getItemProps(p->activeItem().id).maxDurability)return true;
     if(action.kind==MC_ACTION_TRAVEL){if(p->pluginCooldown(key)>0)return true;out.dimension=Plugins::resolveDimension(action.dimension);out.valid=out.dimension!=dim;return true;}
-    if(action.target||action.targetV2){
+    if(action.target||action.contextual()){
         struct Reader{World* world;uint32_t samples=0;} reader{&terrain};
         MC_ActionViewV2 view{};view.size=sizeof(view);auto& base=view.base;base.size=sizeof(base);base.dimension=dim;base.player_id=id;base.item=static_cast<uint16_t>(p->activeItem().id);
         const auto eye=p->getEyePosition(),position=p->getPosition();const auto direction=p->getForward();
@@ -1609,25 +1599,31 @@ bool GameSession::pluginActionTarget(uint64_t id,const std::string& key,bool pre
         view.sneaking=p->sneakInput();view.source=itemBound?0:1;view.phase=preview?0:1;
         if(hit){view.hit_valid=1;for(int i=0;i<3;++i){view.hit[i]=hit->blockPos[i];view.face[i]=hit->faceNormal[i];}view.hit_block=static_cast<uint16_t>(terrain.getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z));}
         const auto& generator=terrain.generator();view.generation={sizeof(MC_GenerationContext),dim,generator.getSeed(),generator.generationConfig().parameters.c_str()};view.builtin_generation=!generator.customGenerator();
-        const auto spawn=generator.isHeaven()&&!generator.customGenerator()?generator.heavenSpawnBlock():worldMetadata.worldSpawn;
+        auto spawn=worldMetadata.worldSpawn;
+        if(const auto sampled=generator.sampleDimensionSpawn())spawn=glm::ivec3(static_cast<int>(std::floor(sampled->x)),static_cast<int>(std::floor(sampled->y))-1,static_cast<int>(std::floor(sampled->z)));
         for(int i=0;i<3;++i)view.spawn[i]=spawn[i];
         view.layers=[](void* data,int32_t x,int32_t z,MC_ActionLayer* layers,uint32_t capacity,uint32_t* count)->int32_t{
             auto& r=*static_cast<Reader*>(data);try {if(!count||!layers||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000||++r.samples>65536)return -1;
-            const auto& g=r.world->generator();
-            if(g.isHeaven()&&!g.customGenerator()){*count=5;if(capacity<5)return -1;const auto columns=g.sampleHeavenLayers(x,z);for(size_t i=0;i<5;++i)layers[i]={columns[i].bottom,columns[i].top,uint32_t(columns[i].present),uint32_t(columns[i].biome)};return 0;}
-            if(g.customGenerator()){const auto spans=g.samplePluginLodColumn(x,z,1);std::vector<MC_ActionLayer> result;for(const auto& span:spans){if(!result.empty()&&result.back().top+1==span.bottom)result.back().top=span.top;else result.push_back({span.bottom,span.top,1,0});}*count=static_cast<uint32_t>(result.size());if(capacity<result.size())return -1;std::copy(result.begin(),result.end(),layers);return 0;}
-            *count=1;if(!capacity)return -1;const auto column=g.sampleTerrainColumn(x,z);layers[0]={Config::WORLD_MIN_Y,column.height,1,0};return 0;
+            const auto result=r.world->generator().sampleGenerationLayers(x,z);*count=static_cast<uint32_t>(result.size());
+            if(capacity<result.size())return -1;
+            for(size_t i=0;i<result.size();++i)layers[i]={result[i].bottom,result[i].top,result[i].present,result[i].biome};return 0;
             }catch(...){return -1;}
         };
         view.block_flags=[](void*,uint16_t raw,uint32_t* flags)->int32_t{const auto block=static_cast<BlockId>(raw);if(!flags||!isValidBlockId(block))return -1;*flags=(isFullCollisionBlock(block)?1u:0u)|(blockCollisionBoxes(block).count==0?2u:0u);return 0;};
-        if(action.targetV2){MC_ActionTargetV2 target{};target.base=out;if(!action.targetV2(view,target)||target.handled>1)return false;out=target.base;if(handled)*handled=target.handled!=0;}
+        if(action.targetV3){
+            MC_ActionViewV3 extended{};extended.size=sizeof(extended);extended.base=view;
+            extended.dimension_key=Plugins::dimensionContent(dim).key.c_str();extended.generation_provider=generator.generationConfig().generator.c_str();
+            MC_ActionTargetV2 target{};target.base=out;if(!action.targetV3(extended,target)||target.handled>1)return false;
+            out=target.base;if(handled)*handled=target.handled!=0;
+        }
+        else if(action.targetV2){MC_ActionTargetV2 target{};target.base=out;if(!action.targetV2(view,target)||target.handled>1)return false;out=target.base;if(handled)*handled=target.handled!=0;}
         else if(!action.target(base,out))return false;
     }else if(hit&&hit->faceNormal.y>0){out.valid=1;out.position[0]=hit->blockPos.x+.5;out.position[1]=hit->blockPos.y+blockCollisionHeight(terrain.getBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z))+.001;out.position[2]=hit->blockPos.z+.5;}
     if(out.size<sizeof(out)||out.valid>1||out.dimension!=dim)return false;
     const glm::dvec3 target(out.position[0],out.position[1],out.position[2]);
     const auto origin=action.rangeFromEye?p->getEyePosition():p->getPosition();
     if(out.valid&&(!pluginSafeLanding(terrain,target)||glm::distance(origin,target)>action.range))out.valid=0;
-    if(p->pluginCooldown(key)>0||(action.targetV2&&action.useCooldown>0&&p->actionUseCooldown()>0))out.valid=0;
+    if(p->pluginCooldown(key)>0||(action.contextual()&&action.useCooldown>0&&p->actionUseCooldown()>0))out.valid=0;
     return true;
 }
 bool GameSession::pluginUseAction(uint64_t id,const std::string& key){
@@ -1666,4 +1662,8 @@ bool GameSession::pluginEmitParticle(const MC_ParticleEmission& e){
     if(e.dimension==static_cast<uint32_t>(dimension)&&!particles.emitPlugin(e))return false;
     if(!e.local_only)for(const auto& entry:guests){const auto& guest=*entry.second;if(e.dimension!=static_cast<uint32_t>(guest.profile.dimension))continue;Lan::Writer writer;Lan::writeDimension(writer,guest.profile.dimension);writer.u64(guest.chunkEpoch);writer.text(e.particle);writer.u32(e.count);for(double v:e.position)writer.f64(v);lanHost.send(entry.first,{Lan::MessageType::PluginParticle,0,std::move(writer.bytes)});}
     return true;
+}
+
+bool GameSession::pluginEmitParticleV2(const MC_ParticleInstanceV2& e) {
+    return e.dimension==static_cast<uint32_t>(dimension)&&particles.emitPluginV2(e);
 }

@@ -25,6 +25,9 @@ enum class ChunkLifecycleState : uint8_t {
 };
 
 class Chunk {
+    friend class WorldGenerator;
+    // Only the generator can publish its completely validated staged blocks.
+    void publishGeneratedBlocks(const Chunk& source);
 public:
     using LifecycleState = ChunkLifecycleState;
 

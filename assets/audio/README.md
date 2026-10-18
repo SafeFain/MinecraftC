@@ -1,6 +1,6 @@
 # MinecraftC Music
 
-The eight tracks in this directory are original music written for MinecraftC
+The six tracks in this directory and two tracks in the official Heaven package are original music written for MinecraftC
 and generated deterministically by `tools/audio_generator.py`. They are project
 assets distributed under MinecraftC's GPL-3.0-only license.
 
@@ -18,9 +18,9 @@ assets distributed under MinecraftC's GPL-3.0-only license.
   reserved for the Overworld.
 - The Overworld independently chooses one of its four tracks when entered and
   after each complete track, so playback has no fixed sequence.
-- `heaven_ether.wav`: slowly breathing pads and floating crystal tones at 56
+- `../plugins/official_heaven/audio/heaven_ether.wav`: slowly breathing pads and floating crystal tones at 56
   BPM, reserved for Heaven.
-- `heaven_sanctum.wav`: a slow pipe-organ chorale with celestial chimes at 48
+- `../plugins/official_heaven/audio/heaven_sanctum.wav`: a slow pipe-organ chorale with celestial chimes at 48
   BPM, reserved for Heaven.
 - Heaven independently chooses either of its tracks when entered and after each
   complete track, so playback has no fixed sequence.

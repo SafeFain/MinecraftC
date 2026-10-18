@@ -14,7 +14,7 @@ layout(push_constant) uniform PostConstants {
     vec4 texelTime;
     vec4 environment;
     vec4 celestial;
-    vec4 screenQuality;
+    vec4 gradeScreen;
     vec4 reflection;
     vec4 sunScreen;
 } post;

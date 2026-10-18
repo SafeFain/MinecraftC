@@ -1,6 +1,7 @@
 #include "game/Localization.h"
 #include "core/AssetStore.h"
 #include "game/ArabicShaper.h"
+#include "plugins/ContentRegistry.h"
 
 #include <algorithm>
 #include <cctype>
@@ -24,6 +25,7 @@ Localization::Strings Localization::loadFile(const std::filesystem::path& path) 
 }
 
 void Localization::load(const std::filesystem::path& assetRoot) {
+    for(auto& language:m_languages)language.clear();
     m_languages[static_cast<size_t>(Language::English)] =
         loadFile(assetRoot / "lang" / "en_us.json");
     for (size_t index = 0; index < m_languages.size(); ++index) {
@@ -48,7 +50,16 @@ const Localization::Strings& Localization::languageStrings(Language language) co
 }
 
 std::string Localization::rawText(std::string_view key) const {
-    const std::string owned(key);
+    std::string owned(key);
+    const auto& extensions=Plugins::content().extensions;
+    if(const auto alias=extensions.translationAliases.find(owned);alias!=extensions.translationAliases.end())owned=alias->second;
+    const auto pluginText=[&](Language language)->const std::string* {
+        const auto bundle=extensions.translations.find(std::string(languageCode(language)));
+        if(bundle==extensions.translations.end())return nullptr;
+        const auto found=bundle->second.find(owned);return found==bundle->second.end()?nullptr:&found->second;
+    };
+    if(const auto* value=pluginText(m_language))return *value;
+    if(const auto* value=pluginText(Language::English))return *value;
     const auto& selected = active();
     if (const auto found = selected.find(owned); found != selected.end()) return found->second;
     const auto& english = languageStrings(Language::English);
@@ -80,11 +91,20 @@ std::string Localization::format(
 }
 
 std::string Localization::itemName(ItemId item) const {
+    if(const auto name=Plugins::content().extensions.nameKeys.find(Plugins::itemKey(item));
+       name!=Plugins::content().extensions.nameKeys.end())return text(name->second);
     const std::string key = "item." + std::to_string(static_cast<uint16_t>(item));
     const auto& selected = active();
     if (const auto found = selected.find(key); found != selected.end())
         return shaped(found->second);
-    return getItemProps(item).name;
+    const auto& english=languageStrings(Language::English);
+    if(const auto found=english.find(key);found!=english.end())return shaped(found->second);
+    return shaped(getItemProps(item).name);
+}
+
+std::string Localization::dimensionName(uint32_t dimension) const {
+    const auto& d=Plugins::dimensionContent(dimension);
+    return d.nameKey.empty()?shaped(d.name):text(d.nameKey);
 }
 
 std::string Localization::actionName(InputAction action) const {
@@ -120,6 +140,10 @@ std::string Localization::bindingName(const InputBinding& binding) const {
 }
 
 bool Localization::hasTranslation(Language language, std::string_view key) const {
+    std::string resolved(key);const auto& e=Plugins::content().extensions;
+    if(const auto alias=e.translationAliases.find(resolved);alias!=e.translationAliases.end())resolved=alias->second;
+    if(const auto bundle=e.translations.find(std::string(languageCode(language)));bundle!=e.translations.end())
+        if(bundle->second.count(resolved))return true;
     const auto& strings = languageStrings(language);
-    return strings.find(std::string(key)) != strings.end();
+    return strings.find(resolved) != strings.end();
 }

@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "materials": {
+    "aether_grass_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "aether_grass_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "aether_soil": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cloudstone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sunstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_log": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skyroot_log_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_leaves": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "star_crystal": {
+      "recipe": "base",
+      "variants": 1,
+      "animation": {
+        "frames": 16,
+        "fps": 6,
+        "loop": "repeat"
+      }
+    },
+    "starflower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cloud_bloom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glowshroom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "moonstone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skystone": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "aether_moss": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "glimmer_silt": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "star_crystal_ore": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "skyroot_planks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "cloudstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sunstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "moonstone_bricks": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "star_crystal_lamp": {
+      "recipe": "base",
+      "variants": 4
+    },
+    "sky_fern": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "dawn_bell": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "moonflower": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glimmer_reed": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "cloudberry_bush": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "hanging_cloud_vine": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "skyroot_door_top": {
+      "recipe": "base",
+      "variants": 1
+    }
+  }
+}

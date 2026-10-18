@@ -50,7 +50,7 @@ class TextureGeneratorTests(unittest.TestCase):
         tile = tg.generate_texture(name,tg.DEFAULT_SEED)
         self.assertTrue(tile[8][3] and tile[15*16+8][3])
         self.assertFalse(tile[0][3])
-        profiles = json.loads((tg.DEFINITION_ROOT/"material_profiles.json").read_text())
+        profiles = tg._read_definition(tg.DEFINITION_ROOT/"material_profiles.json")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"profiles.json"
             for invalid in ([], [True], [-1], [7], "4,5,6"):

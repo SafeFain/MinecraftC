@@ -21,6 +21,67 @@ template<class F> int32_t checked(MC_PluginContext* c,F&& f) {
     try {if(!c)return -1;if(!manager(c).hostThread())return -1;c->error.clear();f();return 0;}catch(const std::exception& e){if(c)c->error=e.what();return -1;}
 }
 void check(bool value,const char* message) {if(!value)throw std::runtime_error(message);}
+std::filesystem::path materializeBuiltinResources(const std::filesystem::path& package,
+                                                 const std::filesystem::path& dataRoot,
+                                                 const std::string& id) {
+    const auto prefix=package.generic_string()+"/";
+    auto manifest=AssetStore::readTitleBinary(prefix+"resources.sha256.json");
+    check(manifest.size()<=2*1024*1024,"Builtin resource manifest exceeds size limit");
+    const auto parsed=Json::parse(std::string(manifest.begin(),manifest.end()));
+    check(parsed.numeric("version",0)==1,"Unsupported builtin resource manifest");
+    const auto& entries=parsed.at("sha256");
+    check(entries.type==Json::Type::Object&&entries.object.size()<=4096,"Invalid builtin resource inventory");
+    // Read the complete immutable package before publishing any cache files.
+    std::map<std::string,std::vector<uint8_t>> files;
+    size_t total=manifest.size();
+    for(const auto& entry:entries.object) {
+        check(AssetStore::validPath(entry.first)&&entry.first.find(':')==std::string::npos&&entry.first!="resources.sha256.json"&&
+              std::filesystem::path(entry.first).lexically_normal().generic_string()==entry.first,
+              "Invalid builtin resource path");
+        const auto digest=entry.second.text();
+        check(digest.size()==64&&digest.find_first_not_of("0123456789abcdef")==std::string::npos,
+              "Invalid builtin resource digest");
+        auto bytes=AssetStore::readTitleBinary(prefix+entry.first);
+        check(bytes.size()<=32*1024*1024,"Builtin resource exceeds size limit");
+        total+=bytes.size();check(total<=128*1024*1024,"Builtin package exceeds size limit");
+        files.emplace(entry.first,std::move(bytes));
+    }
+    uint64_t hash=1469598103934665603ULL;
+    for(const auto byte:manifest){hash^=byte;hash*=1099511628211ULL;}
+    std::ostringstream key;key<<std::hex<<hash;
+    const auto root=std::filesystem::absolute(dataRoot/".cache"/"builtin_plugins"/id/key.str());
+    files.emplace("resources.sha256.json",std::move(manifest));
+    for(const auto& file:files) {
+        const auto destination=root/file.first;
+        for(auto parent=destination;!parent.empty();parent=parent.parent_path()) {
+            check(!std::filesystem::is_symlink(std::filesystem::symlink_status(parent)),
+                  "Builtin resource cache cannot contain symlinks");
+            if(parent==parent.root_path())break;
+        }
+        if(std::filesystem::is_regular_file(destination)&&std::filesystem::file_size(destination)==file.second.size()) {
+            std::ifstream existing(destination,std::ios::binary);
+            const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(existing)),{});
+            if(bytes==file.second)continue;
+        }
+        std::filesystem::create_directories(destination.parent_path());
+        auto temporary=destination;temporary+=".tmp";
+        check(!std::filesystem::is_symlink(std::filesystem::symlink_status(temporary)),"Invalid builtin cache temporary file");
+        {std::ofstream output(temporary,std::ios::binary|std::ios::trunc);
+            output.write(reinterpret_cast<const char*>(file.second.data()),static_cast<std::streamsize>(file.second.size()));
+            output.flush();check(static_cast<bool>(output),"Cannot write builtin resource cache");}
+        std::error_code error;
+        check(Platform::replaceFileAtomically(temporary,destination,error),"Cannot publish builtin resource cache");
+    }
+    return root;
+}
+void validateMaterialImage(const std::filesystem::path& image) {
+        if(image.empty())return;
+        check(std::filesystem::file_size(image)<=1024*1024,"Material image exceeds size limit");
+        std::ifstream file(image,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+        check(bytes.size()>=8&&bytes[0]==137&&bytes[1]=='P'&&bytes[2]=='N'&&bytes[3]=='G',"Material must be PNG");
+        int w=0,h=0,channels=0;stbi_uc* decoded=stbi_load_from_memory(bytes.data(),static_cast<int>(bytes.size()),&w,&h,&channels,4);
+        const bool valid=decoded&&w==16&&h==16;stbi_image_free(decoded);check(valid,"Material must be a valid 16x16 PNG");
+    }
 void hudColor(const float* color) {
     check(color,"Missing HUD color");
     for(int i=0;i<4;++i)check(std::isfinite(color[i])&&color[i]>=0&&color[i]<=1,"Invalid HUD color");
@@ -238,7 +299,7 @@ void PluginManager::owned(MC_PluginContext& ctx,const std::string& key) const {
     const auto block=builtinKeyId(key,"minecraftc:block_",static_cast<uint16_t>(BlockId::COUNT));
     const auto item=builtinKeyId(key,"minecraftc:item_",static_cast<uint16_t>(ItemId::COUNT));
     const bool reserved=info.manifest.builtin&&info.manifest.id=="official_heaven"&&
-        ((block!=INVALID_CONTENT_ID&&heavenBlockSlot(static_cast<BlockId>(block)))||(item!=INVALID_CONTENT_ID&&heavenItemSlot(static_cast<ItemId>(item))));
+        (key=="minecraftc:heaven"||(block!=INVALID_CONTENT_ID&&heavenBlockSlot(static_cast<BlockId>(block)))||(item!=INVALID_CONTENT_ID&&heavenItemSlot(static_cast<ItemId>(item))));
     check(validKey(key)&&(key.rfind(info.manifest.id+":",0)==0||reserved),"Content must use its plugin namespace or trusted reserved slot");
     check(!m_info.at(ctx.index).manifest.visual,"Visual-only plugins cannot register gameplay content");
 }
@@ -277,18 +338,29 @@ int32_t PluginManager::material(MC_PluginContext& ctx,const MC_Material& v) {
     if(v.image&&*v.image)m.image=containedPath(info.root,v.image);
     if(v.normal&&*v.normal)m.normal=containedPath(info.root,v.normal);
     if(v.properties&&*v.properties)m.properties=containedPath(info.root,v.properties);
-    for(const auto& image:{m.image,m.normal,m.properties}) {
-        if(image.empty())continue;
-        check(std::filesystem::file_size(image)<=1024*1024,"Material image exceeds size limit");
-        std::ifstream file(image,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
-        check(bytes.size()>=8&&bytes[0]==137&&bytes[1]=='P'&&bytes[2]=='N'&&bytes[3]=='G',"Material must be PNG");
-        int w=0,h=0,channels=0;stbi_uc* decoded=stbi_load_from_memory(bytes.data(),static_cast<int>(bytes.size()),&w,&h,&channels,4);
-        const bool valid=decoded&&w==16&&h==16;stbi_image_free(decoded);check(valid,"Material must be a valid 16x16 PNG");
-    }
+    for(const auto& image:{m.image,m.normal,m.properties})validateMaterialImage(image);
     m.color={v.color[0],v.color[1],v.color[2],v.color[3]};
     for(size_t i=0;i<4;++i)check(std::isfinite(v.color[i])&&v.color[i]>=0&&v.color[i]<=1,"Invalid material color");
     if(m.replace)LOG_INFO("Plugin "<<info.manifest.id<<" replaces material "<<m.key);
     content().materials[m.key]=std::move(m);return 0;
+}
+void PluginManager::materialSequence(MC_PluginContext& ctx,const MC_MaterialSequenceDefinition& d) {
+    check(d.size>=sizeof(d)&&d.variants>=1&&d.variants<=4&&d.frames>=1&&d.frames<=16&&d.variants*d.frames<=64&&d.fps_milli<=60000&&(d.frames==1||d.fps_milli)&&d.images,"Invalid material sequence");
+    const auto& root=m_info.at(ctx.index).root;
+    std::vector<std::filesystem::path> images,normals,properties;
+    for(uint32_t i=0;i<d.variants*d.frames;++i) {
+        const auto image=containedPath(root,required(d.images[i]));validateMaterialImage(image);images.push_back(image);
+        const auto normal=d.normals&&d.normals[i]?containedPath(root,required(d.normals[i])):std::filesystem::path{};validateMaterialImage(normal);normals.push_back(normal);
+        const auto property=d.properties&&d.properties[i]?containedPath(root,required(d.properties[i])):std::filesystem::path{};validateMaterialImage(property);properties.push_back(property);
+    }
+    auto base=d.base;base.image=d.images[0];base.normal=d.normals?d.normals[0]:nullptr;base.properties=d.properties?d.properties[0]:nullptr;
+    material(ctx,base);auto& value=content().materials.at(d.base.key);value.variants=d.variants;value.frames=d.frames;value.fpsMilli=d.fps_milli;value.seed=d.seed;
+    value.images=std::move(images);value.normals=std::move(normals);value.propertyFrames=std::move(properties);
+}
+void PluginManager::itemIcon(MC_PluginContext& ctx,const MC_ItemIcon& d) {
+    check(d.size>=sizeof(d),"Invalid item icon descriptor");const auto key=required(d.item);owned(ctx,key);
+    const auto id=resolveItem(key);auto& item=content().items.at(static_cast<uint16_t>(id));
+    item.icon=containedPath(m_info.at(ctx.index).root,required(d.path));validateMaterialImage(item.icon);
 }
 int32_t PluginManager::recipe(MC_PluginContext& ctx,const MC_Recipe& v) {
     check(v.size>=sizeof(v)&&v.operation<=2,"Invalid recipe descriptor");const auto key=required(v.key);owned(ctx,key);
@@ -420,10 +492,15 @@ void PluginManager::validateContent() {
     validateCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
-        if(entry.first>=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
+        if(entry.first!=0){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
         if(!d.deathTarget.empty())resolveDimension(d.deathTarget);
         if(!d.voidTarget.empty())resolveDimension(d.voidTarget);
     }
+    const auto english=content().extensions.translations.find("en_us");
+    const auto translated=[&](const std::string& key){return english!=content().extensions.translations.end()&&english->second.count(key);};
+    for(const auto& entry:content().extensions.nameKeys)check(translated(entry.second),"Localized content name requires English translation");
+    for(const auto& entry:content().extensions.dimensions)if(entry.first&&!entry.second.nameKey.empty())check(translated(entry.second.nameKey),"Localized dimension name requires English translation");
+    for(const auto& entry:content().extensions.bedTravel)check(translated(entry.second.nameKey),"Travel label requires English translation");
     auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
     for(auto& entry:content().blocks) {
         if(entry.second.familyKind==MC_SLAB_FAMILY) {
@@ -439,8 +516,12 @@ void PluginManager::buildNetworkDescription() {
     describeCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
-        content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers}).dump();
+        content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers,d.seedDomain,d.nameKey}).dump();
         if(d.sampleSpawn) {auto description=nlohmann::json::parse(content().networkDescription["dimension/"+d.key]);description.push_back("sampled-v2");content().networkDescription["dimension/"+d.key]=description.dump();}
+    }
+    for(const auto& entry:content().extensions.bedTravel) {
+        const auto& t=entry.second;
+        content().networkDescription["bed-travel/"+entry.first]=nlohmann::json::array({dimensionContent(static_cast<DimensionId>(t.source)).key,dimensionContent(static_cast<DimensionId>(t.target)).key,t.nameKey}).dump();
     }
     auto& state=content();
     for(const auto& entry:state.blocks) {
@@ -486,7 +567,7 @@ void PluginManager::buildNetworkDescription() {
     }
     for(const auto& entry:content().extensions.generators) {
         const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({dimensionContent(g.dimension).key,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
-        if(g.batch||g.terrainLod||g.decorationLod)content().networkDescription["generator/"+g.key]=nlohmann::json::array({content().networkDescription["generator/"+g.key],g.lodRevision,bool(g.batch),bool(g.terrainLod),bool(g.decorationLod)}).dump();
+        if(g.batch||g.terrainLod||g.decorationLod)content().networkDescription["generator/"+g.key]=nlohmann::json::array({content().networkDescription["generator/"+g.key],g.lodRevision,bool(g.batch),bool(g.terrainLod),bool(g.decorationLod),bool(g.layers)}).dump();
     }
     for(const auto& entry:content().extensions.modifiers) {
         const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({dimensionContent(m.dimension).key,m.revision,m.radius}).dump();
@@ -536,6 +617,8 @@ void PluginManager::initialize(bool safeMode) {
         auto& loaded=m_loaded[i];loaded.context=std::make_unique<MC_PluginContext>();loaded.context->manager=this;loaded.context->index=i;
         const auto builtinRevision=[&](){for(const auto& d:builtinPlugins())if(info.manifest.id==d.id&&info.manifest.builtin)return std::string(d.revision);return std::string{};}();
         try {
+            if(info.manifest.builtin&&m_paths.assetRoot.empty()&&!info.root.empty())
+                info.root=materializeBuiltinResources(info.root,m_paths.dataRoot,info.manifest.id);
             if(info.manifest.builtin){const auto& entries=builtinPlugins();auto descriptor=std::find_if(entries.begin(),entries.end(),[&](const auto& d){return info.manifest.id==d.id;});check(descriptor!=entries.end(),"Unknown built-in plugin");loaded.api=descriptor->query(MC_PLUGIN_ABI);}
             else if(!info.manifest.entry.empty()) {
                 loaded.library=std::make_unique<Platform::DynamicLibrary>(containedPath(info.root,info.manifest.entry));

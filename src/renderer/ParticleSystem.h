@@ -11,12 +11,14 @@
 #include "world/Biome.h"
 #include "world/CaveGenerator.h"
 #include "renderer/VisualQuality.h"
+#include <cstddef>
+#include <map>
 
 class World;
 
 enum class ParticleKind : uint8_t {
     Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
-    HeavenPollen, HeavenSparkle, CriticalHit, SweepAttack, OverworldMote,
+    SoftTuft, Sparkle, CriticalHit, SweepAttack, OverworldMote,
     Firefly, CaveSpore, CaveDust, CaveEmber, Plugin
 };
 
@@ -72,9 +74,6 @@ struct ParticleRenderData {
 class ParticleSystem {
 public:
     static constexpr size_t MAX_PARTICLES = 2048;
-    static constexpr size_t MAX_SKY_MOTES_PER_UPDATE = 8;
-    static constexpr size_t MAX_POLLEN_PER_UPDATE = 4;
-    static constexpr size_t MAX_SPARKLE_PER_UPDATE = 6;
 
     void setEnhancedVisuals(bool enabled, VisualQuality quality);
     void setEnhancedVisuals(const EnhancedVisualSettings& settings,
@@ -91,6 +90,7 @@ public:
     void emitFishingSplash(const glm::dvec3& position, bool bite);
     void emitSweepAttack(const glm::dvec3& position);
     bool emitPlugin(const MC_ParticleEmission&);
+    bool emitPluginV2(const MC_ParticleInstanceV2&);
     void appendLightning(const glm::dvec3& position);
     std::vector<ParticleRenderData> buildRenderData(
         const glm::dvec3& renderOrigin) const;
@@ -113,15 +113,17 @@ private:
         float angularVelocity = 0.0f;
         float gravity=0;
         glm::vec4 color{1.0f};
+        bool advanced=false,collision=true,ambient=false;
+        uint32_t shape=0;
+        std::array<std::array<float,4>,3> drift{};
     };
 
     std::vector<Particle> m_particles;
     uint64_t m_randomState = 1;
     uint32_t m_pluginEmitted=0;
+    uint32_t m_ambientDimension=MC_INVALID_DIMENSION;
+    std::map<std::string,std::vector<std::max_align_t>> m_ambientState;
     float m_weatherEmission = 0.0f;
-    float m_skyMoteEmission = 0.0f;
-    float m_pollenEmission = 0.0f;
-    float m_sparkleEmission = 0.0f;
     float m_overworldAmbientEmission = 0.0f;
     float m_skyDaylight = 1.0f;
     EnhancedVisualConfig m_enhancedVisual{};
@@ -130,12 +132,7 @@ private:
     float randomFloat();
     void emitWeatherParticle(World& world, const glm::dvec3& viewer,
                              uint64_t seed);
-    void emitSkyMote(const glm::dvec3& viewer, uint64_t seed,
-                     float daylight);
-    void emitHeavenPollen(const glm::dvec3& viewer, uint64_t seed,
-                          int paletteIndex);
-    void emitHeavenSparkle(const glm::dvec3& viewer, uint64_t seed,
-                              int paletteIndex);
+
     void emitOverworldAmbient(World& world, const glm::dvec3& viewer,
                               uint64_t seed, bool firefly);
     void emitCaveAmbient(World& world, const glm::dvec3& viewer,

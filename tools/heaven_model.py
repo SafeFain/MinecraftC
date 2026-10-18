@@ -60,6 +60,9 @@ def generate():
                meshes=[dict(primitives=[dict(attributes=dict(POSITION=0, TEXCOORD_0=1), indices=2, material=0)])],
                nodes=[dict(mesh=0)], scenes=[dict(nodes=[0])], scene=0)
     (root / 'starstep.gltf').write_bytes((json.dumps(doc, separators=(',', ':')) + '\n').encode('utf-8'))
+    if (root / 'resources.sha256.json').is_file():
+        from check_official_package import refresh
+        refresh(root)
 
 
 if __name__ == '__main__':

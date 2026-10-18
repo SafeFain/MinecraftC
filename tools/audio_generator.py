@@ -407,7 +407,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path,
                         default=Path("assets/audio"))
+    parser.add_argument("--heaven-output", type=Path)
     args = parser.parse_args()
+    heaven_output = args.heaven_output or args.output.parent / "plugins/official_heaven/audio"
     write_track(args.output / "menu_whimsy.wav", 104.0, 64, menu_sample)
     write_track(args.output / "menu_spark.wav", 112.0, 64, menu_spark_sample)
     write_track(args.output / "gameplay_calm.wav", 64.0, 64, gameplay_sample)
@@ -417,9 +419,12 @@ def main() -> None:
                 overworld_horizon_sample)
     write_track(args.output / "overworld_nightfall.wav", 54.0, 64,
                 overworld_nightfall_sample)
-    write_track(args.output / "heaven_ether.wav", 56.0, 64, heaven_sample)
-    write_track(args.output / "heaven_sanctum.wav", 48.0, 64,
+    write_track(heaven_output / "heaven_ether.wav", 56.0, 64, heaven_sample)
+    write_track(heaven_output / "heaven_sanctum.wav", 48.0, 64,
                 heaven_sanctum_sample)
+    if (heaven_output.parent / "resources.sha256.json").is_file():
+        from check_official_package import refresh
+        refresh(heaven_output.parent)
 
 
 if __name__ == "__main__":

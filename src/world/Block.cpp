@@ -281,21 +281,16 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
       RenderShape::Fluid, RenderLayer::Translucent, .62f },
     { BlockId::FALLING_LAVA, "Falling Lava", glm::vec3(.95f, .50f, .10f), false, true,
       RenderShape::Fluid, RenderLayer::Translucent, .86f },
-    { BlockId::AETHER_GRASS, "Aether Grass", glm::vec3(.42f, .78f, .40f), true, false },
-    { BlockId::AETHER_SOIL, "Aether Soil", glm::vec3(.50f, .36f, .22f), true, false },
-    { BlockId::CLOUDSTONE, "Cloudstone", glm::vec3(.70f, .78f, .82f), true, false },
-    { BlockId::SUNSTONE, "Sunstone", glm::vec3(.88f, .71f, .35f), true, false },
-    { BlockId::SKYROOT_WOOD, "Skyroot Wood", glm::vec3(.62f, .48f, .30f), true, false },
-    { BlockId::SKYROOT_LEAVES, "Skyroot Leaves", glm::vec3(.42f, .72f, .38f), true, false,
-      RenderShape::Cube, RenderLayer::Cutout, 1.0f },
-    { BlockId::STAR_CRYSTAL, "Star Crystal", glm::vec3(.30f, .78f, .92f), true, true,
-      RenderShape::Cube, RenderLayer::Translucent, .68f },
-    { BlockId::STARFLOWER, "Starflower", glm::vec3(.64f, .52f, .96f), false, true,
-      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
-    { BlockId::CLOUD_BLOOM, "Cloud Bloom", glm::vec3(.92f, .94f, .98f), false, true,
-      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
-    { BlockId::GLOWSHROOM, "Glowshroom", glm::vec3(.50f, .88f, .78f), false, true,
-      RenderShape::Cross, RenderLayer::Cutout, 1.0f },
+    {BlockId::AETHER_GRASS, "", glm::vec3(0), false, false},
+    {BlockId::AETHER_SOIL, "", glm::vec3(0), false, false},
+    {BlockId::CLOUDSTONE, "", glm::vec3(0), false, false},
+    {BlockId::SUNSTONE, "", glm::vec3(0), false, false},
+    {BlockId::SKYROOT_WOOD, "", glm::vec3(0), false, false},
+    {BlockId::SKYROOT_LEAVES, "", glm::vec3(0), false, false},
+    {BlockId::STAR_CRYSTAL, "", glm::vec3(0), false, false},
+    {BlockId::STARFLOWER, "", glm::vec3(0), false, false},
+    {BlockId::CLOUD_BLOOM, "", glm::vec3(0), false, false},
+    {BlockId::GLOWSHROOM, "", glm::vec3(0), false, false},
 #define ARCH_FAMILY(prefix, label, color) \
     {BlockId::prefix##_SLAB_BOTTOM, label " Slab", color, true, true, RenderShape::Slab, RenderLayer::Opaque, 1.0f}, \
     {BlockId::prefix##_SLAB_TOP, label " Slab", color, true, true, RenderShape::Slab, RenderLayer::Opaque, 1.0f}, \
@@ -310,8 +305,8 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     ARCH_FAMILY(PLANKS, "Planks", glm::vec3(.70f, .55f, .30f)),
     ARCH_FAMILY(COBBLESTONE, "Cobblestone", glm::vec3(.43f)),
     ARCH_FAMILY(TERRACOTTA, "Terracotta", glm::vec3(.60f, .30f, .20f)),
-    ARCH_FAMILY(SUNSTONE, "Sunstone", glm::vec3(.88f, .71f, .35f)),
-    ARCH_FAMILY(CLOUDSTONE, "Cloudstone", glm::vec3(.70f, .78f, .82f)),
+    {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+    {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
 #undef ARCH_FAMILY
     {BlockId::EMERALD_ORE, "Emerald Ore", glm::vec3(.18f,.74f,.42f), true, false},
     {BlockId::DEEPSLATE_EMERALD_ORE, "Deepslate Emerald Ore", glm::vec3(.16f,.58f,.36f), true, false},
@@ -406,22 +401,22 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::AMETHYST_CLUSTER, "Amethyst Cluster", glm::vec3(0.678f,0.502f,0.831f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::QUARTZ_CLUSTER, "Quartz Cluster", glm::vec3(0.882f,0.827f,0.749f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
     {BlockId::CAVE_GLOWSHROOM, "Cave Glowshroom", glm::vec3(0.451f,0.784f,0.643f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::MOONSTONE, "Moonstone", glm::vec3(0.835f, 0.859f, 0.922f), true, false},
-    {BlockId::SKYSTONE, "Skystone", glm::vec3(0.455f, 0.600f, 0.702f), true, false},
-    {BlockId::AETHER_MOSS, "Aether Moss", glm::vec3(0.427f, 0.694f, 0.616f), true, false},
-    {BlockId::GLIMMER_SILT, "Glimmer Silt", glm::vec3(0.376f, 0.533f, 0.561f), true, false},
-    {BlockId::STAR_CRYSTAL_ORE, "Star Crystal Ore", glm::vec3(0.392f, 0.698f, 0.808f), true, false},
-    {BlockId::SKYROOT_PLANKS, "Skyroot Planks", glm::vec3(0.749f, 0.604f, 0.416f), true, false},
-    {BlockId::CLOUDSTONE_BRICKS, "Cloudstone Bricks", glm::vec3(0.792f, 0.851f, 0.902f), true, false},
-    {BlockId::SUNSTONE_BRICKS, "Sunstone Bricks", glm::vec3(0.910f, 0.761f, 0.447f), true, false},
-    {BlockId::MOONSTONE_BRICKS, "Moonstone Bricks", glm::vec3(0.843f, 0.875f, 0.941f), true, false},
-    {BlockId::STAR_CRYSTAL_LAMP, "Star Crystal Lamp", glm::vec3(0.522f, 0.902f, 0.949f), true, false},
-    {BlockId::SKY_FERN, "Sky Fern", glm::vec3(0.420f, 0.714f, 0.659f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::DAWN_BELL, "Dawn Bell", glm::vec3(0.957f, 0.780f, 0.486f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::MOONFLOWER, "Moonflower", glm::vec3(0.706f, 0.733f, 0.961f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::GLIMMER_REED, "Glimmer Reed", glm::vec3(0.482f, 0.827f, 0.765f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::CLOUDBERRY_BUSH, "Cloudberry Bush", glm::vec3(0.529f, 0.733f, 0.651f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
-    {BlockId::HANGING_CLOUD_VINE, "Hanging Cloud Vine", glm::vec3(0.490f, 0.733f, 0.800f), false, true, RenderShape::Cross, RenderLayer::Cutout, 1.0f},
+    {BlockId::MOONSTONE, "", glm::vec3(0), false, false},
+    {BlockId::SKYSTONE, "", glm::vec3(0), false, false},
+    {BlockId::AETHER_MOSS, "", glm::vec3(0), false, false},
+    {BlockId::GLIMMER_SILT, "", glm::vec3(0), false, false},
+    {BlockId::STAR_CRYSTAL_ORE, "", glm::vec3(0), false, false},
+    {BlockId::SKYROOT_PLANKS, "", glm::vec3(0), false, false},
+    {BlockId::CLOUDSTONE_BRICKS, "", glm::vec3(0), false, false},
+    {BlockId::SUNSTONE_BRICKS, "", glm::vec3(0), false, false},
+    {BlockId::MOONSTONE_BRICKS, "", glm::vec3(0), false, false},
+    {BlockId::STAR_CRYSTAL_LAMP, "", glm::vec3(0), false, false},
+    {BlockId::SKY_FERN, "", glm::vec3(0), false, false},
+    {BlockId::DAWN_BELL, "", glm::vec3(0), false, false},
+    {BlockId::MOONFLOWER, "", glm::vec3(0), false, false},
+    {BlockId::GLIMMER_REED, "", glm::vec3(0), false, false},
+    {BlockId::CLOUDBERRY_BUSH, "", glm::vec3(0), false, false},
+    {BlockId::HANGING_CLOUD_VINE, "", glm::vec3(0), false, false},
     {BlockId::BARREL, "Barrel", glm::vec3(.55f,.44f,.32f), true, false},
     {BlockId::LECTERN, "Lectern", glm::vec3(.55f,.44f,.32f), true, false},
     {BlockId::CARTOGRAPHY_TABLE, "Cartography Table", glm::vec3(.55f,.44f,.32f), true, false},
@@ -434,10 +429,11 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::JUNGLE_PLANKS, "Jungle Planks", glm::vec3(.68f,.46f,.33f), true, false},
     {BlockId::ACACIA_PLANKS, "Acacia Planks", glm::vec3(.75f,.39f,.22f), true, false},
     }};
-    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "Skyroot", "Iron"};
+    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "", "Iron"};
     for (uint16_t raw = static_cast<uint16_t>(BlockId::DOOR_FIRST);
          raw < static_cast<uint16_t>(BlockId::COUNT); ++raw) {
         const BlockId id = static_cast<BlockId>(raw);
+        if(Plugins::heavenBlockSlot(id))continue;
         DoorState door; ButtonState button;
         if (decodeDoor(id, door)) {
             table[raw] = {id, std::string(names[static_cast<uint8_t>(door.material)]) +
@@ -454,7 +450,10 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
 }();
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
-    if (Plugins::pluginBlock(id)) return BlockTexture::Stone;
+    if (const auto* b=Plugins::pluginBlock(id)) {
+        const auto found=textureNames().find(b->materials.at(static_cast<size_t>(face)));
+        return found==textureNames().end()?BlockTexture::Stone:found->second;
+    }
     if (g_definitionFacesReady) {
         const BlockTexture defined = g_definitionFaces[static_cast<size_t>(id)]
                                                        [static_cast<size_t>(face)];
@@ -482,22 +481,6 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     const bool top = face == FaceDir::TOP;
     const bool bottom = face == FaceDir::BOTTOM;
     switch (id) {
-        case BlockId::MOONSTONE: return BlockTexture::Moonstone;
-        case BlockId::SKYSTONE: return BlockTexture::Skystone;
-        case BlockId::AETHER_MOSS: return BlockTexture::AetherMoss;
-        case BlockId::GLIMMER_SILT: return BlockTexture::GlimmerSilt;
-        case BlockId::STAR_CRYSTAL_ORE: return BlockTexture::StarCrystalOre;
-        case BlockId::SKYROOT_PLANKS: return BlockTexture::SkyrootPlanks;
-        case BlockId::CLOUDSTONE_BRICKS: return BlockTexture::CloudstoneBricks;
-        case BlockId::SUNSTONE_BRICKS: return BlockTexture::SunstoneBricks;
-        case BlockId::MOONSTONE_BRICKS: return BlockTexture::MoonstoneBricks;
-        case BlockId::STAR_CRYSTAL_LAMP: return BlockTexture::StarCrystalLamp;
-        case BlockId::SKY_FERN: return BlockTexture::SkyFern;
-        case BlockId::DAWN_BELL: return BlockTexture::DawnBell;
-        case BlockId::MOONFLOWER: return BlockTexture::Moonflower;
-        case BlockId::GLIMMER_REED: return BlockTexture::GlimmerReed;
-        case BlockId::CLOUDBERRY_BUSH: return BlockTexture::CloudberryBush;
-        case BlockId::HANGING_CLOUD_VINE: return BlockTexture::HangingCloudVine;
 
         case BlockId::GRASS:
             return top ? BlockTexture::GrassTop :
@@ -702,19 +685,6 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         case BlockId::PACKED_ICE:      return BlockTexture::PackedIce;
         case BlockId::BLACK_SAND:      return BlockTexture::BlackSand;
         case BlockId::GRANITE:         return BlockTexture::Granite;
-        case BlockId::AETHER_GRASS:    return top ? BlockTexture::AetherGrassTop :
-                                             bottom ? BlockTexture::AetherSoil :
-                                             BlockTexture::AetherGrassSide;
-        case BlockId::AETHER_SOIL:     return BlockTexture::AetherSoil;
-        case BlockId::CLOUDSTONE:      return BlockTexture::Cloudstone;
-        case BlockId::SUNSTONE:        return BlockTexture::Sunstone;
-        case BlockId::SKYROOT_WOOD:    return top || bottom ? BlockTexture::SkyrootLogTop :
-                                             BlockTexture::SkyrootLog;
-        case BlockId::SKYROOT_LEAVES:  return BlockTexture::SkyrootLeaves;
-        case BlockId::STAR_CRYSTAL:    return BlockTexture::StarCrystal;
-        case BlockId::STARFLOWER:      return BlockTexture::Starflower;
-        case BlockId::CLOUD_BLOOM:     return BlockTexture::CloudBloom;
-        case BlockId::GLOWSHROOM:      return BlockTexture::Glowshroom;
         case BlockId::DRIPSTONE_BLOCK: return BlockTexture::DripstoneBlock;
         case BlockId::POINTED_DRIPSTONE_UP:
         case BlockId::POINTED_DRIPSTONE_DOWN: return BlockTexture::PointedDripstone;
@@ -738,7 +708,7 @@ const char* getBlockTextureAssetName(BlockTexture texture) {
 }
 
 uint16_t getFaceTextureIndex(BlockId id, FaceDir face) {
-    if (const auto* block = Plugins::pluginBlock(id)) return block->tiles.at(static_cast<size_t>(face));
+    if (const auto* block = Plugins::pluginBlock(id);block&&(static_cast<uint16_t>(id)>=Plugins::FIRST_CONTENT_ID||block->tilesReady)) return block->tiles.at(static_cast<size_t>(face));
     return getAtlasTextureIndex(getFaceTexture(id, face));
 }
 
@@ -918,7 +888,7 @@ constexpr uint8_t ARCHITECTURAL_STRIDE = 10;
 
 bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
     state.family=0;
-    if(const auto* b=Plugins::pluginBlock(id)) {
+    if(const auto* b=Plugins::pluginBlock(id);b&&static_cast<uint16_t>(id)>=Plugins::FIRST_CONTENT_ID) {
         if(b->familyKind!=MC_SLAB_FAMILY&&b->familyKind!=MC_STAIR_FAMILY)return false;
         state.family=b->family;state.shape=b->familyKind==MC_SLAB_FAMILY?RenderShape::Slab:RenderShape::Stair;
         state.half=(b->familyKind==MC_SLAB_FAMILY?b->stateIndex:b->stateIndex/4)?BlockHalf::Top:BlockHalf::Bottom;
@@ -1072,13 +1042,6 @@ bool isLava(BlockId id) {
 uint8_t getLightEmission(BlockId id) {
     if (const auto* block = Plugins::pluginBlock(id)) return block->emission;
     if (id == BlockId::TORCH) return 14;
-    if (id == BlockId::STAR_CRYSTAL_LAMP) return 15;
-    if (id == BlockId::HANGING_CLOUD_VINE) return 12;
-    if (id == BlockId::MOONFLOWER) return 4;
-    if (id == BlockId::STAR_CRYSTAL) return 8;
-    if (id == BlockId::STARFLOWER) return 5;
-    if (id == BlockId::CLOUD_BLOOM) return 4;
-    if (id == BlockId::GLOWSHROOM) return 6;
     if (id == BlockId::GLOW_FERN) return 4;
     if (id == BlockId::CAVE_GLOWSHROOM) return 5;
     if (id == BlockId::RESONANT_CRYSTAL) return 8;
@@ -1191,11 +1154,10 @@ bool isSunflower(BlockId id) {
 }
 
 bool isFlower(BlockId id) {
+    if(const auto* behavior=Plugins::blockBehavior(id))if(behavior->fields&MC_BLOCK_TAGS)return (behavior->tags&MC_TAG_FLOWER)!=0;
     return id == BlockId::FLOWER || id == BlockId::DANDELION ||
            id == BlockId::BLUE_ORCHID || id == BlockId::ALLIUM ||
-           id == BlockId::OXEYE_DAISY || id == BlockId::STARFLOWER ||
-           id == BlockId::CLOUD_BLOOM || id == BlockId::GLOWSHROOM ||
-           (id >= BlockId::SKY_FERN && id <= BlockId::HANGING_CLOUD_VINE) ||
+           id == BlockId::OXEYE_DAISY ||
            id == BlockId::GLOW_FERN || id == BlockId::RESONANT_CRYSTAL ||
            id == BlockId::HANGING_ROOTS ||
            isSunflower(id);
@@ -1229,13 +1191,13 @@ uint8_t fireEncouragement(BlockId id) {
     switch (id) {
         case BlockId::WOOD: case BlockId::BIRCH_WOOD:
         case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-        case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: case BlockId::SKYROOT_PLANKS: return 5;
+        case BlockId::ACACIA_WOOD: return 5;
         case BlockId::PLANKS: case BlockId::CRAFTING_TABLE:
         case BlockId::CHEST: case BlockId::COMPOSTER:
         case BlockId::FLETCHING_TABLE: case BlockId::LOOM: return 5;
         case BlockId::LEAVES: case BlockId::BIRCH_LEAVES:
         case BlockId::SPRUCE_LEAVES: case BlockId::JUNGLE_LEAVES:
-        case BlockId::ACACIA_LEAVES: case BlockId::SKYROOT_LEAVES:
+        case BlockId::ACACIA_LEAVES:
         case BlockId::RED_WOOL:
         case BlockId::YELLOW_WOOL:
         case BlockId::BLUE_WOOL:
@@ -1252,8 +1214,7 @@ uint8_t fireEncouragement(BlockId id) {
         case BlockId::WHEAT_7: case BlockId::DANDELION:
         case BlockId::BLUE_ORCHID: case BlockId::ALLIUM:
         case BlockId::OXEYE_DAISY: case BlockId::SUNFLOWER_BOTTOM:
-        case BlockId::SUNFLOWER_TOP: case BlockId::STARFLOWER:
-        case BlockId::CLOUD_BLOOM: case BlockId::GLOWSHROOM:
+        case BlockId::SUNFLOWER_TOP:
         case BlockId::GLOW_FERN: case BlockId::HANGING_ROOTS: return 60;
         case BlockId::TNT: return 100;
         default: return 0;
@@ -1270,7 +1231,7 @@ uint8_t burnOdds(BlockId id) {
         switch (id) {
             case BlockId::WOOD: case BlockId::BIRCH_WOOD:
             case BlockId::SPRUCE_WOOD: case BlockId::JUNGLE_WOOD:
-            case BlockId::ACACIA_WOOD: case BlockId::SKYROOT_WOOD: case BlockId::SKYROOT_PLANKS: return 5;
+            case BlockId::ACACIA_WOOD: return 5;
             default: return 20;
         }
     }
@@ -1356,7 +1317,7 @@ bool isValidBlockId(BlockId id) { return Plugins::validBlock(id); }
 
 bool decodeDoor(BlockId id, DoorState& state) {
     state.family=0;
-    if(const auto* b=Plugins::pluginBlock(id)) {
+    if(const auto* b=Plugins::pluginBlock(id);b&&static_cast<uint16_t>(id)>=Plugins::FIRST_CONTENT_ID) {
         if(b->familyKind!=MC_DOOR_FAMILY)return false;
         state.family=b->family;const auto n=b->stateIndex;
         state.direction=static_cast<BedDirection>(n%4);state.rightHinge=n&4;state.open=n&8;state.powered=n&16;state.upper=n&32;
@@ -1382,7 +1343,7 @@ BlockId doorBlock(const DoorState& s) {
 }
 bool decodeButton(BlockId id, ButtonState& state) {
     state.family=0;
-    if(const auto* b=Plugins::pluginBlock(id)) {
+    if(const auto* b=Plugins::pluginBlock(id);b&&static_cast<uint16_t>(id)>=Plugins::FIRST_CONTENT_ID) {
         if(b->familyKind!=MC_BUTTON_FAMILY)return false;
         state.family=b->family;state.material=DoorMaterial::Oak;
         state.attachment=static_cast<FaceDir>((b->stateIndex%12)/2);state.pressed=b->stateIndex%2;

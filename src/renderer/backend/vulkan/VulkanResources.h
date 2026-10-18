@@ -70,12 +70,11 @@ private:
 };
 
 // ── Frame synchronization ───────────────────────────────────────────────
-// Per-frame fences and acquire/render semaphores, created once with the
-// device.
+// Per-frame fences and acquire semaphores, created once with the device.
+// Presentation semaphores belong to acquired swapchain images.
 struct VulkanFrameSync {
     static constexpr size_t FRAMES_IN_FLIGHT = 2;
     std::array<VkFence, FRAMES_IN_FLIGHT> fences{};
-    std::array<VkSemaphore, FRAMES_IN_FLIGHT> renderFinished{};
     std::array<VkSemaphore, FRAMES_IN_FLIGHT> imageAvailable{};
 
     static VulkanFrameSync create(VkDevice device);
@@ -101,6 +100,7 @@ struct VulkanShadowResources {
     VkRenderPass shadowRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout shadowPipelineLayout = VK_NULL_HANDLE;
     VkPipeline shadowPipeline = VK_NULL_HANDLE;
+    bool imageInitialized = false;
     VkImage shadowImage = VK_NULL_HANDLE;
     VmaAllocation shadowAllocation = VK_NULL_HANDLE;
     VkImageView shadowImageView = VK_NULL_HANDLE;
@@ -249,6 +249,7 @@ struct VulkanSwapchainBundle {
     std::vector<VkFramebuffer> presentFramebuffers;
     std::vector<VkCommandBuffer> commandBuffers;
     std::vector<VkFence> imagesInFlight;
+    std::vector<VkSemaphore> renderFinished;
 
     static VulkanSwapchainBundle create(const CreateParams& params);
 

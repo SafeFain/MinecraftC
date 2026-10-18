@@ -138,7 +138,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     check(Plugins::content().extensions.generators.count("worldgen_v2_demo:islands"),"V2 native registration failed");
     check(plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,1)&&plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,2)&&
-        !plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,3),"V1/V2 extension discovery mismatch");
+        plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,3)&&!plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,4),"V1/V2 extension discovery mismatch");
     auto& g=Plugins::content().extensions.generators.at("worldgen_v2_demo:islands");Counters counters;instrument(g,counters);
     Plugins::GenerationConfig config{g.key,"1","{}",{{"worldgen_v2_demo:markers","1"}}};
     WorldGenerator generator(12,WorldType::Normal,DimensionId::Overworld,config);

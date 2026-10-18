@@ -3,3 +3,7 @@
 # Official package identity hashes its resource bytes on every platform.
 /assets/plugins/official_heaven/*.gltf text eol=lf
 /assets/plugins/official_heaven/*.md text eol=lf
+
+# Resource fingerprints and frozen source hashes require identical checkout bytes.
+/assets/plugins/official_heaven/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+/tests/reference/heaven_v9/*.ref -text whitespace=trailing-space,space-before-tab,cr-at-eol

@@ -1,5 +1,7 @@
 #pragma once
 #include "world/StructureGenerator.h"
+#include "reference/heaven_v9/FrozenHeavenV9.h"
+#include "reference/heaven_v9/FrozenLoot.h"
 
 namespace GenerationPolicyV2Integration {
 struct HeavenStructureReference {
@@ -13,6 +15,7 @@ inline void heavenReference(const std::filesystem::path& root){
     // or evidence that the P1 content migration has been completed.
     for(uint64_t seed:{12ULL,123ULL,999ULL}){
         WorldGenerator native(seed,WorldType::Normal,DimensionId::Heaven);
+        FrozenHeavenReference::FrozenHeavenV9 frozen(native.getSeed());
         auto& dimension=Plugins::content().extensions.dimensions.at(1);
         dimension.spawnUserdata=&native;
         dimension.sampleSpawn=[](const MC_GenerationContext* c,double* p,void* u)->int32_t {
@@ -68,7 +71,7 @@ inline void heavenReference(const std::filesystem::path& root){
             std::map<std::tuple<int,int,int>,std::pair<StructureLootProfile,uint64_t>> metadata;
             std::vector<std::unique_ptr<Chunk>> original;
             for(int z=cz-1;z<=cz+1;++z)for(int x=cx-1;x<=cx+1;++x){auto chunk=std::make_unique<Chunk>(x,z);
-                native.generate(*chunk,{}, {},[&](int wx,int wy,int wz,BlockId block,StructureLootProfile profile,uint64_t lootSeed){if(block==BlockId::CHEST)metadata[{wx,wy,wz}]={profile,lootSeed};});original.push_back(std::move(chunk));}
+                FrozenHeavenReference::FrozenHeavenV9::populateHeaven(*chunk,frozen,[&](int wx,int wy,int wz,BlockId block,StructureLootProfile profile,uint64_t lootSeed){if(block==BlockId::CHEST)metadata[{wx,wy,wz}]={profile,lootSeed};});original.push_back(std::move(chunk));}
             Plugins::LootContent table;table.key=ref.loot;table.revision="9";
             auto entry=[&](ItemId item,uint32_t lo,uint32_t hi,uint32_t chance){table.entries.push_back({Plugins::itemKey(item),lo,hi,chance});};
             const auto profile=index==0?StructureLootProfile::OriginSkywayShrine:index==1?StructureLootProfile::SkywayShrine:
@@ -80,7 +83,7 @@ inline void heavenReference(const std::filesystem::path& root){
             entry(ItemId::STAR_CRYSTAL_SHARD,2,5,85);entry(ItemId::CLOUDBERRY,2,4,70);
             entry(index==2?ItemId::SUNSTONE_BRICKS:index==3?ItemId::MOONSTONE_BRICKS:ItemId::CLOUDSTONE_BRICKS,3,8,80);
             Plugins::content().extensions.loot[table.key]=table;
-            Plugins::StructureContent s;s.key="worldgen_policy_v2:reference_"+std::to_string(index);keys.push_back(s.key);s.name=s.key;s.revision="9";s.dimension=1;s.cell=16;s.radius=9;s.minY=-88;s.maxY=90;s.userdata=&ref;s.namespaces={"minecraftc","worldgen_policy_v2"};
+            Plugins::StructureContent s;s.key="worldgen_policy_v2:reference_"+std::to_string(index);keys.push_back(s.key);s.name=s.key;s.revision="9";s.dimension=1;s.cell=16;s.radius=9;s.minY=-88;s.maxY=90;s.userdata=&ref;s.namespaces={"minecraftc","worldgen_policy_v2"};s.order=1000;
             s.placements=[](const MC_StructureContext* c,int32_t x,int32_t z,MC_StructureInstance* out,uint32_t,uint32_t* count,void* u)->int32_t{
                 const auto& r=*static_cast<HeavenStructureReference*>(u);if(c->generation.seed!=r.generator->getSeed())return -1;
                 *count=0;if(int(std::floor(double(r.instance.anchor[0])/16))==x&&int(std::floor(double(r.instance.anchor[2])/16))==z){out[0]=r.instance;*count=1;}return 0;
@@ -95,13 +98,14 @@ inline void heavenReference(const std::filesystem::path& root){
             bool checkedChest=false;
             for(size_t i=0;i<original.size();++i){std::vector<uint16_t> a,b;original[i]->copyRawBlocks(a);adapted[i]->copyRawBlocks(b);check(a==b,"Heaven v9 structure geometry/overwrite unchanged");
                 auto single=std::make_unique<Chunk>(original[i]->cx,original[i]->cz);native.generate(*single);single->copyRawBlocks(a);check(a==b,"Heaven reference region/singleton equality");
-                for(const auto& block:adapted[i]->pluginStructures)if(block.id==BlockId::CHEST){
+                for(const auto& block:adapted[i]->pluginStructures)if(block.id==BlockId::CHEST&&block.structureKey==s.key){
                     const auto expected=metadata.at({block.worldX,block.worldY,block.worldZ});check(expected.first==profile&&expected.second==block.lootSeed,"native Heaven loot profile/seed equivalence");checkedChest=true;
-                    ChunkStore beforeStore,afterStore;beforeStore.get(0,0)->generated=true;afterStore.get(0,0)->generated=true;
-                    WorldPersistence before(beforeStore),after(afterStore);const uint32_t local=Config::worldYToStorageY(100)*256;
-                    before.registerGeneratedBlockEntityUnlocked(0,0,local,BlockId::CHEST,profile,block.lootSeed);
+                    ChunkStore afterStore;afterStore.get(0,0)->generated=true;
+                    WorldPersistence after(afterStore);const uint32_t local=Config::worldYToStorageY(100)*256;
+                    BlockEntity originalLoot;originalLoot.type=BlockEntityType::Chest;
+                    FrozenHeavenReference::populateGeneratedLoot(originalLoot,profile,block.lootSeed);
                     after.registerGeneratedBlockEntityUnlocked(0,0,local,BlockId::CHEST,StructureLootProfile::None,block.lootSeed,&block);
-                    const auto* left=before.getBlockEntity({0,100,0});const auto* right=after.getBlockEntity({0,100,0});check(left&&right,"reference loot entities");
+                    const auto* left=&originalLoot;const auto* right=after.getBlockEntity({0,100,0});check(left&&right,"reference loot entities");
                     for(size_t slot=0;slot<left->chest.size();++slot)check(left->chest[slot].id==right->chest[slot].id&&left->chest[slot].count==right->chest[slot].count,"native Heaven chest content equivalence");
                     SaveStore save(root/"reference-save");save.saveBlockEntities(0,0,{{local,*right}});const auto loaded=save.loadBlockEntities(0,0);check(loaded.size()==1&&loaded[0].value.structureKey==s.key&&loaded[0].value.lootSeed==block.lootSeed&&loaded[0].value.lootRevision=="9","Heaven keyed metadata roundtrip");
                 }

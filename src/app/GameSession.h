@@ -43,7 +43,7 @@ public:
     enum class SleepAction : uint8_t {
         SleepUntilMorning,
         LeaveBed,
-        TravelToHeaven
+        BedTravel
     };
 
     enum class SleepVisualState : uint8_t {
@@ -55,8 +55,7 @@ public:
 
     enum class LoadingReason : uint8_t {
         World,
-        EnteringHeaven,
-        ReturningOverworld
+        Dimension
     };
 
     enum class LoadingPhase : uint8_t {
@@ -140,6 +139,7 @@ public:
     bool beginSleepAtBed(const glm::ivec3& bed);
     void chooseSleepAction(SleepAction action, RuntimeClock::Tick loadingStarted,
                            const Feedback& feedback);
+    void chooseBedTravel(const std::string&,RuntimeClock::Tick,const Feedback&);
     void cancelSleep(const Feedback& feedback);
     bool isSleeping() const { return sleepState != SleepVisualState::Awake; }
     SleepVisualState sleepVisualState() const { return sleepState; }
@@ -169,11 +169,11 @@ public:
     bool hasWorldStore() const { return saveStore != nullptr; }
     LoadingSnapshot loadingSnapshot() const;
     std::vector<WorldSummary> listWorlds() const;
-    std::array<Plugins::GenerationConfig,2> creationGeneration;
+    std::map<uint32_t,Plugins::GenerationConfig> creationGeneration;
     std::string createWorld(const std::string& name, uint64_t seed,
                             GameMode mode, Difficulty difficulty, bool cheats,
                             WorldType type = WorldType::Normal);
-    void setCreationGeneration(std::array<Plugins::GenerationConfig,2> g) {creationGeneration=std::move(g);}
+    void setCreationGeneration(std::map<uint32_t,Plugins::GenerationConfig> g) {creationGeneration=std::move(g);}
     bool deleteWorld(const std::string& id);
     void setDimensionBedSpawn(const glm::ivec3& bed);
     bool isNight() const { return dayNightCycle().isNight(); }
@@ -227,6 +227,7 @@ public:
     bool pluginSetDimensionTime(const MC_DimensionTime&);
     bool pluginLocateStructure(uint32_t,const std::string&,int32_t,int32_t,uint32_t,MC_LocatedStructure&);
     bool pluginEmitParticle(const MC_ParticleEmission&);
+    bool pluginEmitParticleV2(const MC_ParticleInstanceV2&);
     bool pluginGetBlock(int32_t,int32_t,int32_t,uint16_t&);
     bool pluginSetBlock(int32_t,int32_t,int32_t,uint16_t);
     bool pluginGiveItem(uint16_t,uint32_t);
@@ -393,7 +394,7 @@ private:
     void saveActiveDimensionState();
     void loadActiveDimensionState();
     std::optional<glm::ivec3> loadValidOverworldBed();
-    void ensureHeavenSafePosition();
+    void ensureDimensionSafePosition();
     void finishSleep(const Feedback& feedback);
     void updateSaveMetadata();
     void tickLightning(DimensionSimulation& runtime, const Feedback& feedback);

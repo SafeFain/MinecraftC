@@ -1,0 +1,644 @@
+[
+  {
+    "key": "aether_grass_side",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 135540863,
+    "images": [
+      "textures/materials/aether_grass_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_grass_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_grass_side-0-properties.png"
+    ]
+  },
+  {
+    "key": "aether_grass_top",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2639369189,
+    "images": [
+      "textures/materials/aether_grass_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_grass_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_grass_top-0-properties.png"
+    ]
+  },
+  {
+    "key": "aether_moss",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4056064200,
+    "images": [
+      "textures/materials/aether_moss-0-images.png",
+      "textures/materials/aether_moss-1-images.png",
+      "textures/materials/aether_moss-2-images.png",
+      "textures/materials/aether_moss-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_moss-0-normals.png",
+      "textures/materials/aether_moss-1-normals.png",
+      "textures/materials/aether_moss-2-normals.png",
+      "textures/materials/aether_moss-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_moss-0-properties.png",
+      "textures/materials/aether_moss-1-properties.png",
+      "textures/materials/aether_moss-2-properties.png",
+      "textures/materials/aether_moss-3-properties.png"
+    ]
+  },
+  {
+    "key": "aether_soil",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1764122864,
+    "images": [
+      "textures/materials/aether_soil-0-images.png",
+      "textures/materials/aether_soil-1-images.png",
+      "textures/materials/aether_soil-2-images.png",
+      "textures/materials/aether_soil-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_soil-0-normals.png",
+      "textures/materials/aether_soil-1-normals.png",
+      "textures/materials/aether_soil-2-normals.png",
+      "textures/materials/aether_soil-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_soil-0-properties.png",
+      "textures/materials/aether_soil-1-properties.png",
+      "textures/materials/aether_soil-2-properties.png",
+      "textures/materials/aether_soil-3-properties.png"
+    ]
+  },
+  {
+    "key": "cloud_bloom",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 988999743,
+    "images": [
+      "textures/materials/cloud_bloom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloud_bloom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloud_bloom-0-properties.png"
+    ]
+  },
+  {
+    "key": "cloudberry_bush",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3254957625,
+    "images": [
+      "textures/materials/cloudberry_bush-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudberry_bush-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudberry_bush-0-properties.png"
+    ]
+  },
+  {
+    "key": "cloudstone",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2422799842,
+    "images": [
+      "textures/materials/cloudstone-0-images.png",
+      "textures/materials/cloudstone-1-images.png",
+      "textures/materials/cloudstone-2-images.png",
+      "textures/materials/cloudstone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudstone-0-normals.png",
+      "textures/materials/cloudstone-1-normals.png",
+      "textures/materials/cloudstone-2-normals.png",
+      "textures/materials/cloudstone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudstone-0-properties.png",
+      "textures/materials/cloudstone-1-properties.png",
+      "textures/materials/cloudstone-2-properties.png",
+      "textures/materials/cloudstone-3-properties.png"
+    ]
+  },
+  {
+    "key": "cloudstone_bricks",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 588026929,
+    "images": [
+      "textures/materials/cloudstone_bricks-0-images.png",
+      "textures/materials/cloudstone_bricks-1-images.png",
+      "textures/materials/cloudstone_bricks-2-images.png",
+      "textures/materials/cloudstone_bricks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudstone_bricks-0-normals.png",
+      "textures/materials/cloudstone_bricks-1-normals.png",
+      "textures/materials/cloudstone_bricks-2-normals.png",
+      "textures/materials/cloudstone_bricks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudstone_bricks-0-properties.png",
+      "textures/materials/cloudstone_bricks-1-properties.png",
+      "textures/materials/cloudstone_bricks-2-properties.png",
+      "textures/materials/cloudstone_bricks-3-properties.png"
+    ]
+  },
+  {
+    "key": "dawn_bell",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1096574754,
+    "images": [
+      "textures/materials/dawn_bell-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/dawn_bell-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dawn_bell-0-properties.png"
+    ]
+  },
+  {
+    "key": "glimmer_reed",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2731030707,
+    "images": [
+      "textures/materials/glimmer_reed-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/glimmer_reed-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glimmer_reed-0-properties.png"
+    ]
+  },
+  {
+    "key": "glimmer_silt",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3664449833,
+    "images": [
+      "textures/materials/glimmer_silt-0-images.png",
+      "textures/materials/glimmer_silt-1-images.png",
+      "textures/materials/glimmer_silt-2-images.png",
+      "textures/materials/glimmer_silt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/glimmer_silt-0-normals.png",
+      "textures/materials/glimmer_silt-1-normals.png",
+      "textures/materials/glimmer_silt-2-normals.png",
+      "textures/materials/glimmer_silt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glimmer_silt-0-properties.png",
+      "textures/materials/glimmer_silt-1-properties.png",
+      "textures/materials/glimmer_silt-2-properties.png",
+      "textures/materials/glimmer_silt-3-properties.png"
+    ]
+  },
+  {
+    "key": "glowshroom",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 914787701,
+    "images": [
+      "textures/materials/glowshroom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/glowshroom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glowshroom-0-properties.png"
+    ]
+  },
+  {
+    "key": "hanging_cloud_vine",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1310307523,
+    "images": [
+      "textures/materials/hanging_cloud_vine-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/hanging_cloud_vine-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/hanging_cloud_vine-0-properties.png"
+    ]
+  },
+  {
+    "key": "moonflower",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1948111172,
+    "images": [
+      "textures/materials/moonflower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/moonflower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/moonflower-0-properties.png"
+    ]
+  },
+  {
+    "key": "moonstone",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1758880168,
+    "images": [
+      "textures/materials/moonstone-0-images.png",
+      "textures/materials/moonstone-1-images.png",
+      "textures/materials/moonstone-2-images.png",
+      "textures/materials/moonstone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/moonstone-0-normals.png",
+      "textures/materials/moonstone-1-normals.png",
+      "textures/materials/moonstone-2-normals.png",
+      "textures/materials/moonstone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/moonstone-0-properties.png",
+      "textures/materials/moonstone-1-properties.png",
+      "textures/materials/moonstone-2-properties.png",
+      "textures/materials/moonstone-3-properties.png"
+    ]
+  },
+  {
+    "key": "moonstone_bricks",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1096438337,
+    "images": [
+      "textures/materials/moonstone_bricks-0-images.png",
+      "textures/materials/moonstone_bricks-1-images.png",
+      "textures/materials/moonstone_bricks-2-images.png",
+      "textures/materials/moonstone_bricks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/moonstone_bricks-0-normals.png",
+      "textures/materials/moonstone_bricks-1-normals.png",
+      "textures/materials/moonstone_bricks-2-normals.png",
+      "textures/materials/moonstone_bricks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/moonstone_bricks-0-properties.png",
+      "textures/materials/moonstone_bricks-1-properties.png",
+      "textures/materials/moonstone_bricks-2-properties.png",
+      "textures/materials/moonstone_bricks-3-properties.png"
+    ]
+  },
+  {
+    "key": "sky_fern",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 820453772,
+    "images": [
+      "textures/materials/sky_fern-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sky_fern-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sky_fern-0-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_door_bottom",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 384653781,
+    "images": [
+      "textures/materials/skyroot_door_bottom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_door_bottom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_door_bottom-0-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_door_top",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2791915413,
+    "images": [
+      "textures/materials/skyroot_door_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_door_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_door_top-0-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_leaves",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2001054033,
+    "images": [
+      "textures/materials/skyroot_leaves-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_leaves-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_leaves-0-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_log",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2784056283,
+    "images": [
+      "textures/materials/skyroot_log-0-images.png",
+      "textures/materials/skyroot_log-1-images.png",
+      "textures/materials/skyroot_log-2-images.png",
+      "textures/materials/skyroot_log-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_log-0-normals.png",
+      "textures/materials/skyroot_log-1-normals.png",
+      "textures/materials/skyroot_log-2-normals.png",
+      "textures/materials/skyroot_log-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_log-0-properties.png",
+      "textures/materials/skyroot_log-1-properties.png",
+      "textures/materials/skyroot_log-2-properties.png",
+      "textures/materials/skyroot_log-3-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_log_top",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2010217352,
+    "images": [
+      "textures/materials/skyroot_log_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_log_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_log_top-0-properties.png"
+    ]
+  },
+  {
+    "key": "skyroot_planks",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3513646978,
+    "images": [
+      "textures/materials/skyroot_planks-0-images.png",
+      "textures/materials/skyroot_planks-1-images.png",
+      "textures/materials/skyroot_planks-2-images.png",
+      "textures/materials/skyroot_planks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_planks-0-normals.png",
+      "textures/materials/skyroot_planks-1-normals.png",
+      "textures/materials/skyroot_planks-2-normals.png",
+      "textures/materials/skyroot_planks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_planks-0-properties.png",
+      "textures/materials/skyroot_planks-1-properties.png",
+      "textures/materials/skyroot_planks-2-properties.png",
+      "textures/materials/skyroot_planks-3-properties.png"
+    ]
+  },
+  {
+    "key": "skystone",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1851447878,
+    "images": [
+      "textures/materials/skystone-0-images.png",
+      "textures/materials/skystone-1-images.png",
+      "textures/materials/skystone-2-images.png",
+      "textures/materials/skystone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skystone-0-normals.png",
+      "textures/materials/skystone-1-normals.png",
+      "textures/materials/skystone-2-normals.png",
+      "textures/materials/skystone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skystone-0-properties.png",
+      "textures/materials/skystone-1-properties.png",
+      "textures/materials/skystone-2-properties.png",
+      "textures/materials/skystone-3-properties.png"
+    ]
+  },
+  {
+    "key": "star_crystal",
+    "variants": 1,
+    "frames": 16,
+    "fps_milli": 6000,
+    "seed": 3978037795,
+    "images": [
+      "textures/materials/star_crystal-0-images.png",
+      "textures/materials/star_crystal-1-images.png",
+      "textures/materials/star_crystal-2-images.png",
+      "textures/materials/star_crystal-3-images.png",
+      "textures/materials/star_crystal-4-images.png",
+      "textures/materials/star_crystal-5-images.png",
+      "textures/materials/star_crystal-6-images.png",
+      "textures/materials/star_crystal-7-images.png",
+      "textures/materials/star_crystal-8-images.png",
+      "textures/materials/star_crystal-9-images.png",
+      "textures/materials/star_crystal-10-images.png",
+      "textures/materials/star_crystal-11-images.png",
+      "textures/materials/star_crystal-12-images.png",
+      "textures/materials/star_crystal-13-images.png",
+      "textures/materials/star_crystal-14-images.png",
+      "textures/materials/star_crystal-15-images.png"
+    ],
+    "normals": [
+      "textures/materials/star_crystal-0-normals.png",
+      "textures/materials/star_crystal-1-normals.png",
+      "textures/materials/star_crystal-2-normals.png",
+      "textures/materials/star_crystal-3-normals.png",
+      "textures/materials/star_crystal-4-normals.png",
+      "textures/materials/star_crystal-5-normals.png",
+      "textures/materials/star_crystal-6-normals.png",
+      "textures/materials/star_crystal-7-normals.png",
+      "textures/materials/star_crystal-8-normals.png",
+      "textures/materials/star_crystal-9-normals.png",
+      "textures/materials/star_crystal-10-normals.png",
+      "textures/materials/star_crystal-11-normals.png",
+      "textures/materials/star_crystal-12-normals.png",
+      "textures/materials/star_crystal-13-normals.png",
+      "textures/materials/star_crystal-14-normals.png",
+      "textures/materials/star_crystal-15-normals.png"
+    ],
+    "properties": [
+      "textures/materials/star_crystal-0-properties.png",
+      "textures/materials/star_crystal-1-properties.png",
+      "textures/materials/star_crystal-2-properties.png",
+      "textures/materials/star_crystal-3-properties.png",
+      "textures/materials/star_crystal-4-properties.png",
+      "textures/materials/star_crystal-5-properties.png",
+      "textures/materials/star_crystal-6-properties.png",
+      "textures/materials/star_crystal-7-properties.png",
+      "textures/materials/star_crystal-8-properties.png",
+      "textures/materials/star_crystal-9-properties.png",
+      "textures/materials/star_crystal-10-properties.png",
+      "textures/materials/star_crystal-11-properties.png",
+      "textures/materials/star_crystal-12-properties.png",
+      "textures/materials/star_crystal-13-properties.png",
+      "textures/materials/star_crystal-14-properties.png",
+      "textures/materials/star_crystal-15-properties.png"
+    ]
+  },
+  {
+    "key": "star_crystal_lamp",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 528933195,
+    "images": [
+      "textures/materials/star_crystal_lamp-0-images.png",
+      "textures/materials/star_crystal_lamp-1-images.png",
+      "textures/materials/star_crystal_lamp-2-images.png",
+      "textures/materials/star_crystal_lamp-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/star_crystal_lamp-0-normals.png",
+      "textures/materials/star_crystal_lamp-1-normals.png",
+      "textures/materials/star_crystal_lamp-2-normals.png",
+      "textures/materials/star_crystal_lamp-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/star_crystal_lamp-0-properties.png",
+      "textures/materials/star_crystal_lamp-1-properties.png",
+      "textures/materials/star_crystal_lamp-2-properties.png",
+      "textures/materials/star_crystal_lamp-3-properties.png"
+    ]
+  },
+  {
+    "key": "star_crystal_ore",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2992254573,
+    "images": [
+      "textures/materials/star_crystal_ore-0-images.png",
+      "textures/materials/star_crystal_ore-1-images.png",
+      "textures/materials/star_crystal_ore-2-images.png",
+      "textures/materials/star_crystal_ore-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/star_crystal_ore-0-normals.png",
+      "textures/materials/star_crystal_ore-1-normals.png",
+      "textures/materials/star_crystal_ore-2-normals.png",
+      "textures/materials/star_crystal_ore-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/star_crystal_ore-0-properties.png",
+      "textures/materials/star_crystal_ore-1-properties.png",
+      "textures/materials/star_crystal_ore-2-properties.png",
+      "textures/materials/star_crystal_ore-3-properties.png"
+    ]
+  },
+  {
+    "key": "starflower",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1480539542,
+    "images": [
+      "textures/materials/starflower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/starflower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/starflower-0-properties.png"
+    ]
+  },
+  {
+    "key": "sunstone",
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 570106937,
+    "images": [
+      "textures/materials/sunstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sunstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sunstone-0-properties.png"
+    ]
+  },
+  {
+    "key": "sunstone_bricks",
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3512038060,
+    "images": [
+      "textures/materials/sunstone_bricks-0-images.png",
+      "textures/materials/sunstone_bricks-1-images.png",
+      "textures/materials/sunstone_bricks-2-images.png",
+      "textures/materials/sunstone_bricks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/sunstone_bricks-0-normals.png",
+      "textures/materials/sunstone_bricks-1-normals.png",
+      "textures/materials/sunstone_bricks-2-normals.png",
+      "textures/materials/sunstone_bricks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sunstone_bricks-0-properties.png",
+      "textures/materials/sunstone_bricks-1-properties.png",
+      "textures/materials/sunstone_bricks-2-properties.png",
+      "textures/materials/sunstone_bricks-3-properties.png"
+    ]
+  }
+]

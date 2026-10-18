@@ -1103,6 +1103,10 @@ void testGeneratedBlockEntityRegistration() {
     const uint32_t furnaceIndex = localIndex(6, 7, y);
     const uint32_t stoneIndex = localIndex(7, 7, y);
     const uint32_t lootIndex = localIndex(8, 7, y);
+    RegionGenerationData::PendingBlock lootMetadata{};
+    lootMetadata.lootKey="official_heaven:spire_loot";
+    lootMetadata.structureKey="official_heaven:spire";
+    lootMetadata.lootRevision=Plugins::content().extensions.loot.at(lootMetadata.lootKey).revision;
     store.withUnique([&](ChunkStore&) {
         persistence.registerGeneratedBlockEntityUnlocked(
             3, -2, chestIndex, BlockId::CHEST);
@@ -1116,7 +1120,7 @@ void testGeneratedBlockEntityRegistration() {
             3, -2, stoneIndex, BlockId::STONE);
         persistence.registerGeneratedBlockEntityUnlocked(
             3, -2, lootIndex, BlockId::CHEST,
-            StructureLootProfile::CloudspireTower, 0x12345678u);
+            StructureLootProfile::None, 0x12345678u, &lootMetadata);
     });
     const BlockEntity* chestEntity = persistence.getBlockEntity(
         {3 * 16 + 5, y, -2 * 16 + 7});
@@ -1130,7 +1134,7 @@ void testGeneratedBlockEntityRegistration() {
             "non-work block registered a block entity");
     const glm::ivec3 lootPosition{3 * 16 + 8, y, -2 * 16 + 7};
     const BlockEntity* lootEntity=persistence.getBlockEntity(lootPosition);
-    require(lootEntity&&std::any_of(lootEntity->chest.begin(),lootEntity->chest.end(),
+    require(lootEntity&&lootEntity->lootKey==lootMetadata.lootKey&&std::any_of(lootEntity->chest.begin(),lootEntity->chest.end(),
                 [](const ItemStack& stack){return !stack.empty();}),
             "generated structure chest did not receive deterministic loot");
     const auto originalLoot=lootEntity->chest;

@@ -116,6 +116,8 @@ World::World()
 
 void World::resetForNewSeed(
     uint64_t newSeed, WorldType worldType, DimensionId dimension,Plugins::GenerationConfig config) {
+    if(dimension!=DimensionId::Overworld&&config==Plugins::GenerationConfig{})
+        config=Plugins::dimensionContent(dimension).generation;
     Plugins::validateGeneration(config,static_cast<uint32_t>(dimension));
     if (m_threadPool) m_threadPool->waitIdle();
     m_meshes.releaseAllMeshes();
@@ -310,11 +312,6 @@ CaveBiome World::caveBiomeAt(int worldX, int worldY, int worldZ) const {
     return m_generator.caveBiomeAt(worldX, worldY, worldZ);
 }
 
-int World::heavenBiomePaletteIndex(int worldX, int worldZ) const {
-    if (!m_generator.isHeaven()) return 0;
-    return static_cast<int>(m_generator.heavenBiomeAt(worldX, worldZ));
-}
-
 std::optional<glm::ivec2> World::locateBiome(
     Biome biome, int worldX, int worldZ) const {
     return locateNearestBiome(glm::ivec2(worldX, worldZ), biome,
@@ -323,21 +320,22 @@ std::optional<glm::ivec2> World::locateBiome(
 
 std::optional<glm::ivec3> World::locateStructure(
     StructureType type, int worldX, int worldZ) const {
-    if (m_generator.customGenerator() || m_generator.worldType() != WorldType::Normal) return {};
-    const auto location = m_generator.isHeaven()
-        ? m_generator.locateNearestHeavenStructure(type, worldX, worldZ)
-        : m_generator.getStructureGenerator().locateNearest(
-              type, worldX, worldZ);
+    if (m_generator.worldType() != WorldType::Normal) return {};
+    const auto alias=Plugins::content().extensions.legacyStructureAliases.find(static_cast<uint32_t>(type));
+    if(alias!=Plugins::content().extensions.legacyStructureAliases.end()) {
+        const auto found=m_generator.locatePluginStructure(alias->second,worldX,worldZ);
+        if(found)return glm::ivec3(found->anchor[0],found->anchor[1],found->anchor[2]);
+        return {};
+    }
+    if(m_generator.customGenerator())return {};
+    const auto location=m_generator.getStructureGenerator().locateNearest(type,worldX,worldZ);
     if (!location) return {};
     return glm::ivec3(location->worldX, location->baseY, location->worldZ);
 }
 
 glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
     if(const auto sampled=m_generator.sampleDimensionSpawn())return *sampled;
-    if (m_generator.isHeaven()&&!m_generator.customGenerator()) {
-        const glm::ivec3 spawn = m_generator.heavenSpawnBlock();
-        return {spawn.x + 0.5, spawn.y + 1.01, spawn.z + 0.5};
-    }
+
     glm::ivec2 best{0};
     glm::ivec2 fallback{0};
     bool hasFallback = false;
@@ -354,25 +352,7 @@ glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
                     center.biome == Biome::BLACK_SAND_COAST ||
                     center.height >= Config::WORLD_MAX_Y - 8)
                     continue;
-                if (m_generator.isHeaven()) {
-                    // Heaven spawn points must sit on a primary island with
-                    // a broad walkable apron.  Sampling a small world-space
-                    // square rejects narrow ledges and detached satellites
-                    // before the streaming pipeline is started.
-                    bool broadIsland = true;
-                    for (int dz = -6; dz <= 6 && broadIsland; dz += 3) {
-                        for (int dx = -6; dx <= 6; dx += 3) {
-                            const SurfaceColumn neighbor =
-                                m_generator.sampleTerrainColumn(x + dx, z + dz);
-                            if (neighbor.height <= neighbor.waterLevel ||
-                                std::abs(neighbor.height - center.height) > 8) {
-                                broadIsland = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (!broadIsland) continue;
-                }
+
                 if (!hasFallback) {
                     fallback = {x, z};
                     hasFallback = true;
@@ -399,64 +379,6 @@ glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
     return {static_cast<double>(best.x) + 0.5,
             static_cast<double>(chosen.height) + 1.01,
             static_cast<double>(best.y) + 0.5};
-}
-
-std::optional<glm::dvec3> World::heavenSkywayDestination(
-    const glm::ivec3& core, bool upward) const {
-    if (getBlock(core.x, core.y, core.z) != BlockId::STAR_CRYSTAL)
-        return {};
-    const auto destination = m_generator.heavenSkywayDestination(core, upward);
-    if (!destination) return {};
-    const int x = static_cast<int>(std::floor(destination->x));
-    const int y = static_cast<int>(std::floor(destination->y));
-    const int z = static_cast<int>(std::floor(destination->z));
-    if (!generatedAt(x, z) ||
-        !isFullCollisionBlock(getBlock(x, y - 1, z)) ||
-        blockCollisionBoxes(getBlock(x, y, z)).count != 0 ||
-        blockCollisionBoxes(getBlock(x, y + 1, z)).count != 0)
-        return {};
-    return destination;
-}
-
-bool World::isHeavenSkywayCore(const glm::ivec3& core) const {
-    if (getBlock(core.x, core.y, core.z) != BlockId::STAR_CRYSTAL)
-        return false;
-    return m_generator.heavenSkywayDestination(core, true).has_value() ||
-           m_generator.heavenSkywayDestination(core, false).has_value();
-}
-
-std::optional<glm::dvec3> World::starstepDestination(
-    const glm::dvec3& origin, const glm::vec3& direction,
-    float maxDistance) const {
-    if (!m_generator.isHeaven()) return {};
-    const auto hit = raycast(origin, direction, maxDistance);
-    if (!hit) return {};
-    std::optional<glm::dvec3> best;
-    double bestDistance = std::numeric_limits<double>::max();
-    for (int dz = -1; dz <= 1; ++dz) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            const int x = hit->blockPos.x + dx;
-            const int z = hit->blockPos.z + dz;
-            if (!generatedAt(x, z)) continue;
-            int top = hit->blockPos.y;
-            if (!isFullCollisionBlock(getBlock(x, top, z))) continue;
-            while (top + 1 < Config::WORLD_MAX_Y &&
-                   isFullCollisionBlock(getBlock(x, top + 1, z))) {
-                ++top;
-            }
-            const int standY = top + 1;
-            if (standY + 1 >= Config::WORLD_MAX_Y ||
-                blockCollisionBoxes(getBlock(x, standY, z)).count != 0 ||
-                blockCollisionBoxes(getBlock(x, standY + 1, z)).count != 0)
-                continue;
-            const glm::dvec3 candidate{x + 0.5, standY + 0.01, z + 0.5};
-            const double distance = glm::distance(origin, candidate);
-            if (distance > maxDistance || distance >= bestDistance) continue;
-            bestDistance = distance;
-            best = candidate;
-        }
-    }
-    return best;
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {

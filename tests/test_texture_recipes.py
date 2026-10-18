@@ -165,4 +165,29 @@ class MaterialRecipeTests(unittest.TestCase):
             with self.assertRaises(ValueError):restored.preview({'material':'../../invalid'})
 
 
+class PackageDefinitionTests(unittest.TestCase):
+    def test_import_order_and_owner_writeback(self):
+        import asset_definitions as definitions
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            host=root/'host.json'; package=root/'package.json'
+            host.write_text(json.dumps({'version':1,'imports':['package.json'],
+                                       'entry_order':{'items':['first','owned','last']},
+                                       'items':{'first':1,'last':3}}))
+            package.write_text(json.dumps({'version':1,'items':{'owned':2}}))
+            with patch.object(definitions,'ASSETS',root):
+                document=definitions.load_definition(host)
+                self.assertEqual(list(document['items']),['first','owned','last'])
+                document['items']['owned']=4; document['items']['new']=5
+                definitions.write_owned_definition(host,document)
+                self.assertEqual(json.loads(package.read_text())['items'],{'owned':4})
+                self.assertNotIn('owned',json.loads(host.read_text())['items'])
+                self.assertEqual(definitions.load_definition(host),document)
+                package.write_text(json.dumps({'imports':['host.json']}))
+                with self.assertRaisesRegex(ValueError,'cycle'):
+                    definitions.load_definition(host)
+                with self.assertRaises(ValueError):definitions._import_path('../escape.json')
+
+
 if __name__=='__main__':unittest.main()

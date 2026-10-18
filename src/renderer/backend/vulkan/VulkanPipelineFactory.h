@@ -67,6 +67,7 @@ struct SkyUniforms {
     glm::vec4 horizonColor{0.0f};
     glm::vec4 weather{0.0f};
     glm::vec4 options{0.0f};
+    std::array<glm::vec4,12> layers{};
 };
 
 struct CloudUniforms {
@@ -93,7 +94,7 @@ struct PostConstants {
     glm::vec4 texelTime{0.0f};
     glm::vec4 environment{0.0f};
     glm::vec4 celestial{0.0f};
-    glm::vec4 screenQuality{0.0f};
+    glm::vec4 gradeScreen{0.0f};
     glm::vec4 reflection{0.0f};
     glm::vec4 sunScreen{0.0f};
 };
@@ -140,9 +141,10 @@ struct ModelUniforms {
     glm::vec4 options{0.0f};
 };
 
-static_assert(sizeof(SkyUniforms) == 176);
+static_assert(sizeof(SkyUniforms) == 368);
 static_assert(offsetof(SkyUniforms, weather) == 144);
 static_assert(offsetof(SkyUniforms, options) == 160);
+static_assert(offsetof(SkyUniforms, layers) == 176);
 static_assert(sizeof(CloudUniforms) == 128);
 static_assert(offsetof(CloudUniforms, nearRegion) == 112);
 static_assert(sizeof(FrameUniforms) == 128);

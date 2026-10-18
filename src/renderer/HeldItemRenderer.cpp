@@ -1,5 +1,6 @@
 #include "plugins/ContentRegistry.h"
 #include "renderer/HeldItemRenderer.h"
+#include "renderer/BlockAtlasData.h"
 #include "model/ModelAnimation.h"
 #include <glm/gtc/type_ptr.hpp>
 
@@ -38,6 +39,7 @@ TextureData decode(const std::filesystem::path& path) {
 }
 
 std::string itemKey(ItemId id) {
+    if(const auto* item=Plugins::pluginItem(id);item&&!item->icon.empty())return item->key;
     std::string key = getItemProps(id).name;
     for (char& c : key) c = std::isalnum(static_cast<unsigned char>(c))
         ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '_';
@@ -107,6 +109,7 @@ void HeldItemRenderer::initialize(IGameRenderer& renderer,
          entry != atlasJson.at("items").end(); ++entry)
         m_itemIndices.emplace(entry.key(), entry.value().at("index").get<int>());
     TextureData items = decode(root / "textures/generated/items_atlas.png");
+    appendPluginItemIcons(items,m_itemIndices,m_itemColumns,m_itemRows);
     m_itemWidth = items.width; m_itemHeight = items.height; m_itemPixels = items.pixels;
     TextureSamplerDesc sampler; sampler.addressU=TextureAddressMode::ClampToEdge;
     sampler.addressV=TextureAddressMode::ClampToEdge;
@@ -184,14 +187,14 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
                        static_cast<int>(getFaceTextureIndex(b,FaceDir::BOTTOM))},
                        m_blockTiles,true);
         block=true;
-    }else if(props.placedBlock && Plugins::pluginBlock(*props.placedBlock) &&
+    }else if(props.placedBlock && static_cast<uint16_t>(*props.placedBlock)>=Plugins::FIRST_CONTENT_ID && Plugins::pluginBlock(*props.placedBlock) &&
              (getBlockProps(*props.placedBlock).shape==RenderShape::Slab ||
               getBlockProps(*props.placedBlock).shape==RenderShape::Stair ||
               getBlockProps(*props.placedBlock).shape==RenderShape::Door ||
               getBlockProps(*props.placedBlock).shape==RenderShape::Button ||
               getBlockProps(*props.placedBlock).shape==RenderShape::Boxes)) {
         mesh=buildHeldBlockShapeMesh(*props.placedBlock,m_blockTiles);block=true;
-    }else if(const auto* item=Plugins::pluginItem(id)) {
+    }else if(const auto* item=Plugins::pluginItem(id);item&&item->icon.empty()) {
         const float s=static_cast<float>(m_blockTiles);const int tile=item->tile;
         const float u0=(tile%m_blockTiles+.5f/16)/s,u1=(tile%m_blockTiles+1-.5f/16)/s;
         const float v0=(tile/m_blockTiles+.5f/16)/s,v1=(tile/m_blockTiles+1-.5f/16)/s;

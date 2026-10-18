@@ -22,19 +22,6 @@ vec4 atlasFragment(){
     return texture(blockAtlas,origin+(offset+uv*0.42)/tiles);
 }
 
-vec3 heavenPalette(float index){
-    vec3 color=vec3(1.0,0.86,0.55);
-    if(index<0.5)color=vec3(1.0,0.86,0.55);      // Dawn Meadow
-    else if(index<1.5)color=vec3(0.62,0.95,0.55); // Skyroot Grove
-    else if(index<2.5)color=vec3(1.0,0.72,0.30);  // Sunstone Heights
-    else if(index<3.5)color=vec3(0.45,0.85,1.0);  // Starcrystal Garden
-    else if(index<4.5)color=vec3(0.95,0.97,1.0);  // Cloudbloom Fields
-    else if(index<5.5)color=vec3(0.78,0.80,0.86); // Skystone Barrens
-    else if(index<6.5)color=vec3(0.40,1.0,0.80);  // Glimmer Fen
-    else color=vec3(0.85,0.75,1.0);                // Moonpearl Terrace
-    return color;
-}
-
 void main(){
     vec4 color;
     if(kind>15.5){color=atlasFragment()*tint;color.a*=1.0-clamp(phase,0.0,1.0);}
@@ -68,28 +55,25 @@ void main(){
         float radius=length(centered*vec2(2.0));
         float glow=1.0-smoothstep(0.05,0.72,radius);
         float pulse=0.72+0.28*sin(frame.cameraUpIntensity.w*4.0+phase*6.283);
-        vec3 dayColor=vec3(1.0,0.84,0.38),nightColor=vec3(0.40,0.58,1.0);
-        vec3 tint=mix(nightColor,dayColor,clamp(textureIndex,0.0,1.0));
-        tint=mix(tint,vec3(0.78,0.42,1.0),0.5+0.5*sin(phase*9.0));
-        color=vec4(tint,
+        color=vec4(tint.rgb,
             glow*pulse*0.72*frame.cameraUpIntensity.w);
     }else if(kind<7.5){
-        // Heaven pollen: a soft biome-tinted tuft drifting on the air.
+        // Generic soft tuft.
         vec2 centered=uv-vec2(0.5);
         float radius=length(centered*vec2(1.6));
         float blob=1.0-smoothstep(0.10,0.62,radius);
         float pulse=0.82+0.18*sin(frame.cameraUpIntensity.w*3.0+phase*6.283);
-        color=vec4(heavenPalette(textureIndex),
+        color=vec4(tint.rgb,
             blob*pulse*0.55*frame.cameraUpIntensity.w);
     }else if(kind<8.5){
-        // Heaven sparkle: a narrow four-point star with a sharp twinkle.
+        // Generic four-point sparkle.
         vec2 centered=uv-vec2(0.5);
         float diamond=abs(centered.x)+abs(centered.y);
         float square=max(abs(centered.x),abs(centered.y));
         float star=1.0-smoothstep(0.06,0.34,diamond);
         star*=smoothstep(0.12,0.42,square);
         float twinkle=0.5+0.5*sin(frame.cameraUpIntensity.w*6.0+phase*6.283);
-        color=vec4(heavenPalette(textureIndex)*1.2,
+        color=vec4(tint.rgb,
             star*twinkle*0.85*frame.cameraUpIntensity.w);
     }else if(kind<9.5){
         // Critical hit: a warm four-point impact spark that fades quickly.

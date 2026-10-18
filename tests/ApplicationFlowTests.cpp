@@ -115,6 +115,9 @@ std::string Localization::format(
 std::string Localization::itemName(ItemId) const {
     return "item";
 }
+std::string Localization::dimensionName(uint32_t dimension) const {
+    return Plugins::dimensionContent(dimension).name;
+}
 std::string Localization::actionName(InputAction) const {
     return "action";
 }
@@ -793,7 +796,8 @@ int main(int argc,char** argv) {
         menu.onKeyPress(Key::Down);
         menu.onKeyPress(Key::Down);
         menu.onKeyPress(Key::Enter); // Toggle Normal -> Superflat.
-        for (int i = 0; i < 5; ++i) menu.onKeyPress(Key::Down);
+        // Wrap past the first controls and Cancel; registered rows may vary.
+        for (int i = 0; i < 2; ++i) menu.onKeyPress(Key::Up);
         menu.onKeyPress(Key::Enter); // Confirm.
         require(created && selectedType == WorldType::Superflat,
                 "create menu forwards the selected superflat type");
@@ -835,8 +839,9 @@ int main(int argc,char** argv) {
                     DimensionId::Heaven, harness.clock.now()),
                 "playing world switches into heaven");
         harness.flow.beginDimensionLoading();
-        require(harness.audio.musicMode() == AudioMusicMode::Heaven,
-                "Heaven loading switches to its exclusive music");
+        require(harness.audio.musicMode() == AudioMusicMode::Overworld&&
+                harness.audio.musicDimension()==static_cast<uint32_t>(DimensionId::Heaven),
+                "Heaven loading selects its registered dimension playlist");
         require(harness.session.playerState().getPosition() ==
                     harness.session.worldState().findSafeSpawn(),
                 "heaven switch centers its first stream on the island spawn");

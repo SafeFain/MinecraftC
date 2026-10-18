@@ -162,6 +162,10 @@ int main() {
         nlohmann::json json;
         file >> json;
         require(json.is_object(), "language file parses");
+        const auto& extensions=Plugins::content().extensions;
+        const auto& bundle=extensions.translations.at(std::string(languageCode(language)));
+        for(const auto& alias:extensions.translationAliases)
+            if(const auto value=bundle.find(alias.second);value!=bundle.end())json[alias.first]=value->second;
         size_t missing = 0;
         for (const std::string& key : englishKeys)
             if (!json.contains(key)) ++missing;
@@ -211,6 +215,41 @@ int main() {
     require(localization.text("menu.home.settings") ==
             "ﺕﺍﺩﺍﺪﻋﻹﺍ",
             "Arabic UI strings are shaped for display");
+    localization.setLanguage(Language::English);
+
+    const auto savedContent=Plugins::content();
+    for(const auto language:languagesByEnglishName()) {
+        localization.setLanguage(language);
+        const auto& dictionary=Plugins::content().extensions.translations.at(std::string(languageCode(language)));
+        const auto expected=dictionary.at("official_heaven:dimension.heaven");
+        require(localization.dimensionName(DimensionId::Heaven)==(language==Language::Arabic?shapeArabic(expected):expected),
+                "registered dimension name uses each packaged language");
+        require(localization.hasTranslation(language,"official_heaven:travel.heaven"),"registered travel label is translated in all ten languages");
+    }
+    Plugins::content().extensions.translations["en_us"]["p1_test:english_only"]="English fallback 42";
+    localization.setLanguage(Language::SimplifiedChinese);
+    require(localization.text("p1_test:english_only")=="English fallback 42","partial plugin dictionary falls back to English");
+    localization.setLanguage(Language::Arabic);
+    require(localization.text("p1_test:english_only")==shapeArabic("English fallback 42"),"plugin English fallback uses Arabic shaping path");
+    Plugins::DimensionContent third;third.key="p1_test:realm";third.name="Third realm";third.nameKey="p1_test:realm_name";
+    Plugins::content().extensions.dimensions.emplace(2,third);
+    Plugins::content().extensions.translations["en_us"][third.nameKey]="Third realm";
+    Plugins::content().extensions.translations["zh_cn"][third.nameKey]=u8"第三维度";
+    Plugins::content().extensions.translations["ar_sa"][third.nameKey]=u8"عالم ثالث";
+    localization.setLanguage(Language::SimplifiedChinese);
+    require(localization.dimensionName(static_cast<DimensionId>(2))==u8"第三维度","third registered dimension uses localized UI name");
+    localization.setLanguage(Language::Arabic);
+    require(localization.dimensionName(static_cast<DimensionId>(2))==shapeArabic(u8"عالم ثالث"),"third dimension uses Arabic shaping");
+    localization.setLanguage(Language::Japanese);
+    require(localization.dimensionName(static_cast<DimensionId>(2))=="Third realm","third dimension name falls back to English");
+    const auto& aliases=Plugins::content().extensions.translationAliases;
+    require(!aliases.empty(),"official package preserves historical translation aliases");
+    for(const auto& alias:aliases)require(localization.text(alias.first)==localization.text(alias.second),"historical translation alias differs from namespaced value");
+    Plugins::content()={};
+    localization.setLanguage(Language::English);
+    require(localization.text("official_heaven:dimension.heaven")=="[official_heaven:dimension.heaven]"&&
+            !Plugins::availableItem(ItemId::STARSTEP_SCEPTER),"disabled provider retained translations or content");
+    Plugins::content()=savedContent;
     localization.setLanguage(Language::English);
 
     std::string name = "World";
@@ -263,7 +302,8 @@ int main() {
     // Every non-ASCII codepoint of every translation must rasterize from one
     // of the two bundled faces.
     for (const Language language : languagesByEnglishName()) {
-        std::ifstream langFile(root / "assets" / "lang" /
+        for(const auto& directory:{root/"assets/lang",root/"assets/plugins/official_heaven/lang"}) {
+        std::ifstream langFile(directory /
             (std::string(languageCode(language)) + ".json"));
         nlohmann::json langJson;
         langFile >> langJson;
@@ -275,6 +315,7 @@ int main() {
                         stbtt_FindGlyphIndex(&arabicFont, static_cast<int>(codepoint)) != 0,
                         "every translation glyph resolves in a bundled font");
             }
+        }
         }
         // The language option label is built from the in-code native names, so
         // those glyphs must resolve too.

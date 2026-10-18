@@ -1,8 +1,9 @@
 // Shared by the legacy and GI passes so AO and shafts use the same gates.
 float screenAo(vec4 center,vec3 normal){
     float centerDistance=abs(center.z);
-    int directions=int(post.screenQuality.x+0.5);
-    int steps=int(post.screenQuality.y+0.5);
+    uint policy=uint(post.sunScreen.z+0.5);
+    int directions=int((policy>>1u)&15u);
+    int steps=int((policy>>5u)&7u);
     float occlusion=0.0;
     float samples=0.0;
     if(center.z>0.01&&center.w<1.9){
@@ -31,9 +32,10 @@ float screenAo(vec4 center,vec3 normal){
 }
 
 float screenShafts(){
-    int shaftSamples=int(post.screenQuality.z+0.5);
+    uint policy=uint(post.sunScreen.z+0.5);
+    int shaftSamples=int((policy>>8u)&31u);
     float shafts=0.0;
-    if(shaftSamples>0&&post.sunScreen.z>0.5&&post.celestial.w<0.5){
+    if(shaftSamples>0&&(policy&1u)!=0u&&(policy&8192u)==0u){
         vec2 toSun=post.sunScreen.xy-vUv;
         float illumination=0.0;
         for(int i=1;i<=16;++i){

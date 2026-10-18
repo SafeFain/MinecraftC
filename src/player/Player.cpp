@@ -353,7 +353,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
         m_inventory.slot(static_cast<size_t>(m_selectedSlot));
     if (button == MouseButton::Right && action == ButtonAction::Press) {
         const auto* behavior=Plugins::itemBehavior(selected.id);
-        if(behavior&&!behavior->action.empty()&&Plugins::content().extensions.actions.at(behavior->action).targetV2) {
+        if(behavior&&!behavior->action.empty()&&Plugins::content().extensions.actions.at(behavior->action).contextual()) {
             if(m_actionCooldown<=0.0f)(void)placeBlockImpl();
             return;
         }
@@ -1124,7 +1124,7 @@ bool Player::placeBlockImpl() {
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
     if(const auto* b=Plugins::blockBehavior(targetedBlock)) {
         if(!b->action.empty()){
-            if(Plugins::content().extensions.actions.at(b->action).targetV2){if(Plugins::useDispatcher()&&Plugins::useDispatcher()(m_roomPlayerId,b->action))return true;}
+            if(Plugins::content().extensions.actions.at(b->action).contextual()){if(Plugins::useDispatcher()&&Plugins::useDispatcher()(m_roomPlayerId,b->action))return true;}
             else return Plugins::actionDispatcher()&&Plugins::actionDispatcher()(m_roomPlayerId,b->action);
         }
         if(!b->harvest.empty()) {
