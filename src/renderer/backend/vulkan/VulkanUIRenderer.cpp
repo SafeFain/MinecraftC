@@ -270,6 +270,12 @@ private:
             for(uint32_t cp:decodeUtf8(languageNativeName(language)))
                 if(cp>=32)codepoints.insert(cp);
         }
+        // Active packages own translations outside the base language files.
+        // Include every bundle so switching languages keeps all plugin glyphs.
+        for(const auto& bundle:Plugins::content().extensions.translations)
+            for(const auto& entry:bundle.second)
+                for(uint32_t cp:decodeUtf8(entry.second))
+                    if(cp>=32)codepoints.insert(cp);
         // Arabic presentation forms never appear in the JSON sources; they are
         // produced at runtime by the Arabic shaper, so their ranges are added
         // explicitly.

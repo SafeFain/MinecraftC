@@ -706,7 +706,7 @@
   "menu.create.generator_overworld": "مولد العالم الأساسي: {0}",
   "menu.create.generator_parameters": "معلمات التوليد (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
-  "loading.enter_dimension": "Entering {0}",
+  "loading.enter_dimension": "جارٍ الدخول إلى {0}",
   "menu.plugins.title": "عدم تطابق الإضافات",
   "menu.plugins.force": "نسخ احتياطي والدخول رغم ذلك",
   "menu.plugins.progress": "جارٍ تجهيز العالم",

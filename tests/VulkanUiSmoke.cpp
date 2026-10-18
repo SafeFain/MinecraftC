@@ -12,6 +12,7 @@
 #include "model/ModelRenderer.h"
 #include "game/SessionAccess.h"
 #include "game/Command.h"
+#include "game/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include "ui/UIRenderer.h"
@@ -28,6 +29,7 @@
 #include <iostream>
 #include <functional>
 #include <chrono>
+#include <set>
 
 namespace {
 struct Access final : IContainerAccess,ITradeAccess {
@@ -161,6 +163,23 @@ int main(int argc,char** argv) {
         }
         UIRenderer ui;Localization localization;localization.load(assets);
         ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
+        // Font-file coverage alone cannot catch translations omitted from the
+        // actual GPU atlas. Verify both layout and emitted glyph geometry.
+        std::set<uint32_t> pluginCjk;
+        for(const auto& bundle:Plugins::content().extensions.translations)
+            for(const auto& entry:bundle.second)
+                for(uint32_t cp:decodeUtf8(entry.second))
+                    if(cp>=0x3400 && cp<=0x9FFF)pluginCjk.insert(cp);
+        renderer.beginFrame();ui.beginUIFrame(width,height);
+        for(uint32_t cp:pluginCjk) {
+            std::string glyph;appendUtf8(glyph,cp);
+            if(ui.measureText(glyph,1).x<=0)throw std::runtime_error("Plugin glyph missing from font atlas: "+glyph);
+            const auto before=ui.frameStats().vertices;
+            ui.renderText(glyph,8,8,1,{1,1,1});
+            if(ui.frameStats().vertices!=before+4)throw std::runtime_error("Plugin glyph geometry missing: "+glyph);
+        }
+        ui.endUIFrame();renderer.endFrame();renderer.waitIdle();
+        std::cout<<"Plugin translation CJK atlas coverage passed: "<<pluginCjk.size()<<" glyphs\n";
         ClientSettings settings;
         InventoryModel items;
         items.slot(0)={ItemId::STONE,64,0};items.slot(1)={ItemId::OAK_PLANKS,32,0};
@@ -190,7 +209,7 @@ int main(int argc,char** argv) {
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
-                if(((capture && name=="trades") || name=="plugin-mismatch-warning") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
+                if(((capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -216,13 +235,25 @@ int main(int argc,char** argv) {
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
                 for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
             }
+            if(name=="registered-travel-zh_cn") {
+                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Chinese travel capture size invalid");
+                std::ofstream out(std::filesystem::temp_directory_path()/"localized-travel.ppm",std::ios::binary);
+                out<<"P6\n"<<width<<' '<<height<<"\n255\n";
+                for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
+            }
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
         draw("home",[&]{main.render(ui,width,height);});
         for(const auto language:languagesByEnglishName()) {
             localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[]{});
             draw("plugins-"+std::string(languageCode(language)),[&]{pluginMenu.render(ui,width,height);});
-            draw("registered-travel-"+std::string(languageCode(language)),[&]{sleep.render(ui,width,height);},3);
+            SleepMenu localizedSleep(callbacks,localization,DimensionId::Overworld);
+            draw("registered-travel-"+std::string(languageCode(language)),[&]{
+                localizedSleep.render(ui,width,height);
+                const auto title=localization.format("loading.enter_dimension",{localization.dimensionName(DimensionId::Overworld)});
+                ui.renderText(title,12,height-24,1,{1,1,1});
+            },3);
         }
         localization.setLanguage(Language::English);
         WorldSummary mismatch;mismatch.id="mismatch";mismatch.displayName="Plugin compatibility warning";

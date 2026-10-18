@@ -40,6 +40,14 @@ int main() {
             "localized positional formatting");
     require(localization.format("loading.lod", {"42"}) == "正在加载远景 LOD：42%",
             "distant-terrain loading formats the coverage percentage");
+    require(localization.format("loading.enter_dimension", {
+                localization.dimensionName(DimensionId::Overworld)}) == "正在进入主世界",
+            "Overworld loading title is fully translated in Simplified Chinese");
+    require(localization.text("official_heaven:travel.heaven") == "前往天境" &&
+            localization.text("sleep.travel_heaven") == "前往天境" &&
+            localization.format("loading.enter_dimension", {
+                localization.dimensionName(DimensionId::Heaven)}) == "正在进入天堂",
+            "Chinese plugin travel aliases and loading titles are fully translated");
     for (const Language language : languagesByEnglishName())
         require(localization.hasTranslation(language, "loading.lod"),
                 "distant-terrain loading is translated in every language");

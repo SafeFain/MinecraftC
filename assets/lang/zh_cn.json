@@ -706,7 +706,7 @@
   "menu.create.generator_overworld": "主世界生成器：{0}",
   "menu.create.generator_parameters": "生成参数（JSON）",
   "menu.create.generator_dimension": "{0}: {1}",
-  "loading.enter_dimension": "Entering {0}",
+  "loading.enter_dimension": "正在进入{0}",
   "menu.plugins.title": "插件不匹配",
   "menu.plugins.force": "备份并强行进入",
   "menu.plugins.progress": "正在准备存档",
