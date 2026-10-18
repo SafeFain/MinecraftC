@@ -650,6 +650,43 @@ int main(int argc,char** argv) {
         require(opened==1,"selected world remains focused after rebuilding its card");
     }
 
+    {
+        ClientSettings settings;Localization localization;UIRenderer ui;
+        int opened=0,recovered=0;
+        MenuCallbacks callbacks;callbacks.onOpenWorld=[&](const std::string&){++opened;};
+        callbacks.onBeginWorldRecovery=[&](const std::string& id,const std::string& token)->std::unique_ptr<WorldRecovery>{
+            require(id=="modded"&&token=="reviewed","warning confirms the selected world/token");
+            ++recovered;throw std::runtime_error("fixture recovery failure");
+        };
+        WorldSummary world;world.id="modded";world.displayName="Modded world";
+        world.pluginCompatibility.token="reviewed";world.backupDirectory="backup/directory";
+        for(int i=0;i<30;++i)world.pluginCompatibility.issues.push_back({"changed_plugin","fixture_"+std::to_string(i),std::string(128,'a'),std::string(128,'b')});
+        MainMenu menu(callbacks,{world},settings,localization,nullptr);
+        menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Enter);
+        require(opened==0&&recovered==0,"opening warning never starts recovery");
+        menu.render(ui,320,240);menu.onScroll(-20);menu.render(ui,320,240);
+        menu.onKeyPress(Key::Enter);
+        require(recovered==0,"warning defaults to cancel, repeated enter never confirms");
+        menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter);
+        require(opened==0&&recovered==1,"explicit force action invokes recovery, never ordinary load");
+        menu.onKeyPress(Key::Enter); // Error screen Back.
+        menu.render(ui,960,600);
+        menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Escape);
+        require(opened==0&&recovered==1,"escape cancels a renewed warning without recovery");
+        recordUi=true;drawnLabels.clear();menu.render(ui,960,600);
+        const auto click=[&](glm::vec2 p){menu.onMouseButton(MouseButton::Left,ButtonAction::Press,p.x+4,p.y+4);menu.onMouseButton(MouseButton::Left,ButtonAction::Release,p.x+4,p.y+4);};
+        // Locate controls from their actually rendered labels instead of hardcoding layout.
+        require(drawnLabels.count("menu.worlds.play")!=0,"play control rendered");
+        click(drawnLabels.at("menu.worlds.play"));
+        menu.render(ui,960,600);
+        require(drawnLabels.count("menu.plugins.title")!=0&&recovered==1,"play button routes to warning");
+        menu.onKeyPress(Key::Escape);drawnLabels.clear();menu.render(ui,960,600);
+        const auto card=drawnLabels.at("Modded world");click(card);click(card);
+        menu.render(ui,960,600);
+        require(drawnLabels.count("menu.plugins.title")!=0&&opened==0&&recovered==1,"double-click routes to warning without bypassing confirmation");
+        recordUi=false;
+    }
+
     for (const auto language : languagesByEnglishName()) {
         ClientSettings settings; settings.language=Language::English;
         Localization localization; localization.setLanguage(settings.language);

@@ -360,10 +360,12 @@ plugins may differ. Install required plugins locally before joining. `--safe-mod
 
 Heaven is supplied by the default-enabled `official_heaven` builtin provider.
 Disabling it and restarting removes its dimension, travel entry, content and recipes.
-Worlds require the exact gameplay plugin set: changing this switch, missing resources,
-or a package revision mismatch leaves affected saves listed as incompatible and refuses
-opening without rewriting them. Saves from before the provider was introduced are
-also incompatible; no automatic migration is performed. Generation remains v20 / Heaven v9.
+Ordinary loading requires the exact gameplay plugin set. Changing this switch,
+missing resources or changed fingerprints opens a detailed compatibility warning.
+You can cancel or explicitly back up and recover a local world with the current
+plugins; missing content is removed or replaced with air. LAN joins remain strict.
+Legacy save formats still cannot load. Generation remains v20 / Heaven v9.
+See [plugin save recovery](docs/plugins.md#saves-and-limits).
 
 Plugin authors can also register slab, stair, door and button state families and
 fixed collision/selection boxes with optional box models. See the

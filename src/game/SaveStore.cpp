@@ -6,6 +6,7 @@
 #include "entity/EntityLogic.h"
 
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -15,6 +16,10 @@
 #include <type_traits>
 #include <utility>
 #include <set>
+#include <chrono>
+#include <sstream>
+#include <regex>
+#include "world/WorldGenContext.h"
 
 namespace {
 
@@ -79,7 +84,9 @@ void appendString(Bytes& bytes, const std::string& value) {
 
 class Reader {
 public:
-    explicit Reader(Bytes bytes, uint32_t version=0, bool inspection=false) : inspectOnly(inspection), m_bytes(std::move(bytes)) {
+    explicit Reader(Bytes bytes, uint32_t version=0, bool inspection=false,
+                    bool recovery=false, std::vector<PluginCompatibilityIssue>* issues=nullptr)
+        : inspectOnly(inspection), recoverPlugins(recovery), report(issues), m_bytes(std::move(bytes)) {
         if (version < 16) return;
         const uint32_t requirementCount=read<uint32_t>();
         if (requirementCount>4096) throw std::runtime_error("Too many plugin requirements");
@@ -91,11 +98,15 @@ public:
         }
         auto expected=Plugins::content().requirements, saved=requirements;
         std::sort(expected.begin(),expected.end());std::sort(saved.begin(),saved.end());
-        if (expected!=saved) {
-            compatibilityError="Required content/behavior plugin set differs";
-            for (const auto& plugin:saved) if(std::find(expected.begin(),expected.end(),plugin)==expected.end()) compatibilityError+="; "+plugin.first+" ("+plugin.second+")";
-            if(!inspection) throw std::runtime_error(compatibilityError);
+        for (const auto& plugin:saved) {
+            const auto it=std::find_if(expected.begin(),expected.end(),[&](const auto& p){return p.first==plugin.first;});
+            if(it==expected.end())issue("missing_plugin",plugin.first,plugin.second,"");
+            else if(it->second!=plugin.second)issue("changed_plugin",plugin.first,plugin.second,it->second);
         }
+        for (const auto& plugin:expected)
+            if(std::none_of(saved.begin(),saved.end(),[&](const auto& p){return p.first==plugin.first;}))
+                issue("extra_plugin",plugin.first,"",plugin.second);
+        if (expected!=saved && !inspection && !recovery) throw std::runtime_error(compatibilityError);
         auto palette=[&](bool blocks) {
             const uint32_t count=read<uint32_t>();
             if(count>65535) throw std::runtime_error("Plugin palette is too large");
@@ -105,22 +116,42 @@ public:
                 if(raw<Plugins::FIRST_CONTENT_ID||raw==Plugins::INVALID_CONTENT_ID||!Plugins::validKey(key)||map.count(raw)||!keys.insert(key).second) throw std::runtime_error("Invalid plugin palette");
                 uint16_t resolved=Plugins::INVALID_CONTENT_ID;
                 try {resolved=blocks?static_cast<uint16_t>(Plugins::resolveBlock(key)):static_cast<uint16_t>(Plugins::resolveItem(key));}
-                catch(const std::exception&) {if(!inspection)throw;compatibilityError+="; missing content "+key;}
+                catch(const std::exception&) {if(!inspection&&!recovery)throw;issue("missing_content",key,key,"");}
                 map.emplace(raw,resolved);
             }
         };
         palette(true);palette(false);
     }
+    std::set<PluginCompatibilityIssue> seenIssues;
     bool inspectOnly=false;
+    bool recoverPlugins=false;
+    std::vector<PluginCompatibilityIssue>* report=nullptr;
+    void issue(const std::string& kind,const std::string& key,const std::string& saved,const std::string& current) {
+        const PluginCompatibilityIssue value{kind,key,saved,current};
+        if(!seenIssues.insert(value).second)return;
+        if(!compatibilityError.empty())compatibilityError+="; ";
+        compatibilityError+=kind+": "+key+" ["+saved+" -> "+current+"]";
+        if(report && std::find(report->begin(),report->end(),value)==report->end())report->push_back(value);
+    }
     std::vector<std::pair<std::string,std::string>> requirements;
     std::string compatibilityError;
     std::map<uint16_t,uint16_t> blockMap,itemMap;
-    uint16_t contentId(uint16_t raw, bool block) const {
+    uint16_t contentId(uint16_t raw, bool block) {
         const uint16_t count=block?static_cast<uint16_t>(BlockId::COUNT):static_cast<uint16_t>(ItemId::COUNT);
-        if(raw<count)return raw;
-        const auto& map=block?blockMap:itemMap;const auto it=map.find(raw);
-        if(it==map.end())throw std::runtime_error("Unmapped serialized content ID");
-        return it->second;
+        uint16_t resolved=raw;
+        if(raw>=count) {
+            const auto& map=block?blockMap:itemMap;const auto it=map.find(raw);
+            if(it==map.end())throw std::runtime_error("Unmapped serialized content ID");
+            resolved=it->second;
+        }
+        const bool available=resolved!=Plugins::INVALID_CONTENT_ID &&
+            (block?Plugins::availableBlock(static_cast<BlockId>(resolved)):Plugins::availableItem(static_cast<ItemId>(resolved)));
+        if(recoverPlugins && !available) {
+            // Includes fixed reserved slots whose optional provider is absent.
+            if(resolved!=Plugins::INVALID_CONTENT_ID)issue("missing_content",std::string(block?"minecraftc:block_":"minecraftc:item_")+std::to_string(raw),std::to_string(raw),"");
+            return 0;
+        }
+        return resolved;
     }
 
     template<typename T>
@@ -332,6 +363,7 @@ ItemStack readStack(Reader& reader) {
     stack.id = static_cast<ItemId>(reader.contentId(reader.read<uint16_t>(), false));
     stack.count = reader.read<uint8_t>();
     stack.damage = reader.read<uint16_t>();
+    if(stack.count>64)throw std::runtime_error("Save contains invalid item count");
     if (reader.inspectOnly && !isValidItemId(stack.id)) return stack;
     if (!isValidItemId(stack.id)) throw std::runtime_error("Save contains invalid item id");
     if (stack.empty()) {
@@ -435,20 +467,27 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
             throw std::runtime_error("Save contains invalid villager food");
     }
     if(version>=19) {
-        const auto key=reader.readString();entity.pluginState=reader.readString();entity.pluginStateVersion=reader.read<uint32_t>();
+        const auto key=reader.readString();if(!Plugins::validKey(key))throw std::runtime_error("Invalid entity key");entity.pluginState=reader.readString();entity.pluginStateVersion=reader.read<uint32_t>();
         if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
         Plugins::Json::parse(entity.pluginState);
         const auto old=entity.type;
-        if(!reader.inspectOnly)entity.type=Plugins::resolveEntity(key);
+        if(!reader.inspectOnly) {
+            try {entity.type=Plugins::resolveEntity(key);}
+            catch(const std::exception&) {if(!reader.recoverPlugins)throw;entity.type=Plugins::INVALID_CONTENT_ID;reader.issue("missing_entity",key,key,"");}
+        }
         if(old!=255 && key!="minecraftc:entity_"+std::to_string(old))throw std::runtime_error("Entity key mismatch");
         if(!reader.inspectOnly) {
             const auto* e=Plugins::entityContent(entity.type);
-            if(e && entity.pluginStateVersion!=e->stateVersion)throw std::runtime_error("Entity state version mismatch");
+            if(e && entity.pluginStateVersion!=e->stateVersion) {
+                if(!reader.recoverPlugins)throw std::runtime_error("Entity state version mismatch");
+                reader.issue("entity_revision",key,std::to_string(entity.pluginStateVersion),std::to_string(e->stateVersion));
+                entity.type=Plugins::INVALID_CONTENT_ID;
+            }
         }
     }
     // Appended entity types are legal only in the versions that introduced them.
     if ((version<19 && entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager)) ||
-        (version>=19&&!reader.inspectOnly&&!Plugins::validEntity(entity.type)))
+        (version>=19&&!reader.inspectOnly&&!reader.recoverPlugins&&!Plugins::validEntity(entity.type)))
         throw std::runtime_error("Save contains invalid entity type");
     return entity;
 }
@@ -488,9 +527,11 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     if (entity.value.type == BlockEntityType::Chest) {
         for (auto& stack : entity.value.chest) stack = readStack(reader);
         if(version>=21){auto& e=entity.value;e.lootKey=reader.readString();e.lootRevision=reader.readString();e.structureKey=reader.readString();e.structureRevision=reader.readString();e.lootSeed=reader.read<uint64_t>();const auto flag=reader.read<uint8_t>();if(flag>1)throw std::runtime_error("Invalid loot flag");e.lootInitialized=flag;
-            if(!e.lootKey.empty()){const auto& tables=Plugins::content().extensions.loot;const auto found=tables.find(e.lootKey);if(found==tables.end()||found->second.revision!=e.lootRevision||!e.lootInitialized)throw std::runtime_error("Incompatible chest loot metadata");}
-            if(!e.structureKey.empty()){const auto& structures=Plugins::content().extensions.structures;const auto found=structures.find(e.structureKey);if(found==structures.end()||found->second.revision!=e.structureRevision)throw std::runtime_error("Incompatible chest structure metadata");}}
-    } else if(entity.value.type==BlockEntityType::Resource){entity.value.resourceRemaining=reader.read<uint32_t>();entity.value.resourceBlock=static_cast<uint16_t>(Plugins::resolveBlock(reader.readString()));if(entity.value.resourceRemaining>72000)throw std::runtime_error("Invalid resource timer");
+            if((!e.lootKey.empty()&&!Plugins::validKey(e.lootKey))||(!e.structureKey.empty()&&!Plugins::validKey(e.structureKey)))throw std::runtime_error("Invalid loot/structure key");
+            if(!e.lootKey.empty()){const auto& tables=Plugins::content().extensions.loot;const auto found=tables.find(e.lootKey);if(!e.lootInitialized)throw std::runtime_error("Incompatible chest loot metadata");
+                if(found==tables.end()||found->second.revision!=e.lootRevision){if(!reader.recoverPlugins)throw std::runtime_error("Incompatible chest loot metadata");reader.issue("loot_revision",e.lootKey,e.lootRevision,found==tables.end()?"":found->second.revision);e.lootKey.clear();e.lootRevision.clear();}}
+            if(!e.structureKey.empty()){const auto& structures=Plugins::content().extensions.structures;const auto found=structures.find(e.structureKey);if(found==structures.end()||found->second.revision!=e.structureRevision){if(!reader.recoverPlugins)throw std::runtime_error("Incompatible chest structure metadata");reader.issue("structure_revision",e.structureKey,e.structureRevision,found==structures.end()?"":found->second.revision);e.structureKey.clear();e.structureRevision.clear();}}}
+    } else if(entity.value.type==BlockEntityType::Resource){entity.value.resourceRemaining=reader.read<uint32_t>();const auto resourceKey=reader.readString();if(!Plugins::validKey(resourceKey))throw std::runtime_error("Invalid resource block key");try{entity.value.resourceBlock=static_cast<uint16_t>(Plugins::resolveBlock(resourceKey));}catch(const std::exception&){if(!reader.recoverPlugins)throw;entity.value.resourceBlock=0;reader.issue("missing_content",resourceKey,resourceKey,"");}if(entity.value.resourceRemaining>72000)throw std::runtime_error("Invalid resource timer");
     } else if (entity.value.type == BlockEntityType::Button) {
         entity.value.buttonRemaining = reader.read<uint16_t>();
         if (version < 20 && entity.value.buttonRemaining > 30) throw std::runtime_error("Invalid button timer");
@@ -509,8 +550,9 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
 
 } // namespace
 
-SaveStore::SaveStore(std::filesystem::path worldDirectory)
-    : m_worldDirectory(std::move(worldDirectory)) {}
+SaveStore::SaveStore(std::filesystem::path worldDirectory,SaveReadPolicy policy,
+                     std::vector<PluginCompatibilityIssue>* issues)
+    : m_worldDirectory(std::move(worldDirectory)),m_policy(policy),m_issues(issues) {}
 
 bool SaveStore::exists() const {
     return std::filesystem::is_regular_file(m_worldDirectory / "level.bin");
@@ -624,7 +666,8 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
     if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v21; legacy worlds are incompatible");
-    Reader reader(std::move(checked.payload), checked.version, inspection);
+    const bool recovery=m_policy==SaveReadPolicy::RecoverPlugins;
+    Reader reader(std::move(checked.payload), checked.version, inspection, recovery, m_issues);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
@@ -668,7 +711,8 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     if (entityCount > 4096) throw std::runtime_error("Save contains too many entities");
     metadata.entities.reserve(entityCount);
     for (uint32_t i = 0; i < entityCount; ++i) {
-        metadata.entities.push_back(readEntity(reader, checked.version));
+        auto entity=readEntity(reader, checked.version);
+        if(!recovery || (Plugins::validEntity(entity.type) && !(entity.type==static_cast<uint16_t>(EntityType::Item) && entity.item.empty())))metadata.entities.push_back(std::move(entity));
     }
     if (checked.version >= 9) {
         // World type was appended in v9; older saves intentionally retain the
@@ -723,18 +767,47 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
             } else metadata.gameRules.unknown.push_back({name, value});
         }
     }
+    auto validateGenerationShape=[](const Plugins::GenerationConfig& g) {
+        if(g.generator.empty()&&!g.revision.empty())throw std::runtime_error("Builtin generator has no plugin revision");
+        if(!g.generator.empty()&&!Plugins::validKey(g.generator))throw std::runtime_error("Invalid generator key");
+        if(Plugins::Json::parse(g.parameters).type!=Plugins::Json::Type::Object)throw std::runtime_error("Generator parameters must be a JSON object");
+        std::set<std::string> selected;
+        for(const auto& modifier:g.modifiers)if(!Plugins::validKey(modifier.first)||!selected.insert(modifier.first).second)throw std::runtime_error("Invalid saved generator modifier");
+    };
+    auto repairGeneration=[&](Plugins::GenerationConfig& g,uint32_t dimension) {
+        if(!recovery)return;
+        validateGenerationShape(g);
+        if(!g.generator.empty()) {
+            const auto it=Plugins::content().extensions.generators.find(g.generator);
+            if(it==Plugins::content().extensions.generators.end()||it->second.dimension!=dimension) {
+                reader.issue("missing_generator",g.generator,g.revision,"");
+                g=Plugins::dimensionContent(dimension).generation;
+            } else if(g.revision!=it->second.revision) {
+                reader.issue("generator_revision",g.generator,g.revision,it->second.revision);g.revision=it->second.revision;
+            }
+        }
+        for(auto it=g.modifiers.begin();it!=g.modifiers.end();) {
+            const auto found=Plugins::content().extensions.modifiers.find(it->first);
+            if(found==Plugins::content().extensions.modifiers.end()||found->second.dimension!=dimension) {
+                reader.issue("missing_modifier",it->first,it->second,"");it=g.modifiers.erase(it);
+            } else {if(it->second!=found->second.revision){reader.issue("modifier_revision",it->first,it->second,found->second.revision);it->second=found->second.revision;}++it;}
+        }
+        Plugins::validateGeneration(g,dimension);
+    };
     if(checked.version>=19)for(uint32_t dimension=0;dimension<2;++dimension) {
         auto& g=metadata.generation[dimension];g.generator=reader.readString();g.revision=reader.readString();g.parameters=reader.readString();
         if(g.parameters.size()>4096)throw std::runtime_error("Generation parameters too large");
         Plugins::Json::parse(g.parameters);
         const auto count=reader.read<uint16_t>();if(count>64)throw std::runtime_error("Too many generation modifiers");
         for(uint16_t i=0;i<count;++i){auto key=reader.readString();auto revision=reader.readString();g.modifiers.emplace_back(key,revision);}
-        if(!inspection&&Plugins::validDimension(dimension)&&
+        validateGenerationShape(g);
+        if(!inspection&&!recovery&&Plugins::validDimension(dimension)&&
            (checked.version<20||!(g==Plugins::GenerationConfig{})))Plugins::validateGeneration(g,dimension);
     }
     if(checked.version>=20) {
         auto resolve=[&](const std::string& key,uint32_t fallback) {
-            try{return Plugins::resolveDimension(key);}catch(const std::exception& e){if(!inspection)throw;metadata.pluginCompatibilityError=e.what();return fallback;}
+            if(!Plugins::validKey(key))throw std::runtime_error("Invalid dimension key");
+            try{return Plugins::resolveDimension(key);}catch(const std::exception&){if(!inspection&&!recovery)throw;reader.issue("missing_dimension",key,key,"");return fallback;}
         };
         const auto activeKey=reader.readString();
         const auto count=reader.read<uint32_t>();if(count<1||count>1024)throw std::runtime_error("Invalid dimension count");
@@ -742,11 +815,17 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         for(uint32_t index=0;index<count;++index) {
             const auto key=reader.readString(),revision=reader.readString();if(!keys.insert(key).second)throw std::runtime_error("Duplicate saved dimension");
             const auto id=resolve(key,1024+index);
-            if(Plugins::validDimension(id)&&revision!=Plugins::dimensionContent(id).revision){metadata.pluginCompatibilityError="Dimension revision mismatch: "+key;if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
+            metadata.savedDimensionKeys[id]=key;
+            if(Plugins::validDimension(id)&&revision!=Plugins::dimensionContent(id).revision){reader.issue("dimension_revision",key,revision,Plugins::dimensionContent(id).revision);if(!inspection&&!recovery)throw std::runtime_error(reader.compatibilityError);}
             auto& g=metadata.generation[id];g.generator=reader.readString();g.revision=reader.readString();g.parameters=reader.readString();
             const auto modifiers=reader.read<uint16_t>();if(modifiers>64||g.parameters.size()>4096)throw std::runtime_error("Invalid saved generation configuration");
             for(uint16_t i=0;i<modifiers;++i){auto k=reader.readString(),r=reader.readString();g.modifiers.emplace_back(k,r);}
-            if(!inspection)Plugins::validateGeneration(g,id);
+            validateGenerationShape(g);
+            if(!Plugins::validDimension(id)) {
+                if(!g.generator.empty()&&!Plugins::content().extensions.generators.count(g.generator))reader.issue("missing_generator",g.generator,g.revision,"");
+                for(const auto& modifier:g.modifiers)if(!Plugins::content().extensions.modifiers.count(modifier.first))reader.issue("missing_modifier",modifier.first,modifier.second,"");
+            }
+            if(Plugins::validDimension(id)){repairGeneration(g,id);if(!inspection&&!recovery)Plugins::validateGeneration(g,id);}
             auto& state=metadata.dimensions[id];state.playerPosition=reader.read<glm::dvec3>();state.safePlayerPosition=reader.read<glm::dvec3>();
             auto flag=[&]{const auto v=reader.read<uint8_t>();if(v>1)throw std::runtime_error("Invalid dimension flag");return v!=0;};
             state.hasSafePosition=flag();state.positioned=flag();state.worldTicks=reader.read<uint64_t>();state.dayPhase=reader.read<float>();
@@ -758,9 +837,28 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
         }
         if(!keys.count(activeKey)||!keys.count("minecraftc:overworld"))throw std::runtime_error("Missing saved dimension state");
         metadata.activeDimension=static_cast<DimensionId>(resolve(activeKey,2048));
-        if(count!=Plugins::content().extensions.dimensions.size()){metadata.pluginCompatibilityError="World dimension registry mismatch";if(!inspection)throw std::runtime_error(metadata.pluginCompatibilityError);}
+        if(count!=Plugins::content().extensions.dimensions.size()){reader.issue("dimension_registry","dimensions",std::to_string(count),std::to_string(Plugins::content().extensions.dimensions.size()));if(!inspection&&!recovery)throw std::runtime_error(reader.compatibilityError);}
     }
-    if(checked.version>=21){const auto count=reader.read<uint32_t>();if(count>1024)throw std::runtime_error("Too many time policies");for(uint32_t i=0;i<count;++i){const auto key=reader.readString();uint32_t id=1024+i;try{id=Plugins::resolveDimension(key);}catch(...){if(!inspection)throw;}const auto cycle=reader.read<uint32_t>(),advancing=reader.read<uint32_t>();if(cycle>86400000||advancing>2||!metadata.timePolicies.emplace(id,std::make_pair(cycle,advancing)).second)throw std::runtime_error("Invalid time policy");}}
+    if(checked.version>=21){const auto count=reader.read<uint32_t>();if(count>1024)throw std::runtime_error("Too many time policies");for(uint32_t i=0;i<count;++i){const auto key=reader.readString();uint32_t id=1024+i;try{id=Plugins::resolveDimension(key);}catch(...){if(!inspection&&!recovery)throw;}const auto cycle=reader.read<uint32_t>(),advancing=reader.read<uint32_t>();if(cycle>86400000||advancing>2||!metadata.timePolicies.emplace(id,std::make_pair(cycle,advancing)).second)throw std::runtime_error("Invalid time policy");}}
+    if(recovery) {
+        for(auto& entry:metadata.generation)if(Plugins::validDimension(entry.first))repairGeneration(entry.second,entry.first);
+        for(auto it=metadata.generation.begin();it!=metadata.generation.end();) {
+            if(!Plugins::validDimension(it->first)){metadata.dimensions.erase(it->first);metadata.timePolicies.erase(it->first);it=metadata.generation.erase(it);}else ++it;
+        }
+        for(const auto& entry:Plugins::content().extensions.dimensions) {
+            if(!metadata.generation.count(entry.first)) {reader.issue("extra_dimension",entry.second.key,"",entry.second.revision);metadata.generation[entry.first]=entry.second.generation;}
+        }
+        for(auto it=metadata.timePolicies.begin();it!=metadata.timePolicies.end();)if(!Plugins::validDimension(it->first))it=metadata.timePolicies.erase(it);else ++it;
+        if(!Plugins::validDimension(metadata.activeDimension)) {
+            metadata.needsRecoverySpawn=true;
+            metadata.activeDimension=DimensionId::Overworld;
+            const auto found=metadata.dimensions.find(0);
+            if(found!=metadata.dimensions.end()&&found->second.hasSafePosition)metadata.playerPosition=found->second.safePlayerPosition;
+            else metadata.playerPosition=glm::dvec3(metadata.worldSpawn)+glm::dvec3(.5,.01,.5);
+        }
+        if(!Plugins::validDimension(1))metadata.heaven={};
+    }
+    if(!reader.compatibilityError.empty())metadata.pluginCompatibilityError=reader.compatibilityError;
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
     // fully decoded above, so safely ignore that tail; v10 remains strict.
@@ -815,7 +913,7 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
     const auto path = chunkPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload), checked.version);
+    Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Chunk save coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
@@ -877,7 +975,7 @@ std::optional<std::vector<uint16_t>> SaveStore::loadGeneratedChunk(
     if (!std::filesystem::exists(path)) return std::nullopt;
     try {
         CheckedBytes checked = readChecked(path);
-        Reader reader(std::move(checked.payload), checked.version);
+        Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
         if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ ||
             reader.read<uint32_t>() != generationVersion)
             return std::nullopt;
@@ -953,7 +1051,7 @@ std::vector<PersistedBlockEntity> SaveStore::loadBlockEntities(
     const auto path = blockEntityPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload), checked.version);
+    Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Block entity coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
@@ -982,14 +1080,17 @@ std::vector<WorldMetadata::PersistedEntity> SaveStore::loadChunkEntities(
     const auto path = entityPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return {};
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload), checked.version);
+    Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Entity chunk coordinate mismatch");
     const uint32_t count = reader.read<uint32_t>();
     if (count > 4096) throw std::runtime_error("Too many chunk entities");
     std::vector<WorldMetadata::PersistedEntity> result;
     result.reserve(count);
-    for (uint32_t i = 0; i < count; ++i) result.push_back(readEntity(reader, checked.version));
+    for (uint32_t i = 0; i < count; ++i) {
+        auto entity=readEntity(reader, checked.version);
+        if(m_policy!=SaveReadPolicy::RecoverPlugins || (Plugins::validEntity(entity.type) && !(entity.type==static_cast<uint16_t>(EntityType::Item) && entity.item.empty())))result.push_back(std::move(entity));
+    }
     if (!reader.finished()) throw std::runtime_error("Unexpected chunk entity data");
     return result;
 }
@@ -1008,7 +1109,7 @@ uint32_t SaveStore::loadChunkEntityPopulationVersion(
     const auto path = entityPopulationPath(chunkX, chunkZ);
     if (!std::filesystem::exists(path)) return 0;
     CheckedBytes checked = readChecked(path);
-    Reader reader(std::move(checked.payload), checked.version);
+    Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
         throw std::runtime_error("Entity population coordinate mismatch");
     const uint32_t version = reader.read<uint32_t>();
@@ -1017,15 +1118,249 @@ uint32_t SaveStore::loadChunkEntityPopulationVersion(
     return version;
 }
 
+namespace {
+std::string directoryForKey(const std::string& key);
+struct DurableFile {
+    std::filesystem::path root;
+    char kind=0;
+    int x=0,z=0;
+};
+DurableFile durableFile(const std::filesystem::path& relative) {
+    const auto folder=relative.parent_path().filename().string();
+    if(relative=="level.bin")return {{},'l',0,0};
+    if(folder!="chunks" && folder!="block_entities" && folder!="entities")return {};
+    // Restrict conversion to world partitions, excluding arbitrary plugin/private trees.
+    const auto parent=relative.parent_path().parent_path();
+    if(!parent.empty()) {
+        if(*parent.begin()!="dimensions")return {};
+        const auto directory=parent.lexically_relative("dimensions");
+        if(directory!="heaven") {
+            std::string encoded;
+            for(const auto& segment:directory)encoded+=segment.string();
+            if(encoded.rfind("d_",0)!=0)return {};
+            encoded.erase(0,2);
+            if(encoded.empty()||encoded.size()%2||encoded.size()>512)return {};
+            std::string key;const std::string hex="0123456789abcdef";
+            for(size_t i=0;i<encoded.size();i+=2) {
+                const auto hi=hex.find(encoded[i]),lo=hex.find(encoded[i+1]);
+                if(hi==std::string::npos||lo==std::string::npos)return {};
+                key+=static_cast<char>((hi<<4)|lo);
+            }
+            if(!Plugins::validKey(key)||directory!=std::filesystem::path(directoryForKey(key)))return {};
+        }
+    }
+    if(relative.extension()!=".bin")return {};
+    std::smatch match;const auto filename=relative.filename().string();
+    static const std::regex pattern(R"(^([cbep])\.(-?[0-9]+)\.(-?[0-9]+)\.bin$)");
+    if(!std::regex_match(filename,match,pattern))throw std::runtime_error("Invalid durable partition filename: "+relative.generic_string());
+    const char kind=match[1].str()[0];
+    if((folder=="chunks" && kind!='c') || (folder=="block_entities" && kind!='b') || (folder=="entities" && kind!='e' && kind!='p'))throw std::runtime_error("Invalid durable partition kind");
+    return {parent,kind,std::stoi(match[2]),std::stoi(match[3])};
+}
+std::string directoryForKey(const std::string& key) {
+    if(key=="minecraftc:overworld")return "";
+    if(key=="minecraftc:heaven")return "heaven";
+    std::string result="d_";const char* hex="0123456789abcdef";
+    for(unsigned char c:key){result+=hex[c>>4];result+=hex[c&15];}
+    for(size_t i=122;i<result.size();i+=123)result.insert(i,"/");
+    return result;
+}
+bool under(const std::filesystem::path& path,const std::filesystem::path& prefix) {
+    auto a=path.begin(),b=prefix.begin();for(;b!=prefix.end();++a,++b)if(a==path.end()||*a!=*b)return false;return true;
+}
+std::vector<std::filesystem::path> worldFiles(const std::filesystem::path& root) {
+    if(std::filesystem::is_symlink(std::filesystem::symlink_status(root)))throw std::runtime_error("World recovery rejects symbolic links");
+    std::vector<std::filesystem::path> files;
+    for(const auto& entry:std::filesystem::recursive_directory_iterator(root)) {
+        if(entry.is_symlink())throw std::runtime_error("World recovery rejects symbolic links: "+entry.path().string());
+        if(entry.is_regular_file())files.push_back(entry.path().lexically_relative(root));
+        else if(!entry.is_directory())throw std::runtime_error("Unsupported world file: "+entry.path().string());
+    }
+    std::sort(files.begin(),files.end());return files;
+}
+uint64_t hashText(const std::string& text,uint64_t hash) {
+    for(unsigned char c:text){hash^=c;hash*=1099511628211ULL;}
+    hash^=0;hash*=1099511628211ULL;return hash;
+}
+uint64_t compatibilityHashSeed() {
+    uint64_t hash=1469598103934665603ULL;
+    auto requirements=Plugins::content().requirements;std::sort(requirements.begin(),requirements.end());
+    for(const auto& requirement:requirements){hash=hashText(requirement.first,hash);hash=hashText(requirement.second,hash);}
+    return hash;
+}
+uint64_t hashFile(const std::filesystem::path& path,uint64_t hash) {
+    std::ifstream input(path,std::ios::binary);if(!input)throw std::runtime_error("Cannot read world file: "+path.string());
+    std::array<char,65536> buffer{};
+    while(input){input.read(buffer.data(),buffer.size());for(std::streamsize i=0;i<input.gcount();++i){hash^=static_cast<uint8_t>(buffer[static_cast<size_t>(i)]);hash*=1099511628211ULL;}}
+    if(!input.eof())throw std::runtime_error("Cannot read complete world file");return hash;
+}
+bool disposable(const std::filesystem::path& relative,const std::vector<std::filesystem::path>& dimensions) {
+    auto cache=[](const std::filesystem::path& path) {
+        if(path.empty())return false;
+        const auto first=path.begin()->string();
+        return first=="generated"||first=="lod"||path=="spawn.cache";
+    };
+    if(cache(relative))return true;
+    for(const auto& dimension:dimensions)
+        if(under(relative,dimension)&&cache(relative.lexically_relative(dimension)))return true;
+    return false;
+}
+}
+
+void SaveStore::recoverFileTo(const std::filesystem::path& relative,const std::filesystem::path& destination) const {
+    const auto file=durableFile(relative);
+    SaveStore source(m_worldDirectory/file.root,m_policy,m_issues),target(destination/file.root);
+    if(file.kind) {
+        const auto checked=readChecked(m_worldDirectory/relative);
+        if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v21");
+    }
+    switch(file.kind) {
+        case 'l': {auto metadata=source.loadMetadata();if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");if(!destination.empty()) {
+            target.saveMetadata(metadata);
+            if(metadata.needsRecoverySpawn&&!std::filesystem::exists(m_worldDirectory/RECOVERY_SPAWN_MARKER)) {
+                std::ofstream marker(destination/RECOVERY_SPAWN_MARKER,std::ios::binary);marker<<"pending\n";marker.close();
+                if(!marker)throw std::runtime_error("Cannot record recovery landing check");
+            }
+        }break;}
+        case 'c': {const auto values=source.loadChunkOverrides(file.x,file.z);if(!destination.empty())target.saveChunkOverrides(file.x,file.z,values);break;}
+        case 'b': {
+            auto values=source.loadBlockEntities(file.x,file.z);
+            if(m_policy==SaveReadPolicy::RecoverPlugins) {
+                const auto blocks=source.loadChunkOverrides(file.x,file.z);
+                values.erase(std::remove_if(values.begin(),values.end(),[&](const auto& value){
+                    if(value.value.type==BlockEntityType::Resource)return value.value.resourceBlock==0;
+                    const auto block=std::find_if(blocks.begin(),blocks.end(),[&](const auto& b){return b.localIndex==value.localIndex;});
+                    return block!=blocks.end()&&block->block==BlockId::AIR;
+                }),values.end());
+            }
+            if(!destination.empty())target.saveBlockEntities(file.x,file.z,values);break;
+        }
+        case 'e': {const auto values=source.loadChunkEntities(file.x,file.z);if(!destination.empty())target.saveChunkEntities(file.x,file.z,values);break;}
+        case 'p': {const auto value=source.loadChunkEntityPopulationVersion(file.x,file.z);if(!destination.empty())target.saveChunkEntityPopulationVersion(file.x,file.z,value);break;}
+        default: if(!destination.empty()){std::filesystem::create_directories((destination/relative).parent_path());std::filesystem::copy_file(m_worldDirectory/relative,destination/relative);}break;
+    }
+}
+
 void SaveStore::validatePluginFiles() const {
-    for (const auto& file : std::filesystem::recursive_directory_iterator(m_worldDirectory)) {
-        if (!file.is_regular_file() || file.path().extension() != ".bin") continue;
-        // Generated base caches are disposable; durable partitions must retain
-        // resolvable names before a session can attach a writable store.
-        if (file.path().parent_path().filename() == "generated") continue;
-        auto bytes=readChecked(file.path());
-        if(bytes.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v21");
-        Reader reader(std::move(bytes.payload),bytes.version);
-        (void)reader;
+    for(const auto& relative:worldFiles(m_worldDirectory))if(durableFile(relative).kind)recoverFileTo(relative,{});
+}
+
+WorldCompatibilityReport SaveStore::inspectCompatibility() const {
+    WorldCompatibilityReport result;
+    try {
+        SaveStore recover(m_worldDirectory,SaveReadPolicy::RecoverPlugins,&result.issues);
+        const auto metadata=recover.loadMetadata();
+        if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");
+        uint64_t hash=compatibilityHashSeed();
+        for(const auto& relative:worldFiles(m_worldDirectory)) {
+            hash=hashText(relative.generic_u8string(),hash);
+            hash=hashText(std::to_string(std::filesystem::file_size(m_worldDirectory/relative)),hash);
+            hash=hashFile(m_worldDirectory/relative,hash);
+            if(durableFile(relative).kind)recover.recoverFileTo(relative,{});
+        }
+        std::sort(result.issues.begin(),result.issues.end());
+        result.issues.erase(std::unique(result.issues.begin(),result.issues.end()),result.issues.end());
+        result.token=std::to_string(hash);
+    }catch(const std::exception& e){result.blocker=e.what();}
+    return result;
+}
+
+WorldRecovery::WorldRecovery(std::filesystem::path world,const std::string& confirmedToken)
+    :m_world(std::filesystem::absolute(std::move(world)).lexically_normal()),m_confirmedToken(confirmedToken) {
+    const auto report=SaveStore(m_world).inspectCompatibility();
+    if(!report.recoverable()||report.token!=confirmedToken)throw std::runtime_error("World/plugin compatibility changed; refresh the world list and review the warning again");
+    const auto base=m_world.parent_path()/".plugin-recovery";
+    if(std::filesystem::is_symlink(std::filesystem::symlink_status(base)))throw std::runtime_error("Recovery directory is a symbolic link");
+    std::filesystem::create_directories(base);
+    const auto stamp=std::chrono::system_clock::now().time_since_epoch().count();
+    for(unsigned n=0;;++n){m_transaction=base/(m_world.filename().string()+"-"+std::to_string(stamp)+"-"+std::to_string(n));if(std::filesystem::create_directory(m_transaction))break;}
+    m_stage=m_transaction/"staged";m_backup=m_transaction/"original";
+    try {
+        std::ofstream journal(m_transaction/"world-id",std::ios::binary);journal<<m_world.filename().string();journal.close();if(!journal)throw std::runtime_error("Cannot write recovery journal");
+        std::filesystem::create_directory(m_stage);
+        const auto metadata=SaveStore(m_world,SaveReadPolicy::RecoverPlugins).loadMetadata();
+        std::vector<std::filesystem::path> removed,dimensions;
+        for(const auto& dimension:metadata.savedDimensionKeys)if(dimension.first!=0) {
+            const auto directory=std::filesystem::path("dimensions")/directoryForKey(dimension.second);
+            dimensions.push_back(directory);
+            if(!Plugins::validDimension(dimension.first))removed.push_back(directory);
+        }
+        m_sourceFiles=worldFiles(m_world);
+        for(const auto& relative:m_sourceFiles) {
+            if(disposable(relative,dimensions))continue;
+            if(std::any_of(removed.begin(),removed.end(),[&](const auto& prefix){return under(relative,prefix);}))continue;
+            m_files.push_back(relative);
+        }
+    }catch(...){rollback();throw;}
+}
+WorldRecovery::~WorldRecovery(){if(!m_done)cancel();}
+float WorldRecovery::progress() const {
+    if(m_done)return 1.0f;
+    const float fraction=static_cast<float>(m_next)/static_cast<float>((m_phase==Phase::VerifySource?m_sourceFiles:m_files).size()+1);
+    return m_phase==Phase::Convert?fraction*.6f:m_phase==Phase::Validate?.6f+fraction*.2f:m_phase==Phase::VerifySource?.8f+fraction*.19f:.99f;
+}
+void WorldRecovery::rollback() {
+    if(m_published && std::filesystem::exists(m_backup)) {
+        // Invalidate completion before the rollback can leave the world path
+        // temporarily absent. An interruption must restore the original.
+        std::filesystem::remove(m_transaction/"committed");
+        std::filesystem::rename(m_world,m_stage);m_published=false;
+    }
+    if(!m_backup.empty() && std::filesystem::exists(m_backup) && !std::filesystem::exists(m_world))std::filesystem::rename(m_backup,m_world);
+    // Paths are exclusively created children of the validated recovery directory.
+    if(!m_stage.empty() && std::filesystem::exists(m_stage))std::filesystem::remove_all(m_stage);
+}
+void WorldRecovery::cancel(){if(m_done)return;try{rollback();}catch(const std::exception& e){m_error=e.what();}m_done=true;}
+void WorldRecovery::step() {
+    if(m_done)return;
+    try {
+        if(m_phase==Phase::Convert) {
+            if(m_next<m_files.size()) {SaveStore(m_world,SaveReadPolicy::RecoverPlugins).recoverFileTo(m_files[m_next],m_stage);++m_next;return;}
+            m_next=0;m_phase=Phase::Validate;return;
+        }
+        if(m_phase==Phase::Validate) {
+            if(m_next<m_files.size()) {SaveStore(m_stage).recoverFileTo(m_files[m_next],{});++m_next;return;}
+            SaveStore(m_stage).loadMetadata();
+            m_next=0;m_sourceHash=compatibilityHashSeed();m_phase=Phase::VerifySource;return;
+        }
+        if(m_phase==Phase::VerifySource) {
+            if(m_next<m_sourceFiles.size()) {
+                const auto& relative=m_sourceFiles[m_next];
+                m_sourceHash=hashText(relative.generic_u8string(),m_sourceHash);
+                m_sourceHash=hashText(std::to_string(std::filesystem::file_size(m_world/relative)),m_sourceHash);
+                m_sourceHash=hashFile(m_world/relative,m_sourceHash);++m_next;return;
+            }
+            if(worldFiles(m_world)!=m_sourceFiles || std::to_string(m_sourceHash)!=m_confirmedToken)
+                throw std::runtime_error("World/plugins changed during recovery; refresh the world list and review the warning again");
+            m_phase=Phase::Publish;
+        }
+        std::filesystem::rename(m_world,m_backup);
+        try {std::filesystem::rename(m_stage,m_world);}catch(...){std::filesystem::rename(m_backup,m_world);throw;}
+        m_published=true;
+        std::ofstream committed(m_transaction/"committed",std::ios::binary);committed<<"published\n";committed.close();
+        if(!committed)throw std::runtime_error("Cannot finalize recovery journal");
+        m_succeeded=true;m_done=true;
+    }catch(const std::exception& e){m_error=e.what();try{rollback();}catch(const std::exception& rollbackError){m_error+="; rollback: "+std::string(rollbackError.what());}m_done=true;}
+}
+void WorldRecovery::restoreInterrupted(const std::filesystem::path& saves) {
+    const auto base=saves/".plugin-recovery";
+    if(!std::filesystem::exists(base))return;
+    if(std::filesystem::is_symlink(std::filesystem::symlink_status(base)))throw std::runtime_error("Recovery directory is a symbolic link");
+    for(const auto& transaction:std::filesystem::directory_iterator(base)) {
+        if(transaction.is_symlink()||!transaction.is_directory())continue;
+        std::ifstream completion(transaction.path()/"committed",std::ios::binary);
+        std::string completionState;std::getline(completion,completionState);
+        if(completionState=="published")continue;
+        std::ifstream journal(transaction.path()/"world-id",std::ios::binary);std::string id;std::getline(journal,id);
+        if(id.empty()||id=="."||id==".."||!std::all_of(id.begin(),id.end(),[](unsigned char c){return std::isalnum(c)||c=='-'||c=='_';}))continue;
+        const auto backup=transaction.path()/"original",stage=transaction.path()/"staged",world=saves/id;
+        if(std::filesystem::is_symlink(std::filesystem::symlink_status(backup))||std::filesystem::is_symlink(std::filesystem::symlink_status(stage)))throw std::runtime_error("Recovery transaction contains symbolic links");
+        if(std::filesystem::exists(backup)&&!std::filesystem::exists(world))std::filesystem::rename(backup,world);
+        else if(std::filesystem::exists(backup)&&std::filesystem::exists(world)&&!std::filesystem::exists(stage)) {
+            // Publication completed before interruption; record completion so a
+            // subsequent explicit deletion never resurrects an old backup.
+            std::ofstream committed(transaction.path()/"committed",std::ios::binary);committed<<"published\n";committed.close();
+            if(!committed)throw std::runtime_error("Cannot finalize interrupted recovery journal");
+        }
     }
 }

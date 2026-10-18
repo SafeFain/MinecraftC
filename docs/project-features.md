@@ -399,6 +399,14 @@ deterministic cross-chunk structures and loot metadata, host actions with previe
 dimension time overrides, complete environment parameters, colored particles, static held glTF
 models and WAV playlists. Builtin Heaven remains in core; no migration is included.
 
+Local worlds with missing, extra or changed gameplay plugins offer a detailed
+warning and explicit backup recovery. A staged copy converts all durable partitions;
+missing blocks become air, unavailable items/entities are removed and missing active
+dimensions return the player to the Overworld. Cancellation preserves the original;
+the complete original remains in a separate backup after successful recovery. Normal
+saving resumes. LAN plugin admission and unsupported save/generation versions remain
+strict. See [save recovery](plugins.md#saves-and-limits).
+
 ### Plugin block shapes
 
 Gameplay plugins can register slab, straight stair, door and button state families

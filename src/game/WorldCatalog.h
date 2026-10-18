@@ -18,6 +18,8 @@ struct WorldSummary {
     bool compatible = false;
     WorldType worldType = WorldType::Normal;
     std::string incompatibilityReason;
+    WorldCompatibilityReport pluginCompatibility;
+    std::string backupDirectory;
 };
 
 class WorldCatalog {

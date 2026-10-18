@@ -39,9 +39,12 @@ and damaged files are replaced atomically. This preserves package-relative model
 image and audio paths and the same content fingerprint as desktop installations.
 The provider remains statically linked on mobile; this cache contains resources.
 
-Worlds require the exact gameplay plugin set and package fingerprint. The addition
+Ordinary loading requires the exact gameplay plugin set and package fingerprint.
+Local mismatches can be reviewed and explicitly recovered with a full original-world
+backup; see [Saves and limits](#saves-and-limits). The addition
 of this provider makes worlds saved with the previous plugin set incompatible.
-They remain listed, refuse opening without writes, and are not migrated. Worlds
+They remain listed and require explicit warning confirmation and backup recovery
+to open with the current plugin set. Ordinary refusal performs no writes. Worlds
 created with Heaven disabled contain only the dimensions currently registered.
 Enabling Heaven later also changes that world's required set. Terrain generation
 remains global v20 / Heaven v9; save v21 and numeric content IDs are unchanged.
@@ -228,15 +231,38 @@ corruption from native code cannot be recovered by this mechanism.
 
 Save v16 records namespaced block/item palettes and the exact gameplay plugin set,
 versions and package/configuration fingerprints in each persisted file. Runtime
-IDs can move between launches without losing content. Missing, changed or extra
-gameplay plugins refuse world loading before writable attachment; the world remains
-listed with a compatibility reason. Restore the matching package/configuration to
-open it. No automatic migration or missing-block substitution is provided.
+IDs can move between launches without losing content. Missing, changed or extra gameplay plugins keep ordinary loading strict. The local
+world selector offers a warning listing all missing/extra plugins, saved/current
+versions and fingerprints, missing content, dimensions and generation revisions.
+Cancel is the default. **Back Up and Enter Anyway** explicitly authorizes recovery
+for that world and the reviewed snapshot only; LAN joins still require matching
+plugins.
+
+Recovery builds and validates a separate copy, converts every durable partition
+(including unvisited chunks), then retains the complete original directory at
+`saves/.plugin-recovery/<world>-<unique transaction>/original` before publishing the
+recovered world. The actual backup path is displayed after completion. Cancel or
+preparation failure leaves the original intact; publication failures roll back, and
+an interrupted directory replacement is restored before listing worlds. Completed
+backups are never automatically restored after an explicit world deletion.
+
+Missing blocks become air; missing items and entities are removed. Incompatible
+entity state revisions are removed. Container contents that remain available are
+preserved; obsolete loot/structure provenance is cleared without rerolling loot.
+Unavailable resource reset records and dimensions are removed from the recovered
+copy, with a missing active dimension returning the player to the Overworld.
+Current generator revisions/defaults replace unavailable selections; missing
+modifiers are removed. Derived generated/LOD caches are rebuilt. Plugin-private
+files and LAN player profiles remain unchanged and retain their own strict readers.
+Recovered worlds play and save normally with the current plugin requirements.
+Restore the original backup together with its matching plugins to recover removed
+content. Recovery never bypasses checksums, malformed data, unsupported global
+generation versions or the save-format requirement.
 Visual-only plugins do not contribute a world requirement.
 
 Worlds now require save format v21. v2–v20 metadata remains inspectable, but opening
 those worlds is refused without rewriting. Create new worlds with the desired
-plugin set; no migration is supplied. Generated caches are rebuildable when
+plugin set; legacy format migration is not supplied. Generated caches are rebuildable when
 incompatible. Terrain generation stays v20 and builtin Heaven stays v9.
 
 ABI 1 now exposes optional version 1 entity, world-generation, dimension and render tables.
@@ -366,7 +392,7 @@ See [native dimension example](../examples/plugins/dimension_demo/README.md).
 
 Save v21 stores dimension keys, policy revisions, generation selections and player
 states. The main world and Heaven retain existing directories; other dimension keys
-use segmented hex-encoded directories. Missing dimensions/plugins/revisions refuse
+use segmented hex-encoded directories. Ordinary loads with missing dimensions/plugins/revisions refuse
 loading without writes. LAN v6 sends keys rather than local dimension handles and
 includes canonical dimension policy descriptions in admission fingerprints. Older
 protocols cannot join. Player profile v4 persists dimension-keyed positions/beds;

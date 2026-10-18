@@ -190,7 +190,7 @@ int main(int argc,char** argv) {
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
-                if(capture && name=="trades" && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
+                if(((capture && name=="trades") || name=="plugin-mismatch-warning") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -209,6 +209,13 @@ int main(int argc,char** argv) {
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
                 for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
             }
+            if(name=="plugin-mismatch-warning") {
+                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Warning capture size invalid");
+                std::ofstream out(std::filesystem::temp_directory_path()/"plugin-mismatch-warning.ppm",std::ios::binary);
+                out<<"P6\n"<<width<<' '<<height<<"\n255\n";
+                for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
+            }
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
         draw("home",[&]{main.render(ui,width,height);});
@@ -218,6 +225,17 @@ int main(int argc,char** argv) {
             draw("registered-travel-"+std::string(languageCode(language)),[&]{sleep.render(ui,width,height);},3);
         }
         localization.setLanguage(Language::English);
+        WorldSummary mismatch;mismatch.id="mismatch";mismatch.displayName="Plugin compatibility warning";
+        mismatch.pluginCompatibility.token="smoke";mismatch.backupDirectory="saves/.plugin-recovery/world-backup/original";
+        for(int i=0;i<12;++i)mismatch.pluginCompatibility.issues.push_back({"changed_plugin","example_"+std::to_string(i),"1.0:"+std::string(64,'a'),"2.0:"+std::string(64,'b')});
+        auto warningCallbacks=callbacks;
+        warningCallbacks.onBeginWorldRecovery=[](const std::string&,const std::string&)->std::unique_ptr<WorldRecovery>{throw std::runtime_error("smoke failure");};
+        MainMenu warning(warningCallbacks,{mismatch},settings,localization,nullptr);
+        warning.onKeyPress(Key::Enter);warning.onKeyPress(Key::Enter);warning.onKeyPress(Key::Enter);
+        draw("plugin-mismatch-warning",[&]{warning.render(ui,width,height);});
+        warning.onScroll(-8);draw("plugin-mismatch-warning-scrolled",[&]{warning.render(ui,width,height);});
+        warning.onKeyPress(Key::Down);warning.onKeyPress(Key::Enter);
+        draw("plugin-mismatch-failure",[&]{warning.render(ui,width,height);});
         draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});
         const auto iconPasses=Plugins::content().extensions.renderPasses;Plugins::content().extensions.renderPasses.clear();
         auto iconImage=[&](const std::function<void()>& render) {

@@ -34,6 +34,7 @@ bool WorldCatalog::validId(const std::string& id) {
 std::vector<WorldSummary> WorldCatalog::list() const {
     std::vector<WorldSummary> worlds;
     if (!std::filesystem::exists(m_savesDirectory)) return worlds;
+    WorldRecovery::restoreInterrupted(m_savesDirectory);
     for (const auto& entry : std::filesystem::directory_iterator(m_savesDirectory)) {
         if (!entry.is_directory()) continue;
         const std::string id = entry.path().filename().string();
@@ -42,13 +43,21 @@ std::vector<WorldSummary> WorldCatalog::list() const {
         if (!store.exists()) continue;
         try {
             const auto metadata = store.loadMetadata(true);
-            worlds.push_back({id, metadata.displayName, metadata.gameMode,
-                              metadata.difficulty, metadata.seed,
-                              metadata.worldTicks, metadata.generationVersion,
-                              WorldGenContext::canLoadGeneration(metadata.generationVersion) && metadata.pluginCompatibilityError.empty(),
-                              metadata.worldType, metadata.pluginCompatibilityError});
+            const auto report=store.inspectCompatibility();
+            WorldSummary summary;
+            summary.id=id;summary.displayName=metadata.displayName;summary.mode=metadata.gameMode;
+            summary.difficulty=metadata.difficulty;summary.seed=metadata.seed;summary.worldTicks=metadata.worldTicks;
+            summary.generationVersion=metadata.generationVersion;summary.worldType=metadata.worldType;
+            summary.compatible=report.compatible();summary.pluginCompatibility=report;
+            summary.incompatibilityReason=report.blocker.empty()?metadata.pluginCompatibilityError:report.blocker;
+            summary.backupDirectory=std::filesystem::absolute(m_savesDirectory/".plugin-recovery").u8string();
+            worlds.push_back(std::move(summary));
         } catch (const std::runtime_error& error) {
-            if(std::string(error.what())=="Save was made by a newer version")worlds.push_back({id,id,GameMode::Survival,Difficulty::Normal,0,0,0,false,WorldType::Normal,error.what()});
+            if(std::string(error.what())=="Save was made by a newer version") {
+                WorldSummary summary;summary.id=id;summary.displayName=id;
+                summary.incompatibilityReason=error.what();summary.pluginCompatibility.blocker=error.what();
+                worlds.push_back(std::move(summary));
+            }
             // Malformed worlds stay untouched on disk.
         }
     }

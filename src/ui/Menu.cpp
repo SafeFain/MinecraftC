@@ -6,8 +6,10 @@
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
 #include <algorithm>
+#include <stdexcept>
 #include "game/Utf8.h"
 #include "game/ArabicShaper.h"
+#include "game/TextWrap.h"
 
 namespace {
 struct ThirdPartyCredit {
@@ -269,7 +271,8 @@ void MainMenu::rebuildButtons() {
             m_buttons.back().setDetail(world.compatible ? mode + "  ·  " +
                 std::to_string(world.seed) : m_localization.format("menu.worlds.incompatible", {
                     std::to_string(world.generationVersion)}));
-            if(!world.incompatibilityReason.empty())m_buttons.back().setDetail(world.incompatibilityReason);
+            if(world.pluginCompatibility.recoverable())m_buttons.back().setDetail(m_localization.text("menu.plugins.title"));
+            else if(!world.incompatibilityReason.empty())m_buttons.back().setDetail(world.incompatibilityReason);
             const std::string worldId = world.id;
             m_deleteButtons.emplace_back(
                 m_localization.text(m_pendingDeleteWorldId == worldId
@@ -288,17 +291,27 @@ void MainMenu::rebuildButtons() {
         }
         m_buttons.emplace_back(m_localization.text("menu.worlds.refresh"),
                                [this]() { refreshWorlds(); });
-        m_buttons.emplace_back(m_localization.text("menu.worlds.play"), [this]() {
-            if (m_selectedWorld >= 0 && m_selectedWorld < static_cast<int>(m_worlds.size()) &&
-                m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
-                m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
-        });
-        m_buttons.back().setEnabled(m_selectedWorld>=0 &&
-            m_selectedWorld<static_cast<int>(m_worlds.size()) &&
-            m_worlds[static_cast<size_t>(m_selectedWorld)].compatible);
+        m_buttons.emplace_back(m_localization.text("menu.worlds.play"),[this]() {requestOpenWorld(m_selectedWorld);});
+        m_buttons.back().setEnabled(m_selectedWorld>=0 && m_selectedWorld<static_cast<int>(m_worlds.size()) &&
+            (m_worlds[static_cast<size_t>(m_selectedWorld)].compatible ||
+             m_worlds[static_cast<size_t>(m_selectedWorld)].pluginCompatibility.recoverable()));
         m_buttons.emplace_back(m_localization.text("menu.worlds.create"),
                                [this]() { showCreate(); });
         m_buttons.emplace_back(m_localization.text("common.back"), [this]() { showHome(); });
+    } else if (m_page==Page::PluginWarning || m_page==Page::PluginRecovery || m_page==Page::PluginResult) {
+        m_buttons.emplace_back(m_localization.text(m_page==Page::PluginResult?"common.back":"common.cancel"),[this]() {
+            if(m_recovery)m_recovery->cancel();
+            m_recovery.reset();refreshWorlds();showWorlds();
+        });
+        if(m_page==Page::PluginWarning) {
+            m_buttons.emplace_back(m_localization.text("menu.plugins.force"),[this]() {beginRecovery();});
+            m_buttons.back().setDanger(true);
+        }else if(m_page==Page::PluginResult && m_recoverySucceeded) {
+            m_buttons.emplace_back(m_localization.text("menu.worlds.play"),[this]() {
+                const auto callback=m_callbacks.onOpenWorld;const auto id=m_pendingPluginWorld.id;
+                if(callback)callback(id);
+            });
+        }
     } else if (m_page == Page::Create) {
         m_buttons.emplace_back(m_localization.text("menu.create.world_name"),
                                [this]() { selectField(Field::Name); });
@@ -402,6 +415,62 @@ void MainMenu::rebuildButtons() {
     }
 }
 
+void MainMenu::requestOpenWorld(int index) {
+    if(index<0 || index>=static_cast<int>(m_worlds.size()))return;
+    const auto world=m_worlds[static_cast<size_t>(index)];
+    if(world.compatible){if(m_callbacks.onOpenWorld)m_callbacks.onOpenWorld(world.id);return;}
+    if(!world.pluginCompatibility.recoverable() || !m_callbacks.onBeginWorldRecovery)return;
+    m_pendingPluginWorld=world;m_page=Page::PluginWarning;m_warningOffset=0;
+    m_lastWorldClick=-1;m_lastWorldIndex=-1;rebuildButtons();
+}
+
+void MainMenu::beginRecovery() {
+    if(m_page!=Page::PluginWarning)return;
+    try {
+        m_recovery=m_callbacks.onBeginWorldRecovery(m_pendingPluginWorld.id,m_pendingPluginWorld.pluginCompatibility.token);
+        if(!m_recovery)throw std::runtime_error("Recovery could not start");
+        m_recoveryMessage.clear();m_recoverySucceeded=false;m_page=Page::PluginRecovery;
+    }catch(const std::exception& error){m_recoveryMessage=error.what();m_recoverySucceeded=false;m_page=Page::PluginResult;}
+    m_warningOffset=0;rebuildButtons();
+}
+
+void MainMenu::tick(float dt) {
+    Menu::tick(dt);
+    if(m_page!=Page::PluginRecovery || !m_recovery)return;
+    m_recovery->step();
+    if(!m_recovery->done())return;
+    m_recoverySucceeded=m_recovery->succeeded();
+    m_recoveryMessage=m_recoverySucceeded?m_recovery->backupPath().u8string():m_recovery->error();
+    m_page=Page::PluginResult;m_warningOffset=0;rebuildButtons();
+}
+
+void MainMenu::renderPluginWarning(UIRenderer& ui,int width,int height) {
+    const float w=static_cast<float>(width),h=static_cast<float>(height);
+    const float x=16,y=16,panelW=std::max(1.0f,w-32),panelH=std::max(1.0f,h-32),contentW=std::max(1.0f,panelW-32);
+    UiTheme::panel(ui,x,y,panelW,panelH,UiTheme::PANEL);
+    const std::string title=m_localization.text(m_page==Page::PluginWarning?"menu.plugins.title":m_page==Page::PluginRecovery?"menu.plugins.progress":m_recoverySucceeded?"menu.plugins.success":"menu.plugins.failed");
+    const float titleScale=fittedTextScale(ui,title,1.5f,contentW);
+    UiTheme::textWithShadow(ui,title,x+16,h-48,titleScale,UiTheme::TEXT);
+    std::string text=m_pendingPluginWorld.displayName+"\n";
+    if(m_page==Page::PluginWarning) {
+        text+=m_localization.text("menu.plugins.rules")+"\n"+m_localization.format("menu.plugins.backup",{m_pendingPluginWorld.backupDirectory})+"\n\n";
+        for(const auto& issue:m_pendingPluginWorld.pluginCompatibility.issues) {
+            text+=m_localization.text("menu.plugins."+issue.kind)+": "+issue.key+"\n";
+            text+=m_localization.format("menu.plugins.values",{issue.saved.empty()?"-":issue.saved,issue.current.empty()?"-":issue.current})+"\n\n";
+        }
+    }else if(m_page==Page::PluginRecovery)text+=std::to_string(static_cast<int>(m_recovery->progress()*100))+"%\n"+m_localization.text("menu.plugins.wait");
+    else text+=m_recoverySucceeded?m_localization.format("menu.plugins.backup",{m_recoveryMessage}):m_recoveryMessage;
+    const float scale=1.0f,lineH=18.0f;
+    const auto lines=wrapTextPixels(text,contentW,[&](const std::string& line){return ui.measureText(line,scale).x;});
+    m_warningLines=static_cast<int>(lines.size());m_warningVisible=std::max(1,static_cast<int>((h-150)/lineH));
+    m_warningOffset=std::clamp(m_warningOffset,0,std::max(0,m_warningLines-m_warningVisible));
+    for(int i=0;i<m_warningVisible && i+m_warningOffset<m_warningLines;++i)
+        UiTheme::textWithShadow(ui,lines[static_cast<size_t>(i+m_warningOffset)],x+16,h-78-i*lineH,scale,UiTheme::TEXT_DIM);
+    const float gap=6,buttonW=(contentW-gap*static_cast<float>(m_buttons.size()-1))/static_cast<float>(m_buttons.size());
+    for(size_t i=0;i<m_buttons.size();++i){auto& button=m_buttons[i];button.setPosition(x+16+static_cast<float>(i)*(buttonW+gap),y+8);button.setSize(buttonW,32);prepareButton(button);button.render(ui);}
+    if(m_warningLines>m_warningVisible)UiTheme::scrollBar(ui,w-23,68,4,std::max(1.0f,h-145),m_warningOffset,m_warningVisible,m_warningLines);
+}
+
 void MainMenu::selectField(Field field) {
     m_field = field;
     rebuildButtons();
@@ -430,6 +499,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     }
     UiTheme::menuBackground(ui,w,h);
     if (m_page==Page::About) { renderAbout(ui,screenWidth,screenHeight);return; }
+    if (m_page==Page::PluginWarning || m_page==Page::PluginRecovery || m_page==Page::PluginResult) {renderPluginWarning(ui,screenWidth,screenHeight);return;}
     const bool home=m_page==Page::Home;
     const bool wideHome=home&&w>=800;
     const float panelW=std::min(home?400.0f:600.0f,w-32);
@@ -646,7 +716,11 @@ void MainMenu::onKeyPress(int key, int mods) {
         (key == Key::W || key == Key::S || key == Key::Space)) {
         return;
     }
+    if((m_page==Page::PluginWarning || m_page==Page::PluginResult) && (key==Key::Right || key==Key::Left)) {
+        onScroll((key==Key::Right)?-1:1);return;
+    }
     if (key == Key::Escape) {
+        if(m_page==Page::PluginWarning || m_page==Page::PluginRecovery || m_page==Page::PluginResult){m_buttons[0].activate();return;}
         if (m_page == Page::Create) showWorlds();
         else if (m_page == Page::Worlds || m_page == Page::About || m_page == Page::Language) showHome();
         return;
@@ -656,8 +730,7 @@ void MainMenu::onKeyPress(int key, int mods) {
     }
     if (m_page == Page::Worlds && key == Key::Enter && m_selectedWorld >= 0 &&
         m_selectedIdx == m_selectedWorld - m_worldOffset) {
-        if (m_worlds[static_cast<size_t>(m_selectedWorld)].compatible)
-            m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(m_selectedWorld)].id);
+        requestOpenWorld(m_selectedWorld);
         return;
     }
     switch (key) {
@@ -741,8 +814,7 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
                 const double now = RuntimeClock::seconds(RuntimeClock{}.now());
                 if (m_lastWorldIndex == worldIndex && m_lastWorldClick >= 0.0 &&
                     now - m_lastWorldClick <= 0.35) {
-                    if (m_worlds[static_cast<size_t>(worldIndex)].compatible)
-                        m_callbacks.onOpenWorld(m_worlds[static_cast<size_t>(worldIndex)].id);
+                    requestOpenWorld(worldIndex);
                     return;
                 }
                 m_lastWorldIndex = worldIndex;
@@ -754,6 +826,9 @@ void MainMenu::onMouseButton(int button, ButtonAction action, double x, double y
 }
 
 void MainMenu::onScroll(double yOffset) {
+    if(m_page==Page::PluginWarning || m_page==Page::PluginRecovery || m_page==Page::PluginResult) {
+        m_warningOffset=std::clamp(m_warningOffset+(yOffset<0?3:yOffset>0?-3:0),0,std::max(0,m_warningLines-m_warningVisible));return;
+    }
     if (m_page == Page::About) {
         if (yOffset != 0.0) changeAboutPage(yOffset < 0.0 ? 1 : -1);
         return;

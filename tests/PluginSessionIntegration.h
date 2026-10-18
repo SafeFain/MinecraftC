@@ -49,6 +49,19 @@ inline int run(const std::filesystem::path& assets) {
         auto requirements=Plugins::content().requirements;Plugins::content().requirements.clear();bool refused=false;
         try{session.startWorld(id,false,clock.now());}catch(const std::exception&){refused=true;}
         check(refused&&readBytesForPluginTest(worldPath/"level.bin")==saved,"missing plugin refuses session without rewrite");
+        const auto report=SaveStore(worldPath).inspectCompatibility();
+        check(report.recoverable(),"session exposes explicit recovery after ordinary refusal");
+        auto recovery=session.beginWorldRecovery(id,report.token);
+        for(int i=0;i<10000&&!recovery->done();++i)recovery->step();
+        check(recovery->succeeded(),"session recovery finishes before writable attachment");
+        check(readBytesForPluginTest(recovery->backupPath()/"level.bin")==saved,"session backup retains original metadata");
+        {std::ofstream marker(worldPath/SaveStore::RECOVERY_SPAWN_MARKER);marker<<"pending";}
+        session.startWorld(id,false,clock.now());
+        bool recoveredReady=false;
+        for(int i=0;i<4000&&!recoveredReady;++i){recoveredReady=session.advanceLoading(&renderer,clock.now());if(!recoveredReady)std::this_thread::sleep_for(std::chrono::milliseconds(5));}
+        check(recoveredReady&&!std::filesystem::exists(worldPath/SaveStore::RECOVERY_SPAWN_MARKER),"recovered landing validated before play and marker cleared");
+        check(session.hasWorldStore()&&session.inventory().slot(0).id==item,"recovered world enters the ordinary strict session pipeline");
+        drainGeneration(session);session.leaveWorld();
         Plugins::content().requirements=std::move(requirements);
     }
     plugins.shutdown();Config::RENDER_DISTANCE=distance;std::filesystem::remove_all(root);

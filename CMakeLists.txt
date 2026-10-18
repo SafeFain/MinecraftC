@@ -781,7 +781,7 @@ if(BUILD_TESTING)
         src/game/InventoryInteraction.cpp src/game/InventoryModel.cpp
         src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
         src/game/SurvivalRules.cpp src/game/SurvivalStats.cpp
-        src/game/Utf8.cpp src/game/VillagerTrade.cpp
+        src/game/Utf8.cpp src/game/VillagerTrade.cpp src/game/SaveStore.cpp
         src/model/ModelRenderer.cpp
         src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp

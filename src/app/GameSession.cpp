@@ -48,6 +48,11 @@ GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
         loadingNewWorld, loadingReason};
 }
 
+std::unique_ptr<WorldRecovery> GameSession::beginWorldRecovery(const std::string& id,const std::string& token) const {
+    if(saveStore || terrainGenerated || lanJoining || hostingLan())throw std::runtime_error("Cannot recover an active world");
+    return std::make_unique<WorldRecovery>(worldCatalog.open(id).worldDirectory(),token);
+}
+
 std::vector<WorldSummary> GameSession::listWorlds() const {
     return worldCatalog.list();
 }
@@ -491,6 +496,7 @@ GameMode GameSession::startWorld(
     }
     resetTransientState(
         newWorld, survivalTicks(), loadingStarted);
+    loadingRecoverySpawn=!newWorld&&dimension==DimensionId::Overworld&&std::filesystem::exists(saveStore->worldDirectory()/SaveStore::RECOVERY_SPAWN_MARKER);
     if (newWorld) {
         worldMetadata.activeDimension = dimension;
         const glm::dvec3 spawn = world().findSafeSpawn();
@@ -559,6 +565,27 @@ bool GameSession::advanceLoading(
                 worldMetadata.worldTicks = survivalTicks();
                 worldMetadata.weather = weather().saveState();
                 saveStore->saveMetadata(worldMetadata);
+            }
+            if(loadingRecoverySpawn && !lanJoining) {
+                auto candidate=player.getPosition();
+                if(!pluginSafeLanding(world(),candidate)) {
+                    const int x=static_cast<int>(std::floor(candidate.x)),z=static_cast<int>(std::floor(candidate.z));
+                    bool found=false;
+                    for(int y=Config::WORLD_MAX_Y-3;y>Config::WORLD_MIN_Y;++y) {
+                        candidate={x+.5,y+.01,z+.5};
+                        if(pluginSafeLanding(world(),candidate)){found=true;break;}
+                    }
+                    if(!found) {
+                        const int y=std::clamp(worldMetadata.worldSpawn.y,Config::WORLD_MIN_Y+1,Config::WORLD_MAX_Y-3);
+                        world().setBlock(x,y-1,z,BlockId::STONE);world().setBlock(x,y,z,BlockId::AIR);world().setBlock(x,y+1,z,BlockId::AIR);
+                        candidate={x+.5,y+.01,z+.5};
+                    }
+                    player.setPosition(candidate);
+                }
+                updateSaveMetadata();world().beginModifiedChunkAutosave();world().flushModifiedChunks();
+                saveStore->saveMetadata(worldMetadata);
+                std::filesystem::remove(saveStore->worldDirectory()/SaveStore::RECOVERY_SPAWN_MARKER);
+                loadingRecoverySpawn=false;
             }
             if (dimension != DimensionId::Overworld && !lanJoining) {
                 ensureDimensionSafePosition();
@@ -1219,6 +1246,7 @@ void GameSession::resetTransientState(
     RuntimeClock::Tick loadingStarted) {
     terrainGenerated = false;
     loadingNewWorld = newWorld;
+    loadingRecoverySpawn = false;
     loadingGenerationComplete = false;
     worldLoadingStarted = loadingStarted;
     autosaveSeconds = 0.0f;

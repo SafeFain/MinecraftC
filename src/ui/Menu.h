@@ -29,6 +29,7 @@ enum class GameState {
 
 struct MenuCallbacks {
     std::function<void(const std::string&)> onOpenWorld;
+    std::function<std::unique_ptr<WorldRecovery>(const std::string&,const std::string&)> onBeginWorldRecovery;
     std::function<void(const std::string&, const std::string&, GameMode, WorldType, bool)> onCreateWorld;
     std::function<void(const std::map<uint32_t,Plugins::GenerationConfig>&)> onGenerationConfig;
     std::function<std::vector<WorldSummary>()> onRefreshWorlds;
@@ -104,7 +105,7 @@ private:
 class Menu {
 public:
     virtual ~Menu() = default;
-    void tick(float dt) { m_fade.tick(dt,true,0.16f); }
+    virtual void tick(float dt) { m_fade.tick(dt,true,0.16f); }
     float opacity() const { return m_fade.value; }
     void resetTransition() { m_fade.value=0; }
 
@@ -146,12 +147,13 @@ public:
     void onMouseMove(double x, double y) override;
     void onMouseButton(int button, ButtonAction action, double x, double y) override;
     void onScroll(double yOffset) override;
+    void tick(float dt) override;
     void onChar(unsigned int codepoint) override;
     void onPointerCancel() override;
     bool wantsTextInput() const override { return m_page == Page::Create; }
 
 private:
-    enum class Page { Home, Worlds, Create, Language, About };
+    enum class Page { Home, Worlds, Create, Language, About, PluginWarning, PluginRecovery, PluginResult };
     enum class Field { Name, Seed, Parameters };
 
     MenuCallbacks m_callbacks;
@@ -188,6 +190,14 @@ private:
     double m_lastWorldClick = -1.0;
     int m_lastWorldIndex = -1;
     std::string m_pendingDeleteWorldId;
+    WorldSummary m_pendingPluginWorld;
+    std::unique_ptr<WorldRecovery> m_recovery;
+    std::string m_recoveryMessage;
+    bool m_recoverySucceeded=false;
+    int m_warningOffset=0,m_warningLines=0,m_warningVisible=1;
+    void requestOpenWorld(int index);
+    void beginRecovery();
+    void renderPluginWarning(UIRenderer& ui,int width,int height);
 
     void showHome();
     void showWorlds();

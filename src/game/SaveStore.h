@@ -2,6 +2,9 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <memory>
+#include <tuple>
 #include <optional>
 #include <string>
 #include <vector>
@@ -16,6 +19,28 @@
 #include "game/VillagerTrade.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
+
+// Recovery is an explicit decoding policy; ordinary reads remain strict.
+enum class SaveReadPolicy { Strict, RecoverPlugins };
+struct PluginCompatibilityIssue {
+    std::string kind, key, saved, current;
+    bool operator<(const PluginCompatibilityIssue& other) const {
+        return std::tie(key,kind,saved,current)<std::tie(other.key,other.kind,other.saved,other.current);
+    }
+    bool operator==(const PluginCompatibilityIssue& other) const {
+        return kind==other.kind && key==other.key && saved==other.saved && current==other.current;
+    }
+};
+enum class WorldCompatibilityState { Compatible, PluginMismatch, Blocked };
+struct WorldCompatibilityReport {
+    std::vector<PluginCompatibilityIssue> issues;
+    std::string blocker, token;
+    WorldCompatibilityState state() const {
+        return !blocker.empty()?WorldCompatibilityState::Blocked:issues.empty()?WorldCompatibilityState::Compatible:WorldCompatibilityState::PluginMismatch;
+    }
+    bool compatible() const { return state()==WorldCompatibilityState::Compatible; }
+    bool recoverable() const { return state()==WorldCompatibilityState::PluginMismatch; }
+};
 
 struct WorldMetadata {
     struct DimensionState {
@@ -37,6 +62,8 @@ struct WorldMetadata {
     std::string displayName;
     std::vector<std::pair<std::string,std::string>> pluginRequirements;
     std::string pluginCompatibilityError;
+    bool needsRecoverySpawn=false; // Decode-only: validate landing after terrain loads.
+    std::map<uint32_t,std::string> savedDimensionKeys; // Decode-only; never serialized as runtime IDs.
     uint64_t seed = 0;
     uint32_t generationVersion = 0;
     uint32_t rulesetVersion = SURVIVAL_RULESET_VERSION;
@@ -102,7 +129,13 @@ struct ChunkLoadBundle {
 
 class SaveStore {
 public:
-    explicit SaveStore(std::filesystem::path worldDirectory);
+    static constexpr const char* RECOVERY_SPAWN_MARKER=".recovery-safe-spawn";
+    explicit SaveStore(std::filesystem::path worldDirectory,
+                       SaveReadPolicy policy = SaveReadPolicy::Strict,
+                       std::vector<PluginCompatibilityIssue>* issues = nullptr);
+    WorldCompatibilityReport inspectCompatibility() const;
+    // Convert one known durable partition, or copy a private file unchanged.
+    void recoverFileTo(const std::filesystem::path& relative, const std::filesystem::path& destination) const;
 
     const std::filesystem::path& worldDirectory() const { return m_worldDirectory; }
     bool exists() const;
@@ -132,10 +165,40 @@ public:
 
 private:
     std::filesystem::path m_worldDirectory;
+    SaveReadPolicy m_policy;
+    std::vector<PluginCompatibilityIssue>* m_issues;
 
     std::filesystem::path chunkPath(int chunkX, int chunkZ) const;
     std::filesystem::path generatedChunkPath(int chunkX, int chunkZ) const;
     std::filesystem::path blockEntityPath(int chunkX, int chunkZ) const;
     std::filesystem::path entityPath(int chunkX, int chunkZ) const;
     std::filesystem::path entityPopulationPath(int chunkX, int chunkZ) const;
+};
+
+// Runs one file per step on the main thread, keeping cancellation/UI responsive
+// without executing plugin code or mutating registries on worker threads.
+class WorldRecovery {
+public:
+    WorldRecovery(std::filesystem::path world, const std::string& confirmedToken);
+    ~WorldRecovery();
+    WorldRecovery(const WorldRecovery&) = delete;
+    WorldRecovery& operator=(const WorldRecovery&) = delete;
+    void step();
+    void cancel();
+    bool done() const { return m_done; }
+    bool succeeded() const { return m_succeeded; }
+    float progress() const;
+    const std::string& error() const { return m_error; }
+    const std::filesystem::path& backupPath() const { return m_backup; }
+    static void restoreInterrupted(const std::filesystem::path& saves);
+private:
+    std::filesystem::path m_world, m_transaction, m_stage, m_backup;
+    enum class Phase { Convert, Validate, VerifySource, Publish };
+    Phase m_phase=Phase::Convert;
+    std::vector<std::filesystem::path> m_files,m_sourceFiles;
+    uint64_t m_sourceHash=0;
+    size_t m_next=0;
+    bool m_done=false, m_succeeded=false, m_published=false;
+    std::string m_error, m_confirmedToken;
+    void rollback();
 };
