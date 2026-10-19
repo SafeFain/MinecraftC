@@ -1,7 +1,8 @@
 # Voxel GI Vulkan regression smoke
 
-`vulkan_gi_smoke` is an explicit display-dependent test, excluded from normal
-builds and CTest. It renders Very High and Ultra using the actual production
+`vulkan_gi_smoke` is a display-dependent test. By default it is excluded from
+normal builds and CTest; enabling `MINECRAFTC_VULKAN_TESTS` includes it as
+`vulkan_gi_readback`. See [optional Vulkan validation](development.md). It renders Very High and Ultra using the actual production
 GI shaders and 4× scene MSAA, and reads the rendered half-resolution GI/AO image. An additional compute probe
 uses the exact `voxel_gi_trace.glsl` production traversal/filtering functions.
 
@@ -72,7 +73,7 @@ timeout 300s "$project_root/build-local/vulkan_gi_smoke" "$project_root/assets"
 ## Headless Linux
 
 With Xvfb, xauth and Mesa lavapipe installed, select the local ICD filename
-(this example matches the current development environment):
+(the path below is an example; use the installed ICD filename):
 
 ```bash
 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json SDL_VIDEODRIVER=x11 \

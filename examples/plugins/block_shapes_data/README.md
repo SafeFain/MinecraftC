@@ -1,6 +1,7 @@
 # Portable block shapes
 
-Copy this folder into user-data `mods/block_shapes_data/`, then restart.
+Copy this folder into user-data `mods/block_shapes_data/`, enable it in **Plugins**,
+then restart. See [plugin development](../../../docs/plugin-development.md).
 It works wherever data plugins are supported, including Android and iOS.
 
 Demonstrates slabs/stairs, a normal door/button, a door that villagers can open

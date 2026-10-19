@@ -24,7 +24,7 @@ the publisher's keystore before distribution.
 The APK includes `LICENSE` in its assets. MinecraftC is distributed under
 GPL-3.0-only except for third-party components and assets that identify a
 different license; their notices remain beside the corresponding source or
-asset and are summarized in the root `README.md`.
+asset and are summarized in [third-party licenses](../docs/licenses.md).
 
 ## Versioning and releases
 
@@ -32,7 +32,7 @@ The root `VERSION` supplies Gradle's full `versionName`, including an optional
 alpha/beta/rc iteration. For example, `1.4.0-beta.1` uses `versionName`
 `1.4.0-beta.1` and `versionCode` `104002001`. Increasing the iteration advances
 the installation code without changing the core `1.4.0`. See the root
-[version rules](../README.md#versioning-and-releases) for channel ordering,
+[version rules](../docs/releasing.md) for channel ordering,
 numbering limits and the shared mobile version-code formula.
 
 GitHub Actions builds the same unsigned arm64 release APK on every workflow run.

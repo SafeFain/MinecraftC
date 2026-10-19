@@ -1,7 +1,7 @@
 # LAN multiplayer implementation
 
-Status: **Implemented and validated locally on Linux/software Vulkan.
-Platform build and device coverage are distinguished below.**
+Status: **Implemented. Dated validation records and their platform/device
+coverage are distinguished below.**
 
 ## Playing on a LAN
 
@@ -37,7 +37,7 @@ Guest sidecars use profile v4 palettes and keyed dimension state; older profiles
 - `Platform::NetworkSocket` owns nonblocking native TCP handles. IPv4/IPv6 numeric
   connections, a dual-stack listener, bounded reads/writes and closure/error
   handling are isolated inside the native adapter. Windows links Winsock.
-- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v3 uses a
+- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v6 uses a
   little-endian, 20-byte header (magic, protocol, type, length, sequence), a 1 MiB
   payload limit, a 4 MiB connection queue limit and 128 ready-frame limit.
   Scalars reject non-finite values; strings reject NUL and invalid UTF-8.
@@ -51,9 +51,12 @@ Guest sidecars use profile v4 palettes and keyed dimension state; older profiles
   increasing counters per channel. Network polling has a per-connection 256 KiB
   I/O allowance per direction. These APIs perform no game or GPU mutation.
 - `Lan::ProfileStore` stores local identity and credential plus checked,
-  atomically replaced per-world player sidecars. Profile v2 retains v1 reading and adds held cursor/crafting contents. It contains independent
+  atomically replaced per-world player sidecars. Profile v4 stores namespaced item
+  palettes, held cursor/crafting contents and keyed per-dimension state; v1–v3 are
+  refused without writes. It contains independent
   dimension positions, bed spawn, game mode, survival values and inventory. It
-  does not change save v18, block IDs or generation output. Admission validation
+  does not alter block IDs or generation output; profile storage is independent of
+  save v21. Admission validation
   only reads existing profiles; callers save a new profile after actual admission.
 - `InventoryTransaction` applies logical slot commands to authoritative storage,
   cursor, crafting and optional container data. Sequence/revision checks reject
@@ -107,11 +110,15 @@ invalidations and stale-result rejection. Eight client requests, 4096 subscripti
 and two global server worker jobs bound this lane. Subscription identities reject
 late results after cancel/re-add; superseded CPU replacements never cross the
 GPU upload boundary. Authoritative near terrain
-still never generates locally. Global roster includes both dimensions. Feedback
+still never generates locally. The global roster spans registered dimensions. Feedback
 events provide combat, fishing, explosions, lightning and interactive block sounds;
 owner mining and held-item visuals are replicated. LAN labels cover all ten languages.
 
-## Platform validation
+## Historical platform validation
+
+The following describes the original LAN integration baseline. Later plugin
+Windows validation is recorded separately in [Heaven P1 acceptance](heaven-p1-validation.md);
+none of these records establishes separate-device discovery across platforms.
 
 Linux Release and the explicit `vulkan_lan_smoke` target build locally. Independent
 host/client processes pass full terrain loading, authoritative movement and 100
@@ -134,8 +141,8 @@ check also passed; host saves guest profiles and terrain while changing dimensio
 | Android | SDK 35 Java compilation, NDK arm64 API 29 native/session/SDL-entry syntax | Gradle APK and device lifecycle/discovery |
 | macOS/iOS | Bonjour implementation and service/privacy bundle metadata; earlier public-header API check | Apple SDK builds and device permission/discovery |
 
-An Android SDK/NDK is available locally; Gradle and a wrapper are unavailable.
-An Apple SDK/device is unavailable on this Linux host. Local syntax checks are
+At that Linux validation baseline, an Android SDK/NDK was available, Gradle and
+a wrapper were unavailable, and no Apple SDK/device was available. Local syntax checks are
 not packaged application or cross-device execution tests. Movement prediction
 uses correction against received authority state; it does not rewind/replay an
 input history. Desktop discovery re-enumerates interfaces when refreshed.

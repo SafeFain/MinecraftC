@@ -1,10 +1,12 @@
 # MinecraftC entity models
 
-These ten GLBs are original MinecraftC assets generated deterministically by
+These eleven GLBs are original MinecraftC assets generated deterministically by
 `tools/generate_entity_models.py` version 5 with seed `0x4D43474C`. Embedded
-skins use texture generator version 2 and the `bright-comfortable` style. They are
-licensed under CC0-1.0. No Minecraft, Mojang, or third-party model or texture
-data was copied or adapted.
+skins use texture generator version 5 and the `bright-comfortable` style. The
+original ten models are licensed under CC0-1.0. The later `iron_golem` asset
+family is recorded under the repository GPL-3.0-only license in
+[asset provenance](../../../ASSET_SOURCES.md#village-lifecycle-v19-workstations-and-iron-golem).
+No Minecraft, Mojang, or third-party model or texture data was copied or adapted.
 
 The runtime files use glTF 2.0, Y-up coordinates, meters, local forward `-Z`,
 and place the feet/base at local `Y=0`. Each contains an embedded original

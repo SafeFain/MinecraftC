@@ -6,7 +6,14 @@ It demonstrates five separated terrain layers, seed variation, a bulk volume
 callback, fine-cell crystal silhouettes with surface replacement, and a
 cross-boundary modifier with an independent LOD revision.
 
-CMake builds `plugin_worldgen_v2_demo` alongside the existing native examples.
+From a configured application source build with `BUILD_TESTING=ON`:
+
+```sh
+cmake --build build-local --config Release --target plugin_worldgen_v2_demo
+ctest --test-dir build-local -C Release -R plugin_worldgen_v2_batch_and_lod --output-on-failure
+```
+
+CMake builds `plugin_worldgen_v2_demo` alongside the other native fixtures.
 For a local package, copy the module into a mods/worldgen_v2_demo directory
 and add `mod.json` with id `worldgen_v2_demo`, version `1.0.0`, api `1`, and a
 native platform mapping to the module filename. Select generator key

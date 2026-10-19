@@ -1,8 +1,16 @@
 # Terrain Demo
 
-Build with `cmake -S . -B /tmp/terrain_demo` and `cmake --build /tmp/terrain_demo`.
-Copy the module and all non-source package files here into `<user-data>/mods/terrain_demo/`.
-See [the plugin SDK documentation](../../../docs/plugins.md) for extension contracts.
+From the MinecraftC repository root:
+
+```sh
+cmake -S examples/plugins/terrain_demo -B build-local/plugins/terrain_demo
+cmake --build build-local/plugins/terrain_demo --config Release
+```
+
+Copy `mod.json`, the platform module and referenced package assets into
+`<user-data>/mods/terrain_demo/`. Enable in **Plugins** and restart.
+Visual Studio normally places the module under `Release/`.
+See [plugin development](../../../docs/plugin-development.md).
 
 Select Seeded Plateau in the create-world page. Parameters such as
 `{ "base_height": 48 }` control the base height; enable markers for cross-boundary

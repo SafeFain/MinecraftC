@@ -1,7 +1,8 @@
 # Native gameplay capability example
 
-Build with `cmake -S examples/plugins/capability_native -B build-capability-native`,
-then `cmake --build build-capability-native`. Copy the package and the platform module
+From the repository root, build with
+`cmake -S examples/plugins/capability_native -B build-local/plugins/capability_native`,
+then `cmake --build build-local/plugins/capability_native --config Release`. Copy the package and the platform module
 into user-data `mods/capability_native/`; restart and use a fresh world. The root CMake
 build also produces `plugin_capability_native` for integration testing.
 
@@ -12,3 +13,5 @@ See [the capability guide](../../../docs/plugin-capabilities.md).
 
 The original `staff.glb` and `chime.wav` are identical copies of the assets described in
 [the data example](../capability_demo/README.md), licensed GPL-3.0-only with the repository.
+
+See [plugin development](../../../docs/plugin-development.md) for platform output paths and lifecycle rules.

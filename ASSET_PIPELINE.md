@@ -173,6 +173,9 @@ to reproduce all ten runtime GLBs. `python3 tests/test_entity_models.py`
 performs byte-for-byte regeneration plus the skin, animation, vertex semantic,
 embedded PNG, and nearest-sampler contract checks.
 
+The following v4 sections describe semantic-map contracts retained by the current
+v5 pipeline. Use the v5 recipe/workbench sections for new material authoring.
+
 ## Generator v4: semantic material pipeline
 
 The `bright-comfortable` style keeps its identifier and advances the generator

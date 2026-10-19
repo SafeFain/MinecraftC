@@ -1,8 +1,16 @@
 # Render Demo
 
-Build with `cmake -S . -B /tmp/render_demo` and `cmake --build /tmp/render_demo`.
-Copy the module and all non-source package files here into `<user-data>/mods/render_demo/`.
-See [the plugin SDK documentation](../../../docs/plugins.md) for extension contracts.
+From the MinecraftC repository root:
+
+```sh
+cmake -S examples/plugins/render_demo -B build-local/plugins/render_demo
+cmake --build build-local/plugins/render_demo --config Release
+```
+
+Copy `mod.json`, the platform module and referenced package assets into
+`<user-data>/mods/render_demo/`. Enable in **Plugins** and restart.
+Visual Studio normally places the module under `Release/`.
+See [plugin development](../../../docs/plugin-development.md).
 
 The SPIR-V binaries are generated from the included original GLSL using `glslc`.
 The post pass replaces the default final color pass with a simple color grade.

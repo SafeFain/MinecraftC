@@ -6,14 +6,14 @@ together.
 Package filenames contain the full version, including prerelease iterations such
 as `1.4.0-beta.1`. Running `--version` for that build prints
 `MinecraftC Beta.1-1.4.0`. Alpha/beta/rc support iterations 1..999; `release`
-remains unnumbered. The included `README.md` describes the version-code mapping
+remains unnumbered. The included `docs/releasing.md` describes the version-code mapping
 and release rules. GitHub publishes packages only for pushed tags exactly
 matching `v<VERSION>` after all platform jobs pass; prerelease channels create
 GitHub prereleases, while `release` creates a normal release. Manual workflow
 runs build without publishing.
 
 MinecraftC is licensed under GPL-3.0-only. The complete terms are in `LICENSE`;
-third-party licenses are summarized in `README.md` and retained beside the
+third-party licenses are summarized in `docs/licenses.md` and retained beside the
 corresponding assets and source dependencies.
 
 - Windows: run `minecraftc.exe` or `run-minecraftc.cmd`.
@@ -35,7 +35,7 @@ All supported platforms use Vulkan exclusively. `--renderer=vulkan` remains a
 compatibility alias; initialization failures have no fallback renderer.
 
 Worlds and settings use the platform user-data directory documented in
-`README.md`. If startup fails, inspect `minecraftc.log` in that directory.
+`docs/saves-and-commands.md`. If startup fails, inspect `minecraftc.log` in that directory.
 Unsigned macOS downloads may require Control-clicking the executable and
 choosing Open the first time.
 The Android release APK is intentionally unsigned and cannot be installed until

@@ -11,7 +11,7 @@ iterations from 1 to 999; `release` remains unnumbered. For example,
 `1.4.0-beta.1` keeps `CFBundleShortVersionString` at `1.4.0` and sets
 `CFBundleVersion` to `104002001`, using the same increasing numeric mapping as
 Android. The full version remains in the runtime display and package filenames.
-See the root [version rules](../README.md#versioning-and-releases) for the formula
+See the root [version rules](../docs/releasing.md) for the formula
 and supported limits.
 
 Only a pushed tag exactly matching `v<VERSION>` publishes the unsigned device

@@ -1,6 +1,6 @@
 # Flexible entity animation engine
 
-MinecraftC now drives its ten glTF mobs through versioned JSON action graphs
+MinecraftC drives its glTF mobs through versioned JSON action graphs
 and a general layered animation mixer.
 
 ## Runtime behavior
@@ -18,7 +18,7 @@ and a general layered animation mixer.
 
 ## Assets and combat
 
-Generator version 5 emits ten deterministic GLBs and adjacent version-1
+Generator version 5 emits eleven deterministic mob GLBs and adjacent version-1
 action graphs. Walk cycles use closed three-key loops and species-specific
 phases: diagonal quadrupeds, opposite biped limbs, chicken legs/wings, and four
 alternating spider leg groups.
@@ -27,7 +27,7 @@ Zombie and spider impacts occur at 0.30 seconds, skeleton arrows release at
 0.45 seconds, and blastlings explode at 1.00 second. Range and line of sight
 are checked again at the event; skeleton aim is refreshed at release. Mixer and
 pending-action state remain transient and add no fields to the current save
-format version 12.
+format (v21).
 
 ## Validation
 

@@ -1,5 +1,8 @@
 # MinecraftC plugin loader (ABI 1)
 
+For a step-by-step workflow, see [plugin development](plugin-development.md).
+The [documentation index](README.md) links gameplay, build and compatibility guides.
+
 MinecraftC loads official compiled-in plugins and user packages before creating its
 renderer or opening a world. It follows the registry, dependency and event-bus
 approach of mod loaders such as NeoForge, with a MinecraftC-specific C ABI. Java
@@ -8,8 +11,9 @@ mods, JAR files, Mixins and NeoForge binaries are not compatible.
 ## Install and enable
 
 Put each unpacked package in `<user-data>/mods/<plugin-id>/`, with `mod.json` at
-its root. The user-data directory is the parent of the platform's normal `saves`
-directory listed in the README. Package directory and manifest ID must match;
+its root. Locate the user-data root using [data locations](saves-and-commands.md#data-locations);
+a desktop launch-directory `saves/` also redirects plugin/config paths. Package
+directory and manifest ID must match;
 paths are relative to that package and symlinks are rejected. ZIP files are not
 loaded directly. Package files are read-only to the host.
 
@@ -133,7 +137,8 @@ is an interoperability contract, not an isolation or security sandbox.
 ```
 
 Omit `native` for a data-only package. Omit `data` for native-only packages.
-`game_min` and `game_max` optionally restrict the canonical version from VERSION.
+`game_min` and `game_max` optionally restrict the game compatibility version:
+prereleases use the full `VERSION` string, while `X.Y.Z-release` uses `X.Y.Z`.
 Versions use SemVer, with inclusive minimum/exclusive maximum bounds. A present
 optional dependency must satisfy its bounds. Duplicate IDs, dependency failures,
 conflicts and order cycles prevent affected plugins from loading. Dependencies
@@ -189,8 +194,8 @@ failed host calls. Never throw across the ABI.
 Build the runnable example independently:
 
 ```sh
-cmake -S examples/plugins/native_demo -B /tmp/native-demo
-cmake --build /tmp/native-demo
+cmake -S examples/plugins/native_demo -B build-local/plugins/native_demo
+cmake --build build-local/plugins/native_demo --config Release
 ```
 
 Copy its `mod.json` and platform library into `mods/native_demo/`. It registers a
@@ -229,7 +234,7 @@ corruption from native code cannot be recovered by this mechanism.
 
 ## Saves and limits
 
-Save v16 records namespaced block/item palettes and the exact gameplay plugin set,
+Save v21 records namespaced block/item palettes (introduced in v16) and the exact gameplay plugin set,
 versions and package/configuration fingerprints in each persisted file. Runtime
 IDs can move between launches without losing content. Missing, changed or extra gameplay plugins keep ordinary loading strict. The local
 world selector offers a warning listing all missing/extra plugins, saved/current
@@ -269,7 +274,7 @@ those worlds is refused without rewriting. Create new worlds with the desired
 plugin set; legacy format migration is not supplied. Generated caches are rebuildable when
 incompatible. Terrain generation stays v20 and builtin Heaven stays v9.
 
-ABI 1 now exposes optional version 1 entity, world-generation, dimension and render tables.
+ABI 1 exposes independently versioned entity, world-generation, dimension and render tables.
 Plugins can register/override mobs, select per-dimension generators and modifiers,
 and create Vulkan-owned shader resources and replaceable render stages.
 [Extension contracts and examples](plugin-extensions.md) document these APIs.

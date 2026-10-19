@@ -45,7 +45,7 @@ alone as this scene's success.
 
 Requires Xvfb, xauth, Mesa's lavapipe ICD and the same build above. From the
 repository root, first locate the ICD (`lvp_icd.json` varies by distribution),
-then select its actual path. For this environment:
+then select its actual path. For example:
 
 ```bash
 project_root="$PWD"
@@ -67,5 +67,5 @@ Software Vulkan does not replace hardware GPU, platform CI or manual visual acce
 
 The target can be explicitly built with the desktop project configuration and
 run as `vulkan_cloud_lod_smoke <absolute-asset-directory>` on a Vulkan-capable
-display. Windows/macOS execution has not been verified by this Linux remediation.
+display. The original Linux smoke record does not establish Windows/macOS coverage.
 Android/iOS do not build standalone CTest/smoke executables.

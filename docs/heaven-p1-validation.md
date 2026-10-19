@@ -1,5 +1,8 @@
 # Heaven P1 implementation and validation
 
+This is a dated acceptance record, not a current platform certification. See
+[current status](heaven-plugin-remaining-work.md) for later compatibility changes.
+
 Status: P1 implementation and Windows acceptance completed (2026-10-18); other native platforms/devices remain pending.
 Baseline: `988fbd4fbacfaadeb8d8c07449566244e5c42f78`.
 Local raw logs are retained under

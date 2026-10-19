@@ -102,7 +102,9 @@ Each entry rolls a deterministic count and chest slot from its independent seed 
 Only chest voxels may reference loot. Generated chests store loot key/revision, structure
 key/revision, seed and initialized state. An already registered or restored chest never refills.
 Save v21 persists these values, resource timers and dimension time overrides. v2–v20 metadata
-can be inspected, but opening incompatible saves refuses without writes; no migration occurs.
+can be inspected, but unsupported save formats cannot open. Ordinary refusal performs
+no writes. Plugin mismatches in otherwise supported local worlds may use explicit
+[staged recovery](plugins.md#saves-and-limits); LAN admission remains strict.
 
 ## Accepted structures (extension version 2)
 

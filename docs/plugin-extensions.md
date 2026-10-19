@@ -67,8 +67,10 @@ a real creative-catalog spawn egg and an explicit pig override.
 
 ## World generation
 
-`minecraftc.worldgen` registers named generators and ordered modifiers for the
-existing Overworld (0) or Heaven (1). The create-world page selects each dimension's
+`minecraftc.worldgen` registers named generators and ordered modifiers for
+registered dimensions. Overworld has handle 0; optional official Heaven uses 1.
+Register additional dimensions before their generators; persist keys, not handles.
+The create-world page selects each dimension's
 generator, JSON parameters and modifiers. An empty generator key keeps the builtin
 generator selected by the world type. These choices are saved with the world and
 sent to joining clients; opening a world reuses its choices. Parameters must be a

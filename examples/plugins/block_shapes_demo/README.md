@@ -1,8 +1,16 @@
 # Native block shape example
 
-Build with `cmake -S . -B build && cmake --build build`. Copy `mod.json` and
-`block_shapes_demo.so`/`.dll`/`.dylib` into the user-data
-`mods/block_shapes_demo/` directory, then restart.
+From the MinecraftC repository root:
+
+```sh
+cmake -S examples/plugins/block_shapes_demo -B build-local/plugins/block_shapes_demo
+cmake --build build-local/plugins/block_shapes_demo --config Release
+```
+
+Copy `mod.json`, the platform module and referenced package assets into
+`<user-data>/mods/block_shapes_demo/`. Enable in **Plugins** and restart.
+Visual Studio normally places the module under `Release/`.
+See [plugin development](../../../docs/plugin-development.md).
 
 Registers a slab, stair, manually/villager-openable door, and arrow-sensitive
 seven-tick button plus a fixed half-size box model through `minecraftc.block_shapes` version 1. Each family has

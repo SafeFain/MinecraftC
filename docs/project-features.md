@@ -1,7 +1,9 @@
 # Project Feature Reference
 
-Detailed current feature facts retained from AGENTS.md during the 2026-10-01 organization.
-These describe project behavior; task state belongs in PLAN.md and PROGRESS.md.
+Current gameplay reference. Version numbers in section titles identify when content
+was introduced; they do not expand the set of loadable saves. Current requirements
+are save **v21**, global generation **v20**, optional Heaven **v9**. See
+[save compatibility](saves-and-commands.md), [controls](controls.md) and [documentation index](README.md).
 
 - Infinite chunk loading around the player with a runtime-selectable render distance.
 - Independent, persistent far-terrain LOD progressively refines deterministic
@@ -189,9 +191,8 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-The v15 content remains available in current v20 worlds. Old generation versions
-are incompatible; current compatibility rules are described below.
-Seed layout, terrain heights, tree/structure anchors and Heaven v8 are retained.
+These materials remain available in current v20 worlds. Their introduction did
+not change terrain heights; Heaven now uses the optional v9 provider.
 
 
 ## Surface and cave ecology (generation v16)
@@ -220,11 +221,9 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-Only generation v20 worlds can load. v14/v15 and other previous or future
-versions stay listed as incompatible, retaining their untouched files. No world
-migration remains. The v16 update retained save format v12, seed layout 5, terrain heights, cave-carving
-algorithms, tree/structure anchors and Heaven generation v8. The v17 update below
-changes Heaven and block encoding while retaining Overworld generation output.
+This ecology is part of current generation v20. The separate Heaven ecology
+below uses provider generation v9. Save compatibility is documented centrally in
+[saves and commands](saves-and-commands.md#compatibility-and-recovery).
 
 ## Heaven ecology and resources (generation v17 / Heaven v9)
 
@@ -254,17 +253,14 @@ changes Heaven and block encoding while retaining Overworld generation output.
   and 4/2 for berries, roasted berries, berry bread and roasted glowshrooms.
 - Existing Heaven loot gains shards, berries and bricks while the origin shrine
   retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
-- Save v14 persists a world-wide day/night duration (default 1200 seconds), changed
-  using `/gamerule DayNightDuration <seconds>` with cheats enabled; v2-v13 default
-  to 1200 seconds. Save v13 introduced 16-bit IDs, retained in v14; packed light remains byte-sized.
-  Generated caches support 16-bit raw/RLE streams, and LOD cache revision is 5.
-  Old metadata remains readable/listed; worlds outside global generation v20
-  remain incompatible and are never migrated or rewritten by refused loads.
-  Seed layout, Overworld generation output and application VERSION are unchanged.
+- Day/night duration is world-wide (default 1200 seconds), changed with
+  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v21
+  uses 16-bit block IDs; packed light remains derived byte-sized runtime data.
 
 ## Overworld structures (generation v18)
 
-Global generation v18 adds six structures, bringing the Overworld total to 14.
+The v18 update added six structures. Together with the five village styles added
+through v19, current generation v20 has seventeen Overworld structure types.
 Each has seeded rotation, mirroring and material or damage variants; generation,
 reservations and locate use world-coordinate hashes. Existing structure and loot
 enum values are preserved. All new structures reuse existing blocks and supplies;
@@ -287,12 +283,6 @@ Temple chambers extend at most five blocks below the surface, with build limits
 checked. All supplies and the tower platform are accessible by walking stairs.
 Chests/furnaces use the existing pending registration channel; consumed supplies
 stay consumed across unload and reload. Commands also accept `minecraftc:` names.
-
-Global generation and base-cache keys advance to v18/revision 1. Terrain heights,
-cave carving, ore algorithms, seed layout 5, Heaven v9, block IDs, save format v16
-and application VERSION stay unchanged. Added reservations and overlaps can change
-local trees and other small structures. At that release, only v18 worlds loaded; older/future worlds
-remain listed and refused without rewriting or migration.
 
 ## Village lifecycle (generation v19)
 
@@ -332,11 +322,9 @@ remain listed and refused without rewriting or migration.
   Defenders use navigation, sight-gated melee and normal damage/save paths, patrol
   near home and do not naturally despawn. Death imposes a 600-second village cooldown.
   Low-reputation Survival players can become targets; Creative/Spectator cannot.
-- Save v17 persists food, growth/cooldowns, reputation and demand for metadata and
-  chunk entities; v2–v16 remain readable with defaults. No offline growth or cooldown
-  catch-up. No raids, zombie curing, gossip simulation, or automatic construction.
-  Only global v20 worlds load; refused older/future worlds are never rewritten.
-  Heaven v9, terrain/cave algorithms, existing IDs and application VERSION remain unchanged.
+- Save v21 persists food, growth/cooldowns, reputation and demand (introduced in
+  v17). No offline growth or cooldown catch-up. No raids, zombie curing, gossip
+  simulation, or automatic construction.
 
 ## Classic fishing
 
@@ -370,8 +358,7 @@ remain listed and refused without rewriting or migration.
 - Pausing freezes fishing. Opening inventory follows normal world ticking.
   Switching slots, dropping/losing the rod, sleeping, death, Spectator mode,
   dimension changes, world exit, unloaded water and excess distance cancel it.
-  Rods and fish persist using save v14; bobbers and timers are transient. World
-  fishing introduced no generation change (v17 at introduction). No enchantments, experience, bait or entity hooking.
+  Rods and fish persist in save v21; bobbers and timers are transient. No enchantments, experience, bait or entity hooking.
 
 ### GameRule commands
 
@@ -397,13 +384,16 @@ generation remains v20/Heaven v9.
 Optional [gameplay/presentation capabilities](plugin-capabilities.md) add block/item behavior,
 deterministic cross-chunk structures and loot metadata, host actions with preview/cooldown/wear,
 dimension time overrides, complete environment parameters, colored particles, static held glTF
-models and WAV playlists. Builtin Heaven remains in core; no migration is included.
+models and WAV playlists. Default-enabled `official_heaven` owns Heaven content,
+generation and presentation through these registered interfaces. Disabling it takes
+effect after restart and changes world compatibility requirements.
 
 Local worlds with missing, extra or changed gameplay plugins offer a detailed
-warning and explicit backup recovery. A staged copy converts all durable partitions;
+warning and explicit staged recovery, retaining a backup by default. A staged copy converts all durable partitions;
 missing blocks become air, unavailable items/entities are removed and missing active
 dimensions return the player to the Overworld. Cancellation preserves the original;
-the complete original remains in a separate backup after successful recovery. Normal
+the complete original remains in a separate backup unless **Enter Without Backup**
+was explicitly chosen; then it is discarded after successful publication. Normal
 saving resumes. LAN plugin admission and unsupported save/generation versions remain
 strict. See [save recovery](plugins.md#saves-and-limits).
 
@@ -421,7 +411,7 @@ LAN mappings. See [SDK reference](plugin-extensions.md#block-shapes-and-state-fa
 
 Six wood families (oak, birch, spruce, jungle, acacia, skyroot) have distinct
 planks, two-block doors and buttons; iron doors and stone buttons complete
-the feature. New states append after the existing 274 non-air IDs. Ordinary
+the feature. Serialized state IDs keep their original values. Ordinary
 wood recipes accept all plank families; six same-family planks or iron ingots
 make three doors. One plank or stone makes a button. Wooden doors support
 direct use; iron doors only respond to button power. Buttons support wall,
@@ -430,8 +420,8 @@ floor and ceiling placement and do not block movement. Stone pulses last
 
 Local power reaches adjacent doors and doors adjacent to the button's full
 solid support block. Signals from multiple buttons combine; no wires, levers,
-pressure plates, pistons or recursive conduction are introduced. Save v18
-stores remaining button ticks; unloaded chunks pause and resume simulation.
+pressure plates, pistons or recursive conduction are introduced. Save v21
+retains remaining button ticks (introduced in v18); unloaded chunks pause and resume simulation.
 Simultaneous pulse releases have a 256-transition tick budget; excess due
 releases remain queued for following ticks.
 

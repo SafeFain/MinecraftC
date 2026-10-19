@@ -12,9 +12,11 @@ Queries through inverted old names return inverted values too.
 `doFireTick false/true` sets radius 0/128; `allowFireTicksAwayFromPlayer true/false`
 sets -1/128. These are compatibility conversions; the last write wins.
 
-Each world owns its rules, shared across Overworld and Heaven. Save v15 appends
-a typed rule table using canonical IDs, retained in save v17 alongside plugin palettes and village state. v2–v14 read with Java defaults; existing
-v14 day/night duration is preserved. Unknown well-typed IDs round-trip. Loading
+Each world owns its rules, shared across its registered dimensions. Save v21
+retains the typed canonical-ID rule table introduced in v15 and the world day/night
+duration introduced in v14. Older save metadata is inspectable, but opening requires
+v21 and the current generation version; legacy worlds are not upgraded. Unknown
+well-typed rule IDs round-trip in supported saves. Loading
 never changes the saved terrain generation version. Query/help/error/support messages
 remain visible with command feedback disabled. General feedback/status strings
 are translated in all ten languages; detailed explanations are Chinese/English
