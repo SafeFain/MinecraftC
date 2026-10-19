@@ -169,7 +169,7 @@ public:
     bool hasWorldStore() const { return saveStore != nullptr; }
     LoadingSnapshot loadingSnapshot() const;
     std::vector<WorldSummary> listWorlds() const;
-    std::unique_ptr<WorldRecovery> beginWorldRecovery(const std::string& id,const std::string& token) const;
+    std::unique_ptr<WorldRecovery> beginWorldRecovery(const std::string& id,const std::string& token,bool keepBackup=true) const;
     std::map<uint32_t,Plugins::GenerationConfig> creationGeneration;
     std::string createWorld(const std::string& name, uint64_t seed,
                             GameMode mode, Difficulty difficulty, bool cheats,

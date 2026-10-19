@@ -48,9 +48,9 @@ GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
         loadingNewWorld, loadingReason};
 }
 
-std::unique_ptr<WorldRecovery> GameSession::beginWorldRecovery(const std::string& id,const std::string& token) const {
+std::unique_ptr<WorldRecovery> GameSession::beginWorldRecovery(const std::string& id,const std::string& token,bool keepBackup) const {
     if(saveStore || terrainGenerated || lanJoining || hostingLan())throw std::runtime_error("Cannot recover an active world");
-    return std::make_unique<WorldRecovery>(worldCatalog.open(id).worldDirectory(),token);
+    return std::make_unique<WorldRecovery>(worldCatalog.open(id).worldDirectory(),token,keepBackup);
 }
 
 std::vector<WorldSummary> GameSession::listWorlds() const {

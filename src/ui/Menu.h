@@ -29,7 +29,7 @@ enum class GameState {
 
 struct MenuCallbacks {
     std::function<void(const std::string&)> onOpenWorld;
-    std::function<std::unique_ptr<WorldRecovery>(const std::string&,const std::string&)> onBeginWorldRecovery;
+    std::function<std::unique_ptr<WorldRecovery>(const std::string&,const std::string&,bool)> onBeginWorldRecovery;
     std::function<void(const std::string&, const std::string&, GameMode, WorldType, bool)> onCreateWorld;
     std::function<void(const std::map<uint32_t,Plugins::GenerationConfig>&)> onGenerationConfig;
     std::function<std::vector<WorldSummary>()> onRefreshWorlds;
@@ -196,7 +196,7 @@ private:
     bool m_recoverySucceeded=false;
     int m_warningOffset=0,m_warningLines=0,m_warningVisible=1;
     void requestOpenWorld(int index);
-    void beginRecovery();
+    void beginRecovery(bool keepBackup);
     void renderPluginWarning(UIRenderer& ui,int width,int height);
 
     void showHome();

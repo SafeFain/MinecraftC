@@ -179,7 +179,7 @@ private:
 // without executing plugin code or mutating registries on worker threads.
 class WorldRecovery {
 public:
-    WorldRecovery(std::filesystem::path world, const std::string& confirmedToken);
+    WorldRecovery(std::filesystem::path world, const std::string& confirmedToken, bool keepBackup=true);
     ~WorldRecovery();
     WorldRecovery(const WorldRecovery&) = delete;
     WorldRecovery& operator=(const WorldRecovery&) = delete;
@@ -190,6 +190,7 @@ public:
     float progress() const;
     const std::string& error() const { return m_error; }
     const std::filesystem::path& backupPath() const { return m_backup; }
+    bool backupCleanupPending() const { return m_succeeded && !m_keepBackup && !m_backup.empty(); }
     static void restoreInterrupted(const std::filesystem::path& saves);
 private:
     std::filesystem::path m_world, m_transaction, m_stage, m_backup;
@@ -199,6 +200,7 @@ private:
     uint64_t m_sourceHash=0;
     size_t m_next=0;
     bool m_done=false, m_succeeded=false, m_published=false;
+    bool m_keepBackup=true;
     std::string m_error, m_confirmedToken;
     void rollback();
 };

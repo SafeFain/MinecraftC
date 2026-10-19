@@ -1265,8 +1265,8 @@ WorldCompatibilityReport SaveStore::inspectCompatibility() const {
     return result;
 }
 
-WorldRecovery::WorldRecovery(std::filesystem::path world,const std::string& confirmedToken)
-    :m_world(std::filesystem::absolute(std::move(world)).lexically_normal()),m_confirmedToken(confirmedToken) {
+WorldRecovery::WorldRecovery(std::filesystem::path world,const std::string& confirmedToken,bool keepBackup)
+    :m_world(std::filesystem::absolute(std::move(world)).lexically_normal()),m_keepBackup(keepBackup),m_confirmedToken(confirmedToken) {
     const auto report=SaveStore(m_world).inspectCompatibility();
     if(!report.recoverable()||report.token!=confirmedToken)throw std::runtime_error("World/plugin compatibility changed; refresh the world list and review the warning again");
     const auto base=m_world.parent_path()/".plugin-recovery";
@@ -1277,6 +1277,10 @@ WorldRecovery::WorldRecovery(std::filesystem::path world,const std::string& conf
     m_stage=m_transaction/"staged";m_backup=m_transaction/"original";
     try {
         std::ofstream journal(m_transaction/"world-id",std::ios::binary);journal<<m_world.filename().string();journal.close();if(!journal)throw std::runtime_error("Cannot write recovery journal");
+        if(!m_keepBackup) {
+            std::ofstream discard(m_transaction/"discard-original",std::ios::binary);discard<<"discard after publication\n";discard.close();
+            if(!discard)throw std::runtime_error("Cannot record recovery backup choice");
+        }
         std::filesystem::create_directory(m_stage);
         const auto metadata=SaveStore(m_world,SaveReadPolicy::RecoverPlugins).loadMetadata();
         std::vector<std::filesystem::path> removed,dimensions;
@@ -1341,6 +1345,15 @@ void WorldRecovery::step() {
         if(!committed)throw std::runtime_error("Cannot finalize recovery journal");
         m_succeeded=true;m_done=true;
     }catch(const std::exception& e){m_error=e.what();try{rollback();}catch(const std::exception& rollbackError){m_error+="; rollback: "+std::string(rollbackError.what());}m_done=true;}
+    if(m_succeeded && !m_keepBackup) {
+        // Publication is committed: cleanup must never roll back a partially deleted original.
+        // Keep the journal so interrupted/failed cleanup is retried before listing worlds.
+        try {
+            std::error_code error;
+            std::filesystem::remove_all(m_backup,error);
+            if(!error)m_backup.clear();
+        }catch(const std::exception&) { /* Publication succeeded; report pending cleanup in the UI. */ }
+    }
 }
 void WorldRecovery::restoreInterrupted(const std::filesystem::path& saves) {
     const auto base=saves/".plugin-recovery";
@@ -1350,7 +1363,14 @@ void WorldRecovery::restoreInterrupted(const std::filesystem::path& saves) {
         if(transaction.is_symlink()||!transaction.is_directory())continue;
         std::ifstream completion(transaction.path()/"committed",std::ios::binary);
         std::string completionState;std::getline(completion,completionState);
-        if(completionState=="published")continue;
+        if(completionState=="published") {
+            if(std::filesystem::exists(transaction.path()/"discard-original")) {
+                const auto original=transaction.path()/"original";
+                if(std::filesystem::is_symlink(std::filesystem::symlink_status(original)))throw std::runtime_error("Recovery transaction contains symbolic links");
+                std::error_code error;std::filesystem::remove_all(original,error);
+            }
+            continue;
+        }
         std::ifstream journal(transaction.path()/"world-id",std::ios::binary);std::string id;std::getline(journal,id);
         if(id.empty()||id=="."||id==".."||!std::all_of(id.begin(),id.end(),[](unsigned char c){return std::isalnum(c)||c=='-'||c=='_';}))continue;
         const auto backup=transaction.path()/"original",stage=transaction.path()/"staged",world=saves/id;
@@ -1361,6 +1381,9 @@ void WorldRecovery::restoreInterrupted(const std::filesystem::path& saves) {
             // subsequent explicit deletion never resurrects an old backup.
             std::ofstream committed(transaction.path()/"committed",std::ios::binary);committed<<"published\n";committed.close();
             if(!committed)throw std::runtime_error("Cannot finalize interrupted recovery journal");
+            if(std::filesystem::exists(transaction.path()/"discard-original")) {
+                std::error_code error;std::filesystem::remove_all(backup,error);
+            }
         }
     }
 }

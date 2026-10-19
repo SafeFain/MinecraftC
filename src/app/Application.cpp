@@ -383,8 +383,8 @@ private:
         m_ui.menuCallbacks.onOpenWorld = [this](const std::string& id) {
             try {m_flow.startGame(id, false);} catch(const std::exception& error){LOG_ERROR(error.what());m_flow.showCommandMessage(error.what());}
         };
-        m_ui.menuCallbacks.onBeginWorldRecovery = [this](const std::string& id,const std::string& token) {
-            return m_session.beginWorldRecovery(id,token);
+        m_ui.menuCallbacks.onBeginWorldRecovery = [this](const std::string& id,const std::string& token,bool keepBackup) {
+            return m_session.beginWorldRecovery(id,token,keepBackup);
         };
         m_ui.menuCallbacks.onRefreshWorlds = [this]() {
             return m_session.listWorlds();

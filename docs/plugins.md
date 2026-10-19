@@ -40,10 +40,10 @@ image and audio paths and the same content fingerprint as desktop installations.
 The provider remains statically linked on mobile; this cache contains resources.
 
 Ordinary loading requires the exact gameplay plugin set and package fingerprint.
-Local mismatches can be reviewed and explicitly recovered with a full original-world
-backup; see [Saves and limits](#saves-and-limits). The addition
+Local mismatches can be reviewed and explicitly recovered, retaining a full original-world
+backup by default or discarding it on request; see [Saves and limits](#saves-and-limits). The addition
 of this provider makes worlds saved with the previous plugin set incompatible.
-They remain listed and require explicit warning confirmation and backup recovery
+They remain listed and require explicit warning confirmation and recovery
 to open with the current plugin set. Ordinary refusal performs no writes. Worlds
 created with Heaven disabled contain only the dimensions currently registered.
 Enabling Heaven later also changes that world's required set. Terrain generation
@@ -234,14 +234,18 @@ versions and package/configuration fingerprints in each persisted file. Runtime
 IDs can move between launches without losing content. Missing, changed or extra gameplay plugins keep ordinary loading strict. The local
 world selector offers a warning listing all missing/extra plugins, saved/current
 versions and fingerprints, missing content, dimensions and generation revisions.
-Cancel is the default. **Back Up and Enter Anyway** explicitly authorizes recovery
+Cancel is the default. **Back Up and Enter Anyway** or **Enter Without Backup** explicitly authorizes recovery
 for that world and the reviewed snapshot only; LAN joins still require matching
 plugins.
 
 Recovery builds and validates a separate copy, converts every durable partition
 (including unvisited chunks), then retains the complete original directory at
 `saves/.plugin-recovery/<world>-<unique transaction>/original` before publishing the
-recovered world. The actual backup path is displayed after completion. Cancel or
+recovered world. **Enter Without Backup** uses the same staged conversion, then deletes
+that original only after publication is committed; interrupted cleanup is retried
+when listing worlds. Removed content cannot be restored through this option.
+The actual retained backup path (including cleanup failures) or no-backup status
+is displayed after completion. Cancel or
 preparation failure leaves the original intact; publication failures roll back, and
 an interrupted directory replacement is restored before listing worlds. Completed
 backups are never automatically restored after an explicit world deletion.

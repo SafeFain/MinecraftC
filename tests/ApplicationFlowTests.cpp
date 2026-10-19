@@ -652,11 +652,11 @@ int main(int argc,char** argv) {
 
     {
         ClientSettings settings;Localization localization;UIRenderer ui;
-        int opened=0,recovered=0;
+        int opened=0,recovered=0;bool keptBackup=false;
         MenuCallbacks callbacks;callbacks.onOpenWorld=[&](const std::string&){++opened;};
-        callbacks.onBeginWorldRecovery=[&](const std::string& id,const std::string& token)->std::unique_ptr<WorldRecovery>{
+        callbacks.onBeginWorldRecovery=[&](const std::string& id,const std::string& token,bool keepBackup)->std::unique_ptr<WorldRecovery>{
             require(id=="modded"&&token=="reviewed","warning confirms the selected world/token");
-            ++recovered;throw std::runtime_error("fixture recovery failure");
+            keptBackup=keepBackup;++recovered;throw std::runtime_error("fixture recovery failure");
         };
         WorldSummary world;world.id="modded";world.displayName="Modded world";
         world.pluginCompatibility.token="reviewed";world.backupDirectory="backup/directory";
@@ -668,7 +668,7 @@ int main(int argc,char** argv) {
         menu.onKeyPress(Key::Enter);
         require(recovered==0,"warning defaults to cancel, repeated enter never confirms");
         menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter);
-        require(opened==0&&recovered==1,"explicit force action invokes recovery, never ordinary load");
+        require(opened==0&&recovered==1&&keptBackup,"explicit backup action retains original, never ordinary load");
         menu.onKeyPress(Key::Enter); // Error screen Back.
         menu.render(ui,960,600);
         menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Escape);
@@ -681,9 +681,14 @@ int main(int argc,char** argv) {
         menu.render(ui,960,600);
         require(drawnLabels.count("menu.plugins.title")!=0&&recovered==1,"play button routes to warning");
         menu.onKeyPress(Key::Escape);drawnLabels.clear();menu.render(ui,960,600);
-        const auto card=drawnLabels.at("Modded world");click(card);click(card);
-        menu.render(ui,960,600);
-        require(drawnLabels.count("menu.plugins.title")!=0&&opened==0&&recovered==1,"double-click routes to warning without bypassing confirmation");
+        const auto card=drawnLabels.at("Modded world");click(card);
+        menu.render(ui,960,600); // The first selection rebuilds button bounds before the next input frame.
+        click(card);drawnLabels.clear();menu.render(ui,960,600);
+        require(drawnLabels.count("menu.plugins.force_no_backup")!=0&&opened==0&&recovered==1,"double-click routes to warning without bypassing confirmation");
+        menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Down);menu.onKeyPress(Key::Enter);
+        require(opened==0&&recovered==2&&!keptBackup,"third warning action explicitly requests no-backup recovery");
+        menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Enter);menu.onKeyPress(Key::Enter);
+        require(opened==0&&recovered==2,"repeated input after no-backup action never opens the world");
         recordUi=false;
     }
 

@@ -260,13 +260,18 @@ int main(int argc,char** argv) {
         mismatch.pluginCompatibility.token="smoke";mismatch.backupDirectory="saves/.plugin-recovery/world-backup/original";
         for(int i=0;i<12;++i)mismatch.pluginCompatibility.issues.push_back({"changed_plugin","example_"+std::to_string(i),"1.0:"+std::string(64,'a'),"2.0:"+std::string(64,'b')});
         auto warningCallbacks=callbacks;
-        warningCallbacks.onBeginWorldRecovery=[](const std::string&,const std::string&)->std::unique_ptr<WorldRecovery>{throw std::runtime_error("smoke failure");};
+        warningCallbacks.onBeginWorldRecovery=[](const std::string&,const std::string&,bool)->std::unique_ptr<WorldRecovery>{throw std::runtime_error("smoke failure");};
         MainMenu warning(warningCallbacks,{mismatch},settings,localization,nullptr);
         warning.onKeyPress(Key::Enter);warning.onKeyPress(Key::Enter);warning.onKeyPress(Key::Enter);
         draw("plugin-mismatch-warning",[&]{warning.render(ui,width,height);});
         warning.onScroll(-8);draw("plugin-mismatch-warning-scrolled",[&]{warning.render(ui,width,height);});
         warning.onKeyPress(Key::Down);warning.onKeyPress(Key::Enter);
         draw("plugin-mismatch-failure",[&]{warning.render(ui,width,height);});
+        warning.onKeyPress(Key::Enter);warning.onKeyPress(Key::Enter);
+        warning.onKeyPress(Key::Down);warning.onKeyPress(Key::Down);
+        draw("plugin-mismatch-no-backup",[&]{warning.render(ui,width,height);});
+        warning.onKeyPress(Key::Enter);
+        draw("plugin-mismatch-no-backup-failure",[&]{warning.render(ui,width,height);});
         draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});
         const auto iconPasses=Plugins::content().extensions.renderPasses;Plugins::content().extensions.renderPasses.clear();
         auto iconImage=[&](const std::function<void()>& render) {

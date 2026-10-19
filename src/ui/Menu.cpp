@@ -304,7 +304,9 @@ void MainMenu::rebuildButtons() {
             m_recovery.reset();refreshWorlds();showWorlds();
         });
         if(m_page==Page::PluginWarning) {
-            m_buttons.emplace_back(m_localization.text("menu.plugins.force"),[this]() {beginRecovery();});
+            m_buttons.emplace_back(m_localization.text("menu.plugins.force"),[this]() {beginRecovery(true);});
+            m_buttons.back().setDanger(true);
+            m_buttons.emplace_back(m_localization.text("menu.plugins.force_no_backup"),[this]() {beginRecovery(false);});
             m_buttons.back().setDanger(true);
         }else if(m_page==Page::PluginResult && m_recoverySucceeded) {
             m_buttons.emplace_back(m_localization.text("menu.worlds.play"),[this]() {
@@ -424,10 +426,10 @@ void MainMenu::requestOpenWorld(int index) {
     m_lastWorldClick=-1;m_lastWorldIndex=-1;rebuildButtons();
 }
 
-void MainMenu::beginRecovery() {
+void MainMenu::beginRecovery(bool keepBackup) {
     if(m_page!=Page::PluginWarning)return;
     try {
-        m_recovery=m_callbacks.onBeginWorldRecovery(m_pendingPluginWorld.id,m_pendingPluginWorld.pluginCompatibility.token);
+        m_recovery=m_callbacks.onBeginWorldRecovery(m_pendingPluginWorld.id,m_pendingPluginWorld.pluginCompatibility.token,keepBackup);
         if(!m_recovery)throw std::runtime_error("Recovery could not start");
         m_recoveryMessage.clear();m_recoverySucceeded=false;m_page=Page::PluginRecovery;
     }catch(const std::exception& error){m_recoveryMessage=error.what();m_recoverySucceeded=false;m_page=Page::PluginResult;}
@@ -459,16 +461,26 @@ void MainMenu::renderPluginWarning(UIRenderer& ui,int width,int height) {
             text+=m_localization.format("menu.plugins.values",{issue.saved.empty()?"-":issue.saved,issue.current.empty()?"-":issue.current})+"\n\n";
         }
     }else if(m_page==Page::PluginRecovery)text+=std::to_string(static_cast<int>(m_recovery->progress()*100))+"%\n"+m_localization.text("menu.plugins.wait");
-    else text+=m_recoverySucceeded?m_localization.format("menu.plugins.backup",{m_recoveryMessage}):m_recoveryMessage;
+    else if(!m_recoverySucceeded)text+=m_recoveryMessage;
+    else if(m_recoveryMessage.empty())text+=m_localization.text("menu.plugins.no_backup");
+    else text+=m_localization.format(m_recovery && m_recovery->backupCleanupPending()?
+        "menu.plugins.cleanup_pending":"menu.plugins.backup",{m_recoveryMessage});
+    const bool stacked=w<720;
+    const float buttonArea=stacked?static_cast<float>(m_buttons.size())*38-6:32;
     const float scale=1.0f,lineH=18.0f;
     const auto lines=wrapTextPixels(text,contentW,[&](const std::string& line){return ui.measureText(line,scale).x;});
-    m_warningLines=static_cast<int>(lines.size());m_warningVisible=std::max(1,static_cast<int>((h-150)/lineH));
+    m_warningLines=static_cast<int>(lines.size());m_warningVisible=std::max(1,static_cast<int>((h-118-buttonArea)/lineH));
     m_warningOffset=std::clamp(m_warningOffset,0,std::max(0,m_warningLines-m_warningVisible));
     for(int i=0;i<m_warningVisible && i+m_warningOffset<m_warningLines;++i)
         UiTheme::textWithShadow(ui,lines[static_cast<size_t>(i+m_warningOffset)],x+16,h-78-i*lineH,scale,UiTheme::TEXT_DIM);
-    const float gap=6,buttonW=(contentW-gap*static_cast<float>(m_buttons.size()-1))/static_cast<float>(m_buttons.size());
-    for(size_t i=0;i<m_buttons.size();++i){auto& button=m_buttons[i];button.setPosition(x+16+static_cast<float>(i)*(buttonW+gap),y+8);button.setSize(buttonW,32);prepareButton(button);button.render(ui);}
-    if(m_warningLines>m_warningVisible)UiTheme::scrollBar(ui,w-23,68,4,std::max(1.0f,h-145),m_warningOffset,m_warningVisible,m_warningLines);
+    const float gap=6,buttonW=stacked?contentW:(contentW-gap*static_cast<float>(m_buttons.size()-1))/static_cast<float>(m_buttons.size());
+    for(size_t i=0;i<m_buttons.size();++i) {
+        auto& button=m_buttons[i];
+        button.setPosition(x+16+(stacked?0:static_cast<float>(i)*(buttonW+gap)),
+            y+8+(stacked?static_cast<float>(m_buttons.size()-1-i)*38:0));
+        button.setSize(buttonW,32);prepareButton(button);button.render(ui);
+    }
+    if(m_warningLines>m_warningVisible)UiTheme::scrollBar(ui,w-23,36+buttonArea,4,std::max(1.0f,h-113-buttonArea),m_warningOffset,m_warningVisible,m_warningLines);
 }
 
 void MainMenu::selectField(Field field) {

@@ -149,6 +149,46 @@ void runRecoveryTests(const std::filesystem::path& root) {
     require(after.at("players/private-profile")==before.at("players/private-profile")&&after.at("plugin-private/state.bin")==before.at("plugin-private/state.bin"),"LAN and private plugin files stay unchanged");
     store.saveMetadata(loaded);store.validatePluginFiles();
     const auto worlds=catalog.list();require(worlds.size()==1&&worlds[0].compatible,"backups stay out of world list and saved recovery reopens");
+    const auto noBackupWorld=root/"no-backup";
+    std::filesystem::copy(recovery.backupPath(),noBackupWorld,std::filesystem::copy_options::recursive);
+    const auto noBackupReport=SaveStore(noBackupWorld).inspectCompatibility();
+    {
+        WorldRecovery cancelled(noBackupWorld,noBackupReport.token,false);
+        cancelled.step();cancelled.cancel();
+        require(!cancelled.succeeded()&&snapshotRecoveryFiles(noBackupWorld)==before,"no-backup cancellation preserves every original byte");
+    }
+    {
+        WorldRecovery failed(noBackupWorld,noBackupReport.token,false);
+        std::filesystem::create_directory(failed.backupPath().parent_path()/"committed");
+        for(int n=0;!failed.done()&&n<100;++n)failed.step();
+        require(!failed.succeeded()&&snapshotRecoveryFiles(noBackupWorld)==before,"no-backup publication failure restores the complete original");
+    }
+    WorldRecovery noBackup(noBackupWorld,noBackupReport.token,false);
+    const auto temporaryOriginal=noBackup.backupPath();
+    const auto noBackupTransaction=temporaryOriginal.parent_path();
+    for(int n=0;!noBackup.done()&&n<100;++n)noBackup.step();
+    require(noBackup.succeeded()&&noBackup.backupPath().empty()&&!noBackup.backupCleanupPending()&&!std::filesystem::exists(temporaryOriginal),"no-backup recovery deletes original only after successful publication");
+    require(std::filesystem::exists(noBackupTransaction/"committed")&&std::filesystem::exists(noBackupTransaction/"discard-original"),"no-backup publication journals cleanup intent");
+    SaveStore noBackupStore(noBackupWorld);
+    require(noBackupStore.inspectCompatibility().compatible()&&noBackupStore.loadMetadata().inventory.slot(0).empty(),"no-backup recovery applies the same strict content conversion");
+    noBackupStore.validatePluginFiles();
+    const auto noBackupAfter=snapshotRecoveryFiles(noBackupWorld);
+    // Restore a held original if interrupted before publication, even without retained backup.
+    const auto pending=root/".plugin-recovery/no-backup-pending";
+    std::filesystem::create_directories(pending/"staged");
+    {std::ofstream journal(pending/"world-id");journal<<"no-backup";}
+    {std::ofstream discard(pending/"discard-original");discard<<"discard after publication\n";}
+    std::filesystem::rename(noBackupWorld,pending/"original");
+    WorldRecovery::restoreInterrupted(root);
+    require(snapshotRecoveryFiles(noBackupWorld)==noBackupAfter,"interrupted uncommitted no-backup publication restores the original");
+    // Simulate interruption during cleanup after a committed publication.
+    std::filesystem::copy(recovery.backupPath(),temporaryOriginal,std::filesystem::copy_options::recursive);
+    WorldRecovery::restoreInterrupted(root);WorldRecovery::restoreInterrupted(root);
+    require(!std::filesystem::exists(temporaryOriginal)&&snapshotRecoveryFiles(noBackupWorld)==noBackupAfter,"committed no-backup cleanup retries idempotently without changing recovered world");
+    require(snapshotRecoveryFiles(recovery.backupPath())==before,"no-backup cleanup never deletes retained backups");
+    require(catalog.deleteWorld("no-backup"),"no-backup recovered world can be deleted");
+    WorldRecovery::restoreInterrupted(root);
+    require(!std::filesystem::exists(noBackupWorld),"discarded originals never resurrect deleted worlds");
     // Simulate interruption between the two publication directory renames.
     const auto transaction=root/".plugin-recovery/interrupted";std::filesystem::create_directories(transaction);
     {std::ofstream journal(transaction/"world-id");journal<<id;}
