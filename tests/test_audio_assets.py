@@ -1,74 +1,198 @@
 #!/usr/bin/env python3
-import importlib.util
+"""Audio engine invariants and complete, byte-exact score regeneration."""
+
+from array import array
+from contextlib import redirect_stdout, redirect_stderr
+from dataclasses import replace
+import hashlib
+import io
+import json
+import math
+from pathlib import Path
 import sys
 import tempfile
-import hashlib
-import math
-import struct
+import unittest
+from unittest.mock import patch
 import wave
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(ROOT / "tools"))
+import audio_generator as generator
+from audio_score import Event, TRACKS, compose, voice_lead
+
 EXPECTED = {
-    "menu_whimsy.wav": (104.0, 64, "76f849f2457d04167917802868c73cde275456767da45e8f01775f6d531c87b7"),
-    "menu_spark.wav": (112.0, 64, "f4dea09da8fec6d30548fb42e0e554e75f1d5ed73613209bf2f82d1188392085"),
-    "gameplay_calm.wav": (64.0, 64, "284e126a74342219e9f244112df3dcad5aa4915a336be4931ba6a9f0016d13a1"),
-    "overworld_solitude.wav": (60.0, 64, "84d58d32ca28a058133f88997bae62910c5ac88447c6cc16b72bc8e72ee63b95"),
-    "overworld_horizon.wav": (72.0, 96, "d41163b70d066263d70c53bb20ae7da48a2d6df0bc24ed4952376ea2aea876b2"),
-    "overworld_nightfall.wav": (54.0, 64, "ec9bc67b38a8e69bc18d8add5e9587935717bbe65f3979514e4624c9fa6bddc3"),
-    "heaven_ether.wav": (56.0, 64, "ed79437f567ef8f11ed1632b07dc298689664d69cba0e8578b839a320add4a64"),
-    "heaven_sanctum.wav": (48.0, 64, "30e1b2ff0d7b5c4ad6f7dad15c9c3eeeb607c779131df1cb7a54a7e73d4ce53e"),
+    "menu_whimsy": (104, 96, "f704d95980f508c1886ea5d4a43326da922a2b1c9ecd7a92fa232eaaf1a932b0"),
+    "menu_spark": (112, 96, "1eeed31f4c315ec7312460ef107dae22a7e0a244ca06907ba6331f3e6db6732f"),
+    "gameplay_calm": (64, 128, "df4c2a50f76dad339abfdbae8d62636ee74530e81cf5e57080317e1e5672dac1"),
+    "overworld_solitude": (60, 96, "fa8dcae097bc9a44df1355b245b90e912ac538d80cdca2e95371f85b73b6dbea"),
+    "overworld_horizon": (72, 128, "13bf02e0d00bf9a957f03b2257aa73e61f104d4c49c76fefa5381c52b717980f"),
+    "overworld_nightfall": (54, 96, "b764dd7094cbf3dab68b464484b0c3aae1236e3cff43a4d6eea8a69097106f27"),
+    "heaven_ether": (56, 96, "a45a80b4282248b8932b72661d318b38f1d894c459451ccfe626e31ae4ba71e4"),
+    "heaven_sanctum": (48, 96, "e0817640e8078a18bad736002c0545d34e75ca1a8f74942e08992af06ccce20e"),
 }
 
 
-def require(condition, message):
-    if not condition:
-        raise SystemExit(f"FAILED: {message}")
+def asset_path(track):
+    folder = "assets/plugins/official_heaven/audio" if track.heaven else "assets/audio"
+    return ROOT / folder / (track.name + ".wav")
 
 
-def asset_path(filename):
-    return ROOT / ("assets/plugins/official_heaven/audio" if filename.startswith("heaven_") else "assets/audio") / filename
+class EngineTests(unittest.TestCase):
+    def test_envelopes_and_seven_distinct_voices(self):
+        envelope = generator.event_envelope
+        self.assertEqual(envelope(-.1, 2, .1, .3), 0)
+        self.assertEqual(envelope(0, 2, .1, .3), 0)
+        self.assertEqual(envelope(2, 2, .1, .3), 0)
+        self.assertAlmostEqual(envelope(1, 2, .1, .3), 1)
+        voices = []
+        for name in generator.INSTRUMENTS:
+            samples = generator.synthesize(name, 69, 24000)
+            self.assertEqual(samples[0], 0)
+            self.assertEqual(samples[-1], 0)
+            self.assertTrue(all(math.isfinite(x) for x in samples))
+            self.assertGreater(max(abs(x) for x in samples), .01)
+            voices.append(samples.tobytes())
+        self.assertEqual(len(set(voices)), 7)
+        # Out-of-band upper partials must be removed rather than folded back.
+        self.assertLess(max(abs(x) for x in generator.wavetable("bell", 127)), 1.01)
+        self.assertEqual(set(generator.wavetable("bell", 160)), {0})
+
+    def test_scores_seed_variation_and_voice_leading(self):
+        self.assertEqual(len(TRACKS), 8)
+        for track in TRACKS:
+            events = compose(track)
+            self.assertEqual(events, compose(track))
+            self.assertNotEqual(events, compose(replace(track, seed=track.seed + 1)))
+            self.assertTrue(all(0 <= e.beat < track.beats and e.duration > 0 for e in events))
+            # Intro, contrast and return have distinct note/voice/density content.
+            phrases = [tuple((e.midi, e.voice) for e in events if start <= e.beat < start + 16)
+                       for start in (0, track.beats // 32 * 16, track.beats - 16)]
+            self.assertEqual(len(set(phrases)), 3)
+        chord = (48, 55, 60, 64)
+        led = voice_lead(chord, (45, 64, 67, 72))
+        self.assertEqual(led[0], chord[0])
+        self.assertEqual([x % 12 for x in led], [x % 12 for x in chord])
+
+    def test_note_tails_wrap_and_cache_order_is_irrelevant(self):
+        frames = 24000
+        event = Event(.9, .4, 72, "piano", .1, .3)
+        left, right = generator.render_events((event,), 60, frames)
+        self.assertGreater(max(abs(x) for x in left[:6000]), .001)
+        self.assertEqual(list(left[8000:20000]), [0] * 12000)
+        generator.synthesize.cache_clear()
+        generator.synthesize("bell", 81, 5000)
+        again = generator.render_events((event,), 60, frames)
+        self.assertEqual(left, again[0])
+        self.assertEqual(right, again[1])
+        bass_l, bass_r = generator.pan_gains(36, .7)
+        self.assertEqual(bass_l, bass_r)
+        lg, rg = generator.pan_gains(72, .7)
+        self.assertAlmostEqual(lg * lg + rg * rg, 1)
+
+    def test_reverb_periodic_state_and_decay(self):
+        source = array("f", [0]) * 4800
+        source[-100] = 1
+        period = generator.circular_room(source, 331, .7)
+        twice = generator.circular_room(source * 2, 331, .7)
+        self.assertGreater(max(abs(x) for x in period[:1000]), .01)
+        self.assertLess(max(abs(a - b) for a, b in zip(period, twice[4800:])), 2e-7)
+        # Moving the impulse through the loop must simply rotate the response.
+        shifted = source[500:] + source[:500]
+        response = generator.circular_room(shifted, 331, .7)
+        rotated = period[500:] + period[:500]
+        self.assertLess(max(abs(a - b) for a, b in zip(response, rotated)), 2e-7)
+        silence = generator.circular_room(array("f", [0]) * 4800, 331, .7)
+        self.assertEqual(max(abs(x) for x in silence), 0)
+
+    def test_master_removes_dc_and_preserves_dynamics(self):
+        left = array("f", (.2 + .1 * math.sin(i * math.tau / 100) for i in range(1000)))
+        right = array("f", (x - .4 for x in left))
+        report = generator.analyze(generator.master(left, right, .07))
+        self.assertLess(max(abs(x) for x in report["dc_offset"]), 1 / 32768)
+        self.assertAlmostEqual(report["rms"], .07, places=4)
+        peak = generator.analyze(generator.master(left, right, 5))["peak"]
+        self.assertLessEqual(peak, .88)
+        quiet = generator.master(array("f", [0]) * 100, array("f", [0]) * 100, .07)
+        self.assertEqual(set(quiet), {0})
+
+    def test_cli_listing_selection_paths_report_and_inventory(self):
+        with tempfile.TemporaryDirectory(prefix="minecraftc-audio-cli-") as directory:
+            root = Path(directory)
+            base = root / "audio"
+            heaven = root / "custom/official_heaven/audio"
+            manifest = heaven.parent / "resources.sha256.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text('{"version":1,"sha256":{}}')
+            calls = []
+            original = generator.write_track
+
+            def short_render(path, track):
+                calls.append((path, track.name))
+                return original(path, replace(track, bpm=960, beats=16))
+
+            with redirect_stdout(io.StringIO()) as output:
+                generator.main(["--list", "--output", str(base)])
+            self.assertEqual(len(output.getvalue().splitlines()), 8)
+            self.assertFalse(base.exists())
+            with patch.object(generator, "write_track", side_effect=short_render), redirect_stdout(io.StringIO()):
+                generator.main(["--track", "menu_spark", "--track", "heaven_ether",
+                                "--track", "menu_spark", "--output", str(base),
+                                "--heaven-output", str(heaven), "--report", str(root / "report.json")])
+            self.assertEqual(calls, [(base / "menu_spark.wav", "menu_spark"),
+                                     (heaven / "heaven_ether.wav", "heaven_ether")])
+            report = json.loads((root / "report.json").read_text())
+            self.assertEqual(report["generator_version"], 2)
+            for path, name in calls:
+                entry = next(x for x in report["tracks"] if x["track"] == name)
+                self.assertEqual(entry["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            inventory = json.loads(manifest.read_text())["sha256"]
+            self.assertEqual(inventory, {"audio/heaven_ether.wav": hashlib.sha256((heaven / "heaven_ether.wav").read_bytes()).hexdigest()})
+            with patch.object(generator, "write_track", side_effect=short_render), redirect_stdout(io.StringIO()):
+                generator.main(["--track", "heaven_ether", "--output", str(root / "other/audio")])
+            self.assertTrue((root / "other/plugins/official_heaven/audio/heaven_ether.wav").is_file())
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                generator.main(["--track", "missing"])
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                generator.main(["--track", "menu_spark", "--output", str(base),
+                                "--report", str(base / "menu_spark.wav")])
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                generator.main(["--track", "menu_spark", "--output", str(base),
+                                "--report", str(base / "menu_whimsy.wav")])
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                generator.main(["--track", "heaven_ether", "--heaven-output", str(heaven),
+                                "--report", str(manifest)])
 
 
-for filename, (bpm, beats, digest) in EXPECTED.items():
-    path = asset_path(filename)
-    require(path.is_file(), f"missing music asset {filename}")
-    require(hashlib.sha256(path.read_bytes()).hexdigest() == digest,
-            f"{filename} differs from its deterministic generated asset")
-    with wave.open(str(path), "rb") as source:
-        require(source.getnchannels() == 2, f"{filename} is not stereo")
-        require(source.getsampwidth() == 2, f"{filename} is not 16-bit PCM")
-        require(source.getframerate() == 24000, f"{filename} sample rate changed")
-        expected_frames = round(beats * 60.0 / bpm * source.getframerate())
-        require(source.getnframes() == expected_frames,
-                f"{filename} does not contain one complete musical loop")
-        raw = source.readframes(source.getnframes())
-    values = struct.unpack(f"<{len(raw) // 2}h", raw)
-    peak = max(abs(value) for value in values) / 32768.0
-    rms = math.sqrt(sum(value * value for value in values) / len(values)) / 32768.0
-    stereo_delta = math.sqrt(sum(
-        (values[index] - values[index + 1]) ** 2
-        for index in range(0, len(values), 2)) / (len(values) / 2)) / 32768.0
-    seam = max(abs(values[0] - values[-2]), abs(values[1] - values[-1])) / 32768.0
-    require(0.015 < rms < 0.24, f"{filename} loudness is invalid")
-    require(peak < 0.96, f"{filename} clips")
-    require(stereo_delta > 0.002, f"{filename} collapsed to mono")
-    require(seam < 0.015, f"{filename} has an audible loop discontinuity")
+class AssetTests(unittest.TestCase):
+    def test_complete_regeneration_format_quality_and_hashes(self):
+        with tempfile.TemporaryDirectory(prefix="minecraftc-audio-reference-") as directory:
+            for track in TRACKS:
+                with self.subTest(track=track.name):
+                    bpm, beats, digest = EXPECTED[track.name]
+                    self.assertEqual((track.bpm, track.beats), (bpm, beats))
+                    path = asset_path(track)
+                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
+                    with wave.open(str(path), "rb") as source:
+                        self.assertEqual((source.getnchannels(), source.getsampwidth(), source.getframerate()), (2, 2, 24000))
+                        self.assertEqual(source.getnframes(), round(beats * 60 / bpm * 24000))
+                        pcm = array("h", source.readframes(source.getnframes()))
+                        if sys.byteorder != "little":
+                            pcm.byteswap()
+                    metrics = generator.analyze(pcm)
+                    self.assertTrue(.015 < metrics["rms"] < .24)
+                    self.assertLess(metrics["peak_dbfs"], -1)
+                    self.assertGreater(metrics["stereo_difference_rms"], .002)
+                    self.assertLess(metrics["loop_seam"], .015)
+                    self.assertLess(max(abs(x) for x in metrics["dc_offset"]), 1 / 32768)
+                    # Entire final PCM, including mastering and FX state, is checked.
+                    # A prefix render cannot validate full-track RMS normalization.
+                    regenerated = Path(directory) / (track.name + ".wav")
+                    report = generator.write_track(regenerated, track)
+                    self.assertEqual(regenerated.read_bytes(), path.read_bytes())
+                    self.assertEqual(report["sha256"], digest)
+                    print(f"Full deterministic regeneration passed: {track.name}", flush=True)
 
-sys.dont_write_bytecode = True
-spec = importlib.util.spec_from_file_location("audio_generator", ROOT / "tools/audio_generator.py")
-generator = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(generator)
-samplers = [generator.menu_sample, generator.menu_spark_sample, generator.gameplay_sample,
-            generator.overworld_solitude_sample, generator.overworld_horizon_sample,
-            generator.overworld_nightfall_sample, generator.heaven_sample, generator.heaven_sanctum_sample]
-with tempfile.TemporaryDirectory(prefix="minecraftc-audio-test-") as directory:
-    for (filename, (bpm, _, _)), sampler in zip(EXPECTED.items(), samplers):
-        first, second = Path(directory) / "first.wav", Path(directory) / "second.wav"
-        generator.write_track(first, bpm, 1, sampler)
-        generator.write_track(second, bpm, 1, sampler)
-        require(first.read_bytes() == second.read_bytes(), f"{filename} regeneration is nondeterministic")
-        with wave.open(str(first), "rb") as generated, wave.open(str(asset_path(filename)), "rb") as reference:
-            require(generated.readframes(generated.getnframes()) == reference.readframes(generated.getnframes()),
-                    f"{filename} generator differs from checked-in PCM reference")
-print("music assets and regenerated PCM are deterministic, stereo, bounded, and loop-safe")
+
+if __name__ == "__main__":
+    unittest.main()

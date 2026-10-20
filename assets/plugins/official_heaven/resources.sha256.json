@@ -1,8 +1,8 @@
 {
   "version": 1,
   "sha256": {
-    "audio/heaven_ether.wav": "ed79437f567ef8f11ed1632b07dc298689664d69cba0e8578b839a320add4a64",
-    "audio/heaven_sanctum.wav": "30e1b2ff0d7b5c4ad6f7dad15c9c3eeeb607c779131df1cb7a54a7e73d4ce53e",
+    "audio/heaven_ether.wav": "a45a80b4282248b8932b72661d318b38f1d894c459451ccfe626e31ae4ba71e4",
+    "audio/heaven_sanctum.wav": "e0817640e8078a18bad736002c0545d34e75ca1a8f74942e08992af06ccce20e",
     "content.json": "e7ec673a4c58ecd62887957c4a034cbc541e36b162edeebb7de37958ec57a31f",
     "lang/ar_sa.json": "eadcb061cca3f0a8e1b2b954d797b4b7e60d9976b55e962d4e63291d65d6b372",
     "lang/de_de.json": "387c1cd5666977c011f72cc55775dd75933f87f58085542cc525ea69432bf22d",
@@ -14,7 +14,7 @@
     "lang/pt_br.json": "61894c99a7cc30287240382bc4eafa24b73300a8437405fca5cc0712d159aea3",
     "lang/ru_ru.json": "863e858678288cadd11d6e7db0fd5fce2e71750d3e781694f1b73bb228f75908",
     "lang/zh_cn.json": "762cf298ad6c7f4a9b8a1814a22d8b1eb66240d34c1712bc9bd4d55c1ead9988",
-    "LICENSE.md": "a51c3ffb4b95852545dba566601c782940b7532a75c9ad0c785c9e91116dfe73",
+    "LICENSE.md": "fa657af8b0cc5a4fbe68fd76d580234c6fc41d9b9a89f83884a3238cc0ea3e23",
     "materials.json": "eba8d3076d4b9939b244c6d9c66a7b442c81e332a3304796a85ee414c7148a33",
     "palette.png": "29bd83b0b5522313565b8d4ee5d8ee55b3ae2e5e5e628f6a97252ee5cb84bcd1",
     "starstep.gltf": "0e6314e5f74a902fdc11bcb1bab5c3550b4eaa769c70032a5296a5b529f87e80",
