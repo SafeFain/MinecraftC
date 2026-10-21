@@ -28,10 +28,13 @@ struct Dependency {
 };
 struct Manifest {
     std::string id,name,version,gameMinimum,gameMaximum,entry,data,networkCompatibility;
+    std::map<std::string,std::string> descriptions;
     std::vector<Dependency> dependencies;
     std::vector<std::string> before,after,conflicts;
     bool visual=false, builtin=false, defaultEnabled=true;
     static Manifest parse(const Json& value);
+    void readDescription(const Json& value);
+    std::string description(const std::string& language) const;
 };
 struct PluginInfo {
     Manifest manifest;

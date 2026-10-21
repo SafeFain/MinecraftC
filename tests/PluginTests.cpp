@@ -25,6 +25,13 @@ int main(int argc,char** argv) {
         std::filesystem::remove_all(root);std::filesystem::create_directories(root);
         rejects([]{Plugins::Json::parse("{\"id\":1,\"id\":2}");},"duplicate manifest keys rejected");
         rejects([]{Plugins::Json::parse("[1,]");},"malformed JSON rejected");
+        const auto localized=Plugins::Manifest::parse(Plugins::Json::parse(R"({"id":"description_test","version":"1.0.0","api":1,"description":{"en_us":"English description","zh_cn":"中文描述"}})"));
+        require(localized.description("zh_cn")=="中文描述"&&localized.description("fr_fr")=="English description","localized description and English fallback");
+        const auto plain=Plugins::Manifest::parse(Plugins::Json::parse(R"({"id":"description_test","version":"1.0.0","api":1,"description":"Package description"})"));
+        require(plain.description("zh_cn")=="Package description","plain descriptions are language independent");
+        rejects([]{Plugins::Manifest::parse(Plugins::Json::parse(R"({"id":"description_test","version":"1.0.0","api":1,"description":{"zh_cn":"Missing fallback"}})"));},"localized description requires fallback");
+        rejects([]{Plugins::Manifest m;m.readDescription(Plugins::Json::parse("123"));},"non-text descriptions rejected");
+        rejects([]{Plugins::Manifest m;m.readDescription(Plugins::Json::parse(nlohmann::json(std::string(4097,'x')).dump()));},"oversize descriptions rejected");
         rejects([]{Plugins::Version::parse("-1.0.0");},"negative version rejected");
         rejects([]{Plugins::Version::parse("1.01.0");},"leading zero version rejected");
         require(Plugins::Version::parse("1.0.0-beta.2")<Plugins::Version::parse("1.0.0-beta.10"),"numeric prerelease ordering");
@@ -58,6 +65,10 @@ int main(int argc,char** argv) {
         RuntimePaths paths{MINECRAFTC_SOURCE_DIR "/assets",root};
         Plugins::PluginManager manager(paths);manager.initialize();
         const auto& plugins=manager.plugins();
+        for(const auto& p:plugins)if(p.manifest.builtin) {
+            require(!p.manifest.description("en_us").empty()&&!p.manifest.description("zh_cn").empty(),"official descriptions loaded from assets");
+            require(p.manifest.description("en_us")!=p.manifest.description("zh_cn"),"official Chinese description supplied");
+        }
         for(const auto& p:plugins)if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
         const auto dataMob=Plugins::resolveEntity("extension_data:mob");require(dataMob>=4096&&Plugins::entityContent(dataMob)->health==28,"data entity registry");
         rejects([]{Plugins::resolveEntity("extension_bad:first");},"extension registration failure rolls back all types");
@@ -114,6 +125,7 @@ int main(int argc,char** argv) {
         }
         manager.shutdown();
         Plugins::PluginManager safe(paths);safe.initialize(true);require(Plugins::content().blocks.empty()&&Plugins::content().requirements.empty(),"safe mode loads no optional content");
+        for(const auto& p:safe.plugins())if(p.manifest.builtin)require(!p.enabled&&!p.manifest.description("zh_cn").empty(),"safe mode retains disabled official descriptions");
         for(auto id:creativeInventoryItemsIn(CreativeItemCategory::BuildingBlocks))require(isValidItemId(id),"registry reset removes stale creative items");
         safe.shutdown();
         std::filesystem::remove_all(root);std::cout<<"Plugin loader/content/native/events/persistence regression passed\n";

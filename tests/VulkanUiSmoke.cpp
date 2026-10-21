@@ -211,7 +211,7 @@ int main(int argc,char** argv) {
             const bool menuCapture=name=="quality-zh_cn" || name=="quality-scrolled" ||
                 name=="settings" || name=="settings-audio" || name=="settings-bindings" ||
                 name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
-                name=="plugins-en_us" ||
+                name=="plugins-en_us" || name=="plugins-zh_cn" || name=="plugins-scrolled-zh_cn" ||
                 name=="language-menu-back" || name=="create" || name=="lan";
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
@@ -309,6 +309,10 @@ int main(int argc,char** argv) {
             int pluginBacks=0;
             localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[&]{++pluginBacks;});
             draw("plugins-"+std::string(languageCode(language)),[&]{pluginMenu.render(ui,width,height);});
+            if(language==Language::SimplifiedChinese) {
+                pluginMenu.onScroll(-1);pluginMenu.onScroll(-1);
+                draw("plugins-scrolled-zh_cn",[&]{pluginMenu.render(ui,width,height);});
+            }
             click(pluginMenu,width*.5f,footer.y+footer.height-2);
             if(pluginBacks!=1)throw std::runtime_error("Plugin list overlaps the fixed footer");
             SleepMenu localizedSleep(callbacks,localization,DimensionId::Overworld);

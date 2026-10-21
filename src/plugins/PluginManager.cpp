@@ -165,6 +165,7 @@ bool Version::operator<(const Version& other) const {
 }
 Manifest Manifest::parse(const Json& j) {
     Manifest m;m.id=j.at("id").text();m.name=j.text("name",m.id);m.version=j.at("version").text();Version::parse(m.version);
+    if(j.has("description"))m.readDescription(j.at("description"));
     check(validKey(m.id+":test")&&m.id!="minecraftc","Invalid/reserved plugin ID");
     check(j.numeric("api",0)==MC_PLUGIN_ABI,"Unsupported plugin API");
     m.networkCompatibility=j.text("network_compatibility");
@@ -188,6 +189,26 @@ Manifest Manifest::parse(const Json& j) {
     }
     m.before=strings(j,"before");m.after=strings(j,"after");m.conflicts=strings(j,"conflicts");
     return m;
+}
+void Manifest::readDescription(const Json& value) {
+    std::map<std::string,std::string> entries;
+    auto add=[&](const std::string& language,const Json& text) {
+        const auto description=text.text();
+        check(description.size()<=4096,"Plugin description is too long");
+        entries.emplace(language,description);
+    };
+    if(value.type==Json::Type::String)add("en_us",value);
+    else {
+        check(value.type==Json::Type::Object&&value.object.size()<=32,"Invalid localized plugin description");
+        check(value.has("en_us"),"Localized plugin description requires en_us");
+        for(const auto& translation:value.object)add(translation.first,translation.second);
+    }
+    descriptions=std::move(entries);
+}
+std::string Manifest::description(const std::string& language) const {
+    auto translation=descriptions.find(language);
+    if(translation==descriptions.end()||translation->second.empty())translation=descriptions.find("en_us");
+    return translation==descriptions.end()?std::string{}:translation->second;
 }
 std::filesystem::path PluginManager::containedPath(const std::filesystem::path& root,const std::string& relative) {
     check(AssetStore::validPath(relative),"Plugin path must be relative and contained");
@@ -582,8 +603,20 @@ void PluginManager::initialize(bool safeMode) {
     const uint64_t revision=content().revision;content()=ContentState{};content().revision=revision;
     const auto config=m_paths.dataRoot/"plugins.json";
     if(std::filesystem::exists(config))try {const auto j=readJson(config);for(const auto& p:j.object){check(p.second.type==Json::Type::Boolean,"Plugin enable setting must be boolean");m_enabled[p.first]=p.second.boolean;}}catch(const std::exception& e){LOG_WARN("Ignoring invalid plugin enable settings: "<<e.what());}
+    Json builtinDescriptions;
+    try {
+        // Presentation metadata is outside gameplay package roots and their fingerprints.
+        if(m_paths.assetRoot.empty()) {
+            const auto bytes=AssetStore::readTitleBinary("plugins/descriptions.json");
+            builtinDescriptions=Json::parse(std::string(bytes.begin(),bytes.end()));
+        } else builtinDescriptions=Json::parse(AssetStore::readTextPath(m_paths.assetRoot/"plugins/descriptions.json"));
+        check(builtinDescriptions.type==Json::Type::Object,"Invalid builtin description catalog");
+    }catch(const std::exception& e){LOG_WARN("Cannot read builtin plugin descriptions: "<<e.what());}
     for(const auto& descriptor:builtinPlugins()){
         PluginInfo p;p.manifest.id=descriptor.id;p.manifest.name=descriptor.name;p.manifest.version="1.0.0";
+        if(builtinDescriptions.has(descriptor.id))try {
+            p.manifest.readDescription(builtinDescriptions.at(descriptor.id));
+        }catch(const std::exception& e){LOG_WARN("Invalid plugin description for "<<descriptor.id<<": "<<e.what());}
         p.manifest.builtin=true;p.manifest.visual=descriptor.visual;p.manifest.defaultEnabled=descriptor.enabled;
         if(*descriptor.resources)p.root=m_paths.assetRoot/descriptor.resources;
         p.enabled=!safeMode&&(m_enabled.count(descriptor.id)?m_enabled.at(descriptor.id):descriptor.enabled);

@@ -1,0 +1,14 @@
+{
+  "official_content": {
+    "en_us": "Adds crystal blocks, resonant crystals, crafting recipes and a crystal use interaction.",
+    "zh_cn": "添加水晶方块、共鸣水晶、合成配方和水晶使用交互。"
+  },
+  "official_atmosphere": {
+    "en_us": "Changes sky and fog colors and displays an atmosphere label on the HUD.",
+    "zh_cn": "调整天空与雾的颜色，并在游戏界面显示氛围标记。"
+  },
+  "official_heaven": {
+    "en_us": "Explore Heaven's floating islands, ruins, resources and recipes, with Skyway travel and the Starstep Scepter.",
+    "zh_cn": "探索天堂维度的浮岛、遗迹与资源，体验专属合成配方、天路传送和星步权杖。"
+  }
+}

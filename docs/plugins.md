@@ -17,10 +17,19 @@ directory and manifest ID must match;
 paths are relative to that package and symlinks are rejected. ZIP files are not
 loaded directly. Package files are read-only to the host.
 
-The main menu's **Plugins** page lists builtin/user plugins, versions, dependencies,
+The main menu's **Plugins** page lists builtin/user plugins, descriptions, versions, dependencies,
 load errors and enabled state. Changes take effect after restarting the game.
 `<user-data>/plugins.json` stores enable switches. `--safe-mode` disables all
 optional plugins for diagnosis; it cannot open worlds that require those plugins.
+
+Optional `mod.json` field `description` accepts a string or a language-code object
+such as `{"en_us":"Adds crystal recipes.","zh_cn":"添加水晶配方。"}`. Objects
+require `en_us` as fallback; each translation is limited to 4096 UTF-8 bytes, with
+at most 32 languages. Descriptions are available even when a plugin is disabled.
+Official descriptions come from `assets/plugins/descriptions.json`, keyed by plugin
+ID, and remain visible in safe mode. This presentation catalog sits outside the
+gameplay package roots so editing official descriptions does not change save/LAN
+content fingerprints. The list wraps descriptions and shows at most three lines per entry.
 
 The builtin examples are disabled by default:
 

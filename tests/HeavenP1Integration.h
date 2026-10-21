@@ -72,6 +72,7 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
     std::filesystem::path cached;
     for(const auto& info:packaged.plugins())if(info.manifest.id=="official_heaven") {
         check(info.active&&info.root.is_absolute(),"Packaged builtin resources did not activate");cached=info.root;
+        check(!info.manifest.description("zh_cn").empty(),"Packaged title storage lost official plugin descriptions");
     }
     check(!cached.empty(),"Packaged resource cache missing");
     const auto contentTime=std::filesystem::last_write_time(cached/"content.json");
