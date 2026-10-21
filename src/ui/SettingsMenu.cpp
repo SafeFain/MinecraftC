@@ -513,7 +513,7 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     const float panelW=std::min(m_page == SettingsPage::Quality ? 1000.0f : 640.0f,width-16.0f);
     const float panelH=std::min(height-footer.contentBottom-6.0f,
         m_page == SettingsPage::Quality ? static_cast<float>(height) : rows*49.0f+110.0f);
-    const float panelY=footer.contentBottom;
+    const float panelY=std::max(footer.contentBottom,(height-panelH)*.5f);
     UiTheme::panel(ui,(width-panelW)*.5f,panelY,panelW,panelH);
     const float titleScale=UiTheme::fittedScale(ui,title,2.4f,width-48.0f);
     const auto titleSize = ui.measureText(title,titleScale);

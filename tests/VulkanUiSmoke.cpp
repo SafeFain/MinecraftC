@@ -209,6 +209,7 @@ int main(int argc,char** argv) {
         TouchControls touch;touch.configure(width,height,{});
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
             const bool menuCapture=name=="quality-zh_cn" || name=="quality-scrolled" ||
+                name=="settings" || name=="settings-audio" || name=="settings-bindings" ||
                 name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
                 name=="plugins-en_us" ||
                 name=="language-menu-back" || name=="create" || name=="lan";
@@ -380,6 +381,14 @@ int main(int argc,char** argv) {
         main.onKeyPress(Key::Enter);
         draw("create",[&]{main.render(ui,width,height);});
         draw("settings",[&]{options.render(ui,width,height);});
+        if(width>=440 && height>=500) {
+            // The first row belongs near screen center, independently of Back.
+            const bool autoJump=settings.autoJump;
+            click(options,width*.5f-140,height*.5f+35);
+            if(settings.autoJump==autoJump)
+                throw std::runtime_error("Settings content is not centered above the fixed footer");
+            click(options,width*.5f-140,height*.5f+35);
+        }
         const auto choose=[&](int index) {
             const int columns=width<440?1:2;
             for (int i=0;i<index/columns;++i) options.onKeyPress(Key::Down);
