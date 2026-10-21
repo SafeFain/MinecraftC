@@ -6,6 +6,7 @@
 #include "core/AssetStore.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "ui/PluginMenu.h"
+#include "ui/LanMenu.h"
 #include <fstream>
 #include "core/Window.h"
 #include "entity/EntityManager.h"
@@ -207,9 +208,13 @@ int main(int argc,char** argv) {
         Hotbar hotbar;hotbar.setInventory(&items);
         TouchControls touch;touch.configure(width,height,{});
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
+            const bool menuCapture=name=="quality-zh_cn" || name=="quality-scrolled" ||
+                name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
+                name=="plugins-en_us" ||
+                name=="language-menu-back" || name=="create" || name=="lan";
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
-                if(((capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
+                if((menuCapture || (capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -221,6 +226,13 @@ int main(int argc,char** argv) {
             }
             renderer.waitIdle();
             std::cout<<"READY "<<name<<" vertices="<<previousVertices<<" batches="<<previousBatches<<std::endl;
+            if(menuCapture) {
+                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Menu capture size invalid");
+                std::ofstream out(std::filesystem::temp_directory_path()/(name+".ppm"),std::ios::binary);
+                out<<"P6\n"<<width<<' '<<height<<"\n255\n";
+                for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
+            }
             if(capture && name=="trades") {
                 const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
                 if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("trade capture size invalid");
@@ -244,10 +256,60 @@ int main(int argc,char** argv) {
             }
             if (capture) { std::string next;std::getline(std::cin,next); }
         };
+        const UiMenuFooter footer(width,height);
+        const auto click=[&](Menu& menu,double x,double y) {
+            menu.onMouseButton(MouseButton::Left,ButtonAction::Press,x,y);
+            menu.onMouseButton(MouseButton::Left,ButtonAction::Release,x,y);
+        };
+        for (const auto language:languagesByEnglishName()) {
+            localization.setLanguage(language);
+            ClientSettings qualitySettings;
+            qualitySettings.markGraphicsCustom();
+            int changed=0,backs=0;
+            SettingsMenu quality(qualitySettings,[&]{++changed;},[&]{++backs;},localization);
+            quality.onKeyPress(Key::Tab);quality.onKeyPress(Key::Enter); // Video
+            quality.onKeyPress(Key::Tab);quality.onKeyPress(Key::Tab);quality.onKeyPress(Key::Enter);
+            if(changed!=0 || qualitySettings.graphicsPreset!=GraphicsPreset::Custom)
+                throw std::runtime_error("Opening quality submenu changed Custom settings");
+            draw("quality-initial",[&]{quality.render(ui,width,height);},3);
+            const float tableW=std::min(968.0f,width-40.0f);
+            const float cellW=tableW*.70f/5;
+            const float headerH=height<300?26.0f:36.0f;
+            for(size_t i=0;i<VISUAL_QUALITY_ORDER.size();++i) {
+                click(quality,(width-tableW)*.5f+tableW*.30f+(i+.5f)*cellW,
+                    height-70-headerH*.5f);
+                if(changed!=static_cast<int>(i)+1 ||
+                    qualitySettings.graphicsPreset!=presetForVisualQuality(VISUAL_QUALITY_ORDER[i]))
+                    throw std::runtime_error("Quality header did not directly apply requested preset");
+                draw("quality-selected",[&]{quality.render(ui,width,height);},3);
+            }
+            draw("quality-"+std::string(languageCode(language)),[&]{quality.render(ui,width,height);},3);
+            for(int i=0;i<4;++i)quality.onKeyPress(Key::Right);
+            quality.onKeyPress(Key::Enter);
+            if(qualitySettings.graphicsPreset!=GraphicsPreset::Ultra || changed!=6)
+                throw std::runtime_error("Keyboard quality selection order is incorrect");
+            quality.onKeyPress(Key::End);
+            draw("quality-scrolled",[&]{quality.render(ui,width,height);},3);
+            click(quality,width*.5f,footer.y+footer.height*.5f);
+            quality.onKeyPress(Key::Escape); // Video -> General
+            draw("quality-parent",[&]{quality.render(ui,width,height);},3);
+            click(quality,width*.5f,footer.y+footer.height*.5f);
+            if(backs!=1)throw std::runtime_error("Fixed footer did not return through quality/video/general");
+        }
+        localization.setLanguage(Language::English);
+        int lanBacks=0;
+        LanMenuActions lanActions;lanActions.back=[&]{++lanBacks;};
+        LanMenu lan(lanActions,localization,nullptr,"Player");
+        draw("lan",[&]{lan.render(ui,width,height);},3);
+        click(lan,width*.5f,footer.y+footer.height*.5f);
+        if(lanBacks!=1)throw std::runtime_error("LAN footer is not at screen bottom");
         draw("home",[&]{main.render(ui,width,height);});
         for(const auto language:languagesByEnglishName()) {
-            localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[]{});
+            int pluginBacks=0;
+            localization.setLanguage(language);PluginMenu pluginMenu(plugins,localization,[&]{++pluginBacks;});
             draw("plugins-"+std::string(languageCode(language)),[&]{pluginMenu.render(ui,width,height);});
+            click(pluginMenu,width*.5f,footer.y+footer.height-2);
+            if(pluginBacks!=1)throw std::runtime_error("Plugin list overlaps the fixed footer");
             SleepMenu localizedSleep(callbacks,localization,DimensionId::Overworld);
             draw("registered-travel-"+std::string(languageCode(language)),[&]{
                 localizedSleep.render(ui,width,height);
@@ -334,6 +396,7 @@ int main(int argc,char** argv) {
         draw("settings-bindings",[&]{options.render(ui,width,height);});
         choose(0);draw("settings-keyboard",[&]{options.render(ui,width,height);});
         // Reaching the last control must scroll it into view on narrow screens.
+        options.onKeyPress(Key::Up);
         options.onKeyPress(Key::Up);
         draw("settings-keyboard-scroll",[&]{options.render(ui,width,height);});
         options.onKeyPress(Key::Escape);choose(1);

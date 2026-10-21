@@ -790,6 +790,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
         tests/VulkanUiSmoke.cpp
+        src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
         src/renderer/HeldItemRenderer.cpp src/renderer/HeldItemMesh.cpp src/renderer/HeldToolModel.cpp
         src/model/ModelAnimation.cpp src/model/GltfLoader.cpp
         src/core/Input.cpp src/core/InputCodes.cpp src/core/TextEditBuffer.cpp
@@ -803,7 +804,7 @@ if(BUILD_TESTING)
         src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
         src/ui/ContainerScreen.cpp src/ui/Hotbar.cpp src/ui/Inventory.cpp
-        src/ui/Menu.cpp
+        src/ui/Menu.cpp src/ui/LanMenu.cpp
         src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)

@@ -34,9 +34,7 @@ constexpr ThirdPartyCredit THIRD_PARTY_CREDITS[] = {
     {"Noto Naskh Arabic", "https://github.com/notofonts/arabic", "SIL OFL 1.1"},
     {"mjansson/mdns", "https://github.com/mjansson/mdns", "Unlicense / public domain"},
 };
-constexpr int CREDITS_PER_PAGE = 4;
 constexpr int CREDIT_COUNT = sizeof(THIRD_PARTY_CREDITS) / sizeof(ThirdPartyCredit);
-constexpr int CREDIT_PAGE_COUNT = (CREDIT_COUNT + CREDITS_PER_PAGE - 1) / CREDITS_PER_PAGE;
 
 float fittedTextScale(UIRenderer& ui, const std::string& text, float scale, float width) {
     const float measured = ui.measureText(text, scale).x;
@@ -92,6 +90,14 @@ void Menu::prepareButton(Button& button) {
     button.setFocusVisible(!m_pointerFocus);
     button.setHovered(m_pointerFocus && button.isEnabled() &&
         button.containsPoint(static_cast<float>(m_pointer.x),static_cast<float>(m_pointer.y)));
+}
+
+void Menu::renderFooter(UIRenderer& ui, Button& button, int width, int height) {
+    const UiMenuFooter footer(static_cast<float>(width), static_cast<float>(height));
+    button.setPosition(footer.x, footer.y);
+    button.setSize(footer.width, footer.height);
+    prepareButton(button);
+    button.render(ui);
 }
 
 void Menu::cancelButtons(std::vector<Button>& buttons) {
@@ -184,7 +190,8 @@ void MainMenu::showAbout() {
 }
 
 void MainMenu::changeAboutPage(int delta) {
-    const int page = std::clamp(m_aboutPage + delta, 0, CREDIT_PAGE_COUNT - 1);
+    const int pages = (CREDIT_COUNT + m_creditsPerPage - 1) / m_creditsPerPage;
+    const int page = std::clamp(m_aboutPage + delta, 0, pages - 1);
     if (page == m_aboutPage) return;
     m_aboutPage = page;
     m_pressedButton = -1;
@@ -380,8 +387,8 @@ void MainMenu::rebuildButtons() {
             if (m_callbacks.onOpenUrl)
                 m_callbacks.onOpenUrl("https://github.com/SafeFain/MinecraftC");
         });
-        const int end = std::min(CREDIT_COUNT, (m_aboutPage + 1) * CREDITS_PER_PAGE);
-        for (int index = m_aboutPage * CREDITS_PER_PAGE; index < end; ++index) {
+        const int end = std::min(CREDIT_COUNT, (m_aboutPage + 1) * m_creditsPerPage);
+        for (int index = m_aboutPage * m_creditsPerPage; index < end; ++index) {
             const auto& credit = THIRD_PARTY_CREDITS[index];
             const std::string repository = credit.repository;
             m_buttons.emplace_back(std::string(credit.name) + " | " + credit.license,
@@ -466,21 +473,24 @@ void MainMenu::renderPluginWarning(UIRenderer& ui,int width,int height) {
     else text+=m_localization.format(m_recovery && m_recovery->backupCleanupPending()?
         "menu.plugins.cleanup_pending":"menu.plugins.backup",{m_recoveryMessage});
     const bool stacked=w<720;
-    const float buttonArea=stacked?static_cast<float>(m_buttons.size())*38-6:32;
+    const UiMenuFooter footer(width,height);
+    const size_t actionCount=m_buttons.size()-1;
+    const float buttonArea=actionCount==0?0:stacked?static_cast<float>(actionCount)*38-6:32;
     const float scale=1.0f,lineH=18.0f;
     const auto lines=wrapTextPixels(text,contentW,[&](const std::string& line){return ui.measureText(line,scale).x;});
-    m_warningLines=static_cast<int>(lines.size());m_warningVisible=std::max(1,static_cast<int>((h-118-buttonArea)/lineH));
+    m_warningLines=static_cast<int>(lines.size());m_warningVisible=std::max(1,static_cast<int>((h-90-footer.contentBottom-buttonArea)/lineH));
     m_warningOffset=std::clamp(m_warningOffset,0,std::max(0,m_warningLines-m_warningVisible));
     for(int i=0;i<m_warningVisible && i+m_warningOffset<m_warningLines;++i)
         UiTheme::textWithShadow(ui,lines[static_cast<size_t>(i+m_warningOffset)],x+16,h-78-i*lineH,scale,UiTheme::TEXT_DIM);
-    const float gap=6,buttonW=stacked?contentW:(contentW-gap*static_cast<float>(m_buttons.size()-1))/static_cast<float>(m_buttons.size());
-    for(size_t i=0;i<m_buttons.size();++i) {
+    const float gap=6,buttonW=stacked?contentW:(contentW-gap*static_cast<float>(actionCount>0?actionCount-1:0))/std::max<size_t>(1,actionCount);
+    for(size_t i=1;i<m_buttons.size();++i) {
         auto& button=m_buttons[i];
-        button.setPosition(x+16+(stacked?0:static_cast<float>(i)*(buttonW+gap)),
-            y+8+(stacked?static_cast<float>(m_buttons.size()-1-i)*38:0));
+        button.setPosition(x+16+(stacked?0:static_cast<float>(i-1)*(buttonW+gap)),
+            footer.contentBottom+(stacked?static_cast<float>(m_buttons.size()-1-i)*38:0));
         button.setSize(buttonW,32);prepareButton(button);button.render(ui);
     }
-    if(m_warningLines>m_warningVisible)UiTheme::scrollBar(ui,w-23,36+buttonArea,4,std::max(1.0f,h-113-buttonArea),m_warningOffset,m_warningVisible,m_warningLines);
+    renderFooter(ui,m_buttons[0],width,height);
+    if(m_warningLines>m_warningVisible)UiTheme::scrollBar(ui,w-23,footer.contentBottom+buttonArea+8,4,std::max(1.0f,h-90-footer.contentBottom-buttonArea),m_warningOffset,m_warningVisible,m_warningLines);
 }
 
 void MainMenu::selectField(Field field) {
@@ -535,7 +545,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     const float subY=titleY-ui.measureText(subtitle,subScale).y-(h<400?8:12);
     UiTheme::textWithShadow(ui,subtitle,titleX,subY,subScale,UiTheme::TEXT_DIM);
     const float contentTop=wideHome?panelY+panelH-20:subY-(h<400?12:24);
-    const float contentBottom=panelY+20;
+    const float contentBottom=home?panelY+20:std::max(panelY+20, UiMenuFooter(w,h).contentBottom);
     const float contentW=panelW-40;
     const float contentX=panelX+20;
     if (home) {
@@ -554,13 +564,13 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     } else if (m_page==Page::Create || m_page==Page::Language) {
         const bool languagePage=m_page==Page::Language;
         const bool twoColumns=!languagePage && w>=440 && m_buttons.size()==7;
-        const int rows=languagePage?static_cast<int>(m_buttons.size()):twoColumns?5:static_cast<int>(m_buttons.size());
+        const int rows=twoColumns?5:static_cast<int>(m_buttons.size())-1;
         const float gap=8;
         if (m_formRows!=rows) m_formSelection=-1;
         m_formRows=rows;
         m_formVisibleRows=std::min(rows,std::max(1,static_cast<int>((contentTop-contentBottom+gap)/40)));
         const auto formRow=[&](int index){return twoColumns?(index==0?0:index<=2?1:index==3?2:index==4?3:4):index;};
-        if (m_formSelection!=m_selectedIdx) {
+        if (m_formSelection!=m_selectedIdx && m_selectedIdx+1!=static_cast<int>(m_buttons.size())) {
             const int selectedRow=formRow(m_selectedIdx);
             if (selectedRow<m_formOffset) m_formOffset=selectedRow;
             if (selectedRow>=m_formOffset+m_formVisibleRows)
@@ -570,6 +580,10 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
         m_formOffset=std::clamp(m_formOffset,0,rows-m_formVisibleRows);
         const float rowH=std::min(54.0f,(contentTop-contentBottom-gap*(m_formVisibleRows-1))/m_formVisibleRows);
         for (size_t i=0;i<m_buttons.size();++i) {
+            if (i+1==m_buttons.size()) {
+                renderFooter(ui,m_buttons[i],screenWidth,screenHeight);
+                continue;
+            }
             const int row=formRow(static_cast<int>(i))-m_formOffset;
             if (row<0 || row>=m_formVisibleRows) {
                 m_buttons[i].setPosition(-10000,-10000);m_buttons[i].setSize(0,0);continue;
@@ -610,6 +624,10 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
         }
         const float bw=(contentW-gap)*.5f;
         for (size_t i=cards;i<m_buttons.size();++i) {
+            if (i+1==m_buttons.size()) {
+                renderFooter(ui,m_buttons[i],screenWidth,screenHeight);
+                continue;
+            }
             const size_t action=i-cards;
             m_buttons[i].setPosition(contentX+(action%2)*(bw+gap),
                                     contentBottom+(1-action/2)*(rowH+gap));
@@ -620,6 +638,12 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
 }
 
 void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
+    const int perPage = screenHeight < 300 ? 1 : 4;
+    if (perPage != m_creditsPerPage) {
+        m_aboutPage = m_aboutPage * m_creditsPerPage / perPage;
+        m_creditsPerPage = perPage;
+        rebuildButtons();
+    }
     // Explicit GUI scaling can leave a 320 x 180 logical canvas at 720p.
     const float layoutScale = std::clamp(screenHeight / 480.0f, 0.25f, 1.0f);
     const float panelW = std::min(720.0f, screenWidth - 24.0f);
@@ -646,19 +670,20 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
     m_buttons[0].render(ui);
 
     const std::string heading = m_localization.format("menu.about.third_party", {
-        std::to_string(m_aboutPage + 1), std::to_string(CREDIT_PAGE_COUNT)});
+        std::to_string(m_aboutPage + 1),
+        std::to_string((CREDIT_COUNT + m_creditsPerPage - 1) / m_creditsPerPage)});
     const float headingScale = fittedTextScale(ui, heading, 1.2f * layoutScale, contentW);
     const auto headingSize = ui.measureText(heading, headingScale);
     const float headingY = projectY - headingSize.y - 12.0f * layoutScale;
     UiTheme::textWithShadow(ui, heading, contentX, headingY, headingScale, UiTheme::TEXT);
     UiTheme::rect(ui, contentX, headingY - 8.0f * layoutScale, contentW, 2.0f, UiTheme::ACCENT_DIM);
 
-    const float navigationY = 24.0f;
-    const float navigationH = 30.0f * layoutScale;
+    const float navigationY = UiMenuFooter(screenWidth,screenHeight).contentBottom;
+    const float navigationH = std::max(22.0f,30.0f * layoutScale);
     const float gap = 6.0f * layoutScale;
     const float listTop = headingY - 16.0f * layoutScale;
     const float rowHeight = std::min(62.0f,
-        (listTop - navigationY - navigationH - 12.0f * layoutScale) / CREDITS_PER_PAGE - gap);
+        (listTop - navigationY - navigationH - 12.0f * layoutScale) / m_creditsPerPage - gap);
     const size_t rows = m_buttons.size() - 4; // Project, previous, next, back.
     for (size_t i = 0; i < rows; ++i) {
         auto& button = m_buttons[i + 1];
@@ -667,14 +692,15 @@ void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
         prepareButton(button);
         button.render(ui);
     }
-    const float navigationW = (contentW - 2.0f * gap) / 3.0f;
-    for (size_t i = 0; i < 3; ++i) {
+    const float navigationW = (contentW - gap) / 2.0f;
+    for (size_t i = 0; i < 2; ++i) {
         auto& button = m_buttons[rows + 1 + i];
         button.setPosition(contentX + i * (navigationW + gap), navigationY);
         button.setSize(navigationW, navigationH);
         prepareButton(button);
         button.render(ui);
     }
+    renderFooter(ui,m_buttons.back(),screenWidth,screenHeight);
     UiTheme::textWithShadow(ui, Config::GAME_VERSION, 8.0f, 8.0f, 1.0f,
                             glm::vec3(0.62f, 0.62f, 0.66f));
 }
@@ -857,18 +883,30 @@ void MainMenu::onScroll(double yOffset) {
 
 namespace {
 void renderActionMenu(UIRenderer& ui,int width,int height,const std::string& title,
-                      std::vector<Button>& buttons) {
+                      std::vector<Button>& buttons,int footerIndex,int secondFooter=-1) {
+    const UiMenuFooter footer(width,height);
+    const size_t bodyCount=buttons.size()-1-(secondFooter>=0?1:0);
     const float w=std::min(360.0f,width-32.0f);
     const float gap=8;
-    const float bh=std::min(44.0f,(height-120.0f)/std::max<size_t>(1,buttons.size())-gap);
-    const float ph=80+buttons.size()*(bh+gap);
-    const float px=(width-w)*.5f,py=(height-ph)*.5f;
+    const float bh=std::min(44.0f,(height-footer.contentBottom-76.0f)/std::max<size_t>(1,bodyCount)-gap);
+    const float ph=72+bodyCount*(bh+gap);
+    const float px=(width-w)*.5f,py=footer.contentBottom+(height-footer.contentBottom-ph)*.5f;
     UiTheme::panel(ui,px,py,w,ph);
     const float scale=fittedTextScale(ui,title,2.4f,w-40);
     UiTheme::textWithShadow(ui,title,px+20,py+ph-48,scale,UiTheme::TEXT);
+    size_t row=0;
     for (size_t i=0;i<buttons.size();++i) {
-        buttons[i].setPosition(px+20,py+ph-72-bh-i*(bh+gap));
+        if (static_cast<int>(i)==footerIndex || static_cast<int>(i)==secondFooter) continue;
+        buttons[i].setPosition(px+20,py+ph-64-bh-row++*(bh+gap));
         buttons[i].setSize(w-40,bh);buttons[i].setPrimary(i==0);buttons[i].render(ui);
+    }
+    const float footerW=secondFooter>=0?std::min(600.0f,width-32.0f):footer.width;
+    const float bw=secondFooter>=0?(footerW-gap)*.5f:footerW;
+    auto& back=buttons[static_cast<size_t>(footerIndex)];
+    back.setPosition((width-footerW)*.5f,footer.y);back.setSize(bw,footer.height);back.render(ui);
+    if (secondFooter>=0) {
+        auto& other=buttons[static_cast<size_t>(secondFooter)];
+        other.setPosition((width-footerW)*.5f+bw+gap,footer.y);other.setSize(bw,footer.height);other.render(ui);
     }
 }
 }
@@ -893,7 +931,7 @@ void PauseMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
     for (auto& button : m_buttons) prepareButton(button);
     renderActionMenu(ui,screenWidth,screenHeight,
-                     ui.localization().text("menu.pause.title"),m_buttons);
+                     ui.localization().text("menu.pause.title"),m_buttons,0,static_cast<int>(m_buttons.size())-2);
 }
 
 void PauseMenu::onKeyPress(int key, int mods) {
@@ -977,7 +1015,7 @@ void SleepMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
     ui.drawRect(0,0,screenWidth,screenHeight,UiTheme::OVERLAY);
     for (auto& button : m_buttons) prepareButton(button);
     renderActionMenu(ui,screenWidth,screenHeight,
-                     ui.localization().text("sleep.title"),m_buttons);
+                     ui.localization().text("sleep.title"),m_buttons,1);
 }
 
 void SleepMenu::onKeyPress(int key, int mods) {

@@ -73,6 +73,7 @@ int main(){
             settingsParentPage(SettingsPage::Video)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Audio)==SettingsPage::General&&
             settingsParentPage(SettingsPage::Lod)==SettingsPage::Video&&
+            settingsParentPage(SettingsPage::Quality)==SettingsPage::Video&&
             settingsParentPage(SettingsPage::EnhancedVisuals)==SettingsPage::Video,
             "top-level settings pages return to general settings");
     const SettingsButtonLayout bindingLayout = settingsButtonLayout(620.0f,468.0f,13,true);
@@ -105,11 +106,11 @@ int main(){
         backLayout, 4, 6, true);
     const glm::vec2 backButton = settingsButtonPosition(
         backLayout, 5, 6, true);
-    require(backLayout.rowCount==4&&backButton.y<precedingButton.y&&
+    require(backLayout.rowCount==3&&backButton.y==12.0f&&backButton.y<precedingButton.y&&
             backButton.x>backLayout.leftX&&
             backButton.x<backLayout.leftX+backLayout.buttonWidth+
                 backLayout.columnGap,
-            "an even-count settings page puts Back alone on the bottom row");
+            "Back stays in the screen footer outside content rows");
     require(settingsGridNeighbor(3,6,0,1,true)==5&&
             settingsGridNeighbor(4,6,0,1,true)==5&&
             settingsGridNeighbor(5,6,0,-1,true)==4&&
@@ -120,7 +121,7 @@ int main(){
         620.0f, 468.0f, 13, false, true);
     const glm::vec2 videoBack = settingsButtonPosition(
         videoLayout, 12, 13, true);
-    require(videoLayout.rowCount == 7 &&
+    require(videoLayout.rowCount == 6 &&
                 settingsGridNeighbor(10, 13, 0, 1, true) == 12 &&
                 settingsGridNeighbor(11, 13, 0, 1, true) == 12 &&
                 settingsGridNeighbor(12, 13, 0, -1, true) == 11 &&

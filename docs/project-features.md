@@ -26,7 +26,10 @@ are save **v21**, global generation **v20**, optional Heaven **v9**. See
   asynchronous GPU phases, without claiming unmeasured hardware gains. GI preserves the legacy path when disabled. GI caches survive unrelated
   settings changes. It deliberately retains voxel and flat cirrus
   clouds instead of adding volumetric clouds. The basic page owns five complete
-  quality presets plus an automatic Custom state; the advanced page independently
+  quality presets plus an automatic Custom state. A dedicated quality submenu
+  directly selects each preset and compares its graphics features in a table;
+  menu Back/Cancel/Resume actions stay at the bottom of the screen while content scrolls.
+  The advanced page independently
   toggles and scales Bloom, AO, sun shafts, reflections, atmosphere, material
   motion, ambient particles, and GI.
 - New and existing worlds show loading progress until the selected render radius is

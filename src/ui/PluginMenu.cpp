@@ -26,12 +26,14 @@ void PluginMenu::rebuild() {
 void PluginMenu::render(UIRenderer& ui,int width,int height) {
     const int visible=std::clamp((height-180)/62,1,8);if(visible!=m_visible){m_visible=visible;rebuild();}
     const float w=static_cast<float>(width),h=static_cast<float>(height),panelW=std::min(700.0f,w-32),x=(w-panelW)*.5f;
+    const UiMenuFooter footer(width,height);
     UiTheme::menuBackground(ui,w,h);UiTheme::panel(ui,x,16,panelW,h-32);
     const auto title=m_localization.text("plugins.title"),hint=m_localization.text("plugins.hint");
-    UiTheme::textWithShadow(ui,title,x+16,h-54,UiTheme::fittedScale(ui,title,2.0f,panelW-32),UiTheme::TEXT);
-    UiTheme::textWithShadow(ui,hint,x+16,h-80,UiTheme::fittedScale(ui,hint,.85f,panelW-32),UiTheme::TEXT_DIM);
+    UiTheme::textWithShadow(ui,title,x+16,h-(height<220?36:54),UiTheme::fittedScale(ui,title,2.0f,panelW-32),UiTheme::TEXT);
+    UiTheme::textWithShadow(ui,hint,x+16,h-(height<220?66:80),UiTheme::fittedScale(ui,hint,.85f,panelW-32),UiTheme::TEXT_DIM);
     for(size_t i=0;i<m_buttons.size();++i) {
-        const bool back=i+1==m_buttons.size();m_buttons[i].setPosition(x+16,back?28:h-146-static_cast<float>(i)*62);m_buttons[i].setSize(panelW-32,back?36:54);
+        if(i+1==m_buttons.size()){renderFooter(ui,m_buttons[i],width,height);continue;}
+        m_buttons[i].setPosition(x+16,std::max(footer.contentBottom,h-146-static_cast<float>(i)*62));m_buttons[i].setSize(panelW-32,54);
         prepareButton(m_buttons[i]);m_buttons[i].render(ui);
     }
     if(static_cast<int>(m_manager.plugins().size())>m_visible)UiTheme::scrollBar(ui,x+panelW-8,78,4,h-170,m_offset,m_visible,static_cast<int>(m_manager.plugins().size()));

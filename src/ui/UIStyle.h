@@ -166,7 +166,7 @@ inline void button(T& ui,float x,float y,float w,float h,
     outline(ui,x+inset,y+inset,w-2*inset,h-2*inset,BUTTON_RADIUS,
             withAlpha(fill,alpha),withAlpha(border,alpha),1+std::max(hover,focus));
     if (textScale<=0) textScale=std::clamp((h-bottomInset-12)/14,0.85f,1.35f);
-    textScale=fittedScale(ui,label,textScale,w-24);
+    textScale=fittedScale(ui,label,textScale,w-2*std::min(12.0f,w*.08f));
     const auto size=ui.measureText(label,textScale);
     textWithShadow(ui,label,x+(w-size.x)*.5f,y+(h-size.y+bottomInset)*.5f-press,
                    textScale,glm::mix(TEXT,TEXT_HOVER,hover),alpha);

@@ -11,6 +11,7 @@ enum class SettingsPage {
     General,
     Audio,
     Video,
+    Quality,
     EnhancedVisuals,
     Lod,
     KeyBindings,
@@ -29,6 +30,7 @@ inline SettingsPage settingsParentPage(SettingsPage page) {
         case SettingsPage::Audio:
             return SettingsPage::General;
         case SettingsPage::Lod:
+        case SettingsPage::Quality:
         case SettingsPage::EnhancedVisuals:
             return SettingsPage::Video;
         case SettingsPage::KeyBindings:
@@ -61,12 +63,12 @@ inline SettingsButtonLayout settingsButtonLayout(
         (standaloneLast && buttonCount > 0 ? 1 : 0);
     const int columns=screenWidth<440.0f?1:2;
     const size_t contentRows=(contentCount+columns-1)/columns;
-    const size_t rowCount = std::max<size_t>(
-        1, contentRows + (standaloneLast && buttonCount > 0 ? 1 : 0));
+    const size_t rowCount = std::max<size_t>(1, contentRows);
+    const float contentBottom = standaloneLast ? 72.0f : 14.0f;
     const size_t visibleRows=std::min(rowCount,static_cast<size_t>(
-        std::max(1.0f,std::floor((contentTop-14.0f)/35.0f))));
+        std::max(1.0f,std::floor((contentTop-contentBottom)/35.0f))));
     const float buttonHeight = std::clamp(
-        (contentTop - 14.0f) / visibleRows - 5.0f,
+        (contentTop - contentBottom) / visibleRows - 5.0f,
         30.0f, Config::UI_BUTTON_HEIGHT);
     const float buttonWidth = std::max(1.0f, std::min(
         Config::UI_BUTTON_WIDTH,
@@ -81,11 +83,11 @@ inline glm::vec2 settingsButtonPosition(
     bool standaloneLast = false,int rowOffset = 0) {
     const bool isStandaloneLast = standaloneLast && buttonCount > 0 &&
         index + 1 == buttonCount;
-    const size_t contentCount = buttonCount - (standaloneLast ? 1 : 0);
-    const size_t row = isStandaloneLast ? (contentCount+layout.columns-1)/layout.columns
-        : index/layout.columns;
-    const bool centeredLast = isStandaloneLast ||
-        (layout.columns==2 && buttonCount%2==1 && index+1==buttonCount);
+    if (isStandaloneLast)
+        return {layout.leftX + (layout.buttonWidth + layout.columnGap) *
+            (layout.columns - 1) * .5f, 12.0f};
+    const size_t row = index/layout.columns;
+    const bool centeredLast = layout.columns==2 && buttonCount%2==1 && index+1==buttonCount;
     const float x = centeredLast && layout.columns==2
         ? layout.leftX + (layout.buttonWidth + layout.columnGap) * 0.5f
         : layout.leftX + static_cast<float>(index % layout.columns) *
@@ -232,6 +234,7 @@ private:
     std::string labelForAutoJump() const;
     void showPage(SettingsPage page);
     void refreshButtons();
+    void renderQualityTable(UIRenderer& ui, int width, int height, float titleY);
     void assignBinding(InputBinding binding);
     void assignGamepadBinding(GamepadBinding binding);
     std::string frameRateLabel() const;

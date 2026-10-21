@@ -127,8 +127,7 @@ void SettingsMenu::refreshButtons() {
         m_buttons.emplace_back(m_localization.format("settings.visual_quality", {
             m_localization.text(visualName)}),
             [this]{
-                m_settings.applyGraphicsPreset(m_settings.nextGraphicsPreset());
-                m_onChanged(); refreshButtons();
+                showPage(SettingsPage::Quality);
             });
         m_buttons.emplace_back(m_localization.format("settings.enhanced_visuals", {
             m_localization.text(m_settings.enhancedVisuals
@@ -191,6 +190,22 @@ void SettingsMenu::refreshButtons() {
         m_backButton = static_cast<int>(m_buttons.size());
         m_buttons.emplace_back(m_localization.text("settings.back"), [this]{
             showPage(SettingsPage::General);
+        });
+    } else if (m_page == SettingsPage::Quality) {
+        static constexpr const char* names[] = {"settings.visual_low", "settings.visual_medium",
+            "settings.visual_high", "settings.visual_very_high", "settings.visual_ultra"};
+        for (size_t i = 0; i < VISUAL_QUALITY_ORDER.size(); ++i) {
+            const auto preset = presetForVisualQuality(VISUAL_QUALITY_ORDER[i]);
+            m_buttons.emplace_back(m_localization.text(names[i]), [this, preset] {
+                m_settings.applyGraphicsPreset(preset);
+                m_onChanged();
+                refreshButtons();
+            });
+            m_buttons.back().setPrimary(m_settings.graphicsPreset == preset);
+        }
+        m_backButton = static_cast<int>(m_buttons.size());
+        m_buttons.emplace_back(m_localization.text("common.back"), [this] {
+            showPage(SettingsPage::Video);
         });
     } else if (m_page == SettingsPage::EnhancedVisuals) {
         auto& settings = m_settings.enhancedVisual;
@@ -284,6 +299,7 @@ void SettingsMenu::refreshButtons() {
                 m_onChanged();
                 refreshButtons();
             });
+            m_backButton = static_cast<int>(m_buttons.size());
             m_buttons.emplace_back(m_localization.text("common.cancel"), [this] {
                 m_lodWarningPending = false;
                 refreshButtons();
@@ -478,27 +494,38 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     }
     UiTheme::dirtBackground(ui, static_cast<float>(width),
                             static_cast<float>(height));
-    const std::string title = m_localization.text(
+    const std::string title = m_page == SettingsPage::Quality && m_settings.graphicsPreset == GraphicsPreset::Custom
+        ? m_localization.format("settings.visual_quality", {m_localization.text("settings.visual_custom")})
+        : m_localization.text(
         m_page == SettingsPage::KeyboardMouse ? "settings.keyboard_mouse_title" :
         m_page == SettingsPage::Controller ? "settings.controller_title" :
         m_page == SettingsPage::Lod ? "settings.lod_title" :
         m_page == SettingsPage::EnhancedVisuals ? "settings.enhanced_title" :
         m_page == SettingsPage::Audio ? "settings.audio_title" :
         m_page == SettingsPage::Video ? "settings.video_title" :
+        m_page == SettingsPage::Quality ? "settings.quality_title" :
         m_page == SettingsPage::KeyBindings ? "settings.key_bindings_title" :
         m_page == SettingsPage::Touch ? "settings.touch_title" : "settings.title");
     const int columns=width<440?1:2;
     const size_t contentCount=m_buttons.size()-(m_backButton>=0?1:0);
     const int rows=static_cast<int>((contentCount+columns-1)/columns)+(m_backButton>=0?1:0);
-    const float panelW=std::min(640.0f,width-16.0f);
-    const float panelH=std::min(height-12.0f,rows*49.0f+110.0f);
-    const float panelY=(height-panelH)*.5f;
+    const UiMenuFooter footer(width, height);
+    const float panelW=std::min(m_page == SettingsPage::Quality ? 1000.0f : 640.0f,width-16.0f);
+    const float panelH=std::min(height-footer.contentBottom-6.0f,
+        m_page == SettingsPage::Quality ? static_cast<float>(height) : rows*49.0f+110.0f);
+    const float panelY=footer.contentBottom;
     UiTheme::panel(ui,(width-panelW)*.5f,panelY,panelW,panelH);
     const float titleScale=UiTheme::fittedScale(ui,title,2.4f,width-48.0f);
     const auto titleSize = ui.measureText(title,titleScale);
-    const float titleY=panelY+panelH-54.0f;
+    const float titleY=panelY+panelH-
+        (height<300 && m_page!=SettingsPage::Quality ? 34.0f : 54.0f);
     UiTheme::textWithShadow(ui, title, (width - titleSize.x) * .5f, titleY,
                             titleScale, UiTheme::TEXT_TITLE, 1.0f, 2.0f, -2.0f);
+    if (m_page == SettingsPage::Quality) {
+        renderQualityTable(ui, width, height, titleY);
+        renderFooter(ui, m_buttons[static_cast<size_t>(m_backButton)], width, height);
+        return;
+    }
     const bool hasHelp = m_page == SettingsPage::KeyboardMouse ||
                          m_page == SettingsPage::Controller ||
                          m_page == SettingsPage::Lod;
@@ -526,18 +553,23 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     m_totalRows=static_cast<int>(layout.rowCount);
     m_visibleRows=static_cast<int>(layout.visibleRows);
     if (m_layoutSelection!=m_selectedIdx) {
-        const int selectedRow=standaloneBack&&m_selectedIdx+1==static_cast<int>(m_buttons.size())?
-            static_cast<int>(layout.rowCount)-1:m_selectedIdx/layout.columns;
-        if (selectedRow<m_rowOffset) m_rowOffset=selectedRow;
-        if (selectedRow>=m_rowOffset+m_visibleRows)
-            m_rowOffset=selectedRow-m_visibleRows+1;
+        if (m_selectedIdx != m_backButton) {
+            const int selectedRow=m_selectedIdx/layout.columns;
+            if (selectedRow<m_rowOffset) m_rowOffset=selectedRow;
+            if (selectedRow>=m_rowOffset+m_visibleRows)
+                m_rowOffset=selectedRow-m_visibleRows+1;
+        }
         m_layoutSelection=m_selectedIdx;
     }
     m_rowOffset=std::clamp(m_rowOffset,0,std::max(0,m_totalRows-m_visibleRows));
     for (size_t i=0;i<m_buttons.size();++i) {
+        if (static_cast<int>(i) == m_backButton) {
+            renderFooter(ui, m_buttons[i], width, height);
+            continue;
+        }
         const glm::vec2 position=settingsButtonPosition(layout,i,m_buttons.size(),
                                                         standaloneBack,m_rowOffset);
-        const bool visible=position.y>=10 &&
+        const bool visible=position.y>=footer.contentBottom &&
             position.y+layout.buttonHeight<=layout.firstButtonY+layout.buttonHeight+.1f;
         m_buttons[i].setPosition(visible?position.x:-10000,visible?position.y:-10000);
         m_buttons[i].setSize(visible?layout.buttonWidth:0,visible?layout.buttonHeight:0);
@@ -548,8 +580,8 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
         if (visible) m_buttons[i].render(ui);
     }
     if (m_totalRows>m_visibleRows)
-        UiTheme::scrollBar(ui,width-10.0f,14,4,
-            layout.firstButtonY+layout.buttonHeight-14,m_rowOffset,m_visibleRows,m_totalRows);
+        UiTheme::scrollBar(ui,width-10.0f,footer.contentBottom,4,
+            layout.firstButtonY+layout.buttonHeight-footer.contentBottom,m_rowOffset,m_visibleRows,m_totalRows);
     if (m_frameRateButton >= 0 &&
         m_frameRateButton < static_cast<int>(m_buttons.size()) &&
         m_buttons[static_cast<size_t>(m_frameRateButton)].height()>0) {
@@ -586,8 +618,112 @@ void SettingsMenu::render(UIRenderer& ui, int width, int height) {
     }
 }
 
+void SettingsMenu::renderQualityTable(UIRenderer& ui, int width, int height, float titleY) {
+    struct Row { std::string label; std::array<std::string, 5> values; };
+    static constexpr const char* keys[] = {
+        "settings.quality_msaa", "settings.quality_normals", "settings.smooth_lighting",
+        "settings.shadows", "settings.transparent_leaves", "settings.clouds",
+        "settings.quality_cirrus", "settings.quality_cloud_shadows", "settings.enhanced_bloom",
+        "settings.quality_screen_ao", "settings.enhanced_shafts", "settings.enhanced_reflections",
+        "settings.enhanced_atmosphere", "settings.enhanced_material", "settings.enhanced_particles",
+        "settings.gi_enabled", "settings.gi_distance", "settings.gi_temporal"};
+    std::array<Row, 18> rows;
+    for (size_t r = 0; r < rows.size(); ++r)
+        rows[r].label = m_localization.format(keys[r], {""});
+    const auto enabled = [this](bool value) { return m_localization.text(value ? "common.on" : "common.off"); };
+    static constexpr const char* shadows[] = {"common.off", "settings.shadow_low",
+        "settings.shadow_medium", "settings.shadow_high"};
+    // Use the same preset application and effective feature gates as gameplay.
+    // The live Custom configuration is left untouched when opening this page.
+    for (size_t i = 0; i < VISUAL_QUALITY_ORDER.size(); ++i) {
+        ClientSettings preset = m_settings;
+        preset.applyGraphicsPreset(presetForVisualQuality(VISUAL_QUALITY_ORDER[i]));
+        const auto visual = visualQualityConfig(preset.visualQuality);
+        const auto enhanced = enhancedVisualConfig(preset.visualQuality, preset.enhancedVisual);
+        const auto gi = voxelGiConfig(preset.visualQuality, preset.enhancedVisual);
+        const std::array<std::string, 18> values{{
+            std::to_string(visual.sceneSamples) + "x", enabled(visual.materialNormals),
+            enabled(preset.smoothLighting), m_localization.text(shadows[static_cast<int>(preset.shadowQuality)]),
+            enabled(preset.transparentLeaves), enabled(preset.renderClouds && visual.voxelClouds),
+            enabled(preset.renderClouds && visual.cirrusClouds),
+            enabled(preset.renderClouds && visual.cloudShadowSamples > 0),
+            enabled(enhanced.bloomLevels > 0), enabled(enhanced.aoDirections > 0),
+            enabled(enhanced.lightShaftSamples > 0), enabled(enhanced.reflectionSteps > 0),
+            enabled(enhanced.atmosphereStrength > 0), enabled(enhanced.materialMotionStrength > 0),
+            enabled(enhanced.ambientParticlesPerSecond > 0), enabled(gi.enabled),
+            gi.enabled ? std::to_string(preset.enhancedVisual.gi.distance) : "-",
+            gi.enabled ? std::to_string(preset.enhancedVisual.gi.temporalStability) + "%" : "-"}};
+        for (size_t r = 0; r < rows.size(); ++r) rows[r].values[i] = values[r];
+    }
+    const UiMenuFooter footer(width, height);
+    const float tableW = std::min(968.0f, width - 40.0f), x = (width - tableW) * .5f;
+    const float labelW = tableW * .30f, cellW = (tableW - labelW) / 5;
+    const float headerH = height < 300 ? 26.0f : 36.0f;
+    const float headerY = titleY - headerH - 10;
+    const float top = headerY - 4, bottom = footer.contentBottom;
+    constexpr float rowH = 23;
+    m_totalRows = static_cast<int>(rows.size());
+    m_visibleRows = std::clamp(static_cast<int>((top - bottom) / rowH), 1, m_totalRows);
+    m_rowOffset = std::clamp(m_rowOffset, 0, m_totalRows - m_visibleRows);
+    const auto feature = m_localization.text("settings.quality_feature");
+    UiTheme::textWithShadow(ui, feature, x + 4, headerY + 6,
+        UiTheme::fittedScale(ui, feature, .9f, labelW - 8), UiTheme::TEXT_DIM);
+    for (size_t i = 0; i < VISUAL_QUALITY_ORDER.size(); ++i) {
+        auto& button = m_buttons[i];
+        button.setPosition(x + labelW + i * cellW + 2, headerY);
+        button.setSize(cellW - 4, headerH);
+        prepareButton(button); button.render(ui);
+    }
+    for (int r = 0; r < m_visibleRows; ++r) {
+        const auto& row = rows[static_cast<size_t>(r + m_rowOffset)];
+        const float y = top - (r + 1) * rowH;
+        if (r % 2 == 0) UiTheme::rect(ui, x, y, tableW, rowH, UiTheme::PANEL);
+        UiTheme::textWithShadow(ui, row.label, x + 4, y + 4,
+            UiTheme::fittedScale(ui, row.label, .9f, labelW - 8), UiTheme::TEXT_DIM);
+        for (size_t c = 0; c < VISUAL_QUALITY_ORDER.size(); ++c) {
+            const auto& value = row.values[c];
+            const float scale = UiTheme::fittedScale(ui, value, .9f, cellW - 8);
+            const float cx = x + labelW + c * cellW;
+            if (m_settings.graphicsPreset == presetForVisualQuality(VISUAL_QUALITY_ORDER[c]))
+                UiTheme::rect(ui, cx, y, cellW, rowH, UiTheme::ACCENT_DIM);
+            UiTheme::textWithShadow(ui, value, cx + (cellW - ui.measureText(value, scale).x) * .5f,
+                y + 4, scale, UiTheme::TEXT);
+        }
+    }
+    const float tableBottom = top - m_visibleRows * rowH;
+    for (int c = 0; c <= 5; ++c)
+        UiTheme::rect(ui, x + labelW + c * cellW, tableBottom, 1,
+            top - tableBottom, UiTheme::BORDER);
+    UiTheme::rect(ui, x, top, tableW, 1, UiTheme::BORDER);
+    if (m_totalRows > m_visibleRows)
+        UiTheme::scrollBar(ui, x + tableW + 4, bottom, 4, top - bottom,
+            m_rowOffset, m_visibleRows, m_totalRows);
+}
+
 void SettingsMenu::onKeyPress(int key, int mods) {
     navigationFocus();
+    if (m_page == SettingsPage::Quality) {
+        const int count = static_cast<int>(m_buttons.size());
+        if (key == Key::Escape) showPage(SettingsPage::Video);
+        else if (key == Key::Enter || key == Key::Space) activateSelected(m_buttons, m_selectedIdx);
+        else if (key == Key::Tab) m_selectedIdx = (m_selectedIdx +
+            ((mods & KeyModifier::Shift) ? count - 1 : 1)) % count;
+        else if (key == Key::Left || key == Key::A) m_selectedIdx = (m_selectedIdx + count - 1) % count;
+        else if (key == Key::Right || key == Key::D) m_selectedIdx = (m_selectedIdx + 1) % count;
+        else if (key == Key::Up || key == Key::W || key == Key::Down || key == Key::S) {
+            if (m_selectedIdx == m_backButton) m_selectedIdx = 0;
+            else if (key == Key::Down || key == Key::S) {
+                if (m_rowOffset < m_totalRows - m_visibleRows) onScroll(-1);
+                else m_selectedIdx = m_backButton;
+            } else if (m_rowOffset > 0) onScroll(1);
+            else m_selectedIdx = m_backButton;
+        }
+        else if (key == Key::Home) m_rowOffset = 0;
+        else if (key == Key::End) m_rowOffset = std::max(0, m_totalRows - m_visibleRows);
+        for (size_t i = 0; i < m_buttons.size(); ++i)
+            m_buttons[i].setSelected(static_cast<int>(i) == m_selectedIdx);
+        return;
+    }
     if (m_lodWarningPending && key == Key::Escape) {
         m_lodWarningPending = false;
         refreshButtons();

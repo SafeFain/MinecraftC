@@ -48,7 +48,7 @@ int main() {
         require(bar.x>=7.9f&&bar.x+bar.width<=size.x-7.9f,"nine hotbar slots fit narrow screens");
     }
     const auto narrow=settingsButtonLayout(320,550,13,true,true);
-    require(narrow.columns==1&&narrow.rowCount==13,"portrait settings use a single column");
+    require(narrow.columns==1&&narrow.rowCount==12,"portrait settings exclude the fixed footer from content");
     require(settingsGridNeighbor(3,13,0,1,true,1)==4&&
             settingsGridNeighbor(0,13,0,-1,true,1)==12&&
             settingsGridNeighbor(3,13,1,0,true,1)==3,"single-column focus follows visible order");
@@ -56,7 +56,14 @@ int main() {
     require(shortLayout.visibleRows<shortLayout.rowCount,"short settings scroll rather than overflow");
     const auto last=settingsButtonPosition(shortLayout,12,13,true,
         static_cast<int>(shortLayout.rowCount-shortLayout.visibleRows));
-    require(last.y>=10,"scrolled Back remains visible");
+    const auto initialBack=settingsButtonPosition(shortLayout,12,13,true,0);
+    require(last==initialBack&&last.y==12,"Back never moves when content scrolls");
+    for (auto size:{glm::vec2(960,600),glm::vec2(320,180),glm::vec2(320,640)}) {
+        const UiMenuFooter footer(size.x,size.y);
+        require(footer.x>=12&&footer.x+footer.width<=size.x-12&&
+                footer.y==12&&footer.contentBottom>footer.y+footer.height,
+                "screen footer remains bounded and reserves content clearance");
+    }
 
     require(uiTextLineCapacity(240,18+86+8,25)==5 &&
             uiTextLineCapacity(80,18+86+8,25)==0,

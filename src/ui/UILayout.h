@@ -6,6 +6,20 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
+// Navigation stays in screen space, outside every scrolling content viewport.
+struct UiMenuFooter {
+    float x, y, width, height, contentBottom;
+    UiMenuFooter(int screenWidth, int screenHeight)
+        : UiMenuFooter(static_cast<float>(screenWidth), static_cast<float>(screenHeight)) {}
+    UiMenuFooter(float screenWidth, float screenHeight) {
+        width = std::min(Config::UI_BUTTON_WIDTH, std::max(1.0f, screenWidth - 32));
+        height = screenHeight < 300 ? 30.0f : 36.0f;
+        x = (screenWidth - width) * .5f;
+        y = 12.0f;
+        contentBottom = y + height + 12.0f;
+    }
+};
+
 struct UiCanvasFit {
     float scale;
     float x;

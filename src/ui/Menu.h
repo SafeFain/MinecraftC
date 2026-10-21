@@ -123,6 +123,7 @@ private:
     UiTransition m_fade;
 
 protected:
+    void renderFooter(UIRenderer& ui, Button& button, int width, int height);
     void navigationFocus() { m_pointerFocus = false; }
     void pointerFocus(double x, double y) { m_pointerFocus = true; m_pointer = {x,y}; }
     void prepareButton(Button& button);
@@ -184,6 +185,7 @@ private:
     int m_formRows = 7;
     int m_formSelection = -1;
     int m_aboutPage = 0;
+    int m_creditsPerPage = 4;
     int m_selectedWorld = -1;
     int m_pressedButton = -1;
     int m_pressedDeleteButton = -1;

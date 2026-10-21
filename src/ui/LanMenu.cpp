@@ -114,8 +114,9 @@ void LanMenu::render(UIRenderer& ui, int width, int height) {
     updateLabels();
     UiTheme::menuBackground(ui, static_cast<float>(width), static_cast<float>(height));
     const float panelHeight = m_browsing ? 650.0f : 490.0f;
-    const UiCanvasFit fit(width, height, 520, panelHeight);
-    const float s = fit.scale, x = fit.x, y = fit.y;
+    const UiMenuFooter footer(width,height);
+    const UiCanvasFit fit(static_cast<float>(width), height-footer.contentBottom, 520, panelHeight);
+    const float s = fit.scale, x = fit.x, y = fit.y+footer.contentBottom;
     UiTheme::panel(ui, x, y, 520*s, panelHeight*s);
     UiTheme::textWithShadow(ui, m_localization.text(m_actions.host ? "lan.host_title" : "lan.join_title"), x+20*s, y+(panelHeight-42)*s, 1.8f*s, UiTheme::TEXT);
     const std::string status = !m_error.empty() ? m_error : m_actions.status ? m_actions.status() : "";
@@ -125,6 +126,7 @@ void LanMenu::render(UIRenderer& ui, int width, int height) {
             UiTheme::textWithShadow(ui, lines[i], x+20*s, y+(panelHeight-67-i*14)*s, .8f*s, UiTheme::TEXT_DIM);
     }
     for (size_t i = 0; i < m_buttons.size(); ++i) {
+        if(i+1==m_buttons.size()){renderFooter(ui,m_buttons[i],width,height);continue;}
         m_buttons[i].setPosition(x+20*s, y+(panelHeight-132-i*52)*s); m_buttons[i].setSize(480*s, 44*s);
         prepareButton(m_buttons[i]); m_buttons[i].render(ui);
     }

@@ -51,6 +51,11 @@ int main() {
     for (const Language language : languagesByEnglishName())
         require(localization.hasTranslation(language, "loading.lod"),
                 "distant-terrain loading is translated in every language");
+    for (const Language language : languagesByEnglishName())
+        for (const char* key : {"settings.quality_title", "settings.quality_feature",
+                "settings.quality_msaa", "settings.quality_normals", "settings.quality_cirrus",
+                "settings.quality_cloud_shadows", "settings.quality_screen_ao"})
+            require(localization.hasTranslation(language,key),"quality comparison labels are translated");
     require(localization.hasTranslation(Language::English, "menu.create.world_type") &&
             localization.hasTranslation(Language::SimplifiedChinese,
                                          "menu.create.world_type") &&
