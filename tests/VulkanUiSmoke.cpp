@@ -171,16 +171,44 @@ int main(int argc,char** argv) {
             for(const auto& entry:bundle.second)
                 for(uint32_t cp:decodeUtf8(entry.second))
                     if(cp>=0x3400 && cp<=0x9FFF)pluginCjk.insert(cp);
+        for(const auto& plugin:plugins.plugins())
+            for(const auto& description:plugin.manifest.descriptions)
+                for(uint32_t cp:decodeUtf8(description.second))
+                    if(cp>=0x3400&&cp<=0x9FFF)pluginCjk.insert(cp);
+        // Characters absent from all shipped dictionaries exercise runtime names
+        // and chat, rather than merely retesting startup font collection.
+        const auto runtimeGlyphs=decodeUtf8(u8"龘靐齉");
+        for(uint32_t cp:runtimeGlyphs)pluginCjk.insert(cp);
+        pluginCjk.insert(0x10FFFF); // Unsupported text must produce a visible fallback.
         renderer.beginFrame();ui.beginUIFrame(width,height);
         for(uint32_t cp:pluginCjk) {
             std::string glyph;appendUtf8(glyph,cp);
-            if(ui.measureText(glyph,1).x<=0)throw std::runtime_error("Plugin glyph missing from font atlas: "+glyph);
+            const auto glyphWidth=ui.measureText(glyph,1).x;
+            if(glyphWidth<=0)throw std::runtime_error("Plugin glyph missing from font atlas: "+glyph);
+            if(cp>=0x3400&&cp<=0x9FFF&&std::abs(glyphWidth-ui.measureText(u8"中",1).x)>.01f)
+                throw std::runtime_error("Supported CJK glyph used fallback metrics: "+glyph);
             const auto before=ui.frameStats().vertices;
             ui.renderText(glyph,8,8,1,{1,1,1});
             if(ui.frameStats().vertices!=before+4)throw std::runtime_error("Plugin glyph geometry missing: "+glyph);
         }
         ui.endUIFrame();renderer.endFrame();renderer.waitIdle();
-        std::cout<<"Plugin translation CJK atlas coverage passed: "<<pluginCjk.size()<<" glyphs\n";
+        std::cout<<"Plugin metadata/runtime CJK atlas coverage passed: "<<pluginCjk.size()<<" glyphs\n";
+        const auto captureText=[&](const std::string& text) {
+            VulkanGiSmokeProbe::requestCapture(renderer);
+            renderer.beginFrame();ui.beginUIFrame(width,height);
+            ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),{0,0,0,1});
+            ui.renderText(text,20,40,3,{1,1,1});
+            ui.endUIFrame();renderer.endFrame();renderer.waitIdle();
+            const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+            if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Runtime glyph readback unavailable");
+            return pixels;
+        };
+        const auto blank=captureText("");
+        for(const auto* text:{u8"龘靐齉",u8"鱻麤灥",u8"𠀀",u8"\U0010FFFF"}) {
+            const auto image=captureText(text);
+            if(image==blank)throw std::runtime_error("Runtime glyph atlas update did not reach Vulkan pixels");
+        }
+        std::cout<<"Runtime font append, fallback and Vulkan pixel readback passed\n";
         ClientSettings settings;
         InventoryModel items;
         items.slot(0)={ItemId::STONE,64,0};items.slot(1)={ItemId::OAK_PLANKS,32,0};

@@ -136,7 +136,7 @@
   "settings.touch_mode_touch": "タッチ",
   "settings.touch_sensitivity": "タッチ感度: {0}",
   "settings.touch_size": "ボタンサイズ: {0}%",
-  "settings.touch_opacity": "ボタンの透明度: {0}%",
+  "settings.touch_opacity": "ボタンの不透明度: {0}%",
   "settings.touch_layout": "レイアウト: {0}",
   "settings.touch_left": "左利き",
   "settings.touch_right": "右利き",

@@ -89,10 +89,10 @@ uint32_t rightForm(uint32_t cp, int which) {
 // Mandatory lam-alef ligatures: isolated, final.
 uint32_t lamAlefForm(uint32_t alef, int which) {
     switch (alef) {
-        case 0x0627: { const uint32_t f[2] = {0xFEF5, 0xFEF6}; return f[which]; }
+        case 0x0627: { const uint32_t f[2] = {0xFEFB, 0xFEFC}; return f[which]; }
         case 0x0623: { const uint32_t f[2] = {0xFEF7, 0xFEF8}; return f[which]; }
         case 0x0625: { const uint32_t f[2] = {0xFEF9, 0xFEFA}; return f[which]; }
-        case 0x0622: { const uint32_t f[2] = {0xFEFB, 0xFEFC}; return f[which]; }
+        case 0x0622: { const uint32_t f[2] = {0xFEF5, 0xFEF6}; return f[which]; }
         default: return 0;
     }
 }
@@ -112,6 +112,12 @@ bool isLatin(uint32_t cp) {
     return (cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z');
 }
 
+bool isArabicMark(uint32_t cp) {
+    return (cp>=0x0610&&cp<=0x061A)||(cp>=0x064B&&cp<=0x065F)||cp==0x0670||
+           (cp>=0x06D6&&cp<=0x06DC)||(cp>=0x06DF&&cp<=0x06E4)||
+           (cp>=0x06E7&&cp<=0x06E8)||(cp>=0x06EA&&cp<=0x06ED);
+}
+
 // Joins letters into presentation forms. Non-Arabic characters reset the
 // joining state, exactly like a real shaping engine treats script breaks.
 std::vector<uint32_t> joinLetters(const std::vector<uint32_t>& input) {
@@ -120,19 +126,23 @@ std::vector<uint32_t> joinLetters(const std::vector<uint32_t>& input) {
     bool prevConnects = false;
     for (size_t i = 0; i < input.size(); ++i) {
         const uint32_t cp = input[i];
-        // Mandatory lam-alef ligature.
-        if (cp == 0x0644 && i + 1 < input.size() &&
-            (input[i + 1] == 0x0622 || input[i + 1] == 0x0623 ||
-             input[i + 1] == 0x0625 || input[i + 1] == 0x0627)) {
-            output.push_back(lamAlefForm(input[i + 1], prevConnects ? 1 : 0));
-            ++i;
+        if(isArabicMark(cp)){output.push_back(cp);continue;}
+        size_t next=i+1;
+        while(next<input.size()&&isArabicMark(input[next]))++next;
+        // Vowel marks are transparent to joining and mandatory ligatures.
+        if (cp == 0x0644 && next < input.size() &&
+            (input[next] == 0x0622 || input[next] == 0x0623 ||
+             input[next] == 0x0625 || input[next] == 0x0627)) {
+            output.push_back(lamAlefForm(input[next], prevConnects ? 1 : 0));
+            output.insert(output.end(),input.begin()+static_cast<std::ptrdiff_t>(i+1),input.begin()+static_cast<std::ptrdiff_t>(next));
+            i=next;
             prevConnects = false;
             continue;
         }
         const JoinType type = joinType(cp);
         if (type == JoinType::Causing) {
-            const bool nextJoins = i + 1 < input.size() &&
-                joinType(input[i + 1]) != JoinType::None;
+            const bool nextJoins = next < input.size() &&
+                joinType(input[next]) != JoinType::None;
             output.push_back(cp);
             prevConnects = nextJoins;
             continue;
@@ -143,8 +153,8 @@ std::vector<uint32_t> joinLetters(const std::vector<uint32_t>& input) {
             continue;
         }
         if (type == JoinType::Dual) {
-            const bool nextJoins = i + 1 < input.size() &&
-                joinType(input[i + 1]) != JoinType::None;
+            const bool nextJoins = next < input.size() &&
+                joinType(input[next]) != JoinType::None;
             const int which = prevConnects ? (nextJoins ? 3 : 1)
                                            : (nextJoins ? 2 : 0);
             output.push_back(dualForm(cp, which));
@@ -160,7 +170,10 @@ std::vector<uint32_t> joinLetters(const std::vector<uint32_t>& input) {
 enum class Dir : uint8_t { Left, Right };
 
 std::optional<Dir> strongDirection(uint32_t cp) {
-    if (isLatin(cp) || isDigit(cp)) return Dir::Left;
+    if (isLatin(cp) || isDigit(cp) || (cp>=0x00C0&&cp<=0x02AF) ||
+        (cp>=0x0370&&cp<=0x052F) || (cp>=0x1100&&cp<=0x11FF) ||
+        (cp>=0x3040&&cp<=0x318F) || (cp>=0x3400&&cp<=0x9FFF) ||
+        (cp>=0xAC00&&cp<=0xD7AF)) return Dir::Left;
     if (isArabicScript(cp)) return Dir::Right;
     return std::nullopt;
 }
@@ -198,8 +211,14 @@ std::string encode(const std::vector<uint32_t>& codepoints) {
 } // namespace
 
 std::string shapeArabic(std::string_view text) {
+    // Preserve paragraph order; bidi reordering is local to each line.
+    if(const auto newline=text.find('\n');newline!=std::string_view::npos)
+        return shapeArabic(text.substr(0,newline))+"\n"+shapeArabic(text.substr(newline+1));
     const std::vector<uint32_t> input = decodeUtf8(text);
     if (input.empty()) return {};
+    bool hasArabic=false;
+    for(uint32_t cp:input)if(isArabicScript(cp))hasArabic=true;
+    if(!hasArabic)return std::string(text);
 
     const std::vector<uint32_t> joined = joinLetters(input);
     const std::vector<Dir> directions = resolveDirections(joined);
@@ -215,10 +234,42 @@ std::string shapeArabic(std::string_view text) {
     }
     std::vector<uint32_t> visual;
     for (auto it = runs.rbegin(); it != runs.rend(); ++it) {
-        if (it->second == Dir::Right)
-            visual.insert(visual.end(), it->first.rbegin(), it->first.rend());
-        else
+        if (it->second == Dir::Right) {
+            // Reverse base+mark clusters so vowels remain after their base.
+            size_t end=it->first.size();
+            while(end>0) {
+                size_t start=end-1;
+                while(start>0&&isArabicMark(it->first[start]))--start;
+                visual.insert(visual.end(),it->first.begin()+static_cast<std::ptrdiff_t>(start),
+                    it->first.begin()+static_cast<std::ptrdiff_t>(end));
+                end=start;
+            }
+        } else
             visual.insert(visual.end(), it->first.begin(), it->first.end());
     }
     return encode(visual);
+}
+
+std::string logicalArabic(std::string_view text) {
+    const auto input=decodeUtf8(text);
+    bool shaped=false;
+    for(uint32_t cp:input)if((cp>=0xFB50&&cp<=0xFDFF)||(cp>=0xFE70&&cp<=0xFEFF))shaped=true;
+    if(!shaped)return std::string(text);
+    std::string result;
+    // Visual run reordering is its own inverse for the shaped arguments emitted
+    // by this UI. Expand presentation forms only after restoring logical order.
+    for(uint32_t cp:decodeUtf8(shapeArabic(text))) {
+        if(cp>=0xFEF5&&cp<=0xFEFC) {
+            constexpr uint32_t alefs[]={0x0622,0x0623,0x0625,0x0627};
+            appendUtf8(result,0x0644);appendUtf8(result,alefs[(cp-0xFEF5)/2]);
+            continue;
+        }
+        uint32_t base=cp;
+        for(uint32_t candidate=0x0621;candidate<=0x0671;++candidate) {
+            for(int form=0;form<4;++form)if(dualForm(candidate,form)==cp)base=candidate;
+            for(int form=0;form<2;++form)if(rightForm(candidate,form)==cp)base=candidate;
+        }
+        appendUtf8(result,base);
+    }
+    return result;
 }

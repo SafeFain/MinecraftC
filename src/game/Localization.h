@@ -31,6 +31,7 @@ public:
 private:
     using Strings = std::unordered_map<std::string, std::string>;
     std::array<Strings, static_cast<size_t>(Language::Count)> m_languages;
+    std::array<Strings, static_cast<size_t>(Language::Count)> m_pluginOverrides;
     Language m_language = Language::English;
 
     const Strings& active() const;

@@ -1,14 +1,38 @@
 {
   "official_content": {
     "en_us": "Adds crystal blocks, resonant crystals, crafting recipes and a crystal use interaction.",
-    "zh_cn": "添加水晶方块、共鸣水晶、合成配方和水晶使用交互。"
+    "zh_cn": "添加水晶方块、共鸣水晶、合成配方和水晶使用交互。",
+    "ar_sa": "يضيف كتل البلور والبلورات الرنانة ووصفات التصنيع وتفاعل استخدام البلور.",
+    "fr_fr": "Ajoute des blocs de cristal, des cristaux résonnants, des recettes de fabrication et une interaction avec les cristaux.",
+    "de_de": "Fügt Kristallblöcke, Resonanzkristalle, Herstellungsrezepte und eine Kristallinteraktion hinzu.",
+    "es_es": "Añade bloques de cristal, cristales resonantes, recetas de fabricación y una interacción al usar cristales.",
+    "pt_br": "Adiciona blocos de cristal, cristais ressonantes, receitas de fabricação e uma interação ao usar cristais.",
+    "ru_ru": "Добавляет кристальные блоки, резонансные кристаллы, рецепты и взаимодействие при использовании кристалла.",
+    "ja_jp": "クリスタルブロック、共鳴クリスタル、クラフトレシピ、クリスタル使用時の操作を追加します。",
+    "ko_kr": "수정 블록, 공명 수정, 제작법과 수정 사용 상호작용을 추가합니다."
   },
   "official_atmosphere": {
     "en_us": "Changes sky and fog colors and displays an atmosphere label on the HUD.",
-    "zh_cn": "调整天空与雾的颜色，并在游戏界面显示氛围标记。"
+    "zh_cn": "调整天空与雾的颜色，并在游戏界面显示氛围标记。",
+    "ar_sa": "يغير ألوان السماء والضباب ويعرض اسم الأجواء على واجهة اللعب.",
+    "fr_fr": "Modifie les couleurs du ciel et du brouillard et affiche une indication d’ambiance en jeu.",
+    "de_de": "Ändert die Farben von Himmel und Nebel und zeigt eine Atmosphärenanzeige im HUD.",
+    "es_es": "Cambia los colores del cielo y la niebla y muestra una etiqueta de ambiente en la interfaz.",
+    "pt_br": "Altera as cores do céu e da neblina e exibe um indicador de atmosfera na interface.",
+    "ru_ru": "Изменяет цвета неба и тумана и показывает название атмосферы в игровом интерфейсе.",
+    "ja_jp": "空と霧の色を変更し、ゲーム画面に雰囲気のラベルを表示します。",
+    "ko_kr": "하늘과 안개 색상을 변경하고 게임 화면에 분위기 이름을 표시합니다."
   },
   "official_heaven": {
     "en_us": "Explore Heaven's floating islands, ruins, resources and recipes, with Skyway travel and the Starstep Scepter.",
-    "zh_cn": "探索天堂维度的浮岛、遗迹与资源，体验专属合成配方、天路传送和星步权杖。"
+    "zh_cn": "探索天境的浮岛、遗迹与资源，体验专属合成配方、天路传送和星步权杖。",
+    "ar_sa": "استكشف جزر السماء العائمة وأطلالها ومواردها ووصفاتها، مع السفر عبر الطرق السماوية وصولجان الخطوة النجمية.",
+    "fr_fr": "Explorez les îles flottantes, ruines et ressources du Paradis, avec des recettes, les voies célestes et le sceptre stellaire.",
+    "de_de": "Erkunde die schwebenden Inseln, Ruinen, Ressourcen und Rezepte des Himmels mit Himmelswegen und dem Sternenschritt-Zepter.",
+    "es_es": "Explora las islas flotantes, ruinas, recursos y recetas del Cielo, con rutas celestes y el Cetro del Paso Estelar.",
+    "pt_br": "Explore as ilhas flutuantes, ruínas, recursos e receitas do Céu, com caminhos celestes e o Cetro do Passo Estelar.",
+    "ru_ru": "Исследуйте парящие острова, руины, ресурсы и рецепты Небес с небесными путями и скипетром звёздного шага.",
+    "ja_jp": "天界の浮島、遺跡、資源、レシピを探索し、天空路での移動と星歩の王笏を体験できます。",
+    "ko_kr": "천국의 떠 있는 섬, 유적, 자원과 제작법을 탐험하고 하늘길 이동과 별걸음 홀을 사용하세요."
   }
 }

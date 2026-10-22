@@ -73,6 +73,12 @@ transaction and disappear when it fails, is disabled or is excluded by safe mode
   registering package's namespace. `en_us.json` is required; lookup uses the current
   language, then English. Content names bind a content key to a translation key.
   The official package also supplies aliases for historical host translation keys.
+  Optional host dictionaries at `assets/lang/overrides/xx_xx.json` override loaded
+  provider keys in that language, after alias resolution. They cannot expose a
+  disabled provider's text. These presentation corrections live outside gameplay
+  packages so changing a translation does not alter saved package fingerprints.
+  UI fonts add supported glyphs from actual text on demand, including plugin
+  descriptions, world names and chat; unsupported characters display a fallback.
 - `minecraftc.dimensions`, version 3 (`MC_DimensionsV3`), embeds the V2 definition
   and adds a localized name and seed domain. The host derives the generation seed
   once before invoking callbacks; zero leaves the world seed unchanged. Bed travel

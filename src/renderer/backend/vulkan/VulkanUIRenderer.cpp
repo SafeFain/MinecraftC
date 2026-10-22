@@ -34,6 +34,7 @@ TextureData decodeTexture(const std::filesystem::path& path) {
 }
 
 class VulkanUIBackend final:public IUIRenderBackend{
+    static constexpr int FONT_ATLAS_SIZE = 2048;
     static constexpr float FONT_LINE_HEIGHT = 14.0f;
     static constexpr float FONT_RASTER_HEIGHT = 36.0f;
     static constexpr float FONT_RENDER_SCALE =
@@ -56,6 +57,7 @@ public:
     }
     ~VulkanUIBackend()override{
         m_renderer.waitIdle();
+        releaseRetiredFonts();
         if(m_fontMaterial)m_renderer.destroyMaterial(m_fontMaterial);
         if(m_itemMaterial)m_renderer.destroyMaterial(m_itemMaterial);
         if(m_blockMaterial)m_renderer.destroyMaterial(m_blockMaterial);
@@ -65,7 +67,12 @@ public:
         if(m_whiteTexture)m_renderer.destroyTexture(m_whiteTexture);
     }
     void beginUIFrame(int width,int height)override{
-        m_batches.clear();m_uiWidth=width;m_uiHeight=height;
+        m_batches.clear();
+        if(!m_retiredFonts.empty()) {
+            m_renderer.waitIdle();
+            releaseRetiredFonts();
+        }
+        m_uiWidth=width;m_uiHeight=height;
         const float fullW=m_canvasSize.x>0?m_canvasSize.x:static_cast<float>(width);
         const float fullH=m_canvasSize.y>0?m_canvasSize.y:static_cast<float>(height);
         m_projection=clipSpaceCorrection()*glm::ortho(
@@ -83,6 +90,7 @@ public:
         return stats;
     }
     void endUIFrame()override{
+        uploadFont();
         for(const Batch& batch:m_batches)
             m_renderer.queueUiBatch(batch.vertices,batch.indices,batch.material,m_projection);
     }
@@ -178,8 +186,8 @@ public:
                          const glm::vec3& color,float alpha) override {
         float cursor=x;for(uint32_t cp:decodeUtf8(text)){
             if(cp=='\n'){cursor=x;y-=FONT_LINE_HEIGHT*scale;continue;}
-            const auto found=m_glyphs.find(cp);if(found==m_glyphs.end())continue;
-            const Glyph& g=found->second;
+            const Glyph* glyph=ensureGlyph(cp);if(!glyph)continue;
+            const Glyph& g=*glyph;
             const float renderedHeight = g.height * FONT_RENDER_SCALE;
             if(g.width>0&&g.height>0)quad(
                 cursor + g.xoff * FONT_RENDER_SCALE * scale,
@@ -193,8 +201,8 @@ public:
     glm::vec2 measureText(const std::string& text,float scale)override{
         float width=0,line=0;int lines=1;for(uint32_t cp:decodeUtf8(text)){
             if(cp=='\n'){width=std::max(width,line);line=0;++lines;continue;}
-            if(const auto found=m_glyphs.find(cp);found!=m_glyphs.end())
-                line+=found->second.advance*FONT_RENDER_SCALE*scale;
+            if(const Glyph* glyph=ensureGlyph(cp))
+                line+=glyph->advance*FONT_RENDER_SCALE*scale;
         }return {std::max(width,line),FONT_LINE_HEIGHT*scale*lines};
     }
     void setLocalization(const Localization* value)override{m_localization=value;}
@@ -209,6 +217,12 @@ private:
     int m_blockAtlasTilesPerSide=0,m_itemColumns=0,m_itemRows=0;
     std::unordered_map<std::string,int>m_itemIndices;
     std::unordered_map<uint32_t,Glyph>m_glyphs;
+    std::vector<unsigned char> m_fontBytes,m_arabicBytes;
+    stbtt_fontinfo m_font{},m_arabicFont{};
+    bool m_hasArabic=false,m_fontDirty=false;
+    TextureData m_fontPixels;
+    int m_shelfX=1,m_shelfY=1,m_shelfHeight=0;
+    std::vector<std::pair<RenderMaterialHandle,RenderTextureHandle>> m_retiredFonts;
     RenderMaterialHandle material(RenderTextureHandle texture){MaterialDesc d;
         d.pipeline=MaterialPipeline::UiTextured;d.baseColorTexture=texture;
         return m_renderer.createMaterial(d);}
@@ -240,25 +254,16 @@ private:
         m_itemMaterial=material(m_itemTexture);
     }
     void loadFont(const std::filesystem::path& root){
-        constexpr int atlasSize=2048;
-        constexpr int pixelHeight=static_cast<int>(FONT_RASTER_HEIGHT);
-        const auto bytes=AssetStore::readPath(root/"fonts/noto/NotoSansCJKsc-Regular.otf");
-        stbtt_fontinfo font{};const bool hasCjk=!bytes.empty()&&
-            stbtt_InitFont(&font,bytes.data(),0)!=0;
-        if(!hasCjk)return;
-        // Arabic glyphs (including the presentation forms the runtime shaper
-        // emits) come from a second face that the CJK font does not cover.
-        std::vector<unsigned char> arabicBytes;stbtt_fontinfo arabicFont{};bool hasArabic=false;
-        try{arabicBytes=AssetStore::readPath(root/"fonts/noto/NotoNaskhArabic-Regular.ttf");
-            hasArabic=!arabicBytes.empty()&&
-                stbtt_InitFont(&arabicFont,arabicBytes.data(),0)!=0;
+        m_fontBytes=AssetStore::readPath(root/"fonts/noto/NotoSansCJKsc-Regular.otf");
+        if(m_fontBytes.empty()||!stbtt_InitFont(&m_font,m_fontBytes.data(),0))
+            throw std::runtime_error("Cannot initialize UI font");
+        try {
+            m_arabicBytes=AssetStore::readPath(root/"fonts/noto/NotoNaskhArabic-Regular.ttf");
+            m_hasArabic=!m_arabicBytes.empty()&&stbtt_InitFont(&m_arabicFont,m_arabicBytes.data(),0)!=0;
         }catch(const std::exception&){}
-        const auto fontFor=[&](uint32_t cp)->const stbtt_fontinfo*{
-            if(stbtt_FindGlyphIndex(&font,static_cast<int>(cp))!=0)return &font;
-            if(hasArabic&&stbtt_FindGlyphIndex(&arabicFont,static_cast<int>(cp))!=0)
-                return &arabicFont;
-            return nullptr;
-        };
+        m_fontPixels.format=TextureFormat::Rgba8Unorm;
+        m_fontPixels.width=m_fontPixels.height=FONT_ATLAS_SIZE;
+        m_fontPixels.pixels.resize(static_cast<size_t>(FONT_ATLAS_SIZE)*FONT_ATLAS_SIZE*4u,0);
         std::set<uint32_t> codepoints;for(uint32_t cp=32;cp<127;++cp)codepoints.insert(cp);
         for(const Language language:languagesByEnglishName()){
             try{const std::string text=AssetStore::readTextPath(root/"lang"/
@@ -281,35 +286,68 @@ private:
         // explicitly.
         for(uint32_t cp=0xFB50;cp<=0xFDFF;++cp)codepoints.insert(cp);
         for(uint32_t cp=0xFE70;cp<=0xFEFF;++cp)codepoints.insert(cp);
-        const float cjkScale=stbtt_ScaleForPixelHeight(&font,pixelHeight);
-        const float arabicScale=hasArabic?stbtt_ScaleForPixelHeight(&arabicFont,pixelHeight):0.0f;
-        std::vector<uint8_t> pixels(static_cast<size_t>(atlasSize)*atlasSize*4u,0);
-        int shelfX=1,shelfY=1,shelfHeight=0;
-        for(uint32_t cp:codepoints){
-            const stbtt_fontinfo* face=fontFor(cp);if(!face)continue;
-            const float fontScale=face==&font?cjkScale:arabicScale;
-            int advance=0,bearing=0;
-            stbtt_GetCodepointHMetrics(face,static_cast<int>(cp),&advance,&bearing);
-            int x0=0,y0=0,x1=0,y1=0;stbtt_GetCodepointBitmapBox(face,static_cast<int>(cp),
-                fontScale,fontScale,&x0,&y0,&x1,&y1);const int w=std::max(0,x1-x0),h=std::max(0,y1-y0);
-            if(shelfX+w+2>=atlasSize){shelfX=1;shelfY+=shelfHeight+2;shelfHeight=0;}
-            if(shelfY+h+2>=atlasSize)throw std::runtime_error("UI font atlas capacity exceeded");
-            if(w&&h){std::vector<uint8_t> bitmap(static_cast<size_t>(w)*h);
-                stbtt_MakeCodepointBitmap(face,bitmap.data(),w,h,w,fontScale,fontScale,static_cast<int>(cp));
-                for(int py=0;py<h;++py)for(int px=0;px<w;++px){const uint8_t a=bitmap[py*w+px];
-                    const size_t dst=(static_cast<size_t>(shelfY+py)*atlasSize+shelfX+px)*4u;
-                    pixels[dst]=pixels[dst+1]=pixels[dst+2]=255;
-                    pixels[dst+3]=a;}}
-            m_glyphs[cp]={shelfX/static_cast<float>(atlasSize),(shelfY+h)/static_cast<float>(atlasSize),
-                (shelfX+w)/static_cast<float>(atlasSize),shelfY/static_cast<float>(atlasSize),
-                static_cast<float>(w),static_cast<float>(h),static_cast<float>(x0),
-                static_cast<float>(-y0),advance*fontScale};
-            shelfX+=w+2;shelfHeight=std::max(shelfHeight,h);
+        // Runtime text (world names, chat, plugin metadata) can contain characters
+        // absent from these dictionaries. Measure/render append them to this atlas.
+        ensureGlyph(0xFFFD);
+        for(uint32_t cp:codepoints)ensureGlyph(cp);
+        uploadFont();
+    }
+    const Glyph* ensureGlyph(uint32_t cp) {
+        if(cp<32)return nullptr;
+        if(const auto found=m_glyphs.find(cp);found!=m_glyphs.end())return &found->second;
+        const stbtt_fontinfo* face=nullptr;
+        if(stbtt_FindGlyphIndex(&m_font,static_cast<int>(cp)))face=&m_font;
+        else if(m_hasArabic&&stbtt_FindGlyphIndex(&m_arabicFont,static_cast<int>(cp)))face=&m_arabicFont;
+        if(!face) {
+            // Unsupported text must remain visible and take up layout space.
+            const Glyph replacement=*ensureGlyph('?');
+            return &m_glyphs.emplace(cp,replacement).first->second;
         }
-        TextureData data;data.format=TextureFormat::Rgba8Unorm;data.width=data.height=atlasSize;data.pixels=std::move(pixels);
+        const float scale=stbtt_ScaleForPixelHeight(face,FONT_RASTER_HEIGHT);
+        int advance=0,bearing=0,x0=0,y0=0,x1=0,y1=0;
+        stbtt_GetCodepointHMetrics(face,static_cast<int>(cp),&advance,&bearing);
+        stbtt_GetCodepointBitmapBox(face,static_cast<int>(cp),scale,scale,&x0,&y0,&x1,&y1);
+        const int w=std::max(0,x1-x0),h=std::max(0,y1-y0);
+        if(m_shelfX+w+2>=FONT_ATLAS_SIZE){m_shelfX=1;m_shelfY+=m_shelfHeight+2;m_shelfHeight=0;}
+        if(m_shelfY+h+2>=FONT_ATLAS_SIZE) {
+            const Glyph replacement=*ensureGlyph('?');
+            return &m_glyphs.emplace(cp,replacement).first->second;
+        }
+        if(w&&h) {
+            std::vector<uint8_t> bitmap(static_cast<size_t>(w)*h);
+            stbtt_MakeCodepointBitmap(face,bitmap.data(),w,h,w,scale,scale,static_cast<int>(cp));
+            for(int py=0;py<h;++py)for(int px=0;px<w;++px) {
+                const size_t dst=(static_cast<size_t>(m_shelfY+py)*FONT_ATLAS_SIZE+m_shelfX+px)*4u;
+                m_fontPixels.pixels[dst]=m_fontPixels.pixels[dst+1]=m_fontPixels.pixels[dst+2]=255;
+                m_fontPixels.pixels[dst+3]=bitmap[py*w+px];
+            }
+        }
+        constexpr float side=static_cast<float>(FONT_ATLAS_SIZE);
+        const Glyph glyph{m_shelfX/side,(m_shelfY+h)/side,(m_shelfX+w)/side,m_shelfY/side,
+            static_cast<float>(w),static_cast<float>(h),static_cast<float>(x0),static_cast<float>(-y0),advance*scale};
+        m_shelfX+=w+2;m_shelfHeight=std::max(m_shelfHeight,h);m_fontDirty=true;
+        return &m_glyphs.emplace(cp,glyph).first->second;
+    }
+    void uploadFont() {
+        if(!m_fontDirty)return;
         TextureSamplerDesc sampler;sampler.addressU=sampler.addressV=TextureAddressMode::ClampToEdge;
         sampler.minFilter=sampler.magFilter=TextureFilter::Linear;
-        m_fontTexture=m_renderer.createTexture(data,sampler);m_fontMaterial=material(m_fontTexture);
+        const auto texture=m_renderer.createTexture(m_fontPixels,sampler);
+        const auto nextMaterial=material(texture);
+        if(m_fontMaterial) {
+            for(auto& batch:m_batches)if(batch.material==m_fontMaterial)batch.material=nextMaterial;
+            // Previous submissions can still reference the old descriptor/image.
+            // Retire them after the next frame boundary and an idle wait.
+            m_retiredFonts.emplace_back(m_fontMaterial,m_fontTexture);
+        }
+        m_fontTexture=texture;m_fontMaterial=nextMaterial;m_fontDirty=false;
+    }
+    void releaseRetiredFonts() {
+        for(const auto& retired:m_retiredFonts) {
+            m_renderer.destroyMaterial(retired.first);
+            m_renderer.destroyTexture(retired.second);
+        }
+        m_retiredFonts.clear();
     }
 };
 }

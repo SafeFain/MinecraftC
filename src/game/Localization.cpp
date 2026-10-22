@@ -26,10 +26,15 @@ Localization::Strings Localization::loadFile(const std::filesystem::path& path) 
 
 void Localization::load(const std::filesystem::path& assetRoot) {
     for(auto& language:m_languages)language.clear();
+    for(auto& language:m_pluginOverrides)language.clear();
     m_languages[static_cast<size_t>(Language::English)] =
         loadFile(assetRoot / "lang" / "en_us.json");
     for (size_t index = 0; index < m_languages.size(); ++index) {
         const auto language = static_cast<Language>(index);
+        try {
+            m_pluginOverrides[index]=loadFile(assetRoot/"lang/overrides"/
+                (std::string(languageCode(language))+".json"));
+        }catch(const std::exception&){}
         if (language == Language::English) continue;
         try {
             m_languages[index] = loadFile(assetRoot / "lang" /
@@ -58,9 +63,16 @@ std::string Localization::rawText(std::string_view key) const {
         if(bundle==extensions.translations.end())return nullptr;
         const auto found=bundle->second.find(owned);return found==bundle->second.end()?nullptr:&found->second;
     };
-    if(const auto* value=pluginText(m_language))return *value;
-    if(const auto* value=pluginText(Language::English))return *value;
     const auto& selected = active();
+    const auto* pluginSelected=pluginText(m_language);
+    const auto* pluginEnglish=pluginText(Language::English);
+    if(pluginSelected||pluginEnglish) {
+        // Host language packs can correct provider text without changing a
+        // gameplay package fingerprint. Only apply overrides to loaded keys.
+        const auto& overrides=m_pluginOverrides[static_cast<size_t>(m_language)];
+        if(const auto found=overrides.find(owned);found!=overrides.end())return found->second;
+        return pluginSelected?*pluginSelected:*pluginEnglish;
+    }
     if (const auto found = selected.find(owned); found != selected.end()) return found->second;
     const auto& english = languageStrings(Language::English);
     if (const auto found = english.find(owned); found != english.end()) return found->second;
@@ -79,7 +91,8 @@ std::string Localization::format(
     std::string_view key, std::initializer_list<std::string> arguments) const {
     std::string result = rawText(key);
     size_t index = 0;
-    for (const auto& argument : arguments) {
+    for (const auto& value : arguments) {
+        const std::string argument=m_language==Language::Arabic?logicalArabic(value):value;
         const std::string marker = "{" + std::to_string(index++) + "}";
         size_t position = 0;
         while ((position = result.find(marker, position)) != std::string::npos) {

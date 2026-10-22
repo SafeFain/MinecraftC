@@ -9,3 +9,7 @@
 // glyphs for every presentation form this function emits. Non-Arabic text
 // passes through unchanged.
 std::string shapeArabic(std::string_view text);
+
+// Restore a previously shaped argument before interpolating and shaping the whole line.
+// Logical-order arguments without presentation forms pass through unchanged.
+std::string logicalArabic(std::string_view text);

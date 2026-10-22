@@ -136,7 +136,7 @@
   "settings.touch_mode_touch": "터치",
   "settings.touch_sensitivity": "터치 감도: {0}",
   "settings.touch_size": "버튼 크기: {0}%",
-  "settings.touch_opacity": "버튼 투명도: {0}%",
+  "settings.touch_opacity": "버튼 불투명도: {0}%",
   "settings.touch_layout": "배치: {0}",
   "settings.touch_left": "왼손잡이",
   "settings.touch_right": "오른손잡이",

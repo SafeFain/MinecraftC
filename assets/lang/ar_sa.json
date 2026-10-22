@@ -136,7 +136,7 @@
   "settings.touch_mode_touch": "اللمس",
   "settings.touch_sensitivity": "حساسية اللمس: {0}",
   "settings.touch_size": "حجم الأزرار: {0}%",
-  "settings.touch_opacity": "شفافية الأزرار: {0}%",
+  "settings.touch_opacity": "عتامة الأزرار: {0}%",
   "settings.touch_layout": "التخطيط: {0}",
   "settings.touch_left": "أعسر",
   "settings.touch_right": "أيمن",

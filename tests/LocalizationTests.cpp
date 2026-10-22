@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
+#include <set>
 #include <unordered_set>
 #include <vector>
 
@@ -23,6 +25,12 @@ void require(bool value, const char* message) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
     }
+}
+std::multiset<std::string> placeholders(const std::string& value) {
+    static const std::regex marker(R"(\{[0-9]+\})");
+    std::multiset<std::string> result;
+    for(std::sregex_iterator it(value.begin(),value.end(),marker),end;it!=end;++it)result.insert(it->str());
+    return result;
 }
 }
 
@@ -46,8 +54,15 @@ int main() {
     require(localization.text("official_heaven:travel.heaven") == "前往天境" &&
             localization.text("sleep.travel_heaven") == "前往天境" &&
             localization.format("loading.enter_dimension", {
-                localization.dimensionName(DimensionId::Heaven)}) == "正在进入天堂",
+                localization.dimensionName(DimensionId::Heaven)}) == "正在进入天境",
             "Chinese plugin travel aliases and loading titles are fully translated");
+    require(localization.text("lan.heaven")=="天境" &&
+            localization.itemName(ItemId::SKYROOT_PLANKS)=="天穹木板" &&
+            localization.itemName(ItemId::SUNSTONE_BRICKS)=="曦金石砖",
+            "host corrections unify plugin names and historical aliases");
+    require(localization.text("item.134")=="苦力怕刷怪蛋" &&
+            localization.text("settings.touch_opacity")=="控件不透明度：{0}%",
+            "Chinese item and opacity terminology is accurate");
     for (const Language language : languagesByEnglishName())
         require(localization.hasTranslation(language, "loading.lod"),
                 "distant-terrain loading is translated in every language");
@@ -157,11 +172,13 @@ int main() {
     // Every language file must cover the full English key set, and every
     // non-English file must also name every registered item.
     std::unordered_set<std::string> englishKeys;
+    nlohmann::json englishJson;
     {
         std::ifstream enFile(root / "assets" / "lang" / "en_us.json");
         nlohmann::json enJson;
         enFile >> enJson;
         require(enJson.is_object(), "en_us.json parses");
+        englishJson=enJson;
         for (auto it = enJson.begin(); it != enJson.end(); ++it)
             englishKeys.insert(it.key());
     }
@@ -179,6 +196,20 @@ int main() {
         const auto& bundle=extensions.translations.at(std::string(languageCode(language)));
         for(const auto& alias:extensions.translationAliases)
             if(const auto value=bundle.find(alias.second);value!=bundle.end())json[alias.first]=value->second;
+        for(const auto& entry:englishJson.items()) {
+            require(json.contains(entry.key())&&json[entry.key()].is_string(),"translation has string value");
+            const auto value=json[entry.key()].get<std::string>();
+            require(!value.empty(),"translation is not empty");
+            require(placeholders(value)==placeholders(entry.value().get<std::string>()),
+                    "translation preserves positional placeholders");
+            require(value.find(u8"\uFFFD")==std::string::npos,"translation has no replacement character");
+        }
+        const auto& englishBundle=extensions.translations.at("en_us");
+        for(const auto& entry:englishBundle) {
+            require(bundle.count(entry.first)!=0,"plugin dictionary covers every English key");
+            require(placeholders(bundle.at(entry.first))==placeholders(entry.second),
+                    "plugin translation preserves placeholders");
+        }
         size_t missing = 0;
         for (const std::string& key : englishKeys)
             if (!json.contains(key)) ++missing;
@@ -219,8 +250,19 @@ int main() {
     // right to left so the left-to-right renderers draw them correctly.
     require(shapeArabic("مرحبا") == "ﺎﺒﺣﺮﻣ",
             "Arabic letters join into presentation forms in display order");
-    require(shapeArabic("لا") == "ﻵ",
-            "the lam-alef ligature is applied");
+    require(shapeArabic("لا") == "ﻻ",
+            "plain lam-alef uses the plain alef ligature");
+    require(shapeArabic("لآ")==u8"\uFEF5" && shapeArabic("لأ")==u8"\uFEF7" &&
+            shapeArabic("لإ")==u8"\uFEF9" && shapeArabic("بلا")==u8"\uFEFC\uFE91",
+            "all lam-alef variants and final joining retain their letters");
+    require(shapeArabic("بَت")==u8"\uFE96\uFE91\u064E",
+            "Arabic vowel marks do not break joining or detach from their base");
+    require(shapeArabic("مرحبا\nالعالم")==shapeArabic("مرحبا")+"\n"+shapeArabic("العالم"),
+            "Arabic multiline labels retain line order");
+    for(const char* text:{"简体中文","日本語","한국어","Русский","Français","...: (42)"})
+        require(shapeArabic(text)==text,"non-Arabic text retains its order");
+    for(const char* logical:{"العربية","لا","لآ","مرحبا 42","عالم ثالث","عالم 中文"})
+        require(logicalArabic(shapeArabic(logical))==logical,"shaped format arguments restore logical order");
     require(shapeArabic("سرعة: 60") == "60 :ﺔﻋﺮﺳ",
             "digits move to the left of shaped Arabic text");
     localization.setLanguage(Language::Arabic);
@@ -234,11 +276,16 @@ int main() {
     for(const auto language:languagesByEnglishName()) {
         localization.setLanguage(language);
         const auto& dictionary=Plugins::content().extensions.translations.at(std::string(languageCode(language)));
-        const auto expected=dictionary.at("official_heaven:dimension.heaven");
+        const auto expected=language==Language::SimplifiedChinese?std::string("天境"):
+            dictionary.at("official_heaven:dimension.heaven");
         require(localization.dimensionName(DimensionId::Heaven)==(language==Language::Arabic?shapeArabic(expected):expected),
                 "registered dimension name uses each packaged language");
         require(localization.hasTranslation(language,"official_heaven:travel.heaven"),"registered travel label is translated in all ten languages");
     }
+    localization.setLanguage(Language::Arabic);
+    require(localization.format("loading.enter_dimension",{localization.dimensionName(DimensionId::Heaven)})==
+            shapeArabic("جارٍ الدخول إلى "+Plugins::content().extensions.translations.at("ar_sa").at("official_heaven:dimension.heaven")),
+            "formatting a localized Arabic dimension shapes it exactly once");
     Plugins::content().extensions.translations["en_us"]["p1_test:english_only"]="English fallback 42";
     localization.setLanguage(Language::SimplifiedChinese);
     require(localization.text("p1_test:english_only")=="English fallback 42","partial plugin dictionary falls back to English");
@@ -340,5 +387,23 @@ int main() {
         }
     }
 
+    for(const auto& file:{root/"assets/plugins/descriptions.json",root/"assets/lang/overrides/zh_cn.json"}) {
+        std::ifstream extraInput(file);nlohmann::json extra;extraInput>>extra;
+        const auto checkGlyphs=[&](const auto& self,const nlohmann::json& value)->void {
+            if(value.is_string())for(uint32_t cp:decodeUtf8(value.get<std::string>()))
+                require(cp<128||stbtt_FindGlyphIndex(&font,static_cast<int>(cp))||
+                        stbtt_FindGlyphIndex(&arabicFont,static_cast<int>(cp)),"metadata and correction glyphs resolve");
+            else if(value.is_object())for(const auto& entry:value.items())self(self,entry.value());
+        };
+        checkGlyphs(checkGlyphs,extra);
+        if(file.filename()=="descriptions.json")for(const auto& plugin:extra.items())
+            for(const auto language:languagesByEnglishName())
+                require(plugin.value().contains(std::string(languageCode(language))),"official descriptions cover all ten languages");
+        else for(const auto& entry:extra.items()) {
+            const auto& en=Plugins::content().extensions.translations.at("en_us");
+            require(en.count(entry.key())!=0,"host correction only targets registered provider keys");
+            require(placeholders(entry.value().get<std::string>())==placeholders(en.at(entry.key())),"host correction preserves placeholders");
+        }
+    }
     std::cout << "Localization and UTF-8 tests passed\n";
 }

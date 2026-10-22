@@ -136,7 +136,7 @@
   "settings.touch_mode_touch": "Сенсор",
   "settings.touch_sensitivity": "Чувствительность сенсора: {0}",
   "settings.touch_size": "Размер кнопок: {0}%",
-  "settings.touch_opacity": "Прозрачность кнопок: {0}%",
+  "settings.touch_opacity": "Непрозрачность кнопок: {0}%",
   "settings.touch_layout": "Раскладка: {0}",
   "settings.touch_left": "Левша",
   "settings.touch_right": "Правша",
