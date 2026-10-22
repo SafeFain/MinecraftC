@@ -711,6 +711,7 @@
   "lan.players": "Jogadores · {0}",
   "lan.overworld": "Mundo principal",
   "menu.create.generator_overworld": "Gerador do mundo principal: {0}",
+  "menu.create.advanced_generation": "Configurações avançadas do gerador: {0}",
   "menu.create.generator_parameters": "Parâmetros do gerador (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "ENTRANDO NO {0}",

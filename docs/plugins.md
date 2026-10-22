@@ -372,6 +372,8 @@ A zeroed definition defaults to normal weather, natural spawning, safe-surface
 spawn, same-dimension death respawn and no automatic void return. Generator key,
 generator revision and dimension revision are mandatory for plugin definitions;
 parameters default to `{}` and optional default modifiers use explicit revisions.
+The Create World menu keeps raw parameter editors collapsed by default; enable
+Advanced Generator Settings to edit them. Collapsing the editors retains values.
 Fixed coordinates describe the player's AABB bottom-center. Safe landings require
 loaded support, clearance and no fluid/fire; search is bounded and failure retains
 the original dimension. Weather and natural spawning still obey relevant world

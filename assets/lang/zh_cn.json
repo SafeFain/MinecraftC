@@ -711,6 +711,7 @@
   "lan.players": "玩家 · {0}",
   "lan.overworld": "主世界",
   "menu.create.generator_overworld": "主世界生成器：{0}",
+  "menu.create.advanced_generation": "生成器高级设置：{0}",
   "menu.create.generator_parameters": "生成参数（JSON）",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "正在进入{0}",

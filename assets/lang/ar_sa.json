@@ -711,6 +711,7 @@
   "lan.players": "اللاعبون · {0}",
   "lan.overworld": "العالم الرئيسي",
   "menu.create.generator_overworld": "مولد العالم الأساسي: {0}",
+  "menu.create.advanced_generation": "إعدادات المولد المتقدمة: {0}",
   "menu.create.generator_parameters": "معلمات التوليد (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "جارٍ الدخول إلى {0}",

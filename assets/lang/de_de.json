@@ -711,6 +711,7 @@
   "lan.players": "Spieler · {0}",
   "lan.overworld": "Oberwelt",
   "menu.create.generator_overworld": "Generator der Oberwelt: {0}",
+  "menu.create.advanced_generation": "Erweiterte Generatoreinstellungen: {0}",
   "menu.create.generator_parameters": "Generatorparameter (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "{0} WIRD BETRETEN",

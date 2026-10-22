@@ -568,6 +568,7 @@
   "lan.players": "Players · {0}",
   "lan.overworld": "Overworld",
   "menu.create.generator_overworld": "Overworld generator: {0}",
+  "menu.create.advanced_generation": "Advanced Generator Settings: {0}",
   "menu.create.generator_parameters": "Generator parameters (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "ENTERING {0}",

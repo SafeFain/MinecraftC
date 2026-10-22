@@ -178,6 +178,7 @@ private:
     GameMode m_createMode = GameMode::Survival;
     WorldType m_createWorldType = WorldType::Normal;
     bool m_createCheats = false;
+    bool m_advancedGeneration = false;
     int m_worldOffset = 0;
     int m_visibleWorlds = 6;
     int m_formOffset = 0;

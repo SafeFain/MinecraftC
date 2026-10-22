@@ -163,7 +163,7 @@ void MainMenu::showCreate() {
     m_seedText.setText({});
     m_createMode = GameMode::Survival;
     m_createWorldType = WorldType::Normal;
-    m_generation.clear();m_parameters.clear();
+    m_generation.clear();m_parameters.clear();m_advancedGeneration=false;
     for(const auto& entry:Plugins::content().extensions.dimensions) {
         m_generation[entry.first]=entry.second.generation;
         auto& buffer=m_parameters.try_emplace(entry.first,entry.second.generation.parameters,4096).first->second;
@@ -356,6 +356,14 @@ void MainMenu::rebuildButtons() {
             });
         const bool extensions=!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty();
         m_parameterRows.clear();
+        if(extensions) {
+            m_buttons.emplace_back(m_localization.format("menu.create.advanced_generation",{
+                m_localization.text(m_advancedGeneration?"common.on":"common.off")}),[this]{
+                m_advancedGeneration=!m_advancedGeneration;
+                if(!m_advancedGeneration&&m_field==Field::Parameters)m_field=Field::Name;
+                rebuildButtons();
+            });
+        }
         if(extensions)for(const auto& entry:Plugins::content().extensions.dimensions) {
             const uint32_t dimension=entry.first;
             const auto& selected=m_generation[dimension];
@@ -364,9 +372,11 @@ void MainMenu::rebuildButtons() {
                 std::vector<std::string> keys;if(dimension==0)keys.emplace_back();for(const auto& g:Plugins::content().extensions.generators)if(g.second.dimension==dimension)keys.push_back(g.first);
                 auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);g.generator=keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
                 g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
-            m_parameterRows[dimension]=static_cast<int>(m_buttons.size());
-            m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{m_parameterDimension=dimension;selectField(Field::Parameters);});
-            m_buttons.back().setDetail(m_parameters[dimension].text());
+            if(m_advancedGeneration) {
+                m_parameterRows[dimension]=static_cast<int>(m_buttons.size());
+                m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{m_parameterDimension=dimension;selectField(Field::Parameters);});
+                m_buttons.back().setDetail(m_parameters[dimension].text());
+            }
             for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==dimension) {
                 const auto key=m.first;const bool active=std::any_of(selected.modifiers.begin(),selected.modifiers.end(),[&](const auto& value){return value.first==key;});
                 m_buttons.emplace_back(key+": "+m_localization.text(active?"common.on":"common.off"),[this,dimension,key]{auto& entries=m_generation[dimension].modifiers;
@@ -419,7 +429,7 @@ void MainMenu::rebuildButtons() {
     if (!m_buttons.empty()) {
         m_buttons[static_cast<size_t>(m_selectedIdx)].setSelected(true);
         if (m_page==Page::Home) m_buttons[0].setPrimary(true);
-        if (m_page==Page::Create) m_buttons[5].setPrimary(true);
+        if (m_page==Page::Create) m_buttons[m_buttons.size()-2].setPrimary(true);
         if (m_page==Page::Worlds) m_buttons[m_deleteButtons.size()+1].setPrimary(true);
     }
 }

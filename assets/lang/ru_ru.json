@@ -711,6 +711,7 @@
   "lan.players": "Игроки · {0}",
   "lan.overworld": "Обычный мир",
   "menu.create.generator_overworld": "Генератор основного мира: {0}",
+  "menu.create.advanced_generation": "Расширенные настройки генератора: {0}",
   "menu.create.generator_parameters": "Параметры генератора (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "ВХОД НА {0}",

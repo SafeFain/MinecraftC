@@ -240,7 +240,8 @@ int main(int argc,char** argv) {
                 name=="settings" || name=="settings-audio" || name=="settings-bindings" ||
                 name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
                 name=="plugins-en_us" || name=="plugins-zh_cn" || name=="plugins-scrolled-zh_cn" ||
-                name=="language-menu-back" || name=="create" || name=="lan";
+                name=="language-menu-back" || name=="create" || name=="lan" ||
+                name=="create-default-zh_cn" || name=="create-advanced-zh_cn";
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
                 if((menuCapture || (capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
@@ -412,6 +413,44 @@ int main(int argc,char** argv) {
         for (int i=0;i<std::clamp((height-192)/46,1,6)+2;++i) main.onKeyPress(Key::Down);
         main.onKeyPress(Key::Enter);
         draw("create",[&]{main.render(ui,width,height);});
+        if(!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty()) {
+            localization.setLanguage(Language::SimplifiedChinese);
+            std::string createdName;
+            std::map<uint32_t,Plugins::GenerationConfig> createdGeneration;
+            auto createCallbacks=callbacks;
+            createCallbacks.onGenerationConfig=[&](const auto& config){createdGeneration=config;};
+            createCallbacks.onCreateWorld=[&](const std::string& name,const std::string&,GameMode,WorldType,bool){createdName=name;};
+            MainMenu createMenu(createCallbacks,{},settings,localization,nullptr);
+            createMenu.onKeyPress(Key::Enter);createMenu.onKeyPress(Key::Down);
+            createMenu.onKeyPress(Key::Down);createMenu.onKeyPress(Key::Enter);
+            // Default Tab navigation must wrap from Seed to Name, not enter a
+            // hidden JSON editor. The normal creation callback keeps defaults.
+            createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
+            createMenu.onKeyPress(Key::A,KeyModifier::Control);createMenu.onChar('N');
+            draw("create-default-zh_cn",[&]{createMenu.render(ui,width,height);},3);
+            createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
+            if(createdName!="N")throw std::runtime_error("Default creation focused a hidden parameter field");
+            for(const auto& dimension:Plugins::content().extensions.dimensions)
+                if(createdGeneration.at(dimension.first).parameters!=dimension.second.generation.parameters)
+                    throw std::runtime_error("Default creation changed generator parameters");
+            // Advanced access remains optional, and collapsing while editing
+            // must restore a visible focus without discarding the edited value.
+            createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
+            for(int i=0;i<5;++i)createMenu.onKeyPress(Key::Down);
+            createMenu.onKeyPress(Key::Enter);
+            draw("create-advanced-zh_cn",[&]{createMenu.render(ui,width,height);},3);
+            createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
+            createMenu.onKeyPress(Key::A,KeyModifier::Control);
+            for(char c:std::string(R"({"ui":7})"))createMenu.onChar(static_cast<unsigned char>(c));
+            createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
+            createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
+            createMenu.onKeyPress(Key::A,KeyModifier::Control);createMenu.onChar('C');
+            createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
+            if(createdName!="C"||createdGeneration.begin()->second.parameters!=R"({"ui":7})")
+                throw std::runtime_error("Collapsing advanced generation lost text focus or parameters");
+            localization.setLanguage(Language::English);
+            std::cout<<"Create-world default/advanced parameter focus and preservation passed\n";
+        }
         draw("settings",[&]{options.render(ui,width,height);});
         if(width>=440 && height>=500) {
             // The first row belongs near screen center, independently of Back.

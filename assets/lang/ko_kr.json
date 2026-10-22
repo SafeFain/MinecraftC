@@ -711,6 +711,7 @@
   "lan.players": "플레이어 · {0}",
   "lan.overworld": "오버월드",
   "menu.create.generator_overworld": "오버월드 생성기: {0}",
+  "menu.create.advanced_generation": "생성기 고급 설정: {0}",
   "menu.create.generator_parameters": "생성기 매개변수 (JSON)",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "{0} 진입 중",

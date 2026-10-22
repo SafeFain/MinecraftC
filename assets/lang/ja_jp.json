@@ -711,6 +711,7 @@
   "lan.players": "プレイヤー · {0}",
   "lan.overworld": "オーバーワールド",
   "menu.create.generator_overworld": "オーバーワールド生成器: {0}",
+  "menu.create.advanced_generation": "生成器の詳細設定: {0}",
   "menu.create.generator_parameters": "生成パラメーター（JSON）",
   "menu.create.generator_dimension": "{0}: {1}",
   "loading.enter_dimension": "{0}に入場中",
