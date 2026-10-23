@@ -169,8 +169,8 @@ public:
 
     // Enqueue terrain generation. Groups ungenerated chunks into N×N regions
     // for perfect cross-chunk continuity; remaining singletons use the old
-    // path.
-    void enqueueGeneration();
+    // path. Loading permits a larger worker-count budget.
+    void enqueueGeneration(bool loading = false);
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.

@@ -19,9 +19,11 @@
 #include <glm/glm.hpp>
 
 #include <chrono>
+#include <atomic>
 #include <cstdlib>
 #include <algorithm>
 #include <filesystem>
+#include <future>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -153,7 +155,7 @@ void loadTarget(World& world) {
 }
 
 // Generate every chunk in the target and apply completed generations.
-// enqueueGeneration is bounded by CHUNK_GEN_TASKS_IN_FLIGHT, so keep
+// enqueueGeneration uses a bounded worker-count window, so keep
 // feeding the pipeline until the whole target is generated and idle.
 void generateTarget(World& world, ThreadPool& pool) {
     int frames = 0;
@@ -171,6 +173,75 @@ void generateTarget(World& world, ThreadPool& pool) {
     const auto progress = world.generationProgress();
     require(progress.total > 0 && progress.completed == progress.total,
             "all target chunks finish generating");
+}
+
+void testAdaptiveGenerationBudget() {
+    struct Case { size_t workers; int playing; int loading; };
+    const Case cases[] = {
+        {0, 1, 1}, {1, 1, 1}, {2, 1, 1}, {3, 1, 2}, {4, 2, 3},
+        {6, 3, 4}, {8, 4, 6}, {12, 6, 9}, {16, 8, 12}, {32, 8, 12},
+        {std::numeric_limits<size_t>::max(), 8, 12}
+    };
+    for (const auto& entry : cases) {
+        require(Config::chunkGenerationTasksInFlight(entry.workers) == entry.playing,
+                "playing generation budget does not scale with worker count");
+        require(Config::chunkGenerationTasksInFlight(entry.workers, true) == entry.loading,
+                "loading generation budget does not scale with worker count");
+    }
+
+    const int previousDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 8;
+    for (const bool singletons : {false, true}) {
+        ThreadPool pool(8);
+        World world;
+        world.setThreadPool(&pool);
+        world.resetForNewSeed(42, WorldType::Superflat);
+        world.update({0.5, 64.0, 0.5}, 160);
+        // Isolate CPU scheduling from the independent cache-read window.
+        // Alternating columns cannot form a complete 3x3 region.
+        for (Chunk* chunk : world.getSimulationChunks()) {
+            chunk->cacheChecked = true;
+            if (singletons && (chunk->cx % 2 != 0 || chunk->cz % 2 != 0))
+                chunk->generated = true;
+        }
+
+        // Hold every worker so queued task counts are deterministic. Repeat
+        // after completion to ensure both generation paths release their slots.
+        for (int wave = 0; wave < 2; ++wave) {
+            std::promise<void> release;
+            const auto gate = release.get_future().share();
+            std::atomic<int> started{0};
+            for (int i = 0; i < 8; ++i) {
+                pool.enqueuePriority([&started, gate] {
+                    ++started;
+                    gate.wait();
+                }, std::numeric_limits<int>::max());
+            }
+            const auto deadline = std::chrono::steady_clock::now() +
+                std::chrono::seconds(5);
+            while (started.load() != 8 && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            require(started.load() == 8, "generation test workers did not reach barrier");
+
+            world.enqueueGeneration();
+            require(pool.pendingCount() == 4,
+                    "eight-worker playing window must enqueue four generation tasks");
+            world.enqueueGeneration();
+            require(pool.pendingCount() == 4,
+                    "repeated playing enqueue exceeded the generation window");
+            world.enqueueGeneration(true);
+            require(pool.pendingCount() == 6,
+                    "loading must expand the existing generation window to six tasks");
+            world.enqueueGeneration(true);
+            world.enqueueGeneration();
+            require(pool.pendingCount() == 6,
+                    "loading/playing transition duplicated or exceeded in-flight tasks");
+            release.set_value();
+            pool.waitIdle();
+        }
+        drainWorkers(world, pool);
+    }
+    Config::RENDER_DISTANCE = previousDistance;
 }
 
 bool isChunkActive(const World& world, int cx, int cz) {
@@ -1349,6 +1420,7 @@ void testGuestStreamingInterests() {
 
 int main() {
     installHeavenFixture();
+    testAdaptiveGenerationBudget();
     testGuestStreamingInterests();
     testDoorsAndButtons();
     testChunkStreaming();

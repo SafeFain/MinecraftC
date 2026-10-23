@@ -63,7 +63,19 @@ constexpr int   CHUNK_LOADS_PER_FRAME = 4;
 constexpr int   CHUNK_UNLOADS_PER_FRAME = 2;
 constexpr int   INITIAL_CHUNK_LOADS_PER_FRAME = 16;
 constexpr int   LOADING_CHUNK_LOADS_PER_FRAME = 32;
-constexpr int   CHUNK_GEN_TASKS_IN_FLIGHT = 2; // bounds expensive terrain workers
+constexpr int   CHUNK_GEN_TASKS_IN_FLIGHT_MAX = 8;
+constexpr int   LOADING_CHUNK_GEN_TASKS_IN_FLIGHT_MAX = 12;
+// Use the actual pool size (normally logical CPU count). Leave capacity for
+// meshes/LOD and bound region scratch memory even on very large machines.
+constexpr int chunkGenerationTasksInFlight(size_t workerCount, bool loading = false) {
+    if (workerCount <= 1) return 1;
+    const size_t spare = loading ? workerCount / 4 + (workerCount % 4 != 0 ? 1 : 0)
+                                 : workerCount - workerCount / 2;
+    const size_t tasks = workerCount - spare;
+    const int cap = loading ? LOADING_CHUNK_GEN_TASKS_IN_FLIGHT_MAX
+                            : CHUNK_GEN_TASKS_IN_FLIGHT_MAX;
+    return tasks < static_cast<size_t>(cap) ? static_cast<int>(tasks) : cap;
+}
 constexpr int   CHUNK_MESH_TASKS_IN_FLIGHT = 2; // prevents mesh queue buildup
 constexpr int   CHUNK_CACHE_READ_TASKS_IN_FLIGHT = 2;
 constexpr int   CHUNK_CACHE_WRITE_TASKS_IN_FLIGHT = 1;

@@ -530,7 +530,7 @@ void ChunkStreamer::queueBaseCacheWriteUnlocked(Chunk* chunk) {
     });
 }
 
-void ChunkStreamer::enqueueGeneration() {
+void ChunkStreamer::enqueueGeneration(bool loading) {
     if (m_externalSnapshots) return;
     if (!m_threadPool) return;
 
@@ -538,10 +538,8 @@ void ChunkStreamer::enqueueGeneration() {
     processCacheWriteCompletions();
     enqueueCacheReads();
 
-    const int workerCount = static_cast<int>(m_threadPool->threadCount());
-    const int boundedGenerationTasks = std::min(
-        Config::CHUNK_GEN_TASKS_IN_FLIGHT,
-        std::max(1, workerCount > 1 ? workerCount - 1 : 1));
+    const int boundedGenerationTasks = Config::chunkGenerationTasksInFlight(
+        m_threadPool->threadCount(), loading);
     const int taskSlots = boundedGenerationTasks -
         m_generationTasksInFlight.load();
     if (taskSlots <= 0) return;

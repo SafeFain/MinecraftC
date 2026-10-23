@@ -191,7 +191,7 @@ public:
     // ── Async generation pipeline ──────────────────────────────────────
     // Enqueue terrain generation. Groups ungenerated chunks into N×N regions
     // for perfect cross-chunk continuity. Remaining singletons use the old path.
-    void enqueueGeneration() { m_streamer.enqueueGeneration(); }
+    void enqueueGeneration(bool loading = false) { m_streamer.enqueueGeneration(loading); }
 
     // Check for newly-generated chunks and apply any pending cross-region
     // tree leaves that were waiting for those chunks to finish.

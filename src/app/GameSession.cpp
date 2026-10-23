@@ -509,7 +509,7 @@ GameMode GameSession::startWorld(
     }
     updateLanInterests();
     world().update(player.getPosition());
-    world().enqueueGeneration();
+    world().enqueueGeneration(true);
     return mode;
 }
 
@@ -547,7 +547,7 @@ bool GameSession::advanceLoading(
     // center after generation first reaches 100%. Keep feeding cache reads
     // and generation during the preparation phase so the newly exposed edge
     // of that target cannot remain permanently requested.
-    world().enqueueGeneration();
+    world().enqueueGeneration(true);
     if (!loadingGenerationComplete) {
         world().processCompletedGenerations(false);
         const auto generation = world().generationProgress();
