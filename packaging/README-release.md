@@ -16,7 +16,9 @@ MinecraftC is licensed under GPL-3.0-only. The complete terms are in `LICENSE`;
 third-party licenses are summarized in `docs/licenses.md` and retained beside the
 corresponding assets and source dependencies.
 
-- Windows: run `minecraftc.exe` or `run-minecraftc.cmd`.
+- Windows: select the `windows-x86_64.zip` package for x64 PCs or
+  `windows-arm64.zip` for Windows 11 on Arm, then run `minecraftc.exe` or
+  `run-minecraftc.cmd`. A Vulkan-capable graphics driver is required.
 - Linux: run `./run-minecraftc.sh` from a terminal. A desktop entry and hicolor
   application icon are included under `share/`.
 - macOS: open `MinecraftC.app` or run `./run-minecraftc.sh`. The application

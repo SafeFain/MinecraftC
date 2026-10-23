@@ -21,6 +21,14 @@ platform packages only if the tag exactly matches `v<VERSION>` and every platfor
 job passes. Manual runs do not publish, including runs on a tag. Package filenames include the full version
 (for example `MinecraftC-1.4.0-beta.2-linux-x86_64.tar.gz`).
 
+Windows produces separate `MinecraftC-<version>-windows-x86_64.zip` and
+`MinecraftC-<version>-windows-arm64.zip` portable packages. The Windows matrix
+builds and runs CTest on `windows-2025` (x64) and `windows-11-arm` (native ARM64),
+using the pinned Vulkan SDK 1.4.350.0 installer and checksum for each architecture.
+Each job checks the installed executable's PE machine type, version, assets and
+dependencies before packaging. Both Windows jobs must pass before publication;
+both ZIPs are included in the release assets and `SHA256SUMS`.
+
 Android versionCode and Apple bundle build numbers use
 `(major * 10000 + minor * 100 + patch) * 10000 + channel * 1000 + iteration`,
 where alpha/beta/rc/release are 1/2/3/4 and an omitted iteration is 0. This keeps

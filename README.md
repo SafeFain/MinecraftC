@@ -55,7 +55,8 @@ LAN requires matching gameplay plugins. See [compatibility and recovery](docs/sa
 
 `VERSION` is the single application version source. Tags matching
 `v<VERSION>` publish packages after all platform jobs pass; manual runs build
-without publishing. [Full version rules](docs/releasing.md).
+without publishing. Windows packages are available separately for x86-64 and
+ARM64. [Full version rules](docs/releasing.md).
 
 ## License
 

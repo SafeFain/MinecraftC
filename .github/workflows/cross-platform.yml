@@ -107,7 +107,30 @@ jobs:
 
   windows:
     needs: version
-    runs-on: windows-2025
+    name: Windows ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-2025
+            platform: x64
+            sdk-platform: windows
+            sdk-arch: X64
+            sdk-sha256: 855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b
+            host-tools: Hostx64/x64
+            vc-tools: x86.x64
+            machine: '8664'
+          - arch: arm64
+            runner: windows-11-arm
+            platform: ARM64
+            sdk-platform: warm
+            sdk-arch: ARM64
+            sdk-sha256: f1f1dda1e5f5c7dae9e1b03ac53b3860a27aaad214c22bb3fa59f22ea116834b
+            host-tools: Hostarm64/arm64
+            vc-tools: ARM64
+            machine: AA64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
       - name: Read project version
@@ -117,11 +140,12 @@ jobs:
         shell: pwsh
         run: |
           $version = "1.4.350.0"
-          $expected = "855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b"
+          # Checksums from https://vulkan.lunarg.com/sdk/files.json.
+          $expected = "${{ matrix.sdk-sha256 }}"
           $installer = "$env:RUNNER_TEMP/vulkan_sdk.exe"
           $sdk = "$env:RUNNER_TEMP/VulkanSDK/$version"
           Invoke-WebRequest `
-            -Uri "https://sdk.lunarg.com/sdk/download/$version/windows/vulkan_sdk.exe" `
+            -Uri "https://sdk.lunarg.com/sdk/download/$version/${{ matrix.sdk-platform }}/vulkansdk-windows-${{ matrix.sdk-arch }}-$version.exe" `
             -OutFile $installer
           $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
@@ -139,7 +163,7 @@ jobs:
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$sdk/Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Configure
-        run: cmake -S . -B build-ci -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        run: cmake -S . -B build-ci -A ${{ matrix.platform }} -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER
       - name: Build
         run: cmake --build build-ci --config Release --parallel 2
       - name: Test
@@ -166,24 +190,29 @@ jobs:
             throw "Installed Windows executable does not advertise Vulkan renderer modes"
           }
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          $dumpbin = Get-ChildItem "$vs/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe" |
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.${{ matrix.vc-tools }} -property installationPath
+          $dumpbin = Get-ChildItem "$vs/VC/Tools/MSVC/*/bin/${{ matrix.host-tools }}/dumpbin.exe" |
             Sort-Object FullName | Select-Object -Last 1
           if (!$dumpbin) { throw "dumpbin.exe was not found" }
+          $headers = (& $dumpbin.FullName /headers "$stage/minecraftc.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0 -or $headers -notmatch '(?im)^\s*${{ matrix.machine }} machine \(') {
+            throw "Installed Windows executable is not ${{ matrix.arch }}: $headers"
+          }
           $dependencies = (& $dumpbin.FullName /dependents "$stage/minecraftc.exe" 2>&1) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin dependency inspection failed" }
           if ($dependencies -match "OPENGL32.dll") {
             throw "Installed Windows executable unexpectedly links OpenGL"
           }
       - name: Package Windows release
         shell: pwsh
-        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-x86_64.zip"
+        run: Compress-Archive -Path "$env:RUNNER_TEMP/$env:RELEASE_DIR" -DestinationPath "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-${{ matrix.arch }}.zip"
       - name: Verify official provider resources
-        run: python tools/check_official_package.py "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-x86_64.zip"
+        run: python tools/check_official_package.py "$env:RUNNER_TEMP/MinecraftC-$env:MINECRAFTC_VERSION-windows-${{ matrix.arch }}.zip"
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
-          name: minecraftc-windows-x86_64
-          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-windows-x86_64.zip
+          name: minecraftc-windows-${{ matrix.arch }}
+          path: ${{ runner.temp }}/MinecraftC-${{ env.MINECRAFTC_VERSION }}-windows-${{ matrix.arch }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

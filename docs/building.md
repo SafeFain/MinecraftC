@@ -43,13 +43,28 @@ fallback renderer.
 ## Windows
 
 Install Visual Studio 2022 or newer with Desktop development with C++, CMake,
-Git, and the LunarG Vulkan SDK 1.4.350.0 or newer. In PowerShell:
+Git, and the LunarG Vulkan SDK 1.4.350.0 or newer for the target architecture.
+Windows releases support x86-64 and native ARM64 (Windows 11 on Arm). For ARM64,
+install the MSVC ARM64 build tools and the Windows ARM64 Vulkan SDK; its native
+libraries and tools are under `Lib` and `Bin`. Both architectures require a
+Vulkan-capable graphics driver. In PowerShell, build x64 with:
 
 ```powershell
-cmake -S . -B build-local -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+cmake -S . -B build-local -A x64 -DMINECRAFTC_FETCH_DEPENDENCIES=ON
 cmake --build build-local --config Release --parallel 2
 cmake --install build-local --config Release --prefix install-local
 .\install-local\bin\minecraftc.exe
+```
+
+On a Windows ARM64 host with the ARM64 SDK selected by `VULKAN_SDK`, use a
+separate build directory:
+
+```powershell
+cmake -S . -B build-local-arm64 -A ARM64 -DMINECRAFTC_FETCH_DEPENDENCIES=ON
+cmake --build build-local-arm64 --config Release --parallel 2
+ctest --test-dir build-local-arm64 -C Release --output-on-failure
+cmake --install build-local-arm64 --config Release --prefix install-local-arm64
+.\install-local-arm64\bin\minecraftc.exe
 ```
 
 ## macOS
