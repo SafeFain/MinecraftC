@@ -15,3 +15,9 @@ and a truncated external buffer.
 Review regressions additionally cover overflowing accessor arithmetic,
 unnormalized integer weights, matrix-node animation rejection, and two skins
 sharing one mesh.
+
+`GltfUpgradeCases.h` also uses a confined in-memory asset source to test external
+PNG/JPEG and data URIs, sampler separation, normalized UV/weights, sparse overlays
+with/without base data, sparse index rejection, inactive scenes, hierarchy cycles,
+nonfinite vertices, namespace/failed-load caching and 64/65/256/257-joint boundaries.
+The one-pixel JPEG is original generated test data, embedded beside the assertions.

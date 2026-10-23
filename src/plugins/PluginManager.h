@@ -9,6 +9,8 @@
 #include <optional>
 #include <thread>
 
+namespace model { class ModelAssetCache; }
+
 struct MC_PluginContext {
     void* manager=nullptr;
     size_t index=0;
@@ -56,7 +58,7 @@ struct HostOperations {
 };
 class PluginManager {
 public:
-    explicit PluginManager(RuntimePaths paths);
+    explicit PluginManager(RuntimePaths paths, std::shared_ptr<model::ModelAssetCache> modelAssets = {});
     ~PluginManager();
     PluginManager(const PluginManager&)=delete;
     PluginManager& operator=(const PluginManager&)=delete;
@@ -159,6 +161,7 @@ private:
     struct Listener {size_t plugin;uint32_t kind;int32_t priority;MC_EventCallback callback;void* userdata;};
     struct Command {size_t plugin;MC_EventCallback callback;void* userdata;uint32_t flags=0;};
     RuntimePaths m_paths;
+    std::shared_ptr<model::ModelAssetCache> m_modelAssets;
     MC_Host m_host{};
     std::vector<PluginInfo> m_info;
     std::vector<Loaded> m_loaded;

@@ -5,6 +5,17 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <new>
+
+static bool countAllocations=false;
+static size_t allocationCount=0;
+void* operator new(std::size_t size) {
+    if(countAllocations) ++allocationCount;
+    if(void* p=std::malloc(size?size:1)) return p;
+    throw std::bad_alloc();
+}
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p,std::size_t) noexcept { std::free(p); }
 
 namespace {
 void require(bool value, const char* message) {
@@ -48,6 +59,8 @@ int main() {
     graph.actions.emplace("hurt", model::AnimationActionDefinition{
         "hurt","hurt","reaction",false,1,1,0,0,20,{}});
 
+    std::string prepareError;
+    require(model::prepareAsset(asset,prepareError),"animation fixture preparation failed");
     model::AnimationMixer mixer(&asset, &graph);
     require(mixer.play("walk") && mixer.play("wave") && mixer.play("hurt"),
             "mixer rejected valid actions");
@@ -64,6 +77,19 @@ int main() {
     require(mixer.play("wave", model::PlayPolicy::Queue), "queue request failed");
     mixer.advance(0.5f);
     require(mixer.playing("wave"), "queued action did not start");
+
+    model::ModelInstance instance;
+    mixer.evaluate(instance);
+    require(!mixer.evaluate(instance),"unchanged mixer state recomputed instance pose");
+    model::AnimationMixer reusable(&asset,&graph);
+    reusable.play("walk");
+    for(int i=0;i<10;++i) { reusable.advance(.01f);reusable.evaluate(instance); }
+    allocationCount=0;countAllocations=true;
+    for(int i=0;i<100;++i) { reusable.advance(.001f);reusable.evaluate(instance); }
+    countAllocations=false;
+    require(allocationCount==0,"warmed pose evaluation allocated memory");
+    const auto revision=instance.revision;
+    require(!reusable.evaluate(instance) && instance.revision==revision,"pose cache changed its revision");
 
     const std::filesystem::path valid =
         std::filesystem::temp_directory_path() / "minecraftc-animation-graph-valid.json";

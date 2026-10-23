@@ -3,6 +3,7 @@
 #include "entity/EntityLogic.h"
 #include "model/GltfLoader.h"
 #include "model/AnimationMixer.h"
+#include "model/ModelRenderer.h"
 #include "world/BlockLightLogic.h"
 
 #include <array>
@@ -20,17 +21,20 @@ struct EntityModelDefinition {
     std::filesystem::path filename;
     std::shared_ptr<const model::ModelAsset> asset;
     std::shared_ptr<const model::AnimationGraphAsset> graph;
-    uint32_t handle = 0;
+    model::ModelHandle handle{};
     bool usesPlaceholder = false;
 };
 
 class EntityModelRegistry {
 public:
     using Loader = std::function<model::LoadResult(const std::filesystem::path&)>;
-    explicit EntityModelRegistry(Loader loader = model::loadGltf);
+    explicit EntityModelRegistry(Loader loader = static_cast<model::LoadResult(*)(const std::filesystem::path&)>(model::loadGltf));
 
-    void loadAll(const std::filesystem::path& assetRoot);
+    void loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache = nullptr);
     void clearInstances();
+    void shareAssets(const EntityModelRegistry& source) {
+        clearInstances();m_definitions=source.m_definitions;m_cache=source.m_cache;m_placeholder=source.m_placeholder;
+    }
     void uploadAll(model::ModelRenderer& renderer);
     const EntityModelDefinition& definition(EntityType type) const;
     bool hasModel(EntityType type) const;
@@ -47,19 +51,26 @@ public:
                model::ModelRenderer& renderer, const glm::vec3& visualTint,
                SmoothLightSample light = {}, bool sleeping = false, float scale = 1.0f);
     void endFrame();
+    void retainInstances(const std::vector<uint64_t>& live);
+    void measurePerformance(bool enabled) { m_measure=enabled; }
+    double poseCpuMs() const { return m_poseCpuMs; }
+    double queueCpuMs() const { return m_queueCpuMs; }
 
 private:
     Loader m_loader;
     std::vector<EntityModelDefinition> m_definitions;
-    std::map<std::filesystem::path, std::shared_ptr<const model::ModelAsset>> m_cache;
+    model::ModelAssetCache m_cache;
     std::shared_ptr<const model::ModelAsset> m_placeholder;
     struct InstanceEntry {
         model::ModelInstance instance;
         model::AnimationMixer mixer;
         EntityType type = EntityType::Cow;
         bool initialized = false;
+        uint64_t retentionEpoch=0;
     };
     std::map<uint64_t, InstanceEntry> m_instances;
-    std::unordered_set<uint64_t> m_seen;
+    uint64_t m_retentionEpoch=0;
+    bool m_measure=false;
+    double m_poseCpuMs=0, m_queueCpuMs=0;
     InstanceEntry& ensure(EntityType type, uint64_t id);
 };

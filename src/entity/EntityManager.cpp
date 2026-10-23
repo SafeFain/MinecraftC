@@ -1361,12 +1361,18 @@ void EntityManager::render(
             m_world.sampleLight(dead.position+glm::dvec3(0.0,0.8,0.0)));
     }
     m_modelRegistry.endFrame();
+    std::vector<uint64_t> liveModels;
+    liveModels.reserve(m_entities.size()+m_deadEntityRenders.size());
+    for(const auto& entity:m_entities) liveModels.push_back(entity.id);
+    for(const auto& entity:m_deadEntityRenders) liveModels.push_back(entity.id);
+    m_modelRegistry.retainInstances(liveModels);
     renderer.flushModels(viewProjection);
 }
 
 void EntityManager::initializeModels(const std::filesystem::path& assetRoot,
                                      IGameRenderer& renderer) {
-    m_modelRegistry.loadAll(assetRoot);
+    m_modelRegistry.loadAll(assetRoot, renderer.capabilities().gameplay
+        ? &renderer.modelRenderer().assets() : nullptr);
     if (renderer.capabilities().gameplay)
         m_modelRegistry.uploadAll(renderer.modelRenderer());
 }

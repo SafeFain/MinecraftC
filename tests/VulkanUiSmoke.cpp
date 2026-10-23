@@ -91,7 +91,7 @@ int main(int argc,char** argv) {
         if(extensions) {
             for(const auto& info:plugins.plugins())if(info.enabled&&!info.active)throw std::runtime_error("Render package failed: "+info.status);
             const auto passes=Plugins::content().extensions.renderPasses;
-            model::ModelInstance posed;model::ModelHandle posedModel=0;
+            model::ModelInstance posed;model::ModelHandle posedModel{};
             auto image=[&] {std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){FrameData state;state.clearColor={.2f,.4f,.6f,1};renderer.beginFrame(state);
                 if(posedModel){model::ModelDraw model;model.model=posedModel;model.instance=&posed;renderer.modelRenderer().queue(model);renderer.flushModels(glm::mat4(1));}
                 renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
@@ -108,15 +108,15 @@ int main(int argc,char** argv) {
             entityPass.callback=[&](const MC_RenderFrame& frame){for(uint64_t index=0;index<frame.scene_count;++index){sawScene=true;if(!renderer.pluginSceneDraw(owner,index,scenePipeline))throw std::runtime_error("Scene redraw rejected");}};
             Plugins::content().extensions.renderPasses.push_back(std::move(entityPass));
             auto model=std::make_shared<model::ModelAsset>();model->materials.emplace_back();
-            model::Primitive triangle;triangle.skin=0;triangle.material=0;
+            model::Primitive triangle;triangle.material=0;
             for(const auto& position:{glm::vec3(-.4f,-.4f,0),glm::vec3(.4f,-.4f,0),glm::vec3(0,.4f,0)}){model::Vertex vertex;vertex.position=position;triangle.vertices.push_back(vertex);}
             triangle.indices={0,1,2};model->primitives.push_back(std::move(triangle));
-            model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};
+            model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};model->skins.push_back({{0},{glm::mat4(1)}});
             posed.jointPalettes={{glm::mat4(1)}};posedModel=renderer.modelRenderer().upload(model);
             const auto unshifted=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
             if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
             if(!sawScene||unshifted==shifted)throw std::runtime_error("Custom scene redraw lost skeletal pose");
-            posedModel=0;Plugins::content().extensions.renderPasses=passes;
+            posedModel={};Plugins::content().extensions.renderPasses=passes;
             std::cout<<"Plugin Vulkan posed scene redraw passed\n";
             std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
         }

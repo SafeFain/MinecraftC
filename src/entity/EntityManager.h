@@ -132,7 +132,7 @@ public:
     void applyReplicaSnapshots(const std::vector<EntitySnapshot>& snapshots, const std::vector<EntityDeathSnapshot>& deaths);
     void advanceReplicaPresentation(float dt);
     void shareModels(const EntityManager& source) {
-        m_modelRegistry = source.m_modelRegistry;
+        m_modelRegistry.shareAssets(source.m_modelRegistry);
         m_modelRegistry.clearInstances();
     }
     void initializeModels(const std::filesystem::path& assetRoot,

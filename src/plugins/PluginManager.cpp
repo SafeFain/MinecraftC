@@ -1,5 +1,6 @@
 #include "plugins/PluginManager.h"
 #include "core/AssetStore.h"
+#include "model/GltfLoader.h"
 #include "debug/Log.h"
 #include "Config.h"
 #include <algorithm>
@@ -259,7 +260,7 @@ std::vector<size_t> PluginManager::resolve(std::vector<PluginInfo>& info) {
     for(const auto& entry:ready)if(indegree[entry.second]!=SIZE_MAX)info[entry.second].status="Dependency/order cycle or blocked by cycle";
     return order;
 }
-PluginManager::PluginManager(RuntimePaths paths):m_paths(std::move(paths)) {
+PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAssetCache> modelAssets):m_paths(std::move(paths)),m_modelAssets(modelAssets?std::move(modelAssets):std::make_shared<model::ModelAssetCache>()) {
     m_host.size=sizeof(m_host);m_host.abi=MC_PLUGIN_ABI;
     m_host.log=[](MC_PluginContext* c,uint32_t level,const char* msg){if(c&&msg){if(level>=2)LOG_WARN("Plugin: "<<msg);else LOG_INFO("Plugin: "<<msg);}};
     m_host.last_error=[](MC_PluginContext* c)->const char* {return c?c->error.c_str():"Invalid context";};

@@ -50,19 +50,19 @@ glm::vec4 normalizedRotationValue(const glm::vec4& value) {
 
 } // namespace
 
-Pose bindPose(const ModelAsset& asset) {
-    Pose pose;
-    const std::size_t nodeCount = asset.nodes.size();
-    pose.translation.reserve(nodeCount);
-    pose.scale.reserve(nodeCount);
-    pose.rotation.reserve(nodeCount);
-    pose.global.assign(nodeCount, glm::mat4(1.0f));
-    for (const Node& node : asset.nodes) {
-        pose.translation.push_back(node.translation);
-        pose.scale.push_back(node.scale);
-        pose.rotation.push_back(node.rotation);
+void resetPose(const ModelAsset& asset, Pose& pose) {
+    const auto count = asset.nodes.size();
+    pose.translation.resize(count); pose.scale.resize(count); pose.rotation.resize(count);
+    pose.global.resize(count,glm::mat4(1.0f));
+    for (std::size_t i=0;i<count;++i) {
+        pose.translation[i]=asset.nodes[i].translation;
+        pose.scale[i]=asset.nodes[i].scale;
+        pose.rotation[i]=asset.nodes[i].rotation;
     }
-    return pose;
+}
+
+Pose bindPose(const ModelAsset& asset) {
+    Pose pose; resetPose(asset, pose); return pose;
 }
 
 glm::vec4 sampleChannel(const Channel& channel, float time, bool loop) {
@@ -121,10 +121,9 @@ glm::vec4 sampleChannel(const Channel& channel, float time, bool loop) {
     return channel.path == ChannelPath::Rotation ? normalizedRotationValue(value) : value;
 }
 
-void evaluatePose(const ModelAsset& asset, std::string_view clipName, float time,
+void sampleLocalPose(const ModelAsset& asset, const AnimationClip* clip, float time,
                   bool loop, Pose& pose) {
-    pose = bindPose(asset);
-    const AnimationClip* clip = asset.findClip(clipName);
+    resetPose(asset, pose);
     if (clip) {
         for (const Channel& channel : clip->channels) {
             if (channel.node < 0 ||
@@ -144,6 +143,11 @@ void evaluatePose(const ModelAsset& asset, std::string_view clipName, float time
             }
         }
     }
+}
+
+void evaluatePose(const ModelAsset& asset, std::string_view clipName, float time,
+                  bool loop, Pose& pose) {
+    sampleLocalPose(asset, asset.findClip(clipName), time, loop, pose);
     composeGlobals(asset, pose);
 }
 
@@ -167,7 +171,17 @@ void blendPoses(const Pose& from, const Pose& to, float amount, Pose& out) {
 
 void composeGlobals(const ModelAsset& asset, Pose& pose) {
     const std::size_t nodeCount = asset.nodes.size();
-    pose.global.assign(nodeCount, glm::mat4(1.0f));
+    pose.global.resize(nodeCount);
+    if (asset.topology.size() == nodeCount) {
+        for (int i : asset.topology) {
+            const auto node = static_cast<std::size_t>(i);
+            const auto parent = asset.nodes[node].parent;
+            const auto local = localTransform(asset,pose,node);
+            pose.global[node] = parent < 0 ? local : pose.global[static_cast<std::size_t>(parent)] * local;
+        }
+        return;
+    }
+    // Hand-authored test/procedural assets may not have been prepared yet.
     std::vector<uint8_t> state(nodeCount, 0);
     std::function<void(std::size_t)> composeNode = [&](std::size_t nodeIndex) {
         if (state[nodeIndex] == 2) return;
@@ -193,22 +207,106 @@ void composeGlobals(const ModelAsset& asset, Pose& pose) {
 
 std::vector<glm::mat4> jointMatrices(const ModelAsset& asset, const Pose& pose,
                                      std::size_t skinIndex) {
-    if (skinIndex >= asset.skins.size()) return {};
+    std::vector<glm::mat4> matrices;
+    jointMatrices(asset, pose, skinIndex, matrices);
+    return matrices;
+}
+
+void jointMatrices(const ModelAsset& asset, const Pose& pose, std::size_t skinIndex, std::vector<glm::mat4>& matrices) {
+    if (skinIndex >= asset.skins.size()) { matrices.clear(); return; }
     const Skin& skin = asset.skins[skinIndex];
     const std::size_t jointCount = std::min(skin.joints.size(), MAX_JOINTS);
-    std::vector<glm::mat4> matrices;
-    matrices.reserve(jointCount);
+    matrices.resize(jointCount);
     for (std::size_t index = 0; index < jointCount; ++index) {
         const int joint = skin.joints[index];
         const glm::mat4 inverseBind = index < skin.inverseBindMatrices.size()
             ? skin.inverseBindMatrices[index] : glm::mat4(1.0f);
         if (joint >= 0 && static_cast<std::size_t>(joint) < pose.global.size()) {
-            matrices.push_back(pose.global[static_cast<std::size_t>(joint)] * inverseBind);
+            matrices[index] = pose.global[static_cast<std::size_t>(joint)] * inverseBind;
         } else {
-            matrices.push_back(glm::mat4(1.0f));
+            matrices[index] = glm::mat4(1.0f);
         }
     }
-    return matrices;
+
+}
+
+void updatePalettes(const ModelAsset& asset, ModelInstance& instance) {
+    instance.jointPalettes.resize(asset.skins.size());
+    for (std::size_t skin=0;skin<asset.skins.size();++skin)
+        jointMatrices(asset, instance.pose, skin, instance.jointPalettes[skin]);
+    ++instance.revision;
+}
+
+bool prepareAsset(ModelAsset& asset, std::string& error) {
+    const auto count = asset.nodes.size();
+    asset.topology.clear(); asset.bindings.clear(); asset.clipIndices.clear();
+    for(const auto& skin:asset.skins) {
+        if(skin.joints.empty() || skin.joints.size()>MAX_JOINTS) {error="skin exceeds joint limit or is empty";return false;}
+        for(int joint:skin.joints) if(joint<0 || static_cast<std::size_t>(joint)>=count) {error="skin references invalid node";return false;}
+    }
+    for(const auto& primitive:asset.primitives) {
+        if(primitive.material < -1 || (primitive.material>=0 && static_cast<std::size_t>(primitive.material)>=asset.materials.size())) {error="invalid material reference";return false;}
+        if(primitive.indices.size()>UINT32_MAX) {error="primitive index count overflow";return false;}
+        for(uint32_t index:primitive.indices) if(index>=primitive.vertices.size()) {error="primitive index out of range";return false;}
+    }
+    for(const auto& material:asset.materials) {
+        for(int c=0;c<4;++c) if(!std::isfinite(material.baseColor[c])) {error="nonfinite material factor";return false;}
+        if(!std::isfinite(material.alphaCutoff)) {error="nonfinite alpha cutoff";return false;}
+    }
+    for (std::size_t i=0;i<count;++i) {
+        const auto& node = asset.nodes[i];
+        if(node.skin < -1 || (node.skin>=0 && static_cast<std::size_t>(node.skin)>=asset.skins.size())) {error="invalid skin binding";return false;}
+        const auto validFloat = [](float v){return std::isfinite(v);};
+        for (int c=0;c<3;++c) if (!validFloat(node.translation[c]) || !validFloat(node.scale[c])) { error="non-finite node TRS"; return false; }
+        for (int c=0;c<4;++c) if (!validFloat(node.rotation[c])) { error="non-finite node rotation"; return false; }
+        for (int c=0;c<4;++c) for(int r=0;r<4;++r) if(!validFloat(node.matrix[c][r])) {error="non-finite node matrix";return false;}
+        if (node.parent < 0) asset.topology.push_back(static_cast<int>(i));
+        else if (static_cast<std::size_t>(node.parent)>=count) {error="invalid parent node";return false;}
+    }
+    std::vector<bool> visited(count,false);
+    for (std::size_t cursor=0;cursor<asset.topology.size();++cursor) {
+        const auto node=static_cast<std::size_t>(asset.topology[cursor]);
+        if (visited[node]) {error="node hierarchy cycle or repeated child";return false;}
+        visited[node]=true;
+        for (int child:asset.nodes[node].children) {
+            if (child<0 || static_cast<std::size_t>(child)>=count || asset.nodes[child].parent!=static_cast<int>(node)) {error="invalid child node";return false;}
+            asset.topology.push_back(child);
+        }
+    }
+    if (asset.topology.size()!=count) {error="node hierarchy cycle or disconnected parent";return false;}
+    Pose bind=bindPose(asset); composeGlobals(asset,bind); asset.bindGlobals=bind.global;
+    std::vector<int> active=asset.sceneRoots;
+    std::fill(visited.begin(),visited.end(),false);
+    for (std::size_t i=0;i<active.size();++i) {
+        const auto node=active[i];
+        if(node<0 || static_cast<std::size_t>(node)>=count || visited[node]) {error="invalid or repeated scene root";return false;}
+        visited[node]=true;
+        for(int primitive:asset.nodes[node].primitives) {
+            if(primitive<0 || static_cast<std::size_t>(primitive)>=asset.primitives.size()) {error="invalid primitive binding";return false;}
+            asset.bindings.push_back({primitive,node,asset.nodes[node].skin});
+        }
+        active.insert(active.end(),asset.nodes[node].children.begin(),asset.nodes[node].children.end());
+    }
+    bool hasBounds=false;
+    asset.boundsMin=asset.boundsMax=glm::vec3(0);
+    for(const auto& binding:asset.bindings) {
+        std::vector<glm::mat4> palette=jointMatrices(asset,bind,static_cast<std::size_t>(binding.skin));
+        for(const auto& vertex:asset.primitives[binding.primitive].vertices) {
+            glm::mat4 transform=bind.global[binding.node];
+            if(binding.skin>=0) {
+                transform=glm::mat4(0);
+                for(int j=0;j<4;++j) if(vertex.weights[j]>0) {
+                    if(vertex.joints[j]>=palette.size()) {error="joint out of skin range";return false;}
+                    transform+=vertex.weights[j]*palette[vertex.joints[j]];
+                }
+            }
+            const auto position=glm::vec3(transform*glm::vec4(vertex.position,1));
+            if(!hasBounds) {asset.boundsMin=asset.boundsMax=position;hasBounds=true;}
+            else {asset.boundsMin=glm::min(asset.boundsMin,position);asset.boundsMax=glm::max(asset.boundsMax,position);}
+        }
+    }
+    for(std::size_t i=0;i<asset.animations.size();++i) asset.clipIndices.emplace(asset.animations[i].name,i);
+    return true;
 }
 
 } // namespace model

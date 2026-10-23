@@ -24,26 +24,65 @@ namespace {
 
 using DataHandle = std::unique_ptr<cgltf_data, decltype(&cgltf_free)>;
 
-cgltf_result assetRead(const cgltf_memory_options* memory,
-                       const cgltf_file_options* files,const char* path,
-                       cgltf_size* size,void** data) {
-    try {
-        if(files->user_data) {
-            const auto& root=*static_cast<const std::filesystem::path*>(files->user_data);
-            const auto relative=std::filesystem::relative(std::filesystem::u8path(path),root);
-            if(!AssetStore::validPath(relative.generic_u8string()))return cgltf_result_file_not_found;
+struct ReadContext {
+    const AssetSource* source;
+    std::filesystem::path model;
+};
+
+std::filesystem::path confinedPath(const AssetSource& source, const std::filesystem::path& path) {
+    const auto normalized = path.lexically_normal();
+    const auto relative = normalized.is_absolute()
+        ? normalized.lexically_relative(source.root.lexically_normal()) : normalized;
+    if (!AssetStore::validPath(relative.generic_u8string()))
+        throw std::runtime_error("asset dependency escapes source root: " + path.generic_u8string());
+    // Filesystem sources also reject symlinks that escape their declared root.
+    if (!source.read) {
+        std::error_code ec;
+        const auto canonicalRoot = std::filesystem::weakly_canonical(source.root, ec);
+        if (!ec) {
+            const auto canonical = std::filesystem::weakly_canonical(source.root / relative, ec);
+            if (!ec && !AssetStore::validPath(canonical.lexically_relative(canonicalRoot).generic_u8string()))
+                throw std::runtime_error("asset symlink escapes source root");
         }
-        const auto bytes=AssetStore::readPath(std::filesystem::u8path(path));
-        const cgltf_size requested=*size;
-        if(requested&&bytes.size()<requested)return cgltf_result_data_too_short;
-        void* result=memory->alloc_func?memory->alloc_func(memory->user_data,bytes.size()):std::malloc(bytes.size());
-        if(!result&& !bytes.empty())return cgltf_result_out_of_memory;
-        if(!bytes.empty())std::memcpy(result,bytes.data(),bytes.size());
-        *size=bytes.size();*data=result;return cgltf_result_success;
-    } catch(const std::exception&){return cgltf_result_file_not_found;}
+    }
+    return relative;
 }
-void assetRelease(const cgltf_memory_options* memory,const cgltf_file_options*,void* data){
-    if(memory->free_func)memory->free_func(memory->user_data,data);else std::free(data);
+
+std::vector<uint8_t> readResource(const AssetSource& source, const std::filesystem::path& path) {
+    const auto relative = confinedPath(source, path);
+    return source.read ? source.read(relative) : AssetStore::readPath(source.root / relative);
+}
+
+std::vector<uint8_t> decodeDataUri(const std::string& uri) {
+    const auto comma = uri.find(',');
+    if (comma == std::string::npos || comma < 7 || uri.substr(comma - 7, 7) != ";base64")
+        throw std::runtime_error("unsupported data URI encoding");
+    std::vector<uint8_t> bytes;
+    uint32_t value = 0; int bits = 0; bool padding = false; unsigned pads = 0;
+    const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for (std::size_t i = comma + 1; i < uri.size(); ++i) {
+        const char c = uri[i];
+        if (c == '=') { padding = true; ++pads; if (pads > 2) throw std::runtime_error("invalid base64 padding"); continue; }
+        const auto digit = alphabet.find(c);
+        if (padding || digit == std::string::npos) throw std::runtime_error("invalid base64 data");
+        value = (value << 6) | static_cast<uint32_t>(digit); bits += 6;
+        if (bits >= 8) { bits -= 8; bytes.push_back(static_cast<uint8_t>(value >> bits)); }
+    }
+    if ((uri.size() - comma - 1) % 4 || (bits && (value & ((1u << bits) - 1))) ||
+        (pads == 1 && bits != 2) || (pads == 2 && bits != 4))
+        throw std::runtime_error("truncated base64 data");
+    return bytes;
+}
+
+std::vector<uint8_t> readUri(const ReadContext& context, const char* uri) {
+    const std::string encoded(uri ? uri : "");
+    if (encoded.rfind("data:", 0) == 0) return decodeDataUri(encoded);
+    std::string decoded = encoded;
+    decoded.resize(cgltf_decode_uri(decoded.data()));
+    if (decoded.find(':') != std::string::npos || decoded.find('\\') != std::string::npos ||
+        decoded.find('\0') != std::string::npos || std::filesystem::u8path(decoded).is_absolute())
+        throw std::runtime_error("unsupported or absolute asset URI");
+    return readResource(*context.source, context.model.parent_path() / std::filesystem::u8path(decoded));
 }
 
 LoadResult failure(std::string error) {
@@ -74,39 +113,92 @@ bool checkedAdd(std::size_t left, std::size_t right, std::size_t& result) {
     return true;
 }
 
-bool checkAccessorBounds(const cgltf_accessor& accessor, std::string& error) {
-    if (!accessor.buffer_view || !accessor.buffer_view->buffer || !accessor.buffer_view->buffer->data) {
-        error = "accessor has no loaded buffer view";
-        return false;
+bool checkRange(const cgltf_buffer_view* view, std::size_t offset, std::size_t count,
+                std::size_t stride, std::size_t elementSize, std::string& error) {
+    if (!view || !view->buffer || !view->buffer->data || !count || !elementSize || stride < elementSize) {
+        error = "accessor has no loaded buffer or invalid count/stride"; return false;
     }
-    if (accessor.is_sparse) {
-        error = "sparse accessor is unsupported";
-        return false;
-    }
-    const std::size_t elementSize = cgltf_calc_size(accessor.type, accessor.component_type);
-    const std::size_t stride = accessor.stride == 0 ? elementSize : accessor.stride;
-    if (elementSize == 0 || stride < elementSize) {
-        error = "accessor has an invalid element stride";
-        return false;
-    }
-    const cgltf_buffer_view& view = *accessor.buffer_view;
     std::size_t viewEnd = 0;
-    if (!checkedAdd(view.offset, view.size, viewEnd) || viewEnd > view.buffer->size) {
-        error = "buffer view exceeds its buffer";
-        return false;
-    }
-    if (accessor.count == 0) {
-        error = "accessor range has zero elements";
-        return false;
-    }
-    std::size_t tail = 0;
-    if (accessor.count - 1 > (std::numeric_limits<std::size_t>::max() - elementSize) / stride ||
-        !checkedAdd((accessor.count - 1) * stride, elementSize, tail) ||
-        accessor.offset > view.size || tail > view.size - accessor.offset) {
-        error = "accessor range exceeds its buffer view";
-        return false;
+    if (!checkedAdd(view->offset, view->size, viewEnd) || viewEnd > view->buffer->size ||
+        count - 1 > (std::numeric_limits<std::size_t>::max() - elementSize) / stride ||
+        offset > view->size || (count - 1) * stride + elementSize > view->size - offset) {
+        error = "accessor range exceeds its buffer view"; return false;
     }
     return true;
+}
+
+uint32_t readUnsigned(const uint8_t* p, cgltf_component_type type) {
+    if (type == cgltf_component_type_r_8u) return *p;
+    if (type == cgltf_component_type_r_16u) { uint16_t v; std::memcpy(&v,p,2); return v; }
+    uint32_t v; std::memcpy(&v,p,4); return v;
+}
+
+bool checkAccessorBounds(const cgltf_accessor& accessor, std::string& error) {
+    const auto size = cgltf_calc_size(accessor.type, accessor.component_type);
+    const auto stride = accessor.stride ? accessor.stride : size;
+    const auto componentSize=cgltf_component_size(accessor.component_type);
+    if(!componentSize || accessor.offset%componentSize || stride%componentSize ||
+       (accessor.buffer_view && accessor.buffer_view->offset%componentSize)) {error="unaligned accessor";return false;}
+    if (!size || !accessor.count || accessor.count > std::numeric_limits<std::size_t>::max() / (16 * sizeof(float))) {
+        error = "invalid accessor size/count"; return false;
+    }
+    if (accessor.buffer_view && !checkRange(accessor.buffer_view, accessor.offset, accessor.count, stride, size, error)) return false;
+    if (!accessor.buffer_view && !accessor.is_sparse) { error = "accessor has no loaded buffer view"; return false; }
+    if (accessor.is_sparse) {
+        const auto& sparse = accessor.sparse;
+        const auto component = sparse.indices_component_type;
+        if (component != cgltf_component_type_r_8u && component != cgltf_component_type_r_16u && component != cgltf_component_type_r_32u) {
+            error = "invalid sparse index component"; return false;
+        }
+        const auto indexSize = cgltf_component_size(component);
+        if(!sparse.indices_buffer_view || !sparse.values_buffer_view ||
+           sparse.indices_byte_offset%indexSize || sparse.indices_buffer_view->offset%indexSize ||
+           sparse.values_byte_offset%componentSize || sparse.values_buffer_view->offset%componentSize) {error="unaligned sparse accessor";return false;}
+        if (sparse.count > accessor.count || !checkRange(sparse.indices_buffer_view, sparse.indices_byte_offset, sparse.count, indexSize, indexSize, error) ||
+            !checkRange(sparse.values_buffer_view, sparse.values_byte_offset, sparse.count, size, size, error)) return false;
+        const auto* indices = cgltf_buffer_view_data(sparse.indices_buffer_view) + sparse.indices_byte_offset;
+        uint32_t previous = 0;
+        for (std::size_t i = 0; i < sparse.count; ++i) {
+            const auto value = readUnsigned(indices + i * indexSize, component);
+            if (value >= accessor.count || (i && value <= previous)) { error = "sparse indices out of range or unordered"; return false; }
+            previous = value;
+        }
+    }
+    return true;
+}
+
+// cgltf 1.15 element readers reject sparse accessors. Resolve one overlay element
+// before invoking its normal conversion, using tightly packed sparse values.
+cgltf_accessor elementAccessor(const cgltf_accessor& source, std::size_t& index, cgltf_buffer_view& view) {
+    cgltf_accessor result = source;
+    result.is_sparse = false;
+    if (source.is_sparse) {
+        const auto& sparse = source.sparse;
+        const auto width = cgltf_component_size(sparse.indices_component_type);
+        const auto* indices = cgltf_buffer_view_data(sparse.indices_buffer_view) + sparse.indices_byte_offset;
+        std::size_t lo = 0, hi = sparse.count;
+        while (lo < hi) { const auto mid = lo + (hi-lo)/2;
+            if (readUnsigned(indices + mid*width, sparse.indices_component_type) < index) lo = mid+1; else hi = mid; }
+        if (lo < sparse.count && readUnsigned(indices + lo*width, sparse.indices_component_type) == index) {
+            view = *sparse.values_buffer_view;
+            result.buffer_view = &view;
+            result.offset = sparse.values_byte_offset;
+            result.stride = cgltf_calc_size(source.type, source.component_type);
+            index = lo;
+        }
+    }
+    return result;
+}
+
+bool readFloat(const cgltf_accessor* source, std::size_t index, float* out, std::size_t count) {
+    cgltf_buffer_view view{}; auto accessor = elementAccessor(*source, index, view);
+    if (!cgltf_accessor_read_float(&accessor, index, out, count)) return false;
+    for (std::size_t i=0;i<count;++i) if (!std::isfinite(out[i])) return false;
+    return true;
+}
+bool readUint(const cgltf_accessor* source, std::size_t index, cgltf_uint* out, std::size_t count) {
+    cgltf_buffer_view view{}; auto accessor = elementAccessor(*source, index, view);
+    return cgltf_accessor_read_uint(&accessor, index, out, count) != 0;
 }
 
 bool prevalidateCgltfRanges(const cgltf_data& data, std::string& error) {
@@ -192,21 +284,27 @@ AlphaMode alphaMode(cgltf_alpha_mode mode) {
     }
 }
 
-bool convertImage(const cgltf_image& source, ImageData& destination, std::string& error) {
-    if (!source.buffer_view || !source.buffer_view->buffer || !source.buffer_view->buffer->data ||
-        source.buffer_view->size == 0) {
+bool convertImage(const cgltf_image& source, const ReadContext& context, ImageData& destination, std::string& error) {
+    std::vector<uint8_t> external;
+    if (source.uri) external = readUri(context, source.uri);
+    if (!source.uri && (!source.buffer_view || !source.buffer_view->buffer || !source.buffer_view->buffer->data ||
+        source.buffer_view->size == 0)) {
         error = "image has no embedded loaded data";
         return false;
     }
-    const auto* encoded = static_cast<const stbi_uc*>(cgltf_buffer_view_data(source.buffer_view));
-    if (!encoded || source.buffer_view->size > static_cast<cgltf_size>(std::numeric_limits<int>::max())) {
+    const auto* encoded = source.uri ? external.data() : static_cast<const stbi_uc*>(cgltf_buffer_view_data(source.buffer_view));
+    const auto encodedSize = source.uri ? external.size() : source.buffer_view->size;
+    if (!encoded || encodedSize > static_cast<cgltf_size>(std::numeric_limits<int>::max())) {
         error = "image data is unavailable or too large";
         return false;
     }
+    const bool png=encodedSize>=8 && std::memcmp(encoded,"\x89PNG\r\n\x1a\n",8)==0;
+    const bool jpeg=encodedSize>=3 && encoded[0]==0xff && encoded[1]==0xd8 && encoded[2]==0xff;
+    if(!png && !jpeg) {error="only PNG/JPEG model images are supported";return false;}
     int width = 0;
     int height = 0;
     int channels = 0;
-    stbi_uc* pixels = stbi_load_from_memory(encoded, static_cast<int>(source.buffer_view->size),
+    stbi_uc* pixels = stbi_load_from_memory(encoded, static_cast<int>(encodedSize),
                                             &width, &height, &channels, 4);
     if (!pixels || width <= 0 || height <= 0) {
         error = std::string("image decode failed") +
@@ -230,6 +328,7 @@ bool convertImage(const cgltf_image& source, ImageData& destination, std::string
 
 bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Primitive& destination,
                       std::string& error) {
+    if(source.targets_count || source.has_draco_mesh_compression) {error="morph targets and compressed primitives are unsupported";return false;}
     if (source.type != cgltf_primitive_type_triangles) {
         error = "primitive mode must be TRIANGLES";
         return false;
@@ -240,7 +339,7 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
         error = "POSITION accessor is invalid: " + error;
         return false;
     }
-    if (positions->count == 0) {
+    if (positions->count == 0 || positions->count > UINT32_MAX) {
         error = "POSITION accessor is empty";
         return false;
     }
@@ -252,7 +351,7 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
     }
     const cgltf_accessor* uvs = cgltf_find_accessor(&source, cgltf_attribute_type_texcoord, 0);
     if (uvs && (!expectAccessor(uvs, cgltf_type_vec2, positions->count, "TEXCOORD_0", error) ||
-                uvs->component_type != cgltf_component_type_r_32f)) {
+                !isValidWeightComponent(*uvs))) {
         error = "TEXCOORD_0 accessor is invalid";
         return false;
     }
@@ -275,20 +374,20 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
     for (cgltf_size index = 0; index < positions->count; ++index) {
         Vertex& vertex = destination.vertices[index];
         float values[4]{};
-        if (!cgltf_accessor_read_float(positions, index, values, 3)) {
+        if (!readFloat(positions, index, values, 3)) {
             error = "POSITION accessor read failed";
             return false;
         }
         vertex.position = {values[0], values[1], values[2]};
         if (normals) {
-            if (!cgltf_accessor_read_float(normals, index, values, 3)) {
+            if (!readFloat(normals, index, values, 3)) {
                 error = "NORMAL accessor read failed";
                 return false;
             }
             vertex.normal = {values[0], values[1], values[2]};
         }
         if (uvs) {
-            if (!cgltf_accessor_read_float(uvs, index, values, 2)) {
+            if (!readFloat(uvs, index, values, 2)) {
                 error = "TEXCOORD_0 accessor read failed";
                 return false;
             }
@@ -296,13 +395,14 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
         }
         if (joints) {
             cgltf_uint jointValues[4]{};
-            if (!cgltf_accessor_read_uint(joints, index, jointValues, 4) ||
-                !cgltf_accessor_read_float(weights, index, values, 4)) {
+            if (!readUint(joints, index, jointValues, 4) ||
+                !readFloat(weights, index, values, 4)) {
                 error = "skinning accessor read failed";
                 return false;
             }
             vertex.joints = {jointValues[0], jointValues[1], jointValues[2], jointValues[3]};
             vertex.weights = {values[0], values[1], values[2], values[3]};
+            if (glm::any(glm::lessThan(vertex.weights, glm::vec4(0)))) { error = "negative skin weight"; return false; }
             normalizeWeights(vertex);
         }
         if (!hasBounds) {
@@ -321,7 +421,8 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
         }
         destination.indices.reserve(source.indices->count);
         for (cgltf_size index = 0; index < source.indices->count; ++index) {
-            const cgltf_size value = cgltf_accessor_read_index(source.indices, index);
+            cgltf_uint value = 0;
+            if (!readUint(source.indices, index, &value, 1)) { error = "index read failed"; return false; }
             if (value >= destination.vertices.size()) {
                 error = "index accessor references a vertex out of range";
                 return false;
@@ -336,6 +437,17 @@ bool convertPrimitive(const cgltf_data& data, const cgltf_primitive& source, Pri
     if (destination.indices.size() % 3 != 0) {
         error = "triangle primitive has a non-triangle index count";
         return false;
+    }
+    if(!normals) {
+        for(std::size_t i=0;i<destination.indices.size();i+=3) {
+            auto& a=destination.vertices[destination.indices[i]];auto& b=destination.vertices[destination.indices[i+1]];auto& c=destination.vertices[destination.indices[i+2]];
+            const auto normal=glm::cross(b.position-a.position,c.position-a.position);
+            a.normal+=normal;b.normal+=normal;c.normal+=normal;
+        }
+        for(auto& vertex:destination.vertices) {
+            const float length=glm::length(vertex.normal);
+            vertex.normal=length>0?vertex.normal/length:glm::vec3(0,1,0);
+        }
     }
     return true;
 }
@@ -369,7 +481,7 @@ bool convertSkins(const cgltf_data& data, ModelAsset& asset, std::string& error)
             skin.inverseBindMatrices.resize(source.joints_count);
             for (cgltf_size index = 0; index < source.joints_count; ++index) {
                 float values[16]{};
-                if (!cgltf_accessor_read_float(source.inverse_bind_matrices, index, values, 16)) {
+                if (!readFloat(source.inverse_bind_matrices, index, values, 16)) {
                     error = "inverse bind matrix accessor read failed";
                     return false;
                 }
@@ -430,6 +542,7 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
                 return false;
             }
             const cgltf_type valueType = channel.path == ChannelPath::Rotation ? cgltf_type_vec4 : cgltf_type_vec3;
+            if (sampler.input->count > std::numeric_limits<std::size_t>::max()/3) { error = "animation count overflow"; return false; }
             const cgltf_size valueCount = sampler.input->count *
                 (channel.interpolation == Interpolation::CubicSpline ? 3 : 1);
             if (!sampler.output || sampler.output->type != valueType || sampler.output->count != valueCount ||
@@ -439,8 +552,8 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
             }
             channel.times.resize(sampler.input->count);
             for (cgltf_size index = 0; index < sampler.input->count; ++index) {
-                if (!cgltf_accessor_read_float(sampler.input, index, &channel.times[index], 1) ||
-                    (index > 0 && channel.times[index] < channel.times[index - 1])) {
+                if (!readFloat(sampler.input, index, &channel.times[index], 1) ||
+                    (index > 0 && channel.times[index] <= channel.times[index - 1])) {
                     error = "animation keyframe times are invalid";
                     return false;
                 }
@@ -448,7 +561,7 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
             channel.values.resize(valueCount);
             for (cgltf_size index = 0; index < valueCount; ++index) {
                 float values[4]{};
-                if (!cgltf_accessor_read_float(sampler.output, index, values,
+                if (!readFloat(sampler.output, index, values,
                                                valueType == cgltf_type_vec4 ? 4 : 3)) {
                     error = "animation output accessor read failed";
                     return false;
@@ -465,17 +578,28 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
 
 } // namespace
 
-LoadResult loadGltf(const std::filesystem::path& path) {
-    auto directory=std::filesystem::absolute(path).parent_path();
+static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::filesystem::path& relative) {
+    try {
+    const auto modelPath = confinedPath(assetSource, relative);
+    ReadContext context{&assetSource, modelPath};
+    const auto bytes = readResource(assetSource, modelPath);
     cgltf_options options{};
-    options.file.read=&assetRead;options.file.release=&assetRelease;options.file.user_data=&directory;
     cgltf_data* parsed = nullptr;
-    const std::string nativePath = path.string();
-    cgltf_result result = cgltf_parse_file(&options, nativePath.c_str(), &parsed);
-    if (result != cgltf_result_success) return failure("glTF parse failed: " + std::string(resultName(result)));
+    cgltf_result result = cgltf_parse(&options, bytes.data(), bytes.size(), &parsed);
+    if (result != cgltf_result_success) return failure(modelPath.generic_u8string() + ": glTF parse failed: " + resultName(result));
     DataHandle data(parsed, &cgltf_free);
-    result = cgltf_load_buffers(&options, data.get(), nativePath.c_str());
-    if (result != cgltf_result_success) return failure("glTF buffer load failed: " + std::string(resultName(result)));
+    // Own dependencies until conversion finishes; cgltf references these bytes.
+    std::vector<std::vector<uint8_t>> buffers(data->buffers_count);
+    for (std::size_t i=0;i<data->buffers_count;++i) {
+        auto& buffer = data->buffers[i];
+        if (buffer.uri) {
+            buffers[i] = readUri(context, buffer.uri);
+            if (buffers[i].size() < buffer.size) return failure("glTF buffer load failed: data too short");
+            buffer.data = buffers[i].data();
+        } else if (i == 0 && data->bin && data->bin_size >= buffer.size) buffer.data = const_cast<void*>(data->bin);
+        else return failure("glTF buffer load failed: missing buffer");
+        buffer.data_free_method = cgltf_data_free_method_none;
+    }
     for (cgltf_size index = 0; index < data->extensions_required_count; ++index) {
         return failure("required glTF extension is unsupported: " +
                        std::string(data->extensions_required[index] ? data->extensions_required[index] : "unnamed"));
@@ -508,17 +632,38 @@ LoadResult loadGltf(const std::filesystem::path& path) {
                                   source.pbr_metallic_roughness.base_color_factor[2],
                                   source.pbr_metallic_roughness.base_color_factor[3]};
             if (source.pbr_metallic_roughness.base_color_texture.texture)
-                material.image = imageIndex(*data, source.pbr_metallic_roughness.base_color_texture.texture->image);
+                {
+                const auto* texture = source.pbr_metallic_roughness.base_color_texture.texture;
+                material.image = imageIndex(*data, texture->image);
+                material.texture = static_cast<int>(texture - data->textures);
+                if (source.pbr_metallic_roughness.base_color_texture.texcoord != 0 || source.pbr_metallic_roughness.base_color_texture.has_transform)
+                    return failure("only untransformed TEXCOORD_0 base-color textures are supported");
+            }
         }
         asset->materials.push_back(material);
     }
     asset->images.reserve(data->images_count);
     for (cgltf_size index = 0; index < data->images_count; ++index) {
         ImageData image;
-        if (!convertImage(data->images[index], image, error)) return failure(std::move(error));
+        if (!convertImage(data->images[index], context, image, error)) return failure(std::move(error));
         asset->images.push_back(std::move(image));
     }
 
+    for (std::size_t i=0;i<data->samplers_count;++i) {
+        const auto& sampler = data->samplers[i];
+        const int min=static_cast<int>(sampler.min_filter),mag=static_cast<int>(sampler.mag_filter);
+        const auto validWrap=[](int wrap){return wrap==10497 || wrap==33071 || wrap==33648;};
+        if((min && min!=9728 && min!=9729 && (min<9984 || min>9987)) || (mag && mag!=9728 && mag!=9729) ||
+            !validWrap(sampler.wrap_s) || !validWrap(sampler.wrap_t)) return failure("invalid texture sampler");
+        asset->samplers.push_back({sampler.min_filter ? static_cast<int>(sampler.min_filter) : 9728,
+            sampler.mag_filter ? static_cast<int>(sampler.mag_filter) : 9728,
+            static_cast<int>(sampler.wrap_s), static_cast<int>(sampler.wrap_t)});
+    }
+    for (std::size_t i=0;i<data->textures_count;++i) {
+        const auto& texture = data->textures[i];
+        if(imageIndex(*data,texture.image)<0) return failure("texture has no supported image");
+        asset->textures.push_back({imageIndex(*data, texture.image), texture.sampler ? static_cast<int>(texture.sampler-data->samplers) : -1});
+    }
     std::vector<std::vector<int>> meshPrimitives(data->meshes_count);
     bool hasBounds = false;
     for (cgltf_size meshIndex = 0; meshIndex < data->meshes_count; ++meshIndex) {
@@ -541,10 +686,6 @@ LoadResult loadGltf(const std::filesystem::path& path) {
     }
 
     asset->nodes.resize(data->nodes_count);
-    constexpr int UNBOUND_PRIMITIVE = -3;
-    constexpr int CONFLICTING_PRIMITIVE = -2;
-    std::vector<int> primitiveSkinBindings(
-        asset->primitives.size(), UNBOUND_PRIMITIVE);
     for (cgltf_size index = 0; index < data->nodes_count; ++index) {
         const cgltf_node& source = data->nodes[index];
         Node& node = asset->nodes[index];
@@ -561,10 +702,6 @@ LoadResult loadGltf(const std::filesystem::path& path) {
             node.primitives = meshPrimitives[meshIndex];
             for (int primitiveIndex : node.primitives) {
                 Primitive& primitive = asset->primitives[primitiveIndex];
-                int& binding = primitiveSkinBindings[
-                    static_cast<std::size_t>(primitiveIndex)];
-                if (binding == UNBOUND_PRIMITIVE) binding = node.skin;
-                else if (binding != node.skin) binding = CONFLICTING_PRIMITIVE;
                 if (node.skin >= 0) {
                     const std::size_t jointCount = asset->skins[static_cast<std::size_t>(node.skin)].joints.size();
                     for (const Vertex& vertex : primitive.vertices) {
@@ -584,13 +721,10 @@ LoadResult loadGltf(const std::filesystem::path& path) {
             asset->nodes[child].parent = static_cast<int>(index);
         }
     }
-    for (std::size_t index = 0; index < asset->primitives.size(); ++index) {
-        const int binding = primitiveSkinBindings[index];
-        asset->primitives[index].skin = binding >= 0 ? binding : -1;
-    }
-    if (data->scene) {
-        for (cgltf_size index = 0; index < data->scene->nodes_count; ++index) {
-            const int root = pointerIndex(*data, data->scene->nodes[index]);
+    const auto* scene = data->scene ? data->scene : (data->scenes_count ? &data->scenes[0] : nullptr);
+    if (scene) {
+        for (cgltf_size index = 0; index < scene->nodes_count; ++index) {
+            const int root = pointerIndex(*data, scene->nodes[index]);
             if (root < 0) return failure("scene has an invalid root node");
             asset->sceneRoots.push_back(root);
         }
@@ -600,9 +734,26 @@ LoadResult loadGltf(const std::filesystem::path& path) {
     }
     if (!convertAnimations(*data, *asset, error)) return failure(std::move(error));
 
+    if (!prepareAsset(*asset, error)) return failure(std::move(error));
     LoadResult success;
     success.asset = std::move(asset);
+    for(std::size_t i=0;i<data->extensions_used_count;++i)
+        success.warnings.push_back(std::string("optional glTF extension ignored: ")+data->extensions_used[i]);
     return success;
+    } catch (const std::exception& error) {
+        return failure(relative.generic_u8string() + ": " + error.what());
+    }
+}
+
+LoadResult loadGltf(const AssetSource& source,const std::filesystem::path& relative) {
+    auto result=loadSourceGltf(source,relative);
+    if(!result) result.error=source.namespaceKey+":"+relative.generic_u8string()+": "+result.error;
+    return result;
+}
+
+LoadResult loadGltf(const std::filesystem::path& path) {
+    const auto normalized=path.lexically_normal();
+    return loadGltf(AssetSource{"filesystem", normalized.parent_path(), {}}, normalized.filename());
 }
 
 } // namespace model

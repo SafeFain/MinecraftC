@@ -96,14 +96,13 @@ std::string modelJson(std::size_t byteLength, bool external, bool tooManyJoints,
                       bool nonIndexed = false, bool indices32 = false) {
     const std::size_t positionSize = badAccessor ? 12 : 36;
     const std::string bufferUri = external ? "\"uri\":\"external.bin\"," : "";
-    const std::string joints = tooManyJoints
-        ? "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64]"
-        : "[0,1]";
+    std::string joints = "[0,1]";
+    if(tooManyJoints) { joints="["; for(int i=0;i<257;++i) joints+=(i?",":"")+std::to_string(i); joints+="]"; }
     std::string nodes = "[{\"name\":\"root\",\"translation\":[2,0,0],\"children\":[1]},"
                         "{\"name\":\"mesh\",\"mesh\":0,\"skin\":0,\"scale\":[2,2,2]},"
                         "{\"name\":\"matrix\",\"matrix\":[1,0,0,0,0,1,0,0,0,0,1,0,4,0,0,1]}";
     if (tooManyJoints) {
-        for (int index = 3; index < 65; ++index) nodes += ",{}";
+        for (int index = 3; index < 257; ++index) nodes += ",{}";
     }
     nodes += "]";
     return std::string("{\"asset\":{\"version\":\"2.0\"},") +
@@ -164,7 +163,7 @@ std::filesystem::path fixture(const char* name) {
     std::filesystem::create_directories(root);
     const std::vector<unsigned char> binary = modelBuffer(0);
     writeGlb(root / "skinned.glb", modelJson(binary.size(), false, false, false, false), binary);
-    writeGlb(root / "skin_65.glb", modelJson(binary.size(), false, true, false, false), binary);
+    writeGlb(root / "skin_257.glb", modelJson(binary.size(), false, true, false, false), binary);
     writeGlb(root / "accessor_oob.glb", modelJson(binary.size(), false, false, true, false), binary);
     writeGlb(root / "joint_oob.glb", modelJson(binary.size(), false, false, false, false), modelBuffer(2));
     writeGlb(root / "required_extension.glb", modelJson(binary.size(), false, false, false, true), binary);
@@ -204,7 +203,10 @@ std::filesystem::path fixture(const char* name) {
 
 } // namespace
 
+#include "GltfUpgradeCases.h"
+
 int main() {
+    upgradedCases();
     const auto valid = model::loadGltf(fixture("skinned.glb"));
     require(valid && valid.asset->skins[0].joints.size() == 2, "valid skin failed");
     require(valid.asset->primitives.size() == 1 && valid.asset->primitives[0].indices.size() == 3,
@@ -213,7 +215,7 @@ int main() {
     require(vertices.size() == 3 && vertices[0].uv == glm::vec2(0,0) &&
             vertices[1].uv == glm::vec2(1,0) && vertices[2].uv == glm::vec2(0,1),
             "real loader preserves asymmetric source UV coordinates");
-    require(valid.asset->primitives[0].skin == 0,
+    require(valid.asset->bindings[0].skin == 0,
             "node skin was not handed off to its unique mesh primitive");
     require(valid.asset->images.size() == 1 && valid.asset->images[0].width == 1,
             "embedded PNG was not decoded");
@@ -236,8 +238,8 @@ int main() {
                 animated.asset->animations[0].channels[2].interpolation == model::Interpolation::CubicSpline,
             "animation interpolation modes were not converted");
 
-    const auto over = model::loadGltf(fixture("skin_65.glb"));
-    require(!over && contains(over.error, "65") && contains(over.error, "64"),
+    const auto over = model::loadGltf(fixture("skin_257.glb"));
+    require(!over && contains(over.error, "257") && contains(over.error, "256"),
             "joint limit diagnostic lost counts");
 
     const auto broken = model::loadGltf(fixture("accessor_oob.glb"));
@@ -267,7 +269,7 @@ int main() {
     const auto sharedMesh = model::loadGltf(fixture("shared_mesh_skins.glb"));
     require(sharedMesh && sharedMesh.asset->nodes[1].skin == 0 && sharedMesh.asset->nodes[2].skin == 1 &&
                 sharedMesh.asset->nodes[1].primitives == sharedMesh.asset->nodes[2].primitives &&
-                sharedMesh.asset->primitives[0].skin == -1,
+                sharedMesh.asset->bindings.size() == 2 && sharedMesh.asset->bindings[0].skin != sharedMesh.asset->bindings[1].skin,
             "shared mesh primitive retained a node-specific skin");
 
     const char* entityModels[] = {"cow", "pig", "sheep", "chicken",
@@ -281,7 +283,7 @@ int main() {
         require(static_cast<bool>(loaded),
                 "generated runtime entity model failed loader validation");
         require(loaded.asset->primitives.size() == 1 &&
-                    loaded.asset->primitives[0].skin == 0,
+                    loaded.asset->bindings.size() == 1 && loaded.asset->bindings[0].skin == 0,
                 "generated entity primitive lost its GPU skin binding");
     }
     const auto player = model::loadGltf(

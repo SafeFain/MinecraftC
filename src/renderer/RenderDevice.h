@@ -40,12 +40,16 @@ enum class TextureFormat {
 enum class TextureFilter {
     Nearest,
     Linear,
-    NearestMipmapLinear
+    NearestMipmapLinear,
+    NearestMipmapNearest,
+    LinearMipmapNearest,
+    LinearMipmapLinear
 };
 
 enum class TextureAddressMode {
     Repeat,
-    ClampToEdge
+    ClampToEdge,
+    MirroredRepeat
 };
 
 struct TextureData {
@@ -126,6 +130,10 @@ struct RendererPerformanceStats {
     uint32_t pipelineBinds = 0;
     uint32_t descriptorBinds = 0;
     uint32_t vertexBufferBinds = 0;
+    uint32_t modelDrawCalls = 0;
+    uint32_t modelInstances = 0;
+    uint64_t modelPaletteBytes = 0;
+    uint64_t modelInstanceBytes = 0;
 };
 
 class IRenderDevice {

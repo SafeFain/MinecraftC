@@ -1,3 +1,4 @@
+#include "model/GltfLoader.h"
 #include "plugins/PluginManager.h"
 #include "ui/PluginMenu.h"
 #include "app/Application.h"
@@ -77,7 +78,7 @@ public:
     explicit Application(RuntimePaths paths, bool safeMode)
         : m_paths(std::move(paths)),
           m_assets(m_paths.assetRoot),
-          m_plugins(m_paths),m_safeMode(safeMode),
+          m_plugins(m_paths,m_modelAssets),m_safeMode(safeMode),
           m_window(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT, "MinecraftC"),
           m_renderer(std::make_unique<VulkanRenderer>()),
           m_session(m_paths.savesDirectory()),
@@ -132,6 +133,7 @@ public:
 private:
     RuntimePaths m_paths;
     AssetStore m_assets;
+    std::shared_ptr<model::ModelAssetCache> m_modelAssets=std::make_shared<model::ModelAssetCache>();
     Plugins::PluginManager m_plugins;
     bool m_safeMode=false;
     platform::sdl::SdlClipboard m_clipboard;
@@ -209,6 +211,7 @@ private:
         m_ui.localization.setLanguage(m_clientSettings.language);
         applyClientSettings(false);
 
+        static_cast<VulkanRenderer&>(*m_renderer).setModelAssets(m_modelAssets);
         m_renderer->initialize(m_window, m_paths.assetRoot);
         m_renderer->setVisualQuality(m_clientSettings.visualQuality);
         m_renderer->setEnhancedVisualSettings(m_clientSettings.enhancedVisual);

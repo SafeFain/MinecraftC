@@ -1,5 +1,6 @@
 #include "plugins/PluginManager.h"
 #include "Config.h"
+#include "model/GltfLoader.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -126,7 +127,12 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
     e.health=d.health;e.speed=d.speed;e.damage=d.attack_damage;e.stateVersion=d.state_version;
     std::copy(d.size_xyz,d.size_xyz+3,e.size.begin());e.drop=d.drop_item?d.drop_item:"";e.dropCount=d.drop_count;
 
-    if(d.model&&*d.model){e.model=containedPath(m_info.at(ctx.index).root,d.model);require(std::filesystem::is_regular_file(e.model),"Missing entity model");}
+    if(d.model&&*d.model){e.model=containedPath(m_info.at(ctx.index).root,d.model);require(std::filesystem::is_regular_file(e.model),"Missing entity model");
+        const auto& package=m_info.at(ctx.index);
+        const auto modelRoot=std::filesystem::weakly_canonical(package.root);
+        const auto& loadedModel=m_modelAssets->load(model::AssetSource{package.manifest.id,modelRoot,{}},e.model.lexically_relative(modelRoot));
+        m_modelAssets->alias(e.model,loadedModel);
+    }
     auto& entries=content().extensions.entities;
     for(const auto& it:entries)require(it.second.key!=e.key,"Duplicate entity key");
     if(d.target&&*d.target) {

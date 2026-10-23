@@ -13,7 +13,7 @@ and place the feet/base at local `Y=0`. Each contains an embedded original
 64x64 RGBA semantic skin with nearest filtering, independent head/body faces,
 half-texel-inset UVs, and a genuine multi-joint skin
 containing a root plus rigidly weighted body-part joints. Every vertex uses at
-most four weights and every skin remains below the 64-joint runtime limit.
+most four weights and every skin remains below the 256-joint runtime limit.
 Animated limb joints sit at their anatomical attachment points (shoulder, hip,
 wing root, or inner leg root), so movement rotates around the joint rather than
 the cuboid's geometric center. Each

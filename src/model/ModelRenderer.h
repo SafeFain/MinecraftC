@@ -1,6 +1,7 @@
 #pragma once
 
 #include "model/ModelAnimation.h"
+#include "model/GltfLoader.h"
 #include "renderer/RenderEnvironment.h"
 #include "world/BlockLightLogic.h"
 
@@ -13,15 +14,23 @@ class VulkanRenderer;
 
 namespace model {
 
-using ModelHandle = uint32_t;
+struct ModelHandle {
+    uint32_t value = 0;
+    uint32_t generation = 0;
+    explicit operator bool() const { return value != 0; }
+    bool operator==(ModelHandle other) const { return value==other.value && generation==other.generation; }
+    bool operator!=(ModelHandle other) const { return !(*this==other); }
+    bool operator<(ModelHandle other) const { return generation==other.generation ? value<other.value : generation<other.generation; }
+};
 
 struct ModelDraw {
-    ModelHandle model = 0;
+    ModelHandle model{};
     glm::mat4 transform{1.0f};
     const ModelInstance* instance = nullptr;
     glm::vec4 tint{1.0f};
     float distanceSquared = 0.0f;
     SmoothLightSample light;
+    std::shared_ptr<const ModelInstance> snapshot{};
 };
 
 class IModelRenderBackend {
@@ -36,11 +45,13 @@ public:
         const RenderEnvironment& environment, const glm::vec3& cameraPosition,
         float fogStart, float fogEnd) = 0;
     virtual void clear() = 0;
+    virtual void setBatching(bool enabled, std::size_t pageBytes) { (void)enabled; (void)pageBytes; }
 };
 
 class ModelRenderer {
 public:
-    explicit ModelRenderer(std::unique_ptr<IModelRenderBackend> backend);
+    explicit ModelRenderer(std::unique_ptr<IModelRenderBackend> backend,
+                           std::shared_ptr<ModelAssetCache> assets = {});
     ~ModelRenderer();
     ModelRenderer(const ModelRenderer&) = delete;
     ModelRenderer& operator=(const ModelRenderer&) = delete;
@@ -56,12 +67,15 @@ public:
                     const glm::vec3& cameraPosition,
                     float fogStart, float fogEnd);
     void clear();
+    void setBatching(bool enabled, std::size_t pageBytes = 0) { m_backend->setBatching(enabled, pageBytes); }
+    ModelAssetCache& assets() { return *m_assets; }
 
 private:
     std::unique_ptr<IModelRenderBackend> m_backend;
+    std::shared_ptr<ModelAssetCache> m_assets;
 };
 
 std::unique_ptr<ModelRenderer> createVulkanModelRenderer(
-    ::VulkanRenderer& renderer);
+    ::VulkanRenderer& renderer, std::shared_ptr<ModelAssetCache> assets = {});
 
 } // namespace model

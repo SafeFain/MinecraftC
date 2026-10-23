@@ -4,8 +4,10 @@
 
 namespace model {
 
-ModelRenderer::ModelRenderer(std::unique_ptr<IModelRenderBackend> backend)
-    : m_backend(std::move(backend)) {
+ModelRenderer::ModelRenderer(std::unique_ptr<IModelRenderBackend> backend,
+                             std::shared_ptr<ModelAssetCache> assets)
+    : m_backend(std::move(backend)),
+      m_assets(assets ? std::move(assets) : std::make_shared<ModelAssetCache>()) {
     if (!m_backend) throw std::invalid_argument("Model renderer backend is null");
 }
 

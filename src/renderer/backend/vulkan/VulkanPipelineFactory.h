@@ -126,13 +126,8 @@ struct BloomConstants {
     glm::vec4 sourceTexelAndExtract{0.0f};
 };
 
-struct ModelUniforms {
+struct ModelEnvironment {
     glm::mat4 viewProjection{1.0f};
-    glm::mat4 model{1.0f};
-    glm::mat4 node{1.0f};
-    std::array<glm::mat4, model::MAX_JOINTS> joints{};
-    glm::vec4 baseColor{1.0f};
-    glm::vec4 params{0.0f};
     glm::vec4 cameraFogStart{0.0f};
     glm::vec4 fogColorEnd{0.0f};
     glm::vec4 lightDirection{0.0f};
@@ -140,6 +135,15 @@ struct ModelUniforms {
     glm::vec4 ambientColor{0.0f};
     glm::vec4 options{0.0f};
 };
+struct ModelGpuInstance {
+    glm::mat4 transform{1.0f};
+    glm::vec4 baseColor{1.0f};
+    glm::vec4 params{0.0f};
+    glm::uvec4 indices{0}; // palette offset, joint count, environment index, reserved
+};
+static_assert(sizeof(ModelEnvironment)==160);
+static_assert(sizeof(ModelGpuInstance)==112);
+static_assert(offsetof(ModelGpuInstance,indices)==96);
 
 static_assert(sizeof(SkyUniforms) == 368);
 static_assert(offsetof(SkyUniforms, weather) == 144);
@@ -163,7 +167,7 @@ static_assert(sizeof(VoxelGiInjectConstants) == 96);
 static_assert(offsetof(VoxelGiInjectConstants, regionOffset) == 64);
 static_assert(offsetof(VoxelGiInjectConstants, regionExtent) == 80);
 static_assert(sizeof(BloomConstants) == 16);
-static_assert(sizeof(ModelUniforms) == 4416);
+
 
 // ── Factory inputs/outputs ──────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 #include "entity/EntityModelRegistry.h"
+#include <chrono>
 #include "model/AnimationGraph.h"
 #include "model/ModelRenderer.h"
 #include "debug/Log.h"
@@ -117,42 +118,40 @@ std::string graphContractError(EntityType type,
 
 EntityModelRegistry::EntityModelRegistry(Loader loader)
     : m_loader(std::move(loader)), m_definitions{{
-        {EntityType::Cow,"cow.glb",{},{},0,false},
-        {EntityType::Pig,"pig.glb",{},{},0,false},
-        {EntityType::Sheep,"sheep.glb",{},{},0,false},
-        {EntityType::Chicken,"chicken.glb",{},{},0,false},
-        {EntityType::Zombie,"zombie.glb",{},{},0,false},
-        {EntityType::Skeleton,"skeleton.glb",{},{},0,false},
-        {EntityType::Spider,"spider.glb",{},{},0,false},
-        {EntityType::Blastling,"blastling.glb",{},{},0,false},
-        {EntityType::Villager,"villager.glb",{},{},0,false},
-        {EntityType::ZombieVillager,"zombie_villager.glb",{},{},0,false},
-        {EntityType::IronGolem,"iron_golem.glb",{},{},0,false}}},
-      m_placeholder(makePlaceholder()) {}
+        {EntityType::Cow,"cow.glb",{},{},{},false},
+        {EntityType::Pig,"pig.glb",{},{},{},false},
+        {EntityType::Sheep,"sheep.glb",{},{},{},false},
+        {EntityType::Chicken,"chicken.glb",{},{},{},false},
+        {EntityType::Zombie,"zombie.glb",{},{},{},false},
+        {EntityType::Skeleton,"skeleton.glb",{},{},{},false},
+        {EntityType::Spider,"spider.glb",{},{},{},false},
+        {EntityType::Blastling,"blastling.glb",{},{},{},false},
+        {EntityType::Villager,"villager.glb",{},{},{},false},
+        {EntityType::ZombieVillager,"zombie_villager.glb",{},{},{},false},
+        {EntityType::IronGolem,"iron_golem.glb",{},{},{},false}}},
+      m_cache(m_loader), m_placeholder(makePlaceholder()) {}
 
-void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot) {
+void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache) {
     const std::filesystem::path root = assetRoot / "models" / "entities";
     for(const auto& entry:Plugins::content().extensions.entities) {
         const auto type=static_cast<EntityType>(entry.first);const auto& e=entry.second;
         auto it=std::find_if(m_definitions.begin(),m_definitions.end(),[&](const auto& d){return d.type==type;});
         if(it==m_definitions.end()) {
             const auto base=definition(static_cast<EntityType>(e.base));
-            m_definitions.push_back({type,e.model.empty()?base.filename:e.model,{},{},0,false});
+            m_definitions.push_back({type,e.model.empty()?base.filename:e.model,{},{},{},false});
         } else if(!e.model.empty())it->filename=e.model;
     }
     for (EntityModelDefinition& definition : m_definitions) {
         const std::filesystem::path path = (root / definition.filename).lexically_normal();
-        auto cached = m_cache.find(path);
-        if (cached == m_cache.end()) {
-            model::LoadResult loaded = m_loader(path);
-            if (!loaded)
-                LOG_WARN("Entity model fallback for " << path.u8string()
-                         << ": " << loaded.error);
-            const auto asset = loaded ? loaded.asset : m_placeholder;
-            cached = m_cache.emplace(path, asset).first;
-        }
-        definition.asset = cached->second;
+        const auto previousAsset=definition.asset;
+        const auto& loaded = (cache ? *cache : m_cache).load(path);
+        if (!loaded) LOG_WARN("Entity model fallback for " << path.u8string() << ": " << loaded.error);
+        definition.asset = loaded ? loaded.asset : m_placeholder;
         definition.usesPlaceholder = definition.asset == m_placeholder;
+        if(previousAsset==definition.asset && definition.graph) continue;
+        // Mixers hold pointers into immutable assets/graphs. A genuine asset
+        // replacement retires instances; GPU rebuilds reuse the CPU cache.
+        if(previousAsset) clearInstances();
         const std::filesystem::path graphPath = path.parent_path() /
             (path.stem().u8string() + ".anim.json");
         model::AnimationGraphLoadResult loadedGraph =
@@ -187,7 +186,6 @@ void EntityModelRegistry::uploadAll(model::ModelRenderer& renderer) {
 
 void EntityModelRegistry::clearInstances() {
     m_instances.clear();
-    m_seen.clear();
 }
 
 bool EntityModelRegistry::hasModel(EntityType type) const {
@@ -243,7 +241,7 @@ bool EntityModelRegistry::playing(EntityType type, uint64_t id,
     return entry.mixer.playing(definition(type).graph->actionFor(semantic));
 }
 
-void EntityModelRegistry::beginFrame() { m_seen.clear(); }
+void EntityModelRegistry::beginFrame() { m_poseCpuMs=m_queueCpuMs=0; }
 
 void EntityModelRegistry::queue(
     EntityType type, uint64_t id, const glm::dvec3& position,
@@ -251,14 +249,12 @@ void EntityModelRegistry::queue(
     const glm::dvec3& renderOrigin,
     const glm::vec3& cameraPosition, model::ModelRenderer& renderer,
     const glm::vec3& visualTint, SmoothLightSample light, bool sleeping, float scale) {
-    m_seen.insert(id);
     const auto& definition = this->definition(type);
     InstanceEntry& entry = ensure(type, id);
-    entry.mixer.evaluate(entry.instance.pose);
-    entry.instance.jointPalettes.clear();
-    for (std::size_t skin = 0; skin < definition.asset->skins.size(); ++skin)
-        entry.instance.jointPalettes.push_back(
-            model::jointMatrices(*definition.asset, entry.instance.pose, skin));
+    const auto poseStart=m_measure?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
+    entry.mixer.evaluate(entry.instance);
+    const auto queueStart=m_measure?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
+    if(m_measure) m_poseCpuMs+=std::chrono::duration<double,std::milli>(queueStart-poseStart).count();
     const float facingLength = std::hypot(facing.x, facing.z);
     const float yaw = facingLength > 0.001f
         ? std::atan2(-facing.x, -facing.z)
@@ -279,12 +275,16 @@ void EntityModelRegistry::queue(
     renderer.queue({definition.handle, transform, &entry.instance,
                     glm::vec4(glm::max(illumination,glm::vec3(0.025f)) *
                               visualTint, 1.0f),
-                    glm::dot(delta, delta), light});
+                    glm::dot(delta, delta), light, {}});
+    if(m_measure) m_queueCpuMs+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-queueStart).count();
 }
 
-void EntityModelRegistry::endFrame() {
-    for (auto it = m_instances.begin(); it != m_instances.end();) {
-        if (!m_seen.count(it->first)) it = m_instances.erase(it);
-        else ++it;
+void EntityModelRegistry::endFrame() {}
+
+void EntityModelRegistry::retainInstances(const std::vector<uint64_t>& live) {
+    ++m_retentionEpoch;
+    for(uint64_t id:live) {const auto found=m_instances.find(id);if(found!=m_instances.end()) found->second.retentionEpoch=m_retentionEpoch;}
+    for(auto it=m_instances.begin();it!=m_instances.end();) {
+        if(it->second.retentionEpoch!=m_retentionEpoch) it=m_instances.erase(it); else ++it;
     }
 }

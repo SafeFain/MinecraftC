@@ -38,6 +38,8 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <tuple>
+#include <map>
 #include <vector>
 
 namespace {
@@ -73,7 +75,8 @@ using vkp::PostConstants;
 using vkp::BloomConstants;
 using vkp::VoxelGiScreenUniforms;
 using vkp::VoxelGiInjectConstants;
-using vkp::ModelUniforms;
+using vkp::ModelEnvironment;
+using vkp::ModelGpuInstance;
 
 static_assert(sizeof(ParticleRenderData) == 48);
 static_assert(offsetof(ParticleRenderData,color)==32);
@@ -184,19 +187,32 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         Buffer index;
         uint32_t indexCount = 0;
         int material = -1;
-        int skin = -1;
-        int node = -1;
+
     };
     struct ModelResource {
         std::shared_ptr<const model::ModelAsset> asset;
         std::vector<ModelPrimitive> primitives;
         std::vector<RenderTextureHandle> textures;
         std::vector<RenderMaterialHandle> textureMaterials;
+        std::vector<model::DrawBinding> bindings;
+        std::shared_ptr<model::ModelInstance> bindInstance;
+        bool hasOpaque=false,hasBlend=false;
+    };
+    struct ModelFramePage {
+        std::array<Buffer,3> buffers{};
+        std::array<size_t,3> capacities{};
+        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        std::vector<ModelEnvironment> environments;
+        std::vector<ModelGpuInstance> instances;
+        std::vector<glm::mat4> palettes;
+        uint32_t paletteSource=0;
     };
     struct ModelFrameBuffer {
-        Buffer uniform;
-        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-        size_t capacity = 0;
+        std::vector<ModelFramePage> pages;
+    };
+    struct ModelBatch {
+        uint32_t model=0, primitive=0, page=0, first=0, count=0;
+        bool blended=false;
     };
     struct ModelPassSubmission {
         model::ModelDraw draw;
@@ -370,7 +386,10 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     std::vector<ModelResource> models;
     std::vector<ModelPassSubmission> submittedModelOpaque;
     std::vector<ModelPassSubmission> submittedModelBlend;
-    VkDeviceSize modelUniformStride = 0;
+    std::vector<ModelBatch> modelBatches;
+    uint32_t modelGeneration=1;
+    bool modelBatching=true;
+    size_t modelPageBytes=0;
     std::vector<PendingBufferUpload> pendingBufferUploads;
     std::vector<PreparedBufferCopy> preparedBufferCopies;
     std::vector<PendingImageUpload> pendingImageUploads;
@@ -1344,14 +1363,14 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = samplerDesc.magFilter == TextureFilter::Nearest
             ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
-        samplerInfo.minFilter = samplerDesc.minFilter == TextureFilter::Linear
+        samplerInfo.minFilter = (samplerDesc.minFilter == TextureFilter::Linear || samplerDesc.minFilter == TextureFilter::LinearMipmapNearest || samplerDesc.minFilter == TextureFilter::LinearMipmapLinear)
             ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-        samplerInfo.mipmapMode = samplerDesc.minFilter == TextureFilter::NearestMipmapLinear
+        samplerInfo.mipmapMode = (samplerDesc.minFilter == TextureFilter::NearestMipmapLinear || samplerDesc.minFilter == TextureFilter::LinearMipmapLinear)
             ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
         samplerInfo.addressModeU = samplerDesc.addressU == TextureAddressMode::Repeat
-            ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            ? VK_SAMPLER_ADDRESS_MODE_REPEAT : samplerDesc.addressU == TextureAddressMode::MirroredRepeat ? VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeV = samplerDesc.addressV == TextureAddressMode::Repeat
-            ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            ? VK_SAMPLER_ADDRESS_MODE_REPEAT : samplerDesc.addressV == TextureAddressMode::MirroredRepeat ? VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.maxAnisotropy = 1.0f;
         samplerInfo.maxLod = static_cast<float>(data.mipLevels.size());
@@ -1404,17 +1423,12 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     device, &info, nullptr, &descriptors.chunkDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout");
 
-        VkDescriptorSetLayoutBinding modelBinding{};
-        modelBinding.binding = 0;
-        modelBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        modelBinding.descriptorCount = 1;
-        modelBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT |
-                                  VK_SHADER_STAGE_FRAGMENT_BIT;
-        info.bindingCount = 1;
-        info.pBindings = &modelBinding;
-        require(vkCreateDescriptorSetLayout(
-                    device, &info, nullptr, &descriptors.modelUniformDescriptorSetLayout),
-                "vkCreateDescriptorSetLayout");
+        std::array<VkDescriptorSetLayoutBinding,3> modelBindings{};
+        for(uint32_t i=0;i<3;++i) modelBindings[i]={i,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,
+            static_cast<VkShaderStageFlags>(i==2 ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT),nullptr};
+        info.bindingCount=modelBindings.size(); info.pBindings=modelBindings.data();
+        require(vkCreateDescriptorSetLayout(device,&info,nullptr,&descriptors.modelUniformDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout(model)");
 
         std::array<VkDescriptorSetLayoutBinding,7> postBindings{};
         for (uint32_t binding = 0; binding < postBindings.size(); ++binding) {
@@ -1483,9 +1497,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 "vkCreateDescriptorSetLayout(voxel GI injection)");
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-        const VkDeviceSize alignment = std::max<VkDeviceSize>(
-            1, properties.limits.minUniformBufferOffsetAlignment);
-        modelUniformStride = (sizeof(ModelUniforms) + alignment - 1) & ~(alignment - 1);
+
     }
 
     void createDescriptorPool() {
@@ -2073,123 +2085,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 "vmaFlushAllocation");
     }
 
-    template<typename Callback>
-    void forEachModelPrimitive(const std::vector<ModelPassSubmission>& submissions,
-                               bool blended, Callback&& callback) {
-        for (const ModelPassSubmission& submission : submissions) {
-            if (submission.draw.model == 0 || submission.draw.model > models.size()) continue;
-            ModelResource& resource = models[submission.draw.model - 1];
-            for (ModelPrimitive& primitive : resource.primitives) {
-                const model::Material fallback;
-                const model::Material& material = primitive.material >= 0 &&
-                    static_cast<size_t>(primitive.material) < resource.asset->materials.size()
-                    ? resource.asset->materials[static_cast<size_t>(primitive.material)]
-                    : fallback;
-                if ((model::modelPass(material.alphaMode) == model::ModelPass::Blend) != blended)
-                    continue;
-                callback(submission, resource, primitive, material);
-            }
-        }
-    }
-
-    void prepareModelBuffer() {
-        // Opaque draws have no ordering requirement. Group equal model
-        // resources so their primitive buffers and texture descriptors remain
-        // hot while recording; blended submissions retain strict depth order.
-        std::stable_sort(submittedModelOpaque.begin(), submittedModelOpaque.end(),
-            [](const ModelPassSubmission& a, const ModelPassSubmission& b) {
-                return a.draw.model < b.draw.model;
-            });
-        size_t count = 0;
-        forEachModelPrimitive(submittedModelOpaque, false,
-            [&](const auto&, auto&, auto&, const auto&) { ++count; });
-        forEachModelPrimitive(submittedModelBlend, true,
-            [&](const auto&, auto&, auto&, const auto&) { ++count; });
-        if (count == 0) return;
-        ModelFrameBuffer& frame = modelBuffers[currentFrame];
-        if (frame.capacity < count) {
-            if (frame.descriptorSet) {
-                require(vkFreeDescriptorSets(device, descriptors.descriptorPool, 1,
-                    &frame.descriptorSet), "vkFreeDescriptorSets");
-                frame.descriptorSet = VK_NULL_HANDLE;
-            }
-            destroyBuffer(frame.uniform);
-            frame.capacity = std::max(count, frame.capacity ? frame.capacity * 2 : size_t{64});
-            frame.uniform = createBuffer(modelUniformStride * frame.capacity,
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
-                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-                    VMA_ALLOCATION_CREATE_MAPPED_BIT);
-            VkDescriptorSetAllocateInfo allocate{};
-            allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocate.descriptorPool = descriptors.descriptorPool;
-            allocate.descriptorSetCount = 1;
-            allocate.pSetLayouts = &descriptors.modelUniformDescriptorSetLayout;
-            require(vkAllocateDescriptorSets(device, &allocate, &frame.descriptorSet),
-                    "vkAllocateDescriptorSets");
-            const VkDescriptorBufferInfo bufferInfo{
-                frame.uniform.handle, 0, sizeof(ModelUniforms)};
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = frame.descriptorSet;
-            write.dstBinding = 0;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-            write.pBufferInfo = &bufferInfo;
-            vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-        }
-        size_t index = 0;
-        auto writeUniform = [&](const ModelPassSubmission& submission,
-            ModelResource& resource, ModelPrimitive& primitive,
-            const model::Material& material) {
-            ModelUniforms uniforms;
-            uniforms.joints.fill(glm::mat4(1));
-            uniforms.viewProjection = clipSpaceCorrection() *
-                                      submission.viewProjection;
-            uniforms.model = submission.draw.transform;
-            uniforms.node = glm::mat4(1);
-            if (submission.draw.instance && primitive.node >= 0 &&
-                static_cast<size_t>(primitive.node) <
-                    submission.draw.instance->pose.global.size() && primitive.skin < 0)
-                uniforms.node = submission.draw.instance->pose.global[
-                    static_cast<size_t>(primitive.node)];
-            if (submission.draw.instance && primitive.skin >= 0 &&
-                static_cast<size_t>(primitive.skin) <
-                    submission.draw.instance->jointPalettes.size()) {
-                const auto& palette = submission.draw.instance->jointPalettes[
-                    static_cast<size_t>(primitive.skin)];
-                std::copy_n(palette.begin(), std::min(palette.size(), model::MAX_JOINTS),
-                            uniforms.joints.begin());
-            }
-            const bool textured = material.image >= 0 &&
-                static_cast<size_t>(material.image) < resource.textureMaterials.size();
-            uniforms.baseColor = material.baseColor * submission.draw.tint;
-            uniforms.params = {material.alphaMode == model::AlphaMode::Mask
-                ? material.alphaCutoff : 0.0f, textured ? 1.0f : 0.0f,
-                0.0f, material.alphaMode == model::AlphaMode::Blend ? 1.0f : 0.0f};
-            uniforms.cameraFogStart = glm::vec4(
-                submission.cameraPosition, submission.fogStart);
-            uniforms.fogColorEnd = glm::vec4(
-                submission.environment.fogColor, submission.fogEnd);
-            uniforms.lightDirection = glm::vec4(
-                submission.environment.lightDirection, 0.0f);
-            uniforms.directColor = glm::vec4(
-                submission.environment.directColor * submission.environment.directIntensity,
-                0.0f);
-            uniforms.ambientColor = glm::vec4(
-                submission.environment.ambientColor * submission.environment.ambientIntensity,
-                0.0f);
-            uniforms.options.x = enhancedVisualConfig(
-                visualQuality, enhancedVisualSettings).atmosphereStrength;
-            std::memcpy(static_cast<uint8_t*>(frame.uniform.mapped) +
-                        index * modelUniformStride, &uniforms, sizeof(uniforms));
-            ++index;
-        };
-        forEachModelPrimitive(submittedModelOpaque, false, writeUniform);
-        forEachModelPrimitive(submittedModelBlend, true, writeUniform);
-        require(vmaFlushAllocation(allocator, frame.uniform.allocation, 0,
-                                   count * modelUniformStride),
-                "vmaFlushAllocation");
-    }
+#include "renderer/backend/vulkan/VulkanModelFrames.inl"
 
     void prepareSkyBuffer() {
         if (!skyQueued) return;
@@ -2258,13 +2154,13 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             for(const auto& draw:submittedLodDraws)basic(draw);
             for(const auto& draw:submittedDraws)basic(draw);
             const bool entityPass=std::any_of(Plugins::content().extensions.renderPasses.begin(),Plugins::content().extensions.renderPasses.end(),[](const auto& p){return p.stage==MC_RENDER_ENTITIES;});
-            auto model=[&](const ModelPassSubmission& submission,ModelResource& resource,ModelPrimitive& primitive,const model::Material& material) {
+            auto model=[&](const ModelPassSubmission& submission,ModelResource& resource,ModelPrimitive& primitive,const model::Material& material,const model::DrawBinding& binding) {
                 if(!entityPass)return;
                 vkp::PluginSceneSubmission p;p.vertex=primitive.vertex.handle;p.index=primitive.index.handle;p.count=primitive.indexCount;p.stride=sizeof(model::Vertex);p.uvOffset=offsetof(model::Vertex,uv);
-                glm::mat4 node(1);if(submission.draw.instance&&primitive.node>=0&&static_cast<size_t>(primitive.node)<submission.draw.instance->pose.global.size()&&primitive.skin<0)node=submission.draw.instance->pose.global[primitive.node];
+                glm::mat4 node(1);if(submission.draw.snapshot&&binding.node>=0&&static_cast<size_t>(binding.node)<submission.draw.snapshot->pose.global.size()&&binding.skin<0)node=submission.draw.snapshot->pose.global[binding.node];
                 p.transform=submission.viewProjection*submission.draw.transform*node;p.tint=submission.draw.tint*material.baseColor;
-                if(primitive.skin>=0&&submission.draw.instance&&static_cast<size_t>(primitive.skin)<submission.draw.instance->jointPalettes.size()) {
-                    const auto& palette=submission.draw.instance->jointPalettes[static_cast<size_t>(primitive.skin)];
+                if(binding.skin>=0&&submission.draw.snapshot&&static_cast<size_t>(binding.skin)<submission.draw.snapshot->jointPalettes.size()) {
+                    const auto& palette=submission.draw.snapshot->jointPalettes[static_cast<size_t>(binding.skin)];
                     const auto& source=resource.asset->primitives[static_cast<size_t>(&primitive-resource.primitives.data())];
                     p.posedVertices.reserve(source.vertices.size());
                     for(const auto& vertex:source.vertices) {
@@ -2734,72 +2630,33 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         pluginSceneStage(command,MC_RENDER_TRANSLUCENT);
         pluginSceneStage(command,MC_RENDER_ENTITIES);
         boundPipeline=VK_NULL_HANDLE;boundMaterialSet=VK_NULL_HANDLE;boundVertexBuffer=boundIndexBuffer=VK_NULL_HANDLE;
-        uint32_t modelUniformIndex = 0;
-        VkPipeline boundModelPipeline = VK_NULL_HANDLE;
-        VkDescriptorSet boundModelMaterial = VK_NULL_HANDLE;
-        VkBuffer boundModelVertex = VK_NULL_HANDLE;
-        VkBuffer boundModelIndex = VK_NULL_HANDLE;
-        const auto drawModels = [&](std::vector<ModelPassSubmission>& submissions,
-                                    bool blended) {
-            forEachModelPrimitive(submissions, blended,
-                [&](const ModelPassSubmission&, ModelResource& resource,
-                    ModelPrimitive& primitive, const model::Material& material) {
-                    const VkPipeline selected = blended
-                        ? (material.doubleSided ? swapchain.modelBlendDoubleSidedPipeline
-                                                : swapchain.modelBlendPipeline)
-                        : (material.doubleSided ? swapchain.modelOpaqueDoubleSidedPipeline
-                                                : swapchain.modelOpaquePipeline);
-                    if (boundModelPipeline != selected) {
-                        vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                          selected);
-                        boundModelPipeline = selected;
-                        ++performance.pipelineBinds;
-                    }
-                    if (boundModelVertex != primitive.vertex.handle) {
-                        vkCmdBindVertexBuffers(command, 0, 1,
-                                               &primitive.vertex.handle, &offset);
-                        boundModelVertex = primitive.vertex.handle;
-                        ++performance.vertexBufferBinds;
-                    }
-                    if (boundModelIndex != primitive.index.handle) {
-                        vkCmdBindIndexBuffer(command, primitive.index.handle, 0,
-                                             VK_INDEX_TYPE_UINT32);
-                        boundModelIndex = primitive.index.handle;
-                        ++performance.vertexBufferBinds;
-                    }
-                    RenderMaterialHandle textureMaterial = modelFallbackMaterial;
-                    if (material.image >= 0 && static_cast<size_t>(material.image) <
-                        resource.textureMaterials.size())
-                        textureMaterial = resource.textureMaterials[
-                            static_cast<size_t>(material.image)];
-                    const auto descriptor = materials.find(textureMaterial.value);
-                    if (descriptor == materials.end()) {
-                        ++modelUniformIndex;
-                        return;
-                    }
-                    if (boundModelMaterial != descriptor->second.descriptorSet) {
-                        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            swapchain.modelPipelineLayout, 0, 1,
-                            &descriptor->second.descriptorSet,
-                            0, nullptr);
-                        boundModelMaterial = descriptor->second.descriptorSet;
-                        ++performance.descriptorBinds;
-                    }
-                    const VkDeviceSize byteOffset =
-                        modelUniformIndex++ * modelUniformStride;
-                    if (byteOffset > std::numeric_limits<uint32_t>::max())
-                        throw std::runtime_error("Vulkan model uniform offset overflow");
-                    const uint32_t dynamicOffset = static_cast<uint32_t>(byteOffset);
-                    vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        swapchain.modelPipelineLayout, 1, 1,
-                        &modelBuffers[currentFrame].descriptorSet,
-                        1, &dynamicOffset);
-                    ++performance.descriptorBinds;
-                    vkCmdDrawIndexed(command, primitive.indexCount, 1, 0, 0, 0);
-                    ++performance.drawCalls;
-                });
-        };
-        if(!pluginReplaces(MC_RENDER_ENTITIES)){drawModels(submittedModelOpaque, false);drawModels(submittedModelBlend, true);}
+        VkPipeline boundModelPipeline=VK_NULL_HANDLE;
+        VkDescriptorSet boundModelMaterial=VK_NULL_HANDLE, boundModelFrame=VK_NULL_HANDLE;
+        VkBuffer boundModelVertex=VK_NULL_HANDLE,boundModelIndex=VK_NULL_HANDLE;
+        if(!pluginReplaces(MC_RENDER_ENTITIES)) for(const auto& batch:modelBatches) {
+            auto& resource=models[batch.model-1]; auto& primitive=resource.primitives[batch.primitive];
+            const model::Material fallback;
+            const auto& material=primitive.material>=0 ? resource.asset->materials[primitive.material]:fallback;
+            const auto pipeline=batch.blended
+                ? (material.doubleSided?swapchain.modelBlendDoubleSidedPipeline:swapchain.modelBlendPipeline)
+                : (material.doubleSided?swapchain.modelOpaqueDoubleSidedPipeline:swapchain.modelOpaquePipeline);
+            if(boundModelPipeline!=pipeline) {vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline);boundModelPipeline=pipeline;++performance.pipelineBinds;}
+            if(boundModelVertex!=primitive.vertex.handle) {vkCmdBindVertexBuffers(command,0,1,&primitive.vertex.handle,&offset);boundModelVertex=primitive.vertex.handle;++performance.vertexBufferBinds;}
+            if(boundModelIndex!=primitive.index.handle) {vkCmdBindIndexBuffer(command,primitive.index.handle,0,VK_INDEX_TYPE_UINT32);boundModelIndex=primitive.index.handle;++performance.vertexBufferBinds;}
+            const int texture=material.texture>=0?material.texture:material.image;
+            const auto textureMaterial=texture>=0 && static_cast<size_t>(texture)<resource.textureMaterials.size()?resource.textureMaterials[texture]:modelFallbackMaterial;
+            const auto descriptor=materials.find(textureMaterial.value); if(descriptor==materials.end()) continue;
+            if(boundModelMaterial!=descriptor->second.descriptorSet) {
+                boundModelMaterial=descriptor->second.descriptorSet;
+                vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,swapchain.modelPipelineLayout,0,1,&boundModelMaterial,0,nullptr);++performance.descriptorBinds;
+            }
+            const auto frameSet=modelBuffers[currentFrame].pages[batch.page].descriptorSet;
+            if(boundModelFrame!=frameSet) {
+                boundModelFrame=frameSet;vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,swapchain.modelPipelineLayout,1,1,&frameSet,0,nullptr);++performance.descriptorBinds;
+            }
+            vkCmdDrawIndexed(command,primitive.indexCount,batch.count,0,0,batch.first);
+            ++performance.drawCalls;++performance.modelDrawCalls;
+        }
         if(!submittedParticles.empty()){
             const auto material=materials.find(particleMaterial.value);
             if(material!=materials.end()){
@@ -3383,8 +3240,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                 destroyBuffer(buffer.uniform);
             for (auto& buffer : cloudBuffers)
                 destroyBuffer(buffer.instance);
-            for (auto& buffer : modelBuffers)
-                destroyBuffer(buffer.uniform);
+            for (auto& frame : modelBuffers)
+                for(auto& page:frame.pages) for(auto& buffer:page.buffers) destroyBuffer(buffer);
             for (auto& buffer : uploadBuffers)
                 destroyBuffer(buffer.staging);
         }

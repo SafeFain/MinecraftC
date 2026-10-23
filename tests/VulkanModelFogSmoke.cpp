@@ -5,10 +5,12 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <fstream>
 
 namespace {
 constexpr int width = 128;
 constexpr int height = 128;
+std::string controlCapture;
 
 std::shared_ptr<model::ModelAsset> makeModel(model::AlphaMode mode) {
     auto asset = std::make_shared<model::ModelAsset>();
@@ -28,6 +30,7 @@ std::shared_ptr<model::ModelAsset> makeModel(model::AlphaMode mode) {
     }
     primitive.indices = {0,1,2,0,2,3};
     asset->primitives.push_back(primitive);
+    model::Node node;node.primitives={0};asset->nodes={node};asset->sceneRoots={0};
     return asset;
 }
 
@@ -56,6 +59,12 @@ glm::vec3 capture(VulkanRenderer& renderer, model::ModelHandle model,
     const auto rgba = VulkanGiSmokeProbe::readCapture(renderer);
     if (rgba.size() != width * height * 4)
         throw std::runtime_error("unexpected capture dimensions");
+    if(!controlCapture.empty()) {
+        std::ofstream ppm(controlCapture,std::ios::binary);
+        ppm << "P6\n" << width << ' ' << height << "\n255\n";
+        for(size_t i=0;i<rgba.size();i+=4) ppm.write(reinterpret_cast<const char*>(&rgba[i]),3);
+        controlCapture.clear();
+    }
     glm::vec3 color(0);
     for (int y = height/2-4; y < height/2+4; ++y)
         for (int x = width/2-4; x < width/2+4; ++x) {
@@ -66,9 +75,12 @@ glm::vec3 capture(VulkanRenderer& renderer, model::ModelHandle model,
 }
 }
 
+#include "VulkanModelBatchCases.h"
+
 int main(int argc, char** argv) {
-    if (argc != 2) return 2;
+    if (argc != 2 && argc != 3) return 2;
     try {
+        if(argc==3) controlCapture=std::string(argv[2])+".control.ppm";
         Window window(width, height, "MinecraftC model altitude regression",
                       Window::SurfaceMode::Vulkan, false, false);
         VulkanRenderer renderer;
@@ -116,6 +128,7 @@ int main(int argc, char** argv) {
             } else if(glm::any(glm::lessThan(color,glm::vec3(60))))
                 throw std::runtime_error("white texture UV sampled wrong texel");
         }
+        modelBatchCases(renderer,argc==3?argv[2]:nullptr);
         std::cout << "PASS Vulkan model fog: both dimensions, opaque/mask/blend, "
                      "Y=-64..319, camera translation, distant fog and asymmetric UV sampling\n";
     } catch (const std::exception& error) {

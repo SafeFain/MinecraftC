@@ -187,7 +187,10 @@ void PluginManager::ambientDefinition(MC_PluginContext& c,const MC_AmbientDefini
 void PluginManager::heldModel(MC_PluginContext& c,const MC_HeldModel& d){
     require(d.size>=sizeof(d),"Invalid held model");owned(c,str(d.item));const auto id=static_cast<uint16_t>(resolveItem(d.item));
     HeldModelContent m;m.path=containedPath(m_info.at(c.index).root,str(d.path));require(std::filesystem::is_regular_file(m.path)&&(m.path.extension()==".glb"||m.path.extension()==".gltf"),"Held model must be glTF/GLB");
-    const auto loaded=model::loadGltf(m.path);require(bool(loaded),loaded.error.c_str());m.asset=loaded.asset;
+    const auto& package=m_info.at(c.index);
+    const auto modelRoot=std::filesystem::weakly_canonical(package.root);
+    const auto& loaded=m_modelAssets->load(model::AssetSource{package.manifest.id,modelRoot,{}},m.path.lexically_relative(modelRoot));
+    require(bool(loaded),loaded.error.c_str());m.asset=loaded.asset;m_modelAssets->alias(m.path,loaded);
     for(int i=0;i<16;++i){number(d.first_person[i],-100,100);number(d.third_person[i],-100,100);m.first[i]=d.first_person[i];m.third[i]=d.third_person[i];}
     require(content().extensions.heldModels.emplace(id,m).second,"Duplicate held model");
 }

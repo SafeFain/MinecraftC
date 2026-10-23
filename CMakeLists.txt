@@ -620,7 +620,7 @@ if(BUILD_TESTING)
 
     add_executable(gltf_loader_tests
         tests/GltfLoaderTests.cpp
-        src/model/GltfLoader.cpp
+        src/model/GltfLoader.cpp src/model/ModelAnimation.cpp
         src/renderer/StbImageImpl.cpp)
     target_include_directories(gltf_loader_tests PRIVATE src external/cgltf external/stb)
     target_compile_definitions(gltf_loader_tests PRIVATE
@@ -844,7 +844,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
         tests/VulkanDecorationSmoke.cpp src/game/Item.cpp
         src/debug/Log.cpp
-        src/model/ModelRenderer.cpp
+        src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
@@ -896,7 +896,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_cloud_lod_smoke EXCLUDE_FROM_ALL
         tests/VulkanCloudLodSmoke.cpp
         src/debug/Log.cpp
-        src/model/ModelRenderer.cpp
+        src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
@@ -916,7 +916,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_model_fog_smoke EXCLUDE_FROM_ALL
         tests/VulkanModelFogSmoke.cpp
         src/debug/Log.cpp
-        src/model/ModelRenderer.cpp
+        src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
@@ -964,7 +964,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_gi_smoke EXCLUDE_FROM_ALL
         tests/VulkanGiSmoke.cpp
         src/debug/Log.cpp
-        src/model/ModelRenderer.cpp
+        src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
@@ -1003,7 +1003,7 @@ if(BUILD_TESTING)
     add_executable(vulkan_gi_benchmark EXCLUDE_FROM_ALL
         tests/VulkanGiBenchmark.cpp
         src/debug/Log.cpp
-        src/model/ModelRenderer.cpp
+        src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp
@@ -1063,7 +1063,7 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
 
-    add_executable(plugin_tests tests/PluginTests.cpp src/model/GltfLoader.cpp
+    add_executable(plugin_tests tests/PluginTests.cpp src/model/GltfLoader.cpp src/model/ModelAnimation.cpp
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         src/world/Block.cpp src/world/Chunk.cpp
         src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp

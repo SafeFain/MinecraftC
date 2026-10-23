@@ -7,13 +7,14 @@
 #include <memory>
 
 class Window;
-namespace model { class VulkanModelBackend; }
+namespace model { class VulkanModelBackend; class ModelAssetCache; }
 
 class VulkanRenderer final : public IGameRenderer {
 public:
     VulkanRenderer();
     VulkanRenderer(Window& window, const std::filesystem::path& assetRoot);
     ~VulkanRenderer();
+    void setModelAssets(std::shared_ptr<model::ModelAssetCache> assets) { m_modelAssets=std::move(assets); }
 
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
@@ -124,4 +125,5 @@ private:
     EnhancedVisualSettings m_enhancedVisualSettings{};
     bool m_leafTransparency = false;
     std::unique_ptr<model::ModelRenderer> m_modelRenderer;
+    std::shared_ptr<model::ModelAssetCache> m_modelAssets;
 };

@@ -105,7 +105,7 @@ def main():
             width = len(values)//len(times)
             assert len(times) >= 3 and values[:width] == values[-width:], \
                 f"{path.name} walk does not close its loop"
-        assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"]) <= 64
+        assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"]) <= 256
         attributes = doc["meshes"][0]["primitives"][0]["attributes"]
         assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"} <= set(attributes)
         assert doc["materials"][0].get("doubleSided") is True, \
@@ -164,7 +164,7 @@ def main():
     player_graph = json.loads((PLAYER_DIR / "player.anim.json").read_text())
     assert {"run","jump","fall","sneak_idle","sneak_walk","swim","crawl",
             "swing"} <= set(player_graph["actions"])
-    assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 64
+    assert player_doc["skins"] and len(player_doc["skins"][0]["joints"]) <= 256
     verify_joint_pivots(player_doc,player_binary,"player")
     with tempfile.TemporaryDirectory() as directory:
         generated = pathlib.Path(directory)

@@ -4,20 +4,24 @@ layout(location=0) in vec2 uv;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec3 worldPosition;
 layout(set=0,binding=0) uniform sampler2D baseTexture;
-layout(set=1,binding=0) uniform ModelUniforms {
+struct ModelEnvironment {
     mat4 viewProjection;
-    mat4 model;
-    mat4 node;
-    mat4 joints[64];
-    vec4 baseColor;
-    vec4 params;
     vec4 cameraFogStart;
     vec4 fogColorEnd;
     vec4 lightDirection;
     vec4 directColor;
     vec4 ambientColor;
     vec4 options;
-} data;
+};
+struct ModelInstance {
+    mat4 transform;
+    vec4 baseColor;
+    vec4 params;
+    uvec4 indices;
+};
+layout(std430,set=1,binding=0) readonly buffer Environments { ModelEnvironment environments[]; };
+layout(std430,set=1,binding=1) readonly buffer Instances { ModelInstance instances[]; };
+layout(location=3) flat in uint instanceIndex;
 layout(location=0) out vec4 outColor;
 layout(location=1) out vec4 outSurface;
 layout(location=2) out vec4 outGiSurface;
@@ -30,8 +34,10 @@ vec2 encodeNormal(vec3 n){
 }
 
 void main() {
-    vec4 base=(data.params.y>0.5?texture(baseTexture,uv):vec4(1.0))*data.baseColor;
-    if(base.a<data.params.x)discard;
+    ModelInstance instance=instances[instanceIndex];
+    ModelEnvironment data=environments[instance.indices.z];
+    vec4 base=(instance.params.y>0.5?texture(baseTexture,uv):vec4(1.0))*instance.baseColor;
+    if(base.a<instance.params.x)discard;
     vec3 surfaceNormal=normalize(normal);
     vec3 light=normalize(data.lightDirection.xyz);
     vec3 viewDirection=normalize(data.cameraFogStart.xyz-worldPosition);
@@ -59,10 +65,10 @@ void main() {
         0.0,1.0);
     float fog=1.0-exp(-3.0*fogCoordinate*fogCoordinate);
     color=mix(color,data.fogColorEnd.rgb,fog);
-    if(data.params.z>0.5)color=pow(max(color,vec3(0.0)),vec3(1.0/2.2));
+    if(instance.params.z>0.5)color=pow(max(color,vec3(0.0)),vec3(1.0/2.2));
     outColor=vec4(color,base.a);
     outSurface=vec4(encodeNormal(surfaceNormal),
         length(worldPosition-data.cameraFogStart.xyz),
-        data.params.w>0.5?0.0:roughness);
+        instance.params.w>0.5?0.0:roughness);
     outGiSurface=vec4(base.rgb,0.0);
 }

@@ -2,6 +2,7 @@
 #include "renderer/HeldItemRenderer.h"
 #include "renderer/BlockAtlasData.h"
 #include "model/ModelAnimation.h"
+#include "model/ModelTexture.h"
 #include <glm/gtc/type_ptr.hpp>
 
 #include "core/AssetStore.h"
@@ -426,13 +427,21 @@ bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp
     const auto raw=static_cast<uint16_t>(item.id);const auto found=Plugins::content().extensions.heldModels.find(raw);if(found==Plugins::content().extensions.heldModels.end())return false;
     auto cached=m_pluginModels.find(raw);
     if(cached==m_pluginModels.end()) {
-        auto inserted=m_pluginModels.emplace(raw,std::vector<ModelPart>{});auto& parts=inserted.first->second;const auto& asset=*found->second.asset;const auto pose=model::bindPose(asset);
-        try{for(size_t nodeIndex=0;nodeIndex<asset.nodes.size();++nodeIndex){const auto& node=asset.nodes[nodeIndex];for(int index:node.primitives){const auto& primitive=asset.primitives.at(static_cast<size_t>(index));MeshData mesh;mesh.indices=primitive.indices;const auto palette=node.skin>=0?model::jointMatrices(asset,pose,static_cast<size_t>(node.skin)):std::vector<glm::mat4>{};
+        auto inserted=m_pluginModels.emplace(raw,std::vector<ModelPart>{});auto& parts=inserted.first->second;const auto& asset=*found->second.asset;auto pose=model::bindPose(asset);model::composeGlobals(asset,pose);parts.reserve(asset.bindings.size());
+        try{for(const auto& binding:asset.bindings){const auto nodeIndex=static_cast<size_t>(binding.node);const auto& node=asset.nodes[nodeIndex];const auto& primitive=asset.primitives.at(static_cast<size_t>(binding.primitive));MeshData mesh;mesh.indices=primitive.indices;const auto palette=node.skin>=0?model::jointMatrices(asset,pose,static_cast<size_t>(node.skin)):std::vector<glm::mat4>{};
             for(const auto& v:primitive.vertices){glm::vec4 position(v.position,1);if(!palette.empty()){glm::mat4 skin(0);for(int n=0;n<4;++n)if(v.joints[n]<palette.size())skin+=palette[v.joints[n]]*v.weights[n];position=skin*position;}else position=pose.global[nodeIndex]*position;mesh.vertices.push_back({glm::vec3(position),v.uv});}
             parts.emplace_back();auto& part=parts.back();part.mesh=m_renderer->createMesh(mesh);TextureData texture;texture.width=texture.height=1;texture.pixels={255,255,255,255};const model::Material* material=primitive.material>=0?&asset.materials.at(static_cast<size_t>(primitive.material)):nullptr;
-            if(material){part.color=material->baseColor;if(material->image>=0){const auto& image=asset.images.at(static_cast<size_t>(material->image));texture.width=image.width;texture.height=image.height;texture.pixels=image.pixels;}}
-            part.texture=m_renderer->createTexture(texture,TextureSamplerDesc{});MaterialDesc desc;desc.baseColorTexture=part.texture;desc.backfaceCull=!material||!material->doubleSided;desc.alphaCutoff=material&&material->alphaMode==model::AlphaMode::Mask?material->alphaCutoff:.01f;part.material=m_renderer->createMaterial(desc);
-        }}}
+            TextureSamplerDesc textureSampling;
+            if(material){
+                part.color=material->baseColor;
+                const model::Sampler fallback;
+                const auto* sourceTexture=material->texture>=0?&asset.textures.at(static_cast<size_t>(material->texture)):nullptr;
+                const auto& sampler=sourceTexture&&sourceTexture->sampler>=0?asset.samplers.at(static_cast<size_t>(sourceTexture->sampler)):fallback;
+                const int image=sourceTexture?sourceTexture->image:material->image;
+                if(image>=0) {texture=model::modelTexture(asset.images.at(static_cast<size_t>(image)),sampler);textureSampling=model::textureSampler(sampler);}
+            }
+            part.texture=m_renderer->createTexture(texture,textureSampling);MaterialDesc desc;desc.baseColorTexture=part.texture;desc.backfaceCull=!material||!material->doubleSided;desc.alphaCutoff=material&&material->alphaMode==model::AlphaMode::Mask?material->alphaCutoff:.01f;part.material=m_renderer->createMaterial(desc);
+        }}
         catch(...){for(const auto& part:parts){if(part.mesh)m_renderer->destroyMesh(part.mesh);if(part.material)m_renderer->destroyMaterial(part.material);if(part.texture)m_renderer->destroyTexture(part.texture);}m_pluginModels.erase(raw);throw;}
         cached=inserted.first;
     }
@@ -441,9 +450,8 @@ bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp
     if(dropped&&action!=Plugins::content().extensions.actions.end()&&action->second.toolPose){
         auto normalized=m_pluginDropTransforms.find(raw);
         if(normalized==m_pluginDropTransforms.end()){
-            const auto& asset=*found->second.asset;const auto pose=model::bindPose(asset);
-            glm::vec3 lo(std::numeric_limits<float>::max()),hi(std::numeric_limits<float>::lowest());
-            for(size_t n=0;n<asset.nodes.size();++n)for(const auto index:asset.nodes[n].primitives)for(const auto& v:asset.primitives.at(static_cast<size_t>(index)).vertices){const auto p=glm::vec3(pose.global[n]*glm::vec4(v.position,1));lo=glm::min(lo,p);hi=glm::max(hi,p);}
+            const auto& asset=*found->second.asset;
+            const auto lo=asset.boundsMin,hi=asset.boundsMax;
             const auto extent=hi-lo;
             const auto normalization=glm::scale(glm::mat4(1),glm::vec3(1/std::max({extent.x,extent.y,extent.z,.001f})))*glm::translate(glm::mat4(1),-(lo+hi)*.5f);
             normalized=m_pluginDropTransforms.emplace(raw,normalization).first;

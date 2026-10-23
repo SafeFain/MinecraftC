@@ -3,6 +3,7 @@
 #include "game/Item.h"
 #include "model/AnimationMixer.h"
 #include "model/GltfLoader.h"
+#include "model/ModelRenderer.h"
 #include "player/PlayerVisual.h"
 #include "world/BlockLightLogic.h"
 
@@ -35,7 +36,7 @@ private:
     std::shared_ptr<const model::AnimationGraphAsset> m_graph;
     model::AnimationMixer m_mixer;
     model::ModelInstance m_instance;
-    uint32_t m_handle = 0;
+    model::ModelHandle m_handle{};
     uint32_t m_lastSwingSequence = 0;
     std::string m_locomotion = "idle";
     int m_headNode = -1;

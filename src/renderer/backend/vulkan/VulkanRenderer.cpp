@@ -299,7 +299,8 @@ void VulkanRenderer::initialize(Window& window,
     material.baseColorTexture = m_entityAtlas;
     material.atlasTilesPerSide = 4;
     m_entityMaterial = createMaterial(material);
-    m_modelRenderer = model::createVulkanModelRenderer(*this);
+    if(!m_modelAssets) m_modelAssets=std::make_shared<model::ModelAssetCache>();
+    m_modelRenderer = model::createVulkanModelRenderer(*this,m_modelAssets);
 }
 
 void VulkanRenderer::reinitialize(const std::filesystem::path& assetRoot) {

@@ -53,7 +53,13 @@ void AnimationMixer::reset(const ModelAsset* asset, const AnimationGraphAsset* g
     m_asset = asset;
     m_graph = graph;
     m_layers.clear();
-    if (graph) for (const auto& layer : graph->layers) m_layers.emplace(layer.name, LayerState{});
+    m_evaluationLayers.clear();
+    ++m_revision; m_evaluatedRevision=0;
+    if(asset) resetPose(*asset,m_bind);
+    if (graph) for (const auto& layer : graph->layers) {
+        auto state=m_layers.emplace(layer.name, LayerState{}).first;
+        m_evaluationLayers.push_back({&layer,&state->second});
+    }
 }
 
 void AnimationMixer::start(LayerState& layer, Request request) {
@@ -72,7 +78,7 @@ bool AnimationMixer::play(const std::string& actionName, PlayPolicy policy,
     auto found = m_layers.find(action->layer);
     if (found == m_layers.end()) return false;
     LayerState& layer = found->second;
-    Request request{action, speed};
+    Request request{action, speed, m_asset ? m_asset->findClip(action->clip) : nullptr};
     if (policy == PlayPolicy::Queue && layer.current.action) {
         layer.queue.push_back(request);
         return true;
@@ -84,6 +90,7 @@ bool AnimationMixer::play(const std::string& actionName, PlayPolicy policy,
         return true;
     }
     start(layer, request);
+    ++m_revision;
     return true;
 }
 
@@ -91,16 +98,18 @@ void AnimationMixer::stop(const std::string& layerName) {
     auto found = m_layers.find(layerName);
     if (found == m_layers.end()) return;
     found->second = LayerState{};
+    ++m_revision;
 }
 
 void AnimationMixer::setLayerWeight(const std::string& layerName, float weight) {
     auto found = m_layers.find(layerName);
-    if (found != m_layers.end()) found->second.weight = std::clamp(weight, 0.0f, 1.0f);
+    if (found != m_layers.end()) { found->second.weight = std::clamp(weight, 0.0f, 1.0f); ++m_revision; }
 }
 
 std::vector<FiredAnimationEvent> AnimationMixer::advance(float dt) {
     std::vector<FiredAnimationEvent> fired;
     if (!m_graph || dt <= 0.0f || !std::isfinite(dt)) return fired;
+    ++m_revision;
     for (auto& pair : m_layers) {
         LayerState& layer = pair.second;
         const AnimationActionDefinition* action = layer.current.action;
@@ -146,29 +155,28 @@ std::vector<FiredAnimationEvent> AnimationMixer::advance(float dt) {
     return fired;
 }
 
-void AnimationMixer::evaluate(Pose& output) const {
+void AnimationMixer::evaluateLocal(Pose& output) const {
     if (!m_asset) { output = {}; return; }
-    const Pose bind = bindPose(*m_asset);
-    output = bind;
-    if (!m_graph) { composeGlobals(*m_asset, output); return; }
-    for (const auto& definition : m_graph->layers) {
-        auto found = m_layers.find(definition.name);
-        if (found == m_layers.end()) continue;
-        const LayerState& state = found->second;
-        Pose sampled;
+    if (m_evaluatedRevision==m_revision) { output=m_output; return; }
+    m_output=m_bind;
+    Pose& result=m_output;
+    for (const auto& layer : m_evaluationLayers) {
+        const auto& definition=*layer.definition;
+        const LayerState& state=*layer.state;
+        Pose& sampled=m_sampled;
         if (state.current.action) {
-            evaluatePose(*m_asset, state.current.action->clip, state.time,
+            sampleLocalPose(*m_asset, state.current.clip, state.time,
                          state.current.action->loop, sampled);
             if (state.previous.action && state.transition < 1.0f) {
-                Pose previous;
-                evaluatePose(*m_asset, state.previous.action->clip, state.previousTime,
+                Pose& previous=m_previous;
+                sampleLocalPose(*m_asset, state.previous.clip, state.previousTime,
                              state.previous.action->loop, previous);
-                Pose transitioned;
+                Pose& transitioned=m_transitioned;
                 blendPoses(previous, sampled, state.transition, transitioned);
-                sampled = std::move(transitioned);
+                sampled = transitioned;
             }
         } else if (state.previous.action && state.previous.action->fadeOut > 0.0f) {
-            evaluatePose(*m_asset, state.previous.action->clip,
+            sampleLocalPose(*m_asset, state.previous.clip,
                          state.previousTime, false, sampled);
         } else continue;
         float weight = state.weight;
@@ -180,10 +188,25 @@ void AnimationMixer::evaluate(Pose& output) const {
                     state.current.action->fadeOut, 0.0f, 1.0f);
         }
         if (definition.blend == LayerBlendMode::Override)
-            applyOverride(output, sampled, definition.nodeMask, weight);
-        else applyAdditive(output, sampled, bind, definition.nodeMask, weight);
+            applyOverride(result, sampled, definition.nodeMask, weight);
+        else applyAdditive(result, sampled, m_bind, definition.nodeMask, weight);
     }
-    composeGlobals(*m_asset, output);
+    m_evaluatedRevision=m_revision;
+    output=m_output;
+}
+
+void AnimationMixer::evaluate(Pose& output) const {
+    evaluateLocal(output);
+    if(m_asset) composeGlobals(*m_asset,output);
+}
+
+bool AnimationMixer::evaluate(ModelInstance& output) const {
+    if(output.evaluatedBy==this && output.revision==m_revision) return false;
+    evaluate(output.pose);
+    if(m_asset) updatePalettes(*m_asset,output);
+    output.revision=m_revision;
+    output.evaluatedBy=this;
+    return true;
 }
 
 bool AnimationMixer::playing(const std::string& action) const {

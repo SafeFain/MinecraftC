@@ -39,5 +39,13 @@ int main() {
     const auto fallbackEvents = registry.advance(EntityType::Zombie, 42, 0.31f);
     require(fallbackEvents.size() == 1 && fallbackEvents[0].name == "melee",
             "fallback hostile attack did not emit its gameplay event");
+    registry.beginFrame();registry.endFrame();
+    require(registry.playing(EntityType::Zombie,42,"attack"),"invisible entity lost its animation state");
+    const auto graph=registry.definition(EntityType::Zombie).graph;
+    registry.loadAll("fixtures");
+    require(loads["cow.glb"]==1 && registry.definition(EntityType::Zombie).graph==graph && registry.playing(EntityType::Zombie,42,"attack"),
+            "resource reinitialization reloaded immutable graphs or reset animation state");
+    registry.retainInstances({});
+    require(!registry.playing(EntityType::Zombie,42,"attack"),"retired entity kept its animation state");
     std::cout << "entity model registry tests passed\n";
 }

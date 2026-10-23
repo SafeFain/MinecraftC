@@ -14,7 +14,7 @@
 
 void PlayerRenderer::initialize(const std::filesystem::path& root,
                                 IGameRenderer& renderer) {
-    const auto loaded = model::loadGltf(root / "models/player/player.glb");
+    const auto& loaded = renderer.modelRenderer().assets().load(root / "models/player/player.glb");
     if (!loaded) throw std::runtime_error("Player model: " + loaded.error);
     m_asset = loaded.asset;
     auto graph = model::loadAnimationGraph(
@@ -103,13 +103,13 @@ PlayerHandTransforms PlayerRenderer::renderThirdPerson(
     const glm::mat4& viewProjection, SmoothLightSample light,
     glm::vec3 sleepingFacing) {
     if (!m_asset || !m_handle) return {};
-    m_mixer.evaluate(m_instance.pose);
+    m_mixer.evaluateLocal(m_instance.pose);
     if (m_headNode >= 0) {
         const size_t head=static_cast<size_t>(m_headNode);
         m_instance.pose.rotation[head] = glm::angleAxis(
             glm::radians(-std::clamp(pitchDegrees,-70.0f,70.0f)),glm::vec3(1,0,0)) *
             m_instance.pose.rotation[head];
-        model::composeGlobals(*m_asset,m_instance.pose);
+
     }
     // Action overlays rotate around the authored shoulder pivots.
     if(!m_sleeping) {
@@ -131,12 +131,10 @@ PlayerHandTransforms PlayerRenderer::renderThirdPerson(
             const glm::quat raised=glm::angleAxis(glm::radians(80.0f),glm::vec3(1,0,0));
             m_instance.pose.rotation[i]=glm::slerp(m_instance.pose.rotation[i],raised,m_shieldRaise);
         }
-        model::composeGlobals(*m_asset,m_instance.pose);
+
     }
-    m_instance.jointPalettes.clear();
-    for(size_t skin=0;skin<m_asset->skins.size();++skin)
-        m_instance.jointPalettes.push_back(
-            model::jointMatrices(*m_asset,m_instance.pose,skin));
+    model::composeGlobals(*m_asset,m_instance.pose);
+    model::updatePalettes(*m_asset,m_instance);
     const glm::vec3 local=glm::vec3(position-renderOrigin);
     const float facingYaw = m_sleeping && glm::length(sleepingFacing) > 0.01f
         ? glm::degrees(std::atan2(sleepingFacing.x, sleepingFacing.z))
