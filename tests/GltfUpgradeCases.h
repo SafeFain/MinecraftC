@@ -21,7 +21,11 @@ void upgradedCases() {
     files["models/external.bin"]=bytes;
     files["textures/color.png"]={std::begin(PNG_1X1_RGBA),std::end(PNG_1X1_RGBA)};
     int reads=0;
-    model::AssetSource source{"fixture","pack",[&](const auto& path){++reads;return files.at(path);}};
+    model::AssetSource source{"fixture","pack",[&](const auto& path,size_t maximum){
+        ++reads;const auto& data=files.at(path);
+        if(data.size()>maximum) throw std::runtime_error("fixture byte budget exceeded");
+        return data;
+    }};
     auto external=json;
     replaceOnce(external,"\"bufferView\":7,\"mimeType\":\"image/png\"","\"uri\":\"../textures/color.png\"");
     replaceOnce(external,"\"textures\":[{\"source\":0}]","\"samplers\":[{\"minFilter\":9987,\"magFilter\":9729,\"wrapS\":33648,\"wrapT\":33071}],\"textures\":[{\"source\":0,\"sampler\":0}]");

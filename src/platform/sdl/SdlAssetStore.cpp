@@ -40,15 +40,15 @@ AssetStore::~AssetStore() {
     if (m_impl && m_impl->storage) SDL_CloseStorage(m_impl->storage);
 }
 
-std::vector<uint8_t> AssetStore::readBinary(std::string_view relative) const {
+std::vector<uint8_t> AssetStore::readBinary(std::string_view relative, size_t maxBytes) const {
     if (!validPath(relative)) throw std::invalid_argument("Invalid asset path");
     const std::string path(relative);
     Uint64 length = 0;
     if (!SDL_GetStorageFileSize(m_impl->storage, path.c_str(), &length))
         throw std::runtime_error("Could not query asset '" + path + "': " +
                                  SDL_GetError());
-    if (length > static_cast<Uint64>(std::numeric_limits<size_t>::max()))
-        throw std::runtime_error("Asset is too large: " + path);
+    if (length > static_cast<Uint64>(maxBytes))
+        throw std::runtime_error("Asset byte budget exceeded: " + path);
     std::vector<uint8_t> bytes(static_cast<size_t>(length));
     if (length && !SDL_ReadStorageFile(
             m_impl->storage, path.c_str(), bytes.data(), length))
@@ -62,31 +62,32 @@ std::string AssetStore::readText(std::string_view relative) const {
     return std::string(bytes.begin(), bytes.end());
 }
 
-std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path) {
+std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path, size_t maxBytes) {
     if (s_current) {
         if (s_current->m_root.empty() && path.is_relative())
-            return s_current->readBinary(path.generic_u8string());
+            return s_current->readBinary(path.generic_u8string(), maxBytes);
         std::error_code error;
         const auto relative = std::filesystem::relative(path, s_current->m_root, error);
         if (!error && validPath(relative.generic_u8string()))
-            return s_current->readBinary(relative.generic_u8string());
+            return s_current->readBinary(relative.generic_u8string(), maxBytes);
         // Registered user-package assets have explicit absolute paths outside
         // Title Storage. Relative asset names remain confined to Title Storage.
         if(!path.is_absolute())throw std::runtime_error("Invalid relative asset path: "+path.u8string());
     }
     SDL_IOStream* stream = SDL_IOFromFile(path.u8string().c_str(), "rb");
     if (!stream) throw std::runtime_error("Could not open asset: " + path.u8string());
+    const std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)> ownedStream(stream, &SDL_CloseIO);
     const Sint64 size = SDL_GetIOSize(stream);
     if (size < 0) {
-        SDL_CloseIO(stream);
         throw std::runtime_error("Could not size asset: " + path.u8string());
+    }
+    if (static_cast<Uint64>(size) > static_cast<Uint64>(maxBytes)) {
+        throw std::runtime_error("Asset byte budget exceeded: " + path.u8string());
     }
     std::vector<uint8_t> bytes(static_cast<size_t>(size));
     if (size && SDL_ReadIO(stream, bytes.data(), bytes.size()) != bytes.size()) {
-        SDL_CloseIO(stream);
         throw std::runtime_error("Could not read asset: " + path.u8string());
     }
-    SDL_CloseIO(stream);
     return bytes;
 }
 

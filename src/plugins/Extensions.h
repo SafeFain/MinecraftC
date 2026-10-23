@@ -15,6 +15,7 @@ namespace Plugins {
 struct EntityContent {
     std::string key, name, drop;
     std::filesystem::path model;
+    std::shared_ptr<const model::ModelAsset> asset;
     uint16_t id=0, base=1;
     uint32_t dropCount=0, stateVersion=0;
     bool hostile=false, natural=false;

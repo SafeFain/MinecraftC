@@ -131,7 +131,8 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
         const auto& package=m_info.at(ctx.index);
         const auto modelRoot=std::filesystem::weakly_canonical(package.root);
         const auto& loadedModel=m_modelAssets->load(model::AssetSource{package.manifest.id,modelRoot,{}},e.model.lexically_relative(modelRoot));
-        m_modelAssets->alias(e.model,loadedModel);
+        require(bool(loadedModel),loadedModel.error.c_str());
+        e.asset=loadedModel.asset;
     }
     auto& entries=content().extensions.entities;
     for(const auto& it:entries)require(it.second.key!=e.key,"Duplicate entity key");

@@ -1,5 +1,6 @@
 #include "model/GltfLoader.h"
 #include "core/AssetStore.h"
+#include "core/AllocationBudget.h"
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
@@ -24,9 +25,128 @@ namespace {
 
 using DataHandle = std::unique_ptr<cgltf_data, decltype(&cgltf_free)>;
 
+void budgetRequire(bool ok, const char* label) {
+    if (!ok) throw std::runtime_error(std::string("model budget exceeded: ") + label);
+}
+void consume(size_t& total, size_t amount, size_t maximum, const char* label) {
+    budgetRequire(total <= maximum && amount <= maximum - total, label);
+    total += amount;
+}
+struct LoadBudget {
+    const LoadLimits& limits;
+    size_t encoded = 0, decoded = 0, converted = 0;
+    void output(size_t count, size_t width) {
+        budgetRequire(converted <= limits.convertedBytes &&
+            (!width || count <= (limits.convertedBytes - converted) / width), "converted bytes");
+        converted += count * width;
+    }
+};
+
+// All counts are inspected before conversion resizes any output vector. Shared
+// accessors/channels are charged for every output copy, including sparse bases.
+void validateBudgets(const cgltf_data& data, LoadBudget& budget) {
+    const auto& l = budget.limits;
+    budgetRequire(data.meshes_count <= l.primitives, "meshes");
+    budgetRequire(data.nodes_count <= l.nodes, "nodes");
+    budgetRequire(data.skins_count <= l.skins, "skins");
+    budgetRequire(data.animations_count <= l.animations, "animations");
+    budgetRequire(data.materials_count <= l.materials, "materials");
+    budgetRequire(data.images_count <= l.images, "images");
+    budgetRequire(data.textures_count <= l.textures, "textures");
+    budgetRequire(data.samplers_count <= l.samplers, "samplers");
+    budgetRequire(data.buffers_count <= l.buffers, "buffers");
+    budgetRequire(data.buffer_views_count <= l.bufferViews, "buffer views");
+    budgetRequire(data.accessors_count <= l.accessors, "accessors");
+    const auto* scene=data.scene?data.scene:(data.scenes_count?&data.scenes[0]:nullptr);
+    budgetRequire(!scene || scene->nodes_count<=l.nodes,"scene roots");
+    budget.output(scene?scene->nodes_count:data.nodes_count,sizeof(int));
+    budget.output(data.extensions_used_count,sizeof(std::string)+32);
+    for(size_t i=0;i<data.extensions_used_count;++i)
+        if(data.extensions_used[i]) budget.output(std::strlen(data.extensions_used[i]),1);
+    budget.output(data.nodes_count, sizeof(Node) + 2 * sizeof(glm::mat4));
+    budget.output(data.skins_count, sizeof(Skin));
+    budget.output(data.animations_count, sizeof(AnimationClip));
+    budget.output(data.materials_count, sizeof(Material));
+    budget.output(data.images_count, sizeof(ImageData));
+    budget.output(data.textures_count, sizeof(Texture));
+    budget.output(data.samplers_count, sizeof(Sampler));
+    size_t primitives=0, vertices=0, indices=0, bindings=0, boundVertices=0;
+    for(size_t m=0;m<data.meshes_count;++m) {
+        consume(primitives,data.meshes[m].primitives_count,l.primitives,"primitives");
+        for(size_t p=0;p<data.meshes[m].primitives_count;++p) {
+            const auto& primitive=data.meshes[m].primitives[p];
+            const auto* position=cgltf_find_accessor(&primitive,cgltf_attribute_type_position,0);
+            const size_t vertexCount=position?position->count:0;
+            budgetRequire(vertexCount<=l.primitiveVertices,"primitive vertices");
+            const size_t indexCount=primitive.indices?primitive.indices->count:vertexCount;
+            budgetRequire(indexCount<=l.primitiveIndices,"primitive indices");
+            consume(vertices,vertexCount,l.vertices,"total vertices");
+            consume(indices,indexCount,l.indices,"total indices");
+            budget.output(vertexCount,sizeof(Vertex));budget.output(indexCount,sizeof(uint32_t));
+        }
+    }
+    budget.output(primitives,sizeof(Primitive)+sizeof(int));
+    budget.output(data.meshes_count,sizeof(std::vector<int>));
+    for(size_t n=0;n<data.nodes_count;++n) {
+        const auto& node=data.nodes[n];
+        budgetRequire(node.children_count<=l.nodes,"node children");
+        budget.output(node.children_count,sizeof(int));
+        if(node.name) budget.output(std::strlen(node.name),1);
+        if(!node.mesh) continue;
+        consume(bindings,node.mesh->primitives_count,l.bindings,"draw bindings");
+        for(size_t p=0;p<node.mesh->primitives_count;++p) {
+            const auto& primitive=node.mesh->primitives[p];
+            const auto* position=cgltf_find_accessor(&primitive,cgltf_attribute_type_position,0);
+            if(position) consume(boundVertices,position->count,l.boundVertices,"bound vertices");
+        }
+    }
+    budget.output(bindings,sizeof(DrawBinding)+sizeof(int));
+    for(size_t s=0;s<data.skins_count;++s) {
+        if(data.skins[s].joints_count>MAX_JOINTS) throw std::runtime_error("skin has " +
+            std::to_string(data.skins[s].joints_count) + " joints; limit is " + std::to_string(MAX_JOINTS));
+        budget.output(data.skins[s].joints_count,sizeof(int)+sizeof(glm::mat4));
+    }
+    size_t channels=0,keys=0;
+    for(size_t a=0;a<data.animations_count;++a) {
+        const auto& animation=data.animations[a];
+        consume(channels,animation.channels_count,l.channels,"animation channels");
+        budgetRequire(animation.samplers_count<=l.channels,"animation samplers");
+        if(animation.name) budget.output(std::strlen(animation.name),2);
+        for(size_t c=0;c<animation.channels_count;++c) {
+            const auto* sampler=animation.channels[c].sampler;
+            if(!sampler || !sampler->input || !sampler->output) continue;
+            consume(keys,sampler->input->count,l.keyframes,"animation keyframes");
+            budgetRequire(sampler->input->count<=l.keyframes &&
+                sampler->output->count/3<=l.keyframes,"animation values");
+            budget.output(sampler->input->count,sizeof(float));
+            budget.output(sampler->output->count,sizeof(glm::vec4));
+        }
+    }
+    budget.output(channels,sizeof(Channel));
+}
+
+void validateJsonDepth(const std::vector<uint8_t>& bytes, size_t maximum) {
+    size_t begin=0,end=bytes.size();
+    if(bytes.size()>=20 && std::memcmp(bytes.data(),"glTF",4)==0) {
+        const auto* p=bytes.data()+12;
+        const uint32_t length=uint32_t(p[0])|(uint32_t(p[1])<<8)|(uint32_t(p[2])<<16)|(uint32_t(p[3])<<24);
+        if(length>bytes.size()-20) return; // cgltf reports the malformed container.
+        begin=20;end=begin+length;
+    }
+    size_t depth=0;bool string=false,escaped=false;
+    for(size_t i=begin;i<end;++i) {
+        const auto c=bytes[i];
+        if(string) {if(escaped) escaped=false;else if(c=='\\') escaped=true;else if(c=='"') string=false;continue;}
+        if(c=='"') string=true;
+        else if(c=='{' || c=='[') {budgetRequire(depth<maximum,"JSON nesting");++depth;}
+        else if((c=='}' || c==']') && depth) --depth;
+    }
+}
+
 struct ReadContext {
     const AssetSource* source;
     std::filesystem::path model;
+    LoadBudget* budget;
 };
 
 std::filesystem::path confinedPath(const AssetSource& source, const std::filesystem::path& path) {
@@ -48,16 +168,29 @@ std::filesystem::path confinedPath(const AssetSource& source, const std::filesys
     return relative;
 }
 
-std::vector<uint8_t> readResource(const AssetSource& source, const std::filesystem::path& path) {
+std::vector<uint8_t> readResource(const AssetSource& source, const std::filesystem::path& path, LoadBudget& budget) {
     const auto relative = confinedPath(source, path);
-    return source.read ? source.read(relative) : AssetStore::readPath(source.root / relative);
+    const auto maximum=std::min(budget.limits.fileBytes,budget.limits.encodedBytes-budget.encoded);
+    auto bytes=source.read ? source.read(relative,maximum) : AssetStore::readPath(source.root / relative,maximum);
+    budgetRequire(bytes.size()<=maximum,"resource bytes");
+    consume(budget.encoded,bytes.size(),budget.limits.encodedBytes,"total encoded bytes");
+    return bytes;
 }
 
-std::vector<uint8_t> decodeDataUri(const std::string& uri) {
+std::vector<uint8_t> decodeDataUri(const std::string& uri, LoadBudget& budget) {
     const auto comma = uri.find(',');
     if (comma == std::string::npos || comma < 7 || uri.substr(comma - 7, 7) != ";base64")
         throw std::runtime_error("unsupported data URI encoding");
     std::vector<uint8_t> bytes;
+    const auto length=uri.size()-comma-1;
+    if(length%4) throw std::runtime_error("truncated base64 data");
+    const auto groups=length/4;
+    const size_t paddingBytes=length && uri.back()=='=' ? (length>1 && uri[uri.size()-2]=='=' ? 2 : 1) : 0;
+    const auto maximum=std::min(budget.limits.fileBytes,budget.limits.encodedBytes-budget.encoded);
+    budgetRequire(groups<=std::numeric_limits<size_t>::max()/3,"data URI size");
+    const size_t decodedSize=groups*3-paddingBytes;
+    budgetRequire(decodedSize<=maximum,"data URI bytes");
+    bytes.reserve(decodedSize);
     uint32_t value = 0; int bits = 0; bool padding = false; unsigned pads = 0;
     const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     for (std::size_t i = comma + 1; i < uri.size(); ++i) {
@@ -71,18 +204,19 @@ std::vector<uint8_t> decodeDataUri(const std::string& uri) {
     if ((uri.size() - comma - 1) % 4 || (bits && (value & ((1u << bits) - 1))) ||
         (pads == 1 && bits != 2) || (pads == 2 && bits != 4))
         throw std::runtime_error("truncated base64 data");
+    consume(budget.encoded,bytes.size(),budget.limits.encodedBytes,"total encoded bytes");
     return bytes;
 }
 
 std::vector<uint8_t> readUri(const ReadContext& context, const char* uri) {
     const std::string encoded(uri ? uri : "");
-    if (encoded.rfind("data:", 0) == 0) return decodeDataUri(encoded);
+    if (encoded.rfind("data:", 0) == 0) return decodeDataUri(encoded,*context.budget);
     std::string decoded = encoded;
     decoded.resize(cgltf_decode_uri(decoded.data()));
     if (decoded.find(':') != std::string::npos || decoded.find('\\') != std::string::npos ||
         decoded.find('\0') != std::string::npos || std::filesystem::u8path(decoded).is_absolute())
         throw std::runtime_error("unsupported or absolute asset URI");
-    return readResource(*context.source, context.model.parent_path() / std::filesystem::u8path(decoded));
+    return readResource(*context.source, context.model.parent_path() / std::filesystem::u8path(decoded),*context.budget);
 }
 
 LoadResult failure(std::string error) {
@@ -304,17 +438,30 @@ bool convertImage(const cgltf_image& source, const ReadContext& context, ImageDa
     int width = 0;
     int height = 0;
     int channels = 0;
+    AllocationBudget allocations(context.budget->limits.decoderBytes);
+    DecoderAllocationScope allocationScope(allocations);
+    if (!stbi_info_from_memory(encoded, static_cast<int>(encodedSize), &width, &height, &channels) ||
+        width <= 0 || height <= 0) { error="invalid image header";return false; }
+    const auto& limits=context.budget->limits;
+    budgetRequire(static_cast<size_t>(width)<=limits.imageDimension &&
+        static_cast<size_t>(height)<=limits.imageDimension,"image dimensions");
+    budgetRequire(static_cast<size_t>(width)<=limits.imagePixels/static_cast<size_t>(height),"image pixels");
+    const size_t expectedPixels=static_cast<size_t>(width)*static_cast<size_t>(height);
+    budgetRequire(expectedPixels<=std::numeric_limits<size_t>::max()/4,"image bytes");
+    consume(context.budget->decoded,expectedPixels*4,limits.decodedBytes,"total decoded bytes");
+    context.budget->output(expectedPixels,4);
+    const int expectedWidth=width,expectedHeight=height;
     stbi_uc* pixels = stbi_load_from_memory(encoded, static_cast<int>(encodedSize),
                                             &width, &height, &channels, 4);
+    const std::unique_ptr<stbi_uc,decltype(&stbi_image_free)> ownedPixels(pixels,&stbi_image_free);
     if (!pixels || width <= 0 || height <= 0) {
-        error = std::string("image decode failed") +
+        error = std::string(allocations.rejected?"model budget exceeded: image decoder":"image decode failed") +
                 (stbi_failure_reason() ? ": " + std::string(stbi_failure_reason()) : "");
-        stbi_image_free(pixels);
         return false;
     }
+    if(width!=expectedWidth || height!=expectedHeight) {error="image dimensions changed after preflight";return false;}
     const std::size_t pixelCount = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
     if (pixelCount > std::numeric_limits<std::size_t>::max() / 4) {
-        stbi_image_free(pixels);
         error = "image dimensions overflow";
         return false;
     }
@@ -322,7 +469,6 @@ bool convertImage(const cgltf_image& source, const ReadContext& context, ImageDa
     destination.height = height;
     destination.channels = 4;
     destination.pixels.assign(pixels, pixels + pixelCount * 4);
-    stbi_image_free(pixels);
     return true;
 }
 
@@ -578,16 +724,24 @@ bool convertAnimations(const cgltf_data& data, ModelAsset& asset, std::string& e
 
 } // namespace
 
-static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::filesystem::path& relative) {
+static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::filesystem::path& relative, const LoadLimits& limits) {
     try {
+    LoadBudget budget{limits};
     const auto modelPath = confinedPath(assetSource, relative);
-    ReadContext context{&assetSource, modelPath};
-    const auto bytes = readResource(assetSource, modelPath);
+    ReadContext context{&assetSource, modelPath, &budget};
+    const auto bytes = readResource(assetSource, modelPath,budget);
+    validateJsonDepth(bytes,limits.jsonDepth);
+    AllocationBudget parser(limits.parserBytes);
     cgltf_options options{};
+    options.memory.user_data=&parser;
+    options.memory.alloc_func=[](void* owner,cgltf_size size) {return AllocationBudget::allocate(size,static_cast<AllocationBudget*>(owner));};
+    options.memory.free_func=[](void*,void* pointer) {AllocationBudget::release(pointer);};
     cgltf_data* parsed = nullptr;
     cgltf_result result = cgltf_parse(&options, bytes.data(), bytes.size(), &parsed);
-    if (result != cgltf_result_success) return failure(modelPath.generic_u8string() + ": glTF parse failed: " + resultName(result));
+    if (result != cgltf_result_success) return failure(modelPath.generic_u8string() +
+        (parser.rejected?": model budget exceeded: parser: ":": glTF parse failed: ") + resultName(result));
     DataHandle data(parsed, &cgltf_free);
+    validateBudgets(*data,budget);
     // Own dependencies until conversion finishes; cgltf references these bytes.
     std::vector<std::vector<uint8_t>> buffers(data->buffers_count);
     for (std::size_t i=0;i<data->buffers_count;++i) {
@@ -645,7 +799,12 @@ static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::file
     asset->images.reserve(data->images_count);
     for (cgltf_size index = 0; index < data->images_count; ++index) {
         ImageData image;
-        if (!convertImage(data->images[index], context, image, error)) return failure(std::move(error));
+        const auto& source=data->images[index];
+        const std::string location="image["+std::to_string(index)+"]" +
+            (source.uri ? " " + (std::strncmp(source.uri,"data:",5)==0 ? std::string("<data URI>") : std::string(std::string_view(source.uri).substr(0,256))) : " buffer view");
+        try {
+            if (!convertImage(source, context, image, error)) return failure(location+": "+error);
+        } catch(const std::exception& exception) {return failure(location+": "+exception.what());}
         asset->images.push_back(std::move(image));
     }
 
@@ -663,6 +822,23 @@ static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::file
         const auto& texture = data->textures[i];
         if(imageIndex(*data,texture.image)<0) return failure("texture has no supported image");
         asset->textures.push_back({imageIndex(*data, texture.image), texture.sampler ? static_cast<int>(texture.sampler-data->samplers) : -1});
+    }
+    // GPU upload builds one texture per texture/sampler relation. Count every
+    // relation, including repeated references to one decoded image and its mips.
+    size_t textureBytes=0;
+    const size_t textureCount=asset->textures.empty()?asset->images.size():asset->textures.size();
+    for(size_t i=0;i<textureCount;++i) {
+        const Texture texture=asset->textures.empty()?Texture{static_cast<int>(i),-1}:asset->textures[i];
+        const auto& image=asset->images[texture.image];
+        consume(textureBytes,image.pixels.size(),limits.textureBytes,"texture bytes");
+        const int filter=texture.sampler>=0?asset->samplers[texture.sampler].minFilter:9728;
+        if(filter<9984 || filter>9987) continue;
+        size_t w=static_cast<size_t>(image.width),h=static_cast<size_t>(image.height);
+        while(w>1 || h>1) {
+            w=std::max(size_t{1},w/2);h=std::max(size_t{1},h/2);
+            budgetRequire(w<=limits.textureBytes/4/h,"texture mip bytes");
+            consume(textureBytes,w*h*4,limits.textureBytes,"texture mip bytes");
+        }
     }
     std::vector<std::vector<int>> meshPrimitives(data->meshes_count);
     bool hasBounds = false;
@@ -745,15 +921,15 @@ static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::file
     }
 }
 
-LoadResult loadGltf(const AssetSource& source,const std::filesystem::path& relative) {
-    auto result=loadSourceGltf(source,relative);
+LoadResult loadGltf(const AssetSource& source,const std::filesystem::path& relative,const LoadLimits& limits) {
+    auto result=loadSourceGltf(source,relative,limits);
     if(!result) result.error=source.namespaceKey+":"+relative.generic_u8string()+": "+result.error;
     return result;
 }
 
-LoadResult loadGltf(const std::filesystem::path& path) {
+LoadResult loadGltf(const std::filesystem::path& path,const LoadLimits& limits) {
     const auto normalized=path.lexically_normal();
-    return loadGltf(AssetSource{"filesystem", normalized.parent_path(), {}}, normalized.filename());
+    return loadGltf(AssetSource{"filesystem", normalized.parent_path(), {}}, normalized.filename(),limits);
 }
 
 } // namespace model

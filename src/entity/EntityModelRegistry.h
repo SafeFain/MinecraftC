@@ -28,7 +28,7 @@ struct EntityModelDefinition {
 class EntityModelRegistry {
 public:
     using Loader = std::function<model::LoadResult(const std::filesystem::path&)>;
-    explicit EntityModelRegistry(Loader loader = static_cast<model::LoadResult(*)(const std::filesystem::path&)>(model::loadGltf));
+    explicit EntityModelRegistry(Loader loader = [](const std::filesystem::path& path) { return model::loadGltf(path); });
 
     void loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache = nullptr);
     void clearInstances();

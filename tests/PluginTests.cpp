@@ -62,6 +62,14 @@ int main(int argc,char** argv) {
         write(root/"mods"/"render_bad"/"mod.json",R"({"id":"render_bad","version":"1.0.0","api":1,"data":"content.json"})");
         write(root/"mods"/"render_bad"/"content.json",R"({"entities":[{"key":"render_bad:first","name":"Rollback","template_type":1,"health":10}],"render_resources":[{"key":"render_bad:shader","kind":"shader","path":"bad.spv"}]})");
         write(root/"mods"/"render_bad"/"bad.spv","not-a-valid-spirv!!!!");
+        for(const std::string id:{"model_corrupt","model_unsupported"}) {
+            write(root/"mods"/id/"mod.json","{\"id\":\""+id+"\",\"version\":\"1.0.0\",\"api\":1,\"data\":\"content.json\"}");
+            write(root/"mods"/id/"content.json","{\"entities\":[{\"key\":\""+id+":prior\",\"template_type\":1},{\"key\":\""+id+":bad\",\"template_type\":1,\"model\":\"model.glb\"}]}");
+            write(root/"mods"/id/"model.glb",id=="model_corrupt"?"broken glb":R"({"asset":{"version":"2.0"},"extensionsRequired":["EXT_unsupported"]})");
+        }
+        write(root/"mods"/"model_valid"/"mod.json",R"({"id":"model_valid","version":"1.0.0","api":1,"data":"content.json"})");
+        write(root/"mods"/"model_valid"/"content.json",R"({"entities":[{"key":"model_valid:mob","template_type":1,"model":"cow.glb"}]})");
+        std::filesystem::copy_file(MINECRAFTC_SOURCE_DIR "/assets/models/entities/cow.glb",root/"mods"/"model_valid"/"cow.glb");
         RuntimePaths paths{MINECRAFTC_SOURCE_DIR "/assets",root};
         Plugins::PluginManager manager(paths);manager.initialize();
         const auto& plugins=manager.plugins();
@@ -69,7 +77,10 @@ int main(int argc,char** argv) {
             require(!p.manifest.description("en_us").empty()&&!p.manifest.description("zh_cn").empty(),"official descriptions loaded from assets");
             require(p.manifest.description("en_us")!=p.manifest.description("zh_cn"),"official Chinese description supplied");
         }
-        for(const auto& p:plugins)if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
+        for(const auto& p:plugins)if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad"||p.manifest.id=="model_corrupt"||p.manifest.id=="model_unsupported")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
+        for(const auto* id:{"model_corrupt:prior","model_corrupt:bad","model_unsupported:prior","model_unsupported:bad"})
+            rejects([&]{Plugins::resolveEntity(id);},"failed entity model did not roll back registration");
+        require(Plugins::entityContent(Plugins::resolveEntity("model_valid:mob"))->asset!=nullptr,"registered entity did not retain its validated model");
         const auto dataMob=Plugins::resolveEntity("extension_data:mob");require(dataMob>=4096&&Plugins::entityContent(dataMob)->health==28,"data entity registry");
         rejects([]{Plugins::resolveEntity("extension_bad:first");},"extension registration failure rolls back all types");
         rejects([]{Plugins::resolveEntity("render_bad:first");},"invalid shader rolls back prior gameplay registration");

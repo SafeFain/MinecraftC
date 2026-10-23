@@ -144,7 +144,13 @@ void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model:
     for (EntityModelDefinition& definition : m_definitions) {
         const std::filesystem::path path = (root / definition.filename).lexically_normal();
         const auto previousAsset=definition.asset;
-        const auto& loaded = (cache ? *cache : m_cache).load(path);
+        const auto registered=Plugins::content().extensions.entities.find(static_cast<uint16_t>(definition.type));
+        auto supplied=registered!=Plugins::content().extensions.entities.end() ? registered->second.asset : nullptr;
+        if(!supplied && registered!=Plugins::content().extensions.entities.end() && registered->second.model.empty()) {
+            const auto base=Plugins::content().extensions.entities.find(registered->second.base);
+            if(base!=Plugins::content().extensions.entities.end()) supplied=base->second.asset;
+        }
+        const model::LoadResult loaded = supplied ? model::LoadResult{supplied, {}, {}} : (cache ? *cache : m_cache).load(path);
         if (!loaded) LOG_WARN("Entity model fallback for " << path.u8string() << ": " << loaded.error);
         definition.asset = loaded ? loaded.asset : m_placeholder;
         definition.usesPlaceholder = definition.asset == m_placeholder;

@@ -48,12 +48,49 @@ python3 tests/test_entity_models.py
 The application supplies one `ModelAssetCache` to plugin registration and renderer
 composition. It shares immutable assets and failed-load diagnostics across consumers
 and survives GPU recreation. Plugin entity/held registrations resolve from their
-package roots and publish validated path aliases into this cache. Plugin held
+package roots and retain validated assets; held registrations also publish path
+aliases into this cache. Plugin held
 meshes use selected-scene bindings, composed bind poses, sampler mips and prepared
 bounds; procedural tool meshes keep their existing path. An explicit `AssetSource` identifies its namespace/root and optional
 virtual reader. Dependencies resolve relative to the model and must stay inside
 that root, including decoded URIs and filesystem symlinks. This supports packaged
 Title Storage and plugin assets without putting platform APIs in model code.
+
+Plugin entity registration rejects malformed, unsupported or over-budget models
+with the resource diagnostic and rolls back that plugin's registration. Successful
+`EntityContent` holds the immutable asset directly; registries prefer it even when
+using an independent cache. Omitting a model retains the template fallback.
+
+`LoadLimits` bounds each load before allocation. Default limits are:
+
+| Resource | Limit |
+|---|---|
+| One file/data URI; cumulative encoded input | 32 MiB; 96 MiB |
+| Live parser / decoder allocations | 64 MiB / 128 MiB |
+| Cumulative decoded RGBA / converted output / texture relations including mips | 128 MiB / 256 MiB / 256 MiB |
+| Image dimension / pixels | 4096 per axis / 16,777,216 |
+| Primitives / nodes / skins / animations | 4096 / 8192 / 256 / 256 |
+| Materials / images / textures / samplers | 1024 / 128 / 256 / 256 |
+| Buffers / buffer views / accessors | 256 / 32768 / 32768 |
+| Vertices per primitive / total | 1,048,576 / 2,097,152 |
+| Indices per primitive / total | 3,145,728 / 6,291,456 |
+| Animation channels / total keyframes | 8192 / 2,097,152 |
+| Node draw bindings / referenced vertices / JSON nesting | 16384 / 8,388,608 / 64 |
+
+PNG/JPEG headers are inspected before decoding; the decoder also has actual
+allocation hooks, including temporary buffers and conservative realloc overlap.
+The parser uses budgeted allocation hooks without modifying vendored cgltf.
+Conversion counts charge repeated primitive/accessor/channel references separately,
+and texture budgeting includes each image/sampler relation and requested mip chain.
+Decoded output and live decoder memory are separate budgets, so a small encoded
+image cannot evade the decode limit. Limits are ceilings, not an assurance that
+every combination at the maximum fits all other budgets; they apply per asset
+load, not to the aggregate application cache or number of runtime instances.
+
+Filesystem and Title Storage reads check file size before allocating. A virtual
+reader now receives `(relativePath, maxBytes)` and must enforce that limit before
+allocating its result. Tests can pass smaller `LoadLimits` directly to `loadGltf`;
+production caches use the defaults. Diagnostics retain the source and resource path.
 
 ## Validation
 

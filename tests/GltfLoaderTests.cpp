@@ -204,9 +204,11 @@ std::filesystem::path fixture(const char* name) {
 } // namespace
 
 #include "GltfUpgradeCases.h"
+#include "GltfBudgetCases.h"
 
 int main() {
     upgradedCases();
+    budgetCases();
     const auto valid = model::loadGltf(fixture("skinned.glb"));
     require(valid && valid.asset->skins[0].joints.size() == 2, "valid skin failed");
     require(valid.asset->primitives.size() == 1 && valid.asset->primitives[0].indices.size() == 3,
@@ -255,8 +257,8 @@ int main() {
     require(!overflow && contains(overflow.error, "buffer"), "short external buffer was accepted");
 
     const auto unsafeIndex = model::loadGltf(fixture("unsafe_index_count.glb"));
-    require(!unsafeIndex && contains(unsafeIndex.error, "accessor range"),
-            "overflowing index accessor was not rejected by prevalidation");
+    require(!unsafeIndex && contains(unsafeIndex.error, "primitive indices"),
+            "overflowing index accessor was not rejected before allocation");
 
     const auto badWeights = model::loadGltf(fixture("unnormalized_weights.glb"));
     require(!badWeights && contains(badWeights.error, "WEIGHTS_0"),

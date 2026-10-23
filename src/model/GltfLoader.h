@@ -19,15 +19,37 @@ struct LoadResult {
     explicit operator bool() const { return static_cast<bool>(asset); }
 };
 
-LoadResult loadGltf(const std::filesystem::path& path);
+// Per-load limits, checked before reading, parsing, decoding or conversion.
+// Lower limits are useful for authoring validation and bounded fuzz tests.
+struct LoadLimits {
+    size_t fileBytes = 32 * 1024 * 1024;
+    size_t encodedBytes = 96 * 1024 * 1024;
+    size_t parserBytes = 64 * 1024 * 1024;
+    size_t decoderBytes = 128 * 1024 * 1024;
+    size_t decodedBytes = 128 * 1024 * 1024;
+    size_t convertedBytes = 256 * 1024 * 1024;
+    size_t textureBytes = 256 * 1024 * 1024, jsonDepth = 64;
+    size_t imageDimension = 4096, imagePixels = 16 * 1024 * 1024;
+    size_t primitives = 4096, nodes = 8192, skins = 256, animations = 256;
+    size_t materials = 1024, images = 128, textures = 256, samplers = 256;
+    size_t buffers = 256, bufferViews = 32768, accessors = 32768;
+    size_t primitiveVertices = 1024 * 1024, vertices = 2 * 1024 * 1024;
+    size_t primitiveIndices = 3 * 1024 * 1024, indices = 6 * 1024 * 1024;
+    size_t channels = 8192, keyframes = 2 * 1024 * 1024;
+    size_t bindings = 16384, boundVertices = 8 * 1024 * 1024;
+};
+
+LoadResult loadGltf(const std::filesystem::path& path, const LoadLimits& limits = {});
 
 struct AssetSource {
     std::string namespaceKey;
     std::filesystem::path root;
-    std::function<std::vector<uint8_t>(const std::filesystem::path&)> read;
+    // A virtual reader must enforce maxBytes BEFORE allocating its result.
+    std::function<std::vector<uint8_t>(const std::filesystem::path&, size_t maxBytes)> read;
 };
 
-LoadResult loadGltf(const AssetSource& source, const std::filesystem::path& relative);
+LoadResult loadGltf(const AssetSource& source, const std::filesystem::path& relative,
+                    const LoadLimits& limits = {});
 
 // Application-owned; diagnostics (including failed reads) survive cache hits.
 class ModelAssetCache {

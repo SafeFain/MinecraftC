@@ -1,4 +1,5 @@
 #include "entity/EntityModelRegistry.h"
+#include "plugins/ContentRegistry.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -47,5 +48,24 @@ int main() {
             "resource reinitialization reloaded immutable graphs or reset animation state");
     registry.retainInstances({});
     require(!registry.playing(EntityType::Zombie,42,"attack"),"retired entity kept its animation state");
+    auto supplied=std::make_shared<model::ModelAsset>();
+    supplied->animations.push_back({"idle",1.0f,{}});
+    Plugins::EntityContent plugin;
+    plugin.key="registry_test:mob";plugin.id=4096;plugin.base=static_cast<uint16_t>(EntityType::Cow);
+    plugin.model="unavailable/model.gltf";plugin.asset=supplied;
+    Plugins::content().extensions.entities.emplace(plugin.id,plugin);
+    auto base=plugin;base.id=static_cast<uint16_t>(EntityType::Cow);base.key="registry_test:cow";
+    Plugins::content().extensions.entities.emplace(base.id,base);
+    auto inherited=plugin;inherited.id=4097;inherited.key="registry_test:inherited";inherited.model.clear();inherited.asset.reset();
+    Plugins::content().extensions.entities.emplace(inherited.id,inherited);
+    EntityModelRegistry isolated([](const auto&) {model::LoadResult failure;failure.error="independent cache has no alias";return failure;});
+    isolated.loadAll("fixtures");
+    require(isolated.definition(static_cast<EntityType>(plugin.id)).asset==supplied &&
+        !isolated.definition(static_cast<EntityType>(plugin.id)).usesPlaceholder,"registered asset relied on a cache alias");
+    require(isolated.definition(static_cast<EntityType>(inherited.id)).asset==supplied,
+        "template model inheritance relied on a cache alias");
+    Plugins::content().extensions.entities.erase(plugin.id);
+    Plugins::content().extensions.entities.erase(base.id);
+    Plugins::content().extensions.entities.erase(inherited.id);
     std::cout << "entity model registry tests passed\n";
 }
