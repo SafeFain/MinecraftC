@@ -421,6 +421,42 @@ int main(int argc,char** argv) {
             auto createCallbacks=callbacks;
             createCallbacks.onGenerationConfig=[&](const auto& config){createdGeneration=config;};
             createCallbacks.onCreateWorld=[&](const std::string& name,const std::string&,GameMode,WorldType,bool){createdName=name;};
+            // Exercise every dimension row through the real menu activation path.
+            // Native Nether has no plugin generators: clicking Normal used to divide by zero.
+            int generatorRow=6; // Name, mode, type, seed, cheats and advanced toggle.
+            for(const auto& dimension:Plugins::content().extensions.dimensions) {
+                MainMenu generatorMenu(createCallbacks,{},settings,localization,nullptr);
+                generatorMenu.onKeyPress(Key::Enter);generatorMenu.onKeyPress(Key::Down);
+                generatorMenu.onKeyPress(Key::Down);generatorMenu.onKeyPress(Key::Enter);
+                std::vector<std::string> choices;
+                if(dimension.first==0||dimension.first==2)choices.emplace_back();
+                for(const auto& generator:Plugins::content().extensions.generators)
+                    if(generator.second.dimension==dimension.first)choices.push_back(generator.first);
+                auto expected=dimension.second.generation.generator;
+                for(int activation=0;activation<3;++activation) {
+                    // Rebuilding buttons restores selection to Name after each activation.
+                    for(int row=0;row<generatorRow;++row)generatorMenu.onKeyPress(Key::Down);
+                    generatorMenu.onKeyPress(Key::Enter);
+                    if(!choices.empty()) {
+                        const auto it=std::find(choices.begin(),choices.end(),expected);
+                        expected=it==choices.end()?choices.front():choices[(size_t(it-choices.begin())+1)%choices.size()];
+                    }
+                }
+                draw("create-generator-"+std::to_string(dimension.first),[&]{generatorMenu.render(ui,width,height);},1);
+                // Return focus to Name, then wrap to the create action.
+                generatorMenu.onKeyPress(Key::Tab);generatorMenu.onKeyPress(Key::Tab);
+                generatorMenu.onKeyPress(Key::Up);generatorMenu.onKeyPress(Key::Up);generatorMenu.onKeyPress(Key::Enter);
+                const auto& selected=createdGeneration.at(dimension.first);
+                if(selected.generator!=expected||selected.parameters!=dimension.second.generation.parameters)
+                    throw std::runtime_error("Dimension generator cycling changed defaults or selected the wrong generator");
+                Plugins::validateGeneration(selected,dimension.first);
+                if(selected.generator.empty()&&!selected.revision.empty())
+                    throw std::runtime_error("Native generator retained a plugin revision");
+                ++generatorRow;
+                for(const auto& modifier:Plugins::content().extensions.modifiers)
+                    if(modifier.second.dimension==dimension.first)++generatorRow;
+            }
+            std::cout<<"Create-world native Nether and plugin generator activation passed\n";
             MainMenu createMenu(createCallbacks,{},settings,localization,nullptr);
             createMenu.onKeyPress(Key::Enter);createMenu.onKeyPress(Key::Down);
             createMenu.onKeyPress(Key::Down);createMenu.onKeyPress(Key::Enter);

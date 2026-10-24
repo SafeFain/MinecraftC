@@ -369,8 +369,15 @@ void MainMenu::rebuildButtons() {
             const auto& selected=m_generation[dimension];
             std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
             m_buttons.emplace_back(m_localization.format("menu.create.generator_dimension",{m_localization.dimensionName(dimension),name}),[this,dimension]{
-                std::vector<std::string> keys;if(dimension==0)keys.emplace_back();for(const auto& g:Plugins::content().extensions.generators)if(g.second.dimension==dimension)keys.push_back(g.first);
-                auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);g.generator=keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
+                std::vector<std::string> keys;
+                // Both native dimensions use an empty key for their builtin generator.
+                if(dimension==static_cast<uint32_t>(DimensionId::Overworld)||
+                   dimension==static_cast<uint32_t>(DimensionId::Nether))keys.emplace_back();
+                for(const auto& g:Plugins::content().extensions.generators)
+                    if(g.second.dimension==dimension)keys.push_back(g.first);
+                if(keys.empty())return;
+                auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);
+                g.generator=it==keys.end()?keys.front():keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
                 g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
             if(m_advancedGeneration) {
                 m_parameterRows[dimension]=static_cast<int>(m_buttons.size());
