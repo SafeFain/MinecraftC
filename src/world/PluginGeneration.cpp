@@ -25,6 +25,7 @@ void reconcileStructureSupport(const Changes& changes,Read read,Write write) {
 }
 }
 std::optional<glm::dvec3> WorldGenerator::sampleDimensionSpawn() const {
+    if(isNether())return glm::dvec3(m_nether.spawnBlock())+glm::dvec3(.5,.01,.5);
     const auto& d=Plugins::dimensionContent(m_dimension);
     if(!d.sampleSpawn)return {};
     MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
@@ -51,6 +52,14 @@ SurfaceColumn WorldGenerator::pluginColumn(int x,int z) const {
     return column;
 }
 std::vector<MC_GenerationLayer> WorldGenerator::sampleGenerationLayers(int x,int z) const {
+    if(isNether()) {
+        std::vector<MC_GenerationLayer> layers;
+        for(const auto& span:m_nether.spans(x,z)) {
+            if(!layers.empty()&&layers.back().top+1==span.bottom)layers.back().top=span.top;
+            else layers.push_back({span.bottom,span.top,1,0});
+        }
+        return layers;
+    }
     if(customGenerator()) {
         const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
         if(g.layers) {
@@ -75,6 +84,7 @@ std::vector<MC_GenerationLayer> WorldGenerator::sampleGenerationLayers(int x,int
     return {{Config::WORLD_MIN_Y,sampleTerrainColumn(x,z).height,1,0}};
 }
 BlockId WorldGenerator::samplePluginBlock(int x,int y,int z) const {
+    if(isNether())return m_nether.sample(x,y,z);
     const auto& g=Plugins::content().extensions.generators.at(m_pluginConfig.generator);
     MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
     uint16_t block=static_cast<uint16_t>(BlockId::AIR);
@@ -223,6 +233,7 @@ void WorldGenerator::applyPluginModifiers(Chunk& chunk) const {
 }
 std::array<uint16_t,Config::CHUNK_SIZE_Y> WorldGenerator::samplePluginColumnBlocks(int x,int z) const {
     std::array<uint16_t,Config::CHUNK_SIZE_Y> blocks{};
+    if(isNether()){const auto native=m_nether.column(x,z);for(size_t i=0;i<native.size();++i)blocks[i]=static_cast<uint16_t>(native[i]);return blocks;}
     for(int y=Config::WORLD_MIN_Y;y<Config::WORLD_MAX_Y;++y)
         blocks[static_cast<size_t>(y-Config::WORLD_MIN_Y)]=static_cast<uint16_t>(samplePluginBlock(x,y,z));
     for(const auto& b:pluginModifierBlocks(x,z,1,1,false))blocks[static_cast<size_t>(b.y-Config::WORLD_MIN_Y)]=b.block;
@@ -292,6 +303,7 @@ std::vector<PluginAnchor> structureAnchors(const WorldGenerator& g,const Plugins
 }
 }
 std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureBlocks(int x,int z,int width,int depth,bool coarse) const{
+    if(isNether())return m_nether.structureBlocks(x,z,width,depth);
     if(width<=0||depth<=0||int64_t(x)+width-1>30000000||int64_t(z)+depth-1>30000000||x< -30000000||z< -30000000)Plugins::failGeneration("structure bounds");
     struct Placement {const Plugins::StructureContent* structure;PluginAnchor anchor;int cx,cz;};
     std::vector<Placement> placements;bool v2=false;
@@ -310,7 +322,8 @@ std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureB
         return std::tie(a.structure->order,a.structure->key,a.anchor.order,a.cz,a.cx,a.anchor.x,a.anchor.y,a.anchor.z,a.anchor.variant)<
             std::tie(b.structure->order,b.structure->key,b.anchor.order,b.cz,b.cx,b.anchor.x,b.anchor.y,b.anchor.z,b.anchor.variant);
     });
-    std::vector<RegionGenerationData::PendingBlock> result;
+    std::vector<RegionGenerationData::PendingBlock> result=overworldPortalBlocks(x,z,width,depth);
+    v2=v2||!result.empty();
     for(const auto& placement:placements){const auto& s=*placement.structure;const auto& a=placement.anchor;
         std::vector<Plugins::StructureContent::Block> blocks=s.blocks;
         if(s.build||s.buildV2){
@@ -367,6 +380,17 @@ std::vector<RegionGenerationData::PendingBlock> WorldGenerator::pluginStructureB
     return result;
 }
 std::optional<MC_LocatedStructure> WorldGenerator::locatePluginStructure(const std::string& key,int x,int z,uint32_t range) const{
+    if(isNether()) {
+        const auto s=m_nether.locate(key,x,z,static_cast<int>(range));
+        if(!s)return {};
+        MC_LocatedStructure result{};result.size=sizeof(result);result.dimension=2;
+        for(int i=0;i<3;++i)result.anchor[i]=s->anchor[i];result.variant=s->seed;return result;
+    }
+    if(m_dimension==DimensionId::Overworld&&key=="minecraftc:ruined_portal") {
+        const auto s=locateOverworldPortal(x,z,static_cast<int>(range));if(!s)return {};
+        MC_LocatedStructure result{};result.size=sizeof(result);result.dimension=0;
+        for(int i=0;i<3;++i)result.anchor[i]=s->anchor[i];result.variant=s->seed;return result;
+    }
     const auto found=Plugins::content().extensions.structures.find(key);
     if(found==Plugins::content().extensions.structures.end()||found->second.dimension!=static_cast<uint32_t>(m_dimension)||range>8192||std::abs(int64_t(x))>30000000||std::abs(int64_t(z))>30000000)return {};
     const auto& s=found->second;if(!s.placements&&!s.chance)return {};
@@ -389,6 +413,7 @@ std::optional<MC_LocatedStructure> WorldGenerator::locatePluginStructure(const s
 uint64_t WorldGenerator::pluginStructureFingerprint() const{
     uint64_t h=0;bool found=false;
     for(const auto& pair:Plugins::content().extensions.structures)if(pair.second.dimension==static_cast<uint32_t>(m_dimension)){
+        if(!pair.second.chance&&!pair.second.build&&!pair.second.buildV2&&pair.second.blocks.empty())continue;
         found=true;const auto description=Plugins::content().networkDescription.find("structure/"+pair.first);
         h=WorldGenContext::mix(h^keyHash(pair.first)^keyHash(pair.second.revision)^pair.second.domain^0x7374727563747631ULL);
         if(description!=Plugins::content().networkDescription.end())h=WorldGenContext::mix(h^keyHash(description->second));
@@ -419,6 +444,11 @@ std::vector<MC_LodSpan> WorldGenerator::samplePluginLodColumn(int x,int z,int ce
     const std::vector<MC_LodSpan>& base) const {
     if(cellSize<1||cellSize>8192||(cellSize&(cellSize-1)))Plugins::failGeneration("LOD cell");
     const int wx=x+cellSize/2,wz=z+cellSize/2;
+    if(isNether()) {
+        std::vector<MC_LodSpan> spans;
+        for(const auto& span:m_nether.spans(wx,wz))spans.push_back({span.bottom,span.top,static_cast<uint16_t>(span.block)});
+        return spans;
+    }
     MC_GenerationContext context{sizeof(MC_GenerationContext),static_cast<uint32_t>(m_dimension),m_seed,m_pluginConfig.parameters.c_str()};
     MC_LodCell cellRequest{sizeof(MC_LodCell),x,z,static_cast<uint32_t>(cellSize)};
     // Compose sparse intervals directly. Work depends on spans/overwrites,

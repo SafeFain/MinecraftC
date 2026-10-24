@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "world/Block.h"
+#include "game/NetherItems.h"
+#include "entity/NetherMobs.h"
 
 // Serialized item identifiers. Existing values must never be reordered.
 enum class ItemId : uint16_t {
@@ -319,6 +321,24 @@ enum class ItemId : uint16_t {
     BIRCH_PLANKS, SPRUCE_PLANKS, JUNGLE_PLANKS, ACACIA_PLANKS,
     OAK_DOOR, BIRCH_DOOR, SPRUCE_DOOR, JUNGLE_DOOR, ACACIA_DOOR, SKYROOT_DOOR, IRON_DOOR,
     OAK_BUTTON, BIRCH_BUTTON, SPRUCE_BUTTON, JUNGLE_BUTTON, ACACIA_BUTTON, SKYROOT_BUTTON, STONE_BUTTON,
+#define NETHER_ITEM_ENUM(id,key,label,r,g,b,shape,light) id,
+    MC_NETHER_BLOCKS(NETHER_ITEM_ENUM)
+#undef NETHER_ITEM_ENUM
+#define NETHER_RESOURCE_ENUM(id,key,label) id,
+    MC_NETHER_RESOURCES(NETHER_RESOURCE_ENUM)
+#undef NETHER_RESOURCE_ENUM
+#define NETHER_EQUIPMENT_ENUM(id,key,label,base,durability) id,
+    MC_NETHER_EQUIPMENT(NETHER_EQUIPMENT_ENUM)
+#undef NETHER_EQUIPMENT_ENUM
+#define NETHER_POTION_ENUM(id,key,label,kind,level,ticks,splash) id,
+    MC_NETHER_POTIONS(NETHER_POTION_ENUM)
+#undef NETHER_POTION_ENUM
+#define NETHER_FAMILY_ENUM(id,key,label,shape,material) id,
+    MC_NETHER_FAMILY_ITEMS(NETHER_FAMILY_ENUM)
+#undef NETHER_FAMILY_ENUM
+#define NETHER_EGG_ENUM(type,egg,key,label,h,x,y,z,s,d,monster,fire) egg,
+    MC_NETHER_MOBS(NETHER_EGG_ENUM)
+#undef NETHER_EGG_ENUM
     COUNT,
     POPPY = FLOWER
 };
@@ -357,7 +377,10 @@ enum class SpawnEggMob : uint8_t {
     Spider,
     Blastling,
     Villager,
-    ZombieVillager
+    ZombieVillager,
+#define NETHER_EGG_MOB(type,egg,key,label,h,x,y,z,s,d,monster,fire) type,
+    MC_NETHER_MOBS(NETHER_EGG_MOB)
+#undef NETHER_EGG_MOB
 };
 
 enum class ToolKind : uint8_t {
@@ -378,7 +401,8 @@ enum class ToolTier : uint8_t {
     Stone,
     Iron,
     Gold,
-    Diamond
+    Diamond,
+    Netherite
 };
 
 struct ItemProperties {

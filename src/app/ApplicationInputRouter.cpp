@@ -1,3 +1,4 @@
+#include "world/BlockEntityLogic.h"
 #include "app/ApplicationInputRouter.h"
 #include "app/ApplicationInputController.h"
 #include "app/GameFlowController.h"
@@ -730,7 +731,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
                 m_session.pluginUse(true);
                 return;
             }
-            if (target == BlockId::CHEST || target == BlockId::FURNACE) {
+            if (const auto kind=blockEntityTypeForBlock(target); kind&&isInventoryContainer(*kind)) {
                 if (m_ui.containerScreen.open(m_session, hit->blockPos)) {
                     m_session.pluginUse(true);
                     m_ui.tradeOpen = false;

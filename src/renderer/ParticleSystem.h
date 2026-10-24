@@ -19,7 +19,7 @@ class World;
 enum class ParticleKind : uint8_t {
     Rain, Snow, Lightning, BlockDebris, RainSplash, Trajectory, SkyMote,
     SoftTuft, Sparkle, CriticalHit, SweepAttack, OverworldMote,
-    Firefly, CaveSpore, CaveDust, CaveEmber, Plugin
+    Firefly, CaveSpore, CaveDust, CaveEmber, Plugin, NetherMote
 };
 
 inline bool supportsFireflies(Biome biome) {

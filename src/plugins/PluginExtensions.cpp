@@ -180,7 +180,7 @@ int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_Dimens
     require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");
     const auto& provider=m_info.at(ctx.index).manifest;
     if(provider.builtin&&provider.id=="official_heaven"&&value.key=="minecraftc:heaven")id=1;
-    else {id=2;while(entries.count(id))++id;}
+    else {id=3;while(entries.count(id))++id;}
     require(id<Config::PLUGIN_MAX_DIMENSIONS&&!entries.count(id),"Dimension handle limit/duplicate reservation");
     entries.emplace(id,std::move(value));return 0;
 }

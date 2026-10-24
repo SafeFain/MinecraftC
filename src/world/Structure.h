@@ -47,7 +47,7 @@ enum class StructureLootProfile : uint8_t {
     SwampHut,
     MountainWatchtower,
     StoneCircle,
-    AbandonedFarmstead
+    AbandonedFarmstead, NetherFortress, NetherBastion, RuinedPortal
 };
 
 inline constexpr StructureLootProfile structureLootProfile(StructureType type) {

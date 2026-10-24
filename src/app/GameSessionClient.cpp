@@ -87,6 +87,7 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
     player.applyReplicaVisualState(state.self.visual);
     player.setReplicaMining(state.miningProgress, state.miningTarget);
     player.survivalStats().set(state.health, state.hunger, state.saturation, state.exhaustion, state.foodTimer);
+    player.statusEffects().restore(state.effects);
     playerDead = state.dead;
     if (sleepState == SleepVisualState::Awake && state.sleepState != 0) replicaSleepStarted = true;
     if (sleepState != SleepVisualState::Awake && state.sleepState == 0) replicaSleepEnded = true;

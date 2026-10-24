@@ -131,9 +131,10 @@ class TextureGeneratorTests(unittest.TestCase):
         self.assertEqual(len(fingerprints),6)
 
     def test_doors_and_variant_planks_are_distinct_and_deterministic(self):
-        self.assertEqual(tg.NAMES[238:],list(tg.VARIANT_PLANKS)+list(tg.DOOR_TEXTURES))
+        self.assertEqual(tg.NAMES[238:256],list(tg.VARIANT_PLANKS)+list(tg.DOOR_TEXTURES))
+        self.assertEqual(tg.NAMES[256:],list(tg.NETHER_MATERIALS))
         fingerprints=set()
-        for name in tg.NAMES[238:]:
+        for name in tg.NAMES[238:256]:
             pixels=tg.generate_texture(name,tg.DEFAULT_SEED)
             self.assertEqual(len(pixels),256)
             self.assertTrue(all(pixel[3] in (0,255) for pixel in pixels))

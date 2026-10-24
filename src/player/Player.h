@@ -1,3 +1,4 @@
+#include "game/StatusEffects.h"
 #pragma once
 
 #include <glm/glm.hpp>
@@ -20,12 +21,17 @@
 
 class World;
 class EntityManager;
+struct PotionDefinition;
 
 class Player {
 public:
     Player(World& world);
     void bindWorld(World& world, EntityManager* entities);
     MC_Event pluginEvent(MC_EventKind kind) const;
+    const std::string& persistentIdentity() const {return m_persistentIdentity;}
+    void setPersistentIdentity(std::string key) {m_persistentIdentity=std::move(key);}
+    void followMount(const glm::dvec3& p) {setPosition(p);m_velocity=glm::vec3(0);m_onGround=false;m_fallDistance=0;}
+    uint64_t roomPlayerId() const {return m_roomPlayerId;}
     void setRoomPlayerId(uint64_t id) { m_roomPlayerId = id; }
     void setOrientation(float yaw, float pitch);
     void setAuthority(bool enabled) { m_authority = enabled; cancelBowCharge(); m_mining = false; }
@@ -107,7 +113,10 @@ public:
     const SurvivalStats& survivalStats() const { return m_survivalStats; }
     DamageOutcome takeDamage(float amount, bool bypassArmor = false);
     DamageOutcome takeDamage(const DamageSourceInfo& source);
-    void ignite(float seconds) { m_burningSeconds = std::max(m_burningSeconds, seconds); }
+    void ignite(float seconds) { if(!m_effects.level(StatusEffectType::FireResistance))m_burningSeconds = std::max(m_burningSeconds, seconds); }
+    StatusEffects& statusEffects() {return m_effects;}
+    const StatusEffects& statusEffects() const {return m_effects;}
+    void applyPotion(const PotionDefinition&,float intensity=1.f);
     void extinguish() { m_burningSeconds = 0.0f; m_burnDamageTicks = 0; }
     void setRainExposure(bool exposed) { m_rainExposed = exposed; }
     void resetDamageImmunity() { m_hurtImmunity = {}; }
@@ -202,6 +211,7 @@ private:
 
     // View angles
     uint64_t m_roomPlayerId = 0;
+    std::string m_persistentIdentity="local";
     float m_yaw = 0.0f;
     float m_pitch = 0.0f;
     float m_eyeHeight = Config::EYE_HEIGHT;
@@ -241,6 +251,9 @@ private:
     float m_fallDistance = 0.0f;
     int m_airTicks = 300;
     uint32_t m_environmentDamageTicks = 0;
+    StatusEffects m_effects;
+    float m_effectRemainder=0;
+    void tickStatusEffects(float);
     float m_burningSeconds = 0.0f;
     uint32_t m_burnDamageTicks = 0;
     bool m_rainExposed = false;

@@ -123,7 +123,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         modelReference(*held.asset);originalSignature=Lan::contentSignature(Plugins::content().networkDescription);
         check(getLightDampening(BlockId::SKYROOT_LEAVES)==1&&isLeafBlock(BlockId::SKYROOT_LEAVES)&&fuelTicks(ItemId::SKYROOT_PLANKS)==300,"official semantic rules not published");
         WorldCatalog catalog(root/"saves");const auto id=catalog.create("Enabled",12,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==2,"enabled save lost Heaven");
+        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==3,"enabled save lost Heaven or native Nether");
         Lan::PlayerProfile profile;profile.identity={std::string(32,'a'),std::string(32,'b'),"P0"};profile.inventory.slot(0)={ItemId::STARSTEP_SCEPTER,1,0};
         Lan::ProfileStore(root/"saves"/id/"players").save(profile);
         (void)Lan::ProfileStore::localIdentity(root);
@@ -155,9 +155,9 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         rejects([&]{Lan::ProfileStore(root/"saves/enabled/players").load({std::string(32,'a'),std::string(32,'b'),"P0"});},"disabled profile content loaded");
         check(snapshot(root/"saves")==before,"profile refusal wrote files");
         const auto id=session.createWorld("Disabled",13,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==1,"single-dimension save cannot reload");
-        Lan::WorldInfo info;check(Lan::decodeWorldInfo(Lan::encodeWorldInfo(info)).generation.size()==1,"single-dimension LAN info failed");
-        Lan::PlayerProfile profile;profile.identity={std::string(32,'c'),std::string(32,'d'),"Off"};check(Lan::decodeProfile(Lan::encodeProfile(profile)).positions.size()==1,"single-dimension profile failed");
+        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==2,"native dimensions save cannot reload");
+        Lan::WorldInfo info;check(Lan::decodeWorldInfo(Lan::encodeWorldInfo(info)).generation.size()==2,"native dimensions LAN info failed");
+        Lan::PlayerProfile profile;profile.identity={std::string(32,'c'),std::string(32,'d'),"Off"};check(Lan::decodeProfile(Lan::encodeProfile(profile)).positions.size()==2,"native dimensions profile failed");
         const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=2;
         session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});session.startWorld(id,true,0);GameSessionTestAccess::prepareLanScene(session);
         GameSession client(root/"off-client/saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
@@ -168,7 +168,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         plugins.shutdown();
     }
     {
-        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==1&&Plugins::content().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
+        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&Plugins::content().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
     }
     write(root/"plugins.json","{}");
     {

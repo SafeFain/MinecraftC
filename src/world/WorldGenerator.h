@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/Noise.h"
+#include "world/NetherGenerator.h"
 #ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
 #include "plugins/official_heaven/HeavenGenerator.h"
 #endif
@@ -83,7 +84,7 @@ public:
     int getTerrainHeight(int worldX, int worldZ) const;
     HeightBiome queryHeightBiome(int worldX, int worldZ) const;
     CaveBiome caveBiomeAt(int worldX, int worldY, int worldZ) const {
-        return customGenerator() || m_worldType == WorldType::Superflat
+        return isNether() || customGenerator() || m_worldType == WorldType::Superflat
             ? CaveBiome::Neutral
             : m_caveGenerator.biomeAt(worldX, worldY, worldZ);
     }
@@ -92,6 +93,8 @@ public:
         int worldOriginX, int worldOriginZ, int width, int depth) const;
     std::vector<VillageSpawnRequest> villageSpawnsForChunk(
         int chunkX, int chunkZ) const;
+    bool isNether() const { return m_dimension == DimensionId::Nether; }
+    const NetherGenerator& nether() const { return m_nether; }
     WorldType worldType() const { return m_worldType; }
     DimensionId dimension() const { return m_dimension; }
 #ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
@@ -114,7 +117,7 @@ public:
         const glm::ivec3& core, bool upward) const;
 #endif
     uint32_t generationVersion() const {
-        return m_dimension==DimensionId::Heaven ? HEAVEN_GENERATION_VERSION :
+        return isNether() ? NetherGenerator::VERSION : m_dimension==DimensionId::Heaven ? HEAVEN_GENERATION_VERSION :
                             WorldGenContext::GENERATION_VERSION;
     }
     const Plugins::GenerationConfig& generationConfig() const {return m_pluginConfig;}
@@ -122,12 +125,13 @@ public:
     BlockId samplePluginBlock(int x,int y,int z) const;
     std::array<uint16_t,Config::CHUNK_SIZE_Y> samplePluginColumnBlocks(int,int) const;
     uint32_t chunkCacheVersion() const {
+        if(isNether())return (NetherGenerator::VERSION<<16)|1u;
         const auto structures=pluginStructureFingerprint();
         if(structures||customGenerator()||!m_pluginConfig.modifiers.empty()) {
             const auto hash=Plugins::generationFingerprint(m_pluginConfig)^structures;
             return static_cast<uint32_t>(hash^(hash>>32));
         }
-        return m_dimension==DimensionId::Heaven ? HEAVEN_CHUNK_CACHE_VERSION :
+        return isNether() ? (NetherGenerator::VERSION << 16) | 1u : m_dimension==DimensionId::Heaven ? HEAVEN_CHUNK_CACHE_VERSION :
                             WorldGenContext::CHUNK_CACHE_VERSION;
     }
 
@@ -148,12 +152,16 @@ public:
 
 private:
     SurfaceColumn pluginColumn(int,int) const;
+    std::optional<NetherStructure> overworldPortalForCell(int,int) const;
+    std::vector<RegionGenerationData::PendingBlock> overworldPortalBlocks(int,int,int,int) const;
+    std::optional<NetherStructure> locateOverworldPortal(int,int,int) const;
     void generatePluginChunk(Chunk&) const;
     void applyPluginModifiers(Chunk&) const;
     Plugins::GenerationConfig m_pluginConfig;
     uint64_t m_seed;
     WorldType m_worldType = WorldType::Normal;
     DimensionId m_dimension = DimensionId::Overworld;
+    NetherGenerator m_nether;
     Noise          m_noise;
     HeightPipeline m_heightPipeline;
     CaveGenerator  m_caveGenerator;

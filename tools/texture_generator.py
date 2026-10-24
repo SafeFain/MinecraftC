@@ -150,6 +150,9 @@ def _read_definition(path):
     return load_definition(path)
 
 
+from nether_materials import NETHER_MATERIALS
+NAMES += list(NETHER_MATERIALS)
+
 DEFINITION_ROOT = Path(__file__).resolve().parents[1] / "assets/textures/definitions"
 
 
@@ -1277,6 +1280,13 @@ PALETTES["hanging_cloud_vine"] = [(0,0,0,0), (48,94,100,255),
     (76,139,146,255), (117,183,177,255), (106,211,223,255),
     (183,242,244,255), (239,255,246,255)]
 
+for _name, _spec in NETHER_MATERIALS.items():
+    _base=_spec['color']
+    PALETTES[_name]=[(0,0,0,0) if _spec['plant'] else tuple(max(1,int(c*.55)) for c in _base)+(255,)]
+    PALETTES[_name]+=[tuple(max(1,min(255,int(c*f))) for c in _base)+(255,) for f in (.65,.82,1.,1.15,1.35)]
+    if 'ore' in _name:PALETTES[_name][-1]=(255,204,74,255) if 'gold' in _name else (239,225,201,255)
+    if _spec['plant']:TRANSPARENT.add(_name)
+
 for _name, _palette in PALETTES.items():
     PALETTES[_name] = [SemanticColor(color, role) for role, color in enumerate(_palette)]
 STRUCTURE_PALETTES = dict(PALETTES)
@@ -1284,6 +1294,9 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in NETHER_MATERIALS:
+        from nether_materials import pixels
+        return pixels(sys.modules[__name__],name,local)
     if name in VARIANT_PLANKS:
         palette=PALETTES[name]
         return [palette[i] for i in generate_planks(name,local)]
@@ -1735,6 +1748,9 @@ def generate_item_sprite(template,material,definitions):
     if template not in definitions["templates"]: raise ValueError(f"unknown item template '{template}'")
     if material not in definitions["materials"]: raise ValueError(f"unknown item material '{material}'")
     shades=[_rgba(c) for c in definitions["materials"][material]]
+    if template in ("potion","splash_potion","empty_bottle","smithing_template"):
+        from nether_item_sprites import sprite
+        return sprite(template,shades)
     outline=shades[0]
     handle=[_rgba(c) for c in definitions["handle_palette"]]
     image=[(0,0,0,0)]*(SIZE*SIZE)

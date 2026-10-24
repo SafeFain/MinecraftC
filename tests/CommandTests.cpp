@@ -27,8 +27,8 @@ int main(int argc, char** argv) {
          "/give stone_bricks 999999999999", "/give stone_bricks 2 extra"})
         require(!parseCommand(invalid).command, "give rejects invalid names/counts/arguments");
     const std::string prefix = "/give polished_";
-    require(commandSuggestions(prefix, prefix.size()).size() == 4,
-            "give completes all polished stone variants");
+    require(commandSuggestions(prefix, prefix.size()).size() == 5,
+            "give completes four original polished stone variants and native polished blackstone");
     for (uint16_t raw = 183; raw <= 208; ++raw) {
         const auto item = static_cast<ItemId>(raw);
         require(itemFromCommandName(itemCommandName(item)) == item,

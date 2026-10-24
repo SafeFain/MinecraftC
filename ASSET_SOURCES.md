@@ -121,3 +121,11 @@ python3 tools/texture_generator.py --generate --validate --build-atlas --build-i
 - License: original project-generated assets under the repository license.
 - Modifications: six workstation patterns/icons; iron golem body, skin,
   idle/walk/hurt/death/melee animations; regenerated semantic atlases.
+
+## Native Nether entities and progression
+
+- Creator/tool: MinecraftC tools/generate_nether_models.py and original native texture recipes.
+- Creation date: 2026-10-24.
+- Source: original cuboid geometry, generated semantic skins, animations and pixel sprites.
+- No downloaded or copied Minecraft assets. Licensed under the repository GPL-3.0-only license.
+- Eleven mobs, four projectiles, native materials, equipment, potion bottles and spawn eggs.

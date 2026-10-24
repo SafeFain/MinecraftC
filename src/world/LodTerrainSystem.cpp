@@ -378,6 +378,12 @@ namespace {
 void samplePluginLod(const WorldGenerator& generator,int x,int z,int cellSize,LodColumn& column) {
     std::vector<MC_LodSpan> base;
     for(const auto& s:column.spans)base.push_back({s.bottom,s.top,static_cast<uint16_t>(s.block)});
+    if(generator.isNether()) {
+        column.spans.clear();
+        for(const auto& s:generator.nether().spans(x+cellSize/2,z+cellSize/2))
+            column.spans.push_back({static_cast<int16_t>(s.bottom),static_cast<int16_t>(s.top),s.block});
+        return;
+    }
     const auto sampled=generator.samplePluginLodColumn(x,z,cellSize,base);
     column.spans.clear();
     for(const auto& s:sampled)column.spans.push_back({static_cast<int16_t>(s.bottom),static_cast<int16_t>(s.top),static_cast<BlockId>(s.block)});
@@ -395,7 +401,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
             int wx = originX + x * cellSize + cellSize / 2;
             int wz = originZ + z * cellSize + cellSize / 2;
             LodColumn& column = tile.at(x, z);
-            if(generator.customGenerator()) {
+            if(generator.isNether()||generator.customGenerator()) {
                 samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
@@ -457,7 +463,7 @@ LodTileData buildApproximateLodTile(const WorldGenerator& generator,
     // Preserve deterministic tree silhouettes in the two finest approximate
     // levels. Individual trees are intentionally omitted once a cell exceeds
     // eight blocks so a canopy can never become a giant distant cube.
-    if (!generator.customGenerator() && cellSize <= 8) {
+    if (!generator.isNether() && !generator.customGenerator() && cellSize <= 8) {
         struct TreeOverlay {
             int bottom = Config::WORLD_MIN_Y;
             int top = Config::WORLD_MIN_Y - 1;
@@ -624,7 +630,7 @@ LodNeighborEdges sampleApproximateLodNeighborEdges(const WorldGenerator& generat
             const int wx = originX + cellX * cellSize + cellSize / 2;
             const int wz = originZ + cellZ * cellSize + cellSize / 2;
             LodColumn& column = edges[static_cast<size_t>(side)][static_cast<size_t>(i)];
-            if(generator.customGenerator()) {
+            if(generator.isNether()||generator.customGenerator()) {
                 samplePluginLod(generator,wx-cellSize/2,wz-cellSize/2,cellSize,column);
                 continue;
             }
@@ -808,9 +814,12 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
                            const LodExactNeighborTiles* neighbors,
                            const LodNeighborEdges* edges,
-                           bool sealTileEdges) {
-    if (cellSize == 1 && isFullyExact(data))
-        return buildExactLodTileMesh(data, neighbors, sealTileEdges);
+                           bool sealTileEdges,bool skyLight) {
+    if (cellSize == 1 && isFullyExact(data)) {
+        auto mesh=buildExactLodTileMesh(data, neighbors, sealTileEdges);
+        if(!skyLight)for(auto& vertex:mesh.vertices)vertex.skyLight=0;
+        return mesh;
+    }
 
     ChunkMesh mesh;
     std::vector<unsigned int> opaque, translucent;
@@ -919,6 +928,7 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
     mesh.indices.insert(mesh.indices.end(), translucent.begin(), translucent.end());
     mesh.translucentIndexCount = translucent.size();
     mesh.indexCount = mesh.indices.size();
+    if(!skyLight)for(auto& vertex:mesh.vertices)vertex.skyLight=0;
     return mesh;
 }
 
@@ -1399,7 +1409,7 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                             // Older r4 approximate tiles stored only a short
                             // surface slab. Repair them in memory as well so
                             // existing worlds get continuous coverage.
-                            if (!generator->customGenerator()&&
+                            if (!generator->isNether()&&!generator->customGenerator()&&
                                 generator->generationConfig().modifiers.empty()) {
                                 for (LodColumn& column : data.columns) {
                                     if (!column.exact && !column.spans.empty())
@@ -1425,7 +1435,7 @@ void LodTerrainSystem::enqueueRequests(bool allowRefinements) {
                             }
                             ChunkMesh mesh = buildLodTileMesh(
                                 data, 1 << key.level, spanLimit, neighborPointer,
-                                edgePointer, true);
+                                edgePointer, true, !generator->isNether());
                             // A neighbor callback fault must not leave a newly
                             // written tile from an incomplete sampling request.
                             if(generatedTile)writeTileFile(tilePath(root,key),key,*generator,*generatedTile);
@@ -1775,7 +1785,7 @@ void LodTerrainSystem::releaseGpuMeshes(bool retainCpuGeometry) {
                     edgePointer = &edges;
                 }
                 tile->mesh = buildLodTileMesh(tile->data, 1 << key.level,
-                    spanLimit, neighborPointer, edgePointer, true);
+                    spanLimit, neighborPointer, edgePointer, true,!m_generator||!m_generator->isNether());
             }
             m_cpuBytes += tile->data.memoryBytes() + tile->mesh.uploadBytes();
             if (tile->pendingData && tile->pendingMesh)

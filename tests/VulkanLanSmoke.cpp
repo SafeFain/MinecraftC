@@ -23,6 +23,7 @@ private:
 };
 }
 struct GameSessionTestAccess {
+    static bool netherTravel(GameSession& session);
     static void scene(GameSession& session) {
         session.world().setThreadPool(nullptr);
         for (int z = -2; z <= 2; ++z) for (int x = -2; x <= 2; ++x) {
@@ -49,11 +50,14 @@ struct GameSessionTestAccess {
     }
 };
 
+#include "NetherLanScene.h"
+
 int main(int argc, char** argv) {
     if (argc != 4 && argc != 5 && argc != 6 && argc != 7) { std::cerr << "Usage: vulkan_lan_smoke --host|--client <assets> <isolated-run-directory> [width height] [--plugins]\n"; return 2; }
     try {
         const bool pluginMode=(argc==5||argc==7)&&std::string(argv[argc-1])=="--plugins";
-        require((argc!=5&&argc!=7)||pluginMode,"invalid smoke option");
+        const bool netherMode=(argc==5||argc==7)&&std::string(argv[argc-1])=="--nether";
+        require((argc!=5&&argc!=7)||pluginMode||netherMode,"invalid smoke option");
         const int width = argc >= 6 ? std::stoi(argv[4]) : 960, height = argc >= 6 ? std::stoi(argv[5]) : 640;
         require(width >= 320 && width <= 1920 && height >= 320 && height <= 1080,"invalid smoke viewport");
         const std::string role = argv[1]; const auto assets = std::filesystem::absolute(argv[2]); const std::filesystem::path root = argv[3];
@@ -74,14 +78,17 @@ int main(int argc, char** argv) {
             session.startWorld(world,true,0); GameSessionTestAccess::scene(session); session.setLanNickname("Host");
             require(session.openLanRoom(0,2,true),"listen room failed");
             { std::ofstream port(root / "port"); port << session.lanPort(); }
-            double previous = now(); bool moved = false;
+            double previous = now(); bool moved = false,transferred=false;
             while (now() < 90 && !std::filesystem::exists(root / "client-done")) {
                 const double elapsed = now(); session.pollLan(elapsed);
+                if(netherMode&&!transferred)transferred=GameSessionTestAccess::netherTravel(session);
+                if(netherMode&&transferred&&session.lanGuestCount()==0&&!std::filesystem::exists(root/"guest-left"))std::ofstream(root/"guest-left")<<"profile persisted";
                 GameSessionTestAccess::serverTick(session, static_cast<float>(std::clamp(elapsed - previous, 0.0, .05))); previous = elapsed;
                 moved = moved || GameSessionTestAccess::moved(session);
                 std::this_thread::sleep_for(std::chrono::milliseconds(4));
             }
             require(std::filesystem::exists(root / "client-done") && moved,"separate client did not complete authoritative movement/rendering");
+            if(netherMode)require(transferred&&session.activeDimension()==DimensionId::Overworld,"native guest travel changed host dimension");
             session.closeLanRoom(); session.leaveWorld(); if(plugins)plugins->shutdown(); std::cout << "Separate host accepted and simulated client movement\n";
         } else if (role == "--client") {
             uint16_t port = 0; { std::ifstream input(root / "port"); input >> port; } require(port != 0,"missing host port");
@@ -92,9 +99,9 @@ int main(int argc, char** argv) {
             session.initializeEntityModels(assets,renderer);
             Plugins::contextProvider()=[&]{return session.pluginContext();};
             GameScenePresenter presenter; presenter.initialize(renderer,assets);
-            SmokeClipboard clipboard; GameUiController ui(GameSessionTestAccess::player(session).inventory(),clipboard);
+            SmokeClipboard clipboard; GameUiController ui(GameSessionTestAccess::player(session).inventory(),clipboard);ui.hotbar.setInventory(&session.inventory());
             ui.localization.load(assets); ui.renderer.initialize(renderer,renderer.getBlockAtlasTexture(),assets); ui.renderer.setLocalization(ui.localization);
-            ClientSettings settings; settings.renderClouds = false; settings.guiScale = 1;
+            ClientSettings settings; settings.renderClouds = netherMode; settings.guiScale = 1;
             if(plugins)plugins->operations.hudText=[&](float x,float y,const std::string& text,const glm::vec4& color){ui.renderer.renderTextAlpha(text,x,y,1,glm::vec3(color),color.a);};
             ApplicationInputController inputs;
             require(session.joinLanRoom("::1",port,now()),"replica could not connect");
@@ -103,10 +110,13 @@ int main(int argc, char** argv) {
                 window.finishEventFrame(); const double elapsed = now(); const float dt = static_cast<float>(std::clamp(elapsed - previous,.001,.05)); previous = elapsed;
                 session.pollLan(elapsed); require(!session.lanConnectionFailed(),session.lanError().c_str());
                 if (!session.lanWorldReady()) { std::this_thread::sleep_for(std::chrono::milliseconds(5)); continue; }
+                if(session.worldLoadingPending())loaded=false;
                 if (!loaded) {
                     loaded = session.advanceLoading(&renderer, RuntimeClock{}.now());
-                    if (!loaded) { std::this_thread::sleep_for(std::chrono::milliseconds(5)); continue; }
+                    if(session.worldLoadingPending())loaded=false;
+                if (!loaded) { std::this_thread::sleep_for(std::chrono::milliseconds(5)); continue; }
                 }
+                if(netherMode&&session.activeDimension()!=DimensionId::Nether){std::this_thread::sleep_for(std::chrono::milliseconds(5));continue;}
                 session.setLocalControl(true); InputState movement;
                 movement.setVirtual(InputAction::MoveForward,frames < 18 ? 1.0f : 0.0f); movement.update({});
                 session.handleMovement(movement,dt); session.updatePlaying(dt,&renderer,{},true);
@@ -115,8 +125,9 @@ int main(int argc, char** argv) {
                 presenter.render(session,renderer,settings,window,ui.localization,GameState::Playing,true,dt,RuntimeClock{}.now());
                 ui.render(session,settings,inputs,window,GameState::Playing,true); renderer.endFrame();
                 if (capture) {
-                    require(session.remotePlayers().size() == 1 && session.entityState().entities().size() == 2 &&
+                    require(session.remotePlayers().size() == (netherMode?0u:1u) && session.entityState().entities().size() == 2 &&
                             !presenter.visibleChunks.empty() && session.roomRoster().size() == 2,"joined scene is missing replicated players/entities/terrain/roster");
+                    if(netherMode)require(session.activeDimension()==DimensionId::Nether&&session.inventory().slot(0).id==ItemId::NETHERITE_SWORD&&session.inventory().slot(0).damage==17&&session.inventory().slot(0).count==1&&session.playerState().statusEffects().level(StatusEffectType::FireResistance)>0,"native dimension inventory/effects missing");
                     if(pluginMode)require(Plugins::content().runtimeFault.empty(),"plugin callbacks failed during Vulkan presentation");
                     if(pluginMode)require(session.worldState().getBlock(1,1,5)==Plugins::resolveBlock("official_content:crystal_block"),"plugin terrain missing from joined Vulkan scene");
                     const auto rgba = VulkanGiSmokeProbe::readCapture(renderer); require(rgba.size() == static_cast<size_t>(width)*height*4,"invalid Vulkan capture");
@@ -124,7 +135,14 @@ int main(int argc, char** argv) {
                     for (size_t i = 0; i < rgba.size(); i += 4) output.write(reinterpret_cast<const char*>(rgba.data()+i),3);
                     require(bool(output),"capture write failed");
                 }
-                ++frames; std::this_thread::sleep_for(std::chrono::milliseconds(8));
+                ++frames;
+                if(netherMode&&frames==50) {
+                    session.leaveWorld();const double deadline=now()+5;
+                    while(!std::filesystem::exists(root/"guest-left")&&now()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    require(std::filesystem::exists(root/"guest-left"),"native disconnect profile was not persisted");
+                    require(session.joinLanRoom("::1",port,now()),"native guest reconnect failed");loaded=false;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(8));
             }
             require(frames == 100,"joined Vulkan scene timed out");
             renderer.waitIdle(); ui.renderer.resetGraphics(); presenter.resetGraphics(); session.invalidateGpuMeshes(); session.leaveWorld(); if(plugins)plugins->shutdown();

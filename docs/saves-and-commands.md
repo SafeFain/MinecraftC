@@ -17,10 +17,10 @@ Assets are read-only and resolved separately from the executable/package.
 
 ## Compatibility and recovery
 
-Worlds require **save v21**, **global generation v20**, and matching gameplay
+Worlds require **save v22**, **global generation v21**, and matching gameplay
 plugin requirements. The optional official Heaven provider uses generation **v9**.
 Save-format and generation versions are independent of the application version.
-Older save metadata (v2–v20) remains inspectable in the world list, but opening
+Older save metadata (v2–v21) remains inspectable in the world list, but opening
 unsupported formats or generation versions is refused without rewriting files.
 
 A missing, extra or changed gameplay plugin can trigger a local compatibility

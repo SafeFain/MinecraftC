@@ -3,6 +3,7 @@
 #include "network/Session.h"
 #include "plugins/ContentRegistry.h"
 #include "game/GameRules.h"
+#include "game/StatusEffects.h"
 #include "game/InventoryModel.h"
 #include <array>
 #include <filesystem>
@@ -20,11 +21,13 @@ struct PlayerProfile {
     std::map<uint32_t,glm::dvec3> safePositions;
     std::map<uint32_t,glm::ivec3> beds;
     std::optional<glm::ivec3> bedSpawn;
+    std::optional<glm::ivec3> netherAnchor;
     float health=20;
     uint8_t hunger=20;
     float saturation=5;
     float exhaustion=0;
     uint32_t foodTickTimer=0;
+    std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
     ItemStack cursor;
     std::array<ItemStack, 9> crafting{};

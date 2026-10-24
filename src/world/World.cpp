@@ -1,5 +1,7 @@
 #include "plugins/ContentRegistry.h"
 #include "world/World.h"
+#include "game/DimensionRules.h"
+#include "world/NetherPortal.h"
 #include "world/VoxelRaycast.h"
 #include "world/BiomeLocator.h"
 #include "core/RuntimeClock.h"
@@ -144,6 +146,7 @@ void World::resetForNewSeed(
     m_interactionSounds.clear();
     m_simulation.clear();
     m_lighting.reset();
+    m_lighting.setSkyLight(dimensionRules(dimension).skyLight);
     // Placement-new: WorldGenerator contains reference members (Noise&),
     // so move assignment is deleted. Reconstruct in-place.
     m_generator.~WorldGenerator();
@@ -300,6 +303,7 @@ bool World::hasSkyAccess(int worldX, int worldY, int worldZ) const {
 
 PrecipitationType World::precipitationAt(
     int worldX, int worldY, int worldZ) const {
+    if(!dimensionRules(dimension()).weather)return PrecipitationType::None;
     const HeightBiome sample = m_generator.queryHeightBiome(worldX, worldZ);
     return precipitationFor(sample.biome, worldY);
 }
@@ -387,7 +391,7 @@ void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
 
 bool World::placeBed(const glm::ivec3& foot, BedDirection direction) {
     const glm::ivec3 head = foot + bedDirectionOffset(direction);
-    if (!Config::isValidWorldY(foot.y) || !Config::isValidWorldY(head.y) ||
+    if (!dimensionRules(dimension()).contains(foot.y) || !dimensionRules(dimension()).contains(head.y) ||
         !generatedAt(foot.x, foot.z) || !generatedAt(head.x, head.z) ||
         getBlock(foot.x, foot.y, foot.z) != BlockId::AIR ||
         getBlock(head.x, head.y, head.z) != BlockId::AIR ||
@@ -427,7 +431,8 @@ void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
 
 void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
                              bool recordOverride) {
-    if (m_replicaMode || !Config::isValidWorldY(worldY)) return;
+    if (m_replicaMode || !Config::isValidWorldY(worldY) || !dimensionRules(dimension()).contains(worldY)) return;
+    if(dimensionRules(dimension()).ultrawarm && isWater(id))id=BlockId::AIR;
     // Flowing/falling states are derived simulation output. Even public
     // placement calls must not turn them into persisted overrides; only
     // source states and ordinary player blocks belong in saves.
@@ -486,6 +491,15 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (!m_fluidBatchActive) {
         m_fluids.onBlockChanged(position, previous, id);
         m_fluids.scheduleAround(position);
+    }
+    if(!m_portalValidationActive && NetherPortal::isPortal(id)) {
+        const auto frame=NetherPortal::find([&](glm::ivec3 q){return getBlock(q.x,q.y,q.z);},position,id==BlockId::NETHER_PORTAL_Z,true);
+        if(frame)indexNetherPortal(frame->origin);
+    }
+    if(!m_portalValidationActive && (previous==BlockId::OBSIDIAN || NetherPortal::isPortal(previous))) {
+        struct Guard { bool& flag; ~Guard(){flag=false;} } guard{m_portalValidationActive};
+        m_portalValidationActive=true;
+        NetherPortal::invalidateAround(*this,position);
     }
     DoorState oldDoor, newDoor;
     if (!m_pairMutation && decodeDoor(previous,oldDoor) &&
@@ -592,7 +606,7 @@ bool World::supportsFace(const glm::ivec3& p, FaceDir outward) const {
     return blockSupportsFace(support,outward);
 }
 bool World::placeDoor(const glm::ivec3& p, DoorState state) {
-    if(p.y<Config::WORLD_MIN_Y+1 || p.y+1>=Config::WORLD_MAX_Y ||
+    if(!dimensionRules(dimension()).contains(p.y) || !dimensionRules(dimension()).contains(p.y+1) ||
        !generatedAt(p.x,p.z) || !supportsFace(p-glm::ivec3(0,1,0),FaceDir::TOP) ||
        getBlock(p.x,p.y,p.z)!=BlockId::AIR || getBlock(p.x,p.y+1,p.z)!=BlockId::AIR) return false;
     state.upper=false;
@@ -626,7 +640,7 @@ bool World::interactDoor(const glm::ivec3& p) {
     return true; // iron doors consume use without placing the held item
 }
 bool World::placeButton(const glm::ivec3& p, ButtonState state) {
-    if(!generatedAt(p.x,p.z) || !Config::isValidWorldY(p.y) ||
+    if(!generatedAt(p.x,p.z) || !dimensionRules(dimension()).contains(p.y) ||
        getBlock(p.x,p.y,p.z)!=BlockId::AIR || !supportsFace(p-faceOffset(state.attachment),state.attachment)) return false;
     state.pressed=false;setBlock(p.x,p.y,p.z,buttonBlock(state));return true;
 }

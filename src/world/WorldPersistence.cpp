@@ -38,6 +38,9 @@ struct LootEntry {
 std::vector<LootEntry> lootEntries(StructureLootProfile profile) {
     using P=StructureLootProfile;
     switch(profile) {
+        case P::NetherFortress:return {{ItemId::NETHER_WART,2,6,100},{ItemId::GOLD_INGOT,1,4,70},{ItemId::DIAMOND,1,2,25},{ItemId::IRON_INGOT,1,5,65}};
+        case P::NetherBastion:return {{ItemId::NETHERITE_UPGRADE_TEMPLATE,1,1,100},{ItemId::SADDLE,1,1,20},{ItemId::GOLD_INGOT,3,12,100},{ItemId::CRYING_OBSIDIAN,2,6,70},{ItemId::ANCIENT_DEBRIS,1,2,30},{ItemId::DIAMOND,1,3,35}};
+        case P::RuinedPortal:return {{ItemId::OBSIDIAN,2,6,90},{ItemId::FLINT_AND_STEEL,1,1,65},{ItemId::GOLD_INGOT,1,4,60}};
         case P::AbandonedFarmstead:
         case P::Village: return {{ItemId::BREAD,1,4,90},{ItemId::WHEAT,2,7,80},
             {ItemId::WHEAT_SEEDS,2,8,75},{ItemId::COAL,1,4,45},
@@ -101,12 +104,12 @@ void WorldPersistence::registerGeneratedBlockEntityUnlocked(
     int cx, int cz, uint32_t localIndex, BlockId id,
     StructureLootProfile lootProfile, uint64_t lootSeed,
     const RegionGenerationData::PendingBlock* metadata) {
-    if (id != BlockId::CHEST && id != BlockId::FURNACE) return;
+    const auto kind=blockEntityTypeForBlock(id);
+    if(!kind)return;
     auto& entities = m_blockEntities[{cx, cz}];
     if (entities.count(localIndex) != 0) return;
     BlockEntity entity;
-    entity.type = id == BlockId::CHEST ? BlockEntityType::Chest
-                                       : BlockEntityType::Furnace;
+    entity.type = *kind;
     entity.lootSeed=lootSeed;
     if(metadata){entity.lootKey=metadata->lootKey;entity.lootRevision=metadata->lootRevision;entity.structureKey=metadata->structureKey;entity.structureRevision=metadata->structureRevision;}
     if(!entity.lootKey.empty()) {
@@ -134,11 +137,13 @@ void WorldPersistence::recordOverride(int cx, int cz, uint32_t localIndex,
         const auto timer=entities.find(localIndex);
         if(timer!=entities.end()&&timer->second.type==BlockEntityType::Resource){entities.erase(timer);m_dirtyBlockEntityChunks.insert({cx,cz});}
         ButtonState button;
-        if (id == BlockId::CHEST || id == BlockId::FURNACE || decodeButton(id, button)) {
+        if (blockEntityTypeForBlock(id) || decodeButton(id, button)) {
+            const auto expected=blockEntityTypeForBlock(id).value_or(BlockEntityType::Button);
+            const auto old=entities.find(localIndex);
+            if(old!=entities.end() && old->second.type!=expected)entities.erase(old);
             if (entities.count(localIndex) == 0) {
                 BlockEntity entity;
-                entity.type = id == BlockId::CHEST ? BlockEntityType::Chest :
-                    id == BlockId::FURNACE ? BlockEntityType::Furnace : BlockEntityType::Button;
+                entity.type = blockEntityTypeForBlock(id).value_or(BlockEntityType::Button);
                 entity.buttonRemaining = button.pressed ? (buttonReleaseTicks(button)) : 0;
                 entities.emplace(localIndex, entity);
                 m_dirtyBlockEntityChunks.insert({cx, cz});
@@ -326,7 +331,10 @@ std::vector<ItemStack> WorldPersistence::takeBlockEntityContents(
     if (!entity) return contents;
     if (entity->type == BlockEntityType::Chest) {
         for (auto& stack : entity->chest) if (!stack.empty()) contents.push_back(stack);
-    } else {
+    } else if(entity->type==BlockEntityType::BrewingStand||entity->type==BlockEntityType::SmithingTable) {
+        const int count=entity->type==BlockEntityType::BrewingStand?5:3;
+        for(int i=0;i<count;++i)if(!entity->chest[i].empty())contents.push_back(entity->chest[i]);
+    } else if(entity->type==BlockEntityType::Furnace) {
         for (auto* stack : {&entity->input, &entity->fuel, &entity->output})
             if (!stack->empty()) contents.push_back(*stack);
     }
@@ -334,8 +342,10 @@ std::vector<ItemStack> WorldPersistence::takeBlockEntityContents(
 }
 
 void WorldPersistence::tickBlockEntities() {
-    m_chunks.withUnique([&](ChunkStore&) {
+    m_chunks.withUnique([&](ChunkStore& store) {
         for (auto& [key, entities] : m_blockEntities) {
+            const auto* chunk=store.findUnlocked(key.first,key.second);
+            if(!chunk||!chunk->generated.load())continue;
             bool changed = false;
             for (auto& [index, entity] : entities) {
                 changed = tickFurnace(entity) || changed;
@@ -390,4 +400,19 @@ void WorldPersistence::scheduleResource(const glm::ivec3& p,BlockId id,uint32_t 
 std::vector<std::pair<glm::ivec3,BlockId>> WorldPersistence::tickResources(){
     std::vector<std::pair<glm::ivec3,BlockId>> due;
     m_chunks.withUnique([&](ChunkStore& store){for(auto& pair:m_blockEntities){const auto& key=pair.first;const auto* chunk=store.findUnlocked(key.first,key.second);if(!chunk||!chunk->generated.load())continue;for(auto it=pair.second.begin();it!=pair.second.end();){auto& e=it->second;if(e.type!=BlockEntityType::Resource){++it;continue;}if(e.resourceRemaining)--e.resourceRemaining;m_dirtyBlockEntityChunks.insert(key);if(!e.resourceRemaining&&due.size()<64){const auto index=it->first;due.push_back({{key.first*16+int(index%16),Config::WORLD_MIN_Y+int(index/256),key.second*16+int((index/16)%16)},static_cast<BlockId>(e.resourceBlock)});it=pair.second.erase(it);}else ++it;}}});return due;
+}
+
+std::vector<glm::ivec3> WorldPersistence::loadedSpawners() const {
+    std::vector<glm::ivec3> result;
+    m_chunks.withShared([&](ChunkStore& store) {
+        for(const auto& chunk:m_blockEntities) {
+            const auto* loaded=store.findUnlocked(chunk.first.first,chunk.first.second);
+            if(!loaded||!loaded->generated.load())continue;
+            for(const auto& entry:chunk.second)if(entry.second.type==BlockEntityType::Spawner) {
+                const auto index=entry.first;
+                result.push_back({chunk.first.first*16+int(index%16),int(index/256)+Config::WORLD_MIN_Y,chunk.first.second*16+int(index/16%16)});
+            }
+        }
+    });
+    return result;
 }

@@ -1,3 +1,4 @@
+#include "game/StatusEffects.h"
 #pragma once
 
 #include "network/Protocol.h"
@@ -57,6 +58,7 @@ struct AuthorityState {
     float health = 20, saturation = 5, exhaustion = 0;
     uint8_t hunger = 20;
     uint32_t foodTimer = 0;
+    std::vector<ActiveStatusEffect> effects;
     uint64_t actionAcknowledged = 0;
     InventoryWindowView window;
     uint64_t inventoryRevision = 0;

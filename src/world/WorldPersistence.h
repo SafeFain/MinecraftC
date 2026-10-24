@@ -89,6 +89,7 @@ public:
     // Advance furnace/crafting state for all loaded block entities.
     // Locks internally.
     void tickBlockEntities();
+    std::vector<glm::ivec3> loadedSpawners() const;
     // Only button entities in generated chunks tick; unloaded timers pause.
     std::vector<glm::ivec3> tickButtons();
     void scheduleResource(const glm::ivec3&,BlockId,uint32_t);

@@ -104,7 +104,7 @@ std::string graphContractError(EntityType type,
     const bool hostile = type == EntityType::Zombie || type == EntityType::Skeleton ||
                          type == EntityType::Spider || type == EntityType::Blastling ||
                          type == EntityType::ZombieVillager || type == EntityType::IronGolem;
-    if (!hostile) return {};
+    if (!hostile && !nativeNetherMob(type)) return {};
     const model::AnimationActionDefinition* attack =
         graph.findAction(graph.actionFor("attack"));
     if (!attack) return "missing required hostile attack action";
@@ -129,7 +129,15 @@ EntityModelRegistry::EntityModelRegistry(Loader loader)
         {EntityType::Villager,"villager.glb",{},{},{},false},
         {EntityType::ZombieVillager,"zombie_villager.glb",{},{},{},false},
         {EntityType::IronGolem,"iron_golem.glb",{},{},{},false}}},
-      m_cache(m_loader), m_placeholder(makePlaceholder()) {}
+      m_cache(m_loader), m_placeholder(makePlaceholder()) {
+#define NETHER_MODEL(type,egg,key,label,h,x,y,z,s,d,monster,fire) m_definitions.push_back({EntityType::type,key ".glb",{},{},{},false});
+    MC_NETHER_MOBS(NETHER_MODEL)
+#undef NETHER_MODEL
+    m_definitions.push_back({EntityType::GhastFireball,"ghast_fireball.glb",{},{},{},false});
+    m_definitions.push_back({EntityType::BlazeFireball,"blaze_fireball.glb",{},{},{},false});
+    m_definitions.push_back({EntityType::ThrownPotion,"thrown_potion.glb",{},{},{},false});
+    m_definitions.push_back({EntityType::EnderPearl,"ender_pearl.glb",{},{},{},false});
+}
 
 void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache) {
     const std::filesystem::path root = assetRoot / "models" / "entities";

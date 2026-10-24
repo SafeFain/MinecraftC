@@ -36,6 +36,7 @@ public:
     const LightingBatchStats& statistics() const { return m_statistics; }
     void resetStatistics() { m_statistics = {}; }
 
+    void setSkyLight(bool enabled) { m_skyLight=enabled;markDirty(); }
     bool dirty() const { return m_lightDirty; }
     void markDirty() { m_lightDirty = true; }
 
@@ -48,6 +49,7 @@ public:
 
 private:
     ChunkStore& m_chunks;
+    bool m_skyLight = true;
     bool m_lightDirty = true;
     bool m_lightHasSources = false;
     LightingBatchStats m_statistics;

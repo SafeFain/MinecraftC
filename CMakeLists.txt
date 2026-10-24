@@ -647,7 +647,7 @@ if(BUILD_TESTING)
         tests/AssetDefinitionTests.cpp
         src/world/Chunk.cpp
         src/world/Block.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/renderer/BlockAtlasData.cpp
         src/renderer/RenderDevice.cpp
         src/renderer/StbImageImpl.cpp)
@@ -676,11 +676,11 @@ if(BUILD_TESTING)
     add_test(NAME cavegen_determinism_and_boundaries COMMAND cavegen_tests)
 
     add_executable(worldgen_tests
-        tests/WorldGenerationTests.cpp src/game/Item.cpp
+        tests/WorldGenerationTests.cpp src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -697,6 +697,7 @@ if(BUILD_TESTING)
         target_compile_options(worldgen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --overworld-tests)
+    add_test(NAME nether_native_generation_and_portals COMMAND worldgen_tests --nether-tests)
     add_test(NAME heaven_worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --heaven-tests)
     add_test(NAME heaven_p1_independent_migration_reference COMMAND worldgen_tests --heaven-migration-tests)
     add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
@@ -705,7 +706,7 @@ if(BUILD_TESTING)
         tests/LodTerrainTests.cpp
         src/debug/Log.cpp
         src/game/InventoryModel.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/SaveStore.cpp
         src/threading/ThreadPool.cpp
         src/world/BiomeMap.cpp
@@ -719,7 +720,7 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/StructureGenerator.cpp
         src/world/TreeGenerator.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp)
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp)
     target_include_directories(lod_terrain_tests PRIVATE
         src external/FastNoiseLite)
     target_link_libraries(lod_terrain_tests PRIVATE glm::glm minecraftc_platform)
@@ -747,7 +748,7 @@ if(BUILD_TESTING)
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -763,7 +764,7 @@ if(BUILD_TESTING)
     endif()
 
     add_executable(rendering_logic_tests
-        tests/RenderingLogicTests.cpp src/game/Item.cpp
+        tests/RenderingLogicTests.cpp src/game/NetherProgression.cpp src/game/Item.cpp
         src/renderer/Camera.cpp
         src/renderer/CameraEffects.cpp
         src/renderer/CloudRenderData.cpp
@@ -797,7 +798,7 @@ if(BUILD_TESTING)
         src/debug/Log.cpp
         src/game/ArabicShaper.cpp src/game/ClientSettings.cpp
         src/game/InventoryInteraction.cpp src/game/InventoryModel.cpp
-        src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
         src/game/SurvivalRules.cpp src/game/SurvivalStats.cpp
         src/game/Utf8.cpp src/game/VillagerTrade.cpp src/game/SaveStore.cpp
         src/model/ModelRenderer.cpp
@@ -825,7 +826,7 @@ if(BUILD_TESTING)
     add_executable(held_tool_vulkan_smoke EXCLUDE_FROM_ALL
         tests/HeldToolVulkanSmoke.cpp
         src/core/Input.cpp src/core/InputCodes.cpp
-        src/debug/Log.cpp src/game/Item.cpp
+        src/debug/Log.cpp src/game/NetherProgression.cpp src/game/Item.cpp
         src/model/AnimationGraph.cpp src/model/AnimationMixer.cpp
         src/model/GltfLoader.cpp src/model/ModelAnimation.cpp src/model/ModelRenderer.cpp
         src/player/PlayerRenderer.cpp
@@ -842,7 +843,7 @@ if(BUILD_TESTING)
 
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
     add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
-        tests/VulkanDecorationSmoke.cpp src/game/Item.cpp
+        tests/VulkanDecorationSmoke.cpp src/game/NetherProgression.cpp src/game/Item.cpp
         src/debug/Log.cpp
         src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
@@ -855,7 +856,7 @@ if(BUILD_TESTING)
         src/world/HeightPipeline.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/RegionGenerator.cpp
         src/world/CaveGenerator.cpp
         src/world/OreGenerator.cpp
@@ -876,6 +877,7 @@ if(BUILD_TESTING)
     list(REMOVE_ITEM MINECRAFTC_STRUCTURE_SMOKE_SOURCES tests/VulkanDecorationSmoke.cpp)
     add_executable(vulkan_structure_smoke EXCLUDE_FROM_ALL
         tests/VulkanStructureSmoke.cpp ${MINECRAFTC_STRUCTURE_SMOKE_SOURCES}
+        src/world/LodTerrainSystem.cpp src/game/SaveStore.cpp src/threading/ThreadPool.cpp
         src/entity/EntityModelRegistry.cpp src/model/AnimationGraph.cpp src/model/AnimationMixer.cpp
         src/model/GltfLoader.cpp src/model/ModelAnimation.cpp)
     target_include_directories(vulkan_structure_smoke PRIVATE src external external/stb external/FastNoiseLite external/cgltf)
@@ -972,7 +974,7 @@ if(BUILD_TESTING)
         src/renderer/StbImageImpl.cpp
         src/world/Block.cpp
         src/world/Chunk.cpp)
-    target_sources(vulkan_gi_smoke PRIVATE src/game/Item.cpp)
+    target_sources(vulkan_gi_smoke PRIVATE src/game/NetherProgression.cpp src/game/Item.cpp)
     target_include_directories(vulkan_gi_smoke PRIVATE src external/stb)
     target_include_directories(vulkan_gi_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_gi_smoke PRIVATE
@@ -1030,7 +1032,7 @@ if(BUILD_TESTING)
         tests/VoxelGiTests.cpp
         src/world/Block.cpp
         src/world/Chunk.cpp)
-    target_sources(voxel_gi_tests PRIVATE src/game/Item.cpp)
+    target_sources(voxel_gi_tests PRIVATE src/game/NetherProgression.cpp src/game/Item.cpp)
     target_include_directories(voxel_gi_tests PRIVATE src)
     target_link_libraries(voxel_gi_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1049,9 +1051,21 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME player_ledge_and_auto_jump_logic COMMAND player_physics_tests)
 
+    add_executable(nether_progression_tests tests/NetherProgressionTests.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp
+        src/game/InventoryTransaction.cpp src/game/InventoryInteraction.cpp
+        src/game/SurvivalRules.cpp src/world/Block.cpp src/world/BlockEntityLogic.cpp
+        src/network/Protocol.cpp)
+    target_include_directories(nether_progression_tests PRIVATE src sdk external)
+    target_link_libraries(nether_progression_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(nether_progression_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME nether_native_brewing_smithing_and_effects COMMAND nether_progression_tests)
+
     add_executable(inventory_tests
         tests/InventoryTests.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/InventoryModel.cpp
         src/game/VillagerTrade.cpp
         src/world/Block.cpp
@@ -1066,7 +1080,7 @@ if(BUILD_TESTING)
     add_executable(plugin_tests tests/PluginTests.cpp src/model/GltfLoader.cpp src/model/ModelAnimation.cpp
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         src/world/Block.cpp src/world/Chunk.cpp
-        src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
         src/game/SaveStore.cpp src/game/WorldCatalog.cpp
         src/renderer/BlockAtlasData.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
         src/debug/Log.cpp)
@@ -1109,7 +1123,7 @@ if(BUILD_TESTING)
     add_executable(save_store_tests
         tests/SaveStoreTests.cpp
         src/game/SaveStore.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/InventoryModel.cpp
         src/world/Block.cpp
     )
@@ -1121,7 +1135,7 @@ if(BUILD_TESTING)
     add_test(NAME survival_save_roundtrip_and_corruption COMMAND save_store_tests)
 
     add_executable(fishing_tests tests/FishingTests.cpp src/game/FishingSystem.cpp
-        src/game/Item.cpp src/game/InventoryModel.cpp src/game/SurvivalRules.cpp src/world/Block.cpp)
+        src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/game/SurvivalRules.cpp src/world/Block.cpp)
     target_include_directories(fishing_tests PRIVATE src)
     target_link_libraries(fishing_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1134,7 +1148,7 @@ if(BUILD_TESTING)
         src/game/SurvivalBlockLogic.cpp
         src/game/InventoryModel.cpp
         src/game/SurvivalRules.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
     )
     target_include_directories(survival_rules_tests PRIVATE src)
@@ -1160,7 +1174,7 @@ if(BUILD_TESTING)
     add_executable(survival_stats_tests
         tests/SurvivalStatsTests.cpp
         src/game/SurvivalStats.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
     )
     target_include_directories(survival_stats_tests PRIVATE src)
@@ -1172,7 +1186,7 @@ if(BUILD_TESTING)
 
     add_executable(combat_rules_tests
         tests/CombatRulesTests.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
     )
     target_include_directories(combat_rules_tests PRIVATE src)
@@ -1186,7 +1200,7 @@ if(BUILD_TESTING)
         tests/WorldCatalogTests.cpp
         src/game/WorldCatalog.cpp
         src/game/SaveStore.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/InventoryModel.cpp
         src/world/Block.cpp
     )
@@ -1199,7 +1213,7 @@ if(BUILD_TESTING)
 
     add_executable(command_tests
         tests/CommandTests.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
         src/game/Utf8.cpp
         src/world/BiomeMap.cpp)
@@ -1317,7 +1331,7 @@ if(BUILD_TESTING)
         src/game/Utf8.cpp
         src/game/Language.cpp
         src/game/InventoryInteraction.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp)
     target_include_directories(client_input_tests PRIVATE src)
     target_link_libraries(client_input_tests PRIVATE
@@ -1354,7 +1368,7 @@ if(BUILD_TESTING)
     add_executable(session_flow_tests
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
         tests/SessionFlowTests.cpp
-        src/app/GameSession.cpp
+        src/app/GameSession.cpp src/app/GameSessionNether.cpp
         src/app/GameSessionLan.cpp
         src/app/GameSessionLanLod.cpp
         src/app/GameSessionLanEvents.cpp
@@ -1383,7 +1397,7 @@ if(BUILD_TESTING)
         src/entity/EntityModelRegistry.cpp
         src/game/InventoryInteraction.cpp
         src/game/InventoryModel.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/SaveStore.cpp
         src/game/SurvivalBlockLogic.cpp
         src/game/SurvivalRules.cpp
@@ -1428,9 +1442,9 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(session_flow_tests PRIVATE
@@ -1556,7 +1570,7 @@ if(BUILD_TESTING)
         src/app/ApplicationInputRouter.cpp
         src/app/GameFlowController.cpp
         src/app/GameScenePresenter.cpp
-        src/app/GameSession.cpp
+        src/app/GameSession.cpp src/app/GameSessionNether.cpp
         src/app/GameSessionLan.cpp
         src/app/GameSessionLanLod.cpp
         src/app/GameSessionLanEvents.cpp
@@ -1590,7 +1604,7 @@ if(BUILD_TESTING)
         src/game/InventoryModel.cpp
         src/game/ArabicShaper.cpp
         src/game/Language.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/SaveStore.cpp
         src/game/SurvivalBlockLogic.cpp
         src/game/SurvivalRules.cpp
@@ -1650,9 +1664,9 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(application_flow_tests PRIVATE
@@ -1675,7 +1689,7 @@ if(BUILD_TESTING)
         tests/WorldOrchestrationTests.cpp
         src/debug/Log.cpp
         src/game/InventoryModel.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/SaveStore.cpp
         src/game/SurvivalBlockLogic.cpp
         src/game/SurvivalRules.cpp
@@ -1699,9 +1713,9 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp
         src/world/WorldReplication.cpp
-        src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
+        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
         src/world/WorldSimulation.cpp)
     target_include_directories(world_orchestration_tests PRIVATE
@@ -1725,7 +1739,7 @@ if(BUILD_TESTING)
         src/core/Input.cpp
         src/core/InputCodes.cpp
         src/game/ArabicShaper.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/Language.cpp
         src/game/Localization.cpp
         src/game/Utf8.cpp
@@ -1754,7 +1768,7 @@ if(BUILD_TESTING)
         src/game/SurvivalBlockLogic.cpp
         src/game/SaveStore.cpp
         src/game/InventoryModel.cpp
-        src/game/Item.cpp
+        src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
         src/world/BlockEntityLogic.cpp)
     target_include_directories(survival_integration_tests PRIVATE src external/FastNoiseLite)
@@ -1788,7 +1802,7 @@ endif()
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     add_executable(network_tests tests/NetworkTests.cpp src/network/GameplayProtocol.cpp
         src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
-        src/network/PlayerProfile.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/world/Block.cpp)
+        src/network/PlayerProfile.cpp src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/world/Block.cpp)
     target_include_directories(network_tests PRIVATE src)
     target_link_libraries(network_tests PRIVATE minecraftc_platform glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1802,7 +1816,7 @@ endif()
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     add_executable(inventory_transaction_tests tests/InventoryTransactionTests.cpp
         src/game/InventoryTransaction.cpp src/game/InventoryInteraction.cpp
-        src/game/InventoryModel.cpp src/game/Item.cpp src/game/SurvivalRules.cpp
+        src/game/InventoryModel.cpp src/game/NetherProgression.cpp src/game/Item.cpp src/game/SurvivalRules.cpp
         src/world/Block.cpp)
     target_include_directories(inventory_transaction_tests PRIVATE src)
     target_link_libraries(inventory_transaction_tests PRIVATE glm::glm)
@@ -1861,4 +1875,7 @@ if(BUILD_TESTING)
             target_link_libraries(${heaven_test_target} PRIVATE minecraftc_heaven_test_support)
         endif()
     endforeach()
+    add_test(NAME nether_native_mobs_barter_riding_and_persistence COMMAND session_flow_tests --nether-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_test(NAME nether_native_session_portals_and_anchors COMMAND session_flow_tests --nether-session-tests)
+    add_test(NAME nether_native_without_plugins COMMAND session_flow_tests --nether-mob-tests-no-plugins ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 endif()

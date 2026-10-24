@@ -325,7 +325,7 @@ int testAssets() {
                                    std::istreambuf_iterator<char>());
     require(!itemMetadata.empty(), "items atlas metadata did not load");
     for (ItemId item : creativeInventoryItems()) {
-        std::string logicalName = getItemProps(item).name;
+        std::string logicalName = item>=ItemId::NETHERRACK&&item<ItemId::COUNT?itemCommandName(item):getItemProps(item).name;
         for (char& c : logicalName) {
             const auto value = static_cast<unsigned char>(c);
             c = std::isalnum(value) ? static_cast<char>(std::tolower(value)) : '_';

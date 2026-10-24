@@ -440,6 +440,13 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
         heart(hx, healthFill);
         food(fx, hungerFill);
     }
+    constexpr const char* effectKeys[]={"effect.fireresistance","effect.strength","effect.regeneration","effect.healing","effect.harming","effect.weakness","effect.wither"};
+    int effectRow=0;
+    for(const auto& effect:player.statusEffects().active()) {
+        const uint32_t seconds=(effect.remaining+19)/20;
+        const auto label=localization.text(effectKeys[static_cast<size_t>(effect.type)])+" "+std::to_string(effect.amplifier+1)+"  "+std::to_string(seconds/60)+":"+(seconds%60<10?"0":"")+std::to_string(seconds%60);
+        UiTheme::textWithShadow(renderer,label,leftX,y+(62+14*effectRow++)*s,.85f*s,UiTheme::TEXT);
+    }
     const int armor = totalArmorPoints(player.inventory());
     if (armor > 0) {
         const float armorY=y+16*s;

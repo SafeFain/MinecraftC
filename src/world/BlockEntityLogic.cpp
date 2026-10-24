@@ -1,7 +1,14 @@
 #include "world/BlockEntityLogic.h"
 #include "game/SurvivalRules.h"
+#include "game/NetherProgression.h"
 
 bool tickFurnace(BlockEntity& entity){
+    if(entity.type==BlockEntityType::BrewingStand)return tickBrewingStand(entity);
+    if(entity.type==BlockEntityType::SmithingTable) {
+        const auto result=smithingResult(entity.chest[0],entity.chest[1],entity.chest[2]);
+        const bool changed=result.id!=entity.output.id||result.damage!=entity.output.damage||result.count!=entity.output.count;
+        entity.output=result;return changed;
+    }
     if(entity.type!=BlockEntityType::Furnace) return false;
     bool changed=false;
     const SmeltingRecipe* recipe=entity.input.empty()?nullptr:findSmeltingRecipe(entity.input.id);

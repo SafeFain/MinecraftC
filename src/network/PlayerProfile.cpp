@@ -1,3 +1,4 @@
+#include "network/StatusEffectProtocol.h"
 #include "network/PlayerProfile.h"
 #include "core/Platform.h"
 #include "plugins/ContentRegistry.h"
@@ -11,7 +12,7 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=4;
+constexpr uint16_t PROFILE_VERSION=5;
 constexpr size_t MAX_PROFILE_BYTES=1024*1024;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
@@ -94,7 +95,9 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     }
     writer.u8(profile.bedSpawn?1:0);
     if(profile.bedSpawn) for(int axis=0;axis<3;++axis) writer.u32(static_cast<uint32_t>((*profile.bedSpawn)[axis]));
-    writer.f32(profile.health);writer.u8(profile.hunger);writer.f32(profile.saturation);writer.f32(profile.exhaustion);writer.u32(profile.foodTickTimer);
+    if(profile.netherAnchor){validatePosition(glm::dvec3(*profile.netherAnchor));if(profile.netherAnchor->y<0||profile.netherAnchor->y>=256)throw ProtocolError("Invalid anchor height");}
+    writer.u8(profile.netherAnchor.has_value());if(profile.netherAnchor)for(int axis=0;axis<3;++axis)writer.u32(static_cast<uint32_t>((*profile.netherAnchor)[axis]));
+    writer.f32(profile.health);writer.u8(profile.hunger);writer.f32(profile.saturation);writer.f32(profile.exhaustion);writer.u32(profile.foodTickTimer);writeStatusEffects(writer,profile.effects);
     for(const auto& stack:profile.inventory.storage()) writeStack(writer,stack);
     for(const auto& stack:profile.inventory.armor()) writeStack(writer,stack);
     writeStack(writer,profile.inventory.offhand());
@@ -133,7 +136,9 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     }
     const auto bed=reader.u8();if(bed>1) throw ProtocolError("Invalid profile flag");
     if(bed) {glm::ivec3 position;for(int axis=0;axis<3;++axis) {const uint32_t value=reader.u32();position[axis]=value<=INT32_MAX?static_cast<int32_t>(value):static_cast<int32_t>(-1-static_cast<int64_t>(UINT32_MAX-value));}profile.bedSpawn=position;}
-    profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();
+    const auto anchor=reader.u8();if(anchor>1)throw ProtocolError("Invalid anchor flag");
+    if(anchor){glm::ivec3 p;for(int axis=0;axis<3;++axis)p[axis]=static_cast<int32_t>(reader.u32());validatePosition(glm::dvec3(p));if(p.y<0||p.y>=256)throw ProtocolError("Invalid anchor height");profile.netherAnchor=p;}
+    profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();profile.effects=readStatusEffects(reader);
     for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader,palette);
     for(auto& stack:profile.inventory.armor()) stack=readStack(reader,palette);
     profile.inventory.offhand()=readStack(reader,palette);

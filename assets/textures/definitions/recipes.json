@@ -929,6 +929,174 @@
     "iron_door_top": {
       "recipe": "base",
       "variants": 1
+    },
+    "netherrack": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "soul_sand": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "soul_soil": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blackstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_nylium": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_nylium": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_stem": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_stem": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_planks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_wart_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_wart_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "shroomlight": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "glowstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_quartz_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_gold_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "ancient_debris": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "red_nether_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "polished_blackstone": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blackstone_bricks": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crying_obsidian": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "magma_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_fungus": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_fungus": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_roots": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_roots": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_sprouts": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "weeping_vines": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "twisting_vines": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_wart": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "soul_fire": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_portal_x": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "nether_portal_z": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "respawn_anchor": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "blaze_spawner": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "magma_spawner": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "bone_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "crimson_door_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_door_bottom": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "warped_door_top": {
+      "recipe": "base",
+      "variants": 1
     }
   },
   "examples": {

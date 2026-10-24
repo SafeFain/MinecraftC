@@ -27,9 +27,10 @@ enum class WorldType : uint8_t {
 // deterministic island generator and persistence namespace.
 enum class DimensionId : uint32_t {
     Overworld = 0,
-    Heaven = 1
+    Heaven = 1,
+    Nether = 2
 };
 
-constexpr uint32_t SURVIVAL_RULESET_VERSION = 2602;
-constexpr uint32_t SAVE_FORMAT_VERSION = 21;
+constexpr uint32_t SURVIVAL_RULESET_VERSION = 2603;
+constexpr uint32_t SAVE_FORMAT_VERSION = 22;
 constexpr uint32_t DEFAULT_DAY_NIGHT_DURATION_SECONDS = 1200;

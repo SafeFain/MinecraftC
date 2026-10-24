@@ -171,7 +171,7 @@ void VulkanRenderer::beginFrame(const FrameData& frame) {
     m_impl->submittedChunkEnvironment.cameraPosition =
         glm::vec4(m_cameraPosition, 0.0f);
     m_impl->submittedChunkEnvironment.lightDirection =
-        glm::vec4(frame.lightDirection, 0.0f);
+        glm::vec4(frame.lightDirection,(m_environment.skyFlags&SkyCavernAmbient)?.6f:0.f);
     m_impl->submittedChunkEnvironment.directColorIntensity =
         glm::vec4(frame.directColor, 1.0f);
     m_impl->submittedChunkEnvironment.ambientColorIntensity =
@@ -418,7 +418,7 @@ void VulkanRenderer::setEnvironment(const RenderEnvironment& environment,
     if (!m_impl) return;
     ChunkEnvironmentUniforms& chunk = m_impl->submittedChunkEnvironment;
     chunk.cameraPosition = glm::vec4(cameraPosition, 0.0f);
-    chunk.lightDirection = glm::vec4(environment.lightDirection, 0.0f);
+    chunk.lightDirection = glm::vec4(environment.lightDirection,(environment.skyFlags&SkyCavernAmbient)?.6f:0.f);
     chunk.directColorIntensity = glm::vec4(
         environment.directColor, environment.directIntensity);
     chunk.ambientColorIntensity = glm::vec4(

@@ -6,6 +6,12 @@
 #include "world/World.h"
 #include "game/SurvivalSession.h"
 #include "game/SurvivalRules.h"
+#include "game/NetherProgression.h"
+#include "world/NetherGenerator.h"
+#include "world/NetherPortal.h"
+#include "game/EntityTransferJournal.h"
+#include "game/DimensionRules.h"
+#include "game/NativeProjectileState.h"
 #include "renderer/GameRenderer.h"
 
 #include <algorithm>
@@ -37,10 +43,11 @@ void EntityManager::clear() {
     m_aiTime = 0;
     m_aiArrows.clear();
     m_aiExplosions.clear();
+    m_nativeSpawns.clear();m_nativeExplosions.clear();
     m_searchCursor = 0;
     m_aiStats = {};
     m_deadEntityRenders.clear();
-    m_spawnTimer = 0.0f;
+    m_spawnTimer = 0.0f;m_spawnerTimer=0;
     m_villageLifeTimer=0; m_villageLifeCursor=0;
     m_spawnSequence = 0;
     m_lastPopulationEnabled = false;
@@ -64,7 +71,7 @@ std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const 
             entity.health, entity.ageSeconds, entity.item, entity.behaviorSeed,
             static_cast<uint8_t>((entity.inGround ? 1 : 0) |
                                  (entity.playerOwned ? 2 : 0)), entity.projectileDamage
-            , entity.villager, entity.pluginState,entity.pluginStateVersion
+            , entity.villager, entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active()
         });
     }
     return saved;
@@ -86,6 +93,7 @@ void EntityManager::loadEntities(
         entity.playerOwned = (source.flags & 2) != 0;
         entity.projectileDamage = source.projectileDamage;
         entity.villager = source.villager;
+        entity.nether=source.nether;entity.effects.restore(source.effects);
         entity.pluginState=source.pluginState;entity.pluginStateVersion=source.pluginStateVersion;
         m_entities.push_back(entity);
     }
@@ -114,7 +122,7 @@ void EntityManager::syncChunks() {
                 saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                     entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                     static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                    entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion});
+                    entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active()});
             }
             m_saveStore->saveChunkEntities(key.first,key.second,saved);
         }
@@ -155,7 +163,22 @@ void EntityManager::syncChunks() {
                 villager.behaviorSeed = request.seed;
                 villager.villager.offerSeed = request.seed;
             }
-            if (!requests.empty()) {
+            bool nativePopulation=m_world.dimension()==DimensionId::Nether;
+            if(nativePopulation) {
+                for(const auto& structure:m_world.generator().nether().structuresAt(key.first*16+8,key.second*16+8)) {
+                    if(structure.kind>=NetherStructureKind::Fossil)continue;
+                    for(int i=0;i<3;++i) {
+                        const auto position=glm::dvec3(structure.anchor)+(structure.kind==NetherStructureKind::Fortress?glm::dvec3(i*8-8+.5,1,.5):glm::dvec3(i==1?10.5:-9.5,1,i==2?10.5:-9.5));
+                        if(entityChunk(position)!=key)continue;
+                        const uint32_t seed=hash32(uint32_t(structure.seed)^(uint32_t(i)+1)*0x9e3779b9u);
+                        if(std::any_of(m_entities.begin(),m_entities.end(),[&](const auto& e){return e.behaviorSeed==seed;}))continue;
+                        EntityType type=structure.kind==NetherStructureKind::Fortress?(i==0?EntityType::Blaze:EntityType::WitherSkeleton):
+                            (i==0?EntityType::PiglinBrute:structure.kind==NetherStructureKind::BastionStable?EntityType::Hoglin:EntityType::Piglin);
+                        if(spawnMob(type,position))m_entities.back().behaviorSeed=seed;
+                    }
+                }
+            }
+            if (!requests.empty() || nativePopulation) {
                 std::vector<WorldMetadata::PersistedEntity> populated;
                 for (const Entity& entity : m_entities) {
                     if (entityChunk(entity.position) != key) continue;
@@ -164,7 +187,7 @@ void EntityManager::syncChunks() {
                         entity.ageSeconds,entity.item,entity.behaviorSeed,
                         static_cast<uint8_t>((entity.inGround?1:0) |
                                              (entity.playerOwned?2:0)),
-                        entity.projectileDamage,entity.villager,entity.pluginState,entity.pluginStateVersion});
+                        entity.projectileDamage,entity.villager,entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active()});
                 }
                 // Persist the merged entities first. If a crash interrupts this
                 // sequence, the absent revision marker safely retries and merges
@@ -209,7 +232,7 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
             saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion});
+                entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active()});
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_pendingEntitySaves.erase(key);
         ++savedFiles;
@@ -305,6 +328,8 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
     if(const auto* definition=Plugins::entityContent(static_cast<uint16_t>(type))) {
         entity.health=definition->health;entity.pluginStateVersion=definition->stateVersion;
     }
+    if(nativeNetherMob(type))entity.health=nativeMobHealth(type);
+    if(type==EntityType::MagmaCube)entity.health=16;
     if (collides(entity, position)) return false;
     pluginEvent(entity,MC_ENTITY_SPAWN);
     m_entities.push_back(entity);
@@ -314,6 +339,7 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
 }
 
 bool EntityManager::hostile(EntityType type) {
+    if(nativeNetherMob(type))return type!=EntityType::Strider;
     if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return e->hostile;
     return type == EntityType::Zombie || type == EntityType::Skeleton ||
            type == EntityType::Spider || type == EntityType::Blastling ||
@@ -459,7 +485,7 @@ void EntityManager::spawnAroundPlayer(
     const size_t mobCount = static_cast<size_t>(std::count_if(
         m_entities.begin(), m_entities.end(),
         [spawnHostile](const Entity& entity) {
-            return entity.type != EntityType::Item && entity.type != EntityType::Arrow &&
+            return registeredMob(entity.type) &&
                    entity.type != EntityType::Villager && entity.type != EntityType::IronGolem &&
                    hostile(entity.type) == spawnHostile;
         }));
@@ -469,8 +495,17 @@ void EntityManager::spawnAroundPlayer(
     const float distance = 18.0f + static_cast<float>((random >> 16) % 15);
     const int x = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
     const int z = static_cast<int>(std::floor(playerPosition.z + std::sin(angle) * distance));
+    if(m_world.dimension()==DimensionId::Nether && (!spawnHostile || (random>>20)%8==0)) {
+        for(int y=110;y>=31;--y)if(isLava(m_world.getBlock(x,y-1,z)) &&
+            m_world.getBlock(x,y,z)==BlockId::AIR && m_world.getBlock(x,y+1,z)==BlockId::AIR) {
+            const glm::dvec3 p(x+.5,y,z+.5);
+            if(std::none_of(m_framePlayers.begin(),m_framePlayers.end(),[&](const auto& v){return glm::distance(v.player->getPosition(),p)<18;}))spawnMob(EntityType::Strider,p);
+            return;
+        }
+        return;
+    }
     int surface = -1;
-    const int scanTop = underground
+    const int scanTop = m_world.dimension()==DimensionId::Nether?std::min(110,int(std::floor(playerPosition.y))+7):underground
         ? std::min(Config::WORLD_MAX_Y - 2,
                    static_cast<int>(std::floor(playerPosition.y)) + 7)
         : Config::WORLD_MAX_Y - 1;
@@ -495,6 +530,21 @@ void EntityManager::spawnAroundPlayer(
     for (const auto& view : m_framePlayers)
         if (!view.player->isSpectator() && glm::distance(glm::dvec3(x+.5, surface, z+.5), view.player->getPosition()) < 18) return;
     if (underground && m_world.hasSkyAccess(x, surface, z)) return;
+    if(m_world.dimension()==DimensionId::Nether) {
+        const auto& generator=m_world.generator().nether();
+        EntityType native=EntityType::ZombifiedPiglin;
+        switch(generator.biomeAt(x,z)) {
+            case NetherBiome::Wastes:native=random%8==0?EntityType::Ghast:random%3==0?EntityType::Piglin:EntityType::ZombifiedPiglin;break;
+            case NetherBiome::SoulSandValley:native=random%4==0?EntityType::Ghast:EntityType::Skeleton;break;
+            case NetherBiome::CrimsonForest:native=random%3==0?EntityType::Hoglin:EntityType::Piglin;break;
+            case NetherBiome::WarpedForest:native=EntityType::Enderman;break;
+            case NetherBiome::BasaltDeltas:native=EntityType::MagmaCube;break;
+        }
+        for(const auto& structure:generator.structuresAt(x,z))if(structure.block(x,surface-1,z)) {
+            if(structure.kind==NetherStructureKind::Fortress)native=random%3==0?EntityType::Blaze:EntityType::WitherSkeleton;
+        }
+        spawnMob(native,{x+.5,double(surface),z+.5});return;
+    }
     if (spawnHostile && !hostileSpawnLightValid(m_world.getBlockLight(x, surface, z))) return;
     const EntityType passiveTypes[] = {
         EntityType::Cow, EntityType::Pig, EntityType::Sheep, EntityType::Chicken
@@ -557,6 +607,8 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     // a lethal hit removes it and before the periodic village refresh.
     if(playerAttack && entity.type==EntityType::Villager)rebuildLogicalVillages();
     entity.health -= accepted;
+    if(nativeNetherMob(entity.type)&&playerAttack) {entity.nether.angerTicks=600;if(entity.type==EntityType::Piglin||entity.type==EntityType::ZombifiedPiglin)angerPiglins(entity.position,entity.type==EntityType::ZombifiedPiglin);}
+    if(entity.type==EntityType::Enderman)teleportEnderman(entity);
     if(entity.health<=0 && entity.type==EntityType::IronGolem)
         for(auto& resident:m_entities)if(resident.type==EntityType::Villager && resident.health>0 &&
             glm::distance(resident.position,entity.position)<96)resident.villager.defenseCooldown=Config::VILLAGE_DEFENSE_COOLDOWN;
@@ -659,8 +711,9 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             const int py = static_cast<int>(std::floor(playerPosition.y + 1.0));
             const int pz = static_cast<int>(std::floor(playerPosition.z));
             const bool underground = !m_world.hasSkyAccess(px, py, pz);
-            const bool spawnHostile = shouldAttemptHostileSpawn(underground, isDay, thunderstorm, peaceful);
-            if ((!underground || !peaceful) &&
+            bool spawnHostile = shouldAttemptHostileSpawn(underground, isDay, thunderstorm, peaceful);
+            if(m_world.dimension()==DimensionId::Nether && !m_world.gameRules().boolean(GameRuleId::SpawnMonsters))spawnHostile=false;
+            if ((m_world.dimension()==DimensionId::Nether || !underground || !peaceful) &&
                 (!spawnHostile || m_world.gameRules().boolean(GameRuleId::SpawnMonsters)))
                 spawnAroundPlayer(playerPosition, spawnHostile, underground);
             m_spawnTimer = 0.0f;
@@ -668,6 +721,8 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
     } else {
         m_spawnTimer = 0.0f;
     }
+    m_spawnerTimer+=dt;
+    if(m_spawnerTimer>=1.f){m_spawnerTimer=0;tickSpawners(peaceful);}
     prepareAiFrame(dt);
     refreshPoiIndex();
     m_villageRefreshSeconds += dt;
@@ -679,10 +734,11 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
 
     for (auto& entity : m_entities) {
         if (entity.health <= 0) continue;
-        if (peaceful && hostile(entity.type)) { entity.health=0.0f; continue; }
+        if (peaceful && hostile(entity.type)) { entity.health=0.0f;entity.despawning=true; continue; }
         entity.ageSeconds += dt;
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
+        if(nativeProjectile(entity.type)){updateNativeProjectile(entity,dt);continue;}
         if (entity.type == EntityType::Arrow) {
             updateArrow(entity, dt);
             continue;
@@ -694,6 +750,9 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             continue;
         }
         if (entity.type == EntityType::Item) {
+            const auto cell=glm::ivec3(glm::floor(entity.position));
+            const auto block=m_world.getBlock(cell.x,cell.y,cell.z);
+            if((isLava(block)||block==BlockId::FIRE||block==BlockId::SOUL_FIRE)&&!isNetheriteEquipment(entity.item.id)&&entity.item.id!=ItemId::NETHERITE_INGOT&&entity.item.id!=ItemId::NETHERITE_SCRAP&&entity.item.id!=ItemId::ANCIENT_DEBRIS){entity.health=0;continue;}
             entity.velocity.y -= 20.0f * dt;
             const glm::dvec3 next = entity.position + glm::dvec3(entity.velocity) *
                 static_cast<double>(dt);
@@ -730,7 +789,9 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
 
         entity.ai.previousLocomotion = entity.locomotionVelocity;
         entity.locomotionVelocity = glm::vec3(0.0f);
-        integrateVelocity(entity, dt);
+        tickNativeState(entity,dt);
+        if(entity.health<=0)continue;
+        if(entity.type!=EntityType::Ghast && entity.type!=EntityType::Blaze)integrateVelocity(entity, dt);
 
         {
             const bool inWater = touchesWater(entity);
@@ -740,16 +801,17 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             const bool exposed = exposedToSky(entity);
             const bool wetByRain = raining && exposed &&
                 m_world.precipitationAt(x, y, z) == PrecipitationType::Rain;
-            const bool fireContact = m_world.getBlock(x, y, z) == BlockId::FIRE ||
+            const bool fireContact = isLava(m_world.getBlock(x,y,z)) || m_world.getBlock(x,y,z)==BlockId::SOUL_FIRE || m_world.getBlock(x, y, z) == BlockId::FIRE ||
                 m_world.getBlock(x, static_cast<int>(std::floor(
                     entity.position.y + entitySize(entity).y * 0.5)), z) ==
                     BlockId::FIRE;
             const bool undead = entityTemplate(entity.type) == EntityType::Zombie ||
                                 entityTemplate(entity.type) == EntityType::Skeleton ||
                                 entityTemplate(entity.type) == EntityType::ZombieVillager;
-            const bool ignited = fireContact ||
-                (undead && isDay && !thunderstorm && exposed);
-            const bool extinguished = inWater || wetByRain;
+            const bool immune=nativeFireImmune(entity.type)||entity.effects.level(StatusEffectType::FireResistance)>0;
+            const bool ignited = !immune && (fireContact ||
+                (dimensionRules(m_world.dimension()).skyLight && undead && isDay && !thunderstorm && exposed));
+            const bool extinguished = immune || inWater || wetByRain;
             const float activeBurnTime = extinguished ? 0.0f :
                 (ignited ? dt : std::min(dt, entity.burningSeconds));
             entity.burningSeconds = updateBurning(
@@ -796,11 +858,18 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
                        glm::distance(entity.position, b.player->getPosition());
             });
         const auto& view = selected ? *selected : fallback;
-        if(!pluginAi(entity,dt))updateMobAi(entity, *view.player, dt, isDay,
-                    selected && view.targetable, worldTick, thunderstorm);
+        const bool nativeTarget=selected && view.targetable && nativeTargetsPlayer(entity,*view.player);
+        if(!updateNativeMob(entity,*view.player,dt,nativeTarget) && !pluginAi(entity,dt))
+            updateMobAi(entity,*view.player,dt,isDay,nativeTarget,worldTick,thunderstorm);
         if (entity.ai.hasTarget && !entity.ai.targetId)
             entity.ai.targetPlayerId = view.id;
     }
+    for(auto& queued:m_nativeSpawns) {
+        queued.id=m_nextId++;m_entities.push_back(std::move(queued));
+    }
+    m_nativeSpawns.clear();
+    for(const auto& explosion:m_nativeExplosions)pendingExplosions.push_back({explosion.position,explosion.seed,explosion.power,true});
+    m_nativeExplosions.clear();
     tickVillageLife(dt,worldTick);
     for (const auto& arrow : m_aiArrows)
         spawnArrow(arrow.position, arrow.velocity, arrow.damage, false, arrow.shooterId);
@@ -826,7 +895,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         }
     for (auto& entity : deadMobs) {
         pluginEvent(entity,MC_ENTITY_DEATH);
-        if (entity.type != EntityType::Arrow) {
+        if (registeredMob(entity.type) && !entity.despawning) {
             m_modelRegistry.playAction(entity.type, entity.id, "death");
             m_deadEntityRenders.push_back({entity.id, entity.type,
                 entity.position, entity.velocity, entity.facing,
@@ -837,9 +906,22 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         [](const Entity& entity) {
             return entity.health <= 0.0f ||
                    (entity.type == EntityType::Item && entity.ageSeconds >= 300.0f) ||
-                   (entity.type == EntityType::Arrow && entity.ageSeconds >= 60.0f);
+                   (entity.type == EntityType::Arrow && entity.ageSeconds >= 60.0f) ||
+                   (nativeProjectile(entity.type) && entity.ageSeconds>=30.f);
         }), m_entities.end());
-    for (const auto& entity : deadMobs) dropMobLoot(entity);
+    for (const auto& entity : deadMobs) {
+        if(entity.despawning)continue;
+        if(entity.type==EntityType::MagmaCube && entity.nether.magmaSize>0 && !peaceful) {
+            for(int child=0;child<4;++child) {
+                const auto position=entity.position+glm::dvec3((child%2-.5)*.9,0,(child/2-.5)*.9);
+                // Test the smaller child's footprint, never the parent's bounds.
+                Entity split;split.id=m_nextId++;split.type=EntityType::MagmaCube;split.position=position;
+                split.nether.magmaSize=entity.nether.magmaSize-1;split.health=float(1u<<(2*split.nether.magmaSize));
+                split.behaviorSeed=hash32(entity.behaviorSeed+child+1);
+                if(!collides(split,position))m_entities.push_back(split);
+            }
+        } else dropMobLoot(entity);
+    }
     for (const auto& entity : m_entities)
         m_dirtyEntityChunks.insert(entityChunk(entity.position));
 }
@@ -887,7 +969,20 @@ void EntityManager::dropMobLoot(const Entity& entity) {
         case EntityType::Zombie: loot = {{ItemId::ROTTEN_FLESH, 1, 0}}; break;
         case EntityType::Skeleton:
             loot = {{ItemId::BONE, 1, 0}, {ItemId::ARROW, 1, 0}}; break;
-        case EntityType::Spider: loot = {{ItemId::STRING, 1, 0}}; break;
+        case EntityType::Spider:
+            loot={{ItemId::STRING,1,0}};if(entity.behaviorSeed%3==0)loot.push_back({ItemId::SPIDER_EYE,1,0});break;
+        case EntityType::Ghast:loot={{ItemId::GHAST_TEAR,1,0},{ItemId::GUNPOWDER,1,0}};break;
+        case EntityType::Blaze:loot={{ItemId::BLAZE_ROD,1,0}};break;
+        case EntityType::WitherSkeleton:
+            loot={{ItemId::BONE,1,0},{ItemId::COAL,1,0}};
+            if(entity.behaviorSeed%40==0)loot.push_back({ItemId::WITHER_SKELETON_SKULL,1,0});break;
+        case EntityType::MagmaCube:if(entity.behaviorSeed%4==0)loot={{ItemId::MAGMA_CREAM,1,0}};break;
+        case EntityType::Piglin:case EntityType::PiglinBrute:case EntityType::ZombifiedPiglin:
+            loot={{ItemId::GOLD_NUGGET,1,0}};break;
+        case EntityType::Hoglin:loot={{ItemId::RAW_PORKCHOP,3,0},{ItemId::LEATHER,1,0}};break;
+        case EntityType::Zoglin:loot={{ItemId::ROTTEN_FLESH,2,0}};break;
+        case EntityType::Strider:loot={{ItemId::STRING,2,0}};if(entity.nether.saddled)loot.push_back({ItemId::SADDLE,1,0});break;
+        case EntityType::Enderman:loot={{ItemId::ENDER_PEARL,1,0}};break;
         case EntityType::Blastling: loot = {{ItemId::GUNPOWDER, 1, 0}}; break;
         case EntityType::Villager: break;
         case EntityType::IronGolem: loot={{ItemId::IRON_INGOT,3,0}};break;
@@ -938,12 +1033,12 @@ bool rayEntityAabb(const glm::dvec3& origin, const glm::vec3& direction,
 
 MeleeAttackResult EntityManager::attackRay(
     const glm::dvec3& origin, const glm::vec3& direction,
-    const MeleeAttackRequest& attack, uint64_t playerId) {
+    const MeleeAttackRequest& attack, uint64_t playerId,const std::string& owner) {
     MeleeAttackResult result;
     Entity* best = nullptr;
     float bestAlong = attack.reach + 1.0f;
     for (auto& entity : m_entities) {
-        if (!meleeTarget(entity)) continue;
+        if (!meleeTarget(entity) && entity.type!=EntityType::GhastFireball) continue;
         float along = 0.0f;
         if (!rayEntityAabb(origin, direction, entity, entitySize(entity),
                            attack.reach, along) || along >= bestAlong)
@@ -964,6 +1059,11 @@ MeleeAttackResult EntityManager::attackRay(
         otherPlayer = view.player; bestAlong = along;
     }
     if (!best && !otherPlayer) return result;
+    if(best && !otherPlayer && best->type==EntityType::GhastFireball) {
+        best->velocity=glm::normalize(direction)*18.f;best->playerOwned=true;best->shooterId=playerId==UINT64_MAX?0:playerId;
+        best->nativeOwner=owner;best->pluginState=NativeProjectileState::encode(owner);
+        result.foundTarget=true;result.primaryPosition=best->position;return result;
+    }
 
     result.foundTarget = true;
     const glm::dvec3 primaryPosition = otherPlayer ? otherPlayer->getPosition() : best->position;
@@ -1035,7 +1135,7 @@ bool EntityManager::hasAttackTarget(
     const glm::dvec3& origin, const glm::vec3& direction, float reach) const {
     float bestAlong = reach + 1.0f;
     for (const auto& entity : m_entities) {
-        if (!meleeTarget(entity)) continue;
+        if (!meleeTarget(entity) && entity.type!=EntityType::GhastFireball) continue;
         float along = 0.0f;
         if (!rayEntityAabb(origin, direction, entity, entitySize(entity),
                            reach, along) || along >= bestAlong)
@@ -1113,6 +1213,7 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
         }
         return;
     }
+    if(victim && victim->type==EntityType::Enderman && teleportEnderman(*victim))return;
     glm::vec3 knockback(arrow.velocity.x, 0.0f, arrow.velocity.z);
     if (glm::length(knockback) > 0.001f)
         knockback = glm::normalize(knockback) * 3.0f;
@@ -1273,6 +1374,13 @@ glm::vec3 EntityManager::renderColor(EntityType type) {
 }
 
 glm::vec3 EntityManager::renderSize(EntityType type) {
+    switch(type) {
+#define NETHER_SIZE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return {x,y,z};
+        MC_NETHER_MOBS(NETHER_SIZE)
+#undef NETHER_SIZE
+        default:break;
+    }
+    if(nativeProjectile(type))return {.3f,.3f,.3f};
     if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return {e->size[0],e->size[1],e->size[2]};
     switch (type) {
         case EntityType::Item: return {0.25f, 0.25f, 0.25f};
@@ -1388,5 +1496,290 @@ bool EntityManager::arrowTouchesButton(const glm::ivec3& position) const {
         if(glm::all(glm::greaterThanEqual(local,glm::dvec3(box.min)-.03)) &&
            glm::all(glm::lessThanEqual(local,glm::dvec3(box.max)+.03))) return true;
     }
+    return false;
+}
+
+void EntityManager::explodeAt(const glm::dvec3& center,float power,const std::vector<EntityPlayerView>& players) {
+    auto previous=std::move(m_framePlayers);
+    struct Restore {std::vector<EntityPlayerView>& current;std::vector<EntityPlayerView>& previous;~Restore(){current=std::move(previous);}} restore{m_framePlayers,previous};
+    m_framePlayers=players;
+    explode(center,power,hash32(static_cast<uint32_t>(static_cast<int64_t>(std::floor(center.x)))^static_cast<uint32_t>(static_cast<int64_t>(std::floor(center.z)))),false);
+}
+
+
+void EntityManager::spawnNativeProjectile(EntityType type,const glm::dvec3& origin,
+    const glm::vec3& velocity,uint64_t playerId,ItemStack item,const std::string& owner) {
+    if(!nativeProjectile(type))return;
+    Entity projectile;projectile.id=m_nextId++;projectile.type=type;projectile.health=1;
+    projectile.position=origin;projectile.velocity=velocity;projectile.playerOwned=true;
+    projectile.shooterId=playerId;projectile.item=item;projectile.nativeOwner=owner;projectile.pluginState=NativeProjectileState::encode(owner);m_entities.push_back(projectile);
+}
+
+void EntityManager::applyEntityPotion(Entity& target,const PotionDefinition& potion,float intensity) {
+    auto effect=potion.effect;
+    if(undeadEntity(target.type)) {
+        if(effect.type==StatusEffectType::Healing)effect.type=StatusEffectType::Harming;
+        else if(effect.type==StatusEffectType::Harming)effect.type=StatusEffectType::Healing;
+        else if(effect.type==StatusEffectType::Regeneration)return;
+    }
+    float maximum=nativeMobHealth(target.type);
+    switch(entityTemplate(target.type)) {
+        case EntityType::Cow:case EntityType::Pig:case EntityType::Sheep:maximum=10;break;
+        case EntityType::Chicken:maximum=4;break;
+        case EntityType::Spider:maximum=16;break;
+        case EntityType::IronGolem:maximum=100;break;
+        case EntityType::MagmaCube:maximum=float(1u<<(2*target.nether.magmaSize));break;
+        default:break;
+    }
+    if(effect.type==StatusEffectType::Healing)target.health=std::min(maximum,target.health+float(4u<<effect.amplifier)*intensity);
+    else if(effect.type==StatusEffectType::Harming)damageEntity(target,float(6u<<effect.amplifier)*intensity,glm::vec3(0),false);
+    else target.effects.apply(effect.type,effect.amplifier,uint32_t(effect.remaining*intensity));
+}
+
+void EntityManager::updateNativeProjectile(Entity& projectile,float dt) {
+    if(projectile.playerOwned) {
+        if(projectile.nativeOwner.empty())projectile.nativeOwner=NativeProjectileState::owner(projectile.pluginState);
+        const auto owner=std::find_if(m_framePlayers.begin(),m_framePlayers.end(),[&](const auto& v){return v.player->persistentIdentity()==projectile.nativeOwner;});
+        // Missing/offline owners cannot fall back to the host's room ID zero.
+        if(projectile.nativeOwner.empty()||owner==m_framePlayers.end()){projectile.health=0;return;}
+        projectile.shooterId=owner->id;
+    }
+    const bool curved=projectile.type==EntityType::ThrownPotion||projectile.type==EntityType::EnderPearl;
+    const auto start=projectile.position;const auto velocity=projectile.velocity;
+    double contact=dt;Entity* victim=nullptr;Player* player=nullptr;bool hit=false;
+    auto intersects=[&](const glm::dvec3& minimum,const glm::dvec3& maximum) -> std::optional<double> {
+        if(curved)return projectileAabbHit(start,velocity,minimum,maximum,contact);
+        const double speed=glm::length(velocity);if(speed<.001)return {};
+        double near=0,far=contact;
+        for(int axis=0;axis<3;++axis) {
+            if(std::abs(velocity[axis])<1e-8) {if(start[axis]<minimum[axis]||start[axis]>maximum[axis])return {};continue;}
+            double a=(minimum[axis]-start[axis])/velocity[axis],b=(maximum[axis]-start[axis])/velocity[axis];
+            if(a>b)std::swap(a,b);near=std::max(near,a);far=std::min(far,b);
+            if(near>far)return {};
+        }
+        return near;
+    };
+    for(auto& target:m_entities) {
+        if(!registeredMob(target.type)||target.health<=0||(!projectile.playerOwned&&target.id==projectile.shooterId))continue;
+        const auto size=entitySize(target);
+        const auto t=intersects(target.position+glm::dvec3(-size.x*.5,0,-size.z*.5),target.position+glm::dvec3(size.x*.5,size.y,size.z*.5));
+        if(t&&*t<=contact){contact=*t;victim=&target;player=nullptr;hit=true;}
+    }
+    for(const auto& view:m_framePlayers) {
+        if(!view.damageable||!view.player->isSurvival()||(projectile.playerOwned&&view.id==projectile.shooterId))continue;
+        const auto t=intersects(view.player->getPosition()+glm::dvec3(-.3,0,-.3),view.player->getPosition()+glm::dvec3(.3,view.player->currentHeight(),.3));
+        if(t&&*t<contact){contact=*t;player=view.player;victim=nullptr;hit=true;}
+    }
+    if(curved) {
+        const auto t=projectileBlockHit(start,velocity,contact,[&](int x,int y,int z){return m_world.getBlock(x,y,z);});
+        if(t){contact=*t;player=nullptr;victim=nullptr;hit=true;}
+        projectile.position=projectilePosition(start,velocity,contact);
+        projectile.velocity=projectileVelocityAfter(velocity,float(contact));
+    } else {
+        const float speed=glm::length(velocity);
+        if(speed>.001f)if(const auto block=m_world.raycast(start,velocity/speed,float(contact)*speed)) {
+            contact=block->distance/speed;player=nullptr;victim=nullptr;hit=true;
+        }
+        projectile.position=start+glm::dvec3(velocity)*contact;
+    }
+    if(!hit)return;
+    projectile.health=0;
+    if(projectile.type==EntityType::ThrownPotion) {
+        if(const auto potion=potionDefinition(projectile.item.id)) {
+            for(auto& target:m_entities)if(registeredMob(target.type)&&target.health>0) {
+                const auto center=target.position+glm::dvec3(0,entitySize(target).y*.5,0);
+                const double distance=glm::distance(center,projectile.position);
+                if((&target==victim||distance<4)&&aiClearSight(projectile.position,center))
+                    applyEntityPotion(target,*potion,&target==victim?1.f:float(1-distance/4));
+            }
+            for(const auto& view:m_framePlayers) {
+                const auto center=view.player->getPosition()+glm::dvec3(0,.9,0);
+                const double distance=glm::distance(center,projectile.position);
+                if(view.damageable&&(view.player==player||distance<4)&&
+                    (view.id==projectile.shooterId||m_pvpEnabled||(potion->effect.type!=StatusEffectType::Harming&&potion->effect.type!=StatusEffectType::Weakness))&&aiClearSight(projectile.position,center))
+                    view.player->applyPotion(*potion,view.player==player?1.f:float(1-distance/4));
+            }
+        }
+        return;
+    }
+    if(projectile.type==EntityType::EnderPearl) {
+        for(const auto& view:m_framePlayers)if(view.id==projectile.shooterId && !view.player->survivalStats().dead()) {
+            // Keep the player on the approached side of the collision surface.
+            const auto normal=glm::length(velocity)>.001f?glm::normalize(glm::dvec3(velocity)):glm::dvec3(0);
+            const auto proposed=projectile.position-normal*.65;
+            if(!riderCollides(proposed)) {view.player->teleport(proposed);view.player->takeDamage(5,true);}
+        }
+        return;
+    }
+    if(victim) {
+        const bool immune=nativeFireImmune(victim->type)||victim->effects.level(StatusEffectType::FireResistance);
+        if(projectile.type==EntityType::GhastFireball || !immune)
+            damageEntity(*victim,projectile.playerOwned&&victim->type==EntityType::Ghast?1000.f:projectile.type==EntityType::GhastFireball?6.f:5.f,glm::vec3(0),projectile.playerOwned,projectile.position,projectile.shooterId);
+        if(!immune)victim->burningSeconds=5;
+    }
+    if(player && (projectile.type==EntityType::GhastFireball || !player->statusEffects().level(StatusEffectType::FireResistance))) {
+        DamageSourceInfo source;source.amount=projectile.type==EntityType::GhastFireball?6.f:5.f;
+        source.cause=DamageCause::Projectile;source.shieldBlockable=true;source.hasOrigin=true;source.origin=start;
+        if(player->takeDamage(source).appliedDamage>0)player->ignite(5);
+    }
+    if(projectile.type==EntityType::GhastFireball)m_nativeExplosions.push_back({projectile.position,projectile.behaviorSeed,1.f});
+    else {
+        const auto pos=glm::ivec3(glm::floor(projectile.position));
+        if(m_world.getBlock(pos.x,pos.y,pos.z)==BlockId::AIR&&isSolid(m_world.getBlock(pos.x,pos.y-1,pos.z)))m_world.setBlock(pos.x,pos.y,pos.z,BlockId::FIRE);
+    }
+}
+
+bool EntityManager::riding(uint64_t playerId) const {
+    return std::any_of(m_entities.begin(),m_entities.end(),[&](const auto& entity){return entity.riderId==playerId;});
+}
+void EntityManager::dismount(uint64_t playerId) {
+    for(auto& entity:m_entities)if(entity.riderId==playerId)entity.riderId=UINT64_MAX;
+}
+bool EntityManager::useNativeMob(Player& player,uint64_t playerId) {
+    if(player.isSpectator())return false;
+    auto& selected=player.inventory().slot(size_t(player.selectedSlot()));
+    if(riding(playerId)) {
+        if(selected.id==ItemId::WARPED_FUNGUS_ON_A_STICK) {
+            for(auto& entity:m_entities)if(entity.riderId==playerId && entity.nether.boostTicks==0) {
+                if(player.isSurvival()&&selected.damage+1>=getItemProps(selected.id).maxDurability)return false;
+                entity.nether.boostTicks=100;if(player.isSurvival())++selected.damage;return true;
+            }
+        }
+        return false;
+    }
+    Entity* nearest=nullptr;float along=player.isSurvival()?3.f:6.f;
+    for(auto& entity:m_entities) {
+        if(!registeredMob(entity.type)||entity.health<=0)continue;
+        float hit=0;
+        if(rayEntityAabb(player.getEyePosition(),player.getForward(),entity,entitySize(entity),along,hit)&&
+            !m_world.raycast(player.getEyePosition(),player.getForward(),hit)) {nearest=&entity;along=hit;}
+    }
+    if(!nearest)return false;
+    auto consume=[&](){if(player.isSurvival()&&--selected.count==0)selected.clear();};
+    if(nearest->type==EntityType::Piglin && selected.id==ItemId::GOLD_INGOT && !nearest->nether.angerTicks && !nearest->nether.barterTicks) {
+        consume();nearest->nether.barterTicks=120;nearest->ai={};return true;
+    }
+    if(nearest->type==EntityType::Strider) {
+        if(selected.id==ItemId::SADDLE&&!nearest->nether.saddled){consume();nearest->nether.saddled=1;return true;}
+        if(nearest->nether.saddled && nearest->riderId==UINT64_MAX && !player.sneakInput()&&!riderCollides(nearest->position+glm::dvec3(0,1.7,0))) {nearest->riderId=playerId;return true;}
+    }
+    if(nearest->type==EntityType::ZombieVillager && selected.id==ItemId::GOLDEN_APPLE && nearest->effects.level(StatusEffectType::Weakness)>0 && !nearest->nether.cureTicks) {
+        consume();nearest->nether.cureTicks=3600;nearest->effects.clear();return true;
+    }
+    return false;
+}
+
+
+void EntityManager::tickSpawners(bool peaceful) {
+    if(peaceful||!m_world.gameRules().boolean(GameRuleId::SpawnMobs)||!m_world.gameRules().boolean(GameRuleId::SpawnMonsters))return;
+    const size_t monsters=std::count_if(m_entities.begin(),m_entities.end(),[](const auto& entity){return entity.health>0&&hostile(entity.type);});
+    if(monsters>=64)return;
+    for(const auto& position:m_world.loadedSpawners()) {
+        if(std::count_if(m_entities.begin(),m_entities.end(),[](const auto& e){return e.health>0&&hostile(e.type);})>=64)break;
+        const glm::dvec3 center=glm::dvec3(position)+glm::dvec3(.5);
+        if(std::none_of(m_framePlayers.begin(),m_framePlayers.end(),[&](const auto& view){return view.targetable&&glm::distance(view.player->getPosition(),center)<16;}))continue;
+        auto* state=m_world.getBlockEntity(position);if(!state)continue;
+        if(state->burnRemaining>20){state->burnRemaining-=20;continue;}
+        const auto block=m_world.getBlock(position.x,position.y,position.z);
+        if(block!=BlockId::BLAZE_SPAWNER&&block!=BlockId::MAGMA_SPAWNER)continue;
+        const auto type=block==BlockId::BLAZE_SPAWNER?EntityType::Blaze:EntityType::MagmaCube;
+        const auto count=std::count_if(m_entities.begin(),m_entities.end(),[&](const auto& e){return e.type==type&&e.health>0&&glm::distance(e.position,center)<9;});
+        if(count>=6){state->burnRemaining=100;continue;}
+        const auto seed=hash32(uint32_t(position.x)^uint32_t(position.z)*31u^uint32_t(m_aiTime*20));
+        for(int i=0;i<4 && count+i<6 && monsters+size_t(i)<64;++i) {
+            if(std::count_if(m_entities.begin(),m_entities.end(),[](const auto& e){return e.health>0&&hostile(e.type);})>=64)break;
+            const auto roll=hash32(seed+uint32_t(i));
+            spawnMob(type,center+glm::dvec3(int(roll%7)-3,int((roll>>8)%3)-1,int((roll>>16)%7)-3));
+        }
+        state->burnRemaining=200+seed%401;
+    }
+}
+
+
+std::vector<uint64_t> EntityManager::portalCandidates(float dt) {
+    std::vector<uint64_t> ready;
+    for(auto& entity:m_entities) {
+        if(entity.health<=0||(entity.type!=EntityType::Item&&!registeredMob(entity.type))||entity.riderId!=UINT64_MAX)continue;
+        const bool cooling=entity.portalCooldown>0;
+        entity.portalCooldown=std::max(0.f,entity.portalCooldown-dt);entity.portalRetry=std::max(0.f,entity.portalRetry-dt);
+        const auto p=glm::ivec3(glm::floor(entity.position));
+        const auto block=m_world.getBlock(p.x,p.y,p.z);
+        if(!NetherPortal::isPortal(block))continue;
+        if(cooling){entity.portalCooldown=1;continue;}
+        if(entity.portalRetry>0)continue;
+        const auto frame=NetherPortal::find([&](glm::ivec3 q){return m_world.getBlock(q.x,q.y,q.z);},p,block==BlockId::NETHER_PORTAL_Z,true);
+        if(frame&&ready.size()<16)ready.push_back(entity.id);
+    }
+    return ready;
+}
+void EntityManager::deferPortal(uint64_t id) {for(auto& entity:m_entities)if(entity.id==id){entity.portalRetry=1;break;}}
+
+bool EntityManager::transferTo(uint64_t id,EntityManager& target,const glm::dvec3& desired,const std::filesystem::path& root) {
+    if(&target==this||!m_saveStore||!target.m_saveStore)return false;
+    const auto found=std::find_if(m_entities.begin(),m_entities.end(),[&](const auto& e){return e.id==id;});
+    if(found==m_entities.end()||found->health<=0||found->riderId!=UINT64_MAX||
+        (found->type!=EntityType::Item&&!registeredMob(found->type)))return false;
+    Entity moved=*found;std::optional<glm::dvec3> landing;
+    const auto size=entitySize(moved);
+    for(const auto offset:{glm::dvec3(0),glm::dvec3(0,0,3),glm::dvec3(0,0,-3),glm::dvec3(3,0,0),glm::dvec3(-3,0,0)}) {
+        const auto p=desired+offset;if(target.collides(moved,p))continue;
+        bool safe=true;
+        for(int z=int(std::floor(p.z-size.z*.5));z<=int(std::floor(p.z+size.z*.5-1e-6))&&safe;++z)
+            for(int x=int(std::floor(p.x-size.x*.5));x<=int(std::floor(p.x+size.x*.5-1e-6))&&safe;++x) {
+                for(int y=int(std::floor(p.y));y<=int(std::floor(p.y+size.y-1e-6));++y) {
+                    const auto block=target.m_world.getLoadedBlock(x,y,z);
+                    if(!block||isLava(*block)||*block==BlockId::FIRE||*block==BlockId::SOUL_FIRE){safe=false;break;}
+                }
+                if(moved.type!=EntityType::Ghast&&moved.type!=EntityType::Blaze) {
+                    const auto floor=target.m_world.getLoadedBlock(x,int(std::floor(p.y-.05)),z);
+                    if(!floor||!isFullCollisionBlock(*floor)||*floor==BlockId::MAGMA_BLOCK)safe=false;
+                }
+            }
+        if(safe){landing=p;break;}
+    }
+    if(!landing)return false;
+    const auto sourceKey=entityChunk(found->position),targetKey=entityChunk(*landing);
+    const size_t index=size_t(found-m_entities.begin());auto saved=saveEntities();auto record=saved[index];saved.erase(saved.begin()+index);
+    auto belongs=[](const auto& e,const auto& key){return entityChunk(e.position)==key;};
+    saved.erase(std::remove_if(saved.begin(),saved.end(),[&](const auto& e){return !belongs(e,sourceKey);}),saved.end());
+    auto targetSaved=target.saveEntities();targetSaved.erase(std::remove_if(targetSaved.begin(),targetSaved.end(),[&](const auto& e){return !belongs(e,targetKey);}),targetSaved.end());
+    record.position=*landing;record.velocity=glm::vec3(0);targetSaved.push_back(record);
+    moved.position=*landing;moved.velocity=glm::vec3(0);moved.ai={};moved.attackPending=false;
+    moved.portalCooldown=1;moved.portalRetry=0;moved.id=target.m_nextId;
+    target.m_entities.reserve(target.m_entities.size()+1);
+    EntityTransferJournal::commit(root,{m_world.dimension(),sourceKey.first,sourceKey.second,std::move(saved)},
+        {target.m_world.dimension(),targetKey.first,targetKey.second,std::move(targetSaved)});
+    m_navigation.erase(id);m_entities.erase(m_entities.begin()+index);
+    ++target.m_nextId;target.m_entities.push_back(std::move(moved));
+    m_dirtyEntityChunks.insert(sourceKey);target.m_dirtyEntityChunks.insert(targetKey);return true;
+}
+
+
+bool EntityManager::riderCollides(const glm::dvec3& position) const {
+    // The existing conservative zombie footprint plus the top six centimeters
+    // covers the standing player's complete body without changing mob sizes.
+    Entity shape;shape.type=EntityType::Zombie;
+    for(int z=int(std::floor(position.z-.325));z<=int(std::floor(position.z+.325));++z)
+        for(int x=int(std::floor(position.x-.325));x<=int(std::floor(position.x+.325));++x)
+            for(int y=int(std::floor(position.y));y<=int(std::floor(position.y+Config::PLAYER_HEIGHT));++y)
+                if(!m_world.getLoadedBlock(x,y,z))return true;
+    return collides(shape,position)||collides(shape,position+glm::dvec3(0,.06,0));
+}
+
+bool EntityManager::tryDismount(Player& player,uint64_t playerId) {
+    const auto mount=std::find_if(m_entities.begin(),m_entities.end(),[&](const auto& e){return e.riderId==playerId;});
+    if(mount==m_entities.end())return true;
+    const glm::ivec3 origin(glm::floor(mount->position));
+    for(int radius=1;radius<=8;++radius)for(int dy:{0,1,-1,2,-2,3,-3,4,-4})
+        for(int z=-radius;z<=radius;++z)for(int x=-radius;x<=radius;++x) {
+            if(std::max(std::abs(x),std::abs(z))!=radius)continue;
+            const auto p=origin+glm::ivec3(x,dy,z);
+            const auto floor=m_world.getLoadedBlock(p.x,p.y-1,p.z),feet=m_world.getLoadedBlock(p.x,p.y,p.z),head=m_world.getLoadedBlock(p.x,p.y+1,p.z);
+            if(!floor||!feet||!head||!isFullCollisionBlock(*floor)||*floor==BlockId::MAGMA_BLOCK||isFluid(*feet)||isFluid(*head)||
+                *feet==BlockId::FIRE||*feet==BlockId::SOUL_FIRE||*head==BlockId::FIRE||*head==BlockId::SOUL_FIRE)continue;
+            const auto point=glm::dvec3(p)+glm::dvec3(.5,.01,.5);
+            if(riderCollides(point))continue;
+            dismount(playerId);player.teleport(point);return true;
+        }
     return false;
 }

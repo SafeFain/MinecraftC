@@ -2,6 +2,7 @@
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"
 #include "EntityAiIntegration.h"
+#include "NetherMobIntegration.h"
 #include "VillageLifeIntegration.h"
 #include "ProjectileIntegration.h"
 #include "Config.h"
@@ -54,6 +55,22 @@ struct LanLodTestAccess {
     }
 };
 struct GameSessionTestAccess {
+    static World& netherFlat(GameSession& s,DimensionId d) {
+        auto& runtime=s.ensureDimension(d);runtime.world.setThreadPool(nullptr);runtime.entities.setNaturalSpawningEnabled(false);
+        for(int z=-2;z<=2;++z)for(int x=-2;x<=2;++x) {
+            auto* c=runtime.world.getChunk(x,z);
+            for(int bz=0;bz<16;++bz)for(int bx=0;bx<16;++bx)for(int y=64;y<74;++y)c->setBlock(bx,y,bz,y==64?BlockId::OBSIDIAN:BlockId::AIR);
+            c->generated=true;c->lifecycle=Chunk::LifecycleState::Renderable;
+        }
+        runtime.world.setAdditionalStreamingInterests({{0,0,2}});runtime.world.update({.5,65.01,.5},0);return runtime.world;
+    }
+    static void restoreNetherWorkers(GameSession& s) { s.ensureDimension(DimensionId::Nether).world.setThreadPool(&s.threadPool); }
+    static void netherReady(GameSession& s){s.terrainGenerated=true;s.playerDead=false;}
+    static bool tickPortals(GameSession& s,float dt){return s.updateNetherPortals(dt,{});}
+    static void portalRule(GameSession& s,bool enabled){s.worldMetadata.gameRules.set(GameRuleId::AllowEnteringNetherUsingPortals,GameRuleValue::boolean(enabled));}
+    static std::optional<glm::dvec3> portalLanding(GameSession& s,DimensionId d,glm::dvec3 p){return s.netherPortalLanding(d,p);}
+    static bool anchorUse(GameSession& s,glm::ivec3 p){return s.useRespawnAnchor(0,p);}
+
     static void prepareActionScene(GameSession& session,DimensionId dimension,uint64_t seed){
         session.worldMetadata.seed=seed;auto& runtime=session.ensureDimension(dimension);
         runtime.world.setThreadPool(nullptr);session.dimension=dimension;
@@ -262,6 +279,7 @@ std::string Localization::format(
     return std::string(key);
 }
 
+#include "NetherSessionIntegration.h"
 #include "GameRuleIntegration.h"
 #include "PluginSessionIntegration.h"
 #include "PluginExtensionIntegration.h"
@@ -279,6 +297,14 @@ std::string Localization::format(
 #include "HeavenP1Integration.h"
 
 int main(int argc, char** argv) {
+    if(argc==3 && (std::string(argv[1])=="--nether-mob-tests"||std::string(argv[1])=="--nether-mob-tests-no-plugins")) {
+        try {if(std::string(argv[1])=="--nether-mob-tests")installHeavenFixture();return NetherMobIntegration::run(argv[2]);}
+        catch(const std::exception& error){std::cerr<<"Nether integration exception: "<<error.what()<<'\n';return 1;}
+    }
+    if(argc==2&&std::string(argv[1])=="--nether-session-tests") {
+        try{return NetherSessionIntegration::run();}
+        catch(const std::exception& error){std::cerr<<"Native session exception: "<<error.what()<<'\n';return 1;}
+    }
     installHeavenFixture();
     if(argc==6&&std::string(argv[1])=="--heaven-p1-tests") {
         try{return HeavenP1Integration::run(argv[2],{{argv[3],argv[4],argv[5]}});}
@@ -602,7 +628,7 @@ int main(int argc, char** argv) {
         currentMetadata.inventory.slot(8) = {ItemId::CAVE_GLOWSHROOM,23,0};
         currentMetadata.heaven.worldTicks = 6789;
         currentStore.saveMetadata(currentMetadata);
-        for (uint32_t version : {14u,15u,16u,17u,18u,19u,21u}) {
+        for (uint32_t version : {14u,15u,16u,17u,18u,19u,20u,WorldGenContext::GENERATION_VERSION+1u}) {
             auto incompatible = currentMetadata;
             incompatible.generationVersion = version;
             currentStore.saveMetadata(incompatible);

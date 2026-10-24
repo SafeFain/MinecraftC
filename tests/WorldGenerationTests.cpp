@@ -2126,6 +2126,8 @@ void testHeaven() {
 
 #include "HeavenMigrationIntegration.h"
 
+#include "NetherGenerationIntegration.h"
+
 int main(int argc,char** argv) {
     installHeavenFixture();
     const std::string scenario=argc==2 ? argv[1] : "--all";
@@ -2134,7 +2136,8 @@ int main(int argc,char** argv) {
         test();
         std::cout<<name<<" seconds="<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<'\n';
     };
-    if(scenario=="--heaven-migration-tests") run("heaven-migration",testHeavenMigration);
+    if(scenario=="--nether-tests") run("nether",testNether);
+    else if(scenario=="--heaven-migration-tests") run("heaven-migration",testHeavenMigration);
     else if(scenario=="--heaven-migration-benchmark") run("heaven-migration-benchmark",benchmarkHeavenMigration);
     else if(scenario=="--village-layout-tests") run("village",testVillageLayouts);
     else if(scenario=="--overworld-tests") run("overworld",testOverworld);

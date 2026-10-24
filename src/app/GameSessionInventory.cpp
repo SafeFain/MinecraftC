@@ -1,4 +1,7 @@
+#include "world/BlockEntityLogic.h"
+#include "game/NetherProgression.h"
 #include "app/GameSession.h"
+#include "game/EntityTransferJournal.h"
 #include "game/SurvivalRules.h"
 #include <cmath>
 
@@ -37,7 +40,7 @@ bool canOpenWindow(const Player& owner,DimensionSimulation& runtime,InventoryWin
         if (!reachable(owner, runtime.world, position)) return false;
         const auto block = runtime.world.getLoadedBlock(position.x, position.y, position.z);
         if (kind == InventoryWindowKind::CraftingTable && block != BlockId::CRAFTING_TABLE) return false;
-        if (kind == InventoryWindowKind::Container && block != BlockId::CHEST && block != BlockId::FURNACE) return false;
+        if (kind == InventoryWindowKind::Container && (!block || !blockEntityTypeForBlock(*block) || !isInventoryContainer(*blockEntityTypeForBlock(*block)))) return false;
         if (kind == InventoryWindowKind::Container && !runtime.world.getBlockEntity(position)) return false;
     }
     return true;
@@ -59,6 +62,7 @@ bool GameSession::openAuthorityWindow(Player& owner, DimensionSimulation& runtim
     if(!canOpenWindow(owner,runtime,kind,position))return false;
     closeAuthorityWindow(owner, runtime, transaction, view);
     view.kind = kind; view.position = position;
+    if(kind==InventoryWindowKind::Container && runtime.world.getBlock(position.x,position.y,position.z)==BlockId::CHEST)runtime.entities.angerPiglins(glm::dvec3(position));
     owner.cancelBowCharge();
     return true;
 }
@@ -73,10 +77,10 @@ InventoryWindowView GameSession::authorityWindow(Player& owner, DimensionSimulat
         runtime.world.getLoadedBlock(view.position.x, view.position.y, view.position.z) != BlockId::CRAFTING_TABLE)
         closeAuthorityWindow(owner, runtime, transaction, view);
     if (view.kind == InventoryWindowKind::Container) {
-        const auto* container = runtime.world.getBlockEntity(view.position);
-        if (!container || container->type > BlockEntityType::Furnace)
+        auto* container = runtime.world.getBlockEntity(view.position);
+        if (!container || !isInventoryContainer(container->type))
             closeAuthorityWindow(owner, runtime, transaction, view);
-        else { view.container = *container; view.containerRevision = fingerprint(*container); }
+        else { if(container->type==BlockEntityType::SmithingTable)container->output=smithingResult(container->chest[0],container->chest[1],container->chest[2]);view.container = *container; view.containerRevision = fingerprint(*container); }
     }
     view.revision = fingerprint(owner.inventory(), transaction);
     view.cursor = transaction.cursor(); view.crafting = transaction.crafting();
@@ -101,6 +105,7 @@ void GameSession::applyAuthorityInventory(Player& owner, DimensionSimulation& ru
     action.revision = transaction.revision();
     const auto result = transaction.apply(owner.inventory(), action, context);
     drops(owner, runtime.entities, result.drops);
+    if(&owner==&player)validateFishingRod();
     (void)authorityWindow(owner, runtime, transaction, view);
 }
 InventoryWindowView GameSession::inventoryWindow() const {
@@ -147,6 +152,7 @@ void GameSession::sendReplicaAction() {
     if (lanClient.send({Lan::MessageType::Action, 0, Lan::encodeGameAction(action)})) replicaActionInFlight = action.sequence;
 }
 void GameSession::applyLanAction(LanPlayerRuntime& guest, const Lan::GameAction& action) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (action.sequence <= guest.actionAcknowledged) return;
     guest.actionAcknowledged = action.sequence; guest.lastStateSent = -1;
     if (action.epoch != guest.chunkEpoch) return;

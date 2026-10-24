@@ -530,6 +530,7 @@ ItemStack SurvivalInventoryScreen::dropHovered(bool entireStack) {
 
 bool SurvivalInventoryScreen::acceptsArmor(size_t slot, ItemId item) {
     if (getItemProps(item).kind != ItemKind::Armor) return false;
+    if(item>=ItemId::NETHERITE_HELMET&&item<=ItemId::NETHERITE_BOOTS)return static_cast<uint16_t>(item)-static_cast<uint16_t>(ItemId::NETHERITE_HELMET)==slot;
     const uint16_t relative = static_cast<uint16_t>(item) -
                               static_cast<uint16_t>(ItemId::LEATHER_HELMET);
     return relative % 4 == slot;

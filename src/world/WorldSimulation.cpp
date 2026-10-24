@@ -47,7 +47,7 @@ void WorldSimulation::tickSurvival(const std::vector<glm::dvec3>& playerPosition
     m_persistence.forEachOverride(
         [&](const std::pair<int,int>& key, uint32_t index, BlockId block) {
             if (!isFarmland(block) && !isSapling(block) &&
-                !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)) return;
+                !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)&&!(isNetherWart(block)&&block!=BlockId::NETHER_WART)) return;
             if (!m_chunks.isGenerated(key.first, key.second)) return;
             const bool nearPlayer = std::any_of(m_playerPositions.begin(), m_playerPositions.end(),
                 [&](const glm::dvec3& position) {
@@ -86,7 +86,10 @@ void WorldSimulation::tickSurvival(const std::vector<glm::dvec3>& playerPosition
             if (found != section.second.end() && found->index == selected) {
                 const auto& p = found->position;
                 const BlockId block = m_world.getBlock(p.x, p.y, p.z);
-                if (isFarmland(block)) {
+                if(isNetherWart(block)&&block!=BlockId::NETHER_WART) {
+                    if(m_world.getBlock(p.x,p.y-1,p.z)==BlockId::SOUL_SAND&&(random>>12)%10==0)
+                        m_world.setBlock(p.x,p.y,p.z,block==BlockId::NETHER_WART_CROP_2?BlockId::NETHER_WART:static_cast<BlockId>(static_cast<uint16_t>(block)+1));
+                } else if (isFarmland(block)) {
                     const BlockId next = nextFarmlandState(block, m_world.getBlock(p.x,p.y+1,p.z),
                         hasWaterForFarmland(p, raining), random - random % 20);
                     if (next != block) m_world.setBlock(p.x,p.y,p.z,next);
@@ -190,9 +193,11 @@ void WorldSimulation::tickWeather(const WeatherSystem& weather, bool daytime,
         const bool exposedRain = weather.raining() &&
             m_world.precipitationAt(p.x, p.y, p.z) == PrecipitationType::Rain &&
             m_world.hasSkyAccess(p.x, p.y + 1, p.z);
-        if ((exposedRain && random % 100 <
+        const auto substrate=m_world.getBlock(p.x,p.y-1,p.z);
+        const bool eternal=substrate==BlockId::NETHERRACK||substrate==BlockId::MAGMA_BLOCK;
+        if (!eternal && ((exposedRain && random % 100 <
                 static_cast<uint64_t>(20 + age * 3)) ||
-            (age == 15 && (random >> 9) % 4 == 0)) {
+            (age == 15 && (random >> 9) % 4 == 0))) {
             m_world.setBlock(p.x, p.y, p.z, BlockId::AIR);
             m_fireAges.erase(p);
             continue;

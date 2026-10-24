@@ -16,10 +16,12 @@ struct LanPlayerRuntime {
         if (!profile.cursor.empty() || std::any_of(profile.crafting.begin(), profile.crafting.end(), [](ItemStack item) { return !item.empty(); }))
             window.restoreHeld(profile.cursor, profile.crafting);
         player.setEntityManager(&entities);
+        player.setPersistentIdentity(profile.identity.id.empty()?"local":profile.identity.id);
         player.configureRules(profile.mode, Difficulty::Normal);
         player.inventory() = profile.inventory;
         player.survivalStats().set(profile.health, profile.hunger, profile.saturation,
                                   profile.exhaustion, profile.foodTickTimer);
+        player.statusEffects().restore(profile.effects);
         player.setPosition(profile.positions[static_cast<size_t>(profile.dimension)]);
     }
     Lan::PlayerProfile profile;

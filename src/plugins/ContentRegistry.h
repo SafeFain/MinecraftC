@@ -196,6 +196,7 @@ inline std::string dimensionKey(DimensionId id) {return dimensionContent(id).key
 inline std::string dimensionDirectory(DimensionId id) {
     if(id==DimensionId::Overworld)return "";
     if(id==DimensionId::Heaven)return "heaven";
+    if(id==DimensionId::Nether)return "nether";
     // Hex encoding is injective and cannot introduce separators or traversal.
     std::string result="d_";const char* hex="0123456789abcdef";
     for(unsigned char c:dimensionKey(id)){result+=hex[c>>4];result+=hex[c&15];}
@@ -205,7 +206,7 @@ inline std::string dimensionDirectory(DimensionId id) {
 inline void validateGeneration(const GenerationConfig& config,uint32_t dimension) {
     if(!validDimension(dimension)||config.parameters.size()>4096||config.modifiers.size()>64)
         throw std::runtime_error("Invalid generator configuration limits");
-    if(dimension!=0&&config.generator.empty())throw std::runtime_error("Plugin dimension requires a generator");
+    if(dimension!=0&&dimension!=2&&config.generator.empty())throw std::runtime_error("Plugin dimension requires a generator");
     if(Json::parse(config.parameters).type!=Json::Type::Object)
         throw std::runtime_error("Generator parameters must be a JSON object");
     if(config.generator.empty()&&!config.revision.empty())throw std::runtime_error("Builtin generator has no plugin revision");

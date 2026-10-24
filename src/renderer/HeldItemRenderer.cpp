@@ -41,7 +41,7 @@ TextureData decode(const std::filesystem::path& path) {
 
 std::string itemKey(ItemId id) {
     if(const auto* item=Plugins::pluginItem(id);item&&!item->icon.empty())return item->key;
-    std::string key = getItemProps(id).name;
+    std::string key = id>=ItemId::NETHERRACK&&id<ItemId::COUNT?itemCommandName(id):getItemProps(id).name;
     for (char& c : key) c = std::isalnum(static_cast<unsigned char>(c))
         ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '_';
     return key;

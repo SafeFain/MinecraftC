@@ -103,9 +103,31 @@ float meshMaximumY(const ChunkMesh& mesh) {
 }
 }
 
+// Separate this fixture from the large legacy mesh/neighbor fixture stack.
+void testNativeLod() {
+    {
+        WorldGenerator nether(7,WorldType::Normal,DimensionId::Nether);
+        const auto tile=buildApproximateLodTile(nether,{-3,-2,2});
+        require(sameTile(tile,buildApproximateLodTile(nether,{-3,-2,2})),"native cavern LOD negative-coordinate determinism");
+        bool cavern=false;
+        for(const auto& column:tile.columns) {
+            require(!column.spans.empty()&&column.spans.front().bottom==0&&column.spans.back().top==127,"native LOD retains floor and roof");
+            cavern=cavern||column.spans.size()>1;
+        }
+        require(cavern,"native LOD must retain multiple solid and empty layers");
+        const auto mesh=buildLodTileMesh(tile,4,1,nullptr,nullptr,true,false);
+        require(!mesh.vertices.empty()&&std::all_of(mesh.vertices.begin(),mesh.vertices.end(),[](const auto& vertex){return vertex.skyLight==0;}),"native coarse LOD has no sky light even at minimum precision");
+        LodTileData layers;
+        for(auto& column:layers.columns)column.spans={{0,3,BlockId::BEDROCK},{4,31,BlockId::LAVA},{50,60,BlockId::NETHERRACK},{120,127,BlockId::BEDROCK}};
+        const auto layered=buildLodTileMesh(layers,4,1,nullptr,nullptr,true,false);
+        require(layered.translucentIndexCount>0&&layered.opaqueIndexCount>0,"precision budget retains cavern solids and lava layer");
+    }
+}
+
 int main() {
     installHeavenFixture();
     WorldGenerator normal(123456789ULL, WorldType::Normal, DimensionId::Overworld);
+    testNativeLod();
     const LodTileKey negative{-3, 2, 2};
     const LodTileData first = buildApproximateLodTile(normal, negative);
     for (const LodColumn& column : first.columns)
@@ -754,7 +776,7 @@ int main() {
         }
         require(coverage.coverageReady() && !coverage.submissions().empty(),
                 "LOD loading never reaches GPU-ready coverage");
-        Chunk live(-7, -3);
+        auto liveStorage=std::make_unique<Chunk>(-7,-3);Chunk& live=*liveStorage;
         live.setBlock(8, 64, 8, BlockId::STONE);
         live.generated = true;
         live.lifecycle = Chunk::LifecycleState::Renderable;
@@ -858,7 +880,7 @@ int main() {
         exactSystem.reset(&normal);
         exactSystem.configure({true, 0, LodAggressiveness::PowerSaver,
                                LodPrecision::Low});
-        Chunk live(0, 0);
+        auto liveStorage=std::make_unique<Chunk>(0,0);Chunk& live=*liveStorage;
         live.setBlock(8, 64, 8, BlockId::STONE);
         live.generated = true;
         live.lifecycle = Chunk::LifecycleState::Renderable;

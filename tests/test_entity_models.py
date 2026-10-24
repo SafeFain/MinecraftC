@@ -89,10 +89,35 @@ def verify_joint_pivots(doc,binary,name):
 
 def main():
     files = list(MODEL_DIR.glob("*.glb"))
-    assert {path.stem for path in files} == NAMES, "expected exactly eleven entity GLBs"
+    native={"ghast","blaze","wither_skeleton","magma_cube","piglin","piglin_brute","zombified_piglin","hoglin","zoglin","strider","enderman","ghast_fireball","blaze_fireball","thrown_potion","ender_pearl"}
+    assert {path.stem for path in files} == NAMES|native, "expected eleven original and fifteen appended native entity GLBs"
     graphs = list(MODEL_DIR.glob("*.anim.json"))
-    assert {path.name[:-len(".anim.json")] for path in graphs} == NAMES, \
-        "expected exactly eleven entity action graphs"
+    assert {path.name[:-len(".anim.json")] for path in graphs} == NAMES|native, \
+        "expected matching original and native entity action graphs"
+    native_files=[p for p in files if p.stem in native]
+    files=[p for p in files if p.stem in NAMES]
+    for path in native_files:
+        doc,binary=document(path)
+        assert {a["name"] for a in doc["animations"]}>={"idle","walk","hurt","death","attack"}
+        assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"])<=256
+        primitive=doc["meshes"][0]["primitives"][0]
+        assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"}<=set(primitive["attributes"])
+        assert doc["accessors"][primitive["attributes"]["POSITION"]]["count"]<=4096
+        assert doc["materials"][0].get("doubleSided") is True
+        image_view=doc["bufferViews"][doc["images"][0]["bufferView"]]
+        image=binary[image_view.get("byteOffset",0):image_view.get("byteOffset",0)+image_view["byteLength"]]
+        assert png_dimensions(image)==(64,64)
+        assert len(image)<20*1024,"native embedded skin exceeds budget"
+        graph=json.loads((MODEL_DIR/(path.stem+".anim.json")).read_text())
+        assert graph["actions"]["attack"]["events"]==[{"name":"melee","time":.30}]
+        positions=vec3_accessor(doc,binary,primitive["attributes"]["POSITION"])
+        normals=vec3_accessor(doc,binary,primitive["attributes"]["NORMAL"])
+        indices=index_accessor(doc,binary,primitive["indices"])
+        for offset in range(0,len(indices),3):
+            ia,ib,ic=indices[offset:offset+3];a,b,c=positions[ia],positions[ib],positions[ic]
+            ab=tuple(b[i]-a[i] for i in range(3));ac=tuple(c[i]-a[i] for i in range(3))
+            cross=(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])
+            assert sum(cross[i]*normals[ia][i] for i in range(3))>0,f"{path.name} inward winding"
     for path in files:
         doc, binary = document(path)
         assert {a["name"] for a in doc["animations"]} >= {"idle", "walk", "hurt", "death"}
@@ -181,7 +206,14 @@ def main():
         assert player_path.read_bytes() == (generated_player / "player.glb").read_bytes()
         assert (PLAYER_DIR / "player.anim.json").read_bytes() == \
                (generated_player / "player.anim.json").read_bytes()
-    print("entity model asset contract passed")
+    with tempfile.TemporaryDirectory() as directory:
+        generated=pathlib.Path(directory)
+        subprocess.run([sys.executable,str(ROOT/"tools/generate_nether_models.py"),"--output",str(generated)],check=True)
+        for path in native_files:
+            assert path.read_bytes()==(generated/path.name).read_bytes(),f"{path.name} not deterministic"
+            graph=path.stem+".anim.json"
+            assert (MODEL_DIR/graph).read_bytes()==(generated/graph).read_bytes(),f"{graph} not deterministic"
+    print("original and native entity model asset contract passed")
 
 if __name__ == "__main__":
     try: main()

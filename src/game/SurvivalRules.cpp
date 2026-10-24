@@ -16,6 +16,7 @@ int tierLevel(ToolTier tier) {
         case ToolTier::Stone: return 2;
         case ToolTier::Iron: return 3;
         case ToolTier::Diamond: return 4;
+        case ToolTier::Netherite: return 5;
     }
     return 0;
 }
@@ -209,6 +210,25 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
 
 
 
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::NETHER_FIRST);raw<static_cast<uint16_t>(BlockId::COUNT);++raw)
+        set(static_cast<BlockId>(raw),.4f,ToolKind::Pickaxe,ToolTier::Wood);
+#define NETHER_PLANT_RULE(id,key,label,r,g,b,shape,light) if constexpr(RenderShape::shape==RenderShape::Cross)set(BlockId::id,0.f);
+    MC_NETHER_BLOCKS(NETHER_PLANT_RULE)
+#undef NETHER_PLANT_RULE
+    for(auto id:{BlockId::CRIMSON_STEM,BlockId::WARPED_STEM,BlockId::CRIMSON_PLANKS,BlockId::WARPED_PLANKS})set(id,2.f,ToolKind::Axe);
+    for(auto id:{BlockId::NETHER_WART_BLOCK,BlockId::WARPED_WART_BLOCK})set(id,1.f,ToolKind::Hoe);
+    set(BlockId::GLOWSTONE,.3f);
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::NETHER_WART_CROP_0);raw<=static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2);++raw)set(static_cast<BlockId>(raw),0.f);
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::NETHER_DOOR_FIRST);raw<static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST);++raw)set(static_cast<BlockId>(raw),2.f,ToolKind::Axe);
+    for(int charge=0;charge<=4;++charge)set(respawnAnchorBlock(charge),50.f,ToolKind::Pickaxe,ToolTier::Diamond);
+    set(BlockId::SOUL_SAND,.5f,ToolKind::Shovel);
+    set(BlockId::SOUL_SOIL,.5f,ToolKind::Shovel);
+    set(BlockId::ANCIENT_DEBRIS,30.f,ToolKind::Pickaxe,ToolTier::Diamond);
+    set(BlockId::CRYING_OBSIDIAN,50.f,ToolKind::Pickaxe,ToolTier::Diamond);
+    set(BlockId::BLAZE_SPAWNER,5.f,ToolKind::Pickaxe,ToolTier::Wood);
+    set(BlockId::MAGMA_SPAWNER,5.f,ToolKind::Pickaxe,ToolTier::Wood);
+    for(auto id:{BlockId::NETHER_PORTAL_X,BlockId::NETHER_PORTAL_Z})
+        set(id,-1.f,ToolKind::None,ToolTier::None,true);
     return values;
 }
 
@@ -364,7 +384,7 @@ std::vector<CraftingRecipe> buildRecipes() {
         E,ItemId::GLASS,E,E,ItemId::OAK_PLANKS,E},{ItemId::LECTERN,1,0},false));
     recipes.push_back(shaped(2,3,{ItemId::GLASS,ItemId::GLASS,ItemId::OAK_PLANKS,
         ItemId::OAK_PLANKS,ItemId::OAK_PLANKS,ItemId::OAK_PLANKS},{ItemId::CARTOGRAPHY_TABLE,1,0},false));
-    recipes.push_back(shaped(3,2,{E,ItemId::GOLD_INGOT,E,ItemId::COBBLESTONE,
+    recipes.push_back(shaped(3,2,{E,ItemId::BLAZE_ROD,E,ItemId::COBBLESTONE,
         ItemId::COBBLESTONE,ItemId::COBBLESTONE},{ItemId::BREWING_STAND,1,0},false));
     recipes.push_back(shaped(3,3,{E,ItemId::OAK_LOG,E,ItemId::OAK_LOG,ItemId::FURNACE,
         ItemId::OAK_LOG,E,ItemId::OAK_LOG,E},{ItemId::SMOKER,1,0},false));
@@ -456,6 +476,33 @@ std::vector<CraftingRecipe> buildRecipes() {
             {static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+i),1,0},false);
         button.allowPlankVariants=false; recipes.push_back(button);
     }
+    recipes.push_back(shaped(1,1,{ItemId::CRIMSON_STEM},{ItemId::CRIMSON_PLANKS,4,0},false));
+    recipes.push_back(shaped(1,1,{ItemId::WARPED_STEM},{ItemId::WARPED_PLANKS,4,0},false));
+    recipes.push_back(shaped(1,1,{ItemId::BLAZE_ROD},{ItemId::BLAZE_POWDER,2,0},false));
+    recipes.push_back(shaped(1,1,{ItemId::REEDS},{ItemId::SUGAR,1,0},false));
+    recipes.push_back(shaped(1,1,{ItemId::GOLD_INGOT},{ItemId::GOLD_NUGGET,9,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET,ItemId::GOLD_NUGGET},{ItemId::GOLD_INGOT,1,0},false));
+    for(const auto pair:std::array<std::pair<ItemId,ItemId>,4>{{{ItemId::GLOWSTONE_DUST,ItemId::GLOWSTONE},{ItemId::QUARTZ,ItemId::QUARTZ_BLOCK},{ItemId::NETHER_BRICK,ItemId::NETHER_BRICKS},{ItemId::BLACKSTONE,ItemId::POLISHED_BLACKSTONE}}})
+        recipes.push_back(shaped(2,2,{pair.first,pair.first,pair.first,pair.first},{pair.second,1,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::NETHERITE_SCRAP,ItemId::NETHERITE_SCRAP,ItemId::NETHERITE_SCRAP,ItemId::NETHERITE_SCRAP,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,E},{ItemId::NETHERITE_INGOT,1,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::DIAMOND,ItemId::NETHERITE_UPGRADE_TEMPLATE,ItemId::DIAMOND,ItemId::DIAMOND,ItemId::NETHERRACK,ItemId::DIAMOND,ItemId::DIAMOND,ItemId::DIAMOND,ItemId::DIAMOND},{ItemId::NETHERITE_UPGRADE_TEMPLATE,2,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::CRYING_OBSIDIAN,ItemId::CRYING_OBSIDIAN,ItemId::CRYING_OBSIDIAN,ItemId::GLOWSTONE,ItemId::GLOWSTONE,ItemId::GLOWSTONE,ItemId::CRYING_OBSIDIAN,ItemId::CRYING_OBSIDIAN,ItemId::CRYING_OBSIDIAN},{ItemId::RESPAWN_ANCHOR,1,0},false));
+    recipes.push_back(shaped(3,2,{ItemId::GLASS,E,ItemId::GLASS,E,ItemId::GLASS,E},{ItemId::GLASS_BOTTLE,3,0},false));
+    recipes.push_back(shaped(3,1,{ItemId::SUGAR,ItemId::SPIDER_EYE,ItemId::BROWN_MUSHROOM},{ItemId::FERMENTED_SPIDER_EYE,1,0},false));
+    recipes.push_back(shaped(3,3,{ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::APPLE,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT,ItemId::GOLD_INGOT},{ItemId::GOLDEN_APPLE,1,0},false));
+    recipes.push_back(shaped(2,1,{ItemId::FISHING_ROD,ItemId::WARPED_FUNGUS},{ItemId::WARPED_FUNGUS_ON_A_STICK,1,0},false));
+    for(int i=0;i<2;++i) {
+        const auto ingredient=i?ItemId::WARPED_PLANKS:ItemId::CRIMSON_PLANKS;
+        recipes.push_back(shaped(2,3,{ingredient,ingredient,ingredient,ingredient,ingredient,ingredient},{i?ItemId::WARPED_DOOR:ItemId::CRIMSON_DOOR,3,0},false));
+        recipes.push_back(shaped(1,1,{ingredient},{i?ItemId::WARPED_BUTTON:ItemId::CRIMSON_BUTTON,1,0},false));
+    }
+    for(uint16_t i=0;i<4;++i) {
+        const auto material=static_cast<ArchitecturalMaterial>(5+i);
+        const auto ingredient=itemForBlock(architecturalBaseBlock(material));
+        const auto slab=static_cast<ItemId>(static_cast<uint16_t>(ItemId::CRIMSON_SLAB)+i*2);
+        recipes.push_back(shaped(3,1,{ingredient,ingredient,ingredient},{slab,6,0},false));
+        recipes.push_back(shaped(3,3,{ingredient,E,E,ingredient,ingredient,E,ingredient,ingredient,ingredient},{static_cast<ItemId>(static_cast<uint16_t>(slab)+1),4,0}));
+    }
     return recipes;
 }
 
@@ -491,7 +538,8 @@ ItemId takeIngredient(ItemId item, InventoryModel& inventory,
     }
     if (inventory.remove(item, 1)) return item;
     if (plankVariants && item == ItemId::OAK_PLANKS)
-        for(uint8_t i=1;i<6;++i) {
+        for(uint8_t i=1;i<9;++i) {
+            if(i==6)continue;
             const ItemId candidate=plankItem(static_cast<DoorMaterial>(i));
             if(inventory.remove(candidate,1)) return candidate;
         }
@@ -535,7 +583,7 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
 
 const auto BLOCKS = buildBlocks();
 const auto RECIPES = buildRecipes();
-const std::array<SmeltingRecipe, 19> SMELTING = {{
+const std::array<SmeltingRecipe, 23> SMELTING = {{
     {},
     {},
     {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
@@ -554,7 +602,11 @@ const std::array<SmeltingRecipe, 19> SMELTING = {{
     {ItemId::RAW_PORKCHOP, {ItemId::COOKED_PORKCHOP, 1, 0}, 200},
     {ItemId::MUTTON, {ItemId::COOKED_MUTTON, 1, 0}, 200},
     {ItemId::SAND, {ItemId::GLASS, 1, 0}, 200},
-    {ItemId::RED_SAND, {ItemId::GLASS, 1, 0}, 200}
+    {ItemId::RED_SAND, {ItemId::GLASS, 1, 0}, 200},
+    {ItemId::ANCIENT_DEBRIS,{ItemId::NETHERITE_SCRAP,1,0},200},
+    {ItemId::NETHERRACK,{ItemId::NETHER_BRICK,1,0},200},
+    {ItemId::NETHER_QUARTZ_ORE,{ItemId::QUARTZ,1,0},200},
+    {ItemId::NETHER_GOLD_ORE,{ItemId::GOLD_INGOT,1,0},200}
 }};
 
 } // namespace
@@ -562,6 +614,9 @@ const std::array<SmeltingRecipe, 19> SMELTING = {{
 const BlockSurvivalProperties& getBlockSurvivalProps(BlockId block) {
     if (const auto* value = Plugins::pluginBlock(block)) return value->survival;
     if (!isValidBlockId(block)) throw std::out_of_range("Invalid block ID");
+    ArchitecturalBlockState architectural;
+    if(decodeArchitecturalBlock(block,architectural)&&!architectural.family&&architectural.material>=ArchitecturalMaterial::Crimson)
+        return getBlockSurvivalProps(architecturalBaseBlock(architectural.material));
     DoorState door; ButtonState button;
     static const BlockSurvivalProperties woodDoor{3.0f,ToolKind::Axe,ToolTier::None,false};
     static const BlockSurvivalProperties ironDoor{5.0f,ToolKind::Pickaxe,ToolTier::Wood,false};
@@ -585,6 +640,11 @@ std::vector<ItemStack> getBlockDrops(
         for(const auto& d:b->drops)if(randomValue%d.denominator<d.numerator){const auto count=d.minimum+randomValue%(d.maximum-d.minimum+1);if(count)drops.push_back({Plugins::resolveItem(d.item),static_cast<uint8_t>(count),0});}
         return drops;
     }
+    if(isNetherWart(block))return {{ItemId::NETHER_WART,static_cast<uint8_t>(block==BlockId::NETHER_WART?2+randomValue%3:1),0}};
+    if(block==BlockId::NETHER_QUARTZ_ORE)return {{ItemId::QUARTZ,1,0}};
+    if(block==BlockId::NETHER_GOLD_ORE)return {{ItemId::GOLD_NUGGET,static_cast<uint8_t>(2+randomValue%5),0}};
+    if(block==BlockId::GLOWSTONE)return {{ItemId::GLOWSTONE_DUST,static_cast<uint8_t>(2+randomValue%3),0}};
+    if(block==BlockId::BLAZE_SPAWNER||block==BlockId::MAGMA_SPAWNER||block==BlockId::SOUL_FIRE)return {};
     switch (block) {
         case BlockId::STONE: return {{ItemId::COBBLESTONE, 1, 0}};
         case BlockId::COAL_ORE: return {{ItemId::COAL, 1, 0}};
@@ -605,6 +665,7 @@ std::vector<ItemStack> getBlockDrops(
         case BlockId::SPRUCE_LEAVES:
         case BlockId::JUNGLE_LEAVES:
         case BlockId::ACACIA_LEAVES: {
+            if(block==BlockId::LEAVES && randomValue%200==1)return {{ItemId::APPLE,1,0}};
             if (randomValue % 20 != 0) return {};
             const uint16_t offset = block == BlockId::LEAVES ? 0 :
                 block == BlockId::BIRCH_LEAVES ? 1 :
@@ -645,6 +706,7 @@ float miningSeconds(BlockId block, const ItemStack& toolStack,
             case ToolTier::Iron: speed = 6.0f; break;
             case ToolTier::Gold: speed = 12.0f; break;
             case ToolTier::Diamond: speed = 8.0f; break;
+            case ToolTier::Netherite: speed = 9.0f; break;
             case ToolTier::None: break;
         }
     }
@@ -742,6 +804,7 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
 }
 
 uint16_t fuelTicks(ItemId fuel) {
+    if(fuel==ItemId::CRIMSON_PLANKS||fuel==ItemId::WARPED_PLANKS||(fuel>=ItemId::CRIMSON_DOOR&&fuel<=ItemId::WARPED_STAIRS))return 0;
     if(const auto* b=Plugins::itemBehavior(fuel))if(b->fields&MC_ITEM_FUEL)return static_cast<uint16_t>(b->fuel);
     if(isWoodPlankItem(fuel)) return 300;
     if(fuel>=ItemId::OAK_DOOR && fuel<=ItemId::ACACIA_DOOR)return 200;
@@ -755,6 +818,9 @@ uint16_t fuelTicks(ItemId fuel) {
 }
 
 int armorPointsForItem(ItemId item) {
+    if(item>=ItemId::NETHERITE_HELMET&&item<=ItemId::NETHERITE_BOOTS) {
+        constexpr int points[]={3,8,6,3};return points[static_cast<uint16_t>(item)-static_cast<uint16_t>(ItemId::NETHERITE_HELMET)];
+    }
     static constexpr int armorPoints[4][4] = {
         {1, 3, 2, 1}, {2, 6, 5, 2}, {2, 5, 3, 1}, {3, 8, 6, 3}
     };

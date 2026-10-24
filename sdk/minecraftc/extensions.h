@@ -45,7 +45,7 @@ typedef struct MC_BlockShapesV1 {
 #define MC_RENDER_EXTENSION "minecraftc.render"
 #define MC_EXTENSION_VERSION 1u
 #define MC_ENTITY_STATE_LIMIT 4096u
-#define MC_BUILTIN_ENTITY_COUNT 14u
+#define MC_BUILTIN_ENTITY_COUNT 29u
 /* Runtime entity types are not stable across launches. Persist namespaced keys. */
 typedef struct MC_EntitySnapshot {
     uint32_t size, dimension;

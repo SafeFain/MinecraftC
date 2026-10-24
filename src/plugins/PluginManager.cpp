@@ -515,7 +515,7 @@ void PluginManager::validateContent() {
     validateCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
         const auto& d=entry.second;
-        if(entry.first!=0){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
+        if(entry.first!=0&&entry.first!=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
         if(!d.deathTarget.empty())resolveDimension(d.deathTarget);
         if(!d.voidTarget.empty())resolveDimension(d.voidTarget);
     }

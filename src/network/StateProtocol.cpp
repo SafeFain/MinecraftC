@@ -1,3 +1,5 @@
+#include "network/StatusEffectProtocol.h"
+#include "world/BlockEntityLogic.h"
 #include "network/ContentIds.h"
 #include "network/StateProtocol.h"
 #include <cmath>
@@ -70,7 +72,7 @@ void stateValid(const AuthorityState& state) {
         state.dayDuration < 1 || state.health < 0 || state.health > 20 || state.hunger > 20 ||
         state.saturation < 0 || state.saturation > 20 || state.exhaustion < 0 || state.exhaustion > 40)
         throw ProtocolError("Invalid authority state");
-    if (state.window.kind > InventoryWindowKind::Container || (state.window.container && state.window.container->type > BlockEntityType::Furnace))
+    if (state.window.kind > InventoryWindowKind::Container || (state.window.container && !isInventoryContainer(state.window.container->type)))
         throw ProtocolError("Invalid inventory window");
     std::set<uint64_t> rosterIds;
     Writer names;
@@ -149,7 +151,7 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
     for (const auto& stack : state.inventory.storage()) writeStack(writer, stack);
     for (const auto& stack : state.inventory.armor()) writeStack(writer, stack);
     writeStack(writer, state.inventory.offhand());
-    writer.f32(state.health); writer.u8(state.hunger); writer.f32(state.saturation); writer.f32(state.exhaustion); writer.u32(state.foodTimer);
+    writer.f32(state.health); writer.u8(state.hunger); writer.f32(state.saturation); writer.f32(state.exhaustion); writer.u32(state.foodTimer);writeStatusEffects(writer,state.effects);
     writer.u64(state.actionAcknowledged); writer.u64(state.window.id); writer.u8(static_cast<uint8_t>(state.window.kind));
     for (int i = 0; i < 3; ++i) writer.u32(static_cast<uint32_t>(state.window.position[i]));
     writer.u64(state.window.containerRevision); writer.u8(state.window.container.has_value());
@@ -186,7 +188,7 @@ AuthorityState decodeAuthorityState(const Bytes& bytes) {
     for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) state.inventory.slot(i) = readStack(reader);
     for (auto& stack : state.inventory.armor()) stack = readStack(reader);
     state.inventory.offhand() = readStack(reader);
-    state.health = reader.f32(); state.hunger = reader.u8(); state.saturation = reader.f32(); state.exhaustion = reader.f32(); state.foodTimer = reader.u32();
+    state.health = reader.f32(); state.hunger = reader.u8(); state.saturation = reader.f32(); state.exhaustion = reader.f32(); state.foodTimer = reader.u32();state.effects=readStatusEffects(reader);
     state.actionAcknowledged = reader.u64(); state.window.id = reader.u64(); state.window.kind = static_cast<InventoryWindowKind>(reader.u8());
     for (int i = 0; i < 3; ++i) state.window.position[i] = static_cast<int32_t>(reader.u32());
     state.window.containerRevision = reader.u64();

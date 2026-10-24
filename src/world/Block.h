@@ -1,6 +1,8 @@
 #pragma once
+#include "world/NetherContent.h"
 
 #include <cstdint>
+#include <algorithm>
 #include <string>
 #include <array>
 #include <filesystem>
@@ -275,7 +277,19 @@ enum class BlockId : uint16_t {
     // 64 states per door: facing, hinge, open, powered, half.
     DOOR_FIRST = 279,
     BUTTON_FIRST = DOOR_FIRST + 7 * 64,
-    COUNT = BUTTON_FIRST + 7 * 24,
+    BUTTON_END = BUTTON_FIRST + 7 * 24,
+    NETHER_FIRST = BUTTON_END,
+#define NETHER_BLOCK_ENUM(id,key,name,r,g,b,shape,light) id,
+    NETHER_BLOCK_SENTINEL = NETHER_FIRST - 1,
+    MC_NETHER_BLOCKS(NETHER_BLOCK_ENUM)
+#undef NETHER_BLOCK_ENUM
+    NETHER_DOOR_FIRST,
+    NETHER_BUTTON_FIRST = NETHER_DOOR_FIRST + 2 * 64,
+    NETHER_ARCH_FIRST = NETHER_BUTTON_FIRST + 2 * 24,
+    RESPAWN_ANCHOR_CHARGED_1 = NETHER_ARCH_FIRST + 4 * 10,
+    RESPAWN_ANCHOR_CHARGED_2, RESPAWN_ANCHOR_CHARGED_3, RESPAWN_ANCHOR_CHARGED_4,
+    NETHER_WART_CROP_0, NETHER_WART_CROP_1, NETHER_WART_CROP_2,
+    COUNT,
     POPPY        = FLOWER
 };
 
@@ -312,7 +326,7 @@ enum class RenderShape : uint8_t {
 enum class BedPart : uint8_t { Foot, Head };
 enum class BedDirection : uint8_t { North, East, South, West };
 enum class ArchitecturalMaterial : uint8_t {
-    Planks, Cobblestone, Terracotta, Sunstone, Cloudstone, Count
+    Planks, Cobblestone, Terracotta, Sunstone, Cloudstone, Crimson, Warped, NetherBricks, Blackstone, Count
 };
 enum class BlockHalf : uint8_t { Bottom, Top };
 
@@ -463,6 +477,10 @@ enum class BlockTexture : uint16_t {
     SpruceDoorBottom, SpruceDoorTop, JungleDoorBottom, JungleDoorTop,
     AcaciaDoorBottom, AcaciaDoorTop, SkyrootDoorBottom, SkyrootDoorTop,
     IronDoorBottom, IronDoorTop,
+#define NETHER_TEXTURE_ENUM(id,key,label,r,g,b,shape,light) id,
+    MC_NETHER_BLOCKS(NETHER_TEXTURE_ENUM)
+#undef NETHER_TEXTURE_ENUM
+    CrimsonDoorBottom, CrimsonDoorTop, WarpedDoorBottom, WarpedDoorTop,
     Count
 };
 
@@ -577,7 +595,7 @@ extern const std::array<std::array<int, 6>, 6> FACE_INDICES;
 extern const std::array<glm::vec3, 24> WIRE_CUBE_VERTICES;
 
 // State IDs remain in chunk memory and saves, just like beds and stairs.
-enum class DoorMaterial : uint8_t { Oak, Birch, Spruce, Jungle, Acacia, Skyroot, Iron };
+enum class DoorMaterial : uint8_t { Oak, Birch, Spruce, Jungle, Acacia, Skyroot, Iron, Crimson, Warped };
 struct DoorState {
     uint16_t family = 0;
     DoorMaterial material = DoorMaterial::Oak;
@@ -612,3 +630,16 @@ BlockCollisionBoxes blockModelBoxes(BlockId id);
 struct BlockModelFace {BlockCollisionBox box;FaceDir face;};
 std::vector<BlockModelFace> blockModelFaces(BlockId id);
 bool blockSupportsFace(BlockId id, FaceDir face);
+
+inline bool isNetherWart(BlockId id) {
+    return id==BlockId::NETHER_WART||(id>=BlockId::NETHER_WART_CROP_0&&id<=BlockId::NETHER_WART_CROP_2);
+}
+inline int respawnAnchorCharge(BlockId id) {
+    if(id==BlockId::RESPAWN_ANCHOR)return 0;
+    if(id>=BlockId::RESPAWN_ANCHOR_CHARGED_1&&id<=BlockId::RESPAWN_ANCHOR_CHARGED_4)
+        return 1+static_cast<uint16_t>(id)-static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1);
+    return -1;
+}
+inline BlockId respawnAnchorBlock(int charge) {
+    return charge<=0?BlockId::RESPAWN_ANCHOR:static_cast<BlockId>(static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1)+std::min(charge,4)-1);
+}

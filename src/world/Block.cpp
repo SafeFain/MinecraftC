@@ -66,7 +66,11 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "oak_door_bottom", "oak_door_top", "birch_door_bottom", "birch_door_top",
     "spruce_door_bottom", "spruce_door_top", "jungle_door_bottom", "jungle_door_top",
     "acacia_door_bottom", "acacia_door_top", "skyroot_door_bottom", "skyroot_door_top",
-    "iron_door_bottom", "iron_door_top"
+    "iron_door_bottom", "iron_door_top",
+#define NETHER_TEXTURE_NAME(id,key,name,r,g,b,shape,light) key,
+    MC_NETHER_BLOCKS(NETHER_TEXTURE_NAME)
+#undef NETHER_TEXTURE_NAME
+    "crimson_door_bottom","crimson_door_top","warped_door_bottom","warped_door_top"
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -90,6 +94,15 @@ const std::unordered_map<std::string, BlockId>& blockNames() {
                 else if (!key.empty() && key.back() != '_') key.push_back('_');
             }
             result.emplace(key, static_cast<BlockId>(i));
+        }
+#define NETHER_BLOCK_NAME(id,key,label,r,g,b,shape,light) result[key]=BlockId::id;
+        MC_NETHER_BLOCKS(NETHER_BLOCK_NAME)
+#undef NETHER_BLOCK_NAME
+        constexpr const char* names[]={"crimson","warped","nether_brick","blackstone"};
+        for(int i=0;i<4;++i) {
+            const auto material=static_cast<ArchitecturalMaterial>(5+i);
+            result[std::string(names[i])+"_slab"]=slabBlock(material,BlockHalf::Bottom);
+            result[std::string(names[i])+"_stairs"]=stairBlock(material,BlockHalf::Bottom,BedDirection::North);
         }
         result["wood"] = BlockId::WOOD;
         result["planks"] = BlockId::PLANKS;
@@ -429,7 +442,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     {BlockId::JUNGLE_PLANKS, "Jungle Planks", glm::vec3(.68f,.46f,.33f), true, false},
     {BlockId::ACACIA_PLANKS, "Acacia Planks", glm::vec3(.75f,.39f,.22f), true, false},
     }};
-    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "", "Iron"};
+    constexpr const char* names[] = {"Oak", "Birch", "Spruce", "Jungle", "Acacia", "", "Iron", "Crimson", "Warped"};
     for (uint16_t raw = static_cast<uint16_t>(BlockId::DOOR_FIRST);
          raw < static_cast<uint16_t>(BlockId::COUNT); ++raw) {
         const BlockId id = static_cast<BlockId>(raw);
@@ -446,10 +459,37 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
                 glm::vec3(.7f), false, true, RenderShape::Button};
         }
     }
+#define NETHER_PROPERTIES(id,key,label,r,g,b,kind,light) \
+    table[static_cast<size_t>(BlockId::id)] = {BlockId::id, label, glm::vec3(r,g,b), RenderShape::kind == RenderShape::Cube, RenderShape::kind != RenderShape::Cube, RenderShape::kind, RenderShape::kind == RenderShape::Cube ? RenderLayer::Opaque : RenderLayer::Cutout};
+    MC_NETHER_BLOCKS(NETHER_PROPERTIES)
+#undef NETHER_PROPERTIES
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST);raw<static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1);++raw) {
+        ArchitecturalBlockState state;decodeArchitecturalBlock(static_cast<BlockId>(raw),state);
+        const auto& full=table[static_cast<size_t>(architecturalBaseBlock(state.material))];
+        table[raw]={static_cast<BlockId>(raw),full.name+(state.shape==RenderShape::Slab?" Slab State ":" Stairs State ")+std::to_string(raw),full.color,true,true,state.shape,RenderLayer::Opaque};
+    }
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1);raw<=static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_4);++raw) {
+        table[raw]=table[static_cast<size_t>(BlockId::RESPAWN_ANCHOR)];table[raw].id=static_cast<BlockId>(raw);table[raw].name+=" Charge "+std::to_string(raw-static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1)+1);
+    }
+    for(uint16_t raw=static_cast<uint16_t>(BlockId::NETHER_WART_CROP_0);raw<=static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2);++raw) {
+        table[raw]=table[static_cast<size_t>(BlockId::NETHER_WART)];table[raw].id=static_cast<BlockId>(raw);table[raw].name+=" Stage "+std::to_string(raw-static_cast<uint16_t>(BlockId::NETHER_WART_CROP_0));
+    }
+    for (BlockId portal : {BlockId::NETHER_PORTAL_X, BlockId::NETHER_PORTAL_Z}) {
+        auto& p = table[static_cast<size_t>(portal)];
+        p.solid=false;p.transparent=true;p.layer=RenderLayer::Translucent;p.alpha=.65f;
+    }
     return table;
 }();
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    if(respawnAnchorCharge(id)>0)return BlockTexture::RESPAWN_ANCHOR;
+    if(isNetherWart(id))return BlockTexture::NETHER_WART;
+    switch(id) {
+#define NETHER_FACE(id,key,label,r,g,b,shape,light) case BlockId::id: return BlockTexture::id;
+        MC_NETHER_BLOCKS(NETHER_FACE)
+#undef NETHER_FACE
+        default: break;
+    }
     if (const auto* b=Plugins::pluginBlock(id)) {
         const auto found=textureNames().find(b->materials.at(static_cast<size_t>(face)));
         return found==textureNames().end()?BlockTexture::Stone:found->second;
@@ -461,7 +501,7 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     }
     DoorState door; ButtonState button;
     if (decodeDoor(id, door)) return static_cast<BlockTexture>(
-        static_cast<uint16_t>(BlockTexture::OakDoorBottom) +
+        (door.material>=DoorMaterial::Crimson?static_cast<uint16_t>(BlockTexture::CrimsonDoorBottom)-14:static_cast<uint16_t>(BlockTexture::OakDoorBottom)) +
         static_cast<uint8_t>(door.material) * 2 + (door.upper ? 1 : 0));
     if (decodeButton(id, button)) return getFaceTexture(
         button.material == DoorMaterial::Iron ? BlockId::STONE : woodPlanks(button.material), face);
@@ -895,15 +935,12 @@ bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
         state.direction=static_cast<BedDirection>(b->familyKind==MC_SLAB_FAMILY?0:b->stateIndex%4);return true;
     }
     const uint16_t raw = static_cast<uint16_t>(id);
-    if (raw < ARCHITECTURAL_FIRST ||
-        raw >= ARCHITECTURAL_FIRST + ARCHITECTURAL_STRIDE *
-                   static_cast<uint16_t>(ArchitecturalMaterial::Count)) return false;
-    const uint8_t offset = raw - ARCHITECTURAL_FIRST;
-    const uint8_t material = offset / ARCHITECTURAL_STRIDE;
-    const uint8_t local = offset % ARCHITECTURAL_STRIDE;
-    if (material >= static_cast<uint8_t>(ArchitecturalMaterial::Count))
-        return false;
-    state.material = static_cast<ArchitecturalMaterial>(material);
+    const bool native=raw>=static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST)&&raw<static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1);
+    if(!native&&(raw<ARCHITECTURAL_FIRST||raw>=ARCHITECTURAL_FIRST+ARCHITECTURAL_STRIDE*5))return false;
+    const uint16_t offset=native?raw-static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST):raw-ARCHITECTURAL_FIRST;
+    const uint8_t material=static_cast<uint8_t>(offset/ARCHITECTURAL_STRIDE+(native?5:0));
+    const uint8_t local=static_cast<uint8_t>(offset%ARCHITECTURAL_STRIDE);
+    state.material=static_cast<ArchitecturalMaterial>(material);
     if (local < 2) {
         state.shape = RenderShape::Slab;
         state.half = local == 0 ? BlockHalf::Bottom : BlockHalf::Top;
@@ -917,16 +954,18 @@ bool decodeArchitecturalBlock(BlockId id, ArchitecturalBlockState& state) {
 }
 
 BlockId slabBlock(ArchitecturalMaterial material, BlockHalf half) {
-    const uint8_t raw = ARCHITECTURAL_FIRST +
-        static_cast<uint8_t>(material) * ARCHITECTURAL_STRIDE +
+    const uint16_t index=static_cast<uint8_t>(material);
+    const uint16_t raw = (index>=5?static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST):ARCHITECTURAL_FIRST) +
+        (index>=5?index-5:index) * ARCHITECTURAL_STRIDE +
         (half == BlockHalf::Top ? 1 : 0);
     return static_cast<BlockId>(raw);
 }
 
 BlockId stairBlock(ArchitecturalMaterial material, BlockHalf half,
                    BedDirection direction) {
-    const uint8_t raw = ARCHITECTURAL_FIRST +
-        static_cast<uint8_t>(material) * ARCHITECTURAL_STRIDE + 2 +
+    const uint16_t index=static_cast<uint8_t>(material);
+    const uint16_t raw = (index>=5?static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST):ARCHITECTURAL_FIRST) +
+        (index>=5?index-5:index) * ARCHITECTURAL_STRIDE + 2 +
         (half == BlockHalf::Top ? 4 : 0) + static_cast<uint8_t>(direction);
     return static_cast<BlockId>(raw);
 }
@@ -938,6 +977,10 @@ BlockId architecturalBaseBlock(ArchitecturalMaterial material) {
         case ArchitecturalMaterial::Terracotta: return BlockId::TERRACOTTA;
         case ArchitecturalMaterial::Sunstone: return BlockId::SUNSTONE;
         case ArchitecturalMaterial::Cloudstone: return BlockId::CLOUDSTONE;
+        case ArchitecturalMaterial::Crimson:return BlockId::CRIMSON_PLANKS;
+        case ArchitecturalMaterial::Warped:return BlockId::WARPED_PLANKS;
+        case ArchitecturalMaterial::NetherBricks:return BlockId::NETHER_BRICKS;
+        case ArchitecturalMaterial::Blackstone:return BlockId::BLACKSTONE_BRICKS;
         default: return BlockId::PLANKS;
     }
 }
@@ -1040,6 +1083,13 @@ bool isLava(BlockId id) {
 }
 
 uint8_t getLightEmission(BlockId id) {
+    if(respawnAnchorCharge(id)>0)return static_cast<uint8_t>(respawnAnchorCharge(id)*4-1);
+    switch(id) {
+#define NETHER_LIGHT(id,key,label,r,g,b,shape,light) case BlockId::id: return light;
+        MC_NETHER_BLOCKS(NETHER_LIGHT)
+#undef NETHER_LIGHT
+        default: break;
+    }
     if (const auto* block = Plugins::pluginBlock(id)) return block->emission;
     if (id == BlockId::TORCH) return 14;
     if (id == BlockId::GLOW_FERN) return 4;
@@ -1059,9 +1109,11 @@ uint32_t blockSemanticTags(BlockId id) {
     return tags;
 }
 bool hasNaturalRockTag(BlockId id){return (blockSemanticTags(id)&MC_TAG_NATURAL_ROCK)!=0;}
-bool isSemanticPlant(BlockId id){if(const auto* b=Plugins::blockBehavior(id))return ((b->fields&MC_BLOCK_TAGS)&&(b->tags&MC_TAG_PLANT))||(b->fields&MC_BLOCK_SUBSTRATE)!=0;return false;}
+bool isSemanticPlant(BlockId id){if(isNetherWart(id)||(id>=BlockId::CRIMSON_FUNGUS&&id<=BlockId::NETHER_WART))return true;if(const auto* b=Plugins::blockBehavior(id))return ((b->fields&MC_BLOCK_TAGS)&&(b->tags&MC_TAG_PLANT))||(b->fields&MC_BLOCK_SUBSTRATE)!=0;return false;}
 bool isLeafBlock(BlockId id){return (blockSemanticTags(id)&MC_TAG_LEAVES)!=0;}
 std::optional<bool> semanticPlantSupport(BlockId plant,BlockId soil){
+    if(isNetherWart(plant))return soil==BlockId::SOUL_SAND;
+    if(plant>=BlockId::CRIMSON_FUNGUS&&plant<=BlockId::TWISTING_VINES)return soil==BlockId::CRIMSON_NYLIUM||soil==BlockId::WARPED_NYLIUM||soil==BlockId::NETHERRACK||soil==plant;
     if(const auto* b=Plugins::blockBehavior(plant))if(b->fields&MC_BLOCK_SUBSTRATE)return (blockSemanticTags(soil)&b->substrate)!=0;
     return {};
 }
@@ -1179,6 +1231,8 @@ bool isReplaceableByFluid(BlockId id) {
 uint8_t fireEncouragement(BlockId id) {
     if(const auto* b=Plugins::blockBehavior(id))return static_cast<uint8_t>(b->encouragement);
     DoorState door; ButtonState button;
+    if((decodeDoor(id,door)&&!door.family&&door.material>=DoorMaterial::Crimson)||
+       (decodeButton(id,button)&&!button.family&&button.material>=DoorMaterial::Crimson))return 0;
     if((decodeDoor(id,door) && !door.family && door.material!=DoorMaterial::Iron) ||
        (decodeButton(id,button) && !button.family && button.material!=DoorMaterial::Iron) ||
        (id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS))return 5;
@@ -1324,10 +1378,11 @@ bool decodeDoor(BlockId id, DoorState& state) {
         state.material=DoorMaterial::Oak;return true;
     }
     const uint16_t raw = static_cast<uint16_t>(id);
-    const uint16_t first = static_cast<uint16_t>(BlockId::DOOR_FIRST);
-    if (raw < first || raw >= static_cast<uint16_t>(BlockId::BUTTON_FIRST)) return false;
-    const uint16_t offset = raw-first;
-    state.material = static_cast<DoorMaterial>(offset/64);
+    const bool native=raw>=static_cast<uint16_t>(BlockId::NETHER_DOOR_FIRST)&&raw<static_cast<uint16_t>(BlockId::NETHER_BUTTON_FIRST);
+    const uint16_t first=native?static_cast<uint16_t>(BlockId::NETHER_DOOR_FIRST):static_cast<uint16_t>(BlockId::DOOR_FIRST);
+    if(!native&&(raw<first||raw>=static_cast<uint16_t>(BlockId::BUTTON_FIRST)))return false;
+    const uint16_t offset=raw-first;
+    state.material=static_cast<DoorMaterial>(offset/64+(native?7:0));
     state.direction = static_cast<BedDirection>(offset%4);
     state.rightHinge = (offset & 4) != 0;
     state.open = (offset & 8) != 0;
@@ -1337,8 +1392,9 @@ bool decodeDoor(BlockId id, DoorState& state) {
 }
 BlockId doorBlock(const DoorState& s) {
     if(s.family)return static_cast<BlockId>(s.family+static_cast<uint8_t>(s.direction)+(s.rightHinge?4:0)+(s.open?8:0)+(s.powered?16:0)+(s.upper?32:0));
-    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::DOOR_FIRST) +
-        static_cast<uint8_t>(s.material)*64 + static_cast<uint8_t>(s.direction) +
+    const auto material=static_cast<uint8_t>(s.material);
+    return static_cast<BlockId>((material>=7?static_cast<uint16_t>(BlockId::NETHER_DOOR_FIRST):static_cast<uint16_t>(BlockId::DOOR_FIRST)) +
+        (material>=7?material-7:material)*64 + static_cast<uint8_t>(s.direction) +
         (s.rightHinge?4:0) + (s.open?8:0) + (s.powered?16:0) + (s.upper?32:0));
 }
 bool decodeButton(BlockId id, ButtonState& state) {
@@ -1349,10 +1405,12 @@ bool decodeButton(BlockId id, ButtonState& state) {
         state.attachment=static_cast<FaceDir>((b->stateIndex%12)/2);state.pressed=b->stateIndex%2;
         state.direction=static_cast<BedDirection>(b->stateIndex/12);return true;
     }
-    const uint16_t raw = static_cast<uint16_t>(id), first = static_cast<uint16_t>(BlockId::BUTTON_FIRST);
-    if (raw < first || raw >= static_cast<uint16_t>(BlockId::COUNT)) return false;
-    const uint16_t offset = raw-first;
-    state.material = static_cast<DoorMaterial>(offset/24);
+    const uint16_t raw=static_cast<uint16_t>(id);
+    const bool native=raw>=static_cast<uint16_t>(BlockId::NETHER_BUTTON_FIRST)&&raw<static_cast<uint16_t>(BlockId::NETHER_ARCH_FIRST);
+    const uint16_t first=native?static_cast<uint16_t>(BlockId::NETHER_BUTTON_FIRST):static_cast<uint16_t>(BlockId::BUTTON_FIRST);
+    if(!native&&(raw<first||raw>=static_cast<uint16_t>(BlockId::BUTTON_END)))return false;
+    const uint16_t offset=raw-first;
+    state.material=static_cast<DoorMaterial>(offset/24+(native?7:0));
     state.attachment = static_cast<FaceDir>((offset%12)/2);
     state.pressed = (offset%2)!=0;
     state.direction = static_cast<BedDirection>((offset%24)/12);
@@ -1361,8 +1419,9 @@ bool decodeButton(BlockId id, ButtonState& state) {
 BlockId buttonBlock(const ButtonState& s) {
     if(s.family)return static_cast<BlockId>(s.family+(static_cast<uint8_t>(s.direction)%2)*12+static_cast<uint8_t>(s.attachment)*2+(s.pressed?1:0));
     // Horizontal orientation matters only on floor/ceiling: north-south or east-west.
-    return static_cast<BlockId>(static_cast<uint16_t>(BlockId::BUTTON_FIRST) +
-        static_cast<uint8_t>(s.material)*24 + (static_cast<uint8_t>(s.direction)%2)*12 +
+    const auto material=static_cast<uint8_t>(s.material);
+    return static_cast<BlockId>((material>=7?static_cast<uint16_t>(BlockId::NETHER_BUTTON_FIRST):static_cast<uint16_t>(BlockId::BUTTON_FIRST)) +
+        (material>=7?material-7:material)*24 + (static_cast<uint8_t>(s.direction)%2)*12 +
         static_cast<uint8_t>(s.attachment)*2 + (s.pressed?1:0));
 }
 glm::ivec3 faceOffset(FaceDir face) {
@@ -1375,7 +1434,7 @@ glm::ivec3 faceOffset(FaceDir face) {
 }
 BlockId woodPlanks(DoorMaterial material) {
     constexpr BlockId woods[] = {BlockId::PLANKS, BlockId::BIRCH_PLANKS, BlockId::SPRUCE_PLANKS,
-        BlockId::JUNGLE_PLANKS, BlockId::ACACIA_PLANKS, BlockId::SKYROOT_PLANKS, BlockId::STONE};
+        BlockId::JUNGLE_PLANKS, BlockId::ACACIA_PLANKS, BlockId::SKYROOT_PLANKS, BlockId::STONE, BlockId::CRIMSON_PLANKS, BlockId::WARPED_PLANKS};
     return woods[static_cast<uint8_t>(material)];
 }
 BlockCollisionBoxes blockSelectionBoxes(BlockId id) {

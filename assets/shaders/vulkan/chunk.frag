@@ -20,7 +20,7 @@ struct MaterialSequence { uvec4 parameters; uint slots[64]; };
 layout(std430,set=0,binding=3) readonly buffer MaterialSequences { MaterialSequence sequences[]; };
 layout(set=1,binding=0) uniform ChunkEnvironment {
     vec4 cameraPosition;
-    vec4 lightDirection;
+    vec4 lightDirection; // xyz: direct-light direction; w: dimension ambient visibility floor
     vec4 directColorIntensity;
     vec4 ambientColorIntensity;
     vec4 fogColorDistance;
@@ -334,7 +334,7 @@ void main() {
     }
     float visibility=shadowVisibility(worldPosition,normal)*cloudShadow;
     vec3 illumination=environment.ambientColorIntensity.rgb*
-        environment.ambientColorIntensity.a*skyLight*0.72;
+        environment.ambientColorIntensity.a*max(skyLight,environment.lightDirection.w)*0.72;
     illumination+=environment.directColorIntensity.rgb*
         environment.directColorIntensity.a*diffuse*skyLight*0.52*visibility;
     if(leafSurface&&environment.visualParams.y>0.001){
@@ -407,7 +407,7 @@ void main() {
     float fog=1.0-exp(-3.0*fogCoordinate*fogCoordinate);
     vec3 localFog=mix(environment.ambientColorIntensity.rgb*
         environment.ambientColorIntensity.a*0.34,
-        environment.fogColorDistance.rgb,skyLight);
+        environment.fogColorDistance.rgb,environment.lightDirection.w>0.0?1.0:skyLight);
     color=mix(color,localFog,fog);
     outColor=vec4(color,texel.a*frame.tint.a);
     float signedDistance=isWater?-distanceToCamera:distanceToCamera;

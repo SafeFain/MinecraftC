@@ -2,6 +2,7 @@
 
 #include "entity/EntityLogic.h"
 #include "game/VillagerTrade.h"
+#include "game/StatusEffects.h"
 
 // Presentation data only. Navigation, worker state and persistence are never reconstructed. Replicated
 // IDs address visual instances only.
@@ -17,6 +18,9 @@ struct EntitySnapshot {
     VillagerData villager;
     std::string pluginState="{}";
     uint32_t pluginStateVersion=0;
+    NetherMobState nether;
+    std::vector<ActiveStatusEffect> effects;
+    uint64_t riderId=UINT64_MAX;
 };
 struct EntityDeathSnapshot {
     uint64_t id = 0;

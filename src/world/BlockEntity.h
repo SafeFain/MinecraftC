@@ -6,7 +6,10 @@
 
 #include "game/InventoryModel.h"
 
-enum class BlockEntityType : uint8_t { Chest = 0, Furnace = 1, Button = 2, Resource = 3 };
+enum class BlockEntityType : uint8_t {
+    Chest = 0, Furnace = 1, Button = 2, Resource = 3,
+    BrewingStand = 4, SmithingTable = 5, Spawner = 6
+};
 
 struct BlockEntity {
     BlockEntityType type = BlockEntityType::Chest;

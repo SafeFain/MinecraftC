@@ -35,7 +35,7 @@ and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
 | Topic | Guide |
 |---|---|
 | Build and install | [Desktop and mobile setup](docs/building.md) |
-| Gameplay | [Features](docs/project-features.md), [commands and saves](docs/saves-and-commands.md), [game rules](docs/game-rules.md) |
+| Gameplay | [Built-in Nether](docs/nether.md), [Features](docs/project-features.md), [commands and saves](docs/saves-and-commands.md), [game rules](docs/game-rules.md) |
 | Multiplayer | [LAN setup and compatibility](docs/lan-multiplayer.md) |
 | Plugins | [Install and manage](docs/plugins.md), [develop a plugin](docs/plugin-development.md) |
 | Contributing | [Development and validation](docs/development.md), [asset authoring](ASSET_PIPELINE.md) |
@@ -45,8 +45,8 @@ and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
 
 ## World compatibility
 
-Opening a world requires save format **v21** and global generation **v20**
-(Heaven **v9**). Older/future versions remain listed as incompatible. Gameplay
+Opening a world requires save format **v22** and global generation **v21**
+(native Nether **v1**, optional Heaven **v9**). Older/future versions remain listed as incompatible. Gameplay
 plugin changes require review and explicit local recovery; a full backup is
 retained by default, and entering without one permanently discards removed content.
 LAN requires matching gameplay plugins. See [compatibility and recovery](docs/saves-and-commands.md).

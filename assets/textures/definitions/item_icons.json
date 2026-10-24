@@ -49,7 +49,11 @@
     "fishing_rod": {},
     "fish": {},
     "door": {},
-    "button": {}
+    "button": {},
+    "potion": {},
+    "splash_potion": {},
+    "empty_bottle": {},
+    "smithing_template": {}
   },
   "handle_palette": [
     [
@@ -1070,6 +1074,512 @@
         213,
         172,
         118
+      ]
+    ],
+    "netherite": [
+      [
+        68,
+        56,
+        66
+      ],
+      [
+        68,
+        56,
+        66
+      ],
+      [
+        68,
+        56,
+        66
+      ],
+      [
+        68,
+        56,
+        66
+      ]
+    ],
+    "quartz": [
+      [
+        229,
+        212,
+        192
+      ],
+      [
+        229,
+        212,
+        192
+      ],
+      [
+        229,
+        212,
+        192
+      ],
+      [
+        229,
+        212,
+        192
+      ]
+    ],
+    "brewing_glass": [
+      [
+        126,
+        175,
+        210
+      ],
+      [
+        126,
+        175,
+        210
+      ],
+      [
+        126,
+        175,
+        210
+      ],
+      [
+        126,
+        175,
+        210
+      ]
+    ],
+    "fire_resistance": [
+      [
+        224,
+        130,
+        32
+      ],
+      [
+        224,
+        130,
+        32
+      ],
+      [
+        224,
+        130,
+        32
+      ],
+      [
+        224,
+        130,
+        32
+      ]
+    ],
+    "strength": [
+      [
+        159,
+        37,
+        30
+      ],
+      [
+        159,
+        37,
+        30
+      ],
+      [
+        159,
+        37,
+        30
+      ],
+      [
+        159,
+        37,
+        30
+      ]
+    ],
+    "regeneration": [
+      [
+        218,
+        81,
+        163
+      ],
+      [
+        218,
+        81,
+        163
+      ],
+      [
+        218,
+        81,
+        163
+      ],
+      [
+        218,
+        81,
+        163
+      ]
+    ],
+    "healing": [
+      [
+        245,
+        47,
+        64
+      ],
+      [
+        245,
+        47,
+        64
+      ],
+      [
+        245,
+        47,
+        64
+      ],
+      [
+        245,
+        47,
+        64
+      ]
+    ],
+    "harming": [
+      [
+        82,
+        38,
+        107
+      ],
+      [
+        82,
+        38,
+        107
+      ],
+      [
+        82,
+        38,
+        107
+      ],
+      [
+        82,
+        38,
+        107
+      ]
+    ],
+    "weakness": [
+      [
+        89,
+        92,
+        84
+      ],
+      [
+        89,
+        92,
+        84
+      ],
+      [
+        89,
+        92,
+        84
+      ],
+      [
+        89,
+        92,
+        84
+      ]
+    ],
+    "redstone": [
+      [
+        193,
+        34,
+        28
+      ],
+      [
+        193,
+        34,
+        28
+      ],
+      [
+        193,
+        34,
+        28
+      ],
+      [
+        193,
+        34,
+        28
+      ]
+    ],
+    "crimson_wood": [
+      [
+        114,
+        48,
+        73
+      ],
+      [
+        114,
+        48,
+        73
+      ],
+      [
+        114,
+        48,
+        73
+      ],
+      [
+        114,
+        48,
+        73
+      ]
+    ],
+    "warped_wood": [
+      [
+        40,
+        107,
+        102
+      ],
+      [
+        40,
+        107,
+        102
+      ],
+      [
+        40,
+        107,
+        102
+      ],
+      [
+        40,
+        107,
+        102
+      ]
+    ],
+    "ghast_egg": [
+      [
+        101,
+        99,
+        95
+      ],
+      [
+        157,
+        154,
+        149
+      ],
+      [
+        225,
+        220,
+        213
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "blaze_egg": [
+      [
+        103,
+        74,
+        18
+      ],
+      [
+        161,
+        115,
+        29
+      ],
+      [
+        231,
+        165,
+        42
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "wither_skeleton_egg": [
+      [
+        21,
+        19,
+        21
+      ],
+      [
+        32,
+        30,
+        33
+      ],
+      [
+        47,
+        43,
+        48
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "magma_cube_egg": [
+      [
+        47,
+        12,
+        5
+      ],
+      [
+        73,
+        19,
+        9
+      ],
+      [
+        105,
+        28,
+        13
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "piglin_egg": [
+      [
+        84,
+        56,
+        42
+      ],
+      [
+        130,
+        87,
+        66
+      ],
+      [
+        187,
+        125,
+        95
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "piglin_brute_egg": [
+      [
+        70,
+        44,
+        31
+      ],
+      [
+        109,
+        69,
+        48
+      ],
+      [
+        156,
+        99,
+        69
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "zombified_piglin_egg": [
+      [
+        53,
+        66,
+        40
+      ],
+      [
+        83,
+        103,
+        63
+      ],
+      [
+        119,
+        148,
+        91
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "hoglin_egg": [
+      [
+        76,
+        44,
+        31
+      ],
+      [
+        118,
+        69,
+        48
+      ],
+      [
+        170,
+        99,
+        69
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "zoglin_egg": [
+      [
+        56,
+        62,
+        40
+      ],
+      [
+        88,
+        96,
+        63
+      ],
+      [
+        126,
+        138,
+        91
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "strider_egg": [
+      [
+        82,
+        22,
+        22
+      ],
+      [
+        128,
+        34,
+        35
+      ],
+      [
+        183,
+        49,
+        51
+      ],
+      [
+        246,
+        177,
+        56
+      ]
+    ],
+    "enderman_egg": [
+      [
+        14,
+        10,
+        18
+      ],
+      [
+        23,
+        16,
+        28
+      ],
+      [
+        33,
+        24,
+        40
+      ],
+      [
+        246,
+        177,
+        56
       ]
     ]
   },
@@ -2268,6 +2778,575 @@
       "generator": "item_sprite",
       "template": "button",
       "material": "stone"
+    },
+    "netherrack": {
+      "generator": "block_item_icon",
+      "block": "netherrack"
+    },
+    "soul_sand": {
+      "generator": "block_item_icon",
+      "block": "soul_sand"
+    },
+    "soul_soil": {
+      "generator": "block_item_icon",
+      "block": "soul_soil"
+    },
+    "blackstone": {
+      "generator": "block_item_icon",
+      "block": "blackstone"
+    },
+    "crimson_nylium": {
+      "generator": "block_item_icon",
+      "block": "crimson_nylium"
+    },
+    "warped_nylium": {
+      "generator": "block_item_icon",
+      "block": "warped_nylium"
+    },
+    "crimson_stem": {
+      "generator": "block_item_icon",
+      "block": "crimson_stem"
+    },
+    "warped_stem": {
+      "generator": "block_item_icon",
+      "block": "warped_stem"
+    },
+    "crimson_planks": {
+      "generator": "block_item_icon",
+      "block": "crimson_planks"
+    },
+    "warped_planks": {
+      "generator": "block_item_icon",
+      "block": "warped_planks"
+    },
+    "nether_wart_block": {
+      "generator": "block_item_icon",
+      "block": "nether_wart_block"
+    },
+    "warped_wart_block": {
+      "generator": "block_item_icon",
+      "block": "warped_wart_block"
+    },
+    "shroomlight": {
+      "generator": "block_item_icon",
+      "block": "shroomlight"
+    },
+    "glowstone": {
+      "generator": "block_item_icon",
+      "block": "glowstone"
+    },
+    "nether_quartz_ore": {
+      "generator": "block_item_icon",
+      "block": "nether_quartz_ore"
+    },
+    "nether_gold_ore": {
+      "generator": "block_item_icon",
+      "block": "nether_gold_ore"
+    },
+    "ancient_debris": {
+      "generator": "block_item_icon",
+      "block": "ancient_debris"
+    },
+    "nether_bricks": {
+      "generator": "block_item_icon",
+      "block": "nether_bricks"
+    },
+    "red_nether_bricks": {
+      "generator": "block_item_icon",
+      "block": "red_nether_bricks"
+    },
+    "polished_blackstone": {
+      "generator": "block_item_icon",
+      "block": "polished_blackstone"
+    },
+    "blackstone_bricks": {
+      "generator": "block_item_icon",
+      "block": "blackstone_bricks"
+    },
+    "crying_obsidian": {
+      "generator": "block_item_icon",
+      "block": "crying_obsidian"
+    },
+    "magma_block": {
+      "generator": "block_item_icon",
+      "block": "magma_block"
+    },
+    "crimson_fungus": {
+      "generator": "block_item_icon",
+      "block": "crimson_fungus"
+    },
+    "warped_fungus": {
+      "generator": "block_item_icon",
+      "block": "warped_fungus"
+    },
+    "crimson_roots": {
+      "generator": "block_item_icon",
+      "block": "crimson_roots"
+    },
+    "warped_roots": {
+      "generator": "block_item_icon",
+      "block": "warped_roots"
+    },
+    "nether_sprouts": {
+      "generator": "block_item_icon",
+      "block": "nether_sprouts"
+    },
+    "weeping_vines": {
+      "generator": "block_item_icon",
+      "block": "weeping_vines"
+    },
+    "twisting_vines": {
+      "generator": "block_item_icon",
+      "block": "twisting_vines"
+    },
+    "nether_wart": {
+      "generator": "block_item_icon",
+      "block": "nether_wart"
+    },
+    "soul_fire": {
+      "generator": "block_item_icon",
+      "block": "soul_fire"
+    },
+    "nether_portal_x": {
+      "generator": "block_item_icon",
+      "block": "nether_portal_x"
+    },
+    "nether_portal_z": {
+      "generator": "block_item_icon",
+      "block": "nether_portal_z"
+    },
+    "respawn_anchor": {
+      "generator": "block_item_icon",
+      "block": "respawn_anchor"
+    },
+    "blaze_spawner": {
+      "generator": "block_item_icon",
+      "block": "blaze_spawner"
+    },
+    "magma_spawner": {
+      "generator": "block_item_icon",
+      "block": "magma_spawner"
+    },
+    "bone_block": {
+      "generator": "block_item_icon",
+      "block": "bone_block"
+    },
+    "quartz": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "quartz"
+    },
+    "gold_nugget": {
+      "generator": "item_sprite",
+      "template": "ingot",
+      "material": "gold"
+    },
+    "nether_brick": {
+      "generator": "item_sprite",
+      "template": "brick",
+      "material": "brick"
+    },
+    "netherite_scrap": {
+      "generator": "item_sprite",
+      "template": "ingot",
+      "material": "netherite"
+    },
+    "netherite_ingot": {
+      "generator": "item_sprite",
+      "template": "ingot",
+      "material": "netherite"
+    },
+    "netherite_upgrade_template": {
+      "generator": "item_sprite",
+      "template": "smithing_template",
+      "material": "netherite"
+    },
+    "glowstone_dust": {
+      "generator": "item_sprite",
+      "template": "gunpowder",
+      "material": "gold"
+    },
+    "blaze_rod": {
+      "generator": "item_sprite",
+      "template": "stick",
+      "material": "gold"
+    },
+    "blaze_powder": {
+      "generator": "item_sprite",
+      "template": "gunpowder",
+      "material": "gold"
+    },
+    "ghast_tear": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "quartz"
+    },
+    "magma_cream": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "gold"
+    },
+    "ender_pearl": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "diamond"
+    },
+    "wither_skeleton_skull": {
+      "generator": "item_sprite",
+      "template": "bone",
+      "material": "netherite"
+    },
+    "saddle": {
+      "generator": "item_sprite",
+      "template": "leather",
+      "material": "leather"
+    },
+    "warped_fungus_on_a_stick": {
+      "generator": "item_sprite",
+      "template": "fishing_rod",
+      "material": "diamond"
+    },
+    "glass_bottle": {
+      "generator": "item_sprite",
+      "template": "empty_bottle",
+      "material": "brewing_glass"
+    },
+    "water_bottle": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "brewing_glass"
+    },
+    "awkward_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "brewing_glass"
+    },
+    "sugar": {
+      "generator": "item_sprite",
+      "template": "gunpowder",
+      "material": "quartz"
+    },
+    "spider_eye": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "redstone"
+    },
+    "fermented_spider_eye": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "rotten"
+    },
+    "glistering_melon": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "gold"
+    },
+    "redstone_dust": {
+      "generator": "item_sprite",
+      "template": "gunpowder",
+      "material": "redstone"
+    },
+    "apple": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "redstone"
+    },
+    "golden_apple": {
+      "generator": "item_sprite",
+      "template": "food",
+      "material": "gold"
+    },
+    "netherite_pickaxe": {
+      "generator": "item_sprite",
+      "template": "pickaxe",
+      "material": "netherite"
+    },
+    "netherite_axe": {
+      "generator": "item_sprite",
+      "template": "axe",
+      "material": "netherite"
+    },
+    "netherite_shovel": {
+      "generator": "item_sprite",
+      "template": "shovel",
+      "material": "netherite"
+    },
+    "netherite_hoe": {
+      "generator": "item_sprite",
+      "template": "hoe",
+      "material": "netherite"
+    },
+    "netherite_sword": {
+      "generator": "item_sprite",
+      "template": "sword",
+      "material": "netherite"
+    },
+    "netherite_helmet": {
+      "generator": "item_sprite",
+      "template": "helmet",
+      "material": "netherite"
+    },
+    "netherite_chestplate": {
+      "generator": "item_sprite",
+      "template": "chestplate",
+      "material": "netherite"
+    },
+    "netherite_leggings": {
+      "generator": "item_sprite",
+      "template": "leggings",
+      "material": "netherite"
+    },
+    "netherite_boots": {
+      "generator": "item_sprite",
+      "template": "boots",
+      "material": "netherite"
+    },
+    "fire_resistance_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "fire_resistance"
+    },
+    "long_fire_resistance_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "fire_resistance"
+    },
+    "strength_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "strength"
+    },
+    "long_strength_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "strength"
+    },
+    "strong_strength_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "strength"
+    },
+    "regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "regeneration"
+    },
+    "long_regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "regeneration"
+    },
+    "strong_regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "regeneration"
+    },
+    "healing_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "healing"
+    },
+    "strong_healing_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "healing"
+    },
+    "harming_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "harming"
+    },
+    "strong_harming_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "harming"
+    },
+    "weakness_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "weakness"
+    },
+    "long_weakness_potion": {
+      "generator": "item_sprite",
+      "template": "potion",
+      "material": "weakness"
+    },
+    "splash_fire_resistance_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "fire_resistance"
+    },
+    "splash_long_fire_resistance_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "fire_resistance"
+    },
+    "splash_strength_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "strength"
+    },
+    "splash_long_strength_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "strength"
+    },
+    "splash_strong_strength_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "strength"
+    },
+    "splash_regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "regeneration"
+    },
+    "splash_long_regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "regeneration"
+    },
+    "splash_strong_regeneration_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "regeneration"
+    },
+    "splash_healing_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "healing"
+    },
+    "splash_strong_healing_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "healing"
+    },
+    "splash_harming_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "harming"
+    },
+    "splash_strong_harming_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "harming"
+    },
+    "splash_weakness_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "weakness"
+    },
+    "splash_long_weakness_potion": {
+      "generator": "item_sprite",
+      "template": "splash_potion",
+      "material": "weakness"
+    },
+    "crimson_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "crimson_wood"
+    },
+    "crimson_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "crimson_wood"
+    },
+    "warped_door": {
+      "generator": "item_sprite",
+      "template": "door",
+      "material": "warped_wood"
+    },
+    "warped_button": {
+      "generator": "item_sprite",
+      "template": "button",
+      "material": "warped_wood"
+    },
+    "crimson_slab": {
+      "generator": "block_item_icon",
+      "block": "crimson_slab"
+    },
+    "crimson_stairs": {
+      "generator": "block_item_icon",
+      "block": "crimson_stairs"
+    },
+    "warped_slab": {
+      "generator": "block_item_icon",
+      "block": "warped_slab"
+    },
+    "warped_stairs": {
+      "generator": "block_item_icon",
+      "block": "warped_stairs"
+    },
+    "nether_brick_slab": {
+      "generator": "block_item_icon",
+      "block": "nether_brick_slab"
+    },
+    "nether_brick_stairs": {
+      "generator": "block_item_icon",
+      "block": "nether_brick_stairs"
+    },
+    "blackstone_slab": {
+      "generator": "block_item_icon",
+      "block": "blackstone_slab"
+    },
+    "blackstone_stairs": {
+      "generator": "block_item_icon",
+      "block": "blackstone_stairs"
+    },
+    "ghast_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "ghast_egg"
+    },
+    "blaze_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "blaze_egg"
+    },
+    "wither_skeleton_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "wither_skeleton_egg"
+    },
+    "magma_cube_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "magma_cube_egg"
+    },
+    "piglin_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "piglin_egg"
+    },
+    "piglin_brute_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "piglin_brute_egg"
+    },
+    "zombified_piglin_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "zombified_piglin_egg"
+    },
+    "hoglin_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "hoglin_egg"
+    },
+    "zoglin_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "zoglin_egg"
+    },
+    "strider_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "strider_egg"
+    },
+    "enderman_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "enderman_egg"
     }
   },
   "documentation": {

@@ -20,9 +20,9 @@ inline constexpr std::array<glm::ivec3, 4> FLUID_HORIZONTAL_OFFSETS{{
     {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1}
 }};
 
-inline uint8_t fluidHorizontalDecay(bool lava) { return lava ? 2 : 1; }
-inline uint64_t fluidTickDelay(bool lava) { return lava ? 30u : 5u; }
-inline int fluidSlopeFindDistance(bool lava) { return lava ? 2 : 4; }
+inline uint8_t fluidHorizontalDecay(bool lava, bool ultrawarm=false) { return lava && !ultrawarm ? 2 : 1; }
+inline uint64_t fluidTickDelay(bool lava, bool ultrawarm=false) { return lava ? (ultrawarm ? 10u : 30u) : 5u; }
+inline int fluidSlopeFindDistance(bool lava, bool ultrawarm=false) { return lava && !ultrawarm ? 2 : 4; }
 inline bool fluidCanConvertToSource(bool lava) { return !lava; }
 
 inline uint64_t fluidSpreadDelay(bool lava, BlockId oldBlock, BlockId newBlock,
@@ -110,11 +110,11 @@ inline int fluidSlopeDistanceByAmount(const glm::ivec3& origin, bool lava,
                                       uint8_t amount, int depth,
                                       int blockedDirection,
                                       const Sample& sample,
-                                      const Available& available) {
+                                      const Available& available, bool ultrawarm=false) {
     constexpr int unreachable = 1000;
-    if (depth >= fluidSlopeFindDistance(lava)) return unreachable;
-    const uint8_t candidateAmount = amount > fluidHorizontalDecay(lava)
-        ? static_cast<uint8_t>(amount - fluidHorizontalDecay(lava)) : 0;
+    if (depth >= fluidSlopeFindDistance(lava,ultrawarm)) return unreachable;
+    const uint8_t candidateAmount = amount > fluidHorizontalDecay(lava,ultrawarm)
+        ? static_cast<uint8_t>(amount - fluidHorizontalDecay(lava,ultrawarm)) : 0;
     if (candidateAmount == 0) return unreachable;
     int best = unreachable;
     for (int direction = 0; direction < 4; ++direction) {
@@ -128,7 +128,7 @@ inline int fluidSlopeDistanceByAmount(const glm::ivec3& origin, bool lava,
             fluidCanReceiveAmount(sample(below), lava, 8, true)) return depth;
         best = std::min(best, fluidSlopeDistanceByAmount(
             candidate, lava, candidateAmount, depth + 1, direction ^ 1,
-            sample, available));
+            sample, available, ultrawarm));
     }
     return best;
 }
@@ -137,12 +137,12 @@ template <typename Sample, typename Available>
 inline FluidDirectionSet preferredFluidDirectionsByAmount(
         const glm::ivec3& origin, bool lava, uint8_t currentAmount,
         bool currentFalling, const Sample& sample,
-        const Available& available) {
+        const Available& available, bool ultrawarm=false) {
     constexpr int unreachable = 1000;
     const uint8_t sideAmount = currentFalling
         ? static_cast<uint8_t>(7)
-        : (currentAmount > fluidHorizontalDecay(lava)
-            ? static_cast<uint8_t>(currentAmount - fluidHorizontalDecay(lava)) : 0);
+        : (currentAmount > fluidHorizontalDecay(lava,ultrawarm)
+            ? static_cast<uint8_t>(currentAmount - fluidHorizontalDecay(lava,ultrawarm)) : 0);
     if (sideAmount == 0) return {};
     std::array<int,4> costs{{unreachable,unreachable,unreachable,unreachable}};
     std::array<bool,4> candidates{{false,false,false,false}};
@@ -156,7 +156,7 @@ inline FluidDirectionSet preferredFluidDirectionsByAmount(
         costs[direction] = available(below) &&
             fluidCanReceiveAmount(sample(below), lava, 8, true)
             ? 0 : fluidSlopeDistanceByAmount(candidate, lava, sideAmount,
-                                              1, direction ^ 1, sample, available);
+                                              1, direction ^ 1, sample, available, ultrawarm);
         best = std::min(best, costs[direction]);
     }
     // A flat, supported surface has no downward route.  It is still a valid

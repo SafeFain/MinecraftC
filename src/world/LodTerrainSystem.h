@@ -97,7 +97,7 @@ ChunkMesh buildLodTileMesh(const LodTileData& data, int cellSize,
                            int maximumSpans,
                            const LodExactNeighborTiles* neighbors = nullptr,
                            const LodNeighborEdges* edges = nullptr,
-                           bool sealTileEdges = false);
+                           bool sealTileEdges = false,bool skyLight = true);
 
 class LodTerrainSystem {
 public:

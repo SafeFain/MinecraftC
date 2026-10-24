@@ -25,7 +25,7 @@ void ParticleSystem::setEnhancedVisuals(bool enabled, VisualQuality quality) {
                    particle.kind == ParticleKind::Firefly ||
                    particle.kind == ParticleKind::CaveSpore ||
                    particle.kind == ParticleKind::CaveDust ||
-                   particle.kind == ParticleKind::CaveEmber;
+                   particle.kind == ParticleKind::CaveEmber || particle.kind==ParticleKind::NetherMote;
         }), m_particles.end());
 }
 
@@ -40,7 +40,7 @@ void ParticleSystem::setEnhancedVisuals(
                    particle.kind == ParticleKind::Firefly ||
                    particle.kind == ParticleKind::CaveSpore ||
                    particle.kind == ParticleKind::CaveDust ||
-                   particle.kind == ParticleKind::CaveEmber;
+                   particle.kind == ParticleKind::CaveEmber || particle.kind==ParticleKind::NetherMote;
         }), m_particles.end());
 }
 
@@ -214,7 +214,21 @@ void ParticleSystem::update(World& world, const glm::dvec3& viewer, float dt,
         };
         if(!a.update(view,state.empty()?nullptr:state.data()))break;
     }
-    if(!replaceAmbient) {
+    if(dimension==DimensionId::Nether && m_enhancedVisual.ambientParticlesPerSecond>0) {
+        m_overworldAmbientEmission+=dt*m_enhancedVisual.ambientParticlesPerSecond*.7f;
+        const int count=std::min(4,int(m_overworldAmbientEmission));m_overworldAmbientEmission-=count;
+        const auto biome=world.generator().nether().biomeAt(int(std::floor(viewer.x)),int(std::floor(viewer.z)));
+        constexpr glm::vec4 colors[]={{1,.42f,.13f,.65f},{.45f,.74f,.82f,.42f},{.94f,.23f,.25f,.5f},{.22f,.85f,.75f,.5f},{.7f,.67f,.64f,.65f}};
+        for(int i=0;i<count && m_particles.size()<MAX_PARTICLES;++i) {
+            Particle p;p.kind=ParticleKind::NetherMote;p.ambient=true;
+            p.position=viewer+glm::dvec3((randomFloat()-.5f)*20,(randomFloat()-.3f)*12,(randomFloat()-.5f)*20);
+            const auto cell=glm::ivec3(glm::floor(p.position));
+            if(world.getLoadedBlock(cell.x,cell.y,cell.z)!=BlockId::AIR)continue;
+            p.velocity={(randomFloat()-.5f)*.18f,biome==NetherBiome::BasaltDeltas?-.18f:.08f,(randomFloat()-.5f)*.18f};
+            p.lifetime=4+randomFloat()*4;p.phase=randomFloat();p.size=.06f+randomFloat()*.07f;
+            p.color=colors[static_cast<size_t>(biome)];m_particles.push_back(p);
+        }
+    } else if(!replaceAmbient) {
         const int viewerX = static_cast<int>(std::floor(viewer.x));
         const int viewerY = static_cast<int>(std::floor(viewer.y + 1.0));
         const int viewerZ = static_cast<int>(std::floor(viewer.z));
@@ -471,7 +485,7 @@ void ParticleSystem::buildRenderData(
     result.reserve(m_particles.size());
     for (const auto& particle : m_particles) {
         const glm::dvec3 relative = particle.position - renderOrigin;
-        result.push_back({glm::vec3(relative), particle.kind==ParticleKind::Plugin&&particle.shape?float(5+particle.shape):static_cast<float>(particle.kind),
+        result.push_back({glm::vec3(relative), particle.kind==ParticleKind::NetherMote?6.f:particle.kind==ParticleKind::Plugin&&particle.shape?float(5+particle.shape):static_cast<float>(particle.kind),
                           particle.phase, particle.texture, particle.size,
                           particle.rotation,particle.color});
     }

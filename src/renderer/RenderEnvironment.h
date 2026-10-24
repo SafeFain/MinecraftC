@@ -13,7 +13,7 @@ enum class RenderSkyStyle : uint8_t {
     Standard = 0,
     Layered = 1
 };
-enum RenderSkyFlags : uint32_t {SkyNoAtmosphere=1u,SkyNoLowClouds=2u,SkyNoVoxelClouds=4u,SkyNoLightShafts=8u};
+enum RenderSkyFlags : uint32_t {SkyNoAtmosphere=1u,SkyNoLowClouds=2u,SkyNoVoxelClouds=4u,SkyNoLightShafts=8u,SkyCavernAmbient=16u};
 
 struct RenderEnvironment {
     uint32_t skyFlags=0;

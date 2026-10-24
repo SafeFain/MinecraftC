@@ -1,3 +1,5 @@
+#include "world/BlockEntityLogic.h"
+#include "game/NetherProgression.h"
 #include "game/InventoryTransaction.h"
 #include "game/InventoryInteraction.h"
 #include "game/SurvivalRules.h"
@@ -10,6 +12,7 @@ namespace {
 bool armorAccepts(size_t slot,ItemId id) {
     if (id == ItemId::EMPTY) return true;
     if (slot >= 4 || getItemProps(id).kind != ItemKind::Armor) return false;
+    if(id>=ItemId::NETHERITE_HELMET&&id<=ItemId::NETHERITE_BOOTS)return static_cast<uint16_t>(id)-static_cast<uint16_t>(ItemId::NETHERITE_HELMET)==slot;
     return static_cast<size_t>((static_cast<uint16_t>(id) - static_cast<uint16_t>(ItemId::LEATHER_HELMET)) % 4) == slot;
 }
 bool same(const ItemStack& a,const ItemStack& b) {return a.id==b.id && a.count==b.count && a.damage==b.damage;}
@@ -32,13 +35,8 @@ struct Working {
         case InventoryArea::Crafting: return reference.index<(table?9:4)?&crafting[reference.index]:nullptr;
         case InventoryArea::Container:
             if(!container) return nullptr;
-            if(container->type==BlockEntityType::Chest) return reference.index<27?&container->chest[reference.index]:nullptr;
-            if(container->type==BlockEntityType::Furnace) {
-                if(reference.index==0) return &container->input;
-                if(reference.index==1) return &container->fuel;
-                if(reference.index==2) return &container->output;
-            }
-            return nullptr;
+            if(container->type==BlockEntityType::SmithingTable&&reference.index==3)return nullptr;
+            return containerStack(*container,reference.index);
         case InventoryArea::Output: return nullptr;
         }
         return nullptr;
@@ -46,11 +44,7 @@ struct Working {
     bool accepts(InventorySlot reference,ItemId id) const {
         if(id==ItemId::EMPTY) return true;
         if(reference.area==InventoryArea::Armor) return armorAccepts(reference.index,id);
-        if(reference.area==InventoryArea::Container && container && container->type==BlockEntityType::Furnace) {
-            if(reference.index==0) return findSmeltingRecipe(id)!=nullptr;
-            if(reference.index==1) return fuelTicks(id)>0;
-            return false;
-        }
+        if(reference.area==InventoryArea::Container&&container)return containerAccepts(*container,reference.index,id);
         return reference.area!=InventoryArea::Output;
     }
     std::vector<ItemStack*> storage() {
@@ -59,6 +53,8 @@ struct Working {
         return result;
     }
     bool click(InventorySlot reference,bool right) {
+        if(reference.area==InventoryArea::Container&&container&&container->type==BlockEntityType::SmithingTable&&reference.index==3)
+            return takeSmithingResult(*container,cursor);
         auto* target=slot(reference);if(!target) return false;
         if(reference.area==InventoryArea::Container && container && container->type==BlockEntityType::Furnace && reference.index==2) {
             if (!cursor.empty()) return false;
@@ -111,6 +107,12 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
             }
             break;
         }
+        if(action.slot.area==InventoryArea::Container&&next.container&&next.container->type==BlockEntityType::SmithingTable&&action.slot.index==3) {
+            const auto result=smithingResult(next.container->chest[0],next.container->chest[1],next.container->chest[2]);
+            auto inventory=next.inventory;
+            if(!result.empty()&&inventory.add(result)==0) {ItemStack taken;accepted=takeSmithingResult(*next.container,taken);if(accepted)next.inventory=std::move(inventory);}
+            break;
+        }
         auto* source=next.slot(action.slot);if(!source) break;
         if (action.slot.area == InventoryArea::Storage && !next.container && getItemProps(source->id).kind == ItemKind::Armor) {
             bool equipped = false;
@@ -121,7 +123,7 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
         }
         auto targets=next.storage();
         if(action.slot.area==InventoryArea::Storage && next.container) {
-            targets.clear();const int count=next.container->type==BlockEntityType::Chest?27:2;
+            targets.clear();const int count=containerStackCount(next.container->type);
             for(int i=0;i<count;++i) {
                 InventorySlot reference{InventoryArea::Container,static_cast<uint8_t>(i)};
                 if(next.accepts(reference,source->id)) targets.push_back(next.slot(reference));
@@ -134,6 +136,11 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
     }
     case InventoryOperation::SwapHotbar:
     case InventoryOperation::SwapOffhand: {
+        if(action.slot.area==InventoryArea::Container&&next.container&&next.container->type==BlockEntityType::SmithingTable&&action.slot.index==3) {
+            if(action.operation==InventoryOperation::SwapHotbar&&action.argument>=9)break;
+            auto& destination=action.operation==InventoryOperation::SwapHotbar?next.inventory.slot(action.argument):next.inventory.offhand();
+            accepted=takeSmithingResult(*next.container,destination);break;
+        }
         auto* source=next.slot(action.slot);if(!source || (action.operation==InventoryOperation::SwapHotbar && action.argument>=9)) break;
         InventorySlot targetReference{action.operation==InventoryOperation::SwapHotbar?InventoryArea::Storage:InventoryArea::Offhand,static_cast<uint8_t>(action.operation==InventoryOperation::SwapHotbar?action.argument:0)};
         auto* target=next.slot(targetReference);
@@ -141,6 +148,9 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
         std::swap(*source,*target);accepted=true;break;
     }
     case InventoryOperation::Drop: {
+        if(action.slot.area==InventoryArea::Container&&next.container&&next.container->type==BlockEntityType::SmithingTable&&action.slot.index==3) {
+            ItemStack output;accepted=takeSmithingResult(*next.container,output);if(accepted)next.drops.push_back(output);break;
+        }
         auto* source=next.slot(action.slot);if(!source) break;
         if(!source->empty()) {
             if(action.alternate) {next.drops.push_back(*source);source->clear();}

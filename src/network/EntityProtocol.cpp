@@ -1,6 +1,7 @@
 #include "network/ContentIds.h"
 #include "network/EntityProtocol.h"
 #include "plugins/Json.h"
+#include "network/StatusEffectProtocol.h"
 #include <cmath>
 #include <set>
 
@@ -53,6 +54,14 @@ void entity(Writer& writer, const EntitySnapshot& value) {
     writer.u8(value.inGround); writer.u8(value.playerOwned); writer.u8(value.sleeping); writer.u8(value.attacking);
     if (value.type == EntityType::Villager || value.type == EntityType::ZombieVillager) villager(writer, value.villager);
     entityStateValid(static_cast<uint16_t>(value.type),value.pluginState,value.pluginStateVersion);writer.text(value.pluginState,MC_ENTITY_STATE_LIMIT);writer.u32(value.pluginStateVersion);
+    if(!validNetherMobState(value.nether))throw ProtocolError("Invalid native entity state");
+#define NETHER_WIRE_uint8_t u8
+#define NETHER_WIRE_uint16_t u16
+#define NETHER_WIRE_uint32_t u32
+#define NETHER_WRITE(type,name,initial) writer.NETHER_WIRE_##type(value.nether.name);
+    MC_NETHER_STATE_FIELDS(NETHER_WRITE)
+#undef NETHER_WRITE
+    writeStatusEffects(writer,value.effects);writer.u64(value.riderId);
 }
 EntitySnapshot entity(Reader& reader) {
     EntitySnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(entityType(reader.text())); result.position = position(reader);
@@ -61,6 +70,13 @@ EntitySnapshot entity(Reader& reader) {
     result.inGround = flag(reader); result.playerOwned = flag(reader); result.sleeping = flag(reader); result.attacking = flag(reader);
     if (result.type == EntityType::Villager || result.type == EntityType::ZombieVillager) result.villager = villager(reader);
     result.pluginState=reader.text(MC_ENTITY_STATE_LIMIT);result.pluginStateVersion=reader.u32();
+#define NETHER_READ(type,name,initial) result.nether.name=reader.NETHER_WIRE_##type();
+    MC_NETHER_STATE_FIELDS(NETHER_READ)
+#undef NETHER_READ
+#undef NETHER_WIRE_uint8_t
+#undef NETHER_WIRE_uint16_t
+#undef NETHER_WIRE_uint32_t
+    result.effects=readStatusEffects(reader);result.riderId=reader.u64();
     const auto* definition=Plugins::entityContent(static_cast<uint16_t>(result.type));
     if(definition&&definition->stateVersion!=result.pluginStateVersion)throw ProtocolError("Entity state revision mismatch");
     Writer check; entity(check, result); return result;

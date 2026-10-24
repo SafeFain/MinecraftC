@@ -1,4 +1,5 @@
 #include "app/GameSession.h"
+#include "game/DimensionRules.h"
 #include <algorithm>
 #include <cmath>
 
@@ -6,10 +7,13 @@ bool GameSession::beginLanSleep(uint64_t id, glm::ivec3 bed) {
     const auto found = guests.find(id); if (found == guests.end()) return false;
     auto& guest = *found->second;
     auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
+    if(guest.dead||guest.loading||guest.player.isSpectator())return false;
+    if(respawnAnchorCharge(runtime.world.getBlock(bed.x,bed.y,bed.z))>=0){useRespawnAnchor(id,bed);return false;}
+    if(dimensionRules(guest.profile.dimension).bedsExplode&&isBed(runtime.world.getBlock(bed.x,bed.y,bed.z))){explodeRestBlock(guest.profile.dimension,bed);return false;}
     const auto foot = runtime.world.validBedFoot(bed);
     if (!foot || guest.dead || guest.loading || guest.player.isSpectator()) return false;
     guest.profile.beds[static_cast<uint32_t>(guest.profile.dimension)]=*foot;
-    if (guest.profile.dimension == DimensionId::Overworld) guest.profile.bedSpawn = *foot;
+    if (guest.profile.dimension == DimensionId::Overworld) {guest.profile.bedSpawn = *foot;guest.profile.netherAnchor.reset();}
     if (guest.sleep || !runtime.daylight.isNight() || runtime.entities.hasHostileNear(glm::vec3(*foot), 8)) return false;
     if (dimension == guest.profile.dimension && isSleeping() && sleepBed == *foot) return false;
     for (const auto& other : guests) if (other.first != id && other.second->profile.dimension == guest.profile.dimension &&
@@ -69,19 +73,25 @@ bool GameSession::trySkipLanNight(DimensionId target) {
     for (auto& entry : guests) if (entry.second->profile.dimension == target) finishLanSleep(*entry.second);
     return true;
 }
-bool GameSession::travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn) {
+bool GameSession::travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn, std::optional<glm::dvec3> destination) {
     if(!Plugins::validDimension(target))return false;
+    bool anchorUsed=false;
+    if(respawn&&guest.profile.netherAnchor&&(guest.profile.dimension==DimensionId::Overworld||guest.profile.dimension==DimensionId::Nether)) {
+        if(const auto landing=consumeAnchorRespawn(*guest.profile.netherAnchor)){destination=landing;target=DimensionId::Nether;anchorUsed=true;}
+        else guest.profile.netherAnchor.reset();
+    }
     const auto targetId=static_cast<uint32_t>(target),sourceId=static_cast<uint32_t>(guest.profile.dimension);
     std::optional<glm::dvec3> preferred;
-    if(!respawn&&guest.profile.positioned[targetId])preferred=guest.profile.positions[targetId];
+    if(destination)preferred=destination;
+    else if(!respawn&&guest.profile.positioned[targetId])preferred=guest.profile.positions[targetId];
     std::optional<glm::ivec3> bed;
-    if(respawn){auto it=guest.profile.beds.find(targetId);if(it!=guest.profile.beds.end())bed=it->second;else if(target==DimensionId::Overworld)bed=guest.profile.bedSpawn;}
+    if(respawn&&!anchorUsed){auto it=guest.profile.beds.find(targetId);if(it!=guest.profile.beds.end())bed=it->second;else if(target==DimensionId::Overworld)bed=guest.profile.bedSpawn;}
     const auto landing=dimensionLanding(target,preferred,bed);if(!landing)return false;
     if(respawn&&bed&&!ensureDimension(target).world.validBedFoot(*bed)) {
         guest.profile.beds.erase(targetId);
         if(target==DimensionId::Overworld)guest.profile.bedSpawn.reset();
     }
-    auto& old=*simulations[sourceId];closeAuthorityWindow(guest.player,old,guest.window,guest.windowView);
+    auto& old=*simulations[sourceId];old.entities.dismount(guest.player.roomPlayerId());closeAuthorityWindow(guest.player,old,guest.window,guest.windowView);
     auto position=guest.player.getPosition();
     if(guest.player.onGround())guest.profile.safePositions[sourceId]=position;
     if(position.y<Config::WORLD_MIN_Y){auto safe=guest.profile.safePositions.find(sourceId);if(safe!=guest.profile.safePositions.end())position=safe->second;}
@@ -89,9 +99,9 @@ bool GameSession::travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, b
     auto& runtime=ensureDimension(target);guest.profile.dimension=target;
     guest.profile.positions[targetId]=*landing;guest.profile.positioned[targetId]=true;
     guest.player.bindWorld(runtime.world,&runtime.entities);guest.player.setPosition(*landing);
-    if(respawn){guest.player.survivalStats().resetAfterRespawn();guest.player.resetDamageImmunity();guest.player.extinguish();guest.dead=false;}
+    if(respawn){guest.player.survivalStats().resetAfterRespawn();guest.player.statusEffects().clear();guest.player.resetDamageImmunity();guest.player.extinguish();guest.dead=false;}
     guest.pendingRespawn=false;guest.sleep=0;guest.wantsMorning=false;guest.player.setSleepingVisual(false,0);
     guest.fishing.cancel();guest.input.clearVirtual();guest.buttons=guest.appliedButtons=0;
     guest.loading=true;++guest.chunkEpoch;guest.sentChunkRevisions.clear();guest.lodSubscriptions.clear();guest.lastStateSent=-1;
-    updateLanInterests();return true;
+    saveLanPlayer(guest);updateLanInterests();return true;
 }

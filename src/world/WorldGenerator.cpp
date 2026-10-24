@@ -24,6 +24,7 @@ WorldGenerator::WorldGenerator(
     , m_seed(dimensionSeed(seed, dimension))
     , m_worldType(worldType)
     , m_dimension(dimension)
+    , m_nether(m_seed)
     , m_noise(m_seed)
     , m_heightPipeline(m_noise, m_seed)
     , m_caveGenerator(m_noise, m_seed)
@@ -41,6 +42,7 @@ WorldGenerator::WorldGenerator(
 // ═══════════════════════════════════════════════════════════════════════════
 
 int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
+    if(isNether())return m_nether.surface(worldX,worldZ);
     if(customGenerator())return pluginColumn(worldX,worldZ).height;
     if (m_worldType == WorldType::Superflat)
         return Config::WORLD_MIN_Y + 3;
@@ -51,6 +53,7 @@ int WorldGenerator::getTerrainHeight(int worldX, int worldZ) const {
 }
 
 HeightBiome WorldGenerator::queryHeightBiome(int worldX, int worldZ) const {
+    if(isNether())return {m_nether.surface(worldX,worldZ),Biome::PLAINS};
     if(customGenerator()){const auto c=pluginColumn(worldX,worldZ);return {c.height,c.biome};}
     if (m_worldType == WorldType::Superflat)
         return {Config::WORLD_MIN_Y + 3, Biome::PLAINS};
@@ -71,6 +74,7 @@ SurfaceColumn WorldGenerator::superflatColumn() {
 }
 
 SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const {
+    if(isNether()){SurfaceColumn c;c.height=c.nominalHeight=m_nether.surface(worldX,worldZ);c.waterLevel=31;c.densityMinY=0;c.densityMaxY=127;return c;}
     if(customGenerator())return pluginColumn(worldX,worldZ);
     return m_worldType == WorldType::Superflat
         ? superflatColumn() : m_heightPipeline.sampleColumn(worldX, worldZ);
@@ -78,7 +82,7 @@ SurfaceColumn WorldGenerator::sampleTerrainColumn(int worldX, int worldZ) const 
 
 std::vector<TreeGenerator::TreePlacement> WorldGenerator::sampleLodTrees(
     int worldOriginX, int worldOriginZ, int width, int depth) const {
-    if (customGenerator() || m_worldType == WorldType::Superflat ||
+    if (isNether() || customGenerator() || m_worldType == WorldType::Superflat ||
         width <= 0 || depth <= 0) return {};
 
     std::vector<TreeGenerator::TreePlacement> result =
@@ -120,6 +124,7 @@ void WorldGenerator::generateRegion(
     int originCX, int originCZ, int regionSizeChunks, int padding,
     std::vector<Chunk*>& chunks,
     std::vector<RegionGenerationData::PendingBlock>& pendingOut) {
+    if(isNether()) {pendingOut.clear();for(auto* chunk:chunks)if(chunk)m_nether.generate(*chunk);return;}
     if(customGenerator()) {
         pendingOut.clear();generatePluginChunks(chunks);return;
     }
@@ -150,6 +155,7 @@ void WorldGenerator::generate(Chunk& chunk,
                                const NeighborQuery& neighborQuery,
                                const BlockSetter& blockSetter,
                                const StructureSetter& structureSetter) {
+    if(isNether()){m_nether.generate(chunk);return;}
     if(customGenerator()){generatePluginChunk(chunk);return;}
     if (m_worldType == WorldType::Superflat) {
         populateSuperflat(chunk);

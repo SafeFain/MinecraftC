@@ -600,6 +600,144 @@
     },
     "stone_button": {
       "all": "stone"
+    },
+    "netherrack": {
+      "all": "netherrack"
+    },
+    "soul_sand": {
+      "all": "soul_sand"
+    },
+    "soul_soil": {
+      "all": "soul_soil"
+    },
+    "blackstone": {
+      "all": "blackstone"
+    },
+    "crimson_nylium": {
+      "all": "crimson_nylium"
+    },
+    "warped_nylium": {
+      "all": "warped_nylium"
+    },
+    "crimson_stem": {
+      "all": "crimson_stem"
+    },
+    "warped_stem": {
+      "all": "warped_stem"
+    },
+    "crimson_planks": {
+      "all": "crimson_planks"
+    },
+    "warped_planks": {
+      "all": "warped_planks"
+    },
+    "nether_wart_block": {
+      "all": "nether_wart_block"
+    },
+    "warped_wart_block": {
+      "all": "warped_wart_block"
+    },
+    "shroomlight": {
+      "all": "shroomlight"
+    },
+    "glowstone": {
+      "all": "glowstone"
+    },
+    "nether_quartz_ore": {
+      "all": "nether_quartz_ore"
+    },
+    "nether_gold_ore": {
+      "all": "nether_gold_ore"
+    },
+    "ancient_debris": {
+      "all": "ancient_debris"
+    },
+    "nether_bricks": {
+      "all": "nether_bricks"
+    },
+    "red_nether_bricks": {
+      "all": "red_nether_bricks"
+    },
+    "polished_blackstone": {
+      "all": "polished_blackstone"
+    },
+    "blackstone_bricks": {
+      "all": "blackstone_bricks"
+    },
+    "crying_obsidian": {
+      "all": "crying_obsidian"
+    },
+    "magma_block": {
+      "all": "magma_block"
+    },
+    "crimson_fungus": {
+      "all": "crimson_fungus"
+    },
+    "warped_fungus": {
+      "all": "warped_fungus"
+    },
+    "crimson_roots": {
+      "all": "crimson_roots"
+    },
+    "warped_roots": {
+      "all": "warped_roots"
+    },
+    "nether_sprouts": {
+      "all": "nether_sprouts"
+    },
+    "weeping_vines": {
+      "all": "weeping_vines"
+    },
+    "twisting_vines": {
+      "all": "twisting_vines"
+    },
+    "nether_wart": {
+      "all": "nether_wart"
+    },
+    "soul_fire": {
+      "all": "soul_fire"
+    },
+    "nether_portal_x": {
+      "all": "nether_portal_x"
+    },
+    "nether_portal_z": {
+      "all": "nether_portal_z"
+    },
+    "respawn_anchor": {
+      "all": "respawn_anchor"
+    },
+    "blaze_spawner": {
+      "all": "blaze_spawner"
+    },
+    "magma_spawner": {
+      "all": "magma_spawner"
+    },
+    "bone_block": {
+      "all": "bone_block"
+    },
+    "crimson_slab": {
+      "all": "crimson_planks"
+    },
+    "crimson_stairs": {
+      "all": "crimson_planks"
+    },
+    "warped_slab": {
+      "all": "warped_planks"
+    },
+    "warped_stairs": {
+      "all": "warped_planks"
+    },
+    "nether_brick_slab": {
+      "all": "nether_bricks"
+    },
+    "nether_brick_stairs": {
+      "all": "nether_bricks"
+    },
+    "blackstone_slab": {
+      "all": "blackstone_bricks"
+    },
+    "blackstone_stairs": {
+      "all": "blackstone_bricks"
     }
   },
   "imports": [

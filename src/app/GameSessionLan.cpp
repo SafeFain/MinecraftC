@@ -99,7 +99,13 @@ void GameSession::admitLanPlayer(uint64_t id) {
 void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
     if(!Plugins::content().runtimeFault.empty())return;
     auto& profile = guest.profile;
-    profile.positions[static_cast<size_t>(profile.dimension)] = guest.player.getPosition();
+    auto savedPosition=guest.player.getPosition();
+    auto& runtime=ensureDimension(profile.dimension);
+    if(runtime.entities.riding(guest.player.roomPlayerId())) {
+        const auto safe=profile.safePositions.find(static_cast<uint32_t>(profile.dimension));
+        savedPosition=safe!=profile.safePositions.end()?safe->second:runtime.world.generator().sampleDimensionSpawn().value_or(glm::dvec3(worldMetadata.worldSpawn)+glm::dvec3(.5,.01,.5));
+    }
+    profile.positions[static_cast<size_t>(profile.dimension)] = savedPosition;
     profile.positioned[static_cast<size_t>(profile.dimension)] = true;
     profile.mode = guest.player.gameMode();
     profile.inventory = guest.player.inventory();
@@ -108,6 +114,7 @@ void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
     profile.health = stats.health(); profile.hunger = stats.hunger();
     profile.saturation = stats.saturation(); profile.exhaustion = stats.exhaustion();
     profile.foodTickTimer = stats.foodTickTimer();
+    profile.effects=guest.player.statusEffects().active();
     if (guestProfiles) guestProfiles->save(profile);
 }
 
@@ -126,6 +133,7 @@ void GameSession::removeLanPlayer(uint64_t id) {
         LOG_ERROR("Could not save LAN player: " << error.what());
     }
     const auto nickname = guest.profile.identity.nickname;
+    runtime.entities.dismount(id);portalStates.erase(id);
     guests.erase(found);
     if (hostingLan()) broadcastLanChat({Lan::ChatKind::Left, nickname, {}});
 }
@@ -473,7 +481,7 @@ void GameSession::sendLanStates() {
         state.inventory = guest.player.inventory();
         const auto& stats = guest.player.survivalStats();
         state.health = stats.health(); state.hunger = stats.hunger(); state.saturation = stats.saturation();
-        state.exhaustion = stats.exhaustion(); state.foodTimer = stats.foodTickTimer();
+        state.exhaustion = stats.exhaustion(); state.foodTimer = stats.foodTickTimer();state.effects=guest.player.statusEffects().active();
         state.actionAcknowledged = guest.actionAcknowledged;
         state.inventoryRevision = state.window.revision; state.cursor = guest.window.cursor(); state.crafting = guest.window.crafting();
         if (lanHost.send(entry.first, {Lan::MessageType::PlayerState, 0, Lan::encodeAuthorityState(state)})) guest.lastStateSent = lanNow;
@@ -525,6 +533,7 @@ void GameSession::sendLanEntities() {
             snapshot.pluginState=entity->pluginState;snapshot.pluginStateVersion=entity->pluginStateVersion;
             snapshot.item = entity->item; snapshot.seed = entity->behaviorSeed; snapshot.inGround = entity->inGround;
             snapshot.playerOwned = entity->playerOwned; snapshot.sleeping = entity->sleeping; snapshot.attacking = entity->attackPending;
+            snapshot.nether=entity->nether;snapshot.effects=entity->effects.active();snapshot.riderId=entity->riderId;
             snapshot.villager = entity->villager; batch.entities.push_back(std::move(snapshot));
         }
         for (const auto& dead : runtime.entities.deadEntityRenders()) if (inRange(dead.position) && batch.deaths.size() < Lan::MAX_VISIBLE_DEATHS)

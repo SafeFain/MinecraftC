@@ -31,7 +31,7 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
     for(const auto& info:plugins.plugins())if(info.manifest.id.rfind("p1_",0)==0)
         check(info.active==(info.manifest.id=="p1_fixture"),"P1 fixture activation/rollback status differs");
     const auto dimension=Plugins::resolveDimension("p1_fixture:realm");
-    check(dimension>=2&&Plugins::content().extensions.dimensions.size()==3,"P1 extra registered dimension missing");
+    check(dimension>=3&&Plugins::content().extensions.dimensions.size()==4,"P1 extra registered dimension missing");
     for(const auto& pair:Plugins::content().extensions.dimensions)check(pair.second.key.rfind("p1_bad_",0)!=0,"Failed dimension registration leaked");
     for(const auto& pair:Plugins::content().materials)check(pair.first.rfind("p1_bad_",0)!=0,"Late registration failure leaked material");
     check(!Plugins::content().extensions.actions.count("p1_bad_english:action")&&
@@ -61,7 +61,7 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
           plugins.extension(nullptr,MC_PLAYER_ACTIONS_EXTENSION,3)&&!plugins.extension(nullptr,MC_PLAYER_ACTIONS_EXTENSION,4),"P1 version negotiation differs");
     plugins.shutdown();
     Plugins::PluginManager safe({assets,root});safe.initialize(true);
-    check(Plugins::content().extensions.dimensions.size()==1&&Plugins::content().extensions.translations.empty()&&
+    check(Plugins::content().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&Plugins::content().extensions.translations.empty()&&
           Plugins::content().extensions.bedTravel.empty()&&Plugins::content().materials.empty(),"P1 safe mode published optional registries");
     safe.shutdown();
     Plugins::PluginManager desktop({assets,root/"desktop"});desktop.initialize();

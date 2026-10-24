@@ -33,6 +33,7 @@ int tierPalette(ToolTier tier) {
         case ToolTier::Iron: return Iron;
         case ToolTier::Gold: return Gold;
         case ToolTier::Diamond: return Diamond;
+        case ToolTier::Netherite: return Dark;
         default: return Wood;
     }
 }

@@ -96,7 +96,9 @@ void ChunkStreamer::queueGenerationCompletion(int cx, int cz) {
 }
 
 void ChunkStreamer::setAdditionalInterests(std::vector<StreamingInterest> interests) {
-    if (interests.size() > 7) throw std::invalid_argument("Too many guest streaming interests");
+    // Portal staging retains all eight actors plus one temporary landing area.
+    // Generation/upload windows remain independently bounded.
+    if (interests.size() > 9) throw std::invalid_argument("Too many guest streaming interests");
     for (const auto& interest : interests) {
         if (interest.radius < 2 || interest.radius > 16 ||
             std::abs(static_cast<int64_t>(interest.chunkX)) > 1875000 ||

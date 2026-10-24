@@ -22,6 +22,7 @@
 #include "game/CombatRules.h"
 #include "player/PlayerPhysics.h"
 
+struct PotionDefinition;
 struct EntitySnapshot;
 struct EntityDeathSnapshot;
 class Player;
@@ -66,7 +67,14 @@ struct Entity {
     EntityAiState ai;
     uint64_t shooterId = 0;
     std::string pluginState="{}";
+    std::string nativeOwner; // derived cache of the persisted shared envelope
     uint32_t pluginStateVersion=0;
+    NetherMobState nether;
+    StatusEffects effects;
+    float nativeTickAccumulator=0;
+    uint64_t riderId=UINT64_MAX;
+    float portalCooldown=0,portalRetry=0;
+    bool despawning=false;
     glm::vec3 pluginMovement{0};
     uint64_t pluginAttack=UINT64_MAX;
     double pluginIntentUntil=0;
@@ -106,9 +114,19 @@ public:
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned, uint64_t shooterId = 0);
     bool spawnMob(EntityType type, const glm::dvec3& position);
+    void spawnNativeProjectile(EntityType,const glm::dvec3&,const glm::vec3&,uint64_t,ItemStack={},const std::string& owner="local");
+    bool useNativeMob(Player&,uint64_t playerId);
+    void dismount(uint64_t playerId);
+    bool tryDismount(Player&,uint64_t playerId);
+    std::vector<uint64_t> portalCandidates(float dt);
+    void deferPortal(uint64_t id);
+    bool transferTo(uint64_t id,EntityManager& target,const glm::dvec3&,const std::filesystem::path& root);
+    bool riding(uint64_t playerId) const;
+    void angerPiglins(const glm::dvec3&,bool zombified=false);
     bool pluginSnapshot(uint64_t,MC_EntitySnapshot&,std::string&) const;
     bool pluginRemove(uint64_t);
     bool pluginIntent(uint64_t,const MC_EntityIntent&);
+    void explodeAt(const glm::dvec3&,float,const std::vector<EntityPlayerView>&);
     void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
                   bool removeBlock = true);
     std::vector<glm::dvec3> takeExplosionEvents();
@@ -124,7 +142,7 @@ public:
     void strikeLightning(Player& player, const glm::ivec3& position);
     MeleeAttackResult attackRay(const glm::dvec3& origin,
                                 const glm::vec3& direction,
-                                const MeleeAttackRequest& attack, uint64_t playerId = UINT64_MAX);
+                                const MeleeAttackRequest& attack, uint64_t playerId = UINT64_MAX,const std::string& owner="local");
     bool hasAttackTarget(const glm::dvec3& origin, const glm::vec3& direction,
                          float reach) const;
     void render(IGameRenderer& renderer, const glm::mat4& viewProjection,
@@ -227,6 +245,8 @@ private:
     mutable EntityModelRegistry m_modelRegistry;
     uint64_t m_nextId = 1;
     float m_spawnTimer = 0.0f;
+    float m_spawnerTimer=0;
+    void tickSpawners(bool peaceful);
     uint32_t m_spawnSequence = 0;
     bool m_naturalSpawningEnabled = true;
     bool m_lastPopulationEnabled = false;
@@ -252,6 +272,15 @@ private:
     std::vector<LogicalVillage> m_logicalVillages;
     float m_villageRefreshSeconds = 0.0f;
 
+    std::vector<Entity> m_nativeSpawns;
+    struct NativeExplosion {glm::dvec3 position;uint32_t seed;float power;};
+    std::vector<NativeExplosion> m_nativeExplosions;
+    void tickNativeState(Entity&,float);
+    bool nativeTargetsPlayer(Entity&,const Player&) const;
+    bool updateNativeMob(Entity&,Player&,float,bool);
+    void updateNativeProjectile(Entity&,float);
+    void applyEntityPotion(Entity&,const PotionDefinition&,float);
+    bool teleportEnderman(Entity&);
     void pluginEvent(Entity&,uint32_t);
     bool pluginAi(Entity&,float);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile,
@@ -259,6 +288,7 @@ private:
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
     void integrateVelocity(Entity& entity, float dt);
     bool collides(const Entity& entity, const glm::dvec3& position) const;
+    bool riderCollides(const glm::dvec3& position) const;
     bool exposedToSky(const Entity& entity) const;
     bool touchesWater(const Entity& entity) const;
     float damageEntity(Entity& entity, float damage,
@@ -273,7 +303,7 @@ private:
     static glm::vec3 renderColor(EntityType type);
     static glm::vec3 renderSize(EntityType type);
     static glm::vec3 entitySize(const Entity& entity) {
-        return renderSize(entity.type)*((entity.type==EntityType::Villager ||
+        return renderSize(entity.type)*(entity.type==EntityType::MagmaCube ? static_cast<float>(1u<<entity.nether.magmaSize) : 1.f)*((entity.type==EntityType::Villager ||
             entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
     }
     void tickVillageLife(float dt, uint64_t worldTick);

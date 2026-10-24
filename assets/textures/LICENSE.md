@@ -179,3 +179,9 @@ Their source recipes, tools, seed and provenance are recorded in `ASSET_SOURCES.
 Door panels, variant planks and door/button icons are original deterministic
 16×16 procedural recipes in tools/texture_generator.py, under the project
 GPL-3.0-only license. No Minecraft texture files are used.
+
+## Native Nether materials
+
+The Nether palettes and generated pixel materials in `tools/nether_materials.py`
+are original MinecraftC procedural artwork. They reuse this project's licensed
+semantic material recipes and contain no Mojang textures or extracted assets.

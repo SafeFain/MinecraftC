@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include "VulkanNetherCases.h"
 
 namespace {
 constexpr int width = 960, height = 640;
@@ -35,6 +36,7 @@ int main(int argc, char** argv) {
         Window window(width,height,"MinecraftC structures",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;
         renderer.initialize(window,std::filesystem::absolute(argv[1]));
+        if(argc==4 && std::string(argv[3])=="--nether")return VulkanNetherCases::run(renderer,window,std::filesystem::absolute(argv[1]),std::filesystem::absolute(argv[2]));
         renderer.setVisualQuality(VisualQuality::Medium);
         renderer.setEnhancedVisuals(false);
         std::cout << VulkanGiSmokeProbe::deviceDescription(renderer) << '\n';

@@ -2,7 +2,7 @@
 
 Current gameplay reference. Version numbers in section titles identify when content
 was introduced; they do not expand the set of loadable saves. Current requirements
-are save **v21**, global generation **v20**, optional Heaven **v9**. See
+are save **v22**, global generation **v21**, native Nether **v1**, optional Heaven **v9**. See
 [save compatibility](saves-and-commands.md), [controls](controls.md) and [documentation index](README.md).
 
 - Infinite chunk loading around the player with a runtime-selectable render distance.
@@ -57,7 +57,7 @@ are save **v21**, global generation **v20**, optional Heaven **v9**. See
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 894 serialized
+  types, and 1155 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -65,7 +65,7 @@ are save **v21**, global generation **v20**, optional Heaven **v9**. See
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 310-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 433-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -194,7 +194,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-These materials remain available in current v20 worlds. Their introduction did
+These materials remain available in current v21 worlds. Their introduction did
 not change terrain heights; Heaven now uses the optional v9 provider.
 
 
@@ -224,7 +224,7 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-This ecology is part of current generation v20. The separate Heaven ecology
+This ecology is part of current generation v21. The separate Heaven ecology
 below uses provider generation v9. Save compatibility is documented centrally in
 [saves and commands](saves-and-commands.md#compatibility-and-recovery).
 
@@ -257,13 +257,13 @@ below uses provider generation v9. Save compatibility is documented centrally in
 - Existing Heaven loot gains shards, berries and bricks while the origin shrine
   retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
 - Day/night duration is world-wide (default 1200 seconds), changed with
-  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v21
+  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v22
   uses 16-bit block IDs; packed light remains derived byte-sized runtime data.
 
 ## Overworld structures (generation v18)
 
 The v18 update added six structures. Together with the five village styles added
-through v19, current generation v20 has seventeen Overworld structure types.
+through v19, current generation v21 has seventeen Overworld structure types.
 Each has seeded rotation, mirroring and material or damage variants; generation,
 reservations and locate use world-coordinate hashes. Existing structure and loot
 enum values are preserved. All new structures reuse existing blocks and supplies;
@@ -325,7 +325,7 @@ stay consumed across unload and reload. Commands also accept `minecraftc:` names
   Defenders use navigation, sight-gated melee and normal damage/save paths, patrol
   near home and do not naturally despawn. Death imposes a 600-second village cooldown.
   Low-reputation Survival players can become targets; Creative/Spectator cannot.
-- Save v21 persists food, growth/cooldowns, reputation and demand (introduced in
+- Save v22 persists food, growth/cooldowns, reputation and demand (introduced in
   v17). No offline growth or cooldown catch-up. No raids, zombie curing, gossip
   simulation, or automatic construction.
 
@@ -361,14 +361,14 @@ stay consumed across unload and reload. Commands also accept `minecraftc:` names
 - Pausing freezes fishing. Opening inventory follows normal world ticking.
   Switching slots, dropping/losing the rod, sleeping, death, Spectator mode,
   dimension changes, world exit, unloaded water and excess distance cancel it.
-  Rods and fish persist in save v21; bobbers and timers are transient. No enchantments, experience, bait or entity hooking.
+  Rods and fish persist in save v22; bobbers and timers are transient. No enchantments, experience, bait or entity hooking.
 
 ### GameRule commands
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
-are world-wide and persisted in save v21 (introduced in v15); legacy metadata remains
-inspectable, but opening worlds requires v21. Missing/partial mechanics are explicit in feedback.
+are world-wide and persisted in save v22 (introduced in v15); legacy metadata remains
+inspectable, but opening worlds requires v22. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
 ### Plugin loader
@@ -380,9 +380,9 @@ new/overridden mobs with models, AI and instance state, selected per-dimension t
 generators/modifiers, and Vulkan-owned resources with replaceable render stages.
 Dimension registration supplies namespaced identities, default generators, weather,
 natural spawning, entry/respawn and void-return policies. SDK travel and `/dimension`
-commands use host authority. Save v21 and LAN protocol 6 retain keyed dimension state
+commands use host authority. Save v22 and LAN protocol 7 retain keyed dimension state
 and stable entity keys/generation choices. Older saves are inspection-only; builtin
-generation remains v20/Heaven v9.
+generation is v21/Nether v1/Heaven v9.
 [Installation and SDK](plugins.md), [extension contracts/examples](plugin-extensions.md).
 Optional [gameplay/presentation capabilities](plugin-capabilities.md) add block/item behavior,
 deterministic cross-chunk structures and loot metadata, host actions with preview/cooldown/wear,
@@ -410,7 +410,7 @@ blocks support up to 16 fixed AABBs per collision/selection/model group, includi
 optional union box models. Stable per-state keys persist through save palettes and
 LAN mappings. See [SDK reference](plugin-extensions.md#block-shapes-and-state-families).
 
-## Doors and buttons (generation v20)
+## Doors and buttons (introduced in generation v20)
 
 Six wood families (oak, birch, spruce, jungle, acacia, skyroot) have distinct
 planks, two-block doors and buttons; iron doors and stone buttons complete
@@ -423,7 +423,7 @@ floor and ceiling placement and do not block movement. Stone pulses last
 
 Local power reaches adjacent doors and doors adjacent to the button's full
 solid support block. Signals from multiple buttons combine; no wires, levers,
-pressure plates, pistons or recursive conduction are introduced. Save v21
+pressure plates, pistons or recursive conduction are introduced. Save v22
 retains remaining button ticks (introduced in v18); unloaded chunks pause and resume simulation.
 Simultaneous pulse releases have a 256-transition tick budget; excess due
 releases remain queued for following ticks.
@@ -436,3 +436,8 @@ panel, opens doors before passage, and closes doors it opened when the route
 is clear. Iron doors are not openable by villagers. Global generation v20
 retains seed layout 5, terrain/caves and Heaven v9; v19 files remain untouched
 and incompatible.
+
+## Built-in Nether (generation v21)
+
+The native five-biome Nether, structures, portals and core survival progression work
+with every plugin disabled. See [Nether gameplay and persistence](nether.md).

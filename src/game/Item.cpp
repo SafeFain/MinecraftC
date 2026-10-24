@@ -493,6 +493,39 @@ std::array<ItemProperties, itemCount> buildRegistry() {
 
     items[static_cast<size_t>(ItemId::FLOWER)].name = "Poppy";
 
+#define NETHER_ITEM(id,key,label,r,g,b,shape,light) \
+    set(ItemId::id,{label,ItemKind::Block,64,0,ToolKind::None,ToolTier::None,0,0,0,0,BlockId::id});
+    MC_NETHER_BLOCKS(NETHER_ITEM)
+#undef NETHER_ITEM
+#define NETHER_RESOURCE(id,key,label) set(ItemId::id,{label});
+    MC_NETHER_RESOURCES(NETHER_RESOURCE)
+#undef NETHER_RESOURCE
+#define NETHER_EQUIPMENT(id,key,label,base,durability) {auto p=items[static_cast<size_t>(ItemId::base)];p.name=label;p.tier=ToolTier::Netherite;p.maxDurability=durability;if(p.kind!=ItemKind::Armor&&p.tool!=ToolKind::Hoe)p.attackDamage+=1;set(ItemId::id,p);}
+    MC_NETHER_EQUIPMENT(NETHER_EQUIPMENT)
+#undef NETHER_EQUIPMENT
+#define NETHER_POTION(id,key,label,kind,level,ticks,splash) set(ItemId::id,{label,ItemKind::Material,1});
+    MC_NETHER_POTIONS(NETHER_POTION)
+#undef NETHER_POTION
+    for(auto id:{ItemId::WATER_BOTTLE,ItemId::AWKWARD_POTION,ItemId::SADDLE,ItemId::WITHER_SKELETON_SKULL})items[static_cast<size_t>(id)].maxStack=1;
+    items[static_cast<size_t>(ItemId::ENDER_PEARL)].maxStack=16;
+    set(ItemId::WARPED_FUNGUS_ON_A_STICK,{"Warped Fungus on a Stick",ItemKind::Tool,1,100,ToolKind::FishingRod});
+    set(ItemId::APPLE,{"Apple",ItemKind::Food,64,0,ToolKind::None,ToolTier::None,0,0,4,2.4f});
+    set(ItemId::GOLDEN_APPLE,{"Golden Apple",ItemKind::Food,64,0,ToolKind::None,ToolTier::None,0,0,4,9.6f});
+#define NETHER_FAMILY_Door(mat) [](){DoorState state;state.material=DoorMaterial::mat;return doorBlock(state);}()
+#define NETHER_FAMILY_Button(mat) [](){ButtonState state;state.material=DoorMaterial::mat;return buttonBlock(state);}()
+#define NETHER_FAMILY_Slab(material) slabBlock(ArchitecturalMaterial::material,BlockHalf::Bottom)
+#define NETHER_FAMILY_Stair(material) stairBlock(ArchitecturalMaterial::material,BlockHalf::Bottom,BedDirection::North)
+#define NETHER_FAMILY_ITEM(id,key,label,shape,material) set(ItemId::id,{label,ItemKind::Block,64,0,ToolKind::None,ToolTier::None,0,0,0,0,NETHER_FAMILY_##shape(material)});
+    MC_NETHER_FAMILY_ITEMS(NETHER_FAMILY_ITEM)
+#undef NETHER_FAMILY_ITEM
+#undef NETHER_FAMILY_Door
+#undef NETHER_FAMILY_Button
+#undef NETHER_FAMILY_Slab
+#undef NETHER_FAMILY_Stair
+#define NETHER_EGG_PROPS(type,egg,key,label,h,x,y,z,s,d,monster,fire) {ItemProperties p{label " Spawn Egg",ItemKind::SpawnEgg,64};p.spawnEggMob=SpawnEggMob::type;set(ItemId::egg,p);}
+    MC_NETHER_MOBS(NETHER_EGG_PROPS)
+#undef NETHER_EGG_PROPS
+    items[static_cast<size_t>(ItemId::NETHER_WART)].placedBlock=BlockId::NETHER_WART_CROP_0;
     return items;
 }
 
@@ -502,11 +535,22 @@ const auto REGISTRY = buildRegistry();
 // inventory tests: every serialized item appears in exactly one category and
 // all category sizes are asserted there.
 CreativeItemCategory categoryFor(ItemId id) {
+    if(getItemProps(id).kind==ItemKind::SpawnEgg)return CreativeItemCategory::SpawnEggs;
     if(const auto* item=Plugins::pluginItem(id))return item->category;
     if (id >= ItemId::BIRCH_PLANKS && id <= ItemId::ACACIA_PLANKS)
         return CreativeItemCategory::BuildingBlocks;
     if (id >= ItemId::OAK_DOOR && id <= ItemId::STONE_BUTTON)
         return CreativeItemCategory::Functional;
+    if(id==ItemId::APPLE||id==ItemId::GOLDEN_APPLE)return CreativeItemCategory::Food;
+    if(id==ItemId::SADDLE||id==ItemId::WARPED_FUNGUS_ON_A_STICK)return CreativeItemCategory::Tools;
+    if(id>=ItemId::CRIMSON_FUNGUS&&id<=ItemId::NETHER_WART)return CreativeItemCategory::Nature;
+    if(id>=ItemId::SOUL_FIRE&&id<=ItemId::MAGMA_SPAWNER)return CreativeItemCategory::Functional;
+    if(id>=ItemId::CRIMSON_DOOR&&id<=ItemId::WARPED_BUTTON)return CreativeItemCategory::Functional;
+    if(id>=ItemId::CRIMSON_SLAB&&id<=ItemId::BLACKSTONE_STAIRS)return CreativeItemCategory::BuildingBlocks;
+    if(id>=ItemId::FIRE_RESISTANCE_POTION&&id<=ItemId::SPLASH_LONG_WEAKNESS_POTION)return CreativeItemCategory::Combat;
+    if(id>=ItemId::NETHERITE_PICKAXE&&id<=ItemId::NETHERITE_BOOTS)return getItemProps(id).kind==ItemKind::Tool?CreativeItemCategory::Tools:CreativeItemCategory::Combat;
+    if(id>=ItemId::QUARTZ&&id<=ItemId::GOLDEN_APPLE)return CreativeItemCategory::Materials;
+    if(id >= ItemId::NETHERRACK && id <= ItemId::BONE_BLOCK) return CreativeItemCategory::BuildingBlocks;
     switch (id) {
         // ── Building Blocks ─────────────────────────────────────────────
         case ItemId::GRASS_BLOCK: case ItemId::DIRT: case ItemId::STONE:
@@ -776,8 +820,18 @@ const ItemProperties& getItemProps(ItemId id) {
 }
 
 ItemId itemForBlock(BlockId id) {
+    if(respawnAnchorCharge(id)>0)return ItemId::RESPAWN_ANCHOR;
+    if(isNetherWart(id))return ItemId::NETHER_WART;
+    switch(id) {
+#define NETHER_DROP(id,key,label,r,g,b,shape,light) case BlockId::id: return ItemId::id;
+        MC_NETHER_BLOCKS(NETHER_DROP)
+#undef NETHER_DROP
+        default: break;
+    }
     if (const auto* block = Plugins::pluginBlock(id)) return block->drop;
     DoorState door; ButtonState button;
+    if(decodeDoor(id,door)&&door.material>=DoorMaterial::Crimson)return static_cast<ItemId>(static_cast<uint16_t>(ItemId::CRIMSON_DOOR)+static_cast<uint8_t>(door.material)-7);
+    if(decodeButton(id,button)&&button.material>=DoorMaterial::Crimson)return static_cast<ItemId>(static_cast<uint16_t>(ItemId::CRIMSON_BUTTON)+static_cast<uint8_t>(button.material)-7);
     if(decodeDoor(id,door)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_DOOR)+static_cast<uint8_t>(door.material));
     if(decodeButton(id,button)) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_BUTTON)+static_cast<uint8_t>(button.material));
     if(id>=BlockId::BIRCH_PLANKS && id<=BlockId::ACACIA_PLANKS)
@@ -785,6 +839,7 @@ ItemId itemForBlock(BlockId id) {
     if (isBed(id)) return ItemId::WHITE_BED;
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural)) {
+        if(architectural.material>=ArchitecturalMaterial::Crimson)return static_cast<ItemId>(static_cast<uint16_t>(ItemId::CRIMSON_SLAB)+(static_cast<uint8_t>(architectural.material)-5)*2+(architectural.shape==RenderShape::Stair?1:0));
         const uint16_t base = static_cast<uint16_t>(ItemId::OAK_PLANKS_SLAB) +
             static_cast<uint16_t>(architectural.material) * 2;
         return static_cast<ItemId>(base +
@@ -963,6 +1018,24 @@ std::vector<ItemId> creativeInventoryItems() {
 }
 
 const std::string& itemCommandName(ItemId id) {
+    switch(id) {
+#define NETHER_COMMAND(id,key,label,r,g,b,shape,light) case ItemId::id: {static const std::string name=key;return name;}
+        MC_NETHER_BLOCKS(NETHER_COMMAND)
+#undef NETHER_COMMAND
+#define NETHER_RESOURCE_COMMAND(id,key,label) case ItemId::id: {static const std::string name=key;return name;}
+        MC_NETHER_RESOURCES(NETHER_RESOURCE_COMMAND)
+#undef NETHER_RESOURCE_COMMAND
+#define NETHER_EQUIPMENT_COMMAND(id,key,label,base,durability) case ItemId::id: {static const std::string name=key;return name;}
+        MC_NETHER_EQUIPMENT(NETHER_EQUIPMENT_COMMAND)
+#undef NETHER_EQUIPMENT_COMMAND
+#define NETHER_POTION_COMMAND(id,key,label,kind,level,ticks,splash) case ItemId::id: {static const std::string name=key;return name;}
+        MC_NETHER_POTIONS(NETHER_POTION_COMMAND)
+#undef NETHER_POTION_COMMAND
+#define NETHER_FAMILY_COMMAND(id,key,label,shape,material) case ItemId::id:{static const std::string name=key;return name;}
+        MC_NETHER_FAMILY_ITEMS(NETHER_FAMILY_COMMAND)
+#undef NETHER_FAMILY_COMMAND
+        default:break;
+    }
     if (const auto* item = Plugins::pluginItem(id)) return item->command.empty()?item->key:item->command;
     static const auto names = [] {
         std::array<std::string, itemCount> result{};
@@ -988,11 +1061,11 @@ std::optional<ItemId> itemFromCommandName(std::string_view name) {
 ItemId plankItem(DoorMaterial material) {
     constexpr ItemId items[] = {ItemId::OAK_PLANKS, ItemId::BIRCH_PLANKS,
         ItemId::SPRUCE_PLANKS,ItemId::JUNGLE_PLANKS,ItemId::ACACIA_PLANKS,
-        ItemId::SKYROOT_PLANKS,ItemId::STONE};
+        ItemId::SKYROOT_PLANKS,ItemId::STONE,ItemId::CRIMSON_PLANKS,ItemId::WARPED_PLANKS};
     return items[static_cast<uint8_t>(material)];
 }
 bool isWoodPlankItem(ItemId id) {
     if(const auto* b=Plugins::itemBehavior(id))if(b->fields&MC_ITEM_TAGS)return (b->tags&MC_TAG_PLANKS)!=0;
-    return id==ItemId::OAK_PLANKS ||
+    return id==ItemId::CRIMSON_PLANKS||id==ItemId::WARPED_PLANKS||id==ItemId::OAK_PLANKS ||
         (id>=ItemId::BIRCH_PLANKS && id<=ItemId::ACACIA_PLANKS);
 }

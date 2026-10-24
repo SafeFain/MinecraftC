@@ -12,21 +12,67 @@
 
 enum class EntityType : uint16_t {
     Item, Cow, Pig, Sheep, Chicken, Zombie, Skeleton, Spider, Blastling,
-    Arrow, PrimedTnt, Villager, ZombieVillager, IronGolem
+    Arrow, PrimedTnt, Villager, ZombieVillager, IronGolem,
+#define NETHER_ENTITY_ENUM(type,egg,key,label,h,x,y,z,s,d,monster,fire) type,
+    MC_NETHER_MOBS(NETHER_ENTITY_ENUM)
+#undef NETHER_ENTITY_ENUM
+    GhastFireball, BlazeFireball, ThrownPotion, EnderPearl
 };
+static_assert(static_cast<uint16_t>(EntityType::IronGolem)==13 && static_cast<uint16_t>(EntityType::Ghast)==14 && static_cast<uint16_t>(EntityType::EnderPearl)==28,"Append-only entity identities");
+inline bool nativeNetherMob(EntityType type) {return type>=EntityType::Ghast && type<=EntityType::Enderman;}
+inline bool nativeProjectile(EntityType type) {return type>=EntityType::GhastFireball && type<=EntityType::EnderPearl;}
+inline bool nativeFireImmune(EntityType type) {
+    switch(type) {
+#define NETHER_FIRE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return fire;
+        MC_NETHER_MOBS(NETHER_FIRE)
+#undef NETHER_FIRE
+        default:return false;
+    }
+}
+inline bool undeadEntity(EntityType type) {
+    return type==EntityType::Zombie || type==EntityType::ZombieVillager || type==EntityType::Skeleton ||
+        type==EntityType::WitherSkeleton || type==EntityType::ZombifiedPiglin || type==EntityType::Zoglin;
+}
+inline float nativeMobHealth(EntityType type) {
+    switch(type) {
+#define NETHER_HEALTH(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return h;
+        MC_NETHER_MOBS(NETHER_HEALTH)
+#undef NETHER_HEALTH
+        default:return 20;
+    }
+}
+inline float nativeMobDamage(EntityType type) {
+    switch(type) {
+#define NETHER_DAMAGE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return d;
+        MC_NETHER_MOBS(NETHER_DAMAGE)
+#undef NETHER_DAMAGE
+        default:return 3;
+    }
+}
+inline float nativeMobSpeed(EntityType type) {
+    switch(type) {
+#define NETHER_SPEED(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return s;
+        MC_NETHER_MOBS(NETHER_SPEED)
+#undef NETHER_SPEED
+        default:return 2;
+    }
+}
 
 inline EntityType entityTemplate(EntityType type) {
     if(const auto* definition=Plugins::entityContent(static_cast<uint16_t>(type)))return static_cast<EntityType>(definition->base);
     return type;
 }
 inline bool registeredMob(EntityType type) {
-    return type!=EntityType::Item&&type!=EntityType::Arrow&&type!=EntityType::PrimedTnt&&Plugins::validEntity(static_cast<uint16_t>(type));
+    return !nativeProjectile(type)&&type!=EntityType::Item&&type!=EntityType::Arrow&&type!=EntityType::PrimedTnt&&Plugins::validEntity(static_cast<uint16_t>(type));
 }
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };
 
 inline EntityType entityTypeForSpawnEgg(SpawnEggMob mob) {
     switch (mob) {
+#define NETHER_EGG_TYPE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case SpawnEggMob::type:return EntityType::type;
+        MC_NETHER_MOBS(NETHER_EGG_TYPE)
+#undef NETHER_EGG_TYPE
         case SpawnEggMob::Cow: return EntityType::Cow;
         case SpawnEggMob::Pig: return EntityType::Pig;
         case SpawnEggMob::Sheep: return EntityType::Sheep;

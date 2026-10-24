@@ -37,6 +37,7 @@ struct AudioSystem::Impl {
     std::atomic<int> pluginTarget{-1};
     int observedPlugin=-1;
     float pluginMusicGain=0;
+    float netherGain=0,netherLow=0,netherPhase=0,netherAir=0;
     std::atomic<AudioMusicMode> musicTarget{AudioMusicMode::Menu};
     std::atomic<uint32_t> musicDimension{0};
     std::atomic<float> masterVolume{1.0f};
@@ -247,13 +248,19 @@ struct AudioSystem::Impl {
                              menuMusicGain * 0.72f * musicGain,
                              left, right))
                     menuTrackIndex = randomTrack(menuRandomState, menuMusic.size());
-            } else if (requestedMusic == AudioMusicMode::Overworld) {
+            } else if (requestedMusic == AudioMusicMode::Overworld && musicDimension.load()!=2) {
                 if (mixTrack(overworldMusic[overworldTrackIndex],
                              overworldMusicGain * 0.68f * musicGain, left, right))
                     overworldTrackIndex = randomTrack(
                         overworldRandomState, overworldMusic.size());
             }
 
+            const bool nether=requestedMusic==AudioMusicMode::Overworld && musicDimension.load()==2;
+            netherGain+=((nether?1.f:0.f)-netherGain)*.00004f;
+            netherLow+=(noise()-netherLow)*.0015f;netherAir+=(noise()-netherAir)*.018f;
+            netherPhase+=6.283185307f*37.f/SAMPLE_RATE;if(netherPhase>6.283185307f)netherPhase-=6.283185307f;
+            const float ambience=netherGain*(netherLow*.16f+netherAir*.025f+std::sin(netherPhase)*.009f)*soundEffectsGain;
+            left+=ambience;right+=ambience*.94f;
             rainVolume += (rainTarget.load() - rainVolume) * 0.0008f;
             const float whiteLeft = noise();
             const float whiteRight = noise();

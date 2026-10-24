@@ -27,6 +27,7 @@
 #include "ui/Hotbar.h"
 #include "ui/TouchControls.h"
 #include "world/BlockEntity.h"
+#include "game/NetherProgression.h"
 #include <iostream>
 #include <functional>
 #include <chrono>
@@ -236,7 +237,7 @@ int main(int argc,char** argv) {
         Hotbar hotbar;hotbar.setInventory(&items);
         TouchControls touch;touch.configure(width,height,{});
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
-            const bool menuCapture=name=="quality-zh_cn" || name=="quality-scrolled" ||
+            const bool menuCapture=name.rfind("nether-",0)==0 || name=="quality-zh_cn" || name=="quality-scrolled" ||
                 name=="settings" || name=="settings-audio" || name=="settings-bindings" ||
                 name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
                 name=="plugins-en_us" || name=="plugins-zh_cn" || name=="plugins-scrolled-zh_cn" ||
@@ -493,6 +494,19 @@ int main(int argc,char** argv) {
         access.block.type=BlockEntityType::Furnace;access.block.input=items.slot(0);
         access.block.burnRemaining=80;access.block.burnTotal=160;access.block.cookProgress=100;
         draw("furnace",[&]{container.render(ui,width,height,0,0);});
+        access.block={};access.block.type=BlockEntityType::BrewingStand;
+        access.block.chest[0]={ItemId::FIRE_RESISTANCE_POTION,1,0};access.block.chest[1]={ItemId::STRENGTH_POTION,1,0};access.block.chest[2]={ItemId::HEALING_POTION,1,0};
+        access.block.chest[3]={ItemId::NETHER_WART,10,0};access.block.chest[4]={ItemId::BLAZE_POWDER,5,0};access.block.burnRemaining=16;access.block.cookProgress=200;
+        for(const auto language:{Language::English,Language::SimplifiedChinese,Language::Arabic}) {
+            localization.setLanguage(language);draw("nether-brewing-"+std::string(languageCode(language)),[&]{container.render(ui,width,height,0,0);});
+        }
+        access.block={};access.block.type=BlockEntityType::SmithingTable;
+        access.block.chest[0]={ItemId::NETHERITE_UPGRADE_TEMPLATE,2,0};access.block.chest[1]={ItemId::DIAMOND_SWORD,1,417};access.block.chest[2]={ItemId::NETHERITE_INGOT,3,0};
+        access.block.output=smithingResult(access.block.chest[0],access.block.chest[1],access.block.chest[2]);
+        for(const auto language:{Language::English,Language::SimplifiedChinese,Language::Arabic}) {
+            localization.setLanguage(language);draw("nether-smithing-"+std::string(languageCode(language)),[&]{container.render(ui,width,height,0,0);});
+        }
+        localization.setLanguage(Language::English);
         draw("trades",[&]{trades.render(ui,width,height,0,0);});
         draw("hud-touch",[&]{
             UiTheme::menuBackground(ui,width,height);hotbar.render(ui,width,height);touch.render(ui);

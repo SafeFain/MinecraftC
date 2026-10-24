@@ -1,5 +1,7 @@
 #include "entity/EntityManager.h"
 #include "entity/ProjectileLogic.h"
+#include "game/NetherProgression.h"
+#include "game/DimensionRules.h"
 #include "player/Player.h"
 #include "world/World.h"
 #include <algorithm>
@@ -13,7 +15,7 @@ uint32_t aiHash(uint32_t value) {
 }
 bool livingMob(const Entity& e) {
     return e.health>0 && e.type!=EntityType::Item && e.type!=EntityType::Arrow &&
-           e.type!=EntityType::PrimedTnt;
+           e.type!=EntityType::PrimedTnt && !nativeProjectile(e.type);
 }
 }
 
@@ -291,7 +293,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     if (hostile(entity.type) && shouldHostileDespawn(
             static_cast<float>(nearestPlayerDistance),
             entity.ageSeconds,aiHash(entity.behaviorSeed+static_cast<uint32_t>(entity.ageSeconds)))) {
-        entity.health=0; cancelNavigation(entity); return;
+        entity.health=0;entity.despawning=true; cancelNavigation(entity); return;
     }
     // Invalidation is immediate even while expensive decisions are throttled.
     if (ai.hasTarget) {
@@ -309,6 +311,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     if (m_aiTime+1e-6>=ai.nextDecision) {
         decideBehavior(entity,player,isDay,playerTargetable,worldTick,thunderstorm);
         if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(entity.type)))ai.speed=e->speed;
+        else if(nativeNetherMob(entity.type))ai.speed=nativeMobSpeed(entity.type);
         const float interval=nearestPlayerDistance<=Config::AI_NEAR_DISTANCE ?
             Config::AI_NEAR_INTERVAL : Config::AI_FAR_INTERVAL;
         ai.nextDecision=m_aiTime+interval;
@@ -319,6 +322,8 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
         Entity* other=aiEntity(ai.targetId);
         return other && livingMob(*other) ? std::optional<glm::dvec3>(other->position) : std::nullopt;
     };
+    const float baseDamage=Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : nativeMobDamage(entity.type);
+    const float meleeDamage=std::max(0.f,baseDamage+3*entity.effects.level(StatusEffectType::Strength)-4*entity.effects.level(StatusEffectType::Weakness));
     const auto events=m_modelRegistry.advance(entity.type,entity.id,dt);
     for (const auto& event:events) {
         if (!entity.attackPending) continue;
@@ -345,12 +350,13 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             if (glm::length(knockback)>.001f) knockback=glm::normalize(knockback);
             if (!ai.targetId) {
                 DamageSourceInfo source;
-                source.amount=Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : 3; source.cause=DamageCause::Melee;
+                source.amount=meleeDamage; source.cause=DamageCause::Melee;
                 source.shieldBlockable=true; source.hasOrigin=true; source.origin=origin;
                 source.impulse=knockback*4.0f+glm::vec3(0,2,0);
-                player.takeDamage(source);
+                const auto outcome=player.takeDamage(source);
+                if(outcome.appliedDamage>0 && entity.type==EntityType::WitherSkeleton)player.statusEffects().apply(StatusEffectType::Wither,0,200);
             } else if (Entity* other=aiEntity(ai.targetId)) {
-                damageEntity(*other,Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : 3,knockback*3.0f+glm::vec3(0,entityTemplate(entity.type)==EntityType::IronGolem ? 5.0f : 1.5f,0),false,entity.position,entity.id);
+                damageEntity(*other,meleeDamage,knockback*3.0f+glm::vec3(0,entityTemplate(entity.type)==EntityType::IronGolem ? 5.0f : 1.5f,0),false,entity.position,entity.id);
                 if (other->health<=0 && other->type==EntityType::Villager &&
                     (entityTemplate(entity.type)==EntityType::Zombie || entityTemplate(entity.type)==EntityType::ZombieVillager) &&
                     villagerInfectionConverts(player.difficulty(),aiHash(entity.behaviorSeed^
@@ -392,4 +398,164 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     }
     m_modelRegistry.setLocomotion(entity.type,entity.id,
         std::hypot(entity.locomotionVelocity.x,entity.locomotionVelocity.z));
+}
+
+
+bool EntityManager::nativeTargetsPlayer(Entity& entity,const Player& player) const {
+    if(entity.type==EntityType::Strider)return false;
+    if(entity.type==EntityType::ZombifiedPiglin)return entity.nether.angerTicks>0;
+    if(entity.type==EntityType::Piglin) {
+        if(entity.nether.barterTicks)return false;
+        if(entity.nether.angerTicks)return true;
+        for(const auto& armor:player.inventory().armor())
+            if(!armor.empty() && armor.id>=ItemId::GOLDEN_HELMET && armor.id<=ItemId::GOLDEN_BOOTS)return false;
+    }
+    if(entity.type==EntityType::Enderman && !entity.nether.angerTicks) {
+        const auto eye=entity.position+glm::dvec3(0,2.65,0);
+        const auto delta=eye-player.getEyePosition();const auto distance=glm::length(delta);
+        if(distance>32 || distance<.01 || glm::dot(glm::dvec3(player.getForward()),delta/distance)<1-.025/distance)return false;
+        entity.nether.angerTicks=600;
+    }
+    return true;
+}
+
+void EntityManager::angerPiglins(const glm::dvec3& position,bool zombified) {
+    for(auto& entity:m_entities)if(entity.health>0 &&
+        (zombified?entity.type==EntityType::ZombifiedPiglin:entity.type==EntityType::Piglin) && glm::distance(entity.position,position)<=16)
+        entity.nether.angerTicks=600;
+}
+
+bool EntityManager::teleportEnderman(Entity& entity) {
+    const auto rules=dimensionRules(m_world.dimension());
+    for(uint32_t i=0;i<16;++i) {
+        const uint32_t h=aiHash(entity.behaviorSeed^(++entity.nether.barterSequence));
+        const int x=int(std::floor(entity.position.x))+int(h%33)-16;
+        const int z=int(std::floor(entity.position.z))+int((h>>8)%33)-16;
+        for(int y=std::min(rules.maximumY-3,int(entity.position.y)+8);y>=std::max(rules.minimumY+1,int(entity.position.y)-8);--y) {
+            const auto support=m_world.getBlock(x,y-1,z);
+            if(!isSolid(support)||isLava(support)||support==BlockId::MAGMA_BLOCK)continue;
+            const glm::dvec3 candidate(x+.5,y,z+.5);
+            bool dry=true;
+            for(int dy=0;dy<3;++dy) {
+                const auto block=m_world.getLoadedBlock(x,y+dy,z);
+                if(!block||isFluid(*block)||*block==BlockId::FIRE||*block==BlockId::SOUL_FIRE)dry=false;
+            }
+            if(dry&&!collides(entity,candidate)) {
+                entity.position=candidate;entity.velocity={0,0,0};cancelNavigation(entity);return true;
+            }
+        }
+    }
+    return false;
+}
+
+void EntityManager::tickNativeState(Entity& entity,float dt) {
+    entity.nativeTickAccumulator+=dt*20;
+    while(entity.nativeTickAccumulator>=1) {
+        entity.nativeTickAccumulator-=1;
+        auto& state=entity.nether;
+        if(state.angerTicks && --state.angerTicks==0 && (entity.type==EntityType::ZombifiedPiglin||entity.type==EntityType::Enderman)){entity.ai={};entity.attackPending=false;}
+        if(state.attackTicks)--state.attackTicks;
+        if(state.boostTicks)--state.boostTicks;
+        entity.effects.tick([&](float h){applyEntityPotion(entity,PotionDefinition{{StatusEffectType::Healing,0,1},false},h/4);},
+                            [&](float h){damageEntity(entity,h,glm::vec3(0),false);});
+        if((entity.type==EntityType::Piglin || entity.type==EntityType::PiglinBrute || entity.type==EntityType::Hoglin) && m_world.dimension()==DimensionId::Overworld) {
+            if(++state.conversionTicks>=300) {
+                entity.type=entity.type==EntityType::Hoglin?EntityType::Zoglin:EntityType::ZombifiedPiglin;
+                state.conversionTicks=0;entity.health=std::min(entity.health,nativeMobHealth(entity.type));entity.ai={};
+            }
+        } else state.conversionTicks=0;
+        if(state.cureTicks && --state.cureTicks==0 && entity.type==EntityType::ZombieVillager) {
+            entity.type=EntityType::Villager;entity.health=20;entity.effects.clear();entity.ai={};
+        }
+        if(state.barterTicks && --state.barterTicks==0 && entity.type==EntityType::Piglin) {
+            // One payment has one durable timer and sequence; no request-order RNG.
+            const auto roll=aiHash(entity.behaviorSeed^(++state.barterSequence));
+            constexpr ItemId drops[]={ItemId::ENDER_PEARL,ItemId::QUARTZ,ItemId::OBSIDIAN,ItemId::CRYING_OBSIDIAN,
+                ItemId::STRING,ItemId::LEATHER,ItemId::FIRE_RESISTANCE_POTION,ItemId::SOUL_SAND};
+            Entity drop;drop.type=EntityType::Item;drop.health=1;drop.position=entity.position+glm::dvec3(0,.8,0);
+            drop.velocity=entity.facing*2.f+glm::vec3(0,2,0);drop.actionCooldown=1;
+            drop.item={drops[roll%8],static_cast<uint8_t>(roll%8==6?1:2+(roll>>8)%3),0};
+            m_nativeSpawns.push_back(drop);
+        }
+    }
+    if(entity.type==EntityType::Enderman && touchesWater(entity) && entity.nether.attackTicks==0) {
+        entity.nether.attackTicks=10;
+        if(damageEntity(entity,1,glm::vec3(0),false)<=0)teleportEnderman(entity);
+    }
+    if(entity.type==EntityType::Strider) {
+        const auto pos=glm::ivec3(glm::floor(entity.position));
+        if(isLava(m_world.getBlock(pos.x,pos.y,pos.z)) || isLava(m_world.getBlock(pos.x,pos.y-1,pos.z))) {
+            const double top=std::floor(entity.position.y)+1;
+            if(isLava(m_world.getBlock(pos.x,pos.y,pos.z)) && !isLava(m_world.getBlock(pos.x,pos.y+1,pos.z)))entity.position.y=top;
+            entity.velocity.y=std::max(entity.velocity.y,0.f);entity.ai.grounded=true;
+        }
+    }
+    if(entity.type==EntityType::MagmaCube && entity.ai.grounded && entity.nether.attackTicks==0) {
+        entity.velocity.y=5.f+entity.nether.magmaSize;entity.ai.grounded=false;entity.nether.attackTicks=30;
+    }
+}
+
+bool EntityManager::updateNativeMob(Entity& entity,Player& player,float dt,bool targetable) {
+    if(entity.type==EntityType::Strider && entity.riderId!=UINT64_MAX) {
+        auto found=std::find_if(m_framePlayers.begin(),m_framePlayers.end(),[&](const auto& v){return v.id==entity.riderId;});
+        if(found==m_framePlayers.end()||found->player->survivalStats().dead()) {
+            entity.riderId=UINT64_MAX;return false;
+        }
+        auto& rider=*found->player;
+        if(rider.sneakInput() && tryDismount(rider,entity.riderId))return false;
+        if(rider.inventory().slot(size_t(rider.selectedSlot())).id==ItemId::WARPED_FUNGUS_ON_A_STICK) {
+            const auto pos=glm::ivec3(glm::floor(entity.position));
+            const bool warm=isLava(m_world.getBlock(pos.x,pos.y-1,pos.z))||isLava(m_world.getBlock(pos.x,pos.y,pos.z));
+            glm::vec3 forward(rider.getForward().x,0,rider.getForward().z);
+            if(glm::length(forward)>.001f)forward=glm::normalize(forward);
+            const auto before=entity.position;const auto previousVelocity=entity.velocity;
+            moveWithTerrain(entity,forward*(warm?4.2f:1.1f)*(entity.nether.boostTicks?1.8f:1.f),dt);
+            if(riderCollides(entity.position+glm::dvec3(0,1.7,0))) {
+                entity.position=before;entity.velocity=previousVelocity;entity.locomotionVelocity=glm::vec3(0);
+            }
+        }
+        rider.followMount(entity.position+glm::dvec3(0,1.7,0));
+        m_modelRegistry.advance(entity.type,entity.id,dt);
+        m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(entity.locomotionVelocity));
+        return true;
+    }
+    if(entity.type!=EntityType::Ghast && entity.type!=EntityType::Blaze)return false;
+    const auto eye=entity.position+glm::dvec3(0,entity.type==EntityType::Ghast?2:1.5,0);
+    const auto delta=player.getEyePosition()-eye;const auto distance=glm::length(delta);
+    if(m_aiTime>=entity.ai.nextDecision) {
+        ++m_aiStats.decisions;
+        entity.ai.targetVisible=targetable&&distance<48&&aiClearSight(eye,player.getEyePosition());
+        entity.ai.hasTarget=targetable&&(entity.ai.targetVisible||m_aiTime<entity.ai.memoryUntil);
+        if(entity.ai.targetVisible){entity.ai.lastSeen=player.getEyePosition();entity.ai.memoryUntil=m_aiTime+3;}
+        entity.ai.nextDecision=m_aiTime+(distance<Config::AI_NEAR_DISTANCE?Config::AI_NEAR_INTERVAL:Config::AI_FAR_INTERVAL);
+    }
+    glm::vec3 motion(0);
+    if(targetable&&distance>.01 && (entity.ai.targetVisible || m_aiTime<entity.ai.memoryUntil)) {
+        const auto direction=glm::vec3(glm::normalize(entity.ai.lastSeen-eye));
+        entity.facing=direction;
+        motion=direction*(distance>(entity.type==EntityType::Ghast?18:8)?nativeMobSpeed(entity.type):-.5f);
+        if(entity.ai.targetVisible && entity.nether.attackTicks==0) {
+            const auto type=entity.type==EntityType::Ghast?EntityType::GhastFireball:EntityType::BlazeFireball;
+            Entity projectile;projectile.type=type;projectile.health=1;projectile.position=eye+glm::dvec3(direction)*1.5;
+            projectile.velocity=direction*(type==EntityType::GhastFireball?12.f:18.f);projectile.shooterId=entity.id;
+            m_nativeSpawns.push_back(projectile);
+            if(type==EntityType::BlazeFireball) {
+                entity.nether.attackTicks=++entity.nether.burstRemaining<3?6:80;
+                if(entity.nether.burstRemaining>=3)entity.nether.burstRemaining=0;
+            } else entity.nether.attackTicks=60;
+            entity.attackPending=m_modelRegistry.playAction(entity.type,entity.id,"attack");
+        }
+    } else {
+        const float phase=float(m_aiTime)+entity.behaviorSeed*.01f;
+        motion={std::sin(phase*.2f)*.6f,std::cos(phase*.3f)*.3f,std::cos(phase*.2f)*.6f};
+    }
+    const int steps=sweptCollisionSteps(glm::length(motion)*dt);
+    for(int i=0;i<steps;++i) {
+        const auto next=entity.position+glm::dvec3(motion)*(double(dt)/steps);
+        if(!collides(entity,next))entity.position=next;
+    }
+    entity.locomotionVelocity=motion;
+    m_modelRegistry.advance(entity.type,entity.id,dt);
+    m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(motion));
+    return true;
 }

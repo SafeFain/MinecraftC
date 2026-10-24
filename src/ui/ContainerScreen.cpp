@@ -1,3 +1,5 @@
+#include "world/BlockEntityLogic.h"
+#include "game/NetherProgression.h"
 #include "ui/ContainerScreen.h"
 
 #include "game/SurvivalRules.h"
@@ -52,6 +54,12 @@ void ContainerScreen::layout(int width, int height) {
         for (int i = 0; i < 27; ++i)
             m_containerRects[i] = {x0 + (i % 9) * (slot + gap),
                 y0 + (2 - i / 9) * (slot + gap), slot, slot};
+    } else if(entity->type==BlockEntityType::BrewingStand) {
+        for(int i=0;i<3;++i)m_containerRects[i]={100.f+i*80.f,invY+235,slot,slot};
+        m_containerRects[3]={180,invY+335,slot,slot};m_containerRects[4]={300,invY+335,slot,slot};
+    } else if(entity->type==BlockEntityType::SmithingTable) {
+        for(int i=0;i<3;++i)m_containerRects[i]={36.f+i*80.f,invY+285,slot,slot};
+        m_containerRects[3]={368,invY+285,slot,slot};
     } else {
         const float cx=230,cy=invY+285;
         m_containerRects[0] = {cx - 120, cy + 36, slot, slot};
@@ -93,10 +101,9 @@ void ContainerScreen::quickMove(int x,int y) {
         else if(fuelTicks(source.id))targets.push_back(&entity->fuel);
         InventoryInteraction::transfer(source,targets);return;
     }
-    const int count=entity->type==BlockEntityType::Chest?27:3;
+    const int count=containerStackCount(entity->type);
     for(int i=0;i<count;++i)if(contains(m_containerRects[i],x,y)){
-        ItemStack* source=entity->type==BlockEntityType::Chest?&entity->chest[i]:
-            (i==0?&entity->input:i==1?&entity->fuel:&entity->output);
+        ItemStack* source=containerStack(*entity,i);
         std::vector<ItemStack*> targets;for(size_t slot=0;slot<36;++slot)targets.push_back(&m_inventory.slot(slot));
         InventoryInteraction::transfer(*source,targets);return;
     }
@@ -119,17 +126,20 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     UiTheme::rect(ui,m_panelRect.x+16*scale,m_panelRect.y+242*scale,
                   m_panelRect.w-32*scale,1,UiTheme::BORDER);
     const std::string title=ui.localization().text(
-        entity->type==BlockEntityType::Chest?"container.chest":"container.furnace");
+        entity->type==BlockEntityType::Chest?"container.chest":entity->type==BlockEntityType::BrewingStand?"container.brewing":entity->type==BlockEntityType::SmithingTable?"container.smithing":"container.furnace");
     UiTheme::textWithShadow(ui,title,m_panelRect.x+16*scale,m_panelRect.y+432*scale,
         UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-32*scale),UiTheme::TEXT);
     for (size_t i=0;i<m_inventoryRects.size();++i)
         drawSlot(i,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
-    if (entity->type == BlockEntityType::Chest) {
-        for (int i=0;i<27;++i) drawSlot(36+i,m_containerRects[i],entity->chest[i],contains(m_containerRects[i],mx,my));
-    } else {
-        drawSlot(36,m_containerRects[0],entity->input,contains(m_containerRects[0],mx,my));
-        drawSlot(37,m_containerRects[1],entity->fuel,contains(m_containerRects[1],mx,my));
-        drawSlot(38,m_containerRects[2],entity->output,contains(m_containerRects[2],mx,my));
+    for(int i=0;i<containerStackCount(entity->type);++i)
+        drawSlot(36+i,m_containerRects[i],*containerStack(*entity,i),contains(m_containerRects[i],mx,my));
+    if(entity->type==BlockEntityType::BrewingStand) {
+        UiTheme::progressBar(ui,m_containerRects[3].x,m_containerRects[3].y-30*scale,44*scale,10*scale,
+            entity->cookProgress/400.f,UiTheme::ACCENT);
+        UiTheme::textWithShadow(ui,std::to_string(entity->burnRemaining),m_containerRects[4].x,m_containerRects[4].y-20*scale,scale,UiTheme::TEXT);
+    } else if(entity->type==BlockEntityType::SmithingTable) {
+        UiTheme::sprite(ui,m_containerRects[2].x+66*scale,m_containerRects[2].y+16*scale,2*scale,UiTheme::ARROW_RIGHT,UiTheme::ARROW_PALETTE);
+    } else if(entity->type==BlockEntityType::Furnace) {
         if (entity->burnTotal) {
             const float burn = std::clamp(
                 static_cast<float>(entity->burnRemaining) /
@@ -156,10 +166,9 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
         for (size_t i=0;i<m_inventoryRects.size();++i)
             if (contains(m_inventoryRects[i],mx,my) && !m_inventory.slot(i).empty())
                 ui.drawTooltip(mx+12,my+12,m_inventory.slot(i));
-        const int count = entity->type == BlockEntityType::Chest ? 27 : 3;
+        const int count = containerStackCount(entity->type);
         for (int i=0;i<count;++i) if (contains(m_containerRects[i],mx,my)) {
-            const ItemStack* stack = entity->type == BlockEntityType::Chest ? &entity->chest[i] :
-                (i==0?&entity->input:i==1?&entity->fuel:&entity->output);
+            const ItemStack* stack=containerStack(*entity,i);
             if (!stack->empty()) ui.drawTooltip(mx+12,my+12,*stack);
         }
     }
@@ -173,7 +182,7 @@ void ContainerScreen::click(int button, int x, int y) {
     for (size_t i=0;i<m_inventoryRects.size();++i) if (contains(m_inventoryRects[i],x,y)) {
         moveStack(m_cursor,m_inventory.slot(i),right); return;
     }
-    const int count = entity->type == BlockEntityType::Chest ? 27 : 3;
+    const int count = containerStackCount(entity->type);
     for (int i=0;i<count;++i) if (contains(m_containerRects[i],x,y)) {
         if (entity->type == BlockEntityType::Chest) moveStack(m_cursor,entity->chest[i],right);
         else if (i == 0 && (m_cursor.empty() || findSmeltingRecipe(m_cursor.id)))
@@ -221,7 +230,7 @@ void ContainerScreen::onMouseMove(int x,int y){
 std::vector<ContainerScreen::Rect> ContainerScreen::focusRects() const {
     std::vector<Rect> rects(m_inventoryRects.begin(),m_inventoryRects.end());
     const BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
-    const int count=entity?(entity->type==BlockEntityType::Chest?27:3):0;
+    const int count=entity?(containerStackCount(entity->type)):0;
     for(int i=0;i<count;++i)rects.push_back(m_containerRects[static_cast<size_t>(i)]);
     return rects;
 }
@@ -259,11 +268,10 @@ ItemStack* ContainerScreen::hoveredStack(int x, int y) {
         if (contains(m_inventoryRects[i], x, y)) return &m_inventory.slot(i);
     BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return nullptr;
-    const int count = entity->type == BlockEntityType::Chest ? 27 : 3;
+    const int count = containerStackCount(entity->type);
     for (int i = 0; i < count; ++i) {
         if (!contains(m_containerRects[static_cast<size_t>(i)], x, y)) continue;
-        if (entity->type == BlockEntityType::Chest) return &entity->chest[i];
-        return i == 0 ? &entity->input : i == 1 ? &entity->fuel : &entity->output;
+        return containerStack(*entity,i);
     }
     return nullptr;
 }
@@ -334,13 +342,8 @@ std::optional<InventorySlot> ContainerScreen::logicalSlot(const ItemStack* stack
     for (size_t i = 0; i < 36; ++i) if (stack == &m_inventory.slot(i)) return InventorySlot{InventoryArea::Storage, static_cast<uint8_t>(i)};
     const auto* container = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!container) return std::nullopt;
-    if (container->type == BlockEntityType::Chest) {
-        for (size_t i = 0; i < 27; ++i) if (stack == &container->chest[i]) return InventorySlot{InventoryArea::Container, static_cast<uint8_t>(i)};
-    } else {
-        if (stack == &container->input) return InventorySlot{InventoryArea::Container, 0};
-        if (stack == &container->fuel) return InventorySlot{InventoryArea::Container, 1};
-        if (stack == &container->output) return InventorySlot{InventoryArea::Container, 2};
-    }
+    for(int i=0;i<containerStackCount(container->type);++i)
+        if(stack==containerStack(*container,i))return InventorySlot{InventoryArea::Container,static_cast<uint8_t>(i)};
     return std::nullopt;
 }
 bool ContainerScreen::command(InventoryOperation operation, ItemStack* stack, uint16_t argument, bool alternate) {

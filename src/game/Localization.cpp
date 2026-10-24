@@ -116,6 +116,7 @@ std::string Localization::itemName(ItemId item) const {
 }
 
 std::string Localization::dimensionName(uint32_t dimension) const {
+    if(dimension==static_cast<uint32_t>(DimensionId::Nether))return text("lan.nether");
     const auto& d=Plugins::dimensionContent(dimension);
     return d.nameKey.empty()?shaped(d.name):text(d.nameKey);
 }

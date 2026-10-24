@@ -411,6 +411,12 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
     if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
     Plugins::Json::parse(entity.pluginState);
     appendString(payload,entity.pluginState);append(payload,entity.pluginStateVersion);
+    if(!validNetherMobState(entity.nether)||!validStatusEffects(entity.effects))throw std::runtime_error("Invalid native entity state");
+#define NETHER_SAVE_FIELD(type,name,value) append(payload,entity.nether.name);
+    MC_NETHER_STATE_FIELDS(NETHER_SAVE_FIELD)
+#undef NETHER_SAVE_FIELD
+    append(payload,static_cast<uint8_t>(entity.effects.size()));
+    for(const auto& effect:entity.effects) {append(payload,static_cast<uint8_t>(effect.type));append(payload,effect.amplifier);append(payload,effect.remaining);}
 }
 
 WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
@@ -485,6 +491,14 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
             }
         }
     }
+    if(version>=22) {
+#define NETHER_LOAD_FIELD(type,name,value) entity.nether.name=reader.read<type>();
+        MC_NETHER_STATE_FIELDS(NETHER_LOAD_FIELD)
+#undef NETHER_LOAD_FIELD
+        const auto count=reader.read<uint8_t>();if(count>7)throw std::runtime_error("Too many entity effects");
+        for(uint8_t i=0;i<count;++i)entity.effects.push_back({static_cast<StatusEffectType>(reader.read<uint8_t>()),reader.read<uint8_t>(),reader.read<uint32_t>()});
+        if(!validNetherMobState(entity.nether)||!validStatusEffects(entity.effects))throw std::runtime_error("Invalid native entity state");
+    }
     // Appended entity types are legal only in the versions that introduced them.
     if ((version<19 && entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager)) ||
         (version>=19&&!reader.inspectOnly&&!reader.recoverPlugins&&!Plugins::validEntity(entity.type)))
@@ -500,6 +514,12 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
         appendString(payload,entity.value.lootKey);appendString(payload,entity.value.lootRevision);
         appendString(payload,entity.value.structureKey);appendString(payload,entity.value.structureRevision);
         append(payload,entity.value.lootSeed);append(payload,static_cast<uint8_t>(entity.value.lootInitialized));
+    } else if(entity.value.type==BlockEntityType::BrewingStand||entity.value.type==BlockEntityType::SmithingTable) {
+        const int count=entity.value.type==BlockEntityType::BrewingStand?5:3;
+        for(int i=0;i<count;++i)appendStack(payload,entity.value.chest[i]);
+        if(entity.value.type==BlockEntityType::BrewingStand){appendStack(payload,entity.value.input);append(payload,entity.value.burnRemaining);append(payload,entity.value.cookProgress);}
+    } else if(entity.value.type==BlockEntityType::Spawner) {
+        append(payload,entity.value.burnRemaining);
     } else if (entity.value.type == BlockEntityType::Resource) {
         append(payload,entity.value.resourceRemaining);appendString(payload,Plugins::blockKey(static_cast<BlockId>(entity.value.resourceBlock)));
     } else if (entity.value.type == BlockEntityType::Button) {
@@ -521,7 +541,7 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     if (entity.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid block entity position");
     const uint8_t type = reader.read<uint8_t>();
-    if (type > static_cast<uint8_t>(version >= 21 ? BlockEntityType::Resource : version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
+    if (type > static_cast<uint8_t>(version >= 22 ? BlockEntityType::Spawner : version >= 21 ? BlockEntityType::Resource : version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
         throw std::runtime_error("Invalid block entity type");
     entity.value.type = static_cast<BlockEntityType>(type);
     if (entity.value.type == BlockEntityType::Chest) {
@@ -531,6 +551,12 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
             if(!e.lootKey.empty()){const auto& tables=Plugins::content().extensions.loot;const auto found=tables.find(e.lootKey);if(!e.lootInitialized)throw std::runtime_error("Incompatible chest loot metadata");
                 if(found==tables.end()||found->second.revision!=e.lootRevision){if(!reader.recoverPlugins)throw std::runtime_error("Incompatible chest loot metadata");reader.issue("loot_revision",e.lootKey,e.lootRevision,found==tables.end()?"":found->second.revision);e.lootKey.clear();e.lootRevision.clear();}}
             if(!e.structureKey.empty()){const auto& structures=Plugins::content().extensions.structures;const auto found=structures.find(e.structureKey);if(found==structures.end()||found->second.revision!=e.structureRevision){if(!reader.recoverPlugins)throw std::runtime_error("Incompatible chest structure metadata");reader.issue("structure_revision",e.structureKey,e.structureRevision,found==structures.end()?"":found->second.revision);e.structureKey.clear();e.structureRevision.clear();}}}
+    } else if(entity.value.type==BlockEntityType::BrewingStand||entity.value.type==BlockEntityType::SmithingTable) {
+        const int count=entity.value.type==BlockEntityType::BrewingStand?5:3;
+        for(int i=0;i<count;++i)entity.value.chest[i]=readStack(reader);
+        if(entity.value.type==BlockEntityType::BrewingStand){entity.value.input=readStack(reader);entity.value.burnRemaining=reader.read<uint16_t>();entity.value.cookProgress=reader.read<uint16_t>();entity.value.cookTotal=400;if(entity.value.burnRemaining>20||entity.value.cookProgress>=400)throw std::runtime_error("Invalid brewing progress");}
+    } else if(entity.value.type==BlockEntityType::Spawner) {
+        entity.value.burnRemaining=reader.read<uint16_t>();if(entity.value.burnRemaining>600)throw std::runtime_error("Invalid spawner timer");
     } else if(entity.value.type==BlockEntityType::Resource){entity.value.resourceRemaining=reader.read<uint32_t>();const auto resourceKey=reader.readString();if(!Plugins::validKey(resourceKey))throw std::runtime_error("Invalid resource block key");try{entity.value.resourceBlock=static_cast<uint16_t>(Plugins::resolveBlock(resourceKey));}catch(const std::exception&){if(!reader.recoverPlugins)throw;entity.value.resourceBlock=0;reader.issue("missing_content",resourceKey,resourceKey,"");}if(entity.value.resourceRemaining>72000)throw std::runtime_error("Invalid resource timer");
     } else if (entity.value.type == BlockEntityType::Button) {
         entity.value.buttonRemaining = reader.read<uint16_t>();
@@ -600,6 +626,9 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload, metadata.heaven.dayPhase);
     // v11 persists the Java-style food timer at the payload tail.
     append(payload, metadata.foodTickTimer);
+    if(!validStatusEffects(metadata.effects))throw std::runtime_error("Invalid player effects");
+    append(payload,static_cast<uint8_t>(metadata.effects.size()));
+    for(const auto& e:metadata.effects){append(payload,static_cast<uint8_t>(e.type));append(payload,e.amplifier);append(payload,e.remaining);}
     // v14 stores the world-wide day/night duration in seconds.
     append(payload, metadata.dayNightDurationSeconds);
     const size_t ruleCount = static_cast<size_t>(GameRuleId::DayNightDuration) + metadata.gameRules.unknown.size();
@@ -657,6 +686,7 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
         append(payload,state.worldTicks);append(payload,state.dayPhase);
         append(payload,static_cast<uint8_t>(state.weather.raining));append(payload,static_cast<uint8_t>(state.weather.thundering));append(payload,state.weather.rainTicks);append(payload,state.weather.thunderTicks);append(payload,state.weather.sequence);
         append(payload,static_cast<uint8_t>(state.bedSpawn.has_value()));if(state.bedSpawn)append(payload,*state.bedSpawn);
+        append(payload,static_cast<uint8_t>(state.anchorSpawn.has_value()));if(state.anchorSpawn)append(payload,*state.anchorSpawn);
     }
     append(payload,static_cast<uint32_t>(metadata.timePolicies.size()));
     for(const auto& entry:metadata.timePolicies){appendString(payload,Plugins::dimensionContent(entry.first).key);append(payload,entry.second.first);append(payload,entry.second.second);}
@@ -665,13 +695,13 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
 
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
-    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v21; legacy worlds are incompatible");
+    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v22; legacy worlds are incompatible");
     const bool recovery=m_policy==SaveReadPolicy::RecoverPlugins;
     Reader reader(std::move(checked.payload), checked.version, inspection, recovery, m_issues);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
-    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v21; legacy worlds are incompatible";
+    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v22; legacy worlds are incompatible";
     if (checked.version < 16 && !Plugins::content().requirements.empty()) {
         metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
         if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
@@ -741,6 +771,11 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     }
     if (checked.version >= 11)
         metadata.foodTickTimer = reader.read<uint32_t>();
+    if(checked.version>=22) {
+        const auto count=reader.read<uint8_t>();if(count>7)throw std::runtime_error("Too many player effects");
+        for(uint8_t i=0;i<count;++i)metadata.effects.push_back({static_cast<StatusEffectType>(reader.read<uint8_t>()),reader.read<uint8_t>(),reader.read<uint32_t>()});
+        if(!validStatusEffects(metadata.effects))throw std::runtime_error("Invalid player effects");
+    }
     if (checked.version >= 14) {
         metadata.dayNightDurationSeconds = reader.read<uint32_t>();
         if (metadata.dayNightDurationSeconds == 0)
@@ -834,6 +869,10 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
             state.safePosition=glm::ivec3(glm::floor(state.safePlayerPosition));
             state.weather.raining=flag();state.weather.thundering=flag();state.weather.rainTicks=reader.read<uint32_t>();state.weather.thunderTicks=reader.read<uint32_t>();state.weather.sequence=reader.read<uint64_t>();
             if(flag())state.bedSpawn=reader.read<glm::ivec3>();
+            if(checked.version>=22&&flag()) {
+                state.anchorSpawn=reader.read<glm::ivec3>();const auto p=*state.anchorSpawn;
+                if(id!=2||std::abs(int64_t(p.x))>30000000||std::abs(int64_t(p.z))>30000000||p.y<0||p.y>=256)throw std::runtime_error("Invalid respawn anchor");
+            }
         }
         if(!keys.count(activeKey)||!keys.count("minecraftc:overworld"))throw std::runtime_error("Missing saved dimension state");
         metadata.activeDimension=static_cast<DimensionId>(resolve(activeKey,2048));
@@ -1212,7 +1251,7 @@ void SaveStore::recoverFileTo(const std::filesystem::path& relative,const std::f
     SaveStore source(m_worldDirectory/file.root,m_policy,m_issues),target(destination/file.root);
     if(file.kind) {
         const auto checked=readChecked(m_worldDirectory/relative);
-        if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v21");
+        if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v22");
     }
     switch(file.kind) {
         case 'l': {auto metadata=source.loadMetadata();if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");if(!destination.empty()) {
@@ -1386,4 +1425,45 @@ void WorldRecovery::restoreInterrupted(const std::filesystem::path& saves) {
             }
         }
     }
+}
+
+
+std::vector<glm::ivec3> SaveStore::netherPortalsNear(const glm::dvec3& center,int radius) const {
+    if(radius<0||radius>160||!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(center.z)||std::abs(center.x)>30000000||std::abs(center.z)>30000000)
+        throw std::runtime_error("Invalid portal index query");
+    std::vector<glm::ivec3> result;
+    const int firstX=int(std::floor((center.x-radius)/16)),lastX=int(std::floor((center.x+radius)/16));
+    const int firstZ=int(std::floor((center.z-radius)/16)),lastZ=int(std::floor((center.z+radius)/16));
+    for(int z=firstZ;z<=lastZ;++z)for(int x=firstX;x<=lastX;++x) {
+        const auto file=m_worldDirectory/"portals"/("p."+std::to_string(x)+"."+std::to_string(z)+".bin");
+        if(!std::filesystem::exists(file))continue;
+        const auto checked=readChecked(file);if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Incompatible portal index");
+        Reader reader(checked.payload,checked.version);
+        if(reader.read<int32_t>()!=x||reader.read<int32_t>()!=z)throw std::runtime_error("Invalid portal index coordinates");
+        const auto count=reader.read<uint32_t>();if(count>16384)throw std::runtime_error("Portal index exceeds chunk capacity");
+        for(uint32_t i=0;i<count;++i) {
+            const auto p=reader.read<glm::ivec3>();
+            if(int(std::floor(double(p.x)/16))!=x||int(std::floor(double(p.z)/16))!=z||!Config::isValidWorldY(p.y))throw std::runtime_error("Invalid portal index entry");
+            if(std::abs(p.x-center.x)<=radius&&std::abs(p.z-center.z)<=radius)result.push_back(p);
+        }
+        if(!reader.finished())throw std::runtime_error("Trailing portal index data");
+    }
+    std::sort(result.begin(),result.end(),[&](const auto& a,const auto& b) {
+        const auto da=glm::dvec3(a)-center,db=glm::dvec3(b)-center;
+        const auto first=glm::dot(da,da),second=glm::dot(db,db);
+        return first<second||(first==second&&std::tie(a.x,a.y,a.z)<std::tie(b.x,b.y,b.z));
+    });
+    result.erase(std::unique(result.begin(),result.end()),result.end());return result;
+}
+void SaveStore::indexNetherPortal(const glm::ivec3& origin) const {
+    if(!Config::isValidWorldY(origin.y)||std::abs(double(origin.x))>30000000||std::abs(double(origin.z))>30000000)throw std::runtime_error("Invalid portal origin");
+    const int x=int(std::floor(double(origin.x)/16)),z=int(std::floor(double(origin.z)/16));
+    const glm::dvec3 center(x*16+7.5,origin.y,z*16+7.5);
+    auto entries=netherPortalsNear(center,8);
+    entries.erase(std::remove_if(entries.begin(),entries.end(),[&](const auto& p){return int(std::floor(double(p.x)/16))!=x||int(std::floor(double(p.z)/16))!=z;}),entries.end());
+    if(std::find(entries.begin(),entries.end(),origin)!=entries.end())return;
+    if(entries.size()>=16384)throw std::runtime_error("Portal index exceeds chunk capacity");
+    entries.push_back(origin);std::sort(entries.begin(),entries.end(),[](const auto& a,const auto& b){return std::tie(a.x,a.y,a.z)<std::tie(b.x,b.y,b.z);});
+    Bytes body;append(body,int32_t(x));append(body,int32_t(z));append(body,uint32_t(entries.size()));for(const auto& p:entries)append(body,p);
+    writeAtomic(m_worldDirectory/"portals"/("p."+std::to_string(x)+"."+std::to_string(z)+".bin"),body);
 }

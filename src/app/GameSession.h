@@ -121,7 +121,7 @@ public:
     size_t lanGuestCount() const { return guests.size(); }
     const std::string& lanError() const { return lanFailure; }
     static Lan::Compatibility lanCompatibility();
-    bool usesInventoryCommands() const override { return hostingLan() || joiningLan(); }
+    bool usesInventoryCommands() const override { return true; }
     InventoryWindowView inventoryWindow() const override;
     bool inventoryWindowPending() const override { return lanJoining && !replicaActions.empty(); }
     void openInventoryWindow(InventoryWindowKind kind, glm::ivec3 position = {}) override;
@@ -339,7 +339,14 @@ private:
     void finishLanSleep(LanPlayerRuntime& guest);
     void updateLanSleep(float dt);
     bool trySkipLanNight(DimensionId target);
-    bool travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false);
+    bool travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false, std::optional<glm::dvec3> destination = {});
+    std::optional<glm::dvec3> netherPortalLanding(DimensionId,const glm::dvec3&);
+    bool updateNetherPortals(float,const Feedback&);
+    bool useRespawnAnchor(uint64_t,const glm::ivec3&);
+    void explodeRestBlock(DimensionId,const glm::ivec3&);
+    std::optional<glm::dvec3> consumeAnchorRespawn(const glm::ivec3&);
+    struct PortalState {double inside=0;float cooldown=0,retry=0;};
+    std::map<uint64_t,PortalState> portalStates;
     void simulateDimension(DimensionId id, const std::vector<EntityPlayerView>& views,
                            float dt, const Feedback& feedback, size_t& fluidRemaining,
                            std::chrono::steady_clock::time_point fluidDeadline);

@@ -27,6 +27,7 @@ void EntityManager::applyReplicaSnapshots(const std::vector<EntitySnapshot>& sna
         entity.item = snapshot.item; entity.behaviorSeed = snapshot.seed;
         entity.inGround = snapshot.inGround; entity.playerOwned = snapshot.playerOwned; entity.sleeping = snapshot.sleeping;
         entity.attackPending = snapshot.attacking; entity.villager = snapshot.villager;
+        entity.nether=snapshot.nether;entity.effects.restore(snapshot.effects);entity.riderId=snapshot.riderId;
         entity.pluginState=snapshot.pluginState;entity.pluginStateVersion=snapshot.pluginStateVersion;
         m_entities.push_back(std::move(entity));
     }

@@ -145,7 +145,7 @@ public:
             }
             drawAtlasIcon(x,y,w,h,item->tile,glm::vec4(1));return;
         }
-        std::string name=getItemProps(stack.id).name;
+        std::string name=stack.id>=ItemId::NETHERRACK&&stack.id<ItemId::COUNT?itemCommandName(stack.id):getItemProps(stack.id).name;
         if(const auto* item=Plugins::pluginItem(stack.id);item&&!item->icon.empty())name=item->key;
         if(name.find(':')==std::string::npos)for(char& c:name)c=std::isalnum(static_cast<unsigned char>(c))?
             static_cast<char>(std::tolower(static_cast<unsigned char>(c))):'_';

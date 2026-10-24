@@ -88,7 +88,8 @@ int main() {
             static_cast<uint16_t>(BlockId::EMERALD_ORE) == 166 &&
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
-            static_cast<uint16_t>(BlockId::COUNT) == 895 &&
+            static_cast<uint16_t>(BlockId::NETHERRACK) == 895 &&
+            static_cast<uint16_t>(BlockId::COUNT) == static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2)+1 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -138,7 +139,8 @@ int main() {
             creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
             creativeItems[285] == ItemId::COOKED_SALMON &&
             creativeItems[291] == ItemId::STONECUTTER &&
-            creativeItems.back() == ItemId::STONE_BUTTON,
+            creativeItems[static_cast<size_t>(ItemId::STONE_BUTTON)-1] == ItemId::STONE_BUTTON &&
+            creativeItems.back() == ItemId::ENDERMAN_SPAWN_EGG,
             "creative inventory ordering does not follow stable item ids");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
@@ -159,21 +161,21 @@ int main() {
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
     require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 115 &&
+                CreativeItemCategory::BuildingBlocks)] == 147 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 61 &&
+                CreativeItemCategory::Nature)] == 69 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Functional)] == 34 &&
+                CreativeItemCategory::Functional)] == 44 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Tools)] == 23 &&
+                CreativeItemCategory::Tools)] == 29 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Combat)] == 24 &&
+                CreativeItemCategory::Combat)] == 57 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Food)] == 18 &&
+                CreativeItemCategory::Food)] == 20 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Materials)] == 25 &&
+                CreativeItemCategory::Materials)] == 46 &&
             categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::SpawnEggs)] == 10,
+                CreativeItemCategory::SpawnEggs)] == 21,
             "creative category sizes do not match the tab assignment");
     require(creativeInventoryCategory(ItemId::FISHING_ROD)==CreativeItemCategory::Tools &&
             creativeInventoryCategory(ItemId::RAW_COD)==CreativeItemCategory::Food &&

@@ -47,7 +47,7 @@ void WorldLighting::rebuild() {
                 static_cast<size_t>(Config::CHUNK_VOLUME), 0);
             lightChanged.insert(chunk);
         for (int z=0;z<Config::CHUNK_SIZE_Z;++z) for(int x=0;x<Config::CHUNK_SIZE_X;++x) {
-            uint8_t vertical=15;
+            uint8_t vertical=m_skyLight?15:0;
             for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y) {
                 const size_t index=localIndex(x,y,z);
                 const BlockId block=static_cast<BlockId>(blocks[index]);
@@ -236,7 +236,7 @@ void WorldLighting::updateLightingBatch(
     for(const uint64_t key : columns) {
         const int columnX=static_cast<int>(static_cast<uint32_t>(key>>32));
         const int columnZ=static_cast<int>(static_cast<uint32_t>(key));
-        uint8_t vertical=15;
+        uint8_t vertical=m_skyLight?15:0;
         for(int y=Config::WORLD_MAX_Y-1;y>=Config::WORLD_MIN_Y;--y){
             auto [column,p]=findCell(columnX,y,columnZ);if(!column)continue;
             const uint8_t damping=getLightDampening(column->getBlock(p.x,p.y,p.z));

@@ -38,6 +38,8 @@ class SaveStore;
 class World : private IChunkStreamingWorld {
 public:
     DimensionId dimension() const { return m_generator.dimension(); }
+    void indexNetherPortal(const glm::ivec3&);
+    std::vector<glm::ivec3> savedNetherPortalsNear(const glm::dvec3&,int) const;
     void setGameRules(const GameRuleSet& rules) { m_gameRules = rules; }
     const GameRuleSet& gameRules() const { return m_gameRules; }
 
@@ -60,6 +62,10 @@ public:
         m_persistence.setSaveStore(store);
         m_streamer.setSaveStore(store);
         m_lod.setSaveStore(store);
+    }
+    void persistChunkAt(const glm::ivec3& position) {
+        const int cx=worldToChunkX(position.x),cz=worldToChunkZ(position.z);
+        m_chunks.withUnique([&](ChunkStore&){m_persistence.saveOverrides(cx,cz);m_persistence.saveBlockEntities(cx,cz);});
     }
     bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max()) {
         return m_persistence.flushModifiedChunks(maxFiles);
@@ -106,6 +112,7 @@ public:
     const BlockEntity* getBlockEntity(const glm::ivec3& position) const {
         return m_persistence.getBlockEntity(position);
     }
+    std::vector<glm::ivec3> loadedSpawners() const {return m_persistence.loadedSpawners();}
     std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position) {
         return m_persistence.takeBlockEntityContents(position);
     }
@@ -320,6 +327,7 @@ private:
     friend struct LanLodTestAccess;
     friend class ChunkMeshPipeline;
     friend class FluidScheduler;
+    bool m_portalValidationActive=false;
     bool m_pairMutation = false;
     std::set<std::tuple<int,int,int>> m_pendingDoorPower;
     std::vector<std::pair<glm::ivec3,ItemStack>> m_supportDrops;

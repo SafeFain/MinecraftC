@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 
 #include "game/GameRules.h"
+#include "game/StatusEffects.h"
 #include "plugins/Extensions.h"
 #include "game/GameRuleRegistry.h"
 #include "game/InventoryModel.h"
@@ -51,6 +52,7 @@ struct WorldMetadata {
         bool positioned = false;
         WeatherSaveState weather;
         std::optional<glm::ivec3> bedSpawn;
+        std::optional<glm::ivec3> anchorSpawn;
         uint64_t worldTicks = 0;
         // DayNightCycle deliberately stores a plain phase here so the save
         // layer does not depend on renderer headers.
@@ -82,6 +84,7 @@ struct WorldMetadata {
     float saturation = 5.0f;
     float exhaustion = 0.0f;
     uint32_t foodTickTimer = 0;
+    std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
     struct PersistedEntity {
         uint16_t type = 0;
@@ -96,6 +99,8 @@ struct WorldMetadata {
         VillagerData villager;
         std::string pluginState="{}";
         uint32_t pluginStateVersion=0;
+        NetherMobState nether;
+        std::vector<ActiveStatusEffect> effects;
     };
     std::vector<PersistedEntity> entities;
     WorldType worldType = WorldType::Normal;
@@ -139,6 +144,8 @@ public:
 
     const std::filesystem::path& worldDirectory() const { return m_worldDirectory; }
     bool exists() const;
+    void indexNetherPortal(const glm::ivec3&) const;
+    std::vector<glm::ivec3> netherPortalsNear(const glm::dvec3&,int radius) const;
     void validatePluginFiles() const;
     void saveMetadata(const WorldMetadata& metadata) const;
     // Inspection reports incompatibility without loading or writing the world.

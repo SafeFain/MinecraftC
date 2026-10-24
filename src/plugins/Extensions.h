@@ -48,7 +48,13 @@ struct DimensionTravelContent {
 };
 inline std::map<uint32_t,DimensionContent> builtinDimensions() {
     DimensionContent overworld;overworld.key="minecraftc:overworld";overworld.name="Overworld";overworld.nameKey="lan.overworld";
-    return {{0,overworld}};
+    DimensionContent nether;
+    nether.key="minecraftc:nether";nether.name="Nether";
+    nether.seedDomain=0x4e455448455231ULL;
+    nether.weather=MC_WEATHER_CLEAR;
+    nether.deathTarget="minecraftc:overworld";
+    nether.voidTarget="minecraftc:overworld";
+    return {{0,overworld},{2,nether}};
 }
 struct GeneratorContent {
     std::string key, name, revision;
@@ -120,6 +126,14 @@ struct StructureContent {
     MC_StructureCallbackV2 buildV2=nullptr;
     void* userdata=nullptr;
 };
+inline std::map<std::string,StructureContent> builtinStructures() {
+    std::map<std::string,StructureContent> out;
+    for(const char* key:{"minecraftc:nether_fortress","minecraftc:bastion_bridge","minecraftc:bastion_stable","minecraftc:bastion_housing","minecraftc:bastion_treasure","minecraftc:nether_fossil","minecraftc:ruined_portal"}) {
+        StructureContent s;s.key=key;s.name=key;s.revision="1";s.dimension=s.key=="minecraftc:ruined_portal"?0u:2u;s.cell=256;s.chance=0;
+        out.emplace(s.key,std::move(s));
+    }
+    return out;
+}
 struct ActionContent {
     std::function<bool(const MC_ActionViewV3&,MC_ActionTargetV2&)> targetV3;
     std::function<bool(const MC_ActionViewV2&,MC_ActionTargetV2&)> targetV2;
@@ -176,7 +190,7 @@ struct ExtensionContent {
     std::map<uint16_t,BlockBehaviorContent> blockBehaviors;
     std::map<uint16_t,ItemBehaviorContent> itemBehaviors;
     std::map<std::string,LootContent> loot;
-    std::map<std::string,StructureContent> structures;
+    std::map<std::string,StructureContent> structures=builtinStructures();
     std::map<std::string,ActionContent> actions;
     std::map<uint32_t,EnvironmentContent> environments;
     std::map<std::string,ParticleContent> particles;

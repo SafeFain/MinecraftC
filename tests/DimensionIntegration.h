@@ -19,7 +19,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     const auto id=Plugins::resolveDimension("dimension_demo:plateau"),rainId=Plugins::resolveDimension("dimension_data:rainland");
     const auto dimension=static_cast<DimensionId>(id),rain=static_cast<DimensionId>(rainId);
-    check(id>=2&&rainId>=2&&id!=rainId&&Plugins::content().extensions.dimensions.size()==4,"native/data dimensions and rollback");
+    check(id>=3&&rainId>=3&&id!=rainId&&Plugins::content().extensions.dimensions.size()==5,"native/data dimensions and rollback");
     for(const auto& info:plugins.plugins())if(info.manifest.id=="dimension_bad"||info.manifest.id=="dimension_visual"||info.manifest.id=="dimension_dependency")check(!info.active,"invalid dimension package rejected");
     size_t index=0;for(;index<plugins.plugins().size();++index)if(plugins.plugins()[index].manifest.id=="dimension_demo")break;
     MC_PluginContext ctx;ctx.manager=&plugins;ctx.index=index;
@@ -93,7 +93,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     }
     plugins.travelPlayer={};
     Config::RENDER_DISTANCE=distance;
-    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==1&&!Plugins::validDimension(1),"safe mode retains only the host Overworld");safe.shutdown();
+    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1),"safe mode retains both native dimensions");safe.shutdown();
     std::filesystem::remove_all(root);std::cout<<"Dimension registry/runtime integration passed\n";return 0;
 }
 }

@@ -12,10 +12,10 @@ Queries through inverted old names return inverted values too.
 `doFireTick false/true` sets radius 0/128; `allowFireTicksAwayFromPlayer true/false`
 sets -1/128. These are compatibility conversions; the last write wins.
 
-Each world owns its rules, shared across its registered dimensions. Save v21
+Each world owns its rules, shared across its registered dimensions. Save v22
 retains the typed canonical-ID rule table introduced in v15 and the world day/night
 duration introduced in v14. Older save metadata is inspectable, but opening requires
-v21 and the current generation version; legacy worlds are not upgraded. Unknown
+v22 and the current generation version; legacy worlds are not upgraded. Unknown
 well-typed rule IDs round-trip in supported saves. Loading
 never changes the saved terrain generation version. Query/help/error/support messages
 remain visible with command feedback disabled. General feedback/status strings
@@ -40,13 +40,13 @@ and `javap -c -p`. No Mojang executable code is vendored.
 Implemented means the rule controls its corresponding existing MinecraftC mechanism.
 Partial means the description states concrete limitations. Unavailable rules can
 be queried, set and persisted, and emit an explicit missing-mechanic message.
-This adds no Nether, multiplayer, redstone, command blocks or advancements.
+Nether portal rules control the built-in Overworld/Nether network in singleplayer and LAN. Redstone systems, command blocks and advancements remain unavailable.
 
 | Rule (prefix `minecraft:` optional) | Old name | Default | Range | Support |
 |---|---|---|---|---|
 | `advance_time` | `doDaylightCycle` | true | true/false | Implemented |
 | `advance_weather` | `doWeatherCycle` | true | true/false | Implemented |
-| `allow_entering_nether_using_portals` | `allowEnteringNetherUsingPortals` | true | true/false | Unavailable |
+| `allow_entering_nether_using_portals` | `allowEnteringNetherUsingPortals` | true | true/false | Implemented |
 | `block_drops` | `doTileDrops` | true | true/false | Implemented |
 | `block_explosion_drop_decay` | `blockExplosionDropDecay` | true | true/false | Unavailable |
 | `command_blocks_work` | `commandBlocksEnabled` | true | true/false | Unavailable |
@@ -78,8 +78,8 @@ This adds no Nether, multiplayer, redstone, command blocks or advancements.
 | `mob_griefing` | `mobGriefing` | true | true/false | Partial |
 | `natural_health_regeneration` | `naturalRegeneration` | true | true/false | Implemented |
 | `player_movement_check` | `disablePlayerMovementCheck` | true | true/false | Unavailable |
-| `players_nether_portal_creative_delay` | `playersNetherPortalCreativeDelay` | 0 | 0..2147483647 | Unavailable |
-| `players_nether_portal_default_delay` | `playersNetherPortalDefaultDelay` | 80 | 0..2147483647 | Unavailable |
+| `players_nether_portal_creative_delay` | `playersNetherPortalCreativeDelay` | 0 | 0..2147483647 | Implemented |
+| `players_nether_portal_default_delay` | `playersNetherPortalDefaultDelay` | 80 | 0..2147483647 | Implemented |
 | `players_sleeping_percentage` | `playersSleepingPercentage` | 100 | 0..2147483647 | Implemented |
 | `projectiles_can_break_blocks` | `projectilesCanBreakBlocks` | true | true/false | Unavailable |
 | `pvp` | `pvp` | true | true/false | Unavailable |
@@ -109,7 +109,7 @@ This adds no Nether, multiplayer, redstone, command blocks or advancements.
 
 - **`advance_time`:** Advance the day/night phase naturally; explicit time commands remain available.
 - **`advance_weather`:** Advance natural weather timers and let sleep clear weather; explicit weather commands remain available.
-- **`allow_entering_nether_using_portals`:** Allow Nether portal entry. MinecraftC has no Nether portal system.
+- **`allow_entering_nether_using_portals`:** Allow Nether portal entry. Controls both directions of the built-in portal network.
 - **`block_drops`:** Allow mined blocks, container contents and explosion-destroyed blocks to drop items.
 - **`block_explosion_drop_decay`:** Reduce drops from block-origin explosions other than TNT. No such explosions currently exist.
 - **`command_blocks_work`:** Enable command blocks; command blocks are not implemented.
@@ -141,8 +141,8 @@ This adds no Nether, multiplayer, redstone, command blocks or advancements.
 - **`mob_griefing`:** Allow Blastling explosions to destroy blocks; explosion damage still applies. Villager harvesting/replanting and dropped-food collection also require this rule. Other Java mob block interactions remain absent.
 - **`natural_health_regeneration`:** Allow food-based natural healing. Hunger depletion and starvation continue independently.
 - **`player_movement_check`:** Enable multiplayer movement validation; no multiplayer validation exists. Legacy disablePlayerMovementCheck is inverted.
-- **`players_nether_portal_creative_delay`:** Creative Nether portal delay in ticks; Nether portals are absent.
-- **`players_nether_portal_default_delay`:** Default Nether portal delay in ticks; Nether portals are absent.
+- **`players_nether_portal_creative_delay`:** Creative Nether portal delay in ticks, applied by the authoritative simulation.
+- **`players_nether_portal_default_delay`:** Survival Nether portal delay in ticks, applied by the authoritative simulation.
 - **`players_sleeping_percentage`:** Single-player sleep skips the night when the percentage is at most 100. Higher values prevent the skip. Heaven travel is independent.
 - **`projectiles_can_break_blocks`:** Allow projectile destruction of supported fragile blocks; such projectile interactions are absent.
 - **`pvp`:** Allow player-versus-player combat; multiplayer is absent.

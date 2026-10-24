@@ -1,6 +1,7 @@
 #include "HeavenContentFixture.h"
 #include "plugins/ContentRegistry.h"
 #include "game/SaveStore.h"
+#include "game/EntityTransferJournal.h"
 #include "Config.h"
 #include "world/WorldGenContext.h"
 
@@ -37,10 +38,49 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+// Construct the frozen v21 layout by removing exactly the appended v22
+// native fields. Read lengths from the wire, never from C++ struct padding.
+void stripV22Metadata(std::vector<uint8_t>& bytes) {
+    size_t cursor=24;std::vector<std::pair<size_t,size_t>> removed;
+    auto integer=[&](size_t width) {
+        require(cursor+width<=bytes.size(),"v22 fixture cursor bounds");uint64_t result=0;
+        for(size_t i=0;i<width;++i)result|=uint64_t(bytes[cursor++])<<(8*i);
+        return result;
+    };
+    auto string=[&](){const auto length=integer(2);require(cursor+length<=bytes.size(),"v22 fixture string bounds");cursor+=length;};
+    auto count=integer(4);for(uint64_t i=0;i<count;++i){string();string();}
+    for(int palette=0;palette<2;++palette){count=integer(4);for(uint64_t i=0;i<count;++i){integer(2);string();}}
+    string();cursor+=8+4+4+3+8+18+24+12;
+    if(integer(1))cursor+=12;
+    cursor+=13+41*5;
+    count=integer(4);
+    for(uint64_t i=0;i<count;++i) {
+        cursor+=168;string();string();cursor+=4;
+        const auto start=cursor;cursor+=21;const auto effects=integer(1);cursor+=effects*6;
+        removed.emplace_back(start,cursor-start);
+    }
+    cursor+=59;
+    auto start=cursor;count=integer(1);cursor+=count*6;removed.emplace_back(start,cursor-start);
+    cursor+=4;count=integer(4);for(uint64_t i=0;i<count;++i){string();cursor+=5;}
+    for(int dimension=0;dimension<2;++dimension) {
+        string();string();string();count=integer(2);for(uint64_t i=0;i<count;++i){string();string();}
+    }
+    string();const auto dimensions=integer(4);
+    for(uint64_t i=0;i<dimensions;++i) {
+        for(int field=0;field<5;++field)string();
+        count=integer(2);for(uint64_t j=0;j<count;++j){string();string();}
+        cursor+=80;if(integer(1))cursor+=12;
+        start=cursor;if(integer(1))cursor+=12;removed.emplace_back(start,cursor-start);
+    }
+    require(cursor<=bytes.size(),"v22 fixture tail bounds");
+    for(auto it=removed.rbegin();it!=removed.rend();++it)bytes.erase(bytes.begin()+it->first,bytes.begin()+it->first+it->second);
+}
+
 // Remove only the fields introduced by v19 when constructing genuine old
 // fixtures. The frozen v18 entity record is 168 bytes, before its new tail.
 void stripV19Metadata(std::vector<uint8_t>& bytes,
                       const std::vector<WorldMetadata::PersistedEntity>& entities) {
+    stripV22Metadata(bytes);
     const std::array<uint8_t,20> generationTail{{0,0,0,0,2,0,'{','}',0,0,0,0,0,0,2,0,'{','}',0,0}};
     // Remove the keyed v20 suffix before constructing historical inspection fixtures.
     const auto prefix=std::find_end(bytes.begin(),bytes.end(),generationTail.begin(),generationTail.end());
@@ -108,6 +148,38 @@ void writeLittleEndian(std::vector<uint8_t>& bytes, size_t offset,
     }
 }
 
+
+void transferJournalTests(const std::filesystem::path& root) {
+    using namespace EntityTransferJournal;
+    WorldMetadata metadata;metadata.displayName="Transfer";metadata.seed=7;metadata.generationVersion=WorldGenContext::GENERATION_VERSION;
+    SaveStore(root).saveMetadata(metadata);
+    SaveStore(root).indexNetherPortal({-16,64,0});SaveStore(root).indexNetherPortal({16,64,0});SaveStore(root).indexNetherPortal({0,90,0});
+    SaveStore(root).indexNetherPortal({-16,64,0});
+    const auto portals=SaveStore(root).netherPortalsNear({0,64,0},16);
+    require(portals.size()==3&&portals[0]==glm::ivec3(-16,64,0)&&portals[1]==glm::ivec3(16,64,0),"portal index negative coordinates, duplicate and 3D tie ordering");
+    require(SaveStore(root).netherPortalsNear({0,64,0},15).size()==1,"portal index search radius boundary");
+    WorldMetadata::PersistedEntity item;item.type=0;item.health=1;item.position={.5,1,.5};item.item={ItemId::GOLD_INGOT,2,0};
+    WorldMetadata::PersistedEntity resident;resident.type=1;resident.health=10;resident.position={-1.5,1,-1.5};
+    SaveStore(root).saveChunkEntities(0,0,{item});SaveStore(directory(root,DimensionId::Nether)).saveChunkEntities(-1,-1,{resident});
+    auto moved=item;moved.position={-.5,1,-.5};
+    Partition source{DimensionId::Overworld,0,0,{}};
+    Partition target{DimensionId::Nether,-1,-1,{resident,moved}};
+    prepare(root,source,target);
+    require(SaveStore(root).loadChunkEntities(0,0).size()==1,"journal prepare leaves source before-image intact");
+    SaveStore(root).saveChunkEntities(0,0,{}); // Simulate interruption after only the first replacement.
+    require(recover(root),"published journal recovered");
+    require(SaveStore(root).loadChunkEntities(0,0).empty(),"recovery removes source exactly once");
+    const auto restored=SaveStore(directory(root,DimensionId::Nether)).loadChunkEntities(-1,-1);
+    require(restored.size()==2 && restored[1].item.count==2,"recovery preserves resident and transferred item");
+    const auto before=readBytes(directory(root,DimensionId::Nether)/"entities/e.-1.-1.bin");
+    require(!recover(root)&&readBytes(directory(root,DimensionId::Nether)/"entities/e.-1.-1.bin")==before,"recovery replay is idempotent");
+    prepare(root,source,target);
+    {std::ofstream damaged(pending(root)/"target/entities/e.-1.-1.bin",std::ios::binary|std::ios::trunc);damaged<<"truncated";}
+    bool refused=false;try{recover(root);}catch(const std::exception&){refused=true;}
+    require(refused && SaveStore(root).loadChunkEntities(0,0).empty() && readBytes(directory(root,DimensionId::Nether)/"entities/e.-1.-1.bin")==before,"invalid after-image refuses before either partition is written");
+    std::filesystem::remove_all(pending(root));
+}
+
 }
 
 int main() {
@@ -118,6 +190,7 @@ int main() {
     std::filesystem::remove_all(root);
 
     try {
+        transferJournalTests(root/"transfer-world");
         SaveStore store(root / "negative-coordinates");
         WorldMetadata source;
         source.displayName = "Survival Test";
@@ -265,8 +338,18 @@ int main() {
         require(chunkVillagers.size()==1 && chunkVillagers[0].villager.growthSeconds==1200 &&
             chunkVillagers[0].villager.food[0].count==6 && chunkVillagers[0].villager.reputation==-35,
             "v17 villager lifecycle fields failed chunk roundtrip");
+        const auto v21Directory=root/"legacy-v21";
+        SaveStore(v21Directory).saveMetadata(source);
+        auto v21Bytes=readBytes(v21Directory/"level.bin");stripV22Metadata(v21Bytes);
+        writeLittleEndian(v21Bytes,8,21,4);writeLittleEndian(v21Bytes,12,v21Bytes.size()-24,4);
+        writeLittleEndian(v21Bytes,16,payloadChecksum(v21Bytes,24),8);
+        {std::ofstream out(v21Directory/"level.bin",std::ios::binary|std::ios::trunc);out.write(reinterpret_cast<const char*>(v21Bytes.data()),v21Bytes.size());}
+        const auto v21=SaveStore(v21Directory).loadMetadata(true);
+        require(v21.seed==source.seed&&!v21.pluginCompatibilityError.empty(),"v21 remains inspectable");
+        bool refusedV21=false;try{SaveStore(v21Directory).loadMetadata();}catch(const std::exception&){refusedV21=true;}
+        require(refusedV21&&readBytes(v21Directory/"level.bin")==v21Bytes,"v21 opening refuses without rewriting bytes");
         const auto v20Directory=root/"legacy-v20";SaveStore(v20Directory).saveMetadata(source);
-        auto v20Bytes=readBytes(v20Directory/"level.bin");
+        auto v20Bytes=readBytes(v20Directory/"level.bin");stripV22Metadata(v20Bytes);
         require(source.timePolicies.empty()&&v20Bytes.size()>28,"v20 fixture has empty v21 time tail");v20Bytes.resize(v20Bytes.size()-4);
         writeLittleEndian(v20Bytes,8,20,4);writeLittleEndian(v20Bytes,12,v20Bytes.size()-24,4);writeLittleEndian(v20Bytes,16,payloadChecksum(v20Bytes,24),8);
         {std::ofstream out(v20Directory/"level.bin",std::ios::binary|std::ios::trunc);out.write(reinterpret_cast<const char*>(v20Bytes.data()),v20Bytes.size());}
@@ -698,9 +781,10 @@ int main() {
             rejected = true;
         }
         require(rejected, "checksum rejects corrupt metadata");
-    } catch (...) {
+    } catch (const std::exception& error) {
+        std::cerr<<"Save fixture exception: "<<error.what()<<'\n';
         std::filesystem::remove_all(root);
-        throw;
+        return 1;
     }
 
     std::filesystem::remove_all(root);

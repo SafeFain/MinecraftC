@@ -1,6 +1,9 @@
+#include "game/NetherProgression.h"
+#include "game/DimensionRules.h"
 #include "plugins/Runtime.h"
 #include "world/BiomeBlockLogic.h"
 #include "player/Player.h"
+#include "world/NetherPortal.h"
 #include "world/World.h"
 #include "world/Block.h"
 #include "player/PlayerPhysics.h"
@@ -94,6 +97,7 @@ DamageOutcome Player::takeDamage(const DamageSourceInfo& source) {
 }
 
 DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
+    if(source.cause==DamageCause::Fire&&m_effects.level(StatusEffectType::FireResistance))return {};
     DamageOutcome outcome;
     outcome.rawDamage = source.amount;
     const auto& rules = m_world->gameRules();
@@ -131,6 +135,7 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
             if (!stack.empty() && stack.id >= ItemId::DIAMOND_HELMET &&
                 stack.id <= ItemId::DIAMOND_BOOTS)
                 toughness += 2.0f;
+            if(!stack.empty()&&stack.id>=ItemId::NETHERITE_HELMET&&stack.id<=ItemId::NETHERITE_BOOTS)toughness+=3.f;
         }
         reduced = CombatRules::armorDamage(reduced, armor, toughness);
     }
@@ -151,7 +156,9 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
     outcome.appliedDamage = accepted;
     m_survivalStats.damage(accepted);
     if (source.causesExhaustion && m_authority) m_survivalStats.addExhaustion(0.1f);
-    m_velocity += source.impulse;
+    float resistance=0;
+    for(const auto& stack:m_inventory.armor())if(!stack.empty()&&stack.id>=ItemId::NETHERITE_HELMET&&stack.id<=ItemId::NETHERITE_BOOTS)resistance+=.1f;
+    m_velocity += source.impulse*(1.f-resistance);
     if (m_damageCallback) m_damageCallback(accepted);
     return outcome;
 }
@@ -188,6 +195,8 @@ void Player::handleMovement(const InputState& input, float dt) {
         m_sneakLatched = !m_sneakLatched;
     m_sneakInput = m_toggleSneak ? m_sneakLatched
                                  : input.held(InputAction::Sneak);
+
+    if(m_entities && m_entities->riding(m_roomPlayerId)){m_velocity=glm::vec3(0);m_fallDistance=0;m_onGround=false;return;}
 
     // ── Double-tap SPACE to toggle flight ──────────────────────────
     bool spaceDown = input.held(InputAction::Jump);
@@ -227,6 +236,8 @@ void Player::handleMovement(const InputState& input, float dt) {
     updatePose();
 
     float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
+    const auto below=m_world->getBlock(static_cast<int>(std::floor(m_position.x)),static_cast<int>(std::floor(m_position.y-.1)),static_cast<int>(std::floor(m_position.z)));
+    if(below==BlockId::SOUL_SAND)speed*=.4f;
     const bool inWater = touchingWater && !m_flying;
 
     const bool movingSlowly = m_pose == PlayerPhysics::Pose::Crouching ||
@@ -386,8 +397,9 @@ void Player::handleMouseButton(int button, ButtonAction action) {
         const auto& properties = getItemProps(stack.id);
         const float speed = properties.attackSpeed > 0.0f
             ? properties.attackSpeed : CombatRules::DEFAULT_ATTACK_SPEED;
-        const float baseDamage = properties.attackDamage > 0.0f
-            ? properties.attackDamage : CombatRules::DEFAULT_ATTACK_DAMAGE;
+        const float baseDamage = std::max(0.f,(properties.attackDamage > 0.0f
+            ? properties.attackDamage : CombatRules::DEFAULT_ATTACK_DAMAGE)+
+            3.f*m_effects.level(StatusEffectType::Strength)-4.f*m_effects.level(StatusEffectType::Weakness));
         const float strength = CombatRules::attackStrength(m_attackTicks, speed);
         const bool strong = CombatRules::strongAttack(strength);
         const bool critical = CombatRules::criticalAttack(
@@ -403,7 +415,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
             result = m_entities->attackRay(
                 getEyePosition(), m_forward,
                 {m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
-                 damage, critical, sweeping, strong && m_isSprinting}, m_roomPlayerId);
+                 damage, critical, sweeping, strong && m_isSprinting}, m_roomPlayerId,m_persistentIdentity);
         }
         if (result.foundTarget) {
             m_attackTicks = 0.0f;
@@ -447,7 +459,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
                 m_combatCallback({AttackKind::Miss, 0.0f, {}, {}});
         } else if (m_gameMode == GameMode::Creative) {
             breakBlock();
-            m_actionCooldown = 0.15f;
+            m_actionCooldown = std::max(m_actionCooldown,0.15f);
         } else {
             m_mining = true;
         }
@@ -455,7 +467,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
                m_actionCooldown <= 0.0f) {
         if (placeBlock()) {
             startSwing();
-            m_actionCooldown = 0.15f;
+            m_actionCooldown = std::max(m_actionCooldown,0.15f);
         }
     }
 }
@@ -463,6 +475,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
 // ── Update ────────────────────────────────────────────────────────────
 
 void Player::updateSleeping(float dt) {
+    tickStatusEffects(dt);
     // Bed animation freezes movement and interaction, but survival and
     // environmental simulation still advance so fire, drowning, hunger and
     // hurt immunity can cancel the sleep just like normal gameplay.
@@ -485,6 +498,7 @@ void Player::update(float dt) {
         updateSleeping(dt);
         return;
     }
+    tickStatusEffects(dt);
     if (m_visualPositionInitialized && dt > 0.00001f) {
         m_visualHorizontalVelocity = PlayerPhysics::horizontalVelocity(
             m_previousVisualPosition, m_position, dt);
@@ -516,7 +530,8 @@ void Player::update(float dt) {
     }
 
     updateDirectionVectors();
-    applyPhysics(dt);
+    if(!m_entities || !m_entities->riding(m_roomPlayerId))applyPhysics(dt);
+    else {m_velocity=glm::vec3(0);m_fallDistance=0;m_onGround=false;}
     m_eyeHeight = PlayerPhysics::approachEyeHeight(
         m_eyeHeight, PlayerPhysics::dimensions(m_pose).eyeHeight, dt);
     updateHighlight();
@@ -905,10 +920,11 @@ void Player::updateEnvironment(uint32_t ticks) {
     const BlockId eyeBlock = m_world->getBlock(eye.x, eye.y, eye.z);
     const BlockId feetBlock = m_world->getBlock(feet.x, feet.y, feet.z);
     float contact=0;
+    if(feetBlock==BlockId::SOUL_FIRE || eyeBlock==BlockId::SOUL_FIRE)contact=2;
     const double half=Config::PLAYER_WIDTH/2.0;
     for(int z=int(std::floor(m_position.z-half));z<=int(std::floor(m_position.z+half));++z)for(int x=int(std::floor(m_position.x-half));x<=int(std::floor(m_position.x+half));++x)for(int y=feet.y;y<=int(std::floor(m_position.y+PlayerPhysics::dimensions(m_pose).height));++y)if(const auto* b=Plugins::blockBehavior(m_world->getBlock(x,y,z)))contact=std::max(contact,b->damage);
-    if(contact>0){m_pluginDamageTicks+=ticks;if(m_pluginDamageTicks>=10){DamageSourceInfo source;source.amount=contact;source.cause=DamageCause::Generic;takeDamage(source);m_pluginDamageTicks%=10;}}else m_pluginDamageTicks=0;
-    if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE)
+    if(contact>0){m_pluginDamageTicks+=ticks;if(m_pluginDamageTicks>=10){DamageSourceInfo source;source.amount=contact;source.cause=(feetBlock==BlockId::SOUL_FIRE||eyeBlock==BlockId::SOUL_FIRE)?DamageCause::Fire:DamageCause::Generic;takeDamage(source);m_pluginDamageTicks%=10;}}else m_pluginDamageTicks=0;
+    if (feetBlock == BlockId::FIRE || eyeBlock == BlockId::FIRE || feetBlock==BlockId::SOUL_FIRE || eyeBlock==BlockId::SOUL_FIRE)
         ignite(4.0f);
     if (isWater(feetBlock) || isWater(eyeBlock) || m_rainExposed) {
         m_burningSeconds = 0.0f;
@@ -1031,6 +1047,7 @@ bool Player::breakBlockImpl() {
             if (m_authority) m_survivalStats.addExhaustion(0.005f);
         }
         m_world->setBlock(breakPos.x, breakPos.y, breakPos.z, BlockId::AIR);
+        if(m_entities && (block==BlockId::GOLD_ORE||block==BlockId::NETHER_GOLD_ORE))m_entities->angerPiglins(glm::dvec3(breakPos));
         if (m_blockBreakCallback) m_blockBreakCallback(breakPos, block);
         return true;
     }
@@ -1083,6 +1100,7 @@ bool Player::tryUseInteractiveBlock() {
 }
 
 bool Player::placeBlock() {
+    if(m_entities && m_entities->useNativeMob(*this,m_roomPlayerId))return true;
     if(!m_sneakInput) {
         const auto target=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
         if(target && (m_world->interactDoor(target->blockPos) || m_world->activateButton(target->blockPos))) return true;
@@ -1107,6 +1125,21 @@ bool Player::placeBlockImpl() {
     }
     const ItemId selectedItem =
         m_inventory.slot(static_cast<size_t>(m_selectedSlot)).id;
+    if(m_entities && (selectedItem==ItemId::ENDER_PEARL || (potionDefinition(selectedItem)&&potionDefinition(selectedItem)->splash))) {
+        const auto type=selectedItem==ItemId::ENDER_PEARL?EntityType::EnderPearl:EntityType::ThrownPotion;
+        m_entities->spawnNativeProjectile(type,getEyePosition()+glm::dvec3(m_forward)*.5,m_forward*(type==EntityType::EnderPearl?18.f:10.f)+m_velocity,m_roomPlayerId,{selectedItem,1,0},m_persistentIdentity);
+        if(isSurvival()) {auto& selected=m_inventory.slot(size_t(m_selectedSlot));if(--selected.count==0)selected.clear();}
+        m_actionCooldown=1.f;startSwing();return true;
+    }
+    if(const auto potion=potionDefinition(selectedItem);potion&&!potion->splash) {
+        applyPotion(*potion);
+        if(m_gameMode==GameMode::Survival)m_inventory.slot(static_cast<size_t>(m_selectedSlot))={ItemId::GLASS_BOTTLE,1,0};
+        m_actionCooldown=1.6f;return true;
+    }
+    if(selectedItem==ItemId::WATER_BOTTLE||selectedItem==ItemId::AWKWARD_POTION) {
+        if(m_gameMode==GameMode::Survival)m_inventory.slot(static_cast<size_t>(m_selectedSlot))={ItemId::GLASS_BOTTLE,1,0};
+        m_actionCooldown=1.6f;return true;
+    }
     if (m_gameMode == GameMode::Survival) {
         auto& selected = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
         if (!selected.empty() && getItemProps(selected.id).kind == ItemKind::Food) {
@@ -1120,8 +1153,19 @@ bool Player::placeBlockImpl() {
     if (!hit) return false;
 
     glm::ivec3 placePos = hit->blockPos + hit->faceNormal;
+    if(!dimensionRules(m_world->dimension()).contains(placePos.y))return false;
     const BlockId targetedBlock = m_world->getBlock(
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
+    if(selectedItem==ItemId::GLASS_BOTTLE && (isWater(targetedBlock)||isWater(m_world->getBlock(placePos.x,placePos.y,placePos.z)))) {
+        auto inventory=m_inventory;
+        auto& selected=inventory.slot(static_cast<size_t>(m_selectedSlot));
+        if(m_gameMode==GameMode::Survival&&selected.count==1)selected={ItemId::WATER_BOTTLE,1,0};
+        else {
+            if(m_gameMode==GameMode::Survival)--selected.count;
+            if(inventory.add({ItemId::WATER_BOTTLE,1,0}))return false;
+        }
+        m_inventory=std::move(inventory);return true;
+    }
     if(const auto* b=Plugins::blockBehavior(targetedBlock)) {
         if(!b->action.empty()){
             if(Plugins::content().extensions.actions.at(b->action).contextual()){if(Plugins::useDispatcher()&&Plugins::useDispatcher()(m_roomPlayerId,b->action))return true;}
@@ -1136,6 +1180,9 @@ bool Player::placeBlockImpl() {
         }
     }
     if(const auto* b=Plugins::blockBehavior(targetedBlock))if(b->replaceable&&getItemProps(selectedItem).placedBlock)placePos=hit->blockPos;
+    if(respawnAnchorCharge(targetedBlock)>=0) {
+        if(m_bedCallback)m_bedCallback(hit->blockPos);return true;
+    }
     if (isBed(targetedBlock)) {
         const auto foot = m_world->validBedFoot(hit->blockPos);
         if (!foot) return false;
@@ -1160,13 +1207,14 @@ bool Player::placeBlockImpl() {
         return m_entities != nullptr;
     }
     if (activeItem == ItemId::FLINT_AND_STEEL) {
-        bool used = false;
-        if (targetedBlock == BlockId::TNT && m_entities) {
+        bool used = NetherPortal::ignite(*m_world,placePos);
+        if(used) {}
+        else if (targetedBlock == BlockId::TNT && m_entities) {
             m_entities->primeTnt(hit->blockPos);
             used = true;
         } else if (m_world->getBlock(placePos.x, placePos.y, placePos.z) == BlockId::AIR &&
                    (isSolid(targetedBlock) || isFlammable(targetedBlock))) {
-            m_world->setBlock(placePos.x, placePos.y, placePos.z, BlockId::FIRE);
+            m_world->setBlock(placePos.x, placePos.y, placePos.z, targetedBlock==BlockId::SOUL_SAND||targetedBlock==BlockId::SOUL_SOIL?BlockId::SOUL_FIRE:BlockId::FIRE);
             used = true;
         }
         if (used && m_gameMode == GameMode::Survival) {
@@ -1177,6 +1225,7 @@ bool Player::placeBlockImpl() {
     }
 
     BlockId placed = activeProperties.placedBlock.value_or(BlockId::AIR);
+    if(isNetherWart(placed)&&targetedBlock!=BlockId::SOUL_SAND)return false;
     if(!Plugins::availableBlock(placed)||!Plugins::availableItem(activeItem))return false;
     auto& selectedStack=m_inventory.slot(static_cast<size_t>(m_selectedSlot));
     if(canTillBlock(selectedStack.id,targetedBlock,hit->faceNormal.y)){
@@ -1331,7 +1380,7 @@ bool Player::placeBlockImpl() {
             if (hit->faceNormal.y <= 0 ||
                 (soil != BlockId::GRASS && soil != BlockId::DIRT &&
                  soil != BlockId::PODZOL) ||
-                placePos.y + 1 >= Config::WORLD_MAX_Y ||
+                !dimensionRules(m_world->dimension()).contains(placePos.y+1) ||
                 m_world->getBlock(placePos.x, placePos.y, placePos.z) != BlockId::AIR ||
                 m_world->getBlock(placePos.x, placePos.y + 1, placePos.z) != BlockId::AIR ||
                 collidesWithPlayer(placePos + glm::ivec3(0, 1, 0)))
@@ -1378,11 +1427,31 @@ void Player::applyReplicaVisualState(const PlayerVisualState& state) {
 bool Player::pluginClimbing() const{
     if(m_gameMode==GameMode::Spectator)return false;
     const auto p=glm::ivec3(glm::floor(m_position));
-    for(int y=p.y;y<=int(std::floor(m_position.y+PlayerPhysics::dimensions(m_pose).height));++y)if(const auto* b=Plugins::blockBehavior(m_world->getBlock(p.x,y,p.z)))if(b->climbable)return true;
+    for(int y=p.y;y<=int(std::floor(m_position.y+PlayerPhysics::dimensions(m_pose).height));++y) {
+        const auto block=m_world->getBlock(p.x,y,p.z);
+        if(block==BlockId::WEEPING_VINES||block==BlockId::TWISTING_VINES)return true;
+        if(const auto* b=Plugins::blockBehavior(block))if(b->climbable)return true;
+    }
     return false;
 }
 std::optional<glm::dvec3> Player::pluginTarget() const{
     const auto* b=Plugins::itemBehavior(activeItem().id);if(!b||b->action.empty()||!Plugins::targetDispatcher())return {};
     MC_ActionTarget target{};target.size=sizeof(target);if(!Plugins::targetDispatcher()(m_roomPlayerId,b->action,true,target)||!target.valid||target.dimension!=static_cast<uint32_t>(m_world->dimension()))return {};
     return glm::dvec3(target.position[0],target.position[1],target.position[2]);
+}
+
+void Player::applyPotion(const PotionDefinition& potion,float intensity) {
+    const auto& e=potion.effect;
+    if(e.type==StatusEffectType::FireResistance)extinguish();
+    if(e.type==StatusEffectType::Healing)m_survivalStats.heal(float(4u<<e.amplifier)*intensity);
+    else if(e.type==StatusEffectType::Harming)takeDamage(float(6u<<e.amplifier)*intensity,true);
+    else m_effects.apply(e.type,e.amplifier,static_cast<uint32_t>(e.remaining*intensity));
+}
+void Player::tickStatusEffects(float dt) {
+    if(!m_authority)return;
+    m_effectRemainder+=std::max(0.f,dt)*20;
+    while(m_effectRemainder>=1) {
+        m_effects.tick([&](float amount){m_survivalStats.heal(amount);},[&](float amount){takeDamage(amount,true);});
+        m_effectRemainder-=1;
+    }
 }

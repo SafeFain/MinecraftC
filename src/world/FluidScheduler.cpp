@@ -176,7 +176,7 @@ void FluidScheduler::scheduleAt(const glm::ivec3& position,
     // Remove that opposite-type key now instead of leaving a stale heap node.
     cancelAt(position, !state->lava);
     const uint64_t delay = std::max<uint64_t>(
-        minimumDelay, fluidTickDelay(state->lava));
+        minimumDelay, fluidTickDelay(state->lava,m_world.dimension()==DimensionId::Nether));
     const uint64_t due = m_currentWorldTick + delay;
     const auto existing = m_scheduledFluidIndices.find(key);
     if (existing != m_scheduledFluidIndices.end()) {
@@ -292,7 +292,7 @@ void FluidScheduler::spreadTo(const glm::ivec3& from, const glm::ivec3& to,
         static_cast<uint64_t>(static_cast<uint32_t>(to.x)) ^
         (static_cast<uint64_t>(static_cast<uint32_t>(to.z)) << 32) ^
         static_cast<uint64_t>(static_cast<uint32_t>(to.y)));
-    rescheduleAt(to, fluidSpreadDelay(lava,
+    rescheduleAt(to, m_world.dimension()==DimensionId::Nether&&lava?10u:fluidSpreadDelay(lava,
                                       oldState.has_value() ? target : replacement,
                                       replacement, random));
 }
@@ -340,9 +340,9 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
             isSame(m_world.getBlock(above.x, above.y, above.z), lava)) {
             desiredAmount = 8;
             desiredFalling = true;
-        } else if (desiredAmount == 0 && maximum > fluidHorizontalDecay(lava)) {
+        } else if (desiredAmount == 0 && maximum > fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether)) {
             desiredAmount = static_cast<uint8_t>(
-                maximum - fluidHorizontalDecay(lava));
+                maximum - fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether));
         }
 
         if (desiredAmount == 0) {
@@ -362,7 +362,7 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
                 static_cast<uint64_t>(static_cast<uint32_t>(position.x)) ^
                 (static_cast<uint64_t>(static_cast<uint32_t>(position.z)) << 32) ^
                 static_cast<uint64_t>(static_cast<uint32_t>(position.y)));
-            rescheduleAt(position, fluidSpreadDelay(
+            rescheduleAt(position, m_world.dimension()==DimensionId::Nether&&lava?10u:fluidSpreadDelay(
                 lava, oldCurrent, replacement, random));
             current = replacement;
             state = decodeFluidState(current);
@@ -416,12 +416,12 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
                  },
                  [&neighborhood](const glm::ivec3& p) {
                      return neighborhood.available(p);
-                 })) {
+                 },m_world.dimension()==DimensionId::Nether)) {
             spreadTo(position, position + offset, lava,
                      state->falling ? 7 :
-                         (state->amount > fluidHorizontalDecay(lava)
+                         (state->amount > fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether)
                               ? static_cast<uint8_t>(state->amount -
-                                  fluidHorizontalDecay(lava)) : 0),
+                                  fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether)) : 0),
                      false, tick);
         }
         return;
@@ -435,11 +435,11 @@ void FluidScheduler::updateCell(const glm::ivec3& position, uint64_t tick) {
         return neighborhood.available(p);
     };
     for (const glm::ivec3& offset : preferredFluidDirectionsByAmount(
-             position, lava, state->amount, state->falling, sample, available)) {
+             position, lava, state->amount, state->falling, sample, available,m_world.dimension()==DimensionId::Nether)) {
         const uint8_t amount = state->falling
             ? static_cast<uint8_t>(7)
-            : (state->amount > fluidHorizontalDecay(lava)
-                ? static_cast<uint8_t>(state->amount - fluidHorizontalDecay(lava)) : 0);
+            : (state->amount > fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether)
+                ? static_cast<uint8_t>(state->amount - fluidHorizontalDecay(lava,m_world.dimension()==DimensionId::Nether)) : 0);
         if (amount == 0) continue;
         spreadTo(position, position + offset, lava, amount, false, tick);
     }

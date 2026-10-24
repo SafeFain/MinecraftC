@@ -2,13 +2,18 @@
 
 // Behavioral integration: power follows local geometry and survives disk/streaming.
 void testDoorsAndButtons() {
+    size_t stateCount=0;
     for(uint16_t raw=static_cast<uint16_t>(BlockId::DOOR_FIRST);raw<static_cast<uint16_t>(BlockId::COUNT);++raw) {
         const auto id=static_cast<BlockId>(raw);
         DoorState ds; ButtonState bs;
-        require(decodeDoor(id,ds)?doorBlock(ds)==id:decodeButton(id,bs) && buttonBlock(bs)==id,
+        const bool door=decodeDoor(id,ds),button=decodeButton(id,bs);
+        if(!door&&!button)continue;
+        ++stateCount;
+        require(door?doorBlock(ds)==id:buttonBlock(bs)==id,
             "interactive state encoding lost a serialized bit");
         require(itemForBlock(id)!=ItemId::EMPTY,"interactive state lost its inventory item");
     }
+    require(stateCount==792,"append-only door/button state count");
     // A lone panel must hand off real geometry and shadow layers in every orientation.
     for(int facing=0;facing<4;++facing)for(int hinge=0;hinge<2;++hinge)for(int opened=0;opened<2;++opened) {
         Chunk chunk(-1,-1); DoorState ds;

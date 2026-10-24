@@ -1,3 +1,4 @@
+#include "renderer/NetherEnvironment.h"
 #include "plugins/Runtime.h"
 #include "app/GameScenePresenter.h"
 #include "plugins/EnvironmentPresentation.h"
@@ -45,6 +46,10 @@ void GameScenePresenter::render(
             session.weatherState().thunderGradient(), lightningFlash);
 
         bool renderClouds=settings.renderClouds;
+        if(session.activeDimension()==DimensionId::Nether) {
+            environment=netherEnvironment(session.worldState().generator().nether(),session.playerState().getPosition());
+            renderClouds=false;
+        }
         environment=Plugins::applyEnvironment(environment,static_cast<uint32_t>(session.activeDimension()),renderClouds);
         auto pluginEnvironment=Plugins::event(MC_ENVIRONMENT);
         auto copyColor=[](float* destination,const glm::vec3& source){for(int i=0;i<3;++i)destination[i]=source[i];};

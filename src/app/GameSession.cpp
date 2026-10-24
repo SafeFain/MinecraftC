@@ -1,6 +1,8 @@
 #include "plugins/ContentRegistry.h"
 #include "plugins/Runtime.h"
 #include "app/GameSession.h"
+#include "game/DimensionRules.h"
+#include "game/EntityTransferJournal.h"
 
 #include "Config.h"
 #include "player/PluginLanding.h"
@@ -69,6 +71,7 @@ bool GameSession::deleteWorld(const std::string& id) {
 }
 
 void GameSession::setDimensionBedSpawn(const glm::ivec3& bed) {
+    if(dimension==DimensionId::Overworld)worldMetadata.dimensions[static_cast<uint32_t>(DimensionId::Nether)].anchorSpawn.reset();
     worldMetadata.dimensions[static_cast<uint32_t>(dimension)].bedSpawn=bed;
     if (dimension == DimensionId::Overworld) worldMetadata.bedSpawn = bed;
 }
@@ -404,6 +407,7 @@ SaveStore* GameSession::activeDataStore() const {
 }
 
 void GameSession::flushDimensions(bool synchronous) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     for (auto& runtime : simulations) {
         if (!runtime || !runtime->initialized) continue;
         runtime->entities.beginChunkEntityAutosave();
@@ -418,6 +422,7 @@ void GameSession::flushDimensions(bool synchronous) {
 void GameSession::detachSaveStore() {
     closeLanRoom();
     closeReplica();
+    portalStates.clear();
     player.clearPluginCooldowns();
     // Drain pending generation/cache/entity I/O before destroying either store.
     for (auto& runtime : simulations) {
@@ -466,12 +471,14 @@ GameMode GameSession::startWorld(
     RuntimeClock::Tick loadingStarted) {
     if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
     if (saveStore) detachSaveStore();
+    portalStates.clear();
     player.clearPluginCooldowns();
     auto selectedStore = std::make_unique<SaveStore>(worldCatalog.open(worldId));
     auto selectedMetadata = selectedStore->loadMetadata();
     selectedStore->validatePluginFiles();
     if (!WorldGenContext::canLoadGeneration(selectedMetadata.generationVersion))
         throw std::runtime_error("World generation version is incompatible");
+    EntityTransferJournal::recover(selectedStore->worldDirectory());
     saveStore = std::move(selectedStore);
     worldMetadata = std::move(selectedMetadata);
     dimension = newWorld ? DimensionId::Overworld : worldMetadata.activeDimension;
@@ -486,6 +493,7 @@ GameMode GameSession::startWorld(
         worldMetadata.health, worldMetadata.hunger,
         worldMetadata.saturation, worldMetadata.exhaustion,
         worldMetadata.foodTickTimer);
+    player.statusEffects().restore(worldMetadata.effects);
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
     loadActiveDimensionState();
     if(static_cast<uint32_t>(dimension)>=2){const auto landing=dimensionLanding(dimension,player.getPosition());if(!landing)throw std::runtime_error("Dimension has no safe landing");player.setPosition(*landing);}
@@ -632,6 +640,7 @@ bool GameSession::advanceLoading(
 
 void GameSession::updatePlaying(
     float dt, IGameRenderer* renderer, const Feedback& feedback, bool localControl) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory())){setLocalControl(false);return;}
     if (!localControl) setLocalControl(false);
     if (lanJoining) { updateReplica(dt, renderer, feedback); return; }
     const Plugins::ActorScope actorScope(pluginContext());
@@ -728,6 +737,7 @@ void GameSession::updatePlaying(
         if (!views.empty()) simulateDimension(static_cast<DimensionId>(index), views, dt,
             index == static_cast<size_t>(dimension) ? feedback : Feedback{}, fluidUpdatesRemaining, fluidDeadline);
     }
+    if(updateNetherPortals(dt,feedback))return;
     for (auto& entry : guests) {
         auto& guest = *entry.second;
         if (!guest.dead && guest.player.isSurvival() && guest.player.survivalStats().dead()) {
@@ -991,6 +1001,8 @@ GameSession::CommandResult GameSession::executeCommandImpl(
 }
 
 bool GameSession::beginSleepAtBed(const glm::ivec3& bed) {
+    if(!lanJoining&&respawnAnchorCharge(world().getBlock(bed.x,bed.y,bed.z))>=0){useRespawnAnchor(0,bed);return false;}
+    if(!lanJoining&&!playerDead&&!player.isSpectator()&&dimensionRules(dimension).bedsExplode&&isBed(world().getBlock(bed.x,bed.y,bed.z))){explodeRestBlock(dimension,bed);return false;}
     if (lanJoining || sleepState != SleepVisualState::Awake || playerDead) return false;
     const auto foot = world().validBedFoot(bed);
     if (!foot || !dayNightCycle().isNight()) return false;
@@ -1082,7 +1094,8 @@ bool GameSession::switchDimension(
 
 bool GameSession::enterDimension(DimensionId target,RuntimeClock::Tick loadingStarted,const glm::dvec3& validatedLanding) {
     if(lanJoining||!saveStore||target==dimension||!Plugins::validDimension(target))return false;
-    if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
+    entities().dismount(0);
+    if (usesInventoryCommands()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     saveActiveDimensionState();
     updateSaveMetadata();
     saveStore->saveMetadata(worldMetadata);
@@ -1129,7 +1142,7 @@ bool GameSession::handleVoidFall(
 }
 
 void GameSession::beginPlayerDeath() {
-    if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
+    if (usesInventoryCommands()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     fishing.cancel();
     playerDead = true;
     const glm::vec3 deathPosition = glm::vec3(
@@ -1141,13 +1154,23 @@ void GameSession::beginPlayerDeath() {
 
 void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
     if (lanJoining) { Lan::GameAction action; action.kind = Lan::ActionKind::Respawn; queueReplicaAction(action); return; }
-    const auto source=dimension;const auto target=deathDimension(source);
+    const auto source=dimension;
+    auto& anchor=worldMetadata.dimensions[static_cast<uint32_t>(DimensionId::Nether)].anchorSpawn;
+    if(anchor&&(source==DimensionId::Overworld||source==DimensionId::Nether)) {
+        if(const auto landing=consumeAnchorRespawn(*anchor)) {
+            if(dimension!=DimensionId::Nether&&!enterDimension(DimensionId::Nether,loadingStarted,*landing))return;
+            player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.statusEffects().clear();player.extinguish();player.resetDamageImmunity();
+            resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();if(saveStore)saveStore->saveMetadata(worldMetadata);return;
+        }
+        anchor.reset();
+    }
+    const auto target=deathDimension(source);
     if(target!=DimensionId::Overworld) {
         const auto bed=worldMetadata.dimensions[static_cast<uint32_t>(target)].bedSpawn;
         const auto landing=dimensionLanding(target,{},bed);if(!landing)return;
         if(target!=dimension&&!enterDimension(target,loadingStarted,*landing))return;
-        player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.extinguish();player.resetDamageImmunity();
-        resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();return;
+        player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.statusEffects().clear();player.extinguish();player.resetDamageImmunity();
+        resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();if(saveStore)saveStore->saveMetadata(worldMetadata);return;
     }
     const bool returning = source!=DimensionId::Overworld;
     if (returning&&!switchDimension(target, loadingStarted))return;
@@ -1181,7 +1204,7 @@ void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
         ? blockCollisionHeight(world().getBlock(spawn.x, spawn.y, spawn.z)) + 0.001f
         : 1.01f;
     player.setPosition(glm::vec3(spawn) + glm::vec3(0.5f, spawnHeight, 0.5f));
-    player.survivalStats().resetAfterRespawn();
+    player.survivalStats().resetAfterRespawn();player.statusEffects().clear();
     player.extinguish();
     player.resetDamageImmunity();
     world().update(player.getPosition());
@@ -1265,9 +1288,11 @@ void GameSession::resetTransientState(
 void GameSession::saveActiveDimensionState() {
     auto& state=worldMetadata.dimensions[static_cast<uint32_t>(dimension)];
     state.playerPosition=player.getPosition();state.positioned=true;state.worldTicks=survivalTicks();state.dayPhase=dayNightCycle().phase();state.weather=weather().saveState();
-    if(player.onGround()&&player.getPosition().y>=Config::WORLD_MIN_Y){state.safePlayerPosition=player.getPosition();state.safePosition=glm::ivec3(glm::floor(player.getPosition()));state.hasSafePosition=true;}
+    if(!entities().riding(0)&&player.onGround()&&player.getPosition().y>=Config::WORLD_MIN_Y){state.safePlayerPosition=player.getPosition();state.safePosition=glm::ivec3(glm::floor(player.getPosition()));state.hasSafePosition=true;}
+    if(entities().riding(0))state.playerPosition=state.hasSafePosition?state.safePlayerPosition:
+        world().generator().sampleDimensionSpawn().value_or(glm::dvec3(worldMetadata.worldSpawn)+glm::dvec3(.5,.01,.5));
     if (dimension == DimensionId::Overworld) {
-        worldMetadata.playerPosition = player.getPosition();
+        worldMetadata.playerPosition = state.playerPosition;
         worldMetadata.worldTicks = survivalTicks();
         worldMetadata.overworldDayPhase = dayNightCycle().phase();
     } else if(dimension==DimensionId::Heaven) {
@@ -1368,6 +1393,7 @@ void GameSession::updateSaveMetadata() {
     worldMetadata.saturation = player.survivalStats().saturation();
     worldMetadata.exhaustion = player.survivalStats().exhaustion();
     worldMetadata.foodTickTimer = player.survivalStats().foodTickTimer();
+    worldMetadata.effects=player.statusEffects().active();
     if (simulations[0]->initialized) {
         worldMetadata.worldTicks = simulations[0]->ticks;
         worldMetadata.overworldDayPhase = simulations[0]->daylight.phase();
@@ -1382,6 +1408,7 @@ void GameSession::updateSaveMetadata() {
 }
 
 void GameSession::beginAutosave(const std::function<void()>& onError) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (!saveStore || !terrainGenerated || autosavePending) return;
     try {
         updateSaveMetadata();
@@ -1401,6 +1428,7 @@ void GameSession::beginAutosave(const std::function<void()>& onError) {
 }
 
 void GameSession::processAutosave(const std::function<void()>& onError) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (!autosavePending) return;
     try {
         // One file per call, alternating dimensions and entity/terrain queues.
@@ -1435,6 +1463,7 @@ void GameSession::processAutosave(const std::function<void()>& onError) {
 }
 
 void GameSession::saveNow(const std::function<void()>& onError) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (!Plugins::content().runtimeFault.empty()) return;
     if (!saveStore || (!terrainGenerated && !hostingLan())) return;
     try {
@@ -1450,6 +1479,7 @@ void GameSession::saveNow(const std::function<void()>& onError) {
 }
 
 bool GameSession::pluginUse(bool after) {
+    if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return false;
     if(lanJoining)return true;
     const Plugins::ActorScope actor(pluginContext());
     if(!terrainGenerated)return !Plugins::dispatcher();
@@ -1572,7 +1602,7 @@ std::optional<glm::dvec3> GameSession::dimensionLanding(DimensionId target,std::
     };
     if(bed){terrain.update(glm::dvec3(*bed));terrain.enqueueGeneration();terrain.waitForInitialGeneration(1500);terrain.processCompletedGenerations(false);const auto foot=terrain.validBedFoot(*bed);if(foot){const auto p=glm::dvec3(*foot)+glm::dvec3(.5,blockCollisionHeight(terrain.getBlock(foot->x,foot->y,foot->z))+.001,.5);if(valid(p))return p;}}
     if(preferred&&valid(*preferred))return preferred;
-    if(definition.sampleSpawn) {
+    if(target==DimensionId::Nether||definition.sampleSpawn) {
         const auto sampled=terrain.generator().sampleDimensionSpawn();
         return sampled&&valid(*sampled)?sampled:std::nullopt;
     }

@@ -25,7 +25,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     };
     install(module);AssetStore rootedAssets(assets);Plugins::PluginManager plugins({assets,root});plugins.initialize();
     const uint32_t id=Plugins::resolveDimension("worldgen_policy_v2:layered");const auto dim=static_cast<DimensionId>(id);
-    check(id>=2,"native V2 dimension registration");
+    check(id>=3,"native V2 dimension registration");
     check(plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,1)&&plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,2)&&
         plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,3)&&!plugins.extension(nullptr,MC_DIMENSIONS_EXTENSION,4)&&plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,1)&&
         plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,2)&&plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,3)&&!plugins.extension(nullptr,MC_STRUCTURES_EXTENSION,4),"version negotiation");

@@ -16,7 +16,7 @@ constexpr std::array<TradeOffer, 5> FARMER{{
     offer(ItemId::EMERALD, 1, ItemId::BREAD, 6, 5),
     offer(ItemId::WHEAT_SEEDS, 16, ItemId::EMERALD, 1, 10),
     offer(ItemId::EMERALD, 3, ItemId::STEAK, 4, 15),
-    offer(ItemId::EMERALD, 3, ItemId::COOKED_CHICKEN, 6, 20),
+    offer(ItemId::EMERALD, 4, ItemId::GLISTERING_MELON, 3, 20),
 }};
 constexpr std::array<TradeOffer, 5> FLETCHER{{
     offer(ItemId::STICK, 32, ItemId::EMERALD, 1, 2),
@@ -37,7 +37,7 @@ constexpr std::array<TradeOffer, 5> LEATHERWORKER{{
     offer(ItemId::EMERALD, 3, ItemId::LEATHER_BOOTS, 1, 5),
     offer(ItemId::EMERALD, 5, ItemId::LEATHER_LEGGINGS, 1, 10),
     offer(ItemId::EMERALD, 7, ItemId::LEATHER_CHESTPLATE, 1, 15),
-    offer(ItemId::EMERALD, 5, ItemId::LEATHER_HELMET, 1, 20),
+    offer(ItemId::EMERALD, 6, ItemId::SADDLE, 1, 20),
 }};
 constexpr std::array<TradeOffer, 5> ARMORER{{
     offer(ItemId::COAL, 15, ItemId::EMERALD, 1, 2),
@@ -83,7 +83,7 @@ constexpr std::array<TradeOffer,5> CARTOGRAPHER{{
 }};
 constexpr std::array<TradeOffer,5> CLERIC{{
     offer(ItemId::ROTTEN_FLESH, 32, ItemId::EMERALD, 1, 2),
-    offer(ItemId::EMERALD, 2, ItemId::GLOW_FERN, 4, 7),
+    offer(ItemId::EMERALD, 1, ItemId::REDSTONE_DUST, 2, 7),
     offer(ItemId::GOLD_INGOT, 3, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 3, ItemId::RESONANT_CRYSTAL, 4, 17),
     offer(ItemId::EMERALD, 5, ItemId::BREWING_STAND, 1, 22),
