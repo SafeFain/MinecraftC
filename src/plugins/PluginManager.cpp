@@ -1,4 +1,5 @@
 #include "plugins/PluginManager.h"
+#include "plugins/ContentPackage.h"
 #include "core/AssetStore.h"
 #include "model/GltfLoader.h"
 #include "debug/Log.h"
@@ -173,6 +174,10 @@ Manifest Manifest::parse(const Json& j) {
     check(m.networkCompatibility.size()<=128,"Network compatibility identifier is too long");
     m.visual=j.flag("visual_only",false);m.defaultEnabled=j.flag("enabled_by_default",true);
     m.gameMinimum=j.text("game_min");m.gameMaximum=j.text("game_max");m.data=j.text("data");
+    if(j.has("package_format")) {
+        check(j.at("package_format").type==Json::Type::Number&&j.at("package_format").number==1,"Unsupported package_format (expected 1)");
+        check(!j.has("data"),"package_format cannot be combined with data");m.packageFormat=1;
+    }
     if(j.has("native")) {
         const auto& native=j.at("native");std::string platform;
         switch(currentDesktopPlatform()) {case DesktopPlatform::Linux:platform="linux";break;case DesktopPlatform::Windows:platform="windows";break;case DesktopPlatform::MacOS:platform="macos";break;case DesktopPlatform::Android:platform="android";break;case DesktopPlatform::IOS:platform="ios";break;}
@@ -260,7 +265,7 @@ std::vector<size_t> PluginManager::resolve(std::vector<PluginInfo>& info) {
     for(const auto& entry:ready)if(indegree[entry.second]!=SIZE_MAX)info[entry.second].status="Dependency/order cycle or blocked by cycle";
     return order;
 }
-PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAssetCache> modelAssets):m_paths(std::move(paths)),m_modelAssets(modelAssets?std::move(modelAssets):std::make_shared<model::ModelAssetCache>()) {
+PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAssetCache> modelAssets,std::vector<BuiltinPluginDescriptor> builtins):m_paths(std::move(paths)),m_builtins(std::move(builtins)),m_modelAssets(modelAssets?std::move(modelAssets):std::make_shared<model::ModelAssetCache>()) {
     m_host.size=sizeof(m_host);m_host.abi=MC_PLUGIN_ABI;
     m_host.log=[](MC_PluginContext* c,uint32_t level,const char* msg){if(c&&msg){if(level>=2)LOG_WARN("Plugin: "<<msg);else LOG_INFO("Plugin: "<<msg);}};
     m_host.last_error=[](MC_PluginContext* c)->const char* {return c?c->error.c_str():"Invalid context";};
@@ -437,6 +442,60 @@ int32_t PluginManager::storage(MC_PluginContext& c,bool world,bool write,const c
     else {check(output&&capacity,"Invalid read buffer");std::string text="{}";if(std::filesystem::exists(path)){check(std::filesystem::file_size(path)<=65536,"Plugin state exceeds size limit");std::ifstream file(path);check(static_cast<bool>(file),"Cannot read plugin state");text.assign(std::istreambuf_iterator<char>(file),{});}check(text.size()<capacity&&text.size()<=65536,"State buffer is too small");std::copy(text.begin(),text.end(),output);output[text.size()]='\0';}
     return 0;
 }
+std::vector<PackageDefinition> PluginManager::readPackage(MC_PluginContext& ctx) {
+    const auto& info=m_info.at(ctx.index);std::vector<PackageDefinition> result;uintmax_t bytes=0;
+    const auto packageRoot=std::filesystem::weakly_canonical(info.root);
+    for(const auto& category:packageCategories()) {
+        const auto directory=containedPath(packageRoot,category);
+        if(!std::filesystem::exists(directory))continue;
+        check(std::filesystem::is_directory(directory),"Content category must be a directory");
+        std::vector<std::filesystem::path> files;
+        for(const auto& file:std::filesystem::recursive_directory_iterator(directory)) {
+            check(!file.is_symlink(),"Content package cannot contain symlinks");
+            if(file.is_regular_file()&&file.path().extension()==".json")files.push_back(file.path());
+        }
+        std::sort(files.begin(),files.end(),[&](const auto& a,const auto& b){return a.lexically_relative(packageRoot).generic_string()<b.lexically_relative(packageRoot).generic_string();});
+        for(const auto& file:files) {
+            const auto path=file.lexically_relative(packageRoot).generic_string();
+            try {
+                check(result.size()<4096,"Too many package definitions");bytes+=std::filesystem::file_size(file);
+                check(bytes<=128*1024*1024,"Package definitions exceed size limit");
+                auto value=readJson(file);packageSource(value,path);
+                check(value.type==Json::Type::Object,"Definition must be one JSON object");
+                const auto identity=packageIdentity(value,category);
+                result.push_back({category,path,identity,std::move(value)});
+            }catch(const std::exception& e){throw std::runtime_error(info.manifest.id+" / "+path+": "+e.what());}
+        }
+    }
+    try {orderPackageRenderResources(result);}catch(const std::exception& e){throw std::runtime_error(info.manifest.id+" / "+e.what());}
+    return result;
+}
+void PluginManager::loadPackage(MC_PluginContext& ctx,const std::vector<PackageDefinition>& definitions,bool primary) {
+    const auto& info=m_info.at(ctx.index);
+    for(const auto& d:definitions) {
+        const auto& categories=packageCategories();
+        const bool early=std::find(categories.begin(),categories.begin()+6,d.category)!=categories.begin()+6;
+        if(early!=primary)continue;
+        try {
+            m_definitionSources[{d.category,d.identity}]=info.manifest.id+" / "+d.path;
+            Json data;data.type=Json::Type::Object;auto& entries=data.object[d.category];entries.type=Json::Type::Array;entries.array.push_back(d.value);
+            loadData(ctx,data);
+            if(d.value.has("name_key")) {
+                m_definitionSources.emplace(std::make_pair("names",d.identity),info.manifest.id+" / "+d.path+"/name_key");
+                const auto name=d.value.at("name_key").text();
+                const auto bound=content().extensions.nameKeys.find(d.identity);
+                if(bound==content().extensions.nameKeys.end()||bound->second!=name) localizedName(ctx,d.identity.c_str(),name.c_str());
+            }
+        }catch(const std::exception& e) {
+            const std::string error=e.what();
+            const bool earlyReference=primary&&(error.find("Unknown block:")!=std::string::npos||error.find("Unknown item:")!=std::string::npos);
+            throw std::runtime_error(info.manifest.id+" / "+d.path+" ["+d.identity+"]: "+error+
+                (earlyReference?"; basic references must exist before code registration; define the referenced block/item in data":""));
+        }
+    }
+    if(primary&&std::filesystem::exists(containedPath(info.root,"lang")))try {localizationBundle(ctx,"lang");}
+    catch(const std::exception& e){throw std::runtime_error(info.manifest.id+" / lang: "+e.what());}
+}
 void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     auto each=[&](const char* key,auto apply){if(!data.has(key))return;check(data.at(key).type==Json::Type::Array,"Content field must be an array");for(const auto& value:data.at(key).array)apply(value);};
     auto integer=[](const Json& j,const char* key,uint32_t fallback)->uint32_t {const double v=j.numeric(key,fallback);check(v>=0&&v<=65535&&std::floor(v)==v,"Expected bounded integer");return static_cast<uint32_t>(v);};
@@ -482,7 +541,11 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
         std::vector<std::string> modifierKeys,modifierRevisions;std::vector<MC_DimensionModifier> modifiers;
         if(j.has("modifiers")){const auto& values=j.at("modifiers");check(values.type==Json::Type::Array&&values.array.size()<=64,"Invalid default modifiers");for(const auto& m:values.array){modifierKeys.push_back(m.at("key").text());modifierRevisions.push_back(m.at("revision").text());}for(size_t i=0;i<modifierKeys.size();++i)modifiers.push_back({modifierKeys[i].c_str(),modifierRevisions[i].c_str()});}
         d.modifiers=modifiers.data();d.modifier_count=static_cast<uint32_t>(modifiers.size());
-        uint32_t id;dimensionDefinition(ctx,d,id);
+        uint32_t id;
+        if(j.has("name_key")&&m_info.at(ctx.index).manifest.packageFormat) {
+            MC_DimensionDefinitionV3 v{};v.size=sizeof(v);v.base.size=sizeof(v.base);v.base.base=d;
+            const auto nameKey=j.at("name_key").text();v.name_key=nameKey.c_str();dimensionDefinitionV3(ctx,v,id);
+        }else dimensionDefinition(ctx,d,id);
     });
     if(data.has("entities"))check(data.at("entities").type==Json::Type::Array,"Expected entity array");
     if(data.has("generators"))check(data.at("generators").type==Json::Type::Array,"Expected generator array");
@@ -514,26 +577,32 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
 void PluginManager::validateContent() {
     validateCapabilities();
     for(const auto& entry:content().extensions.dimensions) {
+        validateDefinition("dimensions",entry.second.key,[&] {
         const auto& d=entry.second;
         if(entry.first!=0&&entry.first!=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
         if(!d.deathTarget.empty())resolveDimension(d.deathTarget);
         if(!d.voidTarget.empty())resolveDimension(d.voidTarget);
+        });
     }
     const auto english=content().extensions.translations.find("en_us");
     const auto translated=[&](const std::string& key){return english!=content().extensions.translations.end()&&english->second.count(key);};
-    for(const auto& entry:content().extensions.nameKeys)check(translated(entry.second),"Localized content name requires English translation");
+    for(const auto& entry:content().extensions.nameKeys) {
+        validateDefinition("names",entry.first,[&]{check(translated(entry.second),"name_key requires English translation");});
+    }
     for(const auto& entry:content().extensions.dimensions)if(entry.first&&!entry.second.nameKey.empty())check(translated(entry.second.nameKey),"Localized dimension name requires English translation");
     for(const auto& entry:content().extensions.bedTravel)check(translated(entry.second.nameKey),"Travel label requires English translation");
     auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
     for(auto& entry:content().blocks) {
+        validateDefinition(entry.second.familyKind?"block_families":"blocks",entry.second.key,[&] {
         if(entry.second.familyKind==MC_SLAB_FAMILY) {
             const auto full=resolveBlock(entry.second.fullBlock);check(isFullCollisionBlock(full)&&getBlockProps(full).shape==RenderShape::Cube,"Slab full_block must be a full cube");
         }
         for(const auto& key:entry.second.materials)check(materialExists(key),"Unknown block material");
         if(!entry.second.dropKey.empty())entry.second.drop=resolveItem(entry.second.dropKey);
+        });
     }
-    for(const auto& entry:content().items)check(materialExists(entry.second.material),"Unknown item material");
-    for(const auto& entry:content().extensions.entities)if(!entry.second.drop.empty())resolveItem(entry.second.drop);
+    for(const auto& entry:content().items)validateDefinition("items",entry.second.key,[&]{check(materialExists(entry.second.material),"Unknown item material field material");});
+    for(const auto& entry:content().extensions.entities)validateDefinition("entities",entry.second.key,[&]{if(!entry.second.drop.empty())resolveItem(entry.second.drop);});
 }
 void PluginManager::buildNetworkDescription() {
     describeCapabilities();
@@ -613,14 +682,27 @@ void PluginManager::initialize(bool safeMode) {
         } else builtinDescriptions=Json::parse(AssetStore::readTextPath(m_paths.assetRoot/"plugins/descriptions.json"));
         check(builtinDescriptions.type==Json::Type::Object,"Invalid builtin description catalog");
     }catch(const std::exception& e){LOG_WARN("Cannot read builtin plugin descriptions: "<<e.what());}
-    for(const auto& descriptor:builtinPlugins()){
+    for(const auto& descriptor:m_builtins){
         PluginInfo p;p.manifest.id=descriptor.id;p.manifest.name=descriptor.name;p.manifest.version="1.0.0";
         if(builtinDescriptions.has(descriptor.id))try {
             p.manifest.readDescription(builtinDescriptions.at(descriptor.id));
         }catch(const std::exception& e){LOG_WARN("Invalid plugin description for "<<descriptor.id<<": "<<e.what());}
         p.manifest.builtin=true;p.manifest.visual=descriptor.visual;p.manifest.defaultEnabled=descriptor.enabled;
         if(*descriptor.resources)p.root=m_paths.assetRoot/descriptor.resources;
-        p.enabled=!safeMode&&(m_enabled.count(descriptor.id)?m_enabled.at(descriptor.id):descriptor.enabled);
+        if(descriptor.packaged)try {
+            if(!m_paths.assetRoot.empty()&&*descriptor.developmentRoot&&
+               std::filesystem::weakly_canonical(m_paths.assetRoot)==std::filesystem::weakly_canonical(descriptor.developmentAssets))
+                p.root=descriptor.developmentRoot;
+            Json definition;
+            if(m_paths.assetRoot.empty()) {
+                const auto bytes=AssetStore::readTitleBinary(p.root.generic_string()+"/mod.json");
+                definition=Json::parse(std::string(bytes.begin(),bytes.end()));
+            }else definition=readJson(containedPath(p.root,"mod.json"));
+            auto manifest=Manifest::parse(definition);
+            check(manifest.id==descriptor.id&&manifest.packageFormat==1,"Builtin package manifest identity/format mismatch");
+            manifest.builtin=true;p.manifest=std::move(manifest);
+        }catch(const std::exception& e){p.enabled=false;p.status=e.what();m_info.push_back(std::move(p));continue;}
+        p.enabled=!safeMode&&(m_enabled.count(descriptor.id)?m_enabled.at(descriptor.id):p.manifest.defaultEnabled);
         if(!p.enabled)p.status="Disabled";m_info.push_back(std::move(p));
     }
     const auto directory=m_paths.dataRoot/"mods";std::filesystem::create_directories(directory);
@@ -633,7 +715,7 @@ void PluginManager::initialize(bool safeMode) {
             check(!std::filesystem::is_symlink(root),"Plugin package directory cannot be a symlink");
             p.manifest=Manifest::parse(readJson(containedPath(root,"mod.json")));
             check(p.manifest.id==root.filename().string(),"Package directory must match plugin ID");
-            check(std::none_of(builtinPlugins().begin(),builtinPlugins().end(),[&](const auto& d){return p.manifest.id==d.id;}),"Reserved built-in plugin identity");
+            check(std::none_of(m_builtins.begin(),m_builtins.end(),[&](const auto& d){return p.manifest.id==d.id;}),"Reserved built-in plugin identity");
             p.enabled=!safeMode&&(m_enabled.count(p.manifest.id)?m_enabled.at(p.manifest.id):p.manifest.defaultEnabled);
             if(!p.enabled)p.status="Disabled";
             else if(!p.manifest.entry.empty()&&(!Platform::DynamicLibrary::supported()||p.manifest.entry=="!unsupported"))p.status="Native entry unsupported on this platform";
@@ -648,13 +730,15 @@ void PluginManager::initialize(bool safeMode) {
             if(!dependency.optional&&it==m_info.end())dependenciesActive=false;
         }
         if(!dependenciesActive){info.status="Blocked by failed dependency";continue;}
-        auto before=content();const size_t listeners=m_listeners.size();const auto commands=m_commands;
+        auto before=content();const auto definitionSources=m_definitionSources;const size_t listeners=m_listeners.size();const auto commands=m_commands;
         auto& loaded=m_loaded[i];loaded.context=std::make_unique<MC_PluginContext>();loaded.context->manager=this;loaded.context->index=i;
-        const auto builtinRevision=[&](){for(const auto& d:builtinPlugins())if(info.manifest.id==d.id&&info.manifest.builtin)return std::string(d.revision);return std::string{};}();
+        const auto builtinRevision=[&](){for(const auto& d:m_builtins)if(info.manifest.id==d.id&&info.manifest.builtin)return std::string(d.revision);return std::string{};}();
         try {
             if(info.manifest.builtin&&m_paths.assetRoot.empty()&&!info.root.empty())
                 info.root=materializeBuiltinResources(info.root,m_paths.dataRoot,info.manifest.id);
-            if(info.manifest.builtin){const auto& entries=builtinPlugins();auto descriptor=std::find_if(entries.begin(),entries.end(),[&](const auto& d){return info.manifest.id==d.id;});check(descriptor!=entries.end(),"Unknown built-in plugin");loaded.api=descriptor->query(MC_PLUGIN_ABI);}
+            const auto packageDefinitions=info.manifest.packageFormat?readPackage(*loaded.context):std::vector<PackageDefinition>{};
+            if(info.manifest.packageFormat)loadPackage(*loaded.context,packageDefinitions,true);
+            if(info.manifest.builtin){auto descriptor=std::find_if(m_builtins.begin(),m_builtins.end(),[&](const auto& d){return info.manifest.id==d.id;});check(descriptor!=m_builtins.end(),"Unknown built-in plugin");loaded.api=descriptor->query?descriptor->query(MC_PLUGIN_ABI):nullptr;}
             else if(!info.manifest.entry.empty()) {
                 loaded.library=std::make_unique<Platform::DynamicLibrary>(containedPath(info.root,info.manifest.entry));
                 auto query=reinterpret_cast<MC_PluginQuery>(loaded.library->symbol("MCPlugin_Query"));check(query,"Missing MCPlugin_Query entry point");loaded.api=query(MC_PLUGIN_ABI);
@@ -664,7 +748,7 @@ void PluginManager::initialize(bool safeMode) {
                 check(required(loaded.api->id)==info.manifest.id&&required(loaded.api->version)==info.manifest.version,"Native metadata differs from manifest");
                 loaded.loadEntered=true;
                 check(loaded.api->load(&m_host,loaded.context.get())==0,"Native plugin initialization failed");
-            } else check(info.manifest.entry.empty()&&!info.manifest.builtin,"Plugin rejected host ABI");
+            } else check(info.manifest.entry.empty()&&(!info.manifest.builtin||info.manifest.packageFormat),"Plugin rejected host ABI");
             info.active=true;
             MC_Event registration=event(MC_REGISTER);
             std::vector<Listener> registrationListeners(m_listeners.begin()+static_cast<std::ptrdiff_t>(listeners),m_listeners.end());
@@ -672,6 +756,7 @@ void PluginManager::initialize(bool safeMode) {
             for(const auto& listener:registrationListeners)
                 if(listener.kind==MC_REGISTER)check(listener.callback(loaded.context.get(),&registration,listener.userdata)==0,"Registration callback failed");
             if(!info.manifest.data.empty())loadData(*loaded.context,readJson(containedPath(info.root,info.manifest.data)));
+            if(info.manifest.packageFormat)loadPackage(*loaded.context,packageDefinitions,false);
             check(!loaded.context->registrationFailed,"Plugin ignored a failed registration");
             validateContent();
             if(!info.manifest.visual)content().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?builtinRevision:std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
@@ -688,6 +773,7 @@ void PluginManager::initialize(bool safeMode) {
         }catch(const std::exception& e) {
             info.active=false;info.status=e.what();if(!loaded.context->error.empty())info.status+=" ("+loaded.context->error+")";
             content()=std::move(before);m_listeners.resize(listeners);m_commands=commands;
+            m_definitionSources=definitionSources;
             if(loaded.loadEntered&&loaded.api&&loaded.api->unload)loaded.api->unload(loaded.context.get());
             loaded.api=nullptr;loaded.library.reset();
             LOG_WARN("Plugin "<<info.manifest.id<<": "<<info.status);

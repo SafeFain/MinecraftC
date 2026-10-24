@@ -1,0 +1,8 @@
+{
+  "key": "package_demo:blue_brick",
+  "name": "Blue Brick",
+  "name_key": "package_demo:block.blue_brick",
+  "hardness": 1.5,
+  "materials": "package_demo:blue_brick",
+  "drop": "package_demo:blue_brick"
+}

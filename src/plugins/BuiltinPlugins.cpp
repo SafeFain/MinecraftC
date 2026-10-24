@@ -8,6 +8,9 @@
 #include "plugins/OfficialHeavenActions.h"
 #include <limits>
 #include <glm/gtc/matrix_transform.hpp>
+#ifdef MINECRAFTC_CONTENT_PACKAGES_HEADER
+#include MINECRAFTC_CONTENT_PACKAGES_HEADER
+#endif
 
 namespace {
 struct Demo {const MC_Host* host;MC_PluginContext* context;};
@@ -111,10 +114,16 @@ namespace Plugins {
 const MC_Plugin* builtinContent(uint32_t abi){return abi==MC_PLUGIN_ABI?&contentPlugin:nullptr;}
 const MC_Plugin* builtinAtmosphere(uint32_t abi){return abi==MC_PLUGIN_ABI?&atmospherePlugin:nullptr;}
 const std::vector<BuiltinPluginDescriptor>& builtinPlugins(){
-    static const std::vector<BuiltinPluginDescriptor> entries{
+    static const std::vector<BuiltinPluginDescriptor> entries=[] {
+        std::vector<BuiltinPluginDescriptor> registered{
         {"official_content","Official Content Example","builtin-api1-content1","",false,false,builtinContent},
         {"official_atmosphere","Official Atmosphere Example","builtin-api1-content1","",true,false,builtinAtmosphere},
         {"official_heaven","Heaven","heaven-v9-content2-p1","plugins/official_heaven",false,true,builtinHeaven}};
+#ifdef MINECRAFTC_CONTENT_PACKAGES_HEADER
+        appendContentPackages(registered);
+#endif
+        return registered;
+    }();
     return entries;
 }
 }

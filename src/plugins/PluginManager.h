@@ -18,6 +18,7 @@ struct MC_PluginContext {
     bool registrationFailed=false;
 };
 namespace Plugins {
+struct PackageDefinition;
 struct Version {
     uint32_t major=0,minor=0,patch=0;
     std::vector<std::string> prerelease;
@@ -29,6 +30,7 @@ struct Dependency {
     bool optional=false;
 };
 struct Manifest {
+    uint32_t packageFormat=0;
     std::string id,name,version,gameMinimum,gameMaximum,entry,data,networkCompatibility;
     std::map<std::string,std::string> descriptions;
     std::vector<Dependency> dependencies;
@@ -56,9 +58,19 @@ struct HostOperations {
     std::function<void(float,float,float,float,uint16_t,const glm::vec4&)> hudImage;
     std::function<std::filesystem::path()> worldDirectory;
 };
+struct BuiltinPluginDescriptor {
+    const char *id,*name,*revision,*resources;
+    bool visual,enabled;
+    const MC_Plugin* (*query)(uint32_t);
+    bool packaged=false;
+    const char* developmentRoot="";
+    const char* developmentAssets="";
+};
+const std::vector<BuiltinPluginDescriptor>& builtinPlugins();
 class PluginManager {
 public:
-    explicit PluginManager(RuntimePaths paths, std::shared_ptr<model::ModelAssetCache> modelAssets = {});
+    explicit PluginManager(RuntimePaths paths, std::shared_ptr<model::ModelAssetCache> modelAssets = {},
+                           std::vector<BuiltinPluginDescriptor> builtins = builtinPlugins());
     ~PluginManager();
     PluginManager(const PluginManager&)=delete;
     PluginManager& operator=(const PluginManager&)=delete;
@@ -161,10 +173,19 @@ private:
     struct Listener {size_t plugin;uint32_t kind;int32_t priority;MC_EventCallback callback;void* userdata;};
     struct Command {size_t plugin;MC_EventCallback callback;void* userdata;uint32_t flags=0;};
     RuntimePaths m_paths;
+    std::vector<BuiltinPluginDescriptor> m_builtins;
     std::shared_ptr<model::ModelAssetCache> m_modelAssets;
     MC_Host m_host{};
     std::vector<PluginInfo> m_info;
     std::vector<Loaded> m_loaded;
+    std::map<std::pair<std::string,std::string>,std::string> m_definitionSources;
+    template<class F> void validateDefinition(const std::string& category,const std::string& key,F apply) const {
+        try {apply();}catch(const std::exception& e) {
+            const auto source=m_definitionSources.find({category,key});
+            if(source==m_definitionSources.end())throw;
+            throw std::runtime_error(source->second+" ["+key+"]: "+e.what());
+        }
+    }
     std::vector<Listener> m_listeners;
     std::map<std::string,Command> m_commands;
     std::vector<std::function<bool()>> m_queue;
@@ -179,6 +200,8 @@ private:
     struct ActionReceipt {size_t owner=0;uint32_t status=MC_ACTION_PENDING;};
     std::map<uint64_t,ActionReceipt> m_actionResults;
     void loadData(MC_PluginContext&,const Json&);
+    std::vector<PackageDefinition> readPackage(MC_PluginContext&);
+    void loadPackage(MC_PluginContext&,const std::vector<PackageDefinition>&,bool primary);
     void loadRenderData(MC_PluginContext&,const Json&);
     void validateContent();
     void buildNetworkDescription();
@@ -186,10 +209,4 @@ private:
 };
 const MC_Plugin* builtinContent(uint32_t);
 const MC_Plugin* builtinAtmosphere(uint32_t);
-struct BuiltinPluginDescriptor {
-    const char *id,*name,*revision,*resources;
-    bool visual,enabled;
-    const MC_Plugin* (*query)(uint32_t);
-};
-const std::vector<BuiltinPluginDescriptor>& builtinPlugins();
 }

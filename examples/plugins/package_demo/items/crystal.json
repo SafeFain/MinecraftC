@@ -1,0 +1,6 @@
+{
+  "key": "package_demo:crystal",
+  "name": "Resonant Crystal",
+  "name_key": "package_demo:item.crystal",
+  "material": "package_demo:blue_brick"
+}

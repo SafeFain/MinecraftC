@@ -14,6 +14,10 @@ if scene == "plugins":
     command += ["--extensions", extra[0]]
 elif scene == "capabilities":
     command += ["--capabilities"]
+elif scene == "content_package":
+    if len(extra) != 1:
+        raise SystemExit("Content package smoke requires a published package")
+    command += ["--content-package", extra[0]]
 elif scene in ("heaven_model", "heaven_off"):
     command += ["--heaven-model" if scene == "heaven_model" else "--heaven-off"]
 elif extra:
@@ -47,7 +51,7 @@ with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         raise SystemExit(f"FAILED: Vulkan {scene} exceeded 220 seconds")
 print(stdout, end="")
 print(stderr, end="", file=sys.stderr)
-marker = {"gi": "Voxel GI Vulkan smoke passed", "model_fog": "PASS Vulkan model fog:", "plugins": "Plugin Vulkan shader/post pass, rebuild and resume passed", "capabilities": "Plugin sky/cloud, held GLB, colored particles, WAV initialization and Vulkan rebuild/resume passed", "heaven_model": "Official Heaven day/night sky and registered color-grade Vulkan readback passed", "heaven_off": "Modern UI Vulkan smoke passed"}[scene]
+marker = {"content_package": "Content package Vulkan material/icon and native interaction readback passed", "gi": "Voxel GI Vulkan smoke passed", "model_fog": "PASS Vulkan model fog:", "plugins": "Plugin Vulkan shader/post pass, rebuild and resume passed", "capabilities": "Plugin sky/cloud, held GLB, colored particles, WAV initialization and Vulkan rebuild/resume passed", "heaven_model": "Official Heaven day/night sky and registered color-grade Vulkan readback passed", "heaven_off": "Modern UI Vulkan smoke passed"}[scene]
 if process.returncode != 0:
     raise SystemExit(f"FAILED: Vulkan {scene} exited {process.returncode}")
 if marker not in stdout:

@@ -19,7 +19,9 @@ void write(const std::filesystem::path& file,const std::string& text){std::files
 std::string bytes(const std::filesystem::path& path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 Plugins::PluginInfo info(const std::string& id){Plugins::PluginInfo p;p.manifest.id=id;p.manifest.version="1.0.0";return p;}
 }
+#include "ContentPackageIntegration.h"
 int main(int argc,char** argv) {
+    if(argc==4&&std::string(argv[1])=="--content-package-tests")return ContentPackageIntegration::run(argv[2],argv[3]);
     try {
         const auto root=std::filesystem::temp_directory_path()/"minecraftc-plugin-regressions";
         std::filesystem::remove_all(root);std::filesystem::create_directories(root);

@@ -217,17 +217,22 @@ void PluginManager::localizationBundle(MC_PluginContext& ctx,const char* directo
     for(const auto& entry:std::filesystem::directory_iterator(root)) {
         require(!entry.is_symlink(),"Language files cannot be symlinks");
         if(!entry.is_regular_file()||entry.path().extension()!=".json")continue;
+        try {
         const auto language=entry.path().stem().string();
         require(language.size()==5&&language[2]=='_'&&std::all_of(language.begin(),language.end(),[](char c){return (c>='a'&&c<='z')||c=='_';}),"Invalid language code");
         require(std::filesystem::file_size(entry.path())<=1024*1024,"Language bundle file too large");
         std::ifstream file(entry.path(),std::ios::binary);require(bool(file),"Cannot read language bundle");
         const auto data=Json::parse(std::string(std::istreambuf_iterator<char>(file),{}));require(data.type==Json::Type::Object,"Language dictionary must be an object");
         for(const auto& value:data.object) {
-            require(++entries<=65536&&validKey(value.first)&&value.first.rfind(prefix,0)==0,"Language key must use own namespace/entry limit");
-            require(value.second.type==Json::Type::String&&value.second.string.size()<=16384,"Invalid language value");
-            require(content().extensions.translations[language].emplace(value.first,value.second.string).second,"Duplicate language key");
+            if(!(++entries<=65536&&validKey(value.first)&&value.first.rfind(prefix,0)==0))throw std::runtime_error("Language key must use own namespace/entry limit: "+value.first);
+            if(value.second.type!=Json::Type::String||value.second.string.size()>16384)throw std::runtime_error("Invalid language value: "+value.first);
+            if(!content().extensions.translations[language].emplace(value.first,value.second.string).second)throw std::runtime_error("Duplicate language key: "+value.first);
         }
         english=english||language=="en_us";
+        }catch(const std::exception& e) {
+            if(!info.manifest.packageFormat)throw;
+            throw std::runtime_error(info.manifest.id+" / "+entry.path().lexically_relative(std::filesystem::weakly_canonical(info.root)).generic_string()+": "+e.what());
+        }
     }
     require(english,"Localization bundle requires en_us.json");
 }

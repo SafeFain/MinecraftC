@@ -1,0 +1,12 @@
+{
+  "id": "package_demo",
+  "name": "Package Demo",
+  "version": "1.0.0",
+  "api": 1,
+  "package_format": 1,
+  "native": {
+    "windows": "package_demo.dll",
+    "linux": "package_demo.so",
+    "macos": "package_demo.dylib"
+  }
+}

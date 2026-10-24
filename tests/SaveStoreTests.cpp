@@ -165,6 +165,10 @@ void transferJournalTests(const std::filesystem::path& root) {
     Partition source{DimensionId::Overworld,0,0,{}};
     Partition target{DimensionId::Nether,-1,-1,{resident,moved}};
     prepare(root,source,target);
+    const auto publishedManifest=readBytes(pending(root)/"manifest");
+    bool pendingRefused=false;try{prepare(root,source,target);}catch(const std::exception&){pendingRefused=true;}
+    require(pendingRefused&&readBytes(pending(root)/"manifest")==publishedManifest,
+            "publication must not replace an outstanding entity transfer");
     require(SaveStore(root).loadChunkEntities(0,0).size()==1,"journal prepare leaves source before-image intact");
     SaveStore(root).saveChunkEntities(0,0,{}); // Simulate interruption after only the first replacement.
     require(recover(root),"published journal recovered");

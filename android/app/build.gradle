@@ -31,6 +31,42 @@ if (versionCodeValue > 2100000000) {
 }
 def androidVersionCode = versionCodeValue.toInteger()
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
+def contentPackageRoots = (findProperty("minecraftcContentPackages") ?: "").toString()
+        .split(";").findAll { !it.isEmpty() }.collect { file(it).canonicalFile }
+def contentPackagePaths = contentPackageRoots.collect { it.path.replace('\\', '/') }.join(";")
+def generatedContentAssetsDir = layout.buildDirectory.dir("generated/contentAssets").get().asFile
+def contentStagingDir = layout.buildDirectory.dir("contentPackageStaging").get().asFile
+
+tasks.register("prepareContentAssets") {
+    inputs.files(contentPackageRoots)
+    inputs.file(new File(repositoryRoot, "tools/content_package.py"))
+    inputs.property("packagePaths", contentPackagePaths)
+    outputs.dir(generatedContentAssetsDir)
+    // Staging must run before Sync discovers sources; a Sync task with missing
+    // first-build sources would skip doFirst entirely. Also sync an empty set
+    // when roots are removed so stale packages cannot enter the next APK.
+    doLast {
+        def staged = []
+        contentPackageRoots.each { root ->
+            def id = new groovy.json.JsonSlurper().parse(new File(root, "mod.json")).id
+            if (!(id ==~ /[a-z0-9_.-]+/) || id == "." || id == "..") {
+                throw new GradleException("Invalid content package id")
+            }
+            project.exec {
+                commandLine (findProperty("minecraftcPython") ?: "python3"),
+                        new File(repositoryRoot, "tools/content_package.py"), "stage", root,
+                        "--output", new File(contentStagingDir, id), "--refresh"
+            }
+            staged.add([id: id, directory: new File(contentStagingDir, id)])
+        }
+        project.sync {
+            into generatedContentAssetsDir
+            staged.each { entry ->
+                from(entry.directory) { into "plugins/${entry.id}" }
+            }
+        }
+    }
+}
 
 tasks.register("prepareLegalAssets", Sync) {
     from new File(repositoryRoot, "LICENSE")
@@ -54,6 +90,12 @@ android {
                 arguments "-DANDROID_PLATFORM=android-29", "-DANDROID_STL=c++_shared",
                           "-DBUILD_TESTING=OFF", "-DMINECRAFTC_FETCH_DEPENDENCIES=ON",
                           "-DFETCHCONTENT_SOURCE_DIR_SDL3=${gradle.ext.sdlSourceDir.absolutePath}"
+                if (!contentPackageRoots.isEmpty()) {
+                    arguments "-DMINECRAFTC_CONTENT_PACKAGES=${contentPackagePaths}"
+                    if (findProperty("minecraftcPython")) {
+                        arguments "-DPython3_EXECUTABLE=${findProperty('minecraftcPython')}"
+                    }
+                }
                 cppFlags "-std=c++17"
             }
         }
@@ -67,7 +109,7 @@ android {
     }
     sourceSets {
         main {
-            assets.srcDirs = [new File(repositoryRoot, "assets"), generatedLegalAssetsDir]
+            assets.srcDirs = [new File(repositoryRoot, "assets"), generatedLegalAssetsDir, generatedContentAssetsDir]
             java.srcDirs += new File(gradle.ext.sdlSourceDir, "android-project/app/src/main/java")
         }
     }
@@ -81,4 +123,5 @@ android {
 
 tasks.named("preBuild").configure {
     dependsOn tasks.named("prepareLegalAssets")
+    dependsOn tasks.named("prepareContentAssets")
 }

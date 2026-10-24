@@ -16,26 +16,27 @@ struct Json {
     bool boolean=false;
     double number=0;
     std::string string;
+    std::string source; // Optional package-relative filename and JSON pointer.
     std::vector<Json> array;
     std::map<std::string,Json> object;
     const Json& at(const std::string& key) const {
-        if(type!=Type::Object||!object.count(key))throw std::runtime_error("Missing JSON field: "+key);
+        if(type!=Type::Object||!object.count(key))throw std::runtime_error(source+": Missing JSON field: "+key);
         return object.at(key);
     }
     bool has(const std::string& key) const {return object.count(key)!=0;}
     std::string text() const {
-        if(type!=Type::String)throw std::runtime_error("Expected JSON string");
+        if(type!=Type::String)throw std::runtime_error(source+": Expected JSON string");
         return string;
     }
     std::string text(const std::string& key,const std::string& fallback={}) const {return has(key)?at(key).text():fallback;}
     double numeric(const std::string& key,double fallback) const {
         if(!has(key))return fallback;
-        if(at(key).type!=Type::Number)throw std::runtime_error("Expected JSON number: "+key);
+        if(at(key).type!=Type::Number)throw std::runtime_error(at(key).source+": Expected JSON number: "+key);
         return at(key).number;
     }
     bool flag(const std::string& key,bool fallback) const {
         if(!has(key))return fallback;
-        if(at(key).type!=Type::Boolean)throw std::runtime_error("Expected JSON boolean: "+key);
+        if(at(key).type!=Type::Boolean)throw std::runtime_error(at(key).source+": Expected JSON boolean: "+key);
         return at(key).boolean;
     }
     static Json convert(const nlohmann::json& input) {

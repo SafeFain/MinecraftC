@@ -203,13 +203,15 @@ void PluginManager::playlist(MC_PluginContext& c,const MC_MusicPlaylist& d){
 }
 void PluginManager::validateCapabilities(){
     const auto& e=content().extensions;
-    for(const auto& pair:e.blockBehaviors)for(const auto& d:pair.second.drops)require(resolveItem(d.item)!=ItemId::EMPTY&&d.maximum<=getItemProps(resolveItem(d.item)).maxStack,"Invalid break drop stack");
-    for(const auto& pair:e.loot)for(const auto& b:pair.second.entries){const auto id=resolveItem(b.item);require(id!=ItemId::EMPTY&&b.maximum<=getItemProps(id).maxStack,"Invalid loot item stack");}
-    for(const auto& pair:e.structures)for(const auto& b:pair.second.blocks)if(!b.loot.empty())require(e.loot.count(b.loot),"Unknown structure loot table");
-    for(const auto& pair:e.blockBehaviors){const auto& b=pair.second;if(!b.harvest.empty()){require(resolveItem(b.harvest)!=ItemId::EMPTY,"Empty harvest item");require(b.harvestCount<=getItemProps(resolveItem(b.harvest)).maxStack,"Harvest stack too large");const auto replacement=resolveBlock(b.replacement);require(!b.resetTicks||replacement!=static_cast<BlockId>(pair.first),"Reset requires distinct replacement");}if(!b.action.empty())require(e.actions.count(b.action),"Unknown block action");}
-    for(const auto& pair:e.itemBehaviors){if(!pair.second.action.empty())require(e.actions.count(pair.second.action),"Unknown item action");if(!pair.second.dimension.empty())resolveDimension(pair.second.dimension);}
-    for(const auto& pair:e.actions)if(!pair.second.dimension.empty())resolveDimension(pair.second.dimension);
-    for(const auto& pair:e.particles){const auto& key=pair.second.material;bool found=content().materials.count(key);for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)found=found||key==getBlockTextureAssetName(static_cast<BlockTexture>(i));require(found,"Unknown particle material");}
+    for(const auto& pair:e.blockBehaviors)validateDefinition("block_behaviors",blockKey(static_cast<BlockId>(pair.first)),[&] {
+        for(const auto& d:pair.second.drops)require(resolveItem(d.item)!=ItemId::EMPTY&&d.maximum<=getItemProps(resolveItem(d.item)).maxStack,"Invalid break_drops item/count");
+        const auto& b=pair.second;if(!b.harvest.empty()){require(resolveItem(b.harvest)!=ItemId::EMPTY,"Empty harvest_item");require(b.harvestCount<=getItemProps(resolveItem(b.harvest)).maxStack,"harvest_count too large");const auto replacement=resolveBlock(b.replacement);require(!b.resetTicks||replacement!=static_cast<BlockId>(pair.first),"Reset requires distinct harvest_replacement");}if(!b.action.empty())require(e.actions.count(b.action),"Unknown block action field action");
+    });
+    for(const auto& pair:e.loot)validateDefinition("loot_tables",pair.first,[&]{for(const auto& b:pair.second.entries){const auto id=resolveItem(b.item);require(id!=ItemId::EMPTY&&b.maximum<=getItemProps(id).maxStack,"Invalid loot entries item/count");}});
+    for(const auto& pair:e.structures)validateDefinition("structures",pair.first,[&]{for(const auto& b:pair.second.blocks)if(!b.loot.empty())require(e.loot.count(b.loot),"Unknown structure blocks/loot table");});
+    for(const auto& pair:e.itemBehaviors)validateDefinition("item_behaviors",itemKey(static_cast<ItemId>(pair.first)),[&]{if(!pair.second.action.empty())require(e.actions.count(pair.second.action),"Unknown item action field action");if(!pair.second.dimension.empty())resolveDimension(pair.second.dimension);});
+    for(const auto& pair:e.actions)validateDefinition("player_actions",pair.first,[&]{if(!pair.second.dimension.empty())resolveDimension(pair.second.dimension);});
+    for(const auto& pair:e.particles)validateDefinition("particles",pair.first,[&]{const auto& key=pair.second.material;bool found=content().materials.count(key);for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)found=found||key==getBlockTextureAssetName(static_cast<BlockTexture>(i));require(found,"Unknown particle material field material");});
 }
 void PluginManager::describeCapabilities(){
     const auto& e=content().extensions;auto& n=content().networkDescription;using J=nlohmann::json;

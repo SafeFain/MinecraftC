@@ -10,6 +10,11 @@ release packages also include the SDK and plugin examples.
 
 ## Choose a package type
 
+For new work, use a [self-contained content package](content-packages.md): one
+definition per file, automatic language loading and optional SDK-only C++ in the
+same directory. `package_format: 1` selects data-before-code loading. Original
+`data: "content.json"` packages below retain their lifecycle.
+
 | Type | Suitable work | Platform support |
 |---|---|---|
 | Data (`mod.json` + JSON/assets) | Materials, blocks/items, recipes, declarative entities, flat generators, shapes, capabilities and render passes | All supported platforms |

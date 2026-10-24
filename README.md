@@ -37,7 +37,7 @@ and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
 | Build and install | [Desktop and mobile setup](docs/building.md) |
 | Gameplay | [Built-in Nether](docs/nether.md), [Features](docs/project-features.md), [commands and saves](docs/saves-and-commands.md), [game rules](docs/game-rules.md) |
 | Multiplayer | [LAN setup and compatibility](docs/lan-multiplayer.md) |
-| Plugins | [Install and manage](docs/plugins.md), [develop a plugin](docs/plugin-development.md) |
+| Plugins | [Install and manage](docs/plugins.md), [create a content package](docs/content-packages.md), [SDK development](docs/plugin-development.md) |
 | Contributing | [Development and validation](docs/development.md), [asset authoring](ASSET_PIPELINE.md) |
 | Releases | [Versioning and packaging](docs/releasing.md) |
 

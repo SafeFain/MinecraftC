@@ -59,12 +59,14 @@ int main(int argc,char** argv) {
         const bool heavenOff=argc==3&&std::string(argv[2])=="--heaven-off";
         const bool capabilities=heavenModel||(argc==3&&std::string(argv[2])=="--capabilities");
         const bool extensions=argc==4&&std::string(argv[2])=="--extensions";
-        const int width=!extensions&&argc>=4?std::stoi(argv[2]):960,height=!extensions&&argc>=4?std::stoi(argv[3]):600;
+        const bool contentPackage=argc==4&&std::string(argv[2])=="--content-package";
+        const int width=!extensions&&!contentPackage&&argc>=4?std::stoi(argv[2]):960,height=!extensions&&!contentPackage&&argc>=4?std::stoi(argv[3]):600;
         const bool capture=argc==5 && std::string(argv[4])=="--capture";
         const auto assets=std::filesystem::absolute(argv[1]);
         const auto pluginRoot=std::filesystem::temp_directory_path()/"minecraftc-plugin-ui-smoke";
         std::filesystem::remove_all(pluginRoot);
         std::filesystem::create_directories(pluginRoot/"mods");
+        if(contentPackage&&std::string(argv[3])!="builtin")std::filesystem::copy(std::filesystem::absolute(argv[3]),pluginRoot/"mods/package_demo",std::filesystem::copy_options::recursive);
         std::filesystem::copy(assets.parent_path()/"examples"/"plugins"/"block_shapes_data",pluginRoot/"mods"/"block_shapes_data",std::filesystem::copy_options::recursive);
         const auto legacy=pluginRoot/"mods"/"legacy_icon";std::filesystem::create_directories(legacy);
         {std::ofstream manifest(legacy/"mod.json");manifest<<R"({"id":"legacy_icon","version":"1.0.0","api":1,"data":"content.json"})";}
@@ -388,6 +390,25 @@ int main(int argc,char** argv) {
         shapeImage(Plugins::resolveBlock("block_shapes_data:stair"));shapeImage(Plugins::resolveBlock("block_shapes_data:door"));
         shapeImage(Plugins::resolveBlock("block_shapes_data:button"));shapeImage(Plugins::resolveBlock("block_shapes_data:box"));
         const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::pluginItem(legacyItem)->tile;
+        if(contentPackage) {
+            for(const auto& info:plugins.plugins())if(info.manifest.id=="package_demo"&&!info.active)throw std::runtime_error(info.status);
+            const auto block=Plugins::resolveBlock("package_demo:blue_brick");
+            const auto brick=Plugins::resolveItem("package_demo:blue_brick"),crystal=Plugins::resolveItem("package_demo:crystal");
+            const auto pixels=shapeImage(block);
+            if(pixels==cubeImage)throw std::runtime_error("Package material did not affect Vulkan pixels");
+            const auto blockItem=iconImage([&]{ui.drawItemIcon(16,16,64,64,{brick,1,0});});
+            const auto tile=Plugins::pluginItem(brick)->tile;
+            const auto material=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,tile,glm::vec4(1));});
+            if(tile!=getFaceTextureIndex(block,FaceDir::TOP)||blockItem!=material)throw std::runtime_error("Package block/item material mapping differs");
+            iconImage([&]{ui.drawItemIcon(16,16,64,64,{crystal,1,0});});
+            int grants=0;plugins.operations.giveItem=[&](uint16_t item,uint32_t count){if(item!=uint16_t(brick))throw std::runtime_error("Wrong package item grant");grants+=int(count);return true;};
+            auto ready=Plugins::event(MC_WORLD_READY);plugins.dispatch(ready);
+            if(!plugins.command("/package_demo:gift"))throw std::runtime_error("Package command missing");
+            plugins.flushOperations();auto use=Plugins::event(MC_USE_PRE);use.item=uint16_t(crystal);plugins.dispatch(use);plugins.flushOperations();
+            if(grants!=5||!use.cancelled)throw std::runtime_error("Package native interactions failed");
+            std::cout<<"Content package Vulkan material/icon and native interaction readback passed\n";
+            plugins.operations.giveItem={};
+        }
         const auto itemPixels=iconImage([&]{ui.drawItemIcon(16,16,64,64,{legacyItem,1,0});});
         const auto materialPixels=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,legacyTile,glm::vec4(1));});
         if(itemPixels!=materialPixels)throw std::runtime_error("Legacy cube item lost its independent icon material");

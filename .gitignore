@@ -6,6 +6,8 @@
 /install-local/
 /.vs/
 /out/
+/dist/
+.content-package-build/
 /android/.deps/
 /android/.gradle/
 /android/app/.cxx/

@@ -170,6 +170,25 @@ endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sdk")
 
+# Explicit source-package roots only; never compile code discovered in user mods.
+set(MINECRAFTC_CONTENT_PACKAGES "" CACHE STRING "Semicolon-separated built-in content package source roots")
+include("${CMAKE_CURRENT_SOURCE_DIR}/sdk/cmake/ContentPackage.cmake")
+foreach(package_root IN LISTS MINECRAFTC_CONTENT_PACKAGES)
+    string(SHA256 package_target "${package_root}")
+    string(SUBSTRING "${package_target}" 0 12 package_target)
+    minecraftc_add_content_package(content_${package_target} ROOT "${package_root}" MODE BUILTIN)
+endforeach()
+get_property(content_declarations GLOBAL PROPERTY MINECRAFTC_CONTENT_DECLARATIONS)
+get_property(content_entries GLOBAL PROPERTY MINECRAFTC_CONTENT_ENTRIES)
+get_property(content_libraries GLOBAL PROPERTY MINECRAFTC_CONTENT_LIBRARIES)
+get_property(content_roots GLOBAL PROPERTY MINECRAFTC_CONTENT_ROOTS)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ContentPackages.inc"
+    "${content_declarations}\ninline void appendContentPackages(std::vector<Plugins::BuiltinPluginDescriptor>& entries) {\n(void)entries;\n${content_entries}}\n")
+add_compile_definitions(MINECRAFTC_CONTENT_PACKAGES_HEADER="${CMAKE_CURRENT_BINARY_DIR}/ContentPackages.inc")
+if(content_libraries)
+    link_libraries(${content_libraries})
+endif()
+
 add_library(minecraftc_assets STATIC
     src/core/AssetStore.cpp
     src/platform/sdl/SdlAssetStore.cpp)
@@ -277,6 +296,15 @@ endif()
 
 set(MINECRAFTC_IOS_RESOURCES)
 if(IOS)
+    foreach(content_root IN LISTS content_roots)
+        file(GLOB_RECURSE content_files "${content_root}/*")
+        foreach(content_file IN LISTS content_files)
+            file(RELATIVE_PATH content_relative "${CMAKE_BINARY_DIR}/content-assets" "${content_file}")
+            get_filename_component(content_directory "${content_relative}" DIRECTORY)
+            set_source_files_properties("${content_file}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/${content_directory}")
+            list(APPEND MINECRAFTC_IOS_RESOURCES "${content_file}")
+        endforeach()
+    endforeach()
     file(GLOB_RECURSE MINECRAFTC_IOS_ASSET_FILES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
     foreach(IOS_ASSET IN LISTS MINECRAFTC_IOS_ASSET_FILES)
@@ -512,6 +540,22 @@ else()
     endif()
 endif()
 if(NOT ANDROID AND NOT IOS)
+    if(APPLE)
+        set(content_install "MinecraftC.app/Contents/Resources/assets")
+    elseif(MINECRAFTC_PORTABLE_LAYOUT)
+        set(content_install assets)
+    else()
+        set(content_install "${CMAKE_INSTALL_DATADIR}/minecraftc/assets")
+    endif()
+    foreach(content_root IN LISTS content_roots)
+        install(DIRECTORY "${content_root}" DESTINATION "${content_install}/plugins")
+    endforeach()
+    if(MINECRAFTC_PORTABLE_LAYOUT)
+        install(FILES tools/content_package.py DESTINATION sdk/tools)
+    else()
+        install(FILES tools/content_package.py DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/tools")
+        install(FILES tools/content_package.py DESTINATION "${CMAKE_INSTALL_DOCDIR}/sdk/tools")
+    endif()
     if(MINECRAFTC_PORTABLE_LAYOUT)
         set(MINECRAFTC_ASSET_GUIDE_DESTINATION assets)
     else()
@@ -1088,6 +1132,14 @@ if(BUILD_TESTING)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
+    minecraftc_add_content_package(package_fixture
+        ROOT "${CMAKE_SOURCE_DIR}/examples/plugins/package_demo" MODE BUILTIN)
+    target_link_libraries(plugin_tests PRIVATE package_fixture)
+    add_test(NAME content_package_authoring_loading_and_delivery
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
+            --plugin-tests $<TARGET_FILE:plugin_tests>
+            --builtin-stage "${CMAKE_BINARY_DIR}/content-assets/plugins/package_demo")
+    set_tests_properties(content_package_authoring_loading_and_delivery PROPERTIES TIMEOUT 180)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(plugin_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1507,6 +1559,14 @@ if(BUILD_TESTING)
         add_dependencies(vulkan_ui_smoke plugin_render_demo)
         if(MINECRAFTC_VULKAN_TESTS)
             set_property(TARGET vulkan_ui_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
+            add_test(NAME content_package_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
+                --plugin-tests $<TARGET_FILE:plugin_tests>
+                --builtin-stage "${CMAKE_BINARY_DIR}/content-assets/plugins/package_demo"
+                --vulkan-smoke $<TARGET_FILE:vulkan_ui_smoke>
+                ContentPackageTests.test_native_build_and_runtime)
+            set_tests_properties(content_package_vulkan_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
             add_test(NAME plugin_vulkan_extensions_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets plugins $<TARGET_FILE:plugin_render_demo>)

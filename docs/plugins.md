@@ -1,6 +1,8 @@
 # MinecraftC plugin loader (ABI 1)
 
 For a step-by-step workflow, see [plugin development](plugin-development.md).
+New projects can use [self-contained content packages](content-packages.md), with
+one definition per file and optional code in the same source package.
 The [documentation index](README.md) links gameplay, build and compatibility guides.
 
 MinecraftC loads official compiled-in plugins and user packages before creating its

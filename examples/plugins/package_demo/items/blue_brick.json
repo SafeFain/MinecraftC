@@ -1,0 +1,8 @@
+{
+  "key": "package_demo:blue_brick",
+  "name": "Blue Brick",
+  "name_key": "package_demo:block.blue_brick",
+  "placed_block": "package_demo:blue_brick",
+  "material": "package_demo:blue_brick",
+  "category": 0
+}

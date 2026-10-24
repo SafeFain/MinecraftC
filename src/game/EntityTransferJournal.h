@@ -6,6 +6,7 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 // A published journal owns both complete chunk after-images. Recovery replays
 // replacements, never appends entities, so interruption between writes is safe.
@@ -58,7 +59,19 @@ inline void prepare(const std::filesystem::path& root,const Partition& source,co
     }
     // Publication is the commit point. Unpublished staging directories are not
     // replayed, and therefore cannot remove a source entity after a failed prepare.
-    std::filesystem::rename(staging,pending(root));
+    // On Windows a just-closed snapshot or deleted previous journal can remain
+    // briefly held by filesystem observers. Keep the unpublished after-images
+    // intact and bound the wait; never replace a newly visible pending journal.
+    constexpr int publicationRetries=7;
+    for(int attempt=0;;++attempt) {
+        std::error_code error;
+        std::filesystem::rename(staging,pending(root),error);
+        if(!error)break;
+        const bool transient=error==std::errc::permission_denied||error==std::errc::device_or_resource_busy;
+        if(!transient||attempt>=publicationRetries||EntityTransferJournal::exists(root))
+            throw std::filesystem::filesystem_error("Cannot publish entity transfer",staging,pending(root),error);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5*(attempt+1)));
+    }
 }
 inline bool recover(const std::filesystem::path& root) {
     const auto journal=pending(root);if(!std::filesystem::exists(journal))return false;

@@ -14,6 +14,8 @@ independently; source-code links require the matching checkout.
 
 ## Develop plugins
 
+- [Self-contained content packages](content-packages.md): create/build commands,
+  one definition per file, translations, optional C++ and compiled-in delivery.
 - [Install/manage plugins and loader contracts](plugins.md).
 - [Plugin development](plugin-development.md): first data package, native build, lifecycle,
   extension versions, examples, testing and distribution.
