@@ -354,9 +354,26 @@ void MainMenu::rebuildButtons() {
                 m_createCheats = !m_createCheats;
                 rebuildButtons();
             });
-        const bool extensions=!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty();
+        std::map<uint32_t,std::vector<std::string>> generatorChoices;
+        std::map<uint32_t,bool> editableParameters;
+        for(const auto& entry:Plugins::content().extensions.dimensions) {
+            const auto dimension=entry.first;
+            // Native Nether always uses its builtin generator, independent of plugin config.
+            if(dimension==static_cast<uint32_t>(DimensionId::Nether))continue;
+            auto& choices=generatorChoices[dimension];
+            if(dimension==static_cast<uint32_t>(DimensionId::Overworld))choices.emplace_back();
+            for(const auto& generator:Plugins::content().extensions.generators) {
+                if(generator.second.dimension!=dimension)continue;
+                choices.push_back(generator.first);
+                // The fixed Heaven provider does not consume generation parameters.
+                if(generator.first!="official_heaven:heaven")editableParameters[dimension]=true;
+            }
+            for(const auto& modifier:Plugins::content().extensions.modifiers)
+                if(modifier.second.dimension==dimension)editableParameters[dimension]=true;
+        }
+        const bool hasParameters=!editableParameters.empty();
         m_parameterRows.clear();
-        if(extensions) {
+        if(hasParameters) {
             m_buttons.emplace_back(m_localization.format("menu.create.advanced_generation",{
                 m_localization.text(m_advancedGeneration?"common.on":"common.off")}),[this]{
                 m_advancedGeneration=!m_advancedGeneration;
@@ -364,24 +381,19 @@ void MainMenu::rebuildButtons() {
                 rebuildButtons();
             });
         }
-        if(extensions)for(const auto& entry:Plugins::content().extensions.dimensions) {
+        for(const auto& entry:generatorChoices) {
             const uint32_t dimension=entry.first;
             const auto& selected=m_generation[dimension];
-            std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
-            m_buttons.emplace_back(m_localization.format("menu.create.generator_dimension",{m_localization.dimensionName(dimension),name}),[this,dimension]{
-                std::vector<std::string> keys;
-                // Both native dimensions use an empty key for their builtin generator.
-                if(dimension==static_cast<uint32_t>(DimensionId::Overworld)||
-                   dimension==static_cast<uint32_t>(DimensionId::Nether))keys.emplace_back();
-                for(const auto& g:Plugins::content().extensions.generators)
-                    if(g.second.dimension==dimension)keys.push_back(g.first);
-                if(keys.empty())return;
-                auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);
-                g.generator=it==keys.end()?keys.front():keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
-                g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
-            if(m_advancedGeneration) {
+            if(entry.second.size()>1) {
+                const std::string name=selected.generator.empty()?m_localization.text("common.normal"):Plugins::content().extensions.generators.at(selected.generator).name;
+                m_buttons.emplace_back(m_localization.format("menu.create.generator_dimension",{m_localization.dimensionName(dimension),name}),[this,dimension,keys=entry.second]{
+                    auto& g=m_generation[dimension];auto it=std::find(keys.begin(),keys.end(),g.generator);
+                    g.generator=it==keys.end()?keys.front():keys[(static_cast<size_t>(it-keys.begin())+1)%keys.size()];
+                    g.revision=g.generator.empty()?"":Plugins::content().extensions.generators.at(g.generator).revision;rebuildButtons();});
+            }
+            if(m_advancedGeneration&&editableParameters.count(dimension)) {
                 m_parameterRows[dimension]=static_cast<int>(m_buttons.size());
-                m_buttons.emplace_back(m_localization.text("menu.create.generator_parameters"),[this,dimension]{m_parameterDimension=dimension;selectField(Field::Parameters);});
+                m_buttons.emplace_back(m_localization.dimensionName(dimension)+": "+m_localization.text("menu.create.generator_parameters"),[this,dimension]{m_parameterDimension=dimension;selectField(Field::Parameters);});
                 m_buttons.back().setDetail(m_parameters[dimension].text());
             }
             for(const auto& m:Plugins::content().extensions.modifiers)if(m.second.dimension==dimension) {

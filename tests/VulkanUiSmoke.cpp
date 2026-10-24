@@ -414,17 +414,40 @@ int main(int argc,char** argv) {
         for (int i=0;i<std::clamp((height-192)/46,1,6)+2;++i) main.onKeyPress(Key::Down);
         main.onKeyPress(Key::Enter);
         draw("create",[&]{main.render(ui,width,height);});
-        if(!Plugins::content().extensions.generators.empty()||!Plugins::content().extensions.modifiers.empty()) {
+        const bool configurableGeneration=std::any_of(Plugins::content().extensions.generators.begin(),Plugins::content().extensions.generators.end(),
+            [](const auto& generator){return generator.second.dimension!=2&&generator.first!="official_heaven:heaven";})||
+            std::any_of(Plugins::content().extensions.modifiers.begin(),Plugins::content().extensions.modifiers.end(),
+            [](const auto& modifier){return modifier.second.dimension!=2;});
+        if(!configurableGeneration) {
+            bool created=false;
+            auto fixedCallbacks=callbacks;
+            fixedCallbacks.onGenerationConfig=[&](const auto& config) {
+                for(const auto& dimension:Plugins::content().extensions.dimensions)
+                    if(!(config.at(dimension.first)==dimension.second.generation))
+                        throw std::runtime_error("Hiding fixed dimension controls changed generation defaults");
+            };
+            fixedCallbacks.onCreateWorld=[&](const std::string&,const std::string&,GameMode,WorldType,bool){created=true;};
+            MainMenu fixedMenu(fixedCallbacks,{},settings,localization,nullptr);
+            fixedMenu.onKeyPress(Key::Enter);fixedMenu.onKeyPress(Key::Down);
+            fixedMenu.onKeyPress(Key::Down);fixedMenu.onKeyPress(Key::Enter);
+            // Five genuine fields, followed immediately by Create and Cancel.
+            // Any fixed generator/parameter/toggle row would intercept this action.
+            for(int row=0;row<5;++row)fixedMenu.onKeyPress(Key::Down);
+            fixedMenu.onKeyPress(Key::Enter);
+            if(!created)throw std::runtime_error("Fixed dimension controls remain in create-world menu");
+            std::cout<<"Compact create-world menu preserves fixed Heaven/Nether defaults passed\n";
+        }
+        if(configurableGeneration) {
             localization.setLanguage(Language::SimplifiedChinese);
             std::string createdName;
             std::map<uint32_t,Plugins::GenerationConfig> createdGeneration;
             auto createCallbacks=callbacks;
             createCallbacks.onGenerationConfig=[&](const auto& config){createdGeneration=config;};
             createCallbacks.onCreateWorld=[&](const std::string& name,const std::string&,GameMode,WorldType,bool){createdName=name;};
-            // Exercise every dimension row through the real menu activation path.
-            // Native Nether has no plugin generators: clicking Normal used to divide by zero.
+            // Real alternatives remain switchable; fixed providers have no selector.
             int generatorRow=6; // Name, mode, type, seed, cheats and advanced toggle.
             for(const auto& dimension:Plugins::content().extensions.dimensions) {
+                if(dimension.first==2)continue;
                 MainMenu generatorMenu(createCallbacks,{},settings,localization,nullptr);
                 generatorMenu.onKeyPress(Key::Enter);generatorMenu.onKeyPress(Key::Down);
                 generatorMenu.onKeyPress(Key::Down);generatorMenu.onKeyPress(Key::Enter);
@@ -432,6 +455,11 @@ int main(int argc,char** argv) {
                 if(dimension.first==0||dimension.first==2)choices.emplace_back();
                 for(const auto& generator:Plugins::content().extensions.generators)
                     if(generator.second.dimension==dimension.first)choices.push_back(generator.first);
+                if(choices.size()<=1) {
+                    for(const auto& modifier:Plugins::content().extensions.modifiers)
+                        if(modifier.second.dimension==dimension.first)++generatorRow;
+                    continue;
+                }
                 auto expected=dimension.second.generation.generator;
                 for(int activation=0;activation<3;++activation) {
                     // Rebuilding buttons restores selection to Name after each activation.
@@ -456,7 +484,7 @@ int main(int argc,char** argv) {
                 for(const auto& modifier:Plugins::content().extensions.modifiers)
                     if(modifier.second.dimension==dimension.first)++generatorRow;
             }
-            std::cout<<"Create-world native Nether and plugin generator activation passed\n";
+            std::cout<<"Create-world meaningful plugin generator activation passed\n";
             MainMenu createMenu(createCallbacks,{},settings,localization,nullptr);
             createMenu.onKeyPress(Key::Enter);createMenu.onKeyPress(Key::Down);
             createMenu.onKeyPress(Key::Down);createMenu.onKeyPress(Key::Enter);
