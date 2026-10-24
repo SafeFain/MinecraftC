@@ -446,6 +446,8 @@ int main(int argc,char** argv) {
             createCallbacks.onCreateWorld=[&](const std::string& name,const std::string&,GameMode,WorldType,bool){createdName=name;};
             // Real alternatives remain switchable; fixed providers have no selector.
             int generatorRow=6; // Name, mode, type, seed, cheats and advanced toggle.
+            int firstParameterRow=-1;
+            uint32_t firstParameterDimension=0;
             for(const auto& dimension:Plugins::content().extensions.dimensions) {
                 if(dimension.first==2)continue;
                 MainMenu generatorMenu(createCallbacks,{},settings,localization,nullptr);
@@ -455,6 +457,14 @@ int main(int argc,char** argv) {
                 if(dimension.first==0||dimension.first==2)choices.emplace_back();
                 for(const auto& generator:Plugins::content().extensions.generators)
                     if(generator.second.dimension==dimension.first)choices.push_back(generator.first);
+                const bool editable=std::any_of(Plugins::content().extensions.generators.begin(),Plugins::content().extensions.generators.end(),
+                    [&](const auto& generator){return generator.second.dimension==dimension.first&&generator.first!="official_heaven:heaven";})||
+                    std::any_of(Plugins::content().extensions.modifiers.begin(),Plugins::content().extensions.modifiers.end(),
+                    [&](const auto& modifier){return modifier.second.dimension==dimension.first;});
+                if(firstParameterRow<0&&editable) {
+                    firstParameterRow=generatorRow+(choices.size()>1?1:0);
+                    firstParameterDimension=dimension.first;
+                }
                 if(choices.size()<=1) {
                     for(const auto& modifier:Plugins::content().extensions.modifiers)
                         if(modifier.second.dimension==dimension.first)++generatorRow;
@@ -484,6 +494,7 @@ int main(int argc,char** argv) {
                 for(const auto& modifier:Plugins::content().extensions.modifiers)
                     if(modifier.second.dimension==dimension.first)++generatorRow;
             }
+            if(firstParameterRow<0)throw std::runtime_error("Configurable generation has no editable parameter field");
             std::cout<<"Create-world meaningful plugin generator activation passed\n";
             MainMenu createMenu(createCallbacks,{},settings,localization,nullptr);
             createMenu.onKeyPress(Key::Enter);createMenu.onKeyPress(Key::Down);
@@ -507,11 +518,14 @@ int main(int argc,char** argv) {
             createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
             createMenu.onKeyPress(Key::A,KeyModifier::Control);
             for(char c:std::string(R"({"ui":7})"))createMenu.onChar(static_cast<unsigned char>(c));
-            createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
+            // The first editable dimension may have only one fixed generator,
+            // so its parameter row need not follow a generator selector.
+            for(int row=firstParameterRow;row>5;--row)createMenu.onKeyPress(Key::Up);
+            createMenu.onKeyPress(Key::Enter);
             createMenu.onKeyPress(Key::Tab);createMenu.onKeyPress(Key::Tab);
             createMenu.onKeyPress(Key::A,KeyModifier::Control);createMenu.onChar('C');
             createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
-            if(createdName!="C"||createdGeneration.begin()->second.parameters!=R"({"ui":7})")
+            if(createdName!="C"||createdGeneration.at(firstParameterDimension).parameters!=R"({"ui":7})")
                 throw std::runtime_error("Collapsing advanced generation lost text focus or parameters");
             localization.setLanguage(Language::English);
             std::cout<<"Create-world default/advanced parameter focus and preservation passed\n";

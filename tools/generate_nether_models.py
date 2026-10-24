@@ -118,7 +118,8 @@ def generate(output):
             graph = json.loads(graph_path.read_text())
             graph["actions"]["attack"] = {"clip": "attack", "layer": "action", "loop": False, "duration": .55, "priority": 100, "events": [{"name": "melee", "time": .30}]}
             graph["bindings"]["attack"] = "attack"
-            graph_path.write_text(json.dumps(graph, indent=2) + "\n", encoding="utf-8")
+            # Match the base writer and checked-in UTF-8/LF assets on every OS.
+            graph_path.write_bytes((json.dumps(graph, indent=2) + "\n").encode("utf-8"))
     finally:
         models.parts_for, textures.generate_entity_skin = original_parts, original_skin
 

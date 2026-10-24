@@ -710,6 +710,59 @@ int main() {
         require(glm::dot(normal, glm::vec3(expected)) > 0.0f,
                 "Chunk face winding is not outward CCW");
     }
+    for (bool lava : {false, true}) {
+        for (int edge : {0, Config::CHUNK_SIZE_X - 1}) {
+            for (BlockId lower : {fluidBlockFromAmount(lava, 1),
+                                 fluidBlockFromAmount(lava, 8),
+                                 fluidBlockFromAmount(lava, 8, true)}) {
+                std::fill(blocks.begin(), blocks.end(), static_cast<uint16_t>(BlockId::AIR));
+                const auto index = [edge](int y) {
+                    return edge + edge * Config::CHUNK_SIZE_X +
+                        Config::worldYToStorageY(y) *
+                        Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z;
+                };
+                blocks[static_cast<size_t>(index(-2))] = static_cast<uint16_t>(lower);
+                blocks[static_cast<size_t>(index(-1))] =
+                    static_cast<uint16_t>(fluidBlockFromAmount(lava, 8, true));
+                const auto sample = [&blocks](int wx, int y, int wz) {
+                    const int x = wx + Config::CHUNK_SIZE_X;
+                    const int z = wz + Config::CHUNK_SIZE_Z;
+                    if (x < 0 || x >= Config::CHUNK_SIZE_X ||
+                        z < 0 || z >= Config::CHUNK_SIZE_Z || !Config::isValidWorldY(y))
+                        return BlockId::AIR;
+                    return static_cast<BlockId>(blocks[static_cast<size_t>(x +
+                        z * Config::CHUNK_SIZE_X + Config::worldYToStorageY(y) *
+                        Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z)]);
+                };
+                ChunkMesh fluidMesh;
+                fluidMesh.build(-Config::CHUNK_SIZE_X, -Config::CHUNK_SIZE_Z,
+                    blocks.data(), columnMax, sample,
+                    [](int, int, int) { return LightSample{15, 0}; });
+                require(fluidMesh.vertices.size() == 40 && fluidMesh.indexCount == 60 &&
+                        fluidMesh.indices.size() == fluidMesh.indexCount &&
+                        fluidMesh.opaqueIndexCount == 0 && fluidMesh.translucentIndexOffset == 0 &&
+                        fluidMesh.translucentIndexCount == 60 && fluidMesh.shadowCasterIndexCount == 0,
+                        "fluid column keeps only exterior translucent quads and complete layer metadata");
+                size_t connectedSides = 0;
+                for (size_t v = 0; v < fluidMesh.vertices.size(); v += 4) {
+                    const auto& a = fluidMesh.vertices[v];
+                    if (a.face < static_cast<float>(FaceDir::FRONT)) continue;
+                    const auto& b = fluidMesh.vertices[v + 1];
+                    const auto& c = fluidMesh.vertices[v + 2];
+                    const auto& d = fluidMesh.vertices[v + 3];
+                    if (b.py != -2.0f) continue;
+                    require(a.py == -1.0f && d.py == -1.0f && c.py == -2.0f,
+                            "all four lower fluid sides meet the upper cell without a gap");
+                    ++connectedSides;
+                }
+                require(connectedSides == 4, "fluid column lost an exposed connecting side");
+                for (const auto& vertex : fluidMesh.vertices)
+                    if (vertex.face == static_cast<float>(FaceDir::TOP))
+                        require(vertex.py > -1.0f && vertex.py < 0.0f,
+                                "uncovered fluid surface retains its lowered height");
+            }
+        }
+    }
     require(isMeshMaterialCompatible(MeshVertexLayout::PositionUv,
                 MaterialPipeline::UnlitTextured) &&
             isMeshMaterialCompatible(MeshVertexLayout::Chunk,

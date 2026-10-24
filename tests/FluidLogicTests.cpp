@@ -120,6 +120,36 @@ int main() {
     require(std::abs(weighted - 0.75f) < 0.02f,
             "high fluid corner receives tenfold weight while air remains a sample");
 
+    for (bool lava : {false, true}) {
+        for (int dz = -1; dz <= 0; ++dz) {
+            for (int dx = -1; dx <= 0; ++dx) {
+                Grid column;
+                const glm::ivec3 corner{-16, -2, -16};
+                for (int z = -1; z <= 0; ++z)
+                    for (int x = -1; x <= 0; ++x)
+                        column.set(corner + glm::ivec3(x, 0, z), BlockId::AIR);
+                const glm::ivec3 cell = corner + glm::ivec3(dx, 0, dz);
+                column.set(cell, fluidBlockFromAmount(lava, 1));
+                column.set(cell + glm::ivec3(0, 1, 0),
+                           fluidBlockFromAmount(lava, 8, true));
+                const FluidSample columnSample = [&column](const glm::ivec3& p) {
+                    return column.get(p);
+                };
+                require(fluidCornerHeight(corner, lava, columnSample, available) == 1.0f,
+                        "vertically connected fluid pins every shared corner to full height");
+                const FluidAvailable missingAbove = [cell](const glm::ivec3& p) {
+                    return p != cell + glm::ivec3(0, 1, 0);
+                };
+                require(fluidCornerHeight(corner, lava, columnSample, missingAbove) < 1.0f,
+                        "unavailable fluid above cannot fill a corner");
+                column.set(cell + glm::ivec3(0, 1, 0),
+                           fluidBlockFromAmount(!lava, 8, true));
+                require(fluidCornerHeight(corner, lava, columnSample, available) < 1.0f,
+                        "different fluid above cannot fill a corner");
+            }
+        }
+    }
+
     Grid flow;
     flow.set({0, 1, 0}, BlockId::WATER);
     flow.set({1, 1, 0}, BlockId::FLOWING_WATER_7);

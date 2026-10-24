@@ -260,7 +260,8 @@ inline glm::vec2 fluidFlowVector(const glm::ivec3& origin, bool lava,
 }
 
 // Java's corner sampler: solid neighbors contribute no fluid height, air
-// contributes zero, and high corners (>= .8) get a tenfold weight.
+// contributes zero, and high corners (>= .8) get a tenfold weight. A fluid
+// column above pins the shared corner to full height so vertical sides join.
 inline float fluidCornerHeight(const glm::ivec3& corner, bool lava,
                                const FluidSample& sample,
                                const FluidAvailable& available) {
@@ -274,8 +275,8 @@ inline float fluidCornerHeight(const glm::ivec3& corner, bool lava,
             float height = -1.0f;
             if (sameFluid(block, lava)) {
                 const glm::ivec3 above = p + glm::ivec3(0, 1, 0);
-                if (available(above) && sameFluid(sample(above), lava)) height = 1.0f;
-                else height = fluidSurfaceHeight(block);
+                if (available(above) && sameFluid(sample(above), lava)) return 1.0f;
+                height = fluidSurfaceHeight(block);
             } else if (!isSolid(block)) {
                 height = 0.0f;
             }
