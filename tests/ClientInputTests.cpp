@@ -260,6 +260,24 @@ int main(){
         require(escaped,"relative Title Storage access remains confined");
         bool missing=false;try{assets.readBinary("missing.bin");}catch(const std::exception&){missing=true;}
         require(missing,"missing title assets report failure");}
+    // Empty roots select packaged mobile storage. External plugin files still
+    // use absolute filesystem paths, independently of the current directory.
+    const std::string packagedName="minecraftc-asset-routing-regression.bin";
+    const char* base=SDL_GetBasePath();require(base&&*base,"default title storage has a base path");
+    const auto packagedFile=std::filesystem::path(base)/packagedName;
+    {std::ofstream title(packagedFile,std::ios::binary);title<<"title";}
+    {std::ofstream package(root/packagedName,std::ios::binary);package<<"package";}
+    {AssetStore assets(std::filesystem::path{});
+        require(assets.root().empty(),"packaged storage has no filesystem root override");
+        require(AssetStore::readTextPath(packagedName)=="title",
+                "empty-root relative paths read packaged title storage");
+        require(AssetStore::readTextPath(root/packagedName)=="package",
+                "empty-root absolute plugin paths read filesystem files instead of title storage");
+        bool bounded=false;try{AssetStore::readPath(root/packagedName,2);}catch(const std::exception&){bounded=true;}
+        require(bounded,"absolute plugin file reads retain byte budgets with packaged storage");
+        bool escaped=false;try{AssetStore::readTextPath("../"+packagedName);}catch(const std::exception&){escaped=true;}
+        require(escaped,"empty-root relative paths cannot escape packaged storage");}
+    std::filesystem::remove(packagedFile);
     ClientSettings settings;
     settings.mouseSensitivity=.42f;settings.guiScale=3;settings.frameRateLimit=137;
     settings.invertMouseY=true;settings.toggleSneak=true;

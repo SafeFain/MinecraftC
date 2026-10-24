@@ -64,12 +64,17 @@ std::string AssetStore::readText(std::string_view relative) const {
 
 std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path, size_t maxBytes) {
     if (s_current) {
-        if (s_current->m_root.empty() && path.is_relative())
-            return s_current->readBinary(path.generic_u8string(), maxBytes);
-        std::error_code error;
-        const auto relative = std::filesystem::relative(path, s_current->m_root, error);
-        if (!error && validPath(relative.generic_u8string()))
-            return s_current->readBinary(relative.generic_u8string(), maxBytes);
+        if (s_current->m_root.empty()) {
+            if (path.is_relative())
+                return s_current->readBinary(path.generic_u8string(), maxBytes);
+            // Packaged storage has no filesystem root to relativize against.
+            // Absolute plugin cache paths must keep using filesystem IO.
+        } else {
+            std::error_code error;
+            const auto relative = std::filesystem::relative(path, s_current->m_root, error);
+            if (!error && validPath(relative.generic_u8string()))
+                return s_current->readBinary(relative.generic_u8string(), maxBytes);
+        }
         // Registered user-package assets have explicit absolute paths outside
         // Title Storage. Relative asset names remain confined to Title Storage.
         if(!path.is_absolute())throw std::runtime_error("Invalid relative asset path: "+path.u8string());
