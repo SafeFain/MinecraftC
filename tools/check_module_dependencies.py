@@ -37,6 +37,8 @@ DEFAULT_HEADERS = (
     "game/SaveStore.h",
     "world/World.h",
     "entity/EntityRecord.h",
+    "entity/EntityAttack.h",
+    "entity/EntityPresentation.h",
     "entity/EntityManager.h",
     "app/GameSession.h",
 )

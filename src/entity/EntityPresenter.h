@@ -5,7 +5,6 @@
 
 #include <filesystem>
 #include <string_view>
-#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -29,11 +28,9 @@ public:
     bool hasVisual(EntityType type) const override;
     void clearInstances() override;
     bool play(EntityType type, uint64_t id, std::string_view action) override;
-    bool playing(EntityType type, uint64_t id,
-                 std::string_view action) const override;
+    EntityAttackTiming attackTiming(EntityType type) const override;
     void setLocomotion(EntityType type, uint64_t id, float speed) override;
-    std::vector<EntityPresentationEvent> advance(EntityType type, uint64_t id,
-                                                 float dt) override;
+    void advance(EntityType type, uint64_t id, float dt) override;
 
 private:
     // Drawing and animation queries run from const session views.

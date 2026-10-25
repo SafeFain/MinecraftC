@@ -1,25 +1,18 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <string_view>
-#include <vector>
+
+#include "entity/EntityAttack.h"
 
 // Opaque here so the presentation contract stays independent of gameplay and
 // model headers; consumers already include entity/EntityLogic.h.
 enum class EntityType : uint16_t;
 
-// Gameplay-relevant event fired by the animation currently driving an entity.
-// Simulation consumes these without depending on model animation types.
-struct EntityPresentationEvent {
-    std::string action;
-    std::string name;
-};
-
 // Narrow bridge from entity simulation to optional presentation state.
-// Simulation owns no model assets: it only forwards locomotion/action intents
-// and receives fired events. Drawing and asset lifetimes belong to the
-// implementing presenter.
+// Simulation owns attack wind-up, the one impact event and combat resolution.
+// The presenter may supply the matching animation timing and consume action
+// intents; drawing and asset lifetimes belong to the implementing presenter.
 class IEntityPresentation {
 public:
     virtual ~IEntityPresentation() = default;
@@ -29,14 +22,17 @@ public:
     virtual bool hasVisual(EntityType) const { return false; }
     virtual void clearInstances() {}
     virtual bool play(EntityType, uint64_t, std::string_view) { return false; }
-    virtual bool playing(EntityType, uint64_t, std::string_view) const { return false; }
+    // Animation timing for the attack semantic. Simulation sanitizes the result
+    // and falls back to its canonical table, so this may return defaults when
+    // models or action graphs are unavailable.
+    virtual EntityAttackTiming attackTiming(EntityType) const = 0;
     virtual void setLocomotion(EntityType, uint64_t, float) {}
-    virtual std::vector<EntityPresentationEvent> advance(EntityType, uint64_t,
-                                                         float) {
-        return {};
-    }
+    virtual void advance(EntityType, uint64_t, float) {}
 };
 
-// No-op implementation for headless simulation (tests, dedicated servers and
-// any session that has not initialized rendering models yet).
-class NullEntityPresentation final : public IEntityPresentation {};
+// Timing-only implementation for headless simulation (tests, dedicated servers
+// and any session that has not initialized rendering models yet).
+class NullEntityPresentation final : public IEntityPresentation {
+public:
+    EntityAttackTiming attackTiming(EntityType type) const override;
+};

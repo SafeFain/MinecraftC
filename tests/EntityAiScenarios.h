@@ -11,13 +11,19 @@
 #include <iostream>
 
 namespace EntityAiScenarios {
+// Combat must not depend on presentation: Real exercises the loaded animation
+// graph, Null supplies canonical timings, Unset relies on EntityManager's
+// internal null fallback.
+enum class PresentationMode { Real, Null, Unset };
 struct Scene {
     World world;
     Player player{world};
     EntityPresenter presenter;
+    NullEntityPresentation nullPresenter;
     EntityManager mobs{world};
     EntityAiTestRenderer renderer;
-    explicit Scene(const std::filesystem::path& assets) {
+    explicit Scene(const std::filesystem::path& assets,
+                   PresentationMode mode = PresentationMode::Real) {
         for (int cx=-3; cx<=3; ++cx) for (int cz=-3; cz<=3; ++cz) {
             Chunk* chunk=world.getChunk(cx,cz);
             for (int x=0;x<16;++x) for (int z=0;z<16;++z)
@@ -31,8 +37,12 @@ struct Scene {
         player.setPosition({0.5,1,0.5});
         player.configureRules(GameMode::Survival,Difficulty::Normal);
         mobs.setNaturalSpawningEnabled(false);
-        mobs.setPresentation(&presenter);
-        presenter.initializeModels(assets,renderer);
+        if (mode == PresentationMode::Real) {
+            mobs.setPresentation(&presenter);
+            presenter.initializeModels(assets,renderer);
+        } else if (mode == PresentationMode::Null) {
+            mobs.setPresentation(&nullPresenter);
+        }
     }
     void block(int x,int y,int z,BlockId id) {
         Chunk* chunk=world.getChunk(World::worldToChunkX(x),World::worldToChunkZ(z));

@@ -28,6 +28,7 @@ void EntityManager::applyReplicaSnapshots(const std::vector<EntitySnapshot>& sna
         entity.item = snapshot.item; entity.behaviorSeed = snapshot.seed;
         entity.inGround = snapshot.inGround; entity.playerOwned = snapshot.playerOwned; entity.sleeping = snapshot.sleeping;
         entity.attackPending = snapshot.attacking; entity.villager = snapshot.villager;
+        entity.attackElapsed = 0.0f; entity.attackImpactResolved = true;
         entity.nether=snapshot.nether;entity.effects.restore(snapshot.effects);entity.riderId=snapshot.riderId;
         entity.pluginState=snapshot.pluginState;entity.pluginStateVersion=snapshot.pluginStateVersion;
         m_entities.push_back(std::move(entity));
@@ -53,12 +54,12 @@ void EntityManager::advanceReplicaPresentation(float dt) {
         entity.ageSeconds += std::max(0.0f, dt);
         if (presentation().hasVisual(entity.type)) {
             presentation().setLocomotion(entity.type, entity.id, std::hypot(entity.locomotionVelocity.x, entity.locomotionVelocity.z));
-            (void)presentation().advance(entity.type, entity.id, dt);
+            presentation().advance(entity.type, entity.id, dt);
         }
     }
     for (auto& dead : m_deadEntityRenders) {
         dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
-        (void)presentation().advance(dead.type, dead.id, dt);
+        presentation().advance(dead.type, dead.id, dt);
     }
     m_deadEntityRenders.erase(std::remove_if(m_deadEntityRenders.begin(), m_deadEntityRenders.end(),
         [](const DeadEntityRender& dead) { return !deathPresentationVisible(dead.elapsed); }), m_deadEntityRenders.end());

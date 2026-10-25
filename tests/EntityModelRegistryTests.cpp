@@ -41,6 +41,16 @@ int main() {
     const auto fallbackEvents = registry.advance(EntityType::Zombie, 42, 0.31f);
     require(fallbackEvents.size() == 1 && fallbackEvents[0].name == "melee",
             "fallback hostile attack did not emit its gameplay event");
+    require(registry.playAction(EntityType::Skeleton, 43, "attack"),
+            "fallback graph did not preserve skeleton attack timing");
+    const auto skeletonEvents = registry.advance(EntityType::Skeleton, 43, 0.46f);
+    require(skeletonEvents.size() == 1 && skeletonEvents[0].name == "shoot",
+            "fallback skeleton attack did not emit shoot");
+    require(registry.playAction(EntityType::Blastling, 44, "attack"),
+            "fallback graph did not preserve blastling attack timing");
+    const auto blastlingEvents = registry.advance(EntityType::Blastling, 44, 1.01f);
+    require(blastlingEvents.size() == 1 && blastlingEvents[0].name == "explode",
+            "fallback blastling attack did not emit explode");
     registry.beginFrame();registry.endFrame();
     require(registry.playing(EntityType::Zombie,42,"attack"),"invisible entity lost its animation state");
     const auto graph=registry.definition(EntityType::Zombie).graph;

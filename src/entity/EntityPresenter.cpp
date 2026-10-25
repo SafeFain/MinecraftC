@@ -1,5 +1,6 @@
 #include "entity/EntityPresenter.h"
 
+#include "entity/EntityAttackTiming.h"
 #include "entity/EntityManager.h"
 #include "renderer/GameRenderer.h"
 #include "world/World.h"
@@ -148,21 +149,34 @@ bool EntityPresenter::play(EntityType type, uint64_t id,
     return m_modelRegistry.playAction(type, id, std::string(action));
 }
 
-bool EntityPresenter::playing(EntityType type, uint64_t id,
-                              std::string_view action) const {
-    return m_modelRegistry.playing(type, id, std::string(action));
+EntityAttackTiming EntityPresenter::attackTiming(EntityType type) const {
+    const EntityAttackTiming fallback = defaultAttackTiming(type);
+    if (!m_modelRegistry.hasModel(type)) return fallback;
+    const auto& definition = m_modelRegistry.definition(type);
+    if (!definition.graph) return fallback;
+    const auto* action =
+        definition.graph->findAction(definition.graph->actionFor("attack"));
+    if (!action) return fallback;
+    const float speed = std::isfinite(action->speed) && action->speed > 0.0f
+        ? action->speed : 1.0f;
+    EntityAttackTiming timing = fallback;
+    timing.duration = action->duration / speed;
+    timing.event = EntityAttackEvent::None;
+    for (const auto& event : action->events) {
+        const EntityAttackEvent kind = attackEventFromName(event.name);
+        if (kind == EntityAttackEvent::None) continue;
+        timing.event = kind;
+        timing.impact = event.time / speed;
+        break;
+    }
+    return timing;
 }
 
 void EntityPresenter::setLocomotion(EntityType type, uint64_t id, float speed) {
     m_modelRegistry.setLocomotion(type, id, speed);
 }
 
-std::vector<EntityPresentationEvent> EntityPresenter::advance(
-    EntityType type, uint64_t id, float dt) {
-    const auto fired = m_modelRegistry.advance(type, id, dt);
-    std::vector<EntityPresentationEvent> events;
-    events.reserve(fired.size());
-    for (const auto& event : fired)
-        events.push_back({event.action, event.name});
-    return events;
+void EntityPresenter::advance(EntityType type, uint64_t id, float dt) {
+    // Animation events remain presentation-local; simulation owns combat events.
+    (void)m_modelRegistry.advance(type, id, dt);
 }

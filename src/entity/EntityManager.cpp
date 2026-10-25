@@ -843,7 +843,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             if (!selected) {
                 entity.ai.hasTarget = false;
                 entity.ai.targetVisible = false;
-                entity.attackPending = false;
+                cancelAttack(entity);
                 cancelNavigation(entity);
                 entity.ai.nextDecision = m_aiTime;
             }
@@ -1647,7 +1647,7 @@ bool EntityManager::transferTo(uint64_t id,EntityManager& target,const glm::dvec
     saved.erase(std::remove_if(saved.begin(),saved.end(),[&](const auto& e){return !belongs(e,sourceKey);}),saved.end());
     auto targetSaved=target.saveEntities();targetSaved.erase(std::remove_if(targetSaved.begin(),targetSaved.end(),[&](const auto& e){return !belongs(e,targetKey);}),targetSaved.end());
     record.position=*landing;record.velocity=glm::vec3(0);targetSaved.push_back(record);
-    moved.position=*landing;moved.velocity=glm::vec3(0);moved.ai={};moved.attackPending=false;
+    moved.position=*landing;moved.velocity=glm::vec3(0);moved.ai={};cancelAttack(moved);
     moved.portalCooldown=1;moved.portalRetry=0;moved.id=target.m_nextId;
     target.m_entities.reserve(target.m_entities.size()+1);
     EntityTransferJournal::commit(root,{m_world.dimension(),sourceKey.first,sourceKey.second,std::move(saved)},

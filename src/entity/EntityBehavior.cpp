@@ -1,5 +1,6 @@
 #include "entity/EntityManager.h"
 #include "entity/EntityPresentation.h"
+#include "entity/EntityAttackTiming.h"
 #include "entity/ProjectileLogic.h"
 #include "game/NetherProgression.h"
 #include "game/DimensionRules.h"
@@ -204,7 +205,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             return;
         }
         if (previousBehavior==EntityBehavior::Chase) {
-            entity.attackPending=false;
+            cancelAttack(entity);
             cancelNavigation(entity);
             ai.actionUntil=m_aiTime;
         }
@@ -284,6 +285,21 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
     }
 }
 
+void EntityManager::beginAttack(Entity& entity) {
+    EntityAttackTiming timing=presentation().attackTiming(entity.type);
+    const EntityAttackTiming fallback=defaultAttackTiming(entity.type);
+    if (!std::isfinite(timing.duration) || timing.duration<=0.0f) timing.duration=fallback.duration;
+    if (!std::isfinite(timing.impact) || timing.impact<0.0f) timing.impact=fallback.impact;
+    if (timing.event==EntityAttackEvent::None) timing.event=fallback.event;
+    if (timing.impact>timing.duration) timing.event=EntityAttackEvent::None;
+    entity.attackTiming=timing;
+    entity.attackElapsed=0.0f;
+    entity.attackImpactResolved=false;
+    entity.attackPending=true;
+    // Visual action only: the returned status must not gate authoritative combat.
+    presentation().play(entity.type,entity.id,"attack");
+}
+
 void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDay,
                                bool playerTargetable,uint64_t worldTick,bool thunderstorm) {
     auto& ai=entity.ai;
@@ -303,7 +319,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             (ai.retaliating || !hostile(other->type)) : playerTargetable;
         if (!valid || m_aiTime>=ai.memoryUntil) {
             ai.hasTarget=false; ai.targetVisible=false;
-            entity.attackPending=false;
+            cancelAttack(entity);
             ai.hasDestination=false;
             ai.nextDecision=m_aiTime;
             cancelNavigation(entity);
@@ -325,25 +341,23 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     };
     const float baseDamage=Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : nativeMobDamage(entity.type);
     const float meleeDamage=std::max(0.f,baseDamage+3*entity.effects.level(StatusEffectType::Strength)-4*entity.effects.level(StatusEffectType::Weakness));
-    const auto events=presentation().advance(entity.type,entity.id,dt);
-    for (const auto& event:events) {
-        if (!entity.attackPending) continue;
-        if (event.name!="melee" && event.name!="shoot" && event.name!="explode") continue;
+    presentation().advance(entity.type,entity.id,dt);
+    auto resolveAttack=[&](EntityAttackEvent event) {
         entity.attackPending=false;
         auto position=target();
-        if (!position) continue;
-        const bool ranged=event.name=="shoot";
+        if (!position) return;
+        const bool ranged=event==EntityAttackEvent::Shoot;
         const glm::dvec3 origin=entity.position+glm::dvec3(0,ranged ? 1.45 : 1.2,0);
         const glm::dvec3 center=!ai.targetId && ranged ? player.getEyePosition() : *position+glm::dvec3(0,.9,0);
         const double distance=glm::distance(origin,center);
-        if (distance>=(ranged ? 14.0 : entityTemplate(entity.type)==EntityType::IronGolem ? 2.5 : 1.5) || !aiClearSight(origin,center)) continue;
+        if (distance>=(ranged ? 14.0 : entityTemplate(entity.type)==EntityType::IronGolem ? 2.5 : 1.5) || !aiClearSight(origin,center)) return;
         glm::vec3 direction=distance>.001 ? glm::vec3((center-origin)/distance) : glm::vec3(0);
         if (ranged) {
             auto velocity=lowArcBallisticVelocity(origin,center,bowLaunchSpeed(.9f),
                                                   entity.velocity+ai.previousLocomotion);
             if (velocity) m_aiArrows.push_back({origin+glm::dvec3(glm::normalize(*velocity))*.75,
                                                 *velocity,2.0f,entity.id});
-        } else if (event.name=="explode") {
+        } else if (event==EntityAttackEvent::Explode) {
             m_aiExplosions.push_back({entity.position,entity.behaviorSeed});
             entity.health=0;
         } else {
@@ -369,9 +383,18 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
                 }
             }
         }
+    };
+    if (entity.attackPending) {
+        entity.attackElapsed+=dt;
+        const auto& timing=entity.attackTiming;
+        if (!entity.attackImpactResolved && timing.event!=EntityAttackEvent::None &&
+            entity.attackElapsed+1e-6f>=timing.impact) {
+            entity.attackImpactResolved=true;
+            resolveAttack(timing.event);
+        } else if (entity.attackElapsed+1e-6f>=timing.duration) {
+            entity.attackPending=false;
+        }
     }
-    if (entity.attackPending && !presentation().playing(entity.type,entity.id,"attack"))
-        entity.attackPending=false;
     if (entity.health<=0) return;
     if (!entity.attackPending && !entity.sleeping) followNavigation(entity,dt);
     if (auto position=target()) {
@@ -383,7 +406,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             const glm::dvec3 center=!ai.targetId && ranged ? player.getEyePosition() : *position+glm::dvec3(0,.9,0);
             if (glm::distance(origin,center)<(ranged ? 14.0 : entityTemplate(entity.type)==EntityType::IronGolem ? 2.5 : 1.5) && aiClearSight(origin,center)) {
                 entity.actionCooldown=ranged ? 2.0f : 1.0f;
-                entity.attackPending=presentation().play(entity.type,entity.id,"attack");
+                beginAttack(entity);
             }
         }
     }
@@ -454,7 +477,7 @@ void EntityManager::tickNativeState(Entity& entity,float dt) {
     while(entity.nativeTickAccumulator>=1) {
         entity.nativeTickAccumulator-=1;
         auto& state=entity.nether;
-        if(state.angerTicks && --state.angerTicks==0 && (entity.type==EntityType::ZombifiedPiglin||entity.type==EntityType::Enderman)){entity.ai={};entity.attackPending=false;}
+        if(state.angerTicks && --state.angerTicks==0 && (entity.type==EntityType::ZombifiedPiglin||entity.type==EntityType::Enderman)){entity.ai={};cancelAttack(entity);}
         if(state.attackTicks)--state.attackTicks;
         if(state.boostTicks)--state.boostTicks;
         entity.effects.tick([&](float h){applyEntityPotion(entity,PotionDefinition{{StatusEffectType::Healing,0,1},false},h/4);},
@@ -463,10 +486,12 @@ void EntityManager::tickNativeState(Entity& entity,float dt) {
             if(++state.conversionTicks>=300) {
                 entity.type=entity.type==EntityType::Hoglin?EntityType::Zoglin:EntityType::ZombifiedPiglin;
                 state.conversionTicks=0;entity.health=std::min(entity.health,nativeMobHealth(entity.type));entity.ai={};
+                cancelAttack(entity);
             }
         } else state.conversionTicks=0;
         if(state.cureTicks && --state.cureTicks==0 && entity.type==EntityType::ZombieVillager) {
             entity.type=EntityType::Villager;entity.health=20;entity.effects.clear();entity.ai={};
+            cancelAttack(entity);
         }
         if(state.barterTicks && --state.barterTicks==0 && entity.type==EntityType::Piglin) {
             // One payment has one durable timer and sequence; no request-order RNG.

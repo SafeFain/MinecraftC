@@ -2,6 +2,7 @@
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"
 #include "EntityAiIntegration.h"
+#include "EntityCombatTimingIntegration.h"
 #include "NetherMobIntegration.h"
 #include "VillageLifeIntegration.h"
 #include "ProjectileIntegration.h"
@@ -361,6 +362,8 @@ int main(int argc, char** argv) {
         return EntityAiScenarios::writeDemo(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--ai-tests")
         { EntityAiScenarios::villageLife(argv[2]); return EntityAiScenarios::integration(argv[2]); }
+    if (argc > 2 && std::string(argv[1]) == "--combat-timing-tests")
+        return EntityCombatTimingTests::run(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "--ai-benchmark")
         return EntityAiScenarios::benchmark(argv[2]);
     if(argc!=1){std::cerr<<"Unknown session test arguments\n";return 2;}

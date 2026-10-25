@@ -68,7 +68,7 @@ bool EntityManager::pluginAi(Entity& entity,float dt) {
     moveWithTerrain(entity,entity.pluginMovement,dt);
     if(glm::length(entity.pluginMovement)>.001f)entity.facing=glm::normalize(entity.pluginMovement);
     presentation().setLocomotion(entity.type,entity.id,glm::length(entity.pluginMovement));
-    (void)presentation().advance(entity.type,entity.id,dt);
+    presentation().advance(entity.type,entity.id,dt);
     if(entity.pluginAttack!=UINT64_MAX&&entity.actionCooldown<=0)for(const auto& view:m_framePlayers) {
         if(view.id!=entity.pluginAttack||!view.damageable||!view.targetable)continue;
         const auto origin=entity.position+glm::dvec3(0,entitySize(entity).y*.75f,0);

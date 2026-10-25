@@ -16,6 +16,7 @@
 #include <glm/glm.hpp>
 
 #include "game/Item.h"
+#include "entity/EntityAttack.h"
 #include "entity/EntityRecord.h"
 #include "entity/EntityLogic.h"
 #include "game/CombatRules.h"
@@ -61,6 +62,11 @@ struct Entity {
     glm::vec3 locomotionVelocity{0.0f};
     glm::vec3 facing{0.0f, 0.0f, -1.0f};
     bool attackPending = false;
+    // Simulation-owned attack clock. Presentation only supplies the timing
+    // data and the visual action; it cannot supply authoritative hit events.
+    EntityAttackTiming attackTiming;
+    float attackElapsed = 0.0f;
+    bool attackImpactResolved = false;
     PlayerPhysics::HurtImmunity hurtImmunity;
     VillagerData villager;
     bool sleeping = false;
@@ -147,8 +153,9 @@ public:
                          float reach) const;
     void applyReplicaSnapshots(const std::vector<EntitySnapshot>& snapshots, const std::vector<EntityDeathSnapshot>& deaths);
     void advanceReplicaPresentation(float dt);
-    // Presentation is optional: a null pointer runs animation no-ops, which
-    // keeps simulation, persistence and LAN replication renderer-independent.
+    // Presentation is optional: a null pointer supplies canonical animation
+    // timing and no-op visuals. Attack clocks and impacts stay simulation-owned,
+    // which keeps combat, persistence and LAN replication renderer-independent.
     void setPresentation(IEntityPresentation* presentation) {
         m_presentation = presentation;
     }
@@ -226,6 +233,12 @@ private:
                         bool playerTargetable, uint64_t worldTick, bool thunderstorm);
     void updateMobAi(Entity& entity, Player& player, float dt, bool isDay,
                      bool playerTargetable, uint64_t worldTick, bool thunderstorm);
+    void beginAttack(Entity& entity);
+    static void cancelAttack(Entity& entity) {
+        entity.attackPending = false;
+        entity.attackElapsed = 0.0f;
+        entity.attackImpactResolved = false;
+    }
     void followNavigation(Entity& entity, float dt);
     void chooseEscape(Entity& entity, const glm::dvec3& danger);
     void refreshPoiIndex();

@@ -1,5 +1,6 @@
 #include "entity/EntityModelRegistry.h"
 #include <chrono>
+#include "entity/EntityAttackTiming.h"
 #include "model/AnimationGraph.h"
 #include "model/ModelRenderer.h"
 #include "debug/Log.h"
@@ -80,16 +81,9 @@ std::shared_ptr<const model::AnimationGraphAsset> fallbackGraph(
     attack.name = attack.clip = "attack";
     attack.layer = "action";
     attack.priority = 100;
-    if (type == EntityType::Skeleton) {
-        attack.duration = 0.75f;
-        attack.events.push_back({"shoot", 0.45f});
-    } else if (type == EntityType::Blastling) {
-        attack.duration = 1.20f;
-        attack.events.push_back({"explode", 1.0f});
-    } else {
-        attack.duration = 0.55f;
-        attack.events.push_back({"melee", 0.30f});
-    }
+    const EntityAttackTiming timing = defaultAttackTiming(type);
+    attack.duration = timing.duration;
+    attack.events.push_back({attackEventName(timing.event), timing.impact});
     graph->actions.emplace("attack", attack);
     graph->bindings.emplace("attack", "attack");
     return graph;

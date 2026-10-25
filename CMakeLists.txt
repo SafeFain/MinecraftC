@@ -1442,6 +1442,7 @@ if(BUILD_TESTING)
         src/core/InputCodes.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityPresentation.cpp
         src/entity/EntityReplication.cpp
         src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
@@ -1607,6 +1608,8 @@ if(BUILD_TESTING)
     add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(gamerule_integration PROPERTIES TIMEOUT 120)
     add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_test(NAME entity_combat_timing COMMAND session_flow_tests --combat-timing-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(entity_combat_timing PROPERTIES TIMEOUT 120)
     add_test(NAME projectile_flight_integration COMMAND session_flow_tests --projectile-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(projectile_flight_integration PROPERTIES TIMEOUT 120)
     set_tests_properties(entity_ai_integration PROPERTIES TIMEOUT 120)
@@ -1656,6 +1659,7 @@ if(BUILD_TESTING)
         src/core/TextEditBuffer.cpp
         src/debug/Log.cpp
         src/entity/EntityManager.cpp
+        src/entity/EntityPresentation.cpp
         src/entity/EntityReplication.cpp
         src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
         src/entity/EntityNavigation.cpp
