@@ -18,7 +18,6 @@
 #include "game/Item.h"
 #include "entity/EntityRecord.h"
 #include "entity/EntityLogic.h"
-#include "entity/EntityModelRegistry.h"
 #include "game/CombatRules.h"
 #include "player/PlayerPhysics.h"
 
@@ -26,7 +25,7 @@ struct PotionDefinition;
 struct EntitySnapshot;
 struct EntityDeathSnapshot;
 class Player;
-class IGameRenderer;
+class IEntityPresentation;
 class World;
 class Chunk;
 class SaveStore;
@@ -146,16 +145,17 @@ public:
                                 const MeleeAttackRequest& attack, uint64_t playerId = UINT64_MAX,const std::string& owner="local");
     bool hasAttackTarget(const glm::dvec3& origin, const glm::vec3& direction,
                          float reach) const;
-    void render(IGameRenderer& renderer, const glm::mat4& viewProjection,
-                const glm::dvec3& renderOrigin) const;
     void applyReplicaSnapshots(const std::vector<EntitySnapshot>& snapshots, const std::vector<EntityDeathSnapshot>& deaths);
     void advanceReplicaPresentation(float dt);
-    void shareModels(const EntityManager& source) {
-        m_modelRegistry.shareAssets(source.m_modelRegistry);
-        m_modelRegistry.clearInstances();
+    // Presentation is optional: a null pointer runs animation no-ops, which
+    // keeps simulation, persistence and LAN replication renderer-independent.
+    void setPresentation(IEntityPresentation* presentation) {
+        m_presentation = presentation;
     }
-    void initializeModels(const std::filesystem::path& assetRoot,
-                          IGameRenderer& renderer);
+    static glm::vec3 entitySize(const Entity& entity) {
+        return renderSize(entity.type)*(entity.type==EntityType::MagmaCube ? static_cast<float>(1u<<entity.nether.magmaSize) : 1.f)*((entity.type==EntityType::Villager ||
+            entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
+    }
     const std::vector<Entity>& entities() const { return m_entities; }
     const std::vector<DeadEntityRender>& deadEntityRenders() const {
         return m_deadEntityRenders;
@@ -243,7 +243,8 @@ private:
     std::vector<Entity> m_entities;
     std::map<uint64_t, std::pair<glm::dvec3, glm::vec3>> m_replicaTargets;
     std::vector<DeadEntityRender> m_deadEntityRenders;
-    mutable EntityModelRegistry m_modelRegistry;
+    IEntityPresentation* m_presentation = nullptr;
+    IEntityPresentation& presentation();
     uint64_t m_nextId = 1;
     float m_spawnTimer = 0.0f;
     float m_spawnerTimer=0;
@@ -301,12 +302,7 @@ private:
                  uint32_t eventSeed, bool mobExplosion = false);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);
-    static glm::vec3 renderColor(EntityType type);
     static glm::vec3 renderSize(EntityType type);
-    static glm::vec3 entitySize(const Entity& entity) {
-        return renderSize(entity.type)*(entity.type==EntityType::MagmaCube ? static_cast<float>(1u<<entity.nether.magmaSize) : 1.f)*((entity.type==EntityType::Villager ||
-            entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
-    }
     void tickVillageLife(float dt, uint64_t worldTick);
     void changeVillageReputation(Entity& victim, int amount);
     size_t m_villageLifeCursor = 0;

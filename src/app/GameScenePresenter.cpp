@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "app/GameSession.h"
 #include "core/Window.h"
+#include "entity/EntityPresenter.h"
 #include "entity/ProjectileCollision.h"
 #include "game/ClientSettings.h"
 #include "game/Localization.h"
@@ -191,7 +192,9 @@ void GameScenePresenter::render(
         }
         renderer.endTranslucent();
 
-        session.entityState().render(renderer, vp, renderOrigin);
+        if (const auto* presenter = session.entityPresenter())
+            presenter->render(renderer, vp, renderOrigin,
+                              session.entityState(), session.worldState());
         for (const auto& entity : session.entityState().entities()) {
             if (entity.type!=EntityType::Item) continue;
             heldItemRenderer.renderDropped(entity.item,vp,

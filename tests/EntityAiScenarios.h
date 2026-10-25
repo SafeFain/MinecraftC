@@ -1,6 +1,7 @@
 #pragma once
 #include "EntityAiTestRenderer.h"
 #include "entity/EntityManager.h"
+#include "entity/EntityPresenter.h"
 #include "player/Player.h"
 #include "world/World.h"
 #include "game/WorldCatalog.h"
@@ -13,6 +14,7 @@ namespace EntityAiScenarios {
 struct Scene {
     World world;
     Player player{world};
+    EntityPresenter presenter;
     EntityManager mobs{world};
     EntityAiTestRenderer renderer;
     explicit Scene(const std::filesystem::path& assets) {
@@ -29,7 +31,8 @@ struct Scene {
         player.setPosition({0.5,1,0.5});
         player.configureRules(GameMode::Survival,Difficulty::Normal);
         mobs.setNaturalSpawningEnabled(false);
-        mobs.initializeModels(assets,renderer);
+        mobs.setPresentation(&presenter);
+        presenter.initializeModels(assets,renderer);
     }
     void block(int x,int y,int z,BlockId id) {
         Chunk* chunk=world.getChunk(World::worldToChunkX(x),World::worldToChunkZ(z));

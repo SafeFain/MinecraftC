@@ -5,6 +5,7 @@
 #include "game/EntityTransferJournal.h"
 
 #include "Config.h"
+#include "entity/EntityPresenter.h"
 #include "player/PluginLanding.h"
 #include "debug/Log.h"
 #include "game/SurvivalSession.h"
@@ -25,6 +26,8 @@ GameSession::GameSession(const std::filesystem::path& savesDirectory)
     : simulations([]{std::vector<std::unique_ptr<DimensionSimulation>> v(2);v[0]=std::make_unique<DimensionSimulation>();return v;}()),
       player(world()), dataDirectory(savesDirectory.parent_path()), worldCatalog(savesDirectory) {
     world().setThreadPool(&threadPool);
+    simulations[0]->presenter = std::make_unique<EntityPresenter>();
+    simulations[0]->entities.setPresentation(simulations[0]->presenter.get());
     player.setEntityManager(&entities());
     bindLanFeedback(player, 0);
 }
@@ -107,8 +110,15 @@ void GameSession::setToggleSneak(bool enabled) { player.setToggleSneak(enabled);
 
 void GameSession::initializeEntityModels(
     const std::filesystem::path& assetRoot, IGameRenderer& renderer) {
-    simulations[0]->entities.initializeModels(assetRoot, renderer);
-    for(size_t id=1;id<simulations.size();++id)if(simulations[id])simulations[id]->entities.shareModels(simulations[0]->entities);
+    auto& primary = *simulations[0]->presenter;
+    primary.initializeModels(assetRoot, renderer);
+    for(size_t id=1;id<simulations.size();++id)
+        if(simulations[id] && simulations[id]->presenter)
+            simulations[id]->presenter->shareAssetsFrom(primary);
+}
+
+const EntityPresenter* GameSession::entityPresenter() const {
+    return simulation().presenter.get();
 }
 
 void GameSession::invalidateGpuMeshes() {
@@ -368,7 +378,10 @@ DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
         runtime = std::make_unique<DimensionSimulation>();
         runtime->world.setThreadPool(&threadPool);
         runtime->world.configureLod(lodSettings);
-        runtime->entities.shareModels(simulations[0]->entities);
+        runtime->presenter = std::make_unique<EntityPresenter>();
+        runtime->entities.setPresentation(runtime->presenter.get());
+        if (simulations[0]->presenter)
+            runtime->presenter->shareAssetsFrom(*simulations[0]->presenter);
     }
     if (!runtime->initialized) {
         if (target != DimensionId::Overworld && saveStore)

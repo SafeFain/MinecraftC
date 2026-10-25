@@ -35,6 +35,7 @@
 #include <vector>
 
 class IGameRenderer;
+class EntityPresenter;
 class Localization;
 struct ParsedCommand;
 
@@ -159,6 +160,7 @@ public:
     const World& worldState() const { return world(); }
     const Player& playerState() const { return player; }
     const EntityManager& entityState() const { return entities(); }
+    const EntityPresenter* entityPresenter() const;
     const DayNightCycle& daylightState() const { return dayNightCycle(); }
     const FishingView& fishingState() const { return lanJoining ? replicaFishing : fishing.view(); }
     const WeatherSystem& weatherState() const { return weather(); }

@@ -3,6 +3,7 @@
 #include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
+#include "entity/EntityPresenter.h"
 #include "network/EntityProtocol.h"
 #include "network/StateProtocol.h"
 #include "world/LodTerrainSystem.h"
@@ -71,7 +72,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Lan::EntityBatch sizable;for(uint64_t id=1;id<=200;++id){large.id=id;sizable.entities.push_back(large);}
     const auto payload=Lan::encodeEntityBatch(sizable);check(payload.size()<Lan::MAX_PAYLOAD&&Lan::decodeEntityBatch(payload).entities.size()==200,"large plugin states retain bounded LAN snapshot encoding");
     Lan::WorldInfo info;info.name="Extensions";info.generation[0]=config;check(Lan::decodeWorldInfo(Lan::encodeWorldInfo(info)).generation[0]==config,"LAN generator configuration roundtrip");
-    World world;world.resetForNewSeed(12,WorldType::Superflat);EntityManager entities(world);EntityAiTestRenderer renderer;entities.initializeModels(assets,renderer);
+    World world;world.resetForNewSeed(12,WorldType::Superflat);EntityPresenter presenter;EntityManager entities(world);EntityAiTestRenderer renderer;
+    entities.setPresentation(&presenter);presenter.initializeModels(assets,renderer);
     check(entities.spawnMob(static_cast<EntityType>(5000),{0,0,0}),"registered mob spawn");check(entities.entities().back().health==30,"registered mob attributes");
     MC_EntitySnapshot sdkSnapshot{};sdkSnapshot.size=sizeof(sdkSnapshot);std::string state;check(entities.pluginSnapshot(entities.entities().back().id,sdkSnapshot,state)&&sdkSnapshot.state_version==1,"entity snapshot extension");
     Player player(world);player.setPosition({0,1,0});for(int frame=0;frame<2;++frame)entities.update(player,.1f,true,false,true,false);

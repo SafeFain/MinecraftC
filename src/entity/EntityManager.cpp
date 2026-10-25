@@ -1,5 +1,6 @@
 #include "entity/EntityManager.h"
 #include "entity/EntityLogic.h"
+#include "entity/EntityPresentation.h"
 #include "entity/ProjectileCollision.h"
 
 #include "player/Player.h"
@@ -13,7 +14,6 @@
 #include "game/EntityTransferJournal.h"
 #include "game/DimensionRules.h"
 #include "game/NativeProjectileState.h"
-#include "renderer/GameRenderer.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,6 +32,15 @@ uint32_t hash32(uint32_t value) {
 std::pair<int,int> entityChunk(const glm::dvec3& position) {
     return {World::worldToChunkX(position.x), World::worldToChunkZ(position.z)};
 }
+
+NullEntityPresentation& nullPresentation() {
+    static NullEntityPresentation instance;
+    return instance;
+}
+}
+
+IEntityPresentation& EntityManager::presentation() {
+    return m_presentation ? *m_presentation : nullPresentation();
 }
 
 void EntityManager::clear() {
@@ -60,7 +69,7 @@ void EntityManager::clear() {
     m_poiChunks.clear();
     m_logicalVillages.clear();
     m_villageRefreshSeconds = 0.0f;
-    m_modelRegistry.clearInstances();
+    presentation().clearInstances();
 }
 
 std::vector<EntityRecord> EntityManager::saveEntities() const {
@@ -631,7 +640,7 @@ float EntityManager::damageEntity(Entity& entity, float damage,
         entity.ai.panicUntil = m_aiTime + Config::AI_PANIC_SECONDS;
     entity.hurtFlashSeconds = 0.2f;
     if (registeredMob(entity.type))
-        m_modelRegistry.playAction(entity.type, entity.id, "hurt");
+        presentation().play(entity.type, entity.id, "hurt");
     entity.velocity += knockback;
     pluginEvent(entity,MC_ENTITY_DAMAGE);
     if (playerAttack && entity.type == EntityType::Spider)
@@ -687,7 +696,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         m_dirtyEntityChunks.insert(entityChunk(entity.position));
     for (auto& dead : m_deadEntityRenders) {
         dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
-        m_modelRegistry.advance(dead.type, dead.id, dt);
+        presentation().advance(dead.type, dead.id, dt);
     }
     m_deadEntityRenders.erase(std::remove_if(
         m_deadEntityRenders.begin(), m_deadEntityRenders.end(),
@@ -897,7 +906,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
     for (auto& entity : deadMobs) {
         pluginEvent(entity,MC_ENTITY_DEATH);
         if (registeredMob(entity.type) && !entity.despawning) {
-            m_modelRegistry.playAction(entity.type, entity.id, "death");
+            presentation().play(entity.type, entity.id, "death");
             m_deadEntityRenders.push_back({entity.id, entity.type,
                 entity.position, entity.velocity, entity.facing,
                 entity.behaviorSeed, 0.0f});
@@ -1354,26 +1363,6 @@ void EntityManager::explode(const glm::dvec3& center,
     m_explosionEvents.push_back(center);
 }
 
-glm::vec3 EntityManager::renderColor(EntityType type) {
-    switch (type) {
-        case EntityType::Item: return {0.95f, 0.78f, 0.22f};
-        case EntityType::Cow: return {0.34f, 0.20f, 0.12f};
-        case EntityType::Pig: return {0.92f, 0.52f, 0.58f};
-        case EntityType::Sheep: return {0.88f, 0.88f, 0.82f};
-        case EntityType::Chicken: return {0.92f, 0.90f, 0.72f};
-        case EntityType::Zombie: return {0.20f, 0.48f, 0.28f};
-        case EntityType::Skeleton: return {0.72f, 0.72f, 0.68f};
-        case EntityType::Spider: return {0.16f, 0.08f, 0.07f};
-        case EntityType::Blastling: return {0.35f, 0.72f, 0.30f};
-        case EntityType::Villager: return {0.56f,0.36f,0.22f};
-        case EntityType::ZombieVillager: return {0.27f,0.48f,0.29f};
-        case EntityType::IronGolem: return {.78f,.79f,.70f};
-        case EntityType::Arrow: return {0.58f,0.42f,0.20f};
-        case EntityType::PrimedTnt: return {0.86f,0.18f,0.12f};
-    }
-    return {1.0f, 0.0f, 1.0f};
-}
-
 glm::vec3 EntityManager::renderSize(EntityType type) {
     switch(type) {
 #define NETHER_SIZE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return {x,y,z};
@@ -1397,93 +1386,6 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
         case EntityType::Sheep: return {0.9f, 1.2f, 1.3f};
         default: return {0.65f, 1.75f, 0.65f};
     }
-}
-
-void EntityManager::render(
-    IGameRenderer& renderer, const glm::mat4& viewProjection,
-    const glm::dvec3& renderOrigin) const {
-    m_modelRegistry.beginFrame();
-    for (const auto& entity : m_entities) {
-        // Item geometry/materials are drawn by the scene presenter's shared item cache.
-        if (entity.type==EntityType::Item) continue;
-        int textureIndex = 8;
-        switch (entity.type) {
-            case EntityType::Cow: textureIndex = 0; break;
-            case EntityType::Pig: textureIndex = 1; break;
-            case EntityType::Sheep: textureIndex = 2; break;
-            case EntityType::Chicken: textureIndex = 3; break;
-            case EntityType::Zombie: textureIndex = 4; break;
-            case EntityType::Skeleton: textureIndex = 5; break;
-            case EntityType::Spider: textureIndex = 6; break;
-            case EntityType::Blastling: textureIndex = 7; break;
-            case EntityType::Villager: textureIndex = 9; break;
-            case EntityType::ZombieVillager: textureIndex = 10; break;
-            case EntityType::IronGolem: textureIndex = 11; break;
-            case EntityType::Item: textureIndex = 8; break;
-            case EntityType::Arrow: textureIndex = 8; break;
-            case EntityType::PrimedTnt: textureIndex = 8; break;
-        }
-        glm::vec3 color = renderColor(entity.type);
-        glm::vec3 visualTint(1.0f);
-        if (entity.type == EntityType::PrimedTnt) {
-            const float flash = std::fmod(entity.ageSeconds, 0.25f) < 0.10f ? 1.0f : 0.0f;
-            color = glm::mix(glm::vec3(0.86f, 0.18f, 0.12f), glm::vec3(1.0f), flash);
-        } else if (entity.hurtFlashSeconds > 0.0f) {
-            color = {1.0f, 0.16f, 0.16f};
-            visualTint = color;
-        } else if (entity.burningSeconds > 0.0f) {
-            const float pulse = 0.08f * std::sin(entity.ageSeconds * 18.0f);
-            color = {1.0f, 0.32f + pulse, 0.08f};
-            visualTint = color;
-        }
-        const glm::vec3 position(
-            glm::dvec3(entity.position) - renderOrigin);
-        const glm::vec3 size=entitySize(entity);
-        const SmoothLightSample light=m_world.sampleLight(
-            entity.position+glm::dvec3(0.0,size.y*0.5,0.0));
-        if (m_modelRegistry.hasModel(entity.type) && renderer.capabilities().gameplay) {
-            m_modelRegistry.queue(entity.type, entity.id, entity.position,
-                entity.facing, entity.behaviorSeed,
-                renderOrigin, glm::vec3(0.0f), renderer.modelRenderer(),
-                visualTint * (entity.type==EntityType::Villager ?
-                    glm::mix(glm::vec3(1),glm::vec3(.65f+.025f*static_cast<int>(entity.villager.profession),
-                        .85f,.72f),.5f) : glm::vec3(1)), light, entity.sleeping,
-                    (entity.type==EntityType::Villager || entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
-            continue;
-        }
-        if (!m_modelRegistry.hasModel(entity.type) || !renderer.capabilities().gameplay) {
-            const float facingLength = std::hypot(entity.facing.x, entity.facing.z);
-            const float yaw = facingLength > 0.001f
-                ? std::atan2(-entity.facing.x, -entity.facing.z)
-                : static_cast<float>(entity.behaviorSeed % 628u) * 0.01f;
-            renderer.renderCompatibilityEntityCube(
-                position, size, color, textureIndex, yaw, viewProjection, light);
-            continue;
-        }
-
-    }
-    for (const auto& dead : m_deadEntityRenders) {
-        m_modelRegistry.queue(dead.type, dead.id, dead.position,
-            dead.facing, dead.behaviorSeed, renderOrigin,
-            glm::vec3(0.0f), renderer.modelRenderer(),
-            glm::vec3(1.0f),
-            m_world.sampleLight(dead.position+glm::dvec3(0.0,0.8,0.0)));
-    }
-    m_modelRegistry.endFrame();
-    std::vector<uint64_t> liveModels;
-    liveModels.reserve(m_entities.size()+m_deadEntityRenders.size());
-    for(const auto& entity:m_entities) liveModels.push_back(entity.id);
-    for(const auto& entity:m_deadEntityRenders) liveModels.push_back(entity.id);
-    m_modelRegistry.retainInstances(liveModels);
-    renderer.flushModels(viewProjection);
-}
-
-void EntityManager::initializeModels(const std::filesystem::path& assetRoot,
-                                     IGameRenderer& renderer) {
-    m_modelRegistry.loadAll(assetRoot, renderer.capabilities().gameplay
-        ? &renderer.modelRenderer().assets() : nullptr);
-    if (renderer.capabilities().gameplay)
-        m_modelRegistry.uploadAll(renderer.modelRenderer());
 }
 
 bool EntityManager::arrowTouchesButton(const glm::ivec3& position) const {

@@ -184,6 +184,7 @@ void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model:
             definition.graph = fallbackGraph(*definition.asset, definition.type);
         } else definition.graph = std::move(loadedGraph.graph);
     }
+    m_loaded = true;
 }
 
 void EntityModelRegistry::uploadAll(model::ModelRenderer& renderer) {
@@ -203,7 +204,7 @@ void EntityModelRegistry::clearInstances() {
 }
 
 bool EntityModelRegistry::hasModel(EntityType type) const {
-    return std::any_of(m_definitions.begin(), m_definitions.end(),
+    return m_loaded && std::any_of(m_definitions.begin(), m_definitions.end(),
         [type](const EntityModelDefinition& definition) { return definition.type == type; });
 }
 
@@ -229,6 +230,7 @@ EntityModelRegistry::InstanceEntry& EntityModelRegistry::ensure(
 }
 
 void EntityModelRegistry::setLocomotion(EntityType type, uint64_t id, float speed) {
+    if (!m_loaded) return;
     InstanceEntry& entry = ensure(type, id);
     const auto& graph = *definition(type).graph;
     const bool walking = speed > ENTITY_WALK_SPEED_THRESHOLD;
@@ -240,17 +242,20 @@ void EntityModelRegistry::setLocomotion(EntityType type, uint64_t id, float spee
 bool EntityModelRegistry::playAction(EntityType type, uint64_t id,
                                      const std::string& semantic,
                                      model::PlayPolicy policy) {
+    if (!m_loaded) return false;
     InstanceEntry& entry = ensure(type, id);
     return entry.mixer.play(definition(type).graph->actionFor(semantic), policy);
 }
 
 std::vector<model::FiredAnimationEvent> EntityModelRegistry::advance(
     EntityType type, uint64_t id, float dt) {
+    if (!m_loaded) return {};
     return ensure(type, id).mixer.advance(dt);
 }
 
 bool EntityModelRegistry::playing(EntityType type, uint64_t id,
                                   const std::string& semantic) {
+    if (!m_loaded) return false;
     InstanceEntry& entry = ensure(type, id);
     return entry.mixer.playing(definition(type).graph->actionFor(semantic));
 }

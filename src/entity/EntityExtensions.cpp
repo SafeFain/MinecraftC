@@ -1,4 +1,5 @@
 #include "entity/EntityManager.h"
+#include "entity/EntityPresentation.h"
 #include "plugins/Runtime.h"
 #include "plugins/Json.h"
 #include "plugins/ContentMutation.h"
@@ -66,14 +67,14 @@ bool EntityManager::pluginAi(Entity& entity,float dt) {
     if(!Plugins::mutableContentState().runtimeFault.empty())return true;
     moveWithTerrain(entity,entity.pluginMovement,dt);
     if(glm::length(entity.pluginMovement)>.001f)entity.facing=glm::normalize(entity.pluginMovement);
-    m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(entity.pluginMovement));
-    (void)m_modelRegistry.advance(entity.type,entity.id,dt);
+    presentation().setLocomotion(entity.type,entity.id,glm::length(entity.pluginMovement));
+    (void)presentation().advance(entity.type,entity.id,dt);
     if(entity.pluginAttack!=UINT64_MAX&&entity.actionCooldown<=0)for(const auto& view:m_framePlayers) {
         if(view.id!=entity.pluginAttack||!view.damageable||!view.targetable)continue;
         const auto origin=entity.position+glm::dvec3(0,entitySize(entity).y*.75f,0);
         if(glm::distance(origin,view.player->getEyePosition())>3||!aiClearSight(origin,view.player->getEyePosition()))continue;
         DamageSourceInfo source;source.amount=definition?definition->damage:3;source.cause=DamageCause::Melee;source.shieldBlockable=true;source.hasOrigin=true;source.origin=entity.position;
-        view.player->takeDamage(source);entity.actionCooldown=1;m_modelRegistry.playAction(entity.type,entity.id,"attack");
+        view.player->takeDamage(source);entity.actionCooldown=1;presentation().play(entity.type,entity.id,"attack");
     }
     return true;
 }

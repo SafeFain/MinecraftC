@@ -1427,6 +1427,7 @@ if(BUILD_TESTING)
         src/app/GameSessionClient.cpp
         src/app/GameSessionInventory.cpp
         src/app/GameSessionLanSleep.cpp
+        src/app/DimensionSimulation.cpp
         src/network/Protocol.cpp
         src/network/Connection.cpp
         src/network/Session.cpp
@@ -1447,6 +1448,7 @@ if(BUILD_TESTING)
         src/entity/EntityVillageAi.cpp
         src/entity/GroundNavigation.cpp
         src/entity/EntityModelRegistry.cpp
+        src/entity/EntityPresenter.cpp
         src/game/InventoryInteraction.cpp
         src/game/InventoryModel.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp
@@ -1637,6 +1639,7 @@ if(BUILD_TESTING)
         src/app/GameSessionClient.cpp
         src/app/GameSessionInventory.cpp
         src/app/GameSessionLanSleep.cpp
+        src/app/DimensionSimulation.cpp
         src/network/Protocol.cpp
         src/network/Connection.cpp
         src/network/Session.cpp
@@ -1659,6 +1662,7 @@ if(BUILD_TESTING)
         src/entity/EntityVillageAi.cpp
         src/entity/GroundNavigation.cpp
         src/entity/EntityModelRegistry.cpp
+        src/entity/EntityPresenter.cpp
         src/game/ClientSettings.cpp
         src/game/InventoryInteraction.cpp
         src/game/InventoryModel.cpp

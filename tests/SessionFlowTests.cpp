@@ -10,6 +10,7 @@
 #include "game/Command.h"
 #include "game/Localization.h"
 #include "entity/EntityManager.h"
+#include "entity/EntityPresentation.h"
 #include "network/EntityProtocol.h"
 #include "world/Chunk.h"
 
@@ -763,6 +764,31 @@ int main(int argc, char** argv) {
                 "heaven re-entry does not restore the void position");
         dimensions.leaveWorld();
         drainGeneration(dimensions);
+    }
+
+    {
+        // Milestone B: the entity simulation owns no renderer or model stack.
+        // A no-op presentation must still support update, persistence and copy.
+        World world;
+        Player noRenderPlayer(world);
+        EntityManager noRenderEntities(world);
+        NullEntityPresentation presentation;
+        noRenderEntities.setPresentation(&presentation);
+        noRenderEntities.setNaturalSpawningEnabled(false);
+        require(noRenderEntities.spawnMob(EntityType::Cow, {.5, 1.0, .5}),
+                "headless entity simulation spawns a mob");
+        noRenderEntities.spawnItem({.5, 3.0, .5}, {ItemId::DIAMOND, 1, 0});
+        noRenderPlayer.setPosition({.5, 1.0, 3.5});
+        for (int frame = 0; frame < 30; ++frame)
+            noRenderEntities.update(noRenderPlayer, 1.0f / 20.0f, true,
+                                    false, false, false);
+        require(noRenderEntities.entities().size() == 2,
+                "headless entity simulation retains live entities");
+        const auto saved = noRenderEntities.saveEntities();
+        noRenderEntities.clear();
+        noRenderEntities.loadEntities(saved);
+        require(noRenderEntities.entities().size() == 2,
+                "headless entity simulation round-trips records");
     }
 
     std::filesystem::remove_all(root);

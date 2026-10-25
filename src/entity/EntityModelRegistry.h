@@ -33,7 +33,8 @@ public:
     void loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache = nullptr);
     void clearInstances();
     void shareAssets(const EntityModelRegistry& source) {
-        clearInstances();m_definitions=source.m_definitions;m_cache=source.m_cache;m_placeholder=source.m_placeholder;
+        clearInstances();m_definitions=source.m_definitions;m_cache=source.m_cache;
+        m_placeholder=source.m_placeholder;m_loaded=source.m_loaded;
     }
     void uploadAll(model::ModelRenderer& renderer);
     const EntityModelDefinition& definition(EntityType type) const;
@@ -70,6 +71,7 @@ private:
     };
     std::map<uint64_t, InstanceEntry> m_instances;
     uint64_t m_retentionEpoch=0;
+    bool m_loaded=false;
     bool m_measure=false;
     double m_poseCpuMs=0, m_queueCpuMs=0;
     InstanceEntry& ensure(EntityType type, uint64_t id);

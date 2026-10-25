@@ -1,4 +1,5 @@
 #include "entity/EntityManager.h"
+#include "entity/EntityPresentation.h"
 #include "entity/EntitySnapshot.h"
 #include <algorithm>
 #include <cmath>
@@ -19,9 +20,9 @@ void EntityManager::applyReplicaSnapshots(const std::vector<EntitySnapshot>& sna
         entity.velocity = snapshot.velocity; entity.locomotionVelocity = snapshot.locomotion;
         if (!retained) entity.facing = snapshot.facing;
         entity.health = snapshot.health; entity.ageSeconds = snapshot.age;
-        if (m_modelRegistry.hasModel(entity.type)) {
-            if (snapshot.hurt > 0 && entity.hurtFlashSeconds <= 0) m_modelRegistry.playAction(entity.type, entity.id, "hurt");
-            if (snapshot.attacking && !entity.attackPending) m_modelRegistry.playAction(entity.type, entity.id, "attack");
+        if (presentation().hasVisual(entity.type)) {
+            if (snapshot.hurt > 0 && entity.hurtFlashSeconds <= 0) presentation().play(entity.type, entity.id, "hurt");
+            if (snapshot.attacking && !entity.attackPending) presentation().play(entity.type, entity.id, "attack");
         }
         entity.hurtFlashSeconds = snapshot.hurt; entity.burningSeconds = snapshot.burning;
         entity.item = snapshot.item; entity.behaviorSeed = snapshot.seed;
@@ -35,9 +36,9 @@ void EntityManager::applyReplicaSnapshots(const std::vector<EntitySnapshot>& sna
     for (const auto& dead : m_deadEntityRenders) previousDeaths.insert(dead.id);
     m_deadEntityRenders.clear();
     for (const auto& death : deaths) {
-        if (!m_modelRegistry.hasModel(death.type)) continue;
+        if (!presentation().hasVisual(death.type)) continue;
         m_deadEntityRenders.push_back({death.id, death.type, death.position, death.velocity, death.facing, death.seed, death.elapsed});
-        if (!previousDeaths.count(death.id)) m_modelRegistry.playAction(death.type, death.id, "death");
+        if (!previousDeaths.count(death.id)) presentation().play(death.type, death.id, "death");
     }
 }
 void EntityManager::advanceReplicaPresentation(float dt) {
@@ -50,14 +51,14 @@ void EntityManager::advanceReplicaPresentation(float dt) {
         if (glm::length(facing) > .001f) entity.facing = glm::normalize(facing);
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         entity.ageSeconds += std::max(0.0f, dt);
-        if (m_modelRegistry.hasModel(entity.type)) {
-            m_modelRegistry.setLocomotion(entity.type, entity.id, std::hypot(entity.locomotionVelocity.x, entity.locomotionVelocity.z));
-            (void)m_modelRegistry.advance(entity.type, entity.id, dt);
+        if (presentation().hasVisual(entity.type)) {
+            presentation().setLocomotion(entity.type, entity.id, std::hypot(entity.locomotionVelocity.x, entity.locomotionVelocity.z));
+            (void)presentation().advance(entity.type, entity.id, dt);
         }
     }
     for (auto& dead : m_deadEntityRenders) {
         dead.elapsed = advanceDeathPresentation(dead.elapsed, dt);
-        (void)m_modelRegistry.advance(dead.type, dead.id, dt);
+        (void)presentation().advance(dead.type, dead.id, dt);
     }
     m_deadEntityRenders.erase(std::remove_if(m_deadEntityRenders.begin(), m_deadEntityRenders.end(),
         [](const DeadEntityRender& dead) { return !deathPresentationVisible(dead.elapsed); }), m_deadEntityRenders.end());

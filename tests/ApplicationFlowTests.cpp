@@ -21,6 +21,7 @@
 #include "core/RuntimeClock.h"
 #include "core/Window.h"
 #include "entity/EntityManager.h"
+#include "entity/EntityPresenter.h"
 #include "game/ClientSettings.h"
 #include "game/Item.h"
 #include "game/WorldCatalog.h"
@@ -305,7 +306,8 @@ void checkDroppedItems(const std::filesystem::path& assets) {
             "shared item renderer leaked cached resources");
     World world;EntityManager entities(world);
     entities.spawnItem(glm::dvec3(position),{ItemId::DIAMOND,1,0});
-    entities.render(renderer,glm::mat4(1),{0,0,0});
+    EntityPresenter presentation;
+    presentation.render(renderer,glm::mat4(1),{0,0,0},entities,world);
     require(renderer.cubes==0,"item entities must not draw a duplicate placeholder cube");
     std::cout<<"PASS dropped item models, bounds, lighting, use isolation and cache lifecycle\n";
 }

@@ -1,4 +1,5 @@
 #include "entity/EntityManager.h"
+#include "entity/EntityPresentation.h"
 #include "entity/ProjectileLogic.h"
 #include "game/NetherProgression.h"
 #include "game/DimensionRules.h"
@@ -324,7 +325,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     };
     const float baseDamage=Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : nativeMobDamage(entity.type);
     const float meleeDamage=std::max(0.f,baseDamage+3*entity.effects.level(StatusEffectType::Strength)-4*entity.effects.level(StatusEffectType::Weakness));
-    const auto events=m_modelRegistry.advance(entity.type,entity.id,dt);
+    const auto events=presentation().advance(entity.type,entity.id,dt);
     for (const auto& event:events) {
         if (!entity.attackPending) continue;
         if (event.name!="melee" && event.name!="shoot" && event.name!="explode") continue;
@@ -369,7 +370,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             }
         }
     }
-    if (entity.attackPending && !m_modelRegistry.playing(entity.type,entity.id,"attack"))
+    if (entity.attackPending && !presentation().playing(entity.type,entity.id,"attack"))
         entity.attackPending=false;
     if (entity.health<=0) return;
     if (!entity.attackPending && !entity.sleeping) followNavigation(entity,dt);
@@ -382,7 +383,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             const glm::dvec3 center=!ai.targetId && ranged ? player.getEyePosition() : *position+glm::dvec3(0,.9,0);
             if (glm::distance(origin,center)<(ranged ? 14.0 : entityTemplate(entity.type)==EntityType::IronGolem ? 2.5 : 1.5) && aiClearSight(origin,center)) {
                 entity.actionCooldown=ranged ? 2.0f : 1.0f;
-                entity.attackPending=m_modelRegistry.playAction(entity.type,entity.id,"attack");
+                entity.attackPending=presentation().play(entity.type,entity.id,"attack");
             }
         }
     }
@@ -396,7 +397,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
             ((first && v.restocksToday<1) || (second && v.restocksToday<2)) &&
             interactablePoi(entity,v.claimedWorkstation)) restockVillager(v,day,true);
     }
-    m_modelRegistry.setLocomotion(entity.type,entity.id,
+    presentation().setLocomotion(entity.type,entity.id,
         std::hypot(entity.locomotionVelocity.x,entity.locomotionVelocity.z));
 }
 
@@ -515,8 +516,8 @@ bool EntityManager::updateNativeMob(Entity& entity,Player& player,float dt,bool 
             }
         }
         rider.followMount(entity.position+glm::dvec3(0,1.7,0));
-        m_modelRegistry.advance(entity.type,entity.id,dt);
-        m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(entity.locomotionVelocity));
+        presentation().advance(entity.type,entity.id,dt);
+        presentation().setLocomotion(entity.type,entity.id,glm::length(entity.locomotionVelocity));
         return true;
     }
     if(entity.type!=EntityType::Ghast && entity.type!=EntityType::Blaze)return false;
@@ -543,7 +544,7 @@ bool EntityManager::updateNativeMob(Entity& entity,Player& player,float dt,bool 
                 entity.nether.attackTicks=++entity.nether.burstRemaining<3?6:80;
                 if(entity.nether.burstRemaining>=3)entity.nether.burstRemaining=0;
             } else entity.nether.attackTicks=60;
-            entity.attackPending=m_modelRegistry.playAction(entity.type,entity.id,"attack");
+            entity.attackPending=presentation().play(entity.type,entity.id,"attack");
         }
     } else {
         const float phase=float(m_aiTime)+entity.behaviorSeed*.01f;
@@ -555,7 +556,7 @@ bool EntityManager::updateNativeMob(Entity& entity,Player& player,float dt,bool 
         if(!collides(entity,next))entity.position=next;
     }
     entity.locomotionVelocity=motion;
-    m_modelRegistry.advance(entity.type,entity.id,dt);
-    m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(motion));
+    presentation().advance(entity.type,entity.id,dt);
+    presentation().setLocomotion(entity.type,entity.id,glm::length(motion));
     return true;
 }
